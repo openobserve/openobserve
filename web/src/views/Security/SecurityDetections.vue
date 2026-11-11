@@ -3,6 +3,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <!-- A detection is a scheduled alert carrying a Sigma rule in its context_attributes. -->
 <script setup lang="ts">
+import { securityTime } from "@/utils/security/time";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
@@ -34,8 +35,11 @@ import SecurityRecordDrawer, {
 } from "@/components/security/SecurityRecordDrawer.vue";
 import SecurityKeyValues, { type KeyValueRow } from "@/components/security/SecurityKeyValues.vue";
 import SecurityNewDetectionDialog, {
+  type DetectionEditTarget,
   type NewDetectionPreset,
 } from "@/components/security/SecurityNewDetectionDialog.vue";
+import SecurityDetectionExceptions from "@/components/security/SecurityDetectionExceptions.vue";
+import SecurityTuningDrawer from "@/components/security/SecurityTuningDrawer.vue";
 import alertsService from "@/services/alerts";
 import {
   countsByAlert,
@@ -121,7 +125,7 @@ const notices = computed<SecurityNotice[]>(() => {
       key: "firings-narrowed",
       tone: "warning",
       text: t("siem.detections.firingsNarrowed", {
-        from: new Date(summary24h.effectiveStartMs.value).toLocaleString(),
+        from: securityTime(summary24h.effectiveStartMs.value),
       }),
       dataTest: "security-detections-firings-narrowed",
     });
@@ -415,6 +419,95 @@ async function deleteRule(row: Row) {
   }
 }
 
+// ── Bulk: enable, disable and delete what the table has selected ─────────────
+const selectedIds = ref<string[]>([]);
+const bulkBusy = ref(false);
+const selectedRows = computed(() => scoped.value.filter((r) => selectedIds.value.includes(r.id)));
+
+/** The bulk alert routes take one folder each, so the selection is sent per folder. */
+function byFolder(rows: Row[]) {
+  const groups = new Map<string, Row[]>();
+  for (const row of rows) {
+    const folder = String(row.entry.alert.folder_id ?? "default");
+    groups.set(folder, [...(groups.get(folder) ?? []), row]);
+  }
+  return groups;
+}
+
+async function runBulk(
+  rows: Row[],
+  call: (ids: string[], names: string[], folder: string) => Promise<{ data?: any }>,
+): Promise<{ done: string[]; failed: number }> {
+  const done: string[] = [];
+  let failed = 0;
+  for (const [folder, group] of byFolder(rows)) {
+    const ids = group.map((r) => String(r.entry.alert.id));
+    try {
+      const res = await call(
+        ids,
+        group.map((r) => r.name),
+        folder,
+      );
+      const ok: string[] = (res.data?.successful ?? ids).map(String);
+      done.push(...ok);
+      failed += ids.length - ok.length;
+    } catch {
+      failed += ids.length;
+    }
+  }
+  return { done, failed };
+}
+
+async function bulkToggle(enable: boolean) {
+  if (!canAuthor.value) return;
+  const rows = selectedRows.value.filter((r) => r.enabled !== enable && r.entry.alert.id);
+  if (!rows.length) return;
+  bulkBusy.value = true;
+  try {
+    const { done, failed } = await runBulk(rows, (ids, names, folder) =>
+      alertsService.bulkToggleState(orgId.value, enable, { ids, names }, folder),
+    );
+    for (const id of done) patchRule(id, { enabled: enable });
+    toast({
+      variant: failed ? "warning" : "success",
+      message: t(
+        enable ? "siem.detections.bulk.enabled" : "siem.detections.bulk.disabled",
+        { n: done.length, failed },
+        done.length,
+      ),
+    });
+    selectedIds.value = [];
+  } finally {
+    bulkBusy.value = false;
+  }
+}
+
+async function bulkDelete() {
+  const rows = selectedRows.value.filter((r) => r.entry.alert.id);
+  if (!canAdmin.value || !rows.length) return;
+  const ok = await confirm({
+    title: t("siem.detections.bulk.deleteTitle", { n: rows.length }, rows.length),
+    message: t("siem.detections.bulk.deleteMessage", { n: rows.length }, rows.length),
+    confirmLabel: t("siem.detections.delete"),
+  });
+  if (!ok) return;
+  bulkBusy.value = true;
+  try {
+    const { done, failed } = await runBulk(rows, (ids, _names, folder) =>
+      alertsService.bulkDelete(orgId.value, { ids }, folder),
+    );
+    for (const id of done) removeRule(id);
+    if (selectedId.value && done.includes(selectedId.value)) closeDrawer();
+    toast({
+      variant: failed ? "warning" : "success",
+      message: t("siem.detections.bulk.deleted", { n: done.length, failed }, done.length),
+    });
+    selectedIds.value = [];
+  } finally {
+    bulkBusy.value = false;
+  }
+}
+
 const selectedId = ref<string | null>(null);
 const drawerTab = ref("overview");
 const selected = computed(() => scoped.value.find((r) => r.id === selectedId.value) ?? null);
@@ -534,6 +627,7 @@ const drawerTabs = computed<RecordTab[]>(() => [
   },
   { name: "sigma", label: t("siem.detections.tab.sigma"), icon: "rule" },
   { name: "sql", label: t("siem.detections.tab.sql"), icon: "code" },
+  { name: "exceptions", label: t("siem.detections.tab.exceptions"), icon: "do-not-disturb-on" },
 ]);
 
 const drawerFacts = computed<RecordFact[]>(() => {
@@ -650,12 +744,57 @@ const outcomeVariant = (status: string): BadgeVariant => STATUS_VARIANT[firingSt
 const existingNames = computed(() => rows.value.map((r) => String(r.alert.name ?? "")));
 
 const showNew = ref(false);
+// `?tuning=allowlists` comes from the bulk-install prompt, so the allowlists open on arrival.
+const showTuning = ref(route.query.tuning === "allowlists");
+const detectionNames = computed<Record<string, string>>(() =>
+  Object.fromEntries(
+    rows.value
+      .filter((r) => r.alert.id)
+      .map((r) => [String(r.alert.id), String(r.alert.name ?? r.alert.id)]),
+  ),
+);
 const preset = ref<NewDetectionPreset | null>(null);
+const editTarget = ref<DetectionEditTarget | null>(null);
 
 function openNew(p: NewDetectionPreset | null = null) {
   if (!canAuthor.value) return;
   preset.value = p;
+  editTarget.value = null;
   showNew.value = true;
+}
+
+/** The stored rule is the source of truth, so a detection without one cannot be edited here. */
+function editTargetOf(row: Row): DetectionEditTarget | null {
+  const alert = row.entry.alert;
+  const yaml = row.entry.meta.sigmaYaml;
+  if (!row.isSiem || !yaml || !alert.id) return null;
+  const tc = alert.trigger_condition ?? {};
+  return {
+    alertId: String(alert.id),
+    name: String(alert.name ?? ""),
+    yaml,
+    stream: String(alert.stream_name ?? ""),
+    sourceType: row.entry.meta.sourceType,
+    period: Number(tc.period) || 15,
+    frequency: Number(tc.frequency) || 15,
+    silence: Number(tc.silence ?? 0),
+    destinations: (alert.destinations ?? []).map(String),
+  };
+}
+
+function openEdit(row: Row) {
+  const target = editTargetOf(row);
+  if (!canAuthor.value || !target) return;
+  preset.value = null;
+  editTarget.value = target;
+  showNew.value = true;
+}
+
+async function onUpdated() {
+  await refresh();
+  const id = selected.value?.entry.alert.id;
+  // The list keeps the drawer's YAML and SQL, which came from the old rule.
+  if (id) await loadFullRule(orgId.value, String(id), true);
 }
 
 async function onCreated() {
@@ -694,6 +833,15 @@ watch(orgId, () => void refresh());
   >
     <template #actions>
       <OButton
+        variant="outline"
+        size="sm"
+        icon-left="tune"
+        data-test="security-detections-tuning"
+        @click="showTuning = true"
+      >
+        {{ t("siem.tuning.open") }}
+      </OButton>
+      <OButton
         variant="primary"
         size="sm"
         icon-left="add"
@@ -728,6 +876,8 @@ watch(orgId, () => void refresh());
         table-id="security-detections"
         :enable-column-resize="true"
         :row-class="rowClass"
+        :selection="canAuthor ? 'multiple' : 'none'"
+        v-model:selected-ids="selectedIds"
         :get-row-status-color="(row: Row) => severityRailColor(row.tone)"
         class="min-h-0 flex-1"
         data-test="security-detections-table"
@@ -783,6 +933,36 @@ watch(orgId, () => void refresh());
           </OButton>
         </template>
 
+        <template #selection-actions>
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="play-arrow"
+            :loading="bulkBusy"
+            data-test="security-detections-bulk-enable"
+            @click="bulkToggle(true)"
+            >{{ t("siem.detections.enable") }}</OButton
+          >
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="pause"
+            :loading="bulkBusy"
+            data-test="security-detections-bulk-disable"
+            @click="bulkToggle(false)"
+            >{{ t("siem.detections.disable") }}</OButton
+          >
+          <OButton
+            v-if="canAdmin"
+            variant="outline-destructive"
+            size="sm"
+            icon-left="delete"
+            :loading="bulkBusy"
+            data-test="security-detections-bulk-delete"
+            @click="bulkDelete"
+            >{{ t("siem.detections.delete") }}</OButton
+          >
+        </template>
         <template #cell-severity="{ row }">
           <OTag
             v-if="row.isSiem"
@@ -1063,7 +1243,9 @@ watch(orgId, () => void refresh());
               <OTag :variant="outcomeVariant(h.status)" size="xs" class="shrink-0">
                 {{ t(`siem.detections.outcome.${outcomeKey(h.status)}`) }}
               </OTag>
-              <OTimeCell :value="h.timestamp" unit="us" mode="absolute" class="shrink-0" />
+              <span class="text-text-secondary shrink-0 tabular-nums">{{
+                securityTime(h.timestamp / 1000)
+              }}</span>
               <span class="text-text-secondary min-w-0 flex-1 truncate">
                 <template v-if="h.error">{{ h.error }}</template>
                 <template v-else-if="h.actual_value != null">
@@ -1107,6 +1289,17 @@ watch(orgId, () => void refresh());
         />
       </template>
 
+      <template #tab-exceptions>
+        <SecurityDetectionExceptions
+          v-if="selected.entry.alert.id"
+          :org-id="orgId"
+          :alert-id="String(selected.entry.alert.id)"
+          :stream="selected.stream"
+          :can-author="canAuthor"
+          :can-admin="canAdmin"
+        />
+      </template>
+
       <template #footer>
         <OButton
           v-if="canAdmin"
@@ -1119,6 +1312,17 @@ watch(orgId, () => void refresh());
           {{ t("siem.detections.delete") }}
         </OButton>
         <div class="flex-1" />
+        <OButton
+          v-if="canAuthor"
+          variant="outline"
+          size="sm-action"
+          icon-left="edit"
+          :disabled="!editTargetOf(selected)"
+          data-test="security-detection-drawer-edit"
+          @click="openEdit(selected)"
+        >
+          {{ t("siem.detections.edit.action") }}
+        </OButton>
         <OButton
           variant="outline"
           size="sm-action"
@@ -1143,12 +1347,25 @@ watch(orgId, () => void refresh());
       </template>
     </SecurityRecordDrawer>
 
+    <SecurityTuningDrawer
+      v-if="showTuning"
+      v-model:open="showTuning"
+      :org-id="orgId"
+      :can-author="canAuthor"
+      :can-admin="canAdmin"
+      :detection-names="detectionNames"
+    />
+
+    <!-- Mounted on open so it stacks above the detection drawer it is edited from. -->
     <SecurityNewDetectionDialog
+      v-if="showNew"
       v-model:open="showNew"
       :org-id="orgId"
       :preset="preset"
+      :edit="editTarget"
       :existing-names="existingNames"
       @created="onCreated"
+      @updated="onUpdated"
     />
   </OPageLayout>
 </template>

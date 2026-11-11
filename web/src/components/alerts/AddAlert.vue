@@ -170,6 +170,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OPageHeader>
       </template>
 
+      <div v-if="siemDetectionId" class="flex shrink-0 flex-col gap-2 px-3 pt-2">
+        <OBanner
+          dense
+          variant="info"
+          icon="shield-alert-outline"
+          data-test="add-alert-siem-detection"
+        >
+          {{ t("alerts.siemDetection.notice") }}
+          <template #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              icon-right="open-in-new"
+              data-test="add-alert-siem-detection-open"
+              @click="openInSecurity"
+              >{{ t("alerts.siemDetection.open") }}</OButton
+            >
+          </template>
+        </OBanner>
+      </div>
       <!-- What the source adapter had to change to turn the user's query into an
            alert — a stripped LIMIT, an absolute range become a rolling window.
            Shown here rather than only in the confirm dialog because most
@@ -749,6 +769,7 @@ import CompositeAlertForm from "./composite/CompositeAlertForm.vue";
 import alertsService from "@/services/alerts";
 import { unreachableLine, viaIncidentLine } from "@/utils/alerts/deliveryTarget";
 import { useOnCallSetup } from "@/composables/useOnCallSetup";
+import { getFoldersListByType } from "@/utils/commons";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 
 export default defineComponent({
@@ -1033,6 +1054,14 @@ export default defineComponent({
       const found = folders.find((f: any) => f.folderId === alertForm.activeFolderId.value);
       return found?.name ?? "default";
     });
+    // Opened straight from an alert's page, the folder list may not be loaded, which read as "default".
+    onMounted(() => {
+      const folders = alertForm.store.state.organizationData.foldersByType?.alerts ?? [];
+      const id = alertForm.activeFolderId.value;
+      if (id && id !== "default" && !folders.some((f: any) => f.folderId === id)) {
+        void getFoldersListByType(alertForm.store, "alerts").catch(() => undefined);
+      }
+    });
 
     const goBackToAlertsList = () => {
       return alertForm.router.push({
@@ -1142,8 +1171,29 @@ export default defineComponent({
       enabled: () => !alertForm.beingUpdated.value && !alertForm.anomalyEditMode.value,
     });
 
+    // Its SQL is compiled from its Sigma rule, so the server refuses query edits from here.
+    const siemDetectionId = computed(() => {
+      const attrs = props.modelValue?.context_attributes;
+      const marker = Array.isArray(attrs)
+        ? attrs.find((a: { key?: string }) => a?.key === "siem")?.value
+        : attrs?.siem;
+      return props.isUpdated && String(marker) === "true"
+        ? String(props.modelValue?.id ?? props.modelValue?.alert_id ?? "")
+        : "";
+    });
+    const openInSecurity = () =>
+      alertForm.router.push({
+        path: "/security/detections",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          detection: siemDetectionId.value,
+        },
+      });
+
     return {
       raw,
+      siemDetectionId,
+      openInSecurity,
       ...alertForm,
       alertDraft: alertEditorDraft.draft,
       calibrationHandoff,

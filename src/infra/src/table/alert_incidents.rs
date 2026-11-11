@@ -211,6 +211,7 @@ fn new_incident(
         rca_off_reason: Set(None),
         security_case: Set(case_historical.is_some()),
         historical: Set(case_historical.unwrap_or_default()),
+        last_detection_at: Set(None),
     }
 }
 
@@ -277,21 +278,32 @@ async fn link_firing<C: ConnectionTrait>(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .is_none();
 
-    let alert_link = alert_incident_alerts::ActiveModel {
-        incident_id: Set(incident_id.to_string()),
-        alert_id: Set(alert.alert_id.to_string()),
-        alert_fired_at: Set(alert_fired_at),
-        alert_name: Set(alert.alert_name.to_string()),
-        alert_kind: Set(alert.alert_kind.to_string()),
-        correlation_reason: Set(Some(alert.correlation_reason.to_string())),
-        created_at: Set(now),
-        resolved_at: Set(None),
-    };
+    // Several entities of one firing can roll up into one security case; it is linked once.
+    let already_linked = activity.is_some()
+        && alert_incident_alerts::Entity::find()
+            .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
+            .filter(alert_incident_alerts::Column::AlertId.eq(alert.alert_id))
+            .filter(alert_incident_alerts::Column::AlertFiredAt.eq(alert_fired_at))
+            .one(txn)
+            .await
+            .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+            .is_some();
 
-    alert_link
+    if !already_linked {
+        alert_incident_alerts::ActiveModel {
+            incident_id: Set(incident_id.to_string()),
+            alert_id: Set(alert.alert_id.to_string()),
+            alert_fired_at: Set(alert_fired_at),
+            alert_name: Set(alert.alert_name.to_string()),
+            alert_kind: Set(alert.alert_kind.to_string()),
+            correlation_reason: Set(Some(alert.correlation_reason.to_string())),
+            created_at: Set(now),
+            resolved_at: Set(None),
+        }
         .insert(txn)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    }
 
     let (first, last, historical) = match activity {
         Some(a) => (
@@ -306,7 +318,9 @@ async fn link_firing<C: ConnectionTrait>(
         ),
     };
     let mut active: alert_incidents::ActiveModel = incident.into();
-    active.alert_count = Set(active.alert_count.unwrap() + 1);
+    if !already_linked {
+        active.alert_count = Set(active.alert_count.unwrap() + 1);
+    }
     active.first_alert_at = Set(first);
     active.last_alert_at = Set(last);
     active.historical = Set(historical);
@@ -429,6 +443,18 @@ pub async fn mark_security_case(org_id: &str, id: &str) -> Result<(), errors::Er
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .filter(alert_incidents::Column::Id.eq(id))
         .filter(alert_incidents::Column::SecurityCase.eq(false))
+        .exec(get_orm_client_rw().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(())
+}
+
+/// Records that a different detection joined the case at `at`, for the analysts working it.
+pub async fn mark_new_detection(org_id: &str, id: &str, at: i64) -> Result<(), errors::Error> {
+    alert_incidents::Entity::update_many()
+        .col_expr(alert_incidents::Column::LastDetectionAt, Expr::value(at))
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Id.eq(id))
         .exec(get_orm_client_rw().await)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -704,6 +730,34 @@ async fn link_alert(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     Ok(is_new_alert_type)
+}
+
+/// Rewrites an incident's group values under a row lock; `edit` returns whether it changed them.
+pub async fn update_group_values(
+    org_id: &str,
+    id: &str,
+    edit: impl FnOnce(&mut serde_json::Value) -> bool,
+) -> Result<(), errors::Error> {
+    let db_err = |e: sea_orm::DbErr| Error::DbError(DbError::SeaORMError(e.to_string()));
+    let txn = get_orm_client_rw().await.begin().await.map_err(db_err)?;
+    let Some(incident) = alert_incidents::Entity::find_by_id(id)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .lock(LockType::Update)
+        .one(&txn)
+        .await
+        .map_err(db_err)?
+    else {
+        return Ok(());
+    };
+    let mut dims = incident.group_values.clone();
+    if !edit(&mut dims) {
+        return Ok(());
+    }
+    let mut active: alert_incidents::ActiveModel = incident.into();
+    active.group_values = Set(dims);
+    active.updated_at = Set(chrono::Utc::now().timestamp_micros());
+    active.update(&txn).await.map_err(db_err)?;
+    txn.commit().await.map_err(db_err)
 }
 
 /// Widens a case's first and last seen to cover an event an analyst attached.
@@ -1860,6 +1914,150 @@ pub async fn count_filtered(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// What a security case search keeps, before text and entity matching.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct CaseSearch {
+    pub statuses: Vec<String>,
+    pub severities: Vec<String>,
+    /// Only cases one of these detections fired into; empty matches every case.
+    pub alert_ids: Vec<String>,
+    /// `Some(None)` keeps unassigned cases only.
+    pub assignee: Option<Option<String>>,
+}
+
+/// An org's security cases matching `search`, most recent activity first, at most `cap` rows.
+pub async fn search_security_cases(
+    org_id: &str,
+    search: &CaseSearch,
+    cap: u64,
+) -> Result<Vec<alert_incidents::Model>, errors::Error> {
+    search_security_cases_with(get_orm_client_ro().await, org_id, search, cap).await
+}
+
+/// [`search_security_cases`] on a given connection.
+pub async fn search_security_cases_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    search: &CaseSearch,
+    cap: u64,
+) -> Result<Vec<alert_incidents::Model>, errors::Error> {
+    security_case_search_query(org_id, search)
+        .limit(cap)
+        .all(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Merges `sources` into `target` in one transaction; returns the sources it closed.
+pub async fn merge_cases(
+    org_id: &str,
+    target: &str,
+    sources: &[String],
+    severity: Option<&str>,
+) -> Result<Vec<String>, errors::Error> {
+    merge_cases_with(get_orm_client_rw().await, org_id, target, sources, severity).await
+}
+
+/// [`merge_cases`] on a given connection.
+pub async fn merge_cases_with<C: TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    target: &str,
+    sources: &[String],
+    severity: Option<&str>,
+) -> Result<Vec<String>, errors::Error> {
+    let db_err = |e: sea_orm::DbErr| Error::DbError(DbError::SeaORMError(e.to_string()));
+    let missing = || Error::DbError(DbError::SeaORMError("Incident not found".to_string()));
+    let txn = conn.begin().await.map_err(db_err)?;
+    let found = |id: &str| {
+        alert_incidents::Entity::find_by_id(id.to_string())
+            .filter(alert_incidents::Column::OrgId.eq(org_id))
+            .lock(LockType::Update)
+    };
+    let into = found(target)
+        .one(&txn)
+        .await
+        .map_err(db_err)?
+        .ok_or_else(missing)?;
+    if into.status == "resolved" {
+        return Err(Error::DbError(DbError::SeaORMError(
+            "Reopen the target case before merging into it".to_string(),
+        )));
+    }
+    let now = chrono::Utc::now().timestamp_micros();
+    let (mut first, mut last) = (into.first_alert_at, into.last_alert_at);
+    let mut historical = into.historical;
+    let mut count = into.alert_count;
+    let mut closed = Vec::new();
+    for source in sources {
+        let from = found(source)
+            .one(&txn)
+            .await
+            .map_err(db_err)?
+            .ok_or_else(missing)?;
+        let firings = alert_incident_alerts::Entity::find()
+            .filter(alert_incident_alerts::Column::IncidentId.eq(source.as_str()))
+            .all(&txn)
+            .await
+            .map_err(db_err)?;
+        let mut moved = 0;
+        for firing in firings {
+            let exists = alert_incident_alerts::Entity::find_by_id((
+                target.to_string(),
+                firing.alert_id.clone(),
+                firing.alert_fired_at,
+            ))
+            .one(&txn)
+            .await
+            .map_err(db_err)?
+            .is_some();
+            if !exists {
+                alert_incident_alerts::ActiveModel {
+                    incident_id: Set(target.to_string()),
+                    ..firing.clone().into()
+                }
+                .insert(&txn)
+                .await
+                .map_err(db_err)?;
+                moved += 1;
+            }
+        }
+        // One firing split over several entity cases shares one link, yet each case counted it.
+        count += moved.max(from.alert_count);
+        alert_incident_alerts::Entity::delete_many()
+            .filter(alert_incident_alerts::Column::IncidentId.eq(source.as_str()))
+            .exec(&txn)
+            .await
+            .map_err(db_err)?;
+        first = first.min(from.first_alert_at);
+        last = last.max(from.last_alert_at);
+        historical = historical && from.historical;
+        let was_open = from.status != "resolved";
+        let mut emptied: alert_incidents::ActiveModel = from.into();
+        emptied.alert_count = Set(0);
+        emptied.updated_at = Set(now);
+        if was_open {
+            emptied.status = Set("resolved".to_string());
+            emptied.resolved_at = Set(Some(now));
+            emptied.muted_by_downtime_id = Set(None);
+            closed.push(source.clone());
+        }
+        emptied.update(&txn).await.map_err(db_err)?;
+    }
+    let mut active: alert_incidents::ActiveModel = into.into();
+    active.alert_count = Set(count);
+    active.first_alert_at = Set(first);
+    active.last_alert_at = Set(last);
+    active.historical = Set(historical);
+    if let Some(severity) = severity {
+        active.severity = Set(severity.to_string());
+    }
+    active.updated_at = Set(now);
+    active.update(&txn).await.map_err(db_err)?;
+    txn.commit().await.map_err(db_err)?;
+    Ok(closed)
+}
+
 /// Get topology context from incident with proper deserialization
 ///
 /// This is the SINGLE SOURCE OF TRUTH for topology deserialization.
@@ -2145,6 +2343,40 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
         .exec(client)
         .await?;
     Ok(())
+}
+
+/// Built apart from the call so its shape is testable without a database.
+fn security_case_search_query(
+    org_id: &str,
+    search: &CaseSearch,
+) -> sea_orm::Select<alert_incidents::Entity> {
+    let mut query = alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::SecurityCase.eq(true))
+        .order_by_desc(alert_incidents::Column::LastAlertAt);
+    if !search.statuses.is_empty() {
+        query = query.filter(alert_incidents::Column::Status.is_in(search.statuses.clone()));
+    }
+    if !search.severities.is_empty() {
+        query = query.filter(alert_incidents::Column::Severity.is_in(search.severities.clone()));
+    }
+    match &search.assignee {
+        Some(Some(user)) => query = query.filter(alert_incidents::Column::AssignedTo.eq(user)),
+        Some(None) => query = query.filter(alert_incidents::Column::AssignedTo.is_null()),
+        None => {}
+    }
+    if !search.alert_ids.is_empty() {
+        query = query.filter(
+            alert_incidents::Column::Id.in_subquery(
+                alert_incident_alerts::Entity::find()
+                    .select_only()
+                    .column(alert_incident_alerts::Column::IncidentId)
+                    .filter(alert_incident_alerts::Column::AlertId.is_in(search.alert_ids.clone()))
+                    .into_query(),
+            ),
+        );
+    }
+    query
 }
 
 fn case_condition(cases: CaseFilter) -> Option<sea_orm::Condition> {
@@ -3272,6 +3504,195 @@ mod tests {
             assert!(!stmt.sql.contains("<@"), "{}", stmt.sql);
             assert_eq!(stmt.values.unwrap().0, ["acme".into(), "resolved".into()]);
         }
+    }
+
+    #[tokio::test]
+    async fn a_case_search_filters_on_the_database_side() {
+        let db = incidents_db().await;
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(alert_incident_alerts::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        let open = alert_fired_into(&db, "siem-1", "open", 10).await;
+        let closed = alert_fired_into(&db, "siem-2", "resolved", 20).await;
+        alert_fired_into(&db, "gc-pause", "open", 30).await;
+        let ids =
+            |rows: Vec<alert_incidents::Model>| rows.into_iter().map(|r| r.id).collect::<Vec<_>>();
+
+        let all = search_security_cases_with(&db, "acme", &CaseSearch::default(), 10)
+            .await
+            .unwrap();
+        assert_eq!(ids(all), [closed.clone(), open.clone()]);
+        let only_open = CaseSearch {
+            statuses: vec!["open".to_string()],
+            ..Default::default()
+        };
+        let found = search_security_cases_with(&db, "acme", &only_open, 10)
+            .await
+            .unwrap();
+        assert_eq!(ids(found), std::slice::from_ref(&open));
+        let by_detection = CaseSearch {
+            alert_ids: vec!["siem-2".to_string(), "no-such-detection".to_string()],
+            assignee: Some(None),
+            ..Default::default()
+        };
+        let found = search_security_cases_with(&db, "acme", &by_detection, 10)
+            .await
+            .unwrap();
+        assert_eq!(ids(found), [closed]);
+        let capped = search_security_cases_with(&db, "acme", &CaseSearch::default(), 1)
+            .await
+            .unwrap();
+        assert_eq!(capped.len(), 1);
+        assert!(
+            search_security_cases_with(&db, "other", &CaseSearch::default(), 10)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    /// Stores the count a firing's link adds, as [`link_alert`] does.
+    async fn counted_once(db: &DatabaseConnection, id: &str) {
+        let row = alert_incidents::Entity::find_by_id(id.to_string())
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap();
+        let mut active: alert_incidents::ActiveModel = row.into();
+        active.alert_count = Set(1);
+        active.update(db).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn merging_moves_the_firings_closes_the_sources_and_raises_the_target() {
+        let db = incidents_db().await;
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(alert_incident_alerts::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        let target = alert_fired_into(&db, "siem-1", "open", 50).await;
+        let source = alert_fired_into(&db, "siem-2", "open", 10).await;
+        let done = alert_fired_into(&db, "siem-3", "resolved", 70).await;
+        for id in [&target, &source, &done] {
+            counted_once(&db, id).await;
+        }
+        let row = |id: String| {
+            let db = &db;
+            async move {
+                alert_incidents::Entity::find_by_id(id)
+                    .one(db)
+                    .await
+                    .unwrap()
+                    .unwrap()
+            }
+        };
+
+        let closed = merge_cases_with(
+            &db,
+            "acme",
+            &target,
+            &[source.clone(), done.clone()],
+            Some("P1"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(closed, std::slice::from_ref(&source));
+        let merged = row(target.clone()).await;
+        assert_eq!((merged.first_alert_at, merged.last_alert_at), (10, 70));
+        assert_eq!(merged.severity, "P1");
+        assert_eq!(merged.status, "open");
+        let source_row = row(source.clone()).await;
+        assert_eq!(source_row.status, "resolved");
+        assert!(source_row.resolved_at.is_some());
+        let links = alert_incident_alerts::Entity::find()
+            .filter(alert_incident_alerts::Column::IncidentId.eq(target.as_str()))
+            .count(&db)
+            .await
+            .unwrap();
+        assert_eq!(links, 3);
+        let left = alert_incident_alerts::Entity::find()
+            .filter(alert_incident_alerts::Column::IncidentId.is_in([source.clone(), done]))
+            .count(&db)
+            .await
+            .unwrap();
+        assert_eq!(left, 0);
+        assert_eq!(merged.alert_count, 3);
+    }
+
+    #[tokio::test]
+    async fn merging_cases_split_from_one_firing_keeps_every_cases_count() {
+        let db = incidents_db().await;
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(alert_incident_alerts::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        let target = alert_fired_into(&db, "siem-kerberos", "open", 50).await;
+        counted_once(&db, &target).await;
+        let mut sources = Vec::new();
+        for _ in 0..7 {
+            let source = alert_fired_into(&db, "siem-kerberos", "open", 50).await;
+            counted_once(&db, &source).await;
+            sources.push(source);
+        }
+        merge_cases_with(&db, "acme", &target, &sources, None)
+            .await
+            .unwrap();
+        let merged = alert_incidents::Entity::find_by_id(target.clone())
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            merged.alert_count, 8,
+            "eight cases of one firing are eight alerts"
+        );
+        let links = alert_incident_alerts::Entity::find()
+            .filter(alert_incident_alerts::Column::IncidentId.eq(target.as_str()))
+            .count(&db)
+            .await
+            .unwrap();
+        assert_eq!(links, 1);
+    }
+
+    #[tokio::test]
+    async fn a_failed_merge_changes_nothing() {
+        let db = incidents_db().await;
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(alert_incident_alerts::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        let target = alert_fired_into(&db, "siem-1", "open", 50).await;
+        let source = alert_fired_into(&db, "siem-2", "open", 10).await;
+
+        let missing = "no-such-case".to_string();
+        assert!(
+            merge_cases_with(&db, "acme", &target, &[source.clone(), missing], Some("P1"))
+                .await
+                .is_err()
+        );
+        let source_row = alert_incidents::Entity::find_by_id(source.clone())
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            source_row.status, "open",
+            "the first source's close rolled back"
+        );
+        let target_row = alert_incidents::Entity::find_by_id(target.clone())
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_ne!(target_row.severity, "P1");
+        let left = alert_incident_alerts::Entity::find()
+            .filter(alert_incident_alerts::Column::IncidentId.eq(source.as_str()))
+            .count(&db)
+            .await
+            .unwrap();
+        assert_eq!(left, 1, "the first source's firings rolled back");
+        assert!(
+            merge_cases_with(&db, "other", &target, &[source], None)
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]

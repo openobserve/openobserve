@@ -608,6 +608,11 @@ pub struct OrganizationSetting {
     #[cfg(feature = "enterprise")]
     #[serde(default)]
     pub security_cases: o2_enterprise::enterprise::security::cases::CaseSettings,
+    /// Set through the Security tuning routes; the org settings response leaves it out.
+    #[cfg(feature = "enterprise")]
+    #[serde(default)]
+    #[schema(value_type = o2_enterprise::enterprise::security::tuning::TuningSettings)]
+    pub security_tuning: o2_enterprise::enterprise::security::tuning::SharedTuning,
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
     pub claim_parser_function: String,
@@ -663,6 +668,8 @@ impl Default for OrganizationSetting {
             ai_rca_thread_tool_output: false,
             #[cfg(feature = "enterprise")]
             security_cases: Default::default(),
+            #[cfg(feature = "enterprise")]
+            security_tuning: Default::default(),
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
             #[cfg(feature = "enterprise")]
@@ -1610,6 +1617,8 @@ mod tests {
             #[cfg(feature = "enterprise")]
             security_cases: Default::default(),
             #[cfg(feature = "enterprise")]
+            security_tuning: Default::default(),
+            #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             #[cfg(feature = "enterprise")]
             data_retention: DataRetentionDefaults::default(),
@@ -1651,6 +1660,8 @@ mod tests {
             ai_rca_thread_tool_output: false,
             #[cfg(feature = "enterprise")]
             security_cases: Default::default(),
+            #[cfg(feature = "enterprise")]
+            security_tuning: Default::default(),
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             #[cfg(feature = "enterprise")]

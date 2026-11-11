@@ -2529,6 +2529,7 @@ mod tests {
             rca_off_reason: None,
             security_case: false,
             historical: false,
+            last_detection_at: None,
         };
         alert_incidents::Entity::insert(alert_incidents::ActiveModel::from(row).reset_all())
             .exec(conn)
