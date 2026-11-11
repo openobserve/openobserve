@@ -24,7 +24,7 @@ use super::metrics::{MetricsIndexMergeScope, metrics_index_merge_scope};
 use crate::incremental::OPEN_HOUR_MERGE_FILES;
 
 /// One planned merge: the files and the mode they merge in.
-type PlannedBatch = (Vec<FileKey>, MergeMode);
+pub(super) type PlannedBatch = (Vec<FileKey>, MergeMode);
 
 /// The size rules one merge round batches files under.
 pub(super) struct BatchLimits<'a> {
@@ -35,6 +35,8 @@ pub(super) struct BatchLimits<'a> {
     pub is_incremental: bool,
     /// The classic merge query's cap: larger files are at their target size.
     pub merge_max_original_size: i64,
+    /// Most sorted chains one metrics merge may open; below 2 there is no cap.
+    pub max_merge_groups: usize,
 }
 
 /// Splits a partition's files into merge batches: the legacy metrics files
@@ -56,9 +58,11 @@ pub(super) fn plan_batches(
     let mode_files = indexed_hour_scope(mode_files, mode, limits.max_file_size, stream);
     // the open-hour round is a whole batch too, but only of the pending ingester files
     if mode.merges_open_hour_pending() {
-        if let Some(pending) = pending_ingester_files(mode_files) {
-            batches.push((pending, mode.clone()));
-        }
+        batches.extend(
+            pending_ingester_batches(mode_files, limits.max_merge_groups)
+                .into_iter()
+                .map(|pending| (pending, mode.clone())),
+        );
     } else if mode.merges_whole_batch() {
         if !mode_files.is_empty() {
             batches.push((mode_files, mode.clone()));
@@ -114,17 +118,48 @@ fn indexed_hour_scope(
     }
 }
 
-/// The open hour's pending ingester files, once enough of them have piled up: they merge
-/// into one hash-merged file, so each round leaves one chain, and a round's output never
-/// merges again before the hour-end merge takes everything once. Original size is no measure
-/// here: hash order compresses metrics tens of times, so the size-bounded groups sealed one
-/// flush each.
-fn pending_ingester_files(files: Vec<FileKey>) -> Option<Vec<FileKey>> {
+/// Batches that narrow a closed hour wider than `max_groups` chains into hash-merged files;
+/// empty when the hour fits one merge or narrowing cannot shrink it.
+pub(super) fn narrowing_batches(
+    mut chains: Vec<Vec<FileKey>>,
+    max_groups: usize,
+) -> Vec<Vec<FileKey>> {
+    if max_groups < 2 || chains.len() <= max_groups {
+        return Vec::new();
+    }
+    // an indexed chain is already final: rewriting it hash-merged would drop its `.midx`
+    chains.retain(|chain| {
+        chain
+            .iter()
+            .all(|f| MetricsFileLayout::of(&f.key) != Some(MetricsFileLayout::Indexed))
+    });
+    // smallest first: the most chains collapse for the fewest bytes rewritten
+    chains.sort_by_key(|chain| chain.iter().map(|f| f.meta.compressed_size).sum::<i64>());
+    chains
+        .chunks(max_groups)
+        .filter(|chunk| chunk.len() > 1)
+        .map(|chunk| chunk.concat())
+        .collect()
+}
+
+/// The open hour's pending ingester files once enough have piled up, at most `max_groups`
+/// per batch: each one spans the whole hash range, so every file is a merge input of its own.
+fn pending_ingester_batches(files: Vec<FileKey>, max_groups: usize) -> Vec<Vec<FileKey>> {
     let pending: Vec<FileKey> = files
         .into_iter()
         .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashSorted))
         .collect();
-    (pending.len() >= OPEN_HOUR_MERGE_FILES).then_some(pending)
+    if pending.len() < OPEN_HOUR_MERGE_FILES {
+        return Vec::new();
+    }
+    if max_groups < 2 {
+        return vec![pending];
+    }
+    pending
+        .chunks(max_groups)
+        .filter(|chunk| chunk.len() > 1)
+        .map(<[FileKey]>::to_vec)
+        .collect()
 }
 
 /// Size-bounded merge groups in the planner's file order.
@@ -203,6 +238,7 @@ mod tests {
             max_group_files,
             is_incremental,
             merge_max_original_size: 950,
+            max_merge_groups: 100,
         }
     }
 
@@ -389,6 +425,94 @@ mod tests {
                 "hash-merged-v1-round2.parquet",
                 "hash-sorted-v1-late.parquet"
             ]
+        );
+    }
+
+    /// A delayed open hour merges its pending files at most `max_merge_groups` at a time.
+    #[test]
+    fn test_plan_batches_open_metrics_hour_caps_the_merge_width() {
+        let files: Vec<FileKey> = (1..=25)
+            .map(|i| hash_file(&format!("hash-sorted-v1-{i:02}.parquet"), 30))
+            .collect();
+        let strategy = MergeStrategy::FileTime;
+        let mut limits = limits(&strategy, 0, true);
+        limits.max_merge_groups = 12;
+        let batches = plan_batches(files.clone(), &MergeMode::MetricsHashMerged, &limits, "s");
+        let sizes: Vec<usize> = batches.iter().map(|(files, _)| files.len()).collect();
+        assert_eq!(sizes, [12, 12], "the lone 25th file waits: {batches:?}");
+        limits.max_merge_groups = 0;
+        let batches = plan_batches(files, &MergeMode::MetricsHashMerged, &limits, "s");
+        assert_eq!(batches.len(), 1);
+        assert_eq!(batches[0].0.len(), 25);
+    }
+
+    fn chain(names: &[&str], compressed_size: i64) -> Vec<FileKey> {
+        names
+            .iter()
+            .map(|name| hash_file(name, compressed_size))
+            .collect()
+    }
+
+    #[test]
+    fn test_narrowing_batches_only_when_wider_than_the_cap() {
+        let chains = vec![
+            chain(&["hash-sorted-v1-a.parquet"], 30),
+            chain(&["hash-sorted-v1-b.parquet"], 30),
+            chain(
+                &["hash-merged-v1-c.parquet", "hash-merged-v1-d.parquet"],
+                400,
+            ),
+        ];
+        assert!(narrowing_batches(chains.clone(), 3).is_empty());
+        assert!(narrowing_batches(chains.clone(), 0).is_empty());
+        assert!(narrowing_batches(chains, 1).is_empty());
+    }
+
+    /// Chains merge smallest first in groups of the cap; a lone trailing chain is left alone.
+    #[test]
+    fn test_narrowing_batches_groups_smallest_chains_first() {
+        let chains = vec![
+            chain(
+                &["hash-merged-v1-c.parquet", "hash-merged-v1-d.parquet"],
+                400,
+            ),
+            chain(&["hash-sorted-v1-a.parquet"], 30),
+            chain(&["hash-sorted-v1-b.parquet"], 20),
+            chain(&["hash-sorted-v1-e.parquet"], 40),
+            chain(&["hash-merged-v1-f.parquet"], 900),
+        ];
+        let batches = narrowing_batches(chains, 2);
+        assert_eq!(batches.len(), 2, "{batches:?}");
+        assert_eq!(
+            names(&batches[0]),
+            ["hash-sorted-v1-b.parquet", "hash-sorted-v1-a.parquet"]
+        );
+        assert_eq!(
+            names(&batches[1]),
+            [
+                "hash-sorted-v1-e.parquet",
+                "hash-merged-v1-c.parquet",
+                "hash-merged-v1-d.parquet"
+            ]
+        );
+    }
+
+    /// Indexed chains are final and stay out; with nothing left to pair, no batch is planned.
+    #[test]
+    fn test_narrowing_batches_leave_indexed_chains_alone() {
+        let chains = vec![
+            chain(&["indexed-v1-a.parquet"], 400),
+            chain(&["indexed-v1-b.parquet"], 400),
+            chain(&["hash-sorted-v1-c.parquet"], 30),
+        ];
+        assert!(narrowing_batches(chains.clone(), 2).is_empty());
+        let mut wider = chains;
+        wider.push(chain(&["hash-sorted-v1-d.parquet"], 20));
+        let batches = narrowing_batches(wider, 2);
+        assert_eq!(batches.len(), 1);
+        assert_eq!(
+            names(&batches[0]),
+            ["hash-sorted-v1-d.parquet", "hash-sorted-v1-c.parquet"]
         );
     }
 

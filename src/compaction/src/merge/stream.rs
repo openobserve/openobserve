@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use ::datafusion::arrow::datatypes::Schema;
 use chrono::{DateTime, TimeZone, Utc};
 use config::{
@@ -38,7 +40,7 @@ use tokio::{
 
 use super::{
     job::{job_range_end, job_time_level, scheduling_level},
-    plan::{BatchLimits, plan_batches},
+    plan::{BatchLimits, PlannedBatch, narrowing_batches, plan_batches},
 };
 use crate::{
     bloom::compact::OrphanBlooms,
@@ -47,6 +49,14 @@ use crate::{
 
 /// Position of the hour directory in `files/{org}/{type}/{stream}/YYYY/MM/DD/HH/...`.
 const HOUR_SEGMENT: usize = 7;
+
+/// What one partition's merge round left behind.
+#[derive(Default)]
+struct PartitionOutcome {
+    orphan_blooms: OrphanBlooms,
+    /// A closed hour was only narrowed into hash-merged files: the indexed merge is still due.
+    narrowed: bool,
+}
 
 /// compactor run steps on a stream:
 /// 3. get a cluster lock for compactor stream
@@ -170,16 +180,18 @@ pub async fn merge_by_stream(
             .push(file);
     }
 
+    let scan_schema = Arc::new(schema.clone().with_metadata(Default::default()));
     // use multiple threads to merge
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
+    let semaphore = Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
     let mut tasks = Vec::with_capacity(partition_files_with_size.len());
     for (prefix, mut files_with_size) in partition_files_with_size.into_iter() {
         let org_id = org_id.to_string();
         let stream_name = stream_name.to_string();
         let mode = mode.clone();
+        let scan_schema = scan_schema.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
-        let task: JoinHandle<anyhow::Result<OrphanBlooms>> = tokio::task::spawn(async move {
+        let task: JoinHandle<anyhow::Result<PartitionOutcome>> = tokio::task::spawn(async move {
             let cfg = get_config();
             // sort by file size
             let job_strategy = MergeStrategy::from(&cfg.compact.strategy);
@@ -201,27 +213,33 @@ pub async fn merge_by_stream(
                 max_group_files: cfg.compact.max_group_files,
                 is_incremental,
                 merge_max_original_size: infra_file_list::merge_max_original_size(),
+                max_merge_groups: cfg.compact.metrics_merge_max_groups,
             };
-            let batch_groups: Vec<MergeBatch> = plan_batches(
-                files_with_size,
-                &mode,
-                &limits,
-                &format!("{org_id}/{stream_type}/{stream_name}"),
-            )
-            .into_iter()
-            .enumerate()
-            .map(|(batch_id, (files, mode))| MergeBatch {
-                batch_id,
-                org_id: org_id.clone(),
-                stream_type,
-                stream_name: stream_name.clone(),
-                prefix: prefix.clone(),
-                files,
-                mode,
-            })
-            .collect();
+            let stream = format!("{org_id}/{stream_type}/{stream_name}");
+            let planned = plan_batches(files_with_size, &mode, &limits, &stream);
+            let planned =
+                cap_indexed_merge_width(planned, &scan_schema, limits.max_merge_groups, &stream)
+                    .await;
+            // a closed hour plans hash-merged output only to narrow itself for a later round
+            let narrowed = !is_incremental
+                && planned
+                    .iter()
+                    .any(|(_, mode)| matches!(mode, MergeMode::MetricsHashMerged));
+            let batch_groups: Vec<MergeBatch> = planned
+                .into_iter()
+                .enumerate()
+                .map(|(batch_id, (files, mode))| MergeBatch {
+                    batch_id,
+                    org_id: org_id.clone(),
+                    stream_type,
+                    stream_name: stream_name.clone(),
+                    prefix: prefix.clone(),
+                    files,
+                    mode,
+                })
+                .collect();
             if batch_groups.is_empty() {
-                return Ok(OrphanBlooms::default()); // no files need to merge
+                return Ok(PartitionOutcome::default()); // no files need to merge
             }
 
             // send to worker
@@ -294,15 +312,21 @@ pub async fn merge_by_stream(
             if let Some(e) = last_error {
                 return Err(e);
             }
-            Ok(orphan_blooms)
+            Ok(PartitionOutcome {
+                orphan_blooms,
+                narrowed,
+            })
         });
         tasks.push(task);
     }
 
     // collect bloom files which need to be clean
     let mut orphan_blooms = OrphanBlooms::default();
+    let mut narrowed = false;
     for task in tasks {
-        for (date, bloom_vers) in task.await?? {
+        let outcome = task.await??;
+        narrowed |= outcome.narrowed;
+        for (date, bloom_vers) in outcome.orphan_blooms {
             orphan_blooms.entry(date).or_default().extend(bloom_vers);
         }
     }
@@ -339,6 +363,13 @@ pub async fn merge_by_stream(
         log::warn!(
             "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] range of {date_start} settled during the incremental round, job {job_id} is left for the retry"
         );
+    } else if narrowed {
+        log::info!(
+            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] {date_start} was narrowed into hash-merged files, job {job_id} is re-armed for the indexed merge"
+        );
+        if let Err(e) = infra_file_list::set_job_pending(&[job_id], 0, None).await {
+            log::error!("[COMPACTOR] set_job_pending failed: {e}");
+        }
     } else if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
         log::error!("[COMPACTOR] set_job_done failed: {e}");
     } else if is_incremental
@@ -356,6 +387,51 @@ pub async fn merge_by_stream(
         .inc_by(time);
 
     Ok(())
+}
+
+/// Swaps a closed metrics hour too wide to merge at once for the batches that narrow it.
+async fn cap_indexed_merge_width(
+    batches: Vec<PlannedBatch>,
+    schema: &Arc<Schema>,
+    max_groups: usize,
+    stream: &str,
+) -> Vec<PlannedBatch> {
+    let mut capped = Vec::with_capacity(batches.len());
+    for (files, mode) in batches {
+        // fewer files than the cap cannot form more chains than it
+        if max_groups < 2 || files.len() <= max_groups || !matches!(mode, MergeMode::MetricsIndexed)
+        {
+            capped.push((files, mode));
+            continue;
+        }
+        let chains = match search::merge::hash_ordered_chains(schema.clone(), files.clone()).await {
+            Ok(chains) => chains,
+            Err(e) => {
+                log::warn!(
+                    "[COMPACTOR] merge_by_stream [{stream}] chaining {} files by statistics failed: {e}, counting every file as a chain",
+                    files.len()
+                );
+                files.iter().map(|f| vec![f.clone()]).collect()
+            }
+        };
+        let chain_num = chains.len();
+        let narrowing = narrowing_batches(chains, max_groups);
+        if narrowing.is_empty() {
+            capped.push((files, mode));
+            continue;
+        }
+        log::info!(
+            "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed merge of {} files is {chain_num} chains wide, cap {max_groups}: narrowing in {} hash-merged batches first",
+            files.len(),
+            narrowing.len()
+        );
+        capped.extend(
+            narrowing
+                .into_iter()
+                .map(|files| (files, MergeMode::MetricsHashMerged)),
+        );
+    }
+    capped
 }
 
 fn has_downsampling_rule(_stream_name: &str, _max_ts: i64) -> bool {
