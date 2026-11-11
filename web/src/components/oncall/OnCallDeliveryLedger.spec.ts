@@ -110,6 +110,21 @@ describe("OnCallDeliveryLedger", () => {
     expect(wrapper.find('[data-test="oncall-delivery-row-template-1-0"]').exists()).toBe(false);
   });
 
+  // The real OTag and OnCallPersonName, because a wrapper that drops attributes would hide these from E2E.
+  it("puts the status, channel and recipient ids on the real person row", async () => {
+    const wrapper = mount(OnCallDeliveryLedger, {
+      props: { records: [row({ channel: "sms" })], total: 1 },
+      global: { plugins: [i18n, store], stubs: { OTimeCell: stubs.OTimeCell } },
+    });
+    await flushPromises();
+    const person = wrapper.find('[data-test="oncall-delivery-row-1-0"]');
+    expect(person.find('[data-test="oncall-delivery-status"]').text()).toBe("Sent");
+    expect(person.find('[data-test="oncall-delivery-channel"]').text()).toBe("SMS");
+    const recipient = person.find('[data-test="oncall-delivery-recipient-1-0"]');
+    expect(recipient.attributes("data-test-email")).toBe("ana@o2.ai");
+    expect(recipient.text()).toBe("Ana Ruiz");
+  });
+
   it("draws no room-post section when nothing broadcast", () => {
     expect(render([row()]).find('[data-test="oncall-deliveries-posts-1"]').exists()).toBe(false);
   });

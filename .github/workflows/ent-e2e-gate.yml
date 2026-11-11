@@ -8,7 +8,7 @@ name: Playwright E2E Crosscheck
 # branch protection to actually block merges (one-time admin toggle).
 #
 # Behaviour (A+A+C design):
-#   - PR does NOT touch web/** or tests/ui-testing/**            → pass instantly (never blocks).
+#   - PR does NOT touch web/**, tests/ui-testing/** or on-call code → pass instantly (never blocks).
 #   - Touches them + `skip-ent-e2e` label                       → pass (explicit, auditable opt-out).
 #   - Touches them (the e2e label gates the whole job, like every paid workflow):
 #       · open sister ENT PR (same-named branch) → DEFER to that PR's checks (link it, don't build here)
@@ -86,7 +86,7 @@ jobs:
             echo "mode=pass" >> "$GITHUB_OUTPUT"; exit 0
           fi
 
-          # Relevant = any changed file under web/ or tests/ui-testing/
+          # Relevant = any changed file under web/ or tests/ui-testing/, or on-call code, whose suites run only against the enterprise binary.
           FILES=$(gh api "repos/${{ github.repository }}/pulls/$PR/files" --paginate -q '.[].filename')
           CHANGED=$(gh api "repos/${{ github.repository }}/pulls/$PR" -q .changed_files)
           # The files API lists at most 3000 files, so a list it cut short cannot prove the PR is irrelevant.
@@ -95,10 +95,13 @@ jobs:
           # A here-string, not a pipe: grep -q exits early and the writer's SIGPIPE would fail the pipeline under pipefail.
           elif grep -qE '^(web/|tests/ui-testing/)' <<<"$FILES"; then
             RELEVANT=true
+          # Keep this pattern equal to the one in o2-enterprise's oss-pr-ent-gate.yml, which decides whether the on-call suites run.
+          elif grep -qiE '^(src|web/src|tests/ui-testing|tests/api-testing)/.*(oncall|on_call|telephony|twilio)|^src/.*(alerts/ack\.rs$|alert_acks|one_ack)' <<<"$FILES"; then
+            RELEVANT=true
           else
             RELEVANT=false
           fi
-          echo "::notice::Relevant (web/** or tests/ui-testing/**) changes: $RELEVANT"
+          echo "::notice::Relevant (web/**, tests/ui-testing/** or on-call) changes: $RELEVANT"
 
           if [ "$RELEVANT" != "true" ]; then
             echo "mode=pass" >> "$GITHUB_OUTPUT"
@@ -294,22 +297,22 @@ jobs:
           sticky "### ✅ Playwright E2E Crosscheck — passed
 
           $MARKER
-          The enterprise-only e2e specs passed against this PR. $SISTER_NOTE
+          The enterprise-only e2e specs, and the on-call suites if this PR touches on-call, passed against this PR. $SISTER_NOTE
 
           [ENT run]($RUN_URL)"
-            echo "::notice::✅ Enterprise e2e specs passed against this PR."
+            echo "::notice::✅ Enterprise e2e checks passed against this PR."
           }
           sticky "### 🔄 Playwright E2E Crosscheck — running
 
           $MARKER
-          Building the enterprise binary and running the enterprise-only e2e specs against this PR.
+          Building the enterprise binary and running the enterprise-only e2e specs against this PR, plus the on-call suites if it touches on-call.
           $SISTER_NOTE
 
           [ENT run]($RUN_URL)"
 
           # A lost runner is infra, not the PR: re-run only the lost ENT jobs, up to 3 attempts of the run in all.
           MAX_ATTEMPTS=3; RETRIES=0
-          # Poll budgets follow the engine's job timeouts: subset 10 + build 75 + shard 45 + aggregate 10 + report 10 min, plus 15 min of runner queueing.
+          # Poll budgets follow the engine's job timeouts: subset 10 + build 75 + shard 45 (the on-call suites, about 30 with their own build, fit here) + aggregate 10 + report 10 min, plus 15 min of runner queueing.
           SHARD_MIN=45; RUN_BUDGET_MIN=$((10 + 75 + SHARD_MIN + 10 + 10 + 15)); RERUN_BUDGET_MIN=$((SHARD_MIN + 10 + 10 + 15))
           DEADLINE=$((SECONDS + RUN_BUDGET_MIN * 60))
           while :; do
@@ -353,8 +356,8 @@ jobs:
 
             # A build failure and spec failures need different fixes, so the report tells them apart.
             BUILD_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="build_binary")|.conclusion' 2>/dev/null || echo "")
-            # Single-job re-runs spread shard results over attempts, so each test job counts by its latest attempt; an aggregate counts only without shards.
-            TEST_JOBS=$(gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/jobs?filter=all&per_page=100" --jq '.jobs[]' 2>/dev/null | jq -s '[.[]|select(.name=="ent_gate_tests" or (.name|startswith("ent_gate_tests (")))] | group_by(.name) | map(max_by(.run_attempt)) | (map(select(.name|startswith("ent_gate_tests (")))) as $s | if ($s|length) > 0 then $s else . end' 2>/dev/null || echo '[]')
+            # Each test job counts by its latest attempt because single-job re-runs spread results; a called playwright.yml's summary and Merge Reports can fail with no test at fault, so neither counts.
+            TEST_JOBS=$(gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/jobs?filter=all&per_page=100" --jq '.jobs[]' 2>/dev/null | jq -s '[.[]|select((.name=="ent_gate_tests" or (.name|startswith("ent_gate_tests ("))) and (.name|(endswith(" / playwright_summary") or endswith(" / Merge Reports"))|not))] | group_by(.name) | map(max_by(.run_attempt)) | (map(select(.name|startswith("ent_gate_tests (")))) as $s | if ($s|length) > 0 then $s else . end' 2>/dev/null || echo '[]')
             TEST_CONCL=$(jq -r '[.[].conclusion]|if index("failure") then "failure" elif length > 0 then .[0] // "" else "" end' <<<"$TEST_JOBS")
             # A lost runner leaves its step running: no failed or cancelled step, and it ended before the job timeout, which cancels the step.
             FAILED_JOBS=$(jq -c --argjson limit "$SHARD_MIN" '[.[] | select(.conclusion == "failure") | {id, lost: (([.steps[]? | select(.conclusion == "failure" or .conclusion == "cancelled")] | length) == 0 and .started_at != null and .completed_at != null and ((.completed_at | fromdateiso8601) - (.started_at | fromdateiso8601)) < ($limit * 60))}]' <<<"$TEST_JOBS" 2>/dev/null || echo '[]')
@@ -417,11 +420,14 @@ jobs:
 
           $SISTER_NOTE · [ENT run]($RUN_URL)"
           elif [ "$TEST_CONCL" = "failure" ]; then
+            # The on-call suites are not in the failed-specs artifact, so their failed jobs are named instead.
+            ONCALL_FAILED=$(jq -r '.[] | select(.conclusion == "failure" and (.name | startswith("ent_gate_tests (OnCall"))) | "- on-call job `\(.name)`: open the run for its specs"' <<<"$TEST_JOBS" 2>/dev/null || true)
+            SPEC_LIST=$(printf '%s\n%s' "$SPEC_LIST" "$ONCALL_FAILED" | sed '/^$/d')
             [ -n "$SPEC_LIST" ] || SPEC_LIST="_(couldn't read the failed-spec list — open the run for details)_"
           sticky "### 🚫 Playwright E2E Crosscheck — Needs Review
 
           $MARKER
-          The **enterprise-only** e2e spec(s) below failed against this PR. They run only against the enterprise binary, so this breakage wouldn't show up in OSS CI:
+          The enterprise test(s) below failed against this PR. They run only against the enterprise binary, so this breakage wouldn't show up in OSS CI:
 
           $SPEC_LIST
 
