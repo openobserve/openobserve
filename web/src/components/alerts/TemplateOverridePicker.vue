@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
     </span>
     <OSelect
-      v-else
+      v-if="state !== 'empty' && state !== 'error'"
       :model-value="modelValue"
       :options="options"
       labelKey="label"

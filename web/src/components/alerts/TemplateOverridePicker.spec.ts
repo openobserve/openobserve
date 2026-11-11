@@ -323,6 +323,22 @@ describe("TemplateOverridePicker", () => {
     expect(unset.find('[data-test="template-override-clear"]').exists()).toBe(false);
   });
 
+  it("shows no select in the empty and error states, with or without a stored value", async () => {
+    list.mockResolvedValue({ data: [] } as any);
+    const empty = await mountPicker({ modelValue: "card" });
+    expect(select(empty).exists()).toBe(false);
+    await empty.find('[data-test="template-override-clear"]').trigger("click");
+    await empty.setProps({ modelValue: null });
+    expect(select(empty).exists()).toBe(false);
+    expect(
+      (await mountPicker({ modelValue: null })).findComponent({ name: "OSelect" }).exists(),
+    ).toBe(false);
+
+    list.mockRejectedValue({ response: { status: 500 } });
+    expect(select(await mountPicker({ modelValue: "card" })).exists()).toBe(false);
+    expect(select(await mountPicker({ modelValue: null })).exists()).toBe(false);
+  });
+
   it("says a name missing from the kind's list is not available, not deleted", async () => {
     list.mockResolvedValue({ data: [{ name: "card", kind: "content" }] } as any);
     const w = await mountPicker({ modelValue: "other" });
