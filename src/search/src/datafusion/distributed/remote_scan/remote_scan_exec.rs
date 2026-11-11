@@ -163,12 +163,6 @@ impl RemoteScanExec {
         self
     }
 
-    /// Whether `partition`'s node is never called.
-    pub fn is_skipped(&self, partition: usize) -> bool {
-        self.remote_scan_node
-            .is_skipped(partition, partition == self.enrich_mode_node_idx)
-    }
-
     #[cfg(test)]
     pub fn analyze(&self) -> bool {
         self.remote_scan_node.search_infos.is_analyze
@@ -319,7 +313,13 @@ async fn get_remote_batch(
         start,
     );
 
-    if remote_scan_node.is_skipped(partition, enrich_mode) {
+    // fast return for empty file list querier node
+    if !is_super
+        && is_querier
+        && !is_ingester
+        && !enrich_mode
+        && remote_scan_node.is_file_list_empty(partition)
+    {
         recorder.mark_skipped();
         return Ok(get_empty_stream(empty_stream));
     }
@@ -349,7 +349,6 @@ async fn get_remote_batch(
     {
         Ok((client, request)) => (client, request),
         Err(e) => {
-            recorder.mark_failed(&e);
             return Ok(get_empty_stream(empty_stream.with_error(e)));
         }
     };
@@ -358,12 +357,10 @@ async fn get_remote_batch(
         "[trace_id {trace_id}] flight->search: prepare to request node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}",
     );
 
-    recorder.mark_sent(job_id);
     // runs outside the planner span, so the gRPC CLIENT span takes its parent from this context
     let stream = match client.do_get(request).with_context(context.clone()).await {
         Ok(stream) => stream,
         Err(e) => {
-            recorder.mark_refused(&e);
             if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded || is_parquet_file_not_found(&e) {
                 return Ok(get_empty_stream(empty_stream.with_error(e)));
             }
@@ -375,6 +372,7 @@ async fn get_remote_batch(
         }
     }
     .into_inner();
+    recorder.record_job(job_id);
 
     log::info!(
         "[trace_id {trace_id}] flight->search: prepare to response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}",
@@ -410,7 +408,6 @@ async fn get_remote_batch(
                         start.elapsed().as_millis(),
                     );
                     process_partial_err(partial_err, e);
-                    stream.mark_timed_out();
                     break;
                 }
             }

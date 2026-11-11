@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::VecDeque, pin::Pin, sync::Arc, task::Poll, time::Duration};
+use std::{collections::VecDeque, pin::Pin, sync::Arc, task::Poll};
 
 use arrow::ipc::{CompressionType, writer::IpcWriteOptions};
 use arrow_flight::{FlightData, error::FlightError};
@@ -36,9 +36,6 @@ use crate::handler::grpc::flight::{
 /// Cap on one encoded FlightData message. Mirrors the `ZO_GRPC_MAX_MESSAGE_SIZE` default,
 /// which is what the receiving channel accepts.
 pub(super) const MAX_FLIGHT_DATA_SIZE: usize = 32 * 1024 * 1024;
-
-/// How long a run may take to settle before it reports what it has; under its caller's wait.
-const REPORT_DEADLINE: Duration = Duration::from_secs(REMOTE_PROFILE_TIMEOUT.as_secs() * 4 / 5);
 
 pub struct FlightEncoderStreamBuilder {
     node_messages: NodeMessages,
@@ -395,7 +392,7 @@ impl Drop for FlightEncoderStream {
             Some(report) => {
                 let source = std::mem::replace(&mut self.source, FlightSource::Closed);
                 let tasks = std::mem::take(&mut self.ctx.tasks);
-                tokio::spawn(report_run(source, tasks, guards, report, REPORT_DEADLINE));
+                tokio::spawn(report_run(source, tasks, guards, report));
             }
         }
         log::info!(
@@ -405,29 +402,20 @@ impl Drop for FlightEncoderStream {
     }
 }
 
-/// Reports the run's profile once its partitions have stopped, or at `deadline` as it then stands.
+/// Reports the run's profile once its partitions have stopped and can no longer change it.
 async fn report_run(
     source: FlightSource,
     mut tasks: JoinSet<()>,
     guards: (Option<DeferredLock>, Option<SessionGuard>),
     report: RunReport,
-    deadline: Duration,
 ) {
     drop(source);
-    let RunReport { slot, plan } = report;
-    let settle = async {
-        tasks.shutdown().await;
-        // Partition tasks may read the session data until they have stopped.
-        drop(guards);
-        // A cluster leader must finish its own fetches within its caller's wait.
-        complete_remote_profiles(plan.as_ref(), REMOTE_PROFILE_TIMEOUT / 2).await;
-    };
-    tokio::pin!(settle);
-    let settled = tokio::time::timeout(deadline, &mut settle).await.is_ok();
-    slot.complete(build_profile(plan.as_ref()));
-    if !settled {
-        settle.await;
-    }
+    tasks.shutdown().await;
+    // Partition tasks may read the session data until they have stopped.
+    drop(guards);
+    // A cluster leader must finish its own fetches within its caller's wait.
+    complete_remote_profiles(report.plan.as_ref(), REMOTE_PROFILE_TIMEOUT / 2).await;
+    report.slot.complete(build_profile(report.plan.as_ref()));
 }
 
 fn write_options() -> IpcWriteOptions {

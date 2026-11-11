@@ -60,11 +60,6 @@ impl FlightDecoderStream {
         }
     }
 
-    /// Records that the caller's deadline, not the node, ended this stream.
-    pub fn mark_timed_out(&self) {
-        self.query_context.node_profile.mark_timed_out();
-    }
-
     pub fn process_custom_message(&mut self, message: CustomMessage) {
         match message {
             CustomMessage::ScanStats(stats) => {
@@ -124,7 +119,6 @@ impl Stream for FlightDecoderStream {
                             self.query_context.req_last_time.elapsed().as_millis()
                         );
                     }
-                    self.query_context.node_profile.mark_completed();
                     poll = Poll::Ready(None);
                     break;
                 }
@@ -138,9 +132,7 @@ impl Stream for FlightDecoderStream {
                         self.query_context.is_querier,
                         self.query_context.start.elapsed().as_millis(),
                     );
-                    let status = e.into();
-                    self.query_context.node_profile.mark_failed(&status);
-                    process_partial_err(self.query_context.partial_err.clone(), status);
+                    process_partial_err(self.query_context.partial_err.clone(), e.into());
                     poll = Poll::Ready(None);
                     break;
                 }

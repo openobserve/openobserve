@@ -130,16 +130,6 @@ impl RemoteScanNode {
         }
     }
 
-    /// A querier with no files to scan is never called, unless it serves the enrichment tables.
-    pub fn is_skipped(&self, partition: usize, enrich_mode: bool) -> bool {
-        let node = &self.nodes[partition];
-        !self.super_cluster_info.is_super_cluster
-            && node.is_querier()
-            && !node.is_ingester()
-            && !enrich_mode
-            && self.is_file_list_empty(partition)
-    }
-
     pub fn is_file_list_empty(&self, partition: usize) -> bool {
         let file_id_list = if self.search_infos.file_id_list.is_empty() {
             vec![]

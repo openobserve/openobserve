@@ -48,7 +48,7 @@
 //! caller stores it under the remote scan that made the call.
 //!
 //! The leader also renders the text rows of EXPLAIN ANALYZE from this tree, one per
-//! node that was not skipped, which is why `ProfileMetric::display` keeps each
+//! node that sent back its plan, which is why `ProfileMetric::display` keeps each
 //! value exactly as DataFusion prints it.
 
 use std::fmt::Write;
@@ -167,12 +167,8 @@ pub struct RemoteNodeProfile {
     pub output_batches: u64,
     pub output_bytes: u64,
     pub decode_ns: u64,
-    #[serde(default)]
-    pub status: NodeStatus,
-    /// Same as `status == Skipped`; the UI still reads this instead of `status`.
-    #[serde(default)]
     pub skipped: bool,
-    /// Identifies the call, so the caller can fetch the report a stream did not deliver.
+    /// Identifies the call, so the caller can fetch the node's report on it.
     #[serde(skip)]
     pub job_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -180,38 +176,6 @@ pub struct RemoteNodeProfile {
     /// The plan this node ran; its own remote scans nest the nodes below it the same way.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plan: Option<ProfileNode>,
-}
-
-/// How one remote node's run ended, as its caller knows it.
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum NodeStatus {
-    Completed,
-    /// The caller stopped reading before the end, for example once a LIMIT was met.
-    EarlyStopped,
-    Failed,
-    TimedOut,
-    /// Not called: the node had no files to scan.
-    Skipped,
-    /// The request never reached the node: the caller finished before sending it.
-    NotExecuted,
-    /// What a caller older than `status` leaves.
-    #[default]
-    Unknown,
-}
-
-impl NodeStatus {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Completed => "completed",
-            Self::EarlyStopped => "early_stopped",
-            Self::Failed => "failed",
-            Self::TimedOut => "timed_out",
-            Self::Skipped => "skipped",
-            Self::NotExecuted => "not_executed",
-            Self::Unknown => "unknown",
-        }
-    }
 }
 
 #[cfg(test)]

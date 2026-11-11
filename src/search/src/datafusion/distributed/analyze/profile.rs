@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, fmt, sync::Arc, time::Duration};
+use std::{fmt, time::Duration};
 
 use config::{
     meta::{cluster::NodeInfo, search::ScanStats},
@@ -25,9 +25,7 @@ use datafusion::physical_plan::{
 };
 use flight::{
     common::{NodeProfiles, RemoteScanMetrics, job_trace_id},
-    profile::{
-        MetricKind, NodeStatus, ProfileInputs, ProfileMetric, ProfileNode, RemoteNodeProfile,
-    },
+    profile::{MetricKind, ProfileInputs, ProfileMetric, ProfileNode, RemoteNodeProfile},
 };
 
 use crate::datafusion::distributed::remote_scan::{
@@ -44,12 +42,22 @@ pub struct NodeProfileRecorder {
 }
 
 impl NodeProfileRecorder {
-    /// Publishes the call's entry at once, as not executed until the request goes out.
+    /// Publishes the call's entry at once, so that it exists while its stream is still alive.
     pub fn start(profiles: NodeProfiles, partition: usize, node: &dyn NodeInfo) -> Self {
+        let role = match (node.is_querier(), node.is_ingester()) {
+            (true, true) => "querier,ingester",
+            (true, false) => "querier",
+            (false, true) => "ingester",
+            (false, false) => "",
+        };
         let profile = RemoteNodeProfile {
+            partition,
+            node_name: node.get_name(),
+            node_address: node.get_grpc_addr(),
+            role: role.to_string(),
+            cluster: node.get_cluster(),
             start_us: now_micros(),
-            status: NodeStatus::NotExecuted,
-            ..node_profile(partition, node)
+            ..Default::default()
         };
         profiles.lock().insert(partition, profile);
         Self {
@@ -58,43 +66,12 @@ impl NodeProfileRecorder {
     }
 
     pub fn mark_skipped(&self) {
-        self.update(|p| {
-            p.status = NodeStatus::Skipped;
-            p.skipped = true;
-        });
+        self.update(|p| p.skipped = true);
     }
 
-    /// The request is going out under `job_id`; a call dropped from here on stopped early.
-    pub fn mark_sent(&self, job_id: String) {
-        self.update(|p| {
-            p.status = NodeStatus::EarlyStopped;
-            p.job_id = job_id;
-        });
-    }
-
-    /// The node returned no stream, so it holds no report to fetch.
-    pub fn mark_refused(&self, e: &tonic::Status) {
-        self.mark_failed(e);
-        self.update(|p| p.job_id.clear());
-    }
-
-    /// The node's stream was read to its end.
-    pub fn mark_completed(&self) {
-        self.update(|p| p.status = NodeStatus::Completed);
-    }
-
-    /// This caller's own deadline ended the call.
-    pub fn mark_timed_out(&self) {
-        self.update(|p| p.status = NodeStatus::TimedOut);
-    }
-
-    /// The call failed as this caller saw it.
-    pub fn mark_failed(&self, e: &tonic::Status) {
-        let status = match e.code() {
-            tonic::Code::DeadlineExceeded => NodeStatus::TimedOut,
-            _ => NodeStatus::Failed,
-        };
-        self.update(|p| p.status = status);
+    /// The node returned a stream for `job_id`, so it holds a report to fetch under that id.
+    pub fn record_job(&self, job_id: String) {
+        self.update(|p| p.job_id = job_id);
     }
 
     pub fn add_scan_stats(&self, stats: &ScanStats) {
@@ -152,21 +129,21 @@ pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
     }
 }
 
-/// Gives every partition of every remote scan in `plan` an entry and fetches the reports of the
-/// calls it sent.
+/// Fetches, for every remote scan in `plan`, the plans of the nodes that returned a stream.
 pub async fn complete_remote_profiles(plan: &dyn ExecutionPlan, timeout: Duration) {
     let mut scans = Vec::new();
     collect_remote_scans(plan, &mut scans);
     let mut fetches = Vec::new();
     let now = now_micros();
     for remote in scans {
-        let mut profiles = remote.state.node_profiles.lock();
-        end_open_calls(&mut profiles, now);
-        let nodes = &remote.remote_scan_node().nodes;
-        let pending = pending_reports(&mut profiles, nodes, |p| remote.is_skipped(p));
-        drop(profiles);
-        for (partition, job_id) in pending {
-            fetches.push(fetch_report(remote, partition, job_id, timeout));
+        for (partition, p) in remote.state.node_profiles.lock().iter_mut() {
+            // A stream the runtime has not dropped yet ends now: its caller has stopped reading.
+            if p.end_us == 0 {
+                p.end_us = now;
+            }
+            if p.plan.is_none() && !p.job_id.is_empty() {
+                fetches.push(fetch_report(remote, *partition, p.job_id.clone(), timeout));
+            }
         }
     }
     futures::future::join_all(fetches).await;
@@ -267,59 +244,6 @@ async fn fetch_report(
             identifier.trace_id
         ),
     }
-}
-
-/// Ends the calls whose streams the runtime has not dropped yet: their caller has stopped reading.
-fn end_open_calls(profiles: &mut BTreeMap<usize, RemoteNodeProfile>, now_us: i64) {
-    for p in profiles.values_mut() {
-        if p.start_us > 0 && p.end_us == 0 {
-            p.end_us = now_us;
-        }
-    }
-}
-
-fn node_profile(partition: usize, node: &dyn NodeInfo) -> RemoteNodeProfile {
-    let role = match (node.is_querier(), node.is_ingester()) {
-        (true, true) => "querier,ingester",
-        (true, false) => "querier",
-        (false, true) => "ingester",
-        (false, false) => "",
-    };
-    RemoteNodeProfile {
-        partition,
-        node_name: node.get_name(),
-        node_address: node.get_grpc_addr(),
-        role: role.to_string(),
-        cluster: node.get_cluster(),
-        ..Default::default()
-    }
-}
-
-/// Adds an entry for each partition that never started and lists the sent calls with no report.
-fn pending_reports(
-    profiles: &mut BTreeMap<usize, RemoteNodeProfile>,
-    nodes: &[Arc<dyn NodeInfo>],
-    is_skipped: impl Fn(usize) -> bool,
-) -> Vec<(usize, String)> {
-    for (partition, node) in nodes.iter().enumerate() {
-        profiles.entry(partition).or_insert_with(|| {
-            let skipped = is_skipped(partition);
-            RemoteNodeProfile {
-                status: if skipped {
-                    NodeStatus::Skipped
-                } else {
-                    NodeStatus::NotExecuted
-                },
-                skipped,
-                ..node_profile(partition, node.as_ref())
-            }
-        });
-    }
-    profiles
-        .iter()
-        .filter(|(_, p)| p.plan.is_none() && !p.job_id.is_empty())
-        .map(|(partition, p)| (*partition, p.job_id.clone()))
-        .collect()
 }
 
 /// The scan's node entries with their counters read from the scan, as a stream may drop late.

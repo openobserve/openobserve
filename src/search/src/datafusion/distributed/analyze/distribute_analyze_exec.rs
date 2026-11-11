@@ -32,7 +32,7 @@ use datafusion::{
         stream::RecordBatchStreamAdapter,
     },
 };
-use flight::profile::{NodeStatus, ProfileInputs, ProfileNode, QueryProfile, RemoteNodeProfile};
+use flight::profile::{ProfileInputs, ProfileNode, QueryProfile, RemoteNodeProfile};
 use futures::StreamExt;
 
 use crate::datafusion::distributed::analyze::{
@@ -104,11 +104,11 @@ impl DistributeAnalyzeExec {
 
         let mut remote_rows = Vec::new();
         collect_remote_rows(&profile.plan, 1, &mut remote_rows);
-        for (stage, node) in remote_rows {
+        for (stage, node, plan) in remote_rows {
             phase_builder.append_value(stage);
             address_builder.append_value(&node.node_address);
             name_builder.append_value(&node.node_name);
-            plan_builder.append_value(remote_text(node));
+            plan_builder.append_value(plan.to_text());
         }
 
         if self.verbose {
@@ -243,11 +243,11 @@ impl ExecutionPlan for DistributeAnalyzeExec {
     }
 }
 
-/// Lists, depth first, each remote node that was not skipped, with its stage below the leader.
+/// Lists, depth first, each remote node that sent back its plan, with its stage below the leader.
 fn collect_remote_rows<'a>(
     node: &'a ProfileNode,
     stage: i32,
-    rows: &mut Vec<(i32, &'a RemoteNodeProfile)>,
+    rows: &mut Vec<(i32, &'a RemoteNodeProfile, &'a ProfileNode)>,
 ) {
     match &node.inputs {
         ProfileInputs::Children(children) => {
@@ -256,30 +256,14 @@ fn collect_remote_rows<'a>(
             }
         }
         ProfileInputs::Remote(remotes) => {
-            for remote in remotes {
-                // A leader older than `status` only sets `skipped`.
-                if remote.status == NodeStatus::Skipped || remote.skipped {
-                    continue;
-                }
-                rows.push((stage, remote));
-                if let Some(plan) = &remote.plan {
-                    collect_remote_rows(plan, stage + 1, rows);
-                }
+            for (remote, plan) in remotes
+                .iter()
+                .filter_map(|r| r.plan.as_ref().map(|plan| (r, plan)))
+            {
+                rows.push((stage, remote, plan));
+                collect_remote_rows(plan, stage + 1, rows);
             }
         }
-    }
-}
-
-/// A remote node's text row: its plan, headed by its status unless it completed.
-fn remote_text(remote: &RemoteNodeProfile) -> String {
-    let plan = remote
-        .plan
-        .as_ref()
-        .map(ProfileNode::to_text)
-        .unwrap_or_default();
-    match remote.status {
-        NodeStatus::Completed => plan,
-        status => format!("status={}\n{plan}", status.as_str()),
     }
 }
 
@@ -360,5 +344,40 @@ mod tests {
         let parsed: QueryProfile = serde_json::from_str(profile.value(0)).unwrap();
         assert_eq!(parsed.plan.name, "EmptyExec");
         assert!(parsed.end_us >= parsed.start_us);
+    }
+
+    #[test]
+    fn test_collect_remote_rows_nests_stages_and_skips_nodes_without_plan() {
+        let node = |name: &str, plan: Option<ProfileNode>| RemoteNodeProfile {
+            node_name: name.to_string(),
+            plan,
+            ..Default::default()
+        };
+        let scan = |remotes| ProfileNode {
+            name: "RemoteScanExec".to_string(),
+            inputs: ProfileInputs::Remote(remotes),
+            ..Default::default()
+        };
+        let cluster_leader = node(
+            "b-querier-0",
+            Some(scan(vec![node(
+                "b-querier-1",
+                Some(ProfileNode::default()),
+            )])),
+        );
+        let root = ProfileNode {
+            inputs: ProfileInputs::Children(vec![scan(vec![
+                cluster_leader,
+                node("skipped", None),
+            ])]),
+            ..Default::default()
+        };
+        let mut rows = Vec::new();
+        collect_remote_rows(&root, 1, &mut rows);
+        let rows: Vec<_> = rows
+            .iter()
+            .map(|(stage, node, _)| (*stage, node.node_name.as_str()))
+            .collect();
+        assert_eq!(rows, vec![(1, "b-querier-0"), (2, "b-querier-1")]);
     }
 }
