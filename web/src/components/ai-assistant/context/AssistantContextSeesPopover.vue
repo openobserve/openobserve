@@ -206,6 +206,7 @@ function setOpen(open: boolean): void {
 watch(isOpen, async (open) => {
   if (!open) return;
   trackAssistant("ai_context_inspected", { target: "sees" });
+  voice.probe();
   await nextTick();
   measureInset();
   (heading.value?.$el as HTMLElement | undefined)?.focus();

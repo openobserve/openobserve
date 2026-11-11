@@ -270,6 +270,17 @@ describe("permission wait", () => {
     }
   });
 
+  it("asks about on-device speech only when dictation starts, and listens on the device", async () => {
+    engine.onDevice = true;
+    const canRunOnDevice = vi.spyOn(engine, "canRunOnDevice");
+    expect(canRunOnDevice).not.toHaveBeenCalled();
+
+    await listening();
+
+    expect(canRunOnDevice).toHaveBeenCalledWith("en-US");
+    expect(engine.options).toEqual({ lang: "en-US", onDevice: true });
+  });
+
   it("still dictates when the level source fails for another reason", async () => {
     engine.rejectMic = Object.assign(new Error("busy"), { name: "NotReadableError" });
     await controller.start(fakeVoiceTarget(), "mic");
