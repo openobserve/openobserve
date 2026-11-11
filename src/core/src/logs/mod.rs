@@ -93,7 +93,7 @@ impl DestinationSettings<'_> {
     fn apply(
         &self,
         mut record: Map<String, Value>,
-        original: Option<&String>,
+        original: Option<String>,
         trusted_event_name: Option<Value>,
     ) -> Map<String, Value> {
         // before the UDS trim, so a schema that lists the canonical columns keeps them
@@ -112,7 +112,7 @@ impl DestinationSettings<'_> {
         {
             record.insert(
                 config::ORIGINAL_DATA_COL_NAME.to_string(),
-                Value::String(original.clone()),
+                Value::String(original),
             );
             let record_id = crate::ingestion::generate_record_id(
                 self.org_id,

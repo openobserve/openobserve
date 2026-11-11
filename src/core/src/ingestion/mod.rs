@@ -182,6 +182,21 @@ pub fn has_user_pipeline(pipelines: &[ExecutablePipeline]) -> bool {
     pipelines.iter().any(|p| p.kind == PipelineKind::User)
 }
 
+/// Whether the source stream gets its inputs back: no user pipeline owns it and none reached it.
+pub fn should_preserve_source(
+    org_id: &str,
+    stream_name: &str,
+    pipelines: &[ExecutablePipeline],
+    source_buffered: bool,
+) -> bool {
+    let has_user_pipeline = has_user_pipeline(pipelines);
+    log::debug!(
+        "[Pipeline] source preservation check stream={org_id}/{stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, source_buffered={source_buffered}",
+        pipelines.len()
+    );
+    !has_user_pipeline && !source_buffered
+}
+
 /// Whether the pipeline only scores records with an LLM, so its batch runs off the write path.
 pub fn is_llm_evaluation(pipeline: &ExecutablePipeline) -> bool {
     pipeline.kind == PipelineKind::Evaluation && pipeline.contains_llm_evaluation_node()

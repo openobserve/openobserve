@@ -693,7 +693,7 @@ async fn ingest_inner(
                             // a ResultArray record carries idx usize::MAX and has no source record
                             let local_val = settings.apply(
                                 local_val,
-                                original_options.get(idx).and_then(Option::as_ref),
+                                original_options.get(idx).cloned().flatten(),
                                 None,
                             );
 
@@ -722,19 +722,12 @@ async fn ingest_inner(
 
         crate::ingestion::join_llm_evaluations(evaluation_tasks, org_id, &stream_name).await;
 
-        // When only evaluation pipelines exist for this stream (no user pipeline
-        // is responsible for writing to the source stream), preserve original
-        // records by writing them back to the source stream.
-        let has_user_pipeline = crate::ingestion::has_user_pipeline(&executable_pipelines);
-        let has_evaluation_pipeline = executable_pipelines
-            .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::Evaluation);
-        log::debug!(
-            "[LOGS] source preservation check stream={stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, has_evaluation_pipeline={has_evaluation_pipeline}, source_buffered={}",
-            executable_pipelines.len(),
-            json_data_by_stream.contains_key(&stream_name)
-        );
-        if !has_user_pipeline && !json_data_by_stream.contains_key(&stream_name) {
+        if crate::ingestion::should_preserve_source(
+            org_id,
+            &stream_name,
+            &executable_pipelines,
+            json_data_by_stream.contains_key(&stream_name),
+        ) {
             for (idx, item) in pipeline_inputs.iter().enumerate() {
                 let _ = finalize_and_buffer_record(
                     item.clone(),
@@ -1120,7 +1113,7 @@ fn finalize_and_buffer_record(
             .is_some_and(|v| *v),
         all_values_max_len: ctx.index_all_max_value_length,
     };
-    let local_val = settings.apply(local_val, original_data.as_ref(), None);
+    let local_val = settings.apply(local_val, original_data, None);
     match ctx.json_data_by_stream.get_mut(ctx.stream_name) {
         Some((ts_data, fn_num)) => {
             ts_data.push((timestamp, local_val));

@@ -1226,19 +1226,12 @@ pub async fn handle_otlp_request(
 
         crate::ingestion::join_llm_evaluations(evaluation_tasks, org_id, &traces_stream_name).await;
 
-        // When only evaluation pipelines exist for this stream (no user pipeline
-        // is responsible for writing to the source stream), preserve original
-        // records by writing them back to the source stream.
-        let has_user_pipeline = crate::ingestion::has_user_pipeline(&executable_pipelines);
-        let has_evaluation_pipeline = executable_pipelines
-            .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::Evaluation);
-        log::debug!(
-            "[TRACES:OTLP] source preservation check org_id={org_id}, stream={traces_stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, has_evaluation_pipeline={has_evaluation_pipeline}, source_buffered={}",
-            executable_pipelines.len(),
-            json_data_by_stream.contains_key(&traces_stream_name)
-        );
-        if !has_user_pipeline && !json_data_by_stream.contains_key(&traces_stream_name) {
+        if crate::ingestion::should_preserve_source(
+            org_id,
+            &traces_stream_name,
+            &executable_pipelines,
+            json_data_by_stream.contains_key(&traces_stream_name),
+        ) {
             for value in &stream_pipeline_inputs {
                 let _ = finalize_and_buffer_trace_span(
                     value.clone(),
