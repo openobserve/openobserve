@@ -154,6 +154,29 @@ describe("AlertCalibrationSettings", () => {
     wrapper.unmount();
   });
 
+  it("a_reader_who_may_not_run_is_told_why_in_the_run_now_card_not_offered_a_missing_button_F_N3", async () => {
+    vi.mocked(alertCalibration.getConfig).mockResolvedValue({
+      data: { ...stored, can_edit: false, can_run: false },
+    } as never);
+    const wrapper = await mountSettings();
+    expect(wrapper.text()).not.toContain("Asks for a run now instead of waiting");
+    expect(wrapper.find('[data-test="alert-calibration-settings-run-denied"]').text()).toBe(
+      "You don't have permission to run Alert calibration. Ask an admin for edit access to it.",
+    );
+    wrapper.unmount();
+  });
+
+  it("a_reader_who_may_run_keeps_the_run_now_hint_and_button", async () => {
+    vi.mocked(alertCalibration.getConfig).mockResolvedValue({ data: stored } as never);
+    const wrapper = await mountSettings();
+    expect(wrapper.text()).toContain("Asks for a run now instead of waiting");
+    expect(wrapper.find('[data-test="alert-calibration-settings-run"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-calibration-settings-run-denied"]').exists()).toBe(
+      false,
+    );
+    wrapper.unmount();
+  });
+
   it("a_save_refused_for_rights_turns_the_form_read_only_and_says_what_is_missing", async () => {
     vi.mocked(alertCalibration.getConfig).mockResolvedValue({ data: stored } as never);
     vi.mocked(alertCalibration.updateConfig).mockRejectedValue(
