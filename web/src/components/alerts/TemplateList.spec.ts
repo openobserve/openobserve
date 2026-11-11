@@ -83,6 +83,17 @@ describe("Alert List", async () => {
     vi.clearAllMocks();
   });
 
+  // B27: other kinds skip a prebuilt channel template, so its row says Alert; prebuilt_default serves all.
+  it("names Alert for a prebuilt channel row and All kinds for prebuilt_default", () => {
+    const vm = wrapper.vm as any;
+    expect(
+      String(vm.appliesToText({ name: "prebuilt_slack", isPrebuilt: true, applies_to: [] })),
+    ).toBe("Alert");
+    expect(
+      String(vm.appliesToText({ name: "prebuilt_default", isPrebuilt: true, applies_to: [] })),
+    ).toBe("All kinds");
+  });
+
   it("shows each template's kinds and counts the user templates that apply to every kind", async () => {
     const vm = wrapper.vm as any;
     const userAllKinds = vm.templates.filter(

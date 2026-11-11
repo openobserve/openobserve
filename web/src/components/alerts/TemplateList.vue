@@ -925,14 +925,18 @@ const appliesToFilterOptions = computed(() => [
   ...NOTIFICATION_KINDS.map((kind) => ({ label: t(kindLabelKey(kind)), value: kind })),
 ]);
 const isAllKinds = (row: Template) => !row.applies_to?.length;
+// A prebuilt channel template serves alerts only: other kinds skip it from a destination.
+// prebuilt_default is the fallback for every kind.
 const appliesToText = (row: Template) =>
-  isAllKinds(row)
-    ? t("alert_templates.appliesToAll")
-    : raw(
-        NOTIFICATION_KINDS.filter((k) => row.applies_to?.includes(k))
-          .map((k) => String(t(kindLabelKey(k))))
-          .join(", "),
-      );
+  row.isPrebuilt && row.name !== "prebuilt_default"
+    ? t(kindLabelKey("alert"))
+    : isAllKinds(row)
+      ? t("alert_templates.appliesToAll")
+      : raw(
+          NOTIFICATION_KINDS.filter((k) => row.applies_to?.includes(k))
+            .map((k) => String(t(kindLabelKey(k))))
+            .join(", "),
+        );
 
 // The upgrade stored every existing template as every kind; the notice stays until dismissed.
 const allKindsNoticeKey = computed(() => `o2-templates-all-kinds-notice:${orgIdForList.value}`);

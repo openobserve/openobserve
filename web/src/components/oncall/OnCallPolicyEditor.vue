@@ -466,6 +466,7 @@
                     kind="on_call"
                     :model-value="templateOverride"
                     :destinations="templateDestinations"
+                    :server-error="templateError"
                     @update:model-value="templateOverride = $event"
                   />
                 </div>
@@ -615,6 +616,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import TemplateOverridePicker from "@/components/alerts/TemplateOverridePicker.vue";
+import { templateBindingError } from "@/utils/alerts/templateBindingError";
 import { isSlackAppDestination } from "@/utils/slackAppDestination";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
@@ -791,6 +793,8 @@ const saveChannelWrite = useMutation(() => setTeamChannelMutation(orgId.value, p
 
 /// The team's room, read whole with its provenance.
 const teamChannel = ref<TeamChannel | null>(null);
+/// Whether that read finished: until it does, the room and so the picker's visibility are unknown.
+const teamChannelRead = ref<"pending" | "loaded" | "failed">("pending");
 const teamChannelDraft = ref<string[]>([]);
 /// "Use the policy's list" pressed: Save sends `null`, which is a different fact from an empty list.
 const channelBackToPolicy = ref(false);
@@ -817,6 +821,18 @@ const roomDestinations = computed(() =>
 // Room posts render with the policy's template too, so the picker shows without a webhook rung.
 const templateEnabled = computed(() => webhookEnabled.value || roomDestinations.value.length > 0);
 
+// A hidden picker clears the override on save, but only once the room is known to be empty:
+// a pending or failed team channel read must not drop a template the user cannot see.
+const templateConfirmedOff = computed(
+  () => !templateEnabled.value && teamChannelRead.value === "loaded",
+);
+
+/// The server's refusal of the picked template, shown under the picker until the pick changes.
+const templateError = ref<string | null>(null);
+watch(templateOverride, () => {
+  templateError.value = null;
+});
+
 const templateDestinations = computed(() => {
   const paged = webhookEnabled.value ? destinations.value : [];
   return [...new Set([...paged, ...roomDestinations.value])].map((name) => ({
@@ -837,6 +853,7 @@ function usePolicyChannel() {
 
 // Uncached read-modify-write: a stale entry would seed the draft and be saved back.
 async function fetchTeamChannel() {
+  teamChannelRead.value = "pending";
   try {
     const res = await oncallService.getTeamChannel({
       org_identifier: orgId.value,
@@ -845,9 +862,11 @@ async function fetchTeamChannel() {
     teamChannel.value = res.data ?? null;
     teamChannelDraft.value = [...(res.data?.destinations ?? [])];
     channelBackToPolicy.value = false;
+    teamChannelRead.value = "loaded";
   } catch (err) {
     noteDenial(err);
     teamChannel.value = null;
+    teamChannelRead.value = "failed";
   }
 }
 
@@ -1287,7 +1306,7 @@ async function save(): Promise<boolean> {
     await savePolicyWrite.mutateAsync({
       rungs: draft.value,
       destinations: destinations.value,
-      template: templateOverride.value,
+      template: templateConfirmedOff.value ? null : templateOverride.value,
       ...(l0Touched.value && l0Draft.value ? { l0: l0Draft.value } : {}),
     });
     if (!(await saveChannelAfterPolicy())) {
@@ -1300,6 +1319,7 @@ async function save(): Promise<boolean> {
     return true;
   } catch (err: unknown) {
     noteConfigurationDenied(err);
+    templateError.value = templateBindingError(err);
     toast({
       variant: "error",
       message: raw(serverMessageOf(err)) || t("oncall.savePolicyFailed"),

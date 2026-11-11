@@ -45,6 +45,7 @@ import { getFoldersListByType } from "@/utils/commons";
 import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { templateBindingError } from "@/utils/alerts/templateBindingError";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import {
@@ -363,6 +364,16 @@ const reentryErrors = computed<Record<string, string>>(() =>
   ),
 );
 
+// A template refusal is about the stored pick; a new pick clears it.
+watch(
+  () => check.value.template,
+  () => {
+    if (!validationErrors.value.template) return;
+    const { template: _cleared, ...rest } = validationErrors.value;
+    validationErrors.value = rest;
+  },
+);
+
 onMounted(async () => {
   fetchFolders();
   fetchLocations();
@@ -411,6 +422,9 @@ async function persistCheck(): Promise<"saved" | "missing" | "failed"> {
   } catch (err: any) {
     dismiss();
     if (err?.response?.status === 404) return "missing";
+    const templateError = templateBindingError(err);
+    if (templateError)
+      validationErrors.value = { ...validationErrors.value, template: templateError };
     toast({
       variant: "error",
       message:
