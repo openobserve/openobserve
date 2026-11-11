@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OCheckbox
         size="sm"
         :model-value="tick"
-        :disabled="disabled || group.locked || creatable === 0"
+        :disabled="disabled || group.locked || addable === 0"
         :aria-label="t('insight.bulk.tickGroup', { group: title })"
         :data-test="`bulk-review-group-tick-${slug}`"
         @update:model-value="(v) => emit('toggle', v === true)"
@@ -146,7 +146,8 @@ import { copyRequestLabel, groupMeta, groupTitle, lockedLine, requestText } from
 import {
   NO_TEAM,
   groupTick,
-  isTickable,
+  isAddable,
+  tickedIn,
   type FolderRef,
   type ReviewGroup,
   type ReviewRow,
@@ -186,11 +187,9 @@ watch(editing, (open) => {
 
 const slug = computed(() => props.group.key.replace(/[^a-zA-Z0-9_-]+/g, "-"));
 const title = computed(() => groupTitle(t, props.group));
-const creatable = computed(() => props.group.rows.filter(isTickable).length);
+const addable = computed(() => props.group.rows.filter(isAddable).length);
 const tick = computed(() => groupTick(props.group, props.ticked));
-const tickedCount = computed(
-  () => props.group.rows.filter((r) => isTickable(r) && props.ticked.has(r.key)).length,
-);
+const tickedCount = computed(() => tickedIn(props.group.rows, props.ticked).length);
 const meta = computed(() =>
   groupMeta(t, String(locale.value), props.group, tickedCount.value, props.reachGap),
 );

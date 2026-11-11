@@ -850,6 +850,38 @@ describe("BulkReviewDrawer — drafts the org already has", () => {
     expect(review.toCreate.value.map((r) => r.key)).toEqual(["ingest-c"]);
   });
 
+  it("counts a row that only needs a threshold as addable, in the header and the footer alike", async () => {
+    api.list.mockResolvedValue({
+      data: { list: [existing("svc-ingest-b-no-data", "f-ingest", "ingest", "al-b")] },
+    });
+    api.schema.mockResolvedValue({
+      data: { schema: [{ name: "service_name" }, { name: "level", type: "Utf8" }] },
+    });
+    measureBaseline.mockResolvedValue(null);
+    await mountDrawer();
+    const [added, other] = m12Rows(IDS).slice(0, 2);
+    const { schema: _schema, ...scope } = other.scope as typeof other.scope & { schema?: string[] };
+    await openWith([added, { ...other, scope, key: "errs", kind: "errors", usually: null }]);
+    await flushPromises();
+    const meta = () => text("bulk-review-group-meta-team-ingest").split(" · ").at(-1);
+    expect(text("bulk-review-no-usual-errs")).toBe("None in 7 days");
+    expect(meta()).toBe("0 of 1 ticked");
+    expect(q("bulk-review-group-tick-team-ingest")!.querySelector("button")!.disabled).toBe(false);
+    expect(text("bulk-review-footer")).toBe(
+      "Nothing is ticked, so nothing will be created. 1 was already added and is left out.",
+    );
+    const input = document.querySelector<HTMLInputElement>(
+      '[data-test="bulk-review-firesWhen-errs"] [data-test="bulk-review-threshold-errs"] input',
+    )!;
+    input.value = "40";
+    input.dispatchEvent(new Event("input"));
+    await flushPromises();
+    expect(meta()).toBe("1");
+    expect(text("bulk-review-footer")).toContain(
+      "1 alert will be created in folder ingest. 1 was already added and is left out.",
+    );
+  });
+
   it("says a group has nothing to add and disables its tick when every row was already added", async () => {
     api.list.mockResolvedValue({
       data: {

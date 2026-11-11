@@ -18,7 +18,7 @@ import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { placeLabels } from "../../live/liveCopy";
 import { deniedLine } from "../insightCta";
 import {
-  isTickable,
+  isAddable,
   type BulkKind,
   type FolderRef,
   type ReviewGroup,
@@ -228,8 +228,8 @@ export const groupMeta = (
     parts.push(raw(number(locale, group.rows.length)));
     return parts;
   }
-  // Counts what Add can send, as the footer does; added or unbuildable rows are left out.
-  const addable = group.rows.filter(isTickable).length;
+  // Added, unbuildable or never-firing rows are left out; a row that only needs a threshold counts.
+  const addable = group.rows.filter(isAddable).length;
   if (addable === 0) parts.push(t("insight.bulk.nothingToAdd"));
   else if (ticked === addable) parts.push(raw(number(locale, addable)));
   else parts.push(t("insight.bulk.ticked", { ticked, count: addable }));

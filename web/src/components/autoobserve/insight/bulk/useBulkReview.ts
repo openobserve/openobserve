@@ -516,6 +516,14 @@ export const groupRows = (rows: ReviewRow[], by: GroupBy): ReviewGroup[] => {
 export const isTickable = (row: ReviewRow): boolean =>
   !row.locked && (waiting(row.block) || (!!row.prefill && !row.block));
 
+/** A row the user can add: tickable now, or waiting only for the threshold they type. */
+export const isAddable = (row: ReviewRow): boolean =>
+  isTickable(row) || (!row.locked && row.block?.code === "noBaseline");
+
+/** The rows of a list that are ticked and may be sent, as the footer and each group header count them. */
+export const tickedIn = (rows: ReviewRow[], ticked: Set<string>): ReviewRow[] =>
+  rows.filter((r) => ticked.has(r.key) && isTickable(r));
+
 /** A row that can be created now: tickable, and its stream fields are confirmed. */
 export const isCreatable = (row: ReviewRow): boolean => isTickable(row) && !row.block;
 
@@ -863,9 +871,7 @@ export const useBulkReview = () => ({
   groups,
   toCreate: computed(() => rowsToCreate(reviewRows.value, state.ticked)),
   /** The ticked rows the footer counts, including those still waiting for their fields. */
-  tickedRows: computed(() =>
-    reviewRows.value.filter((r) => state.ticked.has(r.key) && isTickable(r)),
-  ),
+  tickedRows: computed(() => tickedIn(reviewRows.value, state.ticked)),
   /** Rows Add would send that name no destination; they reach on-call only through their incident. */
   silent: computed(() =>
     reviewRows.value.filter(
