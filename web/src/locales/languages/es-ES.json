@@ -1712,7 +1712,9 @@
       "rerunCancelled": "Nueva ejecución cancelada tras {elapsed}. Se muestran los resultados anteriores.",
       "rerunCancelledNow": "Nueva ejecución cancelada. Se muestran los resultados anteriores.",
       "analyzeSucceeded": "La última ejecución se completó correctamente",
-      "analyzeFailedShort": "La última ejecución falló"
+      "analyzeFailedShort": "La última ejecución falló",
+      "analyzeWarned": "La última ejecución terminó con advertencias",
+      "analyzePartial": "La ejecución terminó, pero los resultados pueden estar incompletos."
     },
     "errorDeletingSavedView": "Error al eliminar la vista guardada.",
     "errorCreatingSavedView": "Error al crear la vista guardada.",

@@ -1712,7 +1712,9 @@
       "rerunCancelled": "Ponowne uruchomienie anulowano po {elapsed}. Wyświetlane są poprzednie wyniki.",
       "rerunCancelledNow": "Ponowne uruchomienie anulowano. Wyświetlane są poprzednie wyniki.",
       "analyzeSucceeded": "Ostatnie uruchomienie powiodło się",
-      "analyzeFailedShort": "Ostatnie uruchomienie nie powiodło się"
+      "analyzeFailedShort": "Ostatnie uruchomienie nie powiodło się",
+      "analyzeWarned": "Ostatnie uruchomienie zakończone z ostrzeżeniami",
+      "analyzePartial": "Uruchomienie zakończyło się, ale wyniki mogą być niepełne."
     },
     "errorDeletingSavedView": "Błąd podczas usuwania zapisanego widoku.",
     "errorCreatingSavedView": "Błąd podczas tworzenia zapisanego widoku.",

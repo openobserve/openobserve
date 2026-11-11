@@ -1712,7 +1712,9 @@
       "rerunCancelled": "重新运行已在 {elapsed} 后取消。正在显示之前的结果。",
       "rerunCancelledNow": "重新运行已取消。正在显示之前的结果。",
       "analyzeSucceeded": "上次运行成功",
-      "analyzeFailedShort": "上次运行失败"
+      "analyzeFailedShort": "上次运行失败",
+      "analyzeWarned": "上次运行已完成，但有警告",
+      "analyzePartial": "运行已完成，但结果可能不完整。"
     },
     "errorDeletingSavedView": "删除保存的视图时出错。",
     "errorCreatingSavedView": "创建保存的视图时出错。",

@@ -1712,7 +1712,9 @@
       "rerunCancelled": "Yeniden çalıştırma {elapsed} sonra iptal edildi. Önceki sonuçlar gösteriliyor.",
       "rerunCancelledNow": "Yeniden çalıştırma iptal edildi. Önceki sonuçlar gösteriliyor.",
       "analyzeSucceeded": "Son çalıştırma başarılı oldu",
-      "analyzeFailedShort": "Son çalıştırma başarısız oldu"
+      "analyzeFailedShort": "Son çalıştırma başarısız oldu",
+      "analyzeWarned": "Son çalıştırma uyarılarla tamamlandı",
+      "analyzePartial": "Çalıştırma tamamlandı, ancak sonuçlar eksik olabilir."
     },
     "errorDeletingSavedView": "Kaydedilmiş görünümü silerken hata oluştu.",
     "errorCreatingSavedView": "Kaydedilmiş görünüm oluşturulurken hata oluştu.",

@@ -1712,7 +1712,9 @@
       "rerunCancelled": "Đã hủy chạy lại sau {elapsed}. Đang hiển thị kết quả trước đó.",
       "rerunCancelledNow": "Đã hủy chạy lại. Đang hiển thị kết quả trước đó.",
       "analyzeSucceeded": "Lần chạy trước thành công",
-      "analyzeFailedShort": "Lần chạy trước thất bại"
+      "analyzeFailedShort": "Lần chạy trước thất bại",
+      "analyzeWarned": "Lần chạy gần nhất hoàn tất kèm cảnh báo",
+      "analyzePartial": "Lần chạy đã hoàn tất nhưng kết quả có thể chưa đầy đủ."
     },
     "errorDeletingSavedView": "Lỗi khi xóa chế độ xem đã lưu.",
     "errorCreatingSavedView": "Lỗi khi tạo chế độ xem đã lưu.",
