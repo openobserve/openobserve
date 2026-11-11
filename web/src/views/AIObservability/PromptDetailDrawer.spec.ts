@@ -20,6 +20,8 @@ vi.mock("@/composables/useConfirmDialog", () => ({
   useConfirmDialog: () => ({ confirm: mocks.confirm }),
 }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
 import PromptDetailDrawer from "./PromptDetailDrawer.vue";
 import PromptLabelsPanel from "./PromptLabelsPanel.vue";
 import PromptVersionDiff from "./PromptVersionDiff.vue";
@@ -62,7 +64,7 @@ const ODialogStub = {
   template: "<div v-if='open'><slot /></div>",
 };
 
-function mountDrawer(initialVersion = 1, initialTab = "labels") {
+function mountDrawer(initialVersion = 1, initialTab = "labels", showPlayground?: boolean) {
   return shallowMount(PromptDetailDrawer, {
     props: {
       open: true,
@@ -71,6 +73,7 @@ function mountDrawer(initialVersion = 1, initialTab = "labels") {
       initialTab,
       initialVersion,
       protectedLabels: ["production"],
+      ...(showPlayground === undefined ? {} : { showPlayground }),
     },
     global: {
       stubs: {
@@ -99,6 +102,7 @@ describe("prompt detail navigation and labels", () => {
     await panel.props("saveLabel")("production", 2);
     await flushPromises();
     expect(mocks.moveLabel).toHaveBeenCalledWith("org", "prompt-1", "production", 2, 1);
+    expect(analytics.track).toHaveBeenCalledWith("llm_prompt_label_moved", { protected: true });
     expect(mocks.get).toHaveBeenCalledTimes(1);
     expect(wrapper.findComponent(PromptLabelsPanel).props("selectedVersion")).toBe(1);
     expect(wrapper.emitted("updated")).toHaveLength(1);
@@ -131,6 +135,7 @@ describe("prompt detail navigation and labels", () => {
     dialog.vm.$emit("click:primary");
     await flushPromises();
     expect(mocks.deleteLabel).toHaveBeenCalledWith("org", "prompt-1", "production", 1);
+    expect(analytics.track).toHaveBeenCalledWith("llm_prompt_label_deleted", { protected: true });
     expect(wrapper.findComponent(ODialogStub).props("open")).toBe(false);
   });
 
@@ -142,6 +147,7 @@ describe("prompt detail navigation and labels", () => {
     wrapper.findComponent(ODialogStub).vm.$emit("click:secondary");
     await flushPromises();
     expect(mocks.deleteLabel).not.toHaveBeenCalled();
+    expect(analytics.track).not.toHaveBeenCalledWith("llm_prompt_label_deleted", expect.anything());
     expect(wrapper.findComponent(ODialogStub).props("open")).toBe(false);
   });
 
@@ -190,8 +196,23 @@ describe("prompt detail navigation and labels", () => {
     const diff = wrapper.findComponent(PromptVersionDiff);
     expect(diff.props("left").version).toBe(1);
     expect(diff.props("right").version).toBe(3);
+    expect(analytics.track).toHaveBeenCalledWith("llm_prompt_versions_compared");
     (wrapper.vm as unknown as { swapCompared: () => void }).swapCompared();
     await flushPromises();
     expect(wrapper.findComponent(PromptVersionDiff).props("left").version).toBe(3);
+  });
+});
+
+describe("prompt detail Playground entry", () => {
+  it("shows the Playground action by default", async () => {
+    const wrapper = mountDrawer();
+    await flushPromises();
+    expect(wrapper.find('[data-test="prompt-detail-playground"]').exists()).toBe(true);
+  });
+
+  it("hides the Playground action when Playground is unavailable", async () => {
+    const wrapper = mountDrawer(1, "labels", false);
+    await flushPromises();
+    expect(wrapper.find('[data-test="prompt-detail-playground"]').exists()).toBe(false);
   });
 });

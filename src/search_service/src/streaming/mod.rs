@@ -46,7 +46,6 @@ use o2_enterprise::enterprise::{
 use sqlparser::ast::VisitMut;
 use tokio::sync::mpsc;
 use tracing::Instrument;
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 use vector_enrichment::TableRegistry;
 
 // Only used by the enterprise pattern-extraction path (per-pattern volume buckets).
@@ -81,6 +80,7 @@ pub use sorting::order_search_results;
 
 /// Main function to process search stream requests
 #[allow(clippy::too_many_arguments)]
+#[tracing::instrument(name = "service::search::search_stream_h2", skip_all, parent = &search_span)]
 pub async fn process_search_stream_request(
     trace_id: String,
     org_id: String,
@@ -97,10 +97,6 @@ pub async fn process_search_stream_request(
     is_multi_stream_search: bool,
     extract_patterns: bool,
 ) {
-    let root_span = tracing::info_span!("service::search::search_stream_h2");
-    let _ = root_span.set_parent(search_span.context());
-    let _guard = root_span.enter();
-
     log::info!(
         "[HTTP2_STREAM trace_id {trace_id}] Received HTTP/2 stream request for org_id: {org_id}",
     );
@@ -187,7 +183,8 @@ pub async fn process_search_stream_request(
         .query
         .sql
         .contains(config::utils::query_select_utils::O2_CUSTOM_SUFFIX);
-    let needs_histogram = req.query.histogram_interval == 0 && req.query.sql.contains("histogram(");
+    let needs_histogram = req.query.histogram_interval == 0
+        && crate::sql::histogram::mentions_histogram(&req.query.sql);
 
     if has_custom_patterns || needs_histogram {
         match config::utils::query_select_utils::parse_and_replace_o2_custom_patterns(
@@ -223,6 +220,9 @@ pub async fn process_search_stream_request(
     let started_at = chrono::Utc::now().timestamp_micros();
     let start = Instant::now();
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
+    if !search_cache::is_result_cache_allowed(stream_type) {
+        req.use_cache = false;
+    }
     // Disable caching when pattern extraction is requested since patterns are generated
     // dynamically from search results and cannot be cached
     let use_cache = req.use_cache && !extract_patterns;
@@ -268,16 +268,26 @@ pub async fn process_search_stream_request(
         && req.query.streaming_id.is_none()
     {
         // check cache for the first page
-        let (c_resp, _should_exec_query) = match search_cache::prepare_cache_response(
-            &trace_id,
-            &org_id,
-            stream_type,
-            &mut req,
-            use_cache,
-        )
-        .instrument(search_span.clone())
-        .await
-        {
+        let pin_result = crate::sql::histogram::pin_histogram_timezone(
+            &mut req.query.sql,
+            &mut req.query.timezone,
+            req.query.end_time,
+        );
+        let cache_result = match pin_result {
+            Ok(()) => {
+                search_cache::prepare_cache_response(
+                    &trace_id,
+                    &org_id,
+                    stream_type,
+                    &mut req,
+                    use_cache,
+                )
+                .instrument(search_span.clone())
+                .await
+            }
+            Err(e) => Err(e),
+        };
+        let (c_resp, _should_exec_query) = match cache_result {
             Ok(v) => v,
             Err(e) => {
                 log::error!("[HTTP2_STREAM trace_id {trace_id}] Failed to check cache: {e}");
@@ -289,6 +299,8 @@ pub async fn process_search_stream_request(
                     if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
+                            login_ip: None,
+                            user_agent: None,
                             user_email: user_id,
                             org_id,
                             _timestamp: config::utils::time::now_micros(),
@@ -307,6 +319,8 @@ pub async fn process_search_stream_request(
                                 trace_id: Some(trace_id.to_string()),
                             },
                             delegated: None,
+                            fleet_id: None,
+                            target: None,
                         })
                         .await;
                     }
@@ -395,6 +409,8 @@ pub async fn process_search_stream_request(
                     if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
+                            login_ip: None,
+                            user_agent: None,
                             user_email: user_id,
                             org_id,
                             _timestamp: config::utils::time::now_micros(),
@@ -413,6 +429,8 @@ pub async fn process_search_stream_request(
                                 trace_id: Some(trace_id.to_string()),
                             },
                             delegated: None,
+                            fleet_id: None,
+                            target: None,
                         })
                         .await;
                     }
@@ -476,6 +494,8 @@ pub async fn process_search_stream_request(
                     if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
+                            login_ip: None,
+                            user_agent: None,
                             user_email: user_id,
                             org_id,
                             _timestamp: config::utils::time::now_micros(),
@@ -494,6 +514,8 @@ pub async fn process_search_stream_request(
                                 trace_id: Some(trace_id.to_string()),
                             },
                             delegated: None,
+                            fleet_id: None,
+                            target: None,
                         })
                         .await;
                     }
@@ -548,6 +570,8 @@ pub async fn process_search_stream_request(
                     if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
+                            login_ip: None,
+                            user_agent: None,
                             user_email: user_id,
                             org_id,
                             _timestamp: config::utils::time::now_micros(),
@@ -566,6 +590,8 @@ pub async fn process_search_stream_request(
                                 trace_id: Some(trace_id.to_string()),
                             },
                             delegated: None,
+                            fleet_id: None,
+                            target: None,
                         })
                         .await;
                     }
@@ -612,6 +638,8 @@ pub async fn process_search_stream_request(
                 if audit_enabled {
                     // Using spawn to handle the async call
                     audit(AuditMessage {
+                        login_ip: None,
+                        user_agent: None,
                         user_email: user_id,
                         org_id,
                         _timestamp: config::utils::time::now_micros(),
@@ -630,6 +658,8 @@ pub async fn process_search_stream_request(
                             trace_id: Some(trace_id.to_string()),
                         },
                         delegated: None,
+                        fleet_id: None,
+                        target: None,
                     })
                     .await;
                 }
@@ -691,6 +721,8 @@ pub async fn process_search_stream_request(
         {
             // Using spawn to handle the async call
             audit(AuditMessage {
+                login_ip: None,
+                user_agent: None,
                 user_email: user_id,
                 org_id,
                 _timestamp: config::utils::time::now_micros(),
@@ -705,6 +737,8 @@ pub async fn process_search_stream_request(
                     trace_id: Some(trace_id.to_string()),
                 },
                 delegated: None,
+                fleet_id: None,
+                target: None,
             })
             .await;
         }
@@ -816,6 +850,7 @@ pub async fn process_search_stream_request(
 /// Multi-stream search processing function that handles multiple independent queries
 /// and streams results as they become available from each query
 #[allow(clippy::too_many_arguments)]
+#[tracing::instrument(name = "service::search::search_multi_stream_h2", skip_all, parent = &search_span)]
 pub async fn process_search_stream_request_multi(
     trace_id: String,
     org_id: String,
@@ -836,10 +871,6 @@ pub async fn process_search_stream_request_multi(
     // Top-level VRL function for post-hoc application. Only used when needs_post_vrl=true.
     query_fn: Option<String>,
 ) {
-    let root_span = tracing::info_span!("service::search::search_multi_stream_h2");
-    let _ = root_span.set_parent(search_span.context());
-    let _guard = root_span.enter();
-
     log::debug!(
         "[HTTP2_STREAM_MULTI trace_id {trace_id}] Processing multi-stream request with {} queries for org_id: {org_id}, needs_post_vrl: {needs_post_vrl}",
         queries.len()
@@ -1116,6 +1147,8 @@ pub async fn process_search_stream_request_multi(
         && get_o2_config().common.audit_enabled
     {
         audit(AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: user_id,
             org_id,
             _timestamp: config::utils::time::now_micros(),
@@ -1130,6 +1163,8 @@ pub async fn process_search_stream_request_multi(
                 trace_id: Some(trace_id.to_string()),
             },
             delegated: None,
+            fleet_id: None,
+            target: None,
         })
         .await;
     }
@@ -1391,8 +1426,20 @@ mod tests {
         utils::json,
     };
     use tokio::sync::mpsc;
+    use tracing_subscriber::Registry;
 
-    use super::apply_vrl_to_multi_results;
+    use super::{
+        apply_vrl_to_multi_results, process_search_stream_request,
+        process_search_stream_request_multi,
+    };
+
+    type StreamItem = Result<StreamResponses, infra::errors::Error>;
+
+    fn full_channel() -> (mpsc::Sender<StreamItem>, mpsc::Receiver<StreamItem>) {
+        let (tx, rx) = mpsc::channel(1);
+        tx.try_send(Ok(StreamResponses::Done)).unwrap();
+        (tx, rx)
+    }
 
     /// Helper: collect all StreamResponses::SearchResponse from the receiver channel.
     async fn collect_responses(
@@ -1572,5 +1619,55 @@ for_each(result) -> |_idx, query_hits| {
             responses[1].hits.is_empty(),
             "Empty query should produce empty hits"
         );
+    }
+
+    #[tokio::test]
+    async fn test_search_stream_leaves_no_span_entered_while_suspended() {
+        let _subscriber = tracing::subscriber::set_default(Registry::default());
+        let (tx, _rx) = full_channel();
+        let mut fut = std::pin::pin!(process_search_stream_request(
+            "trace".to_string(),
+            "org".to_string(),
+            "user".to_string(),
+            config::meta::search::Request::default(),
+            config::meta::stream::StreamType::Logs,
+            vec!["stream".to_string()],
+            config::meta::sql::OrderBy::default(),
+            tracing::info_span!("search"),
+            tx,
+            None,
+            None,
+            None,
+            false,
+            false,
+        ));
+
+        assert!(futures::poll!(fut.as_mut()).is_pending());
+        assert!(tracing::Span::current().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_search_multi_stream_leaves_no_span_entered_while_suspended() {
+        let _subscriber = tracing::subscriber::set_default(Registry::default());
+        let (tx, _rx) = full_channel();
+        let mut fut = std::pin::pin!(process_search_stream_request_multi(
+            "trace".to_string(),
+            "org".to_string(),
+            "user".to_string(),
+            vec![config::meta::search::Request::default()],
+            config::meta::stream::StreamType::Logs,
+            tracing::info_span!("search"),
+            tx,
+            None,
+            None,
+            None,
+            None,
+            None,
+            false,
+            None,
+        ));
+
+        assert!(futures::poll!(fut.as_mut()).is_pending());
+        assert!(tracing::Span::current().is_none());
     }
 }

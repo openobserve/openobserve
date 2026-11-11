@@ -3,6 +3,7 @@ import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import enLocale from "@/locales/languages/en-US.json";
 import ORefreshButton from "./ORefreshButton.vue";
+import { raw } from "@/types/i18n";
 
 // The component calls useI18n() in setup, so an i18n instance must be installed
 // or vue-i18n throws "Need to install with app.use function". Source the real
@@ -136,6 +137,16 @@ describe("ORefreshButton", () => {
     expect(ran.find("button").attributes("aria-label")).toBe("Refresh, last refreshed 57s ago");
   });
 
+  it("shows a passed tooltip instead of the last-refreshed time", () => {
+    const wrapper = mount(ORefreshButton, {
+      props: { lastRunAt: Date.now() - 3_000, tooltip: raw("Data as of 16:19") },
+      global: globalConfig,
+    });
+    const tips = wrapper.findAll("[data-stub-tooltip]").map((tip) => tip.text());
+    expect(tips).toContain("Data as of 16:19");
+    expect(tips.some((tip) => tip.startsWith("Last refreshed"))).toBe(false);
+  });
+
   // --- layout="inline" ---
 
   describe("size", () => {
@@ -187,6 +198,13 @@ describe("ORefreshButton", () => {
       const wrapper = inline({ lastRunAt: 0 });
       expect(wrapper.find("span.tabular-nums").exists()).toBe(false);
       expect(wrapper.find("[data-stub-tooltip]").text()).toBe("Not yet refreshed");
+    });
+
+    it("is 32px by default and 34px at the header size", () => {
+      expect(inline().find("button").classes()).toContain("h-8!");
+      const header = inline({ size: "header" }).find("button");
+      expect(header.classes()).toContain("h-8.5!");
+      expect(header.classes()).not.toContain("h-8!");
     });
 
     it("forwards dataTest onto the button", () => {

@@ -25,6 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ]"
     >
       <OForm :form="form">
+        <p
+          v-if="storedIntervals"
+          class="text-text-secondary mb-3 text-xs"
+          data-test="anomaly-retrain-note"
+        >
+          {{ t("alerts.anomaly.retrainOnEditNote") }}
+        </p>
         <!-- Query Mode Tabs -->
         <div class="mb-4">
           <OFormToggleGroup name="query_mode" data-test="anomaly-query-tabs">
@@ -999,6 +1006,8 @@ export default defineComponent({
       untrained: "alerts.anomaly.autoUntrainedHelp",
       training: "alerts.anomaly.autoTrainingHelp",
       failed: "alerts.anomaly.autoFailedHelp",
+      waitingForData: "alerts.anomaly.autoWaitingForDataHelp",
+      notApplicable: "alerts.anomaly.autoNotApplicableHelp",
       retraining: "alerts.anomaly.autoRetrainingHelp",
       retrainFailed: "alerts.anomaly.autoRetrainFailedHelp",
       unconfirmed: "alerts.anomaly.autoUnconfirmedHelp",

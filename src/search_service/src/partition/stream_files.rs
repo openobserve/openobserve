@@ -16,10 +16,7 @@
 use std::cmp::max;
 
 use chrono::Utc;
-use config::{
-    get_config,
-    meta::{sql::TableReferenceExt, stream::StreamSettings},
-};
+use config::meta::sql::TableReferenceExt;
 use infra::{cache::stats, errors::Error, file_list::FileId, schema::unwrap_stream_settings};
 
 use crate::{
@@ -44,7 +41,6 @@ pub async fn collect_stream_files(
     ctx: &PartitionSqlContext,
 ) -> Result<StreamFiles, Error> {
     let start = std::time::Instant::now();
-    let cfg = get_config();
     let sql = &ctx.sql;
     let use_single_partition = ctx.use_single_partition;
     let org_id = &sql.org_id;
@@ -62,11 +58,7 @@ pub async fn collect_stream_files(
         let stream_name = stream.stream_name();
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
         let stats = stats::get_stream_stats(org_id, &stream_name, stream_type);
-        let use_stream_stats_for_partition = if stream_settings == StreamSettings::default() {
-            cfg.common.use_stream_settings_for_partitions_enabled
-        } else {
-            stream_settings.approx_partition
-        };
+        let use_stream_stats_for_partition = stream_settings.approx_partition;
 
         if !use_single_partition && !use_stream_stats_for_partition {
             let stream_files = crate::file_list::query_ids(
@@ -87,11 +79,19 @@ pub async fn collect_stream_files(
             max_query_range_in_hour = max(max_query_range_in_hour, settings_max_query_range);
             files.extend(stream_files);
         } else {
-            let data_retention = if stream_settings.data_retention > 0 {
-                stream_settings.data_retention
-            } else {
-                cfg.compact.data_retention_days
-            };
+            let data_retention = db::organization::stream_retention_days(
+                org_id,
+                stream_type,
+                &stream_name,
+                stream_settings.data_retention,
+            )
+            .await
+            .unwrap_or_else(|e| {
+                log::warn!(
+                    "[trace_id {trace_id}] can't read retention of {org_id}/{stream_name}, estimating with the global value: {e}"
+                );
+                db::organization::global_retention_days(stream_type)
+            });
             let mut data_retention = data_retention * 24 * 60 * 60;
 
             // if stats.doc_time_max is 0, handle the case by using current time

@@ -19,6 +19,7 @@ import useRoutes from "./router";
 import Login from "@/views/Login.vue";
 import store from "@/stores";
 import { routeGuard } from "@/utils/zincutils";
+import { loadSecurityAccess } from "@/composables/security/useSecurityAccess";
 import { isPaywalledDestination, shouldPaywallRoute } from "@/utils/auth";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import config from "@/aws-exports";
@@ -57,6 +58,11 @@ vi.mock("@/utils/zincutils", () => ({
   useLocalTimezone: vi.fn(),
   invalidateLoginData: vi.fn(),
   getPath: vi.fn(() => "/"),
+}));
+
+vi.mock("@/composables/security/useSecurityAccess", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/composables/security/useSecurityAccess")>()),
+  loadSecurityAccess: vi.fn(async () => ({ read: true, triage: true, admin: true })),
 }));
 
 // ---------------------------------------------------------------------------
@@ -265,6 +271,12 @@ describe("useRoutes (router.ts)", () => {
       const { parentRoutes } = useRoutes();
       const loginRoute = parentRoutes.find((r: any) => r.path === "/login");
       expect(loginRoute).toBeDefined();
+    });
+
+    it("should name the /login route so RUM gets a stable view name", () => {
+      const { parentRoutes } = useRoutes();
+      const loginRoute = parentRoutes.find((r: any) => r.path === "/login");
+      expect(loginRoute.name).toBe("login");
     });
 
     it("should have Login component for /login", () => {
@@ -883,6 +895,12 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe("traces/trace-details");
     });
 
+    it("turns on Ask AI for the routed trace detail page only", () => {
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "traceDetails");
+      expect(route.props).toEqual({ showAskAi: true });
+    });
+
     it("redirects the standalone Service Graph path to the canonical query tab", () => {
       config.isEnterprise = "true";
       const { homeChildRoutes } = useRoutes();
@@ -1062,6 +1080,21 @@ describe("useRoutes (router.ts)", () => {
       config.isEnterprise = "false";
       const { homeChildRoutes } = useRoutes();
       expect(findRoute(homeChildRoutes, name)).toBeDefined();
+    });
+  });
+
+  describe("homeChildRoutes — Security enterprise gate", () => {
+    it("does not register any Security route on an OSS build", () => {
+      config.isEnterprise = "false";
+      const { homeChildRoutes } = useRoutes();
+      expect(homeChildRoutes.some((r: any) => r.path?.startsWith("security"))).toBe(false);
+    });
+
+    it("registers the Security routes on an enterprise build", () => {
+      config.isEnterprise = "true";
+      const { homeChildRoutes } = useRoutes();
+      expect(findRoute(homeChildRoutes, "securityOverview")).toBeDefined();
+      expect(findRoute(homeChildRoutes, "securityContent")).toBeDefined();
     });
   });
 
@@ -2626,6 +2659,33 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("SLO import route", () => {
+    it("resolves slos/import to the import page, not an SLO detail with id 'import'", () => {
+      const { homeChildRoutes } = useRoutes();
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          {
+            path: "/",
+            component: { name: "Layout" },
+            children: homeChildRoutes.filter((r: any) => r !== catchAll),
+          },
+        ],
+      });
+      expect(router.resolve("/slos/import").name).toBe("importSlo");
+      expect(router.resolve("/slos/some-id").name).toBe("sloDetail");
+      expect(enTitle(findRoute(homeChildRoutes, "importSlo").meta.titleKey)).toBe("Import SLOs");
+    });
+
+    it("guards the import page with routeGuard", () => {
+      const route = findRoute(useRoutes().homeChildRoutes, "importSlo");
+      const next = vi.fn();
+      route.beforeEnter({}, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith({}, {}, next);
+    });
+  });
+
   describe("profiles route guard", () => {
     const enter = (zoConfig: Record<string, unknown>) => {
       const previous = store.state.zoConfig;
@@ -2650,6 +2710,321 @@ describe("useRoutes (router.ts)", () => {
     it("opens the page when profiling is on, or while /config is still loading", () => {
       expect(enter({ profiling_enabled: true })).toHaveBeenCalledWith();
       expect(enter({})).toHaveBeenCalledWith();
+    });
+  });
+
+  describe("license-locked downtimes and alert insights", () => {
+    const enter = (name: string, zoConfig: Record<string, unknown>) => {
+      const previous = store.state.zoConfig;
+      store.state.zoConfig = zoConfig;
+      try {
+        const route = findRoute(useRoutes().homeChildRoutes, name);
+        const next = vi.fn();
+        route.beforeEnter({ query: { org_identifier: "acme" } }, {}, next);
+        return { route, next };
+      } finally {
+        store.state.zoConfig = previous;
+      }
+    };
+
+    beforeEach(() => {
+      config.isEnterprise = "true";
+    });
+
+    it.each([
+      ["downtimes", "alerts", { downtimes_enabled: false }],
+      ["editDowntime", "alerts", { downtimes_enabled: false }],
+      ["alertCalibration", "alerts", { alert_calibration_enabled: false }],
+      ["alertCalibrationRuns", "alerts", { alert_calibration_enabled: false }],
+    ])("opens a locked %s page, tagged %s, though its flag is off", (name, feature, flags) => {
+      const { route, next } = enter(name, { ...flags, features: { [feature]: "locked" } });
+      expect(route.meta.licenseFeature).toBe(feature);
+      expect(next).toHaveBeenCalledWith();
+    });
+
+    it("still sends a hidden downtimes page with its flag off to Alerts", () => {
+      const { next } = enter("downtimes", {
+        downtimes_enabled: false,
+        features: { alerts: "hidden" },
+      });
+      expect(next).toHaveBeenCalledWith({ name: "alertList", query: { org_identifier: "acme" } });
+    });
+
+    it("tags Alert Sources with the incidents feature", () => {
+      expect(findRoute(useRoutes().homeChildRoutes, "alertSources").meta.licenseFeature).toBe(
+        "incidents",
+      );
+    });
+  });
+
+  describe("security route guard", () => {
+    const SECURITY_ROUTES = [
+      "securityOverview",
+      "securityEvents",
+      "securityDetections",
+      "securityAlerts",
+      "securityCases",
+      "securityEntities",
+      "securityIntel",
+      "securityUEBA",
+      "securityMitre",
+      "securitySources",
+      "securityContent",
+    ];
+
+    const enter = async (
+      name: string,
+      zoConfig: Record<string, unknown>,
+      query: Record<string, string> = { org_identifier: "acme" },
+    ) => {
+      const previous = store.state.zoConfig;
+      store.state.zoConfig = zoConfig;
+      try {
+        const next = vi.fn();
+        findRoute(useRoutes().homeChildRoutes, name).beforeEnter({ query }, {}, next);
+        await vi.waitFor(() => expect(next).toHaveBeenCalled());
+        return next;
+      } finally {
+        store.state.zoConfig = previous;
+      }
+    };
+
+    beforeEach(() => {
+      config.isEnterprise = "true";
+      vi.mocked(loadSecurityAccess).mockResolvedValue({ read: true, triage: false, admin: false });
+    });
+
+    it.each(SECURITY_ROUTES)("tags %s with the security license feature", (name) => {
+      expect(findRoute(useRoutes().homeChildRoutes, name).meta.licenseFeature).toBe("security");
+    });
+
+    it("opens a page for a reader of the org", async () => {
+      const next = await enter("securityCases", {});
+      expect(loadSecurityAccess).toHaveBeenCalledWith("acme");
+      expect(next).toHaveBeenCalledWith();
+    });
+
+    it.each(SECURITY_ROUTES)(
+      "opens %s without read, for the layout's access lock",
+      async (name) => {
+        vi.mocked(loadSecurityAccess).mockResolvedValue({
+          read: false,
+          triage: false,
+          admin: false,
+        });
+        const next = await enter(name, {});
+        expect(next).toHaveBeenCalledWith();
+      },
+    );
+
+    it("waits for the access answer instead of bouncing a cold load", async () => {
+      let answer!: (value: { read: boolean; triage: boolean; admin: boolean }) => void;
+      vi.mocked(loadSecurityAccess).mockReturnValue(new Promise((resolve) => (answer = resolve)));
+      const next = vi.fn();
+      findRoute(useRoutes().homeChildRoutes, "securityEvents").beforeEnter(
+        { query: { org_identifier: "acme" } },
+        {},
+        next,
+      );
+      await Promise.resolve();
+      expect(next).not.toHaveBeenCalled();
+      answer({ read: true, triage: false, admin: false });
+      await vi.waitFor(() => expect(next).toHaveBeenCalledWith());
+    });
+
+    it("renders a locked license locked rather than redirecting", async () => {
+      vi.mocked(loadSecurityAccess).mockResolvedValue({ read: false, triage: false, admin: false });
+      const next = await enter("securityAlerts", { features: { security: "locked" } });
+      expect(next).toHaveBeenCalledWith();
+      expect(loadSecurityAccess).not.toHaveBeenCalled();
+    });
+
+    it("sends a hidden license home without asking for access", async () => {
+      const next = await enter("securityAlerts", { features: { security: "hidden" } });
+      expect(next).toHaveBeenCalledWith({ name: "home", query: { org_identifier: "acme" } });
+      expect(loadSecurityAccess).not.toHaveBeenCalled();
+    });
+
+    it("lets a load with no org yet through, for the layout to decide", async () => {
+      const previousOrg = store.state.selectedOrganization;
+      store.state.selectedOrganization = {} as any;
+      try {
+        const next = await enter("securityOverview", {}, {});
+        expect(next).toHaveBeenCalledWith();
+        expect(loadSecurityAccess).not.toHaveBeenCalled();
+      } finally {
+        store.state.selectedOrganization = previousOrg;
+      }
+    });
+
+    it("forwards a routeGuard redirect untouched", async () => {
+      vi.mocked(routeGuard).mockImplementationOnce((_to: any, _from: any, next: any) =>
+        next({ name: "plans" }),
+      );
+      const next = await enter("securityOverview", {});
+      expect(next).toHaveBeenCalledWith({ name: "plans" });
+      expect(loadSecurityAccess).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("license feature tags", () => {
+    const shell = (path: string): any =>
+      useRoutes().homeChildRoutes.find((r: any) => r.path === path);
+
+    const enterShell = (path: string, zoConfig: Record<string, unknown>) => {
+      const previous = store.state.zoConfig;
+      store.state.zoConfig = zoConfig;
+      try {
+        const next = vi.fn();
+        shell(path).beforeEnter({ query: { org_identifier: "acme" } }, {}, next);
+        return next;
+      } finally {
+        store.state.zoConfig = previous;
+      }
+    };
+
+    it.each([
+      ["dashboards", "dashboards"],
+      ["viewDashboard", "dashboards"],
+      ["dashboardTvPlaylist", "dashboards"],
+      ["importDashboard", "dashboards"],
+      ["publicDashboardLinks", "dashboards"],
+      ["addPanel", "dashboards"],
+      ["reports", "reports"],
+      ["reportDetail", "reports"],
+      ["createReport", "reports"],
+      ["alertList", "alerts"],
+      ["alertDetail", "alerts"],
+      ["addAlert", "alerts"],
+      ["editAlert", "alerts"],
+      ["alertHistory", "alerts"],
+      ["alertInsights", "alerts"],
+      ["alertLibrary", "alerts"],
+      ["importSemanticGroups", "alerts"],
+      ["addAnomalyDetection", "anomaly_detection"],
+      ["editAnomalyDetection", "anomaly_detection"],
+      ["sloList", "anomaly_detection"],
+      ["addSlo", "anomaly_detection"],
+      ["importSlo", "anomaly_detection"],
+      ["editSlo", "anomaly_detection"],
+      ["sloDetail", "anomaly_detection"],
+      ["pipelines", "pipelines"],
+      ["pipelineEditor", "pipelines"],
+      ["createPipeline", "pipelines"],
+      ["importPipeline", "pipelines"],
+      ["pipelineHistory", "pipelines"],
+      ["pipelineBackfill", "pipelines"],
+      ["RUM", "rum"],
+      ["Sessions", "rum"],
+      ["SessionViewer", "rum"],
+      ["ErrorTracking", "rum"],
+      ["SourceMaps", "rum"],
+      ["UploadSourceMaps", "rum"],
+      ["RumPerformance", "rum"],
+      ["rumPerformanceWebVitals", "rum"],
+      [PA_ROUTES.shell, "product_analytics"],
+      [PA_ROUTES.funnels, "product_analytics"],
+      [PA_ROUTES.eventNew, "product_analytics"],
+      [PA_ROUTES.eventEdit, "product_analytics"],
+      ["dbmDatabases", "db_monitoring"],
+      ["dbmDeadlocks", "db_monitoring"],
+      ["dbmQueryDetail", "db_monitoring"],
+      ["profiles", "continuous_profiling"],
+      ["infraKubernetes", "kubernetes_monitoring"],
+      ["infraKubernetes2", "kubernetes_monitoring"],
+      ["infraHosts", "host_monitoring"],
+      ["alertDestinations", "alerts"],
+      ["alertTemplates", "alerts"],
+      ["traces", "traces"],
+      ["traceDetails", "traces"],
+      ["sessionDetails", "traces"],
+      ["metrics", "metrics"],
+    ])("tags %s with meta.licenseFeature %s", (name, feature) => {
+      expect(findRoute(useRoutes().homeChildRoutes, name).meta.licenseFeature).toBe(feature);
+    });
+
+    it("tags the Database Monitoring shell itself", () => {
+      expect(shell("infra/databases").meta.licenseFeature).toBe("db_monitoring");
+    });
+
+    it.each([
+      "pipeline",
+      "functionList",
+      "importFunction",
+      "enrichmentTables",
+      "logs",
+      "logstreams",
+    ])("leaves %s untagged", (name) => {
+      expect(findRoute(useRoutes().homeChildRoutes, name).meta?.licenseFeature).toBeUndefined();
+    });
+
+    it.each(["logs", "searchJobInspector", "searchHistory", "searchScheduler", "streamExplorer"])(
+      "locks %s by its stream_type query instead of a static key",
+      (name) => {
+        const { meta } = findRoute(useRoutes().homeChildRoutes, name);
+        expect(meta.licenseFeatureFromStreamType).toBe(true);
+        expect(meta.licenseFeature).toBeUndefined();
+      },
+    );
+
+    it("leaves the logged-out public dashboard untagged", () => {
+      const route = useRoutes().parentRoutes.find((r: any) => r.name === "publicDashboard");
+      expect(route.meta.licenseFeature).toBeUndefined();
+    });
+
+    it("opens a locked Database Monitoring section though its flag is off", () => {
+      const next = enterShell("infra/databases", {
+        database_monitoring_enabled: false,
+        features: { db_monitoring: "locked" },
+      });
+      expect(next).toHaveBeenCalledWith();
+    });
+
+    it("still sends a hidden Database Monitoring section to traces", () => {
+      const next = enterShell("infra/databases", {
+        database_monitoring_enabled: false,
+        features: { db_monitoring: "hidden" },
+      });
+      expect(next).toHaveBeenCalledWith({ name: "traces", query: { org_identifier: "acme" } });
+    });
+
+    it("opens locked profiles though profiling is off, and still bounces hidden ones", () => {
+      expect(
+        enterShell("profiles", {
+          profiling_enabled: false,
+          features: { continuous_profiling: "locked" },
+        }),
+      ).toHaveBeenCalledWith();
+      expect(
+        enterShell("profiles", {
+          profiling_enabled: false,
+          features: { continuous_profiling: "hidden" },
+        }),
+      ).toHaveBeenCalledWith({ name: "home", query: { org_identifier: "acme" } });
+    });
+
+    it("opens locked public-dashboard links though public dashboards are off", () => {
+      const previous = store.state.zoConfig;
+      const run = (zoConfig: Record<string, unknown>) => {
+        store.state.zoConfig = zoConfig;
+        const next = vi.fn();
+        findRoute(useRoutes().homeChildRoutes, "publicDashboardLinks").beforeEnter(
+          { query: { org_identifier: "acme" } },
+          {},
+          next,
+        );
+        return next;
+      };
+      try {
+        expect(
+          run({ public_dashboards_enabled: false, features: { dashboards: "locked" } }),
+        ).toHaveBeenCalledWith();
+        expect(
+          run({ public_dashboards_enabled: false, features: { dashboards: "hidden" } }),
+        ).toHaveBeenCalledWith({ name: "dashboards", query: { org_identifier: "acme" } });
+      } finally {
+        store.state.zoConfig = previous;
+      }
     });
   });
 

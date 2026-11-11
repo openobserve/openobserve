@@ -168,8 +168,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OTooltip :content="t('settings.organizationManagementPage.revoke')" />
               </OButton>
+              <OTooltip v-if="!row.org_storage_enabled && byobLocked" :content="byobLockedReason">
+                <span class="inline-flex max-md:hidden">
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs-circle"
+                    icon-left="lock"
+                    disabled
+                    :aria-label="t('settings.organizationManagementPage.enableStorage')"
+                    data-test="org-management-storage-enable-btn"
+                  />
+                </span>
+              </OTooltip>
               <OButton
-                v-if="!row.org_storage_enabled"
+                v-else-if="!row.org_storage_enabled"
                 variant="ghost"
                 size="icon-xs-circle"
                 icon-left="cloud-upload"
@@ -270,7 +282,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdownItem>
                 <ODropdownItem
                   v-if="!row.org_storage_enabled"
-                  icon-left="cloud-upload"
+                  :icon-left="byobLocked ? 'lock' : 'cloud-upload'"
+                  :disabled="byobLocked"
+                  :focusable-unavailable="byobLocked"
+                  :description="byobLocked ? byobLockedReason : null"
                   class="md:hidden"
                   data-test="org-management-storage-enable-btn-menu"
                   @select="toggleOrgStorage(row)"
@@ -508,6 +523,7 @@ import { timestampToTimezoneDate, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OrganizationServices from "@/services/organizations";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -522,6 +538,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import orgStorageService from "@/services/org_storage";
+import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -572,6 +589,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const router = useRouter();
     const { confirm } = useConfirmDialog();
+    const { locked: byobLocked, lockedReason: byobLockedReason } = useLicenseLock("byob");
 
     const extendTrialDataRow = ref();
     const extendedTrial = ref(1);
@@ -976,6 +994,7 @@ export default defineComponent({
     const resurrectOrganization = async (row: any) => {
       try {
         await OrganizationServices.resurrect_org(store.state.zoConfig.meta_org, row.identifier);
+        analytics.track("org_management_org_resurrected");
         toast({ variant: "success", message: t("iam.listOrganizations.organizationResurrected") });
         getData();
       } catch (e: any) {
@@ -1016,6 +1035,7 @@ export default defineComponent({
           pool,
           { org_id: usageLimitsRow.value.identifier, limit },
         );
+        analytics.track("org_management_usage_limit_updated", { pool });
         apply(response.data.used, response.data.limit);
         usageLimitsPrompt.value = false;
         toast({ variant: "success", message: copy.success });
@@ -1094,6 +1114,7 @@ export default defineComponent({
         });
         return OrganizationServices.create_external_contract(metaOrg, payload)
           .then(() => {
+            analytics.track("org_management_contract_created");
             toast({
               variant: "success",
               message: t("settings.organizationManagementPage.contractCreatedSuccess"),
@@ -1128,6 +1149,7 @@ export default defineComponent({
         });
         return OrganizationServices.extend_external_contract(metaOrg, payload)
           .then(() => {
+            analytics.track("org_management_contract_extended");
             toast({
               variant: "success",
               message: t("settings.organizationManagementPage.contractExtendedSuccess"),
@@ -1168,6 +1190,7 @@ export default defineComponent({
         });
         OrganizationServices.revoke_external_contract(metaOrg, row.identifier)
           .then(() => {
+            analytics.track("org_management_contract_revoked");
             toast({
               variant: "success",
               message: t("settings.organizationManagementPage.contractRevokedSuccess"),
@@ -1191,6 +1214,7 @@ export default defineComponent({
     };
 
     const toggleOrgStorage = async (row: any) => {
+      if (byobLocked.value) return;
       const ok = await confirm({
         title: t("settings.organizationManagementPage.enableByobTitle"),
         message: t("settings.organizationManagementPage.enableByobMessage", { name: row.name }),
@@ -1245,6 +1269,7 @@ export default defineComponent({
       )
         .then((response) => {
           if (response.data) {
+            analytics.track("org_management_trial_extended");
             toast({
               variant: "success",
               message: t("settings.organizationManagementPage.trialExtendedSuccess"),
@@ -1347,6 +1372,8 @@ export default defineComponent({
       submitContract,
       confirmRevokeContract,
       toggleOrgStorage,
+      byobLocked,
+      byobLockedReason,
       formatMicrosToDate,
       formatCredits,
       filterQuery,

@@ -12,7 +12,12 @@
 
 <template>
   <div class="h-full w-full p-1.25">
-    <div class="h-full w-full" ref="chartRef" id="chart-map"></div>
+    <div
+      class="h-full w-full"
+      :class="{ 'chart-canvas-pixelated': fractionalPixelRatio }"
+      ref="chartRef"
+      id="chart-map"
+    ></div>
   </div>
 </template>
 
@@ -24,6 +29,7 @@ import worldMap from "@/assets/dashboard/maps/map.json";
 import { withChartFont } from "@/utils/fonts";
 import { chartColor } from "@/utils/chartTheme";
 import useTheme from "@/composables/useTheme";
+import { currentDevicePixelRatio, useChartPixelRatio } from "@/composables/useDevicePixelRatio";
 
 echarts.use([MapChart]);
 // Registering once per app keeps panels and theme switches from re-parsing the GeoJSON.
@@ -114,13 +120,19 @@ export default defineComponent({
       if (!chartRef.value) return;
       const view = currentView();
       chart?.dispose();
-      chart = echarts.init(chartRef.value, isDark.value ? "dark" : "light");
+      chart = echarts.init(chartRef.value, isDark.value ? "dark" : "light", {
+        devicePixelRatio: currentDevicePixelRatio(),
+      });
+      syncPixelRatio();
       chart.setOption(withChartFont(currentOptions(view)), true);
     };
 
     watch(isDark, () => {
       if (chart) initChart();
     });
+    const { pixelated: fractionalPixelRatio, sync: syncPixelRatio } = useChartPixelRatio(
+      () => chart,
+    );
 
     onMounted(async () => {
       await nextTick();
@@ -148,7 +160,7 @@ export default defineComponent({
       },
       { deep: true },
     );
-    return { chartRef };
+    return { chartRef, fractionalPixelRatio };
   },
 });
 </script>

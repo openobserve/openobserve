@@ -5,7 +5,7 @@ use super::*;
 // ── Runs API ──────────────────────────────────────────────────────────────────
 
 /// One run in the list response. `status` is a human-readable string derived from `run_result`.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct RunSummary {
     pub id: String,
     pub synthetics_id: String,
@@ -21,7 +21,7 @@ pub struct RunSummary {
     pub completed_at: Option<i64>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct ListRunsResponse {
     pub runs: Vec<RunSummary>,
     pub total: i64,

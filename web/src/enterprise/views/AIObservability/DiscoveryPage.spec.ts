@@ -91,7 +91,9 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
     template: `<div class="o-table" :data-table-id="tableId" :data-total="totalCount"
       :data-page="currentPage" :data-pagination="pagination"
       :data-columns="(columns || []).map(c => c.id).join(',')">
-      <slot name="toolbar" /><slot name="selection-actions" /><slot name="footer-note" /></div>`,
+      <slot name="toolbar" /><slot name="selection-actions" /><slot name="footer-note" />
+      <div v-for="row in data || []" class="o-row" @click="$emit('rowClick', row)">
+        <slot name="cell-trace" :row="row" /></div></div>`,
   },
 }));
 
@@ -115,6 +117,8 @@ vi.mock("@/enterprise/components/AIObservability/AddToQueueMenu.vue", () => ({
 }));
 
 import { mount, flushPromises } from "@vue/test-utils";
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
 import DiscoveryPage from "./DiscoveryPage.vue";
 
 function searchResult(overrides: Record<string, unknown> = {}) {
@@ -151,9 +155,13 @@ function searchResult(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function mountPage() {
+// The lock composable loads before this file's vuex mock, so it reads the real injected store.
+async function mountPage(features: Record<string, string> = {}) {
   const wrapper = mount(DiscoveryPage, {
-    global: { stubs: { OTabs: true, OTab: true, OEmptyState: true, OTag: true, OTimeCell: true } },
+    global: {
+      stubs: { OTabs: true, OTab: true, OEmptyState: true, OTag: true, OTimeCell: true },
+      provide: { store: { state: { zoConfig: { features } } } },
+    },
   });
   await flushPromises();
   return wrapper;
@@ -166,6 +174,7 @@ beforeEach(() => {
   mockListQueues.mockReset().mockResolvedValue([]);
   mockToast.mockReset();
   mockPush.mockReset();
+  vi.mocked(analytics.track).mockClear();
 });
 
 describe("DiscoveryPage fetching", () => {
@@ -197,6 +206,10 @@ describe("DiscoveryPage fetching", () => {
       "test-org",
       expect.objectContaining({ queueStatus: "reviewed", from: 0 }),
     );
+    expect(analytics.track).toHaveBeenCalledWith("llm_discovery_filter_applied", {
+      filter: "queue_status",
+      value: "reviewed",
+    });
   });
 
   it("switches columns and table id per scope, and clears paging", async () => {
@@ -357,6 +370,10 @@ describe("DiscoveryPage fetching", () => {
     await flushPromises();
 
     expect(localStorage.getItem("o2_ai_discovery_scope")).toBe("session");
+    expect(analytics.track).toHaveBeenCalledWith("llm_discovery_filter_applied", {
+      filter: "scope",
+      value: "session",
+    });
   });
 
   it("surfaces a load failure as an error toast", async () => {
@@ -435,6 +452,9 @@ describe("DiscoveryPage row drill-down", () => {
         trace_id: "trace-1",
       },
     });
+    expect(analytics.track).toHaveBeenCalledWith("llm_discovery_target_opened", {
+      scope: "trace",
+    });
   });
 
   it("routes a session row to the session detail view", async () => {
@@ -503,5 +523,27 @@ describe("DiscoveryPage row drill-down", () => {
         span_id: "span-1",
       },
     });
+  });
+
+  // OTable keys the row pointer cursor on whether a row-click listener is bound.
+  const rowListener = (wrapper: Awaited<ReturnType<typeof mountPage>>) =>
+    wrapper.findComponent({ name: "OTable" }).vm.$.vnode.props?.onRowClick;
+
+  it("drops the row affordance, shows the lock and opens nothing while traces are locked", async () => {
+    const wrapper = await mountPage({ traces: "locked" });
+
+    expect(rowListener(wrapper)).toBeUndefined();
+    expect(wrapper.find('[data-test="ai-discovery-row-lock"]').exists()).toBe(true);
+    await wrapper.find(".o-row").trigger("click");
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("keeps rows clickable with no lock when the license enables traces", async () => {
+    const wrapper = await mountPage({ traces: "enabled" });
+
+    expect(rowListener(wrapper)).toBeTypeOf("function");
+    expect(wrapper.find('[data-test="ai-discovery-row-lock"]').exists()).toBe(false);
+    await wrapper.find(".o-row").trigger("click");
+    expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ name: "traceDetails" }));
   });
 });

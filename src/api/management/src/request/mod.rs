@@ -45,6 +45,7 @@ pub mod fleet;
 #[allow(deprecated)]
 pub mod folders;
 pub mod gen_ai;
+pub mod gen_ai_health;
 pub mod ingest_rejections;
 pub mod keys;
 pub mod kv;
@@ -72,10 +73,12 @@ pub mod query_history;
 #[cfg(feature = "enterprise")]
 pub mod remote_tasks;
 pub mod rum_analytics;
+pub mod sample_data;
 #[cfg(feature = "enterprise")]
 pub mod score_configs;
 #[cfg(feature = "enterprise")]
 pub mod scorers;
+pub mod security;
 pub mod service_accounts;
 pub mod service_streams;
 pub mod short_url;
@@ -94,3 +97,48 @@ pub mod workflows;
 pub mod org_domains;
 
 use openobserve_api_common::request::{BulkDeleteRequest, BulkDeleteResponse};
+#[cfg(feature = "enterprise")]
+use {axum::http::StatusCode, o2_enterprise::enterprise::common::auditor::AuditMessage};
+
+#[cfg(feature = "enterprise")]
+#[derive(Clone, Copy)]
+pub(super) enum LoginFailure {
+    InvalidCredentials,
+    AccountLocked,
+    InvalidLoginLink,
+    LoginLinkExpired,
+    InvalidLoginState,
+    TokenExchangeFailed,
+    TokenValidationFailed,
+    LoginPolicyDenied,
+}
+
+#[cfg(feature = "enterprise")]
+impl LoginFailure {
+    fn prepare(
+        self,
+        mut message: AuditMessage,
+        status: StatusCode,
+        timestamp: i64,
+    ) -> AuditMessage {
+        let reason = match self {
+            Self::InvalidCredentials => "invalid_credentials",
+            Self::AccountLocked => "account_locked",
+            Self::InvalidLoginLink => "invalid_login_link",
+            Self::LoginLinkExpired => "login_link_expired",
+            Self::InvalidLoginState => "invalid_login_state",
+            Self::TokenExchangeFailed => "token_exchange_failed",
+            Self::TokenValidationFailed => "token_validation_failed",
+            Self::LoginPolicyDenied => "login_policy_denied",
+        };
+        message._timestamp = timestamp;
+        message.response_meta.http_response_code = status.as_u16();
+        message.response_meta.error_msg = Some(reason.to_string());
+        message
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn audit_login_failure(message: AuditMessage, failure: LoginFailure, status: StatusCode) {
+    audit::audit(failure.prepare(message, status, config::utils::time::now_micros())).await;
+}

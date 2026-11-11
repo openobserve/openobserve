@@ -188,22 +188,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="!sectionTargets?.advancedOncall"
             >
               <OSettingRow
-                v-if="oncallEnabled && tierShows('oncall')"
+                v-if="(oncallEnabled && tierShows('oncall')) || oncallTeamLocked"
                 :label="t('alerts.oncallTeam')"
-                :info="t('alerts.oncallTeamTooltip')"
+                :info="oncallTeamLocked ? undefined : t('alerts.oncallTeamTooltip')"
                 fill
               >
-                <OFormSelect
-                  name="oncall_team"
-                  :aria-label="t('alerts.oncallTeam')"
-                  :options="oncallTeamOptions"
-                  clearable
-                  width="md"
-                  :placeholder="t('alerts.oncallTeamPlaceholder')"
-                  data-test="alert-oncall-team-select"
-                >
-                  <template #empty>{{ t("alerts.oncallTeamNoTeams") }}</template>
-                </OFormSelect>
+                <div class="flex items-center gap-2">
+                  <OFormSelect
+                    name="oncall_team"
+                    :aria-label="t('alerts.oncallTeam')"
+                    :options="oncallTeamOptions"
+                    clearable
+                    width="md"
+                    :placeholder="t('alerts.oncallTeamPlaceholder')"
+                    data-test="alert-oncall-team-select"
+                  >
+                    <template #empty>{{ t("alerts.oncallTeamNoTeams") }}</template>
+                  </OFormSelect>
+                  <OTooltip v-if="oncallTeamLocked" :content="oncallLockReason" side="right">
+                    <span class="inline-flex" data-test="alert-oncall-team-locked">
+                      <OIcon name="lock" size="sm" />
+                    </span>
+                  </OTooltip>
+                </div>
               </OSettingRow>
             </Teleport>
             <OSettingRow
@@ -320,12 +327,14 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import AlertSettingsHelpDrawer from "@/components/alerts/AlertSettingsHelpDrawer.vue";
 import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import { queryClient } from "@/composables/query/queryClient";
 import { oncallTeamsQuery } from "@/services/oncall.queries";
 import { useTierVisibility } from "@/composables/alerts/useAlertSettingTiers";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import type { OnCallTeam } from "@/ts/interfaces/oncall";
 
 export interface Variable {
@@ -342,6 +351,7 @@ export default defineComponent({
     OToggleGroupItem,
     OButton,
     OIcon,
+    OTooltip,
     OFormInput,
     OFormTextarea,
     OFormSelect,
@@ -449,9 +459,28 @@ export default defineComponent({
     // control that cannot page anybody.
     const oncallEnabled = computed(() => store.state.zoConfig?.oncall_enabled === true);
     const oncallTeams = ref<OnCallTeam[]>([]);
-    const oncallTeamOptions = computed(() =>
-      oncallTeams.value.map((team) => ({ label: raw(team.name), value: team.id })),
+    const { locked: oncallLicenseLocked, lockedReason: oncallLockReason } =
+      useLicenseLock("oncall");
+    const oncallTeamValue = form.useStore((s: any) => (s.values?.oncall_team ?? "") as string);
+    const lockedTargetNames = form.useStore(
+      (s: any) => s.values?._ui?.lockedTargetNames as Record<string, string> | undefined,
     );
+    // Shown only with a team to see or clear: with none, a locked picker has nothing to offer.
+    const oncallTeamLocked = computed(
+      () => oncallLicenseLocked.value && !!oncallTeamValue.value.trim(),
+    );
+    const oncallTeamOptions = computed(() => {
+      if (oncallTeamLocked.value) {
+        const name = lockedTargetNames.value?.[oncallTeamValue.value];
+        return [
+          {
+            label: name ? raw(name) : t("alerts.lockedTeamFallback"),
+            value: oncallTeamValue.value,
+          },
+        ];
+      }
+      return oncallTeams.value.map((team) => ({ label: raw(team.name), value: team.id }));
+    });
 
     // A failed lookup leaves the picker empty rather than blocking the save:
     // the field is optional, and routing still resolves from ownership.
@@ -537,6 +566,8 @@ export default defineComponent({
       raw,
       priorityOptions,
       oncallEnabled,
+      oncallTeamLocked,
+      oncallLockReason,
       oncallTeamOptions,
       t,
       store,

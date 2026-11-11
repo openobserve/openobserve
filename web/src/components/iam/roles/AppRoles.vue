@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </OPageLayout>
-  <AddRole v-model:open="showAddGroup" @added:role="onRoleAdded" />
+  <AddRole v-model:open="showAddGroup" :start-from="deepLinkStartFrom" @added:role="onRoleAdded" />
   <ConfirmDialog
     :title="t('iam.appRoles.deleteRole')"
     message-keypath="iam.appRoles.deleteConfirm"
@@ -118,6 +118,7 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { deleteRoleMutation, bulkDeleteRolesMutation } from "@/services/iam.queries";
 import { rolesQuery } from "@/services/iam.queries";
 import { allUserRolesQuery } from "@/services/users.queries";
+import { serviceAccountsQuery } from "@/services/service_accounts.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { computed, onBeforeMount, ref, watch } from "vue";
 import AddRole from "./AddRole.vue";
@@ -139,6 +140,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { forbiddenState } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
 
 const { t } = useI18nTyped();
@@ -202,6 +204,23 @@ const loadAssignedRoleNames = async () => {
 };
 
 watch(assignTarget, loadAssignedRoleNames, { immediate: true });
+
+// ?startFrom=<preset> from an access lock's "Start a role from …" link opens Add role with it chosen.
+const deepLinkStartFrom = ref("");
+watch(
+  () => route.query.startFrom,
+  (startFrom) => {
+    if (typeof startFrom !== "string" || !startFrom) return;
+    deepLinkStartFrom.value = startFrom;
+    showAddGroup.value = true;
+    const { startFrom: _startFrom, ...rest } = route.query;
+    router.replace({ name: "roles", query: rest });
+  },
+  { immediate: true },
+);
+watch(showAddGroup, (open) => {
+  if (!open) deepLinkStartFrom.value = "";
+});
 
 const clearAssignTarget = () => {
   const { member: _member, ...rest } = route.query;
@@ -291,7 +310,7 @@ const onRoleAdded = (payload: { role_name: string; startFrom?: string }) => {
   });
 };
 
-const editRole = (role: any) => {
+const editRole = (role: any, tab?: "users" | "serviceAccounts") => {
   router.push({
     name: "editRole",
     params: {
@@ -299,6 +318,7 @@ const editRole = (role: any) => {
     },
     query: {
       org_identifier: store.state.selectedOrganization.identifier,
+      ...(tab ? { tab } : {}),
     },
   });
 };
@@ -327,7 +347,7 @@ const lastUpdatedAt = rolesList.dataUpdatedAt;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = rolesList.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+  return forbiddenState(e) || e?.status === 403;
 });
 
 // `GET /roles` returns role NAMES only, so a role row has nothing to show beyond
@@ -336,32 +356,65 @@ const forbidden = computed(() => {
 // per-role lookups. Enterprise-only endpoint: on the community edition it 403s and
 // we simply render no member counts.
 const roleUserCounts = ref<Record<string, number> | null>(null);
+const roleServiceAccountCounts = ref<Record<string, number> | null>(null);
+
+// Members of a service-account list we cannot read stay counted as users, so the Users column survives a 403.
+const loadServiceAccounts = async (): Promise<any[] | null> => {
+  if (!store.state.zoConfig?.service_account_enabled) return null;
+  try {
+    return (
+      (await queryClient.fetchQuery(
+        serviceAccountsQuery(store.state.selectedOrganization.identifier, {
+          silentForbidden: true,
+        }),
+      )) ?? []
+    );
+  } catch {
+    return null;
+  }
+};
 
 const loadRoleUserCounts = async (force = false) => {
   if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
   try {
     const options = allUserRolesQuery(store.state.selectedOrganization.identifier);
     if (force) {
-      await queryClient.invalidateQueries({
-        queryKey: options.queryKey,
-        exact: true,
-        refetchType: "none",
-      });
+      await Promise.all(
+        [
+          options.queryKey,
+          serviceAccountsQuery(store.state.selectedOrganization.identifier).queryKey,
+        ].map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey, exact: true, refetchType: "none" }),
+        ),
+      );
     }
-    const res = await queryClient.fetchQuery(options);
+    const [res, serviceAccounts] = await Promise.all([
+      queryClient.fetchQuery(options),
+      loadServiceAccounts(),
+    ]);
+    const accountByEmail = new Map(
+      (serviceAccounts ?? []).map((a: any) => [String(a?.email ?? ""), a]),
+    );
     const counts: Record<string, number> = {};
-    // Response is a map of user email -> role list.
-    Object.values(res ?? {}).forEach((roles: any) => {
+    const saCounts: Record<string, number> = {};
+    // Response is a map of member email -> role list; service accounts share it with users.
+    Object.entries(res ?? {}).forEach(([email, roles]: [string, any]) => {
+      const account = accountByEmail.get(email);
+      // System accounts are hidden from the Service Accounts tab, so they stay out of both counts.
+      if (account?.is_system === true) return;
+      const target = account ? saCounts : counts;
       (Array.isArray(roles) ? roles : []).forEach((role: any) => {
         const key = String(role ?? "").trim();
         if (!key) return;
-        counts[key] = (counts[key] ?? 0) + 1;
+        target[key] = (target[key] ?? 0) + 1;
       });
     });
     roleUserCounts.value = counts;
+    roleServiceAccountCounts.value = serviceAccounts ? saCounts : null;
   } catch {
     // Silent: member counts are context. The list stays fully usable without them.
     roleUserCounts.value = null;
+    roleServiceAccountCounts.value = null;
   }
 };
 
@@ -369,9 +422,11 @@ const loadRoleUserCounts = async (force = false) => {
 // unavailable, so "unknown" and "nobody holds this role" stay distinguishable.
 const applyRoleUserCounts = () => {
   const counts = roleUserCounts.value;
+  const saCounts = roleServiceAccountCounts.value;
   rolesState.roles = rolesState.roles.map((role: any) => ({
     ...role,
     user_count: counts ? (counts[role.role_name] ?? 0) : null,
+    service_account_count: saCounts ? (saCounts[role.role_name] ?? 0) : null,
   }));
   updateTable();
 };
@@ -386,6 +441,7 @@ const applyRoles = (res: any) => {
   rolesState.roles = res.map((role: string) => ({
     role_name: role,
     user_count: null,
+    service_account_count: null,
   }));
   updateTable();
   // Fire-and-forget: the roles list renders immediately and the member counts

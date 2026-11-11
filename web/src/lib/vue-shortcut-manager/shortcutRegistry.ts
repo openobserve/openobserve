@@ -46,6 +46,8 @@ export interface ShortcutEntry {
   skipInInput?: boolean;
   /** Yield to dialogs, drawers, popovers, menus and fields (see `Shortcut.skipInOverlay`). */
   skipInOverlay?: boolean;
+  /** Fire even while focus is inside a dialog or drawer (see `Shortcut.allowInDialog`). */
+  allowInDialog?: boolean;
   /** Hide this entry in the cheatsheet unless the edition/config exposes it. */
   visible?: (caps: ShortcutCapabilities) => boolean;
 }
@@ -216,9 +218,27 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
     titleKey: "shortcuts.modules.runningQueries",
     pages: ["shortcuts.pages.runningQueries"],
   },
+  { titleKey: "shortcuts.modules.security", pages: ["shortcuts.pages.securityRecord"] },
 ];
 
 export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+  {
+    pageKey: "shortcuts.pages.securityRecord",
+    scope: "security-record",
+    visible: enterprise,
+    shortcuts: [
+      {
+        id: "securityRecordNext",
+        key: "j",
+        descriptionKey: "shortcuts.actions.securityRecordNext",
+      },
+      {
+        id: "securityRecordPrev",
+        key: "k",
+        descriptionKey: "shortcuts.actions.securityRecordPrev",
+      },
+    ],
+  },
   // ── Global ──────────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.global",
@@ -272,8 +292,19 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForMac: "meta+shift+d",
         descriptionKey: "shortcuts.actions.logsExport",
       },
-      { id: "logsNextRow", key: "j", descriptionKey: "shortcuts.actions.logsNextRow" },
-      { id: "logsPrevRow", key: "k", descriptionKey: "shortcuts.actions.logsPrevRow" },
+      // J/K also step through rows while the row-detail drawer is open.
+      {
+        id: "logsNextRow",
+        key: "j",
+        descriptionKey: "shortcuts.actions.logsNextRow",
+        allowInDialog: true,
+      },
+      {
+        id: "logsPrevRow",
+        key: "k",
+        descriptionKey: "shortcuts.actions.logsPrevRow",
+        allowInDialog: true,
+      },
       {
         id: "logsRowFocusMove",
         display: "↑ / ↓",
@@ -496,18 +527,21 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.traceDetail",
     scope: "trace-detail",
+    // Trace details is also embedded in drawers (log detail, service side panel), where these must work.
     shortcuts: [
       {
         id: "traceNextSpan",
         keys: ["j", "down"],
         display: "J / ↓",
         descriptionKey: "shortcuts.actions.traceNextVisibleSpan",
+        allowInDialog: true,
       },
       {
         id: "tracePrevSpan",
         keys: ["k", "up"],
         display: "K / ↑",
         descriptionKey: "shortcuts.actions.tracePrevVisibleSpan",
+        allowInDialog: true,
       },
     ],
   },
@@ -1307,6 +1341,7 @@ export interface ShortcutDef {
   allowInInput?: boolean;
   skipInInput?: boolean;
   skipInOverlay?: boolean;
+  allowInDialog?: boolean;
 }
 
 function isRegisterable(e: ShortcutEntry): boolean {
@@ -1332,6 +1367,7 @@ const DEFS: Map<string, ShortcutDef> = (() => {
         allowInInput: e.allowInInput,
         skipInInput: e.skipInInput,
         skipInOverlay: e.skipInOverlay,
+        allowInDialog: e.allowInDialog,
       });
     }
   }

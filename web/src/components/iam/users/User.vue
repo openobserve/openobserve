@@ -73,10 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                highlighted. Deliberately no green/amber/red — a role is a category,
                not a severity. -->
           <template #subheader>
-            <div
-              class="px-page-edge border-table-row-divider border-b py-1.5"
-              data-test="user-list-summary"
-            >
+            <div data-test="user-list-summary">
               <OStatStrip
                 :items="summaryStats"
                 :loading="loading"
@@ -442,6 +439,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { featureState, forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -849,7 +847,8 @@ export default defineComponent({
     const getCustomRoles = async (options: { silent?: boolean } = {}) => {
       if (
         (config.isEnterprise !== "true" && config.isCloud !== "true") ||
-        !store.state.zoConfig.rbac_enabled
+        !store.state.zoConfig.rbac_enabled ||
+        featureState(store.state.zoConfig.features, "rbac") !== "enabled"
       )
         return;
       try {
@@ -899,7 +898,7 @@ export default defineComponent({
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = ref(false);
     const lastUpdatedAt = ref<number | null>(null);
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
     // The ?email= deep link opens the edit dialog, so it is latched — the
     // cached paint and the fresh one must not open it twice.
     let deepLinkOpened = false;
@@ -1054,7 +1053,7 @@ export default defineComponent({
           .catch((err: any) => {
             console.error("Failed to fetch org members:", err);
             dismiss();
-            forbidden.value = err?.response?.status === 403;
+            forbidden.value = forbiddenState(err);
             if (!forbidden.value) {
               toast({
                 variant: "error",

@@ -118,6 +118,10 @@ impl Columns {
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "list"}))
     )
 )]
 pub async fn list_runs(Path(org_id): Path<String>, Query(range): Query<DigestRange>) -> Response {
@@ -152,6 +156,10 @@ pub async fn list_runs(Path(org_id): Path<String>, Query(range): Query<DigestRan
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "list"}))
     )
 )]
 pub async fn list_runs_for_alert(
@@ -190,6 +198,10 @@ pub async fn list_runs_for_alert(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "list"}))
     )
 )]
 pub async fn get_run_records(Path(org_id): Path<String>, Query(run): Query<RunWindow>) -> Response {
@@ -226,6 +238,10 @@ pub async fn get_run_records(Path(org_id): Path<String>, Query(run): Query<RunWi
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "list"}))
     )
 )]
 pub async fn count_findings_by_rule(
@@ -263,6 +279,10 @@ pub async fn count_findings_by_rule(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment, or the org has no config", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "list"}))
     )
 )]
 pub async fn get_status(Path(org_id): Path<String>) -> Response {
@@ -301,6 +321,10 @@ pub async fn get_status(Path(org_id): Path<String>) -> Response {
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment, or the org has no config", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "create"}))
     )
 )]
 pub async fn run_alert_calibration(Path(org_id): Path<String>) -> Response {
@@ -367,5 +391,11 @@ mod tests {
         assert!(Columns::Finding.not_written_yet(&stream));
         assert!(Columns::Finding.not_written_yet(&field));
         assert!(!Columns::Finding.not_written_yet(&timeout));
+    }
+
+    #[test]
+    fn digests_stay_gated_while_search_is_blocked() {
+        // OTLP ingest accepts customer writes here, so it must never join the allowlist
+        assert!(!search_service::is_operational_stream(DIGEST_STREAM));
     }
 }

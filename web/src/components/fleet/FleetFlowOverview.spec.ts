@@ -26,6 +26,9 @@ import FleetFlowList, { type FlowListItem } from "./FleetFlowList.vue";
 import FleetFlowLegend from "./FleetFlowLegend.vue";
 import { apiCollector, apiRollout } from "./fleet.fixtures";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/aws-exports", async (importOriginal) => {
   const actual: any = await importOriginal();
@@ -193,10 +196,10 @@ afterEach(() => {
 });
 
 describe("FleetFlowOverview map", () => {
-  it("draws the four columns fleet, receiver, exporter, destination", async () => {
+  it("draws the three columns fleet, receiver, destination", async () => {
     serve(basePipelines());
     await mountOverview();
-    const columns = ["f:", "r:", "e:", "d:"].map((prefix) =>
+    const columns = ["f:", "r:", "d:"].map((prefix) =>
       nodes()
         .filter((n) => n.id.startsWith(prefix))
         .map((n) => n.id),
@@ -204,44 +207,65 @@ describe("FleetFlowOverview map", () => {
     expect(columns).toEqual([
       ["f:prod", "f:edge"],
       ["r:prod|filelog", "r:prod|hostmetrics", "r:edge|otlp"],
-      ["e:prod|otlphttp/o2", "e:prod|kafka/bus", "e:edge|otlphttp/o2"],
       [`d:${D1.id}`, `d:${D2.id}`],
     ]);
     const x = (id: string) => nodes().find((n) => n.id === id).position.x;
     expect(x("f:prod")).toBeLessThan(x("r:prod|filelog"));
-    expect(x("r:prod|filelog")).toBeLessThan(x("e:prod|kafka/bus"));
-    expect(x("e:prod|kafka/bus")).toBeLessThan(x(`d:${D1.id}`));
+    expect(x("r:prod|filelog")).toBeLessThan(x(`d:${D1.id}`));
   });
 
   it("colours edges by signal and sizes them by rate, never by severity", async () => {
     serve(basePipelines());
     await mountOverview();
-    const metrics = edge(`ed:prod|otlphttp/o2|${D1.id}|metrics`).data;
-    const logs = edge(`ed:prod|otlphttp/o2|${D1.id}|logs`).data;
+    const metrics = edge(`rd:prod|hostmetrics|${D1.id}|metrics`).data;
+    const logs = edge(`rd:prod|filelog|${D1.id}|logs`).data;
     expect(metrics.signal).toBe("metrics");
     expect(logs.signal).toBe("logs");
     expect(metrics.width).toBeGreaterThan(logs.width);
     expect(Object.keys(logs)).not.toContain("severity");
   });
 
-  it("branches the failing exporter off with a dashed send-failed line and rings it", async () => {
-    serve(basePipelines());
+  it("lets zoom-out and fit reach a map far taller than the canvas", async () => {
     await mountOverview();
-    const branch = edge("br:e:prod|otlphttp/o2");
-    expect(branch.source).toBe("e:prod|otlphttp/o2");
-    expect(branch.data).toMatchObject({ branch: true, label: "Send failed 3.3%" });
-    expect(edges().filter((e) => e.data.branch)).toHaveLength(1);
-    const ring = (id: string) => nodes().find((n) => n.id === id).data.ring;
-    expect(ring("e:prod|otlphttp/o2")).toBe("error");
-    expect(ring("e:prod|kafka/bus")).toBe("warning");
-    expect(ring("e:edge|otlphttp/o2")).toBeUndefined();
+    const floor = Number(wrapper.findComponent(VueFlowStub).attributes("min-zoom"));
+    expect(floor).toBeLessThanOrEqual(0.01);
   });
 
-  it("opens the failing exporter's details from the branch", async () => {
+  it("leaves mouse-wheel zoom on", async () => {
+    await mountOverview();
+    expect(wrapper.findComponent(VueFlowStub).attributes("zoom-on-scroll")).not.toBe("false");
+  });
+
+  it("marks each signal filter with the colour its lines are drawn in", async () => {
+    await mountOverview();
+    const dot = (signal: string) =>
+      wrapper.find(`[data-test="fleet-flow-overview-telemetry-dot-${signal}"]`);
+    expect(dot("logs").classes()).toContain("bg-signal-logs");
+    expect(dot("metrics").classes()).toContain("bg-signal-metrics");
+    expect(dot("traces").classes()).toContain("bg-signal-traces");
+    expect(dot("all").exists()).toBe(false);
+  });
+
+  it("branches the failing destination off with a dashed send-failed line and rings it", async () => {
     serve(basePipelines());
     await mountOverview();
-    await clickEdge("br:e:prod|otlphttp/o2");
-    expect(details().props("title")).toBe("otlphttp/o2");
+    const branch = edge(`br:d:${D1.id}`);
+    expect(branch.source).toBe(`d:${D1.id}`);
+    expect(branch.data).toMatchObject({ branch: true, label: "Send failed 20%" });
+    expect(edges().filter((e) => e.data.branch)).toHaveLength(1);
+    const data = (id: string) => nodes().find((n) => n.id === id).data;
+    expect(data(`d:${D1.id}`)).toMatchObject({ ring: "error", outbound: true });
+    expect(data(`d:${D2.id}`)).toMatchObject({ ring: "warning", outbound: false });
+    const sink = nodes().find((n) => n.id === `x:d:${D1.id}`);
+    expect(sink.ariaLabel).toBe("o2.acme.io");
+    expect(sink.data.label).toBe("o2.acme.io");
+  });
+
+  it("opens the failing destination's details from the branch", async () => {
+    serve(basePipelines());
+    await mountOverview();
+    await clickEdge(`br:d:${D1.id}`);
+    expect(details().props("title")).toBe("o2.acme.io");
     expect(
       details()
         .props("issues")
@@ -259,13 +283,13 @@ describe("FleetFlowOverview map", () => {
     expect(nodes().find((n) => n.id === "f:edge").data.selected).toBe(true);
   });
 
-  it("drops the exporters of an unchecked destination from the map", async () => {
+  it("drops an unchecked destination and its lines from the map", async () => {
     serve(basePipelines());
     await mountOverview();
     lists()[1].vm.$emit("update:modelValue", [D1.id]);
     await flushPromises();
     expect(nodes().some((n) => n.id === `d:${D2.id}`)).toBe(false);
-    expect(nodes().some((n) => n.id === "e:prod|kafka/bus")).toBe(false);
+    expect(edges().some((e) => e.target === `d:${D2.id}`)).toBe(false);
   });
 });
 
@@ -392,6 +416,23 @@ describe("FleetFlowOverview window and states", () => {
       .vm.$emit("update:model-value", "5m");
     await flushPromises();
     expect(fleet.getPipelines).toHaveBeenLastCalledWith("default", "5m");
+    expect(analytics.track).toHaveBeenCalledWith("fleet_flow_window_changed", { window: "5m" });
+  });
+
+  it("tracks a signal filter and a details card opened, but not one closed", async () => {
+    serve(basePipelines());
+    await mountOverview();
+    vi.mocked(analytics.track).mockClear();
+    wrapper
+      .findComponent<any>('[data-test="fleet-flow-overview-telemetry"]')
+      .vm.$emit("update:model-value", "logs");
+    await clickNode(`d:${D1.id}`);
+    await clickNode(`d:${D1.id}`);
+    expect(analytics.track).toHaveBeenCalledWith("fleet_flow_signal_changed", { signal: "logs" });
+    expect(analytics.track).toHaveBeenCalledWith("fleet_flow_detail_opened", { kind: "node" });
+    expect(
+      vi.mocked(analytics.track).mock.calls.filter(([e]) => e === "fleet_flow_detail_opened"),
+    ).toHaveLength(1);
   });
 
   it("shows the loading overlay on the first load", async () => {

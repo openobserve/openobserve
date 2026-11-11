@@ -45,6 +45,7 @@
         </div>
         <div class="flex items-center gap-2 max-lg:w-full">
           <OButton
+            v-if="showPlayground"
             variant="outline"
             size="sm"
             icon-left="play-arrow"
@@ -379,6 +380,7 @@ import {
   deletePromptLabelMutation,
 } from "@/services/llm-prompts.service.queries";
 import { computed, ref, watch } from "vue";
+import analytics from "@/services/product_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
@@ -422,8 +424,14 @@ const props = withDefaults(
     initialVersion?: number | null;
     initialTab?: string;
     protectedLabels?: string[];
+    showPlayground?: boolean;
   }>(),
-  { initialVersion: null, initialTab: "configuration", protectedLabels: () => [] },
+  {
+    initialVersion: null,
+    initialTab: "configuration",
+    protectedLabels: () => [],
+    showPlayground: true,
+  },
 );
 
 const moveLabelMutation = useMutation(() => movePromptLabelMutation(props.orgId));
@@ -494,6 +502,7 @@ function openCompare() {
   compareBaseId.value = base.id;
   compareHeadId.value = head.id;
   comparing.value = true;
+  analytics.track("llm_prompt_versions_compared");
 }
 function setCompared(side: 0 | 1, versionNumber: number) {
   const picked = versions.value.find((version) => version.version === versionNumber);
@@ -521,7 +530,7 @@ const payloadText = (payload: unknown) =>
   typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
 const jsonText = (value: unknown) => (value == null ? "—" : JSON.stringify(value, null, 2));
 
-const versionColumns: OTableColumnDef<PromptVersion>[] = [
+const allVersionColumns: OTableColumnDef<PromptVersion>[] = [
   {
     id: "version",
     accessorKey: "version",
@@ -556,6 +565,12 @@ const versionColumns: OTableColumnDef<PromptVersion>[] = [
   },
   { id: "actions", isAction: true, header: raw(""), accessorKey: "id", size: 56 },
 ];
+// The actions column holds only the Playground button.
+const versionColumns = computed(() =>
+  props.showPlayground
+    ? allVersionColumns
+    : allVersionColumns.filter((column) => column.id !== "actions"),
+);
 
 function viewVersion(version: number) {
   selectedVersion.value = version;
@@ -639,6 +654,7 @@ async function moveLabel(name: string, version: number): Promise<boolean> {
       version,
       ifVersion: existing?.version ?? null,
     });
+    analytics.track("llm_prompt_label_moved", { protected: props.protectedLabels.includes(name) });
     await refreshLabels(orgId, entityId);
     toast({
       variant: "success",
@@ -687,6 +703,9 @@ async function deleteLabel(label: PromptLabel) {
     if (!(await askDeleteLabel(label.name, label.version))) return;
     if (props.orgId !== orgId || props.prompt?.entityId !== entityId) return;
     await deleteLabelMutation.mutateAsync({ entityId, name: label.name, ifVersion: label.version });
+    analytics.track("llm_prompt_label_deleted", {
+      protected: props.protectedLabels.includes(label.name),
+    });
     await refreshLabels(orgId, entityId);
     toast({
       variant: "success",

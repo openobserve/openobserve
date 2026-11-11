@@ -210,6 +210,16 @@ async fn run() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("cipher master key boot failed: {e}");
             }
+            #[cfg(feature = "enterprise")]
+            if let Err(e) = infra::table::cipher::install_oncall_key(
+                !o2_enterprise::enterprise::common::config::get_config()
+                    .encryption
+                    .oncall_master_key
+                    .is_empty(),
+            ) {
+                job_init_tx.send(false).ok();
+                panic!("on-call key install failed: {e}");
+            }
 
             if let Err(e) = bootstrap::init().await {
                 job_init_tx.send(false).ok();
@@ -460,6 +470,10 @@ async fn run() -> Result<(), anyhow::Error> {
 /// Initializes enterprise features.
 #[cfg(feature = "enterprise")]
 async fn init_enterprise() -> Result<(), anyhow::Error> {
+    let node = &config::cluster::LOCAL_NODE;
+    // before routes and jobs start, so their first license check sees the loaded license
+    o2_enterprise::enterprise::license::load_license(node.is_router() || node.is_single_role())
+        .await;
     o2_enterprise::enterprise::search::init().await?;
 
     if o2_enterprise::enterprise::common::config::get_config()

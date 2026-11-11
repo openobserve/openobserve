@@ -27,7 +27,7 @@ use crate::{
     table::entity::workflow_associations,
 };
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, utoipa::ToSchema)]
 pub struct Workflow {
     pub id: String,
     pub org_id: String,
@@ -45,13 +45,13 @@ pub struct Workflow {
     pub edges: Vec<Edge>,
 }
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, utoipa::ToSchema)]
 pub struct WorkflowError {
     pub node_id: String,
     pub error: Vec<String>,
 }
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, utoipa::ToSchema)]
 pub struct WorkflowRunErrors {
     pub id: i32,
     pub cluster: String,
@@ -142,7 +142,7 @@ impl From<workflow_run_data::Model> for WorkflowRunData {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, utoipa::ToSchema)]
 pub struct WorkflowAssociation {
     pub id: i32,
     pub org_id: String,
@@ -923,6 +923,27 @@ async fn get_draft_org_id_in<C: ConnectionTrait>(
         .one(conn)
         .await?;
     Ok(res)
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn create_tables_for_tests(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), sea_orm::DbErr> {
+    use sea_orm::ConnectionTrait;
+
+    let backend = db.get_database_backend();
+    let schema = sea_orm::Schema::new(backend);
+    for mut table in [
+        schema.create_table_from_entity(workflows::Entity),
+        schema.create_table_from_entity(workflow_drafts::Entity),
+        schema.create_table_from_entity(workflow_errors::Entity),
+        schema.create_table_from_entity(workflow_associations::Entity),
+        schema.create_table_from_entity(workflow_run_data::Entity),
+    ] {
+        table.if_not_exists();
+        db.execute(backend.build(&table)).await?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

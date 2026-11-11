@@ -29,9 +29,11 @@ import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
 import enLocaleFull from "@/locales/languages/en-US.json";
 import { nextTick } from "vue";
+import analytics from "@/services/product_analytics";
 
 // ── Mock toast ──
 const mockToastFn = vi.fn().mockReturnValue(vi.fn());
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockToastFn(...args),
 }));
@@ -260,7 +262,7 @@ describe("OrganizationManagement.vue", () => {
           ODialog: ODialogStub,
           OTable: OTableStub,
           // Stub heavy sub-components that are not under test
-          OTooltip: { template: "<span />" },
+          OTooltip: { template: "<span><slot /></span>" },
           OIcon: { template: "<span />" },
           // Keep OInput functional but lightweight — tests use data-test to find it
           OInput: {
@@ -576,6 +578,7 @@ describe("OrganizationManagement.vue", () => {
       };
 
       expect(mockExtendTrialPeriod).toHaveBeenCalledWith("default", expectedPayload);
+      expect(analytics.track).toHaveBeenCalledWith("org_management_trial_extended");
 
       mockDateNow.mockRestore();
     });
@@ -865,6 +868,44 @@ describe("OrganizationManagement.vue", () => {
       const storageEnableBtn = wrapper.find('[data-test="org-management-storage-enable-btn"]');
       expect(storageEnableBtn.exists()).toBe(false);
     });
+
+    it.each([
+      ["locked", "lock", true],
+      ["enabled", "cloud-upload", false],
+    ])(
+      "renders Enable BYOB with the %s license as icon %s, disabled=%s",
+      async (state, icon, disabled) => {
+        store.state.zoConfig.meta_org = "default";
+        store.state.zoConfig.features = { byob: state };
+        mockGetAdminOrg.mockResolvedValue({
+          data: {
+            data: [
+              {
+                id: 1,
+                name: "Test Org",
+                identifier: "test-org",
+                plan: "0",
+                created_at: 123456789,
+                trial_expires_at: 987654321,
+                billing_provider: "-",
+                org_storage_enabled: false,
+              },
+            ],
+          },
+        });
+
+        wrapper = createWrapper();
+        await flushPromises();
+        await nextTick();
+
+        const btn = wrapper
+          .findAllComponents({ name: "OButton" })
+          .find((b) => b.attributes("data-test") === "org-management-storage-enable-btn")!;
+        expect(btn.props("iconLeft")).toBe(icon);
+        expect(Boolean(btn.props("disabled"))).toBe(disabled);
+        store.state.zoConfig.features = {};
+      },
+    );
   });
 
   describe("Organization Deletion Status", () => {

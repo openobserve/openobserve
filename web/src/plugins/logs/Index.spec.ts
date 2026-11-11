@@ -196,6 +196,7 @@ vi.mock("@/composables/useDashboardPanelData", () => ({
 }));
 // Records which loader the page-load flow picked; the real loaders still run.
 const loaderCalls = vi.hoisted(() => [] as string[]);
+const streamChangeCalls = vi.hoisted(() => [] as unknown[][]);
 vi.mock("@/composables/useLogs", async () => {
   // Import the real module
   const actual =
@@ -219,6 +220,19 @@ vi.mock("@/composables/useLogs", async () => {
     },
     // Only mock clearSearchObject
     clearSearchObj: vi.fn(),
+  };
+});
+
+vi.mock("@/composables/useLogs/useSearchBar", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/composables/useLogs/useSearchBar")>();
+  return {
+    ...actual,
+    default: (...args: Parameters<typeof actual.default>) => ({
+      ...actual.default(...args),
+      onStreamChange: (...changeArgs: unknown[]) => {
+        streamChangeCalls.push(changeArgs);
+      },
+    }),
   };
 });
 
@@ -263,7 +277,7 @@ vi.mock("@/plugins/traces/metrics/TracesAnalysisDashboard.vue", () => ({
       logSamples: null,
       analysisType: null,
     },
-    template: '<div data-test="drill-down-dashboard-stub" />',
+    template: '<div data-test="drill-down-dashboard-stub"><slot name="header-start" /></div>',
   },
 }));
 
@@ -1588,6 +1602,59 @@ describe("Logs Index", async () => {
       expect(wrapper.find('[data-test="logs-drill-down-no-stream-selected-text"]').exists()).toBe(
         true,
       );
+    });
+
+    const streamSelect = () => wrapper.find('[data-test="logs-drilldown-stream-select-trigger"]');
+
+    it("shows the stream select with the selected stream in the dashboard header", async () => {
+      await enterDrillDown();
+
+      expect(dashboard().find('[data-test="logs-drilldown-stream-select-trigger"]').exists()).toBe(
+        true,
+      );
+      expect(streamSelect().attributes("data-test-selected-value")).toBe("app_logs");
+      expect(wrapper.find('[data-test="logs-drill-down-stream-row"]').exists()).toBe(false);
+    });
+
+    it("keeps the stream select above the pick-a-stream state", async () => {
+      await enterDrillDown({ withHits: false, selectedStream: [] });
+
+      expect(
+        wrapper
+          .find('[data-test="logs-drill-down-stream-row"]')
+          .find('[data-test="logs-drilldown-stream-select-trigger"]')
+          .exists(),
+      ).toBe(true);
+      expect(streamSelect().attributes("data-test-selected-value")).toBe("");
+    });
+
+    it("routes a stream picked in drill down through the stream-change path", async () => {
+      await enterDrillDown();
+      streamChangeCalls.length = 0;
+      wrapper.vm.searchObj.data.filterErrMsg = "stale";
+
+      wrapper
+        .findComponent({ name: "LogsDrillDownStreamSelect" })
+        .vm.$emit("update:modelValue", "audit_logs");
+      await flushPromises();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(["audit_logs"]);
+      expect(wrapper.vm.searchObj.data.filterErrMsg).toBe("");
+      expect(streamChangeCalls).toEqual([["", { origin: "selector" }]]);
+    });
+
+    it("opens the drill-down stream select when a state asks to select a stream", async () => {
+      await enterDrillDown({ withHits: false, selectedStream: [] });
+      const hiddenTrigger = document.querySelector<HTMLElement>(
+        '[data-test="log-search-index-list-select-stream"] button',
+      );
+      const hiddenClick = hiddenTrigger ? vi.spyOn(hiddenTrigger, "click") : null;
+
+      wrapper.vm.onSelectStream();
+      await flushPromises();
+
+      expect(streamSelect().attributes("aria-expanded")).toBe("true");
+      expect(hiddenClick?.mock.calls.length ?? 0).toBe(0);
     });
 
     it("passes the filter of the last completed search, not unrun editor typing", async () => {

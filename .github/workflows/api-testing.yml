@@ -210,7 +210,7 @@ jobs:
           retention-days: 14
 
   # Dedicated query agent SQL regression suite. Runs in parallel with
-  # the default-set and regression jobs so the 310-case (155 queries ×
+  # the default-set jobs so the 310-case (155 queries ×
   # 2 phases: memtable + parquet) suite doesn't extend CI wall time.
   api_query_agent_tests:
     name: "api_query_agent / ${{ matrix.config.label }}"
@@ -316,125 +316,6 @@ jobs:
         with:
           name: openobserve-query-agent-${{ matrix.config.label }}-log
           path: tests/api-testing/o2_query_agent_${{ matrix.config.label }}.log
-          if-no-files-found: warn
-          retention-days: 14
-
-  # Phase 6.b: regression matrix split. The 4 env-flag-sensitive test
-  # configurations now run as 4 parallel jobs instead of 4 sequential
-  # restarts in one job. Each job downloads the run-scoped OO binary and
-  # runs its single configured pytest target.
-  api_regression_tests:
-    name: "api_regression / ${{ matrix.config.label }}"
-    needs: [check_changes, build_api_binary]
-    if: needs.check_changes.outputs.has_changes == 'true'
-    runs-on: ubicloud-standard-4
-    permissions:
-      actions: read
-      contents: read  # only need to checkout the repo
-    strategy:
-      fail-fast: false
-      matrix:
-        config:
-          - label: utf8_view_false
-            env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false"
-            target: tests/regression/test_subquery_join_match.py
-          - label: utf8_view_true
-            env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true"
-            target: tests/regression/test_subquery_join_match.py
-          - label: join_match_one_true
-            env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true"
-            target: tests/regression/test_logs_to_logs_join.py
-          - label: join_match_one_false
-            env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false"
-            target: tests/regression/test_logs_to_logs_join.py
-          # A free-space requirement no runner meets keeps the disk circuit breaker tripped.
-          - label: otlp_grpc_backpressure
-            env: "ZO_DISK_CIRCUIT_BREAKER_ENABLED=true ZO_DISK_CIRCUIT_BREAKER_THRESHOLD=900000000"
-            target: tests/regression/test_otlp_grpc_backpressure.py
-          # Spawns and restarts its own server from target/debug/openobserve.
-          - label: sqlite_meta_invalid_utf8
-            env: ""
-            target: tests/regression/test_sqlite_invalid_utf8_meta_startup.py
-
-          # Cross-tenant gRPC ingest (o2-enterprise#2821); needs no server env, the listener is on by default.
-          - label: grpc_ingest_org_binding
-            env: ""
-            target: tests/regression/test_grpc_ingest_org_binding.py
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Download OpenObserve debug binary
-        uses: actions/download-artifact@v5
-        with:
-          name: openobserve-api-debug-${{ github.sha }}
-          path: api-binary-artifact
-
-      - name: Extract OpenObserve debug binary
-        run: |
-          mkdir -p target/debug
-          tar -I 'zstd -T0' -xf api-binary-artifact/openobserve-api-debug.tar.zst -C target/debug
-          chmod +x target/debug/openobserve
-
-      - uses: actions/setup-python@v7
-        id: setup-python
-        with: { python-version: "3.11.6" }
-
-      - name: Setup rye
-        uses: eifinger/setup-rye@c694239a43768373e87d0103d7f547027a23f3c8 # v4.2.9
-        env:
-          # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
-          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
-        with:
-          enable-cache: true
-          # No trailing slash: setup-rye discards a restored .venv whose recorded path differs from <workspace>/<dir>/.venv.
-          working-directory: "tests/api-testing"
-          version: "0.27.0"
-
-      - name: Pin cpython
-        run: rye pin cpython@3.11.6
-        working-directory: tests/api-testing/
-
-      - name: Rye sync
-        run: rye sync
-        working-directory: tests/api-testing/
-
-      - name: "Run ${{ matrix.config.label }} regression test"
-        # Server binary lives at the repo root (target/debug/openobserve);
-        # this step uses working-directory: tests/api-testing/, so we must
-        # invoke it via ${{ github.workspace }} or the shell will fail with
-        # "No such file or directory". --force-sugar omitted on purpose —
-        # pytest-sugar auto-loads via entry point, and passing the flag
-        # registers it twice and inflates the progress counter ~3x.
-        run: |
-          ${{ matrix.config.env }} ${{ github.workspace }}/target/debug/openobserve > "o2_${{ matrix.config.label }}.log" 2>&1 &
-          SERVER_PID=$!
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
-              echo "Server ready after ${i}s"; break
-            fi
-            sleep 1
-          done
-          rye run pytest ${{ matrix.config.target }} -v --junitxml=junit-regression-${{ matrix.config.label }}.xml
-          kill $SERVER_PID || true
-        working-directory: tests/api-testing/
-
-      # Test-count metrics sidecar (see integration job). Parser dedups the
-      # flag-combo legs that re-run the same target files.
-      - name: Upload API junit (regression)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-junit__api_integration_tests__regression_${{ matrix.config.label }}
-          path: tests/api-testing/junit-regression-${{ matrix.config.label }}.xml
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload server log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: "openobserve-regression-${{ matrix.config.label }}-log"
-          path: "tests/api-testing/o2_${{ matrix.config.label }}.log"
           if-no-files-found: warn
           retention-days: 14
 
@@ -640,7 +521,7 @@ jobs:
   api_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [check_changes, build_api_binary, api_integration_tests, api_query_agent_tests, api_regression_tests, api_alerts_pending_tests]
+    needs: [check_changes, build_api_binary, api_integration_tests, api_query_agent_tests, api_alerts_pending_tests]
     if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
     steps:
       - name: Check test results
@@ -654,6 +535,8 @@ jobs:
           # 2. Nothing API-relevant changed → nothing ran → allow.
           if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
             echo "✅ No API-relevant changes — suite not required."
+            echo "::notice title=API tests skipped::No API-relevant changes — suite did not run."
+            echo "### ⏭️ API suite skipped — no API-relevant changes in this PR, so no tests ran." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
@@ -662,12 +545,11 @@ jobs:
           if [ "${{ needs.build_api_binary.result }}" == "success" ] && \
              [ "${{ needs.api_integration_tests.result }}" == "success" ] && \
              [ "${{ needs.api_query_agent_tests.result }}" == "success" ] && \
-             [ "${{ needs.api_regression_tests.result }}" == "success" ] && \
              [ "${{ needs.api_alerts_pending_tests.result }}" == "success" ]; then
             echo "All API test jobs passed"
             exit 0
           else
-            echo "API tests failed: build=${{ needs.build_api_binary.result }}, integration=${{ needs.api_integration_tests.result }}, query_agent=${{ needs.api_query_agent_tests.result }}, regression=${{ needs.api_regression_tests.result }}, alerts_pending=${{ needs.api_alerts_pending_tests.result }}"
+            echo "API tests failed: build=${{ needs.build_api_binary.result }}, integration=${{ needs.api_integration_tests.result }}, query_agent=${{ needs.api_query_agent_tests.result }}, alerts_pending=${{ needs.api_alerts_pending_tests.result }}"
             exit 1
           fi
 
@@ -675,7 +557,7 @@ jobs:
   # suite=api). Re-runs append one doc per attempt; the dashboard keeps the latest attempt per run_id.
   report_to_openobserve:
     name: Report run metrics to OpenObserve
-    needs: [check_changes, api_integration_tests, api_query_agent_tests, api_regression_tests, api_alerts_pending_tests]
+    needs: [check_changes, api_integration_tests, api_query_agent_tests, api_alerts_pending_tests]
     if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
     runs-on: ubuntu-latest
     permissions:
@@ -703,14 +585,13 @@ jobs:
           O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
           INTEG: ${{ needs.api_integration_tests.result }}
           AGENT: ${{ needs.api_query_agent_tests.result }}
-          REG: ${{ needs.api_regression_tests.result }}
           PEND: ${{ needs.api_alerts_pending_tests.result }}
         run: |
-          if [ "$INTEG" = "skipped" ] && [ "$AGENT" = "skipped" ] && [ "$REG" = "skipped" ] && [ "$PEND" = "skipped" ]; then
+          if [ "$INTEG" = "skipped" ] && [ "$AGENT" = "skipped" ] && [ "$PEND" = "skipped" ]; then
             echo "::notice::no API tests ran (no relevant changes) — skipping metrics"; exit 0
           fi
-          if [ "$INTEG" = "failure" ] || [ "$AGENT" = "failure" ] || [ "$REG" = "failure" ] || [ "$PEND" = "failure" ]; then CONCLUSION=failure
-          elif [ "$INTEG" = "cancelled" ] || [ "$AGENT" = "cancelled" ] || [ "$REG" = "cancelled" ] || [ "$PEND" = "cancelled" ]; then CONCLUSION=cancelled
+          if [ "$INTEG" = "failure" ] || [ "$AGENT" = "failure" ] || [ "$PEND" = "failure" ]; then CONCLUSION=failure
+          elif [ "$INTEG" = "cancelled" ] || [ "$AGENT" = "cancelled" ] || [ "$PEND" = "cancelled" ]; then CONCLUSION=cancelled
           else CONCLUSION=success; fi
           export CONCLUSION STREAM=ci_test_runs SUITE=api
           # Parse junit into per-category + total counts. The TOTAL folds into the

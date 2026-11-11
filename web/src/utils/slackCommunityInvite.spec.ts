@@ -18,7 +18,6 @@ import {
   markSlackInviteDismissed,
   markSlackInviteOffered,
   markSlackInviteResolved,
-  shouldOfferSlackInvite,
   shouldShowStandaloneSlackInvite,
 } from "./slackCommunityInvite";
 
@@ -36,8 +35,9 @@ describe("slackCommunityInvite", () => {
   describe("legacy state migration", () => {
     it("treats a legacy communitySlackInviteSeen:<email> flag as already resolved", () => {
       localStorage.setItem(LEGACY_SEEN_KEY, "true");
+      markSlackInviteOffered(EMAIL);
 
-      expect(shouldOfferSlackInvite(EMAIL)).toBe(false);
+      expect(localStorage.getItem(STATE_KEY)).toBeNull();
       expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(false);
     });
 
@@ -54,20 +54,21 @@ describe("slackCommunityInvite", () => {
 
     it("does not treat a missing or non-'true' legacy flag as resolved", () => {
       localStorage.setItem(LEGACY_SEEN_KEY, "false");
+      markSlackInviteOffered(EMAIL);
 
-      expect(shouldOfferSlackInvite(EMAIL)).toBe(true);
+      expect(JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}").status).toBe("pending_day2");
     });
   });
 
   describe("not_asked -> pending_day2 -> resolved", () => {
-    it("starts as not_asked and offers the embedded invite", () => {
-      expect(shouldOfferSlackInvite(EMAIL)).toBe(true);
+    it("starts as not_asked with no stored record", () => {
+      expect(localStorage.getItem(STATE_KEY)).toBeNull();
+      expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(false);
     });
 
-    it("moves to pending_day2 on first offer and stops offering the embedded invite again", () => {
+    it("moves to pending_day2 on first offer", () => {
       markSlackInviteOffered(EMAIL);
 
-      expect(shouldOfferSlackInvite(EMAIL)).toBe(false);
       const record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
       expect(record.status).toBe("pending_day2");
     });

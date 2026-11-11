@@ -15,7 +15,7 @@
 
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { type SQLContext } from "../shared/types";
-import { chartColor } from "../../../chartTheme";
+import { chartAxisTextColor, chartColor } from "../../../chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { createSeriesOverrideLookup } from "../../seriesOverrides";
 import { sortTooltipParams } from "../../tooltipSort";
@@ -77,6 +77,7 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
     };
     const xAxisLabelRotation = hasTimestampField ? 0 : panelSchema.config?.axis_label_rotate || 0;
     options.xAxis[0].axisLabel = {
+      color: chartAxisTextColor(),
       rotate: xAxisLabelRotation,
     };
     options.xAxis[0].axisTick = {};

@@ -12,11 +12,15 @@ vi.mock("@/services/http", () => ({
   }),
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
+import analytics from "@/services/product_analytics";
 import llmQueuesService from "./llm-queues.service";
 
 beforeEach(() => {
   mockGet.mockReset();
   mockPost.mockReset();
+  vi.mocked(analytics.track).mockClear();
 });
 
 describe("llmQueuesService queue and item contracts", () => {
@@ -223,6 +227,24 @@ describe("llmQueuesService Workbench contracts", () => {
       payload,
     );
     expect(result.annotationId).toBe("submission-1");
+    expect(analytics.track).toHaveBeenCalledWith("llm_queue_review_submitted", {
+      score_count: 1,
+      has_comment: true,
+    });
+  });
+
+  it("tracks a dataset push with whether a new item was created", async () => {
+    mockPost.mockResolvedValue({ data: { created: true, item: { logicalId: "item-9" } } });
+
+    await llmQueuesService.pushToDataset("acme", "queue-1", "item-1", {
+      datasetId: "dataset-1",
+      reviewSubmissionId: "submission-1",
+      expectedOutput: "ok",
+    });
+
+    expect(analytics.track).toHaveBeenCalledWith("llm_queue_item_pushed_to_dataset", {
+      created: true,
+    });
   });
 });
 
@@ -284,6 +306,10 @@ describe("llmQueuesService Score Config version contracts", () => {
     });
 
     expect(mockGet).toHaveBeenCalledWith("/api/acme/score_configs/config-1/versions");
+    expect(analytics.track).toHaveBeenCalledWith("llm_queue_created", {
+      score_config_count: 1,
+      has_target_dataset: false,
+    });
     expect(options[0]).toMatchObject({
       id: "config-1",
       versions: [1, 2],

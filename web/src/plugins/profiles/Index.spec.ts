@@ -5,6 +5,7 @@ import Profiles from "@/plugins/profiles/Index.vue";
 import FlameGraphView from "@/components/common/FlameGraphView.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import analytics from "@/services/product_analytics";
 
 const mocks = vi.hoisted(() => ({
   nowMs: 1_700_000_000_000,
@@ -51,6 +52,8 @@ vi.mock("vue-router", () => ({
   useRoute: () => route,
   useRouter: () => router,
 }));
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/utils/date", () => ({
   getConsumableRelativeTime: mocks.getConsumableRelativeTime,
@@ -247,6 +250,7 @@ describe("Profiles page", () => {
   });
 
   it("runs the query once when the page opens", async () => {
+    vi.mocked(analytics.track).mockClear();
     mountPage();
     await flushPromises();
     await nextTick();
@@ -256,6 +260,22 @@ describe("Profiles page", () => {
     expect(mocks.meta.mock.calls[1][2]).toMatchObject({ service_name: "service-a" });
     expect(mocks.merge).toHaveBeenCalledTimes(1);
     expect(mocks.series).toHaveBeenCalledTimes(1);
+    expect(analytics.track).not.toHaveBeenCalledWith("profiles_query_completed", expect.anything());
+  });
+
+  it("tracks a query run started from the Run button", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mountPage();
+    await settle();
+    vi.mocked(analytics.track).mockClear();
+
+    await wrapper.find('[data-test="profiles-run-query"]').trigger("click");
+    await flushPromises();
+
+    expect(analytics.track).toHaveBeenCalledWith("profiles_query_completed", {
+      filter_count: 0,
+      has_breakdown: false,
+    });
   });
 
   it("runs the query once when the page opens with the real date picker", async () => {
@@ -342,6 +362,110 @@ describe("Profiles page", () => {
       profile_unit: "nanoseconds",
     });
   });
+
+  it("labels sample counts as CPU samples without runtime metadata", async () => {
+    route.query = { stream: "profiles-a", profile_type: "samples", profile_unit: "count" };
+    mocks.meta.mockResolvedValue({
+      data: {
+        ...profileMetaResponse.data,
+        profile_types: [
+          { type: "samples", unit: "count" },
+          { type: "alloc_space", unit: "bytes" },
+        ],
+      },
+    });
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        profile_type: "samples",
+        unit: "count",
+        series: [{ timestamp: 60_000_000, value: 7, rate: 1000 }],
+      },
+    });
+    mocks.merge.mockResolvedValue({
+      data: { ...mergeResponse.data, profile_type: "samples", unit: "count" },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const select = wrapper.get('[data-test="profiles-type-select"] select');
+    expect(select.findAll("option").map((option) => option.text())).toEqual([
+      "CPU samples (count)",
+      "alloc_space (bytes)",
+    ]);
+    expect((select.element as HTMLSelectElement).value).toBe("samples\u0000count");
+    expect(mocks.merge.mock.calls[0][2]).toMatchObject({
+      profile_type: "samples",
+      profile_unit: "count",
+    });
+    expect(route.query).toMatchObject({ profile_type: "samples", profile_unit: "count" });
+    expect(
+      wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options.series[0].data,
+    ).toEqual([[60_000, 7]]);
+    expect(wrapper.get('[data-test="profiles-series-card"]').text()).not.toContain("CPU usage");
+  });
+
+  it("labels seeded sample counts as CPU samples while metadata is loading", async () => {
+    route.query = { stream: "profiles-a", profile_type: "samples", profile_unit: "count" };
+    mocks.meta.mockReturnValue(new Promise(() => {}));
+    const wrapper = mountPage();
+    await flushPromises();
+    const select = wrapper.get('[data-test="profiles-type-select"] select');
+    expect(select.text()).toBe("CPU samples (count)");
+    expect((select.element as HTMLSelectElement).value).toBe("samples\u0000count");
+  });
+
+  it.each(["nanoseconds", "ns", "NS"])(
+    "labels a seeded CPU time %s option while metadata is loading",
+    async (unit) => {
+      route.query = { stream: "profiles-a", profile_type: "cpu", profile_unit: unit };
+      mocks.meta.mockReturnValue(new Promise(() => {}));
+      const wrapper = mountPage();
+      await flushPromises();
+      expect(wrapper.get('[data-test="profiles-type-select"] select').text()).toBe("CPU time");
+    },
+  );
+
+  it.each(["nanoseconds", "nanosecond", "nanos", "ns", "NS"])(
+    "keeps CPU labels and numeric units consistent for %s",
+    async (unit) => {
+      mocks.meta.mockResolvedValue({
+        data: { ...profileMetaResponse.data, profile_types: [{ type: "cpu", unit }] },
+      });
+      mocks.series.mockResolvedValue({
+        data: {
+          ...seriesResponse.data,
+          unit,
+          series: [
+            { timestamp: 60_000_000, value: 6e9, rate: 4.2e8 },
+            { timestamp: 120_000_000, value: 6e9 },
+          ],
+        },
+      });
+      mocks.merge.mockResolvedValue({ data: { ...mergeResponse.data, unit } });
+      const wrapper = mountPage();
+      await settle();
+
+      const select = wrapper.get('[data-test="profiles-type-select"] select');
+      expect(select.text()).toBe("CPU time");
+      expect((select.element as HTMLSelectElement).value).toBe(`cpu\u0000${unit}`);
+      expect(mocks.merge.mock.calls[0][2]).toMatchObject({
+        profile_type: "cpu",
+        profile_unit: unit,
+      });
+      expect(route.query).toMatchObject({ profile_type: "cpu", profile_unit: unit });
+      expect(wrapper.get('[data-test="profiles-series-card"]').text()).toContain(
+        "CPU usage (cores)",
+      );
+      const options = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options;
+      expect(options.series[0].data).toEqual([
+        [60_000, 0.42],
+        [120_000, 0.1],
+      ]);
+      expect(options.tooltip.valueFormatter(0.42)).toBe("0.42 cores");
+      expect(wrapper.get('[data-test="profiles-top-table"]').text()).toContain("10 ns");
+    },
+  );
 
   it("switches to another stream from the selector", async () => {
     const wrapper = mountPage();
@@ -597,6 +721,8 @@ describe("Profiles page", () => {
     await settle();
 
     const options = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options;
+    expect(wrapper.get('[data-test="profiles-type-select"] select').text()).toBe("CPU time");
+    expect(wrapper.get('[data-test="profiles-series-card"]').text()).toContain("CPU usage (cores)");
     expect(options.backgroundColor).toBe("transparent");
     expect(options.series[0].smooth).toBe(false);
     expect(options.series[0].data).toEqual([
@@ -779,6 +905,9 @@ describe("Profiles page", () => {
     const series = wrapper.findComponent({ name: "ChartRendererStub" }).props("data")
       .options.series;
     expect(series.map((line: { name: string }) => line.name)).toEqual(["pod-a", "Others"]);
+    expect(analytics.track).toHaveBeenCalledWith("profiles_breakdown_changed", {
+      has_breakdown: true,
+    });
     expect(route.query.breakdown ?? router.replace.mock.calls.at(-1)?.[0].query.breakdown).toBe(
       "k8s_pod_name",
     );
@@ -1368,9 +1497,11 @@ describe("Profiles page", () => {
 
       await wrapper.find('[data-test="profiles-view-flame"]').trigger("click");
       await nextTick();
+      expect(analytics.track).toHaveBeenCalledWith("profiles_view_changed", { view: "flame" });
       const graph = wrapper.findComponent({ name: "FlameGraphStub" });
       graph.vm.$emit("focus", "root/0");
       graph.vm.$emit("details", "fn-b");
+      expect(analytics.track).toHaveBeenCalledWith("profiles_function_details_opened");
       await wrapper.find('[data-test="profiles-search-functions"]').setValue("fn");
       graph.vm.$emit("sandwich", "fn-c");
       await flushPromises();

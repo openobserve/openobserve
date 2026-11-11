@@ -43,6 +43,16 @@ enum TokenExchangeType {
     IdToken,
 }
 
+// Only documents o2_dex's TokenExchangeResponse, which has no ToSchema in that crate.
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+struct TokenExchangeResponseBody {
+    access_token: String,
+    token_type: String,
+    expires_in: u64,
+    issued_token_type: String,
+}
+
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     post,
@@ -53,7 +63,7 @@ enum TokenExchangeType {
     security(),
     request_body(content = inline(TokenExchangeBody), content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = TokenExchangeResponseBody),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -65,6 +75,8 @@ pub async fn exchange_token(
     let result = o2_dex::service::token_exchange::exchange_token(&body).await;
 
     let mut audit_message = AuditMessage {
+        login_ip: None,
+        user_agent: None,
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -79,6 +91,8 @@ pub async fn exchange_token(
             trace_id: None,
         },
         delegated: None,
+        fleet_id: None,
+        target: None,
     };
     match result {
         Ok(response) => {
@@ -126,7 +140,7 @@ pub async fn exchange_token(
     security(),
     request_body(content = inline(TokenExchangeBody), content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = TokenExchangeResponseBody),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))

@@ -242,9 +242,6 @@ pub struct InitializeResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerCapabilities {
     pub tools: ToolsCapability,
-    /// Advertise completions capability (argument autocompletion) per 2025-11-25
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub completions: Option<serde_json::Map<String, Value>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

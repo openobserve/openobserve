@@ -139,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :module-label="moduleLabel"
                   :entity-label="entityLabel"
                   :summary-actions="summaryActions"
+                  :license-denied="licenseDenied"
                   @open="(moduleKey) => (activeModule = moduleKey)"
                   @preset="(presetId) => applyPreset(presetId, { announce: true })"
                   @load-streams="loadPresetStreams()"
@@ -166,6 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         language="json"
                         ref="permissionJsonEditorRef"
                         v-model:query="permissionsJsonValue"
+                        :read-only="pageLocked"
                         style="height: calc(100vh - var(--navbar-height) - 295px)"
                       />
                       <!-- eslint-enable local/no-hardcoded-px -->
@@ -355,7 +357,9 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { useFeatureLock } from "@/composables/useFeatureLock";
 
 interface RoleDraftData {
   added: string[];
@@ -369,9 +373,20 @@ interface RoleDraftData {
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
+// Monaco is not an O2 primitive, so the page lock cannot disable it on its own.
+const { locked: pageLocked } = useFeatureLock();
+
+let tabRequested = false;
+
 onBeforeMount(() => {
   permissionsState.permissions = [];
   editingRole.value = router.currentRoute.value.params.role_name as string;
+  const requestedTab = router.currentRoute.value.query.tab;
+  const serviceAccountsOn = store.state.zoConfig?.service_account_enabled;
+  if (requestedTab === "users" || (requestedTab === "serviceAccounts" && serviceAccountsOn)) {
+    activeTab.value = requestedTab;
+    tabRequested = true;
+  }
   getRoleDetails();
 });
 
@@ -427,6 +442,8 @@ const addedServiceAccounts = ref(new Set());
 const removedServiceAccounts = ref(new Set());
 
 const roleUsers: Ref<string[]> = ref([]);
+
+const licenseDenied = ref<string[] | null>(null);
 
 const permissionsUiType = ref("table");
 
@@ -605,11 +622,17 @@ const getRoleDetails = () => {
           await seedK8sViewerPreset();
         } else if (preset === "rum_viewer" || preset === "rum_editor") {
           await seedRumPreset(preset);
+        } else if (presets.value.some((item) => item.id === preset)) {
+          // Offered presets only: one needing a module this org lacks would stage tuples FGA rejects.
+          await applyPreset(String(preset));
         }
       }
     })
     .catch((error) => {
       isFetchingInitialRoles.value = false;
+      // The page stays and renders locked; the license bar explains the denial.
+      licenseDenied.value = licenseDeniedFeatures(error);
+      if (licenseDenied.value) return;
       if (error?.response?.status === 404) {
         roleGone = true;
         deleteEditorDraftsFor({
@@ -997,7 +1020,7 @@ const applyRoleDraft = (data: RoleDraftData) => {
   removedServiceAccounts.value = new Set(
     data.removedServiceAccounts.filter((user) => members.has(user)),
   );
-  if (tabs.value.some((tab) => tab.value === data.tab)) activeTab.value = data.tab;
+  if (!tabRequested && tabs.value.some((tab) => tab.value === data.tab)) activeTab.value = data.tab;
   membersKey.value += 1;
 };
 

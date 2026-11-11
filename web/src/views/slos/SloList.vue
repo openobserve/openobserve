@@ -37,6 +37,15 @@
            discoverable once the export dialog is already open. -->
       <IacRegistryLinks data-test="slos-slolist-iac-registries" :compact="isMobile" />
       <OButton
+        variant="outline"
+        size="sm-action"
+        icon-left="upload-file"
+        data-test="slos-slolist-import"
+        @click="goToImport"
+      >
+        {{ t("dashboard.import") }}
+      </OButton>
+      <OButton
         variant="primary"
         size="sm-action"
         data-test="slos-slolist-new"
@@ -58,7 +67,7 @@
     <!-- SLOs share the ALERT folder namespace (there is no FolderType::Slos),
          so `type="alerts"` is not a copy-paste slip — it is what makes a
          "payments" folder hold that team's alerts and its SLOs together. -->
-    <template #sidebar>
+    <template v-if="!anomalyLocked" #sidebar>
       <FolderList type="alerts" :drawer-on-mobile="false" @update:activeFolderId="onFolderChange" />
     </template>
 
@@ -72,6 +81,7 @@
       :loading="loading"
       :loading-reset-key="activeFolderId"
       :error="error"
+      :forbidden="forbidden"
       :page-size="pageSize"
       :page-size-options="[25, 50, 100]"
       :sort-by="sortBy"
@@ -141,10 +151,7 @@
            read the counts for what you narrowed to. Always rendered (skeleton
            while loading) so data arriving never shifts the rows below. -->
       <template #subheader>
-        <div
-          class="px-page-edge border-table-row-divider border-b py-1.5"
-          data-test="slos-slolist-stats"
-        >
+        <div data-test="slos-slolist-stats">
           <OStatStrip
             :items="stats"
             :loading="loading"
@@ -251,20 +258,18 @@
       </template>
 
       <template #cell-tags="{ row }">
-        <OTruncatedText
-          as="div"
-          class="flex flex-wrap gap-1"
-          :tooltip="raw((row.tags || []).join(', '))"
-        >
-          <OTag
-            v-for="tag in (row.tags || []).slice(0, 2)"
-            :key="tag"
-            variant="default-soft"
-            size="xs"
-            :label="raw(tag)"
-          />
-          <span v-if="(row.tags || []).length > 2" class="text-text-secondary">…</span>
-        </OTruncatedText>
+        <OTooltip v-if="row.tags?.length" :content="raw(row.tags.join(', '))">
+          <FitItems :items="row.tags">
+            <template #default="{ item }">
+              <OTag variant="default-soft" size="xs" class="max-w-full">
+                <span class="truncate">{{ item }}</span>
+              </OTag>
+            </template>
+            <template #more="{ count }">
+              <span class="text-text-secondary">+{{ count }}</span>
+            </template>
+          </FitItems>
+        </OTooltip>
       </template>
 
       <template #cell-folder="{ row }">
@@ -549,6 +554,8 @@ import { slosQuery } from "@/services/slos.queries";
 // stays off the query layer and calls the endpoint directly.
 import sloService from "@/services/slos";
 import { computed, onMounted, ref, nextTick, watch } from "vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useDowntimesEnabled } from "@/composables/downtimes/useDowntimesEnabled";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -573,6 +580,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import FitItems from "@/components/common/FitItems.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
@@ -616,10 +624,13 @@ const store = useStore();
 const readOrg = ref<string>(store.state.selectedOrganization?.identifier ?? "");
 const readFolder = ref<string | undefined>(undefined);
 
+// SLOs are licensed under anomaly detection; a locked license reads nothing and says so.
+const { locked: anomalyLocked } = useLicenseLock("anomaly_detection");
+
 const slosList = useQuery(() =>
   // Held until the folder resolves: the reactive key would otherwise fetch an unscoped list first.
   Object.assign(slosQuery(readOrg.value, readFolder.value), {
-    enabled: !!readOrg.value && readFolder.value !== undefined,
+    enabled: !!readOrg.value && readFolder.value !== undefined && !anomalyLocked.value,
   }),
 );
 
@@ -627,7 +638,8 @@ const slosList = useQuery(() =>
 // scope repaints these rows with no wiring here.
 const rows = computed<SloListItem[]>(() => (slosList.data.value ?? []) as SloListItem[]);
 
-const loading = slosList.isPending;
+// A disabled query stays pending forever, so a locked list must not read that as loading.
+const loading = computed(() => !anomalyLocked.value && slosList.isPending.value);
 // A request in flight while rows stay on screen — the refresh button's spinner.
 // `loading` is the skeleton, which only a cold read wants.
 const fetching = slosList.isFetching;
@@ -638,7 +650,11 @@ const lastUpdatedAt = slosList.dataUpdatedAt;
 // query's error and nothing else, so the table used to render an empty list
 // with no explanation.
 const loadError = ref<string | null>(null);
+const forbidden = computed<ForbiddenState>(() =>
+  anomalyLocked.value ? ["anomaly_detection"] : forbiddenState(slosList.error.value),
+);
 const error = computed<string | null>(() => {
+  if (forbidden.value) return null;
   if (loadError.value) return loadError.value;
   const e = slosList.error.value as any;
   if (!e) return null;
@@ -720,7 +736,6 @@ async function fetchSloForExport(id: string): Promise<Record<string, unknown> | 
     id: _id,
     status: _status,
     definition_generation: _generation,
-    groups_estimate: _estimate,
     groups_reserved: _reserved,
     ...definition
   } = body;
@@ -1000,7 +1015,7 @@ const refresh = () => load(null, undefined, true);
 // fall back to the current org and active folder — the folder-change path is the
 // only caller that passes a folder the refs have not caught up with yet.
 async function load(orgId?: string | null, folderId?: string, force = false) {
-  if (!org.value) return;
+  if (!org.value || anomalyLocked.value) return;
   loadError.value = null;
   // sometimes the folder id might not be updated so passed via
   // query params.
@@ -1067,6 +1082,13 @@ async function doMove() {
 // Spreads the list's own query (page, folder, …) forward so the editor's `backTarget` has something to restore.
 function goToNew() {
   router.push({ name: "addSlo", query: { ...route.query, org_identifier: org.value } });
+}
+
+function goToImport() {
+  router.push({
+    name: "importSlo",
+    query: { ...route.query, org_identifier: org.value, folder: activeFolderId.value },
+  });
 }
 
 const activeCorrections = (row: SloListItem) =>

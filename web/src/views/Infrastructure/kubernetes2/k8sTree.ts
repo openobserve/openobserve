@@ -231,36 +231,6 @@ export function clusterTone(stats: ClusterStats | null): ClusterTone {
   return "success";
 }
 
-// Spreads clusters over a few tints; the name alone decides, so a cluster keeps its colour.
-export function clusterHue(name: string, hues = 4): number {
-  let hash = 0;
-  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-  return hash % hues;
-}
-
-// Tile codes that never repeat: leading segment initials, then first and last, then numbered.
-export function clusterCodes(names: string[]): Record<string, string> {
-  const taken = new Set<string>();
-  const codes: Record<string, string> = {};
-  for (const name of names) {
-    const parts = name.split(/[^a-z0-9]+/i).filter(Boolean);
-    const first = parts[0] ?? name;
-    const candidates = [
-      parts.length > 1 ? first[0] + parts[1][0] : first.slice(0, 2),
-      parts.length > 1 ? first[0] + parts[parts.length - 1][0] : first.slice(0, 2),
-      first.slice(0, 2),
-    ].map((c) => c.toUpperCase());
-    let code = candidates.find((c) => c && !taken.has(c));
-    for (let n = 1; !code; n++) {
-      const numbered = `${first[0] ?? "C"}${n}`.toUpperCase();
-      if (!taken.has(numbered)) code = numbered;
-    }
-    taken.add(code);
-    codes[name] = code;
-  }
-  return codes;
-}
-
 export interface NodeSummary {
   total: number;
   ready: number;

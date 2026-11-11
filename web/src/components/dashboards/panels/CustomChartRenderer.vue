@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="h-full w-full"
+    :class="{ 'chart-canvas-pixelated': fractionalPixelRatio }"
     data-test="chart-renderer"
     ref="chartRef"
     id="chart"
@@ -56,6 +57,7 @@ import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import DOMPurify from "dompurify";
 import { withChartFont } from "@/utils/fonts";
 import { useTheme } from "@/composables/useTheme";
+import { currentDevicePixelRatio, useChartPixelRatio } from "@/composables/useDevicePixelRatio";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
 
 // Register necessary components.
@@ -146,7 +148,9 @@ export default defineComponent({
       if (!chart) {
         chart = echarts.init(chartRef.value, dark ? "dark" : undefined, {
           renderer: "canvas",
+          devicePixelRatio: currentDevicePixelRatio(),
         });
+        syncPixelRatio();
         chartDark = dark;
         if (chartRef.value.clientWidth === 0 || chartRef.value.clientHeight === 0) {
           reinitWhenSized();
@@ -234,6 +238,9 @@ export default defineComponent({
       { deep: true },
     );
     watch(isDark, () => initChart());
+    const { pixelated: fractionalPixelRatio, sync: syncPixelRatio } = useChartPixelRatio(
+      () => chart,
+    );
 
     onUnmounted(() => {
       zeroSizeReinitObserver?.disconnect();
@@ -243,7 +250,7 @@ export default defineComponent({
       window.removeEventListener("resize", handleResize);
     });
 
-    return { chartRef, handleMouseOver, handleMouseLeave };
+    return { chartRef, fractionalPixelRatio, handleMouseOver, handleMouseLeave };
   },
 });
 </script>

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 /** The stored row `GET` and `PUT /api/v2/{org}/alert_calibration/config` return. */
 export interface AlertCalibrationConfig {
@@ -75,8 +76,23 @@ const base = (org: string) => `/api/v2/${encodeURIComponent(org)}/alert_calibrat
 const alertCalibration = {
   getConfig: (org: string) => http().get<AlertCalibrationConfig>(`${base(org)}/config`),
   updateConfig: (org: string, body: UpdateAlertCalibrationConfig) =>
-    http().put<AlertCalibrationConfig>(`${base(org)}/config`, body),
-  requestRun: (org: string) => http().post(`${base(org)}/digests/run`),
+    http()
+      .put<AlertCalibrationConfig>(`${base(org)}/config`, body)
+      .then((res) => {
+        analytics.track("alert_calibration_settings_updated", {
+          enabled: res.data?.enabled,
+          frequency_minutes: res.data?.frequency_minutes,
+          window_minutes: res.data?.window_minutes,
+        });
+        return res;
+      }),
+  requestRun: (org: string) =>
+    http()
+      .post(`${base(org)}/digests/run`)
+      .then((res) => {
+        analytics.track("alert_calibration_run_requested");
+        return res;
+      }),
   getStatus: (org: string) => http().get<AlertCalibrationStatus>(`${base(org)}/status`),
   /** Read through the module's endpoints, so its permission, not the digest stream's, decides who sees them. */
   readDigests: async <T>(

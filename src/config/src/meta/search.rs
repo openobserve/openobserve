@@ -52,7 +52,7 @@ pub struct Session {
     pub target_partitions: usize,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[schema(as = SearchRequest)]
 pub struct Request {
     pub query: Query,
@@ -70,6 +70,10 @@ pub struct Request {
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default = "default_use_cache")]
     pub use_cache: bool,
+    /// Set to false to skip the inverted index for this query.
+    #[serde(default = "default_use_index")]
+    #[schema(default = true)]
+    pub use_index: bool,
     #[serde(default)]
     pub clear_cache: bool,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -78,8 +82,31 @@ pub struct Request {
     pub agent_options: Option<AgentOptions>,
 }
 
+impl Default for Request {
+    fn default() -> Self {
+        Self {
+            query: Query::default(),
+            encoding: RequestEncoding::default(),
+            regions: Vec::new(),
+            clusters: Vec::new(),
+            timeout: 0,
+            search_type: None,
+            search_event_context: None,
+            use_cache: false,
+            use_index: default_use_index(),
+            clear_cache: false,
+            local_mode: None,
+            agent_options: None,
+        }
+    }
+}
+
 pub fn default_use_cache() -> bool {
     get_config().common.result_cache_enabled
+}
+
+pub fn default_use_index() -> bool {
+    true
 }
 
 /// Agent-oriented response options. When absent the response is unchanged, so
@@ -198,6 +225,9 @@ pub struct Query {
     /// that don't carry their own 3rd timezone argument. None / "UTC" / "" => UTC.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
+    /// Adds the structured `profile` column to EXPLAIN ANALYZE output.
+    #[serde(default)]
+    pub analyze_profile: bool,
 }
 
 fn default_size() -> i64 {
@@ -223,6 +253,7 @@ impl Default for Query {
             streaming_id: None,
             histogram_interval: 0,
             timezone: None,
+            analyze_profile: false,
         }
     }
 }
@@ -637,6 +668,8 @@ pub struct SearchPartitionRequest {
     pub sampling_ratio: Option<f64>,
     #[serde(default)]
     pub search_type: Option<SearchEventType>,
+    #[serde(default)]
+    pub timezone: Option<String>,
 }
 
 impl SearchPartitionRequest {
@@ -672,6 +705,7 @@ impl From<&Request> for SearchPartitionRequest {
             histogram_interval: req.query.histogram_interval,
             sampling_ratio: req.query.sampling_ratio,
             search_type: req.search_type,
+            timezone: req.query.timezone.clone(),
         }
     }
 }
@@ -766,6 +800,7 @@ impl SearchHistoryRequest {
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
             use_cache: default_use_cache(),
+            use_index: default_use_index(),
             clear_cache: false,
             local_mode: None,
             agent_options: None,
@@ -1321,6 +1356,10 @@ pub struct MultiStreamRequest {
     pub query_fn: Option<String>,
     #[serde(default)]
     pub skip_wal: bool,
+    /// Set to false to skip the inverted index for every query.
+    #[serde(default = "default_use_index")]
+    #[schema(default = true)]
+    pub use_index: bool,
     #[serde(default)]
     pub regions: Vec<String>, // default query all regions, local: only query local region clusters
     #[serde(default)]
@@ -1410,6 +1449,7 @@ impl MultiStreamRequest {
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
                 use_cache: default_use_cache(),
+                use_index: self.use_index,
                 clear_cache: false,
                 local_mode: None,
                 agent_options: None,
@@ -1497,7 +1537,9 @@ pub enum HavingNode {
 pub struct ResultSchemaResponse {
     pub projections: Vec<String>,
     pub group_by: Vec<String>,
+    // HavingNode nests itself, and a self-referencing schema hangs the OpenAPI walk.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
     pub having: Option<HavingNode>,
     pub timeseries_field: Option<String>,
     #[serde(default)]
@@ -2296,6 +2338,7 @@ mod tests {
             histogram_interval: 0,
             sampling_ratio: None,
             search_type: None,
+            timezone: None,
         };
 
         req.decode().unwrap();
@@ -2858,6 +2901,7 @@ mod tests {
             uses_zo_fn: true,
             query_fn: Some("global_fn".to_string()),
             skip_wal: true,
+            use_index: false,
             regions: vec!["region1".to_string()],
             clusters: vec!["cluster1".to_string()],
             search_type: Some(SearchEventType::UI),
@@ -2868,6 +2912,7 @@ mod tests {
 
         let query_reqs = request.to_query_req();
         assert_eq!(query_reqs.len(), 2);
+        assert!(query_reqs.iter().all(|req| !req.use_index));
 
         // Check first query
         let first_req = &query_reqs[0];
@@ -3800,6 +3845,23 @@ mod tests {
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("sampling_ratio"));
         assert_eq!(obj["sampling_ratio"], serde_json::json!(0.5_f64));
+    }
+
+    #[test]
+    fn test_request_use_index_defaults_true() {
+        let body = r#"{"query":{"sql":"SELECT * FROM t","start_time":0,"end_time":1}}"#;
+        let req: Request = serde_json::from_str(body).unwrap();
+        assert!(req.use_index);
+        assert!(Request::default().use_index);
+
+        let body =
+            r#"{"query":{"sql":"SELECT * FROM t","start_time":0,"end_time":1},"use_index":false}"#;
+        let req: Request = serde_json::from_str(body).unwrap();
+        assert!(!req.use_index);
+
+        let body = r#"{"sql":["SELECT * FROM t"],"start_time":0,"end_time":1}"#;
+        let req: MultiStreamRequest = serde_json::from_str(body).unwrap();
+        assert!(req.use_index);
     }
 
     #[test]

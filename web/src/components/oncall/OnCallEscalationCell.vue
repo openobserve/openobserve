@@ -53,6 +53,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import { useOnCallClock } from "@/composables/useOnCallClock";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import type { EscalationProgress, OnCallResponse } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -72,13 +73,16 @@ const props = withDefaults(
     totalRungs?: number | null;
     /** The step the record says it reached, for a list with no progress per row. */
     reachedStep?: number | null;
+    /** The page names a team that no longer exists, so its ladder pages nobody. */
+    teamDeleted?: boolean;
   }>(),
-  { progress: null, progressLoaded: true, totalRungs: null, reachedStep: null },
+  { progress: null, progressLoaded: true, totalRungs: null, reachedStep: null, teamDeleted: false },
 );
 
 const { t } = useI18nTyped();
 const store = useStore();
 const nowMicros = useOnCallClock();
+const { nameOf, tooltipOf } = useOrgUserNames();
 
 const phrase = computed(() =>
   pagePhrase({
@@ -87,6 +91,7 @@ const phrase = computed(() =>
     progressLoaded: props.progressLoaded,
     totalRungs: props.totalRungs,
     reachedStep: props.reachedStep,
+    teamDeleted: props.teamDeleted,
     nowMicros: nowMicros.value,
   }),
 );
@@ -102,6 +107,7 @@ const toneClass = computed(() => {
       return "text-text-body";
     case "snoozed":
     case "reachedNobody":
+    case "nobodyPaged":
       return "text-status-warning-text";
     case "nobodyAnswered":
     case "held":
@@ -133,7 +139,7 @@ const headline = computed<I18nText>(() => {
         : t("oncall.resolvedAfter", { duration: raw(formatMicrosDuration(p.afterMicros)) });
     case "acknowledged":
       return p.by
-        ? t("oncall.escalationAckedBy", { who: raw(p.by) })
+        ? t("oncall.escalationAckedBy", { who: raw(nameOf(p.by)) })
         : t("oncall.state_acknowledged");
     case "snoozed":
       return t("oncall.escalationSnoozedUntil", {
@@ -141,6 +147,8 @@ const headline = computed<I18nText>(() => {
       });
     case "nobodyAnswered":
       return t("oncall.state_exhausted");
+    case "nobodyPaged":
+      return t("oncall.escalationNobodyPaged");
     case "held":
       return t("oncall.escalationHeld", { n: p.secondsLeft });
     case "pagesNobody":
@@ -197,7 +205,15 @@ const detail = computed<I18nText | "">(() => {
   return t("oncall.escalationTo", { who: raw(progress.next_targets.join(", ")), when });
 });
 
+/// The headline names the person; the tooltip adds their email, since two people can share a name.
+const tooltipHeadline = computed<I18nText>(() => {
+  const p = phrase.value;
+  return p.kind === "acknowledged" && p.by
+    ? t("oncall.escalationAckedBy", { who: tooltipOf(p.by) })
+    : headline.value;
+});
+
 const tooltipContent = computed<I18nText>(() =>
-  detail.value ? raw(`${headline.value} — ${detail.value}`) : headline.value,
+  detail.value ? raw(`${tooltipHeadline.value} — ${detail.value}`) : tooltipHeadline.value,
 );
 </script>

@@ -47,7 +47,7 @@ export default class DashboardactionPage {
     this.panelMenuDuplicate = page.locator('[data-test="dashboard-duplicate-panel"]');
     this.panelMenuDelete = page.locator('[data-test="dashboard-delete-panel"]');
     this.shareBtn = page.locator('[data-test="dashboard-share-btn"]');
-    this.settingsBtn = page.locator('[data-test="dashboard-setting-btn"]');
+    this.moreOptionsBtn = page.locator(SELECTORS.MORE_OPTIONS_BTN);
     this.addTabBtn = page.locator('[data-test="dashboard-tab-add-btn"]');
     this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
@@ -363,7 +363,10 @@ export default class DashboardactionPage {
     );
     await this.applyDashboardBtn();
     const response = await promqlResponse;
-    await response.finished();
+    // A streamed (text/event-stream) response may never report finished; waitForChartToRender covers completion.
+    if (!(await response.headerValue("content-type"))?.includes("text/event-stream")) {
+      await response.finished();
+    }
     await this.waitForChartToRender();
     return response;
   }
@@ -384,9 +387,10 @@ export default class DashboardactionPage {
     );
   }
 
-  /** Sorted sample values of every series in a finished PromQL query_range event-stream response. */
+  /** Sorted sample values of every series in a PromQL query_range event-stream response. */
   async promqlSampleValues(response) {
-    return (await response.text())
+    // The browser can abort the stream after the last event and keep no body, so fetch the same absolute range again.
+    return (await (await this.page.request.get(response.url())).text())
       .split("\n")
       .filter((line) => line.startsWith("data: "))
       .map((line) => {

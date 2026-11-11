@@ -51,25 +51,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="outline"
             size="sm"
-            icon-left="shield-alert-outline"
-            :disabled="!alertReady"
+            :icon-left="alertsLocked ? 'lock' : 'shield-alert-outline'"
+            :disabled="alertsLocked || !alertReady"
             data-test="rum-analytics-funnel-alert-btn"
             @click="openAlert"
             >{{ t("rum.analytics.funnel.alert") }}</OButton
           >
-          <OTooltip :content="alertTip" />
+          <OTooltip :content="alertsLocked ? alertsLockedReason : alertTip" />
         </span>
         <span>
           <OButton
             variant="outline"
             size="sm"
-            icon-left="dashboard-customize"
-            :disabled="!dashboardReady"
+            :icon-left="dashboardsLocked ? 'lock' : 'dashboard-customize'"
+            :disabled="dashboardsLocked || !dashboardReady"
             data-test="rum-analytics-funnel-add-dashboard-btn"
             @click="dashboardOpen = true"
             >{{ t("rum.analytics.dashboard.add") }}</OButton
           >
-          <OTooltip v-if="!dashboardReady" :content="dashboardTip" />
+          <OTooltip v-if="dashboardsLocked" :content="dashboardsLockedReason" />
+          <OTooltip v-else-if="!dashboardReady" :content="dashboardTip" />
         </span>
       </template>
       <template v-if="def.steps.length" #menu>
@@ -601,6 +602,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #actions>
                 <OButton
+                  v-if="pa.canWidenRange.value"
                   variant="outline"
                   size="md"
                   icon-left="schedule"
@@ -710,6 +712,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
@@ -811,6 +814,7 @@ import {
 } from "@/utils/rum/funnelCompare";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { buildPrefillFromRumFunnel } from "@/utils/alerts/prefill/fromRumFunnel";
+import analytics from "@/services/product_analytics";
 
 defineOptions({ name: "AnalyticsFunnels" });
 
@@ -847,6 +851,9 @@ const dropoffCohort = ref<FunnelCohort | null>(null);
 const valuesField = ref<string | null>(null);
 const whyOpen = ref(false);
 const dashboardOpen = ref(false);
+const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
+  useLicenseLock("dashboards");
+const { locked: alertsLocked, lockedReason: alertsLockedReason } = useLicenseLock("alerts");
 const linkProblem = pa.savedLinkProblem;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let whyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1260,6 +1267,7 @@ const snapshotScope = () => ({ ...pa.scope.value, xall: undefined });
 
 // The alert starts at today's conversion, so it fires on any drop below what the user sees now.
 const openAlert = () => {
+  if (alertsLocked.value) return;
   const dt = pa.state.datetime;
   requestAlertCreation(
     buildPrefillFromRumFunnel({
@@ -1274,6 +1282,7 @@ const openAlert = () => {
           : { type: "absolute", startTime: dt.startTime, endTime: dt.endTime },
     }),
   );
+  analytics.track("rum_funnel_alert_started");
 };
 
 const org = () => pa.toQuery().org_identifier as string;
@@ -1358,7 +1367,12 @@ const applyDef = (d: FunnelDef) => {
     toast({ variant: "error", message: t("rum.analytics.funnel.editTooLongForLink") });
     return;
   }
+  const prev = def.value.breakdown;
   pa.funnel.value = d;
+  if (d.breakdown && JSON.stringify(d.breakdown) !== JSON.stringify(prev))
+    analytics.track("rum_funnel_breakdown_applied", {
+      dim: typeof d.breakdown === "string" ? d.breakdown : "attribute",
+    });
 };
 
 const update = (patch: Partial<FunnelDef>) => applyDef({ ...def.value, ...patch });
@@ -1473,6 +1487,7 @@ const rerunPrevious = () => {
 
 const setCompare = (v: unknown) => {
   pa.funnelCompare.value = FUNNEL_COMPARE_MODES.find((m) => m === v) ?? null;
+  analytics.track("rum_funnel_compare_changed", { mode: pa.funnelCompare.value ?? "none" });
 };
 
 const removeBreakdownForCompare = () => {
@@ -1485,7 +1500,9 @@ const removeBreakdownForCompare = () => {
 };
 
 const setView = (v: unknown) => {
-  if (v === "steps" || v === "trend") pa.funnelView.value = v;
+  if (v !== "steps" && v !== "trend") return;
+  if (pa.funnelView.value !== v) analytics.track("rum_funnel_view_changed", { view: v });
+  pa.funnelView.value = v;
 };
 
 // Only a funnel already run for the one on screen gets a trend run of its own.
@@ -1642,6 +1659,7 @@ const openDropoff = (stepIndex: number) => {
     stepIndex,
     side: "dropped",
   };
+  analytics.track("rum_funnel_dropoff_opened", { step: stepIndex });
 };
 
 const closeDropoff = () => {
@@ -1666,6 +1684,7 @@ const openCohortPaths = (cohort: FunnelCohort) => {
   };
   pa.lastSubTab.value = "paths";
   void pa.pushSubTab(router, PA_ROUTES.paths);
+  analytics.track("rum_funnel_cohort_paths_opened");
 };
 
 watch(

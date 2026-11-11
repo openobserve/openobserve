@@ -354,7 +354,8 @@ jobs:
       - name: Install Protoc
         run: bash ./.github/protoc.sh
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        # web/package-lock.json needs npm 11, so npm ci fails on Node 20's npm 10.
+        with: { node-version: "24" }
       - name: Build binary + web UI (embedded)
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
@@ -404,7 +405,8 @@ jobs:
       - name: Install Protoc (macOS)
         run: brew install protobuf || true
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        # web/package-lock.json needs npm 11, so npm ci fails on Node 20's npm 10.
+        with: { node-version: "24" }
       - name: Build binary + web UI (embedded)
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
@@ -449,6 +451,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
+      # Some ubuntu-24.04 images leave too little disk for the emulator system image ("No space left on device").
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h /
+
       - uses: actions/checkout@v4
 
       # Test the LATEST SDK on a release event: the mobile-sdk-release dispatch carries {sdk, version};
@@ -486,7 +497,7 @@ jobs:
         with: { distribution: temurin, java-version: "17" }
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Install Maestro
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash

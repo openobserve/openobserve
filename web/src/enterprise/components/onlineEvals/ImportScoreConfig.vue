@@ -182,10 +182,9 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-import onlineEvalsService, {
-  type ScoreConfig,
-  type ScoreDataType,
-} from "@/services/online-evals.service";
+import { type ScoreConfig, type ScoreDataType } from "@/services/online-evals.service";
+import { saveScoreConfigMutation } from "@/services/online-evals.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import {
   prepareScoreConfigImport,
   type ScoreConfigImportError,
@@ -237,6 +236,7 @@ const editorHeights = computed(() => ({
 }));
 
 const orgId = computed(() => props.orgId);
+const saveScoreConfig = useMutation(() => saveScoreConfigMutation(orgId.value));
 
 function goBack() {
   emit("cancel");
@@ -367,7 +367,7 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
 
   const results = await Promise.allSettled(
     payloads.map((payload) =>
-      onlineEvalsService.scoreConfigs.create(orgId.value, payload).then(
+      saveScoreConfig.mutateAsync({ payload }).then(
         () => ({ status: "success" as const, name: payload.name }),
         (err: any) => {
           if (err?.response?.status === 409) {

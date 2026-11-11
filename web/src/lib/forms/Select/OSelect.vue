@@ -17,6 +17,7 @@ import {
 import OSelectItem from "./OSelectItem.vue";
 import OSelectHeaderRow from "./OSelectHeaderRow.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -54,6 +55,7 @@ import {
   watchEffect,
 } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 import { mergeDescribedBy, splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import {
   O_DROPDOWN_NESTED_KEY,
@@ -69,7 +71,7 @@ type NormalizedOption = {
   value: SelectPrimitiveValue;
   disabled: boolean;
   header: boolean;
-  icon?: string;
+  icon?: IconName;
   /** Pre-rendered Vue component (e.g. an inlined SVG) shown beside the option label.
    *  Used when the icon isn't a string name in the OIcon registry. */
   iconComponent?: any;
@@ -97,11 +99,13 @@ type NormalizedOption = {
   parentKey?: string;
   /** Extra lowercase text the search matches besides the label, e.g. a zone's legacy names. */
   searchText?: string;
+  listLabel?: I18nText;
+  suffix?: I18nText;
   headerCount?: I18nText;
   headerAction?: I18nText;
   headerActionAriaLabel?: I18nText;
   keepOnSearch?: boolean;
-  /** The header option as passed in, handed back by `header-action`. */
+  /** The option as passed in: handed back by `header-action`, and to the `#option` slot. */
   source?: SelectOption;
 };
 
@@ -140,6 +144,7 @@ const props = withDefaults(defineProps<SelectProps>(), {
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
+const isDisabled = useLockedDisabled(() => props.disabled);
 
 // Without a label the icon is aria-hidden and unreachable by assistive tech; the tooltip's own content never gets a name otherwise.
 const tooltipIconLabel = computed(() =>
@@ -261,7 +266,7 @@ function normalizeOption(input: unknown): NormalizedOption | null {
     value: rawValue,
     disabled: Boolean(option[DEFAULT_OPTION_DISABLED]),
     header: false,
-    icon: typeof rawIcon === "string" && rawIcon ? rawIcon : undefined,
+    icon: typeof rawIcon === "string" && rawIcon ? (rawIcon as IconName) : undefined,
     iconComponent: rawIconComponent ?? undefined,
     subLabel: typeof rawSubLabel === "string" ? raw(rawSubLabel) : undefined,
     subLabelInline: rawSubLabelInline === true,
@@ -280,6 +285,9 @@ function normalizeOption(input: unknown): NormalizedOption | null {
       : undefined,
     searchText:
       typeof option["searchText"] === "string" ? option["searchText"].toLowerCase() : undefined,
+    source: option as SelectOption,
+    listLabel: option.listLabel ? raw(String(option.listLabel)) : undefined,
+    suffix: option.suffix ? raw(String(option.suffix)) : undefined,
   };
 }
 
@@ -729,10 +737,18 @@ function handleCreateFromInput() {
   const term = searchTerm.value.trim();
   if (!term) return;
 
-  const hasExisting = normalizedOptions.value.some(
+  const matches = normalizedOptions.value.filter(
     (opt) => opt.label === term || String(opt.value) === term,
   );
-  if (hasExisting) return;
+  if (matches.length) {
+    const pick = matches.find((opt) => !opt.header && !opt.disabled && !opt.expandable);
+    if (!pick) return;
+    // Enter on a typed exact match picks it; a multi-select only adds, never toggles it off.
+    if (!props.multiple) handleListboxUpdate(toRekaString(pick.value));
+    else if (!selectedValues.value.includes(pick.value))
+      emit("update:modelValue", [...selectedValues.value, pick.value]);
+    return;
+  }
 
   emit("create", term);
 }
@@ -751,7 +767,7 @@ function close() {
 function focus() {
   if (typeof document === "undefined") return;
   document.getElementById(inputId.value)?.focus();
-  if (props.disabled) return;
+  if (isDisabled.value) return;
   if (listboxModeEnabled.value) {
     popoverOpen.value = true;
   } else {
@@ -766,7 +782,7 @@ defineExpose({ close, focus });
 // event is consumed here so page-level single-letter shortcuts (logs "s",
 // "r", "h", …) never fire while the select has keyboard focus.
 function handleTriggerKeydown(e: KeyboardEvent) {
-  if (props.disabled) return;
+  if (isDisabled.value) return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key.length !== 1 || e.key === " ") return;
   e.preventDefault();
@@ -1034,7 +1050,7 @@ const isOpen = computed(() => (listboxModeEnabled.value ? popoverOpen.value : se
 // the `click` a native <label for> forwards never opens them; open explicitly.
 // `.prevent` (on the template handler) stops the redundant native forwarding.
 function handleLabelClick() {
-  if (props.disabled) return;
+  if (isDisabled.value) return;
   if (listboxModeEnabled.value) {
     popoverOpen.value = true;
   } else {
@@ -1296,7 +1312,7 @@ const overflowSelectedCount = computed(() =>
 // clear button toggles into view.
 const isInlineAppearance = computed(() => props.appearance === "inline");
 const triggerTextTone = computed(() =>
-  props.disabled
+  isDisabled.value
     ? "text-select-disabled-text"
     : hasSelection.value
       ? "text-select-text"
@@ -1317,7 +1333,7 @@ const inlineTriggerClasses = computed(() => [
   "focus:outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-focus-ring-accent",
   // The hover ring is gated on !hasError so it can't override the resting error
   // ring on hover (equal specificity, later class wins) and hide the error.
-  props.disabled
+  isDisabled.value
     ? "ring-transparent cursor-not-allowed opacity-60"
     : hasError.value
       ? "ring-select-border-error cursor-pointer hover:bg-surface-subtle hover:text-text-heading"
@@ -1366,22 +1382,23 @@ const fieldWidthClass = computed(() => {
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
-        disabled
+        isDisabled
           ? 'text-input-label-text-disabled font-normal'
           : 'text-input-label-text cursor-pointer font-medium',
       ]"
       @click.prevent="handleLabelClick"
     >
       {{ label }}<span v-if="required" aria-hidden="true" class="select-none">*</span>
-      <OIcon
+      <!-- The tooltip goes first so it anchors to this focusable wrapper, not the icon's svg, and opens on Tab too. -->
+      <span
         v-if="$slots.tooltip"
-        name="info-outline"
-        size="sm"
-        :label="tooltipIconLabel"
+        tabindex="0"
+        role="img"
+        :aria-label="tooltipIconLabel"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="cursor-help"
-        ><slot name="tooltip"
-      /></OIcon>
+        class="rounded-default focus-visible:ring-focus-ring-accent inline-flex cursor-help focus-visible:ring-2 focus-visible:outline-none"
+        ><slot name="tooltip" /><OIcon name="info-outline" size="sm"
+      /></span>
     </label>
 
     <template v-if="listboxModeEnabled">
@@ -1395,7 +1412,7 @@ const fieldWidthClass = computed(() => {
             type="button"
             :id="inputId"
             :name="name"
-            :disabled="disabled"
+            :disabled="isDisabled"
             :tabindex="inputTabindex"
             role="combobox"
             :aria-expanded="popoverOpen"
@@ -1503,7 +1520,7 @@ const fieldWidthClass = computed(() => {
                       // width, letting any ancestor squeeze it to a lone ellipsis.
                       isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',
                       labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
-                      disabled
+                      isDisabled
                         ? 'text-select-disabled-text'
                         : hasSelection
                           ? 'text-select-text'
@@ -1608,7 +1625,7 @@ const fieldWidthClass = computed(() => {
             <ListboxRoot
               :model-value="listboxStringModelValue"
               :multiple="multiple"
-              :disabled="disabled"
+              :disabled="isDisabled"
               class="flex min-h-0 flex-1 flex-col"
               @update:model-value="handleListboxUpdate"
             >
@@ -1880,9 +1897,21 @@ const fieldWidthClass = computed(() => {
                             />
                           </template>
 
+                          <template v-if="$slots.option && filteredOptions[vRow.index].source">
+                            <OIcon
+                              v-if="filteredOptions[vRow.index].icon"
+                              :name="filteredOptions[vRow.index].icon"
+                              size="sm"
+                              class="shrink-0"
+                            />
+                            <span class="flex min-w-0 flex-1 items-center">
+                              <slot name="option" :option="filteredOptions[vRow.index].source!" />
+                            </span>
+                          </template>
+
                           <!-- Inline subLabel: name – url on a single row -->
                           <template
-                            v-if="
+                            v-else-if="
                               filteredOptions[vRow.index].subLabel &&
                               filteredOptions[vRow.index].subLabelInline
                             "
@@ -1972,7 +2001,15 @@ const fieldWidthClass = computed(() => {
                               class="shrink-0"
                             />
                             <span v-else-if="iconKey" class="size-4 shrink-0" />
-                            <OTruncatedText>{{ filteredOptions[vRow.index].label }}</OTruncatedText>
+                            <OTruncatedText class="min-w-0 flex-1">{{
+                              filteredOptions[vRow.index].listLabel ??
+                              filteredOptions[vRow.index].label
+                            }}</OTruncatedText>
+                            <span
+                              v-if="filteredOptions[vRow.index].suffix"
+                              class="text-text-secondary ms-auto shrink-0 text-xs tabular-nums"
+                              >{{ filteredOptions[vRow.index].suffix }}</span
+                            >
                           </template>
                         </ListboxItem>
                       </div>
@@ -2044,7 +2081,7 @@ const fieldWidthClass = computed(() => {
       v-else
       :model-value="stringValue"
       :open="selectOpen"
-      :disabled="disabled"
+      :disabled="isDisabled"
       :name="name"
       @update:model-value="handleUpdate"
       @update:open="
@@ -2237,6 +2274,9 @@ const fieldWidthClass = computed(() => {
                 :value="opt.value"
                 :label="opt.label"
                 :disabled="opt.disabled || opt.expandable"
+                :icon="opt.icon"
+                :icon-component="opt.iconComponent"
+                :reserve-icon-space="!!iconKey"
               />
             </template>
 

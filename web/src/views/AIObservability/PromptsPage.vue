@@ -53,7 +53,7 @@
         :loading="promptQuery.isPending.value"
         :loading-reset-key="activeFolderId"
         :error="listError"
-        :forbidden="errorStatus(promptQuery.error.value) === 403"
+        :forbidden="forbiddenState(promptQuery.error.value)"
         :frame="false"
         :default-columns="false"
         :show-global-filter="false"
@@ -246,6 +246,7 @@
       :initial-version="routeVersion"
       :initial-tab="detailTab"
       :protected-labels="protectedLabels"
+      :show-playground="!hidesOnlineEvalEntries(store.state.zoConfig)"
       @update:open="closeDetail"
       @updated="replacePrompt"
       @edit="openEditorForVersion"
@@ -299,6 +300,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import analytics from "@/services/product_analytics";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import {
   llmPromptsQuery,
@@ -333,6 +335,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { getFoldersListByType } from "@/utils/commons";
+import { forbiddenState } from "@/utils/featureGate";
 import llmPromptsService, {
   type Prompt,
   type PromptLabel,
@@ -348,6 +351,7 @@ import { storePromptPlaygroundHandoff } from "./promptPlaygroundHandoff";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { hidesOnlineEvalEntries } from "@/composables/shared/useOnlineEvalsGate";
 
 const store = useStore();
 const { t } = useI18nTyped();
@@ -666,6 +670,7 @@ async function movePrompt() {
       input: { folderId: moveDestination.value },
     });
     if (requestedOrg !== orgId.value) return;
+    analytics.track("llm_prompt_moved");
     replacePrompt(updated);
     moveOpen.value = false;
     toast({
@@ -695,6 +700,7 @@ async function archive(prompt: Prompt) {
   if (requestedOrg !== orgId.value) return;
   try {
     const updated = await archiveMutation.mutateAsync(prompt.entityId);
+    analytics.track("llm_prompt_archived");
     // An archived prompt takes no new versions, so its version draft can never be saved.
     deleteEditorDraftsFor({ kind: "prompt", org: requestedOrg, entityId: prompt.entityId });
     if (requestedOrg !== orgId.value) return;

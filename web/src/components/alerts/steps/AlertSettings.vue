@@ -149,6 +149,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :destination-options="formattedDestinations"
               :error="destinationsError"
               :notifies-nobody="notifiesNobody"
+              :oncall-team="formData?.oncall_team"
+              :locked-target-names="formData?._ui?.lockedTargetNames"
               show-status
               :placeholder="t('alerts.summary.noDestination')"
               @update:destinations="$emit('update:destinations', $event)"
@@ -324,6 +326,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :destination-options="formattedDestinations"
               :error="destinationsError"
               :notifies-nobody="notifiesNobody"
+              :oncall-team="formData?.oncall_team"
+              :locked-target-names="formData?._ui?.lockedTargetNames"
               show-status
               :placeholder="t('alerts.summary.noDestination')"
               @update:destinations="$emit('update:destinations', $event)"
@@ -349,6 +353,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-label="t('alerts.alertSettings.createsIncident')"
               data-test="alert-creates-incident-toggle"
             />
+          </OSettingRow>
+
+          <OSettingRow
+            v-if="incidentsEnabled && tierShows('createsIncident') && formData?.creates_incident"
+            :label="t('alerts.alertSettings.incidentTitleTemplate')"
+            :info="t('alerts.alertSettings.incidentTitleTemplateTooltip')"
+            fill
+          >
+            <div class="flex w-full max-w-100 flex-col gap-1">
+              <OFormInput
+                name="incident_title_template"
+                :aria-label="t('alerts.alertSettings.incidentTitleTemplate')"
+                :placeholder="t('alerts.alertSettings.incidentTitleTemplatePlaceholder')"
+                :debounce="300"
+                data-test="alert-incident-title-template-input"
+              />
+              <div
+                v-if="incidentTitlePreview.length"
+                class="text-xs break-words"
+                data-test="alert-incident-title-preview"
+              >
+                <span class="text-text-secondary me-1"
+                  >{{ t("alerts.alertSettings.incidentTitlePreview") }}:</span
+                ><template v-for="(s, i) in incidentTitlePreview" :key="i"
+                  ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
+                >
+              </div>
+              <div v-if="incidentTitlePreview.length" class="text-text-secondary text-xs">
+                {{ t("alerts.alertSettings.incidentTitlePreviewHint") }}
+              </div>
+            </div>
           </OSettingRow>
 
           <!-- Scheduled only: realtime, composite and anomaly alerts keep no episode, so neither field can act. -->
@@ -474,6 +509,7 @@ import type { AlertSectionTargets } from "@/components/alerts/alertFormSections"
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import { useTierVisibility } from "@/composables/alerts/useAlertSettingTiers";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
+import { renderTemplate, segmentClass } from "@/composables/alerts/useTemplatePreview";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { convertMinutesToCron, getCronIntervalDifferenceInSeconds } from "@/utils/zincutils";
@@ -796,10 +832,39 @@ export default defineComponent({
     });
     const hasChatRecovery = computed(() => recoveryPlan.value.some((row) => !row.isPlatform));
 
+    // Row and group-by values exist only at fire time, so their placeholders stay as chips.
+    const incidentTitlePreview = computed(() => {
+      const template = props.formData?.incident_title_template?.trim();
+      if (!template) return [];
+      const live: Record<string, string> = {};
+      for (const attr of props.formData?.context_attributes ?? []) {
+        if (attr?.key) live[attr.key] = String(attr.value ?? "");
+      }
+      const alertFields: Record<string, unknown> = {
+        alert_name: props.formData?.name,
+        stream_name: props.formData?.stream_name,
+        stream_type: props.formData?.stream_type,
+        org_name: store.state.selectedOrganization?.label,
+      };
+      for (const [key, value] of Object.entries(alertFields)) {
+        if (value) live[key] = String(value);
+      }
+      const now = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+      const sample = {
+        alert_time: now,
+        alert_trigger_time_str: now,
+        alert_start_time: now,
+        alert_end_time: now,
+      };
+      return renderTemplate(template, { live, sample });
+    });
+
     const tierShows = useTierVisibility();
 
     return {
       tierShows,
+      incidentTitlePreview,
+      segmentClass,
       recoveryPlan,
       hasChatRecovery,
       t,

@@ -36,6 +36,9 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 import { raw } from "@/types/i18n";
 import { bindAccess } from "@/composables/useAccessStore";
+import { installFetchLicenseReceiver } from "@/services/licenseDenialReceiver";
+
+installFetchLicenseReceiver();
 
 // Apply the resolved theme synchronously before the app mounts so the first
 // paint already uses the correct colors (no flash of the base stylesheet theme).
@@ -65,8 +68,6 @@ const defaultProvider = createDefaultContextProvider(router, store);
 contextRegistry.register("default", defaultProvider);
 
 const { reoInit } = useReo();
-
-reoInit();
 
 // app.use(SearchPlugin);
 
@@ -204,4 +205,10 @@ loadLocaleMessages(activeLocale)
   .catch(() => {})
   .finally(() => {
     app.mount("#app");
+    // reo.js is not needed to render, but the login callback identifies the user and then leaves the page.
+    const startReo = () => void reoInit();
+    if (/\/cb\/?$/.test(window.location.pathname)) startReo();
+    else if (typeof requestIdleCallback !== "undefined")
+      requestIdleCallback(startReo, { timeout: 5000 });
+    else setTimeout(startReo, 0);
   });

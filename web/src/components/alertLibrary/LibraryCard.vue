@@ -43,20 +43,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Not a button any more: a control nested in role="button" is invalid for keyboard and AT. -->
   <article
-    class="rounded-default bg-surface-base flex h-full cursor-pointer flex-col gap-2 border p-3"
-    :class="
+    class="rounded-default bg-surface-base flex h-full flex-col gap-2 border p-3"
+    :class="[
+      licenseLockedReason ? 'cursor-not-allowed' : 'cursor-pointer',
       selected
         ? 'border-accent ring-accent/40 ring-2'
-        : 'border-border-default hover:border-border-strong'
-    "
+        : licenseLockedReason
+          ? 'border-border-default'
+          : 'border-border-default hover:border-border-strong',
+    ]"
+    :aria-disabled="licenseLockedReason ? 'true' : undefined"
     :data-test="`alert-library-card-${entry.id}`"
     :data-selected="selected ? 'true' : 'false'"
-    @click="emit('open')"
+    @click="!licenseLockedReason && emit('open')"
   >
     <div class="flex items-start gap-2">
       <OCheckbox
         size="sm"
         :model-value="selected"
+        :disabled="!!licenseLockedReason"
         :aria-label="t('alert_library.selectAlert', { title: entry.title })"
         class="mt-0.5 shrink-0"
         :data-test="`alert-library-select-${entry.id}`"
@@ -66,7 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           :id="titleId"
           type="button"
-          class="text-text-heading focus-visible:ring-accent/40 rounded-default cursor-pointer text-left outline-none focus-visible:ring-2"
+          :disabled="!!licenseLockedReason"
+          class="text-text-heading focus-visible:ring-accent/40 rounded-default text-left outline-none focus-visible:ring-2 enabled:cursor-pointer disabled:cursor-not-allowed"
           :data-test="`alert-library-card-title-${entry.id}`"
           @click.stop="emit('open')"
         >
@@ -133,8 +139,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('alert_library.alertTypeAnomaly')"
         data-test="alert-library-card-anomaly"
       />
+      <OTooltip v-if="licenseLockedReason" :content="licenseLockedReason">
+        <span class="inline-flex" data-test="alert-library-card-license-locked">
+          <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
+        </span>
+      </OTooltip>
       <OTag
-        v-if="locked"
+        v-else-if="locked"
         variant="default-soft"
         icon="lock"
         :label="t('alert_library.enterprise')"
@@ -143,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- Locked cards open the upsell instead, so they offer nothing to act on here. -->
-      <div v-if="!locked" class="ms-auto flex shrink-0 items-center gap-2">
+      <div v-if="!locked && !licenseLockedReason" class="ms-auto flex shrink-0 items-center gap-2">
         <!-- The editor prefill speaks the scheduled alert shape only. -->
         <OButton
           v-if="!isAnomaly"
@@ -183,7 +194,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 import { alertTypeOf, queryTypeLabel, severityBadgeValue, severityLabel } from "./libraryFacets";
 
@@ -195,6 +206,8 @@ const props = defineProps<{
   selected?: boolean;
   /** An anomaly alert this build is not entitled to; the gallery turns its clicks into the upsell. */
   locked?: boolean;
+  /** Set when the license, not the edition, locks this alert; the card shows a lock with this reason. */
+  licenseLockedReason?: I18nText;
 }>();
 
 const emit = defineEmits<{

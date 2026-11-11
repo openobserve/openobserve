@@ -47,7 +47,7 @@ use ingestion_common::{IngestionResponse, StreamStatus};
 use super::ingest::{self, PipelineFailure, PipelineInputs, RecordsByStream};
 use crate::{
     common::meta::{authz::Authz, stream::SchemaRecords},
-    ingestion::{TriggerAlertData, check_ingestion_allowed},
+    ingestion::check_ingestion_allowed,
     pipeline::batch_execution::ExecutablePipeline,
 };
 
@@ -118,7 +118,7 @@ async fn buffer_record(
         unreachable!("flatten only returns an object")
     };
     let stream_name = match stream_name {
-        Some(name) => name.to_string(),
+        Some(name) => format_stream_name(name.to_string()),
         None => match record
             .get(NAME_LABEL)
             .ok_or_else(|| anyhow!("missing __name__"))?
@@ -216,10 +216,9 @@ async fn buffer_record(
         None => now_micros(),
         // `as_f64` is `None` for a literal out of f64 range (`1e400`), which unwrapping
         // turned into a panic on a request body anyone can send
-        Some(json::Value::Number(s)) => time::parse_i64_to_timestamp_micros(
+        Some(json::Value::Number(s)) => time::parse_f64_to_timestamp_micros(
             s.as_f64()
-                .ok_or_else(|| anyhow::anyhow!("invalid _timestamp, out of range"))?
-                as i64,
+                .ok_or_else(|| anyhow::anyhow!("invalid _timestamp, out of range"))?,
         ),
         Some(_) => {
             return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
@@ -314,7 +313,7 @@ async fn buffer_stream_rows(
     (mut rows, first_type): (Vec<Row>, Option<&'static str>),
     lookups: &mut StreamLookups,
     partitions: &mut HashMap<String, SchemaRecords>,
-) -> Result<Option<TriggerAlertData>> {
+) -> Result<Option<ingest::StreamTriggers>> {
     if !lookups.partitions.contains_key(stream_name) {
         let keys =
             crate::ingestion::get_stream_partition_keys(org_id, &StreamType::Metrics, stream_name)
@@ -511,7 +510,7 @@ pub async fn ingest(
     }
 
     let mut stream_data_buf: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
-    let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
+    let mut stream_trigger_map: HashMap<String, Option<ingest::StreamTriggers>> = HashMap::new();
     for (stream_name, records) in records_by_stream {
         // redacted before finish_rows, so the series hash covers the stored values
         #[cfg(feature = "vectorscan")]

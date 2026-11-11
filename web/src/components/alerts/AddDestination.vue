@@ -408,6 +408,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('alert_destinations.skip_tls_verify')"
                 />
               </div>
+              <div
+                v-if="isCustomWebhook"
+                class="w-1/2 py-2"
+                data-test="add-destination-payload-format"
+              >
+                <OFormSelect
+                  data-test="add-destination-payload-format-select"
+                  name="payload_format"
+                  :label="t('alert_destinations.payloadFormat')"
+                  :options="payloadFormatOptions"
+                  labelKey="label"
+                  valueKey="value"
+                  :help-text="t('alert_destinations.payloadFormatHelp')"
+                  tabindex="0"
+                />
+              </div>
 
               <!-- Test Result Display -->
               <DestinationTestResult
@@ -525,6 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="showPreviewModal"
       :type="dtVal"
       :template-content="previewContent"
+      :show-body="previewShowsBody"
       :recipients="previewRecipients"
       data-test="destination-preview-modal"
     />
@@ -772,6 +789,7 @@ const prebuiltCredentials = form.useStore(
 const destinationSearchQuery = ref("");
 const showPreviewModal = ref(false);
 const previewContent = ref("");
+const previewShowsBody = ref(false);
 const previewRecipients = computed(() =>
   Array.isArray(prebuiltCredentials.value.recipients) ? prebuiltCredentials.value.recipients : [],
 );
@@ -893,6 +911,11 @@ const showPrebuiltFinalActions = computed(
 const isCustomWebhook = computed(
   () => props.isAlerts && dtVal.value === "custom" && typeVal.value === "http",
 );
+const payloadFormatOptions = computed(() => [
+  { label: t("alert_destinations.payloadFormatAuto"), value: "auto" },
+  { label: t("alert_destinations.payloadFormatLegacy"), value: "legacy" },
+  { label: t("alert_destinations.payloadFormatRendered"), value: "rendered" },
+]);
 const handleSlackFlowChange = (): void => {
   clearTestResult();
 };
@@ -1082,6 +1105,7 @@ const setupDestinationData = () => {
       url: props.destination.url ?? "",
       method: props.destination.method ?? "post",
       skip_tls_verify: props.destination.skip_tls_verify ?? false,
+      payload_format: storedPayloadFormat(parsedMetadata),
       template: props.destination.template ?? "",
       emails: props.destination?.emails ?? [],
       type: props.destination.type || "http",
@@ -1253,9 +1277,17 @@ const templateNameFor = (type: string): string => {
 
 const defaultPrebuiltTemplateName = computed(() => templateNameFor(dtVal.value));
 
-// Template choices for a prebuilt destination: the API-sourced prebuilt
-// template for this type as the first (default) option, followed by any
-// user-created templates that fit the channel (email or content for email).
+const pickedPrebuiltTemplate = computed(() =>
+  isPrebuiltDestination.value &&
+  templateVal.value &&
+  templateVal.value !== defaultPrebuiltTemplateName.value
+    ? templateVal.value
+    : undefined,
+);
+
+// A Content template fits every transport, so every prebuilt type offers it.
+const UNIFIED_DEFAULT_TEMPLATE_NAME = "prebuilt_default";
+
 // Other prebuilt types are excluded to prevent cross-type mismatches.
 const prebuiltTemplateOptions = computed(() => {
   const isEmailType = dtVal.value === "email";
@@ -1273,6 +1305,15 @@ const prebuiltTemplateOptions = computed(() => {
     });
     options.push({ label: raw(defaultLabel), value: defaultPrebuiltTemplateName.value });
   }
+
+  options.push({
+    label: raw(
+      t("alert_destinations.templateUnifiedDefaultOption", {
+        name: UNIFIED_DEFAULT_TEMPLATE_NAME,
+      }),
+    ),
+    value: UNIFIED_DEFAULT_TEMPLATE_NAME,
+  });
 
   matching.forEach((template) => {
     options.push({ label: raw(template.name), value: template.name });
@@ -1328,7 +1369,7 @@ const handleTestDestination = async () => {
   if (!isPrebuiltDestination.value) return;
 
   try {
-    await testDestination(dtVal.value, prebuiltCredentials.value);
+    await testDestination(dtVal.value, prebuiltCredentials.value, pickedPrebuiltTemplate.value);
   } catch {
     // testDestination owns user-facing sanitized error state.
   }
@@ -1336,6 +1377,7 @@ const handleTestDestination = async () => {
 
 // Show template preview
 const showPreview = async () => {
+  const pickedTemplate = pickedPrebuiltTemplate.value;
   const customTemplate = isCustomWebhook.value ? templateVal.value : undefined;
   if (isCustomWebhook.value && !customTemplate) {
     toast({ variant: "error", message: t("alerts.validation.templateRequired") });
@@ -1348,10 +1390,19 @@ const showPreview = async () => {
     previewContent.value = "";
 
     // Fetch and generate preview
-    const preview = customTemplate
-      ? await renderTemplateBody(customTemplate)
-      : await generatePreview(dtVal.value, prebuiltCredentials.value);
+    let preview: string;
+    if (pickedTemplate) {
+      preview = await renderTemplateBody(pickedTemplate, {
+        type: dtVal.value,
+        credentials: prebuiltCredentials.value,
+      });
+    } else if (customTemplate) {
+      preview = await renderTemplateBody(customTemplate);
+    } else {
+      preview = await generatePreview(dtVal.value, prebuiltCredentials.value);
+    }
     previewContent.value = preview;
+    previewShowsBody.value = !!pickedTemplate;
 
     // Only show modal after content is ready
     showPreviewModal.value = true;
@@ -1454,6 +1505,30 @@ function headersFromRows(rows: { key: string; value: string }[]): Headers {
   return headers;
 }
 
+/** The stored metadata.payload_format as the select's value; anything else is automatic. */
+function storedPayloadFormat(
+  metadata: Record<string, unknown> | null,
+): "auto" | "legacy" | "rendered" {
+  const stored = metadata?.payload_format;
+  return stored === "legacy" || stored === "rendered" ? stored : "auto";
+}
+
+/** The destination's metadata with payload_format set, or removed for automatic. */
+function withPayloadFormat(
+  stored: DestinationPayload["metadata"],
+  format: string | undefined,
+): Record<string, string> {
+  let metadata: Record<string, string> = {};
+  try {
+    metadata = typeof stored === "string" ? JSON.parse(stored || "{}") : { ...(stored ?? {}) };
+  } catch {
+    metadata = {};
+  }
+  delete metadata.payload_format;
+  if (format === "legacy" || format === "rendered") metadata.payload_format = format;
+  return metadata;
+}
+
 // The custom/pipeline save path (dispatched from saveDestination for non-prebuilt
 // types). OForm calls the submit only once the schema (incl. the type-keyed
 // superRefine) passes — the schema, not a manual guard, gates the save. `value`
@@ -1483,6 +1558,10 @@ function saveCustomDestination(value: AddDestinationForm) {
   if (value.type === "email") {
     payload["type"] = "email";
     payload["emails"] = value.emails ?? [];
+  }
+
+  if (isCustomWebhook.value) {
+    payload.metadata = withPayloadFormat(props.destination?.metadata, value.payload_format);
   }
 
   if (isUpdatingDestination.value) {

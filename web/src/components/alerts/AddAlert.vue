@@ -85,7 +85,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OTooltip
                 :content="raw(anomalyConfig.last_error)"
-                :disabled="anomalyConfig.status !== 'failed' || !anomalyConfig.last_error"
+                :disabled="
+                  (anomalyConfig.status !== 'failed' &&
+                    !isAnomalyDataReadinessStatus(anomalyConfig.status)) ||
+                  !anomalyConfig.last_error
+                "
               >
                 <OTag
                   v-if="anomalyConfig.status"
@@ -121,6 +125,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="replay"
                 >
                   {{ t("alerts.retry") }}
+                </OButton>
+              </OTooltip>
+              <OTooltip
+                v-else-if="anomalyCanCheckDataNow(anomalyConfig)"
+                :content="t('alerts.anomaly.checkDataNowTooltip')"
+              >
+                <OButton
+                  variant="ghost"
+                  size="xs"
+                  :loading="anomalyRetraining"
+                  data-test="anomaly-check-data-now"
+                  @click="anomalyTriggerRetrain"
+                  icon-left="replay"
+                >
+                  {{ t("alerts.anomaly.checkDataNow") }}
                 </OButton>
               </OTooltip>
             </div>
@@ -517,10 +536,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="option.value"
                     :value="option.value"
                     size="sm"
+                    :disabled="option.locked"
+                    :focusable-unavailable="option.locked"
+                    :tooltip="option.locked ? anomalyLockedReason : undefined"
                     :data-test="`add-alert-type-tab-${option.value}`"
                   >
                     <template #icon-left>
-                      <OIcon :name="option.icon" size="sm" />
+                      <OIcon
+                        :class="option.locked ? 'lock-chip' : undefined"
+                        :name="option.locked ? 'lock' : option.icon"
+                        size="sm"
+                      />
                     </template>
                     {{ option.label }}
                   </OToggleGroupItem>
@@ -892,7 +918,11 @@ import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlertin
 import { useAlertForm, defaultAlertValue, type AlertFormEmit } from "@/composables/useAlertForm";
 import { useAlertEditorDraft } from "@/composables/alerts/useAlertEditorDraft";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
-import { anomalyNoticeBadgeKeys } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
+import {
+  anomalyNoticeBadgeKeys,
+  anomalyCanCheckDataNow,
+  isAnomalyDataReadinessStatus,
+} from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -950,6 +980,7 @@ import AlertRecentRuns from "./AlertRecentRuns.vue";
 import { useAlertEditHeader } from "@/composables/alerts/useAlertEditHeader";
 import { useAlertUnsavedChanges } from "@/composables/alerts/useAlertUnsavedChanges";
 import { cloneDeep } from "lodash-es";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 const RAIL_VERDICT_ICONS = {
   fires: { name: "notifications-active", class: "text-status-error-text" },
@@ -1066,6 +1097,8 @@ export default defineComponent({
     const isAnomalyDetectionEnabled = computed(
       () => alertForm.store.state.zoConfig.anomaly_detection_enabled === true,
     );
+    const { locked: anomalyLicenseLocked, lockedReason: anomalyLockedReason } =
+      useLicenseLock("anomaly_detection");
 
     // §4.8: keyed off the config API's notice_class field alone.
     const anomalyNoticeBadge = computed(() => {
@@ -1163,12 +1196,13 @@ export default defineComponent({
         icon: "schedule",
       },
       { label: alertForm.t("alerts.sections.asItHappens"), value: "true", icon: "bolt" },
-      ...(isAnomalyDetectionEnabled.value
+      ...(isAnomalyDetectionEnabled.value || anomalyLicenseLocked.value
         ? [
             {
               label: alertForm.t("alerts.sections.whenUnusual"),
               value: "anomaly",
               icon: "query-stats",
+              locked: anomalyLicenseLocked.value,
             },
           ]
         : []),
@@ -1228,6 +1262,7 @@ export default defineComponent({
     // the ONE form directly. The existing watch on is_real_time still drives the
     // anomaly/composite tab switch.
     const onAlertTypeChange = (value: unknown) => {
+      if (value === "anomaly" && anomalyLicenseLocked.value) return;
       alertForm.setF("is_real_time", value);
       // Realtime runs Builder only. The query text and Compare-with-Past windows
       // stay in the form for a switch back; the payload never sends windows here.
@@ -1611,6 +1646,8 @@ export default defineComponent({
       isAnomalyDetectionEnabled,
       anomalyNoticeBadge,
       anomalyNoticeTooltip,
+      isAnomalyDataReadinessStatus,
+      anomalyCanCheckDataNow,
       alertTypeOptions,
       lgUp,
       snapScrollRef,
@@ -1638,6 +1675,7 @@ export default defineComponent({
       onTierToggle,
       settingFind,
       focusNameField,
+      anomalyLockedReason,
       activeFolderName,
       goBackToAlertsList,
       onStreamTypeChange,

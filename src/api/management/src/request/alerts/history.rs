@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use arrow_schema::Schema;
 use axum::{
     extract::{Path, Query},
@@ -41,8 +43,17 @@ use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
 };
 
+/// Most ids one request may name; keeps the generated predicate bounded.
+const MAX_ALERT_IDS: usize = 500;
+/// Longer id lists become one regex, since each leading-wildcard LIKE is a separate scan.
+const LIKE_PREDICATE_MAX_IDS: usize = 20;
+
+/// Latest accepted end time (9999-12-31); search adds offsets to it and overflows near `i64::MAX`.
+const MAX_END_TIME_MICROS: i64 = 253_402_300_799_999_999;
+
 /// Columns a stream gains only once a row carried them, so [history_columns] adds each one present.
-const OPTIONAL_HISTORY_COLUMNS: [&str; 7] = [
+const OPTIONAL_HISTORY_COLUMNS: [&str; 8] = [
+    "severity",
     "downtime_id",
     "acked_by",
     "ack_action",
@@ -65,6 +76,13 @@ const HISTORY_COLUMNS: &str = "_timestamp, org, key, status, level, actual_value
 pub struct AlertHistoryQuery {
     /// Filter by specific alert name
     pub alert_id: Option<Ksuid>,
+    /// Comma-separated alert ids; rows of any of them (ignored when `alert_id` is set).
+    pub alert_ids: Option<String>,
+    /// Comma-separated run outcomes (`firing`, `normal`, `error`, ...), legacy values included.
+    pub outcome: Option<String>,
+    /// Only the org's SIEM detections, resolved server-side (ignored when ids are given).
+    #[cfg(feature = "enterprise")]
+    pub siem: Option<bool>,
     /// Filter by anomaly detection config ID (mutually exclusive with alert_id).
     /// When set, queries the _anomalies stream instead of the triggers stream.
     pub anomaly_id: Option<String>,
@@ -92,6 +110,9 @@ pub struct AlertHistoryQuery {
 pub struct AlertHistoryEntry {
     pub timestamp: i64,
     pub alert_name: String,
+    /// The alert's id from the trigger key; names are not unique and change on rename.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_id: Option<String>,
     pub org: String,
     pub status: String,
     pub is_realtime: bool,
@@ -118,6 +139,9 @@ pub struct AlertHistoryEntry {
     /// Severity of the matched threshold: "ok" | "warning" | "critical".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub level: Option<String>,
+    /// SIEM detections only: the rule's Sigma level ("informational" to "critical").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub severity: Option<String>,
     /// The value that was compared (row count, or the aggregate).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub actual_value: Option<f64>,
@@ -184,6 +208,9 @@ pub struct AlertHistoryResponse {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("alert_id" = Option<String>, Query, description = "Filter by specific alert id"),
+        ("alert_ids" = Option<String>, Query, description = "Comma-separated alert ids to include, at most 500; ignored when alert_id is set"),
+        ("outcome" = Option<String>, Query, description = "Comma-separated outcomes to include: firing, normal, error, skipped, succeeded, notify_failed"),
+        ("siem" = Option<bool>, Query, description = "Only SIEM detections, resolved by the server; ignored when alert_id or alert_ids is set"),
         ("anomaly_id" = Option<String>, Query, description = "Return history for this anomaly detection config"),
         ("start_time" = Option<i64>, Query, description = "Start time in Unix timestamp microseconds"),
         ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds"),
@@ -194,11 +221,15 @@ pub struct AlertHistoryResponse {
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(AlertHistoryResponse)),
-        (status = 400, description = "Bad Request", content_type = "application/json"),
+        (status = 400, description = "Bad Request: an invalid or over-limit alert_ids list, an unknown outcome or sort field, or an invalid time range", content_type = "application/json"),
         (status = 403, description = "Forbidden", content_type = "application/json"),
         (status = 404, description = "Alert or anomaly config not found", content_type = "application/json"),
         (status = 500, description = "Internal Server Error", content_type = "application/json"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
+    )
 )]
 pub async fn get_alert_history(
     Path(org_id): Path<String>,
@@ -237,7 +268,7 @@ pub async fn get_alert_history(
     }
 
     // Validate time range
-    if let Err(msg) = openobserve_api_common::request::validate_time_range(start_time, end_time) {
+    if let Err(msg) = validate_history_range(start_time, end_time) {
         return MetaHttpResponse::bad_request(msg);
     }
 
@@ -457,6 +488,7 @@ pub async fn get_alert_history(
                 AlertHistoryEntry {
                     timestamp: hit.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
                     alert_name: String::new(),
+                    alert_id: None,
                     org: org_id.clone(),
                     status: result,
                     is_realtime: false,
@@ -479,6 +511,7 @@ pub async fn get_alert_history(
                     // Anomaly rows: the count IS the observed value; the level
                     // comes from the normalized outcome upstream.
                     level: None,
+                    severity: None,
                     actual_value: Some(anomaly_count as f64),
                     threshold_value: None,
                     threshold_operator: None,
@@ -670,11 +703,46 @@ pub async fn get_alert_history(
         query.status.as_deref(),
     ));
 
+    let empty = || {
+        MetaHttpResponse::json(AlertHistoryResponse {
+            total: 0,
+            from,
+            size,
+            hits: vec![],
+        })
+    };
+    #[cfg(feature = "enterprise")]
+    let (siem_rows, siem_only) = (
+        o2_enterprise::enterprise::security::history_summary::siem_rows_predicate(&triggers_schema),
+        query.siem == Some(true),
+    );
+    #[cfg(not(feature = "enterprise"))]
+    let (siem_rows, siem_only): (Option<String>, bool) = (None, false);
     // Add alert ID filter if provided
     // The key field contains the alert ID in the format "alert_name/alert_id"
     if let Some(ref alert_id) = query.alert_id {
         // We need to filter where key ends with the alert ID
         where_clause.push_str(&format!(" AND key LIKE '%{alert_id}'"))
+    } else if let Some(raw) = query.alert_ids.as_deref() {
+        let ids = match parse_alert_ids(raw) {
+            Ok(ids) => restrict_to_permitted(ids, permitted_alert_ids.as_deref()),
+            Err(msg) => return MetaHttpResponse::bad_request(msg),
+        };
+        if ids.is_empty() {
+            return empty();
+        }
+        where_clause.push_str(&format!(" AND ({})", alert_ids_predicate(&ids)));
+    } else if siem_only {
+        let Some(siem_rows) = siem_rows.as_deref() else {
+            return empty();
+        };
+        if let Some(permitted_ids) = permitted_alert_ids.as_deref() {
+            if permitted_ids.is_empty() {
+                return empty();
+            }
+            where_clause.push_str(&format!(" AND ({})", alert_ids_predicate(permitted_ids)));
+        }
+        where_clause.push_str(&format!(" AND {siem_rows}"));
     } else if let Some(permitted_ids) = permitted_alert_ids {
         // Filter by permitted alerts only
         if permitted_ids.is_empty() {
@@ -690,8 +758,8 @@ pub async fn get_alert_history(
         let alert_filter = permitted_ids
             .iter()
             .map(|id| {
-                let escaped_id = escape_like(id);
-                format!("key LIKE '%{}%'", escaped_id.replace("'", "''"))
+                // escape_like already doubles single quotes.
+                format!("key LIKE '%{}%'", escape_like(id))
             })
             .collect::<Vec<_>>()
             .join(" OR ");
@@ -699,6 +767,17 @@ pub async fn get_alert_history(
     }
     // If permitted_alert_ids is None, user has access to all alerts
     // No additional filter needed in WHERE clause
+    if let Some(siem_rows) = siem_rows.as_deref()
+        && !crate::request::security::security_allowed(&org_id, &user_email.user_id, "GET").await
+    {
+        where_clause.push_str(&format!(" AND NOT {siem_rows}"));
+    }
+    if let Some(raw) = query.outcome.as_deref() {
+        match outcome_predicate(raw) {
+            Ok(predicate) => where_clause.push_str(&format!(" AND {predicate}")),
+            Err(msg) => return MetaHttpResponse::bad_request(msg),
+        }
+    }
 
     // Get trace ID for the request
     let trace_id = get_or_create_trace_id(req.headers(), &Span::current());
@@ -825,6 +904,10 @@ pub async fn get_alert_history(
         entries.push(AlertHistoryEntry {
             timestamp: hit.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
             alert_name,
+            alert_id: key
+                .rsplit_once('/')
+                .map(|(_, id)| id.to_string())
+                .filter(|id| !id.is_empty()),
             org: hit
                 .get("org")
                 .and_then(|v| v.as_str())
@@ -881,6 +964,7 @@ pub async fn get_alert_history(
                 .and_then(|v| v.as_i64())
                 .and_then(|v| config::meta::alerts::level::AlertLevel::from_i32(v as i32))
                 .map(|l| l.to_string()),
+            severity: hit_text(&hit, "severity"),
             actual_value: hit.get("actual_value").and_then(|v| v.as_f64()),
             threshold_value: hit.get("threshold_value").and_then(|v| v.as_f64()),
             threshold_operator: hit
@@ -1062,7 +1146,8 @@ fn downtime_filters(downtime_id: Option<&str>, status: Option<&str>) -> String {
         (status = 500, description = "Internal Server Error", content_type = "application/json"),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Recent detection history for all anomaly detection configs", "category": "anomaly_detection"}))
+        ("x-o2-mcp" = json!({"description": "Recent detection history for all anomaly detection configs", "category": "anomaly_detection"})),
+        ("x-o2-ratelimit" = json!({"module": "Anomaly Detection", "operation": "list"}))
     )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
@@ -1078,7 +1163,7 @@ pub async fn get_all_anomaly_history(
         .start_time
         .unwrap_or_else(|| (Utc::now() - Duration::try_days(7).unwrap()).timestamp_micros());
 
-    if let Err(msg) = openobserve_api_common::request::validate_time_range(start_time, end_time) {
+    if let Err(msg) = validate_history_range(start_time, end_time) {
         return MetaHttpResponse::bad_request(msg);
     }
 
@@ -1253,14 +1338,181 @@ pub struct AnomalyBulkHistoryQuery {
     pub end_time: Option<i64>,
 }
 
+/// Like `validate_time_range`, but also rejects end times too large for search to offset.
+pub(crate) fn validate_history_range(start_time: i64, end_time: i64) -> Result<(), &'static str> {
+    openobserve_api_common::request::validate_time_range(start_time, end_time)?;
+    if end_time > MAX_END_TIME_MICROS {
+        return Err("end_time is out of range");
+    }
+    Ok(())
+}
+
+/// Parses a comma-separated id list; ids are KSUIDs, so they need no SQL escaping.
+pub(crate) fn parse_alert_ids(raw: &str) -> Result<Vec<String>, String> {
+    let ids: Vec<String> = raw
+        .split(',')
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .map(|id| {
+            Ksuid::from_str(id)
+                .map(|k| k.to_string())
+                .map_err(|_| format!("Invalid alert id: '{id}'"))
+        })
+        .collect::<Result<_, _>>()?;
+    if ids.len() > MAX_ALERT_IDS {
+        return Err(format!("At most {MAX_ALERT_IDS} alert ids per request"));
+    }
+    Ok(ids)
+}
+
+/// Keeps only the ids the caller may read; `None` means every alert is readable.
+pub(crate) fn restrict_to_permitted(ids: Vec<String>, permitted: Option<&[String]>) -> Vec<String> {
+    match permitted {
+        None => ids,
+        Some(allowed) => ids.into_iter().filter(|id| allowed.contains(id)).collect(),
+    }
+}
+
+/// Matches trigger rows of the given alerts; the key is `"{alert_name}/{alert_id}"`.
+pub(crate) fn alert_ids_predicate(ids: &[String]) -> String {
+    // Only KSUID-shaped ids pass, so a stray permission id cannot put a quote in the SQL.
+    let ids: Vec<&str> = ids
+        .iter()
+        .map(String::as_str)
+        .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric()))
+        .collect();
+    if ids.is_empty() {
+        return "FALSE".to_string();
+    }
+    if ids.len() <= LIKE_PREDICATE_MAX_IDS {
+        return ids
+            .iter()
+            .map(|id| format!("key LIKE '%/{id}'"))
+            .collect::<Vec<_>>()
+            .join(" OR ");
+    }
+    format!("regexp_like(key, '/({})$')", ids.join("|"))
+}
+
+/// A `status IN (...)` predicate; each outcome also matches its legacy spellings.
+pub(crate) fn outcome_predicate(raw: &str) -> Result<String, String> {
+    let mut values: Vec<&str> = Vec::new();
+    for outcome in raw.split(',').map(str::trim).filter(|o| !o.is_empty()) {
+        let stored: &[&str] = match outcome.to_lowercase().as_str() {
+            // A run that matched but failed to notify still fired, as the frontend counts it.
+            "firing" => &["firing", "completed", "notify_failed"],
+            "normal" => &["normal", "condition_not_satisfied"],
+            "error" => &["error", "failed"],
+            "succeeded" => &["succeeded"],
+            "skipped" => &["skipped"],
+            "notify_failed" => &["notify_failed"],
+            _ => return Err(format!("Invalid outcome: '{outcome}'")),
+        };
+        values.extend_from_slice(stored);
+    }
+    if values.is_empty() {
+        return Err("outcome must name at least one value".to_string());
+    }
+    values.sort_unstable();
+    values.dedup();
+    let list = values
+        .iter()
+        .map(|v| format!("'{v}'"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    Ok(format!("status IN ({list})"))
+}
+
 #[cfg(test)]
 mod tests {
+    use svix_ksuid::KsuidLike as _;
+
     use super::*;
+
+    #[test]
+    fn test_validate_history_range_rejects_out_of_range_times() {
+        assert!(validate_history_range(1, MAX_END_TIME_MICROS).is_ok());
+        assert!(validate_history_range(1, i64::MAX).is_err());
+        assert!(validate_history_range(1, MAX_END_TIME_MICROS + 1).is_err());
+        assert!(validate_history_range(i64::MIN, 2).is_err());
+        assert!(validate_history_range(0, 2).is_err());
+        assert!(validate_history_range(5, 5).is_err());
+    }
+
+    #[test]
+    fn test_parse_alert_ids_accepts_ksuids_and_rejects_others() {
+        let id = Ksuid::new(None, None).to_string();
+        assert_eq!(
+            parse_alert_ids(&format!(" {id} ,,")).unwrap(),
+            vec![id.clone()]
+        );
+        assert!(parse_alert_ids("x' OR 1=1 --").is_err());
+        let too_many = vec![id; MAX_ALERT_IDS + 1].join(",");
+        assert!(parse_alert_ids(&too_many).is_err());
+    }
+
+    #[test]
+    fn test_restrict_to_permitted() {
+        let ids = vec!["a".to_string(), "b".to_string()];
+        assert_eq!(restrict_to_permitted(ids.clone(), None), ids);
+        let allowed = vec!["b".to_string()];
+        assert_eq!(
+            restrict_to_permitted(ids, Some(&allowed)),
+            vec!["b".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_alert_ids_predicate_matches_key_suffix() {
+        let ids = vec!["a".to_string(), "b".to_string()];
+        assert_eq!(
+            alert_ids_predicate(&ids),
+            "key LIKE '%/a' OR key LIKE '%/b'"
+        );
+    }
+
+    #[test]
+    fn test_alert_ids_predicate_drops_unsafe_ids_in_both_forms() {
+        let ids = vec!["a1".to_string(), "x' OR '1'='1".to_string()];
+        assert_eq!(alert_ids_predicate(&ids), "key LIKE '%/a1'");
+        assert_eq!(alert_ids_predicate(&["bad'".to_string()]), "FALSE");
+    }
+
+    #[test]
+    fn test_alert_ids_predicate_uses_one_regex_for_long_lists() {
+        let mut ids: Vec<String> = (0..LIKE_PREDICATE_MAX_IDS)
+            .map(|i| format!("id{i}"))
+            .collect();
+        assert!(alert_ids_predicate(&ids).starts_with("key LIKE"));
+        ids.push("x' OR 1=1".to_string());
+        ids.push("last".to_string());
+        let predicate = alert_ids_predicate(&ids);
+        assert!(
+            predicate.starts_with("regexp_like(key, '/(id0|id1|"),
+            "{predicate}"
+        );
+        assert!(predicate.ends_with("|id19|last)$')"), "{predicate}");
+        assert!(!predicate.contains("OR 1=1"), "{predicate}");
+    }
+
+    #[test]
+    fn test_outcome_predicate_expands_legacy_values() {
+        assert_eq!(
+            outcome_predicate("firing, error").unwrap(),
+            "status IN ('completed', 'error', 'failed', 'firing', 'notify_failed')"
+        );
+        assert!(outcome_predicate("nope").is_err());
+        assert!(outcome_predicate(" , ").is_err());
+    }
 
     #[test]
     fn test_alert_history_query_defaults() {
         let query = AlertHistoryQuery {
             alert_id: None,
+            alert_ids: None,
+            outcome: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
             anomaly_id: None,
             start_time: None,
             end_time: None,
@@ -1286,6 +1538,7 @@ mod tests {
         let entry = AlertHistoryEntry {
             timestamp: 1234567890000000,
             alert_name: "test_alert".to_string(),
+            alert_id: None,
             org: "test_org".to_string(),
             status: "firing".to_string(),
             is_realtime: true,
@@ -1304,6 +1557,7 @@ mod tests {
             group_size: None,
             anomaly_count: None,
             level: None,
+            severity: None,
             actual_value: None,
             threshold_value: None,
             threshold_operator: None,
@@ -1346,6 +1600,7 @@ mod tests {
         let entry = AlertHistoryEntry {
             timestamp: 1234567890000000,
             alert_name: "test_alert".to_string(),
+            alert_id: None,
             org: "test_org".to_string(),
             status: "ok".to_string(),
             is_realtime: false,
@@ -1364,6 +1619,7 @@ mod tests {
             group_size: None,
             anomaly_count: None,
             level: None,
+            severity: None,
             actual_value: None,
             threshold_value: None,
             threshold_operator: None,
@@ -1395,6 +1651,7 @@ mod tests {
         let entry = AlertHistoryEntry {
             timestamp: 1234567890000000,
             alert_name: "failing_alert".to_string(),
+            alert_id: None,
             org: "test_org".to_string(),
             status: "error".to_string(),
             is_realtime: true,
@@ -1413,6 +1670,7 @@ mod tests {
             group_size: None,
             anomaly_count: None,
             level: None,
+            severity: None,
             actual_value: None,
             threshold_value: None,
             threshold_operator: None,
@@ -1438,6 +1696,10 @@ mod tests {
         // Test pagination parameters
         let query = AlertHistoryQuery {
             alert_id: None,
+            alert_ids: None,
+            outcome: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
             anomaly_id: None,
             start_time: None,
             end_time: None,
@@ -1475,6 +1737,10 @@ mod tests {
         for field in sort_fields {
             let query = AlertHistoryQuery {
                 alert_id: None,
+                alert_ids: None,
+                outcome: None,
+                #[cfg(feature = "enterprise")]
+                siem: None,
                 anomaly_id: None,
                 start_time: None,
                 end_time: None,
@@ -1496,6 +1762,10 @@ mod tests {
         // Test ascending order
         let query_asc = AlertHistoryQuery {
             alert_id: None,
+            alert_ids: None,
+            outcome: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
             anomaly_id: None,
             start_time: None,
             end_time: None,
@@ -1511,6 +1781,10 @@ mod tests {
         // Test descending order
         let query_desc = AlertHistoryQuery {
             alert_id: None,
+            alert_ids: None,
+            outcome: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
             anomaly_id: None,
             start_time: None,
             end_time: None,
@@ -1626,6 +1900,7 @@ mod tests {
         let entry = AlertHistoryEntry {
             timestamp: 1640995200000000,
             alert_name: "test_alert".to_string(),
+            alert_id: None,
             org: "test_org".to_string(),
             status: "success".to_string(),
             is_realtime: true,
@@ -1644,6 +1919,7 @@ mod tests {
             group_size: None,
             anomaly_count: None,
             level: None,
+            severity: None,
             actual_value: None,
             threshold_value: None,
             threshold_operator: None,
@@ -1671,6 +1947,7 @@ mod tests {
         let entry = AlertHistoryEntry {
             timestamp: 1640995200000000,
             alert_name: "test_alert".to_string(),
+            alert_id: None,
             org: "test_org".to_string(),
             status: "success".to_string(),
             is_realtime: true,
@@ -1689,6 +1966,7 @@ mod tests {
             group_size: None,
             anomaly_count: None,
             level: None,
+            severity: None,
             actual_value: None,
             threshold_value: None,
             threshold_operator: None,
@@ -1723,6 +2001,7 @@ mod tests {
         let entry = AlertHistoryEntry {
             timestamp: 0,
             alert_name: "a".to_string(),
+            alert_id: None,
             org: "o".to_string(),
             status: "ok".to_string(),
             is_realtime: false,
@@ -1741,6 +2020,7 @@ mod tests {
             group_size: None,
             anomaly_count: None,
             level: None,
+            severity: None,
             actual_value: None,
             threshold_value: None,
             threshold_operator: None,
@@ -1765,6 +2045,7 @@ mod tests {
         let entry = AlertHistoryEntry {
             timestamp: 0,
             alert_name: "a".to_string(),
+            alert_id: None,
             org: "o".to_string(),
             status: "ok".to_string(),
             is_realtime: false,
@@ -1783,6 +2064,7 @@ mod tests {
             group_size: Some(3),
             anomaly_count: Some(2),
             level: None,
+            severity: None,
             actual_value: None,
             threshold_value: None,
             threshold_operator: None,
@@ -1930,5 +2212,18 @@ mod tests {
             history_columns(&Schema::new(fields)).ends_with(", success_response"),
             "a sent row such as `destination ops-jira created OPS-141;` must reach the history"
         );
+    }
+
+    #[test]
+    fn the_siem_severity_column_is_read_once_the_stream_has_it() {
+        use arrow_schema::{DataType, Field};
+
+        let field = |name: &str| Field::new(name, DataType::Utf8, true);
+        let mut fields: Vec<Field> = HISTORY_COLUMNS.split(", ").map(field).collect();
+        assert!(!history_columns(&Schema::new(fields.clone())).contains("severity"));
+        fields.push(field("severity"));
+        assert!(history_columns(&Schema::new(fields)).ends_with(", severity"));
+        let hit = serde_json::json!({"severity": "low"});
+        assert_eq!(hit_text(&hit, "severity").as_deref(), Some("low"));
     }
 }

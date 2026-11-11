@@ -80,6 +80,8 @@ vi.mock("@/services/settings", async (importOriginal) => {
 import settingsService from "@/services/settings";
 import * as commons from "@/utils/commons";
 import { useFavoriteDashboards } from "@/composables/useFavoriteDashboards";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { gt } from "@/types/i18n";
 
 // Mock DOM methods to prevent errors from missing DOM APIs
 Object.defineProperty(Element.prototype, "removeAttribute", {
@@ -1091,6 +1093,47 @@ describe("Dashboards.vue", () => {
     });
   });
 
+  describe("Home pin after a move", () => {
+    const pinIn = (folderId: string) => ({
+      data: { setting_value: { dashboardId: "d1", folderId, label: "Pinned" } },
+    });
+
+    afterEach(() => {
+      useHomeDashboard(gt).homeDashboard.value = null;
+    });
+
+    const mountWithWarmPin = async () => {
+      vi.mocked(settingsService.getSetting).mockResolvedValue(pinIn("B") as any);
+      wrapper = shallowMount(Dashboards, { global: buildGlobalConfig(store, router, i18n) });
+      await flushPromises();
+      expect(useHomeDashboard(gt).homeDashboard.value?.folderId).toBe("B");
+      vi.mocked(settingsService.getSetting).mockClear();
+      vi.mocked(settingsService.getSetting).mockResolvedValue(pinIn("A") as any);
+    };
+
+    it("re-reads the pin past a warm cache when the pinned dashboard is moved", async () => {
+      await mountWithWarmPin();
+
+      wrapper.vm.selectedDashboardIdToMove = ["d1"];
+      await wrapper.findComponent({ name: "MoveDashboardToAnotherFolder" }).vm.$emit("updated");
+      await flushPromises();
+
+      expect(useHomeDashboard(gt).homeDashboard.value?.folderId).toBe("A");
+      expect(wrapper.vm.showMoveDashboardDialog).toBe(false);
+    });
+
+    it("does not re-read the pin when a different dashboard is moved", async () => {
+      await mountWithWarmPin();
+
+      wrapper.vm.selectedDashboardIdToMove = ["other"];
+      await wrapper.findComponent({ name: "MoveDashboardToAnotherFolder" }).vm.$emit("updated");
+      await flushPromises();
+
+      expect(settingsService.getSetting).not.toHaveBeenCalled();
+      expect(useHomeDashboard(gt).homeDashboard.value?.folderId).toBe("B");
+    });
+  });
+
   describe("product analytics", () => {
     const mountDashboards = async () => {
       wrapper = shallowMount(Dashboards, { global: buildGlobalConfig(store, router, i18n) });
@@ -1157,6 +1200,47 @@ describe("Dashboards.vue", () => {
 
       expect(dashboardService.bulkDelete).toHaveBeenCalled();
       expect(analytics.track).not.toHaveBeenCalledWith("dashboard_deleted", expect.anything());
+    });
+
+    describe("home unpin", () => {
+      const pinD1 = () => {
+        useHomeDashboard(gt).homeDashboard.value = {
+          dashboardId: "d1",
+          folderId: "default",
+          label: "Pinned",
+        };
+      };
+
+      afterEach(() => {
+        useHomeDashboard(gt).homeDashboard.value = null;
+      });
+
+      it("tracks home_dashboard_unpinned once the pin is cleared", async () => {
+        await mountDashboards();
+        pinD1();
+
+        await wrapper.vm.toggleHome({ id: "d1" });
+
+        expect(analytics.track).toHaveBeenCalledWith("home_dashboard_unpinned", {
+          source: "dashboard_list",
+        });
+      });
+
+      it("does not track an unpin the server refused", async () => {
+        vi.mocked(settingsService.deleteOrgSetting).mockRejectedValueOnce({
+          response: { status: 500 },
+        });
+        await mountDashboards();
+        pinD1();
+
+        await wrapper.vm.toggleHome({ id: "d1" });
+
+        expect(useHomeDashboard(gt).homeDashboard.value?.dashboardId).toBe("d1");
+        expect(analytics.track).not.toHaveBeenCalledWith(
+          "home_dashboard_unpinned",
+          expect.anything(),
+        );
+      });
     });
   });
   describe("Cross-folder search failure", () => {

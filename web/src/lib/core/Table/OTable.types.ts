@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { I18nText } from "@/types/i18n";
+import type { ForbiddenState } from "@/utils/featureGate";
 
 import type { Component, ComputedRef, InjectionKey, Ref } from "vue";
 import type { Row, Table } from "@tanstack/vue-table";
@@ -471,17 +472,19 @@ export interface OTableProps<TData = any> {
   loading?: boolean;
   /** Show the skeleton on every load instead of keeping the last settled rows. */
   skeletonOnRefetch?: boolean;
+  /** Skeleton rows while loading, when the caller already knows how many rows will land; keeps the first paint the loaded height. */
+  skeletonRows?: number;
   /** Changing it drops the kept rows so the next load shows the skeleton; bind the folder or tab whose rows must not show under another. */
   loadingResetKey?: unknown;
   /** Data is arriving incrementally (SSE/WebSocket). Shows a pulsing indicator. */
   streaming?: boolean;
   error?: string | null;
   /**
-   * The data this table lists was denied (403). Shows the no-access state
+   * The data this table lists was denied (403); feature keys mean a license denial. Shows the no-access state
    * instead of the first-run empty state, which would otherwise invite the
    * user to create something they are not allowed to create.
    */
-  forbidden?: boolean;
+  forbidden?: ForbiddenState;
   /** What the forbidden table lists, as the app's access state names it (an IAM resource key). */
   forbiddenResource?: string;
   /** Text shown when data is empty and not loading */
@@ -714,6 +717,8 @@ export interface OTableSlots<TData = any> {
   error?: (props: { message: string }) => any;
   /** One `<tr>` (cells spanning the columns) rendered as the first row of the body, under the column header, before the first data row; not measured by virtual scrolling. */
   "body-start"?: () => any;
+  /** One `<tr>` (cells spanning the columns) rendered as the last row of the body, above the footer; not measured by virtual scrolling. */
+  "body-end"?: () => any;
   /** Expanded row content — scoped to the plain row data (`row.original`) */
   expansion?: (props: { row: TData }) => any;
   /** Tree-mode warning row — rendered between an expanded parent and its children when `getRowWarning(row)` is true. */

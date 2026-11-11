@@ -90,6 +90,34 @@ impl ScorerSelection<'_> {
     }
 }
 
+/// What an Experiment's pinned `global_version` shows as. When the Dataset's
+/// rows cannot be read the pin shows as itself, as it does for a deleted
+/// Dataset; the response describes an action that already happened.
+async fn pinned_write_version(org_id: &str, dataset_id: &str, pin: i64) -> i64 {
+    datasets::pinned_write_version(org_id, dataset_id, pin)
+        .await
+        .unwrap_or_else(|error| {
+            log::error!(
+                "[Experiment] failed to resolve the write version of Dataset {dataset_id} at {pin}: {error}"
+            );
+            pin
+        })
+}
+
+async fn experiment_body(
+    org_id: &str,
+    experiment: experiments::Experiment,
+) -> ExperimentResponseBody {
+    let shown =
+        pinned_write_version(org_id, &experiment.dataset_id, experiment.dataset_version).await;
+    ExperimentResponseBody::new(experiment, shown)
+}
+
+/// Scores come from search, so while it is blocked the list renders without them.
+fn summary_wanted(requested: Option<bool>, org_id: &str) -> bool {
+    requested.unwrap_or(false) && search_service::check_org_search_allowed(org_id).is_ok()
+}
+
 fn experiment_error_response(error: ExperimentError) -> Response {
     match error {
         ExperimentError::Database(error) => {
@@ -333,6 +361,11 @@ fn experiment_result_rows(
                     score_configs,
                 ),
                 p50_latency_ms: aggregate.p50_latency_ms,
+                error_message: aggregate
+                    .failure_causes
+                    .into_iter()
+                    .next()
+                    .map(|cause| cause.message),
                 dispersion: dispersions.remove(&first.row_id).map(Into::into),
             })
         })
@@ -532,6 +565,11 @@ async fn require_stored_reference_access(
         (status = 403, description = "A referenced Dataset, Scorer, Prompt, Provider or Remote Task is not accessible", body = ()),
         (status = 404, description = "Dataset or scorer not found", body = ()),
     ),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "create"}))
+    )
 )]
 pub async fn preview_experiment(
     Path(org_id): Path<String>,
@@ -572,6 +610,11 @@ pub async fn preview_experiment(
         (status = 409, description = "Idempotency conflict", body = ()),
         (status = 412, description = "Cost estimate is above the warning threshold and was not confirmed", body = ()),
     ),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "create"}))
+    )
 )]
 pub async fn create_experiment(
     Path(org_id): Path<String>,
@@ -602,7 +645,13 @@ pub async fn create_experiment(
     match experiments::create(&org_id, &user.user_id, input, &canonical_request).await {
         Ok(result) => {
             set_ownership(&org_id, "experiments", Authz::new(&result.experiment.id)).await;
-            MetaHttpResponse::json(CreateExperimentResponseBody::from(result))
+            let shown = pinned_write_version(
+                &org_id,
+                &result.experiment.dataset_id,
+                result.experiment.dataset_version,
+            )
+            .await;
+            MetaHttpResponse::json(CreateExperimentResponseBody::new(result, shown))
         }
         Err(error) => experiment_error_response(error),
     }
@@ -619,6 +668,11 @@ pub async fn create_experiment(
         ExperimentListQuery,
     ),
     responses((status = 200, body = inline(ListExperimentsResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "list"}))
+    )
 )]
 pub async fn list_experiments(
     Path(org_id): Path<String>,
@@ -636,15 +690,8 @@ pub async fn list_experiments(
         Ok(list) => list,
         Err(error) => return MetaHttpResponse::forbidden(error.to_string()),
     };
-    // One Dataset query for the whole list — a lookup per experiment would be N+1.
-    let dataset_names: std::collections::HashMap<String, String> = datasets::list(&org_id)
-        .await
-        .map(|list| {
-            list.into_iter()
-                .map(|dataset| (dataset.id, dataset.name))
-                .collect()
-        })
-        .unwrap_or_default();
+    // One names-only Dataset query for the whole list — no per-experiment lookups or aggregates.
+    let dataset_names = datasets::list_names(&org_id).await.unwrap_or_default();
     let dataset_id = query
         .dataset_id
         .as_deref()
@@ -684,7 +731,7 @@ pub async fn list_experiments(
             .collect::<Vec<_>>(),
         Err(error) => return experiment_error_response(error),
     };
-    let include_summary = query.include_summary.unwrap_or(false);
+    let include_summary = summary_wanted(query.include_summary, &org_id);
     let mut summaries = if include_summary {
         summary::load(&experiments).await
     } else {
@@ -700,14 +747,27 @@ pub async fn list_experiments(
     } else {
         Vec::new()
     };
+    // One query for every pin in the list, not one per experiment.
+    let pins: Vec<(String, i64)> = experiments
+        .iter()
+        .map(|experiment| (experiment.dataset_id.clone(), experiment.dataset_version))
+        .collect();
+    let shown_versions = datasets::pinned_write_versions(&org_id, &pins)
+        .await
+        .unwrap_or_else(|error| {
+            log::error!("[Experiment] failed to resolve pinned Dataset write versions: {error}");
+            HashMap::new()
+        });
     MetaHttpResponse::json(ListExperimentsResponseBody {
         list: experiments
             .into_iter()
             .map(|experiment| {
                 let id = experiment.id.clone();
                 let dataset_name = dataset_names.get(&experiment.dataset_id).cloned();
+                let pin = (experiment.dataset_id.clone(), experiment.dataset_version);
+                let shown = shown_versions.get(&pin).copied().unwrap_or(pin.1);
                 ExperimentViewResponseBody {
-                    experiment: ExperimentResponseBody::from(experiment)
+                    experiment: ExperimentResponseBody::new(experiment, shown)
                         .with_dataset_name(dataset_name),
                     summary: include_summary.then(|| {
                         experiment_summary_body(
@@ -736,6 +796,11 @@ pub async fn list_experiments(
         (status = 200, body = inline(ExperimentDetailResponseBody)),
         (status = 404, description = "Experiment not found", body = ()),
     ),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "get"}))
+    )
 )]
 pub async fn get_experiment(
     Path((org_id, experiment_id)): Path<(String, String)>,
@@ -877,9 +942,12 @@ pub async fn get_experiment(
         summaries.remove(&experiment.id).unwrap_or_default(),
         &score_configs,
     );
+    let shown =
+        pinned_write_version(&org_id, &experiment.dataset_id, experiment.dataset_version).await;
     MetaHttpResponse::json(ExperimentDetailResponseBody {
         experiment: ExperimentViewResponseBody {
-            experiment: ExperimentResponseBody::from(experiment).with_dataset_name(dataset_name),
+            experiment: ExperimentResponseBody::new(experiment, shown)
+                .with_dataset_name(dataset_name),
             summary: Some(summary),
         },
         preview: preview.into(),
@@ -904,6 +972,10 @@ pub async fn get_experiment(
         (status = 400, description = "Invalid threshold, outcome dimensions, or cross-dataset comparison"),
         (status = 403, description = "One or both Experiments are not accessible"),
         (status = 404, description = "One or both Experiments were not found"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "list"}))
     )
 )]
 pub async fn compare_experiments(
@@ -1048,6 +1120,10 @@ pub async fn compare_experiments(
         (status = 400, description = "Invalid pagination"),
         (status = 403, description = "Experiment is not accessible"),
         (status = 404, description = "Experiment not found"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "list"}))
     )
 )]
 pub async fn list_experiment_result_rows(
@@ -1156,6 +1232,10 @@ pub async fn list_experiment_result_rows(
         (status = 200, description = "Pinned row detail", body = ExperimentRowDetailResponseBody),
         (status = 403, description = "Experiment is not accessible"),
         (status = 404, description = "Experiment or pinned row not found"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "get"}))
     )
 )]
 pub async fn get_experiment_row(
@@ -1231,11 +1311,14 @@ pub async fn get_experiment_row(
         .slots
         .first()
         .expect("a resolved Experiment row always contains at least one trial");
+    let dataset_write_version =
+        pinned_write_version(&org_id, &experiment.dataset_id, experiment.dataset_version).await;
     let response = ExperimentRowDetailResponseBody {
         experiment_id: experiment.id,
         snapshot: ExperimentRowSnapshotBody {
             dataset_id: experiment.dataset_id,
             dataset_version: experiment.dataset_version,
+            dataset_write_version,
         },
         navigation: ExperimentRowNavigationBody {
             row_index: row.row_index,
@@ -1275,11 +1358,15 @@ pub async fn get_experiment_row(
         (status = 200, description = "Experiment cancelled", body = ExperimentResponseBody),
         (status = 404, description = "Experiment not found"),
         (status = 409, description = "Invalid or concurrent lifecycle transition"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "create"}))
     )
 )]
 pub async fn cancel_experiment(Path((org_id, experiment_id)): Path<(String, String)>) -> Response {
     match experiments::cancel(&org_id, &experiment_id).await {
-        Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Ok(experiment) => MetaHttpResponse::json(experiment_body(&org_id, experiment).await),
         Err(error) => experiment_error_response(error),
     }
 }
@@ -1301,6 +1388,10 @@ pub async fn cancel_experiment(Path((org_id, experiment_id)): Path<(String, Stri
         (status = 403, description = "Experiment is not accessible"),
         (status = 404, description = "Experiment not found"),
         (status = 409, description = "Experiment is not eligible to be a Baseline"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "update"}))
     )
 )]
 pub async fn set_experiment_baseline(
@@ -1314,7 +1405,7 @@ pub async fn set_experiment_baseline(
     }
     match baseline::set_baseline(&org_id, &experiment_id, &user.user_id).await {
         Ok(change) => MetaHttpResponse::json(ExperimentBaselineResponseBody {
-            experiment: ExperimentResponseBody::from(change.experiment),
+            experiment: experiment_body(&org_id, change.experiment).await,
             previous_baseline_id: change.previous_baseline_id,
         }),
         Err(error) => experiment_error_response(error),
@@ -1337,6 +1428,10 @@ pub async fn set_experiment_baseline(
         (status = 200, description = "Experiment is no longer the Baseline", body = ExperimentResponseBody),
         (status = 403, description = "Experiment is not accessible"),
         (status = 404, description = "Experiment not found"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "delete"}))
     )
 )]
 pub async fn clear_experiment_baseline(
@@ -1349,7 +1444,7 @@ pub async fn clear_experiment_baseline(
         return response;
     }
     match baseline::clear_baseline(&org_id, &experiment_id, &user.user_id).await {
-        Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Ok(experiment) => MetaHttpResponse::json(experiment_body(&org_id, experiment).await),
         Err(error) => experiment_error_response(error),
     }
 }
@@ -1371,6 +1466,10 @@ pub async fn clear_experiment_baseline(
         (status = 403, description = "Experiment is not accessible"),
         (status = 404, description = "Experiment not found"),
         (status = 409, description = "Experiment lifecycle changed concurrently"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "delete"}))
     )
 )]
 pub async fn delete_experiment(
@@ -1416,6 +1515,10 @@ pub async fn delete_experiment(
         (status = 403, description = "A referenced Dataset, Scorer, Prompt, Provider or Remote Task is not accessible"),
         (status = 404, description = "Experiment not found"),
         (status = 409, description = "Invalid or concurrent lifecycle transition"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "create"}))
     )
 )]
 pub async fn retry_experiment(
@@ -1433,7 +1536,7 @@ pub async fn retry_experiment(
     )
     .await
     {
-        Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Ok(experiment) => MetaHttpResponse::json(experiment_body(&org_id, experiment).await),
         Err(error) => experiment_error_response(error),
     }
 }
@@ -1459,6 +1562,10 @@ pub async fn retry_experiment(
         (status = 403, description = "Experiment or one of its references is not accessible"),
         (status = 404, description = "Experiment, row, or trial not found"),
         (status = 409, description = "Experiment lifecycle, active slot retry, or idempotency conflict"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "create"}))
     )
 )]
 pub async fn retry_experiment_slot(
@@ -1529,6 +1636,10 @@ pub async fn retry_experiment_slot(
         (status = 404, description = "Experiment, Dataset or scorer not found"),
         (status = 409, description = "Only sealed Experiments can be cloned, or the idempotency key describes a different clone"),
         (status = 412, description = "Cost estimate is above the warning threshold and was not confirmed", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "create"}))
     )
 )]
 pub async fn clone_experiment(
@@ -1563,7 +1674,7 @@ pub async fn clone_experiment(
     match experiments::clone_sealed(&org_id, &experiment_id, &user.user_id, overrides).await {
         Ok(experiment) => {
             set_ownership(&org_id, "experiments", Authz::new(&experiment.id)).await;
-            MetaHttpResponse::json(ExperimentResponseBody::from(experiment))
+            MetaHttpResponse::json(experiment_body(&org_id, experiment).await)
         }
         Err(error) => experiment_error_response(error),
     }
@@ -1705,7 +1816,7 @@ pub async fn finalize_experiment(
         return response;
     }
     match ingest::finalize(&org_id, &experiment_id).await {
-        Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Ok(experiment) => MetaHttpResponse::json(experiment_body(&org_id, experiment).await),
         Err(error) => ingest_error_response(error),
     }
 }
@@ -1749,6 +1860,7 @@ mod tests {
             output: None,
             score_summaries: Vec::new(),
             p50_latency_ms: None,
+            error_message: None,
             dispersion: Some(crate::models::experiments::ExperimentRowDispersionBody {
                 row_id,
                 logical_id: format!("case-{row_index}"),
@@ -2136,5 +2248,24 @@ mod tests {
                 .to_string()
                 .contains('7')
         );
+    }
+
+    #[tokio::test]
+    async fn summary_follows_the_request_while_search_is_open() {
+        let _held = o2_enterprise::enterprise::license::TEST_STATICS_LOCK
+            .lock()
+            .await;
+        assert!(summary_wanted(Some(true), "acme"));
+        assert!(!summary_wanted(None, "acme"));
+        assert!(!summary_wanted(Some(false), "acme"));
+    }
+
+    #[tokio::test]
+    async fn summary_is_skipped_while_search_is_blocked() {
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        let _gate = close_search_gate_for_tests().await;
+        assert!(!summary_wanted(Some(true), "acme"));
+        assert!(summary_wanted(Some(true), config::META_ORG_ID));
     }
 }

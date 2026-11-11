@@ -88,7 +88,7 @@ use crate::service::auth::UserEmail;
         }
     })),
     responses(
-        (status = 200, description = "Search Job submitted successfully", body = Object),
+        (status = 200, description = "Search Job submitted successfully", body = crate::common::meta::http::HttpResponse),
         (status = 400, description = "Bad Request", body = Object),
         (status = 500, description = "Internal Server Error", body = Object),
     ),
@@ -253,7 +253,7 @@ pub async fn submit_job(
         ("org_id" = String, Path, description = "Organization name")
     ),
     responses(
-        (status = 200, description = "List of search jobs", body = inline(Vec<Object>), example = json!([{
+        (status = 200, description = "List of search jobs", body = Vec<infra::table::entity::search_jobs::Model>, example = json!([{
             "id": "abc123",
             "trace_id": "xyz789",
             "org_id": "default",
@@ -318,7 +318,7 @@ pub async fn list_status(Path(org_id): Path<String>) -> Response {
         ("job_id" = String, Path, description = "Search job ID")
     ),
     responses(
-        (status = 200, description = "Search job status", body = Object, example = json!({
+        (status = 200, description = "Search job status", body = infra::table::entity::search_jobs::Model, example = json!({
             "id": "abc123",
             "trace_id": "xyz789",
             "org_id": "default",
@@ -391,7 +391,7 @@ pub async fn get_status(
         ("job_id" = String, Path, description = "Search job ID")
     ),
     responses(
-        (status = 200, description = "Search job cancelled successfully", body = Object, example = json!({
+        (status = 200, description = "Search job cancelled successfully", body = crate::common::meta::http::HttpResponse, example = json!({
             "code": 200,
             "message": "[Job_Id: abc123] Running Search Job cancelled successfully."
         })),
@@ -450,7 +450,7 @@ pub async fn cancel_job(
         ("size" = Option<i64>, Query, description = "Number of results to return")
     ),
     responses(
-        (status = 200, description = "Search job results", body = Object, example = json!({
+        (status = 200, description = "Search job results", body = config::meta::search::Response, example = json!({
             "took": 155,
             "hits": [],
             "total": 27179431,
@@ -487,6 +487,9 @@ pub async fn get_job_result(
 
         // check permissions
         if let Some(res) = check_permissions(&model, &org_id, &user_id).await {
+            return res;
+        }
+        if let Some(res) = check_license(&model) {
             return res;
         }
 
@@ -536,7 +539,7 @@ pub async fn get_job_result(
         ("job_id" = String, Path, description = "Search job ID")
     ),
     responses(
-        (status = 200, description = "Search job deleted successfully", body = Object, example = json!({
+        (status = 200, description = "Search job deleted successfully", body = crate::common::meta::http::HttpResponse, example = json!({
             "code": 200,
             "message": "[Job_Id: abc123] Running Search Job deleted successfully."
         })),
@@ -601,7 +604,7 @@ pub async fn delete_job(
         ("job_id" = String, Path, description = "Search job ID")
     ),
     responses(
-        (status = 200, description = "Search job retry initiated successfully", body = Object, example = json!({
+        (status = 200, description = "Search job retry initiated successfully", body = crate::common::meta::http::HttpResponse, example = json!({
             "code": 200,
             "message": "[Job_Id: abc123] Search Job retry successfully."
         })),
@@ -632,6 +635,9 @@ pub async fn retry_job(
 
         // check permissions
         if let Some(res) = check_permissions(&model, &org_id, &user_id).await {
+            return res;
+        }
+        if let Some(res) = check_license(&model) {
             return res;
         }
 
@@ -723,6 +729,32 @@ fn apply_pagination(response: SearchResponse, from: i64, size: i64) -> Response 
     let mut res = response;
     res.pagination(from, size);
     Json(res).into_response()
+}
+
+// The route's `type` query param is caller-controlled, so gate on the type the job was submitted
+// with.
+#[cfg(feature = "enterprise")]
+fn check_license(job: &JobModel) -> Option<Response> {
+    use config::meta::feature::Feature;
+    let feature = match StreamType::from(job.stream_type.as_str()) {
+        StreamType::EnrichmentTables => return None,
+        StreamType::Metrics => Feature::Metrics,
+        StreamType::Traces => Feature::Traces,
+        StreamType::Profiles => Feature::ContinuousProfiling,
+        _ => Feature::Logs,
+    };
+    if o2_enterprise::enterprise::license::check_features(&[feature]) {
+        return None;
+    }
+    let name: &str = feature.into();
+    let err = infra::errors::ErrorCodes::LicenseFeatureNotEntitled(name.to_string());
+    Some(
+        (
+            StatusCode::FORBIDDEN,
+            Json(MetaHttpResponse::error_code(err)),
+        )
+            .into_response(),
+    )
 }
 
 // check permissions

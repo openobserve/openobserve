@@ -19,6 +19,7 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createMemoryHistory, createRouter } from "vue-router";
 import i18n from "@/locales";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamKeys } from "@/services/stream.querykeys";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -100,7 +101,11 @@ const makeStore = (
         isDataIngested: opts.ingested ?? false,
         organizationPasscode: opts.passcode ?? PASSCODE,
         organizationPasscodeForbidden: false,
-        orgTokens: [{ name: "default", token: PASSCODE, enabled: true }],
+        orgTokens: [
+          { name: "default", token: PASSCODE, enabled: true },
+          // A second token, so the snippet names the one it carries.
+          { name: "ci", token: "other", enabled: true },
+        ],
       },
     },
     mutations: {
@@ -198,7 +203,12 @@ const watchedSignal = () => (watchArgs.mock.calls[0]?.[1] as { value?: string })
 
 beforeEach(() => {
   credentialApi.list_org_ingestion_tokens.mockResolvedValue({
-    data: { data: [{ name: "default", token: PASSCODE, enabled: true }] },
+    data: {
+      data: [
+        { name: "default", token: PASSCODE, enabled: true },
+        { name: "ci", token: "other", enabled: true },
+      ],
+    },
   });
   credentialApi.get_organization_passcode.mockResolvedValue({
     data: { data: { passcode: USER_PASSCODE, user: "dev@acme.io" } },
@@ -375,7 +385,7 @@ describe("FirstDataPanel — compact card on Dashboards and Home", () => {
   it("shows the pick, the pill, Copy command and Open the guide on an empty org", async () => {
     window.localStorage.setItem(PICK_KEY, "kubernetes");
     seedLists({
-      logs: [{ name: "usage", stream_type: "logs" }],
+      logs: [{ name: "usage", stream_type: "logs", is_internal: true }],
       metrics: [],
       traces: [],
       profiles: [],
@@ -741,6 +751,21 @@ describe("FirstDataPanel — first data arrived strip (e5)", () => {
     expect(open.text()).toBe("Open in Logs");
     await open.trigger("click");
     expect(wrapper.emitted("open")).toHaveLength(1);
+  });
+
+  it("disables Open in Logs with a lock while the logs license is locked", async () => {
+    await mountPanel({
+      signal: "any",
+      variant: "compact",
+      arrived: { streamName: "default", streamType: "logs", count: 1, rangeStart: 0, rangeEnd: 1 },
+    });
+    store.state.zoConfig.features = { logs: "locked" };
+    await nextTick();
+    const open = q("first-data-panel-arrived-open-btn");
+    expect(open.attributes("disabled")).toBeDefined();
+    expect(open.findAllComponents(OIcon).map((i) => i.props("name"))).toContain("lock");
+    await open.trigger("click");
+    expect(wrapper.emitted("open")).toBeUndefined();
   });
 
   it("states the records and stream, and closes", async () => {

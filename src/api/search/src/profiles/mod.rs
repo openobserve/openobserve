@@ -126,7 +126,9 @@ pub(crate) async fn check_stream_permission(
     user_id: &str,
 ) -> Result<(), Response> {
     #[cfg(feature = "enterprise")]
-    if let Err(e) = search_service::check_search_allowed(org_id, Some(stream_name)) {
+    if let Err(e) =
+        search_service::check_search_allowed(org_id, Some((stream_name, StreamType::Profiles)))
+    {
         return Err(MetaHttpResponse::too_many_requests(e.to_string()));
     }
     if let Some(response) = check_stream_permissions(org_id, stream_name, user_id).await {
@@ -450,6 +452,7 @@ pub(crate) async fn run_profiles_sql(
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
         use_cache: true,
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,

@@ -58,6 +58,7 @@ const store = createStore({
     searchCollapsibleSection: 20,
     printMode: false,
     kioskMode: false,
+    solutionMode: "observability",
     themeOverride: null as string | null,
     savedViewFlag: false,
     savedFunctionDialog: false,

@@ -68,8 +68,8 @@ vi.mock("@/composables/useLockedAffordance", async () => {
 const tooltipStub = defineComponent({
   name: "OTooltip",
   props: ["content"],
-  setup(props) {
-    return () => h("span", { "data-test": "tooltip" }, props.content);
+  setup(props, { slots }) {
+    return () => [h("span", { "data-test": "tooltip" }, props.content), slots.default?.()];
   },
 });
 
@@ -143,12 +143,13 @@ const WARNINGS: WarningEvent[] = [
 
 describe("ClusterOverview", () => {
   let wrapper: VueWrapper<any>;
+  let features: Record<string, string> = {};
 
   const overviewStore = () =>
     createStore({
       state: {
         selectedOrganization: { identifier: "org1" },
-        zoConfig: { incidents_enabled: true },
+        zoConfig: { incidents_enabled: true, features },
       },
     });
 
@@ -194,6 +195,7 @@ describe("ClusterOverview", () => {
 
   beforeEach(() => {
     push.mockClear();
+    features = {};
     listAlerts.mockResolvedValue({ data: { list: [] } });
     listIncidents.mockResolvedValue({ data: { incidents: [], total: 0 } });
   });
@@ -366,6 +368,21 @@ describe("ClusterOverview", () => {
       await flushPromises();
       expect(wrapper.find('[data-test="k8s2-overview-incident-card"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="k8s2-overview-alerts-card"]').exists()).toBe(false);
+    });
+
+    it("locks the alerts tile and skips both reads when alerts and incidents are license-locked", async () => {
+      features = { alerts: "locked", incidents: "locked" };
+      listAlerts.mockClear();
+      listIncidents.mockClear();
+      await mountView();
+      await flushPromises();
+      expect(listAlerts).not.toHaveBeenCalled();
+      expect(listIncidents).not.toHaveBeenCalled();
+      expect(text("k8s2-overview-kpi-alerts")).toContain("Locked: needs");
+      expect(text("k8s2-overview-alerts-locked")).toContain("Locked: needs");
+      expect(text("k8s2-overview-incident-locked")).toContain("Locked: needs");
+      await wrapper.find('[data-test="k8s2-overview-kpi-alerts"]').trigger("click");
+      expect(push).not.toHaveBeenCalled();
     });
 
     it("shows the alerts tile as unavailable when the reads fail", async () => {
@@ -568,6 +585,35 @@ describe("ClusterOverview", () => {
       expect(text("k8s2-overview-warning-message-node|ip-10-0-10-38|MemoryPressure")).toBe(
         "MemoryPressure",
       );
+    });
+
+    it("caps the table at 70% of the viewport, sorts and resizes", async () => {
+      await mountView();
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("maxHeight")).toBe("70vh");
+      expect(table.props("enableColumnResize")).toBe(true);
+      expect(table.props("sorting")).toBe("client");
+      const cols = table.props("columns") as any[];
+      expect(cols.find((c) => c.id === "message").meta.flex).toBe(true);
+    });
+
+    it("sorts by the Age header with undated rows last", async () => {
+      await mountView();
+      const ages = () =>
+        wrapper.findAll('[data-test^="k8s2-overview-warning-age-"]').map((r) => r.text());
+      expect(ages()).toEqual(["5m", "—", "5m"]);
+      await wrapper
+        .find('[data-test="o2-table-th-age"] [data-test="o2-table-th-sort-trigger"]')
+        .trigger("click");
+      await flushPromises();
+      expect(ages().at(-1)).toBe("—");
+    });
+
+    it("sizes the Object column to its longest name", async () => {
+      await mountView();
+      const cols = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+      const size = (id: string) => cols.find((c) => c.id === id).size;
+      expect(size("object")).toBeGreaterThan(size("age"));
     });
 
     it("opens the drawer on a row click when the kind has one", async () => {

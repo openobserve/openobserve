@@ -369,6 +369,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { foldersQuery, optionalFoldersQuery } from "@/services/common.queries";
 import { alertHistoryQuery } from "@/services/alerts.queries";
 import {
@@ -387,6 +388,7 @@ import { failedRequests, viewDenial } from "@/composables/useAccessStore";
 import OAccessLock from "@/components/access/OAccessLock.vue";
 import { sendDowntimeTestMutation } from "@/services/downtimes.queries";
 import { notifySentence } from "@/utils/downtimes/summary";
+import { sentTemplatesText } from "@/utils/alerts/notificationKinds";
 import type { TestDestination } from "@/utils/downtimes/notifyTest";
 import { useToast } from "@/lib/feedback/Toast/useToast";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -478,8 +480,11 @@ const downtimeFolders = useQuery(() =>
 const alertFolders = useQuery(() =>
   Object.assign(optionalFoldersQuery(orgId.value, "alerts"), { enabled: !!orgId.value }),
 );
+const { locked: syntheticsLocked } = useLicenseLock("synthetics");
 const syntheticFolders = useQuery(() =>
-  Object.assign(optionalFoldersQuery(orgId.value, "synthetics"), { enabled: !!orgId.value }),
+  Object.assign(optionalFoldersQuery(orgId.value, "synthetics"), {
+    enabled: !!orgId.value && !syntheticsLocked.value,
+  }),
 );
 
 const historyQuery = useQuery(() =>
@@ -661,6 +666,7 @@ const notificationRows = computed(() =>
     sent_at: entry.sent_at,
     event: EVENT_LABEL_KEYS[entry.event] ? t(EVENT_LABEL_KEYS[entry.event]) : raw(entry.event),
     destinations: raw(entry.destinations.join(", ")),
+    template: raw(sentTemplatesText(entry.templates, t)),
     result: resultText(entry),
     failed: !!entry.result && entry.result !== RESULT_OK,
   })),
@@ -681,6 +687,12 @@ const notificationColumns = computed<OTableColumnDef[]>(() => [
     accessorKey: "destinations",
     header: t("alerts.downtimes.notify.log.destinations"),
     size: 240,
+  },
+  {
+    id: "template",
+    accessorKey: "template",
+    header: t("alerts.downtimes.notify.log.template"),
+    size: 280,
   },
   {
     id: "result",

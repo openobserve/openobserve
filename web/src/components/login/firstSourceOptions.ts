@@ -16,6 +16,7 @@
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { I18nKey } from "@/types/i18n";
 import type { UserDataStreamType } from "@/utils/internalStreams";
+import { featureState, type FeatureStates } from "@/utils/featureGate";
 
 export type FirstSourceId =
   | "kubernetes"
@@ -28,12 +29,13 @@ export type FirstSourceId =
   | "rum"
   | "llm"
   | "agent"
+  | "sample"
   | "unsure";
 
 export interface FirstSourceOption {
   id: FirstSourceId;
   labelKey: I18nKey;
-  /** Guide route name; absent for "Not sure yet", which keeps today's landing. */
+  /** Guide route name; absent for sample data, which loads in the welcome dialog, and for "Not sure yet". */
   route?: string;
   /** Image path under assets/images, for getImageURL. */
   logo?: string;
@@ -43,6 +45,8 @@ export interface FirstSourceOption {
   icon?: IconName;
   /** Signals the picked guide sends. */
   signals: UserDataStreamType[];
+  /** License feature whose locked guide this option opens. */
+  feature?: string;
 }
 
 export interface FirstSourcePrefill {
@@ -50,7 +54,7 @@ export interface FirstSourcePrefill {
   referrer?: string;
 }
 
-/** The 11 Get started choices in the approved order, each with its guide route. */
+/** The first-source choices in the approved order, each with its guide route. */
 export const FIRST_SOURCE_OPTIONS: readonly FirstSourceOption[] = Object.freeze([
   {
     id: "kubernetes",
@@ -108,6 +112,7 @@ export const FIRST_SOURCE_OPTIONS: readonly FirstSourceOption[] = Object.freeze(
     route: "frontendMonitoring",
     icon: "public",
     signals: ["logs"],
+    feature: "rum",
   },
   {
     id: "llm",
@@ -122,6 +127,13 @@ export const FIRST_SOURCE_OPTIONS: readonly FirstSourceOption[] = Object.freeze(
     labelKey: "login.getStarted.sources.agent",
     route: "recommendedMcp",
     icon: "auto-awesome",
+    signals: [],
+    feature: "mcp",
+  },
+  {
+    id: "sample",
+    labelKey: "sampleData.entry.onboardingSource",
+    icon: "science",
     signals: [],
   },
   {
@@ -162,6 +174,13 @@ export function firstSourceOption(id: string | null | undefined): FirstSourceOpt
   return FIRST_SOURCE_OPTIONS.find((option) => option.id === id);
 }
 
+export function isFirstSourceLocked(
+  option: FirstSourceOption,
+  features: FeatureStates | undefined,
+): boolean {
+  return !!option.feature && featureState(features, option.feature) === "locked";
+}
+
 /** Maps an openobserve.ai docs URL to the option its guide belongs to. */
 export function docsReferrerSource(referrer: string | null | undefined): FirstSourceId | undefined {
   if (!referrer) return undefined;
@@ -197,7 +216,7 @@ export function prefillFirstSource(
   return docsReferrerSource(referrer ?? query?.referrer);
 }
 
-/** Stores the signup link's utm_content and docs referrer for the Get started dialog, never replacing a stored pair with nothing. */
+/** Stores the signup link's utm_content and docs referrer for the onboarding page, never replacing a stored pair with nothing. */
 export function capturePrefill(utmContent: unknown, referrer: string | null | undefined): void {
   const utm = typeof utmContent === "string" ? utmContent : "";
   const docs = docsReferrerSource(referrer) ? (referrer as string) : "";
@@ -208,7 +227,7 @@ export function capturePrefill(utmContent: unknown, referrer: string | null | un
     if (docs) record.referrer = docs;
     window.sessionStorage.setItem(FIRST_SOURCE_PREFILL_KEY, JSON.stringify(record));
   } catch {
-    // Storage can be unavailable (private mode); the dialog then opens without a pick.
+    // Storage can be unavailable (private mode); onboarding then opens without a pick.
   }
 }
 

@@ -226,6 +226,29 @@ impl UsageExtractor {
         ) {
             set_val_if_not_zero(&mut usage, "output".to_string(), num);
         }
+        // OpenInference cache details are part of `llm.token_count.prompt`.
+        let oi_cache_keys = [
+            (
+                &[
+                    OpenInferenceAttributes::LLM_TOKEN_COUNT_PROMPT_CACHE_READ,
+                    "llm_token_count_prompt_details_cache_read",
+                ][..],
+                "cache_read_input_tokens",
+            ),
+            (
+                &[
+                    OpenInferenceAttributes::LLM_TOKEN_COUNT_PROMPT_CACHE_WRITE,
+                    "llm_token_count_prompt_details_cache_write",
+                ][..],
+                "cache_creation_input_tokens",
+            ),
+        ];
+        for (keys, usage_key) in &oi_cache_keys {
+            if let Some(num) = extract_i64_any(attributes, keys) {
+                set_val_if_not_zero(&mut usage, usage_key.to_string(), num);
+                input_includes_cache = true;
+            }
+        }
 
         // Vercel AI SDK
         if instrumentation_scope_name == "ai" {
@@ -252,8 +275,67 @@ impl UsageExtractor {
             ) {
                 set_val_if_not_zero(&mut usage, "output".to_string(), num);
             }
-            if let Some(num) = extract_i64_any(attributes, &[VercelAiSdkAttributes::USAGE_TOKENS]) {
+            // ai@4 (`promptTokens`) and ai@5+ (`inputTokens`) names.
+            if let Some(num) = extract_i64_any(
+                attributes,
+                &[
+                    VercelAiSdkAttributes::USAGE_INPUT_TOKENS,
+                    VercelAiSdkAttributes::USAGE_PROMPT_TOKENS,
+                ],
+            ) {
+                set_val_if_not_zero(&mut usage, "input".to_string(), num);
+                input_includes_cache = true;
+            }
+            if let Some(num) = extract_i64_any(
+                attributes,
+                &[
+                    VercelAiSdkAttributes::USAGE_OUTPUT_TOKENS,
+                    VercelAiSdkAttributes::USAGE_COMPLETION_TOKENS,
+                ],
+            ) {
+                set_val_if_not_zero(&mut usage, "output".to_string(), num);
+            }
+            if let Some(num) = extract_i64_any(
+                attributes,
+                &[
+                    VercelAiSdkAttributes::USAGE_TOTAL_TOKENS,
+                    VercelAiSdkAttributes::USAGE_TOKENS,
+                ],
+            ) {
                 set_val_if_not_zero(&mut usage, "total".to_string(), num);
+            }
+            // `ai.usage.tokens` is the embedding call's input token count.
+            if !usage.contains_key("input")
+                && let Some(num) =
+                    extract_i64_any(attributes, &[VercelAiSdkAttributes::USAGE_TOKENS])
+            {
+                set_val_if_not_zero(&mut usage, "input".to_string(), num);
+            }
+
+            // ai@6+ splits `inputTokens` (which includes the cache) into details.
+            let cache_read = extract_i64_any(
+                attributes,
+                &[VercelAiSdkAttributes::USAGE_INPUT_CACHE_READ_TOKENS],
+            );
+            let cache_write = extract_i64_any(
+                attributes,
+                &[VercelAiSdkAttributes::USAGE_INPUT_CACHE_WRITE_TOKENS],
+            );
+            if cache_read.is_some() || cache_write.is_some() {
+                if let Some(num) = cache_read {
+                    set_val_if_not_zero(&mut usage, "cache_read_input_tokens".to_string(), num);
+                }
+                if let Some(num) = cache_write {
+                    set_val_if_not_zero(&mut usage, "cache_creation_input_tokens".to_string(), num);
+                }
+                input_includes_cache = true;
+            } else if let Some(num) = extract_i64_any(
+                attributes,
+                &[VercelAiSdkAttributes::USAGE_CACHED_INPUT_TOKENS],
+            ) {
+                // ai@5 passes through the provider's input count, which may include cache reads.
+                set_val_if_not_zero(&mut usage, "cache_read_input_tokens".to_string(), num);
+                input_includes_cache = !vercel_provider_reports_cache_separately(attributes);
             }
         }
 
@@ -276,7 +358,17 @@ impl UsageExtractor {
                 } else if let Some(s) = v.as_object() {
                     for (sk, sv) in s {
                         if let Some(v) = sv.as_i64() {
-                            set_val_if_not_zero(&mut usage, format!("{}_{}", k, sk), v);
+                            // OpenAI usage nests cache reads; `prompt_tokens` includes them.
+                            if k == "prompt_tokens_details" && sk == "cached_tokens" {
+                                set_val_if_not_zero(
+                                    &mut usage,
+                                    "cache_read_input_tokens".to_string(),
+                                    v,
+                                );
+                                input_includes_cache = true;
+                            } else {
+                                set_val_if_not_zero(&mut usage, format!("{}_{}", k, sk), v);
+                            }
                         }
                     }
                 }
@@ -339,6 +431,16 @@ fn has_provider_native_cache_tokens(attributes: &HashMap<String, json::Value>) -
     ]
     .iter()
     .any(|key| attributes.contains_key(*key))
+}
+
+/// Vercel AI SDK providers whose ai@5 `inputTokens` excludes cache reads (e.g. Anthropic, Bedrock).
+fn vercel_provider_reports_cache_separately(attributes: &HashMap<String, json::Value>) -> bool {
+    attributes
+        .get(VercelAiSdkAttributes::MODEL_PROVIDER)
+        .and_then(|v| v.as_str())
+        .is_some_and(|provider| {
+            provider.contains("anthropic") || provider.starts_with("amazon-bedrock")
+        })
 }
 
 #[cfg(test)]
@@ -597,5 +699,130 @@ mod tests {
         let cost = UsageExtractor.extract_cost(&attrs);
         assert_eq!(cost.get("tokens_input"), Some(&0.01f64));
         assert_eq!(cost.get("tokens_output"), Some(&0.005f64));
+    }
+
+    fn attrs_of(pairs: &[(&str, json::Value)]) -> HashMap<String, json::Value> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn test_extract_usage_vercel_v5_usage_keys() {
+        let attrs = attrs_of(&[
+            ("ai.usage.inputTokens", json::json!(30)),
+            ("ai.usage.outputTokens", json::json!(12)),
+            ("ai.usage.totalTokens", json::json!(42)),
+        ]);
+        let usage = UsageExtractor.extract_usage(&attrs, "ai");
+        assert_eq!(usage.get("input"), Some(&30));
+        assert_eq!(usage.get("output"), Some(&12));
+        assert_eq!(usage.get("total"), Some(&42));
+    }
+
+    #[test]
+    fn test_extract_usage_vercel_v4_usage_keys() {
+        let attrs = attrs_of(&[
+            ("ai.usage.promptTokens", json::json!(30)),
+            ("ai.usage.completionTokens", json::json!(12)),
+        ]);
+        let usage = UsageExtractor.extract_usage(&attrs, "ai");
+        assert_eq!(usage.get("input"), Some(&30));
+        assert_eq!(usage.get("output"), Some(&12));
+    }
+
+    #[test]
+    fn test_extract_usage_vercel_embedding_tokens_are_input() {
+        let attrs = attrs_of(&[("ai.usage.tokens", json::json!(5))]);
+        let usage = UsageExtractor.extract_usage(&attrs, "ai");
+        assert_eq!(usage.get("input"), Some(&5));
+        assert_eq!(usage.get("total"), Some(&5));
+        assert!(!usage.contains_key("output"));
+    }
+
+    #[test]
+    fn test_extract_usage_vercel_input_token_details_cache() {
+        let attrs = attrs_of(&[
+            ("ai.model.provider", json::json!("anthropic.messages")),
+            ("ai.usage.inputTokens", json::json!(1000)),
+            (
+                "ai.usage.inputTokenDetails.cacheReadTokens",
+                json::json!(700),
+            ),
+            (
+                "ai.usage.inputTokenDetails.cacheWriteTokens",
+                json::json!(100),
+            ),
+            ("ai.usage.cachedInputTokens", json::json!(700)),
+        ]);
+        let details = UsageExtractor.extract_usage_details(&attrs, "ai");
+        assert_eq!(details.usage.get("input"), Some(&1000));
+        assert_eq!(details.usage.get("cache_read_input_tokens"), Some(&700));
+        assert_eq!(details.usage.get("cache_creation_input_tokens"), Some(&100));
+        assert!(details.input_includes_cache);
+    }
+
+    #[test]
+    fn test_extract_usage_vercel_v5_cached_input_tokens_by_provider() {
+        for (provider, includes) in [
+            ("openai.chat", true),
+            ("google.generative-ai", true),
+            ("anthropic.messages", false),
+            ("amazon-bedrock", false),
+        ] {
+            let attrs = attrs_of(&[
+                ("ai.model.provider", json::json!(provider)),
+                ("ai.usage.inputTokens", json::json!(300)),
+                ("ai.usage.cachedInputTokens", json::json!(200)),
+            ]);
+            let details = UsageExtractor.extract_usage_details(&attrs, "ai");
+            assert_eq!(details.usage.get("cache_read_input_tokens"), Some(&200));
+            assert_eq!(details.input_includes_cache, includes, "{provider}");
+        }
+    }
+
+    #[test]
+    fn test_extract_usage_openinference_cache_details() {
+        let attrs = attrs_of(&[
+            ("llm.token_count.prompt", json::json!(1000)),
+            ("llm.token_count.completion", json::json!(100)),
+            (
+                "llm.token_count.prompt_details.cache_read",
+                json::json!(700),
+            ),
+            (
+                "llm.token_count.prompt_details.cache_write",
+                json::json!(100),
+            ),
+        ]);
+        let details = UsageExtractor.extract_usage_details(&attrs, "");
+        assert_eq!(details.usage.get("input"), Some(&1000));
+        assert_eq!(details.usage.get("cache_read_input_tokens"), Some(&700));
+        assert_eq!(details.usage.get("cache_creation_input_tokens"), Some(&100));
+        assert!(details.input_includes_cache);
+    }
+
+    #[test]
+    fn test_extract_usage_langfuse_nested_cached_tokens() {
+        let details = json::json!({
+            "prompt_tokens": 1000,
+            "completion_tokens": 100,
+            "total_tokens": 1100,
+            "prompt_tokens_details": {"cached_tokens": 700, "audio_tokens": 0}
+        });
+        let attrs = attrs_of(&[(
+            "langfuse.observation.usage_details",
+            json::Value::String(details.to_string()),
+        )]);
+        let details = UsageExtractor.extract_usage_details(&attrs, "");
+        assert_eq!(details.usage.get("input"), Some(&1000));
+        assert_eq!(details.usage.get("cache_read_input_tokens"), Some(&700));
+        assert!(
+            !details
+                .usage
+                .contains_key("prompt_tokens_details_cached_tokens")
+        );
+        assert!(details.input_includes_cache);
     }
 }

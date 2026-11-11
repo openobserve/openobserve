@@ -37,6 +37,16 @@ pub use super_cluster::replicates;
 static DOWNTIMES: LazyLock<RwLock<HashMap<String, Arc<Vec<Downtime>>>>> =
     LazyLock::new(Default::default);
 
+/// Held from a refresh's read to its apply, so a later apply always carries a later snapshot.
+static REFRESH: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// Proof that the caller holds [REFRESH]; every write to [DOWNTIMES] takes one.
+struct Refresh<'a>(#[allow(dead_code)] tokio::sync::MutexGuard<'a, ()>);
+
+async fn refresh() -> Refresh<'static> {
+    Refresh(REFRESH.lock().await)
+}
+
 /// Writes the row with its SLO re-measures, tells this region's nodes, then the other regions.
 pub async fn set(downtime: &Downtime, remeasures: &[Remeasure]) -> Result<(), anyhow::Error> {
     write(downtime, Guard::None, remeasures).await?;
@@ -118,7 +128,7 @@ pub async fn delete(org: &str, id: &str, stored: table::RowVersion) -> Result<bo
         return Ok(false);
     };
     coordinator::emit_delete_event(org, id).await?;
-    remove_cached(org, id);
+    remove_cached(&refresh().await, org, id);
     // Other regions order by the tombstone's own version and time, so both travel as written.
     #[cfg(feature = "enterprise")]
     super_cluster::emit_delete(org, id, tombstone.version, tombstone.updated_at).await;
@@ -165,15 +175,24 @@ pub async fn delete_ended_before(cutoff: i64) -> Result<u64, anyhow::Error> {
     for row in &ended {
         coordinator::emit_delete_event(&row.org, &row.id).await?;
         crate::authz::remove_ownership(&row.org, "downtimes", ownership(row)).await;
-        remove_cached(&row.org, &row.id);
+        remove_cached(&refresh().await, &row.org, &row.id);
     }
     Ok(removed)
 }
 
-/// Loads every row of every org, replacing the cache.
+/// Loads every row of every org from the primary, replacing the cache.
 pub async fn cache() -> Result<(), anyhow::Error> {
+    let conn = infra::db::get_orm_client_rw().await;
+    refresh_all(async { Ok(table::list_all_with(conn).await?) }).await
+}
+
+/// Replaces the whole cache with what `read` returns; an org it does not name is dropped.
+async fn refresh_all(
+    read: impl std::future::Future<Output = Result<Vec<Downtime>, anyhow::Error>>,
+) -> Result<(), anyhow::Error> {
+    let guard = refresh().await;
     let mut by_org: HashMap<String, Vec<Downtime>> = HashMap::new();
-    for downtime in table::list_all().await? {
+    for downtime in read.await? {
         by_org
             .entry(downtime.org.clone())
             .or_default()
@@ -183,7 +202,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         .into_iter()
         .map(|(org, rows)| (org, Arc::new(rows)))
         .collect();
-    *DOWNTIMES.write().unwrap_or_else(|e| e.into_inner()) = fresh;
+    replace_all(&guard, fresh);
     Ok(())
 }
 
@@ -233,17 +252,24 @@ pub fn ownership(downtime: &Downtime) -> Authz {
     ownership_ref(&downtime.id, &downtime.folder_id)
 }
 
-/// Reloads one org from the table so the cache never holds half a row.
+/// Reloads one org from the primary, so a node sees its own write and no replica lag.
 pub async fn reload_org(org: &str) -> Result<(), anyhow::Error> {
-    let rows = table::list(org, None).await?;
-    replace_org(org, rows);
-    Ok(())
+    reload_org_with(infra::db::get_orm_client_rw().await, org).await
 }
 
-/// [reload_org] through `conn`, so a caller can read the primary instead of a replica.
+/// [reload_org] through `conn`.
 pub async fn reload_org_with<C: ConnectionTrait>(conn: &C, org: &str) -> Result<(), anyhow::Error> {
-    let rows = table::list_with(conn, org, None).await?;
-    replace_org(org, rows);
+    refresh_org(org, async { Ok(table::list_with(conn, org, None).await?) }).await
+}
+
+/// Replaces one org with what `read` returns, read and applied under [REFRESH].
+async fn refresh_org(
+    org: &str,
+    read: impl std::future::Future<Output = Result<Vec<Downtime>, anyhow::Error>>,
+) -> Result<(), anyhow::Error> {
+    let guard = refresh().await;
+    let rows = read.await?;
+    replace_org(&guard, org, rows);
     Ok(())
 }
 
@@ -267,7 +293,7 @@ async fn on_put(org: String, _id: String) -> Result<(), anyhow::Error> {
 }
 
 async fn on_delete(org: String, id: String) -> Result<(), anyhow::Error> {
-    remove_cached(&org, &id);
+    remove_cached(&refresh().await, &org, &id);
     Ok(())
 }
 
@@ -286,7 +312,11 @@ fn ownership_backfill(orgs: &[Arc<Vec<Downtime>>]) -> Vec<(String, Authz)> {
         .collect()
 }
 
-fn replace_org(org: &str, rows: Vec<Downtime>) {
+fn replace_all(_: &Refresh<'_>, fresh: HashMap<String, Arc<Vec<Downtime>>>) {
+    *DOWNTIMES.write().unwrap_or_else(|e| e.into_inner()) = fresh;
+}
+
+fn replace_org(_: &Refresh<'_>, org: &str, rows: Vec<Downtime>) {
     let mut cache = DOWNTIMES.write().unwrap_or_else(|e| e.into_inner());
     if rows.is_empty() {
         cache.remove(org);
@@ -295,7 +325,7 @@ fn replace_org(org: &str, rows: Vec<Downtime>) {
     }
 }
 
-fn remove_cached(org: &str, id: &str) {
+fn remove_cached(_: &Refresh<'_>, org: &str, id: &str) {
     let mut cache = DOWNTIMES.write().unwrap_or_else(|e| e.into_inner());
     let Some(rows) = cache.get(org) else {
         return;
@@ -311,7 +341,7 @@ fn remove_cached(org: &str, id: &str) {
     }
 }
 
-fn remove_org(org: &str) {
+fn remove_org(_: &Refresh<'_>, org: &str) {
     DOWNTIMES
         .write()
         .unwrap_or_else(|e| e.into_inner())
@@ -320,7 +350,7 @@ fn remove_org(org: &str) {
 
 /// Drops this node's rows of the org, then every node's and region's copy of each id.
 async fn evict_org(org: &str, ids: &[String]) -> Result<(), anyhow::Error> {
-    let local = async { remove_org(org) };
+    let local = async { remove_org(&refresh().await, org) };
     let broadcast = async {
         for id in ids {
             coordinator::emit_delete_event(org, id).await?;
@@ -442,33 +472,154 @@ mod tests {
         list_cached(org).iter().map(|d| d.id.clone()).collect()
     }
 
-    #[test]
-    fn a_reload_replaces_the_org_list_and_a_delete_removes_one_id() {
+    #[tokio::test]
+    async fn a_reload_replaces_the_org_list_and_a_delete_removes_one_id() {
         let org = "db_downtimes_cache_test";
-        replace_org(org, vec![downtime(org, "a"), downtime(org, "b")]);
+        let guard = refresh().await;
+        replace_org(&guard, org, vec![downtime(org, "a"), downtime(org, "b")]);
         assert_eq!(ids(org), ["a", "b"]);
 
-        replace_org(org, vec![downtime(org, "c")]);
+        replace_org(&guard, org, vec![downtime(org, "c")]);
         assert_eq!(ids(org), ["c"], "a reload replaces, never merges");
 
-        replace_org(org, vec![downtime(org, "c"), downtime(org, "d")]);
-        remove_cached(org, "c");
+        replace_org(&guard, org, vec![downtime(org, "c"), downtime(org, "d")]);
+        remove_cached(&guard, org, "c");
         assert_eq!(ids(org), ["d"]);
-        remove_cached(org, "missing");
+        remove_cached(&guard, org, "missing");
         assert_eq!(ids(org), ["d"]);
 
-        remove_cached(org, "d");
+        remove_cached(&guard, org, "d");
         assert!(list_cached(org).is_empty());
     }
 
-    #[test]
-    fn remove_org_drops_every_row_of_that_org_only() {
+    #[tokio::test]
+    async fn remove_org_drops_every_row_of_that_org_only() {
         let (a, b) = ("db_downtimes_org_a", "db_downtimes_org_b");
-        replace_org(a, vec![downtime(a, "x")]);
-        replace_org(b, vec![downtime(b, "y")]);
-        remove_org(a);
+        let guard = refresh().await;
+        replace_org(&guard, a, vec![downtime(a, "x")]);
+        replace_org(&guard, b, vec![downtime(b, "y")]);
+        remove_org(&guard, a);
         assert!(list_cached(a).is_empty());
         assert_eq!(ids(b), ["y"]);
+    }
+
+    /// A refresh whose read signals `read_started`, then returns `rows` once `gate` opens.
+    fn gated_refresh(
+        org: &'static str,
+        rows: Vec<Downtime>,
+        read_started: tokio::sync::oneshot::Sender<()>,
+        gate: tokio::sync::oneshot::Receiver<()>,
+    ) -> tokio::task::JoinHandle<Result<(), anyhow::Error>> {
+        tokio::spawn(refresh_org(org, async move {
+            let _ = read_started.send(());
+            let _ = gate.await;
+            Ok(rows)
+        }))
+    }
+
+    #[tokio::test]
+    async fn a_refresh_that_starts_later_reads_after_the_earlier_one_applies() {
+        let org = "db_downtimes_refresh_order";
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+        let (gate_tx, gate_rx) = tokio::sync::oneshot::channel();
+        let first = gated_refresh(org, vec![downtime(org, "old")], started_tx, gate_rx);
+        started_rx.await.unwrap();
+
+        let second_read = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = second_read.clone();
+        let second = tokio::spawn(refresh_org(org, async move {
+            flag.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(vec![downtime(org, "new")])
+        }));
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        assert!(
+            !second_read.load(std::sync::atomic::Ordering::SeqCst),
+            "the second read waits for the first apply"
+        );
+
+        gate_tx.send(()).unwrap();
+        first.await.unwrap().unwrap();
+        second.await.unwrap().unwrap();
+        assert_eq!(ids(org), ["new"], "the later snapshot is applied last");
+    }
+
+    #[tokio::test]
+    async fn a_delete_during_a_refresh_read_is_not_undone() {
+        let org = "db_downtimes_refresh_delete";
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+        let (gate_tx, gate_rx) = tokio::sync::oneshot::channel();
+        // The read saw the row before its delete committed.
+        let reload = gated_refresh(org, vec![downtime(org, "gone")], started_tx, gate_rx);
+        started_rx.await.unwrap();
+        let delete = tokio::spawn(on_delete(org.to_string(), "gone".to_string()));
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        gate_tx.send(()).unwrap();
+        reload.await.unwrap().unwrap();
+        delete.await.unwrap().unwrap();
+        assert!(list_cached(org).is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_org_eviction_during_a_refresh_read_is_not_undone() {
+        let org = "db_downtimes_refresh_evict";
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+        let (gate_tx, gate_rx) = tokio::sync::oneshot::channel();
+        let reload = gated_refresh(org, vec![downtime(org, "x")], started_tx, gate_rx);
+        started_rx.await.unwrap();
+        // The local half of `evict_org`.
+        let evict = tokio::spawn(async move { remove_org(&refresh().await, org) });
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        gate_tx.send(()).unwrap();
+        reload.await.unwrap().unwrap();
+        evict.await.unwrap();
+        assert!(list_cached(org).is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_full_refresh_drops_an_org_with_no_rows_left() {
+        let (kept, emptied) = ("db_downtimes_full_kept", "db_downtimes_full_emptied");
+        {
+            let guard = refresh().await;
+            replace_org(&guard, emptied, vec![downtime(emptied, "last")]);
+        }
+        // The read keeps every other test's org, so only `emptied` is missing from it.
+        refresh_all(async move {
+            let mut rows: Vec<Downtime> = all_cached()
+                .iter()
+                .flat_map(|org| org.iter().cloned())
+                .filter(|d| d.org != emptied)
+                .collect();
+            rows.push(downtime(kept, "k"));
+            Ok(rows)
+        })
+        .await
+        .unwrap();
+        assert!(list_cached(emptied).is_empty());
+        assert_eq!(ids(kept), ["k"]);
+    }
+
+    #[test]
+    fn every_write_to_the_cache_holds_the_refresh_lock() {
+        let src = include_str!("downtimes.rs");
+        let src = &src[..src.find("#[cfg(test)]\nmod tests").unwrap()];
+        let mut writers = 0;
+        for body in src.split("fn ").skip(1) {
+            let body = &body[..body.find("\nfn ").unwrap_or(body.len())];
+            if body.contains("DOWNTIMES") && body.contains(".write()") {
+                writers += 1;
+                let signature = &body[..body.find('{').unwrap()];
+                assert!(
+                    signature.contains("&Refresh<'_>"),
+                    "a writer of DOWNTIMES must take &Refresh: fn {signature}"
+                );
+            }
+        }
+        assert_eq!(
+            writers, 4,
+            "replace_all, replace_org, remove_cached, remove_org"
+        );
     }
 
     #[test]

@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :z-index="10001"
       :aria-label="t('common.selectDateRange')"
       :collision-padding="POPOVER_COLLISION_PADDING"
-      content-class="p-1 shadow-lg!"
+      content-class="border-border-default! overflow-hidden p-0 shadow-lg!"
       @update:open="onMenuOpenChange"
       @open-auto-focus="onPopoverOpenAutoFocus"
     >
@@ -98,38 +98,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <div
-            v-if="showRail"
-            class="border-border-default col-start-1 row-start-1 flex items-center border-e border-b px-3 py-2 max-sm:order-1 max-sm:border-e-0 max-sm:border-b-0"
-            data-test="date-time-rail-header"
-          >
-            <span class="text-sm font-semibold">{{ t("common.timeRangeRecent") }}</span>
-          </div>
-          <div
+            v-if="!(hideClipboard && disableRelative)"
             class="border-border-default row-start-1 flex min-w-0 items-center gap-1 border-b px-3 py-2"
-            :class="showRail ? 'col-start-2 max-sm:order-3' : 'col-start-1'"
+            :class="showRail ? 'col-start-2 max-sm:order-2' : 'col-start-1'"
           >
-            <div v-if="!disableRelative" class="flex flex-1 gap-1">
-              <OButton
-                data-test="date-time-relative-tab"
-                class="flex-1"
-                :variant="selectedType === 'relative' ? 'primary' : 'ghost-primary'"
+            <OToggleGroup
+              v-if="!disableRelative"
+              :model-value="selectedType"
+              type="single"
+              class="flex-1"
+              data-test="date-time-type-toggle"
+              @update:model-value="onTypeToggle"
+            >
+              <OToggleGroupItem
+                value="relative"
                 size="sm"
-                @click="selectTab('relative')"
+                class="flex-1"
+                data-test="date-time-relative-tab"
               >
                 {{ t("common.relative") }}
-              </OButton>
-              <OButton
-                data-test="date-time-absolute-tab"
-                class="flex-1"
-                :variant="selectedType === 'absolute' ? 'primary' : 'ghost-primary'"
+              </OToggleGroupItem>
+              <OToggleGroupItem
+                value="absolute"
                 size="sm"
-                @click="selectTab('absolute')"
+                class="flex-1"
+                data-test="date-time-absolute-tab"
               >
                 {{ t("common.absolute") }}
-              </OButton>
-            </div>
+              </OToggleGroupItem>
+            </OToggleGroup>
             <div v-else class="flex-1" />
-            <OTooltip :content="t('common.copyRange')">
+            <OTooltip v-if="!hideClipboard" :content="t('common.copyRange')">
               <OButton
                 data-test="date-time-copy-btn"
                 variant="ghost"
@@ -139,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="copyRange"
               />
             </OTooltip>
-            <OTooltip :content="t('common.pasteRange')">
+            <OTooltip v-if="!hideClipboard" :content="t('common.pasteRange')">
               <OButton
                 data-test="date-time-paste-btn"
                 variant="ghost"
@@ -152,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="showRail"
-            class="border-border-default relative col-start-1 row-start-2 border-e max-sm:static max-sm:order-2 max-sm:border-e-0 max-sm:border-b"
+            class="bg-surface-panel border-border-default relative col-span-1 col-start-1 row-span-2 row-start-1 border-e max-sm:static max-sm:order-1 max-sm:border-e-0 max-sm:border-b"
             data-test="date-time-rail-frame"
           >
             <DateTimeRail
@@ -168,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             class="row-start-2 flex min-h-0 min-w-0 flex-col overflow-hidden max-sm:max-h-none max-sm:overflow-visible"
-            :class="showRail ? 'col-start-2 max-sm:order-4' : 'col-start-1'"
+            :class="showRail ? 'col-start-2 max-sm:order-3' : 'col-start-1'"
           >
             <div
               class="relative grid min-h-0 flex-1 overflow-y-auto max-sm:flex-none max-sm:overflow-visible"
@@ -208,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         variant="ghost"
                         size="xs"
-                        @click="setRelativeDate(period.value, item)"
+                        @click="pickRelativeChip(period.value, item)"
                         :key="'period_' + item_index"
                       >
                         {{ item }}
@@ -345,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="!hideRelativeTimezone || !autoApply"
-              class="flex shrink-0 items-center gap-3 px-3 py-2"
+              class="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-[0.4rem] py-2"
             >
               <OSelect
                 v-if="!hideRelativeTimezone"
@@ -353,18 +352,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="timezone"
                 :options="timezoneSelectOptions"
                 searchable
-                :label="t('logStream.timezone')"
+                :aria-label="t('logStream.timezone')"
+                :dropdown-style="{ minWidth: 'min(24rem, calc(100vw - 2rem))' }"
                 @update:model-value="onTimezoneChange"
                 @open="isTimezoneSelectOpen = true"
                 @close="isTimezoneSelectOpen = false"
-                class="min-w-0 flex-1"
+                class="min-w-0 italic"
+                :class="autoApply ? 'col-span-2' : ''"
               />
-              <div v-else class="flex-1" />
+              <div v-else />
               <OButton
                 v-if="!autoApply"
                 data-test="date-time-apply-btn"
                 variant="primary"
-                size="xs"
+                size="sm"
+                class="justify-self-end px-6!"
                 @click="applyAndClose"
               >
                 {{ t("common.apply") }}
@@ -392,6 +394,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -435,7 +439,9 @@ import {
   exceedsRangeRestriction,
   formatAbsoluteInstant,
   formatRecentRange,
-  formatRecentRangeParts,
+  formatCalendarRailHint,
+  formatRecentDuration,
+  formatRecentRangeLabel,
   type TimeRangeRailItem,
 } from "@/utils/timeRangeRail";
 import useTimeRangeHistory from "@/composables/useTimeRangeHistory";
@@ -480,11 +486,16 @@ interface ConsumableDateTime {
   userChangedValue?: boolean;
 }
 
+// One offset lookup per zone for the whole app, not per picker instance.
+const zoneOffsets = new Map<string, string>();
+
 export default defineComponent({
   components: {
     OSeparator,
     OButton,
     OIcon,
+    OToggleGroup,
+    OToggleGroupItem,
     OTooltip,
     OTruncatedText,
     OInput,
@@ -544,6 +555,16 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Starts the picker on this IANA zone and keeps zone changes local to it instead of writing the app's timezone. */
+    pickerTimezone: {
+      type: String,
+      default: "",
+    },
+    /** Drops the copy and paste range buttons; a date-only picker then loses its whole top row. */
+    hideClipboard: {
+      type: Boolean,
+      default: false,
+    },
     hideRangeShift: {
       type: Boolean,
       default: false,
@@ -554,6 +575,11 @@ export default defineComponent({
       default: false,
     },
     minDate: {
+      type: String,
+      default: null,
+    },
+    /** The last pickable calendar day (yyyy/MM/dd); absent means today, for a caller that schedules ahead. */
+    maxDate: {
       type: String,
       default: null,
     },
@@ -585,12 +611,21 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Replaces the trigger's range text, for a caller that states the range on its own clock; empty keeps the picker's. */
+    triggerText: {
+      type: String,
+      default: "",
+    },
   },
 
   emits: ["on:date-change", "on:timezone-change", "hide", "show"],
 
   setup(props, { emit }) {
     const store = useStore();
+    const pickerZone = ref(props.pickerTimezone);
+    const zone = computed<string>(() =>
+      props.pickerTimezone ? pickerZone.value : store.state.timezone,
+    );
     const { t, locale } = useI18nTyped();
     const selectedType = ref("relative");
     const selectedTime = ref({
@@ -625,7 +660,7 @@ export default defineComponent({
     const showRail = computed(() => !props.disableRelative);
     const lastValidCustomValue = ref(15);
     const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const timezone = ref(currentTimezone);
+    const timezone = ref(props.pickerTimezone || currentTimezone);
     let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz) => {
       return tz;
     });
@@ -635,22 +670,28 @@ export default defineComponent({
     // Add the UTC option
     timezoneOptions.unshift("UTC");
     timezoneOptions.unshift(browserTime);
+    if (props.pickerTimezone && !timezoneOptions.includes(props.pickerTimezone)) {
+      timezoneOptions.unshift(props.pickerTimezone);
+    }
 
     const onTimezoneChange = async () => {
       let selectedTimezone = timezone.value;
       if (selectedTimezone.toLowerCase() == browserTime.toLowerCase()) {
         selectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       }
-      //Intl.DateTimeFormat().resolvedOptions().timeZone
-      useLocalTimezone(selectedTimezone);
-      store.dispatch("setTimezone", selectedTimezone);
+      if (props.pickerTimezone) {
+        pickerZone.value = selectedTimezone;
+      } else {
+        useLocalTimezone(selectedTimezone);
+        store.dispatch("setTimezone", selectedTimezone);
+      }
       await nextTick();
       if (props.autoApply) {
         if (selectedType.value == "absolute") saveDate("absolute");
         else saveDate("relative");
       }
 
-      emit("on:timezone-change");
+      emit("on:timezone-change", selectedTimezone);
     };
 
     // if initial timezone is provided
@@ -668,12 +709,43 @@ export default defineComponent({
     const filteredTimezone: any = ref(timezoneOptions);
     const isTimezoneSelectOpen = ref(false);
 
+    // longOffset throws on engines that lack it, so the label falls back to no offset.
+    const zoneOffset = (zone: string): string => {
+      const cached = zoneOffsets.get(zone);
+      if (cached !== undefined) return cached;
+      let offset = "";
+      try {
+        const name = new Intl.DateTimeFormat("en-US", {
+          timeZone: zone,
+          timeZoneName: "longOffset",
+        })
+          .formatToParts(new Date())
+          .find((part) => part.type === "timeZoneName")?.value;
+        offset = name?.replace("GMT", "") || "+00:00";
+      } catch {
+        offset = "";
+      }
+      zoneOffsets.set(zone, offset);
+      return offset;
+    };
+
     const timezoneSelectOptions = computed(() =>
-      timezoneOptions.map((tz: string) =>
-        tz === browserTime
-          ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
-          : { label: raw(tz), value: tz },
-      ),
+      timezoneOptions.map((tz: string) => {
+        const isBrowser = tz === browserTime;
+        const zone = isBrowser ? browserTz : tz;
+        const offset = zoneOffset(zone);
+        const suffix = offset ? raw(`UTC${offset}`) : undefined;
+        if (isBrowser) {
+          return { label: t("common.browserTimeWithZone", { zone: browserTz }), suffix, value: tz };
+        }
+        if (tz === "UTC") return { label: raw(tz), suffix, value: tz };
+        return {
+          label: raw(offset ? `${tz} (UTC${offset})` : tz),
+          listLabel: raw(tz),
+          suffix,
+          value: tz,
+        };
+      }),
     );
 
     let relativePeriods = [
@@ -723,10 +795,10 @@ export default defineComponent({
     const calendarTooltip = (token: string | null) =>
       token === null
         ? undefined
-        : (formatCalendarTooltip(token, store.state.timezone, tooltipNow.value) ?? undefined);
+        : (formatCalendarTooltip(token, zone.value, tooltipNow.value) ?? undefined);
 
     const calendarExceedsRestriction = (token: string | null) => {
-      const range = resolveCalendarPeriod(token, store.state.timezone, tooltipNow.value);
+      const range = resolveCalendarPeriod(token, zone.value, tooltipNow.value);
       return (
         !!range &&
         exceedsRangeRestriction(range.startTime, range.endTime, props.queryRangeRestrictionInHour)
@@ -735,10 +807,10 @@ export default defineComponent({
 
     // Each token is resolved once; tooltip and restriction both read that one range.
     const resolvePresetState = (token: string, nowMs: number): CalendarPresetState => {
-      const range = resolveCalendarPeriod(token, store.state.timezone, nowMs);
+      const range = resolveCalendarPeriod(token, zone.value, nowMs);
       if (!range) return { tooltip: undefined, disabled: false };
       return {
-        tooltip: formatResolvedCalendarTooltip(token, range, store.state.timezone),
+        tooltip: formatResolvedCalendarTooltip(token, range, zone.value),
         disabled: exceedsRangeRestriction(
           range.startTime,
           range.endTime,
@@ -749,7 +821,7 @@ export default defineComponent({
 
     // A finished period only moves when the picker's day changes, so a hover that bumps the clock keeps it cached.
     const pickerDay = computed(() =>
-      timestampToTimezoneDate(tooltipNow.value, store.state.timezone, "yyyy/MM/dd"),
+      timestampToTimezoneDate(tooltipNow.value, zone.value, "yyyy/MM/dd"),
     );
 
     const pastPresetStates = computed(() => {
@@ -787,6 +859,14 @@ export default defineComponent({
           id: preset.id,
           label,
           tooltip: state?.tooltip,
+          hint:
+            formatCalendarRailHint(
+              preset.token,
+              zone.value,
+              tooltipNow.value,
+              intlLocale.value,
+              (quarter) => t("common.calendarQuarterShort", { quarter }),
+            ) ?? undefined,
           selected: selectedType.value === "relative" && calendarToken.value === preset.token,
           disabled: state?.disabled ?? false,
         };
@@ -797,9 +877,18 @@ export default defineComponent({
       const current = selectedType.value === "absolute" ? getUTCTimeStamp() : null;
       return timeRangeHistory.entries.value.map((entry, index) => ({
         id: String(index),
-        label: formatRecentRange(entry.startUs, entry.endUs, store.state.timezone),
-        parts: formatRecentRangeParts(entry.startUs, entry.endUs, store.state.timezone),
-        tooltip: formatRangeTooltip(entry.startUs, entry.endUs, store.state.timezone),
+        label: formatRecentRange(entry.startUs, entry.endUs, zone.value),
+        compact: {
+          label: formatRecentRangeLabel(
+            entry.startUs,
+            entry.endUs,
+            zone.value,
+            Date.now(),
+            intlLocale.value,
+          ),
+          duration: formatRecentDuration(entry.startUs, entry.endUs),
+        },
+        tooltip: formatRangeTooltip(entry.startUs, entry.endUs, zone.value),
         selected:
           current !== null && current.startUTC === entry.startUs && current.endUTC === entry.endUs,
         disabled: exceedsRangeRestriction(
@@ -837,7 +926,8 @@ export default defineComponent({
     });
 
     const calendarMaxDate = computed(() => {
-      return timestampToTimezoneDate(new Date().getTime(), store.state.timezone, "yyyy/MM/dd");
+      if (props.maxDate) return props.maxDate;
+      return timestampToTimezoneDate(new Date().getTime(), zone.value, "yyyy/MM/dd");
     });
 
     onMounted(() => {
@@ -920,6 +1010,11 @@ export default defineComponent({
       if (props.autoApply) saveDate("relative");
     };
 
+    const pickRelativeChip = (period: string, value: number) => {
+      setRelativeDate(period, value);
+      if (props.autoApply) closeMenu();
+    };
+
     const isValidCustomValue = (value: unknown) =>
       value !== "" && value !== null && Number.isFinite(Number(value));
 
@@ -969,7 +1064,7 @@ export default defineComponent({
     };
 
     const setRelativeTime = (period: string) => {
-      const calendarRange = resolveCalendarPeriod(period, store.state.timezone);
+      const calendarRange = resolveCalendarPeriod(period, zone.value);
       if (calendarRange && props.calendarPresets) {
         calendarToken.value = period;
         return;
@@ -1048,7 +1143,7 @@ export default defineComponent({
     };
 
     function convertUnixTime(unixTimeMicros: number) {
-      return formatAbsoluteInstant(unixTimeMicros, store.state.timezone);
+      return formatAbsoluteInstant(unixTimeMicros, zone.value);
     }
 
     const refresh = () => {
@@ -1204,7 +1299,7 @@ export default defineComponent({
     const getConsumableDateTime = (): ConsumableDateTime => {
       const calendarRange =
         selectedType.value === "relative"
-          ? resolveCalendarPeriod(calendarToken.value, store.state.timezone)
+          ? resolveCalendarPeriod(calendarToken.value, zone.value)
           : null;
       if (calendarRange) {
         return { ...calendarRange, relativeTimePeriod: calendarToken.value };
@@ -1288,20 +1383,19 @@ export default defineComponent({
     const getUTCTimeStamp = () => {
       let startTime = selectedDate.value.from + " " + selectedTime.value.startTime;
       let endTime = selectedDate.value.to + " " + selectedTime.value.endTime;
-      const startUTC = convertToUtcTimestamp(startTime, store.state.timezone);
+      const startUTC = convertToUtcTimestamp(startTime, zone.value);
       const untouchedSeededEnd =
         seededEnd !== null &&
         seededEnd.date === selectedDate.value.to &&
         seededEnd.time === selectedTime.value.endTime;
       // The shown last second stands for the exclusive end one second later, in whatever zone is now selected.
       const endUTC =
-        convertToUtcTimestamp(endTime, store.state.timezone) +
-        (untouchedSeededEnd ? MICROS_PER_SECOND : 0);
+        convertToUtcTimestamp(endTime, zone.value) + (untouchedSeededEnd ? MICROS_PER_SECOND : 0);
       return { startUTC, endUTC };
     };
 
     const setSavedDate = (dateobj: any) => {
-      timezone.value = store.state.timezone;
+      timezone.value = zone.value;
       selectedType.value = dateobj.type;
 
       if (dateobj.type === "relative") {
@@ -1364,13 +1458,14 @@ export default defineComponent({
      * The `||` fallback covers the first paint, before the mount-time apply.
      */
     const triggerLabel = computed(() => {
+      if (props.triggerText) return props.triggerText;
       const showsApplied = !props.autoApply && !menuOpen.value;
       // A calendar label is re-derived so an older period keeps naming the right day after midnight.
       const appliedCalendarLabel =
         showsApplied && appliedCalendarToken.value !== null
           ? formatCalendarLabel(
               appliedCalendarToken.value,
-              store.state.timezone,
+              zone.value,
               t,
               intlLocale.value,
               tooltipNow.value,
@@ -1393,7 +1488,7 @@ export default defineComponent({
         !props.disableRelative && selectedType.value === "relative" && calendarToken.value !== null
           ? formatCalendarLabel(
               calendarToken.value,
-              store.state.timezone,
+              zone.value,
               t,
               intlLocale.value,
               tooltipNow.value,
@@ -1447,7 +1542,7 @@ export default defineComponent({
     // inverse of convertUnixTime.
     const absoluteToMicros = (date: string, time: string): number => {
       const iso = `${date.replace(/\//g, "-")}T${time}`;
-      return fromZonedTime(iso, store.state.timezone).getTime() * 1000;
+      return fromZonedTime(iso, zone.value).getTime() * 1000;
     };
 
     const finalizeAbsoluteRange = (startMicros: number, endMicros: number) => {
@@ -1534,6 +1629,10 @@ export default defineComponent({
         });
         return;
       }
+      if (!text.trim()) {
+        toast({ variant: "info", message: t("common.dateRangePasteEmpty") });
+        return;
+      }
       applyPastedTextWithToast(text);
     };
 
@@ -1566,11 +1665,7 @@ export default defineComponent({
     };
 
     const optionsFn = (date: string) => {
-      const formattedDate = timestampToTimezoneDate(
-        new Date().getTime(),
-        store.state.timezone,
-        "yyyy/MM/dd",
-      );
+      const formattedDate = calendarMaxDate.value;
       if (props.disableRelative) {
         return date >= props.minDate && date <= formattedDate;
       }
@@ -1600,6 +1695,11 @@ export default defineComponent({
       selectedType.value = type;
     };
 
+    // Clicking the active segment deselects it in the group; the picker always keeps one type.
+    const onTypeToggle = (value: unknown) => {
+      if (value === "relative" || value === "absolute") selectTab(value);
+    };
+
     const setDateType = (type: string) => {
       selectedType.value = type;
       // displayValue.value = getDisplayValue();
@@ -1623,7 +1723,7 @@ export default defineComponent({
     const shiftTimeRange = (direction: "prev" | "next") => {
       if (selectedType.value === "relative" && calendarToken.value !== null) {
         const shifted = shiftCalendarToken(calendarToken.value, direction === "prev" ? -1 : 1);
-        if (shifted === null || !resolveCalendarPeriod(shifted, store.state.timezone)) return;
+        if (shifted === null || !resolveCalendarPeriod(shifted, zone.value)) return;
         refreshTooltipNow();
         // A partial period can step into a full one longer than the page allows, which the rail would have refused.
         if (calendarExceedsRestriction(shifted)) {
@@ -1643,8 +1743,8 @@ export default defineComponent({
 
       let delta = (direction === "prev" ? -1 : 1) * duration;
       if (direction === "next") {
-        // The calendar rejects future dates, so a forward shift stops at now.
-        delta = Math.min(delta, Date.now() * 1000 - endTime);
+        // A forward shift stops where the calendar does: now, or the end of `maxDate`.
+        delta = Math.min(delta, forwardCeilingMicros() - endTime);
         if (delta < MICROS_PER_SECOND) return;
       }
       const startDateTime = convertUnixTime(startTime + delta);
@@ -1660,31 +1760,26 @@ export default defineComponent({
       if (!props.autoApply) saveDate("absolute");
     };
 
+    const forwardCeilingMicros = () =>
+      props.maxDate
+        ? convertToUtcTimestamp(`${props.maxDate} 23:59:59`, zone.value)
+        : Date.now() * 1000;
+
     const isNextShiftDisabled = () => {
       if (selectedType.value === "relative") {
         return (parseCalendarToken(calendarToken.value)?.offset ?? 0) === 0;
       }
       const { endUTC } = getUTCTimeStamp();
-      return !(endUTC + MICROS_PER_SECOND <= Date.now() * 1000);
+      return !(endUTC + MICROS_PER_SECOND <= forwardCeilingMicros());
     };
 
-    // Only the calendar section is a 2-column grid of this/last pairs; every other row is 1-item.
-    const railRows = (panel: HTMLElement): HTMLButtonElement[][] => {
-      const recentRows = Array.from(
-        panel.querySelectorAll<HTMLButtonElement>("[data-date-time-rail-recent]"),
-      ).map((btn) => [btn]);
-      const toggle = panel.querySelector<HTMLButtonElement>(
-        "[data-test='date-time-rail-recent-toggle']",
+    // Rail items in tab order: recent rows, the show-more toggle, then the single-column calendar rows.
+    const railItems = (panel: HTMLElement): HTMLButtonElement[] =>
+      Array.from(
+        panel.querySelectorAll<HTMLButtonElement>(
+          "[data-date-time-rail-recent], [data-test='date-time-rail-recent-toggle'], [data-date-time-rail-calendar]",
+        ),
       );
-      const calendarButtons = Array.from(
-        panel.querySelectorAll<HTMLButtonElement>("[data-date-time-rail-calendar]"),
-      );
-      const calendarRows: HTMLButtonElement[][] = [];
-      for (let i = 0; i < calendarButtons.length; i += 2) {
-        calendarRows.push(calendarButtons.slice(i, i + 2));
-      }
-      return [...recentRows, ...(toggle ? [[toggle]] : []), ...calendarRows];
-    };
 
     // Arrow-key navigation for the picker panel: Left/Right switch the
     // Relative/Absolute tabs, and arrows roam the relative preset grid.
@@ -1698,46 +1793,20 @@ export default defineComponent({
 
       const railItem = target.closest<HTMLButtonElement>("[data-date-time-rail-item]");
       if (railItem) {
-        // Only the calendar grid uses Left/Right; a recent row's own listener reaches its × with it.
-        const isCalendarItem = railItem.hasAttribute("data-date-time-rail-calendar");
-        if (!isCalendarItem && event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+        // A recent row's own listener reaches its × with Left/Right.
+        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
         event.preventDefault();
         event.stopPropagation();
 
-        const rows = railRows(panel);
-        const enabled = (btn?: HTMLButtonElement) => !!btn && !btn.disabled;
-        let r = -1;
-        let c = -1;
-        rows.forEach((row, ri) => {
-          const ci = row.indexOf(railItem);
-          if (ci !== -1) {
-            r = ri;
-            c = ci;
-          }
-        });
-        if (r === -1) return;
-
-        const stepInRow = (dir: number) => {
-          for (let ci = c + dir; ci >= 0 && ci < rows[r].length; ci += dir)
-            if (enabled(rows[r][ci])) return rows[r][ci];
-          return null;
-        };
-        const stepRows = (dir: number) => {
-          for (let ri = r + dir; ri >= 0 && ri < rows.length; ri += dir) {
-            const row = rows[ri];
-            const col = Math.min(c, row.length - 1);
-            if (enabled(row[col])) return row[col];
-            const alt = row.find((btn) => enabled(btn));
-            if (alt) return alt;
-          }
-          return null;
-        };
-
+        const items = railItems(panel);
+        const dir = event.key === "ArrowDown" ? 1 : -1;
         let next: HTMLButtonElement | null = null;
-        if (event.key === "ArrowLeft") next = stepInRow(-1);
-        else if (event.key === "ArrowRight") next = stepInRow(1);
-        else if (event.key === "ArrowUp") next = stepRows(-1);
-        else if (event.key === "ArrowDown") next = stepRows(1);
+        for (let i = items.indexOf(railItem) + dir; i >= 0 && i < items.length; i += dir) {
+          if (!items[i].disabled) {
+            next = items[i];
+            break;
+          }
+        }
         next?.focus();
         return;
       }
@@ -1991,7 +2060,7 @@ export default defineComponent({
       firstItem.focus();
     };
 
-    // A rail pick closes the panel the way a user dismissal does, so listeners waiting on hide still run.
+    // A pick closes the panel the way a user dismissal does, so listeners waiting on hide still run.
     const closeMenu = () => {
       if (!menuOpen.value) return;
       menuOpen.value = false;
@@ -2084,6 +2153,7 @@ export default defineComponent({
       onCustomValueFocus,
       onCustomValueBlur,
       setRelativeDate,
+      pickRelativeChip,
       relativePeriods,
       relativeDates,
       showRail,
@@ -2123,6 +2193,7 @@ export default defineComponent({
       optionsFn,
       setDateType,
       selectTab,
+      onTypeToggle,
       shiftTimeRange,
       isNextShiftDisabled,
       onPickerKeydown,

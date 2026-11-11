@@ -15,10 +15,12 @@
 
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
+import { withLicenseFeature } from "@/utils/featureGate";
 
 import { aiCategories } from "@/components/ingestion/ai/data";
 
 const SplunkHec = () => import("@/components/ingestion/logs/SplunkHec.vue");
+const DatadogAgent = () => import("@/components/ingestion/logs/DatadogAgent.vue");
 const SyslogNg = () => import("@/components/ingestion/logs/SyslogNg.vue");
 const LoongCollector = () => import("@/components/ingestion/logs/LoongCollector.vue");
 const Ingestion = () => import("@/views/Ingestion.vue");
@@ -250,6 +252,14 @@ const useIngestionRoutes = () => {
                   },
                 },
                 {
+                  path: "datadog",
+                  name: "datadogAgentLogs",
+                  component: DatadogAgent,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
                   path: "loongcollector",
                   name: "loongcollector",
                   component: LoongCollector,
@@ -323,9 +333,17 @@ const useIngestionRoutes = () => {
                     routeGuard(to, from, next);
                   },
                 },
+                {
+                  path: "datadog",
+                  name: "datadogAgentMetrics",
+                  component: DatadogAgent,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
               ],
             },
-            {
+            withLicenseFeature("continuous_profiling", {
               path: "profiles",
               name: "ingestProfiles",
               component: IngestProfiles,
@@ -342,7 +360,7 @@ const useIngestionRoutes = () => {
                   },
                 },
               ],
-            },
+            }),
             {
               path: "traces",
               name: "ingestTraces",
@@ -363,6 +381,14 @@ const useIngestionRoutes = () => {
                   path: "otel",
                   name: "ingestTracesFromOtel",
                   component: OtelConfig,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
+                  path: "datadog",
+                  name: "datadogAgentTraces",
+                  component: DatadogAgent,
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -451,25 +477,25 @@ const useIngestionRoutes = () => {
                 routeGuard(to, from, next);
               },
             },
-            {
+            withLicenseFeature("rum", {
               path: "frontend-monitoring",
               name: "frontendMonitoring",
               component: RUMWeb,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
-            },
+            }),
             // Discoverability pointer → the MCP setup home in IAM. Registered on
             // every edition, matching both the tab in Recommended.vue and the
             // target "mcpServer" route, which are no longer build-gated.
-            {
+            withLicenseFeature("mcp", {
               path: "mcp",
               name: "recommendedMcp",
               component: McpCrossLink,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
-            },
+            }),
           ],
         },
         {

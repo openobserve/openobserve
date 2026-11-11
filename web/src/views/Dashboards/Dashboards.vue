@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="homeDashboard"
         variant="outline"
         size="sm"
-        icon-left="keep"
+        icon-left="keep-outline"
         class="max-w-60"
         data-test="dashboard-home-shortcut"
         @click="openHomeDashboard"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="publicLinksEnabled"
         variant="outline"
         size="sm"
-        icon-left="public"
+        icon-left="language"
         data-test="dashboard-public-links"
         @click="openPublicLinks"
       >
@@ -241,14 +241,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-xs-sq"
                   :icon-left="isFavorite(row.id) ? 'star' : 'star-outline'"
                   :class="isFavorite(row.id) ? 'text-favorite shrink-0' : 'shrink-0'"
-                  :title="
+                  :aria-label="
                     isFavorite(row.id)
                       ? t('dashboard.removeFromFavorites')
                       : t('dashboard.addToFavorites')
                   "
                   :data-test="`dashboard-favorite-toggle-${value}`"
                   @click.stop="toggleFavorite(row)"
-                />
+                >
+                  <OTooltip
+                    side="bottom"
+                    :content="
+                      isFavorite(row.id)
+                        ? t('dashboard.removeFromFavorites')
+                        : t('dashboard.addToFavorites')
+                    "
+                  />
+                </OButton>
                 <OTruncatedText
                   class="text-text-body"
                   :data-test="`dashboard-name-cell-${value}`"
@@ -301,35 +310,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   v-if="row.actions == 'true'"
                   icon-left="drive-file-move"
-                  :title="t('dashboard.move_to_another_folder')"
+                  :aria-label="t('dashboard.move_to_another_folder')"
                   variant="ghost"
                   size="icon-xs-sq"
                   class="max-md:hidden"
                   data-test="dashboard-move-to-another-folder"
                   @click.stop="showMoveDashboardPanel(row)"
-                />
+                >
+                  <OTooltip side="bottom" :content="t('dashboard.move_to_another_folder')" />
+                </OButton>
                 <OButton
                   v-if="row.actions == 'true'"
                   icon-left="content-copy"
-                  :title="t('dashboard.duplicate')"
+                  :aria-label="t('dashboard.duplicate')"
                   variant="ghost"
                   size="icon-xs-sq"
                   class="max-md:hidden"
                   data-test="dashboard-duplicate"
                   data-row-action="duplicate"
                   @click.stop="duplicateDashboard(row.id, row.folder_id)"
-                />
+                >
+                  <OTooltip side="bottom" :content="t('dashboard.duplicate')" />
+                </OButton>
                 <OButton
                   v-if="row.actions == 'true'"
                   icon-left="delete"
-                  :title="t('dashboard.delete')"
+                  :aria-label="t('dashboard.delete')"
                   variant="ghost-destructive"
                   size="icon-xs-sq"
                   class="max-md:hidden"
                   data-test="dashboard-delete"
                   data-row-action="delete"
                   @click.stop="showDeleteDialogFn({ row })"
-                />
+                >
+                  <OTooltip side="bottom" :content="t('dashboard.delete')" />
+                </OButton>
                 <!-- Overflow menu (rightmost) — houses the low-frequency "set as
                      home" action so it doesn't clutter every row with an
                      always-on icon. Move/Duplicate/Delete stay inline. -->
@@ -337,12 +352,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #trigger>
                     <OButton
                       icon-left="more-vert"
-                      :title="t('dashboard.moreActions')"
+                      :aria-label="t('dashboard.moreActions')"
                       variant="ghost"
                       size="icon-xs-sq"
                       data-test="dashboard-row-more-actions"
                       @click.stop
-                    />
+                    >
+                      <OTooltip side="bottom" :content="t('dashboard.moreActions')" />
+                    </OButton>
                   </template>
                   <ODropdownItem
                     icon-left="drive-file-move"
@@ -636,6 +653,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
@@ -788,7 +806,13 @@ export default defineComponent({
 
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
-    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard(t);
+    const {
+      isHome,
+      setHomeDashboard,
+      clearHomeDashboard,
+      homeDashboard,
+      load: loadHomeDashboard,
+    } = useHomeDashboard(t);
 
     // Per-user favorites — heart toggle on each row + a folder-independent
     // favorites view.
@@ -872,10 +896,13 @@ export default defineComponent({
         },
       });
     };
-    const toggleHome = (row: any) => {
+    const toggleHome = async (row: any) => {
       const org = store.state.selectedOrganization?.identifier;
       if (isHome(row.id)) {
-        clearHomeDashboard(org);
+        await clearHomeDashboard(org);
+        // clearHomeDashboard reverts the pin instead of throwing when the write fails.
+        if (!isHome(row.id))
+          analytics.track("home_dashboard_unpinned", { source: "dashboard_list" });
       } else {
         // Resolve the folder the SAME way routeToViewD does: row.folder_id is
         // only populated in search-across-folders mode; in the normal folder
@@ -1083,7 +1110,7 @@ export default defineComponent({
           // A newer folder switch cancelled this load; the newer one reports its own outcome.
           if (isCancelledError(error)) return;
           console.error("Error loading dashboards:", error);
-          forbidden.value = asCaughtError(error).response?.status === 403;
+          forbidden.value = forbiddenState(error);
           if (!forbidden.value) {
             showErrorNotification(
               raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
@@ -1334,7 +1361,7 @@ export default defineComponent({
     };
     const loading = ref(true);
     // Only the dashboards fetch is authoritative on access; the folder list is not.
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
       loading,
@@ -1573,6 +1600,11 @@ export default defineComponent({
 
     const handleDashboardMoved = async () => {
       showMoveDashboardDialog.value = false;
+      const org = store.state.selectedOrganization?.identifier;
+      // The server rewrites the pin's folder on move; the cached copy would keep routing to the old one.
+      if (org && selectedDashboardIdToMove.value?.some((id) => isHome(id))) {
+        await loadHomeDashboard(org, true);
+      }
     };
 
     const deleteFolder = async () => {

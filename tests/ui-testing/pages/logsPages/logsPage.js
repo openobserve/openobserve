@@ -516,6 +516,19 @@ export class LogsPage {
         this.searchSettledStates = `${this.logsSearchResultTableRows}, ${this.noResultsFoundText}, [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"], [data-test="logs-search-cancelled-state"], [data-test="logs-auto-run-guard"]`;
         this.resultsProgressBar = '[data-test="logs-results-progress"]';
         this.queryPlanDialog = '[data-test="query-plan-dialog"]';
+        this.queryPlanView = `${this.queryPlanDialog} [data-test="query-plan-view"]`;
+        this.queryPlanTileOperators = `${this.queryPlanDialog} [data-test="query-plan-tile-operators"]`;
+        this.queryPlanOperatorCards = `${this.queryPlanDialog} [data-profile-card]`;
+        this.queryPlanModeAnalyze = `${this.queryPlanDialog} [data-test="query-plan-mode-analyze"]`;
+        this.queryPlanAnalyzeStart = `${this.queryPlanDialog} [data-test="query-plan-analyze-start"]`;
+        this.queryPlanAnalyzeRun = `${this.queryPlanDialog} [data-test="query-plan-analyze-run"]`;
+        // The settled status dot is the only analyze-mode id besides the in-flight elapsed counter.
+        this.queryPlanAnalyzeSettled = `${this.queryPlanDialog} [data-test^="query-plan-mode-analyze-"]:not([data-test$="-elapsed"])`;
+        this.queryPlanModeAnalyzeDone = `${this.queryPlanDialog} [data-test="query-plan-mode-analyze-done"]`;
+        this.queryProfileView = `${this.queryPlanDialog} [data-test="query-profile-view"]`;
+        this.queryProfileSummary = `${this.queryPlanDialog} [data-test="query-profile-summary"]`;
+        this.queryProfileTileRows = `${this.queryPlanDialog} [data-test="query-profile-tile-rows"]`;
+        this.queryProfileTileNodes = `${this.queryPlanDialog} [data-test="query-profile-tile-nodes"]`;
         this.queryEditorSplitter = '[role="separator"][aria-orientation="horizontal"]';
         // useLogsHighlighter marks FTS matches with .log-highlighted inside the result cell.
         this.highlightedMatch = '[data-test="logs-search-result-logs-table"] .log-highlighted';
@@ -3447,13 +3460,7 @@ export class LogsPage {
         // Create lives in the Saved views submenu, which only renders while open.
         const createSavedViewBtn = this.page.locator(this.menuCreateSavedViewBtn);
         if (!(await createSavedViewBtn.isVisible({ timeout: 500 }).catch(() => false))) {
-            const submenuTrigger = this.page.locator(this.menuListSavedViewsBtn);
-            if (!(await submenuTrigger.isVisible().catch(() => false))) {
-                await this.page.locator(this.utilitiesMenuButton).click({ force: true });
-                await submenuTrigger.waitFor({ state: 'visible', timeout: 5000 });
-            }
-            await submenuTrigger.click({ force: true });
-            await createSavedViewBtn.waitFor({ state: 'visible', timeout: 5000 });
+            await this.openSavedViewsSubmenu(this.menuCreateSavedViewBtn);
         }
         await createSavedViewBtn.click();
         await this.page.locator(this.savedViewDialog).waitFor({ state: 'visible', timeout: 10000 });
@@ -4825,11 +4832,7 @@ export class LogsPage {
         // When the show-query toggle is clicked, it switches to results view
         // Check if we're in results view by looking for the logs table
         const logsTable = this.page.locator('[data-test="logs-search-result-logs-table"]');
-        const isResultsVisible = await logsTable.isVisible();
-
-        if (!isResultsVisible) {
-            throw new Error('Expected results view to be visible after toggling query editor off');
-        }
+        await expect(logsTable, 'Expected results view to be visible after toggling query editor off').toBeVisible({ timeout: 15000 });
 
         testLogger.info('Results view is visible - query editor toggled off successfully');
         return true;
@@ -9035,10 +9038,27 @@ export class LogsPage {
             await listMenuItem.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {});
         }
         if (!opened) throw new Error('Could not open saved views menu after 3 attempts');
-        // force: true — ODropdown portal transiently detaches items during initial render
-        await listMenuItem.click({ force: true });
-        await this.page.locator(this.savedViewSearchInput).waitFor({ state: 'visible', timeout: 10000 });
+        await this.openSavedViewsSubmenu(this.savedViewSearchInput);
         testLogger.info('Clicked saved views dropdown arrow');
+    }
+
+    /**
+     * Open the Saved views submenu of the utilities menu and wait for `targetSelector` inside it.
+     * @param {string} targetSelector - element that only renders while the submenu is open
+     */
+    async openSavedViewsSubmenu(targetSelector) {
+        const trigger = this.page.locator(this.menuListSavedViewsBtn);
+        const target = this.page.locator(targetSelector);
+        for (let attempt = 0; attempt < 3; attempt++) {
+            if (!(await trigger.isVisible().catch(() => false))) {
+                await this.page.locator(this.utilitiesMenuButton).click({ force: true });
+                await trigger.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+            }
+            // No force: a click during the menu's open animation lands outside it and dismisses the whole menu.
+            await trigger.click({ timeout: 5000 }).catch(() => {});
+            if (await target.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false)) return;
+        }
+        await target.waitFor({ state: 'visible', timeout: 5000 });
     }
 
     /**
@@ -11383,6 +11403,88 @@ export class LogsPage {
     async expectQueryPlanDialogHidden() {
         await expect(this.page.locator(this.queryPlanDialog)).toBeHidden({ timeout: 10000 });
         testLogger.info('Query plan dialog is hidden');
+    }
+
+    /** Click Run and wait for the hits request of `stream`, skipping the histogram call. */
+    async runQueryAndWaitForStreamSearch(stream) {
+        const searched = this.page.waitForResponse(
+            (r) =>
+                r.url().includes('/_search_stream') &&
+                !r.url().includes('is_ui_histogram') &&
+                (r.request().postData() || '').includes(stream),
+            { timeout: 60000 },
+        );
+        await this.clickRunQueryButton();
+        return await searched;
+    }
+
+    /** Open the Explain query dialog from the More options menu. */
+    async openExplainQueryDialog() {
+        await this.clickMoreOptionsButton();
+        await expect(this.page.locator(this.explainQueryMenuBtn)).toBeVisible({ timeout: 10000 });
+        await this.clickExplainQuery();
+        await this.expectQueryPlanDialogVisible();
+    }
+
+    /** Run a SQL query on a stream, optionally wait for result rows, then open the Explain query dialog. */
+    async openExplainForQuery(stream, sql, { expectRows = true } = {}) {
+        await this.openLogsWithSqlQuery(stream, sql);
+        await this.runQueryAndWaitForStreamSearch(stream);
+        if (expectRows) {
+            await this.waitForSearchResultRows(60000);
+        }
+        await this.openExplainQueryDialog();
+    }
+
+    async expectQueryPlanOperatorCardsRendered() {
+        await expect.poll(() => this.page.locator(this.queryPlanOperatorCards).count(), { timeout: 15000 })
+            .toBeGreaterThan(0);
+    }
+
+    async expectQueryPlanOperatorsRendered() {
+        await expect(this.page.locator(this.queryPlanView)).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator(this.queryPlanTileOperators)).toBeVisible();
+        await this.expectQueryPlanOperatorCardsRendered();
+        testLogger.info('Query plan rendered operator cards');
+    }
+
+    async switchQueryPlanToAnalyze() {
+        await expect(async () => {
+            // #16511 item 4: the More options tooltip opens on the refocused trigger and covers the toggle until blurred.
+            await this.page.mouse.move(0, 0);
+            await this.page.evaluate(() => document.activeElement?.blur());
+            await this.page.locator(this.queryPlanModeAnalyze).click({ timeout: 2000 });
+            await expect(this.page.locator(this.queryPlanAnalyzeStart)).toBeVisible({ timeout: 2000 });
+        }).toPass({ timeout: 15000 });
+    }
+
+    /** Run EXPLAIN ANALYZE and wait until the mode toggle shows a settled state; returns the HTTP status and that state. */
+    async runQueryPlanAnalyze() {
+        const response = this.page.waitForResponse(
+            (r) => r.url().includes('/_search_stream') && (r.request().postData() || '').includes('EXPLAIN ANALYZE'),
+            { timeout: 60000 },
+        );
+        await this.page.locator(this.queryPlanAnalyzeRun).click();
+        const status = (await response).status();
+        const settled = this.page.locator(this.queryPlanAnalyzeSettled);
+        await expect(settled).toHaveCount(1, { timeout: 60000 });
+        const state = (await settled.getAttribute('data-test')).replace('query-plan-mode-analyze-', '');
+        testLogger.info('EXPLAIN ANALYZE settled', { status, state });
+        return { status, state };
+    }
+
+    async expectQueryProfileRendered() {
+        await expect(this.page.locator(this.queryPlanModeAnalyzeDone)).toBeVisible();
+        await expect(this.page.locator(this.queryProfileView)).toBeVisible();
+        await expect(this.page.locator(this.queryProfileSummary)).toBeVisible();
+        await expect(this.page.locator(this.queryProfileTileRows)).toBeVisible();
+        await expect(this.page.locator(this.queryProfileTileNodes)).toBeVisible();
+        await this.expectQueryPlanOperatorCardsRendered();
+        testLogger.info('Query profile rendered operator cards');
+    }
+
+    async expectAnalyzeNotShownAsSuccess() {
+        await expect(this.page.locator(this.queryPlanModeAnalyzeDone)).toHaveCount(0);
     }
 
     /** The logs table delegates scrolling to an unnamed ancestor, so resolve it at runtime. */

@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from "vue";
+import { ref, nextTick } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue";
 import SessionsList from "@/plugins/traces/SessionsList.vue";
@@ -104,17 +104,19 @@ async function onDateChange(value: any) {
   await nextTick();
   // `userChangedValue` distinguishes a genuine user date pick from the
   // programmatic window replay DateTime fires on every mount. Only the former
-  // forces a re-fetch; the mount replay lets SessionsList restore its cached
-  // list (so returning from a session detail doesn't re-hit the API).
+  // forces a re-fetch and re-decides an auto mode for the new window; the mount
+  // replay lets SessionsList restore its cached list (so returning from a
+  // session detail doesn't re-hit the API).
+  const userPicked = value?.userChangedValue === true;
   sessionsRef.value?.refresh?.(
     timeRange.value.startTime,
     timeRange.value.endTime,
-    value?.userChangedValue === true,
+    userPicked,
+    userPicked,
   );
 }
 
-onMounted(() => {
-  // Precedence: URL > cross-page shared state > default relative.
-  mountResolve();
-});
+// Precedence: URL > shared state > default relative. Resolved in setup, not onMounted: the
+// date picker seeds from dateState in its own onMounted, which runs first.
+mountResolve();
 </script>

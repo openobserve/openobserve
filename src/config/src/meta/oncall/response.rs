@@ -78,6 +78,17 @@ pub fn snoozed_ladder_anchor(
     existing_anchor.unwrap_or(opened_at) + (until - quiet_reaches).max(0)
 }
 
+/// Where the ladder's clock sits when a snooze ends early at `now`: as if it had been that short.
+pub fn unsnoozed_ladder_anchor(
+    existing_anchor: Option<i64>,
+    opened_at: i64,
+    snoozed_until: Option<i64>,
+    now: i64,
+) -> i64 {
+    let unused = snoozed_until.map_or(0, |until| (until - now).max(0));
+    existing_anchor.unwrap_or(opened_at) - unused
+}
+
 /// Lifecycle of a response record: `triggered → triaged → acknowledged →
 /// resolved`. `triaged` comes from the L0 agent and is skipped entirely when
 /// the agent is absent or disabled.
@@ -332,6 +343,19 @@ pub struct ResponseEvent {
     /// the answer to "did the page reach them" — not the absence of one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delivered: Option<bool>,
+    /// Per destination, the template a shared-path send rendered with; empty for other sends.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub templates: Vec<SentTemplate>,
+}
+
+/// One destination's template on a delivery, as the send log line names it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SentTemplate {
+    pub destination: String,
+    /// Empty when the send carried no rendered template (a platform resolve or a legacy body).
+    pub template_name: String,
+    /// `explicit`, `destination`, `org_default`, `compiled`, `platform_resolve` or `legacy`.
+    pub template_source: String,
 }
 
 impl ResponseEvent {
@@ -351,6 +375,7 @@ impl ResponseEvent {
             recipient: None,
             channel: None,
             delivered: None,
+            templates: Vec::new(),
         }
     }
 
@@ -374,6 +399,12 @@ impl ResponseEvent {
         self.recipient = Some(recipient.into());
         self.channel = Some(channel);
         self.delivered = Some(delivered);
+        self
+    }
+
+    /// Records the templates the shared path rendered this delivery with.
+    pub fn with_templates(mut self, templates: Vec<SentTemplate>) -> Self {
+        self.templates = templates;
         self
     }
 
@@ -485,6 +516,7 @@ impl std::fmt::Display for ResolutionCause {
 
 /// The record itself, as the API and the UI see it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[schema(as = OnCallResponse)]
 pub struct Response {
     pub id: String,
     pub org_id: String,
@@ -1709,6 +1741,27 @@ mod tests {
             assert_eq!(
                 snoozed_ladder_anchor(None, 7 * MIN, None, 8 * MIN, 18 * MIN),
                 17 * MIN
+            );
+        }
+
+        /// Ending a snooze early gives back the unused quiet, so the rungs keep their gaps from
+        /// where the ladder paused instead of waiting out the rest of the snooze.
+        #[test]
+        fn test_unsnoozing_leaves_the_clock_where_a_snooze_that_short_would() {
+            let snoozed = snoozed_ladder_anchor(None, 0, None, MIN, 61 * MIN);
+            assert_eq!(
+                unsnoozed_ladder_anchor(Some(snoozed), 0, Some(61 * MIN), 3 * MIN),
+                snoozed_ladder_anchor(None, 0, None, MIN, 3 * MIN),
+            );
+        }
+
+        /// A snooze that has already lapsed has no quiet left to give back.
+        #[test]
+        fn test_unsnoozing_a_lapsed_snooze_leaves_the_clock() {
+            let snoozed = snoozed_ladder_anchor(None, 0, None, MIN, 61 * MIN);
+            assert_eq!(
+                unsnoozed_ladder_anchor(Some(snoozed), 0, Some(61 * MIN), 90 * MIN),
+                snoozed
             );
         }
     }

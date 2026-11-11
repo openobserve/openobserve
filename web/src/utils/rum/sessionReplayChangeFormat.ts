@@ -31,8 +31,8 @@
  *     the string table and the stylesheet table are all reset before EVERY full snapshot
  *     (`scope.resetIds()`), so decoding stays deterministic as long as records are
  *     processed in order and each snapshot begins with a FullSnapshot record.
- *   - Strings are de-duplicated via a string table; `AddString` changes append to it and
- *     other changes reference entries by numeric index.
+ *   - Strings are de-duplicated via a string table; `AddString` and `AddRoleAnnotatedStrings`
+ *     changes append to it and other changes reference entries by numeric index.
  *   - An `AddNode` change is `[insertionPoint, nodeName, ...attributeAssignments]`. The
  *     insertion point encodes position relative to already-assigned ids:
  *        null  -> root node (the #document)
@@ -74,6 +74,17 @@ const ChangeType = {
   AttachedStyleSheets: 8,
   MediaPlaybackState: 9,
   VisualViewport: 10,
+  AddRoleAnnotatedStrings: 11,
+  InputValue: 12,
+  InputSelection: 13,
+  ClearStrings: 14,
+  // Skipped: references a canvas image uploaded to a resource endpoint OpenObserve does not have.
+  ImageContent: 15,
+} as const;
+
+const InputSelectionState = {
+  Selected: 0,
+  Deselected: 1,
 } as const;
 
 const IncrementalSource = {
@@ -156,7 +167,8 @@ export function createRecordConverter(): RecordConverter {
   let nextStyleSheetId = 0;
   let rootId: number | null = null;
   let scrolls = new Map<number, { x: number; y: number }>();
-  let inputs = new Map<number, { text?: string; isChecked?: boolean }>();
+  // optionId: the <option> an InputSelection picked, so a rebuilt <select> marks that exact option.
+  let inputs = new Map<number, { text?: string; isChecked?: boolean; optionId?: number }>();
   let changeCount = 0;
 
   function reset() {
@@ -170,12 +182,98 @@ export function createRecordConverter(): RecordConverter {
     inputs = new Map();
   }
 
-  // Resolve a value that may be a string literal or a numeric string-table reference.
-  function decodeStr(value: string | number): string {
+  // Resolve a value that may be a string literal, a role-annotated literal ({ role, string }) or a numeric string-table reference.
+  function decodeStr(value: string | number | { string: string }): string {
     if (typeof value === "number") {
       return stringTable[value] ?? "";
     }
+    if (value !== null && typeof value === "object") {
+      return value.string ?? "";
+    }
     return value;
+  }
+
+  // Applies a string-table change and returns true, or returns false for any other change type.
+  function applyStringChange(group: any[]): boolean {
+    switch (group[0]) {
+      case ChangeType.AddString:
+        for (let i = 1; i < group.length; i++) {
+          stringTable.push(group[i] as string);
+        }
+        return true;
+      case ChangeType.AddRoleAnnotatedStrings:
+        // Each group is [role, ...strings]; playback ignores the role and ids stay positional.
+        for (let i = 1; i < group.length; i++) {
+          const roleGroup = group[i];
+          if (!Array.isArray(roleGroup)) continue;
+          for (let j = 1; j < roleGroup.length; j++) {
+            stringTable.push(roleGroup[j] as string);
+          }
+        }
+        return true;
+      case ChangeType.ClearStrings:
+        stringTable = [];
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  // Depth-first over descendants; visit returns true to descend into that child.
+  function walkChildren(node: any, visit: (child: any) => boolean) {
+    for (const child of node.childNodes ?? []) {
+      if (visit(child)) walkChildren(child, visit);
+    }
+  }
+
+  // The classic Input data for one InputSelection target, or null when it has no classic equivalent.
+  function inputSelectionData(
+    nodeId: number,
+    selected: boolean,
+  ): { id: number; text: string; isChecked: boolean; optionId?: number } | null {
+    const tracked = nodes.get(nodeId);
+    if (!tracked) return null;
+    const node = tracked.node;
+    const attrs = node.attributes;
+    if (attrs?.type === "checkbox" || attrs?.type === "radio") {
+      return { id: nodeId, text: attrs.value ?? "", isChecked: selected };
+    }
+    // The SDK records a <select> pick as the selected <option>, which may sit in an <optgroup>.
+    if (node.tagName !== "option" || !selected) return null;
+    let parent = nodes.get(tracked.parentId);
+    if (parent?.node.tagName === "optgroup") parent = nodes.get(parent.parentId);
+    if (parent?.node.tagName !== "select") return null;
+    return { id: parent.node.id, text: optionValue(node), isChecked: false, optionId: nodeId };
+  }
+
+  // DOM rule: with no value attribute, the text outside <script> with ASCII whitespace collapsed.
+  function optionValue(option: any): string {
+    if (option.attributes?.value !== undefined) return option.attributes.value;
+    const parts: string[] = [];
+    walkChildren(option, (child) => {
+      if (child.type === NodeType.Text) parts.push(child.textContent ?? "");
+      return child.tagName !== "script";
+    });
+    return parts
+      .join("")
+      .replace(/[\t\n\f\r ]+/g, " ")
+      .replace(/^ | $/g, "");
+  }
+
+  // rrweb rebuilds a <select> from its options' selected attributes; no match (a masked value) keeps them.
+  function selectOption(select: any, isMatch: (option: any) => boolean) {
+    const options: any[] = [];
+    walkChildren(select, (child) => {
+      if (child.tagName === "option") options.push(child);
+      return child.tagName === "optgroup";
+    });
+    const match = options.findIndex(isMatch);
+    if (match === -1) return;
+    const multiple = select.attributes?.multiple !== undefined;
+    options.forEach((option, i) => {
+      if (i === match) option.attributes.selected = true;
+      else if (!multiple) delete option.attributes.selected;
+    });
   }
 
   function rulesToCssText(rules: string | string[]): string {
@@ -332,7 +430,7 @@ export function createRecordConverter(): RecordConverter {
   }
 
   // Classic scroll and input records reference converter ids, so their latest state belongs in a rebuilt snapshot.
-  function trackClassic(record: any) {
+  function trackClassic(record: any, optionId?: number) {
     if (!record || record.type !== RecordType.IncrementalSnapshot || !record.data) return;
     const d = record.data;
     if (d.source === IncrementalSource.Scroll) {
@@ -340,9 +438,23 @@ export function createRecordConverter(): RecordConverter {
       changeCount++;
     }
     if (d.source === IncrementalSource.Input) {
-      inputs.set(d.id, { text: d.text, isChecked: d.isChecked });
+      inputs.set(d.id, { text: d.text, isChecked: d.isChecked, optionId });
       changeCount++;
     }
+  }
+
+  function inputRecord(
+    timestamp: number,
+    data: { id: number; text: string; isChecked: boolean },
+    optionId?: number,
+  ) {
+    const record = {
+      type: RecordType.IncrementalSnapshot,
+      timestamp,
+      data: { source: IncrementalSource.Input, ...data },
+    };
+    trackClassic(record, optionId);
+    return record;
   }
 
   function applyTracked(root: any) {
@@ -374,6 +486,13 @@ export function createRecordConverter(): RecordConverter {
         else delete n.attributes.checked;
       } else if (value.text !== undefined) {
         n.attributes.value = value.text;
+        if (n.tagName === "select") {
+          selectOption(n, (option) =>
+            value.optionId !== undefined
+              ? option.id === value.optionId
+              : optionValue(option) === value.text,
+          );
+        }
       }
     });
     return initialOffset;
@@ -396,14 +515,9 @@ export function createRecordConverter(): RecordConverter {
     let initialOffset = { left: 0, top: 0 };
 
     for (const group of record.data as any[]) {
+      if (applyStringChange(group)) continue;
       const changeType = group[0];
       switch (changeType) {
-        case ChangeType.AddString:
-          for (let i = 1; i < group.length; i++) {
-            stringTable.push(group[i] as string);
-          }
-          break;
-
         case ChangeType.AddNode:
           for (let i = 1; i < group.length; i++) {
             const change = group[i];
@@ -476,8 +590,7 @@ export function createRecordConverter(): RecordConverter {
           break;
 
         default:
-          // Attribute / Text / RemoveNode / VisualViewport are not expected inside a
-          // full snapshot; ignore them here (handled in the incremental path).
+          // Mutation, input and viewport changes only arrive in Change records; unknown types are skipped.
           break;
       }
     }
@@ -507,14 +620,9 @@ export function createRecordConverter(): RecordConverter {
     const extraRecords: any[] = [];
 
     for (const group of record.data as any[]) {
+      if (applyStringChange(group)) continue;
       const changeType = group[0];
       switch (changeType) {
-        case ChangeType.AddString:
-          for (let i = 1; i < group.length; i++) {
-            stringTable.push(group[i] as string);
-          }
-          break;
-
         case ChangeType.AddNode:
           for (let i = 1; i < group.length; i++) {
             const change = group[i];
@@ -663,6 +771,35 @@ export function createRecordConverter(): RecordConverter {
               }
             } else {
               applyStyleSheetToNode(nodeId, sheetIds);
+            }
+          }
+          break;
+
+        case ChangeType.InputValue:
+          for (let i = 1; i < group.length; i++) {
+            const [nodeId, value] = group[i];
+            extraRecords.push(
+              inputRecord(timestamp, { id: nodeId, text: decodeStr(value), isChecked: false }),
+            );
+          }
+          break;
+
+        case ChangeType.InputSelection:
+          // Each change is [state, ...nodeIds]; Indeterminate has no classic equivalent.
+          for (let i = 1; i < group.length; i++) {
+            const selection = group[i];
+            if (!Array.isArray(selection)) continue;
+            const state = selection[0];
+            if (state !== InputSelectionState.Selected && state !== InputSelectionState.Deselected)
+              continue;
+            for (let j = 1; j < selection.length; j++) {
+              const result = inputSelectionData(
+                selection[j],
+                state === InputSelectionState.Selected,
+              );
+              if (!result) continue;
+              const { optionId, ...data } = result;
+              extraRecords.push(inputRecord(timestamp, data, optionId));
             }
           }
           break;

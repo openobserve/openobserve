@@ -21,10 +21,10 @@ use axum::{
     response::Response,
 };
 use config::meta::downtimes::{
-    CreateDowntimeResponse, Downtime, DowntimeDetail, DowntimeRequest, ExtendDowntimeRequest,
-    ExtendDowntimeResponse, ListDowntimesQuery, ListDowntimesResponse, MoveDowntimesRequest,
-    PreviewRequest, PreviewResponse, ResourcesRequest, ResourcesResponse, ValuesRequest,
-    ValuesResponse,
+    CreateDowntimeResponse, Downtime, DowntimeDetail, DowntimeRequest, DowntimeTestRequest,
+    DowntimeTestResult, ExtendDowntimeRequest, ExtendDowntimeResponse, ListDowntimesQuery,
+    ListDowntimesResponse, MoveDowntimesRequest, PreviewRequest, PreviewResponse, ResourcesRequest,
+    ResourcesResponse, ValuesRequest, ValuesResponse,
 };
 use openobserve_api_common::extractors::Headers;
 use serde::Deserialize;
@@ -54,6 +54,10 @@ pub struct FolderQuery {
         (status = 200, description = "Success", content_type = "application/json", body = ListDowntimesResponse),
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Downtimes", "operation": "list"}))
+    )
 )]
 pub async fn list_downtimes(
     Path(org_id): Path<String>,
@@ -88,6 +92,10 @@ pub async fn list_downtimes(
         (status = 400, description = "Invalid request", content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Downtimes", "operation": "create"}))
+    )
 )]
 pub async fn create_downtime(
     Path(org_id): Path<String>,
@@ -142,6 +150,10 @@ pub async fn create_downtime(
         (status = 200, description = "Success", content_type = "application/json", body = PreviewResponse),
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Downtimes", "operation": "create"}))
+    )
 )]
 pub async fn preview_downtime(
     Path(org_id): Path<String>,
@@ -176,6 +188,10 @@ pub async fn preview_downtime(
         (status = 400, description = "Invalid request", content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Downtimes", "operation": "create"}))
+    )
 )]
 pub async fn downtime_resources(
     Path(org_id): Path<String>,
@@ -210,6 +226,10 @@ pub async fn downtime_resources(
         (status = 400, description = "Invalid request", content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Downtimes", "operation": "create"}))
+    )
 )]
 pub async fn downtime_values(
     Path(org_id): Path<String>,
@@ -245,6 +265,10 @@ pub async fn downtime_values(
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Downtimes", "operation": "get"}))
+    )
 )]
 pub async fn get_downtime(
     Path((org_id, downtime_id)): Path<(String, String)>,
@@ -282,6 +306,10 @@ pub async fn get_downtime(
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Downtimes", "operation": "update"}))
+    )
 )]
 pub async fn update_downtime(
     Path((org_id, downtime_id)): Path<(String, String)>,
@@ -321,6 +349,10 @@ pub async fn update_downtime(
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Downtimes", "operation": "create"}))
+    )
 )]
 pub async fn cancel_downtime(
     Path((org_id, downtime_id)): Path<(String, String)>,
@@ -361,6 +393,10 @@ pub async fn cancel_downtime(
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
         (status = 409, description = "The downtime changed since it was read", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Downtimes", "operation": "create"}))
+    )
 )]
 pub async fn extend_downtime(
     Path((org_id, downtime_id)): Path<(String, String)>,
@@ -372,6 +408,55 @@ pub async fn extend_downtime(
         respond(
             openobserve_core::downtimes::extend(&org_id, &user_email.user_id, &downtime_id, &req)
                 .await,
+        )
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, downtime_id, user_email, req);
+        not_supported()
+    }
+}
+
+/// TestDowntimeNotifications
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/downtimes/{downtime_id}/test",
+    context_path = "/api",
+    tag = "Downtimes",
+    operation_id = "TestDowntimeNotifications",
+    summary = "Send a downtime's started message to its destinations",
+    description = "Renders and sends the started message of the downtime's current or next window through the same path a real start uses, to the listed destinations of the downtime (all of them when the list is empty). Each destination gets one result.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("downtime_id" = String, Path, description = "Downtime id"),
+    ),
+    request_body(content = DowntimeTestRequest, description = "The destinations to test", content_type = "application/json"),
+    responses(
+        (status = 200, description = "One result per destination", content_type = "application/json", body = Vec<DowntimeTestResult>),
+        (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
+        (status = 404, description = "Not found", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Downtimes", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn test_downtime(
+    Path((org_id, downtime_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req): Json<DowntimeTestRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        respond(
+            openobserve_core::downtimes::send_test(
+                &org_id,
+                &user_email.user_id,
+                &downtime_id,
+                &req,
+            )
+            .await,
         )
     }
     #[cfg(not(feature = "enterprise"))]
@@ -397,6 +482,10 @@ pub async fn extend_downtime(
         (status = 400, description = "Invalid request", content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Downtimes", "operation": "update"}))
+    )
 )]
 pub async fn move_downtimes(
     Path(org_id): Path<String>,
@@ -453,6 +542,10 @@ pub async fn move_downtimes(
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
         (status = 409, description = "Active, scheduled, or it corrected SLO slices", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Downtimes", "operation": "delete"}))
+    )
 )]
 pub async fn delete_downtime(
     Path((org_id, downtime_id)): Path<(String, String)>,

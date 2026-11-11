@@ -10,6 +10,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { defineComponent, nextTick } from "vue";
+import { z } from "zod";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormDateTimeRange from "./OFormDateTimeRange.vue";
 
@@ -112,6 +113,37 @@ describe("OFormDateTimeRange", () => {
     await wrapper.find('[data-test="dt-stub"]').trigger("click");
     await flushPromises();
     expect(wrapper.find('[data-test="dt-stub"]').text()).toBe("relative|30m");
+  });
+
+  // C8: opt-in, so the callers that surface the error elsewhere keep their layout.
+  it.each([
+    [true, "Pick a later window"],
+    [false, ""],
+  ])("renders the field's error under the picker when show-error is %s", async (show, text) => {
+    wrapper = mount(OForm, {
+      props: {
+        defaultValues: { timerange: { type: "absolute", from: 0, to: 0 } },
+        // A form-level refine routed to the field by `path`, the shape the cover form's schema uses.
+        schema: z
+          .object({ timerange: z.object({ from: z.number(), to: z.number() }) })
+          .refine((v) => v.timerange.to > v.timerange.from, {
+            message: "Pick a later window",
+            path: ["timerange"],
+          }),
+      },
+      slots: {
+        default: `<OFormDateTimeRange name="timerange" :show-error="${show}" data-test="tr" />`,
+      },
+      global: {
+        components: { OFormDateTimeRange },
+        stubs: { DateTime: DateTimeStub },
+      },
+    });
+    await (wrapper.vm as any).form.handleSubmit();
+    await flushPromises();
+
+    const error = wrapper.find('[data-test="tr-error"]');
+    expect(error.exists() ? error.text() : "").toBe(text);
   });
 
   // Regression: the wrapper is used with INDEXED/NESTED names

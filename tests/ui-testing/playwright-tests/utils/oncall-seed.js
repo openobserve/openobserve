@@ -30,10 +30,13 @@
  * This module contains NO expect() calls: assertions belong in spec files.
  */
 
+const { AsyncLocalStorage } = require('node:async_hooks');
 const { randomBytes } = require('node:crypto');
 const testLogger = require('./test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
 const { ingestBase } = require('./ingest-url.js');
+
+const orgScope = new AsyncLocalStorage();
 
 /** Every on-call timestamp is microseconds. Named so the call sites read. */
 const MICROS = 1_000_000;
@@ -69,7 +72,11 @@ function ingestUrl() {
 
 /** The org KSUID. Never the display name — see the module note. */
 function orgId() {
-  return getOrgIdentifier();
+  return orgScope.getStore() ?? getOrgIdentifier();
+}
+
+function withOrg(org, fn) {
+  return orgScope.run(org, fn);
 }
 
 /**
@@ -155,6 +162,16 @@ async function getOrNull(page, url, what) {
   const text = await res.text().catch(() => '');
   if (!res.ok()) throw new Error(`${what} failed: HTTP ${res.status()} — ${text.slice(0, 200)}`);
   return text.trim() ? JSON.parse(text) : null;
+}
+
+/** A new org owned by the signed-in root user; the API has no working delete, so it stays. */
+async function createOrg(page, prefix = 'e2e_oncall_org') {
+  const name = uniqueName(prefix);
+  const res = await api(page, 'post', `${baseUrl()}/api/organizations`, { name });
+  const body = await must(res, `Create org "${name}"`, { name });
+  if (!body?.identifier) throw new Error(`Org "${name}" created but no identifier returned: ${JSON.stringify(body)}`);
+  testLogger.info('Org created', { name, id: body.identifier });
+  return { id: body.identifier, name };
 }
 
 // ------------------------------------------------------------- capability probe
@@ -271,6 +288,15 @@ async function addTeamMembers(page, teamId, userEmails) {
   const body = await must(res, `Add members to team ${teamId}`, payload);
   testLogger.info('On-call members added', { teamId, count: userEmails.length });
   return body;
+}
+
+/** Take one person off the team; the server also drops them from every rotation, so a sole member leaves it staffing nobody. */
+async function removeTeamMember(page, teamId, userEmail) {
+  const res = await api(
+    page, 'delete',
+    `${baseUrl()}/api/${orgId()}/oncall/teams/${encodeURIComponent(teamId)}/members?user_email=${encodeURIComponent(userEmail)}`,
+  );
+  return must(res, `Remove ${userEmail} from team ${teamId}`);
 }
 
 async function listTeamMembers(page, teamId) {
@@ -458,14 +484,10 @@ function rungEscalatingToTeam(priority, rotationId, { channels = ['email'] } = {
 async function setTeamPolicy(page, teamId, {
   rungs,
   destinations = undefined,
-  repeatCount = undefined,
-  finalAction = undefined,
   l0 = undefined,
 } = {}) {
   const payload = { rungs };
   if (destinations !== undefined) payload.destinations = destinations;
-  if (repeatCount !== undefined) payload.repeat_count = repeatCount;
-  if (finalAction !== undefined) payload.final_action = finalAction;
   if (l0 !== undefined) payload.l0 = l0;
 
   const res = await api(
@@ -1080,12 +1102,15 @@ module.exports = {
   baseUrl,
   ingestUrl,
   orgId,
+  withOrg,
+  createOrg,
   uniqueName,
   isOnCallAvailable,
   createTeam,
   listTeams,
   getTeam,
   addTeamMembers,
+  removeTeamMember,
   listTeamMembers,
   rotation,
   allDayRestriction,

@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, shallowMount } from "@vue/test-utils";
 import { computed, nextTick } from "vue";
 import i18n from "@/locales";
+import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import Header from "@/components/Header.vue";
 import * as cookies from "@/utils/cookies";
 import { chartColor } from "@/utils/chartTheme";
@@ -31,6 +32,17 @@ vi.mock("@/composables/useBreakpoint", () => ({
     lgUp: computed(() => breakpoint.lgUp),
   }),
 }));
+
+const securityAccess = vi.hoisted(() => ({ canOpen: true, licenseLocked: false }));
+vi.mock("@/composables/security/useSecurityAccess", async () => {
+  const { computed } = await import("vue");
+  return {
+    useSecurityAccess: () => ({
+      canOpen: computed(() => securityAccess.canOpen),
+      licenseLocked: computed(() => securityAccess.licenseLocked),
+    }),
+  };
+});
 
 // Mock the cookies module
 vi.mock("@/utils/cookies", () => ({
@@ -441,6 +453,28 @@ describe("Header Component", () => {
     });
   });
 
+  describe("Focus-mode route", () => {
+    it("drops the menu and AI buttons", async () => {
+      const focusWrapper = createWrapper({
+        mountType: "mount",
+        storeOverrides: { state: { zoConfig: { ai_enabled: true } } },
+        configOverrides: { isEnterprise: "true" },
+        propsOverrides: {
+          router: { ...mockRouter, currentRoute: { value: { meta: { focusMode: true } } } },
+        },
+        stubsOverrides: {},
+      });
+      await focusWrapper.vm.$nextTick();
+
+      expect(focusWrapper.find('[data-test="header-mobile-nav-toggle"]').exists()).toBe(false);
+      expect(focusWrapper.find('[data-test="menu-link-ai-item"]').exists()).toBe(false);
+      // nothing teleports into the old header slot any more
+      expect(focusWrapper.find("#o2-header-actions").exists()).toBe(false);
+
+      focusWrapper.unmount();
+    });
+  });
+
   describe("AI Chat Button", () => {
     it("holds the AI button's place until the config says whether it shows", async () => {
       const aiWrapper = createWrapper({
@@ -518,6 +552,25 @@ describe("Header Component", () => {
       expect(aiButton.exists()).toBe(true);
       expect(aiButton.attributes("disabled")).toBeUndefined();
 
+      aiWrapper.unmount();
+    });
+
+    it("keeps the AI logo with a lock badge and under a locked license", async () => {
+      const aiWrapper = createWrapper({
+        mountType: "mount",
+        storeOverrides: {
+          state: { zoConfig: { ai_enabled: true, features: { ai_assistant: "locked" } } },
+        },
+        configOverrides: { isEnterprise: "true" },
+        stubsOverrides: {},
+      });
+      await aiWrapper.vm.$nextTick();
+
+      const aiButton = aiWrapper.find('[data-test="menu-link-ai-locked"]');
+      expect(aiButton.exists()).toBe(true);
+      expect(aiButton.find("img").exists()).toBe(true);
+      expect(aiButton.findComponent(OLockBadge).exists()).toBe(true);
+      expect(aiButton.attributes("aria-label")).toContain("Locked: needs");
       aiWrapper.unmount();
     });
 
@@ -1340,6 +1393,32 @@ describe("Header Component", () => {
       expect(wrapper.props("userClickedOrg").identifier).toBe(
         wrapper.props("selectedOrg").identifier,
       );
+    });
+  });
+
+  describe("Solution switcher", () => {
+    afterEach(() => {
+      securityAccess.canOpen = true;
+      securityAccess.licenseLocked = false;
+    });
+
+    it("shows the switcher to a user who may open Security", () => {
+      const switcherWrapper = createWrapper();
+      expect(switcherWrapper.findComponent({ name: "SolutionSwitcher" }).exists()).toBe(true);
+    });
+
+    it("hides the switcher from a user without Security access", () => {
+      securityAccess.canOpen = false;
+      const switcherWrapper = createWrapper();
+      expect(switcherWrapper.findComponent({ name: "SolutionSwitcher" }).exists()).toBe(false);
+    });
+
+    it("marks Security locked when the license locks it", () => {
+      securityAccess.licenseLocked = true;
+      const switcherWrapper = createWrapper();
+      expect(
+        switcherWrapper.findComponent({ name: "SolutionSwitcher" }).props("securityLocked"),
+      ).toBe(true);
     });
   });
 

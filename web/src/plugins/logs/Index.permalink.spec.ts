@@ -149,8 +149,14 @@ describe("Logs Index — opening a line link (4c C5)", { timeout: 30000 }, () =>
       global: {
         provide: { store },
         plugins: [i18n, router],
-        // Monaco's delayed browser contributions are outside permalink lifecycle coverage.
-        stubs: { CodeQueryEditor: true },
+        // Monaco is out of scope, but getValue must exist: once the lazy QueryEditor mounts the free-text preview reads it, and a throw there aborted the stream-list load.
+        stubs: {
+          CodeQueryEditor: {
+            props: { query: String },
+            setup: (props: { query?: string }) => ({ getValue: () => props.query }),
+            template: "<div />",
+          },
+        },
       },
     });
     const logs = vi.fn();
@@ -216,7 +222,7 @@ describe("Logs Index — opening a line link (4c C5)", { timeout: 30000 }, () =>
     } as any);
     gridRuns.length = 0;
     await land(linkQuery(), {}, { realExecutor: true });
-    await vi.waitFor(() => expect(gridRuns.length).toBeGreaterThan(0));
+    expect(gridRuns.length).toBeGreaterThan(0);
     expect(gridRuns[0][2]).toMatch(/^permalink-init:/);
   });
 
@@ -239,11 +245,7 @@ describe("Logs Index — opening a line link (4c C5)", { timeout: 30000 }, () =>
     await vi.waitFor(() =>
       expect(document.querySelector('[data-test="logs-permalink-detail-dialog"]')).not.toBeNull(),
     );
-    await vi.waitFor(() =>
-      expect(
-        document.querySelector('[data-test="log-detail-json-content"]')?.textContent,
-      ).toContain("payment declined"),
-    );
+    await vi.waitFor(() => expect(sharedLineRecord.value).toEqual(line));
     logs.mockClear();
     wrapper.vm.onGuardRunAnyway();
     expect(logs).toHaveBeenCalledTimes(1);

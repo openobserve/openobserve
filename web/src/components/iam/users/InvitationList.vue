@@ -202,7 +202,9 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
+import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -306,7 +308,7 @@ export default defineComponent({
       },
     ];
     const loading = ref(false);
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
 
     onMounted(() => {
       fetchPendingInvitations();
@@ -332,7 +334,7 @@ export default defineComponent({
       } catch (error) {
         const e = error as { response?: { status?: number; data?: { message?: string } } };
         dismiss();
-        forbidden.value = e.response?.status === 403;
+        forbidden.value = forbiddenState(e);
         if (!forbidden.value) {
           toast({
             message: raw(e.response?.data?.message || t("iam.invitationList.failedLoadPending")),
@@ -386,6 +388,7 @@ export default defineComponent({
 
       try {
         await organizationsService.process_subscription(selected.token, "confirm", selected.org_id);
+        analytics.track("invitation_accepted", { source: "invitation_list" });
 
         // Refresh the organizations list in the store
         const orgResponse = await organizationsService.list(0, 1000000, "name", false, "");
@@ -431,6 +434,7 @@ export default defineComponent({
 
       try {
         await organizationsService.decline_subscription(selected.token);
+        analytics.track("invitation_declined");
         dismiss();
         toast({
           message: t("iam.invitationList.rejectedSuccess"),

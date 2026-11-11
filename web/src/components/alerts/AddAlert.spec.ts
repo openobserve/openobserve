@@ -825,6 +825,60 @@ describe("AddAlert (OForm owner)", () => {
       },
     );
 
+    it("moves the response-only locked names into _ui, out of every save path", async () => {
+      wrapper = mountAlert({
+        isUpdated: true,
+        modelValue: {
+          name: "locked_alert",
+          stream_type: "metrics",
+          stream_name: "up",
+          is_real_time: false,
+          query_condition: {
+            type: "promql",
+            promql: "up",
+            promql_condition: null,
+            sql: "",
+            aggregation: null,
+            conditions: null,
+            vrl_function: "",
+            multi_time_range: [],
+          },
+          trigger_condition: {
+            period: 5,
+            operator: ">=",
+            frequency: 60,
+            threshold: 1,
+            silence: 0,
+            frequency_type: "minutes",
+            timezone: "UTC",
+          },
+          destinations: [],
+          workflows: ["wf1"],
+          oncall_team: "tm_sre",
+          locked_target_names: { wf1: "Restart pods", tm_sre: "Platform SRE" },
+          context_attributes: {},
+          description: "",
+          row_template: "",
+          row_template_type: "String",
+          enabled: true,
+        },
+        destinations: [],
+      });
+      await flushPromises();
+
+      const values = wrapper.vm.form.state.values;
+      expect(values._ui.lockedTargetNames).toEqual({
+        wf1: "Restart pods",
+        tm_sre: "Platform SRE",
+      });
+      expect(values.locked_target_names).toBeUndefined();
+      const payload = wrapper.vm.getAlertPayload();
+      expect(payload.locked_target_names).toBeUndefined();
+      expect(payload._ui).toBeUndefined();
+      expect(payload.workflows).toEqual(["wf1"]);
+      expect(payload.oncall_team).toBe("tm_sre");
+    });
+
     // RBAC lists only the destinations this user may read. One they cannot read must
     // survive a list refresh (it shows as "Missing"), or saving would silently drop it.
     it("keeps a saved destination that the refreshed destinations list does not include", async () => {
@@ -1711,12 +1765,21 @@ describe("AddAlert (OForm owner)", () => {
           { alert_id: "id-b", name: "High latency", folder_id: "default", accessible: true },
         ],
       };
+      const warning =
+        "This alert's workflow will not run: Workflows is not included in your license.";
+      (alertsService.update_by_alert_id as any).mockResolvedValueOnce({
+        data: { code: 200, message: "Alert Updated", warnings: [warning] },
+      });
       wrapper = mountAlert({ modelValue, isUpdated: true });
       await flushPromises();
 
       expect(wrapper.vm.form.state.values.composite_condition.expression).toBe("{id-a} && {id-b}");
       await wrapper.vm.form.handleSubmit();
       await flushPromises();
+
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "warning", message: warning }),
+      );
 
       expect(alertsService.update_by_alert_id).toHaveBeenCalledWith(
         expect.any(String),
@@ -1793,6 +1856,23 @@ describe("AddAlert (OForm owner)", () => {
 
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
       expect(document.querySelector('[data-test="alert-save-mode-dialog"]')).not.toBeNull();
+    });
+
+    it("locks the anomaly alert type while anomaly_detection is license-locked", async () => {
+      store.state.zoConfig.features = { anomaly_detection: "locked" };
+      try {
+        wrapper = mountAlert();
+        await flushPromises();
+        const anomaly = wrapper.vm.alertTypeOptions.find((o: any) => o.value === "anomaly");
+        expect(anomaly?.locked).toBe(true);
+        const item = wrapper.find('[data-test="add-alert-type-tab-anomaly"]');
+        expect(item.attributes("disabled")).toBeDefined();
+        wrapper.vm.onAlertTypeChange("anomaly");
+        await flushPromises();
+        expect(wrapper.vm.form.state.values.is_real_time).not.toBe("anomaly");
+      } finally {
+        delete store.state.zoConfig.features;
+      }
     });
 
     it("falls back to Builder and keeps the SQL when Alert Type switches to Realtime", async () => {

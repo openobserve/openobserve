@@ -58,6 +58,9 @@ import {
 } from "./fleet.queries";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 import { fleetKeys } from "./fleet.querykeys";
+import analytics from "./product_analytics";
+
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("./http", () => {
   const mockClient = {
@@ -267,9 +270,12 @@ describe("fleet service", () => {
     }
   });
 
-  it("listAudit() calls GET /api/{org}/fleet/audit", () => {
-    fleet.listAudit("acme");
-    expect(mockClient.get).toHaveBeenCalledWith("/api/acme/fleet/audit");
+  it("listAudit() calls GET /api/{org}/fleet/audit with the page and filters as params", () => {
+    const params = { offset: 50, limit: 50, fleet: "prod", module: "configs" };
+    fleet.listAudit("acme", { ...params, from: 1, to: 2 } as any);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/acme/fleet/audit", {
+      params: { ...params, from: 1, to: 2 },
+    });
   });
 
   it("getPipelines() calls GET /api/{org}/fleet/pipelines with the window as a param", () => {
@@ -557,11 +563,32 @@ describe("fleet queries", () => {
   );
 
   it("returns the audit envelope and fails on a malformed one", async () => {
-    const list = { items: [{ id: "a1" }], audit_disabled: false };
+    const list = { total: 1, items: [{ id: "a1" }], audit_disabled: false };
     mockClient.get.mockResolvedValueOnce({ data: list });
     expect(await (fleetAuditQuery("acme").queryFn as any)()).toEqual(list);
     mockClient.get.mockResolvedValueOnce({ data: {} });
     await expect((fleetAuditQuery("acme").queryFn as any)()).rejects.toThrow();
+  });
+
+  it("keys each audit page and filter under the audit prefix the writes invalidate", () => {
+    const prefix = fleetKeys.audit("acme");
+    const first = fleetAuditQuery("acme", { offset: 0, limit: 50 }).queryKey;
+    const next = fleetAuditQuery("acme", { offset: 50, limit: 50 }).queryKey;
+    const tokens = fleetAuditQuery("acme", { offset: 0, limit: 50, module: "tokens" }).queryKey;
+    for (const key of [first, next, tokens]) expect(key.slice(0, prefix.length)).toEqual(prefix);
+    expect(new Set([first, next, tokens].map((k) => JSON.stringify(k))).size).toBe(3);
+  });
+
+  it("rounds the audit period start in the key but sends it exactly", async () => {
+    const at = 1_700_000_000_000;
+    const a = fleetAuditQuery("acme", { from: at + 1_000, fleet: undefined });
+    const b = fleetAuditQuery("acme", { from: at + 2_000 });
+    expect(a.queryKey).toEqual(b.queryKey);
+    mockClient.get.mockResolvedValueOnce({ data: { total: 0, items: [] } });
+    await (a.queryFn as any)();
+    expect(mockClient.get).toHaveBeenLastCalledWith("/api/acme/fleet/audit", {
+      params: { from: at + 1_000 },
+    });
   });
 
   it("keys the settings under the fleet scope and returns their body as is", async () => {
@@ -600,6 +627,10 @@ describe("fleet mutations", () => {
     expect(await run(createFleetTokenMutation("acme"), body)).toEqual(created);
     expect(mockClient.post).toHaveBeenCalledWith("/api/acme/fleet/tokens", body);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: fleetKeys.tokens("acme") });
+    expect(analytics.track).toHaveBeenCalledWith("fleet_token_created", {
+      expires: true,
+      limited_uses: false,
+    });
   });
 
   const heldPlaintext = () =>
@@ -800,6 +831,33 @@ describe("fleet mutations", () => {
     expect(mockClient.put).toHaveBeenCalledWith("/api/acme/fleet/fleets/f1/desired", body);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: fleetKeys.all("acme") });
     expect(setFleetDesiredMutation("acme").meta?.silentError).toBe(true);
+    expect(analytics.track).toHaveBeenCalledWith("fleet_rollout_started", {
+      start: "now",
+      batching: "one",
+      verify: true,
+      auto_rollback: true,
+    });
+  });
+
+  it("tracks only the collectors a bulk remove actually removed", async () => {
+    mockClient.delete.mockResolvedValueOnce({ status: 204 });
+    mockClient.delete.mockRejectedValueOnce({ response: { status: 403 } });
+    await run(deleteCollectorsMutation("acme"), ["c1", "c2"]);
+    expect(analytics.track).toHaveBeenCalledWith("fleet_collector_deleted", { count: 1 });
+  });
+
+  it("tracks a publish with its warning count, and nothing when it is refused", async () => {
+    mockClient.post.mockResolvedValueOnce({
+      data: { version: 3, warnings: { "": [{ severity: "warning", text: "w" }] } },
+    });
+    await run(publishFleetConfigVersionMutation("acme"), { id: "edge", yaml: "x", message: "" });
+    expect(analytics.track).toHaveBeenCalledWith("fleet_config_published", { warnings: 1 });
+    vi.mocked(analytics.track).mockClear();
+    mockClient.post.mockRejectedValueOnce({ response: { status: 422 } });
+    await expect(
+      run(publishFleetConfigVersionMutation("acme"), { id: "edge", yaml: "x", message: "" }),
+    ).rejects.toBeTruthy();
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 
   it("fails the remove with the first error when every call fails", async () => {
@@ -886,6 +944,7 @@ describe("fleet mutations", () => {
     await run(rolloutExitMutation("acme"), { id: "r1", exit, collectorIds: ["c1"] });
     if (body) expect(mockClient.post).toHaveBeenCalledWith(path, body);
     else expect(mockClient.post).toHaveBeenCalledWith(path);
+    expect(analytics.track).toHaveBeenCalledWith("fleet_rollout_exit_taken", { exit });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: fleetKeys.all("acme") });
   });
 

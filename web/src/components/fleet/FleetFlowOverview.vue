@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="telemetry"
           mobile-dropdown
           data-test="fleet-flow-overview-telemetry"
-          @update:model-value="(v) => (telemetry = v as FlowSignal)"
+          @update:model-value="(v) => onSignalChange(v as FlowSignal)"
         >
           <OToggleGroupItem
             v-for="opt in telemetryOptions"
@@ -49,6 +49,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :value="opt.value"
             size="sm"
           >
+            <template v-if="opt.dot" #icon-left>
+              <span
+                class="size-2 shrink-0 rounded-full"
+                :class="opt.dot"
+                aria-hidden="true"
+                :data-test="`fleet-flow-overview-telemetry-dot-${opt.value}`"
+              />
+            </template>
             {{ opt.label }}
           </OToggleGroupItem>
         </OToggleGroup>
@@ -65,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :model-value="timeWindow"
             mobile-dropdown
             data-test="fleet-flow-overview-window"
-            @update:model-value="(v) => (timeWindow = v as FlowWindow)"
+            @update:model-value="(v) => onWindowChange(v as FlowWindow)"
           >
             <OToggleGroupItem v-for="w in windows" :key="w" :value="w" size="sm">
               {{ raw(w) }}
@@ -118,8 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :elements-selectable="false"
           :nodes-focusable="false"
           :edges-focusable="false"
-          :zoom-on-scroll="false"
-          :min-zoom="0.5"
+          :min-zoom="MIN_FLOW_ZOOM"
           :max-zoom="2"
           class="h-full w-full"
           @node-click="onNodeClick"
@@ -314,15 +321,23 @@ import {
   percent,
   ratio,
   SEVERITY_ORDER,
+  SIGNAL_DOT,
   type IssueAction,
   type PathIssue,
   type PathSeverity,
 } from "./flowIssues";
-import type { FleetFlowEdgeData, FleetFlowNodeData, FlowSignal, FlowWindow } from "./flowTypes";
+import {
+  MIN_FLOW_ZOOM,
+  type FleetFlowEdgeData,
+  type FleetFlowNodeData,
+  type FlowSignal,
+  type FlowWindow,
+} from "./flowTypes";
 import { buildPipelineMap, strokeWidth, type MapEdge, type MapNode } from "./pipelineGraph";
 import { formatCount } from "./fleetFormat";
 import { useFleetFlow } from "./useFleetApi";
 import { typeKey } from "./editor/editorGraph";
+import analytics from "@/services/product_analytics";
 
 const emit = defineEmits<{
   navigate: [tab: FleetTab, query: Record<string, string>];
@@ -346,9 +361,9 @@ const DESTINATION_ICON: Record<string, IconName> = {
   awss3: "inventory-2",
 };
 
-const COLUMN_ICON: Record<string, IconName> = { f: "dns", r: "input", e: "send" };
+const COLUMN_ICON: Record<string, IconName> = { f: "dns", r: "input" };
 
-// An exporter failing at least this share of its items, or a receiver refusing it, is rung like its issue.
+// A destination failing at least this share of its items, or a receiver refusing it, is rung like its issue.
 const ISSUE_RATIO = 0.01;
 const QUEUE_WARNING = 0.8;
 
@@ -383,9 +398,9 @@ const timeWindow = ref<FlowWindow>("1h");
 const windows: FlowWindow[] = ["5m", "1h", "24h"];
 const telemetryOptions = computed(() => [
   { value: "all", label: t("fleet.flow.all") },
-  { value: "logs", label: t("fleet.flow.logs") },
-  { value: "metrics", label: t("fleet.flow.metrics") },
-  { value: "traces", label: t("fleet.flow.traces") },
+  { value: "logs", label: t("fleet.flow.logs"), dot: SIGNAL_DOT.logs },
+  { value: "metrics", label: t("fleet.flow.metrics"), dot: SIGNAL_DOT.metrics },
+  { value: "traces", label: t("fleet.flow.traces"), dot: SIGNAL_DOT.traces },
 ]);
 
 const flowQuery = useFleetFlow(() => timeWindow.value);
@@ -421,6 +436,16 @@ function retry() {
 function refresh() {
   retry();
   emit("refresh");
+}
+
+function onWindowChange(next: FlowWindow) {
+  timeWindow.value = next;
+  analytics.track("fleet_flow_window_changed", { window: next });
+}
+
+function onSignalChange(next: FlowSignal) {
+  telemetry.value = next;
+  analytics.track("fleet_flow_signal_changed", { signal: next });
 }
 
 defineExpose({ refresh: retry });
@@ -574,13 +599,13 @@ function nodeSignal(n: MapNode): FlowSignal {
 
 function nodeLabel(n: MapNode): I18nText {
   if (n.column === "fleet") return raw(fleetName(n.name));
-  if (n.column === "destination") return destinationLabel(n.name);
+  if (n.column === "destination" || n.column === "sink") return destinationLabel(n.name);
   return raw(n.name);
 }
 
 function nodeRing(n: MapNode): PathSeverity | undefined {
-  if (n.column === "exporter") {
-    if (ratio(n.failed, n.rate) >= ISSUE_RATIO || n.dropped > 0) return "error";
+  if (n.column === "destination") {
+    if (n.failedRatio >= ISSUE_RATIO || n.dropped > 0) return "error";
     if ((n.queue ?? 0) >= QUEUE_WARNING) return "warning";
   }
   if (n.column === "receiver" && ratio(n.refused, n.rate) >= ISSUE_RATIO) return "warning";
@@ -623,7 +648,7 @@ function nodeData(n: MapNode): FleetFlowNodeData {
     compact: !destination,
     selected: sel?.kind === "node" && sel.id === n.id,
     inbound: true,
-    outbound: !destination,
+    outbound: !destination || n.failed > 0 || n.dropped > 0,
     ring: nodeRing(n),
   };
 }
@@ -762,7 +787,9 @@ function clampPopover() {
 function select(next: Selection, event: MouseEvent | TouchEvent, anchorToNode: boolean) {
   const same = selection.value?.kind === next.kind && selection.value.id === next.id;
   selection.value = same ? null : next;
-  if (!same) placePopover(event, anchorToNode);
+  if (same) return;
+  placePopover(event, anchorToNode);
+  analytics.track("fleet_flow_detail_opened", { kind: next.kind });
 }
 
 function onNodeClick({ node, event }: NodeMouseEvent) {

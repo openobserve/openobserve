@@ -16,32 +16,13 @@
 //! Microsoft Teams renderers — Adaptive Card (Power Automate / Workflows) and
 //! the deprecated O365 MessageCard.
 
-use config::meta::alerts::level::AlertLevel;
 use serde_json::{Value, json};
 
 use super::{
     DEFAULT_LINK_LABEL, clamp, dispatchable_url,
     markdown::{escape_html, markdown_to_plaintext},
-    severity_color,
 };
 use crate::alerts::notifications::{NotificationContext, resolve::RenderedContent};
-
-/// Adaptive Cards' text color vocabulary for the title block.
-///
-/// Exhaustive over `AlertLevel` on purpose — no `_` wildcard — so adding a
-/// variant is a compile error here rather than a silent fallthrough to
-/// "default". Matches `severity_color`'s discipline.
-fn adaptive_color(level: Option<AlertLevel>) -> &'static str {
-    match level {
-        Some(AlertLevel::Critical) => "attention",
-        Some(AlertLevel::Warning) => "warning",
-        Some(AlertLevel::Ok) => "good",
-        // NoData has no Adaptive Cards equivalent; "default" is deliberate.
-        Some(AlertLevel::NoData) => "default",
-        // Single-level alert: no severity axis to color by.
-        None => "default",
-    }
-}
 
 /// Adaptive Card TextBlocks render a small markdown subset and are NOT HTML —
 /// raw `<`/`&` are shown literally, so the escaping job here is to strip the
@@ -60,7 +41,6 @@ pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext
         "weight": "Bolder",
         "size": "Large",
         "wrap": true,
-        "color": adaptive_color(c.severity),
     })];
 
     if !c.body_markdown.is_empty() {
@@ -230,7 +210,6 @@ pub fn render_teams_message_card(c: &RenderedContent) -> Value {
     json!({
         "@type": "MessageCard",
         "@context": "http://schema.org/extensions",
-        "themeColor": severity_color(c.severity).trim_start_matches('#'),
         // `summary` is the notification-toast line; MessageCard rejects a card
         // with neither text nor summary, and it must never be empty.
         "summary": clamp(&title, 200),

@@ -199,6 +199,10 @@ pub struct ScheduledTriggerData {
     /// rendering) is its only consumer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chart_id: Option<String>,
+    /// SIEM detections only: enterprise evaluation memory (covered window, rows alerted on).
+    #[cfg(feature = "enterprise")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub siem: Option<json::Value>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -243,6 +247,13 @@ impl ScheduledTriggerData {
         self.notified_destinations.clear();
     }
 
+    /// Forgets the delivery cycle, so the next firing pages as the alert's first.
+    pub fn clear_delivery(&mut self) {
+        self.delivery_silenced_until = None;
+        self.last_notified_level = None;
+        self.notified_destinations.clear();
+    }
+
     pub fn to_json_string(&self) -> String {
         json::to_string(self).unwrap()
     }
@@ -275,6 +286,43 @@ pub struct SlackSyncFinish {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_re_enabled_alert_pages_inside_its_old_silence_window() {
+        use crate::meta::alerts::level::{AlertLevel, delivery_decision};
+
+        let now = 1_000_000_000;
+        let mut data = ScheduledTriggerData {
+            period_end_time: Some(7),
+            tolerance: 3,
+            last_satisfied_at: Some(5),
+            delivery_silenced_until: Some(now + 3_600_000_000),
+            last_notified_level: Some(AlertLevel::Critical.to_i32()),
+            notified_destinations: vec!["slack".to_string()],
+            ..Default::default()
+        };
+        let decide = |data: &ScheduledTriggerData| {
+            delivery_decision(
+                AlertLevel::Critical,
+                data.last_notified_level.and_then(AlertLevel::from_i32),
+                data.delivery_silenced_until,
+                now,
+                None,
+            )
+            .should_deliver()
+        };
+        assert!(!decide(&data), "the old window holds the Critical back");
+
+        data.clear_delivery();
+
+        assert!(decide(&data), "the first Critical after re-enable pages");
+        assert!(data.notified_destinations.is_empty());
+        assert_eq!(
+            (data.period_end_time, data.tolerance, data.last_satisfied_at),
+            (Some(7), 3, Some(5)),
+            "only the delivery cycle is forgotten"
+        );
+    }
 
     #[test]
     fn test_completed_trigger_has_no_pending_next_run() {
@@ -380,6 +428,8 @@ mod tests {
             last_notified_level: None,
             notified_destinations: vec![],
             chart_id: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
         };
         data.reset();
         assert!(data.period_end_time.is_none());
@@ -447,6 +497,8 @@ mod tests {
             last_notified_level: None,
             notified_destinations: vec![],
             chart_id: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
         };
         let json = data.to_json_string();
         let restored = ScheduledTriggerData::from_json_string(&json).unwrap();
@@ -643,6 +695,8 @@ mod tests {
             last_notified_level: None,
             notified_destinations: vec![],
             chart_id: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
             backfill_job: Some(BackfillJob {
                 current_position: 42,
                 deletion_status: DeletionStatus::Pending,

@@ -1,46 +1,17 @@
 {
-  "body_markdown": "Value **92.5** exceeded `80` \u2014 see [runbook](https://rb.example/x)\n\n<script>alert(1)</script>",
-  "chart_url": null,
-  "context": {
-    "alert_agg_value": "92.5",
-    "alert_count": "3",
-    "alert_description": null,
-    "alert_end_time": "2026-08-01T10:10:00",
-    "alert_level": "critical",
-    "alert_status": "firing",
-    "alert_name": "CPU \"high\"",
-    "alert_operator": ">=",
-    "alert_period": "10",
-    "alert_priority": "P1",
-    "alert_start_time": "2026-08-01T10:00:00",
-    "alert_tags": "infra, prod",
-    "alert_threshold": "80",
-    "alert_threshold_crit": "90",
-    "alert_threshold_warn": "80",
-    "alert_time": "2026-08-01T10:10:00",
-    "alert_trigger_time_str": "2026-08-01T10:10:00",
-    "alert_type": "scheduled",
-    "alert_url": "https://o2.example/short/abc",
-    "alert_warning_threshold": "80",
-    "channel": "#alerts",
-    "cpu": [
-      "92.5"
-    ],
-    "env": "prod",
-    "episode_id": null,
-    "group.pod": "web-1",
-    "host": [
-      "web-1"
-    ],
-    "org_name": "default",
-    "recovery_reason": null,
-    "stream_name": "app",
-    "stream_type": "logs"
-  },
+  "version": 1,
+  "title": "CPU \"high\" & <fire> on web-1",
+  "body_markdown": "Value **92.5** exceeded `80` — see [runbook](https://rb.example/x)\n\n<script>alert(1)</script>",
   "fields": {
-    "cpu": "92.5",
-    "host": "web-1 & web-2"
+    "host": "web-1 & web-2",
+    "cpu": "92.5"
   },
+  "rows": [
+    {
+      "host": "web-1",
+      "cpu": 92.5
+    }
+  ],
   "links": [
     {
       "label": "Runbook",
@@ -51,13 +22,42 @@
       "url": "https://o2.example/short/abc"
     }
   ],
-  "rows": [
-    {
-      "cpu": 92.5,
-      "host": "web-1"
-    }
-  ],
   "severity": "critical",
-  "title": "CPU \"high\" & <fire> on web-1",
-  "version": 1
+  "chart_url": null,
+  "context": {
+    "org_name": "default",
+    "stream_type": "logs",
+    "stream_name": "app",
+    "alert_name": "CPU \"high\"",
+    "alert_type": "scheduled",
+    "alert_period": "10",
+    "alert_operator": ">=",
+    "alert_threshold": "80",
+    "alert_count": "3",
+    "alert_agg_value": "92.5",
+    "alert_level": "critical",
+    "alert_status": "firing",
+    "episode_id": null,
+    "recovery_reason": null,
+    "alert_priority": "P1",
+    "alert_tags": "infra, prod",
+    "alert_threshold_crit": "90",
+    "alert_threshold_warn": "80",
+    "alert_warning_threshold": "80",
+    "alert_start_time": "2026-08-01T10:00:00",
+    "alert_end_time": "2026-08-01T10:10:00",
+    "alert_url": "https://o2.example/short/abc",
+    "alert_trigger_time_str": "2026-08-01T10:10:00",
+    "alert_time": "2026-08-01T10:10:00",
+    "alert_description": null,
+    "host": [
+      "web-1"
+    ],
+    "cpu": [
+      "92.5"
+    ],
+    "env": "prod",
+    "channel": "#alerts",
+    "group.pod": "web-1"
+  }
 }

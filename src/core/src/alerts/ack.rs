@@ -40,11 +40,25 @@ use crate::alerts::lifecycle;
 const CAN_ACT_SHOWN: usize = 2;
 const ON_CALL_SHOWN: usize = 3;
 
-/// What the caller wants to do; Ack and Mute share one rule (Δ2).
+/// What the caller wants to do; every act shares one rule (Δ2) and a refusal names it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Act {
     Ack,
+    Unack,
+    TakeOver,
+    Resolve,
     Mute,
+}
+
+impl From<Verb> for Act {
+    fn from(verb: Verb) -> Self {
+        match verb {
+            Verb::Acknowledge => Self::Ack,
+            Verb::TakeOver => Self::TakeOver,
+            Verb::Unack | Verb::HandOff => Self::Unack,
+            Verb::Resolve => Self::Resolve,
+        }
+    }
 }
 
 /// Which part of the rule let the actor in.
@@ -111,6 +125,8 @@ pub enum Verb {
     Unack,
     /// An unack for a hand-off: the hand-off, not the unack, restarts the page it moves.
     HandOff,
+    /// A person fixed the problem: its ack ends and no page restarts.
+    Resolve,
 }
 
 /// Which firing groups of an alert an ack names.
@@ -181,13 +197,30 @@ pub struct PlanFacts {
     /// Who holds the firing groups of the alert the caller did not name.
     pub other_holders: Vec<String>,
     pub pages: Vec<OpenPage>,
+    /// What a page's Resolve may end; `None` ends the whole problem.
+    pub cover: Option<PageCover>,
+}
+
+/// A page covers the firings of its alert that started by the time it closed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PageCover {
+    pub alert_id: String,
+    pub closed_at: i64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RecordWrite {
     Claim,
-    Move { from: String },
-    Clear { holder: String },
+    Move {
+        from: String,
+    },
+    Clear {
+        holder: String,
+    },
+    /// A clear that writes only while `holder` still holds the record.
+    Release {
+        holder: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -321,6 +354,9 @@ pub fn refusal(
         .collect();
     let (code, verb) = match act {
         Act::Ack => (RefusalCode::AckRefused, "acknowledge"),
+        Act::Unack => (RefusalCode::AckRefused, "unacknowledge"),
+        Act::TakeOver => (RefusalCode::AckRefused, "take over"),
+        Act::Resolve => (RefusalCode::AckRefused, "resolve"),
         Act::Mute => (RefusalCode::MuteRefused, "mute"),
     };
     let message = if facts.fga_enabled {
@@ -361,7 +397,7 @@ pub async fn resolve_target(org_id: &str, alert_id: &str) -> Result<AckTarget, A
             evaluates_through_silence: config::meta::alerts::dispatch::evaluates_through_silence(
                 multi_alert,
                 multi_level,
-            ),
+            ) || siem_evaluates_through_silence(&alert),
         });
     }
     match crate::alerts::composite::get_composite(org_id, alert_id).await {
@@ -384,7 +420,35 @@ pub async fn resolve_target(org_id: &str, alert_id: &str) -> Result<AckTarget, A
 pub fn plan(f: &PlanFacts) -> AckPlan {
     match f.verb {
         Verb::Acknowledge | Verb::TakeOver => plan_hold(f),
-        Verb::Unack | Verb::HandOff => plan_release(f),
+        Verb::Unack | Verb::HandOff | Verb::Resolve => plan_release(f),
+    }
+}
+
+/// Clears each record `f.actor`, the leaver, holds and leaves every page to its release. [pure]
+pub fn plan_leaver_release(f: &PlanFacts) -> AckPlan {
+    let writes: Vec<(AckRecord, RecordWrite)> = f
+        .records
+        .iter()
+        .filter_map(|r| {
+            r.holder
+                .as_ref()
+                .filter(|h| same(h, &f.actor))
+                .map(|h| (r.record.clone(), RecordWrite::Release { holder: h.clone() }))
+        })
+        .collect();
+    AckPlan {
+        answer: if writes.is_empty() {
+            Answer::NotHeld
+        } else {
+            Answer::Changed
+        },
+        writes,
+        pages: f
+            .pages
+            .iter()
+            .map(|p| (p.response_id.clone(), PageStep::Leave))
+            .collect(),
+        still_paging: vec![],
     }
 }
 
@@ -535,7 +599,7 @@ pub async fn take_over(
 /// [weak: the ack is cleared first; a page that fails to restart stays acknowledged until the next
 /// unack; one restarted with no ladder armed is logged and left to `reconcile_abandoned`]
 pub async fn unack(p: &Problem, actor: &str, source: AckSource) -> Result<UnackResponse, AckError> {
-    release(p, Verb::Unack, actor, source).await
+    release(p, Verb::Unack, actor, source, None).await
 }
 
 /// Clears the problem's ack for a hand-off, which restarts the page it moves.
@@ -546,7 +610,63 @@ pub async fn release_for_hand_off(
     actor: &str,
     source: AckSource,
 ) -> Result<UnackResponse, AckError> {
-    release(p, Verb::HandOff, actor, source).await
+    release(p, Verb::HandOff, actor, source, None).await
+}
+
+/// Ends the covered ack after a person's Resolve. [weak: a retried Resolve clears the rest]
+pub async fn resolve(
+    p: &Problem,
+    actor: &str,
+    source: AckSource,
+    cover: Option<PageCover>,
+) -> Result<UnackResponse, AckError> {
+    release(p, Verb::Resolve, actor, source, cover).await
+}
+
+/// An alert page covers its alert's firings up to its first close; an incident page all. [pure]
+pub fn page_cover(subject: &config::meta::oncall::SubjectRef, closed_at: i64) -> Option<PageCover> {
+    match subject.subject_type {
+        config::meta::oncall::SubjectType::Alert => Some(PageCover {
+            alert_id: source_of_page(&subject.source_id).to_string(),
+            closed_at,
+        }),
+        config::meta::oncall::SubjectType::Incident => None,
+    }
+}
+
+/// Clears, as the engine, what the leaver holds. [weak: cleared stays cleared; a retry ends it]
+#[cfg(feature = "enterprise")]
+pub async fn release_leaver(p: &Problem, leaver: &str) -> Result<(), AckError> {
+    use o2_enterprise::enterprise::oncall::escalation::ENGINE_ACTOR;
+
+    // A release verb, so a named group is read even when it no longer fires.
+    let g = gather(p, Verb::HandOff, leaver).await?;
+    let plan = plan_leaver_release(&g.facts);
+    carry_out(p, &g, &plan, ENGINE_ACTOR, AckSource::Oncall)
+        .await
+        .map(|_| ())
+}
+
+/// [`release_leaver`] on each released page's problem; a failure is logged. [no-fail]
+#[cfg(feature = "enterprise")]
+pub async fn release_leaver_pages(org_id: &str, response_ids: &[String], leaver: &str) {
+    for response_id in response_ids {
+        let released = match problem_of_page(org_id, response_id).await {
+            Ok(p) => release_leaver(&p, leaver).await,
+            Err(e) => Err(e),
+        };
+        match released {
+            Ok(()) => {}
+            Err(AckError::NotFound) => {
+                log::info!(
+                    "[ALERT_ACK] page {response_id} has no alert or incident left to release"
+                )
+            }
+            Err(e) => log::error!(
+                "[ALERT_ACK] page {response_id}: the acks {leaver} held could not be released: {e:?}"
+            ),
+        }
+    }
 }
 
 /// A firing that joins an acknowledged incident takes the incident's ack, so nobody is re-paged.
@@ -967,10 +1087,17 @@ async fn gather_facts(
     }
 }
 
-/// OpenFGA edit on the alert, or on any alert of the incident (D24).
+/// Edit on the alert or any of the incident's (D24); Security triage stands in for detections.
 #[cfg(feature = "enterprise")]
 async fn may_edit_any_alert(p: &Problem, actor: &str) -> bool {
+    let siem = db::alerts::alert::resolve_siem_alert_ids(p.org_id()).await;
+    let triage =
+        !siem.is_empty() && crate::security::security_allowed(p.org_id(), actor, "PUT").await;
+    let siem = &siem;
     may_edit_any_alert_with(p, |target: AckTarget| async move {
+        if triage_admits(triage, siem, &target.alert_id) {
+            return true;
+        }
         crate::auth::check_permissions(
             &target.alert_id,
             &target.org_id,
@@ -985,6 +1112,12 @@ async fn may_edit_any_alert(p: &Problem, actor: &str) -> bool {
         .await
     })
     .await
+}
+
+/// Security triage stands in for alert edit, but only on a security detection.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn triage_admits(triage: bool, siem_ids: &[String], alert_id: &str) -> bool {
+    triage && siem_ids.iter().any(|id| id == alert_id)
 }
 
 /// The members of every team with an open page on the problem, owner or impacted.
@@ -1042,6 +1175,26 @@ async fn org_editors(org_id: &str) -> Vec<(String, UserRole, Option<String>)> {
         }
     }
     out
+}
+
+/// The records a release ends; a page's Resolve leaves its alert's firings newer than its close.
+fn covered(f: &PlanFacts) -> Vec<&HeldRecord> {
+    let Some(c) = f.cover.as_ref().filter(|_| f.verb == Verb::Resolve) else {
+        return f.records.iter().collect();
+    };
+    let newer = |r: &HeldRecord| {
+        matches!(&r.record, AckRecord::Firing { alert_id, firing_started_at, .. }
+            if *alert_id == c.alert_id && *firing_started_at > c.closed_at)
+    };
+    let incident = f
+        .records
+        .iter()
+        .any(|r| matches!(r.record, AckRecord::Incident { .. }));
+    // An incident is one problem: a page whose alert fired again after it closed covers none of it.
+    if incident && f.records.iter().any(newer) {
+        return vec![];
+    }
+    f.records.iter().filter(|r| !newer(r)).collect()
 }
 
 fn same(a: &str, b: &str) -> bool {
@@ -1137,13 +1290,13 @@ fn hold_step(p: &OpenPage, f: &PlanFacts, by: &str, take_over: bool) -> PageStep
     }
 }
 
-/// An unack restarts the current pages an ack stopped (D34); a hand-off leaves them be.
+/// An unack restarts the current pages an ack stopped (D34); a hand-off and a resolve do not.
 fn plan_release(f: &PlanFacts) -> AckPlan {
+    let ends = covered(f);
     // Any held record, carried ones too: a retry after a partial clear must finish the job.
-    let held = f.records.iter().any(|r| r.holder.is_some());
+    let held = ends.iter().any(|r| r.holder.is_some());
     let writes = if held {
-        f.records
-            .iter()
+        ends.iter()
             .filter_map(|r| {
                 r.holder
                     .as_ref()
@@ -1203,8 +1356,10 @@ async fn release(
     verb: Verb,
     actor: &str,
     source: AckSource,
+    cover: Option<PageCover>,
 ) -> Result<UnackResponse, AckError> {
-    let g = gather(p, verb, actor).await?;
+    let mut g = gather(p, verb, actor).await?;
+    g.facts.cover = cover;
     let plan = plan(&g.facts);
     let out = carry_out(p, &g, &plan, actor, source).await?;
     Ok(UnackResponse {
@@ -1235,6 +1390,7 @@ async fn gather(p: &Problem, verb: Verb, actor: &str) -> Result<Gathered, AckErr
             other_groups_unacked: 0,
             other_holders: vec![],
             pages,
+            cover: None,
         },
         targets: HashMap::new(),
         held: HashMap::new(),
@@ -1293,7 +1449,7 @@ async fn one_row(
     firing_started_at: Option<i64>,
     verb: Verb,
 ) -> Result<Vec<(String, i64)>, AckError> {
-    if matches!(verb, Verb::Unack | Verb::HandOff) {
+    if matches!(verb, Verb::Unack | Verb::HandOff | Verb::Resolve) {
         let firing = match firing_started_at {
             Some(f) => Some(f),
             None => current_firing(target, group_key).await?,
@@ -1354,19 +1510,22 @@ async fn gather_incident(
     };
     let status: IncidentStatus = model.status.parse().unwrap_or_default();
     g.incident_status = Some(status);
-    // A resolved incident has nothing to acknowledge or clear; reopening it is its own verb.
-    if status == IncidentStatus::Resolved {
+    let resolved = status == IncidentStatus::Resolved;
+    // A resolved incident has nothing to acknowledge; only a resolve still clears its alerts' rows.
+    if resolved && g.facts.verb != Verb::Resolve {
         return Ok(());
     }
-    g.facts.records.push(HeldRecord {
-        record: AckRecord::Incident {
-            incident_id: incident_id.to_string(),
-        },
-        holder: (status == IncidentStatus::Acknowledged)
-            .then_some(model.acknowledged_by)
-            .flatten(),
-        named: true,
-    });
+    if !resolved {
+        g.facts.records.push(HeldRecord {
+            record: AckRecord::Incident {
+                incident_id: incident_id.to_string(),
+            },
+            holder: (status == IncidentStatus::Acknowledged)
+                .then_some(model.acknowledged_by)
+                .flatten(),
+            named: true,
+        });
+    }
     for alert_id in incident_alert_ids(incident_id).await? {
         let target = match resolve_target(org_id, &alert_id).await {
             Ok(t) => t,
@@ -1425,7 +1584,8 @@ async fn carry_out(
             .any(|r| &r.record == record && r.named);
         let won = match record {
             AckRecord::Incident { incident_id } => {
-                let won = write_incident(p.org_id(), incident_id, write, actor).await?;
+                let won =
+                    write_incident(p.org_id(), incident_id, write, actor, g.facts.verb).await?;
                 if won {
                     incident_status = Some(status_after(write));
                 } else if *write == RecordWrite::Claim {
@@ -1497,7 +1657,7 @@ fn ordered_views(
 fn status_after(write: &RecordWrite) -> IncidentStatus {
     match write {
         RecordWrite::Claim | RecordWrite::Move { .. } => IncidentStatus::Acknowledged,
-        RecordWrite::Clear { .. } => IncidentStatus::Open,
+        RecordWrite::Clear { .. } | RecordWrite::Release { .. } => IncidentStatus::Open,
     }
 }
 
@@ -1573,6 +1733,18 @@ async fn write_firing(
             reopen_silence(target, group_key, started, now).await;
             (row, AckAction::Unack, None)
         }
+        RecordWrite::Release { holder } => {
+            let held = AlertAck {
+                acked_by: holder.clone(),
+                ..ack(None)
+            };
+            // Someone else's ack landed since the read: theirs stands.
+            let Some(row) = db::alerts::alert_acks::unack_held(&held, actor, now).await? else {
+                return Ok((None, false));
+            };
+            reopen_silence(target, group_key, started, now).await;
+            (row, AckAction::Unack, None)
+        }
     };
     record_event(target, group_key, actor, action, source, from);
     lifecycle::on_view_changed(&target.org_id, &target.alert_id, Some(group_key)).await;
@@ -1586,6 +1758,7 @@ async fn write_incident(
     incident_id: &str,
     write: &RecordWrite,
     actor: &str,
+    verb: Verb,
 ) -> Result<bool, AckError> {
     use config::meta::alerts::incidents::IncidentEvent;
     use infra::table::alert_incidents;
@@ -1603,9 +1776,14 @@ async fn write_incident(
             alert_incidents::take_over_acknowledgement(org_id, incident_id, from, actor).await?,
             IncidentEvent::acknowledged(actor),
         ),
-        RecordWrite::Clear { holder } => (
+        RecordWrite::Clear { holder } | RecordWrite::Release { holder } => (
             alert_incidents::unacknowledge(org_id, incident_id, holder).await?,
-            IncidentEvent::reopened(actor, "Unacknowledged"),
+            match verb {
+                Verb::Resolve => IncidentEvent::ack_ended_by_page_resolve(actor),
+                Verb::Acknowledge | Verb::TakeOver | Verb::Unack | Verb::HandOff => {
+                    IncidentEvent::reopened(actor, "Unacknowledged")
+                }
+            },
         ),
     };
     if won {
@@ -1621,6 +1799,7 @@ async fn write_incident(
     _incident_id: &str,
     _write: &RecordWrite,
     _actor: &str,
+    _verb: Verb,
 ) -> Result<bool, AckError> {
     Err(AckError::NotFound)
 }
@@ -1844,6 +2023,19 @@ async fn incident_of(_target: &AckTarget) -> Result<Option<String>, AckError> {
     Ok(None)
 }
 
+/// A security detection keeps evaluating through silence, so an unack never pauses it.
+#[cfg(feature = "enterprise")]
+fn siem_evaluates_through_silence(alert: &config::meta::alerts::alert::Alert) -> bool {
+    o2_enterprise::enterprise::security::detection::evaluates_through_silence(
+        alert.context_attributes.as_ref(),
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn siem_evaluates_through_silence(_alert: &config::meta::alerts::alert::Alert) -> bool {
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2059,6 +2251,14 @@ mod tests {
             other_groups_unacked: 0,
             other_holders: vec![],
             pages,
+            cover: None,
+        }
+    }
+
+    fn cover(closed_at: i64) -> PageCover {
+        PageCover {
+            alert_id: "a1".into(),
+            closed_at,
         }
     }
 
@@ -2226,6 +2426,82 @@ mod tests {
                 Answer::Changed,
             ),
             (
+                "a resolve clears every record and restarts no page",
+                facts_for(
+                    Verb::Resolve,
+                    vec![incident(ana), firing("", ana, false)],
+                    vec![page("owner", ana), page("paging", None)],
+                ),
+                vec![cleared(&incident(ana)), cleared(&firing("", ana, false))],
+                vec![("owner", Leave), ("paging", Leave)],
+                vec![],
+                Answer::Changed,
+            ),
+            (
+                "a resolve with nothing held changes nothing",
+                facts_for(
+                    Verb::Resolve,
+                    vec![firing("", None, true)],
+                    vec![page("p1", ana)],
+                ),
+                vec![],
+                vec![("p1", Leave)],
+                vec![],
+                Answer::NotHeld,
+            ),
+            (
+                "a page's resolve leaves a firing that started after the page closed",
+                PlanFacts {
+                    cover: Some(cover(50)),
+                    ..facts_for(
+                        Verb::Resolve,
+                        vec![firing("", ana, true)],
+                        vec![page("p1", ana)],
+                    )
+                },
+                vec![],
+                vec![("p1", Leave)],
+                vec![],
+                Answer::NotHeld,
+            ),
+            (
+                "a page's resolve ends a firing that started while it was open",
+                PlanFacts {
+                    cover: Some(cover(100)),
+                    ..facts_for(Verb::Resolve, vec![firing("", ana, true)], vec![])
+                },
+                vec![cleared(&firing("", ana, true))],
+                vec![],
+                vec![],
+                Answer::Changed,
+            ),
+            (
+                "a page's resolve covers none of an incident its alert re-fired into after the close",
+                PlanFacts {
+                    cover: Some(cover(50)),
+                    ..facts_for(
+                        Verb::Resolve,
+                        vec![incident(ana), firing("", ana, false)],
+                        vec![],
+                    )
+                },
+                vec![],
+                vec![],
+                vec![],
+                Answer::NotHeld,
+            ),
+            (
+                "a hand-off ignores a cover",
+                PlanFacts {
+                    cover: Some(cover(50)),
+                    ..facts_for(Verb::HandOff, vec![firing("", ana, true)], vec![])
+                },
+                vec![cleared(&firing("", ana, true))],
+                vec![],
+                vec![],
+                Answer::Changed,
+            ),
+            (
                 "an unack with nothing held still restarts the page an ack stopped",
                 facts_for(
                     Verb::Unack,
@@ -2319,6 +2595,126 @@ mod tests {
         }
     }
 
+    fn released(r: &HeldRecord) -> (AckRecord, RecordWrite) {
+        let holder = r.holder.clone().unwrap_or_default();
+        (r.record.clone(), RecordWrite::Release { holder })
+    }
+
+    #[test]
+    fn a_leaver_release_clears_only_the_leavers_records_and_leaves_every_page() {
+        let (bo, ana) = (Some("Bo@acme.io"), Some("ana@acme.io"));
+        let pages = || vec![page("p1", bo), page("p2", None), leftover("old", ana)];
+        let cases: Vec<(&str, Vec<HeldRecord>, Vec<HeldRecord>)> = vec![
+            (
+                "the incident only",
+                vec![incident(bo), firing("", None, false)],
+                vec![incident(bo)],
+            ),
+            (
+                "the alerts only",
+                vec![
+                    incident(None),
+                    firing("g1", bo, false),
+                    firing("g2", bo, false),
+                ],
+                vec![firing("g1", bo, false), firing("g2", bo, false)],
+            ),
+            (
+                "both",
+                vec![incident(bo), firing("", bo, false)],
+                vec![incident(bo), firing("", bo, false)],
+            ),
+            (
+                "nothing",
+                vec![incident(None), firing("", None, false)],
+                vec![],
+            ),
+            (
+                "a mix with another holder",
+                vec![
+                    incident(ana),
+                    firing("g1", bo, false),
+                    firing("g2", ana, true),
+                ],
+                vec![firing("g1", bo, false)],
+            ),
+        ];
+        for (name, records, cleared) in cases {
+            let got = plan_leaver_release(&facts_for(Verb::HandOff, records, pages()));
+            assert_eq!(
+                got.writes,
+                cleared.iter().map(released).collect::<Vec<_>>(),
+                "{name}"
+            );
+            assert!(
+                got.pages.iter().all(|(_, step)| *step == PageStep::Leave),
+                "{name}: {:?}",
+                got.pages
+            );
+            assert_eq!(got.pages.len(), 3, "{name}");
+            let answer = if cleared.is_empty() {
+                Answer::NotHeld
+            } else {
+                Answer::Changed
+            };
+            assert_eq!(got.answer, answer, "{name}");
+        }
+    }
+
+    #[test]
+    fn after_a_leaver_release_a_plain_ack_holds_the_page_the_incident_and_the_alert() {
+        let bo = Some("bo@acme.io");
+        let records = vec![incident(bo), firing("", bo, false)];
+        let release = plan_leaver_release(&facts_for(Verb::HandOff, records.clone(), vec![]));
+        let after: Vec<HeldRecord> = records
+            .into_iter()
+            .map(|r| HeldRecord {
+                holder: (!release.writes.iter().any(|(rec, _)| *rec == r.record))
+                    .then(|| r.holder.clone())
+                    .flatten(),
+                ..r
+            })
+            .collect();
+        let ack = plan(&PlanFacts {
+            actor: "cy@acme.io".into(),
+            ..facts_for(Verb::Acknowledge, after, vec![page("p1", None)])
+        });
+        assert_eq!(
+            ack.writes,
+            vec![claim(&incident(None)), claim(&firing("", None, false))]
+        );
+        assert_eq!(
+            ack.pages,
+            vec![(
+                "p1".to_string(),
+                PageStep::Stop {
+                    by: "cy@acme.io".into()
+                }
+            )]
+        );
+        assert_eq!(ack.answer, Answer::Changed);
+    }
+
+    #[test]
+    fn a_refusal_names_the_verb_it_refused() {
+        for (act, verb) in [
+            (Act::Ack, "acknowledge"),
+            (Act::Unack, "unacknowledge"),
+            (Act::TakeOver, "take over"),
+            (Act::from(Verb::TakeOver), "take over"),
+            (Act::from(Verb::Unack), "unacknowledge"),
+            (Act::from(Verb::Resolve), "resolve"),
+        ] {
+            let r = refusal(act, &facts(Some(UserRole::Viewer)), &[]);
+            assert_eq!(r.code, RefusalCode::AckRefused, "{verb}");
+            assert!(
+                r.message.ends_with(&format!("can {verb} it")),
+                "{verb}: {}",
+                r.message
+            );
+        }
+    }
+
     #[test]
     fn a_mute_snoozes_its_pages_for_its_whole_minutes_up_to_a_day() {
         const MINUTE: i64 = 60 * 1_000_000;
@@ -2334,6 +2730,17 @@ mod tests {
     }
 
     #[test]
+    fn an_alert_page_covers_its_alerts_firings_up_to_its_close_and_an_incident_page_all() {
+        use config::meta::oncall::{SubjectRef, SubjectType};
+        let subject = |kind, source: &str| SubjectRef::new(kind, source.to_string(), 1);
+        assert_eq!(
+            page_cover(&subject(SubjectType::Alert, "a1:group:g1"), 70),
+            Some(cover(70))
+        );
+        assert_eq!(page_cover(&subject(SubjectType::Incident, "i1"), 70), None);
+    }
+
+    #[test]
     fn a_page_names_its_source_without_the_group_or_impacted_suffix() {
         for (page_source, source) in [
             ("a1", "a1"),
@@ -2343,5 +2750,29 @@ mod tests {
         ] {
             assert_eq!(source_of_page(page_source), source, "{page_source}");
         }
+    }
+
+    #[test]
+    fn security_triage_admits_an_ack_only_on_a_security_detection() {
+        let siem = vec!["siem-1".to_string()];
+        assert!(triage_admits(true, &siem, "siem-1"));
+        assert!(!triage_admits(true, &siem, "ops-1"));
+        assert!(!triage_admits(false, &siem, "siem-1"));
+        assert!(!triage_admits(true, &[], "siem-1"));
+    }
+
+    #[test]
+    fn a_security_detection_keeps_evaluating_through_an_unack_only_with_enterprise() {
+        let mut alert = config::meta::alerts::alert::Alert::default();
+        assert!(!siem_evaluates_through_silence(&alert));
+        alert.context_attributes = Some(
+            [("siem".to_string(), "true".to_string())]
+                .into_iter()
+                .collect(),
+        );
+        assert_eq!(
+            siem_evaluates_through_silence(&alert),
+            cfg!(feature = "enterprise")
+        );
     }
 }

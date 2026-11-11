@@ -43,6 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
       <template #actions-overflow>
+        <OButton variant="outline" size="sm" @click="openGaps" data-test="model-pricing-gaps-btn">
+          {{ t("modelPricing.unpriced.title") }}
+        </OButton>
         <OButton
           variant="outline"
           size="sm"
@@ -89,6 +92,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="model-pricing-add-draft-dot"
           />
         </OButton>
+      </template>
+      <template v-if="builtInStatus" #subnav>
+        <div
+          class="px-page-edge text-text-secondary flex items-center gap-1.5 py-1.5 text-xs"
+          data-test="model-pricing-built-in-status"
+        >
+          <OIcon name="info-outline" size="xs" class="shrink-0" />
+          <span>{{ builtInStatus }}</span>
+        </div>
       </template>
 
       <!-- List Table -->
@@ -139,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   mobile-dropdown
                   :tabs="tabOptions"
                   v-model:active-tab="selectedTab"
-                  @update:active-tab="onTabChange"
+                  @update:active-tab="onTabSelect"
                 />
               </div>
               <OSearchInput
@@ -238,67 +250,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #cell-pricing="{ row }">
-            <div class="flex flex-wrap gap-1">
+            <div class="flex items-center gap-1">
               <template
                 v-if="getDefaultTier(row) && Object.keys(getDefaultTier(row).prices || {}).length"
               >
-                <ODimensionChip
-                  v-for="(price, key) in getVisiblePrices(row)"
-                  :key="key"
-                  :dim-key="key as string"
-                  :key-label="formatPriceKey(key as string)"
-                  :value="formatPerMillion(price as number)"
-                />
-                <OTag
-                  v-if="getOverflowCount(row) > 0"
-                  type="countChip"
-                  value="neutral"
-                  clickable
-                  @click.stop="openPricingDialog(row)"
-                >
-                  +{{ getOverflowCount(row) }}
-                  {{ t("modelPricing.overflowMore") }}
-                  <OTooltip>
-                    <template #content>
-                      <div class="min-w-60">
-                        <div class="text-compact mb-0.75 font-bold">
-                          {{ row.name }}
-                        </div>
-                        <table class="w-full border-collapse">
-                          <thead>
-                            <tr>
-                              <th
-                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b ps-0 pe-4 pt-0 pb-1 text-left font-semibold"
-                              >
-                                {{ t("modelPricing.usageType") }}
-                              </th>
-                              <th
-                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b ps-0 pe-0 pt-0 pb-1 text-right font-semibold"
-                              >
-                                {{ t("modelPricing.colPricingSimple") }}
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr
-                              v-for="[key, price] in sortedPriceEntries(
-                                getDefaultTier(row)?.prices || {},
-                              )"
-                              :key="key"
-                            >
-                              <td class="py-0.5 ps-0 pe-4 text-xs">{{ formatPriceKey(key) }}</td>
-                              <td class="py-0.5 ps-0 pe-0 text-right text-xs font-medium">
-                                {{ formatPerMillion(price) }}
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </template>
-                  </OTooltip>
-                </OTag>
+                <FitItems :items="sortedPriceEntries(getDefaultTier(row).prices)">
+                  <template #default="{ item }">
+                    <ODimensionChip
+                      :dim-key="item[0]"
+                      :key-label="formatPriceKey(item[0])"
+                      :value="formatPerMillion(item[1])"
+                    />
+                  </template>
+                  <template #more="{ count }">
+                    <OTag
+                      type="countChip"
+                      value="neutral"
+                      clickable
+                      @click.stop="openPricingDialog(row)"
+                    >
+                      +{{ count }}
+                      {{ t("modelPricing.overflowMore") }}
+                      <OTooltip>
+                        <template #content>
+                          <div class="min-w-60">
+                            <div class="text-compact mb-0.75 font-bold">
+                              {{ row.name }}
+                            </div>
+                            <table class="w-full border-collapse">
+                              <thead>
+                                <tr>
+                                  <th
+                                    class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b ps-0 pe-4 pt-0 pb-1 text-left font-semibold"
+                                  >
+                                    {{ t("modelPricing.usageType") }}
+                                  </th>
+                                  <th
+                                    class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b ps-0 pe-0 pt-0 pb-1 text-right font-semibold"
+                                  >
+                                    {{ t("modelPricing.colPricingSimple") }}
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr
+                                  v-for="[key, price] in sortedPriceEntries(
+                                    getDefaultTier(row)?.prices || {},
+                                  )"
+                                  :key="key"
+                                >
+                                  <td class="py-0.5 ps-0 pe-4 text-xs">
+                                    {{ formatPriceKey(key) }}
+                                  </td>
+                                  <td class="py-0.5 ps-0 pe-0 text-right text-xs font-medium">
+                                    {{ formatPerMillion(price) }}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </template>
+                      </OTooltip>
+                    </OTag>
+                  </template>
+                </FitItems>
                 <OTag
                   v-if="hasTimeBasedTiers(row)"
+                  class="shrink-0"
                   type="countChip"
                   value="neutral"
                   clickable
@@ -693,7 +711,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { useQuery } from "@tanstack/vue-query";
-import { modelPricingQuery } from "@/services/model_pricing.queries";
+import { builtInPricingQuery, modelPricingQuery } from "@/services/model_pricing.queries";
 import { modelPricingKeys } from "@/services/model_pricing.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
@@ -705,6 +723,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { getImageURL } from "@/utils/zincutils";
 import modelPricingService from "@/services/model_pricing";
+import analytics from "@/services/product_analytics";
 import ImportModelPricing from "@/components/settings/ImportModelPricing.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -723,9 +742,11 @@ import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import UtcHoursBar from "@/components/settings/UtcHoursBar.vue";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import FitItems from "@/components/common/FitItems.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
@@ -739,6 +760,7 @@ import {
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { forbiddenState } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
 
 const { t } = useI18nTyped();
@@ -765,6 +787,45 @@ const dropPricingDrafts = (ids: string[]) => {
   }
 };
 
+// ── Built-in price list status (header note) ────────────────────────────────
+const builtInQuery = useQuery(() =>
+  Object.assign(builtInPricingQuery(orgIdentifier.value, true), { enabled: !!orgIdentifier.value }),
+);
+
+/** How old the built-in prices are, and whether this server has synced them online. */
+const builtInStatus = computed(() => {
+  const info = builtInQuery.data.value;
+  if (!info?.seed_date) return "";
+  const seed = t("modelPricing.builtInStatus.seed", { date: info.seed_date });
+  const sync = info.last_updated
+    ? t("modelPricing.builtInStatus.lastSynced", {
+        time: timestampToTimezoneDate(
+          info.last_updated * 1000,
+          store.state.timezone || "UTC",
+          "yyyy-MM-dd HH:mm ZZZZ",
+        ),
+      })
+    : t("modelPricing.builtInStatus.neverSynced");
+  return raw(`${seed} ${sync}`);
+});
+
+const viewState = useListViewState("model-pricing", {
+  filterQuery: "",
+  selectedTab: "all",
+  pageSize: 20,
+  currentPage: 1,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const selectedTab = ref(viewState.selectedTab);
+
+/** `?tab=<tab>` reopens a tab after a reload. */
+function applyRouteTab() {
+  const { tab } = router.currentRoute.value.query;
+  if (typeof tab !== "string" || !tabOptions.value.some((o) => o.value === tab)) return;
+  selectedTab.value = tab;
+}
+
 const modelsQuery = useQuery(() =>
   Object.assign(modelPricingQuery(orgIdentifier.value), { enabled: !!orgIdentifier.value }),
 );
@@ -790,7 +851,7 @@ const lastUpdatedAt = modelsQuery.dataUpdatedAt;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = modelsQuery.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+  return forbiddenState(e) || e?.status === 403;
 });
 const refreshing = ref(false);
 
@@ -826,14 +887,6 @@ const confirmDialogMeta = ref({
 const resetConfirmDialog = () => {
   confirmDialogMeta.value.show = false;
 };
-const viewState = useListViewState("model-pricing", {
-  filterQuery: "",
-  selectedTab: "all",
-  pageSize: 20,
-  currentPage: 1,
-  sortBy: "",
-  sortOrder: "asc" as "asc" | "desc",
-});
 const filterQuery = ref(viewState.filterQuery);
 const pageSize = ref(viewState.pageSize);
 const currentPage = ref(viewState.currentPage);
@@ -843,7 +896,6 @@ const showImportModelPricingPage = ref(false);
 const showTestMatchDialog = ref(false);
 const selectedIds = ref<string[]>([]);
 const bulkDeleteLoading = ref(false);
-const selectedTab = ref(viewState.selectedTab);
 
 watch([filterQuery, selectedTab, pageSize, currentPage, sortBy, sortOrder], () => {
   Object.assign(viewState, {
@@ -862,8 +914,14 @@ const tabOptions = computed(() => [
   { label: t("modelPricing.tabSystem"), value: "inherited", icon: "business" },
 ]);
 
+function onTabSelect() {
+  analytics.track("model_pricing_tab_switched", { tab: selectedTab.value });
+  onTabChange();
+}
+
 function onTabChange() {
   selectedIds.value = [];
+  router.replace({ query: { ...router.currentRoute.value.query, tab: selectedTab.value } });
 }
 
 /** Flat list of all models (parents + children) for ID-based lookups. */
@@ -970,6 +1028,7 @@ const isFiltered = computed(() => !!filterQuery.value.trim() || selectedTab.valu
 function clearFilters() {
   filterQuery.value = "";
   selectedTab.value = "all";
+  onTabChange();
 }
 
 const filteredModels = computed(() => {
@@ -1059,22 +1118,6 @@ function sortedPriceEntries(prices: Record<string, number>): [string, number][] 
   });
 }
 
-/** Return the first N prices to display inline as chips. */
-const MAX_VISIBLE_PRICES = 2;
-function getVisiblePrices(model: any): Record<string, number> {
-  const tier = getDefaultTier(model);
-  if (!tier?.prices) return {};
-  return Object.fromEntries(sortedPriceEntries(tier.prices).slice(0, MAX_VISIBLE_PRICES));
-}
-
-/** How many prices are hidden behind the overflow "+N" chip. */
-function getOverflowCount(model: any): number {
-  const tier = getDefaultTier(model);
-  if (!tier?.prices) return 0;
-  const total = Object.keys(tier.prices).length;
-  return Math.max(0, total - MAX_VISIBLE_PRICES);
-}
-
 const ooLogo = computed(() =>
   isDark.value
     ? getImageURL("openobserve_favicon_dark.ico")
@@ -1106,6 +1149,10 @@ async function fetchModels(force = false) {
 watch(modelsQuery.error, (e: any) => {
   if (e) notifyError(t("modelPricing.errLoadModels"), e);
 });
+
+function openGaps() {
+  router.push({ name: "modelPricingGaps", query: { org_identifier: orgIdentifier.value } });
+}
 
 function openEditor(model: any) {
   if (model) {
@@ -1196,7 +1243,7 @@ async function refreshBuiltIn() {
       variant: "success",
       message: t("modelPricing.builtInPricesSynced"),
     });
-    await fetchModels(true);
+    await Promise.all([fetchModels(true), builtInQuery.refetch()]);
   } catch (e: any) {
     notifyError(t("modelPricing.errSync"), e);
   } finally {
@@ -1277,6 +1324,7 @@ onBeforeMount(() => {
   if (router.currentRoute.value.query.action === "import") {
     showImportModelPricingPage.value = true;
   }
+  applyRouteTab();
 });
 
 onActivated(() => {
@@ -1284,6 +1332,7 @@ onActivated(() => {
   if (router.currentRoute.value.query.action === "import") {
     showImportModelPricingPage.value = true;
   }
+  applyRouteTab();
 });
 
 useShortcuts([

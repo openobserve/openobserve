@@ -88,6 +88,7 @@ const GATED_IN_OSS = [
   "shortcuts.pages.evalJobs",
   "shortcuts.pages.scoreConfigs",
   "shortcuts.pages.runningQueries",
+  "shortcuts.pages.securityRecord",
 ];
 
 const OSS_PAGES = [
@@ -124,6 +125,7 @@ describe("shortcut cheatsheet OSS gating", () => {
     expect(titles).not.toContain("shortcuts.modules.onlineEvals");
     expect(titles).not.toContain("shortcuts.modules.runningQueries");
     expect(titles).not.toContain("shortcuts.modules.actions");
+    expect(titles).not.toContain("shortcuts.modules.security");
   });
 
   it("shows enterprise-only pages on enterprise and hides the cloud-only ones", () => {
@@ -136,6 +138,7 @@ describe("shortcut cheatsheet OSS gating", () => {
       "shortcuts.pages.aiToolsets",
       "shortcuts.pages.pipelineDestinations",
       "shortcuts.pages.runningQueries",
+      "shortcuts.pages.securityRecord",
     ]) {
       expect(pages.has(p), `${p} should show on enterprise`).toBe(true);
     }

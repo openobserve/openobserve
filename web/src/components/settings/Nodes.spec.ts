@@ -19,6 +19,7 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import Nodes from "./Nodes.vue";
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/common", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -35,6 +36,7 @@ vi.mock("@/composables/useIsMetaOrg", () => ({
 }));
 
 import CommonService from "@/services/common";
+import analytics from "@/services/product_analytics";
 
 const mockNodeData = {
   "us-west": {
@@ -256,6 +258,31 @@ describe("Nodes", () => {
     });
   });
 
+  describe("analytics", () => {
+    it("tracks the filter panel's Apply with how many values each filter holds", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.onApplyFilterClick();
+      expect(analytics.track).toHaveBeenCalledWith("nodes_filter_applied", {
+        regions: 0,
+        clusters: 0,
+        node_types: 0,
+        statuses: 0,
+      });
+    });
+
+    it("tracks a health card filter, but not clearing it", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.onStatSelect("offline");
+      wrapper.vm.onStatSelect("offline");
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("nodes_health_filter_applied", {
+        status: "offline",
+      });
+    });
+  });
+
   describe("applyFilter", () => {
     it("should filter data by search query", async () => {
       wrapper = mountComponent();
@@ -396,6 +423,42 @@ describe("Nodes", () => {
       await flushPromises();
       const ids = wrapper.vm.computedOTableColumns.map((c: any) => c.id);
       expect(ids).not.toContain("region");
+    });
+
+    it("drops the region column and shows locked region/cluster filters under a super_cluster lock", async () => {
+      const lockedStore = createStore({
+        state: {
+          selectedOrganization: { identifier: "test-org" },
+          zoConfig: { super_cluster_enabled: true, features: { super_cluster: "locked" } },
+          theme: "light",
+        },
+      });
+      wrapper = mount(Nodes, {
+        global: {
+          plugins: [mockI18n],
+          provide: { store: lockedStore },
+          stubs: {
+            Pagination: { template: "<div />" },
+            NoData: { template: "<div />" },
+            OTooltip: { template: "<div><slot /></div>" },
+          },
+        },
+      });
+      await flushPromises();
+      const ids = wrapper.vm.computedOTableColumns.map((c: any) => c.id);
+      expect(ids).not.toContain("region");
+      for (const key of ["region", "cluster"]) {
+        const btn = wrapper.find(`[data-test="nodes-${key}-filter-locked"]`);
+        expect(btn.exists()).toBe(true);
+        expect(btn.attributes("disabled")).toBeDefined();
+      }
+      expect(wrapper.find('[data-test="nodes-region-table"]').exists()).toBe(false);
+    });
+
+    it("shows no locked filters when the license leaves super_cluster enabled", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(wrapper.find('[data-test="nodes-region-filter-locked"]').exists()).toBe(false);
     });
   });
 

@@ -86,6 +86,7 @@ const FIELD_SECTION_PREFIXES: ReadonlyArray<[string, AlertSectionId]> = [
   ["notify_on_recovery", "notify"],
   ["keep_firing_for", "notify"],
   ["creates_incident", "notify"],
+  ["incident_title_template", "notify"],
   ["template", "notify"],
   ["context_attributes", "notify"],
   ["oncall_team", "notify"],

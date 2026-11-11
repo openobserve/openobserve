@@ -17,6 +17,9 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace.vue";
 import i18n from "@/locales";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Stub tab components so the raw panel renders without full setup
 const tabPanelStub = {
@@ -68,6 +71,15 @@ describe("ErrorStackTrace Component", () => {
   afterEach(() => {
     wrapper.unmount();
     vi.restoreAllMocks();
+  });
+
+  it("tracks a switch between the raw and pretty stack views", async () => {
+    vi.mocked(analytics.track).mockClear();
+    wrapper.vm.activeTab = "pretty";
+    await flushPromises();
+    expect(analytics.track).toHaveBeenCalledWith("rum_error_stack_view_changed", {
+      view: "pretty",
+    });
   });
 
   it("mounts successfully", () => {

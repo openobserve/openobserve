@@ -52,6 +52,8 @@ describe("AddAlertView.vue", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    queryClient.clear();
+    vi.mocked(templateService.list).mockResolvedValue({ data: [] } as any);
 
     store = createStore({
       state: {
@@ -123,6 +125,36 @@ describe("AddAlertView.vue", () => {
     expect(destinationService.list).toHaveBeenCalledWith(
       expect.objectContaining({ org_identifier: "test-org", module: "alert" }),
     );
+  });
+
+  it("passes the org templates to the form so the override select has options", async () => {
+    vi.mocked(destinationService.list).mockResolvedValue({ data: [] } as any);
+    vi.mocked(templateService.list).mockResolvedValue({
+      data: [{ name: "slack_alert" }, { name: "email_alert" }],
+    } as any);
+
+    const wrapper = mount(AddAlertView, {
+      global: {
+        plugins: [store, router],
+        stubs: {
+          AddAlert: {
+            name: "AddAlert",
+            props: ["templates"],
+            template: '<div class="add-alert-stub"></div>',
+          },
+        },
+      },
+    });
+
+    await flushPromises();
+
+    expect(templateService.list).toHaveBeenCalledWith(
+      expect.objectContaining({ org_identifier: "test-org" }),
+    );
+    expect(wrapper.findComponent({ name: "AddAlert" }).props("templates")).toEqual([
+      { name: "slack_alert" },
+      { name: "email_alert" },
+    ]);
   });
 
   it("renders AddAlert even when the org has no destinations", async () => {
@@ -305,17 +337,6 @@ describe("AddAlertView.vue", () => {
 
     beforeEach(() => queryClient.clear());
 
-    it("hands the org's templates to the form so Template Override has options", async () => {
-      vi.mocked(templateService.list).mockResolvedValue({
-        data: [{ name: "pagerduty_default" }],
-      } as any);
-      const wrapper = await mountWithTemplates();
-
-      expect(wrapper.findComponent({ name: "AddAlert" }).props("templates")).toEqual([
-        { name: "pagerduty_default" },
-      ]);
-    });
-
     it("reads the templates from the server again when the form asks for a refresh", async () => {
       vi.mocked(templateService.list).mockResolvedValue({ data: [{ name: "a" }] } as any);
       const wrapper = await mountWithTemplates();
@@ -358,7 +379,7 @@ describe("AddAlertView.vue", () => {
 
       const wrapper = await mountEditing();
 
-      expect(alertsService.get_by_alert_id).toHaveBeenCalledWith("test-org", "alert-1");
+      expect(alertsService.get_by_alert_id).toHaveBeenCalledWith("test-org", "alert-1", undefined);
 
       const form = wrapper.findComponent(AddAlertStub);
       expect(form.props("isUpdated")).toBe(true);

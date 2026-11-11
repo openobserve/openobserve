@@ -133,11 +133,12 @@ impl PipelineError {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct NodeErrors {
     node_id: String,
     node_type: String,
+    #[schema(value_type = Vec<Vec<Value>>)]
     pub errors: HashSet<(String, Option<serde_json::Value>)>,
     pub error_count: i32,
     #[serde(skip_serializing_if = "Option::is_none")]

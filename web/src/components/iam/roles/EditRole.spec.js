@@ -664,6 +664,30 @@ describe("EditRole - tabs behavior", () => {
     await wrapper.find(".tab-serviceAccounts").trigger("click");
     expect(wrapper.vm.activeTab).toBe("serviceAccounts");
   });
+
+  it.each(["users", "serviceAccounts"])("opens on the %s tab named in ?tab=", async (tab) => {
+    router.currentRoute.value.query = { tab };
+    const wrapper = await mountEditRole();
+    router.currentRoute.value.query = {};
+    expect(wrapper.vm.activeTab).toBe(tab);
+  });
+
+  it("ignores ?tab=serviceAccounts when service accounts are off", async () => {
+    const original = store.state.zoConfig;
+    store.state.zoConfig = { ...original, service_account_enabled: false };
+    router.currentRoute.value.query = { tab: "serviceAccounts" };
+    const wrapper = await mountEditRole();
+    router.currentRoute.value.query = {};
+    store.state.zoConfig = original;
+    expect(wrapper.vm.activeTab).toBe("permissions");
+  });
+
+  it("ignores an unknown ?tab= value", async () => {
+    router.currentRoute.value.query = { tab: "bogus" };
+    const wrapper = await mountEditRole();
+    router.currentRoute.value.query = {};
+    expect(wrapper.vm.activeTab).toBe("permissions");
+  });
 });
 
 // 4. Permission mapping helpers
@@ -2925,6 +2949,21 @@ describe("EditRole savedGrants - getRoleDetails orchestration", () => {
     );
     push.mockRestore();
   });
+
+  it("stays on the page, without a toast, for a license denial", async () => {
+    ctl.resourcesError = Object.assign(new Error("denied"), {
+      response: { status: 403, data: { code: 40001, error_detail: "rbac" } },
+    });
+    const push = vi.spyOn(router, "push");
+    const wrapper = await mountEditRole();
+    await flushPromises();
+
+    expect(push).not.toHaveBeenCalled();
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(wrapper.vm.isFetchingInitialRoles).toBe(false);
+    expect(wrapper.vm.licenseDenied).toEqual(["rbac"]);
+    push.mockRestore();
+  });
 });
 
 describe("EditRole savedGrants - savePermissionHash / seedSaved", () => {
@@ -3906,5 +3945,21 @@ describe("EditRole - nothing stages while a save is in flight", () => {
     drawer().vm.$emit("add", [streamsList]);
     expect(drawer().props("saving")).toBe(false);
     expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([streamsList]);
+  });
+});
+
+describe("EditRole - job preset from the query", () => {
+  it("stages a job preset an access lock links to", async () => {
+    const wrapper = await mountWithPreset("dashboard_viewer");
+    const staged = Object.values(wrapper.vm.addedPermissions);
+    expect(staged.length).toBeGreaterThan(0);
+    expect(staged.every((p) => p.permission === "AllowGet" || p.permission === "AllowList")).toBe(
+      true,
+    );
+  });
+
+  it("stages nothing for a preset that needs a module this org lacks", async () => {
+    const wrapper = await mountWithPreset("soc_analyst");
+    expect(Object.keys(wrapper.vm.addedPermissions)).toHaveLength(0);
   });
 });

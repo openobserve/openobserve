@@ -150,6 +150,7 @@ const ASSISTANT_SCOPE: &[ScopeRoute] = &[
     v1(&[Param, Lit("oncall"), Lit("incidents"), Param, Lit("responses")], GET),
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("acknowledge")], POST),
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("snooze")], POST),
+    v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("unsnooze")], POST),
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("resolve")], POST),
     v1(&[Param, Lit("ai"), Lit("chat")], POST),
     v1(&[Param, Lit("ai"), Lit("chat_stream")], POST),
@@ -357,7 +358,8 @@ pub(crate) async fn authorize(
         )
         .await;
     if !allowed {
-        return Err(forbidden("permission denied"));
+        log::debug!("delegated token refused: permission denied");
+        return Err(AuthError::RoleRefused("Unauthorized Access".to_string()));
     }
     #[cfg(feature = "enterprise")]
     if let Some(caller) = &result.delegation {
@@ -494,8 +496,8 @@ fn signing_keys() -> anyhow::Result<Keys> {
     let auth = &config::get_config().auth;
     let master = o2_enterprise::enterprise::common::config::get_config()
         .encryption
-        .master_key
-        .clone();
+        .oncall_key()
+        .to_string();
     config::utils::delegation::effective_keys(
         &master,
         &auth.delegation_signing_key,
@@ -584,6 +586,7 @@ fn touch_due(last_used_at: i64, now: i64) -> bool {
     now - last_used_at >= TOUCH_INTERVAL_MICROS
 }
 
+#[cfg(any(feature = "enterprise", test))]
 fn forbidden(reason: &str) -> AuthError {
     log::debug!("delegated token refused: {reason}");
     AuthError::Forbidden("Unauthorized Access".to_string())
@@ -632,7 +635,7 @@ mod tests {
         match result {
             Ok(_) => 200,
             Err(AuthError::Unauthorized(_)) => 401,
-            Err(AuthError::Forbidden(_)) => 403,
+            Err(AuthError::Forbidden(_) | AuthError::RoleRefused(_)) => 403,
             Err(AuthError::NotFound(_)) => 404,
             Err(AuthError::Locked { .. }) => 429,
             Err(AuthError::Unavailable(_)) => 503,
@@ -708,6 +711,7 @@ mod tests {
         );
         for reason in [
             DisabledReason::Edition,
+            DisabledReason::License,
             DisabledReason::Flag,
             DisabledReason::MasterKey,
             DisabledReason::SuperCluster,
@@ -715,6 +719,7 @@ mod tests {
             // A new reason must join this list: the match stops compiling until it does.
             match reason {
                 DisabledReason::Edition
+                | DisabledReason::License
                 | DisabledReason::Flag
                 | DisabledReason::MasterKey
                 | DisabledReason::SuperCluster => {}
@@ -1001,6 +1006,7 @@ mod tests {
             (Method::GET, "acme/oncall/teams/t1/on-call"),
             (Method::POST, "acme/oncall/responses/r1/acknowledge"),
             (Method::POST, "acme/oncall/responses/r1/snooze"),
+            (Method::POST, "acme/oncall/responses/r1/unsnooze"),
             (Method::POST, "acme/oncall/responses/r1/resolve"),
             (Method::POST, "acme/ai/chat_stream"),
             (Method::POST, "acme/ai/confirm/s1"),

@@ -6,6 +6,7 @@ import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../commonActions.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
+const { ingestTraces } = require('../../playwright-tests/utils/trace-ingestion.js');
 
 // Rate and Errors come from web/src/plugins/traces/metrics/metrics.json; Duration is the latency heatmap.
 const TRACES_METRICS_PANELS = ['Rate', 'Errors', 'Duration'];
@@ -13,8 +14,50 @@ const CHART_ZOOM_START_RATIO = 0.35;
 const CHART_ZOOM_END_RATIO = 0.75;
 const CHART_DRAG_STEPS = 20;
 const QUERY_CLEAR_ATTEMPTS = 10;
+const DURATION_UNIT_US = { us: 1, ms: 1000, s: 1000000 };
+
+export function decodedSqlOf(request) {
+  if (request.method() !== 'POST' || !/_search/.test(request.url())) return null;
+  const body = request.postDataJSON?.() ?? null;
+  const query = body?.query ?? {};
+  if (typeof query.sql !== 'string') return null;
+  const base64 = body.encoding === 'base64' || query.encoding === 'base64';
+  return {
+    sql: base64 ? Buffer.from(query.sql, 'base64').toString('utf8') : query.sql,
+    start: query.start_time,
+    end: query.end_time,
+  };
+}
+
+// The comparison sends its own counts and LIMIT 4000 samples; nothing else does.
+export const isComparison = (q) => /^SELECT count\(\*\) AS n\b/.test(q.sql) || /LIMIT 4000$/.test(q.sql);
+export const isCount = (q) => /^SELECT count\(\*\) AS n\b/.test(q.sql);
+// The table search: spans mode posts a base64 `SELECT *` SQL.
+export const isTableSearch = (q) => /^SELECT \* FROM/.test(q.sql);
+
+// The band's bounds in µs as the SQL writes them; a missing side is absent.
+export function bandSql(editorBand) {
+  const toUs = (m) => (m ? Number(m[1]) * DURATION_UNIT_US[m[2]] : null);
+  const lo = toUs(editorBand.match(/duration >= '(\d+)(us|ms|s)'/));
+  const hi = toUs(editorBand.match(/duration < '(\d+)(us|ms|s)'/));
+  return [lo ? `duration >= ${lo}` : '', hi !== null ? `duration < ${hi}` : ''].filter(Boolean).join(' AND ');
+}
 
 export class TracesPage {
+  // Static so a beforeAll, which has no page fixture, can seed through its own context.
+  static async seedTraces(browser, ageMs = 0) {
+    const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
+    const page = await context.newPage();
+    try {
+      for (const scenario of [{ count: 6, forceScenario: 'error' }, { count: 10, forceScenario: 'success' }]) {
+        const seeded = await ingestTraces(page, scenario.count, { forceScenario: scenario.forceScenario, ageMs });
+        expect(seeded.failed, `Seeding ${scenario.forceScenario} traces must succeed`).toBe(0);
+      }
+    } finally {
+      await context.close();
+    }
+  }
+
   constructor(page) {
     this.page = page;
 
@@ -211,6 +254,28 @@ export class TracesPage {
     this.spanBar = '[data-test="span-marker"]';
     this.spanRow = '[data-test="span-block-container"]';
     this.spanBarTrack = '[data-test="span-block-select-trigger"]';
+
+    // Span sidebar → Attributes → Apply & Search (TraceDetailsSidebar.vue)
+    this.sidebarAttributesTab = '[data-test="trace-details-sidebar-tabs-attributes"]';
+    this.sidebarAttributesViewJson = '[data-test="trace-details-sidebar-attributes-view-json"]';
+    this.sidebarAttributesViewTable = '[data-test="trace-details-sidebar-attributes-view-table"]';
+    this.sidebarAttributesTable = '[data-test="trace-details-sidebar-attributes-tenstack-table"]';
+    this.sidebarAttributesJson = '[data-test="trace-details-sidebar-attributes-table"]';
+    this.sidebarServiceName = '[data-test="trace-details-sidebar-header-toolbar-service-name"]';
+    this.sidebarAttributeFieldCell = '[data-test="o2-table-cell-field"]';
+    this.sidebarAttributeRow = '[data-test^="o2-table-row-"]';
+    this.attributeValueDropdownBtn = '[data-test="attribute-value-cell-dropdown-btn"]';
+    this.attributeFilterActionPrefix = 'trace-details-sidebar-attr-filter-action-';
+    this.jsonFilterActionPrefix = 'trace-details-sidebar-json-filter-action-';
+    this.jsonPreviewKeyPrefix = 'json-preview-key-';
+    this.jsonFieldDropdownBtn = '[data-test="json-preview-field-dropdown-btn"]';
+    this.flameGraphCanvas = '[data-test="flame-graph-view-chart-wrapper"] canvas';
+    this.flameGraphSidebar = '[data-test="trace-details-flame-graph-sidebar"]';
+
+    // Run query / Cancel and the result-area states around a cancelled search
+    this.cancelSearchButton = '[data-test="traces-search-bar-cancel-btn"]';
+    this.searchCancelledState = '[data-test="traces-search-cancelled-state"]';
+    this.traceListStreamUrl = '**/traces/latest_stream**';
   }
 
   // Getter methods for common trace elements
@@ -3354,5 +3419,212 @@ export class TracesPage {
       }, intervalMs);
       const cap = setTimeout(finish, maxMs);
     }), { minExamples, maxMs, intervalMs });
+  }
+
+  // ============================================
+  // CREATE ALERT / ADD TO DASHBOARD (RED actions)
+  // Source: web/src/plugins/traces/SearchBar.vue, PanelContainer.vue, metrics/TracesLatencyHeatmap.vue
+  // ============================================
+
+  async openMoreActionsMenu() {
+    await this.page.locator('[data-test="traces-search-bar-more-actions-btn"]').click();
+  }
+
+  async clickAddRedChartsToDashboard() {
+    await this.openMoreActionsMenu();
+    await this.page.locator('[data-test="traces-add-red-to-dashboard-btn"]').click();
+  }
+
+  async createAlertFromChartMenu(title) {
+    const panel = this.metricsPanelLocator(title);
+    if (title === 'Duration') {
+      await panel.hover();
+      await this.page.locator('[data-test="traces-duration-actions-btn"]').click();
+      await this.page.locator('[data-test="traces-duration-create-alert"]').click();
+      return;
+    }
+    // Hovering the chart body opens its tooltip, which then covers this button.
+    const actionsBtn = panel.locator('[data-test="panel-explore-actions-btn"]');
+    await actionsBtn.hover();
+    await actionsBtn.click();
+    await this.page.locator('[data-test="panel-explore-create-alert"]').click();
+  }
+
+  async expectAddToDashboardPanels(count) {
+    const dialog = this.page.locator('[data-test="add-to-dashboard-dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 15000 });
+    await expect(this.page.locator('[data-test="add-to-dashboard-notice"]')).toBeVisible();
+    await expect(this.page.locator('[data-test="add-to-dashboard-panel-title"]')).toHaveCount(count);
+  }
+
+  async selectDashboardInAddDialog(title) {
+    await this.page.locator('[data-test="dashboard-dropdown-dashboard-selection-trigger"]').click();
+    await this.page
+      .locator('[data-test="dashboard-dropdown-dashboard-selection-option"]')
+      .filter({ hasText: title })
+      .first()
+      .click();
+  }
+
+  async confirmAddToDashboard() {
+    await this.page
+      .locator('[data-test="add-to-dashboard-dialog"] [data-test="o-dialog-primary-btn"]')
+      .click();
+  }
+
+  async expectAlertFormPrefilledFromTraces() {
+    await expect(this.page).toHaveURL(/prefill=traces/, { timeout: 30000 });
+    await expect(
+      this.page.locator('[data-test="add-alert-stream-type-select-dropdown"]').first()
+    ).toContainText('traces', { timeout: 30000 });
+    await expect(
+      this.page.locator('[data-test="alert-trigger-threshold-input-field"]').first()
+    ).toHaveValue('1');
+    await expect(
+      this.page.locator('[data-test="alert-trigger-operator-select"]').first()
+    ).toContainText('>=');
+  }
+
+  /** Open the explorer for `streamName` on `tab`; the `stream` param makes the page search on load. */
+  async navigateToTracesTab(streamName, tab = 'traces', period = '15m') {
+    const org = process.env['ORGNAME'] || 'default';
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    await this.page.goto(
+      `${baseUrl}/web/traces?org_identifier=${org}&stream=${encodeURIComponent(streamName)}&period=${period}&tab=${tab}`,
+    );
+  }
+
+  async expectTraceResultWithOperationName(operationName, timeout = 30000) {
+    await expect(
+      this.page.locator(`${this.searchResultList} ${this.traceRowOperationName}`)
+        .filter({ hasText: operationName })
+        .first(),
+    ).toBeVisible({ timeout });
+  }
+
+  async openTraceResultByOperationName(operationName, attempts = 3) {
+    const onDetails = (url) => /\/traces\/trace-details\?/.test(url.toString());
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      if (onDetails(this.page.url())) return;
+      await this.expectTraceResultWithOperationName(operationName);
+      await this.page.locator(`${this.searchResultList} ${this.traceRowOperationName}`)
+        .filter({ hasText: operationName })
+        .first()
+        .click();
+      // The explorer's own URL sync after a search can supersede the row's push, so an early click can be lost.
+      if (await this.page.waitForURL(onDetails, { timeout: 10000 }).then(() => true).catch(() => false)) return;
+      testLogger.warn(`Trace row "${operationName}" did not open trace details (attempt ${attempt}/${attempts})`, { url: this.page.url() });
+    }
+    expect(onDetails(this.page.url()), `trace row "${operationName}" never opened trace details`).toBe(true);
+  }
+
+  async selectWaterfallSpan(operationName) {
+    expect(await this.openTraceDetailsTab('waterfall'), 'the waterfall tab must exist').toBe(true);
+    expect(
+      await this.clickTraceTreeSpanByOperationName(operationName),
+      `span "${operationName}" must be on the waterfall`,
+    ).toBe(true);
+  }
+
+  /** The flame graph is a canvas; its depth-0 bar is the root span and spans the full chart width at the top. */
+  async selectFlameGraphRootSpan() {
+    expect(await this.openTraceDetailsTab('flame-graph'), 'the flame graph tab must exist').toBe(true);
+    const canvas = this.page.locator(this.flameGraphCanvas).first();
+    await expect(canvas).toBeVisible({ timeout: 15000 });
+    const box = await canvas.boundingBox();
+    expect(box, 'the flame graph canvas must lay out').not.toBeNull();
+    await this.page.mouse.click(box.x + box.width / 2, box.y + 14);
+    await expect(this.page.locator(this.flameGraphSidebar)).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectSidebarServiceName(serviceName) {
+    await expect(this.page.locator(this.sidebarServiceName).filter({ visible: true }).first())
+      .toHaveText(serviceName, { timeout: 15000 });
+  }
+
+  /** Attributes → Table or JSON → the field's value menu → Apply & Search with `operator`; waits for the explorer. */
+  async applyAndSearchFromSpanAttributes({ field, operator = '=', view = 'table' }) {
+    await this.page.locator(this.sidebarAttributesTab).filter({ visible: true }).first().click();
+    if (view === 'table') {
+      const toggle = this.page.locator(this.sidebarAttributesViewTable).filter({ visible: true }).first();
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('data-state', 'on');
+      const fieldCell = this.page.locator(this.sidebarAttributeFieldCell, {
+        hasText: new RegExp(`^\\s*${field}\\s*$`),
+      });
+      const row = this.page.locator(`${this.sidebarAttributesTable} ${this.sidebarAttributeRow}`)
+        .filter({ has: fieldCell })
+        .first();
+      await row.locator(this.attributeValueDropdownBtn).click();
+      await this.page.locator(`[data-test="${this.attributeFilterActionPrefix}${operator}"]`).click();
+    } else {
+      const toggle = this.page.locator(this.sidebarAttributesViewJson).filter({ visible: true }).first();
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('data-state', 'on');
+      await this.page.locator(
+        `${this.sidebarAttributesJson} div:has(> [data-test="${this.jsonPreviewKeyPrefix}${field}"]) ${this.jsonFieldDropdownBtn}`,
+      ).first().click();
+      await this.page.locator(`[data-test="${this.jsonFilterActionPrefix}${operator}"]`).click();
+    }
+    await this.page.waitForURL(/\/web\/traces\?/, { timeout: 30000 });
+  }
+
+  /** The explorer query carried in the URL's base64url `query` param, decoded. */
+  getUrlQueryText() {
+    const encoded = new URL(this.page.url()).searchParams.get('query') || '';
+    const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '=');
+    return Buffer.from(base64, 'base64').toString('utf8');
+  }
+
+  getUrlSearchTab() {
+    return new URL(this.page.url()).searchParams.get('tab');
+  }
+
+  /** Hold every trace-list search until the returned release() runs, so a running search can be seen and cancelled. */
+  async holdTraceListSearches() {
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    await this.page.route(this.traceListStreamUrl, async (route) => {
+      await gate;
+      await route.continue().catch(() => {});
+    });
+    return async () => {
+      release();
+      await this.page.unroute(this.traceListStreamUrl);
+    };
+  }
+
+  async startTraceSearch() {
+    await this.page.locator(this.refreshButton).click();
+  }
+
+  async cancelRunningSearch() {
+    const cancel = this.page.locator(this.cancelSearchButton);
+    await expect(cancel).toBeVisible({ timeout: 15000 });
+    await cancel.click();
+    await expect(cancel).toBeHidden({ timeout: 15000 });
+  }
+
+  async getResultRowCount() {
+    return await this.page.locator(this.searchResultItem).count();
+  }
+
+  async expectNoEventsStateHidden() {
+    await expect(this.page.locator(this.resultNotFoundText)).toHaveCount(0);
+  }
+
+  async expectSearchCancelledStateVisible() {
+    await expect(this.page.locator(this.searchCancelledState)).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectSearchCancelledStateHidden() {
+    await expect(this.page.locator(this.searchCancelledState)).toHaveCount(0);
+  }
+
+  /** The cancelled state's only button is its Run query card. */
+  async runQueryFromCancelledState() {
+    await this.page.locator(this.searchCancelledState).getByRole('button').click();
   }
 }

@@ -23,10 +23,10 @@ use utoipa::ToSchema;
 use crate::{
     meta::{
         function::VRLResultResolver,
-        stream::{StreamParams, StreamType},
+        stream::{RemoteStreamParams, StreamParams, StreamType},
     },
     stats::MemorySize,
-    utils::json,
+    utils::{json, schema::format_stream_name},
 };
 
 pub mod components;
@@ -272,8 +272,13 @@ impl Pipeline {
         }
     }
 
-    /// The first Stream/Query node, else the source, naming another org; empty org is this one.
-    /// [pure]
+    /// The full key of this pipeline's scheduler trigger; realtime pipelines have none.
+    pub fn scheduler_module_key(&self) -> Option<String> {
+        self.get_derived_stream()
+            .map(|source| source.get_scheduler_module_key(&self.name, &self.id))
+    }
+
+    /// The first Stream/Query/RemoteStream node, else the source, naming another org. [pure]
     pub fn cross_org(&self) -> Option<CrossOrg<'_>> {
         let foreign = |org: &str| !org.is_empty() && org != self.org;
         let node = self.nodes.iter().find_map(|node| match &node.data {
@@ -282,6 +287,9 @@ impl Pipeline {
                 params,
             }),
             NodeData::Query(query) if foreign(&query.org_id) => Some(CrossOrg::Query(query)),
+            NodeData::RemoteStream(remote) if foreign(remote.org_id.as_ref()) => {
+                Some(CrossOrg::RemoteStream(remote))
+            }
             _ => None,
         });
         if node.is_some() {
@@ -313,6 +321,10 @@ impl Pipeline {
                 stream(if is_source { "source" } else { "destination" }, params)
             }
             CrossOrg::Query(derived_stream) => query(derived_stream),
+            CrossOrg::RemoteStream(remote) => (
+                format!("remote destination {}", remote.destination_name),
+                remote.org_id.to_string(),
+            ),
             CrossOrg::Source(PipelineSource::Realtime(params)) => stream("source", params),
             CrossOrg::Source(PipelineSource::Scheduled(derived_stream)) => query(derived_stream),
         };
@@ -336,6 +348,8 @@ impl Pipeline {
     /// 8. EnrichmentTables can only be used in Scheduled pipelines
     ///
     /// If all satisfies, populates the [Pipeline::source] with the first node in nodes list
+    ///
+    /// Unless `ZO_SKIP_FORMATTING_STREAM_NAME` is set, also formats fixed stream-node names.
     pub fn validate(&mut self) -> Result<()> {
         if self.name.is_empty() {
             return Err(anyhow!("Please provide non-empty name for the pipeline"));
@@ -355,6 +369,18 @@ impl Pipeline {
             }
             _ => {}
         };
+
+        // must run before the internal-stream guards and the ck 3 source copy
+        if !crate::get_config().common.skip_formatting_stream_name {
+            for node in self.nodes.iter_mut() {
+                if let NodeData::Stream(stream_params) = &mut node.data
+                    && !stream_params.stream_name.contains('{')
+                {
+                    stream_params.stream_name =
+                        format_stream_name(stream_params.stream_name.to_string()).into();
+                }
+            }
+        }
 
         for node in &self.nodes {
             if !node.data.is_pipeline_node() {
@@ -644,6 +670,7 @@ pub enum CrossOrg<'a> {
         params: &'a StreamParams,
     },
     Query(&'a DerivedStream),
+    RemoteStream(&'a RemoteStreamParams),
     Source(&'a PipelineSource),
 }
 
@@ -745,6 +772,31 @@ pub fn is_forbidden_destination(source_stream: &str, destination: &str, cross_ty
 mod tests {
     use super::*;
     use crate::meta::alerts::{QueryCondition, TriggerCondition};
+
+    #[test]
+    fn scheduler_module_key_keeps_a_name_with_a_slash_whole() {
+        let mut pipeline = Pipeline {
+            id: "pl_id".to_string(),
+            name: "team/nightly".to_string(),
+            source: PipelineSource::Scheduled(DerivedStream {
+                org_id: "org".to_string(),
+                ..Default::default()
+            }),
+            version: 1,
+            enabled: true,
+            org: "org".to_string(),
+            description: String::new(),
+            nodes: vec![],
+            edges: vec![],
+            kind: Default::default(),
+        };
+        assert_eq!(
+            pipeline.scheduler_module_key().as_deref(),
+            Some("logs/org/team/nightly/pl_id")
+        );
+        pipeline.source = PipelineSource::Realtime(Default::default());
+        assert_eq!(pipeline.scheduler_module_key(), None);
+    }
 
     #[test]
     fn test_pipeline_get_derived_stream() {
@@ -2116,6 +2168,106 @@ mod tests {
     }
 
     #[test]
+    fn test_pipeline_validation_formats_fixed_stream_names() {
+        let stream = |id: &str, name: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::Stream(StreamParams::new("test_org", name, StreamType::Logs)),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let dest_name = |p: &Pipeline| match &p.nodes[1].data {
+            NodeData::Stream(s) => s.stream_name.to_string(),
+            _ => unreachable!(),
+        };
+        let pipeline = |destination: &str| Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "src",
+                StreamType::Logs,
+            )),
+            kind: PipelineKind::User,
+            nodes: vec![stream("1", "src"), stream("2", destination)],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+                source_handle: None,
+            }],
+        };
+        let mut p = pipeline("../../other_org/logs/victim");
+        p.validate().unwrap();
+        let got = dest_name(&p);
+        assert!(!got.contains('/') && !got.contains(".."), "got {got}");
+        assert_eq!(
+            got,
+            format_stream_name("../../other_org/logs/victim".to_string())
+        );
+        let mut t = pipeline("logs_{svc}");
+        t.validate().unwrap();
+        assert_eq!(dest_name(&t), "logs_{svc}");
+    }
+
+    #[test]
+    fn test_pipeline_validation_formats_before_checks() {
+        let stream = |id: &str, name: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::Stream(StreamParams::new("test_org", name, StreamType::Logs)),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let build = |source: &str, dest: &str| Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                source,
+                StreamType::Logs,
+            )),
+            kind: PipelineKind::User,
+            nodes: vec![stream("1", source), stream("2", dest)],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+                source_handle: None,
+            }],
+        };
+        let mut p = build("My-Logs", "dst");
+        p.validate().unwrap();
+        let node0 = match &p.nodes[0].data {
+            NodeData::Stream(s) => s.stream_name.to_string(),
+            _ => unreachable!(),
+        };
+        let src = match &p.source {
+            PipelineSource::Realtime(s) => s.stream_name.to_string(),
+            _ => unreachable!(),
+        };
+        assert_eq!(node0, format_stream_name("My-Logs".to_string()));
+        assert_eq!(src, node0);
+        let err = build("src", "_o2_ai-chat_events")
+            .validate()
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("internal"), "{err}");
+    }
+
+    #[test]
     fn test_internal_streams_take_back_only_their_own_records() {
         assert!(is_forbidden_destination("app", "_o2_ai_chat_events", false));
         assert!(is_forbidden_destination(
@@ -2161,6 +2313,18 @@ mod tests {
                 "input".to_string(),
             )
         };
+        let remote = |id: &str, org: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::RemoteStream(RemoteStreamParams {
+                    org_id: org.to_string().into(),
+                    destination_name: "d".to_string().into(),
+                }),
+                0.0,
+                0.0,
+                "output".to_string(),
+            )
+        };
         let refusal = |what: &str, org: &str| {
             Some(format!(
                 "Pipeline {what} points at organization {org}; pipeline streams must be in organization a"
@@ -2188,6 +2352,12 @@ mod tests {
             (
                 vec![query("src", "b"), stream("dst", "a", "out")],
                 refusal("scheduled query on metrics streams", "b"),
+            ),
+            (vec![stream("src", "a", "in"), remote("dst", "a")], None),
+            (vec![stream("src", "a", "in"), remote("dst", "")], None),
+            (
+                vec![stream("src", "a", "in"), remote("dst", "b")],
+                refusal("remote destination d", "b"),
             ),
         ];
         let pipeline = |source: PipelineSource, nodes| Pipeline {

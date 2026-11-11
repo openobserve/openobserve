@@ -62,6 +62,39 @@ describe("alertConditionText", () => {
     expect(alertConditionText({ query_condition: { sql: "SELECT 1" } })).toBe("SELECT 1");
   });
 
+  /// R12, L1: every stored shape of a Builder rule reads as its conditions and its row-count threshold.
+  it("renders a custom alert's stored conditions and its count threshold", () => {
+    const leaf = { column: "body", operator: "contains", value: "ERROR" };
+    const group = {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [{ filterType: "condition", ...leaf, logicalOperator: "AND" }],
+    };
+    const trigger_condition = { operator: ">=", threshold: 1, period: 5, frequency: 1 };
+    const cases: [string, unknown][] = [
+      [
+        "v2 wrapper, as GET /api/v2/{org}/alerts/{id} returns it",
+        { version: 2, conditions: group },
+      ],
+      ["v2 wrapper with a string version", { version: "2", conditions: group }],
+      ["bare v2 group", group],
+      ["v1 tree", { and: [leaf] }],
+      ["v0 flat list", [leaf]],
+    ];
+    for (const [name, conditions] of cases) {
+      expect(
+        alertConditionText({
+          query_condition: { type: "custom", aggregation: null, conditions },
+          trigger_condition,
+        }),
+        name,
+      ).toBe("body contains 'ERROR' · count >= 1");
+    }
+    expect(alertConditionText({ query_condition: { type: "custom" }, trigger_condition })).toBe(
+      "count >= 1",
+    );
+  });
+
   /// A page outlives the rule it came from, so "no alert" is a real input.
   it("says nothing rather than throwing on a missing alert", () => {
     expect(alertConditionText(null)).toBe("—");

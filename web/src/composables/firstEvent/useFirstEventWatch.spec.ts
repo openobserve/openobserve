@@ -94,6 +94,7 @@ interface WatchOpts {
   filter?: string;
   match?: "exact" | "keyword";
   autoDiagnosis?: boolean;
+  diagnosisAtMs?: number;
 }
 const watchOf = (signal?: StreamSignal, opts: WatchOpts = {}) => {
   scope = effectScope();
@@ -105,6 +106,7 @@ const watchOf = (signal?: StreamSignal, opts: WatchOpts = {}) => {
       filter: ref(opts.filter),
       match: ref(opts.match),
       ...(opts.autoDiagnosis === undefined ? {} : { autoDiagnosis: ref(opts.autoDiagnosis) }),
+      ...(opts.diagnosisAtMs === undefined ? {} : { diagnosisAtMs: ref(opts.diagnosisAtMs) }),
     }),
   )!;
 };
@@ -274,8 +276,10 @@ describe("useFirstEventWatch — confirmation", () => {
     const w = watchOf();
     w.start("open");
     await vi.advanceTimersByTimeAsync(1);
-    rows.logs = [{ name: "usage", stats: { doc_num: 9, doc_time_min: 9 } }];
-    rows.metrics = [{ name: "_o2_db_stats", stats: { doc_num: 9, doc_time_min: 9 } }];
+    rows.logs = [{ name: "usage", is_internal: true, stats: { doc_num: 9, doc_time_min: 9 } }];
+    rows.metrics = [
+      { name: "_o2_db_stats", is_internal: true, stats: { doc_num: 9, doc_time_min: 9 } },
+    ];
     await vi.advanceTimersByTimeAsync(30_000);
     expect(w.state.value).toBe("waiting");
   });
@@ -842,10 +846,12 @@ describe("useFirstEventWatch — org data on a direct load, before the flag is s
 
   it("keeps checking when the org holds only internal streams", async () => {
     rows.logs = [
-      { name: "usage", stats: { doc_num: 9, doc_time_min: 1 } },
-      { name: "_o2_pipeline", stats: { doc_num: 9, doc_time_min: 1 } },
+      { name: "usage", is_internal: true, stats: { doc_num: 9, doc_time_min: 1 } },
+      { name: "_o2_pipeline", is_internal: true, stats: { doc_num: 9, doc_time_min: 1 } },
     ];
-    rows.metrics = [{ name: "_anomalies", stats: { doc_num: 9, doc_time_min: 1 } }];
+    rows.metrics = [
+      { name: "_anomalies", is_internal: true, stats: { doc_num: 9, doc_time_min: 1 } },
+    ];
     const w = watchOf("logs", { targetStream: "syslog_ng" });
     w.start("open");
     await vi.advanceTimersByTimeAsync(1);
@@ -1336,6 +1342,35 @@ describe("useFirstEventWatch — diagnosis", () => {
     expect(recentRejections).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps the new-stream baseline on Troubleshoot and a copy, so a stream that already landed counts", async () => {
+    const w = watchOf(undefined);
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    rows.logs.push({ name: "default", stats: { doc_num: 1, doc_time_min: NOW * 1000 } });
+    await w.troubleshoot();
+    w.start("copy");
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(w.state.value).toBe("received");
+    expect(w.result.value?.streamName).toBe("default");
+  });
+
+  it("keeps a target's server-clock anchor on Troubleshoot", async () => {
+    const serverNowS = Math.floor(NOW / 1000);
+    rows.logs = [{ name: "default", stats: { doc_num: 0, doc_time_min: 0 } }];
+    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
+    const w = watchOf("logs", { targetStream: "default" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.sinceUs.value).toBe(serverNowS * 1_000_000);
+    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS + 60 }]);
+    await vi.advanceTimersByTimeAsync(60_000);
+    await w.troubleshoot();
+    expect(w.sinceUs.value).toBe(serverNowS * 1_000_000);
+    countHits.mockReturnValue([{ zo_count: 1, zo_min: serverNowS * 1_000_000 + 5 }]);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(w.result.value).toMatchObject({ count: 1, sinceUs: serverNowS * 1_000_000 });
+  });
+
   it("diagnoses at once on Troubleshoot and keeps polling", async () => {
     const w = watchOf("logs");
     w.start("open");
@@ -1510,6 +1545,17 @@ describe("useFirstEventWatch — diagnosis", () => {
     expect(probeCalls()).toBeGreaterThan(100);
   });
 
+  it("waits the caller's longer delay before its first automatic read (coding-agent tab)", async () => {
+    const w = watchOf("logs", { diagnosisAtMs: 15 * 60_000 });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(14 * 60_000);
+    expect(recentRejections).not.toHaveBeenCalled();
+    expect(w.state.value).toBe("waiting");
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(recentRejections).toHaveBeenCalledTimes(1);
+    expect(w.diagnosis.value).toMatchObject({ trigger: "auto" });
+  });
+
   it("stops every request once data is received", async () => {
     const w = watchOf("logs");
     w.start("open");
@@ -1523,7 +1569,7 @@ describe("useFirstEventWatch — diagnosis", () => {
     expect(recentRejections).not.toHaveBeenCalled();
   });
 
-  it("marks the detection seen, so the next-visit banner never repeats it", async () => {
+  it("marks the detection seen, and the stream it saw, so the next-visit banner never repeats it", async () => {
     const w = watchOf("logs");
     w.start("open");
     await vi.advanceTimersByTimeAsync(1);
@@ -1532,6 +1578,31 @@ describe("useFirstEventWatch — diagnosis", () => {
     expect(w.state.value).toBe("received");
     expect(JSON.parse(localStorage.getItem("o2.onboarding.firstData.acme")!)).toMatchObject({
       seenDetection: true,
+      detectedStream: { type: "logs", name: "default" },
     });
+  });
+});
+
+describe("useFirstEventWatch — sample streams are not the user's data", () => {
+  it("keeps waiting when only a sample stream appears", async () => {
+    countHits.mockReturnValue([{ zo_count: 5, zo_min: NOW * 1000 }]);
+    const w = watchOf("logs");
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    rows.logs = [{ name: "o2_demo_app_logs", stats: { doc_num: 5 } }];
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(w.state.value).toBe("waiting");
+    expect(countCalls().some((r) => r.query.query.sql.includes("o2_demo_"))).toBe(false);
+  });
+
+  it("does not match a sample stream by keyword", async () => {
+    countHits.mockReturnValue([{ zo_count: 5, zo_min: NOW * 1000 }]);
+    const w = watchOf("logs", { targetStream: "nginx", match: "keyword" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    rows.logs = [{ name: "o2_demo_nginx_access", stats: { doc_num: 5, doc_time_max: 9 } }];
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(w.state.value).toBe("waiting");
+    expect(countCalls().some((r) => r.query.query.sql.includes("o2_demo_"))).toBe(false);
   });
 });

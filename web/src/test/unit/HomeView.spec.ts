@@ -22,6 +22,7 @@ import i18n from "@/locales";
 import { nextTick } from "vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { queryClient } from "@/composables/query/queryClient";
+import { settingKeys } from "@/services/settings.querykeys";
 
 vi.mock("../../aws-exports", () => ({
   default: {
@@ -367,6 +368,7 @@ describe("HomeView org home dashboard tab", () => {
     vi.clearAllTimers();
     localStorage.clear();
     useHomeDashboard(gt).homeDashboard.value = null;
+    queryClient.clear();
   });
 
   const createWrapper = () => {
@@ -438,61 +440,184 @@ describe("HomeView org home dashboard tab", () => {
     };
     wrapper = createWrapper();
     wrapper.vm.activeHomeTab = "dash:default:abc";
-    await wrapper.vm.$nextTick();
+    await flushPromises();
     expect(wrapper.findComponent({ name: "PinnedDashboardTab" }).exists()).toBe(true);
   });
 
-  it("clears the home dashboard and falls back to first tab on unavailable", async () => {
+  const pinIn = (folderId: string, dashboardId = "abc") => ({
+    data: { setting_value: { dashboardId, folderId, label: "X" } },
+  });
+
+  it("clears the home dashboard and falls back to first tab when a fresh read confirms the pin", async () => {
     const hd = useHomeDashboard(gt);
-    hd.homeDashboard.value = {
-      dashboardId: "abc",
-      folderId: "default",
-      label: "Payments Health",
-    };
+    hd.homeDashboard.value = { dashboardId: "abc", folderId: "default", label: "Payments Health" };
+    (settingsService.getSetting as any).mockResolvedValue(pinIn("default"));
     wrapper = createWrapper();
     wrapper.vm.activeHomeTab = "dash:default:abc";
-    await wrapper.vm.$nextTick();
-    wrapper.findComponent({ name: "PinnedDashboardTab" }).vm.$emit("unavailable", "abc");
-    await wrapper.vm.$nextTick();
+    await flushPromises();
+    wrapper.findComponent({ name: "PinnedDashboardTab" }).vm.$emit("unavailable", "abc", "default");
+    await flushPromises();
     expect(hd.homeDashboard.value).toBeNull();
     expect(wrapper.vm.activeHomeTab).not.toBe("dash:default:abc");
   });
 
   it("toasts when the pinned dashboard is reported unavailable", async () => {
-    const hd = useHomeDashboard(gt);
-    hd.homeDashboard.value = {
+    useHomeDashboard(gt).homeDashboard.value = {
       dashboardId: "abc",
       folderId: "default",
       label: "Payments Health",
     };
+    (settingsService.getSetting as any).mockResolvedValue(pinIn("default"));
     wrapper = createWrapper();
     wrapper.vm.activeHomeTab = "dash:default:abc";
-    await wrapper.vm.$nextTick();
+    await flushPromises();
     toastSpy.mockClear();
-    wrapper.findComponent({ name: "PinnedDashboardTab" }).vm.$emit("unavailable", "abc");
-    await wrapper.vm.$nextTick();
+    wrapper.findComponent({ name: "PinnedDashboardTab" }).vm.$emit("unavailable", "abc", "default");
+    await flushPromises();
     expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
   });
 
   it("re-syncs the home_dashboard setting when the pinned tab is activated", async () => {
     (settingsService.getSetting as any).mockClear();
-    (settingsService.getSetting as any).mockResolvedValue({
-      data: { setting_value: { dashboardId: "abc", folderId: "A", label: "X" } },
-    });
-    useHomeDashboard(gt).homeDashboard.value = {
-      dashboardId: "abc",
-      folderId: "B",
-      label: "X",
-    };
+    (settingsService.getSetting as any).mockResolvedValue(pinIn("A"));
+    useHomeDashboard(gt).homeDashboard.value = { dashboardId: "abc", folderId: "B", label: "X" };
     wrapper = createWrapper();
     wrapper.vm.activeHomeTab = "dash:B:abc";
     await flushPromises();
-    // load(org) re-reads the authoritative setting via getSetting(org, key).
     expect(settingsService.getSetting).toHaveBeenCalledWith(
       "test-org",
       "home_dashboard",
       undefined,
     );
+  });
+
+  it("re-reads the pin in the background on each switch without holding the tab back", async () => {
+    const pin = { dashboardId: "abc", folderId: "A", label: "X" };
+    queryClient.setQueryData(settingKeys.one("test-org", "home_dashboard"), pin);
+    useHomeDashboard(gt).homeDashboard.value = { ...pin };
+    (settingsService.getSetting as any).mockResolvedValue(pinIn("A"));
+    wrapper = createWrapper();
+    await flushPromises();
+    (settingsService.getSetting as any).mockClear();
+    for (let i = 0; i < 3; i++) {
+      wrapper.vm.activeHomeTab = "overview";
+      await flushPromises();
+      wrapper.vm.activeHomeTab = "dash:A:abc";
+      await nextTick();
+      expect(wrapper.findComponent({ name: "PinnedDashboardTab" }).exists()).toBe(true);
+      await flushPromises();
+    }
+    expect(settingsService.getSetting).toHaveBeenCalledTimes(3);
+  });
+
+  it("drops a pin cleared on another device when Home is revisited on another tab", async () => {
+    useHomeDashboard(gt).homeDashboard.value = { dashboardId: "abc", folderId: "A", label: "X" };
+    (settingsService.getSetting as any).mockRejectedValue({ response: { status: 404 } });
+    wrapper = createWrapper();
+    await flushPromises();
+
+    expect(wrapper.vm.activeHomeTab).toBe("overview");
+    expect(wrapper.find('[data-test^="home-tab-dash:"]').exists()).toBe(false);
+  });
+
+  it("ignores a late failure from the tab of the folder the pin moved out of", async () => {
+    const pin = { dashboardId: "abc", folderId: "A", label: "X" };
+    useHomeDashboard(gt).homeDashboard.value = { ...pin };
+    (settingsService.getSetting as any).mockResolvedValue(pinIn("A"));
+    wrapper = createWrapper();
+    wrapper.vm.activeHomeTab = "dash:A:abc";
+    await flushPromises();
+    toastSpy.mockClear();
+
+    wrapper.findComponent({ name: "PinnedDashboardTab" }).vm.$emit("unavailable", "abc", "B");
+    await flushPromises();
+
+    expect(useHomeDashboard(gt).homeDashboard.value?.folderId).toBe("A");
+    expect(wrapper.vm.activeHomeTab).toBe("dash:A:abc");
+    expect(settingsService.deleteOrgSetting).not.toHaveBeenCalled();
+    expect(toastSpy).not.toHaveBeenCalled();
+  });
+
+  it("follows a pin moved elsewhere when the cached folder fails, instead of deleting it", async () => {
+    const stale = { dashboardId: "abc", folderId: "B", label: "X" };
+    queryClient.setQueryData(settingKeys.one("test-org", "home_dashboard"), stale);
+    (settingsService.getSetting as any).mockResolvedValue(pinIn("A"));
+    useHomeDashboard(gt).homeDashboard.value = { ...stale };
+    wrapper = createWrapper();
+    wrapper.vm.activeHomeTab = "dash:B:abc";
+    await flushPromises();
+    toastSpy.mockClear();
+
+    wrapper.findComponent({ name: "PinnedDashboardTab" }).vm.$emit("unavailable", "abc", "B");
+    await flushPromises();
+
+    expect(useHomeDashboard(gt).homeDashboard.value?.folderId).toBe("A");
+    expect(wrapper.vm.activeHomeTab).toBe("dash:A:abc");
+    expect(wrapper.findComponent({ name: "PinnedDashboardTab" }).props("folderId")).toBe("A");
+    expect(settingsService.deleteOrgSetting).not.toHaveBeenCalled();
+    expect(toastSpy).not.toHaveBeenCalled();
+  });
+
+  it("leaves the pinned tab without deleting anything when the pin was cleared elsewhere", async () => {
+    const pin = { dashboardId: "abc", folderId: "A", label: "X" };
+    useHomeDashboard(gt).homeDashboard.value = { ...pin };
+    (settingsService.getSetting as any).mockRejectedValue({ response: { status: 404 } });
+    wrapper = createWrapper();
+    wrapper.vm.activeHomeTab = "dash:A:abc";
+    await flushPromises();
+
+    expect(useHomeDashboard(gt).homeDashboard.value).toBeNull();
+    expect(wrapper.vm.activeHomeTab).toBe("overview");
+    expect(wrapper.findComponent({ name: "PinnedDashboardTab" }).exists()).toBe(false);
+    expect(settingsService.deleteOrgSetting).not.toHaveBeenCalled();
+  });
+
+  it("leaves the pinned tab when the pin was replaced by another dashboard elsewhere", async () => {
+    useHomeDashboard(gt).homeDashboard.value = { dashboardId: "abc", folderId: "A", label: "X" };
+    (settingsService.getSetting as any).mockResolvedValue(pinIn("A", "xyz"));
+    wrapper = createWrapper();
+    wrapper.vm.activeHomeTab = "dash:A:abc";
+    await flushPromises();
+
+    expect(wrapper.vm.activeHomeTab).toBe("overview");
+    expect(wrapper.find('[data-test="home-tab-dash:A:xyz"]').exists()).toBe(true);
+  });
+
+  describe("a saved pinned tab restored on mount", () => {
+    const loadPin = async (folderId: string) => {
+      queryClient.clear();
+      (settingsService.getSetting as any).mockResolvedValueOnce(pinIn(folderId));
+      await useHomeDashboard(gt).load("test-org");
+    };
+
+    it("opens the pin's current folder after the dashboard moved", async () => {
+      await loadPin("A");
+      (settingsService.getSetting as any).mockResolvedValue(pinIn("A"));
+      localStorage.setItem("o2_home_active_tab", "dash:B:abc");
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.activeHomeTab).toBe("dash:A:abc");
+      expect(wrapper.findComponent({ name: "PinnedDashboardTab" }).props("folderId")).toBe("A");
+    });
+
+    it("recovers from an out-of-band move once the stale folder fails, keeping the pin", async () => {
+      await loadPin("B");
+      let answer: (v: unknown) => void = () => {};
+      (settingsService.getSetting as any).mockReturnValue(new Promise((r) => (answer = r)));
+      localStorage.setItem("o2_home_active_tab", "dash:B:abc");
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.activeHomeTab).toBe("dash:B:abc");
+
+      wrapper.findComponent({ name: "PinnedDashboardTab" }).vm.$emit("unavailable", "abc", "B");
+      answer(pinIn("A"));
+      await flushPromises();
+
+      expect(wrapper.vm.activeHomeTab).toBe("dash:A:abc");
+      expect(useHomeDashboard(gt).homeDashboard.value?.folderId).toBe("A");
+      expect(settingsService.deleteOrgSetting).not.toHaveBeenCalled();
+    });
   });
 
   it("does NOT toast when the pin is closed deliberately via the ×", async () => {
@@ -565,6 +690,21 @@ describe("HomeView org home dashboard tab", () => {
       await flushPromises();
       expect(wrapper.vm.activeHomeTab).toBe("dash:default:abc");
       expect(wrapper.findComponent({ name: "PinnedDashboardTab" }).exists()).toBe(true);
+    });
+
+    it("opens the pin's new folder when the pending pin arrives moved", async () => {
+      localStorage.setItem("o2_home_active_tab", "dash:old:abc");
+      await startPendingLoad();
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.activeHomeTab).toBe("dash:old:abc");
+
+      answer({ data: { setting_value: PINNED } });
+      await flushPromises();
+      expect(wrapper.vm.activeHomeTab).toBe("dash:default:abc");
+      expect(wrapper.findComponent({ name: "PinnedDashboardTab" }).props("folderId")).toBe(
+        "default",
+      );
     });
 
     it("falls back to the first tab once the org turns out to have no pin", async () => {

@@ -105,6 +105,19 @@ struct PublicEntry {
     current: String,
 }
 
+// Only documents the JSON snapshot_body assembles from the page and both snapshot halves.
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+struct PublicStatusPageSnapshot {
+    name: String,
+    brand_name: Option<String>,
+    accent_color: Option<String>,
+    logo_img: Option<String>,
+    favicon_img: Option<String>,
+    current: config::meta::status_pages::SnapshotCurrent,
+    history: config::meta::status_pages::SnapshotHistory,
+}
+
 #[derive(serde::Deserialize)]
 pub struct AuthBody {
     password: String,
@@ -139,7 +152,7 @@ impl PublicEntry {
         ("slug" = String, Path, description = "Public slug"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = PublicStatusPageSnapshot),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -397,6 +410,8 @@ pub async fn host_route_middleware(
     request: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> Response {
+    use axum::response::IntoResponse;
+    use config::meta::feature::Feature;
     use o2_enterprise::enterprise::status_pages::host_routing::{
         HostRouteDecision, PageRoute, resolve_host_route,
     };
@@ -416,6 +431,18 @@ pub async fn host_route_middleware(
     match resolve_host_route(&host, &method, request.uri().path()).await {
         HostRouteDecision::Fallthrough => next.run(request).await,
         HostRouteDecision::NotConnected => domain_not_connected(),
+        HostRouteDecision::Page { .. }
+            if !o2_enterprise::enterprise::license::check_features(&[Feature::Synthetics]) =>
+        {
+            let err = infra::errors::ErrorCodes::LicenseFeatureNotEntitled(
+                <&str>::from(Feature::Synthetics).to_owned(),
+            );
+            (
+                StatusCode::FORBIDDEN,
+                Json(common::meta::http::HttpResponse::error_code(err)),
+            )
+                .into_response()
+        }
         HostRouteDecision::Page { slug, route } => {
             // The RealIp layer sits outside this one, so the resolved visitor IP is already on the
             // request.
@@ -1283,5 +1310,84 @@ mod tests {
         assert_ne!(own, Some(normalize_host("status.example.com")));
         assert_eq!(own_host_of(""), None);
         assert_eq!(own_host_of("not a url"), None);
+    }
+
+    #[test]
+    fn the_snapshot_body_fits_its_published_schema() {
+        use config::meta::status_pages::{
+            ComponentStatus, CurrentComponent, DayBucket, Grade, HistoryComponent, Impact,
+            NoticeKind, NoticeState, PublicNotice, PublicNoticeUpdate, SnapshotCurrent,
+            SnapshotHistory, UptimeWindows,
+        };
+        use utoipa::{PartialSchema, ToSchema};
+
+        let current = SnapshotCurrent {
+            overall: ComponentStatus::Operational,
+            generated_at: 1,
+            components: vec![CurrentComponent {
+                key: "c0".into(),
+                name: "API".into(),
+                status: ComponentStatus::Operational,
+            }],
+            notices: vec![PublicNotice {
+                kind: NoticeKind::Incident,
+                impact: Impact::Degraded,
+                title: "Slow".into(),
+                body: "Investigating".into(),
+                state: NoticeState::Resolved,
+                starts_at: 1,
+                resolved_at: None,
+                excluded_from_uptime: false,
+                updates: vec![PublicNoticeUpdate {
+                    body: "Fixed".into(),
+                    at: 2,
+                }],
+            }],
+        };
+        let history = SnapshotHistory {
+            generated_at: 1,
+            components: vec![HistoryComponent {
+                key: "c0".into(),
+                name: "API".into(),
+                uptime: UptimeWindows {
+                    d1: Some(100.0),
+                    d7: None,
+                    d30: Some(99.5),
+                    d90: None,
+                },
+                daily: vec![DayBucket {
+                    date: "2026-11-03".into(),
+                    downtime_min: 0,
+                    maint_min: 0,
+                    grade: Grade::Ok,
+                }],
+            }],
+        };
+        let body = snapshot_body(
+            &page_model("t-snapshot-schema"),
+            None,
+            &serde_json::to_string(&current).unwrap(),
+            &serde_json::to_string(&history).unwrap(),
+        );
+        let mut components = vec![(
+            PublicStatusPageSnapshot::name().into_owned(),
+            PublicStatusPageSnapshot::schema(),
+        )];
+        PublicStatusPageSnapshot::schemas(&mut components);
+        let schemas: serde_json::Map<String, serde_json::Value> = components
+            .into_iter()
+            .map(|(name, schema)| (name, serde_json::to_value(schema).unwrap()))
+            .collect();
+        let root = serde_json::json!({
+            "$ref": "#/components/schemas/PublicStatusPageSnapshot",
+            "components": {"schemas": schemas},
+        });
+        let validator = jsonschema::draft202012::new(&root).unwrap();
+        let answer: serde_json::Value = serde_json::from_str(&body).unwrap();
+        let errors: Vec<String> = validator
+            .iter_errors(&answer)
+            .map(|e| e.to_string())
+            .collect();
+        assert!(errors.is_empty(), "{answer}: {errors:?}");
     }
 }

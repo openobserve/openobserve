@@ -180,6 +180,32 @@ describe("environments round-trip", () => {
   });
 });
 
+describe("template override round-trip", () => {
+  it("sends the override on both payloads and null when cleared", () => {
+    expect(buildCreateBrowserTestPayload(check({ template: "ops-card" })).template).toBe(
+      "ops-card",
+    );
+    expect(buildCreateBrowserTestPayload(check({ template: null })).template).toBeNull();
+    const protocolCheck = {
+      ...check({ template: "ops-card" }),
+      checkType: "tcp",
+      tcp: { port: 443, timeout_ms: 10000, response_contains: "" },
+    } as unknown as ProtocolCheck;
+    expect(buildCreateProtocolCheckPayload(protocolCheck).template).toBe("ops-card");
+  });
+
+  it("reads the override back off the wire", () => {
+    const mapped = mapResponseToBrowserCheck({
+      name: "Cloud login",
+      target: "https://app.test",
+      template: "ops-card",
+      config: { steps: [] },
+    });
+    expect(mapped.template).toBe("ops-card");
+    expect(mapResponseToBrowserCheck({ name: "x", config: { steps: [] } }).template).toBeNull();
+  });
+});
+
 describe("browser config extras (UI-04)", () => {
   const stored = {
     name: "api made",

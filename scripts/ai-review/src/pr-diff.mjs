@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 
 const MAX_BUFFER = 200 * 1024 * 1024;
 const TOO_LARGE_RE = /exceeded the maximum number of lines|too_large|HTTP 406|HTTP 422/i;
@@ -55,6 +56,39 @@ export function fetchPinnedDiff(params) {
   return pinDiff({ ...params, diff: fetchDiff(params) });
 }
 
+// Blob ids and hunk line numbers move with the base, so a rebase keeps the fingerprint; the function context after `@@` stays, as the same lines in another function are another change.
+export function diffFingerprint(diff) {
+  const text = String(diff ?? "");
+  // A binary file has no hunks, so its blob ids are the only record of its content.
+  const keepBlobIds = /^(Binary files .* differ|GIT binary patch)$/m.test(text);
+  const normalized = text
+    .split("\n")
+    .map(line => (keepBlobIds ? line : line.replace(/^index [0-9a-f]+\.\.[0-9a-f]+/, "index")))
+    .map(line => line.replace(/^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/, "@@"))
+    .join("\n")
+    .replace(/\n+$/, "");
+  return createHash("sha256").update(normalized).digest("hex");
+}
+
+// Equal text names one change only where each hunk's old lines sit once in the base, so an edit to one of two identical blocks cannot pass for the other.
+export function hunksLocatable(diff, readBase) {
+  for (const section of String(diff ?? "").split(/^diff --git /m).slice(1)) {
+    const firstHunk = section.search(/^@@ /m);
+    if (firstHunk === -1) continue;
+    const header = section.slice(0, firstHunk);
+    if (/^--- \/dev\/null$/m.test(header)) continue;
+    const path = header.match(/^--- a\/(.*?)\t?$/m)?.[1];
+    const base = path ? readBase(path) : null;
+    if (typeof base !== "string") return false;
+    const baseLines = base.split("\n");
+    for (const hunk of section.slice(firstHunk).split(/^@@ [^\n]*(?:\n|$)/m).slice(1)) {
+      const old = hunk.split("\n").filter(line => line.startsWith(" ") || line.startsWith("-")).map(line => line.slice(1));
+      if (old.length === 0 ? base !== "" : occurrences(baseLines, old) !== 1) return false;
+    }
+  }
+  return true;
+}
+
 // `unfocused` keeps the whole diff for a gate candidate, whose approval must rest on reviewers that saw every file; requiresFocus agents still opt out.
 export function reviewerDiff(diff, { fileFocus, requiresFocus }, { unfocused = false, pathOf = path => path } = {}) {
   if (!fileFocus) return { diff, skipped: false, fullDiff: true };
@@ -106,4 +140,13 @@ function prefixGitHeader(line, p) {
 
 function prefixBinaryLine(line, p) {
   return line.replace(/(^Binary files |and )("?)([ab])\//g, `$1$2$3/${p}/`);
+}
+
+// Stops at two: the caller only needs to know whether a block is unique.
+function occurrences(lines, block) {
+  let found = 0;
+  for (let i = 0; i + block.length <= lines.length && found < 2; i += 1) {
+    if (lines[i] === block[0] && block.every((line, j) => lines[i + j] === line)) found += 1;
+  }
+  return found;
 }

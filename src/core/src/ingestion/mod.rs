@@ -30,6 +30,7 @@ use config::{
     ider::SnowflakeIdGenerator,
     meta::{
         alerts::{TriggerCondition, alert::Alert},
+        pipeline::PipelineKind,
         promql::HASH_LABEL,
         self_reporting::usage::{RequestStats, RunOutcome, TriggerData, TriggerDataType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
@@ -71,19 +72,32 @@ use crate::{
 pub mod columnar;
 pub mod grpc;
 pub mod ingestion_service;
+pub mod realtime_mute;
 pub mod rejections;
-
-pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
 /// Global atomic counter for round-robin distribution of requests across memory table buckets.
 /// This ensures even distribution of ingestion load across multiple buckets in axum.
 static REQUEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-/// `org/alert -> until`, taken before the downtime check so concurrent requests run it once.
+/// `org/alert` and `org/alert/downtime` -> until, so one node evaluates each once per floor.
 static REALTIME_FLOOR_CLAIMS: LazyLock<DashMap<String, (i64, u64)>> = LazyLock::new(DashMap::new);
 
 /// Tells claims of one key apart, so a request releases only its own.
 static REALTIME_FLOOR_TOKENS: AtomicU64 = AtomicU64::new(0);
+
+/// Each real-time alert with its matching rows and what is known of their downtime.
+pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>, RealtimeMute)>;
+
+/// The downtime decision a real-time trigger carries from ingestion.
+#[derive(Clone, Debug, PartialEq)]
+pub enum RealtimeMute {
+    /// Not classified at ingestion (the org has no alert downtime then); decided at send time.
+    Unchecked,
+    /// Every carried row is outside any downtime.
+    Unmuted,
+    /// Every matching row was muted; the merged downtime.
+    Muted(config::meta::downtimes::ActiveDowntime),
+}
 
 /// Memoizes the write partition per time bucket while no partition key is enabled.
 pub struct PartitionMemo<'a> {
@@ -163,6 +177,75 @@ pub async fn get_stream_executable_pipelines(stream: &StreamParams) -> Vec<Execu
     pipeline::get_executable_pipelines(stream).await
 }
 
+/// Whether a user pipeline, which owns what reaches the source stream, is among `pipelines`.
+pub fn has_user_pipeline(pipelines: &[ExecutablePipeline]) -> bool {
+    pipelines.iter().any(|p| p.kind == PipelineKind::User)
+}
+
+/// Whether the source stream gets its inputs back: no user pipeline owns it and none reached it.
+pub fn should_preserve_source(
+    org_id: &str,
+    stream_name: &str,
+    pipelines: &[ExecutablePipeline],
+    source_buffered: bool,
+) -> bool {
+    let has_user_pipeline = has_user_pipeline(pipelines);
+    log::debug!(
+        "[Pipeline] source preservation check stream={org_id}/{stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, source_buffered={source_buffered}",
+        pipelines.len()
+    );
+    !has_user_pipeline && !source_buffered
+}
+
+/// Whether the pipeline only scores records with an LLM, so its batch runs off the write path.
+pub fn is_llm_evaluation(pipeline: &ExecutablePipeline) -> bool {
+    pipeline.kind == PipelineKind::Evaluation && pipeline.contains_llm_evaluation_node()
+}
+
+/// Starts the stream's LLM evaluation pipelines over `records`; nothing they return is ingested.
+pub fn spawn_llm_evaluations(
+    org_id: &str,
+    stream_name: &str,
+    pipelines: &[ExecutablePipeline],
+    records: &[Value],
+    in_stream_name: Option<&str>,
+) -> tokio::task::JoinSet<()> {
+    let mut tasks = tokio::task::JoinSet::new();
+    for exec_pl in pipelines.iter().filter(|p| is_llm_evaluation(p)) {
+        let exec_pl = exec_pl.clone();
+        let org_id = org_id.to_string();
+        let stream_name = stream_name.to_string();
+        let records = records.to_vec();
+        let in_stream_name = in_stream_name.map(String::from);
+        tasks.spawn(async move {
+            if let Err(e) = exec_pl
+                .process_batch(&org_id, records, in_stream_name)
+                .await
+            {
+                log::error!(
+                    "[Pipeline] evaluation pipeline for stream {org_id}/{stream_name}: Batch execution error: {e}.",
+                );
+            }
+        });
+    }
+    tasks
+}
+
+/// Waits for the evaluations `spawn_llm_evaluations` started, logging any that panicked.
+pub async fn join_llm_evaluations(
+    mut tasks: tokio::task::JoinSet<()>,
+    org_id: &str,
+    stream_name: &str,
+) {
+    while let Some(result) = tasks.join_next().await {
+        if let Err(e) = result {
+            log::error!(
+                "[Pipeline] evaluation pipeline task for stream {org_id}/{stream_name} failed: {e}.",
+            );
+        }
+    }
+}
+
 pub async fn get_stream_alerts(
     streams: &[StreamParams],
     stream_alerts_map: &mut HashMap<String, Vec<Alert>>,
@@ -206,7 +289,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
         return;
     }
     let mut trigger_usage_reports = vec![];
-    for (alert, val) in triggers.iter() {
+    for (alert, val, mute) in triggers.iter() {
         let module_key = scheduler_key(alert.id);
         let now = Utc::now().timestamp_micros();
         let mut trigger_data_stream = TriggerData {
@@ -259,7 +342,26 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
         } else {
             None
         };
-        let delivered = if let Some(downtime) = realtime_downtime(alert, val, now).await {
+        let downtime = match mute {
+            RealtimeMute::Unchecked => realtime_downtime(alert, val, now).await,
+            RealtimeMute::Unmuted => None,
+            RealtimeMute::Muted(downtime) => Some(downtime.clone()),
+        };
+        let holds_silence = if let Some(downtime) = downtime {
+            // Downtime keys are never released, so expired claims are dropped before a new one.
+            REALTIME_FLOOR_CLAIMS.retain(|_, (until, _)| *until > now);
+            if claim_realtime_floor(
+                &format!("{floor_key}/{}", downtime.id),
+                now,
+                TriggerCondition::min_silence_micros(),
+            )
+            .is_none()
+            {
+                if let Some(token) = floor_claim {
+                    release_realtime_floor(&floor_key, token);
+                }
+                continue;
+            }
             log::info!(
                 "Realtime alert {}/{} suppressed by downtime {}",
                 alert.org_id,
@@ -280,11 +382,11 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             if let Err(e) = &outcome {
                 log::error!("Failed to send notification: {e}");
             }
-            outcome.is_ok()
+            send_holds_silence(&outcome)
         };
         #[cfg(feature = "enterprise")]
         record_realtime_mute(alert, &trigger_data_stream).await;
-        match realtime_silence_micros(alert, &trigger_data_stream, delivered) {
+        match realtime_silence_micros(alert, &trigger_data_stream, holds_silence) {
             Some(silence_micros) => {
                 trigger_data_stream.next_run_at =
                     apply_realtime_silence(alert, module_key, silence_micros, now).await;
@@ -1004,13 +1106,18 @@ fn realtime_alert_is_live(trigger: Option<&db::scheduler::Trigger>) -> bool {
     trigger.is_none_or(|t| !t.is_silenced)
 }
 
-/// A suppressed run keeps the rate-limit floor only, so the first firing after the window pages.
-fn realtime_silence_micros(alert: &Alert, run: &TriggerData, delivered: bool) -> Option<i64> {
+/// A suppressed run silences nothing, so an unmuted service of the same alert still pages.
+fn realtime_silence_micros(alert: &Alert, run: &TriggerData, holds_silence: bool) -> Option<i64> {
     match run.status {
-        RunOutcome::Suppressed => Some(TriggerCondition::min_silence_micros()),
-        _ if delivered => Some(alert.trigger_condition.effective_silence_micros()),
+        RunOutcome::Suppressed => None,
+        _ if holds_silence => Some(alert.trigger_condition.effective_silence_micros()),
         _ => None,
     }
+}
+
+/// A license denial holds the window too, or every matching request writes a history row.
+fn send_holds_silence(outcome: &Result<NotificationOutcome, AlertError>) -> bool {
+    matches!(outcome, Ok(_) | Err(AlertError::FeatureNotLicensed(_)))
 }
 
 /// Silences the trigger for `silence_micros` and returns the wakeup time it wrote.
@@ -1079,7 +1186,7 @@ fn record_realtime_delivery(
     match outcome {
         Err(e) => {
             trigger_data_stream.status = RunOutcome::NotifyFailed;
-            trigger_data_stream.error = Some(format!("error sending notification for alert: {e}"));
+            trigger_data_stream.error = Some(crate::alerts::alert::send_failure_message(e));
         }
         Ok(outcome) => {
             // Any undelivered destination is a failure, even when others succeeded.
@@ -1232,6 +1339,35 @@ mod tests {
     }
 
     #[test]
+    fn test_a_license_denial_holds_the_silence_a_failed_send_does_not() {
+        let denied = Err(crate::alerts::alert::all_workflows_failed_error(
+            1,
+            1,
+            String::new(),
+        ));
+        let failed = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        assert!(send_holds_silence(&denied));
+        assert!(!send_holds_silence(&failed));
+        assert!(send_holds_silence(&Ok(NotificationOutcome::default())));
+
+        // A zero silence still floors, so a denial cannot write one row per request.
+        let alert = Alert::default();
+        assert_eq!(alert.trigger_condition.silence, 0);
+        let mut run = realtime_row();
+        record_realtime_delivery(&mut run, &denied);
+        assert_eq!(
+            run.error.as_deref(),
+            Some(crate::alerts::alert::WORKFLOWS_UNLICENSED_REASON)
+        );
+        assert_eq!(
+            realtime_silence_micros(&alert, &run, send_holds_silence(&denied)),
+            Some(TriggerCondition::min_silence_micros())
+        );
+    }
+
+    #[test]
     fn test_a_slow_failed_request_cannot_release_a_newer_claim() {
         let key = "org1/slow-failed-floor";
         let floor = TriggerCondition::min_silence_micros();
@@ -1245,7 +1381,7 @@ mod tests {
     }
 
     #[test]
-    fn test_only_a_send_or_a_suppression_silences_a_realtime_alert() {
+    fn test_only_a_send_silences_a_realtime_alert() {
         let mut alert = Alert::default();
         alert.trigger_condition.silence = 60;
         let failed = TriggerData {
@@ -1258,6 +1394,12 @@ mod tests {
             Some(3_600_000_000)
         );
         assert!(realtime_alert_is_live(None));
+        // A muted firing silences nothing, so another service's rows still evaluate.
+        let suppressed = TriggerData {
+            status: RunOutcome::Suppressed,
+            ..Default::default()
+        };
+        assert_eq!(realtime_silence_micros(&alert, &suppressed, false), None);
     }
 
     #[test]

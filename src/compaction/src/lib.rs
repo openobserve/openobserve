@@ -27,13 +27,14 @@ use config::{
 use infra::{
     cluster::get_node_from_consistent_hash,
     file_list as infra_file_list,
-    schema::{get_partition_time_level, get_settings},
+    schema::{get_partition_time_level_at, get_settings},
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_matching_downsampling_rules;
 use tokio::sync::mpsc;
 
 mod bloom;
+pub mod classifier;
 pub mod deleted;
 pub mod dump;
 pub mod flatten;
@@ -290,7 +291,6 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
     }
 
     let now = config::utils::time::now();
-    let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
 
     // if the stream partition_time_level is daily we only allow one compactor
     let mut need_release_ids = Vec::new();
@@ -309,14 +309,28 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
         let stream_settings = get_settings(&org_id, &stream_name, stream_type)
             .await
             .unwrap_or_default();
-        let partition_time_level = get_partition_time_level(stream_type);
+        let partition_time_level =
+            get_partition_time_level_at(stream_type, Some(&stream_settings), job.offsets);
         // to avoid compacting conflict with retention, need check the data retention time
-        let stream_data_retention_end = if stream_settings.data_retention > 0 {
-            now - Duration::try_days(stream_settings.data_retention).unwrap()
-        } else {
-            data_lifecycle_end
+        let retention_days = match db::organization::stream_retention_days(
+            &org_id,
+            stream_type,
+            &stream_name,
+            stream_settings.data_retention,
+        )
+        .await
+        {
+            Ok(days) => days,
+            Err(e) => {
+                log::error!(
+                    "[COMPACTOR] merge job [{}] can't read retention, retry later: {e}",
+                    job.stream
+                );
+                need_release_ids.push(job.id);
+                continue;
+            }
         };
-        if job.offsets <= stream_data_retention_end.timestamp_micros() {
+        if retention::past_retention(job.offsets, retention_days, now) {
             need_done_ids.push(job.id); // the data will be deleted by retention, just skip
             continue;
         }
@@ -338,11 +352,9 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
             }
 
             // check if already running a job for this stream
-            if db::compact::stream::is_running(&job.stream) {
+            if !db::compact::stream::set_running(&job.stream) {
                 need_release_ids.push(job.id); // another job is running
                 continue;
-            } else {
-                db::compact::stream::set_running(&job.stream);
             }
         }
         // collect the merge jobs
@@ -352,6 +364,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
             stream_name,
             job_id: job.id,
             offset: job.offsets,
+            holds_stream: partition_time_level == PartitionTimeLevel::Daily,
         });
     }
 
@@ -461,5 +474,10 @@ pub(crate) fn is_past_hour(offset: i64) -> bool {
     let now = now_micros();
     let hour = hour_micros(1);
     let offset_hour_end = offset - offset % hour + hour;
-    now - offset_hour_end > second_micros(get_config().limit.max_file_retention_time as i64) * 3
+    now - offset_hour_end > settle_micros()
+}
+
+/// How long after a range ends its last files can still arrive.
+pub(crate) fn settle_micros() -> i64 {
+    second_micros(get_config().limit.max_file_retention_time as i64) * 3
 }

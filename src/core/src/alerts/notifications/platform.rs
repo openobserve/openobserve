@@ -85,6 +85,17 @@ pub fn stamp_key(
     Ok(value.to_string())
 }
 
+/// The prefix of a resolve answer that found no open record for the key.
+pub const NOTHING_TO_CLOSE: &str = "nothing to close";
+
+/// A non 2xx platform answer; the text is what the alert recovery logged before.
+#[derive(Debug, thiserror::Error)]
+#[error("status {status}{}", body.as_deref().map(|b| format!(": {b}")).unwrap_or_default())]
+pub struct PlatformRejected {
+    pub status: reqwest::StatusCode,
+    pub body: Option<String>,
+}
+
 /// Close whatever the firing opened; ServiceNow needs two, updating only by `sys_id`.
 pub async fn send_resolve(
     platform: Platform,
@@ -141,9 +152,10 @@ async fn resolve_servicenow(endpoint: &Endpoint, episode_id: &str) -> Result<Str
         .iter()
         .filter_map(|row| row["sys_id"].as_str().map(str::to_string))
         .collect();
+    // A resolve of a key that opened nothing, or closed already, is done (D8).
     if sys_ids.is_empty() {
-        return Err(anyhow::anyhow!(
-            "no open incident carries correlation_id {episode_id}"
+        return Ok(format!(
+            "{NOTHING_TO_CLOSE}: no open incident carries correlation_id {episode_id}"
         ));
     }
 
@@ -196,11 +208,7 @@ async fn request(
         .await
         .map_err(|e| anyhow::anyhow!("URL blocked by SSRF guard: {e}"))?;
 
-    let builder = if endpoint.skip_tls_verify {
-        reqwest::Client::builder().danger_accept_invalid_certs(true)
-    } else {
-        reqwest::Client::builder()
-    };
+    let builder = super::send::destination_client_builder(endpoint.skip_tls_verify);
     let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let mut req = client.request(method, url::Url::parse(url)?);
 
@@ -226,13 +234,16 @@ async fn request(
     let resp = req.send().await.map_err(reqwest::Error::without_url)?;
     let status = resp.status();
     let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
-    let text = resp.text().await.unwrap_or_default();
+    let text = resp.text().await;
     if status.is_success() {
-        Ok(text)
-    } else if hide_body {
-        Err(anyhow::anyhow!("status {status}"))
+        // An empty answer means "nothing to close", so a body that times out must stay an error.
+        Ok(text.map_err(reqwest::Error::without_url)?)
     } else {
-        Err(anyhow::anyhow!("status {status}: {text}"))
+        Err(PlatformRejected {
+            status,
+            body: (!hide_body).then_some(text.unwrap_or_default()),
+        }
+        .into())
     }
 }
 
@@ -241,6 +252,50 @@ mod tests {
     use config::meta::destinations::{DestinationType, Endpoint};
 
     use super::*;
+
+    #[test]
+    fn a_platform_that_never_answers_fails_at_the_notification_timeout() {
+        crate::ssrf_test_support::isolated(
+            concat!(
+                module_path!(),
+                "::a_platform_that_never_answers_fails_at_the_notification_timeout"
+            ),
+            &[
+                ("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32"),
+                ("ZO_ALERT_NOTIFICATION_TIMEOUT", "1"),
+            ],
+            || async {
+                let base = crate::ssrf_test_support::hanging_server().await;
+                let endpoint = Endpoint::default();
+                let url = format!("{base}/hang");
+                let send = request(&endpoint, reqwest::Method::POST, &url, None);
+                let sent = tokio::time::timeout(std::time::Duration::from_secs(10), send).await;
+                assert!(sent.expect("the platform send has no limit").is_err());
+            },
+        );
+    }
+
+    #[test]
+    fn a_success_whose_body_never_arrives_is_a_failed_send() {
+        crate::ssrf_test_support::isolated(
+            concat!(
+                module_path!(),
+                "::a_success_whose_body_never_arrives_is_a_failed_send"
+            ),
+            &[
+                ("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32"),
+                ("ZO_ALERT_NOTIFICATION_TIMEOUT", "1"),
+            ],
+            || async {
+                let base = crate::ssrf_test_support::truncated_server().await;
+                let endpoint = Endpoint::default();
+                let url = format!("{base}/stall");
+                let send = request(&endpoint, reqwest::Method::GET, &url, None);
+                let sent = tokio::time::timeout(std::time::Duration::from_secs(10), send).await;
+                assert!(sent.expect("the platform send has no limit").is_err());
+            },
+        );
+    }
 
     fn meta(routing_key: &str) -> hashbrown::HashMap<String, String> {
         let mut m = hashbrown::HashMap::new();

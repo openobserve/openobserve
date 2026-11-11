@@ -27,45 +27,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   descending: the row at the top of an overlapping pair is the one in force.
 -->
 <template>
-  <div
-    class="card-container rounded-surface bg-surface-base border-border-default flex flex-col gap-2 border px-4 py-3"
-    data-test="oncall-cover-list"
-  >
+  <!-- Nothing at all without covers: the timeline and its legend already say there are none. -->
+  <section v-if="covers.length" class="flex flex-col gap-2" data-test="oncall-cover-list">
     <span class="flex flex-wrap items-baseline gap-x-2">
-      <OText variant="panel-title">{{ t("oncall.coverListTitle") }}</OText>
-      <OText variant="meta">{{ t("oncall.coverListHint") }}</OText>
+      <OText variant="section" as="h3" data-test="oncall-cover-list-title">
+        {{ t("oncall.coverListCount", { count: covers.length }) }}
+      </OText>
+      <OText variant="meta" data-test="oncall-cover-list-zone">
+        {{ t("oncall.timesInZone", { zone: raw(timezone) }) }}
+      </OText>
     </span>
 
     <OTable
-      v-if="covers.length || loading"
       :data="covers"
       :columns="columns"
       row-key="id"
       :frame="false"
-      :loading="loading"
       :loading-reset-key="teamId"
       pagination="client"
       :show-global-filter="false"
+      :column-visibility="{ reason: false }"
+      :persist-columns="true"
       table-id="oncall-team-covers"
       data-test="oncall-cover-table"
     >
       <template #cell-who="{ row }">
-        <span class="flex flex-wrap items-center gap-1">
-          <OUserCell :value="row.user_email" />
-          <!-- Which rotation it stands over. Only when the team staffs more
-               than one — otherwise it is the answer to a question nobody on
-               this team can ask. -->
-          <OTag v-if="rotations.length > 1" variant="default-soft" size="xs">
-            {{ rotationName(row.rotation_id) }}
-          </OTag>
-        </span>
+        <OnCallPersonName truncate :email="row.user_email" />
       </template>
 
       <!-- Optional on the wire, and legitimately so: "cover tonight" is a real
            request before anybody has worked out whose night it is. -->
       <template #cell-coveringFor="{ row }">
-        <OUserCell v-if="row.covering_for" :value="row.covering_for" />
+        <OnCallPersonName v-if="row.covering_for" truncate :email="row.covering_for" />
         <OText v-else variant="meta">{{ t("oncall.coverForNobodyNamed") }}</OText>
+      </template>
+
+      <template #cell-rotation="{ row }">
+        <OText variant="meta">{{ rotationName(row.rotation_id) }}</OText>
       </template>
 
       <template #cell-window="{ row }">
@@ -78,50 +76,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-actions="{ row }">
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="delete-outline"
-          :aria-label="t('oncall.coverRemove')"
-          :data-test="`oncall-cover-remove-${row.id}`"
-          @click.stop="openRemove(row)"
-        />
+        <div class="flex items-center justify-end">
+          <OButton
+            variant="ghost-destructive"
+            size="icon-sm"
+            icon-left="delete-outline"
+            :aria-label="t('oncall.coverRemove')"
+            :data-test="`oncall-cover-remove-${row.id}`"
+            @click.stop="openRemove(row)"
+          >
+            <OTooltip side="bottom" :content="t('oncall.coverRemove')" />
+          </OButton>
+        </div>
       </template>
     </OTable>
+  </section>
 
-    <OText v-else variant="meta" data-test="oncall-cover-empty">
-      {{ t("oncall.coverListEmpty") }}
+  <!-- Deleting a cover hands the window back to the rotation, so the confirm names the window, not only the person. -->
+  <ODialog
+    :open="!!toRemove"
+    :title="t('oncall.coverRemoveTitle')"
+    :primary-button-label="t('oncall.coverRemove')"
+    :secondary-button-label="t('oncall.cancel')"
+    primary-button-variant="destructive"
+    :primary-button-loading="removing"
+    data-test="oncall-cover-remove-dialog"
+    @update:open="(v: boolean) => !v && (toRemove = null)"
+    @click:primary="removeCover"
+    @click:secondary="toRemove = null"
+  >
+    <OText v-if="shownRemove">
+      <i18n-t keypath="oncall.coverRemoveBody" tag="span">
+        <template #who>
+          <OnCallPersonName
+            :email="shownRemove.user_email"
+            data-test="oncall-cover-remove-name"
+            class="text-text-heading font-semibold"
+          />
+        </template>
+        <template #range>{{ windowOf(shownRemove) }}</template>
+      </i18n-t>
     </OText>
-
-    <!-- Deleting a cover puts the rotation back in charge of that window, and
-         who that is is not always obvious from the row. The confirm says the
-         window rather than only the name. -->
-    <ODialog
-      :open="!!toRemove"
-      :title="t('oncall.coverRemoveTitle')"
-      :primary-button-label="t('oncall.coverRemove')"
-      :secondary-button-label="t('oncall.cancel')"
-      primary-button-variant="destructive"
-      :primary-button-loading="removing"
-      data-test="oncall-cover-remove-dialog"
-      @update:open="(v: boolean) => !v && (toRemove = null)"
-      @click:primary="removeCover"
-      @click:secondary="toRemove = null"
-    >
-      <OText v-if="shownRemove">
-        <i18n-t keypath="oncall.coverRemoveBody" tag="span">
-          <template #who>
-            <span
-              data-test="oncall-cover-remove-name"
-              class="text-text-heading font-semibold break-all"
-              >{{ shownRemove.user_email }}</span
-            >
-          </template>
-          <template #range>{{ windowOf(shownRemove) }}</template>
-        </i18n-t>
-      </OText>
-    </ODialog>
-  </div>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
@@ -130,18 +126,20 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import { queryClient } from "@/composables/query/queryClient";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OnCallPersonName from "./OnCallPersonName.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { deleteOverrideMutation, teamOverridesQuery } from "@/services/oncall.queries";
 import type { Override, Rotation } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import { formatInZone } from "@/utils/oncall";
+import { serverMessageOf } from "@/utils/slackLink";
 
 const props = withDefaults(
   defineProps<{
@@ -171,7 +169,7 @@ const props = withDefaults(
   { timezone: "UTC", window: null, rotations: () => [], rotationId: null },
 );
 
-const emit = defineEmits<{ changed: [] }>();
+const emit = defineEmits<{ changed: []; licenseDenied: [features: string[]] }>();
 
 const { t } = useI18nTyped();
 
@@ -208,6 +206,11 @@ const columns = computed<OTableColumnDef<Override>[]>(() => [
     accessorFn: (row: Override) => row.covering_for ?? "",
   },
   {
+    id: "rotation",
+    header: t("oncall.coverRotationColumn"),
+    accessorFn: (row: Override) => row.rotation_id,
+  },
+  {
     id: "window",
     header: t("oncall.coverWhen"),
     accessorFn: (row: Override) => row.start_at,
@@ -223,8 +226,8 @@ const columns = computed<OTableColumnDef<Override>[]>(() => [
     header: t("oncall.actions"),
     isAction: true,
     sortable: false,
-    size: 80,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
+    pinned: "right",
+    meta: { align: "center", actionCount: 1 },
   },
 ]);
 
@@ -239,9 +242,6 @@ function windowOf(cover: Override): string {
   return `${fmt(cover.start_at)} – ${fmt(cover.end_at)}`;
 }
 
-/// Newest first, because that is the one in force where two overlap. The
-/// endpoint already answers in this order for the unfiltered read; sorting
-/// here keeps it true for the windowed one as well.
 // The newest read: a slower answer for a window the calendar has already left must not overwrite the list.
 let latestCoversRead = 0;
 
@@ -271,12 +271,13 @@ async function fetchCovers(force = false) {
     const all = props.rotationId
       ? res.filter((cover) => cover.rotation_id === props.rotationId)
       : res;
+    // Newest first, the one in force where two overlap; the windowed read does not promise that order.
     covers.value = [...all].sort((a, b) => b.created_at - a.created_at || b.id.localeCompare(a.id));
-  } catch {
+  } catch (err) {
     if (readId !== latestCoversRead) return;
-    // A cover list that cannot load is not worth an error over the calendar it
-    // sits under — the calendar still answers who is on call, which is the
-    // question people came with.
+    const denied = licenseDeniedFeatures(err);
+    if (denied) emit("licenseDenied", denied);
+    // No error over the calendar: it still answers who is on call.
     covers.value = [];
   } finally {
     if (readId === latestCoversRead) loading.value = false;
@@ -298,18 +299,25 @@ async function removeCover() {
     toRemove.value = null;
     // Unforced: the write expired the entry, so one server read repaints this ref.
     await fetchCovers();
-    // The calendar above is resolved server-side, so it has to be re-asked:
-    // the window this cover held now belongs to the rotation again.
+    // The calendar is resolved server-side, so the window this cover held must be re-asked.
     emit("changed");
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.coverRemoveFailed"),
+      message: raw(serverMessageOf(err)) || t("oncall.coverRemoveFailed"),
     });
   } finally {
     removing.value = false;
   }
 }
+
+// Another team's covers must not linger, deletable, while this team's first read is in flight.
+watch([orgId, () => props.teamId], () => {
+  latestCoversRead++;
+  covers.value = [];
+  toRemove.value = null;
+  loading.value = false;
+});
 
 // Wrapped: a watcher hands its new value to the callback, which `force` would take.
 watch(

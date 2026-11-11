@@ -13,12 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import PatternDetailsDialog from "./PatternDetailsDialog.vue";
 import { PATTERN_VOLUME_CACHE } from "./usePatternVolume";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Stub ODrawer so its slots render inline (no portal) and we can drive its
 // emits directly. Mirrors the same shape used by other migrated specs.
@@ -42,6 +45,8 @@ const ODrawerStub = {
 // Stub OButton so we can read the disabled prop directly (the underlying
 // reka-ui button does not always project a DOM `disabled` attribute), and
 // click events still fire the bound @click handler.
+const TooltipStub = { template: "<div><slot /></div>" };
+
 const OButtonStub = {
   name: "OButton",
   props: ["variant", "size", "disabled", "loading"],
@@ -184,6 +189,28 @@ describe("PatternDetailsDialog", () => {
       await wrapper.find('[data-test="pattern-detail-create-alert-btn"]').trigger("click");
       expect(wrapper.emitted("create-alert")![0]).toEqual([mockSelectedPattern.pattern]);
       expect(wrapper.emitted("update:modelValue")![0]).toEqual([false]);
+      expect(analytics.track).toHaveBeenCalledWith("log_patterns_alert_started");
+    });
+
+    it("disables create-alert with a lock and emits nothing when the license locks alerts", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, features: { alerts: "locked" } };
+      try {
+        const locked = mount(PatternDetailsDialog, {
+          props: { modelValue: true, selectedPattern: mockSelectedPattern, totalPatterns },
+          global: { ...globalConfig, stubs: { ...globalConfig.stubs, OTooltip: TooltipStub } },
+        });
+        const btn = locked.find('[data-test="pattern-detail-create-alert-btn"]');
+        const btnComponent = locked
+          .findAllComponents(OButtonStub)
+          .find((c: any) => c.attributes("data-test") === "pattern-detail-create-alert-btn");
+        expect(btnComponent?.props("disabled")).toBeDefined();
+        expect(locked.find('[data-test="pattern-detail-create-alert-lock"]').exists()).toBe(true);
+        await btn.trigger("click");
+        expect(locked.emitted("create-alert")).toBeUndefined();
+        locked.unmount();
+      } finally {
+        store.state.zoConfig = { ...store.state.zoConfig, features: {} };
+      }
     });
   });
 

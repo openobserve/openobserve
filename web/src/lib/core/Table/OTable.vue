@@ -14,7 +14,8 @@ import {
   watch,
   watchEffect,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { useFeatureNames } from "@/composables/useFeatureLock";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender, type Row } from "@tanstack/vue-table";
@@ -71,6 +72,7 @@ import OTableOverflowTooltip from "./sub-components/OTableOverflowTooltip.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 
 const { t } = useI18nTyped();
+const { featureNames } = useFeatureNames();
 const props = withDefaults(defineProps<OTableProps<TData>>(), {
   pagination: "client",
   pageSize: 20,
@@ -185,6 +187,7 @@ const SKELETON_ROW_STRATEGY = "fixed" as "fixed" | "pageSize";
 const FIXED_SKELETON_ROWS = 8;
 
 const skeletonRowCount = computed(() => {
+  if (props.skeletonRows && props.skeletonRows > 0) return props.skeletonRows;
   if (SKELETON_ROW_STRATEGY === "pageSize") {
     return props.pageSize ?? FIXED_SKELETON_ROWS;
   }
@@ -1329,8 +1332,9 @@ const showEmpty = computed(
     !props.streaming &&
     !props.error &&
     !showForbidden.value &&
-    // A leading body row is content of its own, so it paints even with no data rows.
+    // A leading or trailing body row is content of its own, so it paints even with no data rows.
     !slots["body-start"] &&
+    !slots["body-end"] &&
     (sectionsEnabled.value ? bodyRows.value.length === 0 : displayRows.value.length === 0),
 );
 const showError = computed(() => !heldLoading.value && !!props.error);
@@ -1757,6 +1761,10 @@ defineExpose({
               <slot name="body-start" />
             </template>
 
+            <template v-if="slots['body-end']" #body-end>
+              <slot name="body-end" />
+            </template>
+
             <!-- Section heading row -->
             <template v-if="slots['group-header']" #group-header="ghProps">
               <slot name="group-header" :section-key="ghProps.sectionKey" :rows="ghProps.rows" />
@@ -1877,9 +1885,23 @@ defineExpose({
 
         <!-- ── Access Denied State ───────────────────────────── -->
         <OTableEmpty v-if="showForbidden" :floor="!props.fillHeight" data-test="o2-table-forbidden">
+          <OEmptyState
+            v-if="Array.isArray(props.forbidden)"
+            size="hero"
+            preset="no-access"
+            :title="t('featureLock.toastTitle')"
+            :description="
+              props.forbidden.length
+                ? t('featureLock.toastMessage', {
+                    features: raw(featureNames(props.forbidden)),
+                  })
+                : t('featureLock.toastMessageGeneric')
+            "
+            data-test="o2-table-license-denied"
+          />
           <component
             :is="forbiddenState"
-            v-if="forbiddenState"
+            v-else-if="forbiddenState"
             :resource="props.forbiddenResource"
           />
           <OEmptyState v-else size="hero" preset="no-access" />

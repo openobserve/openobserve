@@ -132,6 +132,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import { useOrgId } from "@/composables/query";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { orgSettingsQuery } from "@/services/organizations.queries";
+import analytics from "@/services/product_analytics";
 import OrgDomainMappings from "./OrgDomainMappings.vue";
 import OrgDomainRequests from "./OrgDomainRequests.vue";
 import OrgDomainRestrictions from "./OrgDomainRestrictions.vue";
@@ -159,6 +160,7 @@ const activeTab = computed<DomainTab>(() => {
 });
 
 function setTab(tab: string | number) {
+  analytics.track("org_domain_tab_switched", { tab: String(tab) });
   router.replace({ query: { ...route.query, tab: String(tab) } });
 }
 </script>

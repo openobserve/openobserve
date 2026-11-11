@@ -1334,6 +1334,65 @@ describe("ServicesCatalog", () => {
       expect(panelAfter.vm).toBe(panelBefore.vm);
       expect(panelAfter.props("selectedNode")?.name).toBe("auth-service");
     });
+
+    // o2-enterprise#3126: without the row's error rate the panel badge always read Healthy.
+    it("should hand the clicked row's error rate to the side panel", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+        }));
+        callbacks?.data?.(null, { type: "search_response_hits", content: { results: { hits } } });
+        callbacks?.complete?.(null, {});
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      const payment = wrapper.vm.services.find(
+        (s: { service_name: string }) => s.service_name === "payment-service",
+      );
+      wrapper.vm.handleRowClick(payment);
+      await flushPromises();
+
+      const panel = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
+      expect(panel.props("selectedNode")).toMatchObject({
+        name: "payment-service",
+        error_rate: 7.0,
+      });
+    });
+
+    it("should give the open side panel the refreshed error rate after a reload", async () => {
+      let paymentErrorRate = 0.5;
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.service_name === "payment-service" ? paymentErrorRate : s.error_rate,
+        }));
+        callbacks?.data?.(null, { type: "search_response_hits", content: { results: { hits } } });
+        callbacks?.complete?.(null, {});
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      await wrapper
+        .find('[data-test="services-catalog-row-name-payment-service"]')
+        .trigger("click");
+      const panel = () => wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
+      expect(panel().props("selectedNode")).toMatchObject({ error_rate: 0.5 });
+
+      paymentErrorRate = 12;
+      await wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.vm.showSidePanel).toBe(true);
+      expect(panel().props("selectedNode")).toMatchObject({
+        name: "payment-service",
+        error_rate: 12,
+      });
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -1759,7 +1818,13 @@ describe("ServicesCatalog", () => {
 
       it("keeps inferred dependencies with the same name but different identities separate", async () => {
         mockStreamSchema.mockResolvedValueOnce({
-          data: { schema: [{ name: "infer_service_name" }] },
+          data: {
+            schema: [
+              { name: "infer_service_name" },
+              { name: "infer_service_system" },
+              { name: "infer_service_type" },
+            ],
+          },
         });
         mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
           callbacks.data(null, {
@@ -2275,6 +2340,34 @@ describe("ServicesCatalog", () => {
       expect(wrapper.find('[data-test="services-catalog-requests-nightly-cron"]').text()).toBe("0");
     });
 
+    it("selects NULL for inferred system and type columns the stream does not have", async () => {
+      const sql = await loadWithSchema(
+        schemaWith("infer_service_name", "reference_parent_span_id"),
+      );
+      expect(selectItem(sql, "_infer_service_system").trim()).toBe(
+        "NULL AS _infer_service_system,",
+      );
+      expect(selectItem(sql, "_infer_service_type").trim()).toBe("NULL AS _infer_service_type,");
+      expect(sql).not.toContain("NULLIF(infer_service_system");
+      expect(sql).not.toContain("NULLIF(infer_service_type");
+      const groupBy = sql.split("GROUP BY")[1].split("ORDER BY")[0];
+      expect(groupBy.trim().split(",\n")).toEqual([
+        "COALESCE(NULLIF(infer_service_name, ''), service_name)",
+        "  NULLIF(infer_service_name, '')",
+      ]);
+    });
+
+    it("groups by only the inferred column the stream has", async () => {
+      const sql = await loadWithSchema(schemaWith("infer_service_name", "infer_service_type"));
+      expect(selectItem(sql, "_infer_service_system").trim()).toBe(
+        "NULL AS _infer_service_system,",
+      );
+      expect(selectItem(sql, "_infer_service_type")).toContain("NULLIF(infer_service_type, '')");
+      const groupBy = sql.split("GROUP BY")[1].split("ORDER BY")[0];
+      expect(groupBy).toContain("NULLIF(infer_service_type, '')");
+      expect(groupBy).not.toContain("infer_service_system");
+    });
+
     it("discards a schema fetched for a stream that is no longer selected", async () => {
       let release!: (value: any) => void;
       mockStreamSchema.mockImplementationOnce(
@@ -2613,6 +2706,17 @@ describe("ServicesCatalog", () => {
       await flushPromises();
       expect(anomaliesSchemaCalls()).toHaveLength(0);
       expect(anomalyCalls()).toHaveLength(0);
+      expect(wrapper.find('[data-test="services-catalog-insights"]').exists()).toBe(false);
+    });
+
+    it("makes no anomaly calls and shows no strip when anomaly_detection is license-locked", async () => {
+      wrapper = mountServicesCatalog({
+        storeOverrides: { zoConfig: { features: { anomaly_detection: "locked" } } },
+      });
+      await flushPromises();
+      expect(anomaliesSchemaCalls()).toHaveLength(0);
+      expect(anomalyCalls()).toHaveLength(0);
+      expect(mockAnomalyList).not.toHaveBeenCalled();
       expect(wrapper.find('[data-test="services-catalog-insights"]').exists()).toBe(false);
     });
 
@@ -3077,6 +3181,76 @@ describe("ServicesCatalog", () => {
 
       expect(wrapper.vm.showSidePanel).toBe(false);
       expect(wrapper.vm.selectedServiceRow).toBeNull();
+    });
+  });
+
+  describe("search error state", () => {
+    const failSearch = () =>
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.error(null, {
+          type: "error",
+          content: { message: "Search field not found: infer_service_system" },
+        });
+      });
+    const errorState = () => wrapper.find('[data-test="services-catalog-error"]');
+    const retry = () => errorState().find('[data-test="o2-empty-state"] button');
+
+    it("shows the load-error state with the server message instead of the empty state", async () => {
+      failSearch();
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="services-catalog-empty"]').exists()).toBe(false);
+      expect(errorState().find('[data-test="o2-empty-state"]').exists()).toBe(true);
+      expect(errorState().text()).toContain("Search field not found: infer_service_system");
+      expect(retry().text()).toContain("Retry");
+    });
+
+    it("retry runs the search again and clears the error once it succeeds", async () => {
+      failSearch();
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      const calls = mockFetchQueryDataWithHttpStream.mock.calls.length;
+
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.complete(null, {});
+      });
+      await retry().trigger("click");
+      await flushPromises();
+
+      expect(mockFetchQueryDataWithHttpStream.mock.calls.length).toBe(calls + 1);
+      expect(errorState().exists()).toBe(false);
+      expect(wrapper.find('[data-test="services-catalog-empty"]').exists()).toBe(true);
+    });
+
+    it("falls back to a generic message when the error has none", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.error(null, { type: "error", content: {} });
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(errorState().text()).toContain("Unknown error");
+    });
+
+    it("drops the previous rows and shows the error when a later search fails", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.data(null, {
+          type: "search_response_hits",
+          content: { results: { hits: [{ service_name: "frontend", total_requests: 3 }] } },
+        });
+        callbacks.complete(null, {});
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      expect(wrapper.find('[data-test="services-catalog-row-name-frontend"]').exists()).toBe(true);
+
+      failSearch();
+      await wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="services-catalog-row-name-frontend"]').exists()).toBe(false);
+      expect(errorState().text()).toContain("Search field not found: infer_service_system");
     });
   });
 

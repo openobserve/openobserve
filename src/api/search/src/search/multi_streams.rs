@@ -50,6 +50,10 @@ use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 use transform as functions;
 use usage_reporting::report_request_usage_stats;
+use utoipa::openapi::{
+    RefOr,
+    schema::{AnyOfBuilder, ArrayBuilder, ObjectBuilder, Schema, SchemaType, Type},
+};
 #[cfg(feature = "cloud")]
 use {
     axum::http::StatusCode as AxumStatusCode,
@@ -70,6 +74,34 @@ use crate::{
     },
     search::{error_utils::map_error_to_http_response, utils::SearchStreamGuard},
 };
+
+/// Only documents `_search_multi`: with `per_query_response` each hit is one query's rows.
+struct MultiSearchResponse;
+
+impl utoipa::PartialSchema for MultiSearchResponse {
+    fn schema() -> RefOr<Schema> {
+        let mut schema = <search::Response as utoipa::PartialSchema>::schema();
+        if let RefOr::T(Schema::Object(response)) = &mut schema {
+            let row = || ObjectBuilder::new().schema_type(Type::Object);
+            // A ResultArray VRL may put non-object values inside a per-query group.
+            let any_value = ObjectBuilder::new().schema_type(SchemaType::AnyValue);
+            let hit = AnyOfBuilder::new()
+                .item(row())
+                .item(ArrayBuilder::new().items(any_value));
+            let hits = ArrayBuilder::new().items(hit).description(Some(
+                "Rows, or with `per_query_response` one array of values per query",
+            ));
+            response.properties.insert("hits".to_string(), hits.into());
+        }
+        schema
+    }
+}
+
+impl utoipa::ToSchema for MultiSearchResponse {
+    fn schemas(schemas: &mut Vec<(String, RefOr<Schema>)>) {
+        <search::Response as utoipa::ToSchema>::schemas(schemas);
+    }
+}
 
 /// SearchStreamData
 #[utoipa::path(
@@ -104,7 +136,7 @@ use crate::{
             status = 200,
             description = "Success",
             content_type = "application/json",
-            body = Object,
+            body = MultiSearchResponse,
             example = json!({
             "took": 155,
             "hits": [
@@ -672,7 +704,7 @@ pub async fn search_multi(
             status = 200,
             description = "Success",
             content_type = "application/json",
-            body = Object,
+            body = config::meta::search::SearchPartitionResponse,
             example = json!({
             "took": 155,
             "file_num": 10,
@@ -853,7 +885,7 @@ pub async fn _search_partition_multi(
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -1012,6 +1044,8 @@ fn parse_simple_multi_stream_request(
     #[derive(serde::Deserialize)]
     struct SimpleMultiStreamWrapper {
         query: SimpleMultiStreamQuery,
+        #[serde(default = "search::default_use_index")]
+        use_index: bool,
     }
     #[derive(serde::Deserialize)]
     struct SimpleMultiStreamQuery {
@@ -1061,6 +1095,7 @@ fn parse_simple_multi_stream_request(
         uses_zo_fn: simple_req.query.query_fn.is_some(),
         query_fn: simple_req.query.query_fn,
         skip_wal: false,
+        use_index: simple_req.use_index,
         regions: vec![],
         clusters: vec![],
         search_type: None,
@@ -1550,6 +1585,8 @@ pub async fn report_to_audit(
     let is_audit_enabled = get_o2_config().common.audit_enabled;
     if is_audit_enabled {
         audit(AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: user_id,
             org_id,
             _timestamp: config::utils::time::now_micros(),
@@ -1564,6 +1601,8 @@ pub async fn report_to_audit(
                 trace_id: Some(trace_id.to_string()),
             },
             delegated: None,
+            fleet_id: None,
+            target: None,
         })
         .await;
     }
@@ -1585,7 +1624,23 @@ mod tests {
     use openobserve_api_common::extractors::Headers;
     use openobserve_core::auth::UserEmail;
 
-    use super::around_multi;
+    use super::{around_multi, parse_simple_multi_stream_request};
+
+    #[test]
+    fn test_parse_simple_multi_stream_request_use_index() {
+        let body = |extra: &str| {
+            format!(
+                r#"{{"query":{{"sql":["SELECT * FROM t"],"start_time":0,"end_time":1}}{extra}}}"#
+            )
+        };
+        assert!(
+            parse_simple_multi_stream_request(body("").as_bytes())
+                .unwrap()
+                .use_index
+        );
+        let req = parse_simple_multi_stream_request(body(r#","use_index":false"#).as_bytes());
+        assert!(!req.unwrap().use_index);
+    }
 
     #[test]
     fn multi_stream_checks_each_query_after_decoding_it() {
@@ -1628,6 +1683,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1681,6 +1737,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1709,6 +1766,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1742,6 +1800,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: Some("base64_encoded_vrl_function".to_string()),
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1776,6 +1835,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1818,6 +1878,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1853,6 +1914,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1919,6 +1981,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: Some("dG9wX2xldmVsX3ZybA==".to_string()), // "top_level_vrl" base64
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1960,6 +2023,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: Some("dG9wX2xldmVsX3ZybA==".to_string()), // "top_level_vrl"
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -2023,6 +2087,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: Some(encoded),
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -2088,6 +2153,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: Some(encoded),
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -2161,6 +2227,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: Some(encoded),
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,

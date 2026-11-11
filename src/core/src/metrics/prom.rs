@@ -65,7 +65,7 @@ use crate::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
         meta::stream::SchemaRecords,
     },
-    ingestion::{TriggerAlertData, check_ingestion_allowed},
+    ingestion::check_ingestion_allowed,
     pipeline::batch_execution::ExecutablePipeline,
 };
 
@@ -186,7 +186,7 @@ pub async fn remote_write(
 
     // realtime alerts
     let mut stream_alerts_map: HashMap<String, Vec<alert::Alert>> = HashMap::new();
-    let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
+    let mut stream_trigger_map: HashMap<String, Option<ingest::StreamTriggers>> = HashMap::new();
 
     let decoded = config::utils::snappy::decode_raw_snappy(&body, cfg.limit.req_payload_limit)
         .map_err(|e| anyhow::anyhow!("Invalid snappy compressed data: {e}"))?;
@@ -878,6 +878,7 @@ fn metadata_search_request(sql: String, start: i64, end: i64) -> config::meta::s
         search_type: None,
         search_event_context: None,
         use_cache: default_use_cache(),
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,
@@ -1631,7 +1632,7 @@ mod tests {
             common::TableReference,
             prelude::SessionContext,
         };
-        use search::datafusion::udf::regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
+        use search::datafusion::udf::regex::regexp::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
 
         for (op, pattern, matching) in [
             ("=", "x' OR '1'='1", "x' OR '1'='1"),
@@ -1700,7 +1701,7 @@ mod tests {
             arrow::{array::StringArray, record_batch::RecordBatch},
             prelude::SessionContext,
         };
-        use search::datafusion::udf::regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
+        use search::datafusion::udf::regex::regexp::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
 
         let ctx = SessionContext::new();
         ctx.register_udf(REGEX_MATCH_UDF.clone());
@@ -1759,7 +1760,7 @@ mod tests {
             arrow::{array::StringArray, record_batch::RecordBatch},
             prelude::SessionContext,
         };
-        use search::datafusion::udf::regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
+        use search::datafusion::udf::regex::regexp::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
 
         let values = [
             "api", "work", "apix", "xwork", "xapix", "apiwork", "apix-x", "workx",

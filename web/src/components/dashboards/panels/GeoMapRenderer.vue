@@ -16,7 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="h-full w-full p-1.25" data-test="dashboard-geomap-renderer">
-    <div class="h-full w-full" ref="chartRef" id="chart-map"></div>
+    <div
+      class="h-full w-full"
+      :class="{ 'chart-canvas-pixelated': fractionalPixelRatio }"
+      ref="chartRef"
+      id="chart-map"
+    ></div>
   </div>
 </template>
 
@@ -56,6 +61,7 @@ import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import { withChartFont } from "@/utils/fonts";
 import { reclusterSeries } from "@/utils/dashboard/geoMapCluster";
+import { currentDevicePixelRatio, useChartPixelRatio } from "@/composables/useDevicePixelRatio";
 
 echarts.use([
   TitleComponent,
@@ -152,6 +158,10 @@ export default defineComponent({
       appliedView = view;
     };
 
+    const { pixelated: fractionalPixelRatio, sync: syncPixelRatio } = useChartPixelRatio(
+      () => chart,
+    );
+
     onMounted(async () => {
       await nextTick();
       await nextTick();
@@ -161,7 +171,10 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       if (chartRef.value) {
-        chart = echarts.init(chartRef.value);
+        chart = echarts.init(chartRef.value, undefined, {
+          devicePixelRatio: currentDevicePixelRatio(),
+        });
+        syncPixelRatio();
       }
       applyOptions();
       window.addEventListener("resize", windowResizeEventCallback);
@@ -183,7 +196,7 @@ export default defineComponent({
       },
       { deep: true },
     );
-    return { chartRef };
+    return { chartRef, fractionalPixelRatio };
   },
 });
 </script>

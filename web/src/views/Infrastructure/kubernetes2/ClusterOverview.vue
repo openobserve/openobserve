@@ -20,6 +20,7 @@ import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { fitColumnSize, TABLE_MAX_HEIGHT } from "./tableSizing";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OText from "@/lib/core/Typography/OText.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -29,6 +30,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OStatCard from "@/lib/data/StatStrip/OStatCard.vue";
 import type { StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useOrgId } from "@/composables/query";
 import { escapeLabel, type QueryId } from "./kubernetesQueries";
@@ -229,17 +231,24 @@ const alertsTile = computed(() => {
   const firing = signals.firingAlerts.value.length;
   const incidents = signals.openIncidents.value.length;
   if (!signals.alertsAvailable.value && !signals.incidentsAvailable.value) {
+    const locked = signals.alertsLocked.value;
     return {
       value: "—",
-      sub: t("infra.k8s2.overviewKpiUnavailable"),
+      sub: locked ? signals.alertsLockedReason.value : t("infra.k8s2.overviewKpiUnavailable"),
       tone: "neutral" as StatTone,
+      locked,
     };
   }
   const sub =
     signals.incidentsAvailable.value && incidents
       ? t("infra.k8s2.overviewKpiAlertsIncidents", { count: incidents }, incidents)
       : t("infra.k8s2.overviewKpiAlertsFiring");
-  return { value: firing, sub, tone: (firing || incidents ? "error" : "success") as StatTone };
+  return {
+    value: firing,
+    sub,
+    tone: (firing || incidents ? "error" : "success") as StatTone,
+    locked: false,
+  };
 });
 
 const chartLabel = computed(
@@ -271,42 +280,50 @@ const chartTime = computed(() => ({
   end_time: new Date(props.range.end),
 }));
 
-const columns = computed<OTableColumnDef<WarningListRow>[]>(() => [
-  {
-    id: "message",
-    header: t("infra.k8s2.overviewColMessage"),
-    accessorFn: (row) => row.message.text ?? "",
-    size: 480,
-    minSize: 200,
-    sortable: true,
-    meta: { cellClass: "text-compact" },
-  },
-  {
-    id: "object",
-    header: t("infra.k8s2.overviewColObject"),
-    accessorFn: (row) => row.object.name,
-    size: 240,
-    sortable: true,
-    meta: { cellClass: "text-compact" },
-  },
-  {
-    id: "type",
-    header: t("infra.k8s2.overviewColType"),
-    accessorFn: (row) => row.object.kind,
-    size: 140,
-    sortable: true,
-    meta: { cellClass: "text-compact" },
-  },
-  {
-    id: "age",
-    header: t("infra.k8s2.overviewColAge"),
-    accessorFn: (row) => row.lastSeen ?? undefined,
-    size: 90,
-    sortable: true,
-    sortUndefined: "last",
-    meta: { cellClass: "text-compact" },
-  },
-]);
+const columns = computed<OTableColumnDef<WarningListRow>[]>(() => {
+  const rows = warningRows.value;
+  const fit = (
+    header: I18nText,
+    pick: (r: WarningListRow) => string | number | undefined,
+    max?: number,
+  ) => fitColumnSize(String(header), rows.map(pick), { max });
+  return [
+    {
+      id: "message",
+      header: t("infra.k8s2.overviewColMessage"),
+      accessorFn: (row) => row.message.text ?? "",
+      size: fit(t("infra.k8s2.overviewColMessage"), (r) => String(messageText(r)), 560),
+      minSize: 200,
+      sortable: true,
+      meta: { cellClass: "text-compact", flex: true },
+    },
+    {
+      id: "object",
+      header: t("infra.k8s2.overviewColObject"),
+      accessorFn: (row) => row.object.name,
+      size: fit(t("infra.k8s2.overviewColObject"), (r) => r.object.name),
+      sortable: true,
+      meta: { cellClass: "text-compact" },
+    },
+    {
+      id: "type",
+      header: t("infra.k8s2.overviewColType"),
+      accessorFn: (row) => row.object.kind,
+      size: fit(t("infra.k8s2.overviewColType"), (r) => r.object.kind),
+      sortable: true,
+      meta: { cellClass: "text-compact" },
+    },
+    {
+      id: "age",
+      header: t("infra.k8s2.overviewColAge"),
+      accessorFn: (row) => row.lastSeen ?? undefined,
+      size: fit(t("infra.k8s2.overviewColAge"), (r) => ageText(r)),
+      sortable: true,
+      sortUndefined: "last",
+      meta: { cellClass: "text-compact" },
+    },
+  ];
+});
 
 function messageText(row: WarningListRow): I18nText {
   return row.message.key ? t(row.message.key) : raw(row.message.text ?? "");
@@ -342,6 +359,7 @@ function openAlerts() {
 }
 
 function onAlertsTile() {
+  if (alertsTile.value.locked) return;
   if (!signals.alertsAvailable.value && signals.incidentsAvailable.value) openIncidents();
   else openAlerts();
 }
@@ -407,7 +425,7 @@ function onAlertsTile() {
           @click="emit('navigate', { view: 'events', status: 'warnings' })"
         />
         <OStatCard
-          clickable
+          :clickable="!alertsTile.locked"
           icon="campaign"
           :label="t('infra.k8s2.overviewKpiAlerts')"
           :value="alertsTile.value"
@@ -416,7 +434,20 @@ function onAlertsTile() {
           :loading="signals.alertsLoading.value"
           data-test="k8s2-overview-kpi-alerts"
           @click="onAlertsTile"
-        />
+        >
+          <template v-if="alertsTile.locked" #value>
+            <OTooltip :content="signals.alertsLockedReason.value">
+              <span class="inline-flex">
+                <OIcon
+                  name="lock"
+                  size="sm"
+                  class="lock-chip"
+                  data-test="k8s2-overview-kpi-alerts-lock"
+                />
+              </span>
+            </OTooltip>
+          </template>
+        </OStatCard>
       </div>
 
       <div class="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
@@ -541,9 +572,13 @@ function onAlertsTile() {
             :incidents="signals.openIncidents.value"
             :incidents-visible="signals.incidentsAvailable.value"
             :incidents-loading="signals.incidentsLoading.value"
+            :incidents-locked="signals.incidentsLocked.value"
+            :incidents-locked-reason="signals.incidentsLockedReason.value"
             :alerts="signals.firingAlerts.value"
             :alerts-visible="signals.alertsAvailable.value"
             :alerts-loading="signals.alertsLoading.value"
+            :alerts-locked="signals.alertsLocked.value"
+            :alerts-locked-reason="signals.alertsLockedReason.value"
             :end-us="range.end"
             @open-incident="openIncident"
             @open-incidents="openIncidents"
@@ -576,6 +611,8 @@ function onAlertsTile() {
           :frame="false"
           :show-global-filter="false"
           pagination="none"
+          :max-height="TABLE_MAX_HEIGHT"
+          enable-column-resize
           sorting="client"
           sort-by="object"
           sort-order="asc"

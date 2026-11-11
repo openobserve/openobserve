@@ -202,6 +202,9 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     const confirmDialog = w.find('[data-test-stub="confirm-dialog"]');
     expect(confirmDialog.attributes("message-keypath")).toBe("slackApp.channels.removeMessage");
     expect(confirmDialog.attributes("message-name")).toBe("#sre-prod");
+    expect(w.findComponent({ name: "ConfirmDialog" }).props("okLabel")).toBe("Remove default");
+    expect(w.find('[data-test="slack-channel-remove-C1"]').attributes("aria-label")).toBe("Remove");
+    expect(w.find('[data-test="slack-channel-C1-menu"]').exists()).toBe(true);
     expect(i18n.global.t("slackApp.channels.removeMessage", { name: "#sre-prod" })).toBe(
       "Questions in #sre-prod then go to each person's default org (they can change it with /o2 org).",
     );

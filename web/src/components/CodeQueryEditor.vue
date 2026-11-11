@@ -102,6 +102,11 @@ const importMonaco = async () => {
   await import("monaco-editor/esm/vs/editor/editor.all.js");
   // Monaco caches glyph widths once; a webfont swapping in later leaves carets drawn at stale offsets.
   document.fonts?.addEventListener?.("loadingdone", () => monaco?.editor?.remeasureFonts?.());
+  // The word highlighter drops a cursor-triggered delay promise, which disposing the editor rejects.
+  const { CancellationError } = await import("monaco-editor/esm/vs/base/common/errors.js");
+  window.addEventListener("unhandledrejection", (event) => {
+    if (event.reason instanceof CancellationError) event.preventDefault();
+  });
   monaco = api;
   return api;
 };
@@ -491,6 +496,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Replaces the default commented-SQL write of an AI result; null leaves the editor unchanged. */
+    transformGeneratedQuery: {
+      type: Function as PropType<(sql: string) => string | null>,
+      default: null,
+    },
     /** The range the field-value resolver searches, in microseconds; null means the default lookback. */
     valuesTimeRange: {
       type: Object as PropType<{ startTime: number; endTime: number } | null>,
@@ -716,7 +726,10 @@ export default defineComponent({
         }
 
         // Normal query generation - transform and update editor with language-specific comments
-        const transformedText = transformToSQL(currentText, generatedSQL, props.language);
+        const transformedText = props.transformGeneratedQuery
+          ? props.transformGeneratedQuery(generatedSQL)
+          : transformToSQL(currentText, generatedSQL, props.language);
+        if (transformedText === null) return;
 
         // Update editor value
         setValue(transformedText);

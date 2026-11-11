@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCardSection role="body">
       <div class="mb-3 text-xl font-semibold">{{ t("about.license_status_title") }}</div>
       <OBanner
-        v-if="envKeyActive"
+        v-if="envKeyActive && revHwmWarning?.source !== 'env'"
         :variant="envKeyInUse ? 'warning' : 'info'"
         :icon="envKeyInUse ? 'warning' : 'info'"
         class="mb-3"
@@ -30,6 +30,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         data-test="license-status-env-key"
       />
+      <OBanner
+        v-if="revHwmWarning"
+        variant="warning"
+        icon="warning"
+        class="mb-3"
+        inline-actions
+        :content="revWarningText"
+        data-test="license-status-rev-hwm"
+      >
+        <template #actions>
+          <OButton
+            v-if="revHwmWarning.source === 'db' && canUpdateLicense"
+            variant="outline"
+            size="sm-action"
+            data-test="license-status-rev-hwm-add-key"
+            @click="emit('add-license-key')"
+            >{{ t("about.add_new_license_key") }}</OButton
+          >
+        </template>
+      </OBanner>
       <ODescriptionList>
         <ODescriptionItem :label="t('about.license_status_search')">
           <div data-test="license-status-search">
@@ -42,10 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OBadge>
             <div v-if="restoredByWaiver && base" class="mt-2 text-sm">
               {{
-                t("about.license_status_on_by_waiver", {
-                  exceeded: base.exceeded_days,
-                  allowed: base.allowed_days,
-                })
+                t(
+                  "about.license_status_on_by_waiver",
+                  { exceeded: base.exceeded_days, allowed: base.allowed_days },
+                  base.allowed_days,
+                )
               }}
             </div>
             <ul v-if="reasons.length" class="mt-2 list-disc ps-5 text-sm">
@@ -59,11 +80,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span data-test="license-status-limit">{{ limitText }}</span>
         </ODescriptionItem>
         <ODescriptionItem
-          v-if="evaluated && decision.limit_today_gb != null"
+          v-if="evaluated && decision.limit_today_gb != null && daysText"
           :label="t('about.license_status_allowed_days')"
           data-test="license-status-days"
         >
           {{ daysText }}
+        </ODescriptionItem>
+        <ODescriptionItem
+          v-if="relief.reportGraceUntil !== undefined"
+          :label="t('about.license_status_reporting')"
+          data-test="license-status-reporting"
+        >
+          {{
+            t("about.license_status_reporting_grace", {
+              end: formatUtc(relief.reportGraceUntil, locale, false),
+            })
+          }}
         </ODescriptionItem>
       </ODescriptionList>
     </OCardSection>
@@ -71,25 +103,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { useI18nTyped, raw } from "@/types/i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
-import { quotaPercent, type LicenseDecision } from "@/utils/licenseWaivers";
+import {
+  issuedOn,
+  formatUtc,
+  statusWaiverRelief,
+  breachRetentionEndUs,
+  MAX_TIMEOUT_MS,
+  type LicenseWaiver,
+  quotaPercent,
+  type LicenseDecision,
+  type RevHwmWarning,
+} from "@/utils/licenseWaivers";
 
 const props = defineProps<{
   decision: LicenseDecision;
   base?: LicenseDecision;
+  waivers?: LicenseWaiver[];
   envKeyActive: boolean;
   envKeyInUse?: boolean;
   evaluatedAt?: number;
+  revHwmWarning?: RevHwmWarning | null;
+  canUpdateLicense?: boolean;
 }>();
 
-const { t } = useI18nTyped();
+const emit = defineEmits<{ "add-license-key": []; boundary: [atUs: number] }>();
+const { t, locale } = useI18nTyped();
+
+const nowUs = ref(Date.now() * 1000);
+const relief = computed(() => statusWaiverRelief(props.waivers, nowUs.value));
+let boundaryTimer: ReturnType<typeof setTimeout> | undefined;
+let armedBoundary: number | undefined;
+const clearBoundaryTimer = () => {
+  if (boundaryTimer !== undefined) clearTimeout(boundaryTimer);
+  boundaryTimer = undefined;
+  armedBoundary = undefined;
+};
+// far boundaries re-arm in steps, so only a timer that reached its boundary reports it
+const onBoundaryTimer = () => {
+  const reached = armedBoundary;
+  armBoundaryTimer();
+  if (reached !== undefined && reached <= nowUs.value) emit("boundary", reached);
+};
+const armBoundaryTimer = () => {
+  clearBoundaryTimer();
+  nowUs.value = Date.now() * 1000;
+  const now = new Date(nowUs.value / 1000);
+  const nextMonth = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1) * 1000;
+  const upcoming = (props.waivers ?? [])
+    .filter((w) => w.type === "breach_days" || w.type === "report_grace")
+    .flatMap((w) => [
+      w.starts_at,
+      w.ends_at,
+      ...(w.type === "breach_days" && nowUs.value < breachRetentionEndUs(w)
+        ? [breachRetentionEndUs(w), nextMonth]
+        : []),
+    ])
+    .filter((boundary) => Number.isFinite(boundary) && boundary > nowUs.value);
+  if (!upcoming.length) return;
+  armedBoundary = Math.min(...upcoming);
+  boundaryTimer = setTimeout(
+    onBoundaryTimer,
+    Math.min(Math.ceil((armedBoundary - nowUs.value) / 1000), MAX_TIMEOUT_MS),
+  );
+};
+watch(() => props.waivers, armBoundaryTimer, { immediate: true, deep: true });
+onBeforeUnmount(clearBoundaryTimer);
+
+const revWarningText = computed(() => {
+  const warning = props.revHwmWarning;
+  if (!warning) return undefined;
+  const undated = warning.loaded_rev === 0;
+  const key =
+    warning.source === "env"
+      ? undated
+        ? "about.license_status_env_below_hwm_undated"
+        : "about.license_status_env_below_hwm"
+      : undated
+        ? "about.license_status_db_below_hwm_undated"
+        : "about.license_status_db_below_hwm";
+  return t(key, {
+    loaded: issuedOn(warning.loaded_rev, locale.value),
+    hwm: issuedOn(warning.hwm_rev, locale.value),
+    variable: raw("O2_LICENSE_KEY"),
+  });
+});
 
 const envKeyInUse = computed(() => props.envKeyInUse !== false);
 
@@ -108,10 +214,11 @@ const reasons = computed<{ key: string; text: string }[]>(() => {
         return [
           {
             key: block,
-            text: t("about.license_status_reason_usage", {
-              exceeded: d.exceeded_days,
-              allowed: d.allowed_days,
-            }),
+            text: t(
+              "about.license_status_reason_usage",
+              { exceeded: d.exceeded_days, allowed: d.allowed_days },
+              d.exceeded_days,
+            ),
           },
         ];
       case "report_failure":
@@ -126,14 +233,28 @@ const reasons = computed<{ key: string; text: string }[]>(() => {
 
 const daysText = computed(() => {
   const d = props.decision;
-  const params = { allowed: d.allowed_days, used: d.exceeded_days };
-  if (props.base && props.base.exceeded_days !== d.exceeded_days) {
-    return t("about.license_status_allowed_days_value_base", {
-      ...params,
-      base: props.base.exceeded_days,
-    });
+  const extra = relief.value.breachDays;
+  const allowed = props.waivers?.some((w) => w.type === "breach_days")
+    ? props.base?.allowed_days
+    : d.allowed_days;
+  const parts = [];
+  if (typeof allowed === "number" && Number.isFinite(allowed)) {
+    parts.push(t("about.license_status_days_allowed", { allowed }));
   }
-  return t("about.license_status_allowed_days_value", params);
+  if (extra > 0) parts.push(t("about.license_status_days_waiver", { extra }));
+  const allowance = parts.join(" + ");
+  const used =
+    typeof d.exceeded_days === "number" && Number.isFinite(d.exceeded_days)
+      ? props.base &&
+        Number.isFinite(props.base.exceeded_days) &&
+        props.base.exceeded_days !== d.exceeded_days
+        ? t("about.license_status_days_used_base", {
+            used: d.exceeded_days,
+            base: props.base.exceeded_days,
+          })
+        : t("about.license_status_days_used", { used: d.exceeded_days })
+      : "";
+  return [allowance, used].filter(Boolean).join(" · ");
 });
 
 const limitText = computed(() => {

@@ -241,6 +241,7 @@ describe("IncidentDetailDrawer.vue", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    store.state.zoConfig.incidents_rca_enabled = true;
 
     // Reset store state
     store.state.selectedOrganization = {
@@ -339,6 +340,17 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.vm.incidentDetails).toBeTruthy();
       expect(wrapper.vm.incidentDetails.id).toBe("test-123");
       expect(wrapper.vm.incidentDetails.title).toBe("Test Incident");
+    });
+
+    it("shows the license empty state when the load is license-denied", async () => {
+      (incidentsService.get as any).mockRejectedValue({
+        response: { status: 403, data: { code: 40001, error_detail: "incidents" } },
+      });
+      wrapper = await createWrapper({}, {}, "test-123");
+      await flushPromises();
+      expect(wrapper.find('[data-test="incident-detail-license-denied"]').text()).toContain(
+        "incidents",
+      );
     });
 
     it("shows no Alert Triggers count until the incident has loaded", async () => {
@@ -1030,6 +1042,46 @@ describe("IncidentDetailDrawer.vue", () => {
     });
   });
 
+  describe("correlation license lock", () => {
+    afterEach(() => {
+      delete store.state.zoConfig.features;
+    });
+
+    it("locks the telemetry tabs and never calls the correlation API", async () => {
+      store.state.zoConfig.features = { correlation: "locked" };
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      (incidentsService.getCorrelatedStreams as any).mockClear();
+
+      wrapper.vm.activeTab = "logs";
+      await flushPromises();
+      await wrapper.vm.refreshCorrelation();
+
+      expect(wrapper.find('[data-test="incident-correlation-license-denied"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "CorrelatedLogsTable" }).exists()).toBe(false);
+      expect(incidentsService.getCorrelatedStreams).not.toHaveBeenCalled();
+      const logsTab = wrapper
+        .findAllComponents({ name: "OTab" })
+        .find((tab) => tab.props("name") === "logs");
+      expect(logsTab?.props("suffixIcon")).toBe("lock");
+    });
+
+    it("loads correlated streams when correlation is enabled", async () => {
+      store.state.zoConfig.features = { correlation: "enabled" };
+      (incidentsService.getCorrelatedStreams as any).mockResolvedValue(null);
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+
+      wrapper.vm.activeTab = "logs";
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="incident-correlation-license-denied"]').exists()).toBe(
+        false,
+      );
+      expect(incidentsService.getCorrelatedStreams).toHaveBeenCalled();
+    });
+  });
+
   // Note: Loading State Centering tests removed
   // Testing loading state UI presentation is better handled through visual regression tests
   // Component logic tests should focus on loading state management, not CSS/layout
@@ -1460,6 +1512,20 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(mockConfirm).toHaveBeenCalled();
       expect(incidentsService.triggerRca).toHaveBeenCalledTimes(1);
       expect(incidentsService.get).toHaveBeenCalledWith("default", "1");
+    });
+
+    it("skips the re-run prompt when no new run can start", async () => {
+      store.state.zoConfig.incidents_rca_enabled = false;
+      vi.mocked(incidentsService.updateIncident).mockResolvedValueOnce({
+        data: { severity: "P2", analysis_in_flight: false },
+      } as never);
+
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+
+      expect(wrapper.vm.editableSeverity).toBe("P2");
+      expect(mockConfirm).not.toHaveBeenCalled();
+      expect(incidentsService.triggerRca).not.toHaveBeenCalled();
     });
 
     it("does not call updateIncident when no incidentDetails", async () => {

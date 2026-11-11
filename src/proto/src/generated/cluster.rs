@@ -3542,6 +3542,8 @@ pub struct IndexInfo {
     pub equal_keys: ::prost::alloc::vec::Vec<KvItem>,
     #[prost(message, optional, tag = "5")]
     pub index_optimize_mode: ::core::option::Option<IdxOptimizeMode>,
+    #[prost(bool, tag = "6")]
+    pub use_index: bool,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SuperClusterInfo {

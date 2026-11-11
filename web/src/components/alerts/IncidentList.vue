@@ -94,10 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Severity summary strip below the toolbar (mirrors the Alerts state
              strip): Total + the four severities as selectable filter tiles. -->
         <template #subheader>
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="incident-list-summary"
-          >
+          <div data-test="incident-list-summary">
             <OStatStrip
               :items="severityStats"
               :loading="loading"
@@ -397,6 +394,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { forbiddenState } from "@/utils/featureGate";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
@@ -466,7 +464,7 @@ export default defineComponent({
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = incidentsList.error.value;
-      return e?.status === 403 || e?.response?.status === 403;
+      return forbiddenState(e) || e?.status === 403;
     });
     // The first real load lands after mount: land on the saved page, or page 1 when it no longer exists. setTimeout(0) runs after the table has taken the new rows.
     watch(
@@ -1120,8 +1118,7 @@ export default defineComponent({
     );
 
     const refreshIncidents = async () => {
-      // Explicit refresh: must reach the server.
-      await loadIncidents(true);
+      if ((await incidentsList.refetch()).isError) return;
       toast({
         variant: "success",
         message: t("toastMessages.alerts.incidentsRefreshed"),

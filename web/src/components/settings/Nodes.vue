@@ -52,8 +52,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="min-h-0 overflow-y-auto">
             <div class="flex flex-col px-2 pb-2">
+              <OTooltip
+                v-if="store.state.zoConfig.super_cluster_enabled && superClusterLocked"
+                :content="superClusterLockedReason"
+              >
+                <span class="mb-2 flex flex-col gap-1">
+                  <OButton
+                    v-for="key in ['region', 'cluster'] as const"
+                    :key="key"
+                    variant="ghost"
+                    size="sm"
+                    class="justify-start"
+                    disabled
+                    :data-test="`nodes-${key}-filter-locked`"
+                  >
+                    <template #icon-left>
+                      <OIcon name="lock" size="sm" class="lock-chip" />
+                    </template>
+                    {{ t(`nodes.${key}`) }}
+                  </OButton>
+                </span>
+              </OTooltip>
               <OCollapsible
-                v-if="regionRows.length > 0 && store.state.zoConfig.super_cluster_enabled"
+                v-if="regionRows.length > 0 && superClusterOn"
                 variant="sidebar"
                 :model-value="sectionOpen.region"
                 @update:model-value="(v) => (sectionOpen.region = v)"
@@ -87,16 +108,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </OCollapsible>
               <OSeparator
-                v-if="
-                  regionRows.length > 0 &&
-                  store.state.zoConfig.super_cluster_enabled &&
-                  sectionOpen.region
-                "
+                v-if="regionRows.length > 0 && superClusterOn && sectionOpen.region"
                 class="my-2"
               />
 
               <OCollapsible
-                v-if="clusterRows.length > 0 && store.state.zoConfig.super_cluster_enabled"
+                v-if="clusterRows.length > 0 && superClusterOn"
                 variant="sidebar"
                 :model-value="sectionOpen.cluster"
                 @update:model-value="(v) => (sectionOpen.cluster = v)"
@@ -130,11 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </OCollapsible>
               <OSeparator
-                v-if="
-                  clusterRows.length > 0 &&
-                  store.state.zoConfig.super_cluster_enabled &&
-                  sectionOpen.cluster
-                "
+                v-if="clusterRows.length > 0 && superClusterOn && sectionOpen.cluster"
                 class="my-2"
               />
 
@@ -406,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="flex shrink-0 justify-end border-t px-2 py-2">
-            <OButton variant="primary" size="sm-action" @click="applyFilter()">
+            <OButton variant="primary" size="sm-action" @click="onApplyFilterClick">
               {{ t("nodes.applyFilter") }}
             </OButton>
           </div>
@@ -439,10 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Health strip: node counts by status, doubling as the status facet.
                  Attention-first — offline, then starting, then online, Total last. -->
             <template #subheader>
-              <div
-                class="px-page-edge border-table-row-divider border-b py-1.5"
-                data-test="nodes-summary"
-              >
+              <div data-test="nodes-summary">
                 <OStatStrip
                   :items="summaryStats"
                   :loading="loading"
@@ -501,7 +511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </template>
 
-            <template v-if="store.state.zoConfig.super_cluster_enabled" #cell-region="{ row }">
+            <template v-if="superClusterOn" #cell-region="{ row }">
               <OTag type="fieldTag" class="badge-region me-1"
                 >{{ row.region }}
                 <OTooltip :content="t('nodes.region')" />
@@ -555,6 +565,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { nodesQuery } from "@/services/common.queries";
+import analytics from "@/services/product_analytics";
 import { defineComponent, reactive, ref, computed, watch, nextTick } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useStore } from "vuex";
@@ -577,6 +588,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -611,6 +623,11 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18nTyped();
+    const { locked: superClusterLocked, lockedReason: superClusterLockedReason } =
+      useLicenseLock("super_cluster");
+    const superClusterOn = computed(
+      () => !!store.state.zoConfig.super_cluster_enabled && !superClusterLocked.value,
+    );
 
     const sectionOpen = reactive({
       region: false,
@@ -755,7 +772,7 @@ export default defineComponent({
       ];
       // Region/cluster only mean something in a super-cluster. Filter by id rather
       // than by position so adding a column can't silently drop the wrong one.
-      if (!store.state.zoConfig.super_cluster_enabled) {
+      if (!superClusterOn.value) {
         return columns.filter((col) => col.id !== "region");
       }
       return columns;
@@ -1045,6 +1062,16 @@ export default defineComponent({
       resultTotal.value = data.length;
     };
 
+    const onApplyFilterClick = () => {
+      applyFilter();
+      analytics.track("nodes_filter_applied", {
+        regions: selectedRegions.value.length,
+        clusters: selectedClusters.value.length,
+        node_types: selectedNodetypes.value.length,
+        statuses: selectedStatuses.value.length,
+      });
+    };
+
     const clearAll = () => {
       filterQuery.value = "";
       statusFilter.value = null;
@@ -1172,6 +1199,7 @@ export default defineComponent({
       }
       statusFilter.value =
         statusFilter.value === key ? null : (key as "offline" | "prepare" | "online");
+      if (statusFilter.value) analytics.track("nodes_health_filter_applied", { status: key });
     };
 
     const healthCounts = computed(() => {
@@ -1305,6 +1333,9 @@ export default defineComponent({
       cpuUsage,
       memoryUsage,
       regionRows,
+      superClusterOn,
+      superClusterLocked,
+      superClusterLockedReason,
       clusterRows,
       nodetypeRows,
       statusesRows,
@@ -1333,6 +1364,7 @@ export default defineComponent({
       maxClosewait,
       maxWaittime,
       applyFilter,
+      onApplyFilterClick,
       clearAll,
       filterOTableColumns,
       filterQuery,

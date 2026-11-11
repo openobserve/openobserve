@@ -74,6 +74,7 @@ const FIELD_LABELS: Record<string, I18nKey> = {
   notify_on_recovery: "alerts.editMode.unsaved.fields.notifyOnRecovery",
   keep_firing_for: "alerts.editMode.unsaved.fields.keepFiring",
   creates_incident: "alerts.editMode.unsaved.fields.createsIncident",
+  incident_title_template: "alerts.editMode.unsaved.fields.incidentTitleTemplate",
   template: "alerts.editMode.unsaved.fields.template",
   context_attributes: "alerts.editMode.unsaved.fields.variables",
   oncall_team: "alerts.editMode.unsaved.fields.oncall",

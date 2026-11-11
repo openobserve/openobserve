@@ -34,6 +34,8 @@ use config::meta::fleet::{
 #[cfg(feature = "enterprise")]
 use config::meta::folder::{Folder, FolderType};
 #[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::auditor::AuditTarget;
+#[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 use openobserve_api_common::extractors::ValidatedJson;
 
@@ -64,6 +66,10 @@ const FLEET_CHECK_CONCURRENCY: usize = 16;
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::fleet::CollectorList),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn list_collectors(
     Path(org_id): Path<String>,
@@ -124,6 +130,10 @@ pub async fn list_collectors(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "get"}))
+    )
 )]
 pub async fn get_collector(
     Path((org_id, id)): Path<(String, String)>,
@@ -168,6 +178,10 @@ pub async fn get_collector(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "update"}))
+    )
 )]
 pub async fn rename_collector(
     Path((org_id, id)): Path<(String, String)>,
@@ -186,7 +200,13 @@ pub async fn rename_collector(
             Err(e) => return MetaHttpResponse::bad_request(e),
         };
         match service::rename_collector(&org_id, &id, req.name.trim()).await {
-            Ok(collector) => MetaHttpResponse::json(collector),
+            Ok(collector) => {
+                let fleet = AuditTarget {
+                    fleet_id: Some(collector.fleet.id.clone()),
+                    target: collector.name.clone(),
+                };
+                audited(MetaHttpResponse::json(collector), fleet)
+            }
             Err(e) => to_response(e),
         }
     }
@@ -214,6 +234,10 @@ pub async fn rename_collector(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "delete"}))
+    )
 )]
 pub async fn delete_collector(
     Path((org_id, id)): Path<(String, String)>,
@@ -223,13 +247,15 @@ pub async fn delete_collector(
     {
         use o2_enterprise::enterprise::fleet::service;
 
-        if let Err(refused) = collector_write(&org_id, &user_email.user_id, &id).await {
-            return refused;
-        }
-        match service::delete_collector(&org_id, &id).await {
+        let fleet = match collector_write(&org_id, &user_email.user_id, &id).await {
+            Ok(fleet) => fleet,
+            Err(refused) => return refused,
+        };
+        let res = match service::delete_collector(&org_id, &id).await {
             Ok(()) => StatusCode::NO_CONTENT.into_response(),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -254,8 +280,12 @@ pub async fn delete_collector(
         (status = 202, description = "Queued", content_type = "application/json", body = config::meta::fleet::RestartQueued),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
-        (status = 409, description = "The collector does not accept restart commands", content_type = "application/json", body = Object),
+        (status = 409, description = "The collector is offline or does not accept restart commands", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn restart_collector(
     Path((org_id, id)): Path<(String, String)>,
@@ -265,13 +295,15 @@ pub async fn restart_collector(
     {
         use o2_enterprise::enterprise::fleet::service;
 
-        if let Err(refused) = collector_write(&org_id, &user_email.user_id, &id).await {
-            return refused;
-        }
-        match service::restart_collector(&org_id, &id).await {
+        let fleet = match collector_write(&org_id, &user_email.user_id, &id).await {
+            Ok(fleet) => fleet,
+            Err(refused) => return refused,
+        };
+        let res = match service::restart_collector(&org_id, &id).await {
             Ok(queued) => (StatusCode::ACCEPTED, axum::Json(queued)).into_response(),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -298,6 +330,10 @@ pub async fn restart_collector(
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Nothing assigned", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn redeliver_collector(
     Path((org_id, id)): Path<(String, String)>,
@@ -307,13 +343,15 @@ pub async fn redeliver_collector(
     {
         use o2_enterprise::enterprise::fleet::service;
 
-        if let Err(refused) = collector_write(&org_id, &user_email.user_id, &id).await {
-            return refused;
-        }
-        match service::redeliver_collector(&org_id, &id).await {
+        let fleet = match collector_write(&org_id, &user_email.user_id, &id).await {
+            Ok(fleet) => fleet,
+            Err(refused) => return refused,
+        };
+        let res = match service::redeliver_collector(&org_id, &id).await {
             Ok(redelivered) => (StatusCode::ACCEPTED, axum::Json(redelivered)).into_response(),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -335,6 +373,10 @@ pub async fn redeliver_collector(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::fleet::FleetList),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn list_fleets(
     Path(org_id): Path<String>,
@@ -397,6 +439,10 @@ pub async fn list_fleets(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 409, description = "Name exists", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn create_fleet(
     Path(org_id): Path<String>,
@@ -424,7 +470,12 @@ pub async fn create_fleet(
         };
         match db::folders::save_folder(&org_id, folder, FolderType::Fleets, false).await {
             Ok(folder) => {
-                (StatusCode::CREATED, axum::Json(fleet_item(folder, &[]))).into_response()
+                let fleet = AuditTarget {
+                    fleet_id: Some(folder.folder_id.clone()),
+                    target: folder.name.clone(),
+                };
+                let res = (StatusCode::CREATED, axum::Json(fleet_item(folder, &[])));
+                audited(res.into_response(), fleet)
             }
             Err(e) => folder_response(e),
         }
@@ -453,6 +504,10 @@ pub async fn create_fleet(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "get"}))
+    )
 )]
 pub async fn get_fleet(
     Path((org_id, fleet_id)): Path<(String, String)>,
@@ -503,6 +558,10 @@ pub async fn get_fleet(
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Name exists", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "update"}))
+    )
 )]
 pub async fn rename_fleet(
     Path((org_id, fleet_id)): Path<(String, String)>,
@@ -523,22 +582,30 @@ pub async fn rename_fleet(
         if name.is_empty() {
             return MetaHttpResponse::bad_request("name must not be empty");
         }
-        let mut folder = match db::folders::get_folder(&org_id, &fleet_id, FolderType::Fleets).await
-        {
-            Ok(folder) => folder,
-            Err(e) => return folder_response(e),
+        let fleet = AuditTarget {
+            fleet_id: Some(fleet_id.clone()),
+            target: name.to_string(),
         };
-        folder.name = name.to_string();
-        let renamed =
-            db::folders::update_folder(&org_id, &fleet_id, FolderType::Fleets, folder).await;
-        let folder = match renamed {
-            Ok(folder) => folder,
-            Err(e) => return folder_response(e),
-        };
-        match o2_enterprise::enterprise::fleet::fleets::list_fleets(&org_id).await {
-            Ok(states) => MetaHttpResponse::json(fleet_item(folder, &states)),
-            Err(e) => to_response(e),
+        let res = async {
+            let mut folder =
+                match db::folders::get_folder(&org_id, &fleet_id, FolderType::Fleets).await {
+                    Ok(folder) => folder,
+                    Err(e) => return folder_response(e),
+                };
+            folder.name = name.to_string();
+            let renamed =
+                db::folders::update_folder(&org_id, &fleet_id, FolderType::Fleets, folder).await;
+            let folder = match renamed {
+                Ok(folder) => folder,
+                Err(e) => return folder_response(e),
+            };
+            match o2_enterprise::enterprise::fleet::fleets::list_fleets(&org_id).await {
+                Ok(states) => MetaHttpResponse::json(fleet_item(folder, &states)),
+                Err(e) => to_response(e),
+            }
         }
+        .await;
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -563,8 +630,12 @@ pub async fn rename_fleet(
         (status = 204, description = "Deleted"),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
-        (status = 409, description = "Still referenced, the default fleet, or changing", content_type = "application/json", body = Object),
+        (status = 409, description = "Still referenced, with the counts in `references`; the default fleet; or changing", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "delete"}))
+    )
 )]
 pub async fn delete_fleet(
     Path((org_id, fleet_id)): Path<(String, String)>,
@@ -579,10 +650,13 @@ pub async fn delete_fleet(
         if fleet_id == config::meta::folder::DEFAULT_FOLDER {
             return MetaHttpResponse::conflict("the default fleet cannot be deleted");
         }
-        match db::folders::delete_folder(&org_id, &fleet_id, FolderType::Fleets).await {
+        // Named before the delete: afterwards the fleet has no name to record.
+        let fleet = fleet_scope(&org_id, &fleet_id).await;
+        let res = match db::folders::delete_folder(&org_id, &fleet_id, FolderType::Fleets).await {
             Ok(()) => StatusCode::NO_CONTENT.into_response(),
             Err(e) => folder_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -608,6 +682,10 @@ pub async fn delete_fleet(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn get_fleet_settings(
     Path((org_id, fleet_id)): Path<(String, String)>,
@@ -652,6 +730,10 @@ pub async fn get_fleet_settings(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "update"}))
+    )
 )]
 pub async fn put_fleet_settings(
     Path((org_id, fleet_id)): Path<(String, String)>,
@@ -673,10 +755,12 @@ pub async fn put_fleet_settings(
         if let Err(e) = req.validate() {
             return MetaHttpResponse::bad_request(e);
         }
-        match settings::put_fleet_settings(&org_id, &fleet_id, req).await {
+        let fleet = fleet_scope(&org_id, &fleet_id).await;
+        let res = match settings::put_fleet_settings(&org_id, &fleet_id, req).await {
             Ok(settings) => MetaHttpResponse::json(settings),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -705,6 +789,10 @@ pub async fn put_fleet_settings(
         (status = 404, description = "Fleet, configuration or version not found", content_type = "application/json", body = Object),
         (status = 409, description = "A cluster upgrade is in progress, or desired keeps changing", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "update"}))
+    )
 )]
 pub async fn set_desired(
     Path((org_id, fleet_id)): Path<(String, String)>,
@@ -713,19 +801,20 @@ pub async fn set_desired(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        use o2_enterprise::enterprise::fleet::{audit, rollouts};
+
         let user_id = &user_email.user_id;
         let req = match desired_request(&org_id, user_id, &fleet_id, body).await {
             Ok(req) => req,
             Err(refused) => return refused,
         };
-        match o2_enterprise::enterprise::fleet::rollouts::set_desired(
-            &org_id, user_id, &fleet_id, req,
-        )
-        .await
-        {
+        let mut fleet = fleet_scope(&org_id, &fleet_id).await;
+        fleet.target = audit::version_target(&fleet.target, &req.config, req.version);
+        let res = match rollouts::set_desired(&org_id, user_id, &fleet_id, req).await {
             Ok(rollout) => MetaHttpResponse::json(rollout),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -753,6 +842,10 @@ pub async fn set_desired(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Fleet not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn preview_desired(
     Path((org_id, fleet_id)): Path<(String, String)>,
@@ -793,6 +886,10 @@ pub async fn preview_desired(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::fleet::TokenList),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn list_tokens(
     Path(org_id): Path<String>,
@@ -839,6 +936,10 @@ pub async fn list_tokens(
         (status = 404, description = "Fleet not found", content_type = "application/json", body = Object),
         (status = 409, description = "Name exists", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn create_token(
     Path(org_id): Path<String>,
@@ -858,10 +959,18 @@ pub async fn create_token(
         if let Some(refused) = fleet_write(&org_id, user_id, &req.fleet, "PUT").await {
             return refused;
         }
-        match o2_enterprise::enterprise::fleet::service::create_token(&org_id, user_id, req).await {
-            Ok(created) => (StatusCode::CREATED, axum::Json(created)).into_response(),
-            Err(e) => to_response(e),
-        }
+        let fleet = AuditTarget {
+            fleet_id: Some(req.fleet.clone()),
+            target: req.name.clone(),
+        };
+        let res =
+            match o2_enterprise::enterprise::fleet::service::create_token(&org_id, user_id, req)
+                .await
+            {
+                Ok(created) => (StatusCode::CREATED, axum::Json(created)).into_response(),
+                Err(e) => to_response(e),
+            };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -887,6 +996,10 @@ pub async fn create_token(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn revoke_token(
     Path((org_id, id)): Path<(String, String)>,
@@ -905,7 +1018,13 @@ pub async fn revoke_token(
             return refused;
         }
         match service::revoke_token(&org_id, &id).await {
-            Ok(token) => MetaHttpResponse::json(token),
+            Ok(token) => {
+                let fleet = AuditTarget {
+                    fleet_id: Some(token.fleet.id.clone()),
+                    target: token.name.clone(),
+                };
+                audited(MetaHttpResponse::json(token), fleet)
+            }
             Err(e) => to_response(e),
         }
     }
@@ -929,6 +1048,10 @@ pub async fn revoke_token(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::fleet::FleetConfigList),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn list_configs(
     Path(org_id): Path<String>,
@@ -976,6 +1099,10 @@ pub async fn list_configs(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 409, description = "Id exists", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn create_config(
     Path(org_id): Path<String>,
@@ -987,7 +1114,8 @@ pub async fn create_config(
         if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::fleet::configs::create_config(
+        let named = org_target(&body.id);
+        let res = match o2_enterprise::enterprise::fleet::configs::create_config(
             &org_id,
             &user_email.user_id,
             body,
@@ -996,7 +1124,8 @@ pub async fn create_config(
         {
             Ok(detail) => (StatusCode::CREATED, axum::Json(detail)).into_response(),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, named)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1022,6 +1151,10 @@ pub async fn create_config(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "get"}))
+    )
 )]
 pub async fn get_config(
     Path((org_id, id)): Path<(String, String)>,
@@ -1074,6 +1207,10 @@ pub async fn get_config(
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Referenced; the body's `references` holds the counts", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "delete"}))
+    )
 )]
 pub async fn delete_config(
     Path((org_id, id)): Path<(String, String)>,
@@ -1084,10 +1221,12 @@ pub async fn delete_config(
         if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "DELETE").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::fleet::configs::delete_config(&org_id, &id).await {
+        let res = match o2_enterprise::enterprise::fleet::configs::delete_config(&org_id, &id).await
+        {
             Ok(()) => StatusCode::NO_CONTENT.into_response(),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, org_target(&id))
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1114,6 +1253,10 @@ pub async fn delete_config(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "update"}))
+    )
 )]
 pub async fn save_config_draft(
     Path((org_id, id)): Path<(String, String)>,
@@ -1125,7 +1268,7 @@ pub async fn save_config_draft(
         if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "PUT").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::fleet::configs::save_draft(
+        let res = match o2_enterprise::enterprise::fleet::configs::save_draft(
             &org_id,
             &user_email.user_id,
             &id,
@@ -1135,7 +1278,8 @@ pub async fn save_config_draft(
         {
             Ok(saved) => MetaHttpResponse::json(saved),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, org_target(&id))
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1165,6 +1309,10 @@ pub async fn save_config_draft(
         (status = 409, description = "Published concurrently", content_type = "application/json", body = Object),
         (status = 422, description = "Validation errors", content_type = "application/json", body = config::meta::fleet::ValidationFailed),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn publish_config_version(
     Path((org_id, id)): Path<(String, String)>,
@@ -1176,7 +1324,7 @@ pub async fn publish_config_version(
         if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::fleet::configs::publish(
+        let res = match o2_enterprise::enterprise::fleet::configs::publish(
             &org_id,
             &user_email.user_id,
             &id,
@@ -1186,7 +1334,8 @@ pub async fn publish_config_version(
         {
             Ok(published) => (StatusCode::CREATED, axum::Json(published)).into_response(),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, org_target(&id))
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1214,6 +1363,10 @@ pub async fn publish_config_version(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "get"}))
+    )
 )]
 pub async fn get_config_version(
     Path((org_id, id, version)): Path<(String, String, i64)>,
@@ -1255,6 +1408,10 @@ pub async fn get_config_version(
         (status = 200, description = "The issues found, also when there are errors", content_type = "application/json", body = config::meta::fleet::ValidationResult),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn validate_config(
     Path(org_id): Path<String>,
@@ -1292,6 +1449,10 @@ pub async fn validate_config(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::fleet::RolloutList),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn list_rollouts(
     Path(org_id): Path<String>,
@@ -1354,6 +1515,10 @@ pub async fn list_rollouts(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "get"}))
+    )
 )]
 pub async fn get_rollout(
     Path((org_id, id)): Path<(String, String)>,
@@ -1395,6 +1560,10 @@ pub async fn get_rollout(
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Not halted, or the halt does not offer this exit", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn resume_rollout(
     Path((org_id, id)): Path<(String, String)>,
@@ -1405,13 +1574,15 @@ pub async fn resume_rollout(
         use o2_enterprise::enterprise::fleet::rollouts;
 
         let user_id = &user_email.user_id;
-        if let Err(refused) = rollout_write(&org_id, user_id, &id).await {
-            return refused;
-        }
-        match rollouts::resume(&org_id, &id, user_id).await {
+        let fleet = match rollout_write(&org_id, user_id, &id).await {
+            Ok(fleet) => fleet,
+            Err(refused) => return refused,
+        };
+        let res = match rollouts::resume(&org_id, &id, user_id).await {
             Ok(rollout) => MetaHttpResponse::json(rollout),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1440,6 +1611,10 @@ pub async fn resume_rollout(
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Not halted, or the halt does not offer this exit", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn skip_rollout(
     Path((org_id, id)): Path<(String, String)>,
@@ -1451,9 +1626,10 @@ pub async fn skip_rollout(
         use o2_enterprise::enterprise::fleet::rollouts;
 
         let user_id = &user_email.user_id;
-        if let Err(refused) = rollout_write(&org_id, user_id, &id).await {
-            return refused;
-        }
+        let fleet = match rollout_write(&org_id, user_id, &id).await {
+            Ok(fleet) => fleet,
+            Err(refused) => return refused,
+        };
         let req = match serde_json::from_value::<SkipRequest>(body) {
             Ok(req) => req,
             Err(e) => return MetaHttpResponse::bad_request(e),
@@ -1461,10 +1637,11 @@ pub async fn skip_rollout(
         if req.collector_ids.is_empty() {
             return MetaHttpResponse::bad_request("collector_ids must not be empty");
         }
-        match rollouts::skip(&org_id, &id, user_id, &req.collector_ids).await {
+        let res = match rollouts::skip(&org_id, &id, user_id, &req.collector_ids).await {
             Ok(rollout) => MetaHttpResponse::json(rollout),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1479,18 +1656,22 @@ pub async fn skip_rollout(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "RollbackFleetRollout",
-    summary = "Start an immediate rollout back to stable and mark this one rolled back",
+    summary = "Roll back to stable, or to the placeholder without one, and mark this rollout rolled back",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Rollout id"),
     ),
     responses(
-        (status = 200, description = "The rollout to stable", content_type = "application/json", body = config::meta::fleet::Rollout),
+        (status = 200, description = "The rollout to stable, or this rollout when the fleet has no stable version", content_type = "application/json", body = config::meta::fleet::Rollout),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Not halted, or the halt does not offer this exit", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn rollback_rollout(
     Path((org_id, id)): Path<(String, String)>,
@@ -1501,13 +1682,15 @@ pub async fn rollback_rollout(
         use o2_enterprise::enterprise::fleet::rollouts;
 
         let user_id = &user_email.user_id;
-        if let Err(refused) = rollout_write(&org_id, user_id, &id).await {
-            return refused;
-        }
-        match rollouts::rollback(&org_id, &id, user_id).await {
+        let fleet = match rollout_write(&org_id, user_id, &id).await {
+            Ok(fleet) => fleet,
+            Err(refused) => return refused,
+        };
+        let res = match rollouts::rollback(&org_id, &id, user_id).await {
             Ok(rollout) => MetaHttpResponse::json(rollout),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1529,6 +1712,10 @@ pub async fn rollback_rollout(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::fleet::FleetSummary),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn summary(
     Path(org_id): Path<String>,
@@ -1570,6 +1757,10 @@ pub async fn summary(
         (status = 400, description = "Invalid window", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn get_pipelines(
     Path(org_id): Path<String>,
@@ -1578,6 +1769,10 @@ pub async fn get_pipelines(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        // Fleet routes are outside the gated group, so this PromQL search checks the licence here.
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
+            return MetaHttpResponse::too_many_requests(e);
+        }
         let user_id = &user_email.user_id;
         if !allowed_on(FLEET_MANAGEMENT, &org_id, user_id, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
@@ -1607,14 +1802,18 @@ pub async fn get_pipelines(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "ListFleetAudit",
-    summary = "The fleet audit trail from the audit stream: the newest 500 events of the last 30 days or of a period",
+    summary = "One page of the fleet audit trail, newest first, from the last 30 days or a period",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), AuditQuery),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::fleet::AuditList),
-        (status = 400, description = "Invalid period", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid period or filter", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn list_audit(
     Path(org_id): Path<String>,
@@ -1623,18 +1822,20 @@ pub async fn list_audit(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed_on(FLEET_MANAGEMENT, &org_id, &user_email.user_id, "GET").await {
+        let user_id = &user_email.user_id;
+        if !allowed_on(FLEET_MANAGEMENT, &org_id, user_id, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        let permitted = match permitted_fleets(&org_id, &user_email.user_id).await {
+        let permitted = match permitted_fleets(&org_id, user_id).await {
             Ok(permitted) => permitted,
             Err(refused) => return refused,
         };
-        match openobserve_core::fleet::list_audit(&org_id, query, permitted.as_ref()).await {
-            Ok(mut list) => {
-                list.total = list.items.len();
-                MetaHttpResponse::json(list)
-            }
+        let fleets = match &query.fleet {
+            None => permitted,
+            Some(fleet) => Some(in_fleet(&org_id, user_id, fleet.clone(), permitted).await),
+        };
+        match openobserve_core::fleet::list_audit(&org_id, query, fleets.as_ref()).await {
+            Ok(list) => MetaHttpResponse::json(list),
             Err(e) => to_response(e),
         }
     }
@@ -1658,6 +1859,10 @@ pub async fn list_audit(
         (status = 200, description = "Success", content_type = "application/json", body = Settings),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn get_settings(
     Path(org_id): Path<String>,
@@ -1695,6 +1900,10 @@ pub async fn get_settings(
         (status = 400, description = "Invalid", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "update"}))
+    )
 )]
 pub async fn update_settings(
     Path(org_id): Path<String>,
@@ -1715,7 +1924,13 @@ pub async fn update_settings(
             return MetaHttpResponse::bad_request(e);
         }
         match o2_enterprise::enterprise::fleet::settings::update_settings(&org_id, req).await {
-            Ok(settings) => MetaHttpResponse::json(settings),
+            Ok(settings) => {
+                use o2_enterprise::enterprise::fleet::audit::settings_target;
+
+                let stored = serde_json::to_value(&settings).unwrap_or_default();
+                let named = org_target(&settings_target(&stored));
+                audited(MetaHttpResponse::json(settings), named)
+            }
             Err(e) => to_response(e),
         }
     }
@@ -1783,14 +1998,13 @@ async fn fleet_allowed(org_id: &str, user_id: &str, fleet: &str, verb: &str) -> 
     .await
 }
 
-/// Every collector write is `PUT` on the collector's current fleet.
+/// Every collector write is `PUT` on the collector's current fleet, which audits it.
 #[cfg(feature = "enterprise")]
-async fn collector_write(org_id: &str, user_id: &str, id: &str) -> Result<String, Response> {
-    use o2_enterprise::enterprise::fleet::{fleets, service::FleetError};
+async fn collector_write(org_id: &str, user_id: &str, id: &str) -> Result<AuditTarget, Response> {
+    use o2_enterprise::enterprise::fleet::{audit, service::FleetError};
 
-    let ids = [id.to_string()];
-    let fleet = match fleets::collector_fleets(org_id, &ids).await {
-        Ok(found) => found.get(id).cloned(),
+    let fleet = match audit::collector_scope(org_id, id).await {
+        Ok(found) => found,
         Err(e) => return Err(to_response(e)),
     };
     let Some(fleet) = fleet else {
@@ -1798,22 +2012,51 @@ async fn collector_write(org_id: &str, user_id: &str, id: &str) -> Result<String
             FleetError::CollectorNotFound(id.to_string()).into(),
         ));
     };
-    match fleet_write(org_id, user_id, &fleet, "PUT").await {
+    let fleet_id = fleet.fleet_id.as_deref().unwrap_or_default();
+    match fleet_write(org_id, user_id, fleet_id, "PUT").await {
         Some(refused) => Err(refused),
         None => Ok(fleet),
     }
 }
 
-/// A rollout exit is `PUT` on the rollout's fleet.
+/// A rollout exit is `PUT` on the rollout's fleet, which audits it.
 #[cfg(feature = "enterprise")]
-async fn rollout_write(org_id: &str, user_id: &str, id: &str) -> Result<(), Response> {
-    let rollout = match o2_enterprise::enterprise::fleet::rollouts::get_rollout(org_id, id).await {
+async fn rollout_write(org_id: &str, user_id: &str, id: &str) -> Result<AuditTarget, Response> {
+    use o2_enterprise::enterprise::fleet::{audit, rollouts};
+
+    let rollout = match rollouts::get_rollout(org_id, id).await {
         Ok(rollout) => rollout,
         Err(e) => return Err(to_response(e)),
     };
     match fleet_write(org_id, user_id, &rollout.fleet.id, "PUT").await {
         Some(refused) => Err(refused),
-        None => Ok(()),
+        None => Ok(audit::rollout_scope(&rollout)),
+    }
+}
+
+/// The audit layer records the event as `named`; an extension never reaches the client.
+#[cfg(feature = "enterprise")]
+fn audited(mut res: Response, named: AuditTarget) -> Response {
+    res.extensions_mut().insert(named);
+    res
+}
+
+/// Configurations and the org's settings belong to no fleet, so every reader sees their events.
+#[cfg(feature = "enterprise")]
+fn org_target(target: &str) -> AuditTarget {
+    AuditTarget {
+        fleet_id: None,
+        target: target.to_string(),
+    }
+}
+
+/// A fleet named as it is now; a fleet not found keeps its id.
+#[cfg(feature = "enterprise")]
+async fn fleet_scope(org_id: &str, fleet_id: &str) -> AuditTarget {
+    let found = db::folders::get_folder(org_id, fleet_id, FolderType::Fleets).await;
+    AuditTarget {
+        fleet_id: Some(fleet_id.to_string()),
+        target: found.map_or_else(|_| fleet_id.to_string(), |f| f.name),
     }
 }
 
@@ -2014,6 +2257,7 @@ fn folder_response(e: db::folders::FolderError) -> Response {
         FolderError::DeleteFleet(message) | FolderError::FleetChanged(message) => {
             MetaHttpResponse::conflict(message)
         }
+        FolderError::FleetInUse(message, references) => in_use_response(message, &references),
         FolderError::PermittedFoldersMissingUser | FolderError::PermittedFoldersValidator(_) => {
             MetaHttpResponse::forbidden("Forbidden")
         }
@@ -2022,6 +2266,16 @@ fn folder_response(e: db::folders::FolderError) -> Response {
             MetaHttpResponse::internal_error("internal error")
         }
     }
+}
+
+#[cfg(feature = "enterprise")]
+fn in_use_response(message: String, references: &config::meta::fleet::References) -> Response {
+    let body = serde_json::json!({
+        "code": StatusCode::CONFLICT.as_u16(),
+        "message": message,
+        "references": references,
+    });
+    (StatusCode::CONFLICT, axum::Json(body)).into_response()
 }
 
 /// The `sea-orm` text carries SQL fragments, so a server fault is logged, not returned.
@@ -2038,14 +2292,7 @@ fn to_response(e: anyhow::Error) -> Response {
             };
             (StatusCode::UNPROCESSABLE_ENTITY, axum::Json(body)).into_response()
         }
-        Some(FleetError::ConfigInUse(_, references)) => {
-            let body = serde_json::json!({
-                "code": StatusCode::CONFLICT.as_u16(),
-                "message": e.to_string(),
-                "references": references,
-            });
-            (StatusCode::CONFLICT, axum::Json(body)).into_response()
-        }
+        Some(FleetError::ConfigInUse(_, references)) => in_use_response(e.to_string(), references),
         Some(err) => MetaHttpResponse::error(err.status_code(), e.to_string()).into_response(),
         None => {
             log::error!("[fleet] {e}");
@@ -2274,6 +2521,21 @@ mod tests {
         let res = to_response(FleetError::ConfigInUse("edge".into(), references).into());
         assert_eq!(res.status(), StatusCode::CONFLICT);
         assert!(body_text(res).await.contains(r#""fleets":2"#));
+        let references = config::meta::fleet::References {
+            collectors: 2,
+            tokens: 1,
+            ..Default::default()
+        };
+        let res = folder_response(db::folders::FolderError::FleetInUse(
+            "fleet in use".to_string(),
+            references,
+        ));
+        assert_eq!(res.status(), StatusCode::CONFLICT);
+        let text = body_text(res).await;
+        assert!(
+            text.contains(r#""collectors":2"#) && text.contains(r#""tokens":1"#),
+            "{text}"
+        );
         let other = to_response(anyhow::anyhow!("SELECT secret FROM x"));
         assert_eq!(other.status(), StatusCode::INTERNAL_SERVER_ERROR);
         assert!(!body_text(other).await.contains("SELECT secret"));
@@ -2657,5 +2919,322 @@ mod tests {
         let empty = fleet_item(folder("f2"), &[stored]);
         assert_eq!(empty.state, Some(FleetState::default()));
         assert_eq!(empty.settings, FleetSettings::default());
+    }
+
+    /// Nothing else in this binary migrates the meta store the handlers write to.
+    async fn meta_store() {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        ONCE.get_or_init(|| async {
+            std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+    }
+
+    /// Shared by the audit tests and never forgotten, since they run in parallel.
+    const AUDIT_ROOT: &str = "audit-root@fleet-audit-scope.test";
+
+    /// A fresh org with one fleet, written by a root caller, so every check passes for real.
+    async fn audit_org(label: &str) -> (String, String) {
+        meta_store().await;
+        openfga_off();
+        seed_member(
+            AUDIT_ROOT,
+            config::meta::user::UserRole::Root,
+            config::DEFAULT_ORG,
+        );
+        let org = format!("fleet-audit-{label}-{}", config::utils::time::now_micros());
+        let res = create_fleet(
+            Path(org.clone()),
+            root(),
+            ValidatedJson(serde_json::json!({"name": "edge hosts"})),
+        )
+        .await;
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let (fleet, target) = recorded(&res).expect("a created fleet is audited under itself");
+        assert_eq!(target, "edge hosts");
+        (org, fleet.expect("a fleet event names its fleet"))
+    }
+
+    fn root() -> Headers<UserEmail> {
+        Headers(UserEmail {
+            user_id: AUDIT_ROOT.to_string(),
+        })
+    }
+
+    /// What the audit layer would record as the event's fleet and target.
+    fn recorded(res: &Response) -> Option<(Option<String>, String)> {
+        res.extensions()
+            .get::<AuditTarget>()
+            .map(|f| (f.fleet_id.clone(), f.target.clone()))
+    }
+
+    fn named(fleet: &str, target: &str) -> Option<(Option<String>, String)> {
+        Some((Some(fleet.to_string()), target.to_string()))
+    }
+
+    fn org_wide(target: &str) -> Option<(Option<String>, String)> {
+        Some((None, target.to_string()))
+    }
+
+    #[tokio::test]
+    async fn fleet_and_token_writes_hand_their_fleet_to_the_audit_layer() {
+        let (org, edge) = audit_org("fleets").await;
+        let body = |v: serde_json::Value| ValidatedJson(v);
+        let at = || Path((org.clone(), edge.clone()));
+
+        let res = rename_fleet(at(), root(), body(serde_json::json!({"name": "edge"}))).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(recorded(&res), named(&edge, "edge"));
+        let res = put_fleet_settings(at(), root(), body(serde_json::json!({}))).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(recorded(&res), named(&edge, "edge"));
+        let desired = serde_json::json!({"config": "otel", "version": 3});
+        let res = set_desired(at(), root(), body(desired)).await;
+        assert_eq!(recorded(&res), named(&edge, "edge: otel v3"));
+
+        let token = serde_json::json!({"name": "k8s", "fleet": edge});
+        let res = create_token(Path(org.clone()), root(), body(token)).await;
+        assert_eq!(res.status(), StatusCode::CREATED);
+        assert_eq!(recorded(&res), named(&edge, "k8s"));
+        let created: serde_json::Value = serde_json::from_str(&body_text(res).await).unwrap();
+        let token_id = created["id"].as_str().unwrap().to_string();
+        let res = revoke_token(Path((org.clone(), token_id)), root()).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(recorded(&res), named(&edge, "k8s"));
+
+        let res = delete_fleet(at(), root()).await;
+        assert_eq!(
+            recorded(&res),
+            named(&edge, "edge"),
+            "named before the delete removes the name"
+        );
+    }
+
+    #[tokio::test]
+    async fn collector_writes_hand_the_collectors_fleet_to_the_audit_layer() {
+        use infra::table::entity::fleet_collectors::{ActiveModel, Entity, Model};
+        use sea_orm::EntityTrait;
+
+        let (org, edge) = audit_org("collectors").await;
+        let row = Model {
+            org_id: org.clone(),
+            id: "c1".to_string(),
+            fleet_id: edge.clone(),
+            hostname: Some("web-1".to_string()),
+            enrolled_at: 1,
+            last_seen_at: 1,
+            ..Default::default()
+        };
+        Entity::insert(ActiveModel::from(row))
+            .exec_without_returning(infra::db::get_orm_client_rw().await)
+            .await
+            .unwrap();
+        let at = || Path((org.clone(), "c1".to_string()));
+
+        let res = restart_collector(at(), root()).await;
+        assert_eq!(recorded(&res), named(&edge, "web-1"), "{}", res.status());
+        let res = redeliver_collector(at(), root()).await;
+        assert_eq!(recorded(&res), named(&edge, "web-1"), "{}", res.status());
+        let name = ValidatedJson(serde_json::json!({"name": "edge-a"}));
+        let res = rename_collector(at(), root(), name).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(recorded(&res), named(&edge, "edge-a"));
+        let res = delete_collector(at(), root()).await;
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+        assert_eq!(
+            recorded(&res),
+            named(&edge, "edge-a"),
+            "named before the delete removes the row"
+        );
+    }
+
+    #[tokio::test]
+    async fn configuration_and_settings_writes_name_their_target_without_a_fleet() {
+        let (org, _) = audit_org("configs").await;
+        let config = || Path((org.clone(), "otel".to_string()));
+        let yaml = "receivers: {}\n";
+
+        let created = CreateConfigRequest {
+            id: "otel".to_string(),
+            description: String::new(),
+            yaml: String::new(),
+        };
+        let res = create_config(Path(org.clone()), root(), ValidatedJson(created)).await;
+        assert_eq!(res.status(), StatusCode::CREATED);
+        assert_eq!(recorded(&res), org_wide("otel"));
+        let draft = SaveDraftRequest {
+            yaml: yaml.to_string(),
+        };
+        let res = save_config_draft(config(), root(), ValidatedJson(draft)).await;
+        assert_eq!(recorded(&res), org_wide("otel"), "{}", res.status());
+        let version = PublishRequest {
+            yaml: yaml.to_string(),
+            message: String::new(),
+        };
+        let res = publish_config_version(config(), root(), ValidatedJson(version)).await;
+        assert_eq!(recorded(&res), org_wide("otel"), "{}", res.status());
+        let res = delete_config(config(), root()).await;
+        assert_eq!(recorded(&res), org_wide("otel"), "{}", res.status());
+
+        let settings = serde_json::json!({"restricted_components": ["debug"]});
+        let res = update_settings(Path(org.clone()), root(), ValidatedJson(settings)).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            recorded(&res),
+            org_wide("target version default; restricted: debug")
+        );
+    }
+
+    #[tokio::test]
+    async fn rollout_exits_hand_the_rollouts_fleet_to_the_audit_layer() {
+        use infra::table::fleet_rollouts::{self, Model};
+
+        let (org, edge) = audit_org("rollouts").await;
+        let row = Model {
+            id: "r1".to_string(),
+            org_id: org.clone(),
+            config_id: "otel".to_string(),
+            from_version: Some(1),
+            to_version: 2,
+            fleet_id: edge.clone(),
+            strategy: "immediate".to_string(),
+            status: "halted".to_string(),
+            phases: "[]".to_string(),
+            failure: None,
+            events: "[]".to_string(),
+            started_at: 1,
+            started_by: AUDIT_ROOT.to_string(),
+            rev: 0,
+            auto_rollback: false,
+            scheduled_for: None,
+            gates: None,
+        };
+        fleet_rollouts::insert_with(infra::db::get_orm_client_rw().await, row, vec![])
+            .await
+            .unwrap();
+        let at = || Path((org.clone(), "r1".to_string()));
+        let want = named(&edge, "edge hosts: otel v2");
+
+        let res = resume_rollout(at(), root()).await;
+        assert_eq!(recorded(&res), want, "{}", res.status());
+        let skip = ValidatedJson(serde_json::json!({"collector_ids": ["c1"]}));
+        let res = skip_rollout(at(), root(), skip).await;
+        assert_eq!(recorded(&res), want, "{}", res.status());
+        let res = rollback_rollout(at(), root()).await;
+        assert_eq!(recorded(&res), want, "{}", res.status());
+    }
+
+    async fn pipelines_as(user_id: &str) -> Response {
+        pipelines_in(ORG, user_id).await
+    }
+
+    async fn pipelines_in(org: &str, user_id: &str) -> Response {
+        get_pipelines(
+            Path(org.to_string()),
+            Query(FlowQuery { window: None }),
+            Headers(UserEmail {
+                user_id: user_id.to_string(),
+            }),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn pipelines_answer_the_search_licence_429_while_search_is_blocked() {
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        let custom = "blocked@fleet-fleets-handlers.test";
+        seed_member(custom, config::meta::user::UserRole::User, ORG);
+        openfga_on(&[], None);
+        let gate = close_search_gate_for_tests().await;
+        let res = pipelines_as(custom).await;
+        drop(gate);
+        openfga_off();
+        forget(custom, ORG);
+        assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
+        let body: serde_json::Value = serde_json::from_str(&body_text(res).await).unwrap();
+        assert_eq!(body["code"], 429);
+        let message = body["message"].as_str().unwrap();
+        assert!(
+            message.contains(
+                "Search is temporarily disabled due to exceeding allotted ingestion limit."
+            ) && message.ends_with("Please contact your administrator."),
+            "{message}"
+        );
+    }
+
+    #[tokio::test]
+    async fn meta_org_pipelines_reach_the_fleet_check_while_search_is_blocked() {
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        let custom = "meta@fleet-fleets-handlers.test";
+        seed_member(
+            custom,
+            config::meta::user::UserRole::User,
+            config::META_ORG_ID,
+        );
+        openfga_on(&[], None);
+        let gate = close_search_gate_for_tests().await;
+        let res = pipelines_in(config::META_ORG_ID, custom).await;
+        drop(gate);
+        openfga_off();
+        forget(custom, config::META_ORG_ID);
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn pipelines_reach_the_fleet_check_while_search_is_open() {
+        let _held = o2_enterprise::enterprise::license::TEST_STATICS_LOCK
+            .lock()
+            .await;
+        let custom = "open@fleet-fleets-handlers.test";
+        seed_member(custom, config::meta::user::UserRole::User, ORG);
+        openfga_on(&[], None);
+        let res = pipelines_as(custom).await;
+        openfga_off();
+        forget(custom, ORG);
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn the_audit_trail_is_not_licence_gated_while_search_is_blocked() {
+        use arrow_schema::{DataType, Field, Schema};
+        use config::meta::{self_reporting::usage::AUDIT_STREAM, stream::StreamType};
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        let (org, _) = audit_org("licence").await;
+        // without an audit schema the read returns before it searches
+        let schema = Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("http_method", DataType::Utf8, true),
+            Field::new("http_path", DataType::Utf8, true),
+            Field::new("user_email", DataType::Utf8, true),
+        ]);
+        let now = config::utils::time::now_micros();
+        infra::schema::merge(
+            config::META_ORG_ID,
+            AUDIT_STREAM,
+            StreamType::Logs,
+            &schema,
+            Some(now),
+        )
+        .await
+        .unwrap();
+        let gate = close_search_gate_for_tests().await;
+        let refusal = search_service::check_search_allowed(&org, None)
+            .expect_err("the org's own searches are blocked")
+            .to_string();
+        let res = list_audit(Path(org.clone()), Query(AuditQuery::default()), root()).await;
+        let audit = openobserve_core::fleet::list_audit(&org, AuditQuery::default(), None).await;
+        drop(gate);
+        // a unit test has no search backend, so only the licence refusal is ruled out
+        assert_ne!(res.status(), StatusCode::TOO_MANY_REQUESTS);
+        let body = body_text(res).await;
+        assert!(!body.contains(&refusal), "{body}");
+        if let Err(e) = audit {
+            assert!(!e.to_string().contains(&refusal), "{e}");
+        }
     }
 }

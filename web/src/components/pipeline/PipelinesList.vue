@@ -62,10 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                as the state facet (the toggle group above facets by pipeline TYPE,
                so the two never overlap). Always rendered so rows never shift. -->
           <template #subheader>
-            <div
-              class="px-page-edge border-table-row-divider border-b py-1.5"
-              data-test="pipeline-list-summary"
-            >
+            <div data-test="pipeline-list-summary">
               <OStatStrip
                 :items="summaryStats"
                 :loading="loading"
@@ -575,6 +572,7 @@ import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { forbiddenState } from "@/utils/featureGate";
 import { COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18nTyped();
@@ -1123,7 +1121,7 @@ const fetching = pipelinesList.isFetching;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = pipelinesList.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+  return forbiddenState(e) || e?.status === 403;
 });
 // Epoch ms of the last successful read — drives the button's "1m ago" label.
 const lastUpdatedAt = pipelinesList.dataUpdatedAt;

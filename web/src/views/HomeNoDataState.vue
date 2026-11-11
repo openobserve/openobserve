@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         icon-variant="blue"
         data-test="home-no-data-logs-card"
-        @click="go('curl')"
+        @click="setUp('logs', 'curl')"
       />
 
       <!-- Send Traces -->
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         icon-variant="purple"
         data-test="home-no-data-traces-card"
-        @click="go('tracesOTLP')"
+        @click="setUp('backend', 'tracesOTLP')"
       />
 
       <!-- Send Metrics -->
@@ -90,8 +90,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         icon-variant="teal"
         data-test="home-no-data-metrics-card"
-        @click="go('prometheus')"
+        @click="setUp('infrastructure', 'prometheus')"
       />
+
+      <div v-if="sampleDataFlow" class="flex basis-full justify-center">
+        <SampleDataCallout class="max-w-200" />
+      </div>
     </template>
 
     <template #extra>
@@ -141,8 +145,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="go('ingestLogs')"
           >{{ t("home.noDataState.shippers") }}</EmptyStateIngestionChip
         >
+        <OTooltip
+          v-if="store.state.zoConfig?.profiling_enabled && profilesLocked"
+          :content="profilesLockedReason"
+        >
+          <span class="inline-flex">
+            <EmptyStateIngestionChip unavailable data-test="home-no-data-profiles-btn">
+              <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
+              {{ t("home.noDataState.profiles") }}
+            </EmptyStateIngestionChip>
+          </span>
+        </OTooltip>
         <EmptyStateIngestionChip
-          v-if="store.state.zoConfig?.profiling_enabled"
+          v-else-if="store.state.zoConfig?.profiling_enabled"
           icon="memory"
           data-test="home-no-data-profiles-btn"
           @click="go('ingestProfiles')"
@@ -170,10 +185,17 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
+import SampleDataCallout from "@/components/sampleData/SampleDataCallout.vue";
+import { sampleDataFlowOn } from "@/utils/firstRunFlow";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { getImageURL } from "@/utils/zincutils";
+import { useSetupTarget } from "@/composables/useSetupTarget";
+import type { OnboardingChoiceId } from "@/components/onboarding/onboardingChoices";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import DOMPurify from "dompurify";
 
 const props = defineProps<{
@@ -193,6 +215,8 @@ defineSlots<{
 const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
+const { locked: profilesLocked, lockedReason: profilesLockedReason } =
+  useLicenseLock("continuous_profiling");
 
 const shell = computed(() => {
   if (props.alternativesOnly) return { size: "block" as const, backdrop: false };
@@ -227,10 +251,17 @@ const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization?.identifier,
 }));
 
+const sampleDataFlow = computed(() => sampleDataFlowOn(store.state.zoConfig));
+
 // Uses v-html — fully i18n-controlled, no user input.
 const description = computed(() => DOMPurify.sanitize(t("home.noDataState.description")));
 
 const go = (routeName: string) => {
   router.push({ name: routeName, query: orgQuery.value });
+};
+// the three main cards start onboarding on cloud for an org with no data
+const { target } = useSetupTarget();
+const setUp = (choice: OnboardingChoiceId, routeName: string) => {
+  void router.push(target(choice, routeName));
 };
 </script>

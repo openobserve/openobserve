@@ -33,9 +33,9 @@ import type {
   PresetDescriptor,
   OnCallPosition,
   OnCallTeam,
+  OnCallTeamContext,
   OnCallTeamMember,
   L0Policy,
-  PolicyFinalAction,
   PriorityRung,
   Rotation,
   CauseAnalytics,
@@ -49,6 +49,7 @@ import type {
   DeliveryLedger,
   EscalateResult,
   EscalationProgress,
+  EscalationProgressEntry,
   MyDeliveries,
   MyDeliveriesRead,
   MyOnCall,
@@ -205,6 +206,20 @@ const oncall = {
       at === undefined ? undefined : { params: { at } },
     ),
 
+  /// Policy, rotation and schedule for many teams in one read; `include_mine` adds the caller's teams.
+  teamContext: ({
+    org_identifier,
+    team_ids,
+    include_mine,
+  }: {
+    org_identifier: string;
+    team_ids: string[];
+    include_mine: boolean;
+  }) =>
+    http().get<{ teams: OnCallTeamContext[] }>(`/api/${org_identifier}/oncall/teams/context`, {
+      params: { team_ids: team_ids.join(","), include_mine },
+    }),
+
   getPolicy: ({ org_identifier, team_id }: { org_identifier: string; team_id: string }) =>
     http().get<OnCallPolicy>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/policy`,
@@ -222,13 +237,11 @@ const oncall = {
       destinations?: string[];
       p1_parallel?: boolean;
       p4_pages?: boolean;
-      /** How many full passes the ladder runs before `final_action`. 1 = once;
-       *  there is no zero. */
-      repeat_count?: number;
-      final_action?: PolicyFinalAction;
       /** Absent = unchanged. Only send when the user touched the L0 panel —
        *  editing rungs must not silently un-configure the gate. */
       l0?: L0Policy;
+      /** Template override; null clears it. */
+      template?: string | null;
     };
   }) =>
     http()
@@ -511,6 +524,18 @@ const oncall = {
       { minutes },
     ),
 
+  /// Ends a snooze now; the ladder continues from the step it paused on.
+  unsnoozeResponse: ({
+    org_identifier,
+    response_id,
+  }: {
+    org_identifier: string;
+    response_id: string;
+  }) =>
+    http().post<OnCallResponse>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/unsnooze`,
+    ),
+
   addNote: ({
     org_identifier,
     response_id,
@@ -586,6 +611,19 @@ const oncall = {
   }) =>
     http().get<EscalationProgress>(
       `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/escalation`,
+    ),
+
+  /// Where the ladder has got to for many records in one read; an unreadable id is left out.
+  escalationProgressBatch: ({
+    org_identifier,
+    response_ids,
+  }: {
+    org_identifier: string;
+    response_ids: string[];
+  }) =>
+    http().get<{ progress: EscalationProgressEntry[] }>(
+      `/api/${org_identifier}/oncall/responses/escalation`,
+      { params: { response_ids: response_ids.join(",") } },
     ),
 
   /// What previous firings of this subject turned out to be, grouped by cause.

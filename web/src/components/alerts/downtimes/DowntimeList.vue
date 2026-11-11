@@ -86,10 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @row-click="openDetail"
             >
               <template #subheader>
-                <div
-                  class="px-page-edge border-table-row-divider border-b py-1.5"
-                  data-test="downtime-list-summary"
-                >
+                <div data-test="downtime-list-summary">
                   <OStatStrip
                     :items="summaryStats"
                     :loading="loading"
@@ -616,7 +613,10 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useOrgId } from "@/composables/query";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { queryClient } from "@/composables/query/queryClient";
 import { foldersQuery, optionalFoldersQuery } from "@/services/common.queries";
 import { folderKeys } from "@/services/common.querykeys";
@@ -718,8 +718,11 @@ const listQuery = useQuery(() =>
 const alertFoldersList = useQuery(() =>
   Object.assign(optionalFoldersQuery(orgId.value, "alerts"), { enabled: !!orgId.value }),
 );
+const { locked: syntheticsLocked } = useLicenseLock("synthetics");
 const syntheticFoldersList = useQuery(() =>
-  Object.assign(optionalFoldersQuery(orgId.value, "synthetics"), { enabled: !!orgId.value }),
+  Object.assign(optionalFoldersQuery(orgId.value, "synthetics"), {
+    enabled: !!orgId.value && !syntheticsLocked.value,
+  }),
 );
 const downtimeFoldersList = useQuery(() =>
   Object.assign(foldersQuery(orgId.value, "downtimes"), { enabled: !!orgId.value }),
@@ -731,9 +734,10 @@ const truncated = computed(() => listQuery.data.value?.truncated === true);
 const loading = listQuery.isPending;
 const fetching = listQuery.isFetching;
 const lastUpdatedAt = listQuery.dataUpdatedAt;
-const forbidden = computed(() => {
+// A license denial carries its missing keys, so the table shows the license copy instead of the RBAC one.
+const forbidden = computed<ForbiddenState>(() => {
   const e: any = listQuery.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+  return forbiddenState(e) || e?.status === 403;
 });
 
 // A failed load must not read as "no downtimes yet" with a Create button.
@@ -832,6 +836,7 @@ const typeOptions = computed<{ value: TypeFilter; label: I18nText; icon: IconNam
 
 const onTypeChange = (value: unknown) => {
   typeFilter.value = (value as TypeFilter) || "all";
+  analytics.track("downtime_list_filtered", { filter: "type", value: typeFilter.value });
 };
 
 const onFolderChange = (folderId: string) => {
@@ -972,6 +977,7 @@ const summaryStats = computed<StatItem[]>(() => {
 
 const onStatSelect = (key: string) => {
   statFilter.value = key === "total" || statFilter.value === key ? null : (key as StatKey);
+  analytics.track("downtime_list_filtered", { filter: "status", value: statFilter.value ?? "all" });
 };
 
 const onEmptyAction = (id?: string) => {
@@ -1232,7 +1238,7 @@ const refreshAll = async () => {
   void getFoldersListByType(store, "downtimes");
   void listQuery.refetch();
   void alertFoldersList.refetch();
-  void syntheticFoldersList.refetch();
+  if (!syntheticsLocked.value) void syntheticFoldersList.refetch();
 };
 
 useShortcuts([

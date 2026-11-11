@@ -446,6 +446,9 @@ export default defineComponent({
             body: input.body,
             type: input.type,
             title: input.title,
+            // An exported content template keeps its kind and the kinds it applies to.
+            ...(input.kind ? { kind: input.kind } : {}),
+            ...(Array.isArray(input.applies_to) ? { applies_to: input.applies_to } : {}),
           },
         });
 

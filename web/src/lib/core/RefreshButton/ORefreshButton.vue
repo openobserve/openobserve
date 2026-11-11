@@ -15,6 +15,7 @@ const props = withDefaults(defineProps<RefreshButtonProps>(), {
   layout: "split",
   dataTest: "refresh-button",
   shortcutId: undefined,
+  tooltip: undefined,
   size: "toolbar",
 });
 
@@ -71,6 +72,7 @@ const buttonName = computed(() =>
 );
 
 const exactTime = computed(() => {
+  if (props.tooltip) return props.tooltip;
   if (!props.lastRunAt) return t("refreshButton.notYetRefreshed");
   return t("refreshButton.lastRefreshed", {
     time: new Date(props.lastRunAt).toLocaleTimeString(),
@@ -95,12 +97,11 @@ function handleClick(e: MouseEvent) {
 </script>
 
 <template>
-  <!-- `h-8!` beats sm-toolbar's own 30px, so this matches the 32px icon-sm buttons beside it. -->
   <OButton
     v-if="layout === 'inline'"
     :variant="variant"
     size="sm-toolbar"
-    class="h-8!"
+    :class="size === 'header' ? 'h-8.5!' : 'h-8!'"
     icon-left="refresh"
     :loading="loading"
     :disabled="disabled"

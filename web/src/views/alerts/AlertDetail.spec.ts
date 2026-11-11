@@ -340,6 +340,15 @@ describe("AlertDetail — History tab", () => {
       wrapper = await mountView({ alert: makeMultiAlert() });
       expect(wrapper.find('[data-otab-name="groups"]').exists()).toBe(true);
       expect(alertsService.list_groups).toHaveBeenCalledWith("default", "alert-1");
+      const table = wrapper.findComponent({ name: "AlertGroupsTable" });
+      expect(table.props("loadError")).toBe(false);
+    });
+
+    it("tells the groups table its load failed, rather than that nothing is tracked", async () => {
+      vi.mocked(alertsService.list_groups).mockRejectedValueOnce(new Error("boom"));
+      wrapper = await mountView({ alert: makeMultiAlert() });
+      const table = wrapper.findComponent({ name: "AlertGroupsTable" });
+      expect(table.props("loadError")).toBe(true);
     });
 
     it("keeps the group column and shows every group's transitions", async () => {
@@ -596,6 +605,33 @@ describe("AlertDetail — anomaly alerts", () => {
   it("leaves every other alert family without a charts tab", async () => {
     wrapper = await mountView({ alert: makeSimpleAlert() });
     expect(wrapper.find('[data-test="alerts-alertdetail-tab-charts"]').exists()).toBe(false);
+  });
+
+  it("locks the charts tab and Edit while anomaly_detection is license-locked", async () => {
+    store.state.zoConfig.features = { anomaly_detection: "locked" };
+    try {
+      wrapper = await mountView({ alert: makeAnomalyAlert() });
+      expect(wrapper.find('[data-test="alerts-alertdetail-anomaly-license-denied"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.findComponent({ name: "AnomalyDetectionChart" }).exists()).toBe(false);
+      const edit = wrapper.find('[data-test="alerts-alertdetail-edit"]');
+      expect(edit.attributes("disabled")).toBeDefined();
+      expect(wrapper.find('[data-test="alerts-alertdetail-edit-lock"]').exists()).toBe(true);
+    } finally {
+      delete store.state.zoConfig.features;
+    }
+  });
+
+  it("keeps Edit open on a scheduled alert while anomaly_detection is license-locked", async () => {
+    store.state.zoConfig.features = { anomaly_detection: "locked" };
+    try {
+      wrapper = await mountView({ alert: makeSimpleAlert() });
+      const edit = wrapper.find('[data-test="alerts-alertdetail-edit"]');
+      expect(edit.attributes("disabled")).toBeUndefined();
+    } finally {
+      delete store.state.zoConfig.features;
+    }
   });
 });
 

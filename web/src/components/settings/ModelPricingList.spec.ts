@@ -23,6 +23,7 @@ import ModelPricingList from "./ModelPricingList.vue";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/model_pricing", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -46,10 +47,12 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 // Router mock — capture push calls
 const routerPushMock = vi.fn();
+const routerReplaceMock = vi.fn();
 const currentRouteRef = { value: { query: {} as Record<string, any> } };
 vi.mock("vue-router", () => ({
   useRouter: () => ({
     push: routerPushMock,
+    replace: routerReplaceMock,
     currentRoute: currentRouteRef,
   }),
 }));
@@ -60,6 +63,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => ({
 }));
 
 import modelPricingService from "@/services/model_pricing";
+import analytics from "@/services/product_analytics";
 
 // ── Stubs for child components ───────────────────────────────────────────────
 
@@ -309,6 +313,12 @@ const mockI18n = createI18n({
         localTimeHint: "In your timezone: {range}",
         tierAlwaysActive: "Always active (default)",
         tierDefaultName: "Default",
+        builtInStatus: {
+          seed: "seed {date}.",
+          neverSynced: "never synced",
+          lastSynced: "synced at {time}",
+        },
+        unpriced: { title: "Pricing gaps" },
       },
     },
   },
@@ -628,6 +638,27 @@ describe("ModelPricingList.vue", () => {
       wrapper.vm.selectedIds = ["org-1", "meta-1"];
       wrapper.vm.onTabChange();
       expect(wrapper.vm.selectedIds).toEqual([]);
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "model_pricing_tab_switched",
+        expect.anything(),
+      );
+    });
+
+    it("tracks a tab switch only when the user selects a tab", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.selectedTab = "org";
+      wrapper.vm.clearFilters();
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "model_pricing_tab_switched",
+        expect.anything(),
+      );
+
+      vi.mocked(analytics.track).mockClear();
+      wrapper.vm.selectedTab = "org";
+      wrapper.vm.onTabSelect();
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("model_pricing_tab_switched", { tab: "org" });
     });
 
     it("should only return org-source models when selectedTab is 'org'", async () => {
@@ -847,26 +878,53 @@ describe("ModelPricingList.vue", () => {
     });
   });
 
-  describe("getVisiblePrices / getOverflowCount", () => {
-    it("reports overflow count for prices beyond the first 2", async () => {
+  describe("pricing cell", () => {
+    let widthSpies: { mockRestore(): void }[] = [];
+    const mockCellWidths = () => {
+      widthSpies = [
+        vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(100),
+        vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(60),
+      ];
+    };
+
+    afterEach(() => widthSpies.forEach((spy) => spy.mockRestore()));
+
+    const waitForRow = (name: string) =>
+      vi.waitFor(() => {
+        const row = wrapper
+          .findAll('[data-test^="o2-table-row-"]')
+          .find((r: any) => r.text().includes(name));
+        expect(row).toBeTruthy();
+        return row!;
+      });
+
+    const mountWithPrices = async () => {
+      vi.mocked(modelPricingService.list).mockResolvedValue({
+        data: [
+          orgModel({
+            tiers: [{ condition: null, prices: { input: 0.1, output: 0.2, audio: 0.3 } }],
+          }),
+        ],
+      } as any);
       wrapper = mountComponent();
       await flushPromises();
-      const model = {
-        tiers: [
-          {
-            condition: null,
-            prices: { input: 0.1, output: 0.2, audio: 0.3, image: 0.4 },
-          },
-        ],
-      };
-      expect(wrapper.vm.getOverflowCount(model)).toBe(2);
+      return waitForRow("GPT-4o (org)");
+    };
+
+    it("collapses prices that do not fit into a +N chip that opens the dialog", async () => {
+      mockCellWidths();
+      const row = await mountWithPrices();
+      await flushPromises();
+      const more = row.find('[data-test="fit-items-more"]');
+      expect(more.text()).toContain("+2");
+      await more.find("button, [tabindex]").trigger("click");
+      expect(wrapper.vm.showPricingDialog).toBe(true);
     });
 
-    it("returns overflow 0 when there are no prices", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const model = { tiers: [{ condition: null, prices: {} }] };
-      expect(wrapper.vm.getOverflowCount(model)).toBe(0);
+    it("shows every price with no +N when they fit", async () => {
+      const row = await mountWithPrices();
+      expect(row.findAll("[data-fit-item]")).toHaveLength(3);
+      expect(row.find('[data-test="fit-items-more"]').exists()).toBe(false);
     });
   });
 
@@ -1381,5 +1439,69 @@ describe("list view state", () => {
       sortBy: "name",
       sortOrder: "desc",
     });
+  });
+});
+
+describe("Route tabs and header", () => {
+  let w: any;
+
+  beforeEach(() => {
+    vi.mocked(modelPricingService.list).mockResolvedValue({ data: mockModels } as any);
+  });
+
+  afterEach(() => {
+    w?.unmount();
+    vi.clearAllMocks();
+  });
+
+  it("switching tab writes it to the route query, keeping the other params", async () => {
+    w = mountComponent({ query: { tab: "all", org_identifier: "test-org" } });
+    await flushPromises();
+
+    w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "org");
+    await flushPromises();
+
+    expect(w.vm.selectedTab).toBe("org");
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      query: { tab: "org", org_identifier: "test-org" },
+    });
+  });
+
+  it("Pricing gaps opens its own page", async () => {
+    w = mountComponent();
+    await flushPromises();
+    await w.find('[data-test="model-pricing-gaps-btn"]').trigger("click");
+    expect(routerPushMock).toHaveBeenCalledWith({
+      name: "modelPricingGaps",
+      query: { org_identifier: "test-org" },
+    });
+  });
+
+  it("reopens the tab named in the route query after a reload", async () => {
+    w = mountComponent({ query: { tab: "inherited" } });
+    await flushPromises();
+    expect(w.vm.selectedTab).toBe("inherited");
+  });
+
+  it("says online sync has not run when the built-in list was never synced", async () => {
+    vi.mocked(modelPricingService.getBuiltIn).mockResolvedValue({
+      data: { models: [], source_url: "", last_updated: 0, seed_date: "2026-10-14" },
+    } as any);
+    w = mountComponent();
+    await flushPromises();
+    const status = w.find('[data-test="model-pricing-built-in-status"]');
+    expect(status.text()).toContain("2026-10-14");
+    expect(status.text()).toContain("never synced");
+  });
+
+  it("gives the last online sync time once the built-in list has synced", async () => {
+    vi.mocked(modelPricingService.getBuiltIn).mockResolvedValue({
+      data: { models: [], source_url: "", last_updated: 1_798_000_000, seed_date: "2026-10-14" },
+    } as any);
+    w = mountComponent();
+    await flushPromises();
+    const status = w.find('[data-test="model-pricing-built-in-status"]');
+    expect(status.text()).toContain("synced at 2026-12-");
+    expect(status.text()).not.toContain("never synced");
   });
 });

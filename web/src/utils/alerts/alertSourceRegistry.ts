@@ -141,6 +141,15 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     defaultThreshold: "count",
     showQueryPreview: true,
   },
+  traces: {
+    id: "traces",
+    labelKey: "alerts.prefill.sources.traces.label",
+    toastKey: "alerts.prefill.sources.traces.toast",
+    icon: "shield-alert-outline",
+    // Each metric carries its threshold in HAVING, so any returned row fires.
+    defaultThreshold: "count",
+    showQueryPreview: true,
+  },
 };
 
 export const getAlertSource = (id: string | undefined): AlertSourceDefinition => {

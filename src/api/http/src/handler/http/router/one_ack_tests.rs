@@ -1488,40 +1488,331 @@ async fn openfga_edit_on_any_alert_of_an_incident_admits() {
     assert!(!ack::may_edit_any_alert_with(&problem, only("none".into())).await);
 }
 
+/// Presses Resolve as an admin on the page route (UI, bulk, Slack), incident PATCH or phone key 6.
+async fn resolve_on(surface: Surface, f: &IncidentFixture) {
+    let (status, body) = match surface {
+        Surface::IncidentRoute => {
+            let uri = format!(
+                "/api/v2/{}/alerts/incidents/{}/update",
+                org(),
+                f.incident_id
+            );
+            let (status, body) = call_as(
+                admin(),
+                Method::PATCH,
+                &uri,
+                Some(json!({"status": "resolved"})),
+            )
+            .await;
+            (status, body.to_string())
+        }
+        Surface::PageRoute => {
+            let uri = format!("/api/{}/oncall/responses/{}/resolve", org(), f.owner);
+            let (status, body) = post(admin(), &uri, json!({})).await;
+            (status, body.to_string())
+        }
+        Surface::PhoneKey => {
+            let tok = token_for(&f.owner, admin(), token::TokenPurpose::Voice).await;
+            post_form(
+                &format!("/api/v2/{}/oncall/ack/voice/{tok}", org()),
+                "Digits=6",
+            )
+            .await
+        }
+        Surface::AlertRoute | Surface::EmailLink => unreachable!("no Resolve on {surface:?}"),
+    };
+    assert_eq!(status, StatusCode::OK, "{surface:?}: {body}");
+}
+
+/// R7: a person's Resolve on every surface ends the problem's ack and restarts no page.
+async fn every_resolve_ends_the_acknowledgement() {
+    for surface in [
+        Surface::PageRoute,
+        Surface::IncidentRoute,
+        Surface::PhoneKey,
+    ] {
+        let f = incident_with_owner_and_impacted_pages(&format!("r7-{surface:?}")).await;
+        let ack = format!("/api/v2/{}/alerts/{}/ack", org(), f.alert_id);
+        let (status, body) = post(member(), &ack, json!({})).await;
+        assert_eq!(status, StatusCode::OK, "{surface:?}: {body}");
+        resolve_on(surface, &f).await;
+        assert_eq!(row_holder(&f.alert_id).await, None, "{surface:?}");
+        assert_eq!(
+            incident_holder(&f.incident_id).await.0,
+            match surface {
+                Surface::IncidentRoute => "resolved",
+                _ => "open",
+            },
+            "{surface:?}"
+        );
+        if !matches!(surface, Surface::IncidentRoute) {
+            let kinds: Vec<String> = infra::table::incident_events::get(org(), &f.incident_id)
+                .await
+                .unwrap()
+                .iter()
+                .map(|e| serde_json::to_value(e).unwrap()["type"].to_string())
+                .collect();
+            assert!(
+                kinds.contains(&"\"AckEndedByPageResolve\"".to_string())
+                    && !kinds.contains(&"\"Reopened\"".to_string()),
+                "{surface:?}: the timeline says why the ack ended: {kinds:?}"
+            );
+            assert_eq!(page(&f.owner).await.state, ResponseState::Resolved);
+            let left = page(&f.impacted).await;
+            assert_eq!(
+                (left.state, left.acked_by.as_deref()),
+                (ResponseState::Acknowledged, Some(member())),
+                "{surface:?}: the problem's other pages are left as they are"
+            );
+        }
+    }
+}
+
+/// R7 [weak]: the page closes first; a failed clear is an error and a retried Resolve clears it.
+async fn a_failed_clear_is_an_error_and_a_retried_resolve_clears_it() {
+    for retry in [Surface::PageRoute, Surface::PhoneKey] {
+        let name = format!("r7-clear-fails-{retry:?}");
+        let alert_id = firing_alert(&name).await;
+        let response = alert_page(&alert_id, Some(&team(&name, &[admin()]).await)).await;
+        let (status, body) = post(
+            admin(),
+            &format!("/api/v2/{}/alerts/{alert_id}/ack", org()),
+            json!({}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let uri = format!("/api/{}/oncall/responses/{}/resolve", org(), response.id);
+        let stuck = "r7_clear_fails";
+        fail_updates(stuck, "alert_acks", "alert_id", &alert_id).await;
+        let (status, body) = post(admin(), &uri, json!({})).await;
+        unfail(stuck).await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
+        assert_eq!(page(&response.id).await.state, ResponseState::Resolved);
+        assert_eq!(
+            row_holder(&alert_id).await.map(|(who, _)| who).as_deref(),
+            Some(admin())
+        );
+        let (status, body) = match retry {
+            Surface::PhoneKey => {
+                let tok = token_for(&response.id, admin(), token::TokenPurpose::Voice).await;
+                post_form(
+                    &format!("/api/v2/{}/oncall/ack/voice/{tok}", org()),
+                    "Digits=6",
+                )
+                .await
+            }
+            _ => {
+                let (status, body) = post(admin(), &uri, json!({})).await;
+                (status, body.to_string())
+            }
+        };
+        assert_eq!(status, StatusCode::OK, "{retry:?}: {body}");
+        assert_eq!(row_holder(&alert_id).await, None, "{retry:?}");
+    }
+}
+
+/// R7 [weak] on the incident: a re-sent Resolve finishes a failed clear with no second event.
+async fn a_failed_incident_clear_is_finished_by_resolving_again() {
+    let f = incident_with_owner_and_impacted_pages("r7-incident-clear-fails").await;
+    let (status, body) = post(
+        member(),
+        &format!("/api/v2/{}/alerts/{}/ack", org(), f.alert_id),
+        json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let patch = format!(
+        "/api/v2/{}/alerts/incidents/{}/update",
+        org(),
+        f.incident_id
+    );
+    let resolve = || {
+        call_as(
+            admin(),
+            Method::PATCH,
+            &patch,
+            Some(json!({"status": "resolved"})),
+        )
+    };
+    let stuck = "r7_incident_clear_fails";
+    fail_updates(stuck, "alert_acks", "alert_id", &f.alert_id).await;
+    let (status, body) = resolve().await;
+    unfail(stuck).await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
+    assert_eq!(incident_holder(&f.incident_id).await.0, "resolved");
+    assert!(row_holder(&f.alert_id).await.is_some());
+
+    let (status, body) = resolve().await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(row_holder(&f.alert_id).await, None);
+    let resolved = infra::table::incident_events::get(org(), &f.incident_id)
+        .await
+        .unwrap()
+        .iter()
+        .filter(|e| serde_json::to_value(e).unwrap()["type"] == "Resolved")
+        .count();
+    assert_eq!(resolved, 1, "the retry writes no second resolved event");
+}
+
+/// Re-fires the alert's one row at `at`, as a firing after a recovery does.
+async fn refire(alert_id: &str, at: i64) {
+    let state = AlertState {
+        last_outcome: Some(RunOutcome::Firing),
+        last_outcome_at: Some(at),
+        since: Some(at),
+        firing_started_at: Some(at),
+        ..AlertState::empty(alert_id, "")
+    };
+    alert_states::persist(
+        &StateUpdate {
+            state: Some(state),
+            transition: None,
+        },
+        None,
+    )
+    .await
+    .unwrap();
+}
+
+/// Who holds the ack of the alert's firing that started at `firing`.
+async fn holder_of(alert_id: &str, firing: i64) -> Option<String> {
+    alert_acks::get(org(), alert_id, "")
+        .await
+        .unwrap()
+        .filter(|a| a.in_force_for(Some(firing)))
+        .map(|a| a.acked_by)
+}
+
+/// N1: a page covers firings up to its close, so a gate-held open page covers a re-fire.
+async fn a_resolve_ends_the_firings_its_page_covered_up_to_its_close() {
+    let alert_id = firing_alert("n1-cover").await;
+    let page_of = alert_page(&alert_id, Some(&team("n1-cover", &[admin()]).await)).await;
+    let ack = format!("/api/v2/{}/alerts/{alert_id}/ack", org());
+    let uri = format!("/api/{}/oncall/responses/{}/resolve", org(), page_of.id);
+
+    let during_gate = page_of.opened_at + 1;
+    refire(&alert_id, during_gate).await;
+    let (status, body) = post(admin(), &ack, json!({})).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let (status, body) = post(admin(), &uri, json!({})).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(
+        holder_of(&alert_id, during_gate).await,
+        None,
+        "the open page was the re-fire's page"
+    );
+
+    let after_close = page(&page_of.id).await.closed_at.unwrap() + 1_000_000;
+    refire(&alert_id, after_close).await;
+    let (status, body) = post(admin(), &ack, json!({})).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let (status, body) = post(admin(), &uri, json!({})).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(
+        holder_of(&alert_id, after_close).await.as_deref(),
+        Some(admin()),
+        "a closed page does not cover a later firing"
+    );
+}
+
+/// N2: a re-sent incident Resolve re-runs the on-call repair a first failure only logged.
+async fn a_resent_incident_resolve_repairs_its_pages() {
+    use sea_orm::ConnectionTrait;
+    let f = incident_with_owner_and_impacted_pages("n2-repair").await;
+    let patch = format!(
+        "/api/v2/{}/alerts/incidents/{}/update",
+        org(),
+        f.incident_id
+    );
+    let resolve = || {
+        call_as(
+            admin(),
+            Method::PATCH,
+            &patch,
+            Some(json!({"status": "resolved"})),
+        )
+    };
+    let recovered = || async {
+        oncall_responses::list_events(&f.owner)
+            .await
+            .unwrap()
+            .iter()
+            .any(|e| e.kind == ResponseEventKind::Recovery)
+    };
+    let stuck = "n2_recovery_fails";
+    unfail(stuck).await;
+    infra::db::get_orm_client_rw()
+        .await
+        .execute_unprepared(&format!(
+            "CREATE TRIGGER {stuck} BEFORE INSERT ON oncall_response_events \
+             WHEN NEW.response_id = '{}' BEGIN SELECT RAISE(ABORT, 'insert fails'); END",
+            f.owner
+        ))
+        .await
+        .expect("fault");
+    let (status, body) = resolve().await;
+    unfail(stuck).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(!recovered().await, "the first recovery failed");
+
+    let (status, body) = resolve().await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(recovered().await, "the re-sent Resolve repaired the page");
+    let resolved = infra::table::incident_events::get(org(), &f.incident_id)
+        .await
+        .unwrap()
+        .iter()
+        .filter(|e| serde_json::to_value(e).unwrap()["type"] == "Resolved")
+        .count();
+    assert_eq!(resolved, 1);
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn one_ack_end_to_end() {
+    // Boxed: inline, debug builds give each step its own slot here and overflow a 2 MB thread.
     let _oncall = oncall(true).await;
-    meta_store().await;
-    seed().await;
-    the_problem_is_the_incident_when_there_is_one_else_the_firing().await;
-    every_page_action_runs_the_one_rule().await;
-    a_teamless_page_refuses_escalate_and_snooze_and_can_be_handed_off().await;
-    let f = incident_with_owner_and_impacted_pages("ak8").await;
-    an_alert_ack_acknowledges_its_incident_and_stops_every_page(&f).await;
-    a_take_over_moves_every_record(&f).await;
-    an_unack_clears_every_record(&f).await;
-    the_incident_routes_admit_a_paged_member_and_refuse_a_stranger(&f).await;
-    a_firing_joining_an_acknowledged_incident_is_acknowledged(&f).await;
-    a_refused_hand_off_keeps_the_ack_and_the_page().await;
-    a_hand_off_clears_the_ack_and_moves_the_page().await;
-    a_mute_snoozes_the_open_page().await;
-    an_impacted_page_acknowledges_the_whole_problem().await;
-    a_page_whose_alert_stopped_firing_still_stops_and_restarts().await;
-    promote_runs_the_one_rule().await;
-    a_failed_page_step_is_finished_by_the_next_press().await;
-    a_mute_says_why_a_page_was_not_snoozed().await;
-    a_failed_release_stops_the_hand_off().await;
-    a_hand_off_to_a_person_clears_the_ack().await;
-    every_surface_reaches_the_one_ack().await;
-    the_phone_and_the_link_refuse_someone_the_rule_refuses().await;
-    openfga_edit_on_any_alert_of_an_incident_admits().await;
-    a_page_whose_alert_is_gone_can_be_taken_over().await;
-    a_failed_incident_read_is_an_error().await;
-    a_press_on_a_closed_page_answers_from_the_page().await;
-    a_press_on_an_older_open_page_stops_it().await;
-    a_leftover_page_stays_stopped_on_unack_and_take_over().await;
-    a_leftover_pages_team_is_a_responder().await;
-    a_press_that_changes_nothing_says_so().await;
-    an_unack_whose_restart_lost_its_trigger_still_reports_it().await;
-    a_failed_page_read_is_an_error().await;
+    Box::pin(meta_store()).await;
+    Box::pin(seed()).await;
+    Box::pin(the_problem_is_the_incident_when_there_is_one_else_the_firing()).await;
+    Box::pin(every_page_action_runs_the_one_rule()).await;
+    Box::pin(a_teamless_page_refuses_escalate_and_snooze_and_can_be_handed_off()).await;
+    let f = Box::pin(incident_with_owner_and_impacted_pages("ak8")).await;
+    Box::pin(an_alert_ack_acknowledges_its_incident_and_stops_every_page(
+        &f,
+    ))
+    .await;
+    Box::pin(a_take_over_moves_every_record(&f)).await;
+    Box::pin(an_unack_clears_every_record(&f)).await;
+    Box::pin(the_incident_routes_admit_a_paged_member_and_refuse_a_stranger(&f)).await;
+    Box::pin(a_firing_joining_an_acknowledged_incident_is_acknowledged(
+        &f,
+    ))
+    .await;
+    Box::pin(a_refused_hand_off_keeps_the_ack_and_the_page()).await;
+    Box::pin(a_hand_off_clears_the_ack_and_moves_the_page()).await;
+    Box::pin(a_mute_snoozes_the_open_page()).await;
+    Box::pin(an_impacted_page_acknowledges_the_whole_problem()).await;
+    Box::pin(a_page_whose_alert_stopped_firing_still_stops_and_restarts()).await;
+    Box::pin(promote_runs_the_one_rule()).await;
+    Box::pin(a_failed_page_step_is_finished_by_the_next_press()).await;
+    Box::pin(a_mute_says_why_a_page_was_not_snoozed()).await;
+    Box::pin(a_failed_release_stops_the_hand_off()).await;
+    Box::pin(a_hand_off_to_a_person_clears_the_ack()).await;
+    Box::pin(every_surface_reaches_the_one_ack()).await;
+    Box::pin(the_phone_and_the_link_refuse_someone_the_rule_refuses()).await;
+    Box::pin(openfga_edit_on_any_alert_of_an_incident_admits()).await;
+    Box::pin(a_page_whose_alert_is_gone_can_be_taken_over()).await;
+    Box::pin(a_failed_incident_read_is_an_error()).await;
+    Box::pin(a_press_on_a_closed_page_answers_from_the_page()).await;
+    Box::pin(a_press_on_an_older_open_page_stops_it()).await;
+    Box::pin(a_leftover_page_stays_stopped_on_unack_and_take_over()).await;
+    Box::pin(a_leftover_pages_team_is_a_responder()).await;
+    Box::pin(a_press_that_changes_nothing_says_so()).await;
+    Box::pin(an_unack_whose_restart_lost_its_trigger_still_reports_it()).await;
+    Box::pin(a_failed_page_read_is_an_error()).await;
+    Box::pin(every_resolve_ends_the_acknowledgement()).await;
+    Box::pin(a_failed_clear_is_an_error_and_a_retried_resolve_clears_it()).await;
+    Box::pin(a_failed_incident_clear_is_finished_by_resolving_again()).await;
+    Box::pin(a_resolve_ends_the_firings_its_page_covered_up_to_its_close()).await;
+    Box::pin(a_resent_incident_resolve_repairs_its_pages()).await;
 }

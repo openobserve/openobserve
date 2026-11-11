@@ -191,35 +191,33 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
       testLogger.warn('Per-field severity filter control not found via expected selectors — skipping show_when UI interaction, will rely on preview-panel severity toggle only');
     }
 
-    // Preview severity select: default is single_level — field with a
-    // show_when:critical filter must NOT appear.
+    // The playground starts on Critical, so a field with a show_when:critical filter shows.
     await pm.alertsPage.getTemplatePreviewVisualTab().click();
     await page.waitForTimeout(500);
 
     if (severityFilterExists) {
       const fieldsBlock = pm.alertsPage.getTemplatePreviewFields();
-      // At single_level, a critical-only field should be absent.
+      const hasFieldAtCritical = await fieldsBlock.getByText('CriticalOnlyField').isVisible({ timeout: 8000 }).catch(() => false);
+      expect(hasFieldAtCritical).toBe(true);
+      testLogger.info('Confirmed critical-only field visible at the default Critical severity');
+
+      // Switch preview severity to single level: the critical-only field must disappear.
+      const severitySelect = pm.alertsPage.getTemplatePreviewSeveritySelect();
+      await severitySelect.click();
+      await page.waitForTimeout(300);
+      await pm.alertsPage.getElementByText(/single/i).first().click();
+      await page.waitForTimeout(800);
+
       const hasFieldAtSingleLevel = await fieldsBlock.getByText('CriticalOnlyField').isVisible({ timeout: 5000 }).catch(() => false);
       expect(hasFieldAtSingleLevel).toBe(false);
       testLogger.info('Confirmed critical-only field hidden at single_level severity');
 
-      // Switch preview severity to critical — the field must now appear.
-      const severitySelect = pm.alertsPage.getTemplatePreviewSeveritySelect();
+      // Reset back to Critical so it doesn't leak into subsequent steps.
       await severitySelect.click();
       await page.waitForTimeout(300);
       await pm.alertsPage.getElementByText(/^Critical$/i).first().click().catch(async () => {
         await pm.alertsPage.getTemplatePreviewSeverityCriticalValue().click();
       });
-      await page.waitForTimeout(800);
-
-      const hasFieldAtCritical = await fieldsBlock.getByText('CriticalOnlyField').isVisible({ timeout: 8000 }).catch(() => false);
-      expect(hasFieldAtCritical).toBe(true);
-      testLogger.info('Confirmed critical-only field visible at severity=critical');
-
-      // Reset back to single_level so it doesn't leak into subsequent steps.
-      await severitySelect.click();
-      await page.waitForTimeout(300);
-      await pm.alertsPage.getElementByText(/single/i).first().click().catch(() => {});
       await page.waitForTimeout(500);
     } else {
       testLogger.warn('SKIPPED severity show_when assertions — per-field severity control selector not found; see report for follow-up');
@@ -337,9 +335,10 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     }).toBeGreaterThan(0);
 
     const slackPayload = JSON.parse(received.slack[0].body);
-    // Block Kit rides inside attachments so the colour bar applies (render/slack.rs:212).
-    const slackBlocks = (slackPayload.attachments ?? []).flatMap((a) => a.blocks ?? []);
-    expect(Array.isArray(slackPayload.attachments)).toBe(true);
+    // Block Kit sits at the top level; the title's status dot carries severity, so no attachment.
+    const slackBlocks = slackPayload.blocks ?? [];
+    expect(Array.isArray(slackPayload.blocks)).toBe(true);
+    expect(slackPayload.attachments).toBeUndefined();
     expect(slackBlocks.length).toBeGreaterThan(0);
     const slackHeaderText = JSON.stringify(slackBlocks);
     expect(slackHeaderText).toContain(alertName);
@@ -385,8 +384,9 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     }).toBeGreaterThan(0);
 
     const hookOverridePayload = JSON.parse(received.hook[0].body);
-    const hookOverrideBlocks = (hookOverridePayload.attachments ?? []).flatMap((a) => a.blocks ?? []);
-    expect(Array.isArray(hookOverridePayload.attachments)).toBe(true);
+    const hookOverrideBlocks = hookOverridePayload.blocks ?? [];
+    expect(Array.isArray(hookOverridePayload.blocks)).toBe(true);
+    expect(hookOverridePayload.attachments).toBeUndefined();
     expect(hookOverrideBlocks.length).toBeGreaterThan(0);
     testLogger.info('Verified render_format override: hook destination now received Block Kit, not the Webhook envelope', {
       blocksCount: hookOverrideBlocks.length,

@@ -38,8 +38,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <!-- The provider behind the Terraform export tab, which is otherwise
              only discoverable once the export dialog is already open. -->
+        <OTooltip v-if="anomalyTabLicenseLocked" :content="anomalyLockedReason">
+          <span class="inline-flex">
+            <OButton data-test="alert-list-add-alert-btn" variant="primary" size="sm" disabled>
+              <template #icon-left>
+                <OIcon
+                  name="lock"
+                  class="lock-chip"
+                  size="sm"
+                  data-test="alert-list-add-anomaly-lock"
+                />
+              </template>
+              {{ t(`alerts.add`) }}
+            </OButton>
+          </span>
+        </OTooltip>
         <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
         <OButton
+          v-else
           data-test="alert-list-add-alert-btn"
           variant="primary"
           size="sm"
@@ -120,6 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="oTableRef"
               :frame="false"
               v-model:selected-ids="selectedAlertIds"
+              :is-row-selectable="(row: any) => !anomalyRowLocked(row)"
               selection="multiple"
               data-test="alert-list-table"
               :data="displayedAlerts"
@@ -128,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               row-key="alert_id"
               :loading="loading"
               :loading-reset-key="`${activeFolderId}:${activeTab}`"
-              :forbidden="forbidden"
+              :forbidden="anomalyTabLicenseLocked ? ['anomaly_detection'] : forbidden"
               forbidden-resource="alert_folders"
               pagination="client"
               :page-size="pageSize"
@@ -155,10 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      search/tabs and above the rows. Always rendered (skeleton
                      while loading) so data arriving never shifts the layout. -->
               <template #subheader>
-                <div
-                  class="px-page-edge border-table-row-divider border-b py-1.5"
-                  data-test="alert-list-summary"
-                >
+                <div data-test="alert-list-summary">
                   <OStatStrip
                     :items="summaryStats"
                     :loading="loading"
@@ -188,13 +202,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :value="tab.value"
                         size="sm"
                         :icon-left="tab.icon"
-                        :title="lgUp && !tab.locked ? undefined : tab.label"
+                        :icon-right="tab.locked ? 'lock' : undefined"
+                        :tooltip="tab.locked ? anomalyLockedReason : undefined"
+                        :title="lgUp || tab.locked ? undefined : tab.label"
                         :data-test="`alert-list-tab-${tab.value}`"
                       >
                         <span class="@max-[42rem]/alert-toolbar:hidden">{{ tab.label }}</span>
-                        <template v-if="tab.locked" #icon-right>
-                          <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
-                        </template>
                       </OToggleGroupItem>
                     </template>
                   </OToggleGroup>
@@ -414,7 +427,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span v-if="row.status && row.status !== '--'" class="relative inline-flex">
                   <OTag type="alertStatus" :value="row.status" />
                   <OTooltip
-                    v-if="row.status === 'failed' && row.last_error"
+                    v-if="
+                      (row.status === 'failed' || isAnomalyDataReadinessStatus(row.status)) &&
+                      row.last_error
+                    "
                     :max-width="'25rem'"
                     :content="row.last_error"
                   />
@@ -454,22 +470,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
               </template>
 
-              <!-- Tags (PT-6). Three visible + overflow count, so an alert
-                   carrying 64 tags cannot blow out the row height. -->
               <template #cell-tags="{ row }">
-                <div v-if="row.tags?.length" class="flex flex-wrap items-center gap-1">
-                  <OTag
-                    v-for="tag in row.tags.slice(0, 3)"
-                    :key="tag"
-                    type="exampleChip"
-                    value="dim"
-                    :label="tag"
-                    :data-test="`alert-list-${row.name}-tag`"
-                  />
-                  <OTooltip v-if="row.tags.length > 3" :content="row.tags.join(', ')">
-                    <span class="text-text-secondary text-2xs">+{{ row.tags.length - 3 }}</span>
-                  </OTooltip>
-                </div>
+                <FitItems v-if="row.tags?.length" :items="row.tags">
+                  <template #default="{ item }">
+                    <OTag
+                      type="exampleChip"
+                      value="dim"
+                      class="max-w-full"
+                      :data-test="`alert-list-${row.name}-tag`"
+                    >
+                      <span class="truncate">{{ item }}</span>
+                    </OTag>
+                  </template>
+                  <template #more="{ count }">
+                    <OTooltip :content="row.tags.join(', ')">
+                      <span class="text-text-secondary text-2xs">+{{ count }}</span>
+                    </OTooltip>
+                  </template>
+                </FitItems>
                 <span v-else class="text-text-secondary">—</span>
               </template>
 
@@ -586,6 +604,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OSpinner size="xs" />
                   </div>
+                  <OTooltip
+                    v-else-if="anomalyRowLocked(row)"
+                    side="bottom"
+                    :content="anomalyLockedReason"
+                  >
+                    <span class="ms-1 inline-flex max-md:hidden">
+                      <OButton
+                        :data-row-action="row.enabled ? 'pause' : 'resume'"
+                        :data-test="`alert-list-${row.name}-pause-start-alert`"
+                        :aria-label="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                        variant="ghost"
+                        size="icon-sm"
+                        icon-left="lock"
+                        disabled
+                      />
+                    </span>
+                  </OTooltip>
                   <OButton
                     v-else
                     :data-row-action="row.enabled ? 'pause' : 'resume'"
@@ -602,7 +637,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :shortcut-id="row.enabled ? 'alertsRowPause' : undefined"
                     />
                   </OButton>
+                  <OTooltip
+                    v-if="rowAnomalyLocked(row)"
+                    side="bottom"
+                    :content="anomalyLockedReason"
+                  >
+                    <span class="inline-flex max-md:hidden">
+                      <OButton
+                        data-row-action="edit"
+                        :data-test="`alert-list-${row.name}-update-alert`"
+                        :aria-label="t('alerts.edit')"
+                        variant="ghost"
+                        size="icon-sm"
+                        icon-left="lock"
+                        disabled
+                      />
+                    </span>
+                  </OTooltip>
                   <OButton
+                    v-else
                     data-row-action="edit"
                     :data-test="`alert-list-${row.name}-update-alert`"
                     variant="ghost"
@@ -624,7 +677,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        with no way to find out why. -->
                   <span class="inline-flex max-md:hidden">
                     <OTooltip
-                      v-if="isSloRow(row)"
+                      v-if="anomalyRowLocked(row)"
+                      side="bottom"
+                      :content="anomalyLockedReason"
+                    />
+                    <OTooltip
+                      v-else-if="isSloRow(row)"
                       side="bottom"
                       :content="t('alerts.sloCloneDisabled')"
                     />
@@ -632,14 +690,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-row-action="duplicate"
                       variant="ghost"
                       size="icon-sm"
-                      icon-left="content-copy"
-                      :disabled="isSloRow(row)"
+                      :icon-left="anomalyRowLocked(row) ? 'lock' : 'content-copy'"
+                      :disabled="isSloRow(row) || anomalyRowLocked(row)"
                       :aria-label="isSloRow(row) ? t('alerts.sloCloneDisabled') : t('alerts.clone')"
                       @click.stop="duplicateAlert(row)"
                       :data-test="`alert-list-${row.name}-clone-alert`"
                     >
                       <OTooltip
-                        v-if="!isSloRow(row)"
+                        v-if="!isSloRow(row) && !anomalyRowLocked(row)"
                         side="bottom"
                         :content="t('alerts.clone')"
                         shortcut-id="alertsRowDuplicate"
@@ -678,43 +736,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                     <ODropdownItem
                       class="md:hidden"
-                      :disabled="!!alertStateLoadingMap[row.uuid]"
+                      :disabled="!!alertStateLoadingMap[row.uuid] || anomalyRowLocked(row)"
+                      :focusable-unavailable="anomalyRowLocked(row)"
+                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-pause-start-alert-menu`"
                       @select="toggleAlertState(row)"
                     >
                       <template #icon-left>
-                        <OIcon :name="row.enabled ? 'pause' : 'play-arrow'" size="sm" />
+                        <OIcon
+                          :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
+                          :name="
+                            anomalyRowLocked(row) ? 'lock' : row.enabled ? 'pause' : 'play-arrow'
+                          "
+                          size="sm"
+                        />
                       </template>
                       {{ row.enabled ? t("alerts.pause") : t("alerts.start") }}
                     </ODropdownItem>
                     <ODropdownItem
                       class="md:hidden"
+                      :disabled="rowAnomalyLocked(row)"
+                      :focusable-unavailable="rowAnomalyLocked(row)"
+                      :description="rowAnomalyLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-update-alert-menu`"
                       @select="editAlert(row)"
                     >
                       <template #icon-left>
-                        <OIcon name="edit" size="sm" />
+                        <OIcon
+                          :class="rowAnomalyLocked(row) ? 'lock-chip' : undefined"
+                          :name="rowAnomalyLocked(row) ? 'lock' : 'edit'"
+                          size="sm"
+                        />
                       </template>
                       {{ t("alerts.edit") }}
                     </ODropdownItem>
                     <ODropdownItem
                       class="md:hidden"
-                      :disabled="isSloRow(row)"
+                      :disabled="isSloRow(row) || anomalyRowLocked(row)"
+                      :focusable-unavailable="anomalyRowLocked(row)"
+                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-clone-alert-menu`"
                       @select="duplicateAlert(row)"
                     >
                       <template #icon-left>
-                        <OIcon name="content-copy" size="sm" />
+                        <OIcon
+                          :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
+                          :name="anomalyRowLocked(row) ? 'lock' : 'content-copy'"
+                          size="sm"
+                        />
                       </template>
                       {{ t("alerts.clone") }}
                     </ODropdownItem>
                     <ODropdownSeparator class="md:hidden" />
                     <ODropdownItem
+                      :disabled="anomalyRowLocked(row)"
+                      :focusable-unavailable="anomalyRowLocked(row)"
+                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-move-alert`"
                       @select="moveAlertToAnotherFolder(row)"
                     >
                       <template #icon-left>
-                        <OIcon name="drive-file-move" size="sm" />
+                        <OIcon
+                          :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
+                          :name="anomalyRowLocked(row) ? 'lock' : 'drive-file-move'"
+                          size="sm"
+                        />
                       </template>
                       {{ t("common.move") }}
                     </ODropdownItem>
@@ -730,7 +816,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("alerts.ack.acknowledge") }}
                       </ODropdownItem>
                     </template>
-                    <template v-if="downtimesEnabled">
+                    <template v-if="downtimesEnabled && !anomalyRowLocked(row)">
                       <ODropdownSeparator />
                       <template v-if="isAlertScopedMute(row) && row.active_downtime">
                         <MuteMenuItems
@@ -763,24 +849,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                     <ODropdownSeparator />
                     <ODropdownItem
+                      :disabled="anomalyRowLocked(row)"
+                      :focusable-unavailable="anomalyRowLocked(row)"
+                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-delete-alert`"
                       variant="destructive"
                       shortcut-id="alertsRowDelete"
                       @select="showDeleteDialogFn({ row })"
                     >
                       <template #icon-left>
-                        <OIcon name="delete" size="sm" />
+                        <OIcon
+                          :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
+                          :name="anomalyRowLocked(row) ? 'lock' : 'delete'"
+                          size="sm"
+                        />
                       </template>
                       {{ t("alerts.delete") }}
                     </ODropdownItem>
                     <ODropdownSeparator />
                     <ODropdownItem
+                      :disabled="anomalyRowLocked(row)"
+                      :focusable-unavailable="anomalyRowLocked(row)"
+                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-export-alert`"
                       shortcut-id="alertsRowExport"
                       @select="exportAlert(row)"
                     >
                       <template #icon-left>
-                        <OIcon size="sm" name="download" />
+                        <OIcon
+                          size="sm"
+                          :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
+                          :name="anomalyRowLocked(row) ? 'lock' : 'download'"
+                        />
                       </template>
                       {{ t("common.export") }}
                     </ODropdownItem>
@@ -788,20 +888,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Anomaly Detection: Trigger Detection + Re-train -->
                     <template v-if="row.type === 'anomaly'">
                       <ODropdownItem
+                        :disabled="anomalyLicenseLocked"
+                        :focusable-unavailable="anomalyLicenseLocked"
+                        :description="anomalyLicenseLocked ? anomalyLockedReason : undefined"
                         :data-test="`alert-list-${row.name}-trigger-detection`"
                         @select="triggerAlert(row)"
                       >
                         <template #icon-left>
-                          <OIcon size="sm" name="sound-sampler" />
+                          <OIcon
+                            size="sm"
+                            :class="anomalyLicenseLocked ? 'lock-chip' : undefined"
+                            :name="anomalyLicenseLocked ? 'lock' : 'sound-sampler'"
+                          />
                         </template>
                         {{ t("alerts.triggerDetection") }}
                       </ODropdownItem>
                       <ODropdownItem
+                        :disabled="anomalyLicenseLocked"
+                        :focusable-unavailable="anomalyLicenseLocked"
+                        :description="anomalyLicenseLocked ? anomalyLockedReason : undefined"
                         :data-test="`alert-list-${row.name}-retrain-anomaly`"
                         @select="retrainAnomaly(row)"
                       >
                         <template #icon-left>
-                          <OIcon size="sm" name="replay" />
+                          <OIcon
+                            size="sm"
+                            :class="anomalyLicenseLocked ? 'lock-chip' : undefined"
+                            :name="anomalyLicenseLocked ? 'lock' : 'replay'"
+                          />
                         </template>
                         {{ t("alerts.retrain") }}
                       </ODropdownItem>
@@ -1080,7 +1194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <ExportResourceDialog
       v-model:open="showExportDialog"
-      :items="alertsToExport"
+      :items="alertsJsonExport"
       :terraform="alertsTerraform"
       :title="
         t('alerts.exportDialogTitle', { count: alertsToExport.length }, alertsToExport.length)
@@ -1191,6 +1305,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import FitItems from "@/components/common/FitItems.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
@@ -1202,10 +1317,13 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { isAnomalyDataReadinessStatus } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import {
@@ -1256,6 +1374,7 @@ export default defineComponent({
     OUserCell,
     OTag,
     OTruncatedText,
+    FitItems,
     OStatStrip,
     CompositeReferencesDrawer,
     ExportResourceDialog,
@@ -1355,7 +1474,7 @@ export default defineComponent({
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = ref(false);
     const lastUpdatedAt = ref<number | null>(null);
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
     const oTableRef: any = ref(null);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
@@ -1484,9 +1603,13 @@ export default defineComponent({
     const anomalyDetectionEntitled = computed(
       () => store.state.zoConfig.build_type !== "opensource" && config.isEnterprise === "true",
     );
+    const { locked: anomalyLicenseLocked, lockedReason: anomalyLockedReason } =
+      useLicenseLock("anomaly_detection");
     const anomalyDetectionTabVisible = computed(
       () =>
-        !anomalyDetectionEntitled.value || store.state.zoConfig.anomaly_detection_enabled === true,
+        !anomalyDetectionEntitled.value ||
+        store.state.zoConfig.anomaly_detection_enabled === true ||
+        anomalyLicenseLocked.value,
     );
     const isAnomalyDetectionEnabled = computed(
       () =>
@@ -1498,7 +1621,11 @@ export default defineComponent({
     // Prevent forcing anomalyDetection tab when the feature is not available.
     const rawTab = (router.currentRoute.value.query.tab as string) || "all";
     const activeTab = ref(
-      rawTab === "anomalyDetection" && !isAnomalyDetectionEnabled.value ? "all" : rawTab,
+      rawTab === "anomalyDetection" &&
+        !isAnomalyDetectionEnabled.value &&
+        !anomalyLicenseLocked.value
+        ? "all"
+        : rawTab,
     );
 
     const filteredResults: Ref<any[]> = ref([]);
@@ -1513,6 +1640,9 @@ export default defineComponent({
       activeTab.value === "anomalyDetection"
         ? alertDrafts.savedAtVariant(ANOMALY_DRAFT_VARIANT)
         : alertDrafts.savedAt(null),
+    );
+    const anomalyTabLicenseLocked = computed(
+      () => activeTab.value === "anomalyDetection" && anomalyLicenseLocked.value,
     );
 
     // ── "Calm Signal" table helpers ─────────────────────────────────────────
@@ -1538,6 +1668,11 @@ export default defineComponent({
     // instead, and links there — which is also where it is edited (D1).
 
     const isSloRow = (row: any): boolean => isSloAlert(row);
+    const rowAnomalyLocked = (row: any): boolean =>
+      anomalyLicenseLocked.value && (row?.type === "anomaly" || isSloRow(row));
+    // Every action on an anomaly row calls the anomaly detection API; SLO alerts only edit through it.
+    const anomalyRowLocked = (row: any): boolean =>
+      anomalyLicenseLocked.value && row?.type === "anomaly";
 
     /** id -> name for every SLO in the org. `list_slos` is unpaginated and
      *  folder-agnostic when asked without a folder, so ONE call resolves every
@@ -1551,7 +1686,7 @@ export default defineComponent({
     let sloNamesLoaded = false;
 
     const ensureSloNames = (rows: any[]): void => {
-      if (sloNamesInFlight || sloNamesLoaded) return;
+      if (sloNamesInFlight || sloNamesLoaded || anomalyLicenseLocked.value) return;
       if (!rows?.some((row: any) => isSloRow(row))) return;
       // The org can legitimately be unset on the very first tick; throwing here
       // would surface as an unhandled error inside a watcher, from a lookup
@@ -1794,6 +1929,7 @@ export default defineComponent({
       "active" | "paused" | "failed" | "firing" | "acknowledged" | "recent" | null
     >(savedAlertListFilters.stateFilter);
     const displayedAlerts = computed(() => {
+      if (anomalyTabLicenseLocked.value) return [];
       const rows = filteredResults.value || [];
       const f = stateFilter.value;
       if (!f) return rows;
@@ -1835,7 +1971,7 @@ export default defineComponent({
           label: t("alerts.anomalyDetection"),
           value: "anomalyDetection",
           icon: "query-stats",
-          locked: !isAnomalyDetectionEnabled.value,
+          locked: anomalyLicenseLocked.value || !isAnomalyDetectionEnabled.value,
         });
       }
       return tabs;
@@ -2429,7 +2565,7 @@ export default defineComponent({
       } catch (error: any) {
         console.error(error);
         dismiss();
-        forbidden.value = error?.response?.status === 403;
+        forbidden.value = forbiddenState(error);
         if (!forbidden.value) {
           toast({
             variant: "error",
@@ -2538,6 +2674,10 @@ export default defineComponent({
       // OToggleGroup is controlled (`:model-value`), so refusing to advance
       // `activeTab` here is what keeps a locked tab from becoming active —
       // clicking it opens the upgrade dialog instead of switching.
+      if (tab === "anomalyDetection" && anomalyLicenseLocked.value) {
+        activeTab.value = tab;
+        return;
+      }
       if (tab === "anomalyDetection" && !isAnomalyDetectionEnabled.value) {
         openUpgradeDialog();
         return;
@@ -2908,6 +3048,7 @@ export default defineComponent({
     };
 
     const duplicateAlert = async (row: any) => {
+      if (anomalyRowLocked(row)) return;
       // SLO alerts are not clonable (D1). The dialog's first act is to demand a
       // stream type and name, which this family has none of — and a clone that
       // did succeed would be a creation path outside the SLO page that silently
@@ -3255,7 +3396,6 @@ export default defineComponent({
       // The editor reads the detail entry cache-first and a row patch cannot reach it; invalidated rather than removed so an in-flight editor read is not cancelled.
       void queryClient.invalidateQueries({
         queryKey: alertKeys.detail(org, id),
-        exact: true,
         refetchType: "none",
       });
     };
@@ -3306,8 +3446,9 @@ export default defineComponent({
         return next.length === cached.length ? undefined : next;
       });
       gone.forEach((id: string) =>
-        queryClient.removeQueries({ queryKey: alertKeys.detail(org, id), exact: true }),
+        queryClient.removeQueries({ queryKey: alertKeys.detail(org, id) }),
       );
+      queryClient.invalidateQueries({ queryKey: alertKeys.firing(org) });
 
       // The deletes that call this are direct service calls, so the anomaly scope has no mutation to drop it from.
       if (droppedAnomaly) queryClient.invalidateQueries({ queryKey: anomalyKeys.all(org) });
@@ -3361,6 +3502,7 @@ export default defineComponent({
       });
     };
     const showDeleteDialogFn = (props: any) => {
+      if (anomalyRowLocked(props?.row)) return;
       selectedDelete.value = props.row;
       confirmDelete.value = true;
     };
@@ -3414,6 +3556,7 @@ export default defineComponent({
     };
 
     const toggleAlertState = (row: any) => {
+      if (anomalyRowLocked(row)) return;
       alertStateLoadingMap.value[row.uuid] = true;
 
       // Two mutations, not one conditional invalidation: an anomaly row is also a config Overview renders.
@@ -3519,6 +3662,14 @@ export default defineComponent({
     const alertsTerraform = computed(() =>
       alertsToTerraform(alertsToExport.value, { folderId: activeFolderId.value }),
     );
+    // Destination names only exist in the source org; Terraform keeps them for re-applying to it.
+    const alertsJsonExport = computed(() =>
+      alertsToExport.value.map((alert) =>
+        alert.alert_type === "anomaly_detection"
+          ? { ...alert, alert_destinations: [] }
+          : { ...alert, destinations: [], recovery_destinations: [] },
+      ),
+    );
     const exportLoading = ref(false);
 
     // The /export endpoint strips runtime fields from anomaly configs and works
@@ -3536,7 +3687,7 @@ export default defineComponent({
     };
 
     const exportAlert = async (row: any) => {
-      if (exportLoading.value) return;
+      if (exportLoading.value || anomalyRowLocked(row)) return;
       exportLoading.value = true;
       try {
         const alert = await fetchAlertForExport(row.alert_id);
@@ -3566,6 +3717,7 @@ export default defineComponent({
     };
 
     const triggerAlert = async (row: any) => {
+      if (anomalyLicenseLocked.value && row?.type === "anomaly") return;
       try {
         const res = await alertsService.trigger_alert(
           store.state.selectedOrganization.identifier,
@@ -3581,7 +3733,9 @@ export default defineComponent({
                   variant: "warning",
                   message: res.data.message || t("alerts.messages.triggerAlertFailed"),
                 }
-              : { variant: "success", message: t("alerts.alertTriggeredSuccess") },
+              : res?.data?.warning
+                ? { variant: "warning", message: raw(res.data.warning) }
+                : { variant: "success", message: t("alerts.alertTriggeredSuccess") },
         );
         if (row.type === "anomaly") {
           await getAlertsFn(store, activeFolderId.value, "", true, "", true);
@@ -3596,6 +3750,7 @@ export default defineComponent({
     };
 
     const retrainAnomaly = async (row: any) => {
+      if (anomalyLicenseLocked.value) return;
       try {
         await retrainAnomalyAlert.mutateAsync(row.alert_id);
         row.status = "training";
@@ -3665,6 +3820,7 @@ export default defineComponent({
     };
 
     const editAlert = async (row: any) => {
+      if (rowAnomalyLocked(row)) return;
       // SLO alerts are authored on the SLO page: the generic editor has no way
       // to represent one (no stream, no query, a different condition), and
       // saving from it would either fail forever or strip the SLO wiring.
@@ -3708,6 +3864,7 @@ export default defineComponent({
     };
 
     const moveAlertToAnotherFolder = (row: any) => {
+      if (anomalyRowLocked(row)) return;
       showMoveAlertDialog.value = true;
       if (row.type === "anomaly") {
         selectedAlertToMove.value = [];
@@ -4031,6 +4188,9 @@ export default defineComponent({
                 : t("toastMessages.alerts.alertsPausedSuccessfully"),
           });
         }
+        queryClient.invalidateQueries({
+          queryKey: alertKeys.firing(store.state.selectedOrganization.identifier),
+        });
         // Refresh alerts
         await getAlertsFn(store, activeFolderId.value, "", true, "", true);
 
@@ -4145,6 +4305,7 @@ export default defineComponent({
           const org = String(store.state.selectedOrganization.identifier);
           const requested = selectedAlerts.value.map((row: AlertRowRef) => String(row?.alert_id));
           selectedAlerts.value = [];
+          queryClient.invalidateQueries({ queryKey: alertKeys.firing(org) });
           // Forced: the point of this branch is to hear it from the server, and an
           // unforced read inside staleTime answers from cache without asking.
           await getAlertsFn(store, activeFolderId.value, "", true, "", true);
@@ -4304,6 +4465,7 @@ export default defineComponent({
       alertStateLoadingMap,
       showRunOutcome,
       isMutedFiring,
+      isAnomalyDataReadinessStatus,
       isAckedFiring,
       canAcknowledgeRow,
       acknowledgeRow,
@@ -4337,6 +4499,7 @@ export default defineComponent({
       exportAlert,
       showExportDialog,
       alertsToExport,
+      alertsJsonExport,
       alertsTerraform,
       onExportDownloaded,
       triggerAlert,
@@ -4386,6 +4549,11 @@ export default defineComponent({
       config,
       isCompactToolbar,
       isAnomalyDetectionEnabled,
+      anomalyLicenseLocked,
+      anomalyLockedReason,
+      anomalyTabLicenseLocked,
+      rowAnomalyLocked,
+      anomalyRowLocked,
       refreshAlerts,
       onAlertTabChange,
       referenceDrawerOpen,

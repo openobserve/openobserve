@@ -161,7 +161,8 @@ export default defineComponent({
           });
         }
         templates.value = await queryClient.fetchQuery(options);
-      } catch {
+      } catch (error: unknown) {
+        if ((error as { response?: { status?: number } })?.response?.status === 403) return;
         toast({
           variant: "error",
           message: t("toastMessages.alerts.errorWhileFetchingTemplates"),
@@ -212,7 +213,7 @@ export default defineComponent({
     };
 
     onBeforeMount(() => {
-      // In parallel: the form needs destinations either way, and edit mode
+      // In parallel: the form needs destinations and templates either way, and edit mode
       // needs the alert. Sequencing them would make editing feel slower than
       // the list-hosted editor it replaces.
       void Promise.all([getDestinations(), getTemplates(), loadAlertForEdit()]);

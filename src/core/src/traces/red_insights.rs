@@ -34,8 +34,6 @@ const MIN_BUCKET_REQUESTS: u32 = 20;
 const NAME_SEPARATOR: &str = " · ";
 /// Alert names forbid `/`; U+2215 reads the same and the web strip maps it back.
 const NAME_SLASH: char = '\u{2215}';
-/// The enterprise custom-SQL check rejects these as substrings anywhere in the query.
-const DESTRUCTIVE_KEYWORDS: [&str; 4] = ["update", "delete", "drop", "insert"];
 /// Mirrors G4's `ERROR_VOCABULARY` in anomaly_detection.rs; the gated validator test pins it.
 const ERROR_VOCABULARY: [&str; 6] = ["error", "errors", "fatal", "critical", "5xx", "50x"];
 const KIND_PREDICATE: &str = "CAST(span_kind AS VARCHAR) IN ('2','5')";
@@ -191,6 +189,7 @@ impl DetectorTemplate {
             owner: None,
             priority: None,
             tags: self.tags,
+            template: None,
         }
     }
 }
@@ -322,10 +321,6 @@ pub fn template(
         signal,
         cols.has_parent,
     );
-    let lowered = custom_sql.to_lowercase();
-    if DESTRUCTIVE_KEYWORDS.iter().any(|k| lowered.contains(k)) {
-        return skip("the query would trip the destructive-keyword check");
-    }
     let (detection_function, detection_function_field, alert_direction) = match signal {
         RedSignal::Rate => ("count", None, "both"),
         RedSignal::ErrorRatio => ("count", None, "above"),
@@ -884,6 +879,7 @@ mod tests {
 
     #[test]
     fn template_skips_signals_the_engine_would_reject() {
+        // The engine parses the SQL, so a destructive word inside a name is not rejected.
         assert!(
             template(
                 "default",
@@ -891,9 +887,9 @@ mod tests {
                 RedSignal::Rate,
                 &ALL_COLS
             )
-            .is_none()
+            .is_some()
         );
-        assert!(template("dropzone", "svc", RedSignal::P95Latency, &ALL_COLS).is_none());
+        assert!(template("dropzone", "svc", RedSignal::P95Latency, &ALL_COLS).is_some());
         assert!(template("app-errors", "svc", RedSignal::Rate, &ALL_COLS).is_none());
         assert!(template("app-errors", "svc", RedSignal::ErrorRatio, &ALL_COLS).is_some());
         assert!(template("terror_logs", "svc", RedSignal::Rate, &ALL_COLS).is_some());
@@ -1223,8 +1219,8 @@ mod tests {
             prelude::{SessionConfig, SessionContext},
         };
         use search::datafusion::{
-            optimizer::physical_optimizer::aggregate_topk::AggregateTopkRule,
-            table_provider::empty_table::NewEmptyTable,
+            datasource::empty_table::NewEmptyTable,
+            physical_optimizer::aggregate_topk::AggregateTopkRule,
         };
 
         let schema = Arc::new(Schema::new(vec![
