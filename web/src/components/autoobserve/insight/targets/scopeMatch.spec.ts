@@ -41,8 +41,13 @@ const BATCH = {
 };
 const SCHEMA = ["_timestamp", "service_name", "level", "message"];
 
-const answer = (hits: Record<string, unknown>[]) =>
-  api.fetch.mockImplementation((_req: unknown, handlers: any) => {
+const ROW = [{ n: 1 }];
+
+// Answers the filtered probe and the unfiltered one separately, as the stream would.
+const answer = (filtered: Record<string, unknown>[], any: Record<string, unknown>[]) =>
+  api.fetch.mockImplementation((req: any, handlers: any) => {
+    const sql = b64DecodeUnicode(req.queryReq.query.sql) ?? "";
+    const hits = sql.includes(" WHERE ") ? filtered : any;
     handlers.data(null, { type: "search_response_hits", content: { results: { hits } } });
     handlers.complete();
   });
@@ -64,31 +69,37 @@ afterEach(() => {
 });
 
 describe("checkScopeMatch: a draft must match rows of its own stream", () => {
-  it("counts the stream's rows and those the draft's own filter keeps, in one query", () => {
-    expect(scopeMatchSql({ ...BATCH, schema: SCHEMA })).toBe(
-      `SELECT count(*) AS total, sum(CASE WHEN "service_name" = 'batchjobs' THEN 1 ELSE 0 END) AS matching FROM "batch_x1"`,
-    );
+  it("asks whether one row exists, filtered and then unfiltered, never counting the stream", () => {
+    const sql = scopeMatchSql({ ...BATCH, schema: SCHEMA });
+    expect(sql).toEqual({
+      filtered: `SELECT 1 AS n FROM "batch_x1" WHERE "service_name" = 'batchjobs' LIMIT 1`,
+      any: `SELECT 1 AS n FROM "batch_x1" LIMIT 1`,
+    });
+    for (const q of Object.values(sql!)) {
+      expect(q).toMatch(/ LIMIT 1$/);
+      expect(q).not.toMatch(/count\(|sum\(/i);
+    }
+  });
+
+  it("says match on the first filtered row and asks nothing more", async () => {
+    answer(ROW, ROW);
+    expect(await checkScopeMatch(ORG, { ...BATCH, schema: SCHEMA })).toBe("match");
+    expect(api.fetch).toHaveBeenCalledTimes(1);
+    expect(sentSql()).toContain(" WHERE ");
   });
 
   it("says none when the stream has rows but none carry the service (batchjobs on batch_x1)", async () => {
-    answer([{ total: 4168, matching: 0 }]);
+    answer([], ROW);
     expect(await checkScopeMatch(ORG, { ...BATCH, schema: SCHEMA })).toBe("none");
-    expect(sentSql()).toContain('FROM "batch_x1"');
+    expect(api.fetch).toHaveBeenCalledTimes(2);
+    expect(sentSql(1)).toBe(`SELECT 1 AS n FROM "batch_x1" LIMIT 1`);
     expect(knownMatch(ORG, BATCH)).toBe("none");
   });
 
   it("says quiet when the stream had no rows at all, so a no-data alert there stays (payments on pay_api)", async () => {
-    answer([{ total: 0 }]);
+    answer([], []);
     const pay = { ...BATCH, service: "payments", stream: { type: "logs", name: "pay_api" } };
     expect(await checkScopeMatch(ORG, { ...pay, schema: SCHEMA })).toBe("quiet");
-  });
-
-  it("sums partitions and says match when any row carries the service", async () => {
-    answer([
-      { total: 10, matching: 0 },
-      { total: 5, matching: 2 },
-    ]);
-    expect(await checkScopeMatch(ORG, { ...BATCH, schema: SCHEMA })).toBe("match");
   });
 
   it("answers null and keeps nothing when the read fails, so nothing is ruled out on a guess", async () => {
@@ -97,8 +108,19 @@ describe("checkScopeMatch: a draft must match rows of its own stream", () => {
     expect(knownMatch(ORG, BATCH)).toBeUndefined();
   });
 
+  it("answers null when only the unfiltered read fails", async () => {
+    api.fetch.mockImplementation((req: any, handlers: any) => {
+      const sql = b64DecodeUnicode(req.queryReq.query.sql) ?? "";
+      if (!sql.includes(" WHERE ")) return handlers.error();
+      handlers.data(null, { type: "search_response_hits", content: { results: { hits: [] } } });
+      handlers.complete();
+    });
+    expect(await checkScopeMatch(ORG, { ...BATCH, schema: SCHEMA })).toBeNull();
+    expect(knownMatch(ORG, BATCH)).toBeUndefined();
+  });
+
   it("reads each stream's fields once and asks once per scope", async () => {
-    answer([{ total: 4168, matching: 0 }]);
+    answer(ROW, ROW);
     const fields = vi.fn(async () => ({ names: SCHEMA, types: {} }));
     await probeScopes(ORG, [BATCH, { ...BATCH }], fields);
     await probeScopes(ORG, [BATCH], fields);
@@ -109,7 +131,7 @@ describe("checkScopeMatch: a draft must match rows of its own stream", () => {
 
 describe("the single Add alert refuses a draft that matches no rows", () => {
   it("blocks Save with the reason when the stream holds no row of the service", async () => {
-    answer([{ total: 4168, matching: 0 }]);
+    answer([], ROW);
     const own = {
       team: {
         name: "",
@@ -136,7 +158,7 @@ describe("the single Add alert refuses a draft that matches no rows", () => {
   });
 
   it("keeps the no-data draft on a stream that had no rows at all", async () => {
-    answer([{ total: 0 }]);
+    answer([], []);
     const own = {
       team: {
         name: "",

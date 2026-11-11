@@ -80,7 +80,7 @@ const answerFromStreams = () =>
   api.fetch.mockImplementation((req: any, handlers: any) => {
     const sql = b64DecodeUnicode(req.queryReq.query.sql) ?? "";
     const blind = sql.includes(`'batchjobs'`);
-    const hits = [{ total: 4168, matching: blind ? 0 : 4168 }];
+    const hits = blind && sql.includes(" WHERE ") ? [] : [{ n: 1 }];
     handlers.data(null, { type: "search_response_hits", content: { results: { hits } } });
     handlers.complete();
   });

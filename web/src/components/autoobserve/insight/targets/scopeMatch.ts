@@ -31,22 +31,16 @@ const running = new Map<string, Promise<ScopeMatch | null>>();
 
 const quoteStream = (name: string): string => `"${name.replace(/"/g, '""')}"`;
 
-const sumOf = (hits: Hit[], key: string): number =>
-  hits.reduce((sum, h) => {
-    const n = Number(h[key]);
-    return sum + (Number.isFinite(n) ? n : 0);
-  }, 0);
-
 /** The stream and service a draft is scoped to, the same before and after its fields are read. */
 export const scopeIdOf = (s: ServiceScope): string =>
   [s.stream.type, s.stream.name, s.service, s.cluster ?? "", s.namespace ?? ""].join("\n");
 
-/** One query counting the stream's rows and those the draft's filter keeps; null when it can't be filtered. */
-export const scopeMatchSql = (s: ServiceScope): string | null => {
+/** Two probes that stop at the first row: one the draft's filter keeps, then any; null when it can't be filtered. */
+export const scopeMatchSql = (s: ServiceScope): { filtered: string; any: string } | null => {
   const where = scopeWhereOf(s);
-  return where
-    ? `SELECT count(*) AS total, sum(CASE WHEN ${where} THEN 1 ELSE 0 END) AS matching FROM ${quoteStream(s.stream.name)}`
-    : null;
+  if (!where) return null;
+  const any = `SELECT 1 AS n FROM ${quoteStream(s.stream.name)}`;
+  return { filtered: `${any} WHERE ${where} LIMIT 1`, any: `${any} LIMIT 1` };
 };
 
 /** The kept answer for a draft's scope, read synchronously by the cards that count drafts. */
@@ -71,14 +65,21 @@ export const checkScopeMatch = (
   const key = `${org}\n${scopeIdOf(s)}`;
   const pending = running.get(key);
   if (pending && !signal) return pending;
+  const end = Date.now() * 1000;
+  const exists = (q: string): Promise<boolean | null> =>
+    readHits(org, s.stream.type, q, end, signal).then((hits: Hit[] | null) =>
+      hits ? hits.length > 0 : null,
+    );
   const read = Promise.resolve()
-    .then(() => readHits(org, s.stream.type, sql, Date.now() * 1000, signal))
-    .then((hits) => {
-      if (!hits) return null;
-      const total = sumOf(hits, "total");
-      const value: ScopeMatch =
-        total === 0 ? "quiet" : sumOf(hits, "matching") > 0 ? "match" : "none";
-      known.set(key, { value, at: Date.now() });
+    .then(async (): Promise<ScopeMatch | null> => {
+      const matched = await exists(sql.filtered);
+      if (matched === null) return null;
+      if (matched) return "match";
+      const any = await exists(sql.any);
+      return any === null ? null : any ? "none" : "quiet";
+    })
+    .then((value) => {
+      if (value) known.set(key, { value, at: Date.now() });
       return value;
     })
     .catch(() => null);

@@ -66,10 +66,9 @@ const answerFromStreams = () =>
     const stream = /FROM "([^"]+)"/.exec(sql)?.[1] ?? "";
     const service = /"service_name" = '([^']+)'/.exec(sql)?.[1] ?? "";
     const data = ROWS[stream] ?? { total: 0, matching: {} };
-    const hit = data.total
-      ? { total: data.total, matching: data.matching[service] ?? 0 }
-      : { total: 0 };
-    handlers.data(null, { type: "search_response_hits", content: { results: { hits: [hit] } } });
+    const rows = sql.includes(" WHERE ") ? (data.matching[service] ?? 0) : data.total;
+    const hits = rows ? [{ n: 1 }] : [];
+    handlers.data(null, { type: "search_response_hits", content: { results: { hits } } });
     handlers.complete();
   });
 
@@ -117,14 +116,17 @@ describe("the review never offers an alert that can't match its own stream", () 
 
   it("waits for the answer before anything can be added", async () => {
     let finish!: () => void;
-    api.fetch.mockImplementation((_req: unknown, handlers: any) => {
-      finish = () => {
+    api.fetch.mockImplementation((req: any, handlers: any) => {
+      const filtered = (b64DecodeUnicode(req.queryReq.query.sql) ?? "").includes(" WHERE ");
+      const reply = () => {
         handlers.data(null, {
           type: "search_response_hits",
-          content: { results: { hits: [{ total: 4168, matching: 0 }] } },
+          content: { results: { hits: filtered ? [] : [{ n: 1 }] } },
         });
         handlers.complete();
       };
+      if (filtered) finish = reply;
+      else reply();
     });
     openBulkReview({ kind: "no_data", rows: [noData("batchjobs", "batch_x1")] });
     const loading = loadReviewContext(ORG);
