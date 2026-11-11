@@ -20,6 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="step-content rounded-default bg-surface-overlay border-border-default h-full overflow-x-hidden overflow-y-auto border px-3 py-4"
     >
       <OForm :form="form">
+        <p
+          v-if="storedIntervals"
+          class="text-text-secondary mb-3 text-xs"
+          data-test="anomaly-retrain-note"
+        >
+          {{ t("alerts.anomaly.retrainOnEditNote") }}
+        </p>
         <!-- Query Mode Tabs -->
         <div class="mb-4">
           <OFormToggleGroup name="query_mode" data-test="anomaly-query-tabs">
