@@ -1936,7 +1936,12 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       role="status"
       data-test="synthetics-journey-replay-banner"
     >
-      <OIcon name="sync" size="sm" class="text-accent animate-spin" aria-hidden="true" />
+      <OIcon
+        name="sync"
+        size="sm"
+        class="text-accent o2-motion-keep animate-spin"
+        aria-hidden="true"
+      />
       <span class="text-text-body text-sm" data-test="synthetics-journey-replay-banner-text">
         {{ t("synthetics.journey.replaying") }}
       </span>
@@ -1957,7 +1962,12 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       role="status"
       data-test="synthetics-journey-stopping-banner"
     >
-      <OIcon name="sync" size="sm" class="text-text-secondary animate-spin" aria-hidden="true" />
+      <OIcon
+        name="sync"
+        size="sm"
+        class="text-text-secondary o2-motion-keep animate-spin"
+        aria-hidden="true"
+      />
       <span class="text-text-body text-sm" data-test="synthetics-journey-stopping-banner-text">
         {{ t("synthetics.journey.replayStopping") }}
       </span>

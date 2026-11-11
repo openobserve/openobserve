@@ -876,3 +876,60 @@ describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () =
     expect(header().exists()).toBe(false);
   });
 });
+
+describe("AlertDetail — first paint", () => {
+  let wrapper: VueWrapper;
+
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  const pendingAlert = () => {
+    let resolveAlert: (value: any) => void = () => {};
+    const alertRequest = new Promise((resolve) => {
+      resolveAlert = resolve;
+    });
+    return { alertRequest, resolveAlert: (alert: any) => resolveAlert({ data: alert }) };
+  };
+  const chart = () => wrapper.findComponent({ name: "AlertGroupChart" });
+  const tabs = () => wrapper.find('[data-test="alerts-alertdetail-tabs"]');
+  const banner = () => wrapper.find('[data-test="alerts-alertdetail-simple-grouped-banner"]');
+  const groupedButSimple = () => ({
+    ...makeSimpleAlert(),
+    query_condition: { aggregation: { group_by: ["host"], multi_alert: false } },
+  });
+
+  it("mounts the evaluation chart with no alert while the GET runs, ahead of the tabs", async () => {
+    const { alertRequest, resolveAlert } = pendingAlert();
+    wrapper = await mountView({ alertRequest });
+
+    expect(chart().exists()).toBe(true);
+    expect(chart().props("alert")).toBeNull();
+    expect(tabs().exists()).toBe(false);
+
+    resolveAlert(makeSimpleAlert());
+    await flushPromises();
+    expect(chart().props("alert")).toMatchObject({ name: "cpu-high" });
+    expect(tabs().exists()).toBe(true);
+  });
+
+  it("drops the held chart when the alert turns out to be an anomaly config", async () => {
+    const { alertRequest, resolveAlert } = pendingAlert();
+    wrapper = await mountView({ alertRequest });
+    expect(chart().exists()).toBe(true);
+
+    resolveAlert(makeAnomalyAlert());
+    await flushPromises();
+    expect(chart().exists()).toBe(false);
+  });
+
+  it("puts the grouped-but-simple banner below the tabs, so the tabs never move when it lands", async () => {
+    wrapper = await mountView({ alert: groupedButSimple() });
+
+    expect(banner().exists()).toBe(true);
+    expect(
+      tabs().element.compareDocumentPosition(banner().element) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+});

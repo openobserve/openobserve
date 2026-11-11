@@ -282,7 +282,8 @@ export class AlertSaveQueryModePage {
 
   async expectDetailConditionCountOnly() {
     const condition = this.page.locator(this.locators.detailCondition);
-    await expect(condition).toContainText('count >=');
+    // A Builder condition is a read-only input, so its text is the input's value; a query renders as a code block.
+    await expect(condition.locator('[data-test="alerts-alertconfigsummary-condition-input-field"]')).toHaveValue(/count >=/);
     await expect(condition).not.toContainText('SELECT');
   }
 

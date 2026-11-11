@@ -1718,7 +1718,10 @@ describe("Profiles page", () => {
       await wrapper.find('[data-test="profiles-type-select"] select').setValue("heap\u0000bytes");
       await flushPromises();
 
-      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test-stale="true"]').exists()).toBe(false);
+      await vi.waitFor(() =>
+        expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true),
+      );
       expect(wrapper.find('[data-test-stale="true"]').exists()).toBe(false);
     });
 

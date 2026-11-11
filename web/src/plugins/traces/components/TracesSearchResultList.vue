@@ -50,6 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data="hits"
                 :loading="loading"
                 :get-row-status-color="traceRowStatusColor"
+                :loading-reset-key="rowsKey"
+                :progress-line="false"
                 :active-row-index="activeRowIndex"
                 sorting="server"
                 :sort-by="props.sortBy"
@@ -539,7 +541,7 @@ const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
   }
 };
 
-const { searchObj, updatedLocalLogFilterField } = useTraces();
+const { searchObj, updatedLocalLogFilterField, loadLocalLogFilterField } = useTraces();
 const { buildColumns } = useTracesTableColumns();
 
 const timestampCol = computed(() => store.state.zoConfig.timestamp_column || "_timestamp");
@@ -549,9 +551,23 @@ const sortFieldMap = computed<Record<string, string>>(() => ({
   duration: "duration",
 }));
 
+// Rows of another stream or mode must never show under this one's columns, even dimmed.
+const rowsKey = computed(
+  () => `${searchObj.data.stream.selectedStream?.value ?? ""}|${props.searchMode ?? "traces"}`,
+);
+
 onMounted(() => {
   if (!searchObj.data.resultGrid.columns.length) {
-    searchObj.data.resultGrid.columns = buildColumns(false, "traces", DEFAULT_TRACE_COLUMNS.traces);
+    // The cold skeleton shows the current mode's columns, so they do not swap when rows land.
+    const mode = props.searchMode === "spans" ? "spans" : "traces";
+    loadLocalLogFilterField(mode);
+    searchObj.data.resultGrid.columns = buildColumns(
+      false,
+      mode,
+      searchObj.data.stream.selectedFields?.length
+        ? searchObj.data.stream.selectedFields
+        : DEFAULT_TRACE_COLUMNS[mode],
+    );
   }
 });
 

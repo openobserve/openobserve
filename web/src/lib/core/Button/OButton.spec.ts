@@ -4,6 +4,7 @@ import { defineComponent, h, nextTick, ref } from "vue";
 import OButton from "./OButton.vue";
 import { provideFeatureLock } from "@/composables/useFeatureLock";
 import type { ButtonVariant } from "./OButton.types";
+import { LOADER_DELAY_MS } from "@/lib/styles/motion";
 
 describe("OButton", () => {
   // --- Slots ---
@@ -110,8 +111,14 @@ describe("OButton", () => {
     expect(wrapper.attributes("disabled")).toBeDefined();
   });
 
-  it("sets the disabled attribute when loading prop is true", () => {
+  it("keeps a loading button focusable: aria-disabled, no native disabled", () => {
     const wrapper = mount(OButton, { props: { loading: true } });
+    expect(wrapper.attributes("disabled")).toBeUndefined();
+    expect(wrapper.attributes("aria-disabled")).toBe("true");
+  });
+
+  it("keeps the native disabled attribute for an explicitly disabled loading button", () => {
+    const wrapper = mount(OButton, { props: { loading: true, disabled: true } });
     expect(wrapper.attributes("disabled")).toBeDefined();
   });
 
@@ -440,8 +447,12 @@ describe("OButton", () => {
   // --- Loading ---
 
   // Regression: a child-mode OTooltip mounted mid-query anchored to an inline-flex wrapper that lost its box once loading ended, opening at (0,0)
-  it("keeps the slot wrapper display:contents while loading and only hides it", () => {
+  it("keeps the slot wrapper display:contents while loading and only hides it", async () => {
+    vi.useFakeTimers();
     const wrapper = mount(OButton, { props: { loading: true }, slots: { default: "Save" } });
+    vi.advanceTimersByTime(LOADER_DELAY_MS);
+    await nextTick();
+    vi.useRealTimers();
     const content = wrapper.find("span.contents");
     expect(content.exists()).toBe(true);
     expect(content.classes()).toContain("text-transparent");
@@ -456,6 +467,105 @@ describe("OButton", () => {
     const content = wrapper.find("span.contents");
     expect(content.exists()).toBe(true);
     expect(content.classes()).not.toContain("invisible");
+  });
+
+  describe("busy timing", () => {
+    afterEach(() => vi.useRealTimers());
+
+    it("is busy at once with its label kept, and shows no spinner yet", async () => {
+      vi.useFakeTimers();
+      const wrapper = mount(OButton, { props: { loading: true }, slots: { default: "Save" } });
+      await nextTick();
+      expect(wrapper.attributes("aria-busy")).toBe("true");
+      expect(wrapper.find(".animate-spin").exists()).toBe(false);
+      expect(wrapper.find("span.contents").classes()).not.toContain("text-transparent");
+      await wrapper.trigger("click");
+      expect(wrapper.emitted("click")).toBeUndefined();
+    });
+
+    it("shows the spinner once the load outlasts the loader delay", async () => {
+      vi.useFakeTimers();
+      const wrapper = mount(OButton, { props: { loading: true }, slots: { default: "Save" } });
+      await nextTick();
+      vi.advanceTimersByTime(LOADER_DELAY_MS - 1);
+      await nextTick();
+      expect(wrapper.find(".animate-spin").exists()).toBe(false);
+      vi.advanceTimersByTime(1);
+      await nextTick();
+      expect(wrapper.find(".animate-spin").exists()).toBe(true);
+      expect(wrapper.find(".animate-spin").classes()).toContain("o2-motion-keep");
+    });
+
+    it("keeps focus when a focused button turns busy", async () => {
+      const wrapper = mount(OButton, { slots: { default: "Pause" }, attachTo: document.body });
+      (wrapper.element as HTMLButtonElement).focus();
+      await wrapper.setProps({ loading: true });
+      expect(document.activeElement).toBe(wrapper.element);
+      expect(wrapper.attributes("aria-busy")).toBe("true");
+      wrapper.unmount();
+    });
+
+    it("blocks a busy submit button's default action and its Enter or Space keys", async () => {
+      const onSubmit = vi.fn((event: Event) => event.preventDefault());
+      const wrapper = mount(
+        {
+          render: () =>
+            h("form", { onSubmit }, [h(OButton, { type: "submit", loading: true }, () => "Save")]),
+        },
+        { attachTo: document.body },
+      );
+      const button = wrapper.get("button");
+      const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+      button.element.dispatchEvent(click);
+      expect(click.defaultPrevented).toBe(true);
+      expect(onSubmit).not.toHaveBeenCalled();
+      for (const key of ["Enter", " "]) {
+        const keydown = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+        button.element.dispatchEvent(keydown);
+        expect(keydown.defaultPrevented).toBe(true);
+      }
+      expect(wrapper.findComponent(OButton).emitted("click")).toBeUndefined();
+      wrapper.unmount();
+    });
+
+    it("looks unavailable while busy and returns to its variant after", async () => {
+      const wrapper = mount(OButton, { slots: { default: "Save" } });
+      await wrapper.setProps({ loading: true });
+      expect(wrapper.classes()).toContain("cursor-not-allowed!");
+      expect(wrapper.classes()).toContain("bg-button-primary-disabled");
+      await wrapper.setProps({ loading: false });
+      expect(wrapper.classes()).not.toContain("cursor-not-allowed!");
+      expect(wrapper.classes()).not.toContain("bg-button-primary-disabled");
+    });
+
+    it("never shows a spinner for a load shorter than the loader delay", async () => {
+      vi.useFakeTimers();
+      const wrapper = mount(OButton, { slots: { default: "Save" } });
+      await wrapper.setProps({ loading: true });
+      vi.advanceTimersByTime(200);
+      await wrapper.setProps({ loading: false });
+      vi.advanceTimersByTime(LOADER_DELAY_MS);
+      await nextTick();
+      expect(wrapper.find(".animate-spin").exists()).toBe(false);
+      expect(wrapper.attributes("aria-busy")).toBeUndefined();
+    });
+
+    it("with spinner off, stays busy and unavailable with its label shown but never spins", async () => {
+      vi.useFakeTimers();
+      const wrapper = mount(OButton, {
+        props: { loading: true, spinner: false },
+        slots: { default: "Save" },
+      });
+      vi.advanceTimersByTime(LOADER_DELAY_MS * 10);
+      await nextTick();
+      expect(wrapper.find(".animate-spin").exists()).toBe(false);
+      expect(wrapper.find("span.contents").classes()).not.toContain("text-transparent");
+      expect(wrapper.attributes("aria-busy")).toBe("true");
+      expect(wrapper.attributes("aria-disabled")).toBe("true");
+      expect(wrapper.classes()).toContain("cursor-not-allowed!");
+      await wrapper.trigger("click");
+      expect(wrapper.emitted("click")).toBeUndefined();
+    });
   });
 
   // --- data attributes ---

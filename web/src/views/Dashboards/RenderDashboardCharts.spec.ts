@@ -1685,3 +1685,79 @@ describe("RenderDashboardCharts", () => {
     });
   });
 });
+
+describe("RenderDashboardCharts lazy-mount placeholder (L-36)", () => {
+  const dashboard = {
+    dashboardId: "d1",
+    name: "D",
+    variables: { showDynamicFilters: true, list: [] },
+    tabs: [
+      {
+        tabId: "default",
+        name: "Default Tab",
+        panels: [
+          {
+            id: "panel-1",
+            title: "Inlet",
+            type: "line",
+            layout: { x: 0, y: 0, w: 6, h: 4, i: "panel-1" },
+            queries: [],
+          },
+        ],
+      },
+    ],
+  };
+  const mountCharts = (slots: Record<string, string> = {}) =>
+    shallowMount(RenderDashboardCharts, {
+      props: { viewOnly: true, dashboardData: dashboard, currentTimeObj: { __global: {} } },
+      slots,
+      global: { plugins: [i18n, store, router] },
+    });
+  const placeholder = (wrapper: any) =>
+    wrapper.find('[data-test="dashboard-panel-placeholder-panel-1"]');
+
+  beforeEach(() => {
+    store.state.selectedOrganization = { identifier: "test-org" };
+    store.state.printMode = false;
+  });
+
+  it("draws its own title and grey block when the host passes no placeholder", async () => {
+    const wrapper = mountCharts();
+    await flushPromises();
+    expect(placeholder(wrapper).classes().sort()).toEqual(
+      ["drag-cancel", "flex", "flex-col", "h-full", "p-2"].sort(),
+    );
+    expect(wrapper.find('[data-test="dashboard-placeholder-title-panel-1"]').exists()).toBe(true);
+    expect(placeholder(wrapper).find(".bg-surface-subtle").exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("draws the host's placeholder, with the panel and its title, in place of its own", async () => {
+    const wrapper = mountCharts({
+      "panel-placeholder": `<template #panel-placeholder="{ panel, title }"><b data-test="host-cell">{{ panel.id }}|{{ title }}</b></template>`,
+    });
+    await flushPromises();
+    expect(placeholder(wrapper).classes().sort()).toEqual(["drag-cancel", "h-full"]);
+    expect(placeholder(wrapper).find('[data-test="host-cell"]').text()).toBe("panel-1|Inlet");
+    expect(wrapper.find('[data-test="dashboard-placeholder-title-panel-1"]').exists()).toBe(false);
+    expect(placeholder(wrapper).find(".bg-surface-subtle").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("drops the host's placeholder once the panel mounts", async () => {
+    const io = installFakeIntersectionObserver({ autoVisible: true });
+    try {
+      const wrapper = mountCharts({
+        "panel-placeholder": `<b data-test="host-cell">cell</b>`,
+      });
+      await flushPromises();
+      await vi.waitFor(() => expect(wrapper.vm.shouldMountPanel("panel-1")).toBe(true));
+      await flushPromises();
+      expect(wrapper.find('[data-test="host-cell"]').exists()).toBe(false);
+      expect(placeholder(wrapper).exists()).toBe(false);
+      wrapper.unmount();
+    } finally {
+      io.restore();
+    }
+  });
+});
