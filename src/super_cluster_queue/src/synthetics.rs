@@ -747,11 +747,24 @@ mod tests {
         apply_last_check_status(&db, "org1", "check-1", &legacy)
             .await
             .unwrap();
-        assert!(!stored_streaks(&db).await.signed, "no hold may trust it");
-        let signed = infra::table::synthetics_checks::StatusStreaks {
+        let voided = stored_streaks(&db).await;
+        assert!(!voided.signed, "no hold may trust it");
+        // A signed copy with an older stamp than the moved one still reads as unsigned.
+        let stale = infra::table::synthetics_checks::StatusStreaks {
             run_ts: 300,
+            recovered_at: 0,
             signed: true,
             ..legacy
+        };
+        apply_last_check_status(&db, "org1", "check-1", &stale)
+            .await
+            .unwrap();
+        assert!(!stored_streaks(&db).await.signed);
+        // The next recovery on the producer finishes later and signs the row again.
+        let signed = infra::table::synthetics_checks::StatusStreaks {
+            run_ts: 400,
+            recovered_at: voided.recovered_at + 1,
+            ..stale
         };
         apply_last_check_status(&db, "org1", "check-1", &signed)
             .await
@@ -809,6 +822,40 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(stored_streaks(&db).await.recovered_at, after.recovered_at);
+    }
+
+    #[tokio::test]
+    async fn an_older_snapshot_with_the_same_run_cannot_sign_a_newer_stamp() {
+        let db = db_with_a_check(0).await;
+        // A late Up corrected the newest run: Up, stamp 900.
+        let corrected = infra::table::synthetics_checks::StatusStreaks {
+            last_check_status: 1,
+            up_runs: 1,
+            run_ts: 300,
+            run_class: 1,
+            recovered_at: 900,
+            signed: true,
+            ..Default::default()
+        };
+        apply_last_check_status(&db, "org1", "check-1", &corrected)
+            .await
+            .unwrap();
+        assert!(stored_streaks(&db).await.signed);
+        // The copy from before the correction arrives late: same run, Down, stamp 100.
+        let older = infra::table::synthetics_checks::StatusStreaks {
+            last_check_status: 3,
+            down_runs: 2,
+            up_runs: 0,
+            run_class: 3,
+            recovered_at: 100,
+            ..corrected
+        };
+        apply_last_check_status(&db, "org1", "check-1", &older)
+            .await
+            .unwrap();
+        let row = stored_streaks(&db).await;
+        assert_eq!((row.down_runs, row.recovered_at), (2, 900));
+        assert!(!row.signed, "a mark here must not arm stamp 900");
     }
 
     #[tokio::test]

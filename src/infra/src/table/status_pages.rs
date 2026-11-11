@@ -205,6 +205,7 @@ pub async fn get_check_states<C: ConnectionTrait>(
                         r.status_up_runs,
                         r.status_run_ts,
                         r.last_run_class,
+                        r.status_recovered_at,
                     ),
                 interval_secs,
                 created_at: r.created_at,

@@ -1257,6 +1257,7 @@ mod tests {
                         m.status_up_runs,
                         m.status_run_ts,
                         m.last_run_class,
+                        m.status_recovered_at,
                     ),
             },
             m.updated_at,

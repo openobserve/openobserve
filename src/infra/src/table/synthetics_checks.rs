@@ -992,16 +992,30 @@ pub struct StatusStreaks {
     pub signed: bool,
 }
 
-/// Signature of the streak columns. Every writer of this build stores it with them, and an
-/// older build changes the streaks without it, which [`StatusStreaks::signed`] detects. All zeros,
-/// as on a new check, signs to 0, which is the column default.
-pub fn streak_sig(down_runs: i32, up_runs: i32, run_ts: i64, run_class: i32) -> i64 {
-    if down_runs == 0 && up_runs == 0 && run_ts == 0 && run_class == 0 {
+/// Signature of the streak columns and the recovery stamp. Every writer of this build stores it
+/// with them, and an older build changes the streaks without it, which [`StatusStreaks::signed`]
+/// detects. The stamp is part of it, so streaks paired with a stamp from another snapshot (an older
+/// replicated copy after the stamp merge kept a newer stamp) read as unsigned. All zeros, as on a
+/// new check, signs to 0, which is the column default.
+pub fn streak_sig(
+    down_runs: i32,
+    up_runs: i32,
+    run_ts: i64,
+    run_class: i32,
+    recovered_at: i64,
+) -> i64 {
+    if down_runs == 0 && up_runs == 0 && run_ts == 0 && run_class == 0 && recovered_at == 0 {
         return 0;
     }
-    // FNV-1a over the four values: stable across builds and platforms.
+    // FNV-1a over the five values: stable across builds and platforms.
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    for v in [down_runs as i64, up_runs as i64, run_ts, run_class as i64] {
+    for v in [
+        down_runs as i64,
+        up_runs as i64,
+        run_ts,
+        run_class as i64,
+        recovered_at,
+    ] {
         for b in v.to_le_bytes() {
             h ^= u64::from(b);
             h = h.wrapping_mul(0x0100_0000_01b3);
@@ -1033,7 +1047,13 @@ const UNSIGNED: i64 = -1;
 
 impl StatusStreaks {
     fn sig(&self) -> i64 {
-        streak_sig(self.down_runs, self.up_runs, self.run_ts, self.run_class)
+        streak_sig(
+            self.down_runs,
+            self.up_runs,
+            self.run_ts,
+            self.run_class,
+            self.recovered_at,
+        )
     }
 }
 
@@ -1076,7 +1096,7 @@ pub async fn get_status_streaks<C: ConnectionTrait>(
             run_class_at,
             tested_at,
             recovered_at,
-            signed: sig == streak_sig(down_runs, up_runs, run_ts, run_class),
+            signed: sig == streak_sig(down_runs, up_runs, run_ts, run_class, recovered_at),
         },
     ))
 }
@@ -1122,7 +1142,7 @@ pub async fn lock_status_streaks<C: ConnectionTrait>(
             run_class_at,
             tested_at,
             recovered_at,
-            signed: sig == streak_sig(down_runs, up_runs, run_ts, run_class),
+            signed: sig == streak_sig(down_runs, up_runs, run_ts, run_class, recovered_at),
         },
     ))
 }
