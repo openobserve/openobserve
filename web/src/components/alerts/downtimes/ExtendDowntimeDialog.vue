@@ -109,8 +109,11 @@ const form = useOForm<ExtendForm>({
     if (!d || until === null) return;
     if (props.submit) {
       const outcome = await props.submit(until);
-      if (outcome !== "failed") emit("settled");
-      if (outcome === "ok") emit("update:open", false);
+      // A refusal leaves the row's version stale, so the dialog closes and the row refetches.
+      if (outcome !== "failed") {
+        emit("settled");
+        emit("update:open", false);
+      }
       return;
     }
     const result = await extend(d, { until });

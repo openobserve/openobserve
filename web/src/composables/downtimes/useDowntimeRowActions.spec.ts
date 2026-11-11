@@ -148,7 +148,7 @@ describe("useDowntimeRowActions", () => {
     expect(refetch).toHaveBeenCalled();
     vi.mocked(downtimes.extend).mockRejectedValue(httpError(403));
     expect(await api.extendUntil(4_102_448_400_000_000)).toBe("conflict");
-    expect(lastToast()?.message).toBe("You do not have permission to end this mute.");
+    expect(lastToast()?.message).toBe("Could not extend the downtime");
     refetch.mockRestore();
   });
 

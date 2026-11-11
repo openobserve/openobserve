@@ -66,7 +66,7 @@ export function useDowntimeRowActions() {
           handler: () => void router?.push(downtimeLink(downtime, orgId.value)),
         },
       });
-    } else if (status === 403) {
+    } else if (status === 403 && fallback === "cancel") {
       toast({ variant: "error", message: t("toastMessages.downtimes.noPermissionToEnd") });
     } else {
       const message =

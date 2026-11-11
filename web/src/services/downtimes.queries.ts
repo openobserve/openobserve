@@ -180,7 +180,6 @@ export const downtimeValuesQuery = (
 
 // ── Writes ──────────────────────────────────────────────────────────────────
 
-/** A downtime changes the Muted chip on every list it can cover. */
 /** Every list that shows a Muted chip, which a mute, an End or an Extend changes. */
 export const mutedListKeys = (org: string) => [
   downtimeKeys.all(org),

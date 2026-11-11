@@ -165,11 +165,11 @@ describe("ExtendDowntimeDialog with a row's own submit", () => {
     wrapper.unmount();
   });
 
-  it("stays open and refreshes its screen when the server refused", async () => {
+  it("closes and refreshes its screen when the server refused", async () => {
     const wrapper = await mountWith(vi.fn().mockResolvedValue("conflict"));
     await press();
     expect(wrapper.emitted("settled")).toHaveLength(1);
-    expect(wrapper.emitted("update:open")).toBeUndefined();
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
     wrapper.unmount();
   });
 
