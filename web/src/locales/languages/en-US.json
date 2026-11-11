@@ -15242,9 +15242,11 @@
       "checkCollector": "Check your collector"
     },
     "coverage": {
-      "line": "{on} of {matched} matched packs have alerts on.",
-      "setUp": "Set up {title}",
-      "turnOn": "Turn on {title} alerts"
+      "turnOn": "Turn on {title} alerts",
+      "silent": "{count} alert fired this week and notified nobody. It is set to in-app only. | {count} alerts fired this week and notified nobody. They are set to in-app only.",
+      "route": "Route alerts",
+      "fit": "{count} fit your data",
+      "install": "Install {count} alert | Install {count} alerts"
     },
     "notifies": {
       "nobody": "Nobody",

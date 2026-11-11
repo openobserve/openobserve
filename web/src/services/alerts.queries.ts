@@ -79,10 +79,11 @@ export const alertsListQuery = (
     staleTime: LIVE_STALE_TIME,
   });
 
-export const alertsByTagsQuery = (org: string, tags: string[]) =>
+export const alertsByTagsQuery = (org: string, tags: string[], withDestinations = false) =>
   queryOptions({
-    queryKey: alertKeys.byTags(org, tags),
-    queryFn: async (): Promise<any[]> => (await alerts.listByTags(org, tags)).data?.list ?? [],
+    queryKey: [...alertKeys.byTags(org, tags), withDestinations],
+    queryFn: async (): Promise<any[]> =>
+      (await alerts.listByTags(org, tags, withDestinations)).data?.list ?? [],
     staleTime: LIVE_STALE_TIME,
   });
 

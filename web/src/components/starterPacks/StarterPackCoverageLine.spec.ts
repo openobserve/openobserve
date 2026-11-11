@@ -24,7 +24,7 @@ const fake = vi.hoisted(() => ({
   metrics: ["kube_pod_status_phase", "system_cpu_time"],
   matchPack: vi.fn(),
   installs: {} as Record<string, Array<{ status: string }>>,
-  alerts: {} as Record<string, Array<{ enabled: boolean }>>,
+  alerts: {} as Record<string, Array<Record<string, unknown>>>,
   push: vi.fn(() => Promise.resolve()),
 }));
 
@@ -44,6 +44,11 @@ vi.mock("@/composables/starterPacks/useInstallRecords", () => ({
     },
   }),
 }));
+vi.mock("@/composables/starterPacks/useStarterPackFlow", async () => {
+  const { fakeFlow } = await import("./starterPackTestFlow");
+  const flow = fakeFlow();
+  return { useStarterPackFlow: () => flow };
+});
 vi.mock("@/composables/query/readQuery", () => ({
   readQuery: async (options: { queryKey: unknown[] }) => {
     const tag = JSON.stringify(options.queryKey).match(/pack:([a-z]+)/)?.[1] ?? "";
@@ -56,7 +61,7 @@ import StarterPackCoverageLine from "./StarterPackCoverageLine.vue";
 const mountLine = async (refreshKey = "a") => {
   const wrapper = mount(StarterPackCoverageLine, {
     props: { org: "org", refreshKey },
-    global: { plugins: [i18n, store] },
+    global: { plugins: [i18n, store], stubs: { StarterPackDrawer: true } },
   });
   await flushPromises();
   return wrapper;
@@ -72,6 +77,11 @@ describe("StarterPackCoverageLine", () => {
     fake.matchPack.mockReset();
     fake.matchPack.mockImplementation(async (_org: string, pack: { id: string }) => ({
       ready: !!fake.ready[pack.id],
+      alerts: new Map([
+        ["a", true],
+        ["b", true],
+        ["c", false],
+      ]),
     }));
     fake.push.mockClear();
   });
@@ -81,32 +91,49 @@ describe("StarterPackCoverageLine", () => {
     expect(wrapper.find('[data-test="starter-pack-coverage-line"]').exists()).toBe(false);
   });
 
-  it("links a matched pack that is not installed to its page", async () => {
+  it("offers a matched pack that is not installed with its fit count", async () => {
     fake.ready = { kubernetes: true };
     const wrapper = await mountLine();
-    expect(wrapper.find('[data-test="starter-pack-coverage-line"]').text()).toContain(
-      "0 of 1 matched packs have alerts on.",
+    expect(wrapper.find('[data-test="starter-pack-coverage-fit-kubernetes"]').text()).toBe(
+      "2 fit your data",
     );
+    expect(wrapper.find('[data-test="starter-pack-coverage-install-kubernetes"]').text()).toBe(
+      "Install 2 alerts",
+    );
+    expect(wrapper.find('[data-test="starter-pack-coverage-see-kubernetes"]').exists()).toBe(true);
+  });
+
+  it("links an installed pack with every alert off to its page", async () => {
+    fake.ready = { kubernetes: true, hosts: true };
+    fake.installs = { kubernetes: [{ status: "complete" }], hosts: [{ status: "complete" }] };
+    fake.alerts = { kubernetes: [{ enabled: false }], hosts: [{ enabled: true }] };
+    const wrapper = await mountLine();
     const link = wrapper.find('[data-test="starter-pack-coverage-link-kubernetes"]');
-    expect(link.text()).toContain("Set up");
+    expect(link.text()).toContain("Turn on");
+    expect(wrapper.find('[data-test="starter-pack-coverage-row-hosts"]').exists()).toBe(false);
     await link.trigger("click");
     expect(fake.push).toHaveBeenCalledWith(
       expect.objectContaining({ name: "starterPack", params: { pack: "kubernetes" } }),
     );
   });
 
-  it("counts an installed pack with every alert off as not covered", async () => {
-    fake.ready = { kubernetes: true, hosts: true };
-    fake.installs = { kubernetes: [{ status: "complete" }], hosts: [{ status: "complete" }] };
-    fake.alerts = { kubernetes: [{ enabled: false }], hosts: [{ enabled: true }] };
+  it("warns when pack alerts fired this week with no destination", async () => {
+    fake.ready = { kubernetes: true };
+    fake.installs = { kubernetes: [{ status: "complete" }] };
+    const now = Date.now() * 1000;
+    fake.alerts = {
+      kubernetes: [
+        { enabled: true, last_triggered_at: now },
+        { enabled: true, last_triggered_at: now, destinations: ["chat"] },
+        { enabled: true, last_triggered_at: now - 8 * 24 * 3_600_000_000 },
+      ],
+    };
     const wrapper = await mountLine();
-    expect(wrapper.find('[data-test="starter-pack-coverage-line"]').text()).toContain(
-      "1 of 2 matched packs have alerts on.",
+    expect(wrapper.find('[data-test="starter-pack-coverage-silent"]').text()).toContain(
+      "1 alert fired this week and notified nobody.",
     );
-    expect(wrapper.find('[data-test="starter-pack-coverage-link-kubernetes"]').text()).toContain(
-      "Turn on",
-    );
-    expect(wrapper.find('[data-test="starter-pack-coverage-link-hosts"]').exists()).toBe(false);
+    await wrapper.find('[data-test="starter-pack-coverage-route-btn"]').trigger("click");
+    expect(fake.push).toHaveBeenCalledWith(expect.objectContaining({ name: "alertDestinations" }));
   });
 
   it("skips the full match for a pack without a signal stream", async () => {
@@ -119,10 +146,8 @@ describe("StarterPackCoverageLine", () => {
     fake.ready = { kubernetes: true, hosts: true };
     fake.failing = "kubernetes";
     const wrapper = await mountLine();
-    expect(wrapper.find('[data-test="starter-pack-coverage-line"]').text()).toContain(
-      "0 of 1 matched packs have alerts on.",
-    );
-    expect(wrapper.find('[data-test="starter-pack-coverage-link-hosts"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="starter-pack-coverage-row-kubernetes"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="starter-pack-coverage-row-hosts"]').exists()).toBe(true);
   });
 
   it("recounts when the list reports a toggle, without matching again", async () => {
@@ -133,9 +158,7 @@ describe("StarterPackCoverageLine", () => {
     fake.alerts = { kubernetes: [{ enabled: true }] };
     await wrapper.setProps({ refreshKey: "a1:true" });
     await flushPromises();
-    expect(wrapper.find('[data-test="starter-pack-coverage-line"]').text()).toContain(
-      "1 of 1 matched packs have alerts on.",
-    );
+    expect(wrapper.find('[data-test="starter-pack-coverage-line"]').exists()).toBe(false);
     expect(fake.matchPack).toHaveBeenCalledTimes(2);
   });
 });
