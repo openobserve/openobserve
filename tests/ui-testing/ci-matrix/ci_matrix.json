@@ -403,7 +403,8 @@
       "logs-query-editor-keyboard.spec.js",
       "logsCrossLinks.spec.js",
       "logsFieldValuePaging.spec.js",
-      "logsFreeText.spec.js"
+      "logsFreeText.spec.js",
+      "logsFilterBuilder.spec.js"
     ],
     "disabled": [
       {
@@ -611,7 +612,8 @@
       "traceQueryEditor.spec.js",
       "traces-autocomplete-suggestions.spec.js",
       "traces-autocomplete-filter-mode.spec.js",
-      "traceDetails.spec.js"
+      "traceDetails.spec.js",
+      "tracesFilterBuilder.spec.js"
     ],
     "disabled": []
   },
