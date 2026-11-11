@@ -58,6 +58,7 @@ const {
 const {
   createOrgUser,
   createOrgUsers,
+  loginAs,
   oncallUserEmail,
   getConfigRisks,
 } = require('../utils/oncall-seed-ext.js');
@@ -414,4 +415,30 @@ test.describe('On-call team staffing', {
       .toBeTruthy();
   });
 
+  test('UN-04 with no provider the chips give the reason, my own row adds where to fix it, and nothing is red', {
+    tag: ['@P1'],
+  }, async ({ page, browser }, testInfo) => {
+    const prefix = uniqueName(`${workerPrefix(testInfo)}_tel_chips`);
+    const [me, mate] = await createOrgUsers(page, prefix, 2);
+    const team = await createTeam(page, { name: `${prefix}_team` });
+    await addTeamMembers(page, team.id, [me, mate]);
+
+    // A seeded person rather than root, whose reserved-domain address would rightly read red.
+    const session = await loginAs(browser, { email: me });
+    try {
+      const screens = new PageManager(session.page);
+      await screens.oncallTeamDetailPage.goto(ORG, team.id, 'members');
+      testLogger.info('Expect a phone reason on every chip, and the fix on my own row (S1, U5, guide 6.1)');
+      // o2-enterprise#3420 UN-04: S1 lists both sentences with no order, so either passes and the exact wording is pytest L-02's.
+      await screens.oncallMinePage.expectChipLinksToMine(
+        me, 'sms', /^(no phone on file|no phone provider for this organisation)\. Add your phone on My on-call$/,
+      );
+      // reka repeats the tooltip's text in a hidden node, so the words can legitimately appear twice.
+      await screens.oncallMinePage.expectChipDoesNotLink(mate, 'sms', /^(no phone on file|no phone provider for this organisation)\1?$/);
+      await screens.oncallMinePage.expectReachableByEmailAndNotRed(me);
+      await screens.oncallMinePage.expectReachableByEmailAndNotRed(mate);
+    } finally {
+      await session.context.close();
+    }
+  });
 });

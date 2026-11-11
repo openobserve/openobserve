@@ -172,7 +172,8 @@ vi.mock("@/lib/overlay/Drawer/ODrawer.vue", async () => {
 
 import SecurityEvents from "./SecurityEvents.vue";
 
-const OKTA_ROWS = Array.from({ length: 50 }, (_, i) =>
+// Paging is asserted on the request, so a few rows stand in for a page and keep each table render cheap.
+const OKTA_ROWS = Array.from({ length: 5 }, (_, i) =>
   oktaEvent({ _timestamp: Date.now() * 1000 - i * 1_000_000, actor_alternateid: `u${i}@acme.io` }),
 );
 const OKTA_FIELDS = Object.keys(oktaEvent());
