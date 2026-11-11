@@ -115,6 +115,7 @@ test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipeline
     });
 
     test("Import Scheduled Pipeline from URL, download and delete imported pipeline", async ({ page }) => {
+        test.fail(process.env["ORGNAME"] !== "default", "#16694: import keeps remote_stream nodes in the fixture's default org, so it never validates in another org");
         const randomPipeline = `scheurl${Math.floor(Math.random() * 1000)}`;
         const randomFirstFunction = `first${Math.floor(Math.random() * 1000)}`;
         const randomPipelineDestination = `destination${Math.floor(Math.random() * 1000)}`;
@@ -149,6 +150,7 @@ test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipeline
     });
 
     test("Import Scheduled Pipeline from JSON file, download and delete imported pipeline", async ({ page }) => {
+        test.fail(process.env["ORGNAME"] !== "default", "#16694: import keeps remote_stream nodes in the fixture's default org, so it never validates in another org");
         const randomPipeline = `schefile${Math.floor(Math.random() * 1000)}`;
         const randomFirstFunction = `first${Math.floor(Math.random() * 1000)}`;
         const randomPipelineDestination = `destination${Math.floor(Math.random() * 1000)}`;

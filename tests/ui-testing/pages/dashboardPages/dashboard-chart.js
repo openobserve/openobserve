@@ -3,6 +3,7 @@
 
 const { expect } = require("@playwright/test");
 const testLogger = require("../../playwright-tests/utils/test-logger.js");
+import { answerPanelDraftRestore } from "./panel-leave-dialog.js";
 
 export default class ChartTypeSelector {
   constructor(page) {
@@ -308,9 +309,23 @@ export default class ChartTypeSelector {
     testLogger.info(`selectStream: stream missing from the cached list, reloading the panel editor (chart=${chartType}, streamType=${streamType})`);
     await this.page.reload({ waitUntil: "domcontentloaded" });
     await this.page.locator('[data-test="index-dropdown-stream"]').waitFor({ state: "visible", timeout: 30000 });
+    // The unload flushes the panel draft, so the reloaded editor opens "Unsaved panel draft" over itself; start fresh and re-pick below.
+    if (await this.hasPanelDraftForThisEditor()) {
+      const answered = await answerPanelDraftRestore(this.page, { choice: "fresh", timeout: 15000 });
+      if (!answered) throw new Error("Panel draft restore dialog did not open after reloading the panel editor");
+    }
     if (chartType) await this.selectChartType(chartType);
     if (streamType) await this.selectStreamType(streamType);
     return true;
+  }
+
+  async hasPanelDraftForThisEditor() {
+    const url = new URL(this.page.url());
+    const suffix = `:${url.searchParams.get("dashboard")}:${url.searchParams.get("panelId") || "new"}`;
+    return this.page.evaluate(
+      (keySuffix) => Object.keys(localStorage).some((key) => key.startsWith("o2_panel_draft:") && key.endsWith(keySuffix)),
+      suffix,
+    );
   }
 
   // Search field and added for X, Y,Breakdown etc.
