@@ -24,16 +24,20 @@ use super::{
 };
 use crate::alerts::notifications::{NotificationContext, resolve::RenderedContent};
 
-/// Body only: other surfaces hold raw values, and parsing them as markdown drops characters such as
-/// `>`.
+/// Body only: other surfaces hold raw values, which a markdown parse would cut, such as `>`.
 fn card_text(s: &str) -> String {
     markdown_to_plaintext(s)
+}
+
+/// A raw value in markdown-capable card text, with link brackets escaped so it cannot hide a URL.
+fn card_raw(s: &str) -> String {
+    s.replace('[', "\\[").replace(']', "\\]")
 }
 
 pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext) -> Value {
     let mut body: Vec<Value> = vec![json!({
         "type": "TextBlock",
-        "text": c.title,
+        "text": card_raw(&c.title),
         "weight": "Bolder",
         "size": "Large",
         "wrap": true,
@@ -50,7 +54,7 @@ pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext
         let facts: Vec<Value> = c
             .fields
             .iter()
-            .map(|(t, v)| json!({"title": t, "value": v}))
+            .map(|(t, v)| json!({"title": card_raw(t), "value": card_raw(v)}))
             .collect();
         body.push(json!({"type": "FactSet", "facts": facts}));
     }
@@ -59,7 +63,7 @@ pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext
         if !lines.is_empty() {
             body.push(json!({
                 "type": "TextBlock",
-                "text": lines.join("\n\n"),
+                "text": lines.iter().map(|l| card_raw(l)).collect::<Vec<_>>().join("\n\n"),
                 "wrap": true,
             }));
         }
@@ -69,7 +73,7 @@ pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext
             .iter()
             .map(|row| {
                 row.iter()
-                    .map(|(k, v)| format!("{k}: {v}"))
+                    .map(|(k, v)| format!("{}: {}", card_raw(k), card_raw(v)))
                     .collect::<Vec<_>>()
                     .join(" · ")
             })

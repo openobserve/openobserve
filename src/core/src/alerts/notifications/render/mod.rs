@@ -1366,11 +1366,11 @@ mod tests {
             ..Default::default()
         };
 
-        let card = |format| {
-            let content = resolve_content(&spec(format), &ctx, "teams");
-            teams::render_teams_adaptive_card(&content, &ctx)["attachments"][0]["content"].clone()
+        let card = |format, ctx: &NotificationContext| {
+            let content = resolve_content(&spec(format), ctx, "teams");
+            teams::render_teams_adaptive_card(&content, ctx)["attachments"][0]["content"].clone()
         };
-        let formatted = card(Some("{op} {v}"));
+        let formatted = card(Some("{op} {v}"), &ctx);
         let body = formatted["body"].as_array().unwrap();
         assert_eq!(body[0]["text"], ">= 80");
         let facts = body.iter().find(|b| b["type"] == "FactSet").unwrap();
@@ -1379,9 +1379,18 @@ mod tests {
         assert_eq!(body.last().unwrap()["text"], ">= 80");
         assert_eq!(formatted["actions"][0]["title"], ">= link");
 
-        let unformatted = card(None);
+        let unformatted = card(None, &ctx);
         let rows = unformatted["body"].as_array().unwrap().last().unwrap();
         assert_eq!(rows["text"], "op: >= · v: 80");
+
+        ctx.rows = vec![
+            serde_json::from_str(r#"{"op":"[View](https://evil.example)","v":"80"}"#).unwrap(),
+        ];
+        let linked = card(Some("{op} {v}"), &ctx);
+        assert_eq!(
+            linked["body"].as_array().unwrap().last().unwrap()["text"],
+            r"\[View\](https://evil.example) 80"
+        );
     }
 
     #[test]

@@ -136,8 +136,7 @@ fn next_placeholder(tpl: &str, mut cursor: usize) -> Option<(usize, usize, bool)
                         Some(decoded) => decoded,
                         None => break,
                     },
-                    // A raw quote ends the enclosing JSON string, so the `\"` argument never
-                    // closed.
+                    // A raw quote ends the JSON string, so the `\"` argument is unclosed.
                     '"' if quote.json => break,
                     ch => ch,
                 };
@@ -178,8 +177,7 @@ fn read_json_escape(chars: &mut impl Iterator<Item = (usize, char)>) -> Option<c
         'u' => {
             let hex: String = chars.take(4).map(|(_, c)| c).collect();
             let code = (hex.len() == 4).then(|| u32::from_str_radix(&hex, 16).ok())??;
-            // A lone surrogate half is neither a quote nor a backslash, which is all the scan
-            // needs.
+            // A lone surrogate half is neither a quote nor a backslash, so it cannot end the scan.
             char::from_u32(code).unwrap_or(char::REPLACEMENT_CHARACTER)
         }
         'n' => '\n',
