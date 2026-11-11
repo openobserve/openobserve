@@ -540,7 +540,7 @@ export default class DashboardCreate {
 
     // Wait for panel editor to be ready
     await this.page.locator('[data-test="dashboard-apply"]').or(
-      this.page.locator('[data-test^="selected-chart-"]').first()
+      this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]').first()
     ).first().waitFor({ state: "visible", timeout: 15000 });
   }
 
@@ -571,7 +571,7 @@ export default class DashboardCreate {
 
     // Wait for panel editor to be ready
     await this.page.locator('[data-test="dashboard-apply"]').or(
-      this.page.locator('[data-test^="selected-chart-"]').first()
+      this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]').first()
     ).first().waitFor({ state: "visible", timeout: 15000 });
   }
 
@@ -607,7 +607,7 @@ export default class DashboardCreate {
 
     // Wait for panel editor to be ready
     await this.page.locator('[data-test="dashboard-apply"]').or(
-      this.page.locator('[data-test^="selected-chart-"]').first()
+      this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]').first()
     ).first().waitFor({ state: "visible", timeout: 15000 });
   }
 

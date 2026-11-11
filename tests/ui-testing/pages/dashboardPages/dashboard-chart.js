@@ -143,9 +143,24 @@ export default class ChartTypeSelector {
     return this.page.locator('[data-test="o-field-list-search-field"]');
   }
 
-  // Returns the "selected chart type" indicator item (e.g. pie, donut)
+  // Returns a row of the chart-type list (only in the DOM while the list is open)
   getSelectedChartItem(chartType) {
     return this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
+  }
+
+  // The Chart type select; its data-test-selected-value is the panel's chart type
+  getChartTypeSelect() {
+    return this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]:visible').first();
+  }
+
+  // Opens the chart-type list from the Chart type select unless the row is already showing
+  async openChartTypeList(chartType) {
+    const chartOption = this.getSelectedChartItem(chartType);
+    if (!(await chartOption.isVisible().catch(() => false))) {
+      await this.getChartTypeSelect().click();
+    }
+    await chartOption.waitFor({ state: "visible", timeout: 15000 });
+    return chartOption;
   }
 
   // Sankey builder layout areas
@@ -185,7 +200,7 @@ export default class ChartTypeSelector {
     // Wait for panel editor to be ready - could be full page or dialog
     // Look for either the Apply button or any chart type selector
     const panelEditorIndicator = this.page.locator('[data-test="dashboard-apply"]').or(
-      this.page.locator('[data-test^="selected-chart-"]').first()
+      this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]').first()
     );
 
     // Wait for panel editor to be visible with retry
@@ -197,10 +212,7 @@ export default class ChartTypeSelector {
       await panelEditorIndicator.first().waitFor({ state: "visible", timeout: 10000 });
     }
 
-    const chartOption = this.page.locator(
-      `[data-test="selected-chart-${chartType}-item"]`
-    );
-    await chartOption.waitFor({ state: "visible", timeout: 15000 });
+    const chartOption = await this.openChartTypeList(chartType);
     await chartOption.scrollIntoViewIfNeeded();
     await chartOption.click();
   }

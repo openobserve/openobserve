@@ -780,14 +780,14 @@ export default class DashboardVariablesScoped {
   }
 
   /**
-   * Wait for the panel editor to open (chart type item OR apply button visible)
+   * Wait for the panel editor to open (chart type select OR apply button visible)
    * @param {Object} options - Wait options
    * @param {number} options.timeout - Timeout in ms (default: 15000)
    */
   async waitForPanelEditorOpen(options = {}) {
     const { timeout = 15000 } = options;
     await this.page
-      .locator(SELECTORS.CHART_LINE_ITEM)
+      .locator(SELECTORS.CHART_TYPE_SELECT)
       .or(this.page.locator(SELECTORS.APPLY_BTN))
       .first()
       .waitFor({ state: "visible", timeout });

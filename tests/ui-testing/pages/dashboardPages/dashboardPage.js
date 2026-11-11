@@ -145,6 +145,7 @@ export class DashboardPage {
 
     // Custom chart locators
     this.customChartItem = page.locator('[data-test="selected-chart-custom_chart-item"]');
+    this.chartTypeSelect = page.locator('[data-test="dashboard-addpanel-chart-type-select"]');
     this.markdownEditor = page.locator('[data-test="dashboard-markdown-editor-query-editor"]');
 
     // Custom chart validation: the error surfaces inside an OTooltip on the
@@ -546,6 +547,15 @@ export class DashboardPage {
     }
   }
 
+  // Opens the chart-type list from the Chart type select unless the row is already showing
+  async openChartTypeList(chartItem) {
+    if (!(await chartItem.isVisible().catch(() => false))) {
+      await this.chartTypeSelect.first().waitFor({ state: 'visible', timeout: 10000 });
+      await this.chartTypeSelect.first().click();
+    }
+    await chartItem.waitFor({ state: 'visible', timeout: 10000 });
+  }
+
   async addCustomChart(dashboardName = "Customcharts") {
     await this.dashboardsMenuItem.waitFor({ state: 'visible', timeout: 10000 });
     await this.dashboardsMenuItem.click();
@@ -583,7 +593,7 @@ export class DashboardPage {
     // Add panel and select custom chart
     await this.addPanelBtn.waitFor({ state: 'visible', timeout: 15000 });
     await this.addPanelBtn.click();
-    await this.customChartItem.waitFor({ state: 'visible', timeout: 10000 });
+    await this.openChartTypeList(this.customChartItem);
     await this.customChartItem.click();
 
     // Clear Monaco editor content

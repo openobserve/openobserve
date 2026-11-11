@@ -126,19 +126,22 @@ export default class LogsVisualise {
 
   // The chart-type auto-selection wins over a table click issued while it is still running, and it can land even after the request wait above gives up (a loaded CI run can delay the tab's first request past that cap) - so re-select until the table renderer is on screen and has stayed there. VRL only works with the table chart type, so every caller needs that end state.
   async ensureTableRendered({ timeout = 60000, quietMs = 1500 } = {}) {
-    const tableChartItem = this.getChartTypeItem("table");
+    const chartTypeSelect = this.getChartTypeSelect();
     const tablePanel = this.getTablePanel();
-    await tableChartItem.waitFor({ state: "visible", timeout: 10000 });
+    await chartTypeSelect.waitFor({ state: "visible", timeout: 10000 });
 
     const deadline = Date.now() + timeout;
     let renderedSince = null;
     while (Date.now() < deadline) {
       const isSelected =
-        (await tableChartItem.getAttribute("data-selected").catch(() => null)) === "true";
+        (await chartTypeSelect.getAttribute("data-test-selected-value").catch(() => null)) ===
+        "table";
       const isRendered = await tablePanel.isVisible().catch(() => false);
 
       if (!isSelected) {
-        await tableChartItem.click({ timeout: 5000 }).catch(() => {});
+        await this.openChartTypeList("table")
+          .then((tableChartItem) => tableChartItem.click({ timeout: 5000 }))
+          .catch(() => {});
         renderedSince = null;
       } else if (!isRendered) {
         renderedSince = null;
@@ -300,10 +303,7 @@ export default class LogsVisualise {
 
   //select chart type
   async selectChartType(chartType) {
-    const chartOption = this.page.locator(
-      `[data-test="selected-chart-${chartType}-item"]`
-    );
-    await chartOption.waitFor({ state: "visible" });
+    const chartOption = await this.openChartTypeList(chartType);
     await chartOption.click({ force: true });
   }
 
@@ -626,12 +626,12 @@ export default class LogsVisualise {
 
   // Helper function to verify chart type selection
   async verifyChartTypeSelected(page, chartType, shouldBeSelected = true) {
-    const locator = page.locator(`[data-test="selected-chart-${chartType}-item"]`);
+    const select = page.locator('[data-test="dashboard-addpanel-chart-type-select"]:visible').first();
 
     if (shouldBeSelected) {
-      await expect(locator).toHaveAttribute("data-selected", "true");
+      await expect(select).toHaveAttribute("data-test-selected-value", chartType);
     } else {
-      await expect(locator).toHaveAttribute("data-selected", "false");
+      await expect(select).not.toHaveAttribute("data-test-selected-value", chartType);
     }
   }
 
@@ -724,9 +724,24 @@ export default class LogsVisualise {
     return this.page.locator('[data-test="dashboard-panel-table"] tbody tr');
   }
 
-  // Chart-type selector item by type (e.g. "table", "line", "bar", "h-bar")
+  // Chart-type list row by type (e.g. "table", "line", "bar", "h-bar"); only in the DOM while the list is open
   getChartTypeItem(chartType) {
     return this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
+  }
+
+  // The Chart type select; its data-test-selected-value is the panel's chart type
+  getChartTypeSelect() {
+    return this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]:visible').first();
+  }
+
+  // Opens the chart-type list from the Chart type select unless the row is already showing
+  async openChartTypeList(chartType) {
+    const chartItem = this.getChartTypeItem(chartType);
+    if (!(await chartItem.isVisible().catch(() => false))) {
+      await this.getChartTypeSelect().click();
+    }
+    await chartItem.waitFor({ state: "visible", timeout: 15000 });
+    return chartItem;
   }
 
   // "Edit panel" action button (from a panel dropdown menu)

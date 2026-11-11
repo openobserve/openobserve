@@ -760,13 +760,23 @@ export class MetricsPage {
     }
 
     // Chart visualization methods
-    async selectChartType(chartType) {
-        // Use the actual selector pattern from ChartSelection.vue
-        // Selector format: [data-test="selected-chart-{chartId}-item"]
-        const chartTypeSelector = `[data-test="selected-chart-${chartType}-item"]`;
 
+    // Opens the chart-type list from the Chart type select unless the row is already showing
+    async openChartTypeList(chartType) {
+        const chartButton = this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
+        if (await chartButton.isVisible().catch(() => false)) return chartButton;
+        const select = this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]:visible').first();
+        if (await select.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await select.click();
+            await chartButton.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        }
+        return chartButton;
+    }
+
+    async selectChartType(chartType) {
+        // List rows: [data-test="selected-chart-{chartId}-item"], shown once the list is open
         try {
-            const chartButton = this.page.locator(chartTypeSelector);
+            const chartButton = await this.openChartTypeList(chartType);
 
             // Check if the chart type button exists and is visible
             const isVisible = await chartButton.isVisible({ timeout: 2000 }).catch(() => false);
@@ -781,15 +791,11 @@ export class MetricsPage {
                 return false;
             }
 
-            // Click the chart type button, then deterministically confirm the type
-            // actually became active instead of a blind 1s sleep. ChartSelection.vue
-            // stamps data-selected="true" on the selected item — wait for that real
-            // signal. If it never flips (e.g. a disabled chart type), return false so
-            // callers see the true outcome rather than a masked success.
+            // A disabled type never flips the select's value, so a timeout reports false instead of a masked success.
             await chartButton.click();
             const activeItem = this.page.locator(
-                `[data-test="selected-chart-${chartType}-item"][data-selected="true"]`
-            );
+                `[data-test="dashboard-addpanel-chart-type-select"][data-test-selected-value="${chartType}"]:visible`
+            ).first();
             return await activeItem
                 .waitFor({ state: 'visible', timeout: 5000 })
                 .then(() => true)
@@ -806,6 +812,12 @@ export class MetricsPage {
     }
 
     async getCurrentChartType() {
+        const chartTypeSelect = this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]:visible').first();
+        const selectedValue = await chartTypeSelect.getAttribute('data-test-selected-value', { timeout: 2000 }).catch(() => null);
+        if (selectedValue) {
+            return selectedValue;
+        }
+
         // Try to identify current chart type from various indicators
         const indicators = [
             { selector: '.chart-type-label', attribute: 'textContent' },

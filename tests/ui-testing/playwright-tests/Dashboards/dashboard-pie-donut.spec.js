@@ -110,8 +110,10 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
     await reopenPanelConfig(page, pm);
 
     // Verify chart type is still pie
-    const pieSelector = pm.chartTypeSelector.getSelectedChartItem("pie");
-    await expect(pieSelector).toBeVisible();
+    await expect(pm.chartTypeSelector.getChartTypeSelect()).toHaveAttribute(
+      "data-test-selected-value",
+      "pie"
+    );
     testLogger.info("Pie chart type persisted after reopen");
 
     // Verify data still renders after reopen
@@ -136,8 +138,10 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
     await pm.dashboardPanelActions.savePanel();
     await reopenPanelConfig(page, pm);
 
-    const donutSelector = pm.chartTypeSelector.getSelectedChartItem("donut");
-    await expect(donutSelector).toBeVisible();
+    await expect(pm.chartTypeSelector.getChartTypeSelect()).toHaveAttribute(
+      "data-test-selected-value",
+      "donut"
+    );
     testLogger.info("Donut chart type persisted after reopen");
 
     await pm.dashboardPanelActions.verifyChartRenders(expect);
@@ -195,7 +199,7 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
     await pm.dashboardPanelActions.verifyChartRenders(expect);
-    await expect(pm.chartTypeSelector.getSelectedChartItem("donut")).toBeVisible();
+    await expect(pm.chartTypeSelector.getChartTypeSelect()).toHaveAttribute("data-test-selected-value", "donut");
     testLogger.info("verifyChartRenders passed - donut after switch", { coloredPixels: await getPlottedPixelCount(page) });
 
     // Switch back to pie
@@ -203,7 +207,7 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
     await pm.dashboardPanelActions.verifyChartRenders(expect);
-    await expect(pm.chartTypeSelector.getSelectedChartItem("pie")).toBeVisible();
+    await expect(pm.chartTypeSelector.getChartTypeSelect()).toHaveAttribute("data-test-selected-value", "pie");
     testLogger.info("verifyChartRenders passed - pie after switch back", { coloredPixels: await getPlottedPixelCount(page) });
 
     await pm.dashboardPanelActions.savePanel();

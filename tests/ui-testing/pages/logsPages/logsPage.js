@@ -320,6 +320,7 @@ export class LogsPage {
 
         // Chart selection
         this.chartSelectionContainer = '[data-test="dashboard-addpanel-chart-selection-item"]';
+        this.chartTypeSelect = '[data-test="dashboard-addpanel-chart-type-select"]';
         this.chartTypeItem = (chartId) => `[data-test="selected-chart-${chartId}-item"]`;
 
         // Panel editor
@@ -10800,11 +10801,7 @@ export class LogsPage {
      * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
      */
     async selectChartType(chartId) {
-        // The Build and Visualize tabs each mount a PanelEditor, so the chart list is in
-        // the DOM twice; the cached one is zero-size and .first() would resolve to it.
-        const chartItem = this.page.locator(`${this.chartTypeItem(chartId)}:visible`).first();
-
-        await chartItem.waitFor({ state: 'visible', timeout: 15000 });
+        const chartItem = await this.openChartTypeList(chartId);
         await chartItem.scrollIntoViewIfNeeded();
         await chartItem.click();
         await this.page.waitForTimeout(500);
@@ -10816,32 +10813,37 @@ export class LogsPage {
      * @param {string} chartId - The chart type ID
      */
     async expectChartTypeVisible(chartId) {
-        const chartItem = this.page.locator(`${this.chartTypeItem(chartId)}:visible`).first();
+        const chartItem = await this.openChartTypeList(chartId);
         await expect(chartItem).toBeVisible({ timeout: 15000 });
+        // Close the list again so the fields it covers are back for the next step.
+        await this.page.keyboard.press('Escape');
         testLogger.info(`Chart type "${chartId}" is visible`);
     }
 
-    /**
-     * Verify a chart type is selected.
-     * data-selected is set directly on [data-test="selected-chart-${chartId}-item"] (inner div)
-     * by ChartSelection.vue — always present as "true" or "false".
-     * toHaveAttribute auto-retries, so no manual waitForFunction/polling needed.
-     * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
-     * @param {boolean} shouldBeSelected - Whether the chart type should be selected (default: true)
-     */
+    // Both tabs mount a PanelEditor, so only the visible select and row count.
+    async openChartTypeList(chartId) {
+        const chartItem = this.page.locator(`${this.chartTypeItem(chartId)}:visible`).first();
+        if (!(await chartItem.isVisible().catch(() => false))) {
+            const select = this.page.locator(`${this.chartTypeSelect}:visible`).first();
+            await select.waitFor({ state: 'visible', timeout: 15000 });
+            await select.click();
+        }
+        await chartItem.waitFor({ state: 'visible', timeout: 15000 });
+        return chartItem;
+    }
+
+    // List rows exist only while the list is open, so the select's data-test-selected-value is read.
     async verifyChartTypeSelected(chartId, shouldBeSelected = true, timeout = 45000) {
-        // Uses data-test-selected attribute on <li> in ChartSelection.vue.
-        // Only the currently selected chart has this attribute set to its ID.
-        // Filters by offsetParent to skip elements hidden by v-show (display:none).
+        // Filters by offsetParent to skip the PanelEditor copy hidden by v-show (display:none).
         try {
             await this.page.waitForFunction(
                 ({ chartId, shouldBeSelected }) => {
-                    const items = document.querySelectorAll(
-                        `[data-test-selected="${chartId}"]`
+                    const selects = document.querySelectorAll(
+                        `[data-test="dashboard-addpanel-chart-type-select"][data-test-selected-value="${chartId}"]`
                     );
                     let visibleFound = false;
-                    for (const item of items) {
-                        if (/** @type {HTMLElement} */ (item).offsetParent !== null) {
+                    for (const select of selects) {
+                        if (/** @type {HTMLElement} */ (select).offsetParent !== null) {
                             visibleFound = true;
                             break;
                         }
@@ -11037,8 +11039,7 @@ export class LogsPage {
         // initializeBuild parses query, sets chart type, runs query, renders chart/table/no-data.
         // Accept EITHER signal:
         //   - chart/table/no-data renderer present
-        //   - any chart-selection <li> already carries data-test-selected (only set on the
-        //     currently-selected chart — the source-side selection signal).
+        //   - the Chart type select already carries data-test-selected-value (source-side signal).
         try {
             await this.page.waitForFunction(
                 () => {
@@ -11049,9 +11050,9 @@ export class LogsPage {
                     ) {
                         return true;
                     }
-                    // Any chart item with data-test-selected attribute → chart type assigned
+                    // A Chart type select naming a type → chart type assigned
                     return !!document.querySelector(
-                        '[data-test="dashboard-addpanel-chart-selection-item"][data-test-selected]'
+                        '[data-test="dashboard-addpanel-chart-type-select"]:not([data-test-selected-value=""])[data-test-selected-value]'
                     );
                 },
                 undefined,
@@ -11169,16 +11170,12 @@ export class LogsPage {
      * @returns {Promise<string|null>} The current chart type or null
      */
     async getCurrentChartType() {
-        // ChartSelection.vue marks the selected chart on the <li> via
-        // :data-test-selected="item.id" (the inner div carries data-selected="true|false",
-        // so reading data-selected off the <li> always yields null). PanelEditor is
-        // mounted in both the Build and Visualize tabs via v-show, so filter to the
-        // visible instance with offsetParent — same approach as verifyChartTypeSelected.
+        // Both tabs mount a PanelEditor; offsetParent skips the hidden one.
         const chartType = await this.page.evaluate(() => {
-            const items = document.querySelectorAll('[data-test-selected]');
-            for (const item of items) {
-                if (item.offsetParent !== null) {
-                    return item.getAttribute('data-test-selected');
+            const selects = document.querySelectorAll('[data-test="dashboard-addpanel-chart-type-select"]');
+            for (const select of selects) {
+                if (select.offsetParent !== null) {
+                    return select.getAttribute('data-test-selected-value') || null;
                 }
             }
             return null;
@@ -11194,11 +11191,7 @@ export class LogsPage {
 
     /**
      * Wait for any chart type to become selected and return its id.
-     * ChartSelection.vue sets :data-test-selected="item.id" on the selected <li>
-     * (and only on that one), so the attribute value IS the chart type. The inner
-     * div's data-selected="true|false" lives on a different element, and the legacy
-     * bg-grey and bg-gray classes no longer exist (the selected <li> now uses the
-     * bg-label-chip-url-bg token), so neither is a usable signal here.
+     * Reads the select's data-test-selected-value; list rows exist only while the list is open.
      * @param {number} timeout - Max wait time in ms (default 20000)
      * @returns {Promise<string|null>} The selected chart type or null if timeout
      */
@@ -11207,12 +11200,12 @@ export class LogsPage {
             // waitForFunction rather than locator polling: the panel re-renders
             // reactively across tab switches and URL restoration.
             const result = await this.page.waitForFunction(() => {
-                const items = document.querySelectorAll('[data-test-selected]');
-                for (const item of items) {
+                const selects = document.querySelectorAll('[data-test="dashboard-addpanel-chart-type-select"]');
+                for (const select of selects) {
                     // PanelEditor is mounted in both Build and Visualize tabs via
                     // v-show, so skip the hidden copy.
-                    if (item.offsetParent !== null) {
-                        return item.getAttribute('data-test-selected');
+                    if (select.offsetParent !== null) {
+                        return select.getAttribute('data-test-selected-value') || null;
                     }
                 }
                 return null;
