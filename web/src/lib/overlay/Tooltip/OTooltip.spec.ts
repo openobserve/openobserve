@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { h, nextTick, ref } from "vue";
 import { TooltipProvider } from "reka-ui";
 import OTooltip from "./OTooltip.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 // Reka UI portals content into <body>. Render inline for unit tests.
 vi.mock("reka-ui", async (importOriginal) => {
@@ -179,6 +180,154 @@ describe("OTooltip", () => {
       expect(spy.mock.calls.some(([el]) => el === plain)).toBe(false);
       spy.mockRestore();
     });
+  });
+
+  describe("binding to the enclosing control", () => {
+    // jsdom loads no Tailwind, so the utility OButton's slot wrapper relies on is defined here.
+    let sheet: HTMLStyleElement;
+    beforeEach(() => {
+      sheet = document.createElement("style");
+      sheet.textContent = ".contents { display: contents; }";
+      document.head.appendChild(sheet);
+    });
+    afterEach(() => sheet.remove());
+
+    const hoverAndSettle = async (el: Element) => {
+      el.dispatchEvent(new MouseEvent("mouseenter"));
+      await new Promise((r) => setTimeout(r, 60));
+      await nextTick();
+    };
+
+    it("opens when the button itself is hovered, not only its left icon", async () => {
+      const wrapper = mount(
+        {
+          render: () =>
+            h(
+              OButton,
+              { iconLeft: "refresh", "data-testid": "btn" },
+              { default: () => h(OTooltip, { content: "Refresh data", delay: 10 }) },
+            ),
+        },
+        { attachTo: document.body },
+      );
+      const button = wrapper.find('[data-testid="btn"]').element;
+
+      expect(button.getAttribute("data-o-tooltip-trigger")).toBe("");
+      expect(button.querySelector("[data-o-tooltip-trigger]")).toBeNull();
+      await hoverAndSettle(button);
+      expect(document.body.textContent).toContain("Refresh data");
+      wrapper.unmount();
+    });
+
+    const mountInfoButton = (listeners: Record<string, unknown> = {}) =>
+      mount(
+        {
+          render: () =>
+            h(
+              OButton,
+              { iconLeft: "info-outline", "data-testid": "btn", ...listeners },
+              { default: () => h(OTooltip, { content: "About this", delay: 5000 }) },
+            ),
+        },
+        { attachTo: document.body },
+      );
+
+    it("opens on click when the button has no action of its own", async () => {
+      const wrapper = mountInfoButton();
+      const button = wrapper.find('[data-testid="btn"]').element as HTMLElement;
+
+      expect(button.hasAttribute("data-o2-inert")).toBe(true);
+      button.click();
+      await nextTick();
+      await nextTick();
+      expect(document.body.textContent).toContain("About this");
+      wrapper.unmount();
+    });
+
+    it("does not open on click when the button runs an action", async () => {
+      const wrapper = mountInfoButton({ onClick: () => {} });
+      const button = wrapper.find('[data-testid="btn"]').element as HTMLElement;
+
+      expect(button.hasAttribute("data-o2-inert")).toBe(false);
+      button.click();
+      await nextTick();
+      await nextTick();
+      expect(document.body.textContent).not.toContain("About this");
+      wrapper.unmount();
+    });
+
+    it("does not treat a popup trigger as inert", () => {
+      const wrapper = mount(() => h(OButton, { "aria-haspopup": "menu", "data-testid": "btn" }));
+      expect(wrapper.find('[data-testid="btn"]').attributes("data-o2-inert")).toBeUndefined();
+    });
+
+    it("binds to a text-only button that gives it no previous sibling", () => {
+      const wrapper = mount({
+        render: () =>
+          h(
+            OButton,
+            { "data-testid": "btn" },
+            { default: () => ["Save", h(OTooltip, { content: "Save changes" })] },
+          ),
+      });
+      expect(wrapper.find('[data-testid="btn"]').attributes("data-o-tooltip-trigger")).toBe("");
+    });
+
+    it("keeps a bare icon outside any control as its own target", async () => {
+      const wrapper = mount(
+        {
+          render: () =>
+            h("div", { "data-testid": "row" }, [
+              h("span", { "data-testid": "icon" }),
+              h(OTooltip, { content: "About this field", delay: 10 }),
+            ]),
+        },
+        { attachTo: document.body },
+      );
+      const icon = wrapper.find('[data-testid="icon"]').element;
+
+      expect(icon.getAttribute("data-o-tooltip-trigger")).toBe("");
+      expect(
+        wrapper.find('[data-testid="row"]').attributes("data-o-tooltip-trigger"),
+      ).toBeUndefined();
+      await hoverAndSettle(icon);
+      expect(document.body.textContent).toContain("About this field");
+      wrapper.unmount();
+    });
+
+    it("keeps an icon inside a laid-out block of a clickable card as its own target", () => {
+      const wrapper = mount({
+        render: () =>
+          h("div", { role: "button", "data-testid": "card" }, [
+            h("div", { class: "flex" }, [
+              h("span", { "data-testid": "icon" }),
+              h(OTooltip, { content: "Info" }),
+            ]),
+          ]),
+      });
+      expect(wrapper.find('[data-testid="icon"]').attributes("data-o-tooltip-trigger")).toBe("");
+      expect(
+        wrapper.find('[data-testid="card"]').attributes("data-o-tooltip-trigger"),
+      ).toBeUndefined();
+    });
+
+    it("leaves an overflow-only tooltip on the text element it measures", () => {
+      const wrapper = mount({
+        render: () =>
+          h("button", [
+            h("span", { "data-testid": "label" }, "long label"),
+            h(OTooltip, { overflowOnly: true }),
+          ]),
+      });
+      expect(wrapper.find('[data-testid="label"]').attributes("data-o-tooltip-trigger")).toBe(
+        "overflow",
+      );
+    });
+  });
+
+  it("waits 300 ms before opening by default", () => {
+    const wrapper = mount(OTooltip, { props: { content: "Hello" } });
+    expect(wrapper.props("delay")).toBe(300);
   });
 
   describe("trigger naming", () => {

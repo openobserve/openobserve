@@ -87,7 +87,7 @@ pub mod work_group;
 
 use ::search::{
     bloom_pruner,
-    datafusion::{self, distributed_plan::streaming_aggs_exec},
+    datafusion::{self, physical_plan::streaming_aggs_exec},
     index, inspector, sql, tantivy, utils,
 };
 #[cfg(feature = "enterprise")]
@@ -311,7 +311,7 @@ pub async fn search(
         }
         Err(e) => {
             if let Some(streaming_id) = in_req.query.streaming_id.as_ref() {
-                streaming_aggs_exec::remove_cache(streaming_id)
+                streaming_aggs_exec::registry::remove_cache(streaming_id)
             }
             Err(e)
         }
@@ -1004,6 +1004,7 @@ pub async fn search_partition_multi(
                 histogram_interval: req.histogram_interval,
                 sampling_ratio: None,
                 search_type: None,
+                timezone: None,
             },
             false,
             false, // disable aggs cache

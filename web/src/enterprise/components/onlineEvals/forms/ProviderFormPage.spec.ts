@@ -12,8 +12,10 @@ import { createStore } from "vuex";
 import { nextTick } from "vue";
 import ProviderFormPage from "./ProviderFormPage.vue";
 import onlineEvalsService from "@/services/online-evals.service";
+import analytics from "@/services/product_analytics";
 import i18n from "@/locales";
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/online-evals.service", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -140,6 +142,9 @@ describe("ProviderFormPage", () => {
       isDefault: false,
     });
     expect(wrapper.emitted("saved")).toBeTruthy();
+    expect(analytics.track).toHaveBeenCalledWith("llm_provider_created", {
+      provider_type: "openai",
+    });
   });
 
   it("clears a required error on change after the first submit", async () => {
@@ -190,6 +195,9 @@ describe("ProviderFormPage", () => {
         authConfig: { api_key: "" },
         isDefault: false,
       });
+      expect(analytics.track).toHaveBeenCalledWith("llm_provider_updated", {
+        provider_type: "anthropic",
+      });
     });
   });
 
@@ -220,6 +228,9 @@ describe("ProviderFormPage", () => {
       await flushPromises();
 
       expect(result(wrapper).text()).toContain("Reached the endpoint.");
+      expect(analytics.track).toHaveBeenCalledWith("llm_provider_tested", {
+        provider_type: "openai",
+      });
     });
 
     it("shows the backend's error once the test fails", async () => {

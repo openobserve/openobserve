@@ -15,12 +15,15 @@
 
 use ::search::{
     CacheQueryRequest, CachedQueryResponse, QueryDelta, ResultCacheSelectionStrategy,
-    cache::streaming_agg::STREAMING_AGGS_CACHE_DIR,
+    datafusion::physical_plan::streaming_aggs_exec::files::STREAMING_AGGS_CACHE_DIR,
 };
 use bytes::Bytes;
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::{search::Response, sql::OrderBy, stream::StreamType},
+    meta::{
+        histogram_origin::histogram_bucket_offset, search::Response, sql::OrderBy,
+        stream::StreamType,
+    },
     utils::{file::scan_files, json},
 };
 use infra::cache::{
@@ -32,7 +35,8 @@ use crate::{
     cache::{
         MultiCachedQueryResponse,
         result_utils::{
-            get_ts_value, has_non_timestamp_ordering, is_timestamp_field, is_ts_order_field,
+            extract_timestamp_range, get_ts_value, is_ranked_by_non_timestamp, is_timestamp_field,
+            is_ts_order_field,
         },
     },
     sql::Sql,
@@ -159,10 +163,6 @@ pub async fn check_cache(
         };
     }
 
-    // Note: Both result_ts_col refinement and SQL modification (adding _timestamp to SELECT)
-    // are now done in prepare_cache_response() before calling this function.
-    // just use the refined result_ts_col that was passed in.
-
     // Check ts_col again, if it is still empty, return default
     if result_ts_col.is_empty() {
         return MultiCachedQueryResponse {
@@ -173,26 +173,26 @@ pub async fn check_cache(
 
     let mut histogram_interval = -1;
     if is_aggregate && let Some(interval) = sql.histogram_interval {
-        // Note: handle_histogram is now called in prepare_cache_response() before hash computation
-        // to ensure consistent hashing. We just need to update req.query.sql with the normalized
-        // SQL.
+        // The query must run the SQL prepare_cache_response normalized and hashed.
         req.query.sql = origin_sql.to_owned();
         histogram_interval = interval * 1000 * 1000; // in microseconds
     }
 
-    // Note: is_descending refinement for histogram queries is now done in prepare_cache_response()
-    // before calling this function, so we use the pre-refined value directly
+    if sql.histogram_offset != Some(0) {
+        return MultiCachedQueryResponse {
+            ts_column: result_ts_col.to_string(),
+            is_descending,
+            order_by: order_by.clone(),
+            ..Default::default()
+        };
+    }
 
     if is_aggregate && order_by.is_empty() && result_ts_col.is_empty() {
         return MultiCachedQueryResponse::default();
     }
 
-    // Determine if this is a histogram query with non-timestamp ORDER BY.
-    // These queries need special handling because results may not be time-ordered,
-    // requiring us to scan all hits to find the actual time range.
-    let is_histogram_non_ts_order = is_histogram_query
-        && !order_by.is_empty()
-        && has_non_timestamp_ordering(order_by, result_ts_col);
+    let is_histogram_non_ts_order =
+        is_histogram_query && is_ranked_by_non_timestamp(order_by, result_ts_col);
 
     let mut multi_resp = MultiCachedQueryResponse {
         trace_id: trace_id.to_string(),
@@ -360,7 +360,10 @@ pub async fn check_cache(
                     *should_exec_query = false;
                 }
 
-                if cached_resp.cached_response.total == (sql.limit as usize)
+                // older rows can only rank after a full page when the newest rows come first
+                if is_descending
+                    && !is_histogram_non_ts_order
+                    && cached_resp.cached_response.total == (sql.limit as usize)
                     && cached_resp.response_end_time == req.query.end_time
                 {
                     *should_exec_query = false;
@@ -431,8 +434,8 @@ pub async fn get_cached_results(
             // check if the data is matching for histogram
             if cache_req.is_aggregate
                 && cache_req.histogram_interval > 0
-                && (m.start_time % cache_req.histogram_interval != 0
-                    || m.end_time % cache_req.histogram_interval != 0)
+                && (histogram_bucket_offset(m.start_time, cache_req.histogram_interval) != 0
+                    || histogram_bucket_offset(m.end_time, cache_req.histogram_interval) != 0)
             {
                 return false;
             }
@@ -478,30 +481,36 @@ pub async fn get_cached_results(
         }
     };
 
-    // filter data based on request time range
-    let (hits_allowed_start_time, hits_allowed_end_time) =
-        (cache_req.q_start_time, cache_req.q_end_time);
-    let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
-    let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
-    let data_start_time = std::cmp::min(first_ts, last_ts);
-    let data_end_time = std::cmp::max(first_ts, last_ts);
-    // convert histogram interval to microseconds
+    let is_time_ordered = !cache_req.is_histogram_non_ts_order;
+    let (data_start_time, data_end_time) =
+        extract_timestamp_range(&cached_response.hits, &cache_req.ts_column, is_time_ordered);
     let histogram_interval = cached_response.histogram_interval.unwrap_or_default() * 1_000_000;
-    // check if need to filter the data
-    if data_start_time < cache_req.q_start_time || data_end_time > cache_req.q_end_time {
+    let exceeds_end = if histogram_interval > 0 {
+        data_end_time + histogram_interval > cache_req.q_end_time
+    } else {
+        data_end_time >= cache_req.q_end_time
+    };
+    if data_start_time < cache_req.q_start_time || exceeds_end {
+        // Clipping ranked hits cannot prove complete coverage of the remaining time range.
+        if cache_req.is_histogram_non_ts_order && histogram_interval > 0 {
+            return None;
+        }
         cached_response.hits.retain(|hit| {
             let hit_ts = get_ts_value(&cache_req.ts_column, hit);
-            hit_ts + histogram_interval < hits_allowed_end_time && hit_ts >= hits_allowed_start_time
+            let within_end = if histogram_interval > 0 {
+                hit_ts + histogram_interval <= cache_req.q_end_time
+            } else {
+                hit_ts < cache_req.q_end_time
+            };
+            hit_ts >= cache_req.q_start_time && within_end
         });
-        // if the data is empty after filtering, return None
         if cached_response.hits.is_empty() {
             return None;
         }
-        // reset the start and end time
-        let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
-        let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
-        matching_meta.start_time = std::cmp::min(first_ts, last_ts);
-        matching_meta.end_time = std::cmp::max(first_ts, last_ts) + histogram_interval;
+        let (start_time, end_time) =
+            extract_timestamp_range(&cached_response.hits, &cache_req.ts_column, is_time_ordered);
+        matching_meta.start_time = start_time;
+        matching_meta.end_time = end_time + histogram_interval;
     }
     cached_response.total = cached_response.hits.len();
 
@@ -1179,6 +1188,7 @@ mod tests {
             order_by: vec![("_timestamp".to_string(), OrderBy::Desc)],
             histogram_interval: None,
             timezone: None,
+            histogram_offset: Some(0),
             sorted_by_time: true,
             sampling_config: None,
         };
@@ -1226,6 +1236,7 @@ mod tests {
             order_by: vec![("_timestamp".to_string(), OrderBy::Asc)],
             histogram_interval: None,
             timezone: None,
+            histogram_offset: Some(0),
             sorted_by_time: true,
             sampling_config: None,
         };
@@ -1395,6 +1406,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_cached_results_picks_only_histogram_grid_entries() {
+        let file_path = "grid_org/logs/grid_stream/grid_hash";
+        let query_key = file_path.replace('/', "_");
+        let thirty_days = 2_592_000_000_000;
+        let on_grid = ResultCacheMeta {
+            start_time: 1_755_907_200_000_000,
+            end_time: 1_755_907_200_000_000 + thirty_days,
+            is_aggregate: true,
+            is_descending: false,
+        };
+        let epoch_grid = ResultCacheMeta {
+            start_time: 1_757_376_000_000_000,
+            end_time: 1_757_376_000_000_000 + thirty_days,
+            is_aggregate: true,
+            is_descending: false,
+        };
+        QUERY_RESULT_CACHE
+            .write()
+            .await
+            .insert(query_key.clone(), vec![on_grid.clone(), epoch_grid.clone()]);
+
+        let cache_req = CacheQueryRequest {
+            q_start_time: 1_755_000_000_000_000,
+            q_end_time: 1_760_000_000_000_000,
+            is_aggregate: true,
+            ts_column: "_timestamp".to_string(),
+            histogram_interval: thirty_days,
+            is_descending: false,
+            is_histogram_non_ts_order: false,
+        };
+        let res = get_cached_results("grid_trace", file_path, cache_req, None).await;
+        assert!(res.is_none());
+        // only the selected entry misses on disk and is healed away
+        let remaining = QUERY_RESULT_CACHE.read().await.get(&query_key).cloned();
+        assert_eq!(remaining, Some(vec![epoch_grid]));
+    }
+
+    #[tokio::test]
     async fn test_check_cache() {
         // Test case 1: Basic cache check with valid SQL
         let trace_id = "test_trace_123";
@@ -1466,5 +1515,131 @@ mod tests {
         assert!(result.is_descending);
         assert_eq!(result.limit, 100);
         assert_eq!(result.file_path, "test_org/logs/test_stream");
+    }
+
+    const CLIP_HOUR: i64 = 3_600_000_000;
+    const CLIP_START: i64 = 1_793_491_200_000_000;
+
+    async fn store_cache_fixture(file_path: &str, meta: &ResultCacheMeta, response: &Response) {
+        let file = format!("results/{file_path}/{}", disk::result_cache_file_name(meta));
+        let path = disk::get_file_path(&file).unwrap();
+        tokio::fs::create_dir_all(std::path::Path::new(&path).parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(&path, json::to_vec(response).unwrap())
+            .await
+            .unwrap();
+        QUERY_RESULT_CACHE
+            .write()
+            .await
+            .insert(file_path.replace('/', "_"), vec![meta.clone()]);
+    }
+
+    /// Reads four cached hourly buckets, stored in `stored_hours` order, for a request in half
+    /// hours.
+    async fn read_clipped_histogram(
+        name: &str,
+        stored_hours: [i64; 4],
+        is_histogram_non_ts_order: bool,
+        (q_start, q_end): (i64, i64),
+    ) -> Option<(Vec<i64>, i64, i64)> {
+        let file_path = format!("clip_org/logs/clip_stream/{name}");
+        let meta = ResultCacheMeta {
+            start_time: CLIP_START,
+            end_time: CLIP_START + 4 * CLIP_HOUR,
+            is_aggregate: true,
+            is_descending: false,
+        };
+        let response = Response {
+            hits: stored_hours
+                .map(|hour| json::json!({"ts": CLIP_START + hour * CLIP_HOUR, "count": 100}))
+                .to_vec(),
+            total: 4,
+            histogram_interval: Some(3600),
+            ..Default::default()
+        };
+        store_cache_fixture(&file_path, &meta, &response).await;
+        let cache_req = CacheQueryRequest {
+            q_start_time: CLIP_START + q_start * CLIP_HOUR / 2,
+            q_end_time: CLIP_START + q_end * CLIP_HOUR / 2,
+            is_aggregate: true,
+            ts_column: "ts".to_string(),
+            histogram_interval: CLIP_HOUR,
+            is_descending: false,
+            is_histogram_non_ts_order,
+        };
+        let cached = get_cached_results("clip_trace", &file_path, cache_req, None).await?;
+        let hours = cached
+            .cached_response
+            .hits
+            .iter()
+            .map(|hit| (get_ts_value("ts", hit) - CLIP_START) / CLIP_HOUR)
+            .collect();
+        Some((
+            hours,
+            (cached.response_start_time - CLIP_START) / CLIP_HOUR,
+            (cached.response_end_time - CLIP_START) / CLIP_HOUR,
+        ))
+    }
+
+    #[tokio::test]
+    async fn test_get_cached_results_keeps_only_fully_covered_histogram_buckets() {
+        let cases = [
+            ("unchanged", (0, 8), Some((vec![0, 1, 2, 3], 0, 4))),
+            ("end_mid_last_bucket", (0, 7), Some((vec![0, 1, 2], 0, 3))),
+            ("end_on_bucket_edge", (0, 6), Some((vec![0, 1, 2], 0, 3))),
+            ("end_mid_inner_bucket", (0, 5), Some((vec![0, 1], 0, 2))),
+            ("start_mid_bucket", (1, 8), Some((vec![1, 2, 3], 1, 4))),
+            ("both_mid_bucket", (1, 7), Some((vec![1, 2], 1, 3))),
+            ("inside_one_bucket", (0, 1), None),
+        ];
+        for (name, range, expected) in cases {
+            let got = read_clipped_histogram(name, [0, 1, 2, 3], false, range).await;
+            assert_eq!(got, expected, "{name}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_cached_results_never_clips_ranked_histogram() {
+        let stored = [2, 0, 3, 1];
+        let unchanged = read_clipped_histogram("ranked_unchanged", stored, true, (0, 8)).await;
+        assert_eq!(unchanged, Some((stored.to_vec(), 0, 4)));
+        for (name, range) in [("ranked_end", (0, 7)), ("ranked_start", (1, 8))] {
+            let clipped = read_clipped_histogram(name, stored, true, range).await;
+            assert_eq!(clipped, None, "{name}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_cached_results_drops_raw_hit_at_exclusive_end() {
+        let file_path = "clip_org/logs/clip_stream/raw";
+        let end = CLIP_START + CLIP_HOUR;
+        let meta = ResultCacheMeta {
+            start_time: CLIP_START,
+            end_time: end,
+            is_aggregate: false,
+            is_descending: false,
+        };
+        let response = Response {
+            hits: [CLIP_START, CLIP_START + 1, end]
+                .map(|ts| json::json!({"_timestamp": ts}))
+                .to_vec(),
+            total: 3,
+            ..Default::default()
+        };
+        store_cache_fixture(file_path, &meta, &response).await;
+        let cache_req = CacheQueryRequest {
+            q_start_time: CLIP_START,
+            q_end_time: end,
+            is_aggregate: false,
+            ts_column: "_timestamp".to_string(),
+            histogram_interval: 0,
+            is_descending: false,
+            is_histogram_non_ts_order: false,
+        };
+        let cached = get_cached_results("clip_trace", file_path, cache_req, None)
+            .await
+            .unwrap();
+        assert_eq!(cached.cached_response.hits, response.hits[..2]);
     }
 }

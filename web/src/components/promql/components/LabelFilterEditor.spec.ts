@@ -34,6 +34,9 @@ const valueStore = vi.hoisted(() => ({
 }));
 vi.mock("@/composables/fieldValueStore", () => valueStore);
 
+const analytics = vi.hoisted(() => ({ track: vi.fn() }));
+vi.mock("@/services/product_analytics", () => ({ default: analytics }));
+
 const fetchQuery = vi.hoisted(() => vi.fn());
 vi.mock("@/composables/query/queryClient", () => ({ queryClient: { fetchQuery } }));
 
@@ -107,6 +110,7 @@ describe("LabelFilterEditor", () => {
     await wrapper!.find(`[data-test="${DT}-chip-method-remove"]`).trigger("click");
     await flushPromises();
     expect(emitted()!.at(-1)![0]).toEqual([labels[1]]);
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 
   describe("in a dashboard panel", () => {
@@ -276,6 +280,9 @@ describe("LabelFilterEditor", () => {
         value: "GET",
         group: 3,
       });
+      expect(analytics.track).toHaveBeenCalledWith("promql_builder_label_filter_added", {
+        new_group: true,
+      });
     });
 
     it("adds a filter inside a negated group as negated too", async () => {
@@ -289,6 +296,9 @@ describe("LabelFilterEditor", () => {
         value: "GET",
         group: 2,
         negate: true,
+      });
+      expect(analytics.track).toHaveBeenCalledWith("promql_builder_label_filter_added", {
+        new_group: false,
       });
     });
 

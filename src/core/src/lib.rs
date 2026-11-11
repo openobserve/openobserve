@@ -29,6 +29,7 @@ pub mod background_access;
 pub mod bootstrap;
 pub mod cache;
 pub mod dashboards;
+pub mod datadog;
 pub mod db_monitoring;
 #[cfg(feature = "enterprise")]
 pub mod downtimes;
@@ -67,6 +68,9 @@ pub mod public_dashboards;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
 pub mod rum_pa;
+pub mod sample_data;
+#[cfg(feature = "enterprise")]
+pub mod security;
 use search_service as search;
 #[cfg(feature = "cpu-profiling")]
 pub mod self_profiles;

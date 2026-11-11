@@ -1,4 +1,7 @@
 import { expect } from '@playwright/test';
+import { RumSessionsPage } from './rumSessionsPage.js';
+
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 // The rrweb faults a replay that lost track of a tab's DOM raises, and VideoPlayer's own "Session replay:" decode faults; other rrweb warnings are benign.
 const PLAYER_FAULT = /^\[replayer\] (Node with id '[^']*' not found|Exception in mutation|parent could not remove child|Found unresolved missing node map)|^\[replayer\].*(appendChild|insertBefore|removeChild|detached)|^Session replay:/;
@@ -14,6 +17,7 @@ export class RumReplayPlayerPage {
         // The speed select carries no data-test either; it is the only combobox whose value reads like "4x".
         this.speedSelect = page.getByRole('combobox').filter({ hasText: /^\d+(\.\d+)?x$/ });
         this.normalSpeedOption = page.getByRole('option', { name: '1x', exact: true });
+        this.tabNotice = page.locator('[data-test="session-viewer-tab-notice"]');
     }
 
     /** Starts collecting uncaught page errors and the player's DOM-replay faults; returns the live list. */
@@ -28,9 +32,50 @@ export class RumReplayPlayerPage {
         return faults;
     }
 
+    /** Opens a session's replay and waits until it has a duration; returns the fault list watchPlayerFaults() keeps filling. */
+    async openSession(sessionId, { startTimeUs, endTimeUs = Date.now() * 1000, timeoutMs = 60000 } = {}) {
+        const faults = this.watchPlayerFaults();
+        await new RumSessionsPage(this.page).gotoSessionViewer(sessionId, { startTimeUs, endTimeUs });
+        await this.expectDurationNotZero(timeoutMs);
+        testLogger.info('Replay opened', { sessionId, duration: await this.durationText() });
+        return faults;
+    }
+
     async playedSeconds() {
         const text = ((await this.playerTime.textContent()) || '').trim();
         return text.split(':').reduce((total, part) => total * 60 + Number(part), 0);
+    }
+
+    /** A replay whose loader stalled on a missing segment reads 00:00 / 00:00. */
+    async expectDurationNotZero(timeoutMs = 30000) {
+        await expect(this.playerDuration).toHaveText(/^\d+:\d\d$/, { timeout: timeoutMs });
+        await expect(this.playerDuration).not.toHaveText(/^0+:00$/);
+    }
+
+    /** The gap notice appears while the playhead is inside a view's missing segment. */
+    async expectGapNoticeDuringPlayback(timeoutMs = 60000) {
+        await expect(this.tabNotice).toBeVisible({ timeout: timeoutMs });
+        await expect(this.tabNotice).toContainText('has a gap from');
+    }
+
+    async expectGapNoticeHidden() {
+        await expect(this.tabNotice).toBeHidden();
+    }
+
+    /** Flags, from now on, any moment the gap notice is on screen; read it back with gapNoticeSeen(). */
+    async watchGapNotice() {
+        await this.page.evaluate(() => {
+            window.__gapNoticeSeen = false;
+            const check = () => {
+                if (document.querySelector('[data-test="session-viewer-tab-notice"]')) window.__gapNoticeSeen = true;
+            };
+            check();
+            new MutationObserver(check).observe(document.body, { childList: true, subtree: true });
+        });
+    }
+
+    async gapNoticeSeen() {
+        return this.page.evaluate(() => window.__gapNoticeSeen === true);
     }
 
     async durationText() {
@@ -65,6 +110,15 @@ export class RumReplayPlayerPage {
         await expect
             .poll(() => this.playedSeconds(), { timeout: 15000, message: 'playback must start after clicking the replay' })
             .toBeGreaterThan(0);
+    }
+
+    /** Starts playback from wherever the player opened, which is past 00:00 when the session's first snapshot comes later. */
+    async resumePlayback() {
+        const from = await this.playedSeconds();
+        await this.playerSurface.click();
+        await expect
+            .poll(() => this.playedSeconds(), { timeout: 15000, message: 'playback must resume after clicking the replay' })
+            .toBeGreaterThan(from);
     }
 
     /** Faults are cumulative, so one raised before the target fails the poll and is printed beside the time playback reached. */

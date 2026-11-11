@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- LEFT SIDE: Logo -->
     <div class="flex shrink-0 items-center justify-start gap-1 ps-3 max-md:ps-1.5">
       <OButton
+        v-if="!focusMode"
         variant="ghost"
         size="icon-toolbar"
         class="md:hidden"
@@ -143,11 +144,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- end left side -->
 
+    <div v-if="securityAccess.canOpen.value" class="ms-3 flex shrink-0 items-center">
+      <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
+    </div>
+
     <!-- CENTER: elastic spacer so the right-side controls stay right-aligned. -->
     <div class="min-w-0 flex-1" />
 
     <!-- RIGHT SIDE: Controls -->
     <div class="flex shrink-0 items-center justify-end gap-1 pe-3">
+      <!-- SAMPLE DATA: stays visible while the org holds sample data -->
+      <SampleDataHeaderChip class="me-2" />
+
       <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
       <div
         class="me-4 flex items-center gap-1 max-md:hidden"
@@ -507,6 +515,8 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OrganizationSelector from "./OrganizationSelector.vue";
+import SolutionSwitcher from "./SolutionSwitcher.vue";
+import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import LinkedAccountsDialog from "./settings/LinkedAccountsDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -516,6 +526,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import SampleDataHeaderChip from "@/components/sampleData/SampleDataHeaderChip.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
@@ -532,6 +543,8 @@ export default defineComponent({
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     OrganizationSelector,
+    SolutionSwitcher,
+    SampleDataHeaderChip,
     LinkedAccountsDialog,
     OButton,
     OIcon,
@@ -626,6 +639,7 @@ export default defineComponent({
     "signout",
   ],
   setup(props, { emit }) {
+    const securityAccess = useSecurityAccess();
     const { t } = useI18nTyped();
     const { featureName } = useFeatureNames();
     const router = useRouter();
@@ -731,6 +745,8 @@ export default defineComponent({
         rbac: props.store.state.zoConfig?.rbac_enabled !== false,
       }),
     );
+    // A focus-mode route has no side menu and no AI panel, so their buttons go too.
+    const focusMode = computed(() => props.router?.currentRoute?.value?.meta?.focusMode === true);
     // The license map applies once the edition allows the assistant.
     const aiAssistantState = computed(() =>
       menuState(
@@ -740,13 +756,13 @@ export default defineComponent({
       ),
     );
     const aiButtonVisible = computed(
-      () => !aiAccess.value.allowed || aiAssistantState.value === "enabled",
+      () => !focusMode.value && (!aiAccess.value.allowed || aiAssistantState.value === "enabled"),
     );
     const aiSlotPending = computed(
       () => aiAccess.value.allowed && !props.store.state.zoConfig?.version,
     );
     const aiLicenseLocked = computed(
-      () => aiAccess.value.allowed && aiAssistantState.value === "locked",
+      () => !focusMode.value && aiAccess.value.allowed && aiAssistantState.value === "locked",
     );
 
     // The edition gate and the org's runtime switch both have to pass, as for Settings › Slack.
@@ -858,6 +874,7 @@ export default defineComponent({
     };
 
     return {
+      securityAccess,
       isDark,
       t,
       raw,
@@ -882,6 +899,7 @@ export default defineComponent({
       openLockedAiAssistant,
       aiAccess,
       aiButtonVisible,
+      focusMode,
       aiLicenseLocked,
       linkedAccountsVisible,
       showLinkedAccounts,

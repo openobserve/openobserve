@@ -47,6 +47,11 @@ const rows = computed(() => {
   const max = Math.max(0, ...props.metrics.map((m) => m.value)) || 1;
   return props.metrics.map((m) => {
     const hasTotal = m.total !== undefined && m.total > 0;
+    // a ratio above its total (a join's fan-out) is a multiplier, not a part of a whole
+    if (props.bar === "fraction" && hasTotal && m.value > (m.total as number)) {
+      const percent = ((m.value / (m.total as number)) * 100).toFixed(2);
+      return { name: m.name, value: `${percent}%`, total: "", ratio: null };
+    }
     let ratio: number | null = null;
     if (props.bar === "share") ratio = m.value / max;
     else if (props.bar === "fraction" && hasTotal) ratio = m.value / (m.total as number);

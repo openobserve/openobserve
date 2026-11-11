@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :current-time="currentTime"
         :start-time="sessionState.data.selectedSession?.start_time || 0"
         :end-time="sessionState.data.selectedSession?.end_time || 0"
-        :rum-window-us="eventsOnlyRumWindowUs"
+        :rum-window-us="rumWindowUs"
         :marked-timestamps="markedTimestamps"
         :loading="eventsLoading"
         @event-emitted="handleSidebarEvent"
@@ -267,6 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :current-time="currentTime"
             :start-time="sessionState.data.selectedSession?.start_time || 0"
             :end-time="sessionState.data.selectedSession?.end_time || 0"
+            :rum-window-us="rumWindowUs"
             :marked-timestamps="markedTimestamps"
             :loading="eventsLoading"
             @event-emitted="handleSidebarEvent"
@@ -526,6 +527,8 @@ let livePolling = false;
 let lastNewIdAtMs = 0;
 let lastEventsTs = 0;
 let lastLogsTs = 0;
+let rumLogLookup: Promise<StreamLookup> | null = null;
+let rumLogListRefreshed = false;
 // Formatted events by stream key, so a poll overlapping the last one adds nothing twice.
 const rumEvents = new Map<string, any>();
 const logEvents = new Map<string, any>();
@@ -538,7 +541,8 @@ const serverStatusByTrace = new Map<string, ServerStatusEntry>();
 // When this viewer first saw each trace id; it caps a trace's age against a staff clock that runs fast.
 const serverFirstSeen = new Map<string, number>();
 const eventsOnly = ref(false);
-const eventsOnlyRumWindowUs = ref<QueryWindow | null>(null);
+// The Traces tab searches _rumdata by arrival time: a batch uploaded after the last device-clock event is still found.
+const rumWindowUs = ref<QueryWindow | null>(null);
 
 // Mobile sessions carry wireframe records (source: react-native/ios/android) → the
 // wireframe player; browser sessions use the rrweb VideoPlayer.
@@ -578,7 +582,7 @@ watchDebounced(
   { debounce: 300 },
 );
 const { performanceState } = usePerformance();
-const { getStream } = useStreams(t);
+const { getStream, getStreams } = useStreams(t);
 const { resolveTraceLocationsBulk, cancel: cancelCorrelatedTracesStream } =
   useCorrelatedTracesStream(t);
 
@@ -787,6 +791,9 @@ onBeforeUnmount(() => {
 
 type StreamLookup = "present" | "missing" | "failed";
 
+const searchErrorCode = (e: unknown) =>
+  (e as { response?: { data?: { code?: number } } })?.response?.data?.code;
+
 // Only a stream the org confirms it lacks means "no replay"; any other failure must surface with Retry.
 async function readStreamSchema(name: string): Promise<StreamLookup> {
   try {
@@ -854,8 +861,7 @@ async function loadEventsOnlySession(): Promise<"found" | "missing" | "failed"> 
     getSessionDetails();
     return "found";
   } catch (e) {
-    const code = (e as { response?: { data?: { code?: number } } })?.response?.data?.code;
-    return code === SEARCH_STREAM_NOT_FOUND ? "missing" : "failed";
+    return searchErrorCode(e) === SEARCH_STREAM_NOT_FOUND ? "missing" : "failed";
   } finally {
     isLoading.value.pop();
   }
@@ -883,11 +889,13 @@ async function openSession(): Promise<void> {
       return;
     }
     sessionNotFound.value = false;
-    eventsOnlyRumWindowUs.value = routeRangeUs();
+    rumWindowUs.value = routeRangeUs();
     eventsOnly.value = true;
     getSessionEvents();
     return;
   }
+  // The events' window, so the Traces tab lists the calls the breadcrumbs show.
+  rumWindowUs.value = serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US);
   openEventSeek();
   getSessionSegments();
   getSessionEvents();
@@ -1554,7 +1562,7 @@ const pollEvents = async () => {
   if (cancelled) return;
   const failed = await fetchFailedRequests(liveWindowUs(lastEventsTs, EVENTS_TAIL_US));
   if (cancelled) return;
-  const logs = await fetchEventPages(errorLogsSql(), liveWindowUs(lastLogsTs, EVENTS_TAIL_US));
+  const logs = await fetchErrorLogPages(liveWindowUs(lastLogsTs, EVENTS_TAIL_US));
   if (cancelled) return;
   const changed = addRumEvents([...hits, ...failed]);
   if (addErrorLogs(logs) || changed) publishEvents();
@@ -1923,6 +1931,29 @@ const refreshServerStatuses = (): Promise<void> => {
   return serverLookupRunning;
 };
 
+// The stream list is cached and can predate the app's first browser log, so the first miss is checked against the server.
+const lookUpRumLogStream = async (): Promise<StreamLookup> => {
+  const lookup = await readStreamSchema("_rumlog");
+  if (lookup !== "missing" || rumLogListRefreshed) return lookup;
+  rumLogListRefreshed = true;
+  await getStreams("logs", false, false, true).catch(() => undefined);
+  return readStreamSchema("_rumlog");
+};
+
+// Only a found stream is kept, so its schema is read once while a missing one is re-checked in the self-refreshing cached list.
+const rumLogStreamMissing = async () => {
+  const pending = (rumLogLookup ??= lookUpRumLogStream());
+  const lookup = await pending;
+  if (lookup !== "present" && rumLogLookup === pending) rumLogLookup = null;
+  return lookup === "missing";
+};
+
+// Apps that send no browser logs have no _rumlog stream, and searching it answers 400.
+const fetchErrorLogPages = async (window: QueryWindow) => {
+  if (await rumLogStreamMissing()) return [];
+  return fetchEventPages(errorLogsSql(), window);
+};
+
 // Re-sends of a view share its date, so the document version marks the newer one, and a later arrival when there is none.
 const isNewerRumEvent = (key: string, hit: any, field: string) => {
   if (!rumEvents.has(key)) return true;
@@ -2004,7 +2035,7 @@ const getSessionEvents = () => {
       getSessionErrorLogs();
     })
     .catch((error) => {
-      console.error("Failed to fetch sesion events:", error);
+      console.error("Failed to fetch session events:", error);
     })
     .finally(() => {
       isLoading.value.pop();
@@ -2014,13 +2045,14 @@ const getSessionEvents = () => {
 
 const getSessionErrorLogs = () => {
   isLoading.value.push(true);
-  fetchEventPages(errorLogsSql(), serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US))
+  fetchErrorLogPages(serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US))
     .then((hits: any[]) => {
       addErrorLogs(hits);
       publishEvents();
     })
     .catch((error) => {
-      console.error("Failed to fetch sesion error logs:", error);
+      if (searchErrorCode(error) === SEARCH_STREAM_NOT_FOUND) return;
+      console.error("Failed to fetch session error logs:", error);
     })
     .finally(() => isLoading.value.pop());
 };
@@ -2261,6 +2293,7 @@ const handleSidebarEvent = (event: string, payload: any) => {
     selectedEvent.value = payload;
     selectedRawEvent.value = rawEventsMap.value.get(payload.event_id) || {};
     showEventDetailDrawer.value = true;
+    analytics.track("rum_session_event_opened", { type: payload.type });
   }
 
   // Always seek to the event time in the player, through the same path as a bar click.

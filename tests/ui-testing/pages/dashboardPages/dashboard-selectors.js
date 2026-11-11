@@ -48,6 +48,8 @@ const COMPONENTS = {
 const DASHBOARD = {
   // Dashboard main buttons
   SETTING_BTN: '[data-test="dashboard-setting-btn"]',
+  MORE_OPTIONS_BTN: '[data-test="dashboard-more-options-btn"]',
+  SHARE_OPTIONS_BTN: '[data-test="dashboard-share-options-btn"]',
   REFRESH_BTN: '[data-test="dashboard-refresh-btn"]',
   SEARCH: '[data-test="dashboard-search"]',
   ADD_PANEL_BTN: '[data-test="dashboard-if-no-panel-add-panel-btn"]',
@@ -286,6 +288,12 @@ function getTabSelector(tabTitle) {
   return `span[data-test*="dashboard-tab-"][title="${tabTitle}"]`;
 }
 
+/** Click an item in a dashboard toolbar menu (More by default), opening the menu first. */
+async function clickDashboardMenuItem(page, itemSelector, triggerSelector = DASHBOARD.MORE_OPTIONS_BTN) {
+  await page.locator(triggerSelector).click();
+  await page.locator(itemSelector).click();
+}
+
 module.exports = {
   // Selector groups
   COMPONENTS,
@@ -309,4 +317,5 @@ module.exports = {
   getVariableError,
   getVariableState,
   getTabSelector,
+  clickDashboardMenuItem,
 };

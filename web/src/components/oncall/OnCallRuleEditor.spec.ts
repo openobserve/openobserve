@@ -21,11 +21,15 @@ import OnCallRuleEditor from "@/components/oncall/OnCallRuleEditor.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { orgUsersQuery } from "@/services/users.queries";
 import { queryClient } from "@/composables/query/queryClient";
+import config from "@/aws-exports";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import type { OwnershipRuleStats, RoutingPreview, UnroutedSignal } from "@/ts/interfaces/oncall";
 
 const whoIsOnCall = vi.fn();
+const resolveRoute = vi.fn((_to: unknown) => ({ href: "/web/settings/correlation/field-aliases" }));
+vi.mock("vue-router", () => ({ useRouter: () => ({ resolve: resolveRoute }) }));
+
 vi.mock("@/services/oncall", () => ({
   default: { whoIsOnCall: (...args: unknown[]) => whoIsOnCall(...args) },
 }));
@@ -93,6 +97,17 @@ const select = (w: Wrapper, test: string) =>
   w.findAllComponents({ name: "OSelect" }).find((c) => c.attributes("data-test") === test)!;
 
 const dialog = (w: Wrapper) => w.findComponent({ name: "ODialog" });
+
+/// Runs `check` on one build, restoring the test build after.
+function onBuild(build: { isEnterprise: string; isCloud: string }, check: () => void) {
+  const saved = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
+  Object.assign(config, build);
+  try {
+    check();
+  } finally {
+    Object.assign(config, saved);
+  }
+}
 
 describe("OnCallRuleEditor", () => {
   beforeEach(() => {
@@ -351,6 +366,107 @@ describe("OnCallRuleEditor", () => {
     expect(wrapper.find('[data-test="oncall-rule-editor-outcome"]').text()).toBe(
       "Takes alerts from Payments",
     );
+  });
+
+  /// A new tab keeps the open draft, which navigating this one would discard.
+  it("opens the correlation field groups in a new tab on an enterprise build", () => {
+    onBuild({ isEnterprise: "true", isCloud: "false" }, () => {
+      const link = render().find('[data-test="oncall-rule-editor-field-groups-link"]');
+      expect(resolveRoute).toHaveBeenCalledWith({
+        name: "correlationSettings",
+        params: { tab: "field-aliases" },
+        query: { org_identifier: "default" },
+      });
+      expect(link.attributes("href")).toBe("/web/settings/correlation/field-aliases");
+      expect(link.attributes("target")).toBe("_blank");
+      expect(link.text()).toBe("Manage field groups");
+    });
+  });
+
+  /// The correlation page is enterprise-only and licensed, so elsewhere the link would land on a locked page.
+  it.each([
+    ["on Cloud", { isEnterprise: "false", isCloud: "true" }, undefined],
+    ["while correlation is license-locked", { isEnterprise: "true", isCloud: "false" }, "locked"],
+  ])("states where fields come from without a link %s", (_where, build, correlation) => {
+    if (correlation) store.state.zoConfig.features = { correlation };
+    try {
+      onBuild(build, () => {
+        const wrapper = render();
+        expect(wrapper.find('[data-test="oncall-rule-editor-field-groups-link"]').exists()).toBe(
+          false,
+        );
+        expect(wrapper.find('[data-test="oncall-rule-editor-fields-help"]').text()).toBe(
+          "Fields come from your correlation field groups.",
+        );
+      });
+    } finally {
+      delete store.state.zoConfig.features;
+    }
+  });
+
+  /// Two rules on one path are refused by the server, so the editor stops it before Save.
+  it.each([
+    [
+      "another team",
+      "team_2",
+      "Payments already has a rule for exactly these conditions. Edit that rule instead.",
+    ],
+    ["the same team", "team_1", "This team already has a rule for exactly these conditions."],
+  ])("blocks Save when %s already holds exactly the drafted path", async (_who, holder, text) => {
+    const wrapper = render({
+      conflict: { team_id: holder, decision: { path: "k8s-namespace=risk/service=risk-api" } },
+      initialDimensions: { "k8s-namespace": "risk", service: "risk-api" },
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-outcome"]').text()).toBe(text);
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
+    dialog(wrapper).vm.$emit("click:primary");
+    expect(wrapper.emitted("save")).toBeUndefined();
+  });
+
+  it("does not block moving the edited rule, which holds its own path, to another team", async () => {
+    const path = "k8s-namespace=risk/service=risk-api";
+    const wrapper = render({
+      rule: {
+        path,
+        team_id: "team_1",
+        dimensions: { "k8s-namespace": "risk", service: "risk-api" },
+      } as unknown as OwnershipRuleStats,
+      conflict: { team_id: "team_1", decision: { path } },
+    });
+    select(wrapper, "oncall-rule-editor-team").vm.$emit("update:modelValue", "team_2");
+    await flushPromises();
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+  });
+
+  /// A broader or narrower holder is a legitimate overlap: the rules split the alerts by specificity.
+  it.each([
+    [
+      "broader",
+      "k8s-namespace=risk",
+      { "k8s-namespace": "risk", service: "risk-api" },
+      "Takes alerts from Payments",
+    ],
+    [
+      "narrower",
+      "k8s-namespace=risk/service=risk-api",
+      { "k8s-namespace": "risk" },
+      "Payments keeps these alerts: its rule is more specific",
+    ],
+    [
+      "equally specific",
+      "service=risk-api",
+      { "k8s-namespace": "risk" },
+      "Competes with a rule for Payments: the more specific one wins",
+    ],
+  ])("keeps Save open when another team holds a %s path", async (_kind, path, dimensions, text) => {
+    const wrapper = render({
+      conflict: { team_id: "team_2", decision: { path } },
+      initialDimensions: dimensions,
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-outcome"]').text()).toBe(text);
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
   });
 
   it("shows who is on call now for the picked team", async () => {

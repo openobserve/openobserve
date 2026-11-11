@@ -227,23 +227,44 @@ describe("ONavbar", () => {
       expect(wrapper.find('[data-test="menu-link-reports-item"]').exists()).toBe(true);
     });
 
-    it("renders IAM / Management / AI as plain links (no submenu)", () => {
+    it("renders AI as a plain link and IAM inside the Settings flyout", () => {
       wrapper = mountNavbar({
         linksList: [
           { title: "Home", icon: "home", link: "/home", name: "home" },
           { title: "IAM", icon: "manage-accounts", link: "/iam", name: "iam" },
-          { title: "Management", icon: "settings", link: "/settings", name: "settings" },
+          { title: "Settings", icon: "settings", link: "/settings", name: "settings" },
           { title: "AI", icon: "auto-awesome", link: "/ai", name: "aiObservability" },
         ],
       });
-      // Plain top-level links …
-      expect(wrapper.find('[data-test="menu-link-iam-item"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="menu-link-settings-item"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="menu-link-aiObservability-item"]').exists()).toBe(true);
-      // … not flyout groups.
-      expect(wrapper.find('[data-test="nav-group-iam"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="nav-group-settings"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="nav-group-aiObservability"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="menu-link-iam-item"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="menu-link-settings-item"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="nav-group-settings"]').exists()).toBe(true);
+    });
+
+    it("adds no flyout groups to a flat rail", () => {
+      wrapper = mountNavbar({
+        flat: true,
+        linksList: [
+          {
+            title: "Overview",
+            icon: "bar-chart",
+            link: "/security/overview",
+            name: "securityOverview",
+          },
+          {
+            title: "Alerts",
+            icon: "notifications-active",
+            link: "/security/alerts",
+            name: "alertList",
+          },
+        ],
+      });
+      expect(wrapper.find('[data-test="nav-group-infra"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="nav-group-reliability"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="menu-link-securityOverview-item"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="menu-link-alertList-item"]').exists()).toBe(true);
     });
 
     it("drops the Data group entirely when no data items are present", () => {
@@ -481,7 +502,7 @@ describe("ONavbar", () => {
       "x1",
       "x2",
       "x3",
-      "iam",
+      "x6",
       "x4",
       "plans",
       "settings",

@@ -87,6 +87,9 @@ export interface DrawerProps {
    */
   seamless?: boolean;
 
+  /** Accessible name for a drawer that renders its own header (no `title`). */
+  ariaLabel?: string;
+
   // ── Header subtitle ────────────────────────────────────────────────────
 
   /**

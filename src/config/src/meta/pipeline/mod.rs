@@ -26,7 +26,7 @@ use crate::{
         stream::{RemoteStreamParams, StreamParams, StreamType},
     },
     stats::MemorySize,
-    utils::json,
+    utils::{json, schema::format_stream_name},
 };
 
 pub mod components;
@@ -348,6 +348,8 @@ impl Pipeline {
     /// 8. EnrichmentTables can only be used in Scheduled pipelines
     ///
     /// If all satisfies, populates the [Pipeline::source] with the first node in nodes list
+    ///
+    /// Unless `ZO_SKIP_FORMATTING_STREAM_NAME` is set, also formats fixed stream-node names.
     pub fn validate(&mut self) -> Result<()> {
         if self.name.is_empty() {
             return Err(anyhow!("Please provide non-empty name for the pipeline"));
@@ -367,6 +369,18 @@ impl Pipeline {
             }
             _ => {}
         };
+
+        // must run before the internal-stream guards and the ck 3 source copy
+        if !crate::get_config().common.skip_formatting_stream_name {
+            for node in self.nodes.iter_mut() {
+                if let NodeData::Stream(stream_params) = &mut node.data
+                    && !stream_params.stream_name.contains('{')
+                {
+                    stream_params.stream_name =
+                        format_stream_name(stream_params.stream_name.to_string()).into();
+                }
+            }
+        }
 
         for node in &self.nodes {
             if !node.data.is_pipeline_node() {
@@ -2221,6 +2235,106 @@ mod tests {
         for ok in ["logs_{kind}", "{kind}", "_o2"] {
             assert!(pipeline(ok).validate().is_ok(), "{ok}");
         }
+    }
+
+    #[test]
+    fn test_pipeline_validation_formats_fixed_stream_names() {
+        let stream = |id: &str, name: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::Stream(StreamParams::new("test_org", name, StreamType::Logs)),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let dest_name = |p: &Pipeline| match &p.nodes[1].data {
+            NodeData::Stream(s) => s.stream_name.to_string(),
+            _ => unreachable!(),
+        };
+        let pipeline = |destination: &str| Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "src",
+                StreamType::Logs,
+            )),
+            kind: PipelineKind::User,
+            nodes: vec![stream("1", "src"), stream("2", destination)],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+                source_handle: None,
+            }],
+        };
+        let mut p = pipeline("../../other_org/logs/victim");
+        p.validate().unwrap();
+        let got = dest_name(&p);
+        assert!(!got.contains('/') && !got.contains(".."), "got {got}");
+        assert_eq!(
+            got,
+            format_stream_name("../../other_org/logs/victim".to_string())
+        );
+        let mut t = pipeline("logs_{svc}");
+        t.validate().unwrap();
+        assert_eq!(dest_name(&t), "logs_{svc}");
+    }
+
+    #[test]
+    fn test_pipeline_validation_formats_before_checks() {
+        let stream = |id: &str, name: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::Stream(StreamParams::new("test_org", name, StreamType::Logs)),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let build = |source: &str, dest: &str| Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                source,
+                StreamType::Logs,
+            )),
+            kind: PipelineKind::User,
+            nodes: vec![stream("1", source), stream("2", dest)],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+                source_handle: None,
+            }],
+        };
+        let mut p = build("My-Logs", "dst");
+        p.validate().unwrap();
+        let node0 = match &p.nodes[0].data {
+            NodeData::Stream(s) => s.stream_name.to_string(),
+            _ => unreachable!(),
+        };
+        let src = match &p.source {
+            PipelineSource::Realtime(s) => s.stream_name.to_string(),
+            _ => unreachable!(),
+        };
+        assert_eq!(node0, format_stream_name("My-Logs".to_string()));
+        assert_eq!(src, node0);
+        let err = build("src", "_o2_ai-chat_events")
+            .validate()
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("internal"), "{err}");
     }
 
     #[test]

@@ -21,11 +21,13 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import { queryClient } from "@/composables/query/queryClient";
 import llmPromptsService, { type Prompt } from "@/services/llm-prompts.service";
 import { readEditorDraft, writeEditorDraft } from "@/utils/drafts/editorDraftStore";
+import analytics from "@/services/product_analytics";
 import PromptsPage from "./PromptsPage.vue";
 
 vi.mock("@/services/llm-prompts.service", () => ({
   default: { list: vi.fn(), getSettings: vi.fn(), archive: vi.fn(), get: vi.fn() },
 }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/utils/commons", () => ({ getFoldersListByType: vi.fn(async () => []) }));
 vi.mock("@/composables/useConfirmDialog", () => ({
   useConfirmDialog: () => ({ confirm: vi.fn(async () => true) }),
@@ -96,6 +98,7 @@ describe("PromptsPage drafts", () => {
   beforeEach(() => {
     localStorage.clear();
     queryClient.clear();
+    vi.mocked(analytics.track).mockClear();
     vi.mocked(llmPromptsService.list).mockResolvedValue([prompt("triage"), prompt("summary")]);
     vi.mocked(llmPromptsService.getSettings).mockResolvedValue({
       protectedLabels: ["production"],
@@ -143,6 +146,7 @@ describe("PromptsPage drafts", () => {
     expect(readEditorDraft(scope("triage"))).toBeNull();
     expect(readEditorDraft(scope("summary"))).not.toBeNull();
     expect(wrapper!.find('[data-test="prompt-triage-draft-dot"]').exists()).toBe(false);
+    expect(analytics.track).toHaveBeenCalledWith("llm_prompt_archived");
   });
 
   it("keeps the drafts when archiving fails", async () => {
@@ -155,5 +159,6 @@ describe("PromptsPage drafts", () => {
     await flushPromises();
 
     expect(readEditorDraft(scope("triage"))).not.toBeNull();
+    expect(analytics.track).not.toHaveBeenCalledWith("llm_prompt_archived");
   });
 });

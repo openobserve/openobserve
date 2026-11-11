@@ -1,9 +1,10 @@
 import { expect } from '@playwright/test';
+import { SELECTORS, clickDashboardMenuItem } from './dashboard-selectors.js';
 
 /**
  * Page object for the "Scheduled Dashboards" drawer opened from a dashboard's
  * view toolbar (web/src/views/Dashboards/ScheduledDashboards.vue, opened by
- * ViewDashboard.vue's `view-dashboard-scheduled-reports` button).
+ * ViewDashboard.vue's `view-dashboard-scheduled-reports` More-menu item).
  *
  * Covers the two regressions fixed in PR #13569:
  *   1. rows duplicating each time the drawer is reopened
@@ -13,8 +14,7 @@ export class ScheduledReportsDrawerPage {
   constructor(page) {
     this.page = page;
 
-    // Toolbar trigger on the dashboard view page (ViewDashboard.vue:195).
-    this.openDrawerBtn = page.locator('[data-test="view-dashboard-scheduled-reports"]');
+    this.moreOptionsBtn = page.locator(SELECTORS.MORE_OPTIONS_BTN);
 
     // ODrawer sets its DialogContent data-test from the consumer's attr
     // (parentDataTest), so the panel itself carries `scheduled-dashboards-drawer`.
@@ -68,11 +68,11 @@ export class ScheduledReportsDrawerPage {
       `&dashboard=${dashboardId}&folder=${folderId}&tab=${tabId}`;
     await this.page.goto(url, { waitUntil: 'domcontentloaded' });
     await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-    await expect(this.openDrawerBtn).toBeVisible({ timeout: 30000 });
+    await expect(this.moreOptionsBtn).toBeVisible({ timeout: 30000 });
   }
 
   /**
-   * Click the toolbar button and wait for the reports list call to settle.
+   * Pick the More-menu item and wait for the reports list call to settle.
    * @returns {Promise<string>} the URL of the `GET /api/{org}/reports` request,
    *          so a test can assert the query contract (no `folder_id=`).
    */
@@ -83,7 +83,7 @@ export class ScheduledReportsDrawerPage {
         response.request().method() === 'GET',
       { timeout: 30000 }
     );
-    await this.openDrawerBtn.click();
+    await clickDashboardMenuItem(this.page, '[data-test="view-dashboard-scheduled-reports"]');
     const response = await listResponse;
     expect(response.status()).toBe(200);
 

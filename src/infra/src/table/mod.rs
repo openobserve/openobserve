@@ -166,6 +166,7 @@ pub async fn migrate() -> Result<(), anyhow::Error> {
 async fn run_migrations(client: &DatabaseConnection) -> Result<(), anyhow::Error> {
     // Reading the history fails on the draft migrations' missing files, so forget them first.
     migration::forget_draft_migrations(client).await?;
+    migration::forget_renamed_migrations(client).await?;
     check_migration_history(client).await?;
     // This is a hack to fix the failing alerts migration
     // For postgres, we need to run the migration that populates the alerts table first.

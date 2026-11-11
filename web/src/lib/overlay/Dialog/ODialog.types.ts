@@ -35,6 +35,12 @@ export interface DialogProps {
   title?: I18nText;
 
   /**
+   * Accessible name used for the hidden dialog title when `title` is not set.
+   * Draws nothing.
+   */
+  ariaTitle?: I18nText;
+
+  /**
    * Whether to render a built-in × close button in the top-right corner.
    * Only applies when `persistent` is false.
    * @default true

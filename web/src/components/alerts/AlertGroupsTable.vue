@@ -240,7 +240,14 @@
 
     <template #empty>
       <OEmptyState
-        v-if="!loading"
+        v-if="!loading && loadError"
+        size="hero"
+        preset="load-error"
+        data-test="alerts-alertgroupstable-load-error"
+        @action="emit('refresh')"
+      />
+      <OEmptyState
+        v-else-if="!loading"
         size="hero"
         :title="t('alerts.groups.emptyTitle')"
         :description="t('alerts.groups.emptyDescription')"
@@ -304,6 +311,7 @@ const props = withDefaults(
   defineProps<{
     groups: AlertGroup[];
     loading?: boolean;
+    loadError?: boolean;
     alertId?: string;
     alertName?: string;
     folderId?: string;
@@ -313,6 +321,7 @@ const props = withDefaults(
   }>(),
   {
     loading: false,
+    loadError: false,
     alertId: "",
     alertName: "",
     folderId: undefined,
@@ -353,16 +362,20 @@ const muteAlertContext = computed<QuickMuteAlertContext>(() => ({
 
 const canAcknowledge = (row: AlertGroup) => isFiringOutcome(row.last_outcome) && !row.ack;
 
+// The alert's chip is one merged mute; a condition-scoped mute is resolved only there.
+const coveringMute = (row: AlertGroup): AlertGroup["downtime"] =>
+  row.downtime ?? downtimeForGroup(props.downtime, row.group_key);
+
 // The table shows the mute per group, so a group mute reads as this group's own countdown.
 const groupMute = (row: AlertGroup): ActiveDowntime | null => {
-  const covering = downtimeForGroup(props.downtime, row.group_key);
+  const covering = coveringMute(row);
   return covering ? { ...covering, alert_groups: null } : null;
 };
 
 const muteRef = (row: AlertGroup): AlertMuteRef | null => {
-  const covering = downtimeForGroup(props.downtime, row.group_key);
-  return covering && props.downtime
-    ? { id: covering.id, ends_at: covering.ends_at, version: props.downtime.version }
+  const covering = coveringMute(row);
+  return covering
+    ? { id: covering.id, ends_at: covering.ends_at, version: covering.version }
     : null;
 };
 

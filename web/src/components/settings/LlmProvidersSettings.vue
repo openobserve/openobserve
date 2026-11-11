@@ -208,6 +208,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { type Provider } from "@/services/online-evals.service";
 import { deleteProviderMutation, providersQuery } from "@/services/online-evals.service.queries";
+import analytics from "@/services/product_analytics";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import {
   defaultModelOf,
@@ -439,6 +440,7 @@ async function performDelete() {
   if (!row) return;
   try {
     await deleteProvider.mutateAsync(row.id);
+    analytics.track("llm_provider_deleted");
     toast({
       variant: "success",
       message: t("onlineEvals.deleted", { label: t("onlineEvals.singular.providers") }),

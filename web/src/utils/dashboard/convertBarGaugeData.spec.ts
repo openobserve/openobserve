@@ -23,7 +23,7 @@ import {
   convertBarGaugeData,
 } from "./convertBarGaugeData";
 import { calculateWidthText } from "./chartDimensionUtils";
-import { chartColor } from "@/utils/chartTheme";
+import { chartAxisTextColor, chartColor } from "@/utils/chartTheme";
 import {
   getLegendSeriesNames,
   readOriginalNames,
@@ -582,6 +582,12 @@ describe("bar gauge through convertPanelData", () => {
     const roomy: any = convertBarGaugeData(gauges, panel, 4000);
     expect(roomy.xAxis.axisLabel.interval).toBe(0);
     expect(valueLabels(roomy).label.show).toBe(true);
+  });
+
+  it("colours the category names like every other axis tick label", async () => {
+    const options = await viaPanel(sqlPanel("bar-gauge", {}, {}, fixedRange), [rows()]);
+    expect(options.yAxis.axisLabel.color).toBe(chartAxisTextColor());
+    expect(options.yAxis.axisLabel.color).not.toBe(chartColor("--color-text-secondary"));
   });
 
   it("puts the value text past the end of the track, never on the fill", async () => {

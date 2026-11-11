@@ -71,7 +71,7 @@ export class AlertNoDestinationPage {
 
   /** An importable alert for this org; `destinations` undefined leaves the key out entirely. */
   importPayload(name, destinations) {
-    const alert = { ...simpleAlert(name), org_id: getOrgIdentifier() };
+    const alert = simpleAlert(name);
     if (destinations === undefined) delete alert.destinations;
     else alert.destinations = destinations;
     return alert;

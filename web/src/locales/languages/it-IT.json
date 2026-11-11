@@ -691,7 +691,8 @@
       "scoreConfigs": "Configurazioni dei punteggi",
       "workflows": "Workflow",
       "syntheticFolders": "Cartelle Synthetics",
-      "downtimeFolders": "Cartelle dei downtime"
+      "downtimeFolders": "Cartelle dei downtime",
+      "security": "Sicurezza"
     },
     "resourcesInline": {
       "dashboards": "dashboard",
@@ -747,7 +748,8 @@
       "fleetManagement": "gestione della flotta",
       "incidents": "incidenti",
       "onCallResponses": "risposte di reperibilità",
-      "searchJobs": "job di ricerca"
+      "searchJobs": "job di ricerca",
+      "security": "Sicurezza"
     },
     "denied": {
       "view": "Non puoi visualizzare {resource}",
@@ -1380,6 +1382,7 @@
     "autoRefreshRelativeOnly": "Si applica solo agli intervalli di tempo relativi",
     "turnOffLiveMode": "Disattiva la modalità Live",
     "autoRefreshWithValue": "Aggiornamento automatico: {value}",
+    "autoRefreshTrigger": "Auto: {interval}",
     "searchHistory": "Cronologia delle ricerche",
     "usageCostHistory": "Cronologia utilizzo e costi",
     "createScheduledSearch": "Crea ricerca pianificata",
@@ -1709,7 +1712,9 @@
       "rerunCancelled": "Nuova esecuzione annullata dopo {elapsed}. Vengono mostrati i risultati precedenti.",
       "rerunCancelledNow": "Nuova esecuzione annullata. Vengono mostrati i risultati precedenti.",
       "analyzeSucceeded": "Ultima esecuzione riuscita",
-      "analyzeFailedShort": "Ultima esecuzione non riuscita"
+      "analyzeFailedShort": "Ultima esecuzione non riuscita",
+      "analyzeWarned": "Ultima esecuzione completata con avvisi",
+      "analyzePartial": "L'esecuzione è terminata, ma i risultati potrebbero essere incompleti."
     },
     "errorDeletingSavedView": "Errore durante l'eliminazione della vista salvata.",
     "errorCreatingSavedView": "Errore durante la creazione della vista salvata.",
@@ -1948,6 +1953,7 @@
     "billings": "Fatturazione",
     "rum": "RUM",
     "settings": "Impostazioni",
+    "allSettings": "Tutte le impostazioni",
     "iam": "IAM",
     "report": "Report",
     "pipeline": "Pipeline",
@@ -2190,12 +2196,12 @@
       "fileTypeZip": "Sono consentiti solo file ZIP"
     },
     "emptyState": {
-      "title": "Monitora i tuoi utenti con Real User Monitoring",
-      "description": "RUM tiene traccia delle interazioni degli utenti reali (caricamento delle pagine, errori, chiamate API e replay delle sessioni) in modo da poter vedere esattamente come gli utenti percepiscono la tua applicazione.",
       "webApp": "Strumenta un'app web",
       "webAppDesc": "Aggiungi l'SDK RUM di OpenObserve a qualsiasi app {product}",
       "sessionReplay": "Abilita la riproduzione della sessione",
       "sessionReplayDesc": "Registra e riproduci le sessioni utente per eseguire il debug dei problemi di UX",
+      "title": "Monitora i tuoi utenti con Real User Monitoring",
+      "description": "RUM tiene traccia delle interazioni degli utenti reali (caricamento delle pagine, errori, chiamate API e replay delle sessioni) in modo da poter vedere esattamente come gli utenti percepiscono la tua applicazione.",
       "learnMore": "Per saperne di più:",
       "quickImpl": "Guida rapida all'implementazione",
       "blogPost": "Nozioni di base sul monitoraggio frontend"
@@ -2327,6 +2333,8 @@
     "translatingStackTrace": "Traduzione della traccia dello stack con source map...",
     "translatingStackTraceHint": "Potrebbe richiedere alcuni istanti",
     "sourceMapsNotAvailable": "Source Map non disponibili",
+    "mobileSourceMapsNotApplicable": "Le source map non si applicano agli errori iOS e Android",
+    "mobileSourceMapsNotApplicableBody": "Le source map JavaScript caricate non possono risolvere gli stack frame nativi mobili. Leggi lo stack originale nella scheda {tab}.",
     "sourceMapsNotAvailableBody": "Per visualizzare tracce dello stack dettagliate con codice sorgente originale e numeri di riga, carica le source map per questa applicazione.",
     "serviceBadge": "Servizio:",
     "versionBadge": "Versione:",
@@ -3296,7 +3304,6 @@
         "inThisView": "In questa vista",
         "pagesFunnelNote": "Un passo del funnel che nomina una pagina nascosta corrisponde comunque.",
         "fieldMissing": "campo non presente in questo stream",
-        "fieldMissingOn": "{field}: campo non presente in questo stream",
         "field": "Campo",
         "match": "Corrispondenza",
         "values": "Valori",
@@ -3348,7 +3355,8 @@
         "edit": "Modifica",
         "identityRowForm": "In questa scheda, le regole di identità si applicano dal primo evento identificato",
         "newUsersOnly": "Solo nuovi utenti",
-        "newUsersSessionsTip": "Solo nuovi utenti funziona solo in modalità Utenti"
+        "newUsersSessionsTip": "Solo nuovi utenti funziona solo in modalità Utenti",
+        "fieldMissingOn": "{field}: campo non presente in questo stream"
       },
       "appFilters": {
         "hiddenLabel": "Nascosto dai filtri dell'app:",
@@ -3557,7 +3565,6 @@
     "licenseAndUsage": "Licenza e utilizzo",
     "copyLicenseId": "Copia ID licenza",
     "editionLbl": "Edizione",
-    "limitPrefix": "· limite",
     "gbPerDay": "GB / giorno",
     "ofDailyLimitUsedToday": "del limite giornaliero utilizzato oggi",
     "gbToday": "GB oggi",
@@ -3581,6 +3588,7 @@
     "usage_limits": "Limiti di utilizzo",
     "feature_comparison_lbl": "Confronto delle funzionalità",
     "feature_comparision_ent_msg": "Stai utilizzando OpenObserve Enterprise Edition con accesso a tutte le funzionalità avanzate elencate di seguito.",
+    "feature_comparision_ent_partial_msg": "Stai usando OpenObserve Enterprise Edition. Alcune funzionalità non sono incluse nella tua licenza; consulta l'elenco sopra.",
     "feature_comparision_plan_detail": "Il tuo piano: Enterprise Edition è gratuito per un massimo di 50 GB/giorno (~1.5 TB/mese) di acquisizione dati.",
     "feature_comparision_os_msg": "Al momento stai utilizzando OpenObserve Open Source Edition. Effettua l'upgrade a Enterprise Edition per sbloccare le funzionalità avanzate elencate nella tabella di confronto riportata di seguito.",
     "feature_comparision_good_news": "Buone notizie: OpenObserve Enterprise Edition è completamente gratuito per un massimo di 50 GB/giorno (~1.5 TB/mese) di acquisizione dati.",
@@ -3661,6 +3669,7 @@
     "features_no_match": "Nessuna funzionalità corrisponde alla tua ricerca",
     "features_none": "Nessuna funzionalità in questo gruppo",
     "features_free_heading": "Gratuite, incluse in ogni licenza",
+    "features_free_not_included": "Gratuita, non inclusa nella tua licenza",
     "features_new": "Nuove dopo la tua licenza",
     "features_filter_new": "Nuove",
     "request_new_license": "Richiedi una nuova licenza",
@@ -3841,6 +3850,13 @@
     "license_already_active_msg": "La tua licenza è ancora attiva. Vuoi aggiornarla con la nuova chiave di licenza?",
     "yes_update_license": "Sì, aggiorna la licenza",
     "no_keep_current": "No, tieniti aggiornato",
+    "license_downgrade_title": "Applicare questa chiave di licenza?",
+    "license_downgrade_intro": "Questa chiave sostituisce la licenza corrente.",
+    "license_downgrade_expired": "Questa chiave è scaduta il {date}. Si applicherà il limite gratuito di 50 GB/giorno.",
+    "license_downgrade_lose": "Perderai: {names}",
+    "license_downgrade_limit": "Il limite giornaliero passa da {old} a {new}",
+    "license_downgrade_expiry": "La scadenza passa da {old} a {new}",
+    "license_limit_per_day": "{gb} GB/giorno",
     "header_button": {
       "cloud_features": "Funzionalità di {product}",
       "enterprise_edition": "Edizione: Enterprise",
@@ -4053,13 +4069,9 @@
     "getStartedBannerMessage": "Prova OpenObserve oggi per un'osservabilità più efficiente e performante.",
     "getStartedBannerAlt": "Banner Inizia",
     "getStartedHeading": "Un'ultima cosa prima di iniziare",
-    "hearAboutUsLabel": "Come hai saputo di noi?",
     "hearAboutUsPlaceholder": "Es. Da un amico",
-    "whereDoYouWorkLabel": "Dove lavori?",
     "whereDoYouWorkPlaceholder": "Nome azienda",
-    "agreeToTermsPrefix": "Ho letto e accetto i",
     "termsOfUse": "Termini di utilizzo",
-    "and": "e",
     "privacyPolicyStar": "Informativa sulla privacy*",
     "startTrialButton": "Inizia la tua prova di 14 giorni",
     "copyrightNotice": "© OpenObserve",
@@ -4070,19 +4082,28 @@
     "emailRequired": "L'email è obbligatoria",
     "emailInvalid": "Inserisci un'email valida",
     "passwordRequired": "La password è obbligatoria",
-    "mustAcceptTerms": "Devi accettare i termini per continuare",
     "getStarted": {
       "title": "Benvenuto in OpenObserve",
-      "subtitle": "La tua prova di 14 giorni è iniziata. Due rapide domande e poi ti portiamo alla configurazione.",
-      "sourceLabel": "Cosa vuoi inviare per primo?",
-      "optional": "(facoltativo)",
-      "skip": "Salta le domande",
-      "continue": "Continua",
-      "hearAboutUsPlaceholder": "Ad esempio, un collega o un post di blog",
-      "whereDoYouWorkPlaceholder": "Azienda o team",
-      "termsOfService": "Termini di servizio",
-      "privacyPolicy": "Informativa sulla privacy",
-      "agreeHint": "Necessario per continuare, anche se salti le domande.",
+      "skipForNow": "Salta per ora",
+      "heard": {
+        "label": "Come hai saputo di noi?",
+        "placeholder": "Seleziona un'opzione",
+        "thanks": "Grazie!"
+      },
+      "connect": {
+        "title": "Connetti i tuoi dati",
+        "point1": "Configurazione passo passo per ogni origine",
+        "point2": "Log, metriche e tracce in un unico posto",
+        "point3": "Visualizza i tuoi primi eventi in pochi minuti",
+        "cta": "Esplora altre origini dei dati"
+      },
+      "sample": {
+        "title": "Esplora con dati di esempio",
+        "point1": "Log, tracce e metriche da servizi di esempio",
+        "point2": "Dashboard, avvisi, una pipeline e funzioni VRL",
+        "point3": "Una visita guidata e un clic per rimuovere tutto",
+        "cta": "Esplora con dati di esempio"
+      },
       "sources": {
         "kubernetes": "Kubernetes",
         "linux": "Host Linux o VM",
@@ -4095,7 +4116,28 @@
         "llm": "App LLM o IA",
         "agent": "Lascia che un agente AI lo configuri",
         "unsure": "Non sono ancora sicuro"
+      },
+      "chips": {
+        "kubernetes": "Kubernetes",
+        "linux": "Linux / VM",
+        "windows": "Windows",
+        "webserver": "Server web",
+        "otel": "OpenTelemetry",
+        "cloud": "AWS · Azure · GCP",
+        "rum": "Browser (RUM)",
+        "llm": "LLM o app AI",
+        "agent": "Agente AI"
       }
+    },
+    "heardFrom": {
+      "question": "Come ci hai trovato?",
+      "quickQuestion": "Una domanda veloce: come ci hai trovato?",
+      "skip": "Salta",
+      "searchEngine": "Motore di ricerca",
+      "friendOrColleague": "Amico o collega",
+      "aiAssistant": "Assistente AI",
+      "other": "Altro",
+      "thanks": "Grazie per avercelo detto!"
     }
   },
   "user": {
@@ -4463,6 +4505,7 @@
       "presetsSubtitle": "Aggiungi a questo ruolo le concessioni di un preset. Non viene rimosso nulla.",
       "presetsSectionBuiltin": "Integrati",
       "presetsSectionJob": "Per mansione",
+      "presetsSectionSecurity": "Sicurezza",
       "presetAddsTooltip": "Aggiunge {count} permesso | Aggiunge {count} permessi",
       "presetInRole": "Nel ruolo",
       "presetInRoleTooltip": "Questo ruolo ha già tutto ciò che c'è in questo preset",
@@ -4538,7 +4581,16 @@
       "presetRestored": "{title} ha ripristinato {permissions}. Verifica le modifiche prima di salvare.",
       "presetSummaryRestores": "Mantiene {count} permesso che hai contrassegnato per la rimozione. | Mantiene {count} permessi che hai contrassegnato per la rimozione.",
       "presetRestoreButton": "Mantieni {count} permesso | Mantieni {count} permessi",
-      "effectStillAllowed": "Nessuna modifica all'accesso: un permesso più ampio lo consente ancora."
+      "effectStillAllowed": "Nessuna modifica all'accesso: un permesso più ampio lo consente ancora.",
+      "moduleGroupSecurity": "Sicurezza",
+      "presetSocAnalystTitle": "Analista SOC",
+      "presetSocAnalystDescription": "Gestire avvisi e casi di Sicurezza, con accesso in lettura a rilevamenti, stream ed elenchi di threat intelligence",
+      "presetDetectionEngineerTitle": "Ingegnere dei rilevamenti",
+      "presetDetectionEngineerDescription": "Creare, ottimizzare, attivare ed eseguire rilevamenti, installare contenuti, collegare sorgenti con le relative funzioni e pipeline e gestire tabelle di arricchimento come gli elenchi di threat intelligence, con accesso in lettura a Sicurezza, casi e stream",
+      "presetSecurityAdminTitle": "Amministratore Sicurezza",
+      "presetSecurityAdminDescription": "Gestire tutta la Sicurezza, inclusa l'eliminazione di rilevamenti e casi e l'esclusione di sorgenti, con incidenti, funzioni, pipeline, tabelle di arricchimento e chiavi di cifratura, e accesso in lettura agli stream",
+      "presetSecurityViewerTitle": "Visualizzatore Sicurezza",
+      "presetSecurityViewerDescription": "Visualizzare Sicurezza, i suoi casi, rilevamenti e stream sorgente senza modificarli"
     },
     "rolesPage": {
       "subtitle": "I ruoli raggruppano le autorizzazioni: assegnali a utenti, account di servizio o gruppi per concedere l'accesso.",
@@ -5035,8 +5087,8 @@
     "otherFieldsSchemaTooltip": "Gli altri campi mostrano solo i campi dello schema che esistevano prima che lo stream fosse configurato per utilizzare uno schema definito dall'utente.",
     "addFieldsTitle": "Aggiungi campi",
     "dataRetentionDaysLabel": "Conservazione dei dati (giorni)",
-    "globalRetentionDays": "La conservazione globale è di {days} giorni",
-    "retentionMinOneDay": "Il periodo di conservazione deve essere di almeno 1 giorno",
+    "retentionDefaultDays": "Lascia vuoto per usare il valore predefinito per questo tipo di stream: {days} giorni",
+    "retentionDefaultForever": "Lascia vuoto per usare il valore predefinito per questo tipo di stream: conserva per sempre",
     "maxQueryRangeHoursLabel": "Intervallo massimo di query (ore)",
     "maxQueryRangeHelp": "Intervallo di tempo massimo consentito per le query. Imposta 0 per un intervallo illimitato.",
     "globalFlattenLevel": "Il valore globale è {level}",
@@ -6477,12 +6529,6 @@
     "joinSlack": "Unisciti a Slack",
     "maybeLater": "Forse più tardi"
   },
-  "connectDataSourcePopup": {
-    "title": "Per iniziare, colleghiamo la tua prima fonte di dati.",
-    "description": "Abbiamo molto da mostrarti, ma dobbiamo prima collegare i tuoi dati. La maggior parte dei team vede i primi log in circa un minuto.",
-    "connectButton": "Collega una fonte di dati",
-    "slackLink": "Unisciti anche alla nostra community Slack"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "Continua da dove si era fermato",
     "startFromNow": "Inizia da ora.",
@@ -7063,6 +7109,9 @@
       "k8sNetworkFlowsTitle": "Scopri quali workload comunicano tra loro: flussi di rete eBPF",
       "k8sInstallerNote": "Questo installa automaticamente cert-manager, l'operatore OpenTelemetry e il collector OpenObserve.",
       "k8sInternalEndpointNote": "Usa questa opzione quando OpenObserve è in esecuzione nello stesso cluster — il traffico non lo lascia mai.",
+      "k8sTraceAppsTitle": "Traccia le tue app",
+      "k8sTraceEbpfDesc": "Attiva il tracciamento eBPF nel collector, poi scegli le app da tracciare per porta, percorso dell'eseguibile o riga di comando.",
+      "k8sTraceLibraryDesc": "Annota il namespace di ogni linguaggio, così l'operatore aggiunge la sua libreria ai pod presenti. Poi riavvia quelle app una volta.",
       "k8sTroubleAnnotationA": "L'iniezione avviene alla creazione del pod, quindi i pod esistenti non vengono influenzati fino al riavvio — esegui `kubectl rollout restart deployment -n my-namespace`. Conferma che l'annotazione sia stata applicata con `kubectl get ns my-namespace -o yaml` e verifica che il valore corrisponda a `openobserve-collector/openobserve-<language>`.",
       "k8sTroubleAnnotationQ": "Ho annotato un namespace ma non appaiono tracce",
       "k8sTroubleEndpointA": "Usa l'**Endpoint interno** solo quando OpenObserve stesso viene eseguito in questo cluster; il traffico rimane allora al suo interno e non attraversa mai la rete. L'URL è `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — il valore predefinito presuppone la release `o2` nel namespace `openobserve`, quindi modificalo se i tuoi sono diversi. Tutti gli altri usano l'endpoint esterno.",
@@ -7335,6 +7384,7 @@
       "androidTroubleScreenNamesQ": "Le sessioni appaiono ma gli schermi hanno tutti lo stesso nome",
       "androidTroubleScreenNamesA": "Il tracciamento delle viste non è collegato. Passa un `useViewTrackingStrategy(...)` — ad esempio `ActivityViewTrackingStrategy(trackExtras = true)` per le Activity, o `NavigationViewTrackingStrategy(...)` se usi AndroidX Navigation — quando crei la `RumConfiguration`.",
       "setupTime5Min": "~5 min",
+      "showStepInstructions": "Mostra istruzioni",
       "snowflakeCollectorVersionNote": "Snowflake necessita del collector v0.92.0 — le versioni più recenti hanno un bug noto.",
       "snowflakeTagline": "Raccogli le metriche dell'account Snowflake con l'OpenTelemetry Collector e inviale a OpenObserve.",
       "sqlClientGuiVariant": "Client SQL (GUI)",
@@ -7378,6 +7428,7 @@
       "verifyCassandraMetricsDesc": "Il controllo qui sotto diventa verde quando i dati arrivano, oppure controlla Stream per le metriche `cassandra_*`.",
       "verifyDatabricksLogsDesc": "Il controllo qui sotto diventa verde quando i dati arrivano, oppure apri Log e cerca `source:databricks`.",
       "verifyDataTitle": "Verifica i dati in OpenObserve",
+      "checkYourDataTitle": "Verifica i tuoi dati",
       "verifyDynamodbLogsDesc": "Il controllo qui sotto diventa verde quando i dati arrivano, oppure apri Log per lo stream `dynamodb` quando gli elementi cambiano.",
       "verifyGcpLogsDesc": "Genera un po' di attività nel progetto (oppure attendi che il sink trovi un log); il controllo qui sotto diventa verde quando i dati arrivano.",
       "verifyK8sDataDesc": "Lascia al collector qualche secondo per avviarsi; il controllo qui sotto diventa verde quando i dati arrivano — i log del cluster finiscono nello stream `default`.",
@@ -7675,6 +7726,28 @@
       "tlsBody": "Il token è una credenziale bearer che può essere riutilizzata su HTTP in chiaro, quindi termina TLS su {brand} ({setting}, disabilitato per impostazione predefinita) o su un proxy attendibile davanti a esso."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "Aggiorna la configurazione del {product} esistente per inviare log, metriche e tracce a questa organizzazione.",
+      "correlationBody": "Per correlare log e tracce, le applicazioni devono registrare l’ID di traccia completo a 128 bit. Se il tracer Java registra solo i 64 bit inferiori, imposta {setting} nell’applicazione.",
+      "profilingBody": "La profilazione utilizza una destinazione separata e la chiave API dell’Agent. Se un’applicazione esegue già un profiler, disattiva la profilazione dell’applicazione o del tracer durante la migrazione oppure configurane separatamente la destinazione.",
+      "multiValueTagsBody": "I tag con più valori distinti usano una stringa di array JSON ordinato. Anche un singolo valore che inizia con [ viene codificato come array JSON di un elemento per preservare l’identità della serie.",
+      "envTitle": "Configurazione dell'Agent",
+      "envBody": "Imposta queste variabili d'ambiente su {product} e riavvialo. Richiede {product} {version} o versione successiva.",
+      "tokenBody": "La chiave API deve essere un token di ingestione dell'organizzazione, che inizia con {prefix}. Questa organizzazione non ha token di ingestione abilitati, quindi non viene mostrato alcuno snippet di configurazione. Crea un token di ingestione, poi torna a questa pagina.",
+      "tokenLink": "Apri token di ingestione",
+      "featuresOffBody": "Le righe dopo gli URL disattivano le funzionalità dell'Agent che inviano ai server di {vendor} con la stessa chiave. {setting} mantiene anche {component} disattivato, che le versioni più recenti dell'Agent eseguono e che non conserva il percorso in questi URL.",
+      "logsTitle": "Log",
+      "logsBody": "La raccolta dei log è disattivata per impostazione predefinita in {product}. Imposta {setting} e configura le tue origini di log.",
+      "dualTitle": "Mantieni la destinazione attuale",
+      "dualBody": "Per inviare a questa organizzazione insieme a una destinazione esistente, mantieni gli URL e la chiave API attuali e aggiungi invece queste voci a {file}. I log richiedono {setting}, perché altrimenti gli endpoint di log aggiuntivi usano TCP.",
+      "metricsTitle": "Interrogazione delle metriche",
+      "metricsTypes": "Ogni serie viene memorizzata come gauge con il valore inviato dall'Agent, etichettata con {typeField} e {intervalField}.",
+      "metricsCount": "Le serie Count contengono il conteggio per ciascun intervallo di flush. Sommale con {promql} in PromQL o {sql} in SQL.",
+      "metricsRate": "Le serie Rate sono al secondo. Moltiplica il valore per {intervalField} per recuperare il conteggio relativo all'intervallo.",
+      "metricsCounterFns": "Le funzioni PromQL {rate} e {increase} richiedono contatori cumulativi, quindi non forniscono risultati significativi su queste serie.",
+      "metricsSketch": "Le distribuzioni vengono memorizzate come bucket di istogramma e i percentili vengono stimati da questi bucket. Un valore più alto di ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA produce bucket più fini e percentili più precisi, al costo di più righe memorizzate."
+    },
     "gpu": "GPU",
     "gpuExporter": "Esportatore GPU"
   },
@@ -7927,6 +8000,7 @@
     "homeDashboardSetFailed": "Impossibile impostare la dashboard iniziale",
     "homeDashboardRemoveFailed": "Impossibile rimuovere la dashboard iniziale",
     "setAsHomeDesc": "Mostra questa dashboard nella home page per tutti i membri dell'organizzazione",
+    "moreOptionsSettingsDraft": "Altre opzioni, bozza impostazioni non salvata",
     "favorites": "Preferiti",
     "addToFavorites": "Aggiungi ai preferiti",
     "removeFromFavorites": "Rimuovi dai preferiti",
@@ -9312,6 +9386,7 @@
       "refresh": "Aggiorna",
       "refreshCacheReload": "Aggiorna cache e ricarica",
       "moreRefreshOptions": "Altre opzioni di aggiornamento",
+      "moreShareOptions": "Altre opzioni di condivisione",
       "autoRunDescription": "Esegue le query all'apertura e quando cambiano filtri o intervallo di tempo",
       "autoRunScope": "Si applica a tutte le dashboard, Log e Tracce",
       "dashboard": "Dashboard",
@@ -10792,7 +10867,10 @@
     "contractManagedMessage": "La fatturazione è gestita tramite il tuo contratto — contatta il tuo account manager per modifiche",
     "upgradeToPlanMessage": "Passa a un piano per continuare a usufruire dei servizi di OpenObserve.",
     "creditsUsedLabel": "crediti usati",
-    "licenseExpiryContactAdmin": "Aggiorna la tua licenza contattando il tuo amministratore.",
+    "licenseExpiredOn": "La tua licenza è scaduta il {date}. Le tue funzionalità restano attive.",
+    "licenseExpiredLimit": "Ora si applica il limite gratuito di {limit} GB/giorno: superarlo per più di {allowed} giorni in un mese sospende la ricerca fino al rinnovo.",
+    "licenseAskAdminToRenew": "Chiedi all'amministratore della licenza di rinnovarla.",
+    "renewLicense": "Rinnova licenza",
     "subscribed": "Sottoscritto",
     "invoiceHistory": "Cronologia fatture",
     "amount": "Importo",
@@ -10936,7 +11014,6 @@
     "failedToLinkAwsSubscription": "Impossibile collegare l'abbonamento AWS",
     "failedToLinkAzureSubscription": "Impossibile collegare l'abbonamento Azure",
     "last15Minutes": "Ultimi 15 minuti",
-    "licenseHasExpired": "La tua licenza è scaduta",
     "numberOfPipelines": "Numero di pipeline",
     "oneDayUntilLicenseExpires": "Manca 1 giorno alla scadenza della tua licenza",
     "pleaseWaitProcessingRequest": "Attendi mentre elaboriamo la tua richiesta...",
@@ -11452,6 +11529,68 @@
     }
   },
   "alerts": {
+    "firing": {
+      "title": "Attivi",
+      "drawer": {
+        "openInLogs": "Apri nei log",
+        "partOfIncident": "Parte dell'incidente:",
+        "incidentAck": "Prendere in carico qui significa prendere in carico l'intero incidente.",
+        "incidentTakeOver": "Prendere il controllo qui significa assumere il controllo dell'intero incidente.",
+        "now": "Ora",
+        "threshold": "soglia {value}",
+        "since": "da {time}",
+        "flaps": "Oscillazioni, ultime 6h",
+        "flapsUnit": "cambi di stato",
+        "notified": "Notificato",
+        "notDeliveredTo": "{name}: non consegnato",
+        "history": "Cronologia",
+        "last2h": "ultime 2h",
+        "lastSpan": "ultimi {span}",
+        "viewAll": "Visualizza tutto",
+        "historyEmpty": "Nessuna esecuzione in questa finestra.",
+        "historyFailed": "Impossibile caricare la cronologia.",
+        "barFiring": "{span} attivo",
+        "barOk": "{span} ok",
+        "barUnknown": "{span} non letto",
+        "eventStarted": "Attivazione iniziata",
+        "eventRecovered": "Ripristinato",
+        "eventNotified": "Notificato",
+        "eventNotifiedTo": "Notificato a {names}",
+        "eventFailed": "Non consegnato",
+        "eventFailedTo": "Non consegnato a {names}",
+        "soFar": "{span} finora",
+        "lasted": "durata {span}",
+        "okFor": "ok per {span}"
+      },
+      "chipCount": "{label} {count}",
+      "chipFiring": "Attivo",
+      "chipAcked": "Preso in carico",
+      "chipMuted": "Silenziato",
+      "chipFailed": "Non consegnato",
+      "searchPlaceholder": "Cerca avvisi",
+      "priorityAll": "Priorità",
+      "priorityLabel": "Priorità",
+      "priorityUnset": "Nessuna priorità",
+      "folderAll": "Cartella: tutte",
+      "folderLabel": "Cartella",
+      "stale": "obsoleto",
+      "refreshFailed": "Impossibile aggiornare gli avvisi attivi ({reason}). Visualizzazione dei dati da {time}.",
+      "refreshFailedReason": "richiesta non riuscita",
+      "statusUnavailable": "Lo stato degli avvisi non è disponibile in questo momento, quindi non è possibile mostrare gli avvisi attivi.",
+      "retry": "Riprova",
+      "columnPriority": "Priorità",
+      "columnState": "Stato",
+      "columnAlert": "Avviso",
+      "columnFolder": "Cartella",
+      "columnFiringFor": "Attivo da",
+      "acknowledgeCount": "Prendi in carico {count}",
+      "mute": "Silenzia",
+      "clear": "Rimuovi",
+      "emptyFiring": "Nessun avviso attivo",
+      "emptyAcked": "Nessun avviso preso in carico",
+      "emptyMuted": "Nessun avviso silenziato",
+      "emptyFailed": "Nessun invio non riuscito"
+    },
     "moreActions": "Altre azioni",
     "promRuleMode": "Modalità regola",
     "promRulePreview": "{count} serie restituite corrispondono ora. Ogni serie deve completare il periodo di attesa prima di attivarsi.",
@@ -11464,7 +11603,6 @@
       "anomalyImportSuccess": "Rilevamento anomalie - {index}: \"{name}\" importato correttamente",
       "anomalyImportFailed": "Rilevamento anomalie - {index}: \"{name}\" importazione non riuscita — {reason}",
       "nameRequired": "Avviso - {index}: Il nome è obbligatorio e deve essere una stringa valida.",
-      "orgIdInvalid": "Avviso - {index}: L'ID organizzazione è obbligatorio, deve esistere nell'elenco delle organizzazioni e deve essere uguale a {orgId}.",
       "streamTypeInvalid": "Avviso - {index}: il tipo di stream è obbligatorio e deve essere uno tra: 'logs', 'metrics', 'traces'.",
       "streamNameInvalid": "Avviso - {index}: Il nome dello stream è obbligatorio, deve esistere nell'elenco degli stream e deve essere una stringa valida.",
       "destinationsArray": "Avviso - {index}: Le destinazioni devono essere un array.",
@@ -11613,7 +11751,6 @@
     "jsonFilesOnlyHint": "Solo file .json",
     "outputMessages": "Messaggi di output",
     "timezoneRequiredLabel": "Fuso orario *",
-    "organizationIdLabel": "ID organizzazione",
     "alertCreationTitle": "Creazione avviso",
     "noAlertsFound": "Nessun avviso trovato",
     "groupedNotification": "Notifica raggruppata",
@@ -12661,6 +12798,8 @@
       "noDestinationNote": "Opzionale. L'avviso viene comunque eseguito e ne registra la cronologia, ma nessuna destinazione viene notificata.",
       "sendsToStatus": "Invia a {targets} ogni volta che l'avviso si attiva.",
       "oncallTeamTarget": "un team di reperibilità",
+      "lockedWorkflowFallback": "Workflow bloccato",
+      "lockedTargetBadge": "Bloccato",
       "createsIncident": "Crea incidente",
       "createsIncidentTooltip": "Se un avviso può creare un incidente, non invia una notifica dedicata. Al suo posto, viene inviata una notifica per l'incidente quando viene creato un nuovo incidente o quando un nuovo tipo di avviso si unisce a un incidente esistente.",
       "incidentTitleTemplate": "Titolo dell'incidente",
@@ -12902,6 +13041,9 @@
       "lastTrained": "Ultimo addestramento",
       "level": "Livello",
       "lookBackWindow": "Finestra di lookback",
+      "scheduleIntervalFloor": "L'intervallo di controllo deve essere almeno {min}.",
+      "lookBackWindowCap": "La finestra di analisi può essere al massimo {max} con questa risoluzione di rilevamento: una finestra più lunga contiene più di 100.000 bucket. Accorcia la finestra o usa una risoluzione di rilevamento più lunga.",
+      "retrainOnEditNote": "La modifica della query, della funzione o della risoluzione di rilevamento riaddestra questo rilevatore. Il rilevamento si mette in pausa finché l'addestramento non termina.",
       "lookBackWindowFloor": "La finestra di lookback deve essere di almeno {min} — Controlla ogni più una Risoluzione di rilevamento. Una finestra più breve non può contenere un bucket completo quando la prima esecuzione viene avviata, quindi quell'esecuzione salterebbe dei bucket.",
       "lookBackWindowLegacy": "Questa finestra salvata è inferiore al minimo di {min} (Controlla ogni più una Risoluzione di rilevamento). Verrà salvata invariata, ma una prima esecuzione può saltare dei bucket finché la finestra non viene aumentata.",
       "lookBackWindowMinimum": "Almeno {min}; per queste impostazioni si consiglia {recommended} o più.",
@@ -12914,6 +13056,9 @@
       "noDestinationsFound": "Nessuna destinazione trovata",
       "noDetectionResults": "Ancora nessun risultato di rilevamento in questo intervallo",
       "noFieldsFound": "Nessun campo trovato",
+      "checkDataNow": "Controlla ora",
+      "checkDataNowTooltip": "Valuta di nuovo i dati attuali ora invece di attendere il prossimo controllo automatico.",
+      "dataReadinessReason": "Motivo",
       "noticeRetrain": "Riaddestramento automatico",
       "noticeRetrainTooltip": "Impossibile leggere il modello salvato dopo un aggiornamento, quindi è stato eliminato e la configurazione è stata messa in coda per il riaddestramento automatico. Non è richiesta alcuna azione; il rilevamento riprende al termine dell'addestramento.",
       "noticeSkipAbsence": "La valutazione dell'assenza è rimasta indietro rispetto alla finestra di lookback; lo span che non poteva più essere recuperato è stato saltato e registrato.",
@@ -12948,6 +13093,8 @@
       "autoUntrainedHelp": "Auto apprenderà un livello dalla tua cronologia.",
       "autoTrainingHelp": "Il livello apparirà al termine dell'addestramento.",
       "autoFailedHelp": "Addestramento non riuscito. Nessun livello appreso finora. Controlla l'errore di addestramento sopra.",
+      "autoWaitingForDataHelp": "Dati di addestramento adatti ancora insufficienti. Fino ad allora nessun livello appreso. Il rilevatore resta abilitato e viene ricontrollato automaticamente.",
+      "autoNotApplicableHelp": "I dati attuali non supportano un modello di anomalie. Non è un errore. Il rilevatore resta abilitato e viene ricontrollato automaticamente.",
       "autoRetrainingHelp": "Riaddestramento. Viene mostrato l'ultimo livello appreso; la disponibilità del modello non è confermata.",
       "autoRetrainFailedHelp": "Riaddestramento non riuscito. Viene mostrato l'ultimo livello appreso; la disponibilità del modello non è confermata. Controlla l'errore di addestramento sopra.",
       "autoUnconfirmedHelp": "Viene mostrato l'ultimo livello appreso; un modello attivo non è stato confermato.",
@@ -13185,6 +13332,7 @@
     "oncallTeamPlaceholder": "Instrada in base alle regole di proprietà",
     "oncallTeamTooltip": "Quale team viene contattato da questo avviso. Lascialo non impostato per ricavare il team dalle dimensioni di identità dell'avviso, che è il caso normale — imposta un solo team quando queste dimensioni non possono esprimere il proprietario.",
     "oncallTeamNoTeams": "Non ci sono ancora team di reperibilità. Creane uno nella sezione Reperibilità.",
+    "lockedTeamFallback": "Team bloccato",
     "oncallTeamAtFireTime": "Dalle regole di proprietà",
     "oncallTeamFromRules": "Per questo avviso non è impostato alcun team: il proprietario viene determinato dalle dimensioni di identità della riga che lo attiva. Queste non sono note fino all'attivazione.",
     "tags": "Tag",
@@ -14550,6 +14698,7 @@
     "separator_placeholder": "Inserisci il separatore (es., {'|'}, \\n, \\t, spazio)",
     "separator_hint": "Stringa separatrice da utilizzare tra i record (spazi consentiti)",
     "templateDefaultOption": "Predefinito ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Lascia il valore predefinito per usare il template {type} standard ({name}), oppure scegline uno personalizzato.",
     "loadingData": "Caricamento dei dati della destinazione...",
     "noEmailTemplates": "Sembra che tu non abbia ancora creato alcun template email.",
@@ -15486,6 +15635,20 @@
       "azureCredentials": "Credenziali Azure",
       "awsRoleArn": "ARN del ruolo AWS"
     },
+    "dataRetentionDefaults": {
+      "title": "Valori predefiniti di conservazione dei dati",
+      "about": "Per gli stream che non hanno una conservazione propria. Vuoto o 0 utilizza il valore globale; altrimenti almeno 3 giorni.",
+      "defaultDays": "Predefinito (giorni)",
+      "streamType": "Tipo di stream",
+      "days": "Giorni",
+      "addType": "Aggiungi tipo di stream",
+      "removeType": "Rimuovi questo tipo di stream",
+      "globalDefault": "Globale: {value}",
+      "globalType": "Globale {type}: {value}",
+      "daysValue": "{days} giorni",
+      "forever": "conserva per sempre",
+      "invalid": "Usa 0 o almeno 3 giorni"
+    },
     "organizationSettings": {
       "fieldNameHelp": "Usa solo caratteri alfanumerici e '+=,.{'@'}-_', senza spazi.",
       "settingsUpdated": "Impostazioni organizzazione aggiornate con successo",
@@ -15515,9 +15678,7 @@
     },
     "licensePage": {
       "unexpectedError": "errore imprevisto",
-      "daysRemaining": "{days} giorni rimanenti alla scadenza della licenza",
-      "oneDayRemaining": "1 giorno rimanente alla scadenza della licenza",
-      "licenseExpired": "La tua licenza è scaduta"
+      "daysRemaining": "{days} giorni rimanenti alla scadenza della licenza"
     },
     "nodesPage": {
       "subtitle": "Nodi del cluster e loro stato",
@@ -22492,6 +22653,7 @@
       "actions": "Azioni",
       "rum": "RUM",
       "runningQueries": "Interrogazioni in esecuzione",
+      "security": "Sicurezza",
       "oncall": "Reperibilità",
       "synthetics": "Synthetics",
       "fleet": "Flotta",
@@ -22553,7 +22715,8 @@
       "syntheticsJourney": "Percorso Synthetics",
       "downtimes": "Downtime",
       "fleetConfigEditor": "Editor configurazione",
-      "fleetOverview": "Pipeline della flotta"
+      "fleetOverview": "Pipeline della flotta",
+      "securityRecord": "Sicurezza — apri record"
     },
     "actions": {
       "openCheatsheet": "Apri il cheatsheet delle scorciatoie da tastiera",
@@ -22686,7 +22849,9 @@
       "traceNextVisibleSpan": "Span visibile successivo",
       "tracePrevVisibleSpan": "Span visibile precedente",
       "fleetEditorDeleteNode": "Rimuovi il componente selezionato",
-      "fleetFlowCloseDetails": "Chiudi i dettagli del percorso o comprimi la mappa"
+      "fleetFlowCloseDetails": "Chiudi i dettagli del percorso o comprimi la mappa",
+      "securityRecordNext": "Record successivo",
+      "securityRecordPrev": "Record precedente"
     }
   },
   "components": {
@@ -23026,7 +23191,9 @@
         "ready": "Pronto",
         "running": "In esecuzione",
         "training": "In addestramento",
-        "waiting": "In attesa"
+        "waiting": "In attesa",
+        "waitingForData": "In attesa di dati",
+        "notApplicable": "Non applicabile"
       },
       "anomalyStatus": {
         "active": "Attivo",
@@ -23034,7 +23201,9 @@
         "training": "In addestramento",
         "failed": "Fallito",
         "waiting": "In attesa",
-        "disabled": "Disabilitato"
+        "disabled": "Disabilitato",
+        "waitingForData": "In attesa di dati",
+        "notApplicable": "Non applicabile"
       },
       "aiToolsetKind": {
         "skill": "Abilità",
@@ -23219,6 +23388,11 @@
       "failedToLoadToolset": "Impossibile caricare il set di strumenti"
     },
     "alerts": {
+      "firing": {
+        "bulkResult": "{acked} presi in carico, {skipped} saltati",
+        "bulkResultFailed": "{acked} presi in carico, {skipped} saltati, {failed} non riusciti",
+        "bulkAllAcked": "{acked} presi in carico"
+      },
       "failedToNavigateToAlert": "Impossibile passare all'avviso",
       "alertNotFound": "Avviso non trovato",
       "failedToLoadAlerts": "Impossibile caricare gli avvisi",
@@ -23397,7 +23571,6 @@
     },
     "login": {
       "somethingWentWrong": "Qualcosa è andato storto",
-      "thankYouForYourFeedback": "Grazie per il tuo feedback",
       "selectedSuggestion": "Suggerimento selezionato \"{suggestion}\"",
       "pleaseFillAllTheFieldsAnd": "Compila tutti i campi e riprova.",
       "invalidUsernameOrPassword": "Nome utente o password non validi.",
@@ -23864,6 +24037,19 @@
     "exportSucceeded": "Esportato {count} SLO | Esportati {count} SLO",
     "moved": "Spostati {count} SLO in {folder}",
     "moveFailed": "Spostamento non riuscito",
+    "import": {
+      "title": "Importa SLO",
+      "results": "Risultati dell'importazione",
+      "noResults": "Il risultato di ogni SLO compare qui dopo l'importazione.",
+      "jsonEmpty": "Aggiungi il JSON degli SLO da un file, un URL o l'editor prima di importare.",
+      "invalidJson": "Impossibile analizzare il JSON degli SLO.",
+      "notAnObject": "SLO #{index} non è un oggetto JSON ed è stato ignorato.",
+      "nameRequired": "SLO #{index} non ha un nome ed è stato ignorato.",
+      "created": "SLO #{index} \"{name}\" importato.",
+      "failed": "SLO #{index} \"{name}\" non è stato importato: {reason}",
+      "unknownError": "Errore sconosciuto",
+      "succeeded": "Importato {count} SLO | Importati {count} SLO"
+    },
     "preview": {
       "goodEvents": "Eventi buoni",
       "badEvents": "Eventi cattivi",
@@ -23954,6 +24140,1425 @@
       "minutes": "{count} minuto | {count} minuti",
       "hours": "{count} ora | {count} ore",
       "days": "{count} giorno | {count} giorni"
+    }
+  },
+  "solutionSwitcher": {
+    "title": "Soluzione",
+    "hint": "Cambia prodotto senza perdere la posizione",
+    "observability": {
+      "label": "Osservabilità",
+      "description": "Log, metriche, tracce, dashboard"
+    },
+    "security": {
+      "label": "Sicurezza",
+      "description": "SIEM · OCSF · Regole Sigma"
+    }
+  },
+  "siem": {
+    "severity": {
+      "critical": "Critico",
+      "high": "Alto",
+      "medium": "Medio",
+      "low": "Basso",
+      "info": "Info",
+      "unknown": "Sconosciuto",
+      "fatal": "Fatale",
+      "other": "Altro"
+    },
+    "range": {
+      "1h": "1h",
+      "24h": "24h",
+      "7d": "7g",
+      "30d": "30g"
+    },
+    "common": {
+      "close": "Chiudi",
+      "mitre": "MITRE ATT&CK",
+      "severity": "Gravità",
+      "viewAll": "Visualizza tutto"
+    },
+    "caseStatus": {
+      "open": "Nuovo",
+      "acknowledged": "In analisi",
+      "resolved": "Chiuso"
+    },
+    "health": {
+      "live": "In segnalazione",
+      "quiet": "Silenzioso da oltre 24 ore",
+      "never": "Ancora nessun dato"
+    },
+    "outcome": {
+      "success": "Successo",
+      "failure": "Fallimento"
+    },
+    "op": {
+      "eq": "uguale",
+      "neq": "diverso da",
+      "contains": "contiene",
+      "notContains": "non contiene"
+    },
+    "pivot": {
+      "include": "Filtra per valore",
+      "exclude": "Escludi valore",
+      "copy": "Copia valore"
+    },
+    "entity": {
+      "actor": "Attore",
+      "source": "Origine",
+      "destination": "Destinazione",
+      "host": "Host",
+      "process": "Processo",
+      "operation": "Operazione",
+      "resource": "Risorsa"
+    },
+    "notices": {
+      "more": "{n} altri",
+      "less": "Mostra meno",
+      "readMore": "Scopri di più",
+      "tone": {
+        "error": "Errore",
+        "warning": "Avviso",
+        "info": "Informazioni"
+      }
+    },
+    "fieldGroup": {
+      "event": "Evento",
+      "actor": "Attore",
+      "src": "Endpoint di origine",
+      "dst": "Endpoint di destinazione",
+      "network": "Connessione",
+      "http": "HTTP",
+      "process": "Processo e file",
+      "cloud": "Cloud e API",
+      "finding": "Riscontro",
+      "device": "Dispositivo",
+      "metadata": "Metadati",
+      "other": "Altri campi"
+    },
+    "column": {
+      "time": "Ora",
+      "severityId": "Gravità",
+      "className": "Classe",
+      "activity": "Attività",
+      "statusId": "Esito",
+      "actor": "Attore",
+      "srcIp": "IP di origine",
+      "dstIp": "IP di destinazione",
+      "host": "Host",
+      "process": "Processo",
+      "operation": "Operazione",
+      "resource": "Risorsa",
+      "product": "Prodotto",
+      "message": "Messaggio"
+    },
+    "mitre": {
+      "tactics": {
+        "reconnaissance": "Ricognizione",
+        "resource_development": "Sviluppo di risorse",
+        "initial_access": "Accesso iniziale",
+        "execution": "Esecuzione",
+        "persistence": "Persistenza",
+        "privilege_escalation": "Escalation dei privilegi",
+        "defense_evasion": "Evasione delle difese",
+        "credential_access": "Accesso alle credenziali",
+        "discovery": "Scoperta",
+        "lateral_movement": "Movimento laterale",
+        "collection": "Raccolta",
+        "command_and_control": "Comando e controllo",
+        "exfiltration": "Esfiltrazione",
+        "impact": "Impatto"
+      }
+    },
+    "overview": {
+      "title": "Panoramica SOC",
+      "subtitle": "Cosa è scattato, cosa è aperto e se le tue origini stanno ancora inviando dati",
+      "autoRefreshOn": "L'aggiornamento automatico ogni minuto è attivo",
+      "autoRefreshOff": "L'aggiornamento automatico è disattivato",
+      "historyError": "Impossibile caricare la cronologia dei rilevamenti: {reason}",
+      "rulesError": "Impossibile caricare i rilevamenti: {reason}",
+      "noDetections": "Nessun rilevamento SIEM è ancora abilitato, quindi qui non può scattare nulla. Abilita i rilevamenti dal catalogo Sigma per iniziare il monitoraggio.",
+      "browseDetections": "Sfoglia i rilevamenti",
+      "stat": {
+        "critical": "Attivazioni critiche",
+        "high": "Attivazioni alte",
+        "openCases": "Casi aperti",
+        "firingDetections": "Rilevamenti attivati",
+        "quietSources": "Sorgenti silenziose",
+        "activeRules": "Rilevamenti attivi"
+      },
+      "activity": "Attività di rilevamento",
+      "activityHint": "Nessuna attivazione in questa finestra | {n} attivazione in questa finestra, impilata per gravità | {n} attivazioni in questa finestra, impilate per gravità",
+      "quiet": "Nessuna attivazione",
+      "quietHint": "Nessun rilevamento è scattato in questo intervallo di tempo.",
+      "openCases": "Casi aperti",
+      "casesUnsupported": "La gestione dei casi non è disponibile in questa distribuzione",
+      "noOpenCases": "Nessun caso aperto",
+      "untitledCase": "Caso senza titolo",
+      "caseAlerts": "{n} avviso | {n} avvisi",
+      "triage": "Coda di triage",
+      "triageHint": "Ultime attivazioni, dalla più recente",
+      "fullQueue": "Coda completa",
+      "detection": "Rilevamento",
+      "matches": "Corrispondenze",
+      "fired": "Attivato",
+      "queueClear": "La coda di triage è vuota",
+      "topDetections": "Rilevamenti più rumorosi",
+      "topDetectionsHint": "Dove la messa a punto rende di più",
+      "mitre": "Copertura MITRE ATT&CK",
+      "mitreHint": "{covered} tattiche su {total} coperte dai rilevamenti abilitati",
+      "rulesCount": "{n} regola | {n} regole",
+      "firingsCount": "{n} attivazione | {n} attivazioni",
+      "legendFiring": "Attivati nella finestra",
+      "legendCovered": "Coperto",
+      "legendGap": "Nessuna copertura",
+      "sources": "Stato delle sorgenti di log",
+      "sourcesHint": "{live} su {total} sorgenti di sicurezza stanno inviando dati",
+      "explore": "Esplora",
+      "noSources": "Nessuna sorgente di sicurezza",
+      "noSourcesHint": "Ingerisci CloudTrail, Okta, VPC Flow o syslog. Gli stream con security, audit, auth o firewall nel nome compaiono qui automaticamente.",
+      "summaryPartial": "Questa finestra contiene più cronologia avvisi di quanta ne possa contenere un riepilogo, quindi i conteggi e i grafici sono un limite inferiore; scegli una finestra più breve per numeri completi."
+    },
+    "events": {
+      "title": "Eventi di sicurezza",
+      "subtitle": "Cerca tra la telemetria di sicurezza normalizzata",
+      "run": "Esegui",
+      "hideSidebar": "Nascondi campi",
+      "showSidebar": "Mostra campi",
+      "selectStream": "Seleziona uno stream",
+      "securityStreams": "Stream di sicurezza",
+      "otherStreams": "Altri stream",
+      "builder": "Builder",
+      "allSeverities": "Tutte le gravità",
+      "field": "Campo",
+      "value": "Valore",
+      "addFilter": "Aggiungi filtro",
+      "clearFilters": "Cancella tutto",
+      "sources": "Origini",
+      "addSource": "Aggiungi uno stream come origine",
+      "removeSource": "Rimuovi dalle origini",
+      "autoSource": "Selezionato automaticamente: {label}, {n}% di corrispondenza",
+      "nameSource": "Selezionato perché il nome sembra un'origine di sicurezza",
+      "autoTag": "auto",
+      "suggested": "Suggerito",
+      "suggestedSource": "Sembra {label} ({n}% di corrispondenza)",
+      "addSuggested": "Aggiungi come origine",
+      "dismissSuggestion": "Ignora",
+      "showMore": "Mostra altri {n}",
+      "showFewer": "Mostra meno",
+      "classShare": "{uid} {pct}%",
+      "classifying": "Ricerca di dati di sicurezza negli stream",
+      "searchFields": "Cerca campi",
+      "addColumn": "Mostra come colonna",
+      "removeColumn": "Nascondi colonna",
+      "noValues": "Nessun valore in questa finestra",
+      "noFields": "Nessun campo corrispondente",
+      "selectStreamFirst": "Seleziona uno stream per vederne i campi",
+      "confidence": "{n}% di corrispondenza",
+      "telemetryOnly": "Solo telemetria",
+      "matchedOn": "corrispondenza su {fields}",
+      "ocsfCategory": "Categoria OCSF: {name}",
+      "ocsfClass": "Classe OCSF: {name} ({uid})",
+      "rulesMatch": "Le regole corrispondono a {logsource}",
+      "rulesMatchHint": "Il logsource Sigma su cui vengono confrontate le rilevazioni, non la categoria OCSF",
+      "product": "Prodotto: {name}",
+      "classMix": "Classi nell'ultima ora: {mix}",
+      "objects": "Oggetti OCSF",
+      "missingSignals": "Non rilevati: {fields}",
+      "detections": "{n} regola corrispondente | {n} regole corrispondenti",
+      "firing": "{n} con riscontro | {n} con riscontri",
+      "matchingRulesHint": "Regole del catalogo Sigma applicabili a questa origine. I riscontri sono corrispondenze nella finestra corrente, non rilevamenti distribuiti.",
+      "rulesFor": "Regole Sigma per {source}",
+      "hits": "{n} occorrenza | {n} occorrenze",
+      "viewHits": "Visualizza occorrenze",
+      "createDetection": "Crea rilevazione",
+      "events": "Eventi",
+      "sqlTimelineNote": "La timeline e la suddivisione per gravità seguono i filtri del builder. Torna al Builder per vederle per questa ricerca.",
+      "noStreamTitle": "Nessuno stream da cercare",
+      "noStreamHint": "Ingerisci log di sicurezza per iniziare la ricerca. Gli stream compaiono qui non appena arrivano i dati.",
+      "showingOf": "Visualizzazione degli ultimi {shown} eventi su {total}",
+      "count": "{n} evento | {n} eventi",
+      "hideTimeline": "Nascondi timeline",
+      "showTimeline": "Mostra timeline",
+      "normalized": "Normalizzato",
+      "normalizedHint": "Ogni origine mappata sulle colonne OCSF",
+      "raw": "Dati grezzi",
+      "refresh": "Aggiorna risultati",
+      "noEvents": "Nessun evento trovato",
+      "noEventsHint": "Amplia l'intervallo di tempo o allenta i filtri.",
+      "noEventsLastReported": "{stream} non contiene nulla in questo intervallo di tempo. L'ultima segnalazione risale a {ago}.",
+      "searchWider": "Cerca negli ultimi {period}",
+      "searchFailed": "Ricerca non riuscita",
+      "cancel": "Annulla",
+      "cancelled": "Ricerca annullata",
+      "latestCount": "{n} evento corrispondente più recente | {n} eventi corrispondenti più recenti",
+      "sql": "SQL",
+      "invertFilter": "Alterna tra inclusione ed esclusione",
+      "removeFilter": "Rimuovi filtro",
+      "pivotSqlUnsupported": "Questa query SQL non è un semplice SELECT … WHERE, quindi non è stato possibile aggiungervi il filtro. Modifica la query manualmente oppure passa a Builder.",
+      "topValuesWholeStream": "Modalità SQL: i valori vengono conteggiati sull'intero stream, non sulla tua query.",
+      "allSources": "Tutte le sorgenti di sicurezza",
+      "sortSqlMode": "Una query scritta a mano imposta il proprio ORDER BY",
+      "includeFailed": "Impossibile aggiungere {name} a Sicurezza",
+      "excludeFailed": "Impossibile rimuovere {name} da Sicurezza",
+      "hunt": {
+        "title": "Cerca in tutte le sorgenti di sicurezza contemporaneamente",
+        "hint": "Digita un indirizzo IP, un utente o un host. Ogni sorgente viene cercata con le proprie colonne e ogni riga indica da quale sorgente proviene.",
+        "noMatches": "Nessuna corrispondenza in questo intervallo",
+        "noMatchesHint": "Amplia l'intervallo di tempo oppure cerca in qualsiasi campo anziché in un solo tipo.",
+        "noFields": "I campi variano da sorgente a sorgente. Scegli una sorgente per sfogliarne i campi.",
+        "search": "Cerca",
+        "aliases": "Corrisponde anche a {n} grafia | Corrisponde anche a {n} grafie",
+        "clearAliases": "Corrispondi solo al nome digitato",
+        "uncounted": "Non conteggiato: {streams}",
+        "kind": {
+          "any": "Qualsiasi campo",
+          "user": "Utente",
+          "ip": "Indirizzo IP",
+          "host": "Host"
+        },
+        "placeholder": {
+          "any": "Indirizzo IP, utente, host o testo",
+          "user": "dave, ACME\\dave o dave{'@'}acme.io",
+          "ip": "185.220.101.47",
+          "host": "Nome host"
+        },
+        "column": {
+          "time": "Ora",
+          "source": "Origine",
+          "user": "Utente",
+          "ip": "IP di origine",
+          "host": "Host",
+          "action": "Azione",
+          "outcome": "Esito",
+          "message": "Messaggio"
+        }
+      }
+    },
+    "drawer": {
+      "event": "Evento di sicurezza",
+      "overview": "Panoramica",
+      "detections": "Rilevamenti",
+      "fields": "Campi",
+      "json": "JSON",
+      "noEntities": "Nessuna entità riconosciuta",
+      "noEntitiesHint": "Questa origine non ha una mappatura per i campi actor, network o host. Vedi la scheda Campi per tutto ciò che è arrivato.",
+      "classifiedAs": "Classificato come",
+      "evaluating": "Valutazione dei rilevamenti per questo evento",
+      "noRules": "Nessun rilevamento si applica a questa origine",
+      "noRulesHint": "Nessuna delle regole Sigma fornite è scritta per questa origine di log.",
+      "matchError": "Impossibile valutare i rilevamenti",
+      "noMatches": "Nessun rilevamento corrispondente",
+      "noMatchesHint": "Valutata {n} regola su questo evento; non ha trovato corrispondenza. | Valutate {n} regole su questo evento; nessuna ha trovato corrispondenza.",
+      "attack": "Tecniche ATT&CK",
+      "classUid": "class_uid {n}",
+      "eyebrow": "Evento di sicurezza",
+      "source": "Origine",
+      "matchedRules": "{n} rilevamento corrispondente | {n} rilevamenti corrispondenti",
+      "openCase": "Apri caso",
+      "openCaseHint": "Apri un caso sull'host, l'utente o l'indirizzo indicato da questo evento",
+      "addToCase": "Aggiungi al caso",
+      "pickCase": "Aggiungi a un caso aperto",
+      "caseOpened": "Caso aperto: {title}",
+      "caseUpdated": "Evento aggiunto a {title}",
+      "caseError": "Impossibile aprire un caso da questo evento"
+    },
+    "record": {
+      "prev": "Record precedente",
+      "next": "Record successivo",
+      "position": "{n} di {total}",
+      "copyLink": "Copia link a questo record",
+      "linkCopied": "Link copiato",
+      "searchFields": "Cerca campi e valori",
+      "noFields": "Nessun campo corrispondente",
+      "copyFailed": "Impossibile copiare negli appunti"
+    },
+    "alerts": {
+      "title": "Avvisi",
+      "subtitle": "Ogni volta che un rilevamento è stato attivato, con le prove a supporto",
+      "eyebrow": "Rilevamento attivo",
+      "range": {
+        "1h": "1h",
+        "6h": "6h",
+        "24h": "24h",
+        "7d": "7g",
+        "30d": "30g"
+      },
+      "stat": {
+        "firings": "Attivazioni {severity}",
+        "error": "Valutazioni non riuscite",
+        "silenced": "Silenziati",
+        "low": "Attivazioni basse / info"
+      },
+      "status": {
+        "firing": "Attivo",
+        "notify_failed": "Attivo · notifica non riuscita",
+        "error": "Valutazione non riuscita",
+        "normal": "Normale",
+        "skipped": "Saltato",
+        "other": "Sconosciuto"
+      },
+      "column": {
+        "detection": "Rilevamento",
+        "status": "Esito",
+        "value": "Corrispondenza",
+        "window": "Finestra",
+        "fired": "Attivato",
+        "evaluated": "Valutato"
+      },
+      "fact": {
+        "firedAt": "Attivato alle",
+        "value": "Corrispondenza vs soglia",
+        "window": "Finestra",
+        "evaluation": "Durata valutazione",
+        "windowRange": "Finestra valutata",
+        "group": "Gruppo",
+        "error": "Errore",
+        "evaluatedAt": "Valutato alle"
+      },
+      "tab": {
+        "overview": "Panoramica",
+        "evidence": "Prove",
+        "detection": "Rilevamento",
+        "raw": "Grezzo"
+      },
+      "rule": {
+        "name": "Nome",
+        "state": "Stato",
+        "enabled": "Abilitato",
+        "disabled": "Disabilitato",
+        "stream": "Stream",
+        "frequency": "Esecuzione ogni",
+        "logsource": "Origine dei log",
+        "sigmaId": "ID regola Sigma"
+      },
+      "minutes": "{n} minuto | {n} minuti",
+      "seconds": "{n}s",
+      "yes": "Sì",
+      "search": "Cerca rilevamenti o tecniche",
+      "showEvaluations": "Mostra tutte le valutazioni",
+      "count": "{n} riga | {n} righe",
+      "refresh": "Aggiorna",
+      "cappedRows": "La tabella elenca le {n} esecuzioni corrispondenti più recenti su {total}, fino a {from}. I conteggi per gravità coprono l'intera finestra.",
+      "summaryPartial": "I conteggi per gravità hanno raggiunto il limite di righe del server e potrebbero essere sottostimati; scegli una finestra più breve per ottenere numeri completi.",
+      "notSiem": "Non è una regola SIEM",
+      "notSiemTitle": "Non è un rilevamento SIEM",
+      "notSiemHint": "Questo avviso non dispone di metadati Sigma, quindi non c'è alcuna regola da mostrare. È elencato perché l'opzione solo SIEM è disattivata.",
+      "empty": "Nessuna attivazione",
+      "emptyHint": "Nessun rilevamento attivato in questa finestra.",
+      "noDetections": "Nessun rilevamento SIEM per ora",
+      "noDetectionsHint": "Abilita i rilevamenti dal catalogo Sigma nella pagina Rilevamenti; le loro attivazioni compaiono qui.",
+      "whatItDetects": "Cosa rileva",
+      "whyItFired": "Perché si è attivato",
+      "falsePositives": "Falsi positivi noti",
+      "noEvidence": "Nessuna query di evidenza",
+      "noEvidenceHint": "Questo rilevamento non ha uno stream né una clausola WHERE da rieseguire.",
+      "evidenceCount": "{n} evento corrispondente nella finestra valutata | {n} eventi corrispondenti nella finestra valutata",
+      "evidenceError": "Impossibile caricare gli eventi corrispondenti",
+      "evidenceAgedOut": "Non restano eventi corrispondenti in questa finestra; potrebbero essere usciti dal periodo di conservazione.",
+      "query": "Query di rilevamento",
+      "investigate": "Indaga in Eventi",
+      "openDetection": "Apri rilevamento",
+      "evaluation": "Valutazione",
+      "eyebrowEvaluation": "Valutazione del rilevamento",
+      "evidenceNone": "Nessun elemento corrisponde a questo rilevamento nella finestra valutata.",
+      "customWindow": "Visualizzazione di una finestra fissa: {from} → {to}",
+      "backToRange": "Torna agli ultimi {range}",
+      "missing": "L'avviso a cui punta questo link non è nella finestra caricata. Potrebbe essere più vecchio di questo intervallo o oltre il limite delle righe più recenti.",
+      "dismiss": "Ignora",
+      "triage": {
+        "createCase": "Crea caso",
+        "addToCase": "Aggiungi al caso",
+        "openCase": "Apri caso",
+        "acknowledge": "Avvia analisi",
+        "addNote": "Aggiungi nota",
+        "notePlaceholder": "Aggiungi una nota al caso di questa attivazione",
+        "acknowledged": "Caso preso in analisi",
+        "noted": "Nota aggiunta al caso",
+        "caseOpened": "Caso aperto",
+        "attached": "Attivazione aggiunta al caso",
+        "failed": "Impossibile aggiornare il caso"
+      }
+    },
+    "cases": {
+      "title": "Casi",
+      "subtitle": "Attivazioni correlate, valutate fino a un verdetto",
+      "eyebrow": "Caso",
+      "search": "Filtra questa pagina per titolo, id, assegnatario o entità",
+      "refresh": "Aggiorna",
+      "loadError": "Impossibile caricare i casi",
+      "openError": "Impossibile aprire il caso",
+      "hiddenAlerts": "{n} attivazione da avvisi non di sicurezza in questo caso è nascosta | {n} attivazioni da avvisi non di sicurezza in questo caso sono nascoste",
+      "noSecurityAlerts": "Questo caso è stato aperto da avvisi che non sono rilevamenti di sicurezza, quindi non sono mostrati qui",
+      "updateError": "Impossibile aggiornare il caso",
+      "commentError": "Impossibile pubblicare il commento",
+      "analysisError": "Analisi della causa principale non riuscita",
+      "empty": "Nessun caso",
+      "emptyHint": "I casi si aprono automaticamente quando rilevamenti correlati si attivano insieme.",
+      "unassigned": "Non assegnato",
+      "column": {
+        "priority": "Priorità",
+        "title": "Caso",
+        "status": "Stato",
+        "alerts": "Avvisi",
+        "assignee": "Assegnatario",
+        "firstSeen": "Prima osservazione",
+        "lastSeen": "Ultima osservazione"
+      },
+      "fact": {
+        "duration": "Durata",
+        "timeToClose": "Tempo di chiusura"
+      },
+      "durationMinutes": "{n} min",
+      "durationHours": "{n} h",
+      "durationDays": "{n} g",
+      "tab": {
+        "overview": "Panoramica",
+        "alerts": "Avvisi",
+        "timeline": "Cronologia",
+        "analysis": "Analisi"
+      },
+      "detections": "Rilevamenti in questo caso",
+      "noDetections": "Nessun rilevamento registrato finora",
+      "firedTimes": "attivato {n} volta | attivato {n} volte",
+      "entities": "Entità interessate",
+      "noEntities": "Il motore di correlazione non ha registrato dimensioni di raggruppamento per questo caso.",
+      "noAlerts": "Nessun avviso registrato",
+      "external": "Esterno",
+      "reason": {
+        "service_discovery": "Correlato tramite service discovery",
+        "primary_match": "Correlato sulle dimensioni primarie",
+        "secondary_match": "Correlato sulle dimensioni secondarie",
+        "alert_id": "Stesso rilevamento",
+        "entity": "Stesso host, utente o indirizzo"
+      },
+      "commentPlaceholder": "Aggiungi una nota per il team",
+      "postComment": "Pubblica nota",
+      "noEvents": "Nessuna attività finora",
+      "event": {
+        "created": "Caso aperto",
+        "alert": "{name} attivato ({n})",
+        "severityUpgrade": "Priorità aumentata {from} → {to}: {reason}",
+        "severityOverride": "Priorità impostata {from} → {to}",
+        "acknowledged": "Contrassegnato come in analisi",
+        "resolved": "Chiuso",
+        "autoResolved": "Chiuso automaticamente",
+        "reopened": "Riaperto: {reason}",
+        "titleChanged": "Rinominato in {to}",
+        "assigned": "Assegnato a {to}",
+        "unassigned": "Non assegnato",
+        "comment": "Nota",
+        "analysisBegin": "Analisi della causa radice avviata",
+        "analysisComplete": "Analisi della causa radice completata",
+        "analysisFailed": "Analisi della causa radice non riuscita: {reason}",
+        "analysisCancelled": "Analisi della causa radice annullata",
+        "other": "{type}",
+        "verdict": {
+          "true_positive": "Verdetto: vero positivo",
+          "false_positive": "Verdetto: falso positivo",
+          "benign": "Verdetto: benigno",
+          "duplicate": "Verdetto: duplicato",
+          "stale": "Verdetto: obsoleto / storico"
+        },
+        "alertsAttached": "Attivazioni aggiunte manualmente: {names}",
+        "eventAttached": "Evento da {stream} alle {at} aggiunto"
+      },
+      "analysisHint": "Un riepilogo AI di ciò che collega le attivazioni in questo caso.",
+      "runAnalysis": "Analizza",
+      "rerunAnalysis": "Rianalizza",
+      "noAnalysis": "Nessuna analisi finora",
+      "priorityOption": "{p} · {level}",
+      "priorityChanged": "Priorità impostata su {p}",
+      "statusChanged": "Caso contrassegnato come {status}",
+      "viewFirings": "Visualizza attivazioni",
+      "transition": {
+        "open": "Riapri",
+        "acknowledged": "Avvia analisi",
+        "resolved": "Chiudi caso"
+      },
+      "notFound": "Caso non trovato",
+      "timelinePartial": "Questa sequenza temporale è stata ricostruita dal record del caso, quindi potrebbero mancare note, prese in carico e attività di analisi precedenti alla ricostruzione.",
+      "verdict": {
+        "true_positive": "Vero positivo",
+        "false_positive": "Falso positivo",
+        "benign": "Benigno",
+        "duplicate": "Duplicato",
+        "stale": "Obsoleto / storico"
+      },
+      "close": {
+        "title": "Chiudi caso",
+        "verdict": "Verdetto",
+        "verdictRequired": "Scegli un verdetto",
+        "reason": "Motivo",
+        "reasonPlaceholder": "Cosa hai trovato e perché il caso può essere chiuso",
+        "reasonRequired": "Indica un motivo",
+        "reasonTooLong": "Limita il motivo a {max} caratteri o meno",
+        "cancel": "Annulla"
+      },
+      "settings": {
+        "open": "Impostazioni dei casi",
+        "title": "Impostazioni dei casi",
+        "save": "Salva",
+        "saved": "Impostazioni dei casi salvate",
+        "loadFailed": "Impossibile caricare le impostazioni dei casi",
+        "saveFailed": "Impossibile salvare le impostazioni dei casi",
+        "autoCloseDays": "Chiudi i casi inattivi dopo (giorni)",
+        "autoCloseDaysHint": "Un caso senza nuove attivazioni per questo numero di giorni si chiude da solo. 0 mantiene i casi aperti. Al massimo {max}.",
+        "groupWindowMinutes": "Raggruppa le attivazioni entro (minuti)",
+        "groupWindowMinutesHint": "L'attività sullo stesso host, utente o indirizzo entro questi minuti dall'ultima attività di un caso, in base all'ora dell'evento, si unisce a quel caso. 0 apre un caso per rilevamento. Al massimo {max}.",
+        "wholeNumber": "Inserisci un numero intero",
+        "range": "Inserisci un valore da 0 a {max}"
+      },
+      "assignedTo": "Assegnato a {to}",
+      "unassignedToast": "Caso non assegnato",
+      "historical": "Storico (backfill)",
+      "historicalHint": "Ogni attivazione in questo caso proviene da un backfill su dati passati, quindi non descrive alcuna attività attuale."
+    },
+    "mitrePage": {
+      "title": "MITRE ATT&CK",
+      "subtitle": "Quali tecniche coprono i tuoi rilevamenti abilitati e quali si sono attivati",
+      "summaryPartial": "Questa finestra contiene più cronologia degli avvisi di quanta un riepilogo possa contenerne, quindi i conteggi delle attivazioni sono un limite inferiore; scegli una finestra più breve per ottenere numeri completi.",
+      "stat": {
+        "firing": "Tecniche attive",
+        "gaps": "Lacune di copertura",
+        "techniques": "Tecniche coperte su {total}",
+        "tactics": "Tattiche coperte su {total}"
+      },
+      "view": {
+        "all": "Tutte",
+        "covered": "Coperte",
+        "gaps": "Lacune",
+        "firing": "Attivo"
+      },
+      "search": "Cerca tecnica o regola",
+      "legend": {
+        "firing": "Attivati nella finestra (più scuro = più)",
+        "covered": "Coperta da un rilevamento abilitato",
+        "available": "Regola disponibile, non abilitata",
+        "none": "Nessuna regola nel catalogo"
+      },
+      "columnCount": "{covered} di {total} coperte",
+      "cellEnabled": "{n} rilevamento attivo | {n} rilevamenti attivi",
+      "cellAvailable": "{n} regola disponibile | {n} regole disponibili",
+      "noMatch": "Nessuna tecnica corrispondente",
+      "unmapped": "Tecniche senza una tattica nota",
+      "footnote": "La copertura è misurata rispetto alle {total} tecniche di MITRE ATT&CK Enterprise v{version}, con le sotto-tecniche conteggiate nella tecnica padre; {n} regole Sigma sono incluse nel prodotto.",
+      "drawerEyebrow": "Tecnica ATT&CK",
+      "state": {
+        "firing": "Attivo",
+        "covered": "Coperta",
+        "available": "Non coperta",
+        "none": "Nessuna regola"
+      },
+      "fact": {
+        "state": "Copertura",
+        "enabled": "Rilevamenti attivi",
+        "catalog": "Regole del catalogo",
+        "firings": "Attivazioni ({range})"
+      },
+      "tab": {
+        "detections": "Rilevamenti",
+        "firings": "Attivazioni",
+        "reference": "Riferimento"
+      },
+      "subOf": "Sotto-tecnica di {id}",
+      "yourDetections": "I tuoi rilevamenti",
+      "noDetections": "Nessun tuo rilevamento copre ancora questa tecnica",
+      "enabled": "Attivo",
+      "disabled": "Disattivo",
+      "inCatalog": "Disponibile nel catalogo",
+      "enable": "Abilita",
+      "noFirings": "Nessuna attivazione per questa tecnica negli ultimi {range}",
+      "referenceHint": "I nomi delle tecniche, le procedure e le mitigazioni sono gestiti da MITRE. Questa pagina mostra l'id che le tue regole riportano e collega alla voce ufficiale.",
+      "openTechnique": "Apri {id} su attack.mitre.org",
+      "viewOnAttack": "Visualizza su ATT&CK",
+      "manageDetections": "Gestisci rilevamenti",
+      "historyNarrowed": "L'intervallo massimo di query della cronologia degli avvisi limita le attivazioni a quelle a partire da {from}; le attivazioni precedenti in questa finestra non vengono conteggiate.",
+      "cellNone": "Nessuna regola",
+      "coverageError": "Impossibile caricare la copertura ATT&CK: {reason}"
+    },
+    "detections": {
+      "title": "Rilevamenti",
+      "subtitle": "Regole Sigma in esecuzione come rilevamenti pianificati sui tuoi stream di sicurezza",
+      "new": "Nuovo rilevamento",
+      "eyebrow": "Regola di rilevamento",
+      "refresh": "Aggiorna rilevamenti",
+      "search": "Cerca per nome, stream o tecnica",
+      "anySeverity": "Qualsiasi gravità",
+      "notSiem": "Avviso",
+      "scheduleValue": "Ogni {every} min su {over} min",
+      "minutes": "{n} minuto | {n} minuti",
+      "stat": {
+        "fired": "Attivati nelle 24h",
+        "erroring": "In errore",
+        "enabled": "Abilitato",
+        "disabled": "Disabilitato",
+        "all": "Tutti i rilevamenti",
+        "notifyFailing": "Notifica non riuscita"
+      },
+      "column": {
+        "name": "Rilevamento",
+        "stream": "Stream",
+        "schedule": "Pianificazione",
+        "enabled": "Abilitato",
+        "fired24h": "Attivazioni (24h)",
+        "lastRun": "Ultima esecuzione"
+      },
+      "state": {
+        "enabled": "Abilitato",
+        "disabled": "Disabilitato",
+        "erroring": "In errore",
+        "notifyFailing": "Notifica non riuscita"
+      },
+      "tab": {
+        "overview": "Panoramica",
+        "history": "Cronologia",
+        "sigma": "Regola Sigma",
+        "sql": "Query"
+      },
+      "field": {
+        "logsource": "Origine log",
+        "sourceType": "Tipo di origine",
+        "sigmaId": "ID regola Sigma",
+        "destinations": "Notifiche",
+        "silence": "Silenzio dopo l'attivazione",
+        "owner": "Proprietario",
+        "lastError": "Ultimo errore"
+      },
+      "erroringHint": "L'ultima valutazione di questa regola non è riuscita. Non rileva nulla finché la prossima esecuzione non va a buon fine.",
+      "historyLoading": "Caricamento cronologia valutazioni…",
+      "historyError": "Impossibile caricare la cronologia di questa regola",
+      "historyEmpty": "Nessuna valutazione registrata",
+      "historyEmptyHint": "Questa regola non è stata valutata negli ultimi {days} giorni.",
+      "historySummary": "{firings} attivazione nelle ultime {runs} valutazioni negli ultimi {days} giorni. | {firings} attivazioni nelle ultime {runs} valutazioni negli ultimi {days} giorni.",
+      "historyCapped": "{total} valutazioni in totale; quelle più vecchie non sono mostrate.",
+      "outcome": {
+        "firing": "Attivato",
+        "error": "Errore",
+        "normal": "Nessun risultato",
+        "notify_failed": "Attivato · notifica non riuscita",
+        "skipped": "Saltato",
+        "other": "Esito sconosciuto"
+      },
+      "matched": "{n} righe corrispondenti",
+      "took": "{s}s",
+      "noSigma": "Nessuna regola Sigma su questo avviso",
+      "noSigmaHint": "Gli avvisi creati al di fuori del SIEM funzionano allo stesso modo ma non sono stati scritti come rilevamenti.",
+      "noSql": "-- Questa regola non ha una query SQL",
+      "delete": "Elimina",
+      "deleteTitle": "Elimina rilevamento",
+      "deleteMessage": "Eliminare “{name}”? Smette di essere eseguito immediatamente. Le sue attivazioni passate restano nella cronologia degli avvisi.",
+      "deleted": "{name} eliminato",
+      "deleteFailed": "Impossibile eliminare il rilevamento",
+      "enable": "Abilita",
+      "disable": "Disabilita",
+      "enabledToast": "{name} abilitato",
+      "disabledToast": "{name} disattivato",
+      "toggleFailed": "Impossibile modificare lo stato della regola",
+      "noId": "{name} non ha un id e non può essere modificato",
+      "viewMatches": "Visualizza le corrispondenze in Eventi",
+      "emptyTitle": "Nessun rilevamento per ora",
+      "emptyHint": "Un rilevamento è una regola Sigma eseguita come avviso pianificato. Ogni attivazione finisce in Avvisi e confluisce nei Casi.",
+      "createFirst": "Crea un rilevamento",
+      "newTitle": "Nuovo rilevamento",
+      "newSubtitle": "Una regola Sigma compilata in SQL sul tuo stream e pianificata come avviso",
+      "create": "Crea rilevamento",
+      "cancel": "Annulla",
+      "library": "Libreria delle regole ({n})",
+      "writeSigma": "Scrivi regola Sigma",
+      "librarySearch": "Filtra per titolo, tecnica o logsource",
+      "libraryEmpty": "Nessuna regola corrisponde a quel filtro",
+      "stream": "Stream",
+      "streamPlaceholder": "Scegli lo stream su cui eseguire",
+      "notify": "Notifica (facoltativo)",
+      "notifyPlaceholder": "Nessuna: gli avvisi attivi aprono comunque casi",
+      "noDestinations": "Non esistono ancora destinazioni di avviso. I rilevamenti generano comunque riscontri e aprono casi anche senza una destinazione; aggiungi una destinazione solo se desideri anche le notifiche.",
+      "createDestination": "Crea destinazione",
+      "reloadDestinations": "Aggiorna",
+      "lookBack": "Intervallo retrospettivo (minuti)",
+      "lookBackHelp": "Almeno la finestra di correlazione di {minutes} minuti; ogni esecuzione fa scorrere quella finestra al suo interno",
+      "correlationWindowLabel": "Finestra di correlazione (minuti)",
+      "backfill": "Controlla anche i dati passati alla prima esecuzione",
+      "backfillRange": "Dati passati da controllare",
+      "backfillHours": "Ultima ora | Ultime {n} ore",
+      "runEvery": "Esegui ogni (minuti)",
+      "silence": "Rimani in silenzio per (minuti)",
+      "compiles": "Compilata su {stream}",
+      "compilesAs": "Compilata su {stream}, identificato come {source}",
+      "logsourceMismatch": "Questa regola è scritta per {rule}, ma {stream} è identificato come {source}. Può corrispondere solo dove i due condividono i nomi dei campi.",
+      "unseenFields": "Campo non ancora visto su questo stream: {fields}. La creazione del rilevamento aggiunge queste colonne, così è attivo prima del primo evento di questo tipo.",
+      "ocsfBridge": "{stream} è OCSF, quindi i campi della regola sono mappati ai percorsi OCSF e la regola viene eseguita solo sugli eventi con {guard}.",
+      "ocsfGuard": {
+        "class": "class_uid {uid}",
+        "activity": "activity_id {id}",
+        "product": "un nome di prodotto che contiene \"{name}\""
+      },
+      "createDestinationAria": "Crea destinazione (si apre in una nuova scheda)",
+      "wontRun": "Non verrà eseguita su {stream}",
+      "created": "Rilevamento {name} creato",
+      "createFailed": "Impossibile creare il rilevamento",
+      "neverRun": "Non ancora eseguito",
+      "notFired": "Non si è attivato",
+      "firedTimes": "Una volta, {when} | {n} volte, l'ultima volta {when}",
+      "firedCount": "Attivato una volta nelle 24h | Attivato {n} volte nelle 24h",
+      "firingsPartial": "Troppe valutazioni nelle ultime 24 ore per contarle tutte; i conteggi delle attivazioni sono un limite inferiore.",
+      "firingsNarrowed": "I conteggi delle attivazioni partono da {from}: l'archivio della cronologia limita fino a quanto indietro può arrivare una query.",
+      "ago": {
+        "now": "proprio ora",
+        "minutes": "{n}m fa",
+        "hours": "{n}h fa",
+        "days": "{n}g fa"
+      },
+      "firingsError": "Impossibile caricare la cronologia delle attivazioni",
+      "firingsErrorBanner": "I conteggi delle attivazioni non sono disponibili: {reason}",
+      "validation": {
+        "positive": "Deve essere almeno 1 minuto",
+        "nonNegative": "Non può essere negativo",
+        "periodGap": "Inferiore all'intervallo di esecuzione: i minuti tra un'esecuzione e l'altra non verrebbero mai controllati",
+        "belowTimespan": "Deve essere almeno la finestra di correlazione di {minutes} minuti"
+      },
+      "nameTaken": "Esiste già una detection o un avviso denominato “{name}”. La sua cronologia verrebbe unita a questa, quindi scegli un altro stream o rimuovi prima quello esistente.",
+      "loadError": "Impossibile caricare le regole di detection",
+      "notifyFailingHint": "Questa regola è scattata ma l'ultima notifica non ha potuto essere consegnata. Controlla le sue destinazioni in Cronologia.",
+      "correlationWindow": "Definito dall'intervallo di tempo della correlazione",
+      "createForbidden": "Creare un rilevamento richiede il permesso Sicurezza",
+      "preview": {
+        "run": "Anteprima corrispondenze",
+        "hint": "Esegue la query sulle ultime 24 ore e mostra i primi 20 eventi corrispondenti",
+        "empty": "Nessuna corrispondenza nelle ultime 24 ore",
+        "shown": "{shown} di {total} eventi corrispondenti nelle ultime 24 ore",
+        "failed": "La query non è riuscita: {reason}",
+        "time": "Ora"
+      },
+      "queryFailed": "Non salvato: la query di questo rilevamento non viene eseguita ({reason})"
+    },
+    "content": {
+      "title": "Contenuto",
+      "subtitle": "Le regole di detection e le origini di log incluse nel SIEM, confrontate con i tuoi dati",
+      "refresh": "Aggiorna",
+      "streamsError": "Impossibile caricare i tuoi stream, quindi le corrispondenze con i tuoi dati sono sconosciute",
+      "tab": {
+        "rules": "Regole di detection",
+        "sources": "Origini di log",
+        "overview": "Panoramica",
+        "yourData": "I tuoi dati",
+        "yaml": "Sigma YAML",
+        "yourStreams": "I tuoi stream",
+        "mapping": "Mappatura dei campi"
+      },
+      "logsources": "Origini di log",
+      "allLogsources": "Tutte le regole",
+      "anyLevel": "Qualsiasi livello",
+      "searchRules": "Cerca regole per titolo, tecnica o origine di log",
+      "searchSources": "Cerca origini per nome, fornitore o origine di log",
+      "stat": {
+        "ready": "Pronto per l'installazione",
+        "installed": "Installato",
+        "applies": "Si applicano ai tuoi dati",
+        "allRules": "Tutte le regole",
+        "detected": "Trovato nei tuoi dati",
+        "supported": "Origini supportate"
+      },
+      "column": {
+        "rule": "Regola",
+        "logsource": "Origine di log",
+        "status": "Stato",
+        "yourData": "I tuoi dati",
+        "installed": "Installato",
+        "source": "Origine",
+        "vendor": "Fornitore",
+        "ocsf": "Classe OCSF",
+        "rules": "Regole",
+        "yourStreams": "I tuoi stream"
+      },
+      "status": {
+        "stable": "Stabile",
+        "test": "Test",
+        "experimental": "Sperimentale",
+        "deprecated": "Deprecato",
+        "unsupported": "Non supportato"
+      },
+      "streamCount": "{n} stream | {n} stream",
+      "noMatchingData": "Nessuna origine corrispondente",
+      "installed": "Installato",
+      "readyToInstall": "Pronto per l'installazione",
+      "noRules": "Nessuna regola corrisponde",
+      "noSources": "Nessuna origine corrisponde",
+      "telemetryOnly": "Solo telemetria",
+      "notDetected": "Non presente nei tuoi dati",
+      "detectedInData": "Trovato nei tuoi dati",
+      "ruleEyebrow": "Regola Sigma",
+      "sourceEyebrow": "Sorgente log",
+      "field": {
+        "author": "Autore",
+        "modified": "Aggiornato",
+        "required": "Identificato da",
+        "signals": "Campi di supporto"
+      },
+      "falsePositives": "Falsi positivi noti",
+      "references": "Riferimenti",
+      "noStreamsForRule": "Nessuno dei tuoi stream corrisponde a questa regola",
+      "noStreamsForRuleHint": "È stata scritta per {logsource}. Esegui l'ingestione di quella sorgente e apparirà qui.",
+      "runnable": "Eseguibile su questo stream",
+      "openInEvents": "Apri in Eventi",
+      "installHere": "Installa su questo stream",
+      "install": "Installa come rilevamento",
+      "installAgain": "Installa su un altro stream",
+      "viewDetection": "Visualizza rilevamento",
+      "noStreamsForSource": "Non presente nei tuoi dati",
+      "noStreamsForSourceHint": "Uno stream viene identificato come questa sorgente quando contiene {fields}.",
+      "noRulesForSource": "Non sono ancora state scritte regole per questa sorgente",
+      "mappingHint": "Come i campi di questa sorgente vengono mappati sulle colonne normalizzate lette da ogni pagina SIEM. Il primo campo presente in una riga prevale.",
+      "detectionCount": "Sì, come {n} rilevamento | Sì, come {n} rilevamenti",
+      "notInstalled": "Non installato",
+      "mapColumn": {
+        "actorId": "ID attore",
+        "srcPort": "Porta di origine",
+        "dstPort": "Porta di destinazione",
+        "vendor": "Fornitore",
+        "classUid": "ID classe OCSF",
+        "className": "Classe",
+        "severityId": "Gravità",
+        "statusId": "Esito"
+      },
+      "catalogError": "Impossibile caricare il catalogo dei rilevamenti: {reason}",
+      "notRunnableYet": "Non ancora eseguibile",
+      "newRulesAvailable": "{n} nuova regola ora può essere eseguita su {stream} | {n} nuove regole ora possono essere eseguite su {stream}",
+      "reviewNewRules": "Esamina",
+      "reviewingNewRules": "{n} regola che ora può essere eseguita su {stream} | {n} regole che ora possono essere eseguite su {stream}",
+      "showAllRules": "Mostra tutte le regole",
+      "installSelected": "Installa selezionate",
+      "selectRunnable": "Seleziona eseguibili",
+      "selectRunnableHint": "Seleziona tutte le regole mostrate che funzionano sui tuoi dati e non sono ancora installate",
+      "bulk": {
+        "title": "Installa {n} regola | Installa {n} regole",
+        "subtitle": "Ogni regola viene compilata per il suo stream sul server e salvata come rilevamento con queste impostazioni.",
+        "stream": "Stream",
+        "everyStream": "Ogni stream su cui viene eseguita ciascuna regola",
+        "folder": "Cartella avvisi",
+        "correlationWindow": "Una regola di correlazione guarda indietro almeno quanto la propria finestra.",
+        "nothing": "Nessuna delle regole selezionate viene eseguita su questo stream.",
+        "plan": "Verrà creato {n} rilevamento: | Verranno creati {n} rilevamenti:",
+        "correlation": "Correlazione",
+        "confirm": "Installa {n} rilevamento | Installa {n} rilevamenti",
+        "close": "Chiudi",
+        "summary": "{installed} installati, {skipped} ignorati, {failed} non riusciti su {total}",
+        "duplicate": "Esiste già un rilevamento chiamato {name}.",
+        "correlationBlocked": "La correlazione non può essere eseguita su questo stream.",
+        "status": {
+          "installed": "Installato",
+          "skipped": "Ignorato",
+          "failed": "Non riuscito",
+          "pending": "In attesa"
+        },
+        "done": "{n} rilevamento installato | {n} rilevamenti installati"
+      }
+    },
+    "entities": {
+      "title": "Entità",
+      "subtitle": "Tutti gli utenti, gli IP di origine e gli host menzionati dalle tue sorgenti di sicurezza",
+      "view": {
+        "table": "Tabella",
+        "graph": "Grafico del rischio"
+      },
+      "riskGraph": {
+        "empty": "Nessun elemento collegato in questa finestra",
+        "emptyHint": "Il grafico collega utenti, indirizzi IP e host che compaiono nello stesso evento o nello stesso caso. Nessuno è comparso in questa finestra; amplia l'intervallo di tempo.",
+        "showingTop": "Visualizzazione dei primi {n} di {total} per rischio",
+        "legend": "Linea continua: visti nello stesso evento. Linea tratteggiata: nominati dallo stesso caso.",
+        "edgeEvents": "{n} evento | {n} eventi",
+        "edgeCases": "{n} caso | {n} casi",
+        "scoreHint": "Casi che la nominano: {detection}. Eventi non riusciti: {failure}. Collegata a un'entità nominata da un caso: {neighbour}.",
+        "nodeFacts": "{events} eventi · {failures} non riusciti",
+        "nodeCases": "{n} caso | {n} casi"
+      },
+      "kinds": {
+        "user": "Utenti",
+        "ip": "Indirizzi IP",
+        "host": "Host"
+      },
+      "kind": {
+        "user": "Utente",
+        "ip": "Indirizzo IP",
+        "host": "Host"
+      },
+      "all": {
+        "user": "Tutti gli utenti",
+        "ip": "Tutti gli indirizzi IP",
+        "host": "Tutti gli host"
+      },
+      "search": {
+        "user": "Cerca utenti",
+        "ip": "Cerca indirizzi IP",
+        "host": "Cerca host"
+      },
+      "col": {
+        "signals": "Segnali",
+        "events": "Eventi",
+        "failures": "Errori",
+        "peers": {
+          "ips": "Max IP in una singola origine",
+          "users": "Max utenti in una singola origine"
+        },
+        "streams": "Origini",
+        "firstSeen": "Prima osservazione",
+        "lastSeen": "Ultima osservazione"
+      },
+      "signal": {
+        "failures": "Tasso di errori elevato",
+        "spread": {
+          "user": "Molti IP di origine",
+          "ip": "Molti utenti",
+          "host": "Molti utenti"
+        },
+        "external": "Indirizzo pubblico",
+        "fail_then_success": "Successo dopo errori",
+        "open_case": "Caso aperto"
+      },
+      "signalHint": {
+        "failures": "Almeno il {rate}% degli eventi di questa entità ha avuto esito negativo, con almeno {n} errori, contando solo le origini che riportano un esito.",
+        "spread": {
+          "user": "Visto da {n} o più IP di origine in un'unica sorgente, ben al di sopra di quanto mostrano altri utenti in questa finestra.",
+          "ip": "Usato da {n} o più utenti in un'unica sorgente, ben al di sopra di altri indirizzi in questa finestra. Anche l'egress NAT e VPN si presenta così; lo stesso vale per il password spraying.",
+          "host": "A cui accedono {n} o più utenti in un'unica sorgente, ben al di sopra di altri host in questa finestra."
+        },
+        "external": "Non appartenente a un intervallo privato, di loopback o link-local.",
+        "fail_then_success": "Almeno {n} eventi non riusciti, poi uno riuscito dopo il primo errore: un tentativo che potrebbe aver funzionato.",
+        "open_case": "Un caso SIEM aperto indica questa entità."
+      },
+      "peersChip": {
+        "ips": "Fino a {n} IP di origine in una singola origine | Fino a {n} IP di origine in una singola origine",
+        "users": "Fino a {n} utente in una singola origine | Fino a {n} utenti in una singola origine"
+      },
+      "noSignals": "Nessun segnale",
+      "windowNote": "I conteggi coprono la finestra selezionata su tutte le origini di sicurezza.",
+      "capped": "Ogni origine ha restituito le sue {n} entità più attive; quelle meno attive non sono elencate e i conteggi per le entità vicine a tale soglia possono essere parziali. I conteggi delle schede contrassegnati con + sono troncati.",
+      "failedStreams": "Impossibile leggere: {streams}",
+      "noSources": "Nessuna origine di sicurezza da leggere",
+      "noSourcesHint": "Le entità si trovano negli stream il cui nome li contrassegna come dati di sicurezza, oppure che hai incluso in Sicurezza → Origini.",
+      "empty": "Nessuna entità in questa finestra",
+      "emptyHint": "Amplia l'intervallo di tempo o verifica che le tue origini contengano campi utente, IP o host.",
+      "refresh": "Aggiorna",
+      "drawerSubtitle": "Attività negli ultimi {window}",
+      "tab": {
+        "activity": "Attività",
+        "related": "Correlati",
+        "sources": "Origini",
+        "cases": "Casi"
+      },
+      "activity": "Eventi nel tempo",
+      "chart": {
+        "ok": "Riusciti o sconosciuti",
+        "failed": "Non riusciti"
+      },
+      "topN": "Primi {n} per eventi",
+      "noRelated": "Nessun elemento correlato in questa finestra.",
+      "noCases": "Nessun caso SIEM indica questa entità.",
+      "caseOpen": "Aperto",
+      "caseResolved": "Risolto",
+      "failedCount": "{n} fallito | {n} falliti",
+      "openEvents": "Apri in Eventi",
+      "huntInEvents": "Cerca in Eventi",
+      "partialStreams": "Risultati parziali da: {streams}",
+      "limited": "{stream}: ~{rows} righe in {window}. Visualizzazione delle ultime {slice}.",
+      "runFull": "Esegui finestra completa",
+      "limitedMany": "{n} sorgenti di grandi dimensioni mostrano solo l'ultima {slice} di {window}: {streams}",
+      "sourcesLoading": "Lettura delle sorgenti:",
+      "sourceStatus": {
+        "loading": "Caricamento",
+        "done": "Caricata",
+        "failed": "Impossibile leggere"
+      },
+      "loadError": "Impossibile caricare le sorgenti di sicurezza",
+      "detailFailed": "Non è stato possibile leggere alcuni dati di questa entità: {streams}.",
+      "aliasCount": "+{n} grafia | +{n} grafie",
+      "aliasHint": "Registrata con questa grafia; è la stessa identità."
+    },
+    "ueba": {
+      "title": "Analisi del comportamento degli utenti",
+      "subtitle": "Ogni utente confrontato con il proprio passato recente",
+      "windowHint": "Ultimo periodo {current}, confrontato con il {baseline} precedente",
+      "method": "I punteggi di rischio sono euristici: l'ultimo periodo {current} di ogni utente viene confrontato con il proprio {baseline} precedente. Ogni segnalazione mostra i numeri che l'hanno determinata.",
+      "noSources": "Nessuna sorgente indica un utente",
+      "noSourcesHint": "UEBA richiede una sorgente di sicurezza con un campo utente (CloudTrail, Okta, un log di autenticazione con una colonna utente).",
+      "search": "Cerca utenti",
+      "empty": "Nessuna attività utente in questa finestra",
+      "emptyHint": "Amplia la finestra o verifica che le sorgenti contengano un campo utente.",
+      "eyebrow": "Comportamento utente",
+      "riskChip": "Rischio {tone} · {score}",
+      "expected": "rispetto al solito ~{n}",
+      "new": "Nuovo",
+      "newIp": "Nuovo",
+      "noIps": "Nessun IP sorgente registrato per questo utente.",
+      "col": {
+        "user": "Utente",
+        "risk": "Rischio",
+        "signals": "Segnali",
+        "events": "Eventi",
+        "failures": "Errori",
+        "ips": "IP sorgente"
+      },
+      "stat": {
+        "critical": "Rischio critico",
+        "high": "Rischio alto",
+        "medium": "Rischio medio",
+        "all": "Utenti analizzati"
+      },
+      "signal": {
+        "volume": "Picco di volume",
+        "new_ip": "Nuovo IP sorgente",
+        "failure_jump": "Impennata di errori",
+        "new_hours": "Orari insoliti",
+        "first_seen": "Prima apparizione",
+        "peer_volume": "Molto sopra i pari",
+        "peer_failures": "Errori molto sopra i pari",
+        "fail_then_success": "Successo dopo errori",
+        "open_case": "Caso aperto"
+      },
+      "reason": {
+        "volume": "{n} eventi, circa {ratio}× i ~{expected} attesi nel precedente {baseline}.",
+        "newIp": "{n} eventi da {ip}, mai visti nel precedente {baseline}. | {n} eventi da {ip}, mai visti nel precedente {baseline} ({count} nuovi indirizzi in totale).",
+        "newIpExternal": "{n} eventi dall'indirizzo pubblico {ip}, mai visto nel precedente {baseline}. | {n} eventi dall'indirizzo pubblico {ip}, mai visto nel precedente {baseline} ({count} nuovi indirizzi in totale).",
+        "failureJump": "{n} errori — {rate}% degli eventi, in aumento dal {baseline}% del periodo di riferimento.",
+        "newHours": "{n} eventi alle {hours} UTC, orari in cui questo utente non è mai stato attivo nel precedente {baseline}.",
+        "firstSeen": "{n} eventi da un utente senza alcuna attività nel precedente {baseline}.",
+        "peerVolume": "{n} eventi mentre un utente tipico ne aveva circa {median}. La baseline propria di questo utente è ancora in costruzione.",
+        "peerFailures": "{n} errori ({rate}% degli eventi) mentre un utente tipico ne aveva circa {median}. La baseline propria di questo utente è ancora in costruzione.",
+        "newIpBuilding": "{n} eventi dall'indirizzo pubblico {ip}. La baseline di questo utente è ancora in costruzione, quindi viene segnalato qualsiasi indirizzo pubblico. | {n} eventi dall'indirizzo pubblico {ip}. La baseline di questo utente è ancora in costruzione, quindi viene segnalato qualsiasi indirizzo pubblico ({count} indirizzi pubblici in totale).",
+        "failThenSuccess": "{n} errori da {ip}, poi un evento riuscito dallo stesso indirizzo.",
+        "openCase": "Indicato dal caso aperto \"{title}\" ({severity}). | Indicato da {n} casi aperti, il più recente \"{title}\" ({severity})."
+      },
+      "fact": {
+        "events": "Eventi",
+        "eventsValue": "{n} vs ~{expected}",
+        "failureRate": "Tasso di errore",
+        "failureValue": "{now}% vs {base}%",
+        "history": "Cronologia di riferimento",
+        "historyValue": "{span} di {window}",
+        "noHistory": "Nessuno — prima apparizione",
+        "scoreValue": "{n} su 100"
+      },
+      "tab": {
+        "signals": "Segnali",
+        "hours": "Ore di attività",
+        "ips": "IP di origine"
+      },
+      "noSignals": "Niente di anomalo",
+      "noSignalsHint": "L'attività di questo utente nella finestra è simile alla sua baseline.",
+      "scoring": "Punteggio = somma dei pesi dei segnali, con tetto a 100. Il volume atteso è commisurato alla cronologia effettivamente disponibile per l'utente; un picco di volume richiede almeno {min} eventi e {ratio}× quel valore. Le ore insolite richiedono una cronologia che copra il {share}% del {baseline} precedente.",
+      "hoursTitle": "Quando questo utente è attivo",
+      "hoursUtc": "Ora del giorno, UTC",
+      "baselineRow": "{w} precedenti",
+      "nowRow": "Ultimi {w}",
+      "hourCell": "{h}:00 UTC — {n} eventi",
+      "legendUsual": "Attività",
+      "legendNew": "Ora mai usata nella baseline",
+      "openEntity": "Apri entità",
+      "withheld": "Alcuni dati della baseline sono risultati incompleti, quindi questi segnali non sono stati valutati: {signals}.",
+      "currentPartial": "La finestra corrente ha restituito dati parziali; i conteggi potrebbero essere bassi.",
+      "limited": "{stream}: ~{rows} righe in {window} e nella sua baseline di {baseline}. Vengono letti solo l'ultimo {slice} e il {slice} precedente la finestra, quindi i segnali di prima apparizione, nuovo IP e ore insolite non vengono valutati, né i segnali di volume e tasso di errore per i suoi utenti.",
+      "limitedMany": "{n} origini di grandi dimensioni vengono lette solo sull'ultimo {slice} di {window} e sul {slice} precedente, non sull'intera baseline di {baseline}, quindi per esse non vengono valutati i segnali di prima apparizione, nuovo IP e ore insolite, né i segnali di volume e tasso di errore per i loro utenti: {streams}",
+      "provisional": "Lettura delle origini ancora in corso: i segnali di prima apparizione, nuovo IP e ore insolite compaiono quando tutte le origini hanno risposto.",
+      "limitedTag": "Ultimo {slice}",
+      "limitedTagHint": "Alcuni eventi di questo utente provengono da un'origine troppo grande per l'intera finestra; questi vengono conteggiati solo sull'ultimo {slice}.",
+      "excluded": "Esclusi (i loro dati non sono stati leggibili in entrambe le finestre): {streams}.",
+      "loadError": "Impossibile caricare le origini di sicurezza",
+      "spanHours": "{n} ora | {n} ore",
+      "spanDays": "{n} giorno | {n} giorni",
+      "notEvaluated": "Non valutati per questo utente perché i dati della baseline erano incompleti: {signals}.",
+      "hoursNotJudged": "Le ore insolite vengono valutate solo con almeno {min} eventi di baseline che coprano il {share}% del {baseline} precedente. La cronologia di questo utente è più breve, quindi nessuna ora viene segnalata.",
+      "noHistory": "Nessun dato nel {baseline} precedente per {streams}, quindi nessuno viene indicato come prima apparizione.",
+      "volumeNotJudged": "Il volume non viene valutato per questo utente: le finestre inferiori a un giorno vengono confrontate con le stesse ore del giorno nella baseline, il che richiede almeno un giorno di cronologia.",
+      "baselineBuilding": "Baseline in costruzione",
+      "baselineBuildingHint": "{span} di cronologia finora. Il confronto con il passato di questo utente inizia quando esiste una cronologia completa di {baseline}; nel frattempo vengono segnalati solo i valori anomali evidenti rispetto agli altri utenti.",
+      "buildingNotice": "La baseline è ancora in costruzione per {n} utente: finché non esiste una cronologia completa di {baseline}, vengono segnalati solo i valori anomali evidenti rispetto agli altri utenti. | Le baseline sono ancora in costruzione per {n} utenti: finché non esiste una cronologia completa di {baseline}, vengono segnalati solo i valori anomali evidenti rispetto agli altri utenti."
+    },
+    "intel": {
+      "title": "Threat Intel",
+      "subtitle": "Indicatori noti come malevoli e ogni punto in cui sono comparsi nei tuoi dati di sicurezza",
+      "loadFailed": "Impossibile caricare gli elenchi di indicatori",
+      "add": "Aggiungi indicatori",
+      "import": "Importa",
+      "importFile": "File CSV",
+      "importFeed": "URL del feed",
+      "runSweep": "Avvia scansione",
+      "refresh": "Ricarica gli elenchi e scansiona di nuovo",
+      "search": "Cerca indicatori, origini, elenchi",
+      "allTypes": "Tutti i tipi",
+      "expiringOnly": "In scadenza",
+      "expired": "Scaduti",
+      "never": "Mai",
+      "notSighted": "Non osservato",
+      "notSightedIn": "Non osservato in {range}",
+      "sighted": "Osservato una volta | Osservato {n} volte",
+      "sweeping": "Scansione… {done} di {total} query",
+      "sweptAcross": "Scansionata {n} origine di sicurezza | Scansionate {n} origini di sicurezza",
+      "failedQueries": "{n} colonna non è stata cercata ed è stata saltata. | {n} colonne non sono state cercate e sono state saltate.",
+      "truncated": "Sono state lette solo le prime {n} righe di {lists}; il resto non è stato analizzato.",
+      "noIndicators": "Nessun indicatore",
+      "noCoverage": "Esegui una scansione per vedere quali colonne vengono cercate",
+      "coverageHint": "Cosa ha cercato una scansione in {n} origini di sicurezza. Ogni colonna viene confrontata in base al suo valore completo e ai token interi al suo interno, come array, testo dei log e hash SHA256=; un tipo senza colonna non può essere individuato affatto.",
+      "indicatorCount": "{n} indicatore | {n} indicatori",
+      "columnsSearched": "{n} colonna | {n} colonne",
+      "blind": "Non cercabile",
+      "blindHint": "Nessuno stream di sicurezza ha una colonna che contenga questo tipo di valore, quindi questi indicatori non possono ancora corrispondere a nulla.",
+      "cidrNote": "{n} intervallo CIDR rimane nell'elenco ma non viene analizzato: la corrispondenza esatta non può verificare l'appartenenza all'intervallo. | {n} intervalli CIDR rimangono nell'elenco ma non vengono analizzati: la corrispondenza esatta non può verificare l'appartenenza all'intervallo.",
+      "stat": {
+        "matched": "Indicatori rilevati",
+        "hits": "Rilevamenti",
+        "indicators": "Indicatori",
+        "expiring": "Scaduti o in scadenza",
+        "lists": "Elenchi"
+      },
+      "tab": {
+        "matches": "Corrispondenze",
+        "indicators": "Indicatori",
+        "coverage": "Copertura"
+      },
+      "col": {
+        "indicator": "Indicatore",
+        "type": "Tipo",
+        "hits": "Rilevamenti",
+        "seenIn": "Rilevato in",
+        "firstSeen": "Prima rilevazione",
+        "lastSeen": "Ultima rilevazione",
+        "source": "Origine",
+        "confidence": "Confidenza",
+        "list": "Elenco",
+        "added": "Aggiunto",
+        "expires": "Scade",
+        "description": "Descrizione"
+      },
+      "type": {
+        "auto": "Rileva automaticamente",
+        "ip": "Indirizzo IP",
+        "cidr": "Intervallo CIDR",
+        "domain": "Dominio",
+        "url": "URL",
+        "hash": "Hash del file",
+        "email": "Indirizzo email"
+      },
+      "empty": {
+        "title": "Ancora nessuna intelligence sulle minacce",
+        "description": "Aggiungi indicatori da un report, importa un CSV o iscriviti a un feed. Ogni indicatore viene quindi confrontato con le tue origini di sicurezza."
+      },
+      "noMatches": {
+        "title": "Nessun indicatore è stato rilevato",
+        "description": "Nessuno dei {n} indicatori live è comparso in {streams} origini di sicurezza nell'arco di {range}."
+      },
+      "drawer": {
+        "eyebrow": "Indicatore · {type}",
+        "sightings": "Rilevamenti",
+        "details": "Dettagli",
+        "overTime": "Rilevamenti nel tempo",
+        "hunt": "Cerca",
+        "huntTop": "Cerca negli eventi",
+        "notSeenTitle": "Non rilevato in questa finestra",
+        "notSeen": "Questo indicatore non è comparso in {streams} origini di sicurezza nell'arco di {range}.",
+        "cidrNotSwept": "Gli intervalli CIDR non vengono scansionati: la corrispondenza esatta non può verificare l'appartenenza a un intervallo."
+      },
+      "remove": {
+        "action": "Rimuovi",
+        "title": "Rimuovi indicatore",
+        "message": "Rimuovere {indicator} da {table}? L'elenco viene letto e riscritto senza di esso, mantenendo ogni altra riga come memorizzata. L'operazione non è atomica: gli indicatori aggiunti a {table} da altri durante l'esecuzione andrebbero persi.",
+        "confirm": "Rimuovi",
+        "done": "Rimosso {indicator} | Rimosse {n} righe contenenti {indicator}",
+        "failed": "Impossibile rimuovere l'indicatore",
+        "tooLarge": "{table} ha {n} righe, più di quante questa pagina possa leggere, quindi non può essere riscritta in modo sicuro. Modificala nella pagina Tabelle di arricchimento.",
+        "feedHint": "Questo elenco viene aggiornato da un feed; rimuovi l'indicatore dal feed.",
+        "notFound": "{indicator} non è più in {table}; potrebbe essere già stato rimosso."
+      },
+      "form": {
+        "addTitle": "Aggiungi indicatori",
+        "addSubtitle": "Incolla da un report. Sono accettati valori neutralizzati come evil[.]com e hxxp://.",
+        "addSubmit": "Aggiungi",
+        "cancel": "Annulla",
+        "indicators": "Indicatori",
+        "indicatorsPlaceholder": "185.220.101.4\nevil[.]example\nd41d8cd98f00b204e9800998ecf8427e",
+        "indicatorsHelp": "Uno per riga, oppure separati da virgole o spazi. I duplicati vengono ignorati. Un elenco può contenere fino a {max}.",
+        "indicatorsRequired": "Inserisci almeno un indicatore",
+        "invalid": "Non riconosciuti come indicatori ({n}): {sample}",
+        "line": "riga {n}",
+        "list": "Elenco",
+        "listHelp": "Memorizzato come tabella di arricchimento; i nomi ricevono il prefisso ioc_.",
+        "listRequired": "Assegna un nome all'elenco",
+        "type": "Tipo",
+        "confidence": "Confidenza (0–100)",
+        "confidenceRange": "La confidenza deve essere compresa tra 0 e 100",
+        "source": "Origine",
+        "sourcePlaceholder": "Nome del report, del fornitore o del feed",
+        "description": "Descrizione",
+        "expiry": "Scade",
+        "never": "Mai",
+        "days": "Tra {n} giorno | Tra {n} giorni",
+        "added": "Aggiunto {n} indicatore a {table} | Aggiunti {n} indicatori a {table}",
+        "importedSkipped": "Aggiunti {n} indicatori a {table}; saltata {skipped} riga che non era un indicatore | Aggiunti {n} indicatori a {table}; saltate {skipped} righe che non erano indicatori",
+        "saveFailed": "Impossibile salvare gli indicatori",
+        "feedReadOnly": "{table} viene aggiornata da un feed e non può accettare righe aggiunte. Scegli un altro elenco.",
+        "importTitle": "Importa indicatori da CSV",
+        "importSubtitle": "Richiede una colonna indicatore; tipo, gravità, origine e scadenza sono facoltativi.",
+        "importSubmit": "Importa",
+        "file": "File CSV",
+        "fileHelp": "Le righe che non sono indicatori vengono saltate e conteggiate. Un elenco può contenere fino a {max} indicatori; i file fino a {mb} MB.",
+        "fileRequired": "Scegli un file CSV",
+        "defaultSeverity": "Gravità per le righe che non ne hanno una",
+        "append": "Aggiungi all'elenco invece di sostituirlo",
+        "noIndicatorColumn": "Il file non ha una colonna indicatore",
+        "noValidRows": "Nessuna riga del file è un indicatore riconosciuto",
+        "feedTitle": "Sottoscrivi un feed",
+        "feedSubtitle": "Il server recupera il CSV in background e mantiene l'elenco sincronizzato con esso.",
+        "feedSubmit": "Sottoscrivi",
+        "url": "URL del feed",
+        "urlHelp": "Un CSV pubblico con una colonna di indicatori.",
+        "urlInvalid": "Inserisci un URL http:// o https://",
+        "feedQueued": "Recupero di {table} in corso. Gli indicatori compaiono al termine del download.",
+        "allPresent": "Tutti gli indicatori sono già in {table}",
+        "addedSkippedDupes": "Aggiunto {n} indicatore a {table}; {dupes} già presenti | Aggiunti {n} indicatori a {table}; {dupes} già presenti",
+        "urlPlaceholder": "https://feeds.example/indicators.csv",
+        "noIndicatorColumnIn": "{table} non ha una colonna indicator, ioc o value, quindi non è possibile aggiungervi indicatori. Scegli un altro elenco.",
+        "replaceTitle": "Sostituisci l'elenco",
+        "replaceMessage": "L'importazione con l'aggiunta disattivata sostituisce interamente {table}: ogni riga esistente, le sue colonne e le impostazioni vengono rimosse e restano solo gli indicatori di questo file.",
+        "replaceConfirm": "Sostituisci",
+        "tooMany": "Incollati {n} indicatori; un elenco ne contiene al massimo {max}.",
+        "listFull": "{table} conterrebbe {count} indicatori; un elenco ne contiene al massimo {max}. Suddividili in più elenchi.",
+        "fileTooLarge": "Il file supera {max} MB. Suddividilo in file più piccoli."
+      },
+      "importCsv": "Importa un CSV",
+      "unreadTables": "Impossibile leggere {lists}; i suoi indicatori non vengono mostrati né analizzati. | Impossibile leggere {lists}; i loro indicatori non vengono mostrati né analizzati.",
+      "noIndicatorColumn": "{lists} non ha una colonna indicator, quindi nessuna delle sue righe viene usata. | {lists} non hanno una colonna indicator, quindi nessuna delle loro righe viene usata.",
+      "skippedRows": "Le righe che non sono indicatori riconoscibili sono state saltate: {detail}.",
+      "unreadStreams": "Non è stato possibile leggere lo schema di {streams}, quindi non è stato cercato. | Non è stato possibile leggere gli schemi di {streams}, quindi non sono stati cercati.",
+      "columnsSkipped": "{n} colonna non cercata | {n} colonne non cercate",
+      "skippedHint": "Ricerca non completa — la scansione ha raggiunto il limite di query o la query non è riuscita:",
+      "caveat": {
+        "failed": "{n} colonna non è stata cercata. | {n} colonne non sono state cercate.",
+        "partial": "{n} query ha restituito solo risultati parziali, quindi quelle colonne non sono state cercate del tutto. | {n} query hanno restituito solo risultati parziali, quindi quelle colonne non sono state cercate del tutto.",
+        "unsearched": "Nessuno stream ha una colonna per: {types}.",
+        "cidr": "{n} intervallo CIDR non è stato analizzato. | {n} intervalli CIDR non sono stati analizzati.",
+        "checked": "Solo {checked} indicatori su {total} sono stati controllati completamente."
+      },
+      "partialChecked": "Risultato parziale: controllati {checked} indicatori su {total}. I conteggi per gli altri potrebbero essere bassi.",
+      "partialCapped": "Risultato parziale: controllati {checked} indicatori su {total}. La scansione si ferma a {n} query; gli indicatori meno gravi non sono stati controllati.",
+      "inText": "{column} (nel testo)"
+    },
+    "sources": {
+      "title": "Origini dei dati",
+      "comingSoon": "L'onboarding guidato con template di normalizzazione OCSF è in arrivo. Fino ad allora, ingerisci i log di sicurezza come qualsiasi stream; la pagina Eventi li identifica e normalizza automaticamente.",
+      "subtitle": "Allega un pacchetto OCSF per normalizzare uno stream in fase di ingestione, oppure includilo così com'è come origine di sicurezza.",
+      "colStream": "Stream",
+      "colSourceType": "Tipo di origine",
+      "colMapping": "Mappatura",
+      "colActions": "Azioni",
+      "stateMapped": "Mappato {pack}",
+      "stateIncluded": "Incluso (non mappato)",
+      "stateNotMapped": "Non mappato",
+      "stateSuggested": "Suggerito: {label}",
+      "attach": "Allega pacchetto",
+      "detach": "Scollega",
+      "include": "Includi",
+      "exclude": "Escludi",
+      "attached": "Pacchetto {pack} allegato.",
+      "detached": "Pacchetto scollegato.",
+      "empty": "Non ci sono ancora stream di log. Ingerisci i log di sicurezza come qualsiasi stream e compariranno qui.",
+      "noticePackRemoved": "{stream}: pacchetto rimosso al di fuori del SIEM. Riallegalo o rimuovilo.",
+      "noticeNoRecord": "{stream}: un pacchetto è allegato senza una registrazione. Registralo o scollegalo.",
+      "noticeNotWriting": "{stream}: la pipeline non scrive più su questo stream.",
+      "noticeDisabled": "{stream}: la pipeline è disabilitata; nulla è mappato.",
+      "blockStreamNotWritten": "{stream}: la pipeline esistente instrada le righe solo verso {streams}, non di nuovo su questo stream.",
+      "blockFlattenLevel": "{stream}: il livello di flatten dello stream è diverso da quello globale, quindi l'allegamento rinominerebbe le sue colonne.",
+      "blockGlobalFlatten": "{stream}: il livello di flatten globale ({level}) non manterrebbe le colonne OCSF piatte.",
+      "blockSchemaMissing": "{stream}: allo schema definito dall'utente mancano colonne OCSF: {columns}.",
+      "blockPipelineDisabled": "{stream}: la pipeline esistente è disabilitata; abilitala prima di allegare.",
+      "actionFailed": "La modifica non è stata salvata.",
+      "stateExcluded": "Escluso",
+      "excludedBy": "Escluso da {user} il {time}",
+      "sourceTypeConfidence": "{label} ({n}%)",
+      "notClassified": "Non ancora classificato",
+      "lastChange": "Ultima modifica di {user} il {time}: {summary}",
+      "previewTitle": "Allegare {pack} a {stream}?",
+      "previewSubtitle": "Nulla viene scritto finché non confermi.",
+      "previewLoading": "Verifica di cosa cambierebbe allegando…",
+      "previewPack": "Pacchetto",
+      "previewClasses": "Classe OCSF che scrive",
+      "previewFunction": "Funzione",
+      "previewPipeline": "Pipeline",
+      "previewFunctionCreate": "Crea {name}",
+      "previewFunctionReuse": "Riusa {name}, già identica",
+      "previewPipelineCreate": "Crea {name}: {stream} → funzione → {stream}",
+      "previewPipelineExtend": "Aggiungi un nodo funzione a {name}, subito dopo l'origine, che alimenta {feeds}",
+      "previewPipelineAlready": "{name} esegue già questo pacchetto; viene scritto solo il record",
+      "confirmAttach": "Allega",
+      "cancel": "Annulla",
+      "detachedSkipped": "Pacchetto scollegato. La pipeline {id} non è stata modificata: {reason}.",
+      "skipReason": {
+        "pipeline_missing": "non esiste più",
+        "other_stream": "ora legge un altro stream",
+        "other_pack": "ora esegue un pacchetto diverso"
+      }
+    },
+    "nav": {
+      "overview": "Panoramica",
+      "events": "Eventi",
+      "detections": "Rilevamenti",
+      "alerts": "Avvisi",
+      "cases": "Casi",
+      "entities": "Entità",
+      "intel": "Threat Intelligence",
+      "ueba": "UEBA",
+      "mitre": "MITRE ATT&CK",
+      "content": "Contenuti",
+      "sources": "Sorgenti dati"
+    },
+    "sigma": {
+      "notSupported": "Non supportato: {fields}",
+      "cannotMatch": "Impossibile trovare corrispondenze: questo stream non ha {fields}",
+      "compiledEmpty": "La regola non ha prodotto nulla dopo la compilazione",
+      "assumedAbsent": "Si presume che questo stream non abbia mai {fields}"
+    },
+    "audit": {
+      "title": "Registro modifiche",
+      "hint": "Chi ha modificato rilevamenti, sorgenti e casi negli ultimi 7 giorni",
+      "when": "Quando",
+      "who": "Modificato da",
+      "area": "Area",
+      "action": "Azione",
+      "target": "Cosa è cambiato",
+      "empty": "Nessuna modifica registrata",
+      "emptyHint": "Le modifiche a rilevamenti, sorgenti di Sicurezza e casi vengono mostrate qui.",
+      "disabled": "Il log di audit è disattivato",
+      "disabledHint": "Attiva il log di audit per questa distribuzione per registrare chi modifica le impostazioni di Sicurezza.",
+      "category": {
+        "detection": "Rilevamento",
+        "case": "Caso",
+        "source": "Sorgente",
+        "security": "Sicurezza"
+      },
+      "verb": {
+        "created": "Creato",
+        "changed": "Modificato",
+        "deleted": "Eliminato",
+        "enabled": "Attivato",
+        "disabled": "Disattivato"
+      }
+    },
+    "access": {
+      "needsAuthor": "Richiede il permesso Crea su Sicurezza",
+      "openPreset": "Crea un ruolo da {preset}",
+      "askPreset": "Chiedi a un amministratore il preset {preset}.",
+      "checkFailedTitle": "Impossibile verificare il tuo accesso a Sicurezza",
+      "checkFailedHint": "Il server non ha risposto. La tua sessione è ancora attiva."
+    },
+    "aria": {
+      "addSource": "Aggiungi un'origine",
+      "addToCase": "Aggiungi al caso",
+      "caseAssignee": "Assegnatario del caso",
+      "casePriority": "Priorità del caso",
+      "filterField": "Campo del filtro",
+      "filterOperator": "Operatore del filtro",
+      "filterValue": "Valore del filtro",
+      "huntKind": "Cosa cercare",
+      "indicatorType": "Tipo di indicatore",
+      "severityFilter": "Filtro gravità",
+      "stream": "Stream"
     }
   },
   "promql": {
@@ -24131,6 +25736,7 @@
     }
   },
   "routeTitles": {
+    "onboarding": "Inizia",
     "reportDetail": "Report",
     "sharedChat": "Chat condivisa",
     "passwordPolicy": "Criteri password",
@@ -24714,16 +26320,17 @@
       "groupStorage": "Archiviazione",
       "groupAutoscaling": "Scalabilità automatica",
       "subtitle": "Monitora cluster, workload e risorse",
-      "hotbarAll": "Tutti i cluster",
+      "clusterPickerLabel": "Cluster",
+      "clusterPickerTrigger": "Cluster: {name}",
+      "clusterPickerSearch": "Trova cluster",
+      "clusterPickerEmpty": "Nessun cluster corrisponde",
       "healthHealthy": "Integro",
       "healthWarning": "Attenzione",
       "healthCritical": "Critico",
       "healthSilent": "Non segnala",
       "treeWorkloadsOverview": "Panoramica workload",
       "viewSelect": "Vista",
-      "hotbarLabel": "Cluster",
       "hotbarTileLabel": "{name}, {health}",
-      "hotbarTitle": "Cluster",
       "treeFilter": "Filtra risorse",
       "treeOverview": "Panoramica",
       "treeNodesReady": "{ready} di {total} nodo pronto | {ready} di {total} nodi pronti",
@@ -25014,6 +26621,13 @@
       "depsCaption": "Byte al secondo approssimativi, mediati su {window} fino alla fine dell'intervallo di tempo",
       "depsCaptionMore": "La larghezza degli archi segue i byte al secondo. Le frecce puntano dal client al server dove la direzione è nota; per una linea grigia il client è sconosciuto, oppure entrambe le estremità agiscono come client. Il colore di una scheda indica il suo namespace. Le connessioni sotto 1 B/s sono nascoste a meno che Connessioni a basso traffico non sia attivo.",
       "depsCapped": "Visualizzazione delle {shown} connessioni più trafficate su {total}. Filtra per namespace per vedere le altre.",
+      "depsCollapseMode": "Raggruppamento",
+      "depsCollapseAuto": "Auto",
+      "depsCollapseExpanded": "Espanso",
+      "depsCollapseCollapsed": "Compresso",
+      "depsGroupDetail": "{count} workload | {count} workload",
+      "depsGroupHint": "Fai clic su un namespace per mostrarne i workload.",
+      "depsGroupCollapse": "Comprimi {namespace}",
       "depsNoStreamTitle": "Nessun dato sui flussi di rete",
       "depsNoStreamDescription": "La mappa delle dipendenze è costruita dalle metriche dei flussi di rete eBPF ({stream}). Provengono dal chart Helm openobserve-collector 0.8.0 o successivo con ebpf.enabled=true e ebpf.network.enabled=true.",
       "depsNoFlowsTitle": "Nessun flusso di rete in questo intervallo di tempo",
@@ -25031,6 +26645,9 @@
       "depsTypeIn": "{type} in {namespace}",
       "depsKindNode": "Nodo",
       "depsKindExternal": "Altri indirizzi",
+      "depsCollapseFiltering": "Il raggruppamento è disattivato mentre un filtro o una ricerca è attivo",
+      "depsCollapseHint": "Auto raggruppa i workload per namespace quando la mappa ha più di {count} endpoint. Compresso raggruppa sempre, Espanso mai.",
+      "depsExpandEnd": "Mostra i workload in {name}: {detail}, {summary}",
       "depsOpenEnd": "Apri dettagli per {name}: {detail}, {summary}",
       "depsEndSummary": "{count} connessione · {rate} | {count} connessioni · {rate}",
       "depsApprox": "~{rate}",
@@ -26856,10 +28473,6 @@
     "saveScheduleFailed": "Impossibile salvare la pianificazione",
     "policy": "Politica di escalation",
     "policyIfNoAck": "Se nessuno prende in carico, dopo",
-    "policyRepeatTimes": "Esegui la scala una volta | Esegui la scala {count} volte",
-    "policyFinalStop": "poi interrompi",
-    "policyFinalNotifyDefault": "poi avvisa il team di ultima istanza",
-    "policyNoDefaultTeam": "Nessun team predefinito è stato designato, quindi equivale a interrompere. Designane uno nella scheda Instradamento.",
     "policyPrioritySilent": "{priority} non avvisa nessuno. Aggiungi un gradino per cambiare le cose — il silenzio qui è una decisione, non un'omissione.",
     "policyDoneEditing": "Termina modifica",
     "policyHint": "Chi viene avvisato a ogni priorità e dopo quanto tempo. Questi sono valori predefiniti — puoi modificarli.",
@@ -27339,9 +28952,6 @@
     "policyP1ParallelHint": "Nessuno deve aspettare cinque minuti per scoprire che il sito è irraggiungibile.",
     "policyP4Pages": "Avvisa anche per questa priorità",
     "policyP4PagesHint": "Disattivato per impostazione predefinita — una P4 che sveglia qualcuno è un errore di gravità.",
-    "policyFinalAction": "Se nessuno prende in carico",
-    "policyFinal_notifyDefaultTeam": "Notifica il team predefinito",
-    "policyFinal_stop": "Interrompi",
     "policySummaryTitle": "Cosa fa questa policy in questo momento",
     "policySummaryLine": "{priority} — {who} {channels}",
     "policySummaryAllAtOnce": "tutti insieme",
@@ -27594,7 +29204,6 @@
     "ladderL0Off": "Nessun SRE AI",
     "ladderStaleDefaultTag": "La scala non ha mai appreso le rotazioni",
     "ladderStaleDefaultHint": "Ogni livello contatta l'intero team, ma questo team ha delle rotazioni: la scala è stata creata prima che esistessero. L'aggiunta o la rimozione di un membro riesegue l'impostazione predefinita, oppure modifica la scala una volta a mano.",
-    "ladderEndsHandsOff": "La notifica passa di mano",
     "reachShortNoSmtp": "solo email · nessun trasporto SMTP",
     "reachShortNoFromAddress": "solo email · nessun indirizzo From",
     "reachShortNoAddress": "nessun indirizzo in archivio",
@@ -27720,7 +29329,6 @@
     "ladderEvery": "· ogni {duration}",
     "ladderEnd": "fine",
     "ladderEndUnknown": "Non è previsto altro.",
-    "ladderEndsDefaultTeam": "I passi di escalation sono terminati — il team predefinito è stato notificato.",
     "rungLost": "fallito",
     "rungLostTimes": "fallito ×{count}",
     "routingDetails": "Dettagli di routing",
@@ -27735,7 +29343,6 @@
     "policyStepsSection": "Passi di escalation",
     "policyChipSteps": "{count} passo | {count} passi",
     "policyAddStep": "Aggiungi passo",
-    "policyWhenStepsRunOut": "Quando i passi finiscono",
     "policyAppliesToNewPages": "Le modifiche si applicano solo alle nuove notifiche.",
     "policySave": "Salva",
     "policyFix": "Correggi",
@@ -27745,9 +29352,6 @@
     "policyEmailLockedBySlack": "L'email resta attiva con Slack: chi non ha un account Slack collegato riceve comunque l'email.",
     "policyNoProvider": "Nessun provider telefonico è connesso, quindi SMS e Voce vengono saltati e queste notifiche arrivano via email.",
     "policyNoProviderLink": "Connettine uno in Impostazioni → Telefonia",
-    "policyEndOptionStop": "Esegui una volta, poi termina | Esegui {count} volte, poi termina",
-    "policyEndOptionHandOff": "Esegui una volta, poi passa al team catch-all | Esegui {count} volte, poi passa al team catch-all",
-    "policyEndOptionHandOffTo": "Esegui una volta, poi passa a {team} | Esegui {count} volte, poi passa a {team}",
     "policyDeliveryTitle": "Invio",
     "policyTodayIs": "oggi: {who}",
     "policyPeopleCount": "{count} persona | {count} persone",
@@ -27869,6 +29473,12 @@
     "ruleEditorTakesFrom": "Prende gli avvisi da {team}",
     "ruleEditorKeptBy": "{team} mantiene questi avvisi: la sua regola è più specifica",
     "ruleEditorContends": "Concorre con una regola per {team}: vince quella più specifica",
+    "ruleEditorFieldSourcesMore": "{fields} +{count} altri",
+    "ruleEditorFieldsHelp": "I campi provengono dai tuoi gruppi di campi di correlazione. {link}",
+    "ruleEditorFieldsSource": "I campi provengono dai tuoi gruppi di campi di correlazione.",
+    "ruleEditorManageFieldGroups": "Gestisci gruppi di campi",
+    "ruleEditorDuplicatePath": "{team} ha già una regola per esattamente queste condizioni. Modifica invece quella regola.",
+    "ruleEditorDuplicatePathSameTeam": "Questo team ha già una regola per esattamente queste condizioni.",
     "routingTestRouting": "Testa il routing",
     "routingTabNeedsOwnerPlain": "Richiede un proprietario",
     "simulatorStartFrom": "Parti da",
@@ -29651,6 +31261,387 @@
       }
     }
   },
+  "onboarding": {
+    "guideAbout": {
+      "linux": "Log, metriche e tracce da qualsiasi server Linux.",
+      "windows": "Log eventi e metriche da server Windows.",
+      "macos": "Log e metriche da macchine Mac.",
+      "aws": "Log e metriche dai tuoi servizi AWS.",
+      "googleCloud": "Log dai tuoi progetti {gcp}, tramite una sottoscrizione push {pubSub}.",
+      "azure": "Log attività dalla tua sottoscrizione {azure}, tramite {eventHub}.",
+      "postgresql": "Metriche di query, connessione e replica.",
+      "mysql": "Metriche di query, connessione e InnoDB.",
+      "mongodb": "Metriche di operazione, connessione e cache.",
+      "redis": "Metriche di memoria, comandi e keyspace.",
+      "sqlServer": "Metriche di query, attesa e buffer.",
+      "oracle": "Metriche di sessione, tablespace e limiti di risorse.",
+      "mariadb": "Metriche di query, connessione e InnoDB.",
+      "elasticsearch": "Integrità di cluster, indici e nodi.",
+      "cassandra": "Metriche di lettura, scrittura e compattazione.",
+      "dynamodb": "Modifiche agli elementi (inserimenti, aggiornamenti, eliminazioni) come log, tramite {kinesisFirehose}.",
+      "snowflake": "Utilizzo di warehouse, query e crediti.",
+      "databricks": "Log dei notebook, inviati tramite l'API dei log.",
+      "couchdb": "Metriche di richieste, database e replica.",
+      "aerospike": "Metriche di namespace, nodo, memoria e connessioni.",
+      "sapHana": "Metriche di memoria, CPU e servizi.",
+      "zookeeper": "Metriche di latenza, connessioni e nodi.",
+      "nginx": "Log di accesso ed errori, raccolti in tempo reale da {fluentBit}.",
+      "apache": "Log di accesso ed errori, raccolti in tempo reale da {fluentBit}.",
+      "iis": "Log delle richieste, raccolti in tempo reale da {fluentBit}.",
+      "kafka": "Metriche di broker, topic e lag dei consumer.",
+      "rabbitmq": "Metriche di profondità delle code, frequenza dei messaggi e nodi.",
+      "nats": "Metriche di connessioni, messaggi e stream.",
+      "prometheus": "Invia le metriche che già raccogli, tramite remote write.",
+      "telegraf": "Invia metriche da un agent che già esegui.",
+      "opentelemetryCollector": "Punta qui un collector che già esegui.",
+      "cloudwatch": "Invia le metriche in streaming dal tuo account AWS.",
+      "gpu": "Utilizzo, memoria e temperatura per GPU {nvidia}.",
+      "networkFlows": "Flussi di traffico tra i tuoi host e le tue reti.",
+      "fluentBit": "Forwarder di log leggero per host e Kubernetes.",
+      "fluentd": "Collector di log con un ampio set di plugin.",
+      "vector": "Pipeline veloce per log e metriche.",
+      "filebeat": "Invia file di log con un agent leggero.",
+      "logstash": "Invia log da una pipeline esistente.",
+      "syslogNg": "Inoltra syslog dai tuoi server.",
+      "loongcollector": "Agent per log e metriche per host e container.",
+      "splunkHec": "Mantieni invariati i tuoi sender HTTP Event Collector.",
+      "cribl": "Instrada i dati dalle pipeline che già esegui.",
+      "kinesisFirehose": "Invia log in streaming da un delivery stream in AWS.",
+      "googleCloudLogs": "Esporta i log dai tuoi progetti tramite un log sink.",
+      "okta": "Eventi di accesso e di audit amministrativo.",
+      "office365": "Log di audit di posta, file e amministrazione.",
+      "googleWorkspace": "Log di audit di accesso e amministrazione.",
+      "falco": "Avvisi di sicurezza runtime dai container.",
+      "osquery": "Stato degli endpoint come log interrogabili.",
+      "jumpcloud": "Eventi di directory e di accesso.",
+      "openvpn": "Log di connessione e sessione VPN.",
+      "githubActions": "Log delle esecuzioni dei workflow e dei job.",
+      "jenkins": "Log di build ed eventi delle pipeline.",
+      "terraform": "Log di plan e apply delle tue esecuzioni.",
+      "ansible": "Log e risultati delle esecuzioni dei playbook.",
+      "vercel": "Log di deployment e delle funzioni.",
+      "heroku": "Log di app e router da un log drain.",
+      "airflow": "Log delle esecuzioni dei DAG e metriche dei task.",
+      "airbyte": "Log e stato dei job di sincronizzazione.",
+      "languageTile": "Tracce con l'SDK {otel}, con strumentazione automatica dove il tuo linguaggio la supporta.",
+      "aiIntegration": "Tracce delle chiamate della tua app AI, con token e costo per le chiamate ai modelli."
+    },
+    "skipToApp": "Vai all'app",
+    "chooseTitle": "Cosa vuoi monitorare per prima cosa?",
+    "back": "Indietro",
+    "searchGuides": "Cerca in {count} guida | Cerca in {count} guide",
+    "showMore": "Mostra altri {count} | Mostra altri {count}",
+    "noMatch": "Nessuna guida corrisponde a \"{query}\" qui.",
+    "foundElsewhere": "Trovato in altre scelte:",
+    "inChoice": "in {choice}",
+    "tryShorter": "Prova un nome più breve. Qualsiasi strumento può anche {link}.",
+    "sendOverHttp": "inviare log via HTTP",
+    "clearSearch": "Cancella ricerca",
+    "othersTitle": "Altri modi per iniziare",
+    "whatYouGet": "Cosa ottieni",
+    "signals": {
+      "metrics": "Metriche",
+      "logs": "Log",
+      "traces": "Tracce",
+      "profiles": "Profili",
+      "sessions": "Sessioni",
+      "errors": "Errori",
+      "webVitals": "Web vitals (web)",
+      "replays": "Replay delle sessioni",
+      "tokens": "Token",
+      "cost": "Costo",
+      "latency": "Latenza",
+      "uptime": "Uptime",
+      "certificates": "Certificati"
+    },
+    "example": {
+      "caption": {
+        "row": "Schermata di esempio: cosa mostra {product} per {name}.",
+        "infrastructure": "Schermata di esempio: una panoramica del cluster {k8s} con CPU, memoria e stato dei pod.",
+        "backend": "Schermata di esempio: il waterfall di una traccia di checkout non riuscita, con 21 span su 9 servizi.",
+        "frontend": "Schermata di esempio: web vitals {rum} dalle sessioni degli utenti reali.",
+        "logs": "Schermata di esempio: una ricerca nei log con un istogramma e le righe di log corrispondenti.",
+        "llm": "Schermata di esempio: {insights} con costo, token e latenza per modello, più tracce ed errori nel tempo.",
+        "agent": "Schermata di esempio: la pagina del server {mcp} a cui si connette il tuo agente di codifica.",
+        "synthetics": "Schermata di esempio: risultati di un check {http} su 3 località."
+      }
+    },
+    "guide": {
+      "agentTitle": "Preferisci un agente di codifica?",
+      "agentSteps": "Esegui questo nel terminale, poi passa a {claudeCode}, {cursor} o {codex} il prompt o il file.",
+      "copyPrompt": "Copia prompt",
+      "downloadFile": "Scarica .md",
+      "inviteTitle": "Nessun accesso?",
+      "inviteText": "Invita un collega che possa eseguire il comando.",
+      "inviteAction": "Invita un collega",
+      "loadFailed": "Impossibile caricare questa guida.",
+      "openInApp": "Apri in Origini dei dati",
+      "languageText": "Per {language}, aggiungi {otelSdk}, con strumentazione automatica dove {language} la supporta, poi puntalo a {product} con le impostazioni riportate sotto.",
+      "languageLink": "Guida {otel} per {language}"
+    },
+    "rail": {
+      "label": "Avanzamento configurazione",
+      "check": "Verifica i tuoi dati",
+      "received": "Dati ricevuti",
+      "attention": "Richiede attenzione",
+      "waitingShort": "In attesa di dati",
+      "title": "Configura {name}",
+      "run": "Esegui il comando di configurazione",
+      "explore": "Esplora i tuoi dati"
+    },
+    "firstData": {
+      "title": "I tuoi dati stanno arrivando",
+      "count": "{count} record è arrivato in {stream} | {count} record sono arrivati in {stream}",
+      "exploreLogs": "Esplora i tuoi log",
+      "exploreMetrics": "Esplora le tue metriche",
+      "exploreTraces": "Esplora le tue tracce",
+      "exploreProfiles": "Esplora i tuoi profili",
+      "addAnother": "Aggiungi un'altra origine"
+    },
+    "others": {
+      "synthetics": {
+        "name": "Controlli sintetici",
+        "description": "Controlla un sito web, un'API, una porta o un certificato. Nessuna installazione.",
+        "gets": "Esegui controlli pianificati dall'esterno della tua rete."
+      },
+      "invite": {
+        "name": "Invita un collega a configurare",
+        "description": "Riceverà un invito alla tua organizzazione."
+      },
+      "agent": {
+        "name": "Configura con il tuo agente di programmazione",
+        "description": "Dai a {claudeCode}, {cursor} o {codex} un solo prompt.",
+        "gets": "Il tuo agente di programmazione aggiunge la configurazione e verifica che i dati arrivino."
+      }
+    },
+    "agentLink": "Oppure lascia che lo faccia il tuo agente di programmazione",
+    "stepDone": "(fatto)",
+    "agent": {
+      "crumb": "Agente di programmazione",
+      "title": "Configura con il tuo agente di programmazione",
+      "lead": "{claudeCode}, {cursor}, {codex} o qualsiasi agente di programmazione legge il tuo progetto, aggiunge la configurazione e verifica che i dati siano arrivati. Ti chiede prima di installare qualcosa o modificare i file di deployment.",
+      "tokenTitle": "Salva il tuo token",
+      "tokenText": "Esegui questo comando nel terminale da cui avvierai il tuo agente di programmazione, prima di avviarlo.",
+      "powerShell": "In {powerShell}:",
+      "copyPowerShell": "Copia il comando {powerShell}",
+      "promptTitle": "Copia il prompt",
+      "focusLabel": "Configura",
+      "focus": {
+        "kubernetes": "Cluster {k8s}",
+        "host": "Host {linux}, {macos} o {windows}",
+        "backend": "Servizio backend ({otel})",
+        "llm": "App LLM",
+        "frontend": "Frontend web",
+        "logs": "Solo log"
+      },
+      "copyPrompt": "Copia prompt",
+      "promptCopied": "Prompt copiato",
+      "download": "Scarica .md",
+      "preview": "Anteprima del prompt",
+      "previewLines": "{count} riga | {count} righe",
+      "pasteTitle": "Incollalo nel tuo agente di programmazione",
+      "other": "Altro",
+      "hint": {
+        "claudeCode": "Nello stesso terminale, esegui {command} nella cartella del progetto, poi incolla il prompt.",
+        "cursor": "Avvia {product} dallo stesso terminale con {command}, così può leggere il token. Poi incolla il prompt nella sua chat.",
+        "codex": "Nello stesso terminale, esegui {command} nella cartella del progetto, poi incolla il prompt.",
+        "other": "Avvia il tuo agente di programmazione dallo stesso terminale, così può leggere il token. Poi incolla il prompt, oppure passagli {file}."
+      },
+      "mcp": "Connetti il server {mcp} così il tuo agente di programmazione può leggere i tuoi dati",
+      "aside": {
+        "eyebrow": "Cosa dice il prompt al tuo agente di programmazione",
+        "title": "Modifiche piccole e sicure",
+        "line1": "Trova cosa esegue il progetto",
+        "line2": "Fai la modifica più piccola che funziona",
+        "line3": "Mantieni il token nell'ambiente",
+        "line4": "Invia un evento di test allo stream {stream}",
+        "line5": "Segnala quali file sono cambiati"
+      }
+    },
+    "collect": {
+      "continueToSetup": "Continua con la configurazione",
+      "languages": "Lingue",
+      "languagesRequired": "Scegli almeno una lingua.",
+      "kubernetesCluster": {
+        "question": "Scegli cosa raccogliere dal tuo cluster",
+        "off": {
+          "name": "Log e metriche",
+          "description": "Integrità del cluster e log dei container. Un solo comando.",
+          "about": "Log dei container, CPU e memoria di ogni nodo e pod, e gli eventi {k8s} come log, con un solo comando di installazione."
+        },
+        "ebpf": {
+          "name": "Aggiungi tracce con eBPF",
+          "description": "Nessuna modifica al codice, qualsiasi linguaggio. Richiede kernel Linux 5.8+ sui tuoi nodi.",
+          "about": "La stessa installazione, più le tracce. Il collector vede le richieste dal kernel Linux, quindi le tue app non cambiano. Collega una richiesta tra i servizi solo tramite HTTP in chiaro."
+        },
+        "library": {
+          "name": "Aggiungi tracce con le librerie per linguaggio",
+          "description": "Più dettagli per app. Scegli i tuoi linguaggi, poi riavvia le app una volta.",
+          "about": "La stessa installazione, più le tracce. Il {otelOperator} aggiunge la {otelLibrary} per ogni linguaggio ai pod nei namespace che scegli. Il tuo codice non cambia."
+        }
+      }
+    },
+    "groups": {
+      "webServers": "Server web",
+      "messageQueues": "Code di messaggi",
+      "metricsYouCollect": "Metriche che già raccogli",
+      "gpuAndNetwork": "GPU e flussi di rete",
+      "movingFromAnotherTool": "Passaggio da un altro strumento",
+      "cloudLogs": "Log cloud",
+      "securityTools": "Strumenti di sicurezza",
+      "cicdAndPlatforms": "CI/CD e piattaforme"
+    },
+    "infrastructure": {
+      "name": "Infrastruttura",
+      "description": "Server, {k8s}, account cloud e database",
+      "gets": "Visualizza ogni host, pod e servizio cloud in un unico posto.",
+      "question": "Come vuoi monitorare la tua infrastruttura?",
+      "rows": {
+        "kubernetesCluster": {
+          "name": "Cluster {k8s}",
+          "description": "Log, metriche ed eventi {k8s} da una sola installazione. Tracce con un comando in più.",
+          "about": "Installa il {productCollector} nel tuo cluster con un solo comando. Ottieni log dei container, eventi {k8s} e metriche del cluster."
+        },
+        "linuxWindowsOrMacosHost": {
+          "name": "Host {linux}, {windows} o {macos}",
+          "description": "Installa il {productAgent} come servizio",
+          "about": "Un solo agente raccoglie log e metriche dall'host. Su {linux} può anche tracciare i programmi senza modifiche al codice.",
+          "question": "Qual è il sistema operativo del tuo host?"
+        },
+        "cloudAccount": {
+          "name": "Account cloud",
+          "description": "{aws}, {gcp} o {azure}",
+          "about": "Trasmette log dal tuo account cloud e metriche da {aws}. Nulla viene eseguito sui tuoi server.",
+          "question": "Su quale cloud si trova il tuo account?"
+        },
+        "databases": {
+          "name": "Database",
+          "description": "{examples} e altri {count}",
+          "about": "Raccoglie metriche dei database, principalmente tramite il {otelCollector}.",
+          "question": "Quale database vuoi monitorare?"
+        },
+        "somethingElse": {
+          "name": "Altro",
+          "description": "Server web, code di messaggi, {prometheus}, GPU e flussi di rete",
+          "about": "Server web, code di messaggi, metriche che già raccogli, utilizzo della GPU e flussi di rete.",
+          "question": "Cos'altro vuoi monitorare?"
+        }
+      }
+    },
+    "backend": {
+      "name": "Applicazioni backend",
+      "description": "Tracce dai tuoi servizi e log dove il tuo SDK li invia",
+      "gets": "Scopri come ogni richiesta si sposta tra i tuoi servizi.",
+      "question": "Come vuoi tracciare i tuoi servizi?",
+      "rows": {
+        "addALibraryToYourCode": {
+          "name": "Aggiungi una libreria al tuo codice",
+          "description": "{nodejs}, {python}, {java}, {go}, {dotnet}, {rust} o {fastapi}",
+          "about": "Aggiunge {otelLibrary} per il tuo linguaggio. Le tracce vengono inviate a {product}.",
+          "question": "In quale linguaggio è scritto il tuo servizio?"
+        },
+        "kubernetesWorkloadsNoCodeChanges": {
+          "name": "Carichi di lavoro {k8s}, nessuna modifica al codice",
+          "description": "Strumentazione automatica nel tuo cluster",
+          "about": "L'{otelOperator} aggiunge strumentazione ai pod in un namespace. Nessuna modifica al codice o all'immagine."
+        },
+        "anyLanguageWithOpentelemetry": {
+          "name": "Qualsiasi linguaggio con {otel}",
+          "description": "Invia OTLP dalla tua configurazione",
+          "about": "Punta qualsiasi {otelSdk} o collector al tuo endpoint {product}."
+        },
+        "continuousProfiling": {
+          "name": "Profilazione continua",
+          "description": "Profili CPU e memoria",
+          "about": "Inoltra i profili dai tuoi profiler ({go}, {java}, {rust} o il profiler eBPF) tramite {otelCollector}."
+        }
+      }
+    },
+    "frontend": {
+      "name": "App frontend e mobile",
+      "description": "Monitoraggio degli utenti reali per web e mobile",
+      "gets": "Scopri l'esperienza reale degli utenti nelle tue app web e mobile.",
+      "question": "Dove viene eseguita la tua app?",
+      "rows": {
+        "browser": {
+          "name": "Browser",
+          "description": "Siti web e app web",
+          "about": "Aggiunge {sdk} alla tua app web. Ottieni caricamenti di pagina, errori e sessioni da browser reali."
+        },
+        "reactNative": {
+          "description": "{ios} e {android} da un'unica base di codice",
+          "about": "Aggiunge {sdk} alla tua app {platform}."
+        },
+        "android": {
+          "description": "App native {android}",
+          "about": "Aggiunge {sdk} alla tua app {platform}. Ottieni sessioni, visualizzazioni di schermata, errori e crash."
+        },
+        "ios": {
+          "description": "App native {ios}",
+          "about": "Aggiunge {sdk} alla tua app {platform}. Ottieni sessioni, visualizzazioni di schermata, errori e crash."
+        }
+      }
+    },
+    "logs": {
+      "name": "Log da qualsiasi origine",
+      "description": "Invia log da qualsiasi agente di inoltro, servizio o strumento",
+      "gets": "Cerca e filtra ogni riga di log, indipendentemente da chi la invia.",
+      "question": "Come vuoi inviare i tuoi log?",
+      "rows": {
+        "fromALogShipperYouRun": {
+          "name": "Da un agente di inoltro dei log che esegui",
+          "description": "{examples} e altri {count}",
+          "about": "Indirizza l'agente di inoltro che già esegui verso {product}. Nessun nuovo agente.",
+          "question": "Quale agente di inoltro dei log esegui?"
+        },
+        "overHttpWithCurl": {
+          "name": "Tramite HTTP con {curl}",
+          "description": "Una richiesta da qualsiasi script. Nessuna installazione.",
+          "about": "Invia log JSON da qualsiasi script o servizio con una singola richiesta HTTP."
+        },
+        "fromOpentelemetry": {
+          "name": "Da {otel}",
+          "description": "Log OTLP da un SDK o da un collector",
+          "about": "Invia log tramite OTLP da un {otelSdk} o da un collector."
+        },
+        "somethingElse": {
+          "name": "Qualcos'altro",
+          "description": "{splunk} o {cribl}, log cloud, strumenti di sicurezza e CI/CD",
+          "about": "Passa da {splunk} o {cribl}, oppure raccogli log dal tuo cloud, dai tuoi strumenti di sicurezza e dalla CI/CD.",
+          "question": "Da dove altro provengono i tuoi log?"
+        }
+      }
+    },
+    "llm": {
+      "name": "App LLM e AI",
+      "description": "Traccia chiamate LLM, agenti e strumenti",
+      "gets": "Visualizza ogni chiamata LLM, chiamata a strumento e passaggio dell'agente.",
+      "question": "Cosa usa la tua app AI?",
+      "rows": {
+        "openai": {
+          "description": "{openaiSdk}, Agents o {assistantsApi}",
+          "about": "Traccia ogni chiamata effettuata tramite {openaiSdk}, con token, costo e latenza.",
+          "question": "Quale libreria {openai} usi?"
+        },
+        "anthropic": {
+          "description": "{anthropicSdk} o {claudeAgentSdk}",
+          "about": "Traccia ogni chiamata effettuata tramite {anthropicSdk}, con token, costo e latenza.",
+          "question": "Quale libreria {anthropic} usi?"
+        },
+        "langchainOrLanggraph": {
+          "description": "Chain, agent e grafi",
+          "about": "Traccia ogni chain, ogni passaggio dell'agente e ogni chiamata agli strumenti.",
+          "question": "Quale libreria {langchain} usi?"
+        },
+        "somethingElse": {
+          "name": "Qualcos'altro",
+          "description": "Altri framework, provider di modelli, gateway e strumenti",
+          "about": "Framework, provider di modelli, gateway, strumenti no-code, analytics e strumenti.",
+          "question": "Cosa usa la tua app AI?"
+        }
+      }
+    }
+  },
   "fleet": {
     "title": "Gestione fleet",
     "subtitle": "Registra i collector OpenTelemetry, versiona le loro configurazioni e distribuisci le modifiche in sicurezza",
@@ -30315,10 +32306,169 @@
       "legendToggle": "Mostra o nascondi questo stato sulla mappa"
     }
   },
-  "filterBar": {
-    "validation": {
-      "regexLength": "Usa al massimo {max} caratteri nel pattern.",
-      "regexInvalid": "Questo pattern non è valido o non è supportato. Non è possibile usare lookahead, lookbehind e riferimenti all'indietro."
+  "sampleData": {
+    "delete": "Elimina dati di esempio",
+    "loadForbidden": "Per caricare i dati di esempio serve l'accesso in scrittura a questa organizzazione.",
+    "steps": {
+      "functions": "Creazione di funzioni",
+      "pipeline": "Creazione di una pipeline in tempo reale",
+      "telemetry": "Generazione e invio di log, tracce e metriche",
+      "dashboards": "Creazione di dashboard",
+      "alerts": "Creazione di avvisi",
+      "enrichment": "Caricamento della tabella dei proprietari dei servizi"
+    },
+    "progress": {
+      "loading": "Caricamento dei dati di esempio…",
+      "done": "Dati di esempio caricati",
+      "counts": "{logs} record di log · {spans} span · {metrics} punti metrici",
+      "skipped": "Ignorati",
+      "logs": "Log",
+      "spans": "Span",
+      "metrics": "Punti metrici"
+    },
+    "removeSteps": {
+      "alerts": "Avvisi",
+      "alertDelivery": "Template di avviso e webhook",
+      "dashboards": "Dashboard",
+      "pipeline": "Pipeline",
+      "functions": "Funzioni",
+      "streams": "Stream"
+    },
+    "removeDialog": {
+      "removing": {
+        "title": "Rimozione dei dati di esempio",
+        "body": "L'operazione richiede qualche secondo. Puoi chiudere questa finestra, ma lascia aperta questa scheda fino al termine.",
+        "label": "Rimozione dei dati di esempio…"
+      },
+      "done": {
+        "title": "Dati di esempio rimossi",
+        "body": "Il server completa l'eliminazione dei dati memorizzati in pochi minuti. Dopodiché potrai caricare di nuovo i dati di esempio.",
+        "label": "Rimozione completata",
+        "done": "Fatto",
+        "keptLabel": "Mantenuti, perché qualcos'altro li utilizza:"
+      },
+      "failed": {
+        "title": "Impossibile rimuovere tutti i dati di esempio",
+        "body": "Riprova: gli elementi già rimossi vengono ignorati.",
+        "label": "Rimozione interrotta",
+        "close": "Chiudi",
+        "tryAgain": "Riprova"
+      }
+    },
+    "removeConfirm": {
+      "title": "Eliminare i dati di esempio?",
+      "message": "Vengono eliminati gli stream, le dashboard, gli avvisi, le funzioni e la tabella di arricchimento di esempio. I tuoi dati non vengono toccati."
+    },
+    "toast": {
+      "loaded": "Dati di esempio caricati. Buona esplorazione!",
+      "loadFailed": "Impossibile caricare i dati di esempio",
+      "removed": "Dati di esempio rimossi",
+      "removedWithKept": "Dati di esempio rimossi. {count} elemento di esempio rimane perché qualcos'altro lo utilizza. | Dati di esempio rimossi. {count} elementi di esempio rimangono perché qualcos'altro li utilizza.",
+      "removeFailed": "Impossibile rimuovere tutti i dati di esempio",
+      "removeWhileLoading": "Attendi il completamento del caricamento dei dati di esempio."
+    },
+    "entry": {
+      "onboardingSource": "Esplora i dati di esempio"
+    },
+    "callout": {
+      "title": "Non sei ancora pronto a inviare dati?",
+      "body": "Esplora {product} con un negozio online di esempio: un incidente in corso e un tour guidato tra dashboard, avvisi, log, tracce, metriche e pipeline.",
+      "cta": "Esplora con i dati di esempio"
+    },
+    "header": {
+      "label": "Dati di esempio",
+      "try": "Prova i dati di esempio",
+      "finish": "Completa il caricamento"
+    },
+    "dock": {
+      "details": "Mostra dettagli"
+    },
+    "homeBanner": {
+      "cleanup": {
+        "message": "I tuoi dati stanno arrivando. Elimina i dati di esempio affinché non si mescolino con dashboard, avvisi e ricerche.",
+        "keep": "Mantieni per ora",
+        "remove": "Elimina i dati di esempio"
+      }
+    },
+    "welcome": {
+      "continueInBackground": "Continua in background",
+      "progress": {
+        "title": "Creazione del tuo negozio di esempio",
+        "body": "Richiede circa un minuto. Puoi chiudere questa finestra di dialogo, ma mantieni questa scheda aperta fino al termine del caricamento."
+      },
+      "ready": {
+        "title": "Il tuo negozio di esempio è live",
+        "startTour": "Avvia il tour guidato",
+        "ownWay": "Esplora in autonomia"
+      },
+      "errorBody": "Si è verificato un problema durante il caricamento. Riprova: le dashboard e gli avvisi già esistenti vengono riutilizzati, non duplicati."
+    },
+    "tour": {
+      "label": "Tour guidato",
+      "position": "Tour guidato · passo {current} di {total}",
+      "pill": "Tour {current}/{total}",
+      "done": "Tour completato",
+      "stepFailed": "Impossibile aprire questo passo. Riprova.",
+      "minimize": "Riduci a icona il tour",
+      "close": "Termina il tour",
+      "next": "Avanti",
+      "capabilities": {
+        "dashboards": "Dashboard",
+        "alerts": "Avvisi",
+        "logs": "Ricerca log",
+        "traces": "Tracciamento",
+        "metrics": "Metriche e PromQL",
+        "pipelines": "Pipeline"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "Individua il problema",
+          "body": "Questa è la panoramica dei servizi della vetrina. Il tasso di errore e la latenza del checkout sono entrambi aumentati bruscamente negli ultimi 35 minuti.",
+          "look": "Ogni pannello è una query SQL. Passa il mouse su un grafico per confrontare le serie, trascina sul grafico per ingrandire oppure apri il menu di un pannello per modificarne la query."
+        },
+        "alert": {
+          "title": "L'avviso si è già attivato",
+          "body": "Un avviso sugli errori di pagamento esegue una query SQL sui log in base a una pianificazione e si è attivato non appena gli errori hanno superato la soglia.",
+          "look": "Apri un avviso per visualizzarne la query, la soglia e la pianificazione. La destinazione di esempio è un webhook segnaposto, quindi le consegne risultano non riuscite: indirizzala a Slack, email o PagerDuty per ricevere notifiche reali."
+        },
+        "logs": {
+          "title": "Cerca gli errori",
+          "body": "Log filtrati per gli errori di pagamento. Quasi tutti riportano la stessa cosa: timeout durante l'acquisizione di una connessione dal pool.",
+          "look": "Espandi un record per visualizzare tutti i campi. Fai clic su un valore di campo per filtrarlo, oppure passa alla modalità SQL per raggruppare e aggregare."
+        },
+        "deploy": {
+          "title": "Scopri cosa è cambiato",
+          "body": "Payment v2.15.0 è stato distribuito un minuto prima che iniziassero gli errori, e le sue note di rilascio hanno ridotto il pool di connessioni a 20.",
+          "look": "Questa è la causa principale, trovata con una sola ricerca sugli stessi log. La ricerca full-text e SQL viene eseguita sugli stessi dati."
+        },
+        "traces": {
+          "title": "Segui una richiesta in errore",
+          "body": "Ogni traccia segue un checkout attraverso i servizi. Aprine una: il diagramma a cascata mostra il servizio di pagamento in attesa per 3 secondi di una connessione al database.",
+          "look": "I log riportano lo stesso trace ID, così puoi passare da uno span ai suoi log in entrambe le direzioni."
+        },
+        "metrics": {
+          "title": "Conferma con PromQL",
+          "body": "La latenza p95 di ogni servizio, interrogata con PromQL. Payment e checkout crescono insieme.",
+          "look": "Le metriche risiedono nello stesso motore di log e tracce, quindi la dashboard Infrastructure è costruita interamente con PromQL."
+        },
+        "pipeline": {
+          "title": "Elabora i dati mentre arrivano",
+          "body": "Una pipeline in tempo reale esegue una funzione VRL su ogni log di accesso, aggiungendo client_os e is_mobile prima che il record venga memorizzato.",
+          "look": "Apri la pipeline per vedere il suo grafico. Le pipeline possono filtrare, arricchire, instradare e oscurare i dati senza toccare le tue applicazioni."
+        },
+        "business": {
+          "title": "Misura l'impatto sul business",
+          "body": "Gli stessi log alimentano le dashboard di business: checkout falliti, ricavi e ordini per metodo di pagamento.",
+          "look": "Non serve uno strumento di analisi separato. Qualsiasi dato nei tuoi log può diventare un KPI."
+        }
+      },
+      "finale": {
+        "title": "Hai trovato la causa principale",
+        "body": "In pochi minuti sei passato da un picco su una dashboard al deploy che l'ha causato, con ogni segnale in un unico posto.",
+        "connect": "Collega i tuoi dati",
+        "restart": "Ricomincia il tour",
+        "finish": "Termina il tour"
+      }
     }
   },
   "recentSearches": {
@@ -30393,5 +32543,11 @@
     "recentRow": "Ricerca recente",
     "deletedQuery": "Eliminata {query}",
     "undo": "Annulla"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Usa al massimo {max} caratteri nel pattern.",
+      "regexInvalid": "Questo pattern non è valido o non è supportato. Non è possibile usare lookahead, lookbehind e riferimenti all'indietro."
+    }
   }
 }

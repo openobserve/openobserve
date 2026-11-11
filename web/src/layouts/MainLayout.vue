@@ -38,9 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            The wrapper always renders — an unconditional ref keeps the observer
            attached even when nothing is on screen yet. -->
       <div ref="announcementBarRef">
-        <!-- Webinar announcement bar: shown above toolbar for cloud users -->
+        <!-- Webinar announcement bar: shown above toolbar for cloud users, but not over a focus-mode page -->
         <div
-          v-if="config.isCloud === 'true'"
+          v-if="config.isCloud === 'true' && !focusMode"
           class="bg-button-primary text-button-primary-foreground text-center"
         >
           <WebinarBanner variant="header" />
@@ -87,9 +87,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex min-h-0 flex-1">
       <ONavbar
-        v-if="store.state.printMode !== true && !store.state.kioskMode"
+        v-if="store.state.printMode !== true && !focusMode && !store.state.kioskMode"
         class="max-md:hidden"
         :links-list="navLinks"
+        :flat="store.state.solutionMode === 'security'"
         :loading="!menuReady"
         :mini-mode="miniMode"
         @menu-hover="handleMenuHover"
@@ -97,6 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Not seamless: the scrim gives tap-outside-to-close a target. -->
       <ODrawer
+        v-if="!focusMode"
         v-model:open="mobileNavOpen"
         side="left"
         :width="30"
@@ -131,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ONavbar
             class="min-h-0 flex-1 overflow-y-auto"
             :links-list="navLinks"
+            :flat="store.state.solutionMode === 'security'"
             :visible="true"
             @menu-hover="handleMenuHover"
           />
@@ -142,10 +145,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <main
           data-test="main-content"
           class="bg-surface-chrome-deeper flex min-h-0 flex-col"
-          :class="store.state.kioskMode ? '' : 'pe-2 pb-2 max-md:pe-0'"
+          :class="
+            store.state.kioskMode
+              ? ''
+              : focusMode
+                ? 'px-2 pb-2 max-md:px-0'
+                : 'pe-2 pb-2 max-md:pe-0'
+          "
           :style="{
             width:
-              !store.state.isAiChatEnabled || isChatOverlay || store.state.kioskMode
+              focusMode || !store.state.isAiChatEnabled || isChatOverlay || store.state.kioskMode
                 ? '100%'
                 : store.state.isAiChatExpanded
                   ? '50%'
@@ -162,12 +171,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
           >
             <div
-              v-if="isLoading && fullConfigSettled"
+              v-if="isLoading && fullConfigSettled && !holdForOnboarding"
               :key="store.state.selectedOrganization?.identifier"
               class="o2-content-scroll h-full flex-1 overflow-y-auto"
             >
               <FirstDataNotice
                 v-if="
+                  !focusMode &&
                   firstDataNotice.visible.value &&
                   router.currentRoute.value.name !== 'home' &&
                   !store.state.kioskMode
@@ -180,7 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <!-- Enter-only fade; the body's slide lives in OPageLayout so the header stays put. -->
               <FeatureLockBoundary :feature="lockedFeature">
-                <router-view v-slot="{ Component }">
+                <SecurityPageGate v-if="securityGated" />
+                <router-view v-else v-slot="{ Component }">
                   <OAccessBoundary>
                     <keep-alive :include="KEPT_ALIVE_VIEWS">
                       <component
@@ -208,6 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
+          v-if="!focusMode"
           v-show="store.state.isAiChatEnabled && isLoading && !store.state.kioskMode"
           class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper shrink-0 overflow-y-auto"
           :class="[
@@ -247,22 +259,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <ODialog
-      data-test="main-layout-get-started-dialog"
-      v-model:open="showGetStarted"
-      size="lg"
-      persistent
-      :show-close="false"
-    >
-      <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
-    </ODialog>
+    <SampleDataWelcome />
+    <SampleDataRemoveDialog />
+    <SampleDataTour />
+    <SampleDataProgressDock />
     <EditorDraftSignOutDialog
       v-model:open="signOutDraftsOpen"
       :count="signOutDraftCount"
       @confirm="performSignout"
     />
-    <ConnectDataSourcePopup />
-    <CommunitySlackInvite />
+    <!-- It checks once, on mount, before the page claims the session, so it stays off focus-mode pages (onboarding). -->
+    <CommunitySlackInvite v-if="!focusMode" />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
     <PaidOverageConsentDialog v-if="config.isCloud == 'true'" />
@@ -279,6 +286,7 @@ import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import { ENTER_FADE } from "@/lib/styles/motion";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
+import { securityNavLinks as buildSecurityNavLinks } from "@/utils/security/nav";
 import { featureState, menuState, streamTypeFeature, type FeatureState } from "@/utils/featureGate";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
@@ -304,6 +312,7 @@ import {
   onMounted,
   onUnmounted,
   watch,
+  watchEffect,
   markRaw,
   nextTick,
   onBeforeMount,
@@ -312,7 +321,9 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRouter, RouterView } from "vue-router";
+import { useRoute, useRouter, RouterView } from "vue-router";
+import { solutionModeForPath } from "@/utils/security/solutionMode";
+import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import config from "../aws-exports";
 
 import { setLanguage } from "../utils/cookies";
@@ -324,10 +335,21 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
-import GetStarted from "@/components/login/GetStarted.vue";
+import {
+  isFirstLoginOf,
+  markStartPending,
+  recordStart,
+  redirectPending,
+} from "@/components/onboarding/onboardingFlow";
+import { orgHasUserData } from "@/composables/useOrgHasUserData";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
+import type { FirstSourceId } from "@/components/login/firstSourceOptions";
+import { flowsKnown, onboardingFlowOn, sampleDataFlowOn } from "@/utils/firstRunFlow";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
-import ConnectDataSourcePopup from "@/components/ConnectDataSourcePopup.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import SampleDataWelcome from "@/components/sampleData/SampleDataWelcome.vue";
+import SampleDataRemoveDialog from "@/components/sampleData/SampleDataRemoveDialog.vue";
+import SampleDataTour from "@/components/sampleData/SampleDataTour.vue";
+import SampleDataProgressDock from "@/components/sampleData/SampleDataProgressDock.vue";
 import EditorDraftSignOutDialog from "@/components/common/drafts/EditorDraftSignOutDialog.vue";
 import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -340,6 +362,7 @@ import useStreams from "@/composables/useStreams";
 import { userDataStreams } from "@/utils/internalStreams";
 import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
 import FeatureLockBoundary from "@/components/common/FeatureLockBoundary.vue";
+import SecurityPageGate from "@/components/security/SecurityPageGate.vue";
 import { clearLicenseDenials } from "@/composables/useLicenseDenials";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import {
@@ -394,16 +417,18 @@ export default defineComponent({
     O2AIChat,
     PaidOverageConsentDialog,
     ShortcutCheatsheet,
-    GetStarted,
     CommunitySlackInvite,
-    ConnectDataSourcePopup,
-    ODialog,
+    SampleDataWelcome,
+    SampleDataRemoveDialog,
+    SampleDataTour,
+    SampleDataProgressDock,
     ODrawer,
     OButton,
     OSkeleton,
     FirstDataNotice,
     EditorDraftSignOutDialog,
     FeatureLockBoundary,
+    SecurityPageGate,
     DashboardSaveConflictDialog: defineAsyncComponent(
       () => import("@/components/dashboards/DashboardSaveConflictDialog.vue"),
     ),
@@ -466,6 +491,13 @@ export default defineComponent({
     const signOutDraftCount = ref(0);
     const { isMobile, lgUp } = useBreakpoint();
     // Below lg no split leaves room for pages with a folder rail, so the chat overlays instead.
+    // Focus-mode routes (e.g. onboarding) keep the header but drop the side menu, the AI panel and the banners.
+    const focusMode = computed(() => router.currentRoute.value.meta?.focusMode === true);
+    // A first cloud login may be sent to onboarding: show no page until that is decided, so the
+    // user never sees Home for a moment before onboarding replaces it.
+    const holdForOnboarding = ref(
+      config.isCloud === "true" && isFirstLoginOf(store.state.userInfo?.email),
+    );
     const isChatOverlay = computed(() => !lgUp.value);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
@@ -484,7 +516,6 @@ export default defineComponent({
     const { prefetchRoute } = useRoutePrefetch();
 
     const isMonacoEditorLoaded = ref(false);
-    const showGetStarted = ref((localStorage.getItem("isFirstTimeLogin") ?? "false") === "true");
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
     const aiChatAppendMode = ref(true);
@@ -659,7 +690,55 @@ export default defineComponent({
         store.state.zoConfig.version != ""
       ),
     );
-    const navLinks = computed(() => (menuReady.value ? linksList.value : []));
+    const securityNavLinks = buildSecurityNavLinks(t);
+
+    // The URL decides the mode, so a shared /security link or a /logs jump shows the matching nav.
+    const route = useRoute();
+    const securityGated = ref(false);
+    // Not reactive: only the org watcher reads it, to skip a list that did not change.
+    const orgListSnapshot = markRaw({ value: "" });
+    if (config.isEnterprise == "true") {
+      const securityAccess = useSecurityAccess();
+      // Unknown until the access answer arrives, so a cold load never flips the mode early.
+      const securityAllowed = computed(
+        () => !securityAccess.loaded.value || securityAccess.canOpen.value,
+      );
+      const onSecurityPage = computed(
+        () => route.path === "/security" || route.path.startsWith("/security/"),
+      );
+      // A member without read gets a lock naming the grant, and an unanswered check a retry, instead of the page.
+      watchEffect(() => {
+        securityGated.value =
+          onSecurityPage.value &&
+          securityAccess.feature.value === "enabled" &&
+          securityAccess.loaded.value &&
+          (securityAccess.failed.value || !securityAccess.canEnter.value);
+      });
+      watch(
+        [() => route.path, securityAllowed],
+        ([path, allowed]: [string, boolean]) => {
+          const mode = solutionModeForPath(path, store.state.solutionMode, allowed);
+          if (mode !== store.state.solutionMode) store.commit("setSolutionMode", mode);
+          // Only a hidden feature leaves the page; a refused member stays on it to read the lock.
+          if (securityAccess.feature.value === "hidden" && onSecurityPage.value) {
+            router.replace({
+              name: "home",
+              query: { org_identifier: store.state.selectedOrganization?.identifier },
+            });
+          }
+        },
+        { immediate: true },
+      );
+    }
+
+    // Security links never enter linksList, so the observability list keeps its flag and license edits.
+    const navLinks = computed(() =>
+      !menuReady.value
+        ? []
+        : store.state.solutionMode === "security"
+          ? securityNavLinks
+          : linksList.value,
+    );
 
     const langList = [
       {
@@ -768,6 +847,91 @@ export default defineComponent({
       document.documentElement.style.setProperty("--navbar-height", `${2.5 + barHeightRem}rem`);
     };
 
+    // a sign-up that never reaches onboarding still sends its one attribution event: its pick, or skipped
+    const recordFirstStart = (firstSource?: FirstSourceId) => {
+      if (config.isCloud !== "true") return;
+      const email = store.state.userInfo?.email;
+      markStartPending(email);
+      void recordStart(
+        store.state.selectedOrganization?.identifier,
+        email,
+        firstSource,
+        !firstSource,
+      );
+    };
+
+    // A brand-new cloud user goes to the onboarding page once; the flag is cleared so a reload does not repeat it.
+    const firstLoginRedirect = async (): Promise<void> => {
+      if (!isFirstLoginOf(store.state.userInfo?.email)) return;
+      await router.isReady();
+      // the flow switches arrive with the full config
+      await fullConfigReady();
+      // a failed full config decides nothing; the flag waits for a retry or the next Home visit
+      if (!flowsKnown(store.state.zoConfig)) return;
+      if (!onboardingFlowOn(store.state.zoConfig)) {
+        // the sample data welcome ends the first login itself; with neither flow it ends here
+        if (!sampleDataFlowOn(store.state.zoConfig)) {
+          localStorage.removeItem("isFirstTimeLogin");
+          recordFirstStart();
+        }
+        return;
+      }
+      // A pending redirect (a marketplace or deep link) keeps the flag, so a later Home visit in the same session still onboards.
+      const notNow = () =>
+        config.isCloud === "true" &&
+        redirectPending(router.currentRoute.value.name as string | undefined);
+      if (notNow()) return;
+      const org = store.state.selectedOrganization?.identifier;
+      const hasData =
+        config.isCloud !== "true" ||
+        store.state.organizationData.isDataIngested === true ||
+        // the store flag is still false at mount, so an org with data shows only in its stream lists
+        (await orgHasUserData(org));
+      // A user who left Home while the lists loaded keeps the flag too.
+      if (notNow()) return;
+      // The answer belongs to the org queried; after a switch, decide again for the org now selected.
+      if (store.state.selectedOrganization?.identifier !== org) return firstLoginRedirect();
+      // a failed list, or streams with no stats yet, decide nothing; the next Home visit asks again
+      if (hasData === undefined) return;
+      localStorage.removeItem("isFirstTimeLogin");
+      if (hasData) return recordFirstStart();
+      markStartPending(store.state.userInfo?.email);
+      await router.replace({
+        name: "onboarding",
+        query: { org_identifier: store.state.selectedOrganization?.identifier },
+      });
+    };
+    let deciding = false;
+    const onboardFirstLogin = async () => {
+      if (deciding) return;
+      deciding = true;
+      try {
+        await firstLoginRedirect();
+      } finally {
+        deciding = false;
+        holdForOnboarding.value = false;
+      }
+    };
+    onMounted(onboardFirstLogin);
+    // A first login a pending redirect deferred onboards on the next Home visit, remount or not, or once a late full config lands.
+    watch(
+      [() => router.currentRoute.value.name, () => flowsKnown(store.state.zoConfig)],
+      ([name]) => {
+        const firstLogin = name === "home" && isFirstLoginOf(store.state.userInfo?.email);
+        // Only Home waits on the decision, and only when it may onboard: a page the user moved to while the lists load shows at once.
+        holdForOnboarding.value = firstLogin && onboardingFlowOn(store.state.zoConfig);
+        if (firstLogin && !deciding) void onboardFirstLogin();
+      },
+    );
+
+    // A load started outside the welcome (the header Try, Home's callout) marks the welcome seen, so the first login ends here.
+    const sampleSession = useSampleDataSession();
+    watch(sampleSession.status, (now) => {
+      if (now !== "loading" || !isFirstLoginOf(store.state.userInfo?.email)) return;
+      localStorage.removeItem("isFirstTimeLogin");
+      recordFirstStart("sample");
+    });
+
     onMounted(() => {
       setNavbarHeight(announcementBarRef.value?.offsetHeight ?? 0);
 
@@ -789,6 +953,16 @@ export default defineComponent({
       store.state.zoConfig.version == "";
     // Pages read flags like ai_enabled once at setup, so they mount after the full config lands or fails.
     const fullConfigSettled = ref(!needsFullConfig());
+    const fullConfigReady = () =>
+      fullConfigSettled.value
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => {
+            const stop = watch(fullConfigSettled, (settled) => {
+              if (!settled) return;
+              stop();
+              resolve();
+            });
+          });
 
     // Which org the full config was fetched for — the response carries
     // org-scoped fields (e.g. per-user permission flags), so an org switch
@@ -1464,6 +1638,8 @@ export default defineComponent({
           ai_rca_thread_tool_output:
             orgSettings?.data?.data?.ai_rca_thread_tool_output ??
             defaultSettings.ai_rca_thread_tool_output,
+          data_retention: orgSettings?.data?.data?.data_retention,
+          resolved_data_retention: orgSettings?.data?.resolved_data_retention,
         });
 
         if (
@@ -1670,13 +1846,6 @@ export default defineComponent({
 
       return getImageURL("images/common/ai_icon_gradient.svg");
     });
-    //this will be the function used to cancel the get started dialog and remove the isFirstTimeLogin from local storage
-    //this will be called from the get started component whenever users clicks on the submit button
-    const removeFirstTimeLogin = (val: boolean) => {
-      showGetStarted.value = val;
-      localStorage.removeItem("isFirstTimeLogin");
-    };
-
     /** `value` is a query string or `{ query, autoSend?, chipName?, newChat?, context? }`; a chip never auto-sends. */
     const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
       const wasOpen = store.state.isAiChatEnabled;
@@ -1785,6 +1954,8 @@ export default defineComponent({
       dashboardSaveConflict: dashboardSaveConflictState,
       firstDataNotice,
       lockedFeature,
+      securityGated,
+      orgListSnapshot,
       layoutMixin,
       router,
       store,
@@ -1798,6 +1969,8 @@ export default defineComponent({
       selectedOrg,
       orgOptions,
       isMobile,
+      focusMode,
+      holdForOnboarding,
       isChatOverlay,
       miniMode,
       mobileNavOpen,
@@ -1823,8 +1996,6 @@ export default defineComponent({
       closeChat,
       getBtnLogo,
       isHovered,
-      showGetStarted,
-      removeFirstTimeLogin,
       sendToAiChat,
       aiChatInputContext,
       aiChatAppendMode,
@@ -1860,7 +2031,11 @@ export default defineComponent({
       this.layoutMixin.getDefaultOrganization(this.store);
     },
     changeOrganization: {
-      handler() {
+      handler(orgs: unknown) {
+        // The list is often replaced with an identical copy, which would reload the org's settings for nothing.
+        const snapshot = JSON.stringify(orgs ?? null);
+        if (snapshot === this.orgListSnapshot.value) return;
+        this.orgListSnapshot.value = snapshot;
         this.setSelectedOrganization();
       },
       deep: true,

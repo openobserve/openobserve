@@ -494,15 +494,9 @@ export class ModelPricingPage {
         await expect(this.tieWarning).toBeVisible({ timeout: 10000 });
     }
 
-    /** Open the "+N more" pricing drawer for a model row and assert it is visible. */
+    /** Open the pricing drawer by clicking the model's row. */
     async openPricingDrawerForModel(name) {
-        const row = this.listTable.locator(`tr:has-text("${name}")`);
-        const moreLink = row
-            .locator('button, a, span')
-            .filter({ hasText: new RegExp(`\\+\\d+\\s*${modelPricingStrings.overflowMore}`, 'i') })
-            .first();
-        await expect(moreLink).toBeVisible({ timeout: 5000 });
-        await moreLink.click();
+        await this.listTable.locator(`tr:has-text("${name}")`).getByText(name, { exact: true }).first().click();
         await expect(this.pricingDrawer).toBeVisible({ timeout: 10000 });
     }
 

@@ -127,6 +127,7 @@ import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
+import analytics from "@/services/product_analytics";
 
 const props = defineProps<{
   error: Record<string, any>;
@@ -153,10 +154,11 @@ const occurredAt = computed(() => {
   return raw(formatDate(Math.floor(micros / 1000), "MMM DD, YYYY HH:mm:ss Z"));
 });
 
-const copyErrorId = () => {
-  copyToClipboard(props.error.error_id, t, {
+const copyErrorId = async () => {
+  const copied = await copyToClipboard(props.error.error_id, t, {
     successMessage: t("rum.copiedToClipboard"),
     timeout: 1500,
   });
+  if (copied) analytics.track("rum_error_id_copied");
 };
 </script>

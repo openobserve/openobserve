@@ -20,7 +20,7 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use arrow_schema::Schema;
-use chrono::{Datelike, Duration, TimeZone, Utc};
+use chrono::{Datelike, TimeZone, Utc};
 use config::{
     FileFormat, PARQUET_MAX_ROW_GROUP_SIZE,
     cluster::LOCAL_NODE,
@@ -79,7 +79,6 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
     }
 
     let now = now();
-    let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
 
     // check jobs before dumping
     let mut need_release_ids = Vec::new();
@@ -105,12 +104,24 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
             continue;
         }
         // to avoid compacting conflict with retention, need check the data retention time
-        let stream_data_retention_end = if stream_settings.data_retention > 0 {
-            now - Duration::try_days(stream_settings.data_retention).unwrap()
-        } else {
-            data_lifecycle_end
+        let retention_days = match db::organization::stream_retention_days(
+            &org_id,
+            stream_type,
+            &stream_name,
+            stream_settings.data_retention,
+        )
+        .await
+        {
+            Ok(days) => days,
+            Err(e) => {
+                log::error!(
+                    "[COMPACTOR] dump job [{stream}] can't read retention, retry later: {e}"
+                );
+                need_release_ids.push(*job_id);
+                continue;
+            }
         };
-        if *offset <= stream_data_retention_end.timestamp_micros() {
+        if crate::retention::past_retention(*offset, retention_days, now) {
             need_done_ids.push(*job_id); // the data will be deleted by retention, just skip
             continue;
         }

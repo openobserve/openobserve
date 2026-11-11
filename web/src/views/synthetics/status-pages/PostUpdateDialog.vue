@@ -182,6 +182,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import statusPagesService, { type StatusPageNotice } from "@/services/status_pages";
+import analytics from "@/services/product_analytics";
 import {
   makePostUpdateSchema,
   postUpdateDefaults,
@@ -283,6 +284,9 @@ async function onSubmitAttach(values: AttachUpdateForm) {
       activeIncident.value.id,
       values.body,
     );
+    analytics.track("status_page_notice_update_posted", {
+      escalated: values.escalateTo !== "none",
+    });
     dismiss();
     toast({ variant: "success", message: t("statusPages.postUpdate.posted") });
     emit("update:open", false);

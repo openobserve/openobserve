@@ -139,6 +139,7 @@ describe("emojiCatalog", () => {
       LogstashDatasource: "logstash",
       SyslogNg: "syslog",
       SplunkHec: "splunk",
+      DatadogAgent: "datadog",
       OtelCollector: "opentelemetry",
       OtelConfig: "opentelemetry",
       OpenTelemetry: "opentelemetry",

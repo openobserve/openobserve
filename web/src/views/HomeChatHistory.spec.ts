@@ -32,8 +32,10 @@ vi.mock("@/composables/useAiChat", () => ({
 }));
 const service = vi.hoisted(() => ({ listForChat: vi.fn(), listMine: vi.fn(), listAll: vi.fn() }));
 vi.mock("@/services/ai_chat_share", () => ({ default: service }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 import HomeChatHistory from "./HomeChatHistory.vue";
+import analytics from "@/services/product_analytics";
 
 const chats = [
   {
@@ -90,6 +92,23 @@ describe("HomeChatHistory", () => {
     expect(row.attributes("tabindex")).toBe("0");
     await row.trigger("keydown", { key: "Enter" });
     expect(wrapper.emitted("load-chat")).toEqual([[1]]);
+    expect(analytics.track).toHaveBeenCalledWith("home_chat_history_opened");
+  });
+
+  it("tracks a delete only when the chat was actually deleted", async () => {
+    const { wrapper } = mountList();
+    await flushPromises();
+    const confirmDelete = async () => {
+      await wrapper.find('[data-test="home-chat-history-delete-1"]').trigger("click");
+      await flushPromises();
+      document.querySelector<HTMLElement>('[data-test="o-dialog-primary-btn"]')!.click();
+      await flushPromises();
+    };
+    history.deleteChatById.mockResolvedValueOnce(false);
+    await confirmDelete();
+    expect(analytics.track).not.toHaveBeenCalledWith("home_chat_history_deleted");
+    await confirmDelete();
+    expect(analytics.track).toHaveBeenCalledWith("home_chat_history_deleted");
   });
 
   it("confirms a delete, naming the chat in bold and the links that stop working", async () => {

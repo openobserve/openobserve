@@ -51,6 +51,7 @@ import type { PromqlLabelMatcher } from "@/components/promql/types";
 import type { FilterField } from "@/utils/query/filterBar";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import { compileLabelFilters, MAX_FILTER_BRANCHES } from "@/components/promql/labelBoolean";
+import analytics from "@/services/product_analytics";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
 import { queryClient } from "@/composables/query/queryClient";
@@ -170,6 +171,11 @@ function onChange(next: unknown) {
     return;
   }
   refusedCount.value = 0;
+  if (labels.length > props.labels.length) {
+    const groups = new Set(props.labels.map((label) => label.group ?? 0));
+    const newGroup = labels.some((label) => !groups.has(label.group ?? 0));
+    analytics.track("promql_builder_label_filter_added", { new_group: newGroup });
+  }
   emit("update:labels", labels);
 }
 </script>

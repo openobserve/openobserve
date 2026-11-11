@@ -142,6 +142,8 @@ impl ChatAudit {
     /// Built here, not by `report_with_protocol`, which has no `delegated` parameter (request 20).
     fn message(&self, code: u16, error_message: Option<String>) -> AuditMessage {
         AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: self.user_id.clone(),
             org_id: self.org_id.clone(),
             _timestamp: config::utils::time::now_micros(),
@@ -2525,6 +2527,8 @@ mod tests {
             rca_confidence: None,
             rca_summary: None,
             rca_off_reason: None,
+            security_case: false,
+            historical: false,
         };
         alert_incidents::Entity::insert(alert_incidents::ActiveModel::from(row).reset_all())
             .exec(conn)

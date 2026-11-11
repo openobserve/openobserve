@@ -265,10 +265,14 @@ mod m20261213_000001_retire_compiled_default_templates;
 mod m20261214_000001_templates_columns_to_text;
 mod m20261215_000001_add_alert_incident_title_template;
 mod m20261216_000001_rename_user_default_folders;
+mod m20261217_000001_add_alert_incidents_unresolved_index;
+mod m20261218_000001_add_security_case_to_alert_incidents;
+mod m20261219_000001_add_historical_to_alert_incidents;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
 pub(crate) use m20261021_000001_create_public_dashboards::forget_draft_migrations;
+pub(crate) use m20261218_000001_add_security_case_to_alert_incidents::forget_renamed_migrations;
 
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn create_public_dashboards_schema_for_test(
@@ -441,6 +445,15 @@ pub(crate) async fn create_downtime_notifications_for_test(
         .await?;
     m20261211_000001_add_templates_to_downtime_notifications::Migration
         .up(&manager)
+        .await
+}
+
+#[cfg(test)]
+pub(crate) async fn create_alert_incidents_unresolved_index_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20261217_000001_add_alert_incidents_unresolved_index::Migration
+        .up(&SchemaManager::new(db))
         .await
 }
 
@@ -842,6 +855,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20261214_000001_templates_columns_to_text::Migration),
             Box::new(m20261215_000001_add_alert_incident_title_template::Migration),
             Box::new(m20261216_000001_rename_user_default_folders::Migration),
+            Box::new(m20261217_000001_add_alert_incidents_unresolved_index::Migration),
+            Box::new(m20261218_000001_add_security_case_to_alert_incidents::Migration),
+            Box::new(m20261219_000001_add_historical_to_alert_incidents::Migration),
         ]
     }
 }
@@ -962,6 +978,9 @@ mod tests {
         (144, "m20261214_000001_templates_columns_to_text"),
         (145, "m20261215_000001_add_alert_incident_title_template"),
         (146, "m20261216_000001_rename_user_default_folders"),
+        (147, "m20261217_000001_add_alert_incidents_unresolved_index"),
+        (148, "m20261218_000001_add_security_case_to_alert_incidents"),
+        (149, "m20261219_000001_add_historical_to_alert_incidents"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1071,6 +1090,14 @@ mod tests {
             (
                 "m20251204_000001_create_alert_incidents_table",
                 "m20261009_000002_add_muted_by_downtime_id_to_alert_incidents",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261218_000001_add_security_case_to_alert_incidents",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261219_000001_add_historical_to_alert_incidents",
             ),
             (
                 "m20260725_000001_create_alert_states_tables",

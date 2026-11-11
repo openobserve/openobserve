@@ -192,6 +192,7 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0, store?: any
       formatter: (value: any) => {
         return formatAxisTickValue(value, config?.unit, config?.unit_custom, config?.decimals);
       },
+      ...(config.axis_width && { width: config.axis_width }),
     },
     splitLine: {
       show: showGridlines,
@@ -201,17 +202,6 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0, store?: any
     ...(config.axis_border_show !== undefined && {
       axisLine: {
         show: config.axis_border_show,
-      },
-    }),
-    ...(config.axis_width && {
-      axisLabel: {
-        show: config.axis_label !== false,
-        color: chartAxisTextColor(),
-        width: config.axis_width,
-        // Preserve unit formatter when axis_width is set
-        formatter: (value: any) => {
-          return formatAxisTickValue(value, config?.unit, config?.unit_custom, config?.decimals);
-        },
       },
     }),
   };

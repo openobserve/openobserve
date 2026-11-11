@@ -403,6 +403,41 @@ pub async fn set_settings_enabled<C: ConnectionTrait>(
     upsert_settings_columns(db, org_id, enabled, None, &columns, updated_by, now).await
 }
 
+/// Moves the org's settings rev to `max(rev + 1, now)` and changes nothing else, so every
+/// stored public result of the org is rebuilt before it is served again. A new row is enabled
+/// with the env default limit, the same as a missing row.
+pub async fn bump_settings_rev<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    updated_by: &str,
+    now: i64,
+) -> Result<(), errors::Error> {
+    let row = settings::ActiveModel {
+        org_id: Set(org_id.to_string()),
+        rev: Set(now),
+        enabled: Set(true),
+        max_links: Set(None),
+        max_links_set_by: Set(None),
+        updated_at: Set(now),
+        updated_by: Set(updated_by.to_string()),
+    };
+    settings::Entity::insert(row)
+        .on_conflict(
+            OnConflict::column(settings::Column::OrgId)
+                .value(
+                    settings::Column::Rev,
+                    Func::greatest([
+                        Expr::col((settings::Entity, settings::Column::Rev)).add(1),
+                        Expr::value(now),
+                    ]),
+                )
+                .to_owned(),
+        )
+        .exec(db)
+        .await?;
+    Ok(())
+}
+
 /// Upserts `columns` with the rev and audit fields; writing `max_links` also records who set it.
 async fn upsert_settings_columns<C: ConnectionTrait>(
     db: &C,

@@ -64,7 +64,7 @@ use o2_openfga::{
 use proto::cluster_rpc::SearchQuery;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use search::{
-    datafusion::plan::projections::get_result_schema,
+    datafusion::logical_plan::projections::get_result_schema,
     sql::{RE_ONLY_SELECT, Sql},
 };
 use svix_ksuid::Ksuid;
@@ -406,6 +406,24 @@ impl ManualTrigger {
     }
 }
 
+/// Plans `sql` over the last minute, so a query that cannot run is refused with the engine's error.
+pub async fn plan_sql(org_id: &str, stream_type: StreamType, sql: &str) -> Result<(), String> {
+    let end_time = config::utils::time::now_micros();
+    let query = SearchQuery {
+        sql: sql.to_string(),
+        start_time: end_time - 60_000_000,
+        end_time,
+        ..Default::default()
+    };
+    let sql = Sql::new(&query, org_id, stream_type, None)
+        .await
+        .map_err(|e| e.to_string())?;
+    get_result_schema(sql, false, false)
+        .await
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
 pub async fn save(
     org_id: &str,
     stream_name: &str,
@@ -525,6 +543,9 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
         }
         return Ok(());
     }
+
+    // A recovery message goes only to these when set, so a missing one sends it nowhere.
+    validate_template_and_destinations(org_id, None, &alert.recovery_destinations).await?;
 
     // A resolve carries the key of the trigger that opened the ticket, so it can only be sent where
     // the firing went; a platform here would be selected and then never used.
@@ -706,6 +727,58 @@ async fn clean_up_opted_out_groups(alert: &Alert) {
              reaper: {e}"
         ),
     }
+}
+
+/// Whether this save turns a disabled alert back on.
+pub(crate) fn re_enables(was_enabled: Option<bool>, enabled: bool) -> bool {
+    was_enabled == Some(false) && enabled
+}
+
+/// Drops an alert's run-state rows and its scheduler delivery memory, so it starts like a new
+/// alert.
+pub(crate) async fn reset_run_state(
+    org_id: &str,
+    alert_id: &str,
+    module: db::scheduler::TriggerModule,
+) -> Result<(), infra::errors::Error> {
+    use config::meta::alerts::state::ROLLUP_GROUP_KEY;
+
+    let firing = crate::alerts::lifecycle::firing_rows(alert_id).await;
+    let mut rows = infra::table::alert_states::list_groups(alert_id).await?;
+    rows.extend(infra::table::alert_states::get(alert_id, ROLLUP_GROUP_KEY).await?);
+    db::alerts::alert_states::delete_states(alert_id).await?;
+    forget_trigger_delivery(org_id, module, alert_id).await?;
+    crate::alerts::recovery::log_orphaned_episodes(alert_id, &rows, "dropped on re-enable");
+    let cleared = crate::alerts::lifecycle::deleted_clears(
+        &firing,
+        config::utils::time::now_micros(),
+        crate::alerts::lifecycle::ClearKind::AlertReEnabled,
+    );
+    crate::alerts::lifecycle::on_all_cleared(org_id, alert_id, &cleared).await;
+    Ok(())
+}
+
+/// Clears the silence window and notified level the scheduler keeps in the trigger's data.
+async fn forget_trigger_delivery(
+    org_id: &str,
+    module: db::scheduler::TriggerModule,
+    key: &str,
+) -> Result<(), infra::errors::Error> {
+    use config::meta::triggers::ScheduledTriggerData;
+    use infra::errors::{DbError, Error};
+
+    let mut trigger = match db::scheduler::get(org_id, module, key).await {
+        Ok(trigger) => trigger,
+        Err(Error::DbError(DbError::KeyNotExists(_))) => return Ok(()),
+        Err(e) => return Err(e),
+    };
+    // Unparsable data is read as the default by the scheduler, so it remembers no delivery.
+    let Ok(mut data) = ScheduledTriggerData::from_json_string(&trigger.data) else {
+        return Ok(());
+    };
+    data.clear_delivery();
+    trigger.data = data.to_json_string();
+    db::scheduler::update_trigger(trigger, false, "").await
 }
 
 /// What saving this alert does to the SLOs measuring from it: decided before
@@ -1421,9 +1494,9 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
         return Err(AlertError::PermissionDenied);
     }
 
+    // Every alert is checked before any moves, so one bad id moves nothing.
+    let mut moves = Vec::with_capacity(alert_ids.len());
     for alert_id in alert_ids {
-        let _alert_id_str = alert_id.to_string();
-
         let Some((curr_folder, alert)) =
             db::alerts::alert::get_by_id(conn, org_id, *alert_id).await?
         else {
@@ -1431,10 +1504,9 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
         };
 
         #[cfg(feature = "enterprise")]
-        if get_openfga_config().enabled {
-            // TODO: Try to make a single call for all alerts
-            if !check_permissions(
-                &_alert_id_str,
+        if get_openfga_config().enabled
+            && !check_permissions(
+                &alert_id.to_string(),
                 org_id,
                 _user_id,
                 "alerts",
@@ -1445,11 +1517,13 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
                 false,
             )
             .await
-            {
-                return Err(AlertError::PermissionDenied);
-            }
+        {
+            return Err(AlertError::PermissionDenied);
         }
+        moves.push((alert_id.to_string(), curr_folder, alert));
+    }
 
+    for (_alert_id_str, curr_folder, alert) in moves {
         update(
             conn,
             org_id,
@@ -1571,6 +1645,12 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
         }
     }
 
+    // Before the write: once enabled, the scheduler may evaluate against the old state.
+    if let Some(id) = alert.id
+        && re_enables(was_enabled, alert.enabled)
+    {
+        reset_run_state(org_id, &id.to_string(), db::scheduler::TriggerModule::Alert).await?;
+    }
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
     slo_effect.apply().await;
     clean_up_opted_out_groups(&alert).await;
@@ -1709,10 +1789,42 @@ pub async fn list_v2<C: ConnectionTrait>(
 /// Whether an individual grant in `permissions` covers `alert`, by its old or new OpenFGA id.
 pub(crate) fn is_alert_permitted(folder: &Folder, alert: &Alert, permissions: &[String]) -> bool {
     permissions.contains(&format!("alert:{}", alert.name))
+        || permissions.contains(&format!("afolder:{}", folder.folder_id))
         || alert.id.is_some_and(|id| {
             permissions.contains(&format!("alert:{}/{id}", folder.folder_id))
                 || permissions.contains(&format!("alert:{id}"))
         })
+}
+
+/// The grants a folder adds to a no-folder read: folders the user can both open and read.
+#[cfg(any(feature = "enterprise", test))]
+fn readable_folder_grants(
+    org_id: &str,
+    mut readable: Vec<String>,
+    listable: &[String],
+) -> Vec<String> {
+    let all_folders = format!("afolder:_all_{org_id}");
+    let lists_all = listable.contains(&all_folders);
+    readable.retain(|folder| lists_all || listable.contains(folder));
+    if readable.contains(&all_folders) {
+        readable.push(format!("alert:_all_{org_id}"));
+    }
+    readable
+}
+
+/// Folder ids out of `afolder:` grants; `None` when one of them is the org-wide grant.
+#[cfg(any(feature = "enterprise", test))]
+fn listable_folder_ids(org_id: &str, objects: &[String]) -> Option<Vec<String>> {
+    if objects.contains(&format!("afolder:_all_{org_id}")) {
+        return None;
+    }
+    Some(
+        objects
+            .iter()
+            .filter_map(|object| object.strip_prefix("afolder:"))
+            .map(str::to_string)
+            .collect(),
+    )
 }
 
 /// Deletes an alert by its KSUID primary key, unconditionally.
@@ -2415,9 +2527,13 @@ pub async fn enable_by_name(
             }
         };
     let changed = alert.enabled != value;
+    let reset = re_enables(Some(alert.enabled), value);
     alert.enabled = value;
     let alert_id = alert.id.map(|id| id.to_string());
     let by = alert.last_edited_by.clone().unwrap_or_default();
+    if reset && let Some(alert_id) = alert_id.as_deref() {
+        reset_run_state(org_id, alert_id, db::scheduler::TriggerModule::Alert).await?;
+    }
     db::alerts::alert::set(org_id, alert, false).await?;
     if changed && let Some(alert_id) = alert_id {
         crate::alerts::lifecycle::on_alert_enabled_changed(org_id, &alert_id, &by, value).await;
@@ -2533,6 +2649,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             notify,
             now,
             // Manual triggers evaluate nothing; no level to map.
+            None,
             None,
             None,
             None,
@@ -2672,6 +2789,7 @@ async fn suppressed_manual_trigger(
         now,
         None,
         &downtime,
+        None,
     )
     .await;
     count_suppressed_run(&alert.org_id, "alerts");
@@ -4584,6 +4702,22 @@ pub(super) fn to_float(val: &Value) -> f64 {
         val.as_str().unwrap_or_default().parse().unwrap_or_default()
     }
 }
+
+/// Alert folders the user may list, whatever `list_only_permitted` says; `None` is every folder.
+#[cfg(feature = "enterprise")]
+pub async fn listable_alert_folders(
+    org_id: &str,
+    user_id: &str,
+) -> Result<Option<Vec<String>>, AlertError> {
+    let folder_type = o2_openfga::meta::mapping::OFGA_MODELS
+        .get("alert_folders")
+        .map_or("afolder", |model| model.key);
+    let objects = db::authz::list_permitted_objects(org_id, user_id, "LIST", folder_type)
+        .await
+        .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?;
+    Ok(objects.and_then(|objects| listable_folder_ids(org_id, &objects)))
+}
+
 #[cfg(not(feature = "enterprise"))]
 pub async fn permitted_alerts(
     _org_id: &str,
@@ -4659,7 +4793,7 @@ pub async fn permitted_alerts(
     // to see the dashboard. This is used to check if the user has permission to see a specific
     // dashboard.
 
-    let permitted_objects = crate::authz::list_objects_for_user(
+    let mut permitted_objects = crate::authz::list_objects_for_user(
         org_id,
         user_id,
         "GET_INDIVIDUAL_FROM_ROLE",
@@ -4667,6 +4801,29 @@ pub async fn permitted_alerts(
     )
     .await
     .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?;
+
+    // GET_INDIVIDUAL_FROM_ROLE ignores parents, so a read across folders must add folder grants.
+    if folder_id.is_none()
+        && let Some(objects) = permitted_objects.as_mut()
+    {
+        let folder_objects = |permission| {
+            crate::authz::list_objects_for_user(
+                org_id,
+                user_id,
+                permission,
+                OFGA_MODELS.get("alert_folders").unwrap().key,
+            )
+        };
+        let readable = folder_objects("GET")
+            .await
+            .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?
+            .unwrap_or_default();
+        let listable = folder_objects("LIST")
+            .await
+            .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?
+            .unwrap_or_default();
+        objects.extend(readable_folder_grants(org_id, readable, &listable));
+    }
 
     Ok(permitted_objects)
 }
@@ -5553,6 +5710,70 @@ mod send_path_tests {
 }
 
 #[cfg(test)]
+mod folder_grant_tests {
+    use super::*;
+
+    fn strings(values: &[&str]) -> Vec<String> {
+        values.iter().map(|v| v.to_string()).collect()
+    }
+
+    #[test]
+    fn test_folder_grant_needs_both_get_and_list() {
+        let granted = readable_folder_grants(
+            "o",
+            strings(&["afolder:a", "afolder:b"]),
+            &strings(&["afolder:b", "afolder:c"]),
+        );
+        assert_eq!(granted, strings(&["afolder:b"]));
+    }
+
+    #[test]
+    fn test_org_wide_folder_grant_becomes_the_all_alerts_grant() {
+        let all = strings(&["afolder:_all_o"]);
+        let granted = readable_folder_grants("o", all.clone(), &all);
+        assert!(granted.contains(&"alert:_all_o".to_string()));
+    }
+
+    #[test]
+    fn test_listable_folders_are_the_granted_folder_ids() {
+        let listable = listable_folder_ids("o", &strings(&["afolder:a", "afolder:b"]));
+        assert_eq!(listable, Some(strings(&["a", "b"])));
+    }
+
+    #[test]
+    fn test_org_wide_list_grant_leaves_folders_unrestricted() {
+        let listable = listable_folder_ids("o", &strings(&["afolder:a", "afolder:_all_o"]));
+        assert_eq!(listable, None);
+    }
+
+    #[test]
+    fn test_no_list_grant_lists_no_folder() {
+        assert_eq!(listable_folder_ids("o", &[]), Some(vec![]));
+        let other_org = listable_folder_ids("o", &strings(&["afolder:_all_other"]));
+        assert_eq!(other_org, Some(strings(&["_all_other"])));
+    }
+
+    #[test]
+    fn test_folder_grant_passes_only_that_folders_alerts() {
+        let folder = |folder_id: &str| Folder {
+            folder_id: folder_id.to_string(),
+            ..Default::default()
+        };
+        let permissions = strings(&["afolder:mine"]);
+        assert!(is_alert_permitted(
+            &folder("mine"),
+            &Alert::default(),
+            &permissions
+        ));
+        assert!(!is_alert_permitted(
+            &folder("other"),
+            &Alert::default(),
+            &permissions
+        ));
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use arrow_schema::DataType;
     use serde_json::json;
@@ -5588,6 +5809,134 @@ mod tests {
         alert.query_condition.query_type = QueryType::PromQL;
         alert.query_condition.promql_multi_alert = true;
         assert!(validate_recovery_templates("default", &alert).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn a_recovery_destination_this_org_lacks_is_refused() {
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org = format!("recovery_targets_{}", config::utils::time::now_micros());
+        crate::common::infra::config::DESTINATIONS.insert(
+            format!("{org}/real"),
+            config::meta::destinations::Destination {
+                org_id: org.clone(),
+                name: "real".into(),
+                module: Module::Alert {
+                    template: None,
+                    destination_type: DestinationType::Http(Endpoint::default()),
+                },
+                ..Default::default()
+            },
+        );
+        let recovering_to = |dest: &str| {
+            let mut alert = Alert::default();
+            alert.notify_on_recovery = true;
+            alert.recovery_destinations = vec![dest.to_string()];
+            alert
+        };
+
+        assert_eq!(
+            validate_recovery_templates(&org, &recovering_to("nope"))
+                .await
+                .map_err(|e| e.to_string()),
+            Err("Alert destination nope not found".to_string())
+        );
+        assert!(
+            validate_recovery_templates(&org, &recovering_to("real"))
+                .await
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn only_turning_an_alert_back_on_resets_it() {
+        assert!(re_enables(Some(false), true));
+        assert!(!re_enables(Some(true), false));
+        assert!(!re_enables(Some(true), true));
+        assert!(!re_enables(Some(false), false));
+        assert!(!re_enables(None, true), "a new alert has nothing to reset");
+    }
+
+    #[tokio::test]
+    async fn re_enabling_drops_every_state_row_and_keeps_the_history() {
+        use config::meta::{
+            alerts::{level::AlertLevel, state::ROLLUP_GROUP_KEY},
+            self_reporting::usage::RunOutcome,
+        };
+        use svix_ksuid::KsuidLike;
+
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org = format!("re_enable_reset_{}", config::utils::time::now_micros());
+        let folder = Folder {
+            folder_id: "default".to_string(),
+            name: "default".to_string(),
+            ..Default::default()
+        };
+        infra::table::folders::get_or_create(&org, folder, FolderType::Alerts)
+            .await
+            .unwrap();
+        let mut alert = Alert::default();
+        alert.org_id = org.clone();
+        alert.name = "re_enable_reset".to_string();
+        alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+        let alert = infra::table::alerts::create(
+            infra::db::get_orm_client_rw().await,
+            &org,
+            "default",
+            alert,
+            false,
+        )
+        .await
+        .unwrap();
+        let alert_id = alert.id.unwrap().to_string();
+        for key in [ROLLUP_GROUP_KEY, "host=a"] {
+            let mut update = config::meta::alerts::state::apply_outcome(
+                &alert_id,
+                key,
+                None,
+                RunOutcome::Firing,
+                Some(AlertLevel::Critical),
+                1_000,
+            );
+            if let Some(state) = update.state.as_mut() {
+                state.episode_id = Some(format!("ep-{key}"));
+            }
+            db::alerts::alert_states::persist(&update, None)
+                .await
+                .unwrap();
+        }
+
+        reset_run_state(&org, &alert_id, db::scheduler::TriggerModule::Alert)
+            .await
+            .unwrap();
+
+        assert!(
+            infra::table::alert_states::get(&alert_id, ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            infra::table::alert_states::list_groups(&alert_id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        let history = infra::table::alert_states::list_transitions(&alert_id, 10)
+            .await
+            .unwrap();
+        assert_eq!(history.len(), 2, "the transition log outlives the reset");
     }
 
     #[test]

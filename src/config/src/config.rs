@@ -39,7 +39,7 @@ use crate::{
     meta::{
         cluster,
         meta_store::MetaStore,
-        stream::{QueryPartitionStrategy, StreamType},
+        stream::{DataRetentionDefaults, QueryPartitionStrategy, StreamType},
     },
     utils::{str::redact_dsn, sysinfo},
 };
@@ -144,7 +144,10 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 144: turn a json templates column from an earlier 141 or 142 into text.
 // 145: add alerts.incident_title_template.
 // 146: rename user folders named default so the built-in default folder can be created.
-pub const DB_SCHEMA_VERSION: u64 = 146;
+// 147: index alert_incidents.last_alert_at over unresolved incidents.
+// 148: add alert_incidents.security_case, backfilled from SIEM detections and case group keys.
+// 149: add alert_incidents.historical, set on a security case only backfilled firings opened.
+pub const DB_SCHEMA_VERSION: u64 = 149;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -166,18 +169,14 @@ pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 pub const GRPC_HTTP2_STREAM_WINDOW_SIZE: u32 = 8 * 1024 * 1024; // 8 MB
 pub const GRPC_HTTP2_CONNECTION_WINDOW_SIZE: u32 = 16 * 1024 * 1024; // 16 MB
 pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
+const MAX_FILE_SIZE_DEFAULT_CAP: usize = 512 * 1024 * 1024;
+const MAX_FILE_SIZE_DEFAULT_FLOOR: usize = 32 * 1024 * 1024;
 // The current value is recorded in each tantivy index file (puffin `row_group_size`
 // property) so it can be changed safely without breaking row_id → row_group mapping
 // for older files.
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 128 * 1024;
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
-// Uncompressed total per upload; the request body cap only bounds compressed bytes.
-pub const SOURCEMAP_ZIP_MAX_SIZE: u64 = 1024 * 1024 * 100; // 100 MB
-pub const SOURCEMAP_ZIP_MAX_ENTRIES: usize = 1000;
-// max file size for individual sourcemap. We temp cache these in mem,
-// so it will affect spikes in mem at resolving stacktrace
-pub const SOURCEMAP_FILE_MAX_SIZE: u64 = 1024 * 1024 * 5; // 5 MB
 pub const SOURCEMAP_MEM_CACHE_SIZE: usize = 10000;
 
 #[inline]
@@ -638,6 +637,16 @@ pub fn get_instance_id() -> String {
         Some(id) => id.clone(),
         None => "".to_string(),
     }
+}
+
+/// Keyed by the instance id, so an unauthenticated caller cannot map it to a public commit.
+pub fn build_fingerprint() -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::new()
+        .chain_update(get_instance_id())
+        .chain_update(COMMIT_HASH)
+        .finalize();
+    hex::encode(&digest[..12])
 }
 
 /// Caches the internal gRPC token stored in the meta db; empty means none is stored.
@@ -2487,6 +2496,12 @@ pub struct Common {
     )]
     pub restricted_routes_on_empty_data: bool,
     #[env_config(
+        name = "ZO_SAMPLE_DATA_ONBOARDING_ENABLED",
+        default = false,
+        help = "Greet a new user with the first-run welcome dialog that loads sample data in one click. When off, a new cloud user gets the full-page onboarding instead; other builds show Home as usual."
+    )]
+    pub sample_data_onboarding_enabled: bool,
+    #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
         help = "Toggle search to be trigger based on button click event."
@@ -2733,12 +2748,38 @@ pub struct Limit {
     pub js_function_max_execution_time_secs: u64,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
-    // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 512)]
+    #[env_config(
+        name = "ZO_MAX_FILE_SIZE_ON_DISK",
+        default = 0,
+        help = "MB, per wal file size limit on disk, 0 derives it from the memtable budget: ZO_MEM_TABLE_MAX_SIZE / 4, between 32 MB and 512 MB"
+    )]
     pub max_file_size_on_disk: usize,
-    // MB, per data file size limit in memory
-    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 512)]
+    #[env_config(
+        name = "ZO_MAX_FILE_SIZE_IN_MEMORY",
+        default = 0,
+        help = "MB, per memtable size limit, 0 derives it from the memtable budget: ZO_MEM_TABLE_MAX_SIZE / 4, between 32 MB and 512 MB"
+    )]
     pub max_file_size_in_memory: usize,
+    // MB, every distinct map in a stacktrace is parsed and held in memory for one resolve
+    #[env_config(
+        name = "ZO_SOURCEMAP_FILE_MAX_SIZE",
+        default = 50,
+        help = "Maximum size in MB of one source map file in an upload; 0 means 50"
+    )]
+    pub sourcemap_file_max_size: u64,
+    // MB, uncompressed total per upload; the request body cap only bounds compressed bytes
+    #[env_config(
+        name = "ZO_SOURCEMAP_ZIP_MAX_SIZE",
+        default = 500,
+        help = "Maximum total uncompressed size in MB of one source map upload; 0 means 500"
+    )]
+    pub sourcemap_zip_max_size: u64,
+    #[env_config(
+        name = "ZO_SOURCEMAP_ZIP_MAX_ENTRIES",
+        default = 5000,
+        help = "Maximum number of source map files in one upload; 0 means 5000"
+    )]
+    pub sourcemap_zip_max_entries: usize,
     #[deprecated(
         since = "0.14.1",
         note = "Please use `ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS` instead. This ENV is subject to be removed soon"
@@ -2767,7 +2808,7 @@ pub struct Limit {
     #[env_config(
         name = "ZO_MEM_TABLE_BUCKET_NUM",
         default = 0,
-        help = "MemTable bucket num, 0 derives it from the memtable budget: ZO_MEM_TABLE_MAX_SIZE / ZO_MAX_FILE_SIZE_IN_MEMORY / 2, between 1 and the cpu num"
+        help = "MemTable bucket num, 0 derives it from the memtable budget: ZO_MEM_TABLE_MAX_SIZE / ZO_MAX_FILE_SIZE_IN_MEMORY / 4, between 1 and the cpu num"
     )]
     pub mem_table_bucket_num: usize,
     #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 2)] // seconds
@@ -2944,7 +2985,7 @@ pub struct Limit {
     #[env_config(
         name = "ZO_ALERT_MAX_GROUP_NOTIFICATIONS_PER_EVAL",
         default = 0,
-        help = "Cap on per-group notifications sent by one multi-alert evaluation (alerts_2.md §5.5 MN-8/D48). 0 = unlimited, which is the default because paging per group is the feature's contract and the group cap already bounds the worst case. Dispatch is worst-first, so a cap always delivers the most severe groups; anything dropped is logged."
+        help = "Cap on per-group notifications sent by one multi-alert evaluation (alerts_2.md §5.5 MN-8/D48). 0 = unlimited, which is the default because paging per group is the feature's contract and the group cap already bounds the worst case. Dispatch is worst-first, so a cap always delivers the most severe groups; anything dropped is logged and noted on the evaluation's history record."
     )]
     pub alert_max_group_notifications_per_eval: usize,
     #[env_config(
@@ -3432,7 +3473,15 @@ pub struct Compact {
         help = "Closed days that must all agree before the classifier moves a stream, at least 3; a stream younger than this is not classified."
     )]
     pub dynamic_partition_window_days: i64,
-    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
+    #[env_config(
+        name = "ZO_COMPACT_DATA_RETENTION_DAYS",
+        default = "3650",
+        help = "Default retention in days for streams with no value of their own: a plain number (30), optionally with per-type values (30,logs:21,metrics:180). Types: logs, metrics, traces, profiles. Without a plain number the default is 3650; 0 keeps data forever and <type>:0 inherits the plain number. A positive value must be at least 3."
+    )]
+    pub data_retention_spec: String,
+    // Both parsed from data_retention_spec in check_compact_config.
+    #[env_config(parse, default = "0")]
+    pub data_retention: DataRetentionDefaults,
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
     pub old_data_max_days: i64,
@@ -4412,17 +4461,18 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.req_cols_per_record_limit = 1000;
     }
 
-    // check max_file_size_on_disk to MB
-    if cfg.limit.max_file_size_on_disk == 0 {
-        cfg.limit.max_file_size_on_disk = 512 * 1024 * 1024; // 512MB
-    } else {
-        cfg.limit.max_file_size_on_disk *= 1024 * 1024;
+    cfg.limit.sourcemap_file_max_size = match cfg.limit.sourcemap_file_max_size {
+        0 => 50,
+        v => v,
     }
-    // check max_file_size_in_memory to MB
-    if cfg.limit.max_file_size_in_memory == 0 {
-        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024; // 512MB
-    } else {
-        cfg.limit.max_file_size_in_memory *= 1024 * 1024;
+    .saturating_mul(1024 * 1024);
+    cfg.limit.sourcemap_zip_max_size = match cfg.limit.sourcemap_zip_max_size {
+        0 => 500,
+        v => v,
+    }
+    .saturating_mul(1024 * 1024);
+    if cfg.limit.sourcemap_zip_max_entries == 0 {
+        cfg.limit.sourcemap_zip_max_entries = 5000;
     }
     cfg.limit.file_download_sync_max_size *= 1024 * 1024;
 
@@ -4831,6 +4881,14 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.limit.mem_table_max_size *= 1024 * 1024;
     }
+    cfg.limit.max_file_size_in_memory = match cfg.limit.max_file_size_in_memory {
+        0 => default_max_file_size(cfg.limit.mem_table_max_size),
+        mb => mb * 1024 * 1024,
+    };
+    cfg.limit.max_file_size_on_disk = match cfg.limit.max_file_size_on_disk {
+        0 => default_max_file_size(cfg.limit.mem_table_max_size),
+        mb => mb * 1024 * 1024,
+    };
     if cfg.limit.mem_table_bucket_num == 0 {
         cfg.limit.mem_table_bucket_num = default_mem_table_bucket_num(
             cfg.limit.mem_table_max_size,
@@ -4941,14 +4999,20 @@ pub fn deverbatim(path: &Path) -> std::borrow::Cow<'_, str> {
     path.to_string_lossy()
 }
 
-/// Half of what the budget holds, so full memtables can rotate out while the next ones fill.
+/// A quarter of what the budget holds, so each bucket can keep two full memtables in memory.
 fn default_mem_table_bucket_num(
     mem_table_max_size: usize,
     max_file_size_in_memory: usize,
     cpu_num: usize,
 ) -> usize {
-    let by_memory = mem_table_max_size / max_file_size_in_memory.max(1) / 2;
+    let by_memory = mem_table_max_size / max_file_size_in_memory.max(1) / 4;
     by_memory.clamp(1, cpu_num.max(1))
+}
+
+/// A quarter of the memtable budget in whole MB, clamped to 32..512 MB.
+fn default_max_file_size(mem_table_max_size: usize) -> usize {
+    let mb = 1024 * 1024;
+    (mem_table_max_size / 4 / mb * mb).clamp(MAX_FILE_SIZE_DEFAULT_FLOOR, MAX_FILE_SIZE_DEFAULT_CAP)
 }
 
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
@@ -5083,11 +5147,12 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
-        return Err(anyhow::anyhow!(
-            "Data retention is not allowed to be less than 3 days."
-        ));
-    }
+    cfg.compact.data_retention = cfg
+        .compact
+        .data_retention_spec
+        .parse()
+        .map_err(|e| anyhow::anyhow!("Invalid ZO_COMPACT_DATA_RETENTION_DAYS: {e}"))?;
+    cfg.compact.data_retention_days = cfg.compact.data_retention.default;
     parse_dynamic_partition_stream_types(&cfg.compact.dynamic_partition_stream_types)?;
     if cfg.compact.dynamic_partition_window_days == 0 {
         cfg.compact.dynamic_partition_window_days = 7;
@@ -5931,13 +5996,12 @@ mod tests {
         cfg.limit.file_push_interval = 0;
         cfg.limit.req_cols_per_record_limit = 0;
         cfg.compact.interval = 0;
-        cfg.compact.data_retention_days = 10;
+        cfg.compact.data_retention_spec = "10".to_string();
         let ret = check_common_config(&mut cfg);
         assert!(ret.is_ok());
-        assert_eq!(cfg.compact.data_retention_days, 10);
         assert_eq!(cfg.limit.req_cols_per_record_limit, 1000);
 
-        cfg.compact.data_retention_days = 2;
+        cfg.compact.data_retention_spec = "2".to_string();
         let ret = check_compact_config(&mut cfg);
         assert!(ret.is_err());
 
@@ -6129,6 +6193,37 @@ mod tests {
             FileFormat::from_extension("/some/path/file.parquet"),
             Some(FileFormat::Parquet)
         );
+    }
+
+    #[test]
+    fn test_sourcemap_limits_default_to_bytes() {
+        let mut cfg = Config::init().unwrap();
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.sourcemap_file_max_size, 50 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_size, 500 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_entries, 5000);
+    }
+
+    #[test]
+    fn test_sourcemap_limits_zero_falls_back_to_default() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.sourcemap_file_max_size = 0;
+        cfg.limit.sourcemap_zip_max_size = 0;
+        cfg.limit.sourcemap_zip_max_entries = 0;
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.sourcemap_file_max_size, 50 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_size, 500 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_entries, 5000);
+    }
+
+    #[test]
+    fn test_sourcemap_limits_mb_converted_to_bytes() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.sourcemap_file_max_size = 7;
+        cfg.limit.sourcemap_zip_max_size = 9;
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.sourcemap_file_max_size, 7 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_size, 9 * 1024 * 1024);
     }
 
     #[test]
@@ -6402,21 +6497,16 @@ mod tests {
     #[test]
     fn test_default_mem_table_bucket_num() {
         let mb = 1024 * 1024;
-        // 32 GB holds 64 memtables of 512 MB; half of that, then the core count caps it
+        // 32 GB holds 64 memtables of 512 MB; a quarter of that, then the core count caps it
         assert_eq!(
             default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 64),
-            32
-        );
-        assert_eq!(
-            default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 28),
-            28
-        );
-        assert_eq!(default_mem_table_bucket_num(4 * 1024 * mb, 512 * mb, 28), 4);
-        assert_eq!(
-            default_mem_table_bucket_num(4 * 1024 * mb, 128 * mb, 28),
             16
         );
-        // a budget of one memtable or less still gets one bucket
+        assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 8), 8);
+        assert_eq!(default_mem_table_bucket_num(4 * 1024 * mb, 512 * mb, 28), 2);
+        assert_eq!(default_mem_table_bucket_num(2 * 1024 * mb, 512 * mb, 28), 1);
+        assert_eq!(default_mem_table_bucket_num(4 * 1024 * mb, 128 * mb, 28), 8);
+        // a budget of under four memtables still gets one bucket
         assert_eq!(default_mem_table_bucket_num(512 * mb, 512 * mb, 28), 1);
         assert_eq!(default_mem_table_bucket_num(0, 512 * mb, 28), 1);
         assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 0, 28), 28);
@@ -6424,34 +6514,44 @@ mod tests {
     }
 
     #[test]
-    fn test_check_memory_config_derives_mem_table_bucket_num() {
-        let mut cfg = Config::default();
-        cfg.common.node_role = "all".to_string();
-        cfg.limit.cpu_num = 8;
-        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024;
-        cfg.limit.mem_table_max_size = 8 * 1024;
-        cfg.limit.mem_table_bucket_num = 0;
-        check_memory_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.mem_table_bucket_num, 8);
+    fn test_default_max_file_size() {
+        let mb = 1024 * 1024;
+        assert_eq!(default_max_file_size(64 * 1024 * mb), 512 * mb);
+        assert_eq!(default_max_file_size(2 * 1024 * mb), 512 * mb);
+        assert_eq!(default_max_file_size(1024 * mb), 256 * mb);
+        assert_eq!(default_max_file_size(512 * mb), 128 * mb);
+        assert_eq!(default_max_file_size(1000 * mb + 123), 250 * mb);
+        assert_eq!(default_max_file_size(64 * mb), 32 * mb);
+        assert_eq!(default_max_file_size(0), 32 * mb);
+    }
 
-        let mut cfg = Config::default();
-        cfg.common.node_role = "all".to_string();
-        cfg.limit.cpu_num = 8;
-        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024;
-        cfg.limit.mem_table_max_size = 2 * 1024;
-        cfg.limit.mem_table_bucket_num = 0;
-        check_memory_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.mem_table_bucket_num, 2);
-
-        // an explicit value is kept as is
-        let mut cfg = Config::default();
-        cfg.common.node_role = "all".to_string();
-        cfg.limit.cpu_num = 8;
-        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024;
-        cfg.limit.mem_table_max_size = 8 * 1024;
-        cfg.limit.mem_table_bucket_num = 3;
-        check_memory_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.mem_table_bucket_num, 3);
+    #[test]
+    fn test_check_memory_config_derives_mem_table_sizes() {
+        let mb = 1024 * 1024;
+        let derive = |mem_table_max_size_mb: usize, file_size_mb: usize, bucket_num: usize| {
+            let mut cfg = Config::default();
+            cfg.common.node_role = "all".to_string();
+            cfg.limit.cpu_num = 8;
+            cfg.limit.mem_table_max_size = mem_table_max_size_mb;
+            cfg.limit.max_file_size_in_memory = file_size_mb;
+            cfg.limit.max_file_size_on_disk = file_size_mb;
+            cfg.limit.mem_table_bucket_num = bucket_num;
+            check_memory_config(&mut cfg).unwrap();
+            (
+                cfg.limit.mem_table_bucket_num,
+                cfg.limit.max_file_size_in_memory,
+                cfg.limit.max_file_size_on_disk,
+            )
+        };
+        // 8 GB local mode: 2 GB budget keeps 512 MB files in one bucket
+        assert_eq!(derive(2 * 1024, 0, 0), (1, 512 * mb, 512 * mb));
+        // 4 GB local mode: 1 GB budget shrinks the files so a bucket still holds four
+        assert_eq!(derive(1024, 0, 0), (1, 256 * mb, 256 * mb));
+        assert_eq!(derive(8 * 1024, 0, 0), (4, 512 * mb, 512 * mb));
+        assert_eq!(derive(32 * 1024, 0, 0), (8, 512 * mb, 512 * mb));
+        // explicit values are kept as is
+        assert_eq!(derive(8 * 1024, 256, 3), (3, 256 * mb, 256 * mb));
+        assert_eq!(derive(1024, 512, 0), (1, 512 * mb, 512 * mb));
     }
 
     #[test]
@@ -6610,7 +6710,7 @@ mod tests {
     #[allow(deprecated)]
     fn test_check_compact_config_defaults() {
         let mut cfg = Config::default();
-        cfg.compact.data_retention_days = 0;
+        cfg.compact.data_retention_spec = "0".to_string();
         cfg.compact.interval = 0;
         cfg.compact.max_file_size = 0;
         cfg.compact.delete_files_delay_hours = 0;
@@ -6641,18 +6741,47 @@ mod tests {
     #[test]
     fn test_check_compact_config_retention_too_short() {
         let mut cfg = Config::default();
-        cfg.compact.data_retention_days = 1;
+        cfg.compact.data_retention_spec = "1".to_string();
         assert!(check_compact_config(&mut cfg).is_err());
-        cfg.compact.data_retention_days = 2;
+        cfg.compact.data_retention_spec = "2".to_string();
         assert!(check_compact_config(&mut cfg).is_err());
+    }
+
+    #[test]
+    fn test_check_compact_config_parses_the_retention_spec() {
+        let mut cfg = Config::default();
+        cfg.compact.data_retention_spec = "30,logs:21,metrics:180".to_string();
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(cfg.compact.data_retention_days, 30);
+        assert_eq!(cfg.compact.data_retention.logs, 21);
+        assert_eq!(cfg.compact.data_retention.metrics, 180);
+
+        cfg.compact.data_retention_spec = "metrics:180".to_string();
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(cfg.compact.data_retention_days, 3650);
+
+        cfg.compact.data_retention_spec = "30,index:7".to_string();
+        let err = check_compact_config(&mut cfg).unwrap_err().to_string();
+        assert!(err.contains("ZO_COMPACT_DATA_RETENTION_DAYS"), "{err}");
+    }
+
+    #[test]
+    fn test_check_compact_config_caps_the_retention_spec() {
+        let mut cfg = Config::default();
+        cfg.compact.data_retention_spec = i64::MAX.to_string();
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(
+            cfg.compact.data_retention_days,
+            crate::meta::stream::MAX_DATA_RETENTION_DAYS
+        );
     }
 
     #[test]
     fn test_check_compact_config_valid_retention() {
         let mut cfg = Config::default();
-        cfg.compact.data_retention_days = 3;
+        cfg.compact.data_retention_spec = "3".to_string();
         assert!(check_compact_config(&mut cfg).is_ok());
-        cfg.compact.data_retention_days = 0; // 0 means disabled
+        cfg.compact.data_retention_spec = "0".to_string(); // 0 means disabled
         assert!(check_compact_config(&mut cfg).is_ok());
     }
 

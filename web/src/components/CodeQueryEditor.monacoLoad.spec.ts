@@ -16,6 +16,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createStore } from "vuex";
+import { Delayer } from "monaco-editor/esm/vs/base/common/async.js";
+import { CancellationError } from "monaco-editor/esm/vs/base/common/errors.js";
 import CodeQueryEditor from "./CodeQueryEditor.vue";
 
 // Any Monaco service call before editor.all.js finishes initialises StandaloneServices without the contributions' singletons.
@@ -314,5 +316,37 @@ describe("CodeQueryEditor Monaco loading", () => {
     await vi.waitFor(() => expect(monacoApi.editor.create).toHaveBeenCalledTimes(1));
     expect(monacoApi.editor.create.mock.calls[0][1].value).toBe("new payload");
     fresh.unmount();
+  });
+
+  // Disposing an editor rejects the word highlighter's pending delay, a promise Monaco never catches.
+  it("marks only Monaco's cancellation rejections handled once Monaco has loaded", async () => {
+    load.release();
+    attachHost("editor-cancel");
+    const wrapper = mountEditor("editor-cancel");
+    await settle();
+    const rejection = (reason: unknown) => {
+      const event = Object.assign(new Event("unhandledrejection", { cancelable: true }), {
+        reason,
+      });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    const delayer = new Delayer<void>(50);
+    // jsdom never fires unhandledrejection, so the real rejection is caught and replayed.
+    const pending = delayer.trigger(() => undefined).catch((reason: unknown) => reason);
+    delayer.dispose();
+
+    expect(rejection(await pending)).toBe(true);
+    expect(rejection(new CancellationError())).toBe(true);
+    for (const lookalike of [
+      Object.assign(new Error("Canceled"), { name: "Canceled" }),
+      Object.assign(new Error("canceled"), { name: "CanceledError" }),
+      new Error("Canceled"),
+      "Canceled",
+      undefined,
+    ]) {
+      expect(rejection(lookalike)).toBe(false);
+    }
+    wrapper.unmount();
   });
 });

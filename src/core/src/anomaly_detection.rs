@@ -421,7 +421,8 @@ async fn pk_to_name(pk: Option<&str>) -> String {
 
 /// Convert an integer status code to its human-readable string label.
 /// This is applied when serializing configs to API responses so the UI
-/// continues to receive "waiting"/"ready"/"training"/"failed"/"disabled".
+/// continues to receive "waiting"/"ready"/"training"/"failed"/"disabled", plus the
+/// data-readiness labels "waiting_for_data"/"not_applicable".
 fn status_label(status: i32) -> &'static str {
     o2_enterprise::enterprise::anomaly_detection::types::Status::label(status)
 }
@@ -666,6 +667,7 @@ pub async fn create_config(
 ) -> Result<serde_json::Value> {
     let normalized_tags = checked_create_body(&mut req)?;
     let template = checked_template(org_id, req.template.as_deref()).await?;
+    checked_destinations(org_id, &req.alert_destinations).await?;
 
     let db = get_orm_client_rw().await;
 
@@ -845,6 +847,7 @@ pub async fn check_create_config(org_id: &str, req: &CreateAnomalyConfigRequest)
     let mut req = req.clone();
     checked_create_body(&mut req)?;
     checked_template(org_id, req.template.as_deref()).await?;
+    checked_destinations(org_id, &req.alert_destinations).await?;
     folder_pk(org_id, create_folder_name(&req))
         .await
         .map(|_| ())
@@ -861,6 +864,9 @@ pub async fn check_update_config(
     checked_update_body(&mut req, &existing)?;
     if let Some(template) = &req.template {
         checked_template(org_id, template.as_deref()).await?;
+    }
+    if let Some(destinations) = &req.alert_destinations {
+        checked_destinations(org_id, destinations).await?;
     }
     if let Some(folder) = req.folder_id.as_deref() {
         folder_pk(org_id, folder).await?;
@@ -1033,12 +1039,18 @@ pub async fn update_config(
         active_model.template = Set(checked_template(org_id, template.as_deref()).await?);
     }
     if let Some(destinations) = req.alert_destinations {
+        checked_destinations(org_id, &destinations).await?;
         active_model.alert_destinations = Set(Some(
             serde_json::to_value(&destinations).unwrap_or(serde_json::json!([])),
         ));
     }
+    let mut moved_folders = None;
     if let Some(folder_id_str) = req.folder_id {
-        active_model.folder_id = Set(folder_pk(org_id, &folder_id_str).await?);
+        let pk = folder_pk(org_id, &folder_id_str).await?;
+        if pk != previous.folder_id {
+            moved_folders = Some((pk_to_name(Some(&previous.folder_id)).await, folder_id_str));
+        }
+        active_model.folder_id = Set(pk);
     }
     if let Some(owner) = req.owner {
         active_model.owner = Set(Some(owner));
@@ -1072,7 +1084,40 @@ pub async fn update_config(
 
     active_model.updated_at = Set(Utc::now().timestamp_micros());
 
-    let updated = active_model.update(db).await?;
+    let mut updated = active_model.update(db).await?;
+    if let Some((from, to)) = moved_folders {
+        repoint_folder(anomaly_id, &from, &to).await;
+    }
+
+    // After the save, so the training it queues reads the repaired config, even over a claim.
+    if retryable_change {
+        match o2_enterprise::enterprise::anomaly_detection::scheduler::requeue_data_readiness(
+            db,
+            &updated.anomaly_id,
+        )
+        .await
+        {
+            Ok(true) => {
+                updated.status =
+                    o2_enterprise::enterprise::anomaly_detection::types::Status::Waiting.to_i32();
+                updated.retries = 0;
+                updated.last_error = None;
+                // A verdict between the save and the requeue can revoke the model, and the
+                // broadcast below must not restore `is_trained` in a peer region.
+                match config_to_update(db, org_id, anomaly_id).await {
+                    Ok(row) => updated = row,
+                    Err(e) => log::warn!(
+                        "[anomaly_detection {anomaly_id}] failed to re-read the config after a requeue: {e}"
+                    ),
+                }
+            }
+            Ok(false) => {}
+            // The edit is saved, so this logs and continues like the other steps after the save.
+            Err(e) => log::warn!(
+                "[anomaly_detection {anomaly_id}] failed to requeue a data-readiness config after an edit: {e}"
+            ),
+        }
+    }
 
     // Evict any cached model for this config — training params may have changed,
     // so the next detection run should load a fresh model from S3.
@@ -1168,6 +1213,19 @@ pub async fn update_config(
         obj.insert("folder_id".to_string(), serde_json::Value::String(name));
     }
     Ok(val)
+}
+
+/// Moves the config's folder grants from `from` to `to`, as an alert move does. [no-fail]
+async fn repoint_folder(anomaly_id: &str, from: &str, to: &str) {
+    use o2_openfga::authorizer::authz::{
+        get_ofga_type, remove_parent_relation, set_parent_relation,
+    };
+    if !o2_openfga::config::get_config().enabled {
+        return;
+    }
+    let (alerts, folders) = (get_ofga_type("alerts"), get_ofga_type("alert_folders"));
+    set_parent_relation(anomaly_id, &alerts, to, &folders).await;
+    remove_parent_relation(anomaly_id, &alerts, from, &folders).await;
 }
 
 /// Delete an anomaly detection configuration
@@ -1585,10 +1643,10 @@ impl SeriesDefinition {
 /// in `scheduled_jobs`.
 ///
 /// Called once at startup (in `job/mod.rs`) before the alert scheduler starts.
-/// Handles one failure mode: trigger row missing entirely (e.g. DB was reset, row never
-/// created). Processing→Waiting recovery is intentionally NOT done here — the OSS
-/// scheduler's `watch_timeout()` job already resets any `Processing` rows whose
-/// `end_time` has passed, exactly as it does for alert triggers.
+/// Handles two failure modes: trigger row missing entirely (e.g. DB was reset, row never
+/// created), and a row an older kill switch parked as Completed. Processing→Waiting recovery is
+/// intentionally NOT done here — the OSS scheduler's `watch_timeout()` job already resets any
+/// `Processing` rows whose `end_time` has passed, exactly as it does for alert triggers.
 pub async fn recover_detection_triggers_on_startup() {
     let db = get_orm_client_ro().await;
 
@@ -1612,6 +1670,7 @@ pub async fn recover_detection_triggers_on_startup() {
         configs.len()
     );
     recreate_missing_triggers(&configs).await;
+    resume_parked_triggers().await;
     if !unresolved.is_empty() {
         tokio::spawn(retry_unresolved_recovery(unresolved));
     }
@@ -1640,6 +1699,41 @@ async fn retry_unresolved_recovery(
         recreate_missing_triggers(&active).await;
         pending = unresolved;
     }
+}
+
+/// Re-arms triggers an older kill switch parked as Completed. [weak: a failed one waits a rerun]
+async fn resume_parked_triggers() {
+    let triggers = match crate::db::scheduler::list(Some(TriggerModule::AnomalyDetection)).await {
+        Ok(triggers) => triggers,
+        Err(e) => {
+            log::warn!("[anomaly_detection] Failed to list triggers to resume parked ones: {e}");
+            return;
+        }
+    };
+    let now = now_micros();
+    for trigger in triggers
+        .into_iter()
+        .filter_map(|trigger| resumed_trigger(trigger, now))
+    {
+        let key = trigger.module_key.clone();
+        log::info!("[anomaly_detection] Resuming trigger {key} parked by the kill switch");
+        if let Err(e) = crate::db::scheduler::update_trigger(trigger, false, "").await {
+            log::warn!("[anomaly_detection] Failed to resume parked trigger {key}: {e}");
+        }
+    }
+}
+
+/// `trigger` due at `now` when it is parked as Completed, else `None`. [pure]
+fn resumed_trigger(
+    mut trigger: crate::db::scheduler::Trigger,
+    now: i64,
+) -> Option<crate::db::scheduler::Trigger> {
+    if trigger.status != crate::db::scheduler::TriggerStatus::Completed {
+        return None;
+    }
+    trigger.status = crate::db::scheduler::TriggerStatus::Waiting;
+    trigger.next_run_at = now;
+    Some(trigger)
 }
 
 /// The current rows of the `pending` configs, among the configs enabled now.
@@ -2065,6 +2159,13 @@ async fn checked_template(org_id: &str, name: Option<&str>) -> Result<Option<Str
     .await
     .map_err(|e| validation_error(anyhow::anyhow!(e)))?;
     Ok(Some(name.to_string()))
+}
+
+/// A destination that does not resolve would drop every notification without a word.
+async fn checked_destinations(org_id: &str, names: &[String]) -> Result<()> {
+    crate::alerts::alert::validate_template_and_destinations(org_id, None, names)
+        .await
+        .map_err(|e| validation_error(anyhow::anyhow!(e)))
 }
 
 /// Normalizes and validates a create body; returns its normalized tags.
@@ -4994,6 +5095,29 @@ mod tests {
         assert_eq!(rows, [("kept".to_string(), "acme-renamed".to_string())]);
     }
 
+    #[test]
+    fn test_recovery_resumes_only_a_trigger_the_kill_switch_parked() {
+        use crate::db::scheduler::{Trigger, TriggerStatus};
+        let now = 1_700_000_000_000_000;
+        let cases = [
+            (
+                TriggerStatus::Completed,
+                Some((TriggerStatus::Waiting, now)),
+            ),
+            (TriggerStatus::Waiting, None),
+            (TriggerStatus::Processing, None),
+        ];
+        for (status, expected) in cases {
+            let trigger = Trigger {
+                status: status.clone(),
+                next_run_at: 5,
+                ..Default::default()
+            };
+            let resumed = resumed_trigger(trigger, now).map(|t| (t.status, t.next_run_at));
+            assert_eq!(resumed, expected, "{status:?}");
+        }
+    }
+
     /// The key names here are a cross-crate contract:
     /// `anomaly_config_to_list_item` reads them by these exact strings, and a
     /// rename on either side silently blanks the list's Last Outcome column.
@@ -5420,6 +5544,128 @@ mod tests {
                             .unwrap()
                             .is_some()
                     );
+                },
+            );
+        }
+    }
+
+    mod destination_binding {
+        use config::meta::{
+            destinations::{Destination, DestinationType, Endpoint, Module},
+            folder::{Folder, FolderType},
+        };
+
+        use super::{UpdateAnomalyConfigRequest, make_valid_filters_req};
+        use crate::ssrf_test_support::isolated;
+
+        const MISSING: &str = "validation error: Alert destination nope not found";
+
+        fn run<F: std::future::Future<Output = ()>>(path: &str, task: impl FnOnce() -> F) {
+            let name = path.rsplit("::").next().unwrap_or(path);
+            let dir = std::env::temp_dir().join(format!(
+                "o2-destination-binding-{name}-{}",
+                std::process::id()
+            ));
+            let dir = format!("{}/", dir.display());
+            isolated(path, &[("ZO_DATA_DIR", dir.as_str())], task);
+        }
+
+        async fn store_with_destination(org: &str) -> String {
+            infra::db_init().await.unwrap();
+            infra::table::migrate().await.unwrap();
+            infra::table::destinations::put(Destination {
+                org_id: org.to_string(),
+                name: "ops".to_string(),
+                module: Module::Alert {
+                    template: None,
+                    destination_type: DestinationType::Http(Endpoint::default()),
+                },
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+            let folder = Folder {
+                folder_id: "default".to_string(),
+                name: "default".to_string(),
+                description: String::new(),
+                icon: None,
+            };
+            let (pk, _) = infra::table::folders::put(org, None, folder, FolderType::Alerts)
+                .await
+                .unwrap();
+            pk.to_string()
+        }
+
+        fn sending_to(dest: &str) -> super::CreateAnomalyConfigRequest {
+            let mut req = make_valid_filters_req();
+            req.alert_destinations = vec![dest.to_string()];
+            req
+        }
+
+        fn retarget(dest: &str) -> UpdateAnomalyConfigRequest {
+            UpdateAnomalyConfigRequest {
+                alert_destinations: Some(vec![dest.to_string()]),
+                ..Default::default()
+            }
+        }
+
+        #[test]
+        fn create_refuses_a_destination_the_org_lacks() {
+            run(
+                concat!(
+                    module_path!(),
+                    "::create_refuses_a_destination_the_org_lacks"
+                ),
+                || async {
+                    store_with_destination("acme").await;
+
+                    let err = super::super::check_create_config("acme", &sending_to("nope"))
+                        .await
+                        .unwrap_err();
+                    assert_eq!(err.to_string(), MISSING);
+                    let err = super::super::create_config("acme", sending_to("nope"))
+                        .await
+                        .unwrap_err();
+                    assert_eq!(err.to_string(), MISSING);
+                    super::super::check_create_config("acme", &sending_to("ops"))
+                        .await
+                        .unwrap();
+                },
+            );
+        }
+
+        #[test]
+        fn update_refuses_a_destination_the_org_lacks() {
+            run(
+                concat!(
+                    module_path!(),
+                    "::update_refuses_a_destination_the_org_lacks"
+                ),
+                || async {
+                    let folder = store_with_destination("acme").await;
+                    let mut model = super::update_interval_validation::stored_config();
+                    model.anomaly_id = config::ider::uuid();
+                    model.org_id = "acme".to_string();
+                    model.folder_id = folder;
+                    let id = model.anomaly_id.clone();
+                    infra::table::anomaly_detection::config::create(
+                        infra::db::get_orm_client_rw().await,
+                        model,
+                    )
+                    .await
+                    .unwrap();
+
+                    let err = super::super::check_update_config("acme", &id, &retarget("nope"))
+                        .await
+                        .unwrap_err();
+                    assert_eq!(err.to_string(), MISSING);
+                    let err = super::super::update_config("acme", &id, retarget("nope"))
+                        .await
+                        .unwrap_err();
+                    assert_eq!(err.to_string(), MISSING);
+                    super::super::check_update_config("acme", &id, &retarget("ops"))
+                        .await
+                        .unwrap();
                 },
             );
         }
@@ -7282,6 +7528,20 @@ mod tests {
         }
 
         #[test]
+        fn the_context_gives_jira_the_detector_id_and_kind() {
+            let c = super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::PartialDrop));
+            let attribute = |key: &str| {
+                c.context_attributes
+                    .iter()
+                    .find(|(k, _)| k == key)
+                    .map(|(_, v)| v.as_str())
+            };
+            assert_eq!(attribute("anomaly_id"), Some("id1"));
+            assert_eq!(attribute("anomaly_kind"), Some("partial_drop"));
+            assert!(c.alert_id.is_empty() && c.incident_id.is_empty());
+        }
+
+        #[test]
         fn the_context_is_keyed_by_the_anomaly_id_and_the_recovery_resolves() {
             use config::meta::alerts::notification_kind::{NotificationEvent, NotificationKind};
             let firing = super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::Value));
@@ -7609,6 +7869,28 @@ mod tests {
             let mut c = explore_ctx("logs", Some("a = 1"), false);
             c.explore = None;
             assert_eq!(super::super::anomaly_explore_link(&c), empty);
+        }
+
+        /// A detector that scores one bucket per run gets a window one interval wide,
+        /// not a zero-width one, so the link survives the guard and `from`..`to` is the
+        /// lead-in plus that one bucket.
+        #[test]
+        fn a_one_bucket_window_keeps_the_link_and_spans_the_bucket() {
+            const MIN_US: i64 = 60 * 1_000_000;
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            // Bucket 00:00..00:05 behind a 15 minute (3 x 5m) lead-in.
+            c.window_start_us = 1_704_067_200_000_000;
+            c.window_end_us = c.window_start_us + 5 * MIN_US;
+            c.explore.as_mut().unwrap().start_us = c.window_start_us - 15 * MIN_US;
+            let (url, label) = super::super::anomaly_explore_link(&c);
+            assert!(!url.is_empty());
+            let (_, p) = pairs(&url);
+            let from: i64 = get(&p, "from").unwrap().parse().unwrap();
+            let to: i64 = get(&p, "to").unwrap().parse().unwrap();
+            assert_eq!(from, c.window_start_us - 15 * MIN_US);
+            assert_eq!(to, c.window_end_us);
+            assert_eq!(to - from, 20 * MIN_US);
+            assert_eq!(label, FILTERED);
         }
 
         #[test]

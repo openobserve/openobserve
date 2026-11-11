@@ -77,6 +77,8 @@ pub enum DestinationError {
     JiraTokenMissing,
     #[error("Enter the API token again, because the Jira URL, type or email changed.")]
     JiraTokenChanged,
+    #[error("{0}")]
+    JiraAlertsUnsupported(String),
 }
 
 /// A refused Slack app save; `code` lets the form show its own copy (MK-7, MK-20).

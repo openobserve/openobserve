@@ -172,6 +172,9 @@ describe("operatorCategory / operatorLabel", () => {
     expect(operatorCategory("RemoteScanExec")).toBe("remote");
     expect(operatorCategory("DataSourceExec")).toBe("scan");
     expect(operatorCategory("NewEmptyExec")).toBe("scan");
+    expect(operatorCategory("GlobalLimitExec")).toBe("sort");
+    expect(operatorCategory("SharedSubplanReaderExec")).toBe("exchange");
+    expect(operatorCategory("UnnestExec")).toBe("projection");
     expect(operatorCategory("FilterExec")).toBe("filter");
     expect(operatorCategory("HashJoinExec")).toBe("join");
     expect(operatorCategory("AggregateExec")).toBe("agg");
@@ -644,6 +647,16 @@ describe("parseSearchStream / extractProfile", () => {
     expect(parseSearchStream(err({ code: 500 }))?.error).toBe("");
   });
 
+  it("flags a partial run and keeps the server's error text", () => {
+    const sse = (results: unknown) => `data: ${JSON.stringify({ results })}\n\n`;
+    const failed = { hits: [], total: 0, is_partial: true, function_error: ["Cast error"] };
+    expect(parseSearchStream(sse(failed))?.warning).toBe("Cast error");
+    expect(parseSearchStream(sse({ hits: [], total: 0, is_partial: true }))?.warning).toBe("");
+    expect(parseSearchStream(sse({ hits: [], total: 0 }))?.warning).toBeUndefined();
+    const laterPartial = sse(failed) + sse({ hits: [], total: 0, is_partial: true });
+    expect(parseSearchStream(laterPartial)?.warning).toBe("Cast error");
+  });
+
   it("merges hits across events and keeps took_detail from the metadata event", () => {
     const meta = {
       results: {
@@ -793,6 +806,17 @@ describe("physicalPlanToProfile", () => {
     expect(plan.fetch).toBe(10);
     expect(plan.scans).toHaveLength(1);
     expect(plan.leaderCategories).toEqual(["sort", "projection", "agg", "exchange"]);
+  });
+
+  it("reads the result limit below a remote scan, but not below an aggregate", () => {
+    const fetchOf = (plan: string) =>
+      summarizePlan(buildProfileModel(physicalPlanToProfile(plan)!, { planOnly: true })).fetch;
+    const limit = `GlobalLimitExec: skip=0, fetch=5\n      NewEmptyExec: name="app_logs"`;
+    expect(fetchOf(`RemoteScanExec: input_partitions=output_partitions=1\n    ${limit}`)).toBe(5);
+    expect(
+      fetchOf(`AggregateExec: mode=Final, gby=[], aggr=[count(Int64(1))]\n    ${limit}`),
+    ).toBeNull();
+    expect(fetchOf(`UnnestExec\n    ${limit}`)).toBeNull();
   });
 
   it("reads sort order pushdown from a top-N plan", () => {

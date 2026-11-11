@@ -44,11 +44,6 @@ use crate::bloom::compact::bloom_files_deleted;
 
 pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    // check data retention
-    if cfg.compact.data_retention_days <= 0 {
-        return Ok(());
-    }
-
     // check if current hour is allowed for retention
     if !cfg.compact.retention_allowed_hours.is_empty() {
         let current_hour = Utc::now().hour();
@@ -71,8 +66,6 @@ pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
     }
 
     let now = config::utils::time::now();
-    let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
-
     let grouped = db::schema::list_all_streams_grouped().await;
     for (org_id, stream_types) in grouped {
         for (stream_type, streams) in stream_types {
@@ -88,39 +81,7 @@ pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
                 if LOCAL_NODE.name.ne(&node_name) {
                     continue; // not this node
                 }
-
-                let stream_settings =
-                    infra::schema::get_settings(&org_id, &stream_name, stream_type)
-                        .await
-                        .unwrap_or_default();
-                let stream_data_retention_end = if stream_settings.data_retention > 0 {
-                    now - Duration::try_days(stream_settings.data_retention).unwrap()
-                } else {
-                    data_lifecycle_end
-                };
-
-                // quick check with the cached stream stats, if the stream has no data older than
-                // the retention boundary we can skip it without any db call.
-                let retention_end_micros = stream_data_retention_end.timestamp_micros();
-                let retention_day_start =
-                    retention_end_micros - retention_end_micros % day_micros(1);
-                let stats =
-                    infra::cache::stats::get_stream_stats(&org_id, &stream_name, stream_type);
-                if stats.doc_time_min > 0 && stats.doc_time_min >= retention_day_start {
-                    continue;
-                }
-
-                let extended_retention_days = &stream_settings.extended_retention_days;
-                // creates jobs to delete data
-                if let Err(e) = generate_retention_job(
-                    &stream_data_retention_end,
-                    &org_id,
-                    stream_type,
-                    &stream_name,
-                    extended_retention_days,
-                )
-                .await
-                {
+                if let Err(e) = generate_stream_job(&org_id, stream_type, &stream_name, now).await {
                     log::error!(
                         "[COMPACTOR] lifecycle: generate_retention_job [{org_id}/{stream_type}/{stream_name}] error: {e}"
                     );
@@ -130,6 +91,56 @@ pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+async fn generate_stream_job(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    now: DateTime<Utc>,
+) -> Result<(), anyhow::Error> {
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
+        .await
+        .unwrap_or_default();
+    let retention_days = db::organization::stream_retention_days(
+        org_id,
+        stream_type,
+        stream_name,
+        stream_settings.data_retention,
+    )
+    .await?;
+    let Some(stream_data_retention_end) = retention_end(retention_days, now) else {
+        return Ok(()); // kept forever
+    };
+
+    // quick check with the cached stream stats, if the stream has no data older than
+    // the retention boundary we can skip it without any db call.
+    let retention_end_micros = stream_data_retention_end.timestamp_micros();
+    let retention_day_start = retention_end_micros - retention_end_micros % day_micros(1);
+    let stats = infra::cache::stats::get_stream_stats(org_id, stream_name, stream_type);
+    if stats.doc_time_min > 0 && stats.doc_time_min >= retention_day_start {
+        return Ok(());
+    }
+
+    // creates jobs to delete data
+    generate_retention_job(
+        &stream_data_retention_end,
+        org_id,
+        stream_type,
+        stream_name,
+        &stream_settings.extended_retention_days,
+    )
+    .await
+}
+
+/// The time before which a stream's data is deleted; `None` keeps it forever.
+fn retention_end(retention_days: i64, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
+    (retention_days > 0).then(|| now - Duration::try_days(retention_days).unwrap())
+}
+
+/// True when the retention job owns the data at `offset`, so compacting it would conflict.
+pub(crate) fn past_retention(offset: i64, retention_days: i64, now: DateTime<Utc>) -> bool {
+    retention_end(retention_days, now).is_some_and(|end| offset <= end.timestamp_micros())
 }
 
 /// This function will split the original time range based on the exclude range
@@ -584,11 +595,16 @@ async fn prune_partition_time_level(
     let Some(mut settings) = infra::schema::unwrap_stream_settings(&schema) else {
         return Ok(());
     };
-    let Some(cutoff) = level_prune_cutoff(
-        &settings,
-        get_config().compact.data_retention_days,
-        config::utils::time::now_micros(),
-    ) else {
+    let retention_days = db::organization::stream_retention_days(
+        org_id,
+        stream_type,
+        stream_name,
+        settings.data_retention,
+    )
+    .await?;
+    let Some(cutoff) =
+        level_prune_cutoff(&settings, retention_days, config::utils::time::now_micros())
+    else {
         return Ok(());
     };
     if settings.partition_time_level.prune(cutoff) {
@@ -597,22 +613,8 @@ async fn prune_partition_time_level(
     Ok(())
 }
 
-/// The stream's retention, else the default; not positive means none.
-pub(crate) fn retention_days(settings: &StreamSettings, default_retention_days: i64) -> i64 {
-    if settings.data_retention > 0 {
-        settings.data_retention
-    } else {
-        default_retention_days
-    }
-}
-
 /// Days before this hold no files; extended ranges still do, `None` means no retention.
-fn level_prune_cutoff(
-    settings: &StreamSettings,
-    default_retention_days: i64,
-    now: i64,
-) -> Option<i64> {
-    let retention_days = retention_days(settings, default_retention_days);
+fn level_prune_cutoff(settings: &StreamSettings, retention_days: i64, now: i64) -> Option<i64> {
     if retention_days <= 0 {
         return None;
     }
@@ -1512,18 +1514,84 @@ mod tests {
                 .collect(),
             ..Default::default()
         };
-        let cutoff = |s: &StreamSettings, default_days| level_prune_cutoff(s, default_days, now);
+        let cutoff = |s: &StreamSettings, days| level_prune_cutoff(s, days, now);
 
         assert_eq!(cutoff(&settings(0, &[]), 30), Some(days_ago(30)));
-        assert_eq!(cutoff(&settings(7, &[]), 30), Some(days_ago(7)));
         // no retention anywhere: no day is gone, whatever the history holds
         assert_eq!(cutoff(&settings(0, &[]), 0), None);
         // an extended range older than the cutoff still holds files, the earliest one counts
         assert_eq!(
-            cutoff(&settings(7, &[(20, 18), (90, 80)]), 30),
+            cutoff(&settings(7, &[(20, 18), (90, 80)]), 7),
             Some(days_ago(90))
         );
         // one inside the retention window changes nothing
         assert_eq!(cutoff(&settings(30, &[(5, 3)]), 30), Some(days_ago(30)));
+    }
+
+    #[test]
+    fn test_a_shorter_default_keeps_the_data_inside_an_extended_range() {
+        let now = Utc.timestamp_nanos(1_700_000_000_000_000_000);
+        let days_ago = |days| (now - Duration::days(days)).timestamp_micros();
+        let extended = TimeRange::new(days_ago(40), days_ago(35));
+        let created_at = days_ago(100);
+        let deleted_ranges = |retention_days| {
+            let end = retention_end(retention_days, now).unwrap();
+            let last_retained = (end - Duration::days(3650)).timestamp_micros();
+            generate_time_ranges_for_deletion(
+                vec![extended.clone()],
+                TimeRange::new(created_at, end.timestamp_micros()),
+                last_retained,
+            )
+        };
+
+        // whichever side of the range the default falls on
+        for retention_days in [90, 30, 7, 3] {
+            let ranges = deleted_ranges(retention_days);
+            assert!(!ranges.is_empty(), "{retention_days}");
+            for range in &ranges {
+                assert!(!range.intersects(&extended), "{retention_days}: {range}");
+            }
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_failed_org_settings_read_skips_the_stream() {
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        infra::db_init().await.expect("meta store");
+        infra_file_list::create_table().await.unwrap();
+        let org_id = format!("retention_unreadable_{}", config::utils::time::now_micros());
+        let key = format!("{}/{org_id}", db::organization::ORG_SETTINGS_KEY_PREFIX);
+        db::put(&key, "not json".into(), infra::db::NO_NEED_WATCH, None)
+            .await
+            .unwrap();
+
+        let now = config::utils::time::now();
+        let result = generate_stream_job(&org_id, StreamType::Logs, "app", now).await;
+        assert!(result.is_err(), "the global value must not be used instead");
+        let org_prefix = format!("{org_id}/");
+        assert!(
+            !db::compact::retention::list()
+                .await
+                .unwrap()
+                .iter()
+                .any(|job| job.starts_with(&org_prefix))
+        );
+    }
+
+    #[test]
+    fn test_retention_end_follows_resolved_days_not_the_global_value() {
+        let now = Utc.timestamp_nanos(1_700_000_000_000_000_000);
+        assert_eq!(retention_end(0, now), None);
+        assert_eq!(retention_end(3, now), Some(now - Duration::days(3)));
+
+        // a stream kept forever never conflicts with retention, whatever its offset
+        assert!(!past_retention(0, 0, now));
+        let boundary = (now - Duration::days(3)).timestamp_micros();
+        assert!(past_retention(boundary, 3, now));
+        assert!(!past_retention(boundary + 1, 3, now));
     }
 }

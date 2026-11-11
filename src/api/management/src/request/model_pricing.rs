@@ -253,6 +253,9 @@ pub async fn create(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(mut item): Json<ModelPricingDefinition>,
 ) -> Response {
+    if !cfg!(feature = "enterprise") {
+        return MetaHttpResponse::forbidden("Not supported in the open source version");
+    }
     #[cfg(feature = "enterprise")]
     if !check_permissions(
         &org_id,
@@ -341,6 +344,9 @@ pub async fn update(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(mut item): Json<ModelPricingDefinition>,
 ) -> Response {
+    if !cfg!(feature = "enterprise") {
+        return MetaHttpResponse::forbidden("Not supported in the open source version");
+    }
     #[cfg(feature = "enterprise")]
     if !check_permissions(
         &org_id,
@@ -416,6 +422,7 @@ pub async fn delete(
     Path((org_id, model_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    // Not edition-gated: OSS must still be able to remove prices it can no longer edit.
     #[cfg(feature = "enterprise")]
     if !check_permissions(
         &org_id,
@@ -612,6 +619,9 @@ pub async fn refresh_built_in(
     Path(_org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    if !cfg!(feature = "enterprise") {
+        return MetaHttpResponse::forbidden("Not supported in the open source version");
+    }
     #[cfg(feature = "enterprise")]
     if !check_permissions(
         &_org_id,
@@ -1810,5 +1820,35 @@ mod tests {
         let captured = captured_models(&entries, &org_candidate(r"(?i)^gpt-4o"));
         assert!(find(&captured, "gpt-4o").is_some());
         assert!(find(&captured, "gpt-4o-mini").is_none());
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn writes_are_refused_without_enterprise() {
+        let def = || {
+            Json(
+                serde_json::from_value::<ModelPricingDefinition>(serde_json::json!({
+                    "name": "x", "match_pattern": "(?i)x", "enabled": true,
+                    "tiers": [{"name": "Default", "prices": {"input": 1e-6, "output": 2e-6}}],
+                }))
+                .unwrap(),
+            )
+        };
+        let org = || Path("default".to_string());
+        let model = || Path(("default".to_string(), "m".to_string()));
+        for (op, resp) in [
+            ("create", create(org(), def()).await),
+            ("update", update(model(), def()).await),
+            ("refresh_built_in", refresh_built_in(org()).await),
+        ] {
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN, "{op}");
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert!(
+                String::from_utf8_lossy(&body).contains("open source version"),
+                "{op}"
+            );
+        }
     }
 }
