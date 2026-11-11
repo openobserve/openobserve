@@ -40,7 +40,7 @@ use tokio::{
 
 use super::{
     job::{job_range_end, job_time_level, scheduling_level},
-    plan::{BatchLimits, PlannedBatch, narrowing_batches, plan_batches},
+    plan::{BatchLimits, PlannedBatch, plan_batches, pre_merge_batches},
 };
 use crate::{
     bloom::compact::OrphanBlooms,
@@ -218,7 +218,7 @@ pub async fn merge_by_stream(
             let stream = format!("{org_id}/{stream_type}/{stream_name}");
             let planned = plan_batches(files_with_size, &mode, &limits, &stream);
             let planned =
-                cap_indexed_merge_width(planned, &scan_schema, limits.max_merge_groups, &stream)
+                limit_indexed_merge_groups(planned, &scan_schema, limits.max_merge_groups, &stream)
                     .await;
             // a closed hour plans hash-merged output only to narrow itself for a later round
             let narrowed = !is_incremental
@@ -390,7 +390,7 @@ pub async fn merge_by_stream(
 }
 
 /// Swaps a closed metrics hour too wide to merge at once for the batches that narrow it.
-async fn cap_indexed_merge_width(
+async fn limit_indexed_merge_groups(
     batches: Vec<PlannedBatch>,
     schema: &Arc<Schema>,
     max_groups: usize,
@@ -415,7 +415,7 @@ async fn cap_indexed_merge_width(
             }
         };
         let chain_num = chains.len();
-        let narrowing = narrowing_batches(chains, max_groups);
+        let narrowing = pre_merge_batches(chains, max_groups);
         if narrowing.is_empty() {
             capped.push((files, mode));
             continue;

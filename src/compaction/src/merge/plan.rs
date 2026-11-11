@@ -120,7 +120,7 @@ fn indexed_hour_scope(
 
 /// Batches that narrow a closed hour wider than `max_groups` chains into hash-merged files;
 /// empty when the hour fits one merge or narrowing cannot shrink it.
-pub(super) fn narrowing_batches(
+pub(super) fn pre_merge_batches(
     mut chains: Vec<Vec<FileKey>>,
     max_groups: usize,
 ) -> Vec<Vec<FileKey>> {
