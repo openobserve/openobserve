@@ -32,7 +32,7 @@ use datafusion::{
     self,
     physical_plan::{
         ExecutionPlan,
-        metrics::{self, ExecutionPlanMetricsSet, MetricBuilder, MetricValue, MetricsSet},
+        metrics::{self, ExecutionPlanMetricsSet, MetricBuilder, MetricValue},
     },
 };
 use parking_lot::Mutex;
@@ -42,9 +42,6 @@ use crate::profile::{ProfileNode, RemoteNodeProfile};
 
 /// Flight action that fetches the profile a node holds for one finished run.
 pub const QUERY_PROFILE_ACTION: &str = "query_profile";
-
-const DECODE_TIME: &str = "decode_time";
-const BATCHES_RECEIVED: &str = "batches_received";
 
 #[derive(Debug, Clone)]
 pub struct RemoteScanMetrics {
@@ -65,10 +62,10 @@ pub struct RemoteScanMetrics {
 impl RemoteScanMetrics {
     pub fn new(input_partition: usize, metrics: &ExecutionPlanMetricsSet) -> Self {
         let fetch_time = MetricBuilder::new(metrics).subset_time("fetch_time", input_partition);
-        let decode_time = MetricBuilder::new(metrics).subset_time(DECODE_TIME, input_partition);
+        let decode_time = MetricBuilder::new(metrics).subset_time("decode_time", input_partition);
         let output_rows = MetricBuilder::new(metrics).output_rows(input_partition);
         let batches_received =
-            MetricBuilder::new(metrics).counter(BATCHES_RECEIVED, input_partition);
+            MetricBuilder::new(metrics).counter("batches_received", input_partition);
 
         // Register as OutputBytes so the display uses human_readable_size (KB/MB/GB)
         // instead of human_readable_count (K/M/B where B means billion).
@@ -84,19 +81,6 @@ impl RemoteScanMetrics {
             batches_received,
             bytes_received,
         }
-    }
-
-    /// Copies the counters a scan's `set` holds for `profile`'s partition into it.
-    pub fn copy_to_profile(set: &MetricsSet, profile: &mut RemoteNodeProfile) {
-        let partition = Some(profile.partition);
-        let sum = |name: &str| {
-            set.sum(|m| m.partition() == partition && m.value().name() == name)
-                .map_or(0, |v| v.as_usize() as u64)
-        };
-        profile.output_rows = sum("output_rows");
-        profile.output_batches = sum(BATCHES_RECEIVED);
-        profile.output_bytes = sum("output_bytes");
-        profile.decode_ns = sum(DECODE_TIME);
     }
 
     pub fn record_output(&self, batch: &RecordBatch) {
@@ -211,8 +195,30 @@ pub enum NodeRole {
     ClusterLeader(RemoteScanState),
 }
 
-/// Per-partition profiles of one remote scan, keyed by partition.
-pub type NodeProfiles = Arc<Mutex<BTreeMap<usize, RemoteNodeProfile>>>;
+/// The calls one remote scan made, keyed by partition.
+pub type NodeProfiles = Arc<Mutex<BTreeMap<usize, RemoteCall>>>;
+
+/// Everything a caller knows about one call to a remote node.
+#[derive(Debug)]
+pub struct RemoteCall {
+    pub profile: RemoteNodeProfile,
+    /// Read when the profile is built, as the call's stream may still be alive then.
+    pub counters: RemoteScanMetrics,
+    /// Set once the node returned a stream, so it holds a profile to fetch under this id.
+    pub job_id: String,
+}
+
+impl RemoteCall {
+    pub fn to_profile(&self) -> RemoteNodeProfile {
+        RemoteNodeProfile {
+            output_rows: self.counters.output_rows.value() as u64,
+            output_batches: self.counters.batches_received.value() as u64,
+            output_bytes: self.counters.bytes_received.value() as u64,
+            decode_ns: self.counters.decode_time.value() as u64,
+            ..self.profile.clone()
+        }
+    }
+}
 
 /// What a remote scan collects from the nodes it calls, shared by every copy of the scan.
 #[derive(Debug, Clone, Default)]

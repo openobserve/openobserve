@@ -299,7 +299,7 @@ async fn get_remote_batch(
     }
 
     let recorder = if remote_scan_node.search_infos.is_analyze {
-        NodeProfileRecorder::start(node_profiles, partition, node.as_ref())
+        NodeProfileRecorder::start(node_profiles, partition, node.as_ref(), metrics.clone())
     } else {
         NodeProfileRecorder::default()
     };
