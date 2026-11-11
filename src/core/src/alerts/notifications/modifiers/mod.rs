@@ -132,11 +132,13 @@ fn next_placeholder(tpl: &str, mut cursor: usize) -> Option<(usize, usize, bool)
             let index = cursor + offset;
             if quote.open {
                 let decoded = match ch {
-                    // In the `\"` form each JSON escape pair decodes to one argument character.
-                    '\\' if quote.json => match chars.next() {
-                        Some((_, escaped)) => json_unescape(escaped),
+                    '\\' if quote.json => match read_json_escape(&mut chars) {
+                        Some(decoded) => decoded,
                         None => break,
                     },
+                    // A raw quote ends the enclosing JSON string, so the `\"` argument never
+                    // closed.
+                    '"' if quote.json => break,
                     ch => ch,
                 };
                 quote.feed(decoded);
@@ -169,13 +171,22 @@ fn next_placeholder(tpl: &str, mut cursor: usize) -> Option<(usize, usize, bool)
     }
 }
 
-fn json_unescape(escaped: char) -> char {
-    match escaped {
+/// Decodes the JSON escape after a backslash, so the `\"` form scans what the formatter will read.
+fn read_json_escape(chars: &mut impl Iterator<Item = (usize, char)>) -> Option<char> {
+    let (_, escaped) = chars.next()?;
+    Some(match escaped {
+        'u' => {
+            let hex: String = chars.take(4).map(|(_, c)| c).collect();
+            let code = (hex.len() == 4).then(|| u32::from_str_radix(&hex, 16).ok())??;
+            // A lone surrogate half is neither a quote nor a backslash, which is all the scan
+            // needs.
+            char::from_u32(code).unwrap_or(char::REPLACEMENT_CHARACTER)
+        }
         'n' => '\n',
         't' => '\t',
         'r' => '\r',
         other => other,
-    }
+    })
 }
 
 /// Removes the one JSON escape layer a Raw payload body puts on `\"`-quoted arguments.
@@ -309,6 +320,20 @@ mod tests {
         assert_eq!(
             prepared.finish(prepared.template.clone()),
             r#"1970 "q" \ } 1.2k"#
+        );
+
+        let unicode = r#"{"text":"{t|formatTimestamp(\"%Y\u0022)} {v|humanize}"}"#;
+        let prepared = prepare_modifiers(unicode, lookup, |_| false, false);
+        assert_eq!(
+            prepared.finish(prepared.template.clone()),
+            r#"{"text":"1970 1.2k"}"#
+        );
+
+        let unclosed = r#"{"text":"{t|formatTimestamp(\"%Y)} {v|humanize}"}"#;
+        let prepared = prepare_modifiers(unclosed, lookup, |_| false, false);
+        assert_eq!(
+            prepared.finish(prepared.template.clone()),
+            r#"{"text":"{t|formatTimestamp(\"%Y)} 1.2k"}"#
         );
     }
 }
