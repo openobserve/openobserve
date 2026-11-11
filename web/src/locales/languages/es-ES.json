@@ -3355,7 +3355,8 @@
         "edit": "Editar",
         "identityRowForm": "En esta tarjeta, las reglas de identidad se aplican desde el primer evento identificado",
         "newUsersOnly": "Solo usuarios nuevos",
-        "newUsersSessionsTip": "Solo usuarios nuevos funciona en el modo Usuarios"
+        "newUsersSessionsTip": "Solo usuarios nuevos funciona en el modo Usuarios",
+        "fieldMissingOn": "{field}: campo no está en este stream"
       },
       "appFilters": {
         "hiddenLabel": "Ocultas por los filtros de la aplicación:",
@@ -32543,5 +32544,11 @@
     "recentRow": "Búsqueda reciente",
     "deletedQuery": "Se eliminó {query}",
     "undo": "Deshacer"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Usa como máximo {max} caracteres en el patrón.",
+      "regexInvalid": "Este patrón no es válido o no es compatible. No se pueden usar lookahead, lookbehind ni referencias inversas."
+    }
   }
 }

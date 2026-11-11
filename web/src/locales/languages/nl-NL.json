@@ -3355,7 +3355,8 @@
         "edit": "Bewerken",
         "identityRowForm": "Op deze kaart gelden identiteitsregels vanaf de eerste geïdentificeerde gebeurtenis",
         "newUsersOnly": "Alleen nieuwe gebruikers",
-        "newUsersSessionsTip": "Alleen nieuwe gebruikers werkt alleen in de modus Gebruikers"
+        "newUsersSessionsTip": "Alleen nieuwe gebruikers werkt alleen in de modus Gebruikers",
+        "fieldMissingOn": "{field}: veld niet in deze stream"
       },
       "appFilters": {
         "hiddenLabel": "Verborgen door app-filters:",
@@ -32543,5 +32544,11 @@
     "recentRow": "Recente zoekopdracht",
     "deletedQuery": "{query} verwijderd",
     "undo": "Ongedaan maken"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Gebruik maximaal {max} tekens voor het patroon.",
+      "regexInvalid": "Dit patroon is ongeldig of wordt niet ondersteund. Lookahead, lookbehind en terugverwijzingen kunnen niet worden gebruikt."
+    }
   }
 }

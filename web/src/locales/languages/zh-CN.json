@@ -3355,7 +3355,8 @@
         "edit": "编辑",
         "identityRowForm": "在此卡片上，身份规则从第一个已识别事件开始应用",
         "newUsersOnly": "仅新用户",
-        "newUsersSessionsTip": "“仅新用户”仅在用户模式下有效"
+        "newUsersSessionsTip": "“仅新用户”仅在用户模式下有效",
+        "fieldMissingOn": "{field}: 字段不在此数据流中"
       },
       "appFilters": {
         "hiddenLabel": "被应用过滤器隐藏：",
@@ -32543,5 +32544,11 @@
     "recentRow": "最近搜索",
     "deletedQuery": "已删除 {query}",
     "undo": "撤销"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "模式最多 {max} 个字符。",
+      "regexInvalid": "此模式无效或不受支持。不能使用先行断言、后行断言和反向引用。"
+    }
   }
 }

@@ -3355,7 +3355,8 @@
         "edit": "Chỉnh sửa",
         "identityRowForm": "Trên thẻ này, quy tắc danh tính áp dụng từ sự kiện được nhận diện đầu tiên",
         "newUsersOnly": "Chỉ người dùng mới",
-        "newUsersSessionsTip": "Chỉ người dùng mới chỉ hoạt động trong chế độ Người dùng"
+        "newUsersSessionsTip": "Chỉ người dùng mới chỉ hoạt động trong chế độ Người dùng",
+        "fieldMissingOn": "{field}: trường không có trong stream này"
       },
       "appFilters": {
         "hiddenLabel": "Bị ẩn bởi bộ lọc ứng dụng:",
@@ -32543,5 +32544,11 @@
     "recentRow": "Tìm kiếm gần đây",
     "deletedQuery": "Đã xóa {query}",
     "undo": "Hoàn tác"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Giữ mẫu trong tối đa {max} ký tự.",
+      "regexInvalid": "Mẫu này không hợp lệ hoặc không được hỗ trợ. Không thể dùng lookahead, lookbehind và tham chiếu ngược."
+    }
   }
 }

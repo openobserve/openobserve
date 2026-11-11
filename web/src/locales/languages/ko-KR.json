@@ -3355,7 +3355,8 @@
         "edit": "편집",
         "identityRowForm": "이 카드에서는 첫 번째 식별된 이벤트부터 ID 규칙이 적용됩니다",
         "newUsersOnly": "신규 사용자만",
-        "newUsersSessionsTip": "신규 사용자만은 사용자 모드에서만 작동합니다"
+        "newUsersSessionsTip": "신규 사용자만은 사용자 모드에서만 작동합니다",
+        "fieldMissingOn": "{field}: 이 스트림에 없는 필드"
       },
       "appFilters": {
         "hiddenLabel": "앱 필터로 숨겨짐:",
@@ -32543,5 +32544,11 @@
     "recentRow": "최근 검색",
     "deletedQuery": "{query} 삭제됨",
     "undo": "실행 취소"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "패턴은 {max}자 이하로 입력하세요.",
+      "regexInvalid": "이 패턴은 잘못되었거나 지원되지 않습니다. 전방 탐색, 후방 탐색, 역참조는 사용할 수 없습니다."
+    }
   }
 }

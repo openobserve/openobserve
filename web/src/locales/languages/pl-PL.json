@@ -3355,7 +3355,8 @@
         "edit": "Edytuj",
         "identityRowForm": "Na tej karcie reguły tożsamości działają od pierwszego zidentyfikowanego zdarzenia",
         "newUsersOnly": "Tylko nowi użytkownicy",
-        "newUsersSessionsTip": "Opcja „Tylko nowi użytkownicy” działa tylko w trybie Użytkownicy"
+        "newUsersSessionsTip": "Opcja „Tylko nowi użytkownicy” działa tylko w trybie Użytkownicy",
+        "fieldMissingOn": "{field}: pole nie występuje w tym strumieniu"
       },
       "appFilters": {
         "hiddenLabel": "Ukryte przez filtry aplikacji:",
@@ -32543,5 +32544,11 @@
     "recentRow": "Ostatnie wyszukiwanie",
     "deletedQuery": "Usunięto {query}",
     "undo": "Cofnij"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Wzorzec może mieć najwyżej {max} znaków.",
+      "regexInvalid": "Ten wzorzec jest nieprawidłowy lub nieobsługiwany. Nie można używać lookahead, lookbehind ani odwołań wstecznych."
+    }
   }
 }

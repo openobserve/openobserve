@@ -16,7 +16,7 @@
 // Fields a workflow Condition can branch on when the trigger is an Incident
 // Event. Like the alert fields, the backend flattens the `{ meta: {...} }`
 // envelope, so each field is exposed to conditions as `meta_<field>`. The
-// Condition form passes these to FilterGroup with `allow-custom-columns`, so a
+// Condition form passes these to the condition builder, which allows custom fields, so a
 // user can still type any field not listed here.
 //
 // An incident event's `meta` has two layers (see the incident lifecycle

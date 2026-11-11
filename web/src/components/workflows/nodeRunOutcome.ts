@@ -41,6 +41,10 @@ const branchHandleCount = (
   result: RunResultMaps,
   handle: string,
 ): number => {
+  // A Branch Run Step reports what each handle routed directly, since nothing downstream ran.
+  const own = result?.outputs?.[node?.id];
+  if (own && typeof own === "object" && !Array.isArray(own))
+    return len((own as Record<string, unknown>)[handle]);
   const target = targetOfHandle(node, edges, handle);
   return target ? len(result?.inputs?.[target]) : 0;
 };
@@ -51,11 +55,12 @@ export const branchPathCounts = (
   edges: any[],
   inputs: Record<string, unknown> | undefined,
   t: TranslateFn,
+  outputs?: Record<string, unknown>,
 ): BranchPathCount[] =>
   branchHandles(node).map((handle) => ({
     handle,
     label: branchEdgeLabel(node, handle, t),
-    count: branchHandleCount(node, edges, { inputs }, handle),
+    count: branchHandleCount(node, edges, { inputs, outputs }, handle),
   }));
 
 // Runs predating the outputs map stored none, so absence falls back to downstream recorded inputs — else an old run's forwarding condition would be falsely flagged no-match.

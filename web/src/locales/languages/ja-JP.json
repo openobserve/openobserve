@@ -3355,7 +3355,8 @@
         "edit": "編集",
         "identityRowForm": "このカードでは、ID ルールは最初に識別されたイベントから適用されます",
         "newUsersOnly": "新規ユーザーのみ",
-        "newUsersSessionsTip": "「新規ユーザーのみ」はユーザーモードでのみ機能します"
+        "newUsersSessionsTip": "「新規ユーザーのみ」はユーザーモードでのみ機能します",
+        "fieldMissingOn": "{field}: このストリームに存在しないフィールド"
       },
       "appFilters": {
         "hiddenLabel": "アプリフィルターによる非表示:",
@@ -32543,5 +32544,11 @@
     "recentRow": "最近の検索",
     "deletedQuery": "{query} を削除しました",
     "undo": "元に戻す"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "パターンは{max}文字以内にしてください。",
+      "regexInvalid": "このパターンは無効か、サポートされていません。先読み、後読み、後方参照は使用できません。"
+    }
   }
 }

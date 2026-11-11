@@ -3355,7 +3355,8 @@
         "edit": "Düzenle",
         "identityRowForm": "Bu kartta, kimlik kuralları ilk tanımlanan olaydan itibaren geçerlidir.",
         "newUsersOnly": "Yalnızca yeni kullanıcılar",
-        "newUsersSessionsTip": "Yalnızca yeni kullanıcılar, Kullanıcılar modunda çalışır"
+        "newUsersSessionsTip": "Yalnızca yeni kullanıcılar, Kullanıcılar modunda çalışır",
+        "fieldMissingOn": "{field}: bu akışta olmayan alan"
       },
       "appFilters": {
         "hiddenLabel": "Uygulama filtreleri tarafından gizlendi:",
@@ -32543,5 +32544,11 @@
     "recentRow": "Son arama",
     "deletedQuery": "{query} silindi",
     "undo": "Geri al"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Deseni en fazla {max} karakterle sınırlayın.",
+      "regexInvalid": "Bu desen geçersiz veya desteklenmiyor. İleriye bakma, geriye bakma ve geri başvurular kullanılamaz."
+    }
   }
 }

@@ -16,14 +16,7 @@
 import { raw } from "@/types/i18n";
 import { sqlLiteral, sqlLike } from "@/utils/query/sqlFilterBuilder";
 
-/**
- * Operator list that mirrors the dashboard condition operators
- * (AddCondition.vue) so both surfaces stay in sync.
- *
- * Doubles as the dropdown options AND the value persisted in the alert config
- * (and matched by `buildAnomalyFilterExpression`'s `case` arms below), so the
- * word-shaped entries stay verbatim — hence `raw()`.
- */
+/** Each entry is also the saved value `buildAnomalyFilterExpression` matches, so word operators stay verbatim. */
 export const ANOMALY_FILTER_OPERATORS = [
   "=",
   "<>",

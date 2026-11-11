@@ -90,15 +90,17 @@ export class AlertsPage {
             queryTabsContainer: '[data-test="step2-query-tabs"]',
             viewEditorButton: '[data-test="step2-view-editor-btn"]',
             conditionsTabsContainer: '[data-test="scheduled-alert-tabs"]',
-            conditionColumnSelect: '[data-test="alert-conditions-select-column"]',
-            operatorSelect: '[data-test="alert-conditions-operator-select"]',
-            conditionValueInput: '[data-test="alert-conditions-value-input"]',
-            addConditionButton: '[data-test="alert-conditions-add-condition-btn"]',
-            addFirstConditionButton: '[data-test="alert-conditions-add-btn"]',
-            addConditionGroupButton: '[data-test="alert-conditions-add-condition-group-btn"]',
-            deleteConditionButton: '[data-test="alert-conditions-delete-condition-btn"]',
-            columnInput: '[data-test="alert-conditions-select-column"]',
-            valueInput: '[data-test="alert-conditions-value-input"]',
+            // The shared condition builder (FilterBuilder, prefix "alert-conditions"): one chip per
+            // condition with -field / -operator / -value / -remove parts; the picker adds new ones.
+            conditionColumnSelect: '[data-test^="alert-conditions-chip-"][data-test$="-field"]',
+            operatorSelect: '[data-test^="alert-conditions-chip-"][data-test$="-operator"]',
+            conditionValueInput: '[data-test^="alert-conditions-chip-"][data-test$="-value"]',
+            addConditionButton: '[data-test="alert-conditions-add-condition"]',
+            addFirstConditionButton: '[data-test="alert-conditions-empty-row"]',
+            addConditionGroupButton: '[data-test="alert-conditions-add-group"]',
+            deleteConditionButton: '[data-test^="alert-conditions-chip-"][data-test$="-remove"]',
+            columnInput: '[data-test^="alert-conditions-chip-"][data-test$="-field"]',
+            valueInput: '[data-test^="alert-conditions-chip-"][data-test$="-value"]',
             stepQueryConfig: '.step-query-config',
 
             // Step 3: Compare with Past (Scheduled only)
