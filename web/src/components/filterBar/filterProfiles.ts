@@ -116,6 +116,8 @@ export interface FilterEditorConfig {
   freeText: boolean;
   /** Let the user name a field that is not in `fields`. */
   allowCustomFields: boolean;
+  /** What a custom field name may look like, when the dialect's identifier rule is too strict. */
+  customFieldPattern?: RegExp;
   /** An empty filter shows a "Where · choose a field" line ready to click. */
   startWithEmptyRow: boolean;
   limits: FilterLimits;
@@ -563,6 +565,8 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
       boolean: TIER_RULE_OPERATORS,
     },
     allowCustomFields: true,
+    // A rule may name fallback keys, read in order: `a.b, c.d`.
+    customFieldPattern: /^[A-Za-z_@][\w.@-]*(\s*,\s*[A-Za-z_@][\w.@-]*)*$/,
     limits: { maxConditions: MAX_TIER_RULES + 1 },
     codec: modelPricingCodec(),
     validation: "requireComplete",

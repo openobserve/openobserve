@@ -101,13 +101,20 @@ const TYPE_ICONS: Record<FilterFieldType, IconName> = {
   boolean: "toggle-off",
 };
 
-const rankByMatch = (names: string[], needle: string): string[] => {
+const rankByMatch = (
+  names: string[],
+  needle: string,
+  labelOf: (name: string) => string | undefined = () => undefined,
+): string[] => {
   if (!needle) return names;
   const lower = needle.toLowerCase();
   const prefix: string[] = [];
   const inner: string[] = [];
   for (const name of names) {
-    const index = name.toLowerCase().indexOf(lower);
+    const hits = [name, labelOf(name) ?? ""]
+      .map((text) => text.toLowerCase().indexOf(lower))
+      .filter((at) => at >= 0);
+    const index = hits.length ? Math.min(...hits) : -1;
     if (index === 0) prefix.push(name);
     else if (index > 0) inner.push(name);
   }
@@ -255,6 +262,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
         // A label typed in full stays reachable, for matchers like job!="a", job!="b".
         .filter((name) => name === editedField || name === needle || !usedInGroup.value.has(name)),
       needle,
+      (name) => fieldMap.value.get(name)?.label,
     ).slice(0, MAX_ROWS);
     for (const name of names) {
       const type = fieldMap.value.get(name)!.type;
@@ -271,7 +279,10 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
       config.value.allowCustomFields &&
       !fieldMap.value.has(needle) &&
       !taken(needle) &&
-      (dialect.value === "promql" ? PROMQL_LABEL_NAME : SQL_FIELD_NAME).test(needle)
+      (
+        config.value.customFieldPattern ??
+        (dialect.value === "promql" ? PROMQL_LABEL_NAME : SQL_FIELD_NAME)
+      ).test(needle)
     ) {
       rows.push({
         key: CUSTOM_FIELD_KEY,

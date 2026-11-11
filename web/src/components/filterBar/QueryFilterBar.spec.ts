@@ -584,6 +584,32 @@ describe("QueryFilterBar", () => {
     expect(rowKeys()).toContain("\u0000shorthand");
   });
 
+  it("finds a field by its shown label as well as its name", async () => {
+    mountBar({
+      fields: [
+        { name: "response_time_ms", type: "number", label: "Response time (ms)" },
+        { name: "body", type: "string", label: "Response body" },
+      ],
+    });
+    await openBar();
+    await type("Response time");
+    expect(rowKeys()).toEqual(["response_time_ms"]);
+    await type("resp");
+    expect(rowKeys()).toEqual(["response_time_ms", "body"]);
+  });
+
+  it("takes a comma list of fallback keys as one custom field only where the profile allows it", async () => {
+    mountBar({ profile: "model-pricing" });
+    await openBar();
+    await type("anthropic.response.tier, anthropic.request.tier");
+    expect(rowKeys()).toContain("\u0000custom-field");
+    wrapper!.unmount();
+    mountBar({ allowCustomFields: true });
+    await openBar();
+    await type("a.b, c.d");
+    expect(rowKeys()).not.toContain("\u0000custom-field");
+  });
+
   describe("extra suggestions", () => {
     const extraSuggestions = {
       title: "Recent searches",
