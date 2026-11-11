@@ -850,10 +850,11 @@ mod tests {
         };
 
         let port = ports().investigation.expect("the incident path is wired");
+        // Not on a stream, so the incident path answers without opening an incident.
         let request = ActionRequest {
             org: "demo-org".into(),
             entity_type: "stream".into(),
-            entity_id: "logs/checkout".into(),
+            entity_id: "checkout".into(),
             decision_kind: "stream_silence".into(),
             group_key: String::new(),
             action: ActionKind::Investigate,
@@ -864,6 +865,9 @@ mod tests {
         // ENT defaults incidents on; then the request passes the gate into the incident path.
         let on = crate::alerts::incidents::incidents_enabled();
         assert_eq!(e.downcast_ref::<ActionRefused>().is_some(), !on, "{e}");
+        if on {
+            assert_eq!(e.to_string(), "the finding is not on a stream");
+        }
     }
 
     /// Deleting a stream drops its cached settings, so the re-created stream is bounded again.

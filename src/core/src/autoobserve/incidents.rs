@@ -517,10 +517,11 @@ mod tests {
                 .map(|r| r.0.as_str()),
             Some(REFUSED_INCIDENTS_OFF)
         );
+        // Not on a stream: past the gate (ENT defaults incidents on) it fails before opening one.
         let request = ActionRequest {
             org: "demo-org".into(),
             entity_type: kinds::STREAM.into(),
-            entity_id: "logs/checkout".into(),
+            entity_id: "checkout".into(),
             decision_kind: decision_kinds::STREAM_SILENCE.into(),
             group_key: String::new(),
             action: ActionKind::Investigate,
@@ -528,12 +529,11 @@ mod tests {
             peers: Vec::new(),
         };
         let e = IncidentInvestigation.start(&request).await.unwrap_err();
-        // ENT defaults incidents on, so the switch decides which side of the gate this reaches.
-        assert_eq!(
-            e.downcast_ref::<ActionRefused>().is_some(),
-            !incidents_enabled(),
-            "{e}"
-        );
+        let on = incidents_enabled();
+        assert_eq!(e.downcast_ref::<ActionRefused>().is_some(), !on, "{e}");
+        if on {
+            assert_eq!(e.to_string(), "the finding is not on a stream");
+        }
     }
 
     #[test]
