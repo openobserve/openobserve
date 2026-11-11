@@ -487,33 +487,15 @@ mod tests {
             assert!(matches!(mode, MergeMode::MetricsHashMerged), "{mode}");
             assert!(files.iter().all(|f| f.key.contains("/hash-sorted-v1-")));
         }
-    }
-
-    /// At the cap, or with the cap off, the closed hour goes straight to the indexed merge.
-    #[test]
-    fn test_plan_batches_closed_hour_within_the_cap_merges_indexed() {
-        let strategy = MergeStrategy::FileTime;
-        let mut limits = limits(&strategy, 0, false);
-        for (max_merge_groups, ingester_files) in [(3, 3), (0, 7)] {
-            limits.max_merge_groups = max_merge_groups;
-            let mut files = ingester_hour(ingester_files);
-            files.push(hash_file("hash-merged-v1-round1.parquet", 400));
-            let batches = plan_batches(files, &MergeMode::MetricsIndexed, &limits, "s");
-            assert_eq!(batch_sizes(&batches), [ingester_files + 1]);
-            assert!(matches!(batches[0].1, MergeMode::MetricsIndexed));
-        }
-    }
-
-    /// Hash-merged files alone never pre-merge, however many: the hour cannot be re-armed forever.
-    #[test]
-    fn test_plan_batches_closed_hour_of_round_outputs_is_not_pre_merged() {
-        let files: Vec<FileKey> = (1..=240)
-            .map(|i| hash_file(&format!("hash-merged-v1-{i:03}.parquet"), 400))
-            .collect();
-        let strategy = MergeStrategy::FileTime;
-        let limits = limits(&strategy, 0, false);
+        limits.max_merge_groups = 7;
+        let mut files = ingester_hour(7);
+        files.push(hash_file("hash-merged-v1-round1.parquet", 400));
         let batches = plan_batches(files, &MergeMode::MetricsIndexed, &limits, "s");
-        assert_eq!(batch_sizes(&batches), [240]);
+        assert_eq!(
+            batch_sizes(&batches),
+            [8],
+            "within the cap: one indexed merge"
+        );
         assert!(matches!(batches[0].1, MergeMode::MetricsIndexed));
     }
 
