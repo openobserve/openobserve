@@ -1131,12 +1131,87 @@ async fn with_suggestions(
 ) -> Result<Vec<Value>, Response> {
     let mut hits = hits?;
     drop_unlisted_findings(org_id, &mut hits).await;
+    if let Err(e) = restamp_finding_counts(org_id, visibility, &mut hits).await {
+        log::warn!("[alert_calibration] org={org_id}: run counts keep their hidden findings: {e}");
+    }
     offer_destination_suggestions(org_id, user_id, visibility, &mut hits).await;
     if let Err(e) = keep_offers(org_id, user_id, &hits).await {
         log::error!("[alert_calibration] keeping the offers for org={org_id} failed: {e}");
         return Err(MetaHttpResponse::internal_error(e));
     }
     Ok(hits)
+}
+
+/// Each emission's `finding_count` as the page lists it, so the tile counts the rows it shows.
+async fn restamp_finding_counts(
+    org_id: &str,
+    visibility: &AlertVisibility,
+    hits: &mut [Value],
+) -> Result<(), InfraError> {
+    let schema = alert_schema(org_id).await?;
+    let held = |column: &str| schema.field_with_name(column).is_ok();
+    if !FINDING_COLUMNS.iter().all(|column| held(column)) {
+        return Ok(());
+    }
+    let now = now_micros();
+    let every_of = |run: DigestRun| async move {
+        let range = (run.window_end, now + 1);
+        let search = |sql, from, size| search_at(org_id, sql, range, from, size);
+        run_pages(&run, &search, |after: &str| {
+            finding_ids_sql(&run, after, &held)
+        })
+        .await
+    };
+    restamp_with(org_id, visibility, hits, every_of).await
+}
+
+async fn restamp_with<E, F>(
+    org_id: &str,
+    visibility: &AlertVisibility,
+    hits: &mut [Value],
+    every_of: E,
+) -> Result<(), InfraError>
+where
+    E: Fn(DigestRun) -> F,
+    F: Future<Output = Result<Vec<Value>, InfraError>>,
+{
+    let emissions: BTreeSet<(i64, i64, i64)> = hits.iter().filter_map(emission_of).collect();
+    for key @ (emitted_at, window_start, window_end) in emissions {
+        let run = DigestRun {
+            emitted_at,
+            window_start,
+            window_end,
+            ..DigestRun::default()
+        };
+        let every = every_of(run).await?;
+        let seen = every.iter().filter(|hit| sees_row(visibility, hit)).count();
+        let listed = listed_finding_ids(org_id, visibility, every).await.len();
+        let hidden = i64::try_from(seen.saturating_sub(listed)).unwrap_or(i64::MAX);
+        if hidden == 0 {
+            continue;
+        }
+        for row in hits.iter_mut().filter(|row| emission_of(row) == Some(key)) {
+            if let Some(count) = int_of(row, "finding_count") {
+                row["finding_count"] = (count - hidden).max(0).into();
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The emission a row with a run count belongs to: its `_timestamp` and window.
+fn emission_of(row: &Value) -> Option<(i64, i64, i64)> {
+    int_of(row, "finding_count")?;
+    Some((
+        int_of(row, "_timestamp")?,
+        int_of(row, "window_start")?,
+        int_of(row, "window_end")?,
+    ))
+}
+
+fn int_of(row: &Value, key: &str) -> Option<i64> {
+    let value = row.get(key)?;
+    value.as_i64().or_else(|| value.as_f64().map(|n| n as i64))
 }
 
 /// What the alert page offers is kept for its reader, so their Save records exactly that change.
@@ -1977,5 +2052,68 @@ mod tests {
         let probed = probe_of(&every);
         assert_eq!(probed.ids.len(), 4);
         assert!(!probed.full);
+    }
+
+    #[tokio::test]
+    async fn the_run_count_the_tile_reads_leaves_out_the_findings_the_page_hides() {
+        use config::meta::{
+            alerts::alert::{Alert, SIEM_ATTRIBUTE},
+            folder::Folder,
+        };
+        use svix_ksuid::KsuidLike;
+
+        let org = format!("cal_tile_{}", config::ider::uuid());
+        let id = || svix_ksuid::Ksuid::new(None, None).to_string();
+        let (detection, wired, plain) = (id(), id(), id());
+        for (alert_id, siem, destinations) in [
+            (&detection, true, vec![]),
+            (&wired, false, vec!["pager".to_string()]),
+            (&plain, false, vec![]),
+        ] {
+            let mut alert = Alert::default();
+            alert.org_id = org.clone();
+            alert.destinations = destinations;
+            alert.context_attributes = siem.then(|| {
+                [(SIEM_ATTRIBUTE.to_string(), "true".to_string())]
+                    .into_iter()
+                    .collect()
+            });
+            common::infra::config::ALERTS.write().await.insert(
+                db::alerts::alert::cache_alert_key(&org, alert_id),
+                (Folder::default(), alert),
+            );
+        }
+        let finding = |fid: &str, rule: &str, alert: &str| serde_json::json!({"finding_id": fid, "kind": "finding", "rule_id": rule, "alert_id": alert});
+        let newest = vec![
+            finding("f-detection", "noise", &detection),
+            finding("f-fixed", NO_DESTINATION_RULE, &wired),
+            finding("f-plain", "silent", &plain),
+        ];
+        let older = vec![finding("f-old", "silent", &plain)];
+        let row = |at: i64, count: i64, kind: &str| serde_json::json!({"_timestamp": at, "window_start": 10, "window_end": 20, "finding_count": count, "kind": kind});
+        let mut hits = vec![row(30, 3, "run"), row(30, 3, "finding"), row(25, 1, "run")];
+        let read = |run: DigestRun| {
+            let every = match run.emitted_at {
+                30 => newest.clone(),
+                _ => older.clone(),
+            };
+            ready(Ok(every))
+        };
+        restamp_with(&org, &AlertVisibility::Org, &mut hits, read)
+            .await
+            .unwrap();
+        let counts: Vec<&Value> = hits.iter().map(|hit| &hit["finding_count"]).collect();
+        assert_eq!(
+            counts,
+            [1, 1, 1],
+            "each emission counts only what the page lists"
+        );
+        let mut scoped = vec![row(30, 2, "run")];
+        let only = AlertVisibility::Only(BTreeSet::from([plain.clone(), wired.clone()]));
+        restamp_with(&org, &only, &mut scoped, read).await.unwrap();
+        assert_eq!(
+            scoped[0]["finding_count"], 1,
+            "a scoped count drops its hidden ones too"
+        );
     }
 }
