@@ -700,6 +700,76 @@ describe("AddPanel.vue", () => {
       expect(confirmSpy).not.toHaveBeenCalled();
       expect(next).toHaveBeenCalledWith();
     });
+
+    describe("URL sync from the live preview", () => {
+      const variables = { values: [] };
+      const editorRouter = () => vi.mocked(useRouter).mock.results.at(-1)!.value;
+      const editorRoute = () => vi.mocked(useRoute).mock.results.at(-1)!.value;
+
+      const openLeaveDialog = async () => {
+        window.dispatchEvent(new Event("keydown"));
+        wrapper.vm.dashboardPanelData.data.title = "edited by the user";
+        await nextTick();
+        const next = vi.fn();
+        const done = leaveGuard(
+          { path: "/dashboards/view" },
+          { path: "/dashboards/add_panel" },
+          next,
+        ) as unknown as Promise<void>;
+        await nextTick();
+        expect(wrapper.vm.leaveDialogOpen).toBe(true);
+        return { next, done };
+      };
+
+      it("writes the preview time range to the URL when no leave is pending", () => {
+        editorRouter().replace.mockClear();
+
+        wrapper.vm.variablesDataUpdated(variables);
+
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+        expect(editorRouter().replace.mock.calls[0][0].query).toEqual({
+          dashboard: "test-dashboard",
+          period: "15m",
+        });
+      });
+
+      it("does not replace the route with a query identical to the current one", () => {
+        wrapper.vm.variablesDataUpdated(variables);
+        const synced = editorRouter().replace.mock.calls.at(-1)![0].query;
+        editorRoute().query = { ...synced };
+        editorRouter().replace.mockClear();
+
+        wrapper.vm.variablesDataUpdated(variables);
+
+        expect(editorRouter().replace).not.toHaveBeenCalled();
+      });
+
+      it("does not replace the route while the leave dialog is open, so Discard still leaves", async () => {
+        const { next, done } = await openLeaveDialog();
+        editorRouter().replace.mockClear();
+
+        wrapper.vm.variablesDataUpdated(variables);
+        expect(editorRouter().replace).not.toHaveBeenCalled();
+
+        wrapper.vm.onLeaveChoice("discard");
+        await done;
+        expect(next).toHaveBeenCalledWith();
+        wrapper.vm.variablesDataUpdated(variables);
+        expect(editorRouter().replace).not.toHaveBeenCalled();
+      });
+
+      it("syncs the URL again after the user chooses to stay", async () => {
+        const { next, done } = await openLeaveDialog();
+        wrapper.vm.onLeaveChoice("stay");
+        await done;
+        expect(next).toHaveBeenCalledWith(false);
+        editorRouter().replace.mockClear();
+
+        wrapper.vm.variablesDataUpdated(variables);
+
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+      });
+    });
   });
 
   describe("Panel title OForm (real form)", () => {
