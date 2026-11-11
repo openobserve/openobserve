@@ -601,6 +601,36 @@ pub(crate) async fn finding_target(
     Ok(hit.as_ref().filter(|_| listed).and_then(target_of))
 }
 
+/// The finding's stored change as the alert read offers it to this reader, destination included.
+pub(crate) async fn finding_change(
+    org_id: &str,
+    user_id: &str,
+    finding_id: &str,
+    now: i64,
+) -> Result<Option<SuggestedChange>, InfraError> {
+    let Some(hit) = finding_hit(org_id, finding_id, now).await? else {
+        return Ok(None);
+    };
+    if unlisted(org_id, &hit).await {
+        return Ok(None);
+    }
+    let Some(alert_id) = hit
+        .get("scope_key")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+    else {
+        return Ok(None);
+    };
+    let probe = Probe {
+        ids: vec![alert_id.clone()],
+        full: false,
+    };
+    let visibility = live_visibility(org_id, user_id, || ready(Ok(probe))).await?;
+    let mut rows = [hit];
+    offer_destination_suggestions(org_id, user_id, &visibility, &mut rows).await;
+    Ok(change_of(&rows[0]))
+}
+
 /// Findings whose cause is gone since the run are unlisted until the next run decides again.
 async fn drop_unlisted_findings(org_id: &str, hits: &mut Vec<Value>) {
     let mut kept = Vec::with_capacity(hits.len());
@@ -667,36 +697,6 @@ fn finding_alert(hit: &Value) -> Option<&str> {
         .or_else(|| hit.get("scope_key"))
         .and_then(Value::as_str)
         .filter(|id| !id.is_empty())
-}
-
-/// The finding's stored change as the alert read offers it to this reader, destination included.
-pub(crate) async fn finding_change(
-    org_id: &str,
-    user_id: &str,
-    finding_id: &str,
-    now: i64,
-) -> Result<Option<SuggestedChange>, InfraError> {
-    let Some(hit) = finding_hit(org_id, finding_id, now).await? else {
-        return Ok(None);
-    };
-    if unlisted(org_id, &hit).await {
-        return Ok(None);
-    }
-    let Some(alert_id) = hit
-        .get("scope_key")
-        .and_then(Value::as_str)
-        .map(str::to_string)
-    else {
-        return Ok(None);
-    };
-    let probe = Probe {
-        ids: vec![alert_id.clone()],
-        full: false,
-    };
-    let visibility = live_visibility(org_id, user_id, || ready(Ok(probe))).await?;
-    let mut rows = [hit];
-    offer_destination_suggestions(org_id, user_id, &visibility, &mut rows).await;
-    Ok(change_of(&rows[0]))
 }
 
 async fn finding_hit(

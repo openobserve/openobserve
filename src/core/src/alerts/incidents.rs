@@ -9076,8 +9076,7 @@ mod tests {
         );
     }
 
-    /// AutoObserve's alerts have no destination and may name no service, yet a firing still opens
-    /// one.
+    /// AutoObserve's alerts may lack a destination and a service, yet a firing still opens one.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn an_incident_alert_with_no_destination_and_no_service_still_opens_an_incident() {
