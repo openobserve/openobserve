@@ -38,6 +38,11 @@ export class PipelinesEP {
         this.importOrgIdTrigger = page.locator('[data-test="pipeline-import-org-id-input-trigger"]');
         this.importOrgIdSearch = page.locator('[data-test="pipeline-import-org-id-input-search"]');
         this.importOrgIdOption = (org) => page.locator(`[data-test="pipeline-import-org-id-input-option"][data-test-value="${org}"]`);
+        this.importOrgIdError = (org) => page
+            .locator('[data-test^="pipeline-import-error-"]')
+            .filter({ hasText: 'Organization Id is mandatory' })
+            .filter({ hasText: new RegExp(`should be equal to ${org}\\b`) })
+            .first();
         // Stream picker is OSelect (Reka Listbox) post-migration.
         this.menuScroll = '[data-test$="-popover"], [role="listbox"]';
         this.menuItem = '[data-test$="-option"]';
@@ -262,8 +267,10 @@ export class PipelinesEP {
     }
 
     // The option list is virtualised, so on an org with many functions the wanted row is not rendered until searched for.
-    async selectImportOption(dataTest, value, index = 0) {
-        const trigger = this.page.locator(`[data-test="${dataTest}-trigger"]`).nth(index);
+    async selectImportOption(dataTest, value, index = 0, label = null) {
+        let field = this.page.locator(`[data-test="${dataTest}"]`);
+        if (label) field = field.filter({ has: this.page.getByText(label, { exact: true }) });
+        const trigger = field.nth(index).locator(`[data-test="${dataTest}-trigger"]`);
         await trigger.click();
         const search = this.page.locator(`[data-test="${dataTest}-search"]`);
         await search.fill(value);
@@ -272,15 +279,28 @@ export class PipelinesEP {
         await expect(trigger).toHaveAttribute('data-test-selected-value', value);
     }
 
-
     // The import fixtures carry org "default"; in any other org the form asks for the Organization Id, which must be the current org.
     async selectImportOrgIdIfAsked() {
-        if (!(await this.importOrgIdTrigger.isVisible())) return;
+        // A pipeline's error rows render as one group, so once its function picker is up a missing org picker was not asked for.
+        await this.importOrgIdTrigger.first()
+            .or(this.page.locator(`[data-test="${this.destinationFunctionNameDataTest}-trigger"]`).first())
+            .waitFor({ state: 'visible', timeout: 15000 });
         const org = process.env.ORGNAME || 'default';
-        await this.importOrgIdTrigger.click();
-        await this.importOrgIdSearch.fill(org);
-        await this.importOrgIdOption(org).click();
-        await expect(this.importOrgIdTrigger).toHaveAttribute('data-test-selected-value', org);
+        const pickers = await this.importOrgIdTrigger.count();
+        for (let i = 0; i < pickers; i++) {
+            const trigger = this.importOrgIdTrigger.nth(i);
+            await trigger.click();
+            await this.importOrgIdSearch.fill(org);
+            await this.importOrgIdOption(org).click();
+            await expect(this.importOrgIdSearch).toBeHidden();
+            await expect(trigger).toHaveAttribute('data-test-selected-value', org);
+        }
+    }
+
+    // The import button stays disabled until validation finishes, so the error read after it is this click's result.
+    async expectImportBlockedByOrgId(org) {
+        await expect(this.page.locator(this.importJsonButton)).toBeEnabled({ timeout: 30000 });
+        await expect(this.importOrgIdError(org)).toBeVisible();
     }
 
     async importJsonButtonPipeline() {
@@ -325,7 +345,8 @@ export class PipelinesEP {
         await nameField.fill(name, { force: true });
         await this.selectImportOrgIdIfAsked();
         await this.selectImportOption(this.destinationFunctionNameDataTest, functionName);
-        await this.selectImportOption(this.remoteDestinationDataTest, remoteDestination);
+        // This data-test is shared by the stream-type, remote-destination and timezone pickers, so pick by label.
+        await this.selectImportOption(this.remoteDestinationDataTest, remoteDestination, 0, 'Remote Destination');
     }
 
 }

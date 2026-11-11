@@ -4,6 +4,7 @@
 const { expect } = require("@playwright/test");
 const testLogger = require("../../playwright-tests/utils/test-logger.js");
 import { answerPanelDraftRestore } from "./panel-leave-dialog.js";
+import DashboardactionPage from "./dashboard-panel-actions.js";
 
 export default class ChartTypeSelector {
   constructor(page) {
@@ -221,7 +222,6 @@ export default class ChartTypeSelector {
     await this.page.locator('[data-test="index-dropdown-stream"]').waitFor({ state: "visible", timeout: 10000 });
   }
 
-  // Stream select with retry mechanism; reloads the panel editor at most once, only when the stream is missing from the list
   async selectStream(streamName, maxRetries = 3) {
     const streamInput = this.page.locator(
       '[data-test="index-dropdown-stream"]'
@@ -292,31 +292,55 @@ export default class ChartTypeSelector {
     }
   }
 
-  // Returns false where a reload would lose unsaved editor state the test built (outside the dashboard editor, or with extra query tabs).
+  // A reload drops in-memory editor state, so it runs only where that state can be read back and re-applied.
   async reloadPanelEditorKeepingSelections() {
     if (!/\/dashboards\/add_panel/.test(this.page.url())) return false;
-    if ((await this.page.locator('[data-test="dashboard-panel-query-tab-1"]').count()) > 0) return false;
-    const chartType = await this.page
-      .locator('[data-test="dashboard-addpanel-chart-selection-item"][data-test-selected]')
-      .first()
-      .getAttribute("data-test-selected", { timeout: 2000 })
-      .catch(() => null);
-    const streamType = await this.page
-      .locator('[data-test="index-dropdown-stream_type-trigger"]')
-      .first()
-      .getAttribute("data-test-selected-value", { timeout: 2000 })
-      .catch(() => null);
-    testLogger.info(`selectStream: stream missing from the cached list, reloading the panel editor (chart=${chartType}, streamType=${streamType})`);
+    if ((await this.page.locator('[data-test="dashboard-panel-query-tab-1"]').count()) > 0) {
+      throw new Error("selectStream: stream missing from the cached list, but reloading would drop the extra query tabs this panel already has");
+    }
+    const chartType = await this.readEditorAttribute(
+      this.page.locator('[data-test="dashboard-addpanel-chart-selection-item"][data-test-selected]').first(),
+      "data-test-selected",
+      "chart type",
+    );
+    const streamType = await this.readEditorAttribute(
+      this.page.locator('[data-test="index-dropdown-stream_type-trigger"]').first(),
+      "data-test-selected-value",
+      "stream type",
+    );
+    const panelName = await this.readPanelName();
+    testLogger.info(`selectStream: stream missing from the cached list, reloading the panel editor (chart=${chartType}, streamType=${streamType}, panelName=${panelName})`);
     await this.page.reload({ waitUntil: "domcontentloaded" });
     await this.page.locator('[data-test="index-dropdown-stream"]').waitFor({ state: "visible", timeout: 30000 });
-    // The unload flushes the panel draft, so the reloaded editor opens "Unsaved panel draft" over itself; start fresh and re-pick below.
+    // The unload flushes the panel draft, so the reloaded editor opens "Unsaved panel draft" over itself.
     if (await this.hasPanelDraftForThisEditor()) {
       const answered = await answerPanelDraftRestore(this.page, { choice: "fresh", timeout: 15000 });
       if (!answered) throw new Error("Panel draft restore dialog did not open after reloading the panel editor");
     }
-    if (chartType) await this.selectChartType(chartType);
-    if (streamType) await this.selectStreamType(streamType);
+    await this.selectChartType(chartType);
+    await this.selectStreamType(streamType);
+    if (panelName && (await this.readPanelName()) !== panelName) {
+      await new DashboardactionPage(this.page).addPanelName(panelName);
+    }
     return true;
+  }
+
+  async readEditorAttribute(locator, attribute, label) {
+    let value;
+    try {
+      value = await locator.getAttribute(attribute, { timeout: 5000 });
+    } catch (error) {
+      throw new Error(`selectStream: cannot read the panel's ${label} before reloading the editor: ${error.message}`);
+    }
+    if (!value) throw new Error(`selectStream: the panel's ${label} is empty, so a reload could not restore it`);
+    return value;
+  }
+
+  // Display mode shows the placeholder for an empty name, which compares equal before and after the reload.
+  async readPanelName() {
+    const input = this.page.locator('[data-test="dashboard-panel-name-input"]');
+    if (await input.isVisible()) return input.inputValue();
+    return this.page.locator('[data-test="dashboard-panel-name-trigger"] [data-test="dashboard-panel-name-value"]').innerText({ timeout: 5000 });
   }
 
   async hasPanelDraftForThisEditor() {

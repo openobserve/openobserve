@@ -1,6 +1,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 
 test.describe.configure({ mode: "parallel" });
 
@@ -37,19 +38,19 @@ test.describe("Stream name casing preservation tests", () => {
   test("should preserve stream name casing after ingestion and show in stream explorer", {
     tag: ['@streamName', '@casing', '@all', '@streams']
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), 'Cloud runs ZO_FORMAT_STREAM_NAME_TO_LOWERCASE=true (default) — stream names are always lowercased');
+
     testLogger.info('Testing stream name casing preservation');
 
-    // Deployed servers default ZO_FORMAT_STREAM_NAME_TO_LOWERCASE to true; PR CI starts the server with it false, so only there must casing survive.
-    const casingMustSurvive = process.env.ZO_FORMAT_STREAM_NAME_TO_LOWERCASE === 'false';
+    // PR CI declares the server flag false, so a lowercased name there is a real regression rather than a server setting.
+    const casingDeclaredPreserved = process.env.ZO_FORMAT_STREAM_NAME_TO_LOWERCASE === 'false';
     const streams = [];
     for (const stream of TEST_STREAMS) {
       const storedName = await pm.streamsPage.ingestTestData(stream.name);
       if (storedName) storedNames.add(storedName);
-      if (casingMustSurvive) {
-        expect(storedName, 'ingest response stream name').toBe(stream.name);
-      } else {
-        expect([stream.name, stream.name.toLowerCase()], 'ingest response stream name').toContain(storedName);
-      }
+      const lowercasedByServer = storedName !== stream.name && storedName?.toLowerCase() === stream.name.toLowerCase();
+      test.skip(!casingDeclaredPreserved && lowercasedByServer, 'server lowercases stream names (ZO_FORMAT_STREAM_NAME_TO_LOWERCASE)');
+      expect(storedName, 'ingest response stream name').toBe(stream.name);
       streams.push(storedName);
       testLogger.info('Ingested test data', { streamName: stream.name, storedName });
     }

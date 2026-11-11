@@ -11,8 +11,7 @@ Each Playwright workflow builds its matrix from one of these JSON files (via a
 | `ci_matrix.json` (+ ENT `ci_matrix.ent.json`) | `playwright.yml` (PR gate) | shared base + overlay |
 | `ci_matrix_regression.json` (+ ENT `ci_matrix_regression.ent.json`) | `playwright_bugfix_regression.yml` | shared base + overlay |
 | `ci_matrix_cloud.json` *(ENT repo)* | `playwright_alpha1.yml` | ENT-only standalone |
-| `ci_matrix_env.json` *(ENT repo)* | `playwright_env.yml` | ENT-only standalone |
-| `ci_matrix_env_scheduled.json` *(ENT repo)* | `playwright_env_scheduled.yml` | ENT-only standalone |
+| *(no manifest)* | `playwright_env.yml` *(ENT repo)* | env runs use o2-enterprise `playwright_env.yml` with `.github/ci/env-e2e-exclusions.json` |
 | `ci_matrix_firefox.json` *(ENT repo)* | `playwright-firefox-ondemand.yml` | ENT-only standalone |
 
 Base manifests + `build-ci-matrix.js` live in OSS; overlays and ENT-only manifests live
