@@ -1008,6 +1008,7 @@ import {
   computed,
   defineComponent,
   ref,
+  shallowRef,
   onMounted,
   onUpdated,
   onBeforeUnmount,
