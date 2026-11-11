@@ -829,21 +829,15 @@ export default class ChartTypeSelector {
   }
 
   /**
-   * Enter a custom SQL query in the Monaco editor.
-   * Clicks the editor wrapper (data-test) then types via the page keyboard,
-   * avoiding class/role selectors that violate the PO selector policy.
+   * Replace the panel query editor's SQL with the given query.
    * @param {string} query - The SQL query to enter
    */
   async enterCustomSQL(query) {
     await this.queryEditor.waitFor({ state: "visible", timeout: 10000 });
     await this.queryEditor.click();
     await this.dismissSuggestionsIfOpen();
-    await this.page.keyboard.press("Control+a");
-    await this.page.keyboard.press("Delete");
-    // Use insertText (single input event) instead of type (per-character keydown events)
-    // to prevent Monaco's autocomplete from accepting suggestions mid-input and
-    // mangling the SQL (e.g. replacing table names with function calls).
-    await this.page.keyboard.insertText(query);
+    // One edit, not keystrokes: typing lets autocomplete rewrite the SQL, and a multi-line insertText repeats line one in Firefox.
+    await this.monaco.fillInputArea(this.queryEditor, query);
     await this.dismissSuggestionsIfOpen();
     testLogger.debug('Entered custom SQL query', { query });
   }
