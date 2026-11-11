@@ -407,6 +407,62 @@ export const serviceLabel = (
   });
 };
 
+/** One service in one cluster and namespace, as the coverage page names it. */
+export interface ServicePlace {
+  name: string;
+  cluster: string | null;
+  namespace: string | null;
+}
+
+export const placeOf = (row: {
+  service_name: string;
+  cluster: string | null;
+  namespace: string | null;
+}): ServicePlace => ({ name: row.service_name, cluster: row.cluster, namespace: row.namespace });
+
+const PLACE_TIERS = [
+  (_t: TranslateFn, p: ServicePlace): string => p.name,
+  (t: TranslateFn, p: ServicePlace): string => serviceLabel(t, p.name, p, false),
+  (t: TranslateFn, p: ServicePlace): string => serviceLabel(t, p.name, p, true),
+];
+
+const groupBy = (labels: string[]) =>
+  labels.reduce<Map<string, number[]>>(
+    (m, label, i) => m.set(label, [...(m.get(label) ?? []), i]),
+    new Map(),
+  );
+
+/** One unique label per place: the name, then its namespace, then its cluster, each only where the shorter one repeats. */
+export const placeLabels = (t: TranslateFn, places: ServicePlace[]): string[] => {
+  const tier = places.map(() => 0);
+  const labelOf = (i: number) =>
+    PLACE_TIERS[Math.min(tier[i], PLACE_TIERS.length - 1)](t, places[i]);
+  for (let round = 0; round < PLACE_TIERS.length; round++) {
+    const clashes = [...groupBy(places.map((_, i) => labelOf(i))).values()].filter(
+      (g) => g.length > 1,
+    );
+    if (!clashes.length) return places.map((_, i) => labelOf(i));
+    for (const group of clashes) {
+      const top = Math.max(...group.map((i) => tier[i]));
+      group.filter((i) => tier[i] === top).forEach((i) => (tier[i] += 1));
+    }
+  }
+  // The design keys rows by name, so every label must be unique, even against a real name that reads like a generated one.
+  const labels = places.map((_, i) => labelOf(i));
+  const groups = groupBy(labels);
+  const taken = new Set(labels);
+  const lastNumber = new Map<string, number>();
+  return labels.map((label) => {
+    if ((groups.get(label)?.length ?? 1) < 2) return label;
+    let n = (lastNumber.get(label) ?? 0) + 1;
+    while (taken.has(`${label} #${n}`)) n += 1;
+    const numbered = `${label} #${n}`;
+    lastNumber.set(label, n);
+    taken.add(numbered);
+    return numbered;
+  });
+};
+
 export type LiveCoverageState = "watched" | "gap";
 
 const COVERAGE_WORD: Record<LiveCoverageState, I18nKey> = {

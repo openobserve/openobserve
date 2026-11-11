@@ -22,7 +22,7 @@ import type {
   AutoObserveIncidentMember,
   AutoObserveSuggestion,
 } from "@/services/autoobserve";
-import { formatWhen } from "../live/liveCopy";
+import { formatWhen, placeLabels, placeOf } from "../live/liveCopy";
 import {
   heartbeatAlert,
   noDataAlert,
@@ -124,8 +124,23 @@ const serviceOf = (s: AutoObserveSuggestion): string =>
 const cellsOf = (s: AutoObserveSuggestion) =>
   (s.evidence.cells ?? {}) as Partial<Record<GapClass, AutoObserveCell>>;
 
-const rowOf = (s: AutoObserveSuggestion, ctx: CtaContext): AutoObserveCoverageRow | null => {
+const labelled = new WeakMap<AutoObserveCoverageRow[], TranslateFn>();
+const rowLabel = new WeakMap<AutoObserveCoverageRow, string>();
+
+// Drafts carry the coverage page's own label, so review and Add alert name a service as the map does.
+const labelRows = (t: TranslateFn, rows: AutoObserveCoverageRow[]) => {
+  if (labelled.get(rows) === t) return;
+  placeLabels(t, rows.map(placeOf)).forEach((label, i) => rowLabel.set(rows[i], label));
+  labelled.set(rows, t);
+};
+
+const rowOf = (
+  t: TranslateFn,
+  s: AutoObserveSuggestion,
+  ctx: CtaContext,
+): AutoObserveCoverageRow | null => {
   const rows = ctx.rows ?? [];
+  labelRows(t, rows);
   const dims = s.subject.key_dims;
   // The entity id names one coverage row; a name alone also matches its namesakes in other namespaces.
   const byId = dims.entity_id ? rows.find((r) => r.service_id === dims.entity_id) : undefined;
@@ -153,6 +168,7 @@ const rowStream = (row: AutoObserveCoverageRow) => streamOf(row, "logs") ?? stre
 
 const scopeOf = (row: AutoObserveCoverageRow, stream: { type: string; name: string }) => ({
   service: row.service_name,
+  ...(rowLabel.has(row) ? { label: rowLabel.get(row) } : {}),
   cluster: row.cluster,
   namespace: row.namespace,
   stream,
@@ -255,7 +271,7 @@ const gapCopy = (
   const service = serviceOf(s);
   const cells = cellsOf(s);
   const missing = GAP_CLASSES.filter((c) => cells[c]?.state !== "covered");
-  const row = rowOf(s, ctx);
+  const row = rowOf(t, s, ctx);
   const drafts = row ? draftsOf(row, missing) : [];
   const traces = row ? !!streamOf(row, "traces") : true;
   const latencyBlocked = missing.includes("latency") && !traces;
@@ -416,7 +432,7 @@ const noAbsenceCopy = (
   const cell = cellsOf(s).absence;
   const monitor = monitorOf(cell);
   if (cell?.state === "silent" && monitor) return silentCheckCopy(t, s, monitor);
-  const row = rowOf(s, ctx);
+  const row = rowOf(t, s, ctx);
   const add = row ? addOne(t, row) : null;
   const params = { service: raw(service), monitor: raw(monitor?.monitor_name ?? "") };
   const lead =
@@ -489,7 +505,7 @@ const silentCoverageCopy = (
 const lostCopy = (t: TranslateFn, s: AutoObserveSuggestion, ctx: CtaContext): Partial<KindCopy> => {
   const service = serviceOf(s);
   const lost = Object.keys((s.evidence.lost ?? {}) as object);
-  const row = rowOf(s, ctx);
+  const row = rowOf(t, s, ctx);
   const add = lost.includes("absence") && row ? addOne(t, row) : null;
   return {
     why: t("insight.kind.coverage_lost.why"),
@@ -760,7 +776,7 @@ export const gapGroupCopy = (
   );
   const traffic = gaps.reduce((sum, s) => sum + (num(s.evidence.traffic_per_hour) ?? 0), 0);
   const rows = gaps.flatMap((s) => {
-    const row = rowOf(s, ctx);
+    const row = rowOf(t, s, ctx);
     const missing = GAP_CLASSES.filter((c) => cellsOf(s)[c]?.state !== "covered");
     return row ? draftsOf(row, missing).map((kind) => bulkRow(row, kind)) : [];
   });

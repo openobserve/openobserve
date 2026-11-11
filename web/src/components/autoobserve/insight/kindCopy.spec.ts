@@ -577,6 +577,36 @@ describe("many coverage gaps fold into one card (0, 1, a few, many)", () => {
     expect(streams.has("logs_b-none")).toBe(true);
   });
 
+  it("names each drafted service the way the coverage map does (F-N4)", () => {
+    const placed = (id: string, cluster: string): AutoObserveCoverageRow => ({
+      ...row([{ type: "logs", name: `logs_${id}` }]),
+      service_id: id,
+      service_name: "svc-y",
+      cluster,
+      namespace: "ns-g",
+    });
+    const gapFor = (id: string) =>
+      suggestion(
+        "coverage_gap",
+        { service_name: "svc-y", cells: NONE_CELLS, traffic_per_hour: 1 },
+        { id: `gap-${id}`, subject: { kind: "service", key_dims: { entity_id: id } } },
+      );
+    const gaps = [...Array.from({ length: 5 }, (_, i) => gap(i)), gapFor("y-e"), gapFor("y-f")];
+    const list = toRequests(gt, zone, [other, ...gaps], NOW_MS, {
+      rows: [
+        ...Array.from({ length: 5 }, (_, i) => gapRow(i)),
+        placed("y-e", "cluster-e"),
+        placed("y-f", "cluster-f"),
+      ],
+    });
+    const target = list[1].insight.cta?.target;
+    if (target?.type !== "bulk") throw new Error("expected bulk");
+    const labels = new Map(target.request.rows.map((r) => [r.scope.stream.name, r.scope.label]));
+    expect(labels.get("logs_y-e")).toBe("svc-y · cluster-e · ns-g");
+    expect(labels.get("logs_y-f")).toBe("svc-y · cluster-f · ns-g");
+    expect(labels.get("logs_0")).toBe("svc-0");
+  });
+
   it("keeps one card per gap while the server counts fewer than six (F8)", () => {
     const all = Array.from({ length: 5 }, (_, i) => gap(i));
     const list = toRequests(gt, zone, [other, all[0], all[1]], NOW_MS, {

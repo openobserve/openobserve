@@ -15,6 +15,7 @@
 
 import type { IncidentReachGap } from "@/utils/alerts/deliveryTarget";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import { placeLabels } from "../../live/liveCopy";
 import { deniedLine } from "../insightCta";
 import type { BulkKind, FolderRef, ReviewGroup, ReviewRow } from "./useBulkReview";
 
@@ -85,19 +86,30 @@ export const ruleOf = (t: TranslateFn, kind: BulkKind, rows: ReviewRow[]): I18nT
   return raw([rule, t("insight.bulk.ruleTail")].filter(Boolean).join(" "));
 };
 
-/** The coverage page's name for the service, else the name with its cluster and namespace only when another row shares it. */
+const placeKey = (r: ReviewRow) => [r.service, r.cluster ?? "", r.namespace ?? ""].join("\u0000");
+
+const listLabels = new WeakMap<ReviewRow[], { t: TranslateFn; labels: Map<string, string> }>();
+
+// A service's own drafts of other kinds share its place, so each place is named once per list.
+const labelsOf = (t: TranslateFn, all: ReviewRow[]): Map<string, string> => {
+  const kept = listLabels.get(all);
+  if (kept?.t === t) return kept.labels;
+  const places = [...new Map(all.map((r) => [placeKey(r), r])).values()];
+  const names = placeLabels(
+    t,
+    places.map((r) => ({ name: r.service, cluster: r.cluster, namespace: r.namespace })),
+  );
+  const labels = new Map(places.map((r, i) => [placeKey(r), names[i]]));
+  listLabels.set(all, { t, labels });
+  return labels;
+};
+
+/** The coverage page's name for the service, else the coverage page's naming applied to the places in this list. */
 export const serviceLabel = (t: TranslateFn, row: ReviewRow, all: ReviewRow[]): I18nText => {
   const scope = row.row.scope;
   const pageLabel = "field" in scope ? undefined : scope.label;
   if (pageLabel) return raw(pageLabel);
-  // A service's own drafts of other kinds share its scope, so only a different cluster or namespace is a twin.
-  const twins = all.filter(
-    (r) =>
-      r.service === row.service && (r.cluster !== row.cluster || r.namespace !== row.namespace),
-  );
-  if (twins.length === 0) return raw(row.service);
-  const where = [row.cluster ?? "", row.namespace ?? t("insight.bulk.noNamespace")].filter(Boolean);
-  return raw(`${row.service} · ${where.join(" / ")}`);
+  return raw(labelsOf(t, all).get(placeKey(row)) ?? row.service);
 };
 
 /** Why a row cannot be ticked: its stream fields, or a builder that could not make the alert. */

@@ -34341,7 +34341,6 @@
       "noTeamWhy": "No owner is known for these, so they use the org default.",
       "chooseFolder": "Choose a folder and destination",
       "noCluster": "No cluster",
-      "noNamespace": "no namespace",
       "folder": "folder {folder}",
       "folderDefault": "folder {folder} (org default)",
       "folders": "{count} folders",
