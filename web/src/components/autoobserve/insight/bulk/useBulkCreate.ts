@@ -231,7 +231,7 @@ export const useBulkCreate = (deps: BulkCreateDeps) => {
 
   // One toast holds every batch of the session, since equal toasts collapse and keep the first handler.
   const announce = (s: Session): void => {
-    if (!s.created.length && s.skipped) {
+    if (s.skipped && s.created.length === s.announced) {
       toast({ variant: "default", message: skippedLine(deps.t, s.skipped) });
       return;
     }
@@ -293,6 +293,24 @@ export const useBulkCreate = (deps: BulkCreateDeps) => {
     });
   };
 
+  // A failed or timed-out POST may still have created its alert, so Retry re-checks the same way Add does.
+  const checkThenRun = async (s: Session, list: Job[]): Promise<void> => {
+    s.skipped = 0;
+    running.value = true;
+    for (const job of list) results[job.key] = { status: "queued" };
+    let fresh: Job[];
+    try {
+      fresh = await skipExisting(s, list);
+    } finally {
+      running.value = false;
+    }
+    if (!mayWrite(s)) {
+      for (const job of fresh) delete results[job.key];
+      return;
+    }
+    await run(s, fresh);
+  };
+
   /** Creates exactly the given rows, one POST each, in the org the review shows. */
   const create = async (kind: BulkKind, rows: ReviewRow[]): Promise<void> => {
     if (running.value) return;
@@ -319,24 +337,10 @@ export const useBulkCreate = (deps: BulkCreateDeps) => {
         : [],
     );
     for (const job of list) jobs.set(job.key, job);
-    const s = session;
-    s.skipped = 0;
-    running.value = true;
-    for (const job of list) results[job.key] = { status: "queued" };
-    let fresh: Job[];
-    try {
-      fresh = await skipExisting(s, list);
-    } finally {
-      running.value = false;
-    }
-    if (!mayWrite(s)) {
-      for (const job of fresh) delete results[job.key];
-      return;
-    }
-    await run(s, fresh);
+    await checkThenRun(session, list);
   };
 
-  /** Re-sends only failed rows a retry can help, in the batch's org; a created row is never sent twice. */
+  /** Re-sends only failed rows a retry can help and the org still lacks, in the batch's org; a created row is never sent twice. */
   const retry = async (keys: string[]): Promise<void> => {
     if (running.value || !session || deps.org() !== session.org) return;
     const list = keys
@@ -344,7 +348,7 @@ export const useBulkCreate = (deps: BulkCreateDeps) => {
       .flatMap((key) => (jobs.has(key) ? [jobs.get(key)!] : []));
     if (list.length === 0) return;
     if (!session.undoable || session.cancelled) session = newSession(session.org);
-    await run(session, list);
+    await checkThenRun(session, list);
   };
 
   /** Hides the Undo toast while a new review covers its place; Undo itself stays valid. */

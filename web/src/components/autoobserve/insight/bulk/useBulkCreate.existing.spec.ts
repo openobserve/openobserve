@@ -136,3 +136,54 @@ describe("Add re-checks the org's alerts right before creating", () => {
     expect(shown.action).toBeUndefined();
   });
 });
+
+describe("Retry re-checks the org's alerts first", () => {
+  it("skips a draft whose timed-out POST did create it, and says so", async () => {
+    const rows = review.toCreate.value.slice(0, 2);
+    const [lost, kept] = rows;
+    api.create.mockImplementation((_o: string, body: any) =>
+      body.name === lost.prefill!.name
+        ? Promise.reject({ code: "ECONNABORTED" })
+        : Promise.resolve({ data: { id: `id-${body.name}` } }),
+    );
+    const { create, retry, results } = makeCreate();
+    await create("no_data", rows);
+    expect(results[lost.key]).toMatchObject({ status: "failed", retryable: true });
+    expect(results[kept.key]).toMatchObject({ status: "created" });
+    api.list.mockResolvedValue({
+      data: {
+        list: [
+          {
+            alert_id: "landed-1",
+            name: lost.prefill!.name,
+            folder_id: lost.folder.id,
+            folder_name: lost.folder.name,
+            stream_type: lost.stream.type,
+            stream_name: lost.stream.name,
+            condition: { sql: lost.prefill!.sql },
+          },
+        ],
+      },
+    });
+    api.create.mockClear();
+    api.toast.mockClear();
+    await retry([lost.key]);
+    expect(api.create).not.toHaveBeenCalled();
+    expect(results[lost.key]).toEqual({ status: "exists", id: "landed-1" });
+    expect(String(api.toast.mock.calls.at(-1)?.[0].message)).toContain(
+      "1 already existed and was skipped.",
+    );
+  });
+
+  it("re-sends a draft the org still doesn't have", async () => {
+    const rows = review.toCreate.value.slice(0, 1);
+    api.create.mockRejectedValueOnce({ code: "ECONNABORTED" });
+    const { create, retry, results } = makeCreate();
+    await create("no_data", rows);
+    expect(results[rows[0].key]).toMatchObject({ status: "failed", retryable: true });
+    api.create.mockClear();
+    await retry([rows[0].key]);
+    expect(api.create).toHaveBeenCalledTimes(1);
+    expect(results[rows[0].key]).toMatchObject({ status: "created" });
+  });
+});
