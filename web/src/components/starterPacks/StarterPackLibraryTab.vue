@@ -200,6 +200,10 @@ const load = async () => {
           records.list(pack.id),
         ]);
         const live = installs.filter(({ status }) => status !== "removed");
+        // Without a preview the flow counts every manifest item, not what install would create.
+        if (props.view === "packs" && match.ready && !live.length) {
+          void flows.get(pack.id)?.loadPreview();
+        }
         return props.view === "packs"
           ? packRows(pack, match.ready, live)
           : dashboardRows(pack, match.dashboards, live);
