@@ -102,7 +102,15 @@ const storedPrefill = {
 };
 
 // Vue's v-if placeholders are not part of what a user sees, so they are not part of "unchanged".
-const visible = (html: string) => html.replace(/<!--[\s\S]*?-->/g, "").replace(/^\s*\n/gm, "");
+const visible = (html: string) => {
+  let out = html;
+  let prev: string;
+  do {
+    prev = out;
+    out = out.replace(/<!--[\s\S]*?-->/g, "");
+  } while (out !== prev);
+  return out.replace(/^\s*\n/gm, "");
+};
 
 const check = { ...mockProtocolCheckHttp, locations: ["private-mumbai-1"] };
 
