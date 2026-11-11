@@ -17,7 +17,13 @@ import type { IncidentReachGap } from "@/utils/alerts/deliveryTarget";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { placeLabels } from "../../live/liveCopy";
 import { deniedLine } from "../insightCta";
-import type { BulkKind, FolderRef, ReviewGroup, ReviewRow } from "./useBulkReview";
+import {
+  isTickable,
+  type BulkKind,
+  type FolderRef,
+  type ReviewGroup,
+  type ReviewRow,
+} from "./useBulkReview";
 
 // Lists name three items, then "and N more".
 const LIST_NAMES = 3;
@@ -200,7 +206,7 @@ export const reachPart = (
     : t("insight.bulk.notifiesSome", { count: named, total: group.rows.length, destinations });
 };
 
-/** "folder ingest · notifies ingest-oncall · 5", with the tick count when some are unticked. */
+/** "folder ingest · notifies ingest-oncall · 5", with the tick count of addable rows when some are unticked. */
 export const groupMeta = (
   t: TranslateFn,
   locale: string,
@@ -218,12 +224,15 @@ export const groupMeta = (
     }
   }
   parts.push(reachPart(t, locale, group, gap));
-  const creatable = group.rows.filter((r) => r.prefill && !r.locked).length;
-  parts.push(
-    ticked === creatable || group.locked
-      ? raw(number(locale, group.rows.length))
-      : t("insight.bulk.ticked", { ticked, count: group.rows.length }),
-  );
+  if (group.locked) {
+    parts.push(raw(number(locale, group.rows.length)));
+    return parts;
+  }
+  // Counts what Add can send, as the footer does; added or unbuildable rows are left out.
+  const addable = group.rows.filter(isTickable).length;
+  if (addable === 0) parts.push(t("insight.bulk.nothingToAdd"));
+  else if (ticked === addable) parts.push(raw(number(locale, addable)));
+  else parts.push(t("insight.bulk.ticked", { ticked, count: addable }));
   return parts;
 };
 

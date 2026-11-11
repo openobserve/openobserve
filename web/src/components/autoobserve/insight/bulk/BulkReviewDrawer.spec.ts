@@ -828,6 +828,43 @@ describe("BulkReviewDrawer — drafts the org already has", () => {
     expect(review.state.open).toBe(false);
   });
 
+  it("counts only the rows Add can send in the group header, as the footer does", async () => {
+    api.list.mockResolvedValue({
+      data: { list: [existing("svc-ingest-b-no-data", "f-ingest", "ingest", "al-b")] },
+    });
+    await mountDrawer();
+    await openWith(m12Rows(IDS).slice(0, 2));
+    const meta = () => text("bulk-review-group-meta-team-ingest").split(" · ").at(-1);
+    const press = async (test: string) => {
+      q(test)!.querySelector("button")!.click();
+      await flushPromises();
+    };
+    expect(meta()).toBe("1");
+    await press("bulk-review-tick-ingest-c");
+    expect(meta()).toBe("0 of 1 ticked");
+    expect(text("bulk-review-footer")).toBe(
+      "Nothing is ticked, so nothing will be created. 1 was already added and is left out.",
+    );
+    await press("bulk-review-group-tick-team-ingest");
+    expect(meta()).toBe("1");
+    expect(review.toCreate.value.map((r) => r.key)).toEqual(["ingest-c"]);
+  });
+
+  it("says a group has nothing to add and disables its tick when every row was already added", async () => {
+    api.list.mockResolvedValue({
+      data: {
+        list: [
+          existing("svc-ingest-b-no-data", "f-ingest", "ingest", "al-b"),
+          existing("svc-ingest-c-no-data", "f-ingest", "ingest", "al-c"),
+        ],
+      },
+    });
+    await mountDrawer();
+    await openWith(m12Rows(IDS).slice(0, 2));
+    expect(text("bulk-review-group-meta-team-ingest").split(" · ").at(-1)).toBe("nothing to add");
+    expect(q("bulk-review-group-tick-team-ingest")!.querySelector("button")!.disabled).toBe(true);
+  });
+
   it("disables Add with the reason when every draft was already added", async () => {
     api.list.mockResolvedValue({
       data: {

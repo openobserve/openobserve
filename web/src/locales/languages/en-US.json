@@ -34354,6 +34354,7 @@
       "notifiesSome": "{count} of {total} notify {destinations}",
       "notifiesViaIncident": "pages on-call through an incident",
       "ticked": "{ticked} of {count} ticked",
+      "nothingToAdd": "nothing to add",
       "change": "Change folder or destination",
       "changeFolder": "Folder",
       "changeDestinations": "Destinations",
