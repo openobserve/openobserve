@@ -498,6 +498,10 @@ function noteActivationKey(event: KeyboardEvent) {
   activatedByKey = event.key === "Enter" || event.key === " ";
 }
 
+function clearActivationKey() {
+  activatedByKey = false;
+}
+
 function isKeyboardActivation(event?: MouseEvent): boolean {
   const byKey = activatedByKey || event?.detail === 0;
   activatedByKey = false;
@@ -693,6 +697,7 @@ function onChildMouseenter(event: MouseEvent) {
     @mouseleave="scheduleClose"
     @mousemove="onTileMousemove"
     @keydown="noteActivationKey"
+    @pointerdown="clearActivationKey"
   >
     <!-- Link mode: a navigating MenuLink that also reveals sub-pages on hover.
          `active` is driven by "is any child active" so a group tile (e.g. Data,
@@ -881,6 +886,7 @@ function onChildMouseenter(event: MouseEvent) {
         @mouseenter="clearTimers"
         @mouseleave="scheduleClose"
         @keydown="onFlyoutKeydown"
+        @pointerdown="clearActivationKey"
       >
         <!-- Three levels, and the type says so: group (sm/semibold) → section
              (xs/semibold, secondary) → item (sm/normal). It used to run 11px →
