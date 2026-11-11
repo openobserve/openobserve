@@ -697,6 +697,7 @@ export class DowntimesPage {
 
   async sendTestFromDetail() {
     await this.page.locator(this.detailSendTest).click();
+    await this.confirm();
   }
 
   async endNowFromDetail() {
