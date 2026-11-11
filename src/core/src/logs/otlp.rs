@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+};
 
 use axum::{http::StatusCode, response::Response};
 use chrono::{Duration, Utc};
@@ -385,11 +388,14 @@ pub async fn handle_request(
                         need_all_values,
                         all_values_max_len: index_all_max_value_length,
                     };
-                    // read off `log_record`, never the record: a forged attribute looks identical
-                    // there
+                    // from `log_record`, not the record, where a forged attribute looks the same
                     let trusted_event_name = (!log_record.event_name.is_empty() && event_name_gate)
                         .then(|| log_record.event_name.as_str().into());
-                    let local_val = settings.apply(local_val, original_data, trusted_event_name);
+                    let local_val = settings.apply(
+                        local_val,
+                        original_data.map(Cow::Owned),
+                        trusted_event_name,
+                    );
 
                     stream_records.push((timestamp, local_val));
                 }
@@ -507,7 +513,10 @@ pub async fn handle_request(
                             // a ResultArray record carries idx usize::MAX and has no source record
                             let local_val = settings.apply(
                                 local_val,
-                                original_options.get(idx).cloned().flatten(),
+                                original_options
+                                    .get(idx)
+                                    .and_then(|o| o.as_deref())
+                                    .map(Cow::Borrowed),
                                 trusted_event_name,
                             );
 
@@ -579,8 +588,11 @@ pub async fn handle_request(
                 };
                 // replayed inputs still hold the name the producer loop wrote
                 let trusted_event_name = local_val.get(O2_EVENT_NAME).cloned();
-                let local_val =
-                    settings.apply(local_val, original_options[idx].clone(), trusted_event_name);
+                let local_val = settings.apply(
+                    local_val,
+                    original_options[idx].as_deref().map(Cow::Borrowed),
+                    trusted_event_name,
+                );
 
                 let (ts_data, fn_num) = json_data_by_stream
                     .entry(stream_name.clone())

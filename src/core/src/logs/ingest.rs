@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet, VecDeque},
     io::{BufRead, Cursor, Read},
     sync::{LazyLock, Mutex},
@@ -693,7 +694,10 @@ async fn ingest_inner(
                             // a ResultArray record carries idx usize::MAX and has no source record
                             let local_val = settings.apply(
                                 local_val,
-                                original_options.get(idx).cloned().flatten(),
+                                original_options
+                                    .get(idx)
+                                    .and_then(|o| o.as_deref())
+                                    .map(Cow::Borrowed),
                                 None,
                             );
 
@@ -1113,7 +1117,7 @@ fn finalize_and_buffer_record(
             .is_some_and(|v| *v),
         all_values_max_len: ctx.index_all_max_value_length,
     };
-    let local_val = settings.apply(local_val, original_data, None);
+    let local_val = settings.apply(local_val, original_data.map(Cow::Owned), None);
     match ctx.json_data_by_stream.get_mut(ctx.stream_name) {
         Some((ts_data, fn_num)) => {
             ts_data.push((timestamp, local_val));
