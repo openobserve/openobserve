@@ -149,10 +149,10 @@ conditional.
 
 ### Comments stay short
 
-**One line, or none** (CLAUDE.md, enforced in review). A comment carries the *why*
+**Two lines, or none** (AGENTS.md, enforced in review). A comment carries the *why*
 behind a non-obvious constraint — not a re-telling of the code, not layout narration
 ("< md the toolbar wraps", "matches the header height"), and not the history of the
-PR that added it. If the point needs a second line, it does not belong in a comment.
+PR that added it. If the point needs a third line, it does not belong in a comment.
 
 ```vue
 <!-- good -->
@@ -166,8 +166,8 @@ PR that added it. If the point needs a second line, it does not belong in a comm
 ```
 
 Drop ticket ids, "review finding", "as discussed", "previously we…", and any
-line that just narrates the next statement. Same rule in `.spec.ts` files: one
-line on why a setup is unusual, not a paragraph defending it.
+line that just narrates the next statement. Same rule in `.spec.ts` files: a line
+or two on why a setup is unusual, not a paragraph defending it.
 
 ### A UI pass changes UI only
 

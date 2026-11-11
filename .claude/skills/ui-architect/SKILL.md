@@ -833,7 +833,7 @@ considering the UI done:
       component's visual change is gated below lg or on a flag only your page sets,
       and a regular page using it is unchanged at ≥1024. See
       [conventions § A UI pass changes UI only](references/conventions.md).
-- [ ] **Comments are one line, or none** — the *why* of a non-obvious constraint,
+- [ ] **Comments are two lines, or none** — the *why* of a non-obvious constraint,
       never layout narration ("< md this wraps"), a re-telling of the code, or the
       history of the PR that added it (no ticket ids, "review finding", "as
       discussed"). Same in specs. See
