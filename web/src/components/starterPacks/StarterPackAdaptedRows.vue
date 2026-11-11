@@ -142,7 +142,6 @@ const changeBinding = (binding: PackBinding) => {
       </template>
     </OBanner>
     <div v-if="hasRows" class="flex flex-col">
-      <strong>{{ t("starterPacks.adapted.title") }}</strong>
       <div
         v-for="question in answered"
         :key="question.want"

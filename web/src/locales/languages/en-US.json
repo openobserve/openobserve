@@ -15303,7 +15303,6 @@
       }
     },
     "adapted": {
-      "title": "Adapted to your data",
       "readsRole": "Reads {what} from {stream}",
       "readsMetric": "Reads metric data from {stream}",
       "readsAll": "Reads {what} from {count} streams: {streams}",
