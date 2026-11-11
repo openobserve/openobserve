@@ -18,6 +18,8 @@ import { createMemoryHistory, createRouter } from "vue-router";
 
 import { armHomeReturn, decodeHomeReturn } from "@/composables/goto/homeReturn";
 import { decodeAssistantSet } from "../../assistantSet";
+import { timeWindowOf } from "../../context/contextChips";
+import { pageContext } from "../../context/pageContext";
 import { makeEnv } from "../__tests__/actionEnv";
 import { navigationApplier } from "./navigation";
 
@@ -100,6 +102,57 @@ describe("navigation applier", () => {
       env,
     );
     expect(result).toEqual({ ok: false, reason: "guard_declined" });
+    expect(env.store().state.sessions[sid].composer.timeOverride).toBeNull();
+  });
+
+  it("keeps the chat's window when its own link moves the page to the link's range", async () => {
+    const { env, sid, store } = makeEnv();
+    const now = 1_794_395_430_000;
+    pageContext.value = {
+      currentPage: "logs",
+      timeRange: {
+        type: "relative",
+        relativeTimePeriod: "15m",
+        startTime: (now - 900_000) * 1000,
+        endTime: now * 1000,
+      },
+    };
+    await navigationApplier(
+      sid,
+      {
+        kind: "navigate",
+        target: { name: "traceDetails", query: { trace_id: "3b44ad2e78a81d70dfc27f77457be8b8" } },
+        label: "x" as any,
+      },
+      env,
+    );
+    const linked = {
+      currentPage: "traceDetails",
+      timeRange: {
+        type: "relative",
+        relativeTimePeriod: "1m",
+        startTime: (now - 60_000) * 1000,
+        endTime: now * 1000,
+      },
+    };
+    const override = store.state.sessions[sid].composer.timeOverride;
+    expect(timeWindowOf(linked, override, now)).toMatchObject({ period: "15m", source: "custom" });
+    pageContext.value = null;
+  });
+
+  it("leaves a window the user picked as it is", async () => {
+    const { env, sid, store } = makeEnv();
+    store.setTimeOverride(sid, { from: 1, to: 2 });
+    await navigationApplier(
+      sid,
+      {
+        kind: "navigate",
+        target: { name: "logs", query: { type: "ai_chat_query" } },
+        label: "x" as any,
+      },
+      env,
+    );
+    expect(store.state.sessions[sid].composer.timeOverride).toEqual({ from: 1, to: 2 });
   });
 
   it("opens a new tab from a docked container, never a push", async () => {

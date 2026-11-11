@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
+import { boundedFindings } from "@/composables/assistant/evidence";
 import { raw } from "@/types/i18n";
 
 import { fakeEvidence } from "../__tests__/fakeEvidence";
@@ -103,9 +104,21 @@ describe("AssistantFindings", () => {
     );
   });
 
-  it("drops Next when the turn has follow-ups, which are the next step", () => {
-    const wrapper = mountFindings(findings, [{ type: "follow_ups", followUps: ["Show more"] }]);
-    expect(wrapper.find('[data-test="assistant-findings-next-steps"]').exists()).toBe(false);
+  it("keeps the fix in Next when the turn also has follow-up questions", () => {
+    const frame = {
+      type: "findings",
+      likely_cause: "inventory-svc v3.8.1 cut DB_POOL_MAX_SIZE from 50 to 5",
+      confidence: "high",
+      evidence: [{ text: "pending connections 0 to 26", call_id: "call_3", kind: "verified" }],
+      ruled_out: ["database health"],
+      unknowns: [],
+      next_steps: ["Restore DB_POOL_MAX_SIZE=50 for inventory-svc", "Alert on pending > 0"],
+    };
+    const block: ContentBlock = { type: "findings", findings: boundedFindings(frame)! };
+    const wrapper = mountFindings(block, [{ type: "follow_ups", followUps: ["Show more"] }]);
+    expect(wrapper.get('[data-test="assistant-findings-next-steps"]').text()).toBe(
+      "Next: Restore DB_POOL_MAX_SIZE=50 for inventory-svc",
+    );
   });
 
   it("says Not established for what the findings could not settle", () => {

@@ -49,6 +49,11 @@ export function sqlStreamOf(sql: unknown): string | undefined {
   return typeof sql === "string" ? FROM_STREAM.exec(sql)?.[1] : undefined;
 }
 
+/** True when the text is a SQL statement, so a metrics stream's query opens in the SQL editor, not PromQL. */
+export function isSqlStatement(text: string): boolean {
+  return STATEMENT.test(withoutComments(text));
+}
+
 /** PromQL and metrics streams open in Metrics, traces streams in Traces, the rest in Logs. */
 export function explorerOf(query: Pick<QueryRef, "language" | "streamType">): Explorer {
   if (query.language === "promql" || query.streamType === "metrics") return "metrics";
@@ -136,11 +141,11 @@ function metrics(query: QueryRef, base: Record<string, string>): Record<string, 
   if (encoded) out.query = encoded;
   // The Metrics page reads its URL range in milliseconds.
   if (query.from && query.to) return { ...out, from: String(query.from), to: String(query.to) };
-  return { ...out, period: FALLBACK_PERIOD };
+  return { ...out, period: query.period ?? FALLBACK_PERIOD };
 }
 
 function microRange(query: QueryRef): Record<string, string> {
-  if (!query.from || !query.to) return { period: FALLBACK_PERIOD };
+  if (!query.from || !query.to) return { period: query.period ?? FALLBACK_PERIOD };
   return { from: String(query.from * 1000), to: String(query.to * 1000) };
 }
 

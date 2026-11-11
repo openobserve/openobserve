@@ -25,6 +25,8 @@ export interface QueryRef {
   streamType?: string;
   from?: number;
   to?: number;
+  /** A relative window such as `2h`, used when there is no absolute range. */
+  period?: string;
   /** The session's captured org, never tool args (round 2 E-16). */
   org: string;
 }

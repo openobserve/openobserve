@@ -18,7 +18,6 @@ import {
   effectScope,
   getCurrentScope,
   onScopeDispose,
-  shallowRef,
   toValue,
   watch,
   type ComputedRef,
@@ -48,14 +47,14 @@ import {
   type SeesRow,
   type TimeWindow,
 } from "./contextChips";
+import { pageContext } from "./pageContext";
 import { sentWindows, wireContextOf } from "./serialize";
 import type { ContextChip, PageContext } from "./types";
 
 /** How often a visible container re-reads the page provider, so the tray follows the page (CT-01 AC 5). */
 export const PAGE_POLL_MS = 1_000;
 
-// One reader per tab: every tray shares the same page context.
-const page: ShallowRef<PageContext | null> = /* @__PURE__ */ shallowRef(null);
+const page = pageContext;
 
 let subscribers = 0;
 

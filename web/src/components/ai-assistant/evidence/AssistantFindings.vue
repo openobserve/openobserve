@@ -124,16 +124,12 @@ const verified = computed(() =>
 );
 const rawText = computed(() => JSON.stringify(props.block ?? {}, null, 2));
 
-// Follow-ups are the next step, so the Next line would say it twice.
-const followUpsSent = computed(
-  () => !!props.message.contentBlocks?.some((block) => block.type === "follow_ups"),
-);
-
 const lines = computed<{ key: string; text: I18nText }[]>(() => {
   const current = findings.value;
   if (!current) return [];
   const inferred = current.evidence.filter((item) => item.kind === "inferred");
-  const next = followUpsSent.value ? [] : current.nextSteps.slice(0, 1);
+  // The fix leads next_steps; follow-up questions are extra and never replace it.
+  const next = current.nextSteps.slice(0, 1);
   const list = (items: string[]) => ({ text: raw(items.join("; ")) });
   return [
     inferred.length && {

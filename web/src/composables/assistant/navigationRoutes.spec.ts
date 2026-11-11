@@ -189,6 +189,87 @@ describe("buildNavigationRoute", () => {
     );
     expect(link).toMatchObject({ kind: "dashboard", name: "Checkout", id: "d1" });
   });
+
+  // The navigation_action frames below are copied from a live agent run (persona test, 2026-11-11).
+  it("opens SQL on a metrics stream in the SQL editor over the agent's relative window", () => {
+    const link = buildNavigationRoute(
+      {
+        resource_type: "metrics",
+        action: "load_query",
+        target: {
+          query:
+            "SELECT histogram(_timestamp, '1 minute') AS x_axis_1, pod, AVG(value) AS y_axis_1 FROM ta_persona_container_memory_working_set_bytes WHERE service = 'ta_persona_payments-worker' GROUP BY x_axis_1, pod ORDER BY x_axis_1",
+          sql_mode: true,
+          stream: "ta_persona_container_memory_working_set_bytes",
+          from: "2h",
+          to: "now",
+        },
+      },
+      "default",
+    );
+    expect(link?.query).toMatchObject({ language: "sql", period: "2h" });
+    expect(link?.route).toMatchObject({ name: "metrics" });
+    expect(link?.route.query).toMatchObject({ query_type: "sql", period: "2h" });
+  });
+
+  it("keeps PromQL on a metrics link that is not a SQL statement", () => {
+    const link = buildNavigationRoute(
+      {
+        resource_type: "metrics",
+        action: "load_query",
+        target: { query: "avg by (pod) (container_memory_working_set_bytes)", from: "6h" },
+      },
+      "default",
+    );
+    expect(link?.route.query).toMatchObject({ query_type: "promql", period: "6h" });
+  });
+
+  it("opens a query for one trace in its trace view, with the range in microseconds", () => {
+    const link = buildNavigationRoute(
+      {
+        resource_type: "traces",
+        action: "load_query",
+        target: {
+          query:
+            "SELECT service_name, operation_name, span_kind, duration, status_code, status_message FROM ta_persona_traces WHERE trace_id = '3b44ad2e78a81d70dfc27f77457be8b8' ORDER BY start_time ASC",
+          sql_mode: true,
+          stream: "ta_persona_traces",
+          from: 1794395390000000,
+          to: 1794395430000000,
+        },
+      },
+      "default",
+    );
+    expect(link).toMatchObject({ kind: "trace", name: "3b44ad2e78a81d70dfc27f77457be8b8" });
+    expect(link?.route).toEqual({
+      name: "traceDetails",
+      query: {
+        trace_id: "3b44ad2e78a81d70dfc27f77457be8b8",
+        stream: "ta_persona_traces",
+        from: "1794395390000000",
+        to: "1794395430000000",
+      },
+    });
+  });
+
+  it("keeps a traces query over many traces in the Traces explorer", () => {
+    const link = buildNavigationRoute(
+      {
+        resource_type: "traces",
+        action: "load_query",
+        target: {
+          query:
+            "SELECT * FROM ta_persona_traces WHERE trace_id = 'aaaaaaaa11111111' OR span_status = 'ERROR'",
+          stream: "ta_persona_traces",
+          from: 1794395390000000,
+          to: 1794395430000000,
+        },
+      },
+      "default",
+    );
+    expect(link?.kind).toBe("explorer");
+    expect(link?.route.name).toBe("traces");
+  });
 });
 
 describe("rebuildMarkdownTarget", () => {
