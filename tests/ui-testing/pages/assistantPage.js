@@ -18,7 +18,10 @@ export class AssistantPage {
       chat: page.locator(".chat-container").filter({ visible: true }).last(),
       composer: page.locator(".chat-container [contenteditable=true]").filter({ visible: true }).last(),
       regexToggle: page.locator('[data-test="add-regex-pattern-open-close-ai-btn"]'),
-      nlToggle: page.locator('[data-test="logs-search-bar-ai-toggle-btn"]'),
+      // Logs opens the filter builder by default, which hides the editor's toggle and shows its own AI button.
+      nlToggle: page
+        .locator('[data-test="logs-search-bar-filter-builder-ai-btn"], [data-test="logs-search-bar-ai-toggle-btn"]')
+        .filter({ visible: true }),
       nlInput: page.locator('[data-test="logs-search-bar-ai-input-field-field"]'),
     };
     this.headerButton = page.locator('[data-test="menu-link-ai-item"]');
