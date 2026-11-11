@@ -530,7 +530,11 @@ async fn write_logs(
     )
     .await?;
     // the check that turned the UDS on projected the schema, which would drop unpacked columns
-    if let Some(fields) = newly_enabled_uds_fields(has_uds, stream_schema_map.get(stream_name)) {
+    if let Some(fields) = newly_enabled_uds_fields(
+        StreamType::Logs,
+        has_uds,
+        stream_schema_map.get(stream_name),
+    ) {
         repack_records(json_data.iter_mut().map(|(_, record)| record), &fields);
         (schema_evolution, infer_schema) = resolve_batch_schema(
             org_id,

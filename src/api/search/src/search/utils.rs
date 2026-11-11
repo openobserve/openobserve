@@ -108,7 +108,10 @@ pub async fn validate_query_fields(
                 Error::ErrorCode(ErrorCodes::SearchStreamNotFound(stream_name.to_string()))
             })?;
         let settings = infra::schema::get_settings(org_id, stream_name, target_stream_type).await;
-        let uds_fields = infra::schema::get_stream_setting_defined_schema_fields(&settings);
+        let uds_fields = schema::effective_uds_fields(
+            target_stream_type,
+            &infra::schema::get_stream_setting_defined_schema_fields(&settings),
+        );
 
         for field in target_fields {
             if is_system_field(&field) {

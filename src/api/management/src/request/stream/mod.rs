@@ -118,9 +118,9 @@ pub async fn schema(
             .collect::<HashMap<_, _>>();
         // internal columns are implicit in the UDS even when not persisted
         let internal_columns = schema.settings.uds_internal_columns();
-        schema.uds_schema = schema
-            .settings
-            .defined_schema_fields
+        let uds_fields =
+            schema::effective_uds_fields(stream_type, &schema.settings.defined_schema_fields);
+        schema.uds_schema = uds_fields
             .iter()
             .chain(internal_columns.iter())
             .filter_map(|f| schema_fields.remove(f))
