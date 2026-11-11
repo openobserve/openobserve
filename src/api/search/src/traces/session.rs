@@ -39,12 +39,13 @@ use crate::{
 /// counting every distinct session is more expensive than fetching one page.
 /// `total` is therefore a lower bound while `has_more` is true, and becomes
 /// exact on the final page.
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct LatestSessionsResponse {
     took: usize,
     total: usize,
     from: i64,
     size: i64,
+    #[schema(value_type = Vec<Object>)]
     hits: Vec<json::Value>,
     #[serde(skip_serializing_if = "String::is_empty")]
     trace_id: String,
@@ -81,7 +82,7 @@ struct LatestSessionsResponse {
         ("sort_order" = Option<String>, Query, description = "Sort order: asc or desc (default: desc)"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = LatestSessionsResponse, example = json!({
             "took": 155,
             "total": 11,
             "has_more": true,
@@ -106,7 +107,8 @@ struct LatestSessionsResponse {
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "List recent LLM sessions from a trace stream: session_id, trace count, token usage, cost, error count. An optional keyword narrows the list by matching either the user id or conversation text.", "category": "traces"}))
+        ("x-o2-mcp" = json!({"description": "List recent LLM sessions from a trace stream: session_id, trace count, token usage, cost, error count. An optional keyword narrows the list by matching either the user id or conversation text.", "category": "traces"})),
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"}))
     )
 )]
 pub async fn get_latest_sessions(
@@ -120,7 +122,8 @@ pub async fn get_latest_sessions(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -253,6 +256,11 @@ pub async fn get_latest_sessions(
     };
     let query_sql =
         build_latest_session_page_sql(&stream_name, &filter, &search, &sort, &validated);
+    if let Some(response) =
+        super::check_sql_permissions(&org_id, user_id, &query_sql, &trace_id).await
+    {
+        return response;
+    }
     let user_id_opt = Some(user_id.to_string());
 
     let mut req = config::meta::search::Request {
@@ -446,12 +454,13 @@ pub async fn get_latest_sessions(
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::PaginatedResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Get per-turn trace summaries for a single LLM session by session_id.", "category": "traces"}))
+        ("x-o2-mcp" = json!({"description": "Get per-turn trace summaries for a single LLM session by session_id.", "category": "traces"})),
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"}))
     )
 )]
 pub async fn get_session_details(
@@ -465,7 +474,9 @@ pub async fn get_session_details(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) =
+            search_service::check_search_allowed(&org_id, Some((&stream_name, StreamType::Traces)))
+        {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -2039,6 +2050,8 @@ mod tests {
         );
 
         assert!(sql.contains(filter));
+        let tables = openobserve_core::authz::resolve_sql_tables(&sql).unwrap();
+        assert!(tables.iter().any(|t| t.table() == "other_stream"));
     }
 
     fn sort(field: LatestSessionSortField, order: LatestSessionSortOrder) -> LatestSessionSort {

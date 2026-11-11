@@ -17,16 +17,23 @@
 //!
 //! Correlates fired alerts into unified incidents to reduce alert fatigue.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    hash::{DefaultHasher, Hash, Hasher},
+    sync::LazyLock,
+};
 
 use config::{
-    meta::alerts::{
-        alert::Alert,
-        incidents::{
-            AlertEdge, AlertKind, AlertNode, CompositeAlertSummary, CorrelationReason, EdgeType,
-            Incident, IncidentAlert, IncidentCorrelationOutcome, IncidentEvent, IncidentTopology,
-            IncidentWithAlerts,
+    meta::{
+        alerts::{
+            alert::Alert,
+            incidents::{
+                AlertEdge, AlertKind, AlertNode, CompositeAlertSummary, CorrelationReason,
+                EdgeType, Incident, IncidentAlert, IncidentCorrelationOutcome, IncidentEvent,
+                IncidentTopology, IncidentWithAlerts,
+            },
         },
+        correlation::{FieldAlias, ServiceIdentityConfig},
     },
     utils::json::{Map, Value},
 };
@@ -41,6 +48,12 @@ const UNKNOWN_SERVICE: &str = "unknown";
 const INCIDENT_EDGE_RANGE_SECS: i64 = 3600;
 /// How many of an alert's latest firings a Firing run after a window looks through for open pages.
 const MUTED_RESOLVES_SCANNED: u64 = 10;
+/// Pause between two attempts of one incident notification.
+#[cfg(feature = "enterprise")]
+const INCIDENT_NOTIFY_RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
+/// Per-entity case lock, so detections firing in one tick join one case; striped to stay bounded.
+static SIEM_CASE_LOCKS: LazyLock<Vec<tokio::sync::Mutex<()>>> =
+    LazyLock::new(|| (0..64).map(|_| tokio::sync::Mutex::new(())).collect());
 
 /// Service Discovery correlation result
 struct ServiceDiscoveryResult {
@@ -72,7 +85,7 @@ struct IncidentSend<'a> {
 /// non-alert identities (e.g. external alert sources) can be correlated using the
 /// same machinery. For the internal alert path this is built from an `Alert`.
 #[derive(Debug, Clone)]
-pub struct CorrelationSubject {
+pub struct CorrelationSubject<'a> {
     /// internal: `alert.get_unique_key()`; external: `external_alerts.id`
     pub id: String,
     pub name: String,
@@ -83,6 +96,29 @@ pub struct CorrelationSubject {
     /// carry `alert.priority` mapped through `determine_severity`, when set.
     /// `None` → eval_level default (Critical→P2, Warning→P3).
     pub severity: Option<config::meta::alerts::incidents::IncidentSeverity>,
+    pub title_inputs: Option<super::incident_title::TitleInputs<'a>>,
+    /// Title for a new incident when no template renders one.
+    pub case_title: Option<String>,
+    /// Case window (µs): join a recent open case with exactly these values, never an ops incident.
+    pub siem_case_window: Option<i64>,
+    /// A SIEM detection: the incident it opens or joins is marked a security case.
+    pub security_case: bool,
+    /// A SIEM backfill firing whose evidence all predates its run's own window.
+    pub historical: bool,
+    /// Security case only: the firing's evidence span, the case's first and last seen.
+    pub case_activity: Option<infra::table::alert_incidents::CaseActivity>,
+    /// Security case only: the entity a case growing to several detections is retitled on.
+    pub case_entity: Option<o2_enterprise::enterprise::security::cases::Entity>,
+}
+
+/// One event an analyst opens a security case from.
+#[derive(Debug, Clone)]
+pub struct CaseEvent {
+    pub stream: String,
+    /// The event's `_timestamp`, in microseconds.
+    pub at: i64,
+    /// The event's fields; they name the case's host, user or address.
+    pub fields: Map<String, Value>,
 }
 
 /// An alert's incident correlation, and why its incident notification missed a destination.
@@ -118,11 +154,10 @@ enum MuteChange<'a> {
 async fn extract_filtered_semantic_dimensions(
     org_id: &str,
     labels: &HashMap<String, String>,
+    identity_config: &ServiceIdentityConfig,
+    semantic_groups: &[FieldAlias],
 ) -> Option<FilteredSemanticResult> {
     use config::meta::alerts::incidents::KeyType;
-
-    // Load ServiceIdentityConfig with auto-configuration applied
-    let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
 
     // No identity sets configured AND service is opted out — nothing to extract.
     // Otherwise fall through: "service" alone is a viable dimension even with zero sets.
@@ -133,9 +168,6 @@ async fn extract_filtered_semantic_dimensions(
         );
         return None;
     }
-
-    // Load semantic groups for field mapping
-    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
 
     // Collect all distinguish_by group IDs from ALL identity sets (flattened)
     // Don't require a specific set to "match" - extract whatever we can
@@ -199,6 +231,8 @@ async fn extract_filtered_semantic_dimensions(
 async fn extract_filtered_semantic_dimensions(
     _org_id: &str,
     _labels: &HashMap<String, String>,
+    _identity_config: &ServiceIdentityConfig,
+    _semantic_groups: &[FieldAlias],
 ) -> Option<FilteredSemanticResult> {
     None
 }
@@ -207,11 +241,13 @@ async fn extract_filtered_semantic_dimensions(
 async fn correlate_parallel(
     org_id: &str,
     labels: &HashMap<String, String>,
+    semantic_groups: &[FieldAlias],
 ) -> ParallelCorrelationResult {
+    let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
     // Execute both approaches in parallel
     let (sd_result, semantic_result) = tokio::join!(
-        query_service_discovery_key(org_id, labels),
-        extract_filtered_semantic_dimensions(org_id, labels)
+        query_service_discovery_key(org_id, labels, &identity_config, semantic_groups),
+        extract_filtered_semantic_dimensions(org_id, labels, &identity_config, semantic_groups)
     );
 
     log::debug!(
@@ -476,17 +512,12 @@ async fn send_incident_notifications_inner(
             &service_name,
             &incident_url,
         );
+        let explicit: Vec<_> = send.alert_template.into_iter().cloned().collect();
         for dest_name in &send.dest_names {
-            match crate::alerts::alert::send_templated_to_destination(
-                org_id,
-                &subject,
-                dest_name,
-                send.alert_template,
-                &mut send.ctx,
-            )
-            .await
+            match notify_incident_destination(org_id, dest_name, &explicit, &subject, &mut send.ctx)
+                .await
             {
-                Ok(resp) => success_parts.push(format!("{dest_name}: {resp}")),
+                Ok(sent) => success_parts.push(format!("{dest_name}: {}", sent.response)),
                 Err(e) => {
                     log::error!(
                         "[incidents] Failed to notify {dest_name} for incident {org_id}/{incident_id}: {e}"
@@ -512,6 +543,52 @@ async fn send_incident_notifications_inner(
     }
 }
 
+/// Retries a temporary failure in place: later firings join as repeats and never re-send it.
+#[cfg(feature = "enterprise")]
+async fn notify_incident_destination(
+    org_id: &str,
+    dest_name: &str,
+    explicit: &[config::meta::destinations::Template],
+    subject: &str,
+    ctx: &mut crate::alerts::notifications::NotificationContext,
+) -> Result<
+    crate::alerts::notifications::notify::SendOutcome,
+    crate::alerts::notifications::notify::NotifyError,
+> {
+    let attempts = infra::scheduler::get_scheduler_max_retries();
+    let mut attempt = 1;
+    loop {
+        match crate::alerts::notifications::notify::notify(
+            org_id,
+            dest_name,
+            explicit,
+            Some(subject),
+            ctx,
+        )
+        .await
+        {
+            Err(error) if retries_incident_notify(&error, attempt, attempts) => {
+                log::warn!(
+                    "[incidents] notify {dest_name} failed for {org_id}, attempt {attempt}/{attempts}: {error}"
+                );
+                attempt += 1;
+                tokio::time::sleep(INCIDENT_NOTIFY_RETRY_DELAY).await;
+            }
+            result => return result,
+        }
+    }
+}
+
+/// Whether a failed incident send is tried again; a refusal that cannot pass is not.
+#[cfg(feature = "enterprise")]
+fn retries_incident_notify(
+    error: &crate::alerts::notifications::notify::NotifyError,
+    attempt: i32,
+    attempts: i32,
+) -> bool {
+    error.is_retryable() && attempt < attempts
+}
+
 /// Point `ctx` at the incident: its link, and the `incident_*` template variables.
 #[cfg(feature = "enterprise")]
 fn apply_incident_to_context(
@@ -526,6 +603,17 @@ fn apply_incident_to_context(
     // The alert's own link points at its search; an incident notification must open the incident.
     ctx.alert_url = incident_url.to_string();
     ctx.incident_id = incident_id.to_string();
+    ctx.kind = config::meta::alerts::notification_kind::NotificationKind::Incident;
+    ctx.event = config::meta::alerts::notification_kind::NotificationEvent::Firing;
+    ctx.episode_id = Some(incident_id.to_string());
+    // Level, the dot and show_when follow the incident severity, as an on-call priority does.
+    ctx.alert_level = severity.to_string();
+    // P4 is informational, so it gets no level rather than a warning dot.
+    ctx.level = match severity {
+        "P1" | "P2" => Some(config::meta::alerts::level::AlertLevel::Critical),
+        "P3" => Some(config::meta::alerts::level::AlertLevel::Warning),
+        _ => None,
+    };
     ctx.context_attributes.extend(
         [
             ("incident_id", incident_id),
@@ -546,26 +634,8 @@ async fn subject_notification_context(
     subject_name: &str,
     triggered_at: i64,
 ) -> crate::alerts::notifications::NotificationContext {
-    use chrono::TimeZone;
-
-    let org_name = match crate::common::infra::config::ORGANIZATIONS
-        .read()
-        .await
-        .get(org_id)
-    {
-        Some(org) => org.name.clone(),
-        None => org_id.to_string(),
-    };
-    let trigger_time_str = if triggered_at > 0 {
-        chrono::Local
-            .timestamp_nanos(triggered_at * 1000)
-            .format("%Y-%m-%dT%H:%M:%S")
-            .to_string()
-    } else {
-        String::from("N/A")
-    };
     crate::alerts::notifications::NotificationContext {
-        org_name,
+        org_name: org_display_name(org_id).await,
         alert_name: subject_name.to_string(),
         alert_status: crate::alerts::notifications::STATUS_FIRING.to_string(),
         alert_start_time: String::from("N/A"),
@@ -573,9 +643,18 @@ async fn subject_notification_context(
         alert_start_time_millis: String::from("N/A"),
         alert_end_time_millis: String::from("N/A"),
         alert_trigger_time: triggered_at,
-        alert_trigger_time_str: trigger_time_str,
+        alert_trigger_time_str: crate::alerts::alert::format_alert_time(triggered_at),
         ..Default::default()
     }
+}
+
+#[cfg(feature = "enterprise")]
+async fn org_display_name(org_id: &str) -> String {
+    crate::common::infra::config::ORGANIZATIONS
+        .read()
+        .await
+        .get(org_id)
+        .map_or_else(|| org_id.to_string(), |org| org.name.clone())
 }
 
 /// Send a notification for an incident severity change to all correlated alert destinations.
@@ -668,6 +747,7 @@ pub fn rca_agent_available() -> bool {
 /// Correlation priority:
 /// 1. Service Discovery — uses labels matched by service_streams to identify service
 /// 2. Manual extraction — extracts semantic dimensions from alert labels
+#[allow(clippy::too_many_arguments)]
 pub async fn correlate_alert_to_incident(
     alert: &Alert,
     result_row: &Map<String, Value>,
@@ -680,15 +760,96 @@ pub async fn correlate_alert_to_incident(
     // The exact evaluated observation, so `{alert_count}` is not capped at the sampled rows.
     actual_value: Option<f64>,
     downtime: Option<&config::meta::downtimes::ActiveDowntime>,
+    // Where a backfill run's own window starts; `None` outside a backfill.
+    history_before: Option<i64>,
+) -> Result<Option<CorrelatedIncident>, anyhow::Error> {
+    use o2_enterprise::enterprise::security::{cases, detection};
+
+    let siem = detection::is_siem(alert.context_attributes.as_ref());
+    if !siem || notify_rows.is_empty() {
+        let historical = siem
+            && history_before.is_some_and(|cutoff| {
+                detection::predates(std::slice::from_ref(result_row), cutoff)
+            });
+        return correlate_rows(
+            alert,
+            result_row,
+            notify_rows,
+            siem.then(|| cases::entity_of(result_row)).flatten(),
+            triggered_at,
+            eval_level,
+            actual_value,
+            downtime,
+            historical,
+        )
+        .await;
+    }
+    let group_window = db::organization::read_org_setting(&alert.org_id, |s| s.security_cases)
+        .await
+        .unwrap_or_default()
+        .group_window_micros();
+    // One case per entity and window, so old and current evidence never share a case.
+    let mut merged: Option<CorrelatedIncident> = None;
+    for part in cases::case_partitions(notify_rows, group_window, history_before) {
+        let Some(first_row) = part.rows.first() else {
+            continue;
+        };
+        let correlated = correlate_rows(
+            alert,
+            first_row,
+            &part.rows,
+            part.entity,
+            triggered_at,
+            eval_level,
+            actual_value,
+            downtime,
+            part.historical,
+        )
+        .await?;
+        merged = merge_correlations(merged, correlated);
+    }
+    Ok(merged)
+}
+
+/// The first partition's incident, with every partition's notification outcome.
+fn merge_correlations(
+    merged: Option<CorrelatedIncident>,
+    next: Option<CorrelatedIncident>,
+) -> Option<CorrelatedIncident> {
+    match (merged, next) {
+        (Some(first), Some(next)) => Some(CorrelatedIncident {
+            notify_error: match (first.notify_error, next.notify_error) {
+                (Some(a), Some(b)) => Some(format!("{a}; {b}")),
+                (a, b) => a.or(b),
+            },
+            notify_attempted: first.notify_attempted || next.notify_attempted,
+            outcome: first.outcome,
+        }),
+        (first, next) => first.or(next),
+    }
+}
+
+/// `entity` is the security case's grouping entity; the overflow partition passes `None`.
+#[allow(clippy::too_many_arguments)]
+async fn correlate_rows(
+    alert: &Alert,
+    result_row: &Map<String, Value>,
+    notify_rows: &[Map<String, Value>],
+    entity: Option<o2_enterprise::enterprise::security::cases::Entity>,
+    triggered_at: i64,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
+    actual_value: Option<f64>,
+    downtime: Option<&config::meta::downtimes::ActiveDowntime>,
+    historical: bool,
 ) -> Result<Option<CorrelatedIncident>, anyhow::Error> {
     let mut labels = labels_from_row(result_row);
+    let semantic_groups =
+        crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
 
     // Enrich with alert condition dimensions (deterministic baseline)
     // Handles SQL WHERE, GUI conditions, and PromQL label matchers
     #[cfg(feature = "enterprise")]
     {
-        let semantic_groups =
-            crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
         let condition_dims =
             o2_enterprise::enterprise::alerts::sql_parser::extract_dimensions_from_alert_conditions(
                 &alert.query_condition,
@@ -719,11 +880,55 @@ pub async fn correlate_alert_to_incident(
     );
 
     // Execute Service Discovery and semantic extraction in parallel (non-blocking)
-    let parallel_result = correlate_parallel(&alert.org_id, &labels).await;
+    let parallel_result = correlate_parallel(&alert.org_id, &labels, &semantic_groups).await;
 
-    let group_values = parallel_result.final_group_values;
+    let mut group_values = parallel_result.final_group_values;
     let mut key_type = parallel_result.final_key_type;
-    let correlation_reason = parallel_result.correlation_reason;
+    let mut correlation_reason = parallel_result.correlation_reason;
+    let siem =
+        o2_enterprise::enterprise::security::detection::is_siem(alert.context_attributes.as_ref());
+    let mut siem_case_window = None;
+    let mut case_title = None;
+    let mut case_activity = None;
+    let mut case_entity = None;
+    if siem {
+        use o2_enterprise::enterprise::security::cases;
+        let settings = db::organization::read_org_setting(&alert.org_id, |s| s.security_cases)
+            .await
+            .unwrap_or_default();
+        let entity = settings.group_window_micros().and(entity);
+        let rule_title = alert
+            .context_attributes
+            .as_ref()
+            .and_then(|attrs| attrs.get("sigma_title"))
+            .filter(|t| !t.trim().is_empty())
+            .cloned()
+            .unwrap_or_else(|| alert.name.clone());
+        case_title = Some(cases::case_title(&rule_title, entity.as_ref()));
+        // Ops dimensions never reach a security case: it groups only on its own entity key.
+        group_values = entity
+            .as_ref()
+            .map(cases::Entity::group_values)
+            .unwrap_or_default();
+        if entity.is_some() {
+            key_type = config::meta::alerts::incidents::KeyType::Primary;
+            correlation_reason = cases::ENTITY_REASON.to_string();
+        }
+        siem_case_window = settings.group_window_micros();
+        let evidence = if notify_rows.is_empty() {
+            std::slice::from_ref(result_row)
+        } else {
+            notify_rows
+        };
+        let (first_event_at, last_event_at) =
+            cases::event_span(evidence).unwrap_or((triggered_at, triggered_at));
+        case_activity = Some(infra::table::alert_incidents::CaseActivity {
+            first_event_at,
+            last_event_at,
+            historical,
+        });
+        case_entity = entity;
+    }
 
     // Extract service name using both results
     let service_name = extract_service_name_parallel(&labels, &parallel_result.service_discovery);
@@ -762,11 +967,18 @@ pub async fn correlate_alert_to_incident(
     // wins over the Critical/Warning->P2/P3 fallback in `create_new_incident`
     // — otherwise the incident dashboard's severity tiles silently undercount
     // P1s for every alert that only defines a Critical tier.
-    let severity = alert.priority.and_then(|p| {
-        o2_enterprise::enterprise::alerts::incidents::determine_severity(Some(p.as_str()))
-            .parse()
-            .ok()
-    });
+    let severity = alert
+        .priority
+        .and_then(|p| {
+            o2_enterprise::enterprise::alerts::incidents::determine_severity(Some(p.as_str()))
+                .parse()
+                .ok()
+        })
+        .or_else(|| {
+            siem.then(|| alert.context_attributes.as_ref()?.get("sigma_level"))
+                .flatten()
+                .and_then(|level| o2_enterprise::enterprise::security::cases::sigma_severity(level))
+        });
 
     // Build the correlation subject for the internal alert path.
     let subject = CorrelationSubject {
@@ -776,9 +988,24 @@ pub async fn correlate_alert_to_incident(
         kind: AlertKind::Internal,
         base_destinations: alert.destinations.clone(),
         severity,
+        title_inputs: Some(super::incident_title::TitleInputs {
+            alert,
+            result_row,
+            notify_rows,
+            labels: &labels,
+        }),
+        case_title,
+        siem_case_window,
+        security_case: siem,
+        historical: siem && historical,
+        case_activity,
+        case_entity,
     };
 
-    // Find or create incident
+    let _case_guard = match subject.siem_case_window {
+        Some(_) => Some(siem_case_lock(&alert.org_id, &group_values).lock().await),
+        None => None,
+    };
     let correlation = find_or_create_incident(
         &alert.org_id,
         &group_values,
@@ -792,6 +1019,21 @@ pub async fn correlate_alert_to_incident(
     )
     .await?;
     let outcome = correlation.outcome;
+    if siem
+        && !matches!(
+            outcome,
+            IncidentCorrelationOutcome::NewIncidentCreated { .. }
+        )
+        && let Err(e) =
+            infra::table::alert_incidents::mark_security_case(&alert.org_id, outcome.incident_id())
+                .await
+    {
+        log::error!(
+            "[incidents] could not mark {}/{} a security case: {e}",
+            alert.org_id,
+            outcome.incident_id()
+        );
+    }
     // D23: a firing joining an acknowledged incident is acknowledged too, so nobody is re-paged.
     if !matches!(
         outcome,
@@ -816,7 +1058,7 @@ pub async fn correlate_alert_to_incident(
     {
         // Single-sourced with `scheduler::handlers`: the row, then the alert's own conditions.
         let mut dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
-            &crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await,
+            &semantic_groups,
             &alert.query_condition,
             result_row,
         );
@@ -846,7 +1088,11 @@ pub async fn correlate_alert_to_incident(
         let priority = alert
             .priority
             .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
-        let title = alert.name.clone();
+        // The stored title, so a templated or reopened incident pages under the name it shows.
+        let title = match infra::table::alert_incidents::get(&alert.org_id, incident_id).await {
+            Ok(Some(incident)) => incident.title.unwrap_or_else(|| alert.name.clone()),
+            _ => alert.name.clone(),
+        };
         match o2_enterprise::enterprise::oncall::escalation::start_for_incident(
             &alert.org_id,
             &incident_id.to_string(),
@@ -997,7 +1243,8 @@ pub async fn correlate_external_event(
     );
 
     // Same parallel correlation the internal path uses.
-    let parallel_result = correlate_parallel(org_id, &labels).await;
+    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
+    let parallel_result = correlate_parallel(org_id, &labels, &semantic_groups).await;
 
     let group_values = parallel_result.final_group_values;
     let mut key_type = parallel_result.final_key_type;
@@ -1033,6 +1280,13 @@ pub async fn correlate_external_event(
         kind: AlertKind::External,
         base_destinations,
         severity: Some(external.severity.parse().unwrap_or(IncidentSeverity::P3)),
+        title_inputs: None,
+        case_title: None,
+        siem_case_window: None,
+        security_case: false,
+        historical: false,
+        case_activity: None,
+        case_entity: None,
     };
 
     let triggered_at = external.last_seen_at;
@@ -1103,8 +1357,7 @@ pub async fn correlate_external_event(
     Ok(Some(outcome))
 }
 
-/// Narrow on purpose: one member recovering is not the incident being over, and an acknowledged or
-/// assigned incident is a human's to close. `auto_resolve_after_minutes` stays as the backstop.
+/// Narrow on purpose: acknowledged, assigned and security cases are a human's to close.
 pub async fn resolve_alert_firing(
     event: &config::meta::alerts::recovery::RecoveryEvent,
     muted: bool,
@@ -1141,15 +1394,11 @@ pub async fn resolve_alert_firing(
     else {
         return Ok(());
     };
-    if incident.status == "resolved" {
-        return Ok(());
-    }
-    if incident.acknowledged_by.is_some() || incident.assigned_to.is_some() {
-        return Ok(());
-    }
-
     let links = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
-    if links.is_empty() || links.iter().any(|l| l.resolved_at.is_none()) {
+    let fired_by_detection =
+        db::alerts::alert::any_siem_alert(&event.org_id, links.iter().map(|l| l.alert_id.as_str()))
+            .await;
+    if !recovery_closes(&incident, &links, fired_by_detection) {
         return Ok(());
     }
 
@@ -1234,6 +1483,163 @@ pub async fn try_auto_resolve_incident_for_external_alert(
     Ok(())
 }
 
+/// Whether all of an incident's firings recovering closes it; a security case never closes so.
+fn recovery_closes(
+    incident: &infra::table::entity::alert_incidents::Model,
+    links: &[infra::table::entity::alert_incident_alerts::Model],
+    fired_by_detection: bool,
+) -> bool {
+    incident.status != "resolved"
+        && incident.acknowledged_by.is_none()
+        && incident.assigned_to.is_none()
+        && !links.is_empty()
+        && links.iter().all(|l| l.resolved_at.is_some())
+        && !incident.security_case
+        && !fired_by_detection
+}
+
+/// The lock stripe for one org's security case on `group_values`.
+fn siem_case_lock(
+    org_id: &str,
+    group_values: &HashMap<String, String>,
+) -> &'static tokio::sync::Mutex<()> {
+    let mut dims: Vec<(&String, &String)> = group_values.iter().collect();
+    dims.sort();
+    let mut hasher = DefaultHasher::new();
+    org_id.hash(&mut hasher);
+    dims.hash(&mut hasher);
+    &SIEM_CASE_LOCKS[(hasher.finish() % SIEM_CASE_LOCKS.len() as u64) as usize]
+}
+
+/// The open security case with exactly `group_values` active within `window` of `span`.
+async fn find_open_siem_case(
+    org_id: &str,
+    group_values: &HashMap<String, String>,
+    span: (i64, i64),
+    window: i64,
+) -> Result<Option<infra::table::entity::alert_incidents::Model>, anyhow::Error> {
+    let client = infra::db::get_orm_client_ro().await;
+    let mut open = Vec::new();
+    for candidate in infra::table::alert_incidents::find_correlation_candidates(org_id).await? {
+        // Only the exact entity can be this case, so every other candidate stays unread.
+        let same_entity = serde_json::from_value::<HashMap<String, String>>(candidate.group_values)
+            .is_ok_and(|dims| &dims == group_values);
+        if same_entity
+            && let Some(incident) =
+                infra::table::alert_incidents::get_with(client, org_id, &candidate.id).await?
+            && incident.status != "resolved"
+        {
+            open.push(incident);
+        }
+    }
+    Ok(o2_enterprise::enterprise::security::cases::pick_open_case(
+        open,
+        group_values,
+        span,
+        window,
+    ))
+}
+
+/// The open case a detection naming no entity fired into, active within `window` of `span`.
+async fn find_open_detection_case(
+    org_id: &str,
+    alert_id: &str,
+    span: (i64, i64),
+    window: i64,
+) -> Result<Option<infra::table::entity::alert_incidents::Model>, anyhow::Error> {
+    let open =
+        infra::table::alert_incidents::find_open_incidents_by_alert_id(org_id, alert_id).await?;
+    Ok(o2_enterprise::enterprise::security::cases::pick_open_case(
+        open,
+        &HashMap::new(),
+        span,
+        window,
+    ))
+}
+
+/// Links a firing; a security case's span widens to the firing's evidence, not its run time.
+async fn link_firing(
+    incident_id: &str,
+    subject: &CorrelationSubject<'_>,
+    triggered_at: i64,
+    correlation_reason: &str,
+) -> Result<bool, infra::errors::Error> {
+    match subject.case_activity {
+        Some(activity) => {
+            infra::table::alert_incidents::add_firing_to_case(
+                incident_id,
+                &subject.id,
+                &subject.name,
+                subject.kind.as_str(),
+                triggered_at,
+                correlation_reason,
+                activity,
+            )
+            .await
+        }
+        None => {
+            infra::table::alert_incidents::add_alert_to_incident(
+                incident_id,
+                &subject.id,
+                &subject.name,
+                subject.kind.as_str(),
+                triggered_at,
+                correlation_reason,
+            )
+            .await
+        }
+    }
+}
+
+/// Renames a case a second detection joined, unless an analyst already renamed it.
+async fn retitle_growing_case(
+    org_id: &str,
+    incident: &infra::table::entity::alert_incidents::Model,
+    entity: &o2_enterprise::enterprise::security::cases::Entity,
+) {
+    let detections =
+        match infra::table::alert_incidents::get_alert_counts(std::slice::from_ref(&incident.id))
+            .await
+        {
+            Ok(counts) => counts.get(&incident.id).map_or(0, |c| c.groups.len()),
+            Err(e) => {
+                log::error!(
+                    "[incidents] could not count detections of case {org_id}/{}: {e}",
+                    incident.id
+                );
+                return;
+            }
+        };
+    let Some(title) = o2_enterprise::enterprise::security::cases::grown_case_title(
+        incident.title.as_deref(),
+        detections,
+        entity,
+    ) else {
+        return;
+    };
+    if let Err(e) = infra::table::alert_incidents::update_title(org_id, &incident.id, &title).await
+    {
+        log::error!(
+            "[incidents] could not retitle case {org_id}/{}: {e}",
+            incident.id
+        );
+        return;
+    }
+    let from = incident.title.clone().unwrap_or_default();
+    if let Err(e) = infra::table::incident_events::append(
+        org_id,
+        &incident.id,
+        IncidentEvent::title_changed(from, title, "system@openobserve.ai"),
+    )
+    .await
+    {
+        log::error!(
+            "[incidents] could not record the retitle of case {org_id}/{}: {e}",
+            incident.id
+        );
+    }
+}
+
 /// The scalar columns of a result row, as the labels correlation matches on.
 fn labels_from_row(row: &Map<String, Value>) -> HashMap<String, String> {
     row.iter()
@@ -1262,7 +1668,15 @@ pub(crate) async fn correlated_service_for_routing(
     org_id: &str,
     row: &Map<String, Value>,
 ) -> Option<String> {
-    let found = query_service_discovery_key(org_id, &labels_from_row(row)).await?;
+    let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
+    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
+    let found = query_service_discovery_key(
+        org_id,
+        &labels_from_row(row),
+        &identity_config,
+        &semantic_groups,
+    )
+    .await?;
     if found.service_name_from_stream || found.service_name.trim().is_empty() {
         return None;
     }
@@ -1276,18 +1690,16 @@ pub(crate) async fn correlated_service_for_routing(
 async fn query_service_discovery_key(
     org_id: &str,
     labels: &HashMap<String, String>,
+    identity_config: &ServiceIdentityConfig,
+    semantic_groups: &[FieldAlias],
 ) -> Option<ServiceDiscoveryResult> {
     #[cfg(feature = "enterprise")]
     {
-        let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
-
-        let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
-
         match o2_enterprise::enterprise::service_streams::storage::correlate(
             org_id,
             labels,
-            &identity_config,
-            &semantic_groups,
+            identity_config,
+            semantic_groups,
         )
         .await
         {
@@ -1515,7 +1927,7 @@ async fn create_new_incident(
     org_id: &str,
     group_values: &HashMap<String, String>,
     key_type: config::meta::alerts::incidents::KeyType,
-    subject: &CorrelationSubject,
+    subject: &CorrelationSubject<'_>,
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
@@ -1535,19 +1947,61 @@ async fn create_new_incident(
         }
     };
 
-    let title =
-        o2_enterprise::enterprise::alerts::incidents::generate_title(&subject.name, group_values);
+    // Rendered once here, so later firings that join the incident never retitle it.
+    let custom_title = match subject
+        .title_inputs
+        .as_ref()
+        .filter(|i| i.alert.incident_title_template.is_some())
+    {
+        Some(inputs) => super::incident_title::render(
+            inputs,
+            &org_display_name(org_id).await,
+            group_values,
+            triggered_at,
+        ),
+        None => None,
+    };
+    let title = custom_title
+        .or_else(|| subject.case_title.clone())
+        .unwrap_or_else(|| {
+            o2_enterprise::enterprise::alerts::incidents::generate_title(
+                &subject.name,
+                group_values,
+            )
+        });
 
-    let incident = infra::table::alert_incidents::create_with_mute(
-        org_id,
-        &severity,
-        serde_json::to_value(group_values)?,
-        &key_type.to_string(),
-        triggered_at,
-        Some(title.clone()),
-        muted_by.map(str::to_string),
-    )
-    .await?;
+    let dims = serde_json::to_value(group_values)?;
+    let key = key_type.to_string();
+    let muted = muted_by.map(str::to_string);
+    let incident = if subject.security_case {
+        infra::table::alert_incidents::create_security_case(
+            org_id,
+            &severity,
+            dims,
+            &key,
+            subject
+                .case_activity
+                .unwrap_or(infra::table::alert_incidents::CaseActivity {
+                    first_event_at: triggered_at,
+                    last_event_at: triggered_at,
+                    historical: subject.historical,
+                }),
+            Some(title.clone()),
+            muted,
+        )
+        .await?
+    } else {
+        infra::table::alert_incidents::create_with_mute(
+            org_id,
+            &severity,
+            dims,
+            &key,
+            triggered_at,
+            Some(title.clone()),
+            muted,
+        )
+        .await?
+    };
 
     // Initialize event timeline for new incident
     if let Err(e) = infra::table::incident_events::init(org_id, &incident.id).await {
@@ -1562,15 +2016,7 @@ async fn create_new_incident(
     }
 
     // Add the first alert to the incident
-    infra::table::alert_incidents::add_alert_to_incident(
-        &incident.id,
-        &subject.id,
-        &subject.name,
-        subject.kind.as_str(),
-        triggered_at,
-        correlation_reason,
-    )
-    .await?;
+    link_firing(&incident.id, subject, triggered_at, correlation_reason).await?;
 
     // Record alert event
     if let Err(e) = infra::table::incident_events::record_alert(
@@ -1657,7 +2103,7 @@ async fn create_new_incident(
 async fn escalate_severity(
     org_id: &str,
     incident: &infra::table::entity::alert_incidents::Model,
-    subject: &CorrelationSubject,
+    subject: &CorrelationSubject<'_>,
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
 ) -> Result<bool, anyhow::Error> {
     let Some((current_severity, new_severity)) =
@@ -1747,13 +2193,47 @@ impl Correlation {
     }
 }
 
+fn candidate_can_join(stored: &serde_json::Value, incoming: &HashMap<String, String>) -> bool {
+    use config::meta::alerts::incidents::DimensionRelationship;
+
+    let dimensions = serde_json::from_value(stored.clone()).unwrap_or_default();
+    matches!(
+        DimensionRelationship::check(&dimensions, incoming),
+        DimensionRelationship::Equal
+            | DimensionRelationship::NewIsSubset
+            | DimensionRelationship::NewIsSuperset
+    )
+}
+
+async fn select_correlation_candidate<C: sea_orm::ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    incoming: &HashMap<String, String>,
+    candidates: Vec<infra::table::alert_incidents::CorrelationCandidate>,
+) -> Result<Option<infra::table::entity::alert_incidents::Model>, infra::errors::Error> {
+    for candidate in candidates {
+        if !candidate_can_join(&candidate.group_values, incoming) {
+            continue;
+        }
+        let Some(incident) =
+            infra::table::alert_incidents::get_with(client, org_id, &candidate.id).await?
+        else {
+            continue;
+        };
+        if incident.status != "resolved" && candidate_can_join(&incident.group_values, incoming) {
+            return Ok(Some(incident));
+        }
+    }
+    Ok(None)
+}
+
 /// Find an existing open incident or create a new one
 #[allow(clippy::too_many_arguments)]
 async fn find_or_create_incident(
     org_id: &str,
     group_values: &HashMap<String, String>,
     key_type: config::meta::alerts::incidents::KeyType,
-    subject: &CorrelationSubject,
+    subject: &CorrelationSubject<'_>,
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
@@ -1762,27 +2242,34 @@ async fn find_or_create_incident(
 ) -> Result<Correlation, anyhow::Error> {
     use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
 
-    // STEP 1: AlertId exact match - check for existing incident with same alert_id
-    if key_type == KeyType::AlertId {
-        let alert_id = subject.id.clone();
-
-        // Use the dedicated DB query: junction table lookup + incident fetch
-        if let Some(incident) =
-            infra::table::alert_incidents::find_open_incident_by_alert_id(org_id, &alert_id).await?
-        {
-            // Found existing AlertId incident for this alert - join it
-            let (_, reopened) = join_then_unmute(
-                infra::table::alert_incidents::add_alert_to_incident(
-                    &incident.id,
-                    &alert_id,
-                    &subject.name,
-                    subject.kind.as_str(),
-                    triggered_at,
-                    correlation_reason,
-                ),
+    // STEP 1: AlertId exact match, or a security case for the same entity within its window
+    let span = subject
+        .case_activity
+        .map_or((triggered_at, triggered_at), |a| {
+            (a.first_event_at, a.last_event_at)
+        });
+    let exact = match (key_type, subject.siem_case_window) {
+        (KeyType::AlertId, Some(window)) => {
+            find_open_detection_case(org_id, &subject.id, span, window).await?
+        }
+        (KeyType::AlertId, None) => {
+            infra::table::alert_incidents::find_open_incident_by_alert_id(org_id, &subject.id)
+                .await?
+        }
+        (_, Some(window)) => find_open_siem_case(org_id, group_values, span, window).await?,
+        _ => None,
+    };
+    {
+        if let Some(incident) = exact {
+            let alert_id = subject.id.clone();
+            let (is_new_alert_type, reopened) = join_then_unmute(
+                link_firing(&incident.id, subject, triggered_at, correlation_reason),
                 async || unmute_for_firing(org_id, &incident, muted_by).await,
             )
             .await?;
+            if is_new_alert_type && let Some(entity) = subject.case_entity.as_ref() {
+                retitle_growing_case(org_id, &incident, entity).await;
+            }
 
             if let Err(e) = infra::table::incident_events::record_alert(
                 org_id,
@@ -1847,6 +2334,14 @@ async fn find_or_create_incident(
                 ));
             }
 
+            if is_new_alert_type {
+                return Ok(Correlation::existing(
+                    IncidentCorrelationOutcome::NewAlertTypeJoined {
+                        incident_id: incident.id,
+                        service_name: service_name.to_string(),
+                    },
+                ));
+            }
             return Ok(Correlation::existing(
                 IncidentCorrelationOutcome::ExistingAlertRepeated {
                     incident_id: incident.id,
@@ -1856,33 +2351,26 @@ async fn find_or_create_incident(
         }
     }
 
-    // STEP 2: Venn diagram match against all open incidents (for Primary/Secondary key types)
+    // STEP 2: Venn diagram match against open incidents (for Primary/Secondary key types)
     //
-    // Load all open incidents and check for dimension compatibility.
     // Equal or NewIsSubset → join incident; NewIsSuperset → upgrade and join.
     // PartialOverlap or Incompatible → skip (create new incident).
-    if key_type != KeyType::AlertId {
-        let open_incidents =
-            infra::table::alert_incidents::find_open_incidents_filtered(org_id, None, None).await?;
-
-        for existing in open_incidents {
+    if key_type != KeyType::AlertId && subject.siem_case_window.is_none() {
+        let candidates = infra::table::alert_incidents::find_correlation_candidates(org_id).await?;
+        if let Some(existing) = select_correlation_candidate(
+            infra::db::get_orm_client_ro().await,
+            org_id,
+            group_values,
+            candidates,
+        )
+        .await?
+        {
             let existing_key_type = KeyType::from_stored(&existing.key_type);
 
             let existing_dims: HashMap<String, String> =
                 serde_json::from_value(existing.group_values.clone()).unwrap_or_default();
 
             let relationship = DimensionRelationship::check(&existing_dims, group_values);
-
-            let join_incident = matches!(
-                relationship,
-                DimensionRelationship::Equal
-                    | DimensionRelationship::NewIsSubset
-                    | DimensionRelationship::NewIsSuperset
-            );
-
-            if !join_incident {
-                continue;
-            }
 
             let mut merged_dims = existing_dims.clone();
             let dimensions_changed = merge_dimensions(&mut merged_dims, group_values, &existing.id);
@@ -2065,12 +2553,21 @@ async fn find_or_create_incident(
     })
 }
 
-/// Get incident with its alerts and RCA runs for the detail view.
+/// The detail view: the incident, its RCA runs and the alert definitions `user_id` may read.
 pub async fn get_incident_with_alerts(
     org_id: &str,
     incident_id: &str,
+    user_id: &str,
 ) -> Result<Option<IncidentWithAlerts>, anyhow::Error> {
-    incident_with_alerts(org_id, incident_id, true).await
+    incident_with_alerts(
+        org_id,
+        incident_id,
+        true,
+        |alert_id: String, folder_id: String| async move {
+            can_read_alert(org_id, user_id, &alert_id, &folder_id).await
+        },
+    )
+    .await
 }
 
 /// [get_incident_with_alerts] without the RCA runs, for callers that never read them.
@@ -2078,14 +2575,65 @@ pub async fn get_incident_with_triggers(
     org_id: &str,
     incident_id: &str,
 ) -> Result<Option<IncidentWithAlerts>, anyhow::Error> {
-    incident_with_alerts(org_id, incident_id, false).await
+    incident_with_alerts(org_id, incident_id, false, |_, _| std::future::ready(true)).await
 }
 
-async fn incident_with_alerts(
+/// Whether `user_id` may GET the alert, checked as the `GET /v2/{org}/alerts/{id}` route checks it.
+#[cfg(feature = "enterprise")]
+async fn can_read_alert(org_id: &str, user_id: &str, alert_id: &str, folder_id: &str) -> bool {
+    !o2_openfga::config::get_config().enabled
+        || crate::auth::check_permissions(
+            alert_id,
+            org_id,
+            user_id,
+            "alerts",
+            "GET",
+            Some(folder_id),
+            false,
+            true,
+            false,
+        )
+        .await
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn can_read_alert(_org_id: &str, _user_id: &str, _alert_id: &str, _folder_id: &str) -> bool {
+    true
+}
+
+/// The alerts, given as `(alert_id, folder_id, alert)`, and composites that `can_read` allows.
+async fn readable_definitions<F>(
+    alerts: Vec<(String, String, Alert)>,
+    composites: Vec<CompositeAlertSummary>,
+    can_read: impl Fn(String, String) -> F,
+) -> (Vec<Alert>, Vec<CompositeAlertSummary>)
+where
+    F: Future<Output = bool>,
+{
+    let mut readable_alerts = Vec::with_capacity(alerts.len());
+    for (alert_id, folder_id, alert) in alerts {
+        if can_read(alert_id, folder_id).await {
+            readable_alerts.push(alert);
+        }
+    }
+    let mut readable_composites = Vec::with_capacity(composites.len());
+    for composite in composites {
+        if can_read(composite.id.clone(), composite.folder_id.clone()).await {
+            readable_composites.push(composite);
+        }
+    }
+    (readable_alerts, readable_composites)
+}
+
+async fn incident_with_alerts<F>(
     org_id: &str,
     incident_id: &str,
     with_rca_runs: bool,
-) -> Result<Option<IncidentWithAlerts>, anyhow::Error> {
+    can_read: impl Fn(String, String) -> F,
+) -> Result<Option<IncidentWithAlerts>, anyhow::Error>
+where
+    F: Future<Output = bool>,
+{
     let incident = match infra::table::alert_incidents::get(org_id, incident_id).await? {
         Some(i) => i,
         None => return Ok(None),
@@ -2146,6 +2694,7 @@ async fn incident_with_alerts(
             created_at: a.created_at,
             source_url: None,
             labels: None,
+            annotations: None,
             detected_source: None,
         })
         .collect();
@@ -2172,6 +2721,10 @@ async fn incident_with_alerts(
                     if let Some(record) = records_by_id.get(&trigger.alert_id) {
                         trigger.source_url = record.source_url.clone();
                         trigger.labels = serde_json::from_value(record.labels.clone()).ok();
+                        trigger.annotations = record
+                            .last_payload
+                            .get("annotations")
+                            .and_then(|a| serde_json::from_value(a.clone()).ok());
                         trigger.detected_source = Some(record.detected_source.clone());
                     }
                 }
@@ -2203,8 +2756,16 @@ async fn incident_with_alerts(
         if let Some(trigger) = incident_alerts.iter().find(|a| a.alert_name == alert_name) {
             // Parse alert_id as Ksuid
             if let Ok(alert_ksuid) = trigger.alert_id.parse() {
-                match super::alert::get_by_id_db(&incident_org_id, alert_ksuid).await {
-                    Ok(alert) => alerts.push(alert),
+                match super::alert::get_by_id(
+                    infra::db::get_orm_client_ro().await,
+                    &incident_org_id,
+                    alert_ksuid,
+                )
+                .await
+                {
+                    Ok((folder, alert)) => {
+                        alerts.push((trigger.alert_id.clone(), folder.folder_id, alert))
+                    }
                     Err(e) => {
                         // Not an ordinary alert — a composite has no `alerts`
                         // row, so fall back to the composite graph (§9.6).
@@ -2242,6 +2803,7 @@ async fn incident_with_alerts(
             }
         }
     }
+    let (alerts, composite_alerts) = readable_definitions(alerts, composite_alerts, can_read).await;
 
     Ok(Some(IncidentWithAlerts {
         incident: incident_data,
@@ -2258,10 +2820,29 @@ pub async fn list_incidents(
     limit: u64,
     offset: u64,
 ) -> Result<(Vec<Incident>, u64), anyhow::Error> {
-    // Get total count before pagination
-    let total = infra::table::alert_incidents::count(org_id, status).await?;
+    list_incidents_filtered(
+        org_id,
+        status,
+        infra::table::alert_incidents::CaseFilter::All,
+        limit,
+        offset,
+    )
+    .await
+}
 
-    let incidents = infra::table::alert_incidents::list(org_id, status, limit, offset).await?;
+/// List incidents, keeping only the security cases `cases` allows.
+pub async fn list_incidents_filtered(
+    org_id: &str,
+    status: Option<&str>,
+    cases: infra::table::alert_incidents::CaseFilter,
+    limit: u64,
+    offset: u64,
+) -> Result<(Vec<Incident>, u64), anyhow::Error> {
+    // Get total count before pagination
+    let total = infra::table::alert_incidents::count_filtered(org_id, status, cases).await?;
+
+    let incidents =
+        infra::table::alert_incidents::list_filtered(org_id, status, cases, limit, offset).await?;
 
     // Get actual alert counts from junction table (source of truth)
     let incident_ids: Vec<String> = incidents.iter().map(|i| i.id.clone()).collect();
@@ -3133,6 +3714,7 @@ fn model_to_incident_with_topology(
         rca,
         rca_off_reason: db_model.rca_off_reason,
         alert_groups: None,
+        historical: db_model.historical,
     }
 }
 
@@ -3412,6 +3994,295 @@ pub async fn update_title(
     model_to_incident(updated).await
 }
 
+/// Sets or clears the incident's assignee and records who changed it.
+pub async fn update_assignee(
+    org_id: &str,
+    incident_id: &str,
+    assigned_to: Option<&str>,
+    user_id: &str,
+) -> Result<Incident, anyhow::Error> {
+    let current = infra::table::alert_incidents::get_rw(org_id, incident_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
+    if current.assigned_to.as_deref() == assigned_to {
+        return model_to_incident(current).await;
+    }
+    let updated =
+        infra::table::alert_incidents::update_assigned_to(org_id, incident_id, assigned_to).await?;
+    if let Err(e) = crate::incidents::append_event(
+        org_id,
+        incident_id,
+        IncidentEvent::assignment_changed(
+            current.assigned_to,
+            assigned_to.map(str::to_string),
+            user_id,
+        ),
+    )
+    .await
+    {
+        log::error!("[Incidents] Failed to record assignment event: org_id: {org_id}, error: {e}");
+    }
+    model_to_incident(updated).await
+}
+
+/// A more severe attached firing raises the case's priority; the timeline records who attached.
+pub async fn attach_firings_to_case(
+    org_id: &str,
+    case_id: Option<&str>,
+    title: &str,
+    severity: config::meta::alerts::incidents::IncidentSeverity,
+    firings: &[o2_enterprise::enterprise::security::cases::AttachedFiring],
+    user_id: &str,
+) -> Result<Incident, anyhow::Error> {
+    let key_type = config::meta::alerts::incidents::KeyType::AlertId.to_string();
+    let (case, opened_at) = match case_id {
+        Some(id) => (
+            infra::table::alert_incidents::get_rw(org_id, id)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("Incident not found"))?,
+            None,
+        ),
+        None => {
+            let first = firings
+                .iter()
+                .map(|f| f.fired_at)
+                .min()
+                .unwrap_or_else(config::utils::time::now_micros);
+            let case = infra::table::alert_incidents::create_security_case(
+                org_id,
+                &severity.to_string(),
+                serde_json::json!({}),
+                &key_type,
+                infra::table::alert_incidents::CaseActivity {
+                    first_event_at: first,
+                    last_event_at: first,
+                    historical: false,
+                },
+                Some(title.to_string()),
+                None,
+            )
+            .await?;
+            if let Err(e) = infra::table::incident_events::init(org_id, &case.id).await {
+                log::error!(
+                    "[Incidents] Failed to init events for case {org_id}/{}: {e}",
+                    case.id
+                );
+            }
+            (case, Some(first))
+        }
+    };
+    if opened_at.is_none() {
+        infra::table::alert_incidents::mark_security_case(org_id, &case.id).await?;
+    }
+    if let Some(first) = opened_at
+        && let Err(e) = publish_case_create(org_id, &key_type, severity, first, title).await
+    {
+        log::error!("[SUPER_CLUSTER] Failed to publish case create: org_id: {org_id}, error: {e}");
+    }
+
+    let linked: std::collections::HashSet<(String, i64)> =
+        infra::table::alert_incidents::get_incident_alerts(&case.id)
+            .await?
+            .into_iter()
+            .map(|l| (l.alert_id, l.alert_fired_at))
+            .collect();
+    let mut alert_ids = Vec::new();
+    let mut alert_names = Vec::new();
+    for firing in firings {
+        if linked.contains(&(firing.alert_id.clone(), firing.fired_at)) {
+            continue;
+        }
+        infra::table::alert_incidents::add_alert_to_incident(
+            &case.id,
+            &firing.alert_id,
+            &firing.alert_name,
+            AlertKind::Internal.as_str(),
+            firing.fired_at,
+            "manual",
+        )
+        .await?;
+        if let Err(e) = publish_case_add_alert(org_id, &case.id, firing).await {
+            log::error!(
+                "[SUPER_CLUSTER] Failed to publish case add_alert: org_id: {org_id}, error: {e}"
+            );
+        }
+        if let Err(e) = infra::table::incident_events::record_alert(
+            org_id,
+            &case.id,
+            &firing.alert_id,
+            &firing.alert_name,
+            firing.fired_at,
+        )
+        .await
+        {
+            log::error!(
+                "[Incidents] Failed to record alert event for case {org_id}/{}: {e}",
+                case.id
+            );
+        }
+        alert_ids.push(firing.alert_id.clone());
+        alert_names.push(firing.alert_name.clone());
+    }
+    if !alert_ids.is_empty()
+        && let Err(e) = crate::incidents::append_event(
+            org_id,
+            &case.id,
+            IncidentEvent::alerts_attached(user_id, alert_ids, alert_names),
+        )
+        .await
+    {
+        log::error!("[Incidents] Failed to record attach event: org_id: {org_id}, error: {e}");
+    }
+    if let Some((from, to)) = escalated_severity(&case.severity, Some(severity), None) {
+        infra::table::alert_incidents::update_severity(org_id, &case.id, &to.to_string()).await?;
+        if let Err(e) = crate::incidents::append_event(
+            org_id,
+            &case.id,
+            IncidentEvent::severity_upgrade(from, to, format!("{user_id} attached a {to} firing")),
+        )
+        .await
+        {
+            log::error!(
+                "[Incidents] Failed to record severity event: org_id: {org_id}, error: {e}"
+            );
+        }
+    }
+
+    let case = infra::table::alert_incidents::get_rw(org_id, &case.id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
+    model_to_incident(case).await
+}
+
+/// Opens a case from one event, or adds it to `case_id`; the case spans the event's time.
+pub async fn attach_event_to_case(
+    org_id: &str,
+    case_id: Option<&str>,
+    title: Option<&str>,
+    event: &CaseEvent,
+    user_id: &str,
+) -> Result<Incident, anyhow::Error> {
+    use o2_enterprise::enterprise::security::cases;
+    let case = match case_id {
+        Some(id) => {
+            infra::table::alert_incidents::widen_case_span(org_id, id, event.at, event.at).await?;
+            infra::table::alert_incidents::mark_security_case(org_id, id).await?;
+            id.to_string()
+        }
+        None => {
+            let entity = cases::entity_of(&event.fields);
+            let title = title
+                .map(str::trim)
+                .filter(|t| !t.is_empty())
+                .map(str::to_string)
+                .unwrap_or_else(|| cases::event_case_title(&event.stream, entity.as_ref()));
+            let key_type = match entity {
+                Some(_) => config::meta::alerts::incidents::KeyType::Primary,
+                None => config::meta::alerts::incidents::KeyType::AlertId,
+            }
+            .to_string();
+            let dims = serde_json::to_value(
+                entity
+                    .as_ref()
+                    .map(cases::Entity::group_values)
+                    .unwrap_or_default(),
+            )?;
+            let severity = config::meta::alerts::incidents::IncidentSeverity::default();
+            let case = infra::table::alert_incidents::create_security_case(
+                org_id,
+                &severity.to_string(),
+                dims,
+                &key_type,
+                infra::table::alert_incidents::CaseActivity {
+                    first_event_at: event.at,
+                    last_event_at: event.at,
+                    historical: false,
+                },
+                Some(title.clone()),
+                None,
+            )
+            .await?;
+            if let Err(e) = infra::table::incident_events::init(org_id, &case.id).await {
+                log::error!(
+                    "[Incidents] Failed to init events for case {org_id}/{}: {e}",
+                    case.id
+                );
+            }
+            if let Err(e) = publish_case_create(org_id, &key_type, severity, event.at, &title).await
+            {
+                log::error!(
+                    "[SUPER_CLUSTER] Failed to publish case create: org_id: {org_id}, error: {e}"
+                );
+            }
+            case.id
+        }
+    };
+    if let Err(e) = crate::incidents::append_event(
+        org_id,
+        &case,
+        IncidentEvent::event_attached(user_id, &event.stream, event.at),
+    )
+    .await
+    {
+        log::error!("[Incidents] Failed to record event attach: org_id: {org_id}, error: {e}");
+    }
+    let case = infra::table::alert_incidents::get_rw(org_id, &case)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
+    model_to_incident(case).await
+}
+
+/// Whether incident writes are published to the other regions of a super-cluster.
+fn replicates_incidents() -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !config::get_config().common.local_mode
+}
+
+/// Replicates a manually opened case, as correlation does for one a firing opens.
+async fn publish_case_create(
+    org_id: &str,
+    key_type: &str,
+    severity: config::meta::alerts::incidents::IncidentSeverity,
+    first: i64,
+    title: &str,
+) -> Result<(), anyhow::Error> {
+    if !replicates_incidents() {
+        return Ok(());
+    }
+    o2_enterprise::enterprise::super_cluster::queue::incidents_create_with_mute(
+        org_id,
+        key_type,
+        &severity.to_string(),
+        serde_json::json!({}),
+        first,
+        Some(title.to_string()),
+        None,
+    )
+    .await
+}
+
+/// Replicates one firing attached to a case by hand.
+async fn publish_case_add_alert(
+    org_id: &str,
+    case_id: &str,
+    firing: &o2_enterprise::enterprise::security::cases::AttachedFiring,
+) -> Result<(), anyhow::Error> {
+    if !replicates_incidents() {
+        return Ok(());
+    }
+    o2_enterprise::enterprise::super_cluster::queue::incidents_add_alert(
+        org_id,
+        case_id,
+        &firing.alert_id,
+        &firing.alert_name,
+        firing.fired_at,
+        "manual",
+    )
+    .await
+}
+
 /// Update incident severity
 pub async fn update_severity(
     org_id: &str,
@@ -3460,6 +4331,256 @@ pub async fn update_severity(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    async fn correlation_db() -> sea_orm::DatabaseConnection {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ConnectionTrait, Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let table = Schema::new(backend).create_table_from_entity(alert_incidents::Entity);
+        db.execute(backend.build(&table)).await.unwrap();
+        db
+    }
+
+    async fn store_correlation_incident(
+        db: &sea_orm::DatabaseConnection,
+        id: &str,
+        created_at: i64,
+        group_values: serde_json::Value,
+    ) -> infra::table::entity::alert_incidents::Model {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::ActiveModelTrait;
+
+        let mut row = incident(None);
+        row.id = id.to_string();
+        row.created_at = created_at;
+        row.group_values = group_values;
+        let active: alert_incidents::ActiveModel = row.into();
+        active.reset_all().insert(db).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn correlation_selection_preserves_matching_and_legacy_fallbacks() {
+        use sea_orm::ConnectionTrait;
+
+        let incoming = HashMap::from([
+            ("ns".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "a".to_string()),
+        ]);
+        let cases = [
+            Some(serde_json::json!({"ns": "prod", "cluster": "a"})),
+            Some(serde_json::json!({"ns": "prod"})),
+            Some(serde_json::json!({"ns": "prod", "cluster": "a", "pod": "p1"})),
+            Some(serde_json::json!({})),
+            Some(serde_json::json!({"ns": 1})),
+            Some(serde_json::Value::Null),
+            Some(serde_json::json!(["legacy"])),
+            None,
+        ];
+        for dimensions in cases {
+            let db = correlation_db().await;
+            if let Some(dimensions) = &dimensions {
+                store_correlation_incident(&db, "older", 1, dimensions.clone()).await;
+                store_correlation_incident(&db, "selected", 2, dimensions.clone()).await;
+            }
+            store_correlation_incident(&db, "conflicting", 3, serde_json::json!({"ns": "dev"}))
+                .await;
+            store_correlation_incident(
+                &db,
+                "partial",
+                4,
+                serde_json::json!({"ns": "prod", "db": "redis"}),
+            )
+            .await;
+            db.execute_unprepared(
+                "UPDATE alert_incidents SET topology_context = 'invalid JSON' WHERE id IN ('conflicting', 'partial')",
+            )
+            .await
+            .unwrap();
+            let candidates =
+                infra::table::alert_incidents::find_correlation_candidates_with(&db, "default")
+                    .await
+                    .unwrap();
+            let found = select_correlation_candidate(&db, "default", &incoming, candidates)
+                .await
+                .unwrap();
+            assert_eq!(
+                found.as_ref().map(|row| row.id.as_str()),
+                dimensions.as_ref().map(|_| "selected"),
+                "stored dimensions: {dimensions:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn correlation_selection_continues_after_stale_projected_matches() {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+
+        let same = serde_json::json!({"ns": "prod", "cluster": "a"});
+        let incoming = serde_json::from_value(same.clone()).unwrap();
+        let changes = [
+            None,
+            Some(("default", "resolved", same.clone())),
+            Some(("other", "open", same.clone())),
+            Some(("default", "open", serde_json::json!({"ns": "dev"}))),
+            Some((
+                "default",
+                "open",
+                serde_json::json!({"ns": "prod", "db": "redis"}),
+            )),
+        ];
+        for change in changes {
+            let db = correlation_db().await;
+            store_correlation_incident(&db, "older", 1, same.clone()).await;
+            let newest = store_correlation_incident(&db, "newest", 2, same.clone()).await;
+            let candidates =
+                infra::table::alert_incidents::find_correlation_candidates_with(&db, "default")
+                    .await
+                    .unwrap();
+            if let Some((org, status, dimensions)) = change {
+                let mut active: alert_incidents::ActiveModel = newest.into();
+                active.org_id = Set(org.to_string());
+                active.status = Set(status.to_string());
+                active.group_values = Set(dimensions);
+                active.update(&db).await.unwrap();
+            } else {
+                alert_incidents::Entity::delete_by_id("newest")
+                    .exec(&db)
+                    .await
+                    .unwrap();
+            }
+            let found = select_correlation_candidate(&db, "default", &incoming, candidates)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(found.id, "older");
+        }
+    }
+
+    #[tokio::test]
+    async fn correlation_selection_returns_current_compatible_dimensions() {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ActiveModelTrait, Set};
+
+        let db = correlation_db().await;
+        let original = serde_json::json!({"ns": "prod", "cluster": "a", "pod": "p1"});
+        let current = serde_json::json!({"ns": "prod"});
+        let row = store_correlation_incident(&db, "newest", 1, original).await;
+        let candidates =
+            infra::table::alert_incidents::find_correlation_candidates_with(&db, "default")
+                .await
+                .unwrap();
+        let mut active: alert_incidents::ActiveModel = row.into();
+        active.group_values = Set(current.clone());
+        active.update(&db).await.unwrap();
+        let incoming = HashMap::from([
+            ("ns".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "a".to_string()),
+        ]);
+        let found = select_correlation_candidate(&db, "default", &incoming, candidates)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.group_values, current);
+    }
+
+    #[tokio::test]
+    async fn correlation_selection_propagates_selected_lookup_errors() {
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+        let incoming = HashMap::from([("ns".to_string(), "prod".to_string())]);
+        let candidates = vec![infra::table::alert_incidents::CorrelationCandidate {
+            id: "selected".to_string(),
+            group_values: serde_json::json!({"ns": "prod"}),
+        }];
+        assert!(matches!(
+            select_correlation_candidate(&db, "default", &incoming, candidates).await,
+            Err(infra::errors::Error::DbError(
+                infra::errors::DbError::SeaORMError(_)
+            ))
+        ));
+        assert!(
+            select_correlation_candidate(&db, "default", &incoming, Vec::new())
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn firings_on_one_entity_share_a_case_lock() {
+        let dims = |pairs: &[(&str, &str)]| -> HashMap<String, String> {
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect()
+        };
+        let a = siem_case_lock("org", &dims(&[("security_host", "win-1")]));
+        let b = siem_case_lock("org", &dims(&[("security_host", "win-1")]));
+        assert!(std::ptr::eq(a, b));
+        let both = siem_case_lock("org", &dims(&[("a", "1"), ("b", "2")]));
+        let swapped = siem_case_lock("org", &dims(&[("b", "2"), ("a", "1")]));
+        assert!(std::ptr::eq(both, swapped));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_incident_send_is_keyed_by_the_incident_id() {
+        use config::meta::alerts::notification_kind::{NotificationEvent, NotificationKind};
+        let mut ctx = crate::alerts::notifications::NotificationContext {
+            episode_id: Some("alert-episode".into()),
+            ..Default::default()
+        };
+        apply_incident_to_context(
+            &mut ctx,
+            "inc_1",
+            "severity_escalated",
+            "High error rate",
+            "P1",
+            "checkout",
+            "https://o2/web/alerts/incidents/inc_1",
+        );
+        assert_eq!(ctx.kind, NotificationKind::Incident);
+        assert_eq!(ctx.event, NotificationEvent::Firing);
+        assert_eq!(ctx.episode_id.as_deref(), Some("inc_1"));
+        assert_eq!(ctx.alert_url, "https://o2/web/alerts/incidents/inc_1");
+        let route =
+            crate::alerts::notifications::notify::route(&pagerduty_resolved(), &ctx).unwrap();
+        assert_eq!(route, crate::alerts::notifications::notify::Route::Render);
+        // Strict D8: an incident sends no recovery today, so a platform hears nothing on resolve.
+        ctx.event = NotificationEvent::Resolved;
+        assert!(matches!(
+            crate::alerts::notifications::notify::route(&pagerduty_resolved(), &ctx),
+            Err(crate::alerts::notifications::notify::NotifyError::Skipped(
+                _
+            ))
+        ));
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn pagerduty_resolved() -> crate::alerts::notifications::notify::Resolved {
+        use crate::alerts::notifications::org_default::{
+            EffectiveTemplate, TemplateSource, compiled_fallback,
+        };
+        let dest_type = config::meta::destinations::DestinationType::Http(
+            config::meta::destinations::Endpoint {
+                destination_type: Some("pagerduty".into()),
+                url: "https://events.pagerduty.com/v2/enqueue".into(),
+                ..Default::default()
+            },
+        );
+        crate::alerts::notifications::notify::Resolved {
+            destination: Default::default(),
+            channel: crate::alerts::notifications::derive_channel_format(&dest_type),
+            destination_type: dest_type,
+            effective: EffectiveTemplate {
+                template: compiled_fallback("org"),
+                source: TemplateSource::Compiled,
+                skipped: vec![],
+            },
+        }
+    }
 
     /// The incident path and the alert path page the same person about the same
     /// alert, so an unset priority has to mean the same thing on both. They used
@@ -3607,6 +4728,50 @@ mod tests {
         assert_eq!(reason, "alert_id_fallback");
     }
 
+    #[tokio::test]
+    async fn semantic_extraction_uses_the_settings_it_is_given() {
+        use config::meta::correlation::IdentitySet;
+        let identity = ServiceIdentityConfig {
+            sets: vec![IdentitySet {
+                id: "k8s".to_string(),
+                label: "Kubernetes".to_string(),
+                distinguish_by: vec!["k8s-namespace".to_string()],
+            }],
+            ..Default::default()
+        };
+        let groups = vec![
+            FieldAlias::new("k8s-namespace", "Namespace", &["k8s_namespace_name"]),
+            FieldAlias::new("service", "Service", &["service_name"]),
+        ];
+        let labels: HashMap<String, String> = [
+            ("k8s_namespace_name".to_string(), "prod".to_string()),
+            ("service_name".to_string(), "checkout".to_string()),
+            ("host".to_string(), "node-1".to_string()),
+        ]
+        .into();
+
+        let found = extract_filtered_semantic_dimensions("org-16560", &labels, &identity, &groups)
+            .await
+            .expect("the configured groups resolve");
+        assert_eq!(
+            found.group_values,
+            HashMap::from([
+                ("k8s-namespace".to_string(), "prod".to_string()),
+                ("service".to_string(), "checkout".to_string()),
+            ])
+        );
+
+        let opted_out = ServiceIdentityConfig {
+            service_optional: true,
+            ..Default::default()
+        };
+        assert!(
+            extract_filtered_semantic_dimensions("org-16560", &labels, &opted_out, &groups)
+                .await
+                .is_none()
+        );
+    }
+
     #[test]
     fn test_extract_service_name_from_sd_result() {
         use config::meta::alerts::incidents::KeyType;
@@ -3701,6 +4866,8 @@ mod tests {
             rca_confidence: None,
             rca_summary: None,
             rca_off_reason: None,
+            security_case: false,
+            historical: false,
         }
     }
 
@@ -3970,14 +5137,17 @@ mod tests {
     async fn a_run_started_while_rca_is_off_ends_rca_disabled() {
         use config::meta::alerts::rca_runs::{RunState, RunTrigger};
 
-        use crate::alerts::rca_runs::tests::{db, failures, new_incident, start, stored, timeline};
+        use crate::alerts::rca_runs::tests::{
+            db, failures, new_incident, rca_off, start, stored, timeline,
+        };
 
+        let _db = db().await;
+        rca_off();
         let cfg = o2_enterprise::enterprise::common::config::get_config();
         assert!(
             !(cfg.incidents.enabled && cfg.incidents.rca_enabled),
-            "the test relies on the default: RCA off"
+            "rca_off() turned RCA off"
         );
-        let _db = db().await;
         let (org, inc) = new_incident(None).await;
         let run_id = start(&org, &inc, RunTrigger::Manual).await;
 
@@ -4188,10 +5358,11 @@ mod tests {
 
         use crate::alerts::rca_runs::{
             StartOutcome, StartRun, start_run,
-            tests::{db, incident_start, new_incident, start, stored},
+            tests::{db, incident_start, new_incident, rca_off, start, stored},
         };
 
         let _db = db().await;
+        rca_off();
         let (org, inc) = new_incident(None).await;
         let source_run = start(&org, &inc, RunTrigger::Manual).await;
         crate::alerts::rca_runs::fail_run(
@@ -4422,6 +5593,247 @@ mod tests {
         assert_eq!(json_of(&archived)["rca"]["report_format"], "v1");
     }
 
+    /// A case spans its evidence, stays historical while every firing is, and an event widens it.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_security_case_spans_event_time_and_tracks_backfill_only_firings() {
+        use infra::table::alert_incidents::{
+            CaseActivity, add_firing_to_case, create_security_case, get_rw,
+        };
+
+        use crate::alerts::rca_runs::tests::db;
+
+        const HOUR: i64 = 3_600_000_000;
+        let _db = db().await;
+        let org = format!("case_span_{}", config::ider::uuid());
+        let span = |first, last, historical| CaseActivity {
+            first_event_at: first,
+            last_event_at: last,
+            historical,
+        };
+        let case = create_security_case(
+            &org,
+            "P2",
+            serde_json::json!({}),
+            "AlertId",
+            span(10 * HOUR, 11 * HOUR, true),
+            Some("Kerberoasting on DC-02".to_string()),
+            None,
+        )
+        .await
+        .unwrap();
+        add_firing_to_case(
+            &case.id,
+            "det-1",
+            "d",
+            "internal",
+            30 * HOUR,
+            "entity",
+            span(10 * HOUR, 11 * HOUR, true),
+        )
+        .await
+        .unwrap();
+        let stored = get_rw(&org, &case.id).await.unwrap().unwrap();
+        assert_eq!(
+            (stored.first_alert_at, stored.last_alert_at),
+            (10 * HOUR, 11 * HOUR)
+        );
+        assert!(stored.historical, "the run time never becomes last seen");
+
+        let open = infra::table::alert_incidents::find_open_incidents_by_alert_id(&org, "det-1")
+            .await
+            .unwrap();
+        assert_eq!(open.len(), 1);
+        assert!(
+            find_open_detection_case(&org, "det-1", (40 * HOUR, 40 * HOUR), 2 * HOUR)
+                .await
+                .unwrap()
+                .is_none(),
+            "a firing a day later opens its own case"
+        );
+        assert!(
+            find_open_detection_case(&org, "det-1", (12 * HOUR, 12 * HOUR), 2 * HOUR)
+                .await
+                .unwrap()
+                .is_some()
+        );
+
+        add_firing_to_case(
+            &case.id,
+            "det-2",
+            "d2",
+            "internal",
+            31 * HOUR,
+            "entity",
+            span(9 * HOUR, 12 * HOUR, false),
+        )
+        .await
+        .unwrap();
+        let stored = get_rw(&org, &case.id).await.unwrap().unwrap();
+        assert_eq!(
+            (stored.first_alert_at, stored.last_alert_at),
+            (9 * HOUR, 12 * HOUR)
+        );
+        assert!(
+            !stored.historical,
+            "a current firing makes the case current"
+        );
+
+        let event = CaseEvent {
+            stream: "okta_auth".to_string(),
+            at: 13 * HOUR,
+            fields: serde_json::json!({"actor_alternateid": "bob@acme.io"})
+                .as_object()
+                .unwrap()
+                .clone(),
+        };
+        let widened = attach_event_to_case(&org, Some(&case.id), None, &event, "a@acme.io")
+            .await
+            .unwrap();
+        assert_eq!(widened.last_alert_at, 13 * HOUR);
+        let opened = attach_event_to_case(&org, None, None, &event, "a@acme.io")
+            .await
+            .unwrap();
+        assert_eq!(
+            opened.title.as_deref(),
+            Some("Event from okta_auth on bob@acme.io")
+        );
+        assert_eq!(
+            opened.group_values,
+            serde_json::json!({"security_user": "bob@acme.io"})
+        );
+        assert_eq!(
+            (opened.first_alert_at, opened.last_alert_at),
+            (13 * HOUR, 13 * HOUR)
+        );
+    }
+
+    /// Hosts past the partition cap join the detection's entity-less case, not the first of them.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn rows_past_the_entity_cap_never_file_under_an_overflow_host() {
+        use infra::table::alert_incidents::CaseFilter;
+        use o2_enterprise::enterprise::security::cases::MAX_ENTITY_PARTITIONS;
+        use svix_ksuid::{Ksuid, KsuidLike};
+
+        use crate::alerts::rca_runs::tests::db;
+
+        const HOUR: i64 = 3_600_000_000;
+        let _db = db().await;
+        let org = format!("case_cap_{}", config::ider::uuid());
+        let mut alert = Alert::default();
+        alert.id = Some(Ksuid::new(None, None));
+        alert.org_id = org.clone();
+        alert.name = "brute_force".to_string();
+        alert.context_attributes = Some(
+            [
+                ("siem".to_string(), "true".to_string()),
+                ("sigma_title".to_string(), "Brute force".to_string()),
+            ]
+            .into_iter()
+            .collect(),
+        );
+        let rows: Vec<Map<String, Value>> = (0..60)
+            .map(|i| {
+                serde_json::json!({"hostname": format!("host-{i:02}"), "_timestamp": HOUR})
+                    .as_object()
+                    .unwrap()
+                    .clone()
+            })
+            .collect();
+
+        correlate_alert_to_incident(&alert, &rows[0], &rows, 2 * HOUR, None, None, None, None)
+            .await
+            .unwrap();
+
+        let (cases, total) = list_incidents_filtered(&org, None, CaseFilter::OnlyCases, 100, 0)
+            .await
+            .unwrap();
+        assert_eq!(total as usize, MAX_ENTITY_PARTITIONS + 1);
+        let mut titles: Vec<String> = cases.iter().filter_map(|c| c.title.clone()).collect();
+        titles.sort();
+        assert_eq!(titles.first().map(String::as_str), Some("Brute force"));
+        assert!(
+            !titles.iter().any(|t| t == "Brute force on host-50"),
+            "the first overflow host gets no case of its own"
+        );
+        let overflow = cases
+            .iter()
+            .find(|c| c.title.as_deref() == Some("Brute force"))
+            .unwrap();
+        assert_eq!(overflow.group_values, serde_json::json!({}));
+        assert_eq!(overflow.alert_count, 1);
+    }
+
+    /// A backfill firing with old and current rows on one host files each into its own case.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_backfill_keeps_old_evidence_out_of_the_current_case() {
+        use infra::table::alert_incidents::CaseFilter;
+        use svix_ksuid::{Ksuid, KsuidLike};
+
+        use crate::alerts::rca_runs::tests::db;
+
+        const HOUR: i64 = 3_600_000_000;
+        let _db = db().await;
+        let org = format!("case_backfill_{}", config::ider::uuid());
+        let mut alert = Alert::default();
+        alert.id = Some(Ksuid::new(None, None));
+        alert.org_id = org.clone();
+        alert.name = "uid0".to_string();
+        alert.context_attributes = Some(
+            [
+                ("siem".to_string(), "true".to_string()),
+                (
+                    "sigma_title".to_string(),
+                    "Linux Account Created With UID 0".to_string(),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        );
+        let now = 48 * HOUR;
+        let rows: Vec<Map<String, Value>> = [now - 6 * HOUR, now - 60_000_000]
+            .iter()
+            .map(|at| {
+                serde_json::json!({"host": "web-01", "_timestamp": at})
+                    .as_object()
+                    .unwrap()
+                    .clone()
+            })
+            .collect();
+
+        correlate_alert_to_incident(
+            &alert,
+            &rows[0],
+            &rows,
+            now,
+            None,
+            None,
+            None,
+            Some(now - HOUR),
+        )
+        .await
+        .unwrap();
+
+        let (cases, total) = list_incidents_filtered(&org, None, CaseFilter::OnlyCases, 10, 0)
+            .await
+            .unwrap();
+        assert_eq!(total, 2, "one case per window of evidence");
+        let mut shape: Vec<(i64, i64, bool)> = cases
+            .iter()
+            .map(|c| (c.first_alert_at, c.last_alert_at, c.historical))
+            .collect();
+        shape.sort();
+        assert_eq!(
+            shape,
+            [
+                (now - 6 * HOUR, now - 6 * HOUR, true),
+                (now - 60_000_000, now - 60_000_000, false),
+            ]
+        );
+    }
+
     /// Each listed incident names the alerts that fired into it and how often; an incident
     /// with no links lists none, and `alert_count` heals to the junction's firing total.
     #[cfg(feature = "enterprise")]
@@ -4435,8 +5847,13 @@ mod tests {
         let _db = db().await;
         let (org, repeat) = new_incident(None).await;
         let unlinked = add_incident(&org, None).await;
-        for (alert, fired_at) in [("a", 1), ("b", 2), ("a", 3), ("a", 4)] {
-            add_alert_to_incident(
+        for (alert, fired_at, new_type) in [
+            ("a", 1, true),
+            ("b", 2, true),
+            ("a", 3, false),
+            ("a", 4, false),
+        ] {
+            let joined = add_alert_to_incident(
                 &repeat,
                 alert,
                 &format!("{alert}-name"),
@@ -4446,6 +5863,7 @@ mod tests {
             )
             .await
             .unwrap();
+            assert_eq!(joined, new_type, "{alert} at {fired_at}");
         }
 
         let (incidents, _) = list_incidents(&org, None, 50, 0).await.unwrap();
@@ -4550,6 +5968,7 @@ mod tests {
             stream_name: "go_gc_duration_seconds".into(),
             alert_status: "firing".into(),
             alert_url: "https://o2.example/short/alert".into(),
+            alert_level: "critical".into(),
             ..Default::default()
         };
         super::apply_incident_to_context(
@@ -4563,6 +5982,24 @@ mod tests {
         );
         assert_eq!(ctx.alert_url, incident_url);
         assert_eq!(ctx.incident_id, "inc-1");
+        assert_eq!(ctx.alert_level, "P2");
+        assert_eq!(
+            ctx.level,
+            Some(config::meta::alerts::level::AlertLevel::Critical)
+        );
+        for (severity, level) in [
+            (
+                "P1",
+                Some(config::meta::alerts::level::AlertLevel::Critical),
+            ),
+            ("P3", Some(config::meta::alerts::level::AlertLevel::Warning)),
+            ("P4", None),
+            ("", None),
+        ] {
+            let mut other = NotificationContext::default();
+            super::apply_incident_to_context(&mut other, "inc-2", "e", "t", severity, "s", "u");
+            assert_eq!(other.level, level, "{severity}");
+        }
 
         let content = resolve_content(
             &compiled_default_content(),
@@ -4575,7 +6012,7 @@ mod tests {
         };
         let slack: serde_json::Value = serde_json::from_str(&body).unwrap();
         assert!(slack.get("incident").is_none(), "{body}");
-        assert!(slack["attachments"].is_array(), "{body}");
+        assert!(slack["blocks"].is_array(), "{body}");
         assert!(body.contains("incidents/inc-1"), "{body}");
 
         let custom = apply_custom_template(
@@ -4589,5 +6026,118 @@ mod tests {
                 r#"{{"text":"go_gc_rate_high on coredns [P2] new_incident_created {incident_url}"}}"#
             )
         );
+    }
+
+    #[tokio::test]
+    async fn incident_details_keep_only_the_alert_definitions_the_caller_may_read() {
+        let alert = |name: &str| {
+            let mut alert = Alert::default();
+            alert.name = name.to_string();
+            alert
+        };
+        let composite = |id: &str, folder_id: &str| CompositeAlertSummary {
+            id: id.to_string(),
+            name: id.to_string(),
+            alert_type: "composite".to_string(),
+            enabled: true,
+            folder_id: folder_id.to_string(),
+        };
+        let alerts = vec![
+            ("allowed".to_string(), "open".to_string(), alert("allowed")),
+            ("denied".to_string(), "open".to_string(), alert("denied")),
+            (
+                "in_closed".to_string(),
+                "closed".to_string(),
+                alert("in_closed"),
+            ),
+        ];
+        let composites = vec![
+            composite("c_allowed", "open"),
+            composite("c_closed", "closed"),
+        ];
+
+        let (alerts, composites) = readable_definitions(alerts, composites, |id, folder| {
+            std::future::ready(id != "denied" && folder != "closed")
+        })
+        .await;
+
+        let names: Vec<_> = alerts.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(names, ["allowed"]);
+        let ids: Vec<_> = composites.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, ["c_allowed"]);
+    }
+
+    fn recovered_link(alert_id: &str) -> infra::table::entity::alert_incident_alerts::Model {
+        infra::table::entity::alert_incident_alerts::Model {
+            incident_id: "inc-1".to_string(),
+            alert_id: alert_id.to_string(),
+            alert_fired_at: 1,
+            alert_name: alert_id.to_string(),
+            alert_kind: "internal".to_string(),
+            correlation_reason: None,
+            created_at: 1,
+            resolved_at: Some(2),
+        }
+    }
+
+    #[test]
+    fn an_ops_incident_closes_once_every_firing_recovers() {
+        let open = incident(None);
+        assert!(recovery_closes(&open, &[recovered_link("cpu")], false));
+
+        let mut still_firing = recovered_link("cpu");
+        still_firing.resolved_at = None;
+        assert!(!recovery_closes(&open, &[still_firing], false));
+        assert!(!recovery_closes(&open, &[], false));
+
+        let mut assigned = incident(None);
+        assigned.assigned_to = Some("a@acme.io".to_string());
+        assert!(!recovery_closes(&assigned, &[recovered_link("cpu")], false));
+    }
+
+    #[test]
+    fn a_security_case_never_closes_on_recovery() {
+        let open = incident(None);
+        assert!(!recovery_closes(&open, &[recovered_link("siem-1")], true));
+        let mut marked = incident(None);
+        marked.security_case = true;
+        assert!(
+            !recovery_closes(&marked, &[recovered_link("deleted-detection")], false),
+            "the marker keeps a case open after its detection is deleted"
+        );
+    }
+
+    #[test]
+    fn a_higher_sigma_firing_raises_the_case_priority() {
+        use config::meta::alerts::incidents::IncidentSeverity;
+        use o2_enterprise::enterprise::security::cases;
+        assert_eq!(
+            escalated_severity("P3", cases::sigma_severity("critical"), None),
+            Some((IncidentSeverity::P3, IncidentSeverity::P1))
+        );
+        assert_eq!(
+            escalated_severity("P1", cases::sigma_severity("low"), None),
+            None
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_an_incident_notification_retries_only_a_temporary_failure() {
+        use crate::alerts::notifications::notify::NotifyError;
+        let rejected = |status| NotifyError::Rejected {
+            status,
+            body: String::new(),
+        };
+        assert!(retries_incident_notify(&rejected(500), 1, 3));
+        assert!(retries_incident_notify(&rejected(429), 2, 3));
+        assert!(!retries_incident_notify(&rejected(500), 3, 3));
+        assert!(!retries_incident_notify(&rejected(400), 1, 3));
+        assert!(!retries_incident_notify(
+            &NotifyError::DestinationNotFound("slack".to_string()),
+            1,
+            3
+        ));
+        assert!(!retries_incident_notify(&rejected(500), 1, 0));
     }
 }

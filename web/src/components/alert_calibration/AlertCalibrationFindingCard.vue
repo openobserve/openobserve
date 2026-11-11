@@ -142,6 +142,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useOrgId } from "@/composables/query";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { parseLagRows, type FindingRecord, type LagRow } from "./digests";
 import { ACTION_META, isProposedAction, RULE_META } from "./rules";
 import {
@@ -168,6 +169,10 @@ const meta = computed(() => RULE_META[props.finding.rule_id]);
 
 /** A new tab, so the digest stays where it was while the alert is fixed. */
 const openAlert = () => {
+  analytics.track("alert_calibration_finding_alert_opened", {
+    rule: props.finding.rule_id,
+    source: "digest",
+  });
   const { href } = router.resolve({
     name: "alertDetail",
     params: { alert_id: props.finding.alert_id },

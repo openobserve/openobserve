@@ -119,6 +119,7 @@
                 name-prefix="filterGroup"
                 :target-scope="formValues.targetScope"
                 :stream-fields="streamFields"
+                :stream="formValues.stream"
                 data-test="job-form-filter-builder"
               />
             </div>
@@ -247,6 +248,7 @@
                 :group="endSignalGroup"
                 purpose="endSignal"
                 :stream-fields="streamFields"
+                :stream="formValues.stream"
                 data-test="job-form-end-signal-builder"
                 @update:group="endSignalGroup = $event"
               />
@@ -421,10 +423,6 @@ const form = useOForm<JobForm>({
 });
 const formValues = form.useStore((s: any) => s.values as JobForm);
 
-// The filter-builder tree is FORM-OWNED now: a reactive READ-VIEW of the
-// form's `filterGroup` field (JobFilterBuilder renders FilterGroup in form mode
-// and writes structural changes straight to the form). Single source of truth,
-// no mirror ref. Drives the preview computeds below and the save payload.
 const filterGroup = form.useStore((s: any) => s.values.filterGroup ?? createEmptyJobFilterGroup());
 // The completion end-signal and mapping/selectors are composite working state
 // built into the payload at submit.

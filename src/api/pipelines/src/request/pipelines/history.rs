@@ -127,6 +127,10 @@ pub struct PipelineHistoryResponse {
         (status = 403, description = "Forbidden", content_type = "application/json"),
         (status = 500, description = "Internal Server Error", content_type = "application/json"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"}))
+    )
 )]
 pub async fn get_pipeline_history(
     Path(org_id): Path<String>,

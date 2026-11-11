@@ -7,7 +7,8 @@ import { createStore } from "vuex";
 import i18n from "@/locales";
 import type { AxiosResponse } from "axios";
 import zo_config from "@/services/config";
-import { LICENSE_REFRESH_SETTLE_MS } from "@/utils/licenseWaivers";
+import { LICENSE_BOUNDARY_RETRY_MS, LICENSE_REFRESH_SETTLE_MS } from "@/utils/licenseWaivers";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 // Helper to create mock Axios responses
 const createAxiosResponse = <T = any>(data: T): AxiosResponse<T> => ({
@@ -80,6 +81,7 @@ vi.mock("@/services/license_server", async (importOriginal) => {
     default: {
       get_license: vi.fn(),
       update_license: vi.fn(),
+      check_license: vi.fn(),
       refresh_license_limits: vi.fn(),
     },
   });
@@ -97,7 +99,7 @@ vi.mock("@/enterprise/components/billings/LicensePeriod.vue", () => ({
   default: {
     name: "LicensePeriod",
     template: '<div data-test="license-period">License Period</div>',
-    emits: ["updateLicense"],
+    emits: ["renew"],
   },
 }));
 
@@ -137,6 +139,7 @@ describe("License.vue", () => {
     },
     ingestion_used: 45.5,
     ingestion_exceeded: 2,
+    can_update_license: true,
   };
 
   const createWrapper = (options = {}) => {
@@ -498,49 +501,91 @@ describe("License.vue", () => {
     });
 
     it("text typed into the update form survives the immediate and scheduled reloads", async () => {
-      vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue(createAxiosResponse({}));
+      const onlineData = {
+        ...mockLicenseData,
+        can_update_license: true,
+        refresh: {
+          mode: "online",
+          registration: "registered",
+          server_host: "license.openobserve.ai",
+          key_id: "synthetic-id",
+          last_success_at: null,
+          key_at_rest: "encrypted",
+          last_outcome: null,
+        },
+      };
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(onlineData));
+      vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue(
+        createAxiosResponse({ outcome: "unchanged" }),
+      );
+      wrapper.vm.licenseData = onlineData;
       wrapper.vm.showUpdateForm = true;
       await flushPromises();
       const field = () => wrapper.find('textarea[data-test="update-license-key-input-field"]');
       await field().setValue("half-typed-key");
 
-      await wrapper.vm.triggerLimitRefresh();
+      await wrapper.get('[data-test="license-online-refresh"]').trigger("click");
       await flushPromises();
       expect(field().element.value).toBe("half-typed-key");
 
-      const before = vi.mocked(licenseServer.get_license).mock.calls.length;
       await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS);
       await flushPromises();
-      expect(vi.mocked(licenseServer.get_license).mock.calls.length).toBe(before + 1);
       expect(wrapper.text()).not.toContain("Loading license information");
       expect(field().element.value).toBe("half-typed-key");
     });
 
-    it("refresh sends one request per click burst and spins only while it runs", async () => {
-      let resolveRefresh: (v: unknown) => void = () => {};
-      vi.mocked(licenseServer.refresh_license_limits).mockImplementation(
-        () => new Promise((r) => (resolveRefresh = r)) as never,
+    it("an older node's response without refresh status still offers a limits refresh", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({ ...mockLicenseData, can_update_license: true }),
       );
-      const first = wrapper.vm.triggerLimitRefresh();
-      const second = wrapper.vm.triggerLimitRefresh();
+      vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue(createAxiosResponse(""));
+      wrapper.unmount();
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="license-online-card"]').exists()).toBe(false);
+      const before = vi.mocked(licenseServer.get_license).mock.calls.length;
+      await wrapper.get('[data-test="refresh-license-limits-btn"]').trigger("click");
       await flushPromises();
       expect(licenseServer.refresh_license_limits).toHaveBeenCalledTimes(1);
-      expect(wrapper.vm.refreshing).toBe(true);
-
-      resolveRefresh(createAxiosResponse({}));
-      await Promise.all([first, second]);
-      await flushPromises();
-      expect(wrapper.vm.refreshing).toBe(false);
-
-      let resolveReload: (v: unknown) => void = () => {};
-      vi.mocked(licenseServer.get_license).mockImplementation(
-        () => new Promise((r) => (resolveReload = r)) as never,
+      expect(vi.mocked(licenseServer.get_license).mock.calls.length).toBeGreaterThan(before);
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Limits refreshed; online refresh needs all nodes upgraded",
+        }),
       );
-      await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS);
-      expect(licenseServer.get_license).toHaveBeenCalled();
-      expect(wrapper.vm.refreshing).toBe(false);
-      resolveReload(createAxiosResponse(mockLicenseData));
+    });
+
+    it("an older node's response hides the limits refresh without update permission", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({ ...mockLicenseData, can_update_license: false }),
+      );
+      wrapper.unmount();
+      wrapper = createWrapper();
       await flushPromises();
+      expect(wrapper.find('[data-test="refresh-license-limits-btn"]').exists()).toBe(false);
+    });
+
+    it("refresh button lives in the online card", async () => {
+      wrapper.vm.licenseData = {
+        ...mockLicenseData,
+        refresh: {
+          mode: "online",
+          registration: "registered",
+          server_host: "license.openobserve.ai",
+          key_id: "synthetic-id",
+          last_success_at: null,
+          key_at_rest: "encrypted",
+          last_outcome: null,
+        },
+        can_update_license: true,
+      };
+      await flushPromises();
+      expect(wrapper.find('[data-test="refresh-license-limits-btn"]').exists()).toBe(false);
+      expect(
+        wrapper
+          .find('[data-test="license-online-card"] [data-test="license-online-refresh"]')
+          .text(),
+      ).toBe("Refresh now");
     });
 
     it("unmounting before the delay cancels the reload", async () => {
@@ -555,6 +600,227 @@ describe("License.vue", () => {
       expect(setConfig).not.toHaveBeenCalled();
     });
 
+    it("passes the high-water warning and permission to the status card", async () => {
+      const warning = {
+        source: "db",
+        license_id: "lic_1",
+        loaded_rev: Date.UTC(2026, 9, 14) * 1000,
+        hwm_rev: Date.UTC(2026, 9, 20) * 1000,
+      };
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({
+          ...mockLicenseData,
+          decision: {
+            search_allowed: true,
+            blocks: [],
+            exceeded_days: 0,
+            allowed_days: 3,
+            limit_today_gb: 200,
+            used_today_gb: 122,
+            waiver_ids_applied: [],
+          },
+          rev_hwm_warning: warning,
+          can_update_license: true,
+        }),
+      );
+      wrapper.unmount();
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="license-status-rev-hwm"]').text()).toContain("stored key");
+      await wrapper.find('[data-test="license-status-rev-hwm-add-key"]').trigger("click");
+      expect(wrapper.vm.showUpdateForm).toBe(true);
+    });
+    it("a rev_rollback 409 shows both issue dates inline", async () => {
+      vi.mocked(licenseServer.update_license).mockRejectedValue({
+        response: {
+          status: 409,
+          data: {
+            code: 409,
+            reason: "rev_rollback",
+            message: "older",
+            license_id: "lic_1",
+            loaded_rev: Date.UTC(2026, 9, 20) * 1000,
+            pasted_rev: Date.UTC(2026, 9, 14) * 1000,
+          },
+        },
+      });
+      wrapper.vm.licenseKey = "new-license-key";
+      await wrapper.vm.updateLicense();
+      await flushPromises();
+      expect(wrapper.find('[data-test="license-key-check-banner"]').text()).toContain(
+        "Oct 20, 2026",
+      );
+      expect(wrapper.find('[data-test="license-key-check-banner"]').text()).toContain(
+        "Oct 14, 2026",
+      );
+      expect(mockToast).not.toHaveBeenCalled();
+    });
+    it("Check key calls check_license and never update_license", async () => {
+      vi.mocked(licenseServer.check_license).mockResolvedValue(
+        createAxiosResponse({
+          dry_run: true,
+          outcome: "accept",
+          license_id: "lic_1",
+          message: "",
+          same_license: true,
+          loaded_rev: 1,
+          pasted_rev: 2,
+          waivers_added: [],
+          waivers_removed: [],
+        }),
+      );
+      wrapper.vm.showUpdateForm = true;
+      await flushPromises();
+      await wrapper
+        .find('textarea[data-test="update-license-key-input-field"]')
+        .setValue("checked-key");
+      await wrapper.find('[data-test="check-update-license-btn"]').trigger("click");
+      await flushPromises();
+      expect(licenseServer.check_license).toHaveBeenCalledWith("checked-key");
+      expect(licenseServer.update_license).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain("same waivers");
+    });
+    it("draft edits discard a pending preview and block accidental updates", async () => {
+      let resolve: (response: AxiosResponse) => void = () => {};
+      vi.mocked(licenseServer.check_license).mockImplementation(
+        () => new Promise((r) => (resolve = r)),
+      );
+      wrapper.vm.showUpdateForm = true;
+      await flushPromises();
+      const field = wrapper.find('textarea[data-test="update-license-key-input-field"]');
+      await field.setValue("first-key");
+      await wrapper.find('[data-test="check-update-license-btn"]').trigger("click");
+      await field.setValue("second-key");
+      await wrapper.vm.updateLicense({ licenseKey: "second-key" });
+      expect(licenseServer.update_license).not.toHaveBeenCalled();
+      resolve(
+        createAxiosResponse({
+          dry_run: true,
+          outcome: "accept",
+          license_id: "lic_1",
+          message: "",
+          same_license: true,
+          loaded_rev: 1,
+          pasted_rev: 2,
+          waivers_added: [],
+          waivers_removed: [],
+        }),
+      );
+      await flushPromises();
+      expect(wrapper.find('[data-test="license-key-check-banner"]').exists()).toBe(false);
+    });
+    it("cancel clears the form-owned draft even when the incoming key was empty", async () => {
+      wrapper.vm.showUpdateForm = true;
+      await flushPromises();
+      const field = () => wrapper.find('textarea[data-test="update-license-key-input-field"]');
+      await field().setValue("typed-key");
+      await wrapper.find('[data-test="cancel-update-license-btn"]').trigger("click");
+      wrapper.vm.showUpdateForm = true;
+      await flushPromises();
+      expect(field().element.value).toBe("");
+    });
+    it("editing a completed preview clears it", async () => {
+      vi.mocked(licenseServer.check_license).mockResolvedValue(
+        createAxiosResponse({
+          dry_run: true,
+          outcome: "accept",
+          license_id: "lic_1",
+          message: "",
+          same_license: true,
+          loaded_rev: 1,
+          pasted_rev: 2,
+          waivers_added: [],
+          waivers_removed: [],
+        }),
+      );
+      wrapper.vm.showUpdateForm = true;
+      await flushPromises();
+      const field = wrapper.find('textarea[data-test="update-license-key-input-field"]');
+      await field.setValue("first-key");
+      await wrapper.find('[data-test="check-update-license-btn"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="license-key-check-banner"]').exists()).toBe(true);
+      await field.setValue("second-key");
+      expect(wrapper.find('[data-test="license-key-check-banner"]').exists()).toBe(false);
+    });
+    it("an accept preview lists added and removed waivers", async () => {
+      const waiver = {
+        id: "added",
+        type: "search_unblock",
+        starts_at: 1,
+        ends_at: Date.UTC(2026, 9, 30) * 1000,
+        note: "Added waiver",
+      };
+      vi.mocked(licenseServer.check_license).mockResolvedValue(
+        createAxiosResponse({
+          dry_run: true,
+          outcome: "accept",
+          license_id: "lic_1",
+          message: "",
+          same_license: true,
+          loaded_rev: 1,
+          pasted_rev: 2,
+          waivers_added: [waiver],
+          waivers_removed: [{ ...waiver, id: "removed", note: "Removed waiver" }],
+        }),
+      );
+      wrapper.vm.showUpdateForm = true;
+      await flushPromises();
+      await wrapper
+        .find('textarea[data-test="update-license-key-input-field"]')
+        .setValue("checked-key");
+      await wrapper.find('[data-test="check-update-license-btn"]').trigger("click");
+      await flushPromises();
+      const text = wrapper.find('[data-test="license-key-check"]').text();
+      expect(text).toContain("Added (1)");
+      expect(text).toContain("Removed (1)");
+      expect(text).toContain("Added waiver");
+      expect(text).toContain("Removed waiver");
+    });
+    it("a 409 without a rev reason still toasts the server message", async () => {
+      vi.mocked(licenseServer.update_license).mockRejectedValue({
+        response: {
+          status: 409,
+          data: { code: 409, reason: "future_reason", message: "Generic conflict" },
+        },
+      });
+      await wrapper.vm.updateLicense({ licenseKey: "checked-key" });
+      await flushPromises();
+      expect(mockToast.mock.calls.at(-1)?.[0].message).toContain("Generic conflict");
+    });
+    for (const status of [400, 403]) {
+      it(`a failed check (${status}) appears inline`, async () => {
+        vi.mocked(licenseServer.check_license).mockRejectedValue({
+          response: { status, data: { message: "the license key could not be decoded." } },
+        });
+        wrapper.vm.showUpdateForm = true;
+        await flushPromises();
+        await wrapper
+          .find('textarea[data-test="update-license-key-input-field"]')
+          .setValue("checked-key");
+        await wrapper.find('[data-test="check-update-license-btn"]').trigger("click");
+        await flushPromises();
+        expect(wrapper.find('[data-test="license-key-check-error"]').text()).toContain(
+          status === 403 ? "permission" : "could not be decoded",
+        );
+        expect(licenseServer.update_license).not.toHaveBeenCalled();
+      });
+    }
+    it("a malformed preview is shown as a failed check", async () => {
+      vi.mocked(licenseServer.check_license).mockResolvedValue(
+        createAxiosResponse({ outcome: "accept" }),
+      );
+      wrapper.vm.showUpdateForm = true;
+      await flushPromises();
+      await wrapper
+        .find('textarea[data-test="update-license-key-input-field"]')
+        .setValue("checked-key");
+      await wrapper.find('[data-test="check-update-license-btn"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="license-key-check-error"]').text()).toContain(
+        "Couldn’t check this key",
+      );
+    });
     it("a 409 from the env key shows the server message", async () => {
       vi.mocked(licenseServer.update_license).mockRejectedValue({
         response: { status: 409, data: { message: "Remove O2_LICENSE_KEY first" } },
@@ -1123,6 +1389,43 @@ describe("License.vue", () => {
   });
 
   describe("Backend search decision", () => {
+    it("passes GET waiver data to the status card", async () => {
+      const date = new Date();
+      const now = date.getTime() * 1000;
+      const monthStart = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1) * 1000;
+      const monthEnd = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1) * 1000;
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({
+          ...withDecision({ allowed_days: 5, exceeded_days: 4 }),
+          base: { ...decision, allowed_days: 3, exceeded_days: 4 },
+          waivers: [
+            {
+              id: "breach",
+              type: "breach_days",
+              extra: 2,
+              starts_at: monthStart,
+              ends_at: monthEnd,
+              note: "",
+            },
+            {
+              id: "grace",
+              type: "report_grace",
+              starts_at: now - 1000000,
+              ends_at: now + 1000000,
+              note: "",
+            },
+          ],
+        }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find("[data-test=license-status-days]").text()).toContain(
+        "3 allowed this month + 2 from a waiver · 4 used",
+      );
+      expect(wrapper.find("[data-test=license-status-reporting]").text()).toContain(
+        "features stay on while reports catch up",
+      );
+    });
     const decision = {
       search_allowed: true,
       blocks: [],
@@ -1299,15 +1602,24 @@ describe("License.vue", () => {
     const mountWith = async (
       license: Record<string, unknown>,
       features: object = configFeatures,
+      response: object = {},
     ) => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(
         createAxiosResponse({
           ...mockLicenseData,
+          ...response,
           license: { ...mockLicenseData.license, ...license },
         }),
       );
       store = createStore({
-        state: { zoConfig: { license_server_url: "https://license.example.com", features } },
+        state: {
+          zoConfig: {
+            license_server_url: "https://license.example.com",
+            version: "v0.70.0",
+            feature_revision: 1,
+            features,
+          },
+        },
       });
       wrapper = mount(License, {
         global: { plugins: [store, i18n], stubs: { LicensePeriod: true, ODialog: ODialogStub } },
@@ -1325,7 +1637,7 @@ describe("License.vue", () => {
       await flushPromises();
     };
     const licenseUrl =
-      "https://license.example.com/user/request-license?base_url=http%3A%2F%2Flocalhost%3A3000&license_id=test-installation-123";
+      "https://license.example.com/user/request-license?base_url=http%3A%2F%2Flocalhost%3A3000&license_id=test-installation-123&o2_version=v0.70.0&feature_revision=1&features=sso";
 
     it("summarises unlocked of paid features and the free count", async () => {
       await mountWith({ features: ["sso"], feature_definition: featureDefinition });
@@ -1369,8 +1681,18 @@ describe("License.vue", () => {
     it("reads 0 of N for an empty features list", async () => {
       await mountWith({ features: [], feature_definition: featureDefinition });
 
-      expect(find("-summary").text()).toContain("0 of 3 paid features");
+      expect(find("-summary").text()).toContain("0 of 2 paid features");
+      expect(items("free-not-included")).toEqual(["sso"]);
       expect(find("-unlocked").exists()).toBe(false);
+    });
+
+    it("passes evaluated_at 0 down, so a stale enabled key stays missing", async () => {
+      await mountWith({ features: [], feature_definition: featureDefinition }, configFeatures, {
+        evaluated_at: 0,
+      });
+
+      expect(find("-free-not-included").exists()).toBe(false);
+      expect(items("missing")).toContain("sso");
     });
 
     it("shows only the all-features summary for a license without a features list", async () => {
@@ -1431,6 +1753,39 @@ describe("License.vue", () => {
       expect(open).toHaveBeenCalledTimes(2);
       for (const call of open.mock.calls) expect(call).toEqual([licenseUrl, "_blank"]);
       open.mockRestore();
+    });
+
+    it("sends no event as a parameter from any request link", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+
+      await find("-request-access").trigger("click");
+      await wrapper.find("[data-test=request-new-license-btn]").trigger("click");
+      wrapper.findComponent({ name: "LicensePeriod" }).vm.$emit("renew");
+
+      expect(open).toHaveBeenCalledTimes(3);
+      for (const [url] of open.mock.calls) {
+        expect([...new URL(String(url)).searchParams.keys()]).toEqual([
+          "base_url",
+          "license_id",
+          "o2_version",
+          "feature_revision",
+          "features",
+        ]);
+      }
+      open.mockRestore();
+    });
+
+    it("hides the action row from a viewer who cannot update the license", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({ ...mockLicenseData, can_update_license: false }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.find("[data-test=request-new-license-btn]").exists()).toBe(false);
+      expect(wrapper.find("[data-test=add-license-key-btn]").exists()).toBe(false);
+      expect(wrapper.find("[data-test=refresh-license-limits-btn]").exists()).toBe(false);
     });
 
     it("lets the masked license key wrap while the reveal button keeps its size", async () => {
@@ -1511,7 +1866,10 @@ describe("License.vue", () => {
         const open = vi.spyOn(window, "open").mockReturnValue(null);
         await find("-request-access").trigger("click");
 
-        expect(open).toHaveBeenCalledWith(licenseUrl, "_blank");
+        expect(open).toHaveBeenCalledWith(
+          licenseUrl.replace("features=sso", "features=ai%2Crbac%2Csso"),
+          "_blank",
+        );
         open.mockRestore();
       });
 
@@ -1571,6 +1929,417 @@ describe("License.vue", () => {
         expect(new Set(all).size).toBe(all.length);
         expect(items("unlocked")).toEqual(["sso", "workflows"]);
         expect(items("new")).toEqual(["traces_v2"]);
+      });
+    });
+  });
+
+  describe("Waiver boundary refetch", () => {
+    const now = Date.UTC(2026, 9, 20, 12);
+    const unblockEndUs = (now + 1000) * 1000;
+    const graceEndUs = (now + 1300) * 1000;
+    const decision = {
+      search_allowed: true,
+      blocks: [],
+      exceeded_days: 4,
+      allowed_days: 3,
+      limit_today_gb: 50,
+      used_today_gb: 10,
+      waiver_ids_applied: ["unblock"],
+    };
+    const base = { ...decision, search_allowed: false, waiver_ids_applied: [] };
+    const waivers = [
+      {
+        id: "unblock",
+        type: "search_unblock",
+        starts_at: (now - 86400000) * 1000,
+        ends_at: unblockEndUs,
+        note: "Unblock",
+      },
+      {
+        id: "grace",
+        type: "report_grace",
+        starts_at: (now - 86400000) * 1000,
+        ends_at: graceEndUs,
+        note: "Grace",
+      },
+    ];
+    const response = (over: Record<string, unknown>) =>
+      createAxiosResponse({
+        ...mockLicenseData,
+        license: { ...mockLicenseData.license, version: 2, limit_breach_allowed_count: 3 },
+        decision,
+        base,
+        waivers,
+        evaluated_at: now * 1000,
+        ...over,
+      });
+    const paused = {
+      decision: { ...base, blocks: ["usage_over_limit"] },
+      evaluated_at: graceEndUs + 1000,
+    };
+    const search = () => wrapper.find("[data-test=license-status-search]").text();
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+      vi.setSystemTime(now);
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it("refetches the licence once after a burst of boundaries and shows the new decision", async () => {
+      vi.mocked(licenseServer.get_license)
+        .mockResolvedValueOnce(response({}))
+        .mockResolvedValue(response(paused));
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(1);
+      expect(search()).toContain("Restored by a waiver");
+
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      await flushPromises();
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(2);
+      expect(search()).toContain("Paused");
+      expect(search()).not.toContain("Restored by a waiver");
+
+      await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS * 3);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(2);
+    });
+
+    it("fetches again while the server decision predates the boundary", async () => {
+      vi.mocked(licenseServer.get_license)
+        .mockResolvedValueOnce(response({}))
+        .mockResolvedValueOnce(response({}))
+        .mockResolvedValue(response(paused));
+      wrapper = createWrapper();
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(2500);
+      await flushPromises();
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(2);
+      expect(search()).toContain("Restored by a waiver");
+
+      await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS);
+      await flushPromises();
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(3);
+      expect(search()).toContain("Paused");
+      await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS * 3);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(3);
+    });
+
+    const deferred = () => {
+      let resolve: (value: AxiosResponse) => void = () => {};
+      const promise = new Promise<AxiosResponse>((r) => (resolve = r));
+      return { promise, resolve };
+    };
+    const errorToasts = () =>
+      mockToast.mock.calls.filter(([options]) => options?.variant === "error").length;
+
+    it("drops a pending refetch on unmount, including one a boundary set during a refetch", async () => {
+      const inFlight = deferred();
+      vi.mocked(licenseServer.get_license)
+        .mockResolvedValueOnce(response({}))
+        .mockReturnValueOnce(inFlight.promise)
+        .mockResolvedValue(response({}));
+      wrapper = createWrapper();
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(2500);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(2);
+      wrapper.vm.refetchAtBoundary(graceEndUs);
+      inFlight.resolve(response({}));
+      await flushPromises();
+      wrapper.unmount();
+      await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS * 3);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(2);
+    });
+
+    it("schedules nothing when a refetch in flight finishes after unmount", async () => {
+      const inFlight = deferred();
+      vi.mocked(licenseServer.get_license)
+        .mockResolvedValueOnce(response({}))
+        .mockReturnValueOnce(inFlight.promise)
+        .mockResolvedValue(response({}));
+      wrapper = createWrapper();
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(2500);
+      wrapper.unmount();
+      inFlight.resolve(response({}));
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS * 3);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps a single retry chain when a boundary arrives during a refetch", async () => {
+      const inFlight = deferred();
+      vi.mocked(licenseServer.get_license)
+        .mockResolvedValueOnce(response({}))
+        .mockReturnValueOnce(inFlight.promise)
+        .mockResolvedValue(response({}));
+      wrapper = createWrapper();
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(2500);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(2);
+      wrapper.vm.refetchAtBoundary(graceEndUs);
+      inFlight.resolve(response({}));
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(3);
+      for (let minute = 1; minute <= 3; minute++) {
+        await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS);
+        expect(licenseServer.get_license).toHaveBeenCalledTimes(3 + minute);
+      }
+    });
+
+    it("toasts only the first failure of a boundary retry chain", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const gets = () => vi.mocked(licenseServer.get_license).mock.calls.length;
+      vi.mocked(licenseServer.get_license)
+        .mockResolvedValueOnce(response({}))
+        .mockRejectedValue({ response: { status: 503 } });
+      wrapper = createWrapper();
+      await flushPromises();
+      mockToast.mockClear();
+
+      await vi.advanceTimersByTimeAsync(2500 + 5000);
+      expect(gets()).toBeGreaterThan(1);
+      expect(errorToasts()).toBe(1);
+
+      const userReload = wrapper.vm.reloadLicenseData();
+      await vi.advanceTimersByTimeAsync(5000);
+      await userReload;
+      expect(errorToasts()).toBe(2);
+
+      const beforeRetries = gets();
+      await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS * 3);
+      expect(gets()).toBeGreaterThan(beforeRetries + 2);
+      expect(errorToasts()).toBe(2);
+
+      wrapper.vm.refetchAtBoundary(graceEndUs + 1);
+      await vi.advanceTimersByTimeAsync(1000 + 5000);
+      expect(errorToasts()).toBe(3);
+      await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS * 2);
+      expect(errorToasts()).toBe(3);
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe("Applying a key that makes something worse", () => {
+    // Signed with the license test key; all claims are placeholders.
+    const SIGNED_KEY =
+      "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJPcGVuT2JzZXJ2ZSIsInZlcnNpb24iOjIsImluc3RhbGxhdGlvbl9pZCI6Imluc3RfdGVzdCIsImxpY2Vuc2VfaWQiOiJsaWNfdGVzdCIsImFjdGl2ZSI6dHJ1ZSwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMDAwMDAwMCwiZXhwaXJlc19hdCI6NDEwMjQ0NDgwMDAwMDAwMCwibXN2IjoiMC4wLjAiLCJjb21wYW55IjoiVGVzdCBDbyIsImFkZHJlc3MiOiIxIFRlc3QgV2F5IiwiY29udGFjdF9uYW1lIjoiVGVzdCBVc2VyIiwiY29udGFjdF9lbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJhZGRpdGlvbmFsX2VtYWlscyI6W10sImJhc2VfdXJscyI6W10sImxpbWl0cyI6eyJJbmdlc3Rpb24iOnsidHlwIjoiUGVyRGF5Q291bnQiLCJ2YWx1ZSI6MTAwfX0sImNvbXBhbnlfaWQiOiIiLCJlbnZpcm9ubWVudF90eXBlIjoiYWlyZ2FwcGVkIiwibGltaXRfYnJlYWNoX2FsbG93ZWRfY291bnQiOjMsImFsbG93X3NlYXJjaF9hZnRlcl9saW1pdF9leGNlZWRlZCI6ZmFsc2UsInZhbGlkYXRvcl91cmwiOiIiLCJ2YWxpZGF0b3JfYXV0aCI6IiIsIm5vX3VzYWdlX3JlcG9ydF9hbGxvd2VkX2R1cmF0aW9uIjo2MDQ4MDAwMDAwMDAsImZlYXR1cmVzIjpbImFpX2Fzc2lzdGFudCJdLCJmZWF0dXJlX2RlZmluaXRpb24iOnsidmVyc2lvbiI6IjEiLCJyZWxlYXNlIjoidGVzdCIsImZlYXR1cmVzIjp7ImFpX2Fzc2lzdGFudCI6eyJkaXNwbGF5X25hbWUiOiJBSSBBc3Npc3RhbnQiLCJnYXRlIjp0cnVlfSwib25jYWxsIjp7ImRpc3BsYXlfbmFtZSI6Ik9uLUNhbGwiLCJnYXRlIjp0cnVlfSwiYWxlcnRzIjp7ImRpc3BsYXlfbmFtZSI6IkFsZXJ0cyIsImdhdGUiOmZhbHNlfX19fQ.k_brgZLB6lFm7Of456aYnKMSQSEnZgzv2ISIMN6sIy2ws5drROQ-suCq4GilBY4Liuo9L36EqxjOzFWFDrd7V42uoYaKDFR8i9swOpkuvkji7OUwqp2_2mNV7S7rp1Vq9fSWWfNRkyanHRnqfjD0H7-6heNf9GEghZ6bWqK00lgtocvsmbj4RpRzFoytSIVbG_SF5Jb8wj22-4ODZeUkDt_9p2d7DKjXt94EUGOZ0plAF2Dmam3R0sMct7c0XY8SYcGbb5vqPpLdLX9oTbmHpNu56tGQxSRYiqJtXj1kxjudg-UqCI_8zi8SDivWIL79xDIRVxGWdXHsJMqTViEnsA";
+    const { currentDialog, handleCancel, handleConfirm } = useConfirmDialog();
+
+    const b64url = (claims: object) => btoa(JSON.stringify(claims)).replace(/=+$/, "");
+    const keyWith = (claims: object) => `eyJhbGciOiJSUzI1NiJ9.${b64url(claims)}.c2lnbmF0dXJl`;
+    const lines = () => currentDialog.value?.lines?.map(String);
+
+    const mountCurrent = async (license: Record<string, unknown> | null) => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({ ...mockLicenseData, license }),
+      );
+      vi.mocked(licenseServer.update_license).mockResolvedValue(
+        createAxiosResponse({ success: true }),
+      );
+      store = createStore({
+        state: {
+          zoConfig: {
+            license_server_url: "https://license.example.com",
+            feature_names: { oncall: "On-Call", ai_assistant: "AI Assistant" },
+            features: {},
+          },
+        },
+      });
+      wrapper = mount(License, {
+        global: { plugins: [store, i18n], stubs: { LicensePeriod: true, ODialog: ODialogStub } },
+      });
+      await flushPromises();
+    };
+
+    const allFeatures = {
+      ...mockLicenseData.license,
+      expires_at: 4200000000000000,
+      limits: { Ingestion: { typ: "Unlimited", value: 0 } },
+    };
+
+    afterEach(() => handleCancel());
+
+    it("decodes a real signed key and names every loss in a destructive dialog", async () => {
+      await mountCurrent(allFeatures);
+
+      void wrapper.vm.updateLicense({ licenseKey: SIGNED_KEY });
+      await flushPromises();
+
+      expect(currentDialog.value).toMatchObject({
+        title: "Apply this license key?",
+        message: "This key replaces your current license.",
+        linesDataTest: "license-key-losses",
+        confirmLabel: "Yes, update license",
+        cancelLabel: "No, keep current",
+        confirmVariant: "destructive",
+        focusCancel: true,
+      });
+      const date = (us: number) =>
+        new Date(us / 1000).toLocaleDateString("en-us", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+      expect(lines()).toEqual([
+        "You will lose: On-Call",
+        "Daily limit goes from Unlimited to 100 GB/day",
+        `Expiry moves from ${date(4200000000000000)} to ${date(4102444800000000)}`,
+      ]);
+    });
+
+    it("cancel sends no POST and leaves the form", async () => {
+      await mountCurrent(allFeatures);
+      wrapper.vm.showUpdateForm = true;
+
+      const applying = wrapper.vm.updateLicense({ licenseKey: SIGNED_KEY });
+      await flushPromises();
+      handleCancel();
+      await applying;
+
+      expect(licenseServer.update_license).not.toHaveBeenCalled();
+      expect(wrapper.vm.showUpdateForm).toBe(true);
+
+      void wrapper.vm.updateLicense({ licenseKey: SIGNED_KEY });
+      await flushPromises();
+      expect(currentDialog.value).not.toBeNull();
+    });
+
+    it("confirm sends the POST", async () => {
+      await mountCurrent(allFeatures);
+
+      const applying = wrapper.vm.updateLicense({ licenseKey: SIGNED_KEY });
+      await flushPromises();
+      handleConfirm();
+      await applying;
+
+      expect(licenseServer.update_license).toHaveBeenCalledWith(SIGNED_KEY);
+    });
+
+    it("an upgrade sends the POST with no dialog", async () => {
+      await mountCurrent({
+        ...mockLicenseData.license,
+        expires_at: 1000,
+        features: ["ai_assistant"],
+        limits: { Ingestion: { typ: "PerDayCount", value: 50 } },
+      });
+
+      await wrapper.vm.updateLicense({ licenseKey: SIGNED_KEY });
+
+      expect(currentDialog.value).toBeNull();
+      expect(licenseServer.update_license).toHaveBeenCalledWith(SIGNED_KEY);
+    });
+
+    it("warns about an expired first key", async () => {
+      await mountCurrent(null);
+      const expiredKey = keyWith({ expires_at: 1000000000000000 });
+
+      const applying = wrapper.vm.updateLicense({ licenseKey: expiredKey });
+      await flushPromises();
+
+      expect(lines()).toEqual([
+        expect.stringMatching(/^This key expired on .* The free limit of 50 GB\/day will apply\.$/),
+      ]);
+      handleConfirm();
+      await applying;
+      expect(licenseServer.update_license).toHaveBeenCalledWith(expiredKey);
+    });
+
+    it.each([
+      ["no separators", "not-a-key"],
+      ["a payload that is not base64", "a.%%.c"],
+      ["a payload that is not JSON", `a.${btoa("nope")}.c`],
+      ["a payload of null", `a.${btoa("null")}.c`],
+      ["features that are not a list", `a.${btoa('{"features":"x","expires_at":1}')}.c`],
+    ])("skips the dialog for %s and lets the server answer", async (_name, key) => {
+      await mountCurrent(allFeatures);
+
+      await wrapper.vm.updateLicense({ licenseKey: key });
+
+      expect(currentDialog.value).toBeNull();
+      expect(licenseServer.update_license).toHaveBeenCalledWith(key);
+    });
+  });
+
+  describe("Expired Unlimited license", () => {
+    it("is not reported as unlimited", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({
+          ...mockLicenseData,
+          expired: true,
+          license: {
+            ...mockLicenseData.license,
+            limits: { Ingestion: { typ: "Unlimited", value: 0 } },
+          },
+        }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.isIngestionUnlimited).toBe(false);
+    });
+  });
+
+  describe("Usage chart limit line", () => {
+    const decision = {
+      search_allowed: true,
+      blocks: [],
+      exceeded_days: 0,
+      allowed_days: 3,
+      limit_today_gb: null,
+      used_today_gb: 0,
+      waiver_ids_applied: [],
+    };
+    const limitLine = async (typ: string, value: number, expired: boolean) => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({
+          key: "anonymised-key",
+          license: { ...mockLicenseData.license, limits: { Ingestion: { typ, value } } },
+          installation_id: "inst_test",
+          expired,
+          ingestion_used: 0,
+          ingestion_exceeded: 0,
+          waivers: [],
+          decision,
+          base: decision,
+          evaluated_at: 0,
+          env_key_active: false,
+          env_key_in_use: false,
+          can_update_license: true,
+        }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+      return wrapper.vm.usageDashboardData.tabs[0].panels[0].config.mark_line.map(
+        (line: { value: number }) => line.value,
+      );
+    };
+
+    it.each([
+      ["a live 200 GB key at its own limit", "PerDayCount", 200, false, [204800]],
+      ["an expired 200 GB key at the free limit", "PerDayCount", 200, true, [51200]],
+      ["an expired Unlimited key at the free limit", "Unlimited", 0, true, [51200]],
+      ["a live Unlimited key without a line", "Unlimited", 0, false, []],
+    ])("draws %s", async (_name, typ, value, expired, expected) => {
+      expect(await limitLine(typ, value, expired)).toEqual(expected);
+    });
+
+    it("says the same limit in the summary as the line draws for an expired key", async () => {
+      expect(await limitLine("Unlimited", 0, true)).toEqual([51200]);
+
+      expect(wrapper.text()).toContain("50 GB of data ingestion per day");
+    });
+
+    it("places the line in the panel's megabytes and labels it in GB", async () => {
+      await limitLine("PerDayCount", 200, false);
+
+      const panel = wrapper.vm.usageDashboardData.tabs[0].panels[0];
+      expect(panel.config.unit).toBe("megabytes");
+      expect(panel.config.mark_line[0]).toMatchObject({
+        value: 200 * 1024,
+        label_formatter: "{b}:200 GB",
       });
     });
   });

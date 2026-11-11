@@ -8,6 +8,7 @@ const {
   getEditVariableBtn,
   getVariableLoadingIndicator,
   SELECTORS,
+  clickDashboardMenuItem,
 } = require("./dashboard-selectors.js");
 
 export default class DashboardShareExportPage {
@@ -32,10 +33,14 @@ export default class DashboardShareExportPage {
     this.toastMessage = page.locator('[data-test="o-toast-message"]');
     this.dateTimeBtn = page.locator('[data-test="date-time-btn"]');
     this.absoluteTab = page.locator('[data-test="date-time-absolute-tab"]');
-    this.settingBtn = page.locator('[data-test="dashboard-setting-btn"]');
     this.settingsTabTab = page.locator('[data-test="dashboard-settings-tab-tab"]');
     this.tabListContainer = page.locator(
       '[data-test="dashboard-tab-list-container"]'
+    );
+    this.publicLinksPanelSelector = '[data-test="dashboards-public-links-panel"]';
+    this.publicLinksPanel = page.locator(this.publicLinksPanelSelector);
+    this.publicLinksPanelCloseBtn = page.locator(
+      '[data-test="dashboards-public-links-panel"] [data-test="o-drawer-close-btn"]'
     );
   }
 
@@ -148,7 +153,7 @@ export default class DashboardShareExportPage {
 
   //Open settings drawer and switch to the Tab section
   async openSettingsTabSection() {
-    await this.settingBtn.click();
+    await clickDashboardMenuItem(this.page, SELECTORS.SETTING_BTN);
     await this.settingsTabTab.waitFor({ state: "visible" });
     await this.settingsTabTab.click();
   }
@@ -206,5 +211,55 @@ export default class DashboardShareExportPage {
       state: "visible",
     });
     await this.exportBtn.click();
+  }
+
+  /** Count exports: each one clicks a detached `<a download="*.dashboard.json">`. */
+  async trackExportClicks() {
+    await this.page.locator(SELECTORS.MORE_OPTIONS_BTN).waitFor({ state: "visible" });
+    await this.page.evaluate(() => {
+      window.__e2eExportClicks = 0;
+      const click = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () {
+        if (this.download?.endsWith(".dashboard.json")) window.__e2eExportClicks += 1;
+        return click.call(this);
+      };
+    });
+  }
+
+  async getExportClickCount() {
+    return await this.page.evaluate(() => window.__e2eExportClicks ?? 0);
+  }
+
+  async pressExportShortcut() {
+    await this.page.keyboard.press("x");
+  }
+
+  async openPublicLinksPanel() {
+    await clickDashboardMenuItem(
+      this.page,
+      '[data-test="dashboard-publish-public-btn"]',
+      SELECTORS.SHARE_OPTIONS_BTN
+    );
+    await expect(this.publicLinksPanel).toBeVisible({ timeout: 15000 });
+  }
+
+  /** Click the header's left padding, away from the back button and every control, so focus rests on the drawer itself. */
+  async focusPublicLinksPanelHeader() {
+    await this.publicLinksPanel.click({ position: { x: 8, y: 28 } });
+  }
+
+  /** True when focus is inside the Public links drawer on something that is not a text field. */
+  async isFocusOnPublicLinksPanelChrome() {
+    return await this.page.evaluate((selector) => {
+      const el = document.activeElement;
+      if (!el?.closest(selector)) return false;
+      return !["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) && !el.isContentEditable;
+    }, this.publicLinksPanelSelector);
+  }
+
+  async closePublicLinksPanel() {
+    if (!(await this.publicLinksPanel.isVisible())) return;
+    await this.publicLinksPanelCloseBtn.click();
+    await expect(this.publicLinksPanel).toBeHidden({ timeout: 15000 });
   }
 }

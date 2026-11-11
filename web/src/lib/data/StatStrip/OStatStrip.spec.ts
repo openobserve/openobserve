@@ -181,3 +181,69 @@ describe("OStatStrip", () => {
     });
   });
 });
+
+describe("OStatStrip tray (selectable)", () => {
+  const tiles = [
+    { key: "failed", label: raw("Failed"), value: 1, tone: "error" as const },
+    { key: "total", label: raw("Total"), value: 8 },
+  ];
+  const mountTray = (props: Record<string, unknown> = {}) =>
+    mount(OStatStrip, { props: { items: tiles, selectable: true, defaultKey: "total", ...props } });
+
+  it("sits in a non-wrapping recessed tray that scrolls sideways only", () => {
+    const strip = mountTray().get('[data-test="o-stat-strip"]');
+    expect(strip.classes()).toContain("bg-surface-subtle");
+    expect(strip.classes()).not.toContain("flex-wrap");
+    expect(strip.classes()).toContain("overflow-x-auto");
+    expect(strip.classes()).toContain("overflow-y-hidden");
+  });
+
+  it("keeps tile width independent of how many tiles there are", () => {
+    const one = mountTray({ items: [tiles[0]] }).get("button");
+    const two = mountTray().get("button");
+    expect(one.classes()).toContain("grow-0");
+    expect(one.classes()).toContain("max-w-56");
+    expect(two.classes()).toContain("grow-0");
+  });
+
+  it("lifts only the selected tile with a tone top bar", () => {
+    const [failed, total] = mountTray({ selectedKey: "failed" }).findAll("button");
+    expect(failed.classes()).toContain("border-t-error-500");
+    expect(failed.classes()).toContain("z-10");
+    expect(total.classes()).not.toContain("z-10");
+  });
+
+  it("lets a navigation strip opt out of the tray while staying selectable", () => {
+    const strip = mountTray({ tray: false }).get('[data-test="o-stat-strip"]');
+    expect(strip.classes()).toContain("flex-wrap");
+    expect(strip.classes()).not.toContain("bg-surface-subtle");
+    expect(mountTray({ tray: false }).get("button").classes()).not.toContain("grow-0");
+  });
+
+  it("does not tint tiles that cannot be clicked on hover", () => {
+    const wrapper = mountTray({
+      items: [{ key: "calls", label: raw("Calls"), value: 4, selectable: false }, ...tiles],
+    });
+    const [calls, failed] = wrapper.findAll("button, div.flex-col");
+    expect(calls.classes()).not.toContain("hover:bg-surface-base/60");
+    expect(failed.classes()).toContain("hover:bg-surface-base/60");
+  });
+
+  it("keeps the progress track visible on unselected tiles", () => {
+    const [failed, total] = mountTray({ selectedKey: "failed" }).findAll("button");
+    const track = (b: typeof failed) => b.find(".h-1").classes();
+    expect(track(total)).toContain("bg-surface-base");
+    expect(track(failed)).toContain("bg-surface-subtle");
+  });
+
+  it("uses the accent top bar for a neutral selected tile", () => {
+    const [, total] = mountTray().findAll("button");
+    expect(total.classes()).toContain("border-t-accent");
+  });
+
+  it("leaves a non-selectable strip as the old wrapping tiles", () => {
+    const strip = mount(OStatStrip, { props: { items: tiles } }).get('[data-test="o-stat-strip"]');
+    expect(strip.classes()).toContain("flex-wrap");
+    expect(strip.classes()).not.toContain("bg-surface-subtle");
+  });
+});

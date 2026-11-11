@@ -132,6 +132,7 @@ describe("SlackLinkedPeople", () => {
     const confirmDialog = w.find('[data-test-stub="confirm-dialog"]');
     expect(confirmDialog.attributes("message-keypath")).toBe("slackApp.people.unlinkMessage");
     expect(confirmDialog.attributes("message-name")).toBe("dana@acme.example");
+    expect(w.findComponent({ name: "ConfirmDialog" }).props("okLabel")).toBe("Unlink account");
     await w.find('[data-test-stub="confirm-ok"]').trigger("click");
     await flushPromises();
     expect(slack.deleteLink).toHaveBeenCalledWith("acme", "link-1");

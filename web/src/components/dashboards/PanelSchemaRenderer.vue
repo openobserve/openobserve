@@ -139,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @mouseover="onChartMouseOver"
           @mouseout="onChartMouseOut"
           @finished="onChartFinished"
+          @painted="onChartPainted"
         />
         <ExemplarMarkerList
           v-if="exemplarPoints.length"
@@ -203,6 +204,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
+      <PanelChartPlaceholder
+        v-if="showsChartPlaceholder"
+        class="absolute inset-0"
+        data-test="panel-chart-placeholder"
+      />
       <OEmptyState
         v-if="
           noData &&
@@ -405,6 +411,7 @@ import {
   withTimeRangeVariables,
 } from "@/utils/dashboard/variables/variablesUtils";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
 import {
   forecastPointOf,
   usePanelAlertCreation,
@@ -529,6 +536,7 @@ export default defineComponent({
     AddAnnotation,
     CustomChartSandboxRenderer,
     LoadingProgress,
+    PanelChartPlaceholder,
     OButton,
     OIcon,
     OTooltip,
@@ -708,6 +716,7 @@ export default defineComponent({
     "show-legends",
     "format-column",
     "sendToAiChat",
+    "painted",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -958,6 +967,21 @@ export default defineComponent({
         isFirstLoadSettled?.value === false &&
         !["html", "markdown", "alert-list"].includes(panelSchema.value?.type),
     );
+
+    // An ECharts canvas stays blank until a frame of the converted data is drawn, so the placeholder waits for that frame.
+    const chartPainted = ref(false);
+    let chartDataConverted = false;
+    const onChartPainted = () => {
+      if (chartDataConverted) chartPainted.value = true;
+    };
+    // Only a mounted ChartRenderer reports painted frames; until the renderer branch has rendered, assume it will.
+    const rendererRendered = ref(false);
+    watch(
+      () => !errorDetail.value?.message && !isAwaitingFirstLoad.value,
+      (shown) => (rendererRendered.value = shown),
+      { flush: "post", immediate: true },
+    );
+    const drawsWithECharts = computed(() => !rendererRendered.value || !!chartRendererRef.value);
 
     // Dashboard-level annotation sources are queried once by the dashboard and merged after the panel's own.
     const {
@@ -1680,6 +1704,7 @@ export default defineComponent({
           }
 
           panelData.value = result;
+          chartDataConverted = true;
           customChartRunSkipped = false;
 
           limitNumberOfSeriesWarningMessage.value =
@@ -2241,6 +2266,20 @@ export default defineComponent({
         { tabId: tabId.value, panelId: panelSchema.value?.id },
       ),
     );
+    const showsChartPlaceholder = computed(
+      () =>
+        !errorDetail.value?.message &&
+        (isAwaitingFirstLoad.value ||
+          (drawsWithECharts.value && !chartPainted.value && !noData.value)),
+    );
+    watch(
+      showsChartPlaceholder,
+      (shown) => {
+        if (!shown && !errorDetail.value?.message) emit("painted");
+      },
+      { immediate: true },
+    );
+
     const noDataTitle = computed(() =>
       customNoDataText.value ? raw(customNoDataText.value) : t("panel.noData"),
     );
@@ -2636,7 +2675,7 @@ export default defineComponent({
       const executedSql = String(metadata.value?.queries?.[qi]?.query ?? query?.query ?? "");
 
       // Panel WHERE is fetched lazily (not on panel render) — resolve it for THIS query
-      await ensureDrilldownSchema(qi);
+      await ensureDrilldownSchema(qi, true);
 
       const cell = getCellDrilldownField(qi, alias);
       const stream = cell?.streamName ?? query?.fields?.stream ?? query?.stream ?? "";
@@ -2760,6 +2799,8 @@ export default defineComponent({
       cellDrawer,
       onCellSendToAiChat,
       exploreCellInLogs,
+      ensureDrilldownSchema,
+      panelBaseWhere,
       onCellDrawerOpenChange,
       exemplarsEligible,
       exemplarsEnabled,
@@ -2777,6 +2818,8 @@ export default defineComponent({
       exemplarActiveUnit,
       formatExemplarValue,
       onChartFinished,
+      onChartPainted,
+      showsChartPlaceholder,
     };
   },
 });

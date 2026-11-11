@@ -20,7 +20,6 @@ use serde_json::{Value, json};
 use super::{
     DEFAULT_LINK_LABEL, clamp, dispatchable_url,
     markdown::{escape_mrkdwn, guard_leading_blockquote, markdown_to_mrkdwn},
-    severity_color,
 };
 use crate::alerts::notifications::{NotificationContext, resolve::RenderedContent};
 
@@ -122,12 +121,7 @@ pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
         }
     }
 
-    // Buttons and chart live in a SECOND attachment (same severity color):
-    // Slack folds any single tall attachment behind "Show more" — with
-    // everything in one attachment the fold was live-observed hiding first
-    // the buttons, then the chart. Split in two, each half stays under the
-    // fold threshold while the stripe still runs beside all of it (the
-    // user-picked "full stripe" layout).
+    // The title's status dot carries severity, so every block sits at the top level, unstriped.
     let mut tail_blocks: Vec<Value> = Vec::new();
 
     // Slack validates every button `url` server-side and rejects the WHOLE
@@ -199,17 +193,8 @@ pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
         }));
     }
 
-    // Live-verified against a real Slack webhook: an attachment carrying
-    // `color` with an EMPTY `blocks` array renders nothing at all — Slack
-    // silently drops a content-less attachment, stripe included. The first
-    // attachment always has the title block; the second is only emitted
-    // when it has buttons and/or a chart to show.
-    let color = severity_color(c.severity);
-    let mut attachments = vec![json!({"color": color, "blocks": blocks})];
-    if !tail_blocks.is_empty() {
-        attachments.push(json!({"color": color, "blocks": tail_blocks}));
-    }
-    json!({ "attachments": attachments })
+    blocks.extend(tail_blocks);
+    json!({ "blocks": blocks })
 }
 
 // ---------------------------------------------------------------------------

@@ -17,6 +17,7 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import { withQueryClient } from "@/test/unit/helpers/queryClient";
@@ -28,7 +29,11 @@ import type {
 } from "@/ts/interfaces/oncall";
 import TelephonyAccountDialog from "./TelephonyAccountDialog.vue";
 import TelephonySettings from "./TelephonySettings.vue";
+import { axiosReply } from "@/test/unit/helpers/mockService";
+import analytics from "@/services/product_analytics";
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 vi.mock("@/services/oncall", () => ({
   default: {
     getTelephony: vi.fn(),
@@ -87,7 +92,7 @@ const text = (id: string) => q(id)?.textContent?.replace(/\s+/g, " ").trim() ?? 
 const card = (id: string) =>
   document.querySelector<HTMLElement>(`[data-test="telephony-card-${id}"]`);
 const cardText = (id: string) => card(id)?.textContent?.replace(/\s+/g, " ").trim() ?? "";
-const PRESS4 = "Call keys (4 acknowledge, 6 resolve, 8 escalate)";
+const PRESS4 = "Call keys4 acknowledge · 6 resolve · 8 escalate";
 const NOTE = "Set by the operator, so there is nothing to configure here.";
 const dialog = (id: string) =>
   document.querySelector<HTMLInputElement>(`[data-test="telephony-account-dialog-${id}-field"]`);
@@ -146,12 +151,11 @@ describe("TelephonySettings", () => {
 
     it("5d: without a callback URL press 4 reads not available, with the link fallback", async () => {
       await render({ ...CONNECTED, press4_available: false });
-      expect(text("press4")).toContain(PRESS4);
+      expect(text("press4")).toBe(
+        "Call keysNot available · people acknowledge from the link in their text",
+      );
       expect(q("press4")?.querySelector('[role="img"]')?.getAttribute("aria-label")).toBe(
         "Not available",
-      );
-      expect(text("press4")).toContain(
-        "Calls ask people to acknowledge from the link in their text.",
       );
     });
 
@@ -163,7 +167,7 @@ describe("TelephonySettings", () => {
       expect(body).toContain("This deployment's Twilio account");
       expect(cardText("status")).toBe("Connected");
       expect(cardText("meta")).toBe("From +18335550199");
-      expect(body).toContain(NOTE);
+      expect(body).not.toContain(NOTE);
       expect(text("press4")).toBe(PRESS4);
       expect(q("hero")).toBeNull();
 
@@ -223,8 +227,33 @@ describe("TelephonySettings", () => {
       expect(card("problem")).not.toBeNull();
       expect(card("problem-update")).toBeNull();
       expect(q("press4")).toBeNull();
-      expect(text("deployment")).toContain(NOTE);
+      expect(text("deployment")).not.toContain(NOTE);
       expect(text("deployment")).not.toContain("already work");
+    });
+
+    it("Check account asks Twilio again and says when it passed", async () => {
+      await render(CONNECTED);
+      expect(service.getTelephonyStatus).toHaveBeenCalledTimes(1);
+      service.getTelephonyStatus.mockResolvedValue(axiosReply(status("account_rejected")));
+      card("check")!.click();
+      await flushPromises();
+      expect(service.getTelephonyStatus).toHaveBeenCalledTimes(2);
+      expect(cardText("status")).toBe("Not working");
+      expect(toast).toHaveBeenLastCalledWith(expect.objectContaining({ variant: "warning" }));
+      service.getTelephonyStatus.mockResolvedValue(axiosReply(status("ok")));
+      card("check")!.click();
+      await flushPromises();
+      expect(toast).toHaveBeenLastCalledWith({
+        variant: "success",
+        message: "Twilio account verified",
+      });
+    });
+
+    it("every account action carries an icon", async () => {
+      await render(CONNECTED);
+      for (const button of [q("update"), q("disconnect"), card("check")]) {
+        expect(button?.querySelector("svg")).not.toBeNull();
+      }
     });
 
     it("an unreachable Twilio reads Couldn't check, not Not working", async () => {
@@ -249,7 +278,7 @@ describe("TelephonySettings", () => {
     it("a trial account says who it can reach", async () => {
       await render(CONNECTED, true, status("ok", { trial: true }));
       expect(cardText("trial")).toBe(
-        "Trial account: texts and calls only reach numbers verified in Twilio.",
+        "Trial account: Twilio only calls and texts numbers verified on the account.",
       );
     });
 
@@ -296,6 +325,7 @@ describe("TelephonySettings", () => {
       settle({ data: CONNECTED.org });
       await flushPromises();
       expect(dialog("sid")).toBeNull();
+      expect(analytics.track).toHaveBeenCalledWith("telephony_updated");
     });
 
     it("connect sends the token it was given", async () => {
@@ -313,6 +343,8 @@ describe("TelephonySettings", () => {
         auth_token: "secret",
         from_number: "+18335550100",
       });
+      await flushPromises();
+      expect(analytics.track).toHaveBeenCalledWith("telephony_connected");
     });
 
     it("5c: a rejected account shows the mockup banner and keeps the dialog open", async () => {
@@ -390,8 +422,8 @@ describe("TelephonySettings", () => {
 
   describe("disconnect", () => {
     it.each([
-      [true, "From the next page step, texts and calls use this deployment's provider."],
-      [false, "From the next page step, pages go by email only."],
+      [true, "switch from ACte…0001 to this deployment's account."],
+      [false, "Texts and calls from ACte…0001 stop; email and Slack still page."],
     ])("with a deployment account %s, says what takes over", async (present, expected) => {
       await render({ ...CONNECTED, deployment_account_present: present });
       await click("disconnect");
@@ -404,9 +436,10 @@ describe("TelephonySettings", () => {
       await click("disconnect");
       const name = document.querySelector('[data-test="confirm-dialog-name"]');
       expect(name?.textContent).toBe("ACte…0001");
-      expect(document.body.textContent).toContain("This disconnects the ACte…0001 account.");
+      expect(document.body.textContent).toContain("Texts and calls from ACte…0001 stop");
       const ok = document.querySelector('[data-test="o-dialog-primary-btn"]');
       expect(ok?.className).toContain("bg-button-destructive");
+      expect(ok?.textContent?.trim()).toBe("Disconnect Twilio");
     });
   });
 
@@ -422,6 +455,15 @@ describe("TelephonySettings", () => {
       expect(q("disconnect")?.hasAttribute("disabled")).toBe(true);
     });
 
+    it("a disconnect tracks the event", async () => {
+      service.deleteTelephony.mockResolvedValue({} as any);
+      await render(CONNECTED);
+      await click("disconnect");
+      document.querySelector<HTMLButtonElement>('[data-test="o-dialog-primary-btn"]')!.click();
+      await flushPromises();
+      expect(analytics.track).toHaveBeenCalledWith("telephony_disconnected");
+    });
+
     it("a 403 on disconnect latches the page read-only", async () => {
       service.deleteTelephony.mockRejectedValue(failure(403));
       await render(CONNECTED);
@@ -430,6 +472,7 @@ describe("TelephonySettings", () => {
       await flushPromises();
       expect(service.deleteTelephony).toHaveBeenCalled();
       expect(text("read-only")).toBe(READ_ONLY);
+      expect(analytics.track).not.toHaveBeenCalledWith("telephony_disconnected");
     });
 
     it("a 403 on the read shows the sentence instead of the hero", async () => {

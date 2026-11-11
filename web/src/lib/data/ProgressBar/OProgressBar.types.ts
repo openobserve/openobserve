@@ -22,6 +22,8 @@ export interface ProgressBarProps {
   color?: string;
   /** Track height. Default: "sm" */
   size?: ProgressBarSize;
+  /** Work with no known end: a short fill slides along the track and `value` is ignored. */
+  indeterminate?: boolean;
 }
 
 export interface ProgressBarSlots {

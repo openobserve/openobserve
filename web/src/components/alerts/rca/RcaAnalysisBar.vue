@@ -79,19 +79,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaAsk.button") }}</span>
     </OButton>
 
-    <OButton
+    <OTooltip
       v-if="!live"
-      data-test="rca-reanalyze-btn"
-      variant="outline"
-      size="sm"
-      class="shrink-0"
-      icon-left="refresh"
-      :loading="triggering"
-      :disabled="resuming"
-      @click="$emit('reanalyze')"
+      :content="startLockedReason"
+      :disabled="!startLockedReason"
+      side="bottom"
     >
-      <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaReanalyze") }}</span>
-    </OButton>
+      <span class="inline-flex shrink-0">
+        <OButton
+          data-test="rca-reanalyze-btn"
+          variant="outline"
+          size="sm"
+          :icon-left="startLockedReason ? 'lock' : 'refresh'"
+          :loading="triggering"
+          :disabled="resuming || !!startLockedReason"
+          @click="$emit('reanalyze')"
+        >
+          <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaReanalyze") }}</span>
+        </OButton>
+      </span>
+    </OTooltip>
 
     <ODropdown align="end" content-class="w-55">
       <template #trigger>
@@ -140,6 +147,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { RcaRunItem } from "@/services/incidents";
 import { formatTimestampInTimezone } from "@/utils/date";
@@ -166,12 +174,15 @@ const props = withDefaults(
     /** A resume is in flight: Re-analyze waits for it. */
     resuming?: boolean;
     cancelling?: boolean;
+    /** Why no new run can start: Re-analyze stays visible, disabled, with this reason. */
+    startLockedReason?: I18nText;
   }>(),
   {
     canAsk: false,
     triggering: false,
     resuming: false,
     cancelling: false,
+    startLockedReason: undefined,
   },
 );
 

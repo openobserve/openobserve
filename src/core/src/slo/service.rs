@@ -499,7 +499,7 @@ pub async fn list_slo_eligible_alerts(
 }
 
 /// One ledger interval on the wire, which is what the ribbon draws.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
 pub struct AlertSliPreviewInterval {
     /// `None` when the stored level is one this build cannot interpret — which
     /// the ribbon must draw as unmeasured, never as good.
@@ -511,7 +511,7 @@ pub struct AlertSliPreviewInterval {
 
 /// What an alert SLI would have measured over a window, computed from the
 /// ledger before anything is saved.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, utoipa::ToSchema)]
 pub struct AlertSliPreview {
     pub alert_id: String,
     /// The range the ribbon is drawn against. Intervals alone cannot place a
@@ -1825,6 +1825,7 @@ mod tests {
                     operator: Operator::GreaterThanEquals,
                     value: serde_json::json!(1),
                     ignore_case: false,
+                    case_insensitive: None,
                 },
                 warning_value: None,
                 multi_alert,

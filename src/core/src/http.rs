@@ -67,7 +67,9 @@ impl From<AlertError> for Response {
             | AlertError::AlertNameOfgaUnsupported
             | AlertError::AlertNameContainsForwardSlash
             | AlertError::ProtectedStream(_)
+            | AlertError::InvalidCondition(_)
             | AlertError::TemplateNotConfigured { .. }
+            | AlertError::AlertTemplateNotForAlert { .. }
             | AlertError::RealtimeMissingCustomQuery
             // Both are user input errors -> 400, same as the other
             // trigger-condition validations.
@@ -135,6 +137,13 @@ impl From<AlertError> for Response {
             AlertError::GetDestinationWithTemplateError(err) => {
                 MetaHttpResponse::internal_error(err)
             }
+            AlertError::FeatureNotLicensed(feature) => (
+                StatusCode::FORBIDDEN,
+                Json(MetaHttpResponse::error_code(
+                    infra::errors::ErrorCodes::LicenseFeatureNotEntitled(feature.clone()),
+                )),
+            )
+                .into_response(),
             AlertError::PermittedAlertsMissingUser => MetaHttpResponse::forbidden(""),
             AlertError::PermittedAlertsValidator(err) => MetaHttpResponse::forbidden(err),
             AlertError::NotSupportedAlertDestinationType(err) => MetaHttpResponse::forbidden(err),
@@ -169,6 +178,9 @@ pub fn template_error_response(value: TemplateError) -> Response {
         TemplateError::NotFound => MetaHttpResponse::not_found(TemplateError::NotFound),
         TemplateError::DeleteWithDestination(destination) => {
             MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(destination))
+        }
+        TemplateError::DeleteWithBinding(by) => {
+            MetaHttpResponse::conflict(TemplateError::DeleteWithBinding(by))
         }
         TemplateError::PrebuiltReadOnly(name) => {
             MetaHttpResponse::forbidden(TemplateError::PrebuiltReadOnly(name))
@@ -269,7 +281,9 @@ impl From<PipelineError> for Response {
         match value {
             PipelineError::InfraError(err) => MetaHttpResponse::internal_error(err),
             PipelineError::NotFound(_) => MetaHttpResponse::not_found(value),
-            PipelineError::Modified(_) => MetaHttpResponse::conflict(value),
+            PipelineError::Modified(_) | PipelineError::RunInProgress(_) => {
+                MetaHttpResponse::conflict(value)
+            }
             PipelineError::Refused(refusal) => refusal.into_response(),
             error => MetaHttpResponse::bad_request(error),
         }

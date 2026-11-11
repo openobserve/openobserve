@@ -154,6 +154,31 @@ function mountUsageTab() {
 describe("UsageTab", () => {
   let wrapper: VueWrapper;
 
+  it("switches to the meta org before Renew license opens the license page", async () => {
+    const { zoConfig, organizations } = store.state;
+    store.state.zoConfig = { ...zoConfig, meta_org: "_meta" };
+    store.state.organizations = [{ id: 7, identifier: "_meta", name: "_meta" }];
+    const dispatch = vi.spyOn(store, "dispatch").mockResolvedValue(undefined);
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+    wrapper = mountUsageTab();
+    await flushPromises();
+
+    wrapper.findComponent({ name: "LicensePeriod" }).vm.$emit("renew");
+
+    expect(dispatch).toHaveBeenCalledWith(
+      "setSelectedOrganization",
+      expect.objectContaining({ identifier: "_meta" }),
+    );
+    expect(push).toHaveBeenCalledWith({
+      name: "license",
+      query: { org_identifier: "_meta" },
+    });
+    dispatch.mockRestore();
+    push.mockRestore();
+    store.state.zoConfig = zoConfig;
+    store.state.organizations = organizations;
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     // Re-apply mocks that vi.clearAllMocks() strips
@@ -240,6 +265,34 @@ describe("UsageTab", () => {
       expect(panel.exists()).toBe(true);
       expect(panel.text()).toContain("No data ingested yet");
       expect(panel.text()).toContain("This organization hasn't received any data");
+    });
+
+    it("should show the no-data panel when the org's only streams are ones O2 writes itself", async () => {
+      vi.mocked(orgService.get_organization_summary).mockResolvedValueOnce({
+        data: {
+          ...mockEmptySummaryData,
+          streams: { ...mockEmptySummaryData.streams, num_streams: 1, num_user_streams: 0 },
+        },
+      });
+
+      wrapper = mountUsageTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="home-usage-tab-no-data"]').exists()).toBe(true);
+    });
+
+    it("should show the summary once the org has a user data stream", async () => {
+      vi.mocked(orgService.get_organization_summary).mockResolvedValueOnce({
+        data: {
+          ...mockEmptySummaryData,
+          streams: { ...mockEmptySummaryData.streams, num_streams: 2, num_user_streams: 1 },
+        },
+      });
+
+      wrapper = mountUsageTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="home-usage-tab-no-data"]').exists()).toBe(false);
     });
   });
 

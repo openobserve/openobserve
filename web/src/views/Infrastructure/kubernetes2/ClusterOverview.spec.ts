@@ -68,8 +68,8 @@ vi.mock("@/composables/useLockedAffordance", async () => {
 const tooltipStub = defineComponent({
   name: "OTooltip",
   props: ["content"],
-  setup(props) {
-    return () => h("span", { "data-test": "tooltip" }, props.content);
+  setup(props, { slots }) {
+    return () => [h("span", { "data-test": "tooltip" }, props.content), slots.default?.()];
   },
 });
 
@@ -585,6 +585,35 @@ describe("ClusterOverview", () => {
       expect(text("k8s2-overview-warning-message-node|ip-10-0-10-38|MemoryPressure")).toBe(
         "MemoryPressure",
       );
+    });
+
+    it("caps the table at 70% of the viewport, sorts and resizes", async () => {
+      await mountView();
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("maxHeight")).toBe("70vh");
+      expect(table.props("enableColumnResize")).toBe(true);
+      expect(table.props("sorting")).toBe("client");
+      const cols = table.props("columns") as any[];
+      expect(cols.find((c) => c.id === "message").meta.flex).toBe(true);
+    });
+
+    it("sorts by the Age header with undated rows last", async () => {
+      await mountView();
+      const ages = () =>
+        wrapper.findAll('[data-test^="k8s2-overview-warning-age-"]').map((r) => r.text());
+      expect(ages()).toEqual(["5m", "—", "5m"]);
+      await wrapper
+        .find('[data-test="o2-table-th-age"] [data-test="o2-table-th-sort-trigger"]')
+        .trigger("click");
+      await flushPromises();
+      expect(ages().at(-1)).toBe("—");
+    });
+
+    it("sizes the Object column to its longest name", async () => {
+      await mountView();
+      const cols = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+      const size = (id: string) => cols.find((c) => c.id === id).size;
+      expect(size("object")).toBeGreaterThan(size("age"));
     });
 
     it("opens the drawer on a row click when the kind has one", async () => {

@@ -65,7 +65,7 @@ test.describe('Profiles query controls', () => {
     await pm.profilesPage.gotoRef(ref);
     await pm.profilesPage.expectSelected(pm.profilesPage.streamSelect, ref.stream);
     await pm.profilesPage.expectSelected(pm.profilesPage.serviceSelect, 'checkout');
-    await pm.profilesPage.expectSelected(pm.profilesPage.typeSelect, 'cpu (cores)');
+    await pm.profilesPage.expectSelected(pm.profilesPage.typeSelect, 'CPU time');
   });
 
   test('An unseeded open picks the first stream, CPU and Past 15 minutes and writes the URL', { tag: ['@all', '@profiles', '@P1'] }, async () => {
@@ -81,13 +81,13 @@ test.describe('Profiles query controls', () => {
 
   test('The type list is scoped to the chosen service', { tag: ['@all', '@profiles', '@P0'] }, async () => {
     await pm.profilesPage.gotoRef(ref);
-    expect(await pm.profilesPage.selectOptionLabels(pm.profilesPage.typeSelect)).toEqual(['cpu (cores)']);
+    expect(await pm.profilesPage.selectOptionLabels(pm.profilesPage.typeSelect)).toEqual(['CPU time']);
     const calls = pm.profilesPage.trackRequests();
     await pm.profilesPage.selectService('payments');
     await expect.poll(() => calls.meta.filter((call) => call.url.includes('service_name=payments')).length).toBeGreaterThan(0);
     await expect
       .poll(() => pm.profilesPage.selectOptionLabels(pm.profilesPage.typeSelect), { timeout: 15000 })
-      .toEqual(['alloc_space (bytes)', 'cpu (cores)', 'inuse_space (bytes)']);
+      .toEqual(['alloc_space (bytes)', 'CPU time', 'inuse_space (bytes)']);
   });
 
   test('With Auto Run off a change marks Run as pending without querying', { tag: ['@all', '@profiles', '@P1'] }, async () => {
@@ -187,9 +187,10 @@ test.describe('Profiles query controls', () => {
     await pm.profilesPage.expectUrlParam('filters', 'service_version=v1.5.0');
   });
 
-  test('A second value of the same label replaces the first', { tag: ['@all', '@profiles', '@P1'] }, async () => {
+  test('A label keeps one filter: it leaves the picker and a new value replaces the old', { tag: ['@all', '@profiles', '@P1'] }, async () => {
     await pm.profilesPage.gotoRef(ref, { filters: 'service_version=v1.5.0' });
-    await pm.profilesPage.addFilter('service_version', 'v1.4.0');
+    await pm.profilesPage.expectLabelNotOffered('service_version');
+    await pm.profilesPage.editFilter('service_version', 'v1.4.0');
     await pm.profilesPage.expectFilterChipCount(1);
     await pm.profilesPage.expectFilterChip('service_version', 'v1.4.0');
     const calls = pm.profilesPage.trackRequests();
@@ -225,9 +226,9 @@ test.describe('Profiles query controls', () => {
     await pm.profilesPage.expectUrlParamAbsent('filters');
   });
 
-  test('The value select stays disabled until a label is picked', { tag: ['@all', '@profiles', '@P2'] }, async () => {
+  test('The filter picker lists labels before any value', { tag: ['@all', '@profiles', '@P2'] }, async () => {
     await pm.profilesPage.gotoRef(ref);
-    await pm.profilesPage.expectValueSelectDisabled();
+    await pm.profilesPage.expectLabelsBeforeValues('service_version', 'v1.5.0');
   });
 
   test('Changing stream clears the filters and the service', { tag: ['@all', '@profiles', '@P2'] }, async () => {
@@ -277,7 +278,7 @@ test.describe('Profiles query controls', () => {
     await pm.profilesPage.expectSearchValue('json');
     await pm.profilesPage.expectFilterChip('service_version', 'v1.5.0');
     await pm.profilesPage.expectSelected(pm.profilesPage.serviceSelect, 'checkout');
-    await pm.profilesPage.expectSelected(pm.profilesPage.typeSelect, 'cpu (cores)');
+    await pm.profilesPage.expectSelected(pm.profilesPage.typeSelect, 'CPU time');
     expect(calls.merge).toHaveLength(1);
     expect(calls.series).toHaveLength(1);
   });

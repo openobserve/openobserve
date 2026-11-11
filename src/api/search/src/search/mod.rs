@@ -47,8 +47,8 @@ use openobserve_core::auth::UserEmail;
 #[cfg(feature = "cloud")]
 use openobserve_core::organization::is_org_in_free_trial_period;
 use search::{
-    datafusion::plan::projections::get_result_schema, sql::visitor::pickup_where::pickup_where,
-    utils::is_permissable_function_error,
+    datafusion::logical_plan::projections::get_result_schema,
+    sql::visitor::pickup_where::pickup_where, utils::is_permissable_function_error,
 };
 use search_service as SearchService;
 use search_service::query_range::get_settings_max_query_range;
@@ -114,7 +114,7 @@ pub mod utils;
         }
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -234,19 +234,8 @@ pub async fn search(
         }
     };
     #[cfg(feature = "enterprise")]
-    for stream in stream_names.iter() {
-        {
-            if let Err(e) = search_service::check_search_allowed(&org_id, Some(stream)) {
-                return (
-                    StatusCode::TOO_MANY_REQUESTS,
-                    Json(MetaHttpResponse::error(
-                        StatusCode::TOO_MANY_REQUESTS,
-                        e.to_string(),
-                    )),
-                )
-                    .into_response();
-            }
-        }
+    if let Some(refused) = search_license_refusal(&org_id, &req.query.sql, stream_type) {
+        return refused;
     }
 
     // Handle histogram data for UI
@@ -450,7 +439,7 @@ pub async fn search(
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -492,7 +481,8 @@ pub async fn around_v1(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -584,7 +574,7 @@ pub async fn around_v1(
         "pod_name": "openobserve-ingester-0"
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -627,7 +617,8 @@ pub async fn around_v2(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -717,7 +708,7 @@ pub async fn around_v2(
         ("no_count" = Option<bool>, Query, description = "no need count, true of false"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json!({
             "took": 155,
             "values": [
                 {
@@ -744,7 +735,8 @@ pub async fn values(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -913,6 +905,7 @@ pub async fn build_search_request_per_field(
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
         use_cache: req.use_cache,
+        use_index: true,
         clear_cache: req.clear_cache,
         local_mode: None,
         agent_options: None,
@@ -1096,6 +1089,7 @@ async fn values_inner(
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
         use_cache: default_use_cache(),
+        use_index: true,
         clear_cache: get_clear_cache_from_request(query),
         local_mode: None,
         agent_options: None,
@@ -1289,9 +1283,31 @@ fn resolve_typed_stream_names(
         .collect())
 }
 
+/// The licence 429 unless every stream `sql` reads, under the type its SQL names, is exempt.
+#[cfg(feature = "enterprise")]
+fn search_license_refusal(org_id: &str, sql: &str, stream_type: StreamType) -> Option<Response> {
+    // an unparsed query is checked as the whole org, so a parse gap never opens the gate
+    let refused = match resolve_typed_stream_names(sql, stream_type) {
+        Ok(streams) => streams.iter().find_map(|(stream, stream_type)| {
+            search_service::check_search_allowed(org_id, Some((stream, *stream_type))).err()
+        }),
+        Err(_) => search_service::check_search_allowed(org_id, None).err(),
+    };
+    refused.map(|e| {
+        (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(MetaHttpResponse::error(
+                StatusCode::TOO_MANY_REQUESTS,
+                e.to_string(),
+            )),
+        )
+            .into_response()
+    })
+}
+
 /// Requires permission on every stream `sql` reads, under the type its SQL names; `None` = allowed.
 #[cfg(feature = "enterprise")]
-async fn check_sql_stream_permissions(
+pub(crate) async fn check_sql_stream_permissions(
     sql: &str,
     org_id: &str,
     user_id: &str,
@@ -1342,7 +1358,7 @@ async fn check_sql_stream_permissions(
         "end_time": 1675185660872049i64
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::SearchPartitionResponse, example = json!({
             "took": 155,
             "file_num": 10,
             "original_size": 10240,
@@ -1416,21 +1432,8 @@ pub async fn search_partition(
 
     #[cfg(feature = "enterprise")]
     {
-        let stream_names = match resolve_stream_names(&req.sql) {
-            Ok(stream_names) => stream_names,
-            Err(err) => return map_error_to_http_response(&err.into(), Some(trace_id)),
-        };
-        for stream in stream_names.iter() {
-            if let Err(e) = search_service::check_search_allowed(&org_id, Some(stream)) {
-                return (
-                    StatusCode::TOO_MANY_REQUESTS,
-                    Json(MetaHttpResponse::error(
-                        StatusCode::TOO_MANY_REQUESTS,
-                        e.to_string(),
-                    )),
-                )
-                    .into_response();
-            }
+        if let Some(refused) = search_license_refusal(&org_id, &req.sql, stream_type) {
+            return refused;
         }
         if let Some(res) = check_sql_stream_permissions(
             &req.sql,
@@ -1518,7 +1521,7 @@ pub async fn search_partition(
         })
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json ! ({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json ! ({
             "took": 40,
             "took_detail": {
                 "total": 40,
@@ -1712,7 +1715,7 @@ pub async fn search_history(
         }
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::ResultSchemaResponse, example = json!({
             "projections": ["ns","histogram(k8s._timestamp)"],
             "group_by": ["histogram(k8s._timestamp)"],
             "timeseries_field": "histogram(k8s._timestamp)",
@@ -2162,6 +2165,7 @@ mod tests {
                 histogram_interval: 0,
                 sampling_ratio: None,
                 search_type: None,
+                timezone: None,
             }),
         )
         .await;

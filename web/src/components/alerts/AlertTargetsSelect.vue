@@ -141,6 +141,8 @@ const props = defineProps<{
   workflowsLocked?: boolean;
   workflowsLicenseLocked?: boolean;
   workflowsLockMessage?: I18nText;
+  /** Display names by id for selected workflows the closed group cannot list. */
+  lockedWorkflowNames?: Record<string, string>;
   error?: boolean;
   placeholder?: I18nText;
 }>();
@@ -227,20 +229,35 @@ const missingOptions = (
     }));
 };
 
+// A selected workflow with no list to come from still needs a row, or OSelect prints its raw value.
+const unlistedWorkflows = () =>
+  (props.workflows || []).filter(isFilled).map((id) => {
+    const name = props.lockedWorkflowNames?.[id];
+    return {
+      label: name ? raw(name) : t("alerts.alertSettings.lockedWorkflowFallback"),
+      value: `${WF}${id}`,
+    };
+  });
+
 const options = computed(() => {
   const dests = toTagged(props.destinationOptions, DEST);
   const missingDests = missingOptions(props.destinations, dests, DEST);
-  if (!props.workflowsEnabled && !props.workflowsLocked) return [...dests, ...missingDests];
+  if (!props.workflowsEnabled && !props.workflowsLocked) {
+    return [...dests, ...missingDests, ...unlistedWorkflows()];
+  }
   const workflowsHeader = { header: true, label: t("alerts.alertSettings.targetsWorkflowsGroup") };
   if (!props.workflowsEnabled) {
-    // Locked: the header stays visible (so the capability is discoverable
-    // while browsing), but there's nothing selectable beneath it — this
-    // edition has no entitlement to produce real options for.
+    // The header stays for discovery; only what the alert already selected sits under it, to remove.
     return [
       { header: true, label: t("alerts.alertSettings.targetsDestinationsGroup") },
       ...dests,
       ...missingDests,
       workflowsHeader,
+      ...unlistedWorkflows().map((option) => ({
+        ...option,
+        badge: t("alerts.alertSettings.lockedTargetBadge"),
+        badgeMuted: true,
+      })),
     ];
   }
   const wfs = toTagged(props.workflowOptions, WF);

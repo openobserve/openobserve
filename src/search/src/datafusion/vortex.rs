@@ -173,7 +173,7 @@ impl CompressorPlugin for LongTextCompressor {
 }
 
 /// Build the Vortex file write strategy selected by `ZO_VORTEX_COMPRESSION`.
-pub(super) fn vortex_write_strategy(session: &VortexSession) -> Arc<dyn LayoutStrategy> {
+pub(crate) fn vortex_write_strategy(session: &VortexSession) -> Arc<dyn LayoutStrategy> {
     build_vortex_write_strategy(session, config::get_config().common.vortex_compression)
 }
 

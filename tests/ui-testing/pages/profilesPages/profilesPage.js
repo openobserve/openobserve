@@ -4,6 +4,7 @@ import { expect } from '@playwright/test';
 import { PNG } from 'pngjs';
 
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 
 const FLAME_ROW_PX = 26;
 const FLAME_PLOT_INSET_PX = 10;
@@ -52,10 +53,7 @@ export class ProfilesPage {
     this.serviceSelect = 'profiles-service-select';
     this.typeSelect = 'profiles-type-select';
 
-    this.addFilterBtn = '[data-test="profiles-add-filter"]';
-    this.tagKeySelect = 'profiles-tag-key-select';
-    this.tagValueSelect = 'profiles-tag-value-select';
-    this.filterChips = '[data-test^="profiles-filter-chip-"]';
+    this.filterBuilderId = 'profiles-filter-builder';
 
     this.errorState = '[data-test="profiles-error"]';
     this.noStreamState = '[data-test="profiles-no-stream"]';
@@ -443,75 +441,74 @@ export class ProfilesPage {
     await expect(this.page.locator(this.dateBtn)).toContainText(pattern);
   }
 
-  async openAddFilter() {
-    const add = this.page.locator(this.addFilterBtn);
-    await expect(async () => {
-      if ((await add.getAttribute('aria-expanded')) !== 'true') await add.click();
-      await expect(this.selectTrigger(this.tagKeySelect)).toBeVisible({ timeout: 1500 });
-    }).toPass({ timeout: 15000 });
+  filterBuilder() {
+    return new FilterBuilderDriver(this.page, this.filterBuilderId);
   }
 
-  async openFilterEditor(key) {
-    const edit = this.page.locator(`[data-test="profiles-filter-edit-${key}"]`);
-    await expect(async () => {
-      if ((await edit.getAttribute('aria-expanded')) !== 'true') await edit.click();
-      await expect(this.selectTrigger(this.tagValueSelect)).toBeVisible({ timeout: 1500 });
-    }).toPass({ timeout: 15000 });
+  /** Builds `key <operator> value` in the label filter builder; the profiles builder asks for the operator after the label. */
+  async addFilter(key, value, operator = '=') {
+    const builder = this.filterBuilder();
+    await builder.addCondition(key, operator, value);
+    await this.expectFilterChip(key, value);
   }
 
-  /** Opens the add-filter menu, picks the label, then the value (which applies the filter). */
-  async addFilter(key, value) {
-    await this.openAddFilter();
-    await this.pickOption(this.tagKeySelect, key);
-    await this.pickFilterValue(value);
-  }
-
-  async pickFilterValue(value) {
-    const trigger = this.selectTrigger(this.tagValueSelect);
-    await expect(trigger).toBeEnabled();
-    await this.openSelect(this.tagValueSelect);
-    const option = this.page.locator(
-      `[data-test="${this.tagValueSelect}-popover"] [data-test="${this.tagValueSelect}-option"][data-test-label="${value}"]`,
-    );
-    await expect(option).toBeVisible();
-    await option.click();
-    await expect(this.selectTrigger(this.tagValueSelect)).toHaveCount(0);
-  }
-
+  /** The values the picker lists for `key` once its label and `=` are picked. */
   async filterValueOptionLabels(key) {
-    await this.openAddFilter();
-    await this.pickOption(this.tagKeySelect, key);
-    await expect(this.selectTrigger(this.tagValueSelect)).toBeEnabled();
-    const labels = await this.selectOptionLabels(this.tagValueSelect);
-    await this.page.keyboard.press('Escape');
+    const builder = this.filterBuilder();
+    await builder.openForNew();
+    await builder.pickField(key);
+    await builder.pickOperator('=');
+    const items = this.page.locator(`[data-test^="${this.filterBuilderId}-suggest-item-"]:not([data-test$="-custom"])`);
+    await expect(items.first()).toBeVisible({ timeout: 15000 });
+    const prefix = `${this.filterBuilderId}-suggest-item-`;
+    const labels = (await items.evaluateAll((rows) => rows.map((row) => row.getAttribute('data-test')))).map((id) => id.slice(prefix.length));
+    await builder.close();
     return labels;
   }
 
   async editFilter(key, value) {
-    await this.openFilterEditor(key);
-    await this.pickFilterValue(value);
+    const builder = this.filterBuilder();
+    await builder.close();
+    await this.page.locator(builder.id(`chip-${key}-value`)).click();
+    await builder.waitForPicker();
+    await builder.pickValue(value);
+    await builder.close();
   }
 
   async removeFilter(key) {
-    await this.page.locator(`[data-test="profiles-filter-remove-${key}"]`).click();
-    await expect(this.page.locator(`[data-test="profiles-filter-chip-${key}"]`)).toHaveCount(0);
+    const builder = this.filterBuilder();
+    await builder.close();
+    await builder.removeChip(key);
+    await expect(builder.chip(key)).toHaveCount(0);
   }
 
   async expectFilterChip(key, value) {
-    const chip = this.page.locator(`[data-test="profiles-filter-chip-${key}"]`);
+    const chip = this.filterBuilder().chip(key);
     await expect(chip).toHaveCount(1);
     await expect(chip).toContainText(key);
     await expect(chip).toContainText(value);
   }
 
   async expectFilterChipCount(count) {
-    await expect(this.page.locator(this.filterChips)).toHaveCount(count);
+    await expect(this.filterBuilder().chips).toHaveCount(count);
   }
 
-  async expectValueSelectDisabled() {
-    await this.openAddFilter();
-    await expect(this.selectTrigger(this.tagValueSelect)).toBeDisabled();
-    await this.page.keyboard.press('Escape');
+  /** The picker opens on the label list; no value is offered before a label is picked. */
+  async expectLabelsBeforeValues(label, value) {
+    const builder = this.filterBuilder();
+    await builder.openForNew();
+    await expect(builder.suggestion(label)).toBeVisible();
+    await expect(builder.suggestion(value)).toHaveCount(0);
+    await builder.close();
+  }
+
+  /** A label that already has a filter is not offered again. */
+  async expectLabelNotOffered(label) {
+    const builder = this.filterBuilder();
+    await builder.openForNew();
+    await expect(this.page.locator(`[data-test^="${this.filterBuilderId}-suggest-item-"]`).first()).toBeVisible();
+    await expect(builder.suggestion(label)).toHaveCount(0);
+    await builder.close();
   }
 
   async switchView(view) {

@@ -151,6 +151,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { orgDomainsQuery, updateOrgSettingsMutation } from "@/services/organizations.queries";
+import analytics from "@/services/product_analytics";
 import {
   configToBlocklists,
   setDomainBlocklist,
@@ -242,6 +243,7 @@ async function writeBlocklist(
     await updateSettings.mutateAsync({
       domain_management_config: setDomainBlocklist(props.config, domain, emails),
     });
+    analytics.track("org_domain_blocklist_updated", { count: emails.length });
   } catch (err: any) {
     toast({
       variant: "error",

@@ -172,7 +172,11 @@ export const convertPanelData = async (
         return {
           chartType: panelSchema.type,
           ...gauges,
-          options: convertBarGaugeData(gauges?.options, panelSchema),
+          options: convertBarGaugeData(
+            gauges?.options,
+            panelSchema,
+            chartPanelRef?.value?.offsetWidth,
+          ),
         };
       } catch (error) {
         if (panelSchema?.queryType == "promql") throw error;

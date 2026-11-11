@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-run-pending="runPending && !queryLoading ? 'true' : undefined"
           :data-test="queryLoading ? 'profiles-cancel-query' : 'profiles-run-query'"
           :class="isAutoRunAvailable ? 'border-y-0! border-s-0! border-e!' : 'border-0!'"
-          @click="queryLoading ? cancelQuery() : runQuery()"
+          @click="queryLoading ? cancelQuery() : runQuery(true)"
         >
           <span class="grid">
             <span
@@ -161,15 +161,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OContent class="border-border-default border-t py-1.5">
         <ProfilesLabelFilters
-          v-model:editing-index="editingFilterIndex"
-          v-model:draft-key="draftTagKey"
-          v-model:draft-value="draftTagValue"
           :filters="appliedFilters"
-          :label-options="tagKeyOptions"
-          :value-options="tagValueOptions"
-          :values-loading="tagValuesLoading"
-          @apply="applyDraftFilter"
-          @remove="removeFilter"
+          :labels="labelNames"
+          :load-values="loadTagValues"
+          @update:filters="setFilters"
         />
       </OContent>
     </template>
@@ -213,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
         data-test="profiles-search-cancelled"
       >
-        <OEmptyState preset="search-cancelled" size="block" @action="runQuery" />
+        <OEmptyState preset="search-cancelled" size="block" @action="runQuery(true)" />
       </div>
 
       <div
@@ -249,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <header
             class="border-border-default flex flex-wrap items-center gap-x-2 gap-y-1 border-b px-3 py-1.5 text-sm"
           >
-            <span class="font-semibold">{{ t("profiles.timeSeriesTitle") }}</span>
+            <span class="font-semibold">{{ timeSeriesTitle }}</span>
             <div
               v-if="seriesLines.length > 1"
               class="flex min-w-0 flex-wrap items-center gap-1"
@@ -692,14 +687,16 @@ import { calleesOf, callersOf } from "./sandwich";
 import { formatPercent } from "./format";
 import { copyToClipboard } from "@/utils/clipboard";
 import streamService from "@/services/stream";
+import analytics from "@/services/product_analytics";
 import profilesService, {
-  encodeProfileFilters,
+  encodeProfileRouteFilters,
   parseProfileFilters,
   type ProfileFilter,
   type ProfilesMergeResponse,
   type ProfilesQueryBody,
   type ProfilesSeriesPoint,
   type ProfilesSeriesResponse,
+  type ProfileTypeMeta,
   type ProfilesTreeNode,
 } from "@/services/profiles";
 import { cssToken } from "@/utils/theme";
@@ -776,17 +773,14 @@ const streamOptions = ref<SelectOption[]>([]);
 const selectedStream = ref<string | null>(null);
 const selectedService = ref<string | null>(null);
 const selectedProfileType = ref<string | null>(null);
-const draftTagKey = ref<string | null>(null);
-const draftTagValue = ref<string | null>(null);
-const tagValueOptions = ref<SelectOption[]>([]);
-const tagValuesLoading = ref(false);
 const appliedFilters = ref<ProfileFilter[]>([]);
-const editingFilterIndex = ref<number | null>(null);
 const searchQuery = ref("");
 const activeView = ref<ProfileView>("top");
 const setView = (value: unknown) => {
   const next = PROFILE_VIEWS.find((view) => view === value);
-  if (next) activeView.value = next;
+  if (!next || next === activeView.value) return;
+  activeView.value = next;
+  analytics.track("profiles_view_changed", { view: next });
 };
 const expandedStackIds = ref<string[]>([]);
 // On phones the page body is the one scroller and the Top Table virtualizes against it; from md up each table scrolls itself.
@@ -831,6 +825,7 @@ const showInFlameGraph = (name: string) => {
 };
 const showDetails = (name: string) => {
   detailsName.value = name;
+  analytics.track("profiles_function_details_opened");
 };
 const showSandwich = (name: string) => {
   sandwichFunction.value = name;
@@ -857,7 +852,7 @@ const focusInFlameGraph = async (path: string) => {
 
 const metaResponse = ref<{
   services: string[];
-  profile_types: Array<{ type: string; unit: string }>;
+  profile_types: ProfileTypeMeta[];
   label_names: string[];
 } | null>(null);
 const seriesResponse = ref<ProfilesSeriesResponse | null>(null);
@@ -894,6 +889,8 @@ const FLAME_SKELETON_WIDTHS = ["w-full", "w-11/12", "w-3/4", "w-7/12", "w-5/12",
 let metaRequestSeq = 0;
 let queryRequestSeq = 0;
 let tagValuesRequestSeq = 0;
+// The server ignores the typed search, so one full list per label and inputs is fetched and filtered here.
+const tagValuesCache = new Map<string, Promise<string[]>>();
 let initRunSeq = 0;
 // Holds the stream and date watchers off while a route seed is applied or dropped, so they cannot reset it or reload.
 let seeding = false;
@@ -919,17 +916,18 @@ const serviceOptions = computed<SelectOption[]>(() =>
 );
 const profileTypeOptions = computed<SelectOption[]>(() =>
   (metaResponse.value?.profile_types ?? []).map((item) => ({
-    label: raw(`${item.type} (${seriesUnitLabel(item.type, item.unit)})`),
+    label: profileTypeLabel(item),
     value: `${item.type}\u0000${item.unit}`,
   })),
 );
+const labelNames = computed<string[]>(() => metaResponse.value?.label_names ?? []);
 // A type seeded from the URL is shown by its label, not its raw id, until meta lists it.
 const profileTypeSelectOptions = computed<SelectOption[]>(() => {
   const selected = selectedProfileType.value;
   const options = profileTypeOptions.value;
   if (!selected || options.some((option) => option.value === selected)) return options;
   const [type, unit = ""] = selected.split("\u0000");
-  return [...options, { label: raw(`${type} (${seriesUnitLabel(type, unit)})`), value: selected }];
+  return [...options, { label: profileTypeLabel({ type, unit }), value: selected }];
 });
 const tagKeyOptions = computed<SelectOption[]>(() =>
   (metaResponse.value?.label_names ?? []).map((value) => ({ label: raw(value), value })),
@@ -974,9 +972,10 @@ const currentUnit = computed(
 const currentType = computed(
   () => currentProfileType.value?.type || seriesResponse.value?.profile_type || "",
 );
-const isCpuMetric = computed(
-  () => currentType.value.toLowerCase() === "cpu" && /nano/i.test(currentUnit.value),
-);
+const isNanosecondsUnit = (unit: string) => /^(nanoseconds?|ns|nanos)$/i.test(unit);
+const isCpuTime = (profileType: string, unit: string) =>
+  profileType.toLowerCase() === "cpu" && isNanosecondsUnit(unit);
+const isCpuMetric = computed(() => isCpuTime(currentType.value, currentUnit.value));
 
 // Token values change with the theme, so they are re-read whenever it switches.
 const seriesColors = computed(() => {
@@ -1258,12 +1257,26 @@ const profileColumns = computed<OTableColumnDef[]>(() => {
 });
 
 const seriesUnitLabel = (profileType: string, unit: string) => {
-  if (profileType.toLowerCase() === "cpu" && /nano/i.test(unit)) return "cores";
+  if (isCpuTime(profileType, unit)) return "cores";
   if (/nanosecond|^ns$/i.test(unit)) return "nanoseconds";
   if (/byte|^b$/i.test(unit)) return "bytes";
   if (!unit) return "count";
   return unit;
 };
+
+const profileTypeLabel = (profileType: ProfileTypeMeta) => {
+  const { type, unit } = profileType;
+  if (isCpuTime(type, unit)) return t("profiles.cpuTime", { cpu: raw("CPU") });
+  if (type === "samples" && unit === "count")
+    return t("profiles.cpuSamples", { cpu: raw("CPU"), unit: raw("count") });
+  return raw(`${type} (${seriesUnitLabel(type, unit)})`);
+};
+
+const timeSeriesTitle = computed(() =>
+  isCpuMetric.value
+    ? t("profiles.cpuUsage", { cpu: raw("CPU"), unit: raw("cores") })
+    : t("profiles.timeSeriesTitle"),
+);
 
 const tableUnitLabel = computed(() => {
   if (isCpuMetric.value) return t("profiles.cpuDuration");
@@ -1471,15 +1484,7 @@ const buildErrorMessage = (error: unknown): string => {
 
 const invalidateTagValuesRequest = () => {
   tagValuesRequestSeq += 1;
-  tagValuesLoading.value = false;
-};
-
-const clearDraftTag = () => {
-  invalidateTagValuesRequest();
-  editingFilterIndex.value = null;
-  draftTagKey.value = null;
-  draftTagValue.value = null;
-  tagValueOptions.value = [];
+  tagValuesCache.clear();
 };
 
 const resetProfilesState = () => {
@@ -1487,7 +1492,7 @@ const resetProfilesState = () => {
   selectedProfileType.value = null;
   appliedFilters.value = [];
   searchQuery.value = "";
-  clearDraftTag();
+  invalidateTagValuesRequest();
   seriesResponse.value = null;
   mergeResult.value = null;
   lastRun.value = null;
@@ -1540,68 +1545,57 @@ const filterToBreakdownValue = async (line: SeriesLine) => {
   await runOrMarkPending();
 };
 
-/** Adds the draft filter, or replaces the one being edited, then closes the menu and re-runs. */
-const applyDraftFilter = async () => {
-  const key = draftTagKey.value;
-  const value = draftTagValue.value;
-  if (!key || !value) return;
-  setLabelFilter(key, value, editingFilterIndex.value ?? -1);
-  editingFilterIndex.value = null;
-  draftTagKey.value = null;
+/** Takes the builder's filters, keeping one per label in the slot of its first chip, then re-runs. */
+const setFilters = async (next: ProfileFilter[]) => {
+  const byKey = new Map<string, number>();
+  const kept: ProfileFilter[] = [];
+  for (const filter of next) {
+    const at = byKey.get(filter.key);
+    if (at === undefined) {
+      byKey.set(filter.key, kept.length);
+      kept.push(filter);
+    } else kept[at] = filter;
+  }
+  appliedFilters.value = kept;
   await runOrMarkPending();
 };
 
-const removeFilter = async (filter: ProfileFilter) => {
-  appliedFilters.value = appliedFilters.value.filter(
-    (item) => !(item.key === filter.key && item.value === filter.value),
-  );
-  await runOrMarkPending();
-};
-
-const loadTagValues = async () => {
+/** A label's values for the filter builder; a filter on that label must not narrow its own list. */
+const loadTagValues = async (tag: string, search: string): Promise<string[]> => {
   const org = orgIdentifier.value;
   const stream = selectedStream.value;
-  const tag = draftTagKey.value;
   const range = resolveTimeRange();
   const profileType = currentProfileType.value;
-  if (!org || !stream || !tag || !range) {
-    tagValueOptions.value = [];
-    return;
+  if (!org || !stream || !tag || !range) return [];
+  const requestSeq = tagValuesRequestSeq;
+  const body = {
+    service_name: selectedService.value || undefined,
+    profile_type: profileType?.type,
+    profile_unit: profileType?.unit,
+    filters: appliedFilters.value
+      .filter((filter) => filter.key !== tag)
+      .map((filter) => ({ ...filter })),
+    tag,
+  };
+  const { valueType, relativeTimePeriod, startTime, endTime } = dateState.value;
+  const period = valueType === "relative" ? relativeTimePeriod : [startTime, endTime];
+  const key = JSON.stringify([org, stream, period, body]);
+  let request = tagValuesCache.get(key);
+  if (!request) {
+    request = profilesService
+      .tagValues(org, stream, { start_time: range.startTime, end_time: range.endTime, ...body })
+      .then((response) => response.data.values ?? []);
+    tagValuesCache.set(key, request);
+    request.catch(() => tagValuesCache.delete(key));
   }
-  const requestSeq = ++tagValuesRequestSeq;
-  tagValuesLoading.value = true;
   try {
-    const response = await profilesService.tagValues(org, stream, {
-      start_time: range.startTime,
-      end_time: range.endTime,
-      service_name: selectedService.value || undefined,
-      profile_type: profileType?.type,
-      profile_unit: profileType?.unit,
-      // The filter being edited must not narrow its own value list.
-      filters: appliedFilters.value
-        .filter((_, index) => index !== editingFilterIndex.value)
-        .map((filter) => ({ ...filter })),
-      tag,
-    });
-    if (requestSeq !== tagValuesRequestSeq) return;
-    tagValueOptions.value = (response.data.values ?? []).map((value) => ({
-      label: raw(value),
-      value,
-    }));
-    if (
-      draftTagValue.value &&
-      !tagValueOptions.value.some((option) => option.value === draftTagValue.value)
-    ) {
-      draftTagValue.value = null;
-    }
+    const values = await request;
+    if (requestSeq !== tagValuesRequestSeq) return [];
+    const needle = search.trim().toLowerCase();
+    return needle ? values.filter((value) => value.toLowerCase().includes(needle)) : values;
   } catch {
     // As the Metrics label filter does: the value list stays empty, and the results stay.
-    if (requestSeq !== tagValuesRequestSeq) return;
-    tagValueOptions.value = [];
-  } finally {
-    if (requestSeq === tagValuesRequestSeq) {
-      tagValuesLoading.value = false;
-    }
+    return [];
   }
 };
 
@@ -1680,12 +1674,6 @@ const loadMeta = async () => {
       selectedProfileType.value = firstProfileType;
     }
     if (
-      draftTagKey.value &&
-      !tagKeyOptions.value.some((item) => item.value === draftTagKey.value)
-    ) {
-      clearDraftTag();
-    }
-    if (
       breakdownLabel.value &&
       !breakdownOptions.value.some((item) => item.value === breakdownLabel.value)
     ) {
@@ -1721,6 +1709,7 @@ const setBreakdown = async (value: unknown) => {
     );
     if (requestSeq !== seriesRequestSeq) return;
     seriesResponse.value = response.data;
+    analytics.track("profiles_breakdown_changed", { has_breakdown: !!label });
   } catch (error) {
     if (requestSeq !== seriesRequestSeq || abort.signal.aborted) return;
     errorMessage.value = buildErrorMessage(error);
@@ -1729,7 +1718,8 @@ const setBreakdown = async (value: unknown) => {
   }
 };
 
-const runQuery = async () => {
+const runQuery = async (userRun = false) => {
+  tagValuesCache.clear();
   const org = orgIdentifier.value;
   const stream = selectedStream.value;
   const range = resolveTimeRange();
@@ -1762,6 +1752,12 @@ const runQuery = async () => {
     lastRun.value = runState;
     resetStackExpansion(mergeResponseValue.data.root);
     syncUrl();
+    if (userRun) {
+      analytics.track("profiles_query_completed", {
+        filter_count: appliedFilters.value.length,
+        has_breakdown: !!breakdownLabel.value,
+      });
+    }
   } catch (error) {
     if (requestSeq !== queryRequestSeq || isStaleRun(run, org)) return;
     errorMessage.value = buildErrorMessage(error);
@@ -1859,7 +1855,7 @@ const pageQuery = (range?: { startTime: number; endTime: number } | null) => {
     query.profile_type = profileType.type;
     query.profile_unit = profileType.unit;
   }
-  const filters = encodeProfileFilters(appliedFilters.value);
+  const filters = encodeProfileRouteFilters(appliedFilters.value);
   if (filters) query.filters = filters;
   query.view = activeView.value;
   return query;
@@ -1974,17 +1970,6 @@ const initPage = async () => {
   }
 };
 
-watch(draftTagKey, async (key, previousKey) => {
-  if (key === previousKey) return;
-  draftTagValue.value = null;
-  tagValueOptions.value = [];
-  if (!key) {
-    invalidateTagValuesRequest();
-    return;
-  }
-  await loadTagValues();
-});
-
 /** Reloads meta for a new stream or window, holding the select watcher so it does not query halfway. */
 const reloadMeta = async () => {
   reloadingMeta = true;
@@ -2000,16 +1985,12 @@ watch([selectedService, selectedProfileType], async ([service], [previousService
   if (seeding || reloadingMeta) return;
   // Profile types are scoped to the service; reloadMeta holds this watcher, so it cannot loop.
   if (service !== previousService) await reloadMeta();
-  if (draftTagKey.value) {
-    draftTagValue.value = null;
-    await loadTagValues();
-  }
   await runOrMarkPending();
 });
 
 watch(selectedStream, async (stream, previousStream) => {
   if (seeding || !stream || stream === previousStream) return;
-  clearDraftTag();
+  invalidateTagValuesRequest();
   appliedFilters.value = [];
   selectedService.value = null;
   await reloadMeta();
@@ -2026,9 +2007,6 @@ watch(dateState, async () => {
   } else {
     await reloadMeta();
     runPending.value = true;
-  }
-  if (draftTagKey.value) {
-    await loadTagValues();
   }
 });
 

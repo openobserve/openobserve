@@ -27,12 +27,12 @@ pub struct InviteRequest {
     org_id: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct MembershipResponse {
     membership: Option<MemberResponseItem>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct MemberResponseItem {
     id: i32,
     payer_org_id: String,
@@ -44,7 +44,7 @@ pub struct MemberResponseItem {
     accepted_by: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct InviteResponseItem {
     id: i32,
     inviter_org_id: String,
@@ -54,6 +54,7 @@ pub struct InviteResponseItem {
     inviter_id: String,
     created_at: i64,
     expires_at: i64,
+    #[schema(value_type = String)]
     status: Status,
     token: String,
 }
@@ -76,7 +77,7 @@ async fn get_org_name(org_id: &str) -> String {
     description = "List invites for and from the org for billing groups",
     security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Invites for and from the org", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 200, description = "Invites for and from the org", content_type = "application/json", body = Vec<InviteResponseItem>),
     ),
     tag = "Organizations",
     extensions(("x-o2-ratelimit" = json!({"module": "Billings", "operation": "list"})), 
@@ -385,7 +386,7 @@ pub async fn leave_group(
     ),
     security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Billing group membership of the org", content_type = "application/json", body = Object),
+        (status = 200, description = "Billing group membership of the org", content_type = "application/json", body = MembershipResponse),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
     tag = "Organizations",
@@ -432,7 +433,7 @@ pub async fn check_membership(Path(org_id): Path<String>) -> Response {
     ),
     security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Members of the billing group", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 200, description = "Members of the billing group", content_type = "application/json", body = Vec<MemberResponseItem>),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
     tag = "Organizations",

@@ -52,7 +52,7 @@ use ingester::WAL_PARQUET_METADATA;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
-    datafusion::{sort_order::FileSortOrder, table_provider::memtable::NewMemTable},
+    datafusion::{datasource::memtable::NewMemTable, sort_order::FileSortOrder},
     generate_filter_from_equal_items, generate_search_schema_diff,
     index::IndexCondition,
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},

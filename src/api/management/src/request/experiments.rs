@@ -113,6 +113,11 @@ async fn experiment_body(
     ExperimentResponseBody::new(experiment, shown)
 }
 
+/// Scores come from search, so while it is blocked the list renders without them.
+fn summary_wanted(requested: Option<bool>, org_id: &str) -> bool {
+    requested.unwrap_or(false) && search_service::check_org_search_allowed(org_id).is_ok()
+}
+
 fn experiment_error_response(error: ExperimentError) -> Response {
     match error {
         ExperimentError::Database(error) => {
@@ -560,6 +565,11 @@ async fn require_stored_reference_access(
         (status = 403, description = "A referenced Dataset, Scorer, Prompt, Provider or Remote Task is not accessible", body = ()),
         (status = 404, description = "Dataset or scorer not found", body = ()),
     ),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "create"}))
+    )
 )]
 pub async fn preview_experiment(
     Path(org_id): Path<String>,
@@ -600,6 +610,11 @@ pub async fn preview_experiment(
         (status = 409, description = "Idempotency conflict", body = ()),
         (status = 412, description = "Cost estimate is above the warning threshold and was not confirmed", body = ()),
     ),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "create"}))
+    )
 )]
 pub async fn create_experiment(
     Path(org_id): Path<String>,
@@ -653,6 +668,11 @@ pub async fn create_experiment(
         ExperimentListQuery,
     ),
     responses((status = 200, body = inline(ListExperimentsResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "list"}))
+    )
 )]
 pub async fn list_experiments(
     Path(org_id): Path<String>,
@@ -711,7 +731,7 @@ pub async fn list_experiments(
             .collect::<Vec<_>>(),
         Err(error) => return experiment_error_response(error),
     };
-    let include_summary = query.include_summary.unwrap_or(false);
+    let include_summary = summary_wanted(query.include_summary, &org_id);
     let mut summaries = if include_summary {
         summary::load(&experiments).await
     } else {
@@ -776,6 +796,11 @@ pub async fn list_experiments(
         (status = 200, body = inline(ExperimentDetailResponseBody)),
         (status = 404, description = "Experiment not found", body = ()),
     ),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "get"}))
+    )
 )]
 pub async fn get_experiment(
     Path((org_id, experiment_id)): Path<(String, String)>,
@@ -947,6 +972,10 @@ pub async fn get_experiment(
         (status = 400, description = "Invalid threshold, outcome dimensions, or cross-dataset comparison"),
         (status = 403, description = "One or both Experiments are not accessible"),
         (status = 404, description = "One or both Experiments were not found"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "list"}))
     )
 )]
 pub async fn compare_experiments(
@@ -1091,6 +1120,10 @@ pub async fn compare_experiments(
         (status = 400, description = "Invalid pagination"),
         (status = 403, description = "Experiment is not accessible"),
         (status = 404, description = "Experiment not found"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "list"}))
     )
 )]
 pub async fn list_experiment_result_rows(
@@ -1199,6 +1232,10 @@ pub async fn list_experiment_result_rows(
         (status = 200, description = "Pinned row detail", body = ExperimentRowDetailResponseBody),
         (status = 403, description = "Experiment is not accessible"),
         (status = 404, description = "Experiment or pinned row not found"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "get"}))
     )
 )]
 pub async fn get_experiment_row(
@@ -1321,6 +1358,10 @@ pub async fn get_experiment_row(
         (status = 200, description = "Experiment cancelled", body = ExperimentResponseBody),
         (status = 404, description = "Experiment not found"),
         (status = 409, description = "Invalid or concurrent lifecycle transition"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "create"}))
     )
 )]
 pub async fn cancel_experiment(Path((org_id, experiment_id)): Path<(String, String)>) -> Response {
@@ -1347,6 +1388,10 @@ pub async fn cancel_experiment(Path((org_id, experiment_id)): Path<(String, Stri
         (status = 403, description = "Experiment is not accessible"),
         (status = 404, description = "Experiment not found"),
         (status = 409, description = "Experiment is not eligible to be a Baseline"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "update"}))
     )
 )]
 pub async fn set_experiment_baseline(
@@ -1383,6 +1428,10 @@ pub async fn set_experiment_baseline(
         (status = 200, description = "Experiment is no longer the Baseline", body = ExperimentResponseBody),
         (status = 403, description = "Experiment is not accessible"),
         (status = 404, description = "Experiment not found"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "delete"}))
     )
 )]
 pub async fn clear_experiment_baseline(
@@ -1417,6 +1466,10 @@ pub async fn clear_experiment_baseline(
         (status = 403, description = "Experiment is not accessible"),
         (status = 404, description = "Experiment not found"),
         (status = 409, description = "Experiment lifecycle changed concurrently"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "delete"}))
     )
 )]
 pub async fn delete_experiment(
@@ -1462,6 +1515,10 @@ pub async fn delete_experiment(
         (status = 403, description = "A referenced Dataset, Scorer, Prompt, Provider or Remote Task is not accessible"),
         (status = 404, description = "Experiment not found"),
         (status = 409, description = "Invalid or concurrent lifecycle transition"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "create"}))
     )
 )]
 pub async fn retry_experiment(
@@ -1505,6 +1562,10 @@ pub async fn retry_experiment(
         (status = 403, description = "Experiment or one of its references is not accessible"),
         (status = 404, description = "Experiment, row, or trial not found"),
         (status = 409, description = "Experiment lifecycle, active slot retry, or idempotency conflict"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "create"}))
     )
 )]
 pub async fn retry_experiment_slot(
@@ -1575,6 +1636,10 @@ pub async fn retry_experiment_slot(
         (status = 404, description = "Experiment, Dataset or scorer not found"),
         (status = 409, description = "Only sealed Experiments can be cloned, or the idempotency key describes a different clone"),
         (status = 412, description = "Cost estimate is above the warning threshold and was not confirmed", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "create"}))
     )
 )]
 pub async fn clone_experiment(
@@ -2183,5 +2248,24 @@ mod tests {
                 .to_string()
                 .contains('7')
         );
+    }
+
+    #[tokio::test]
+    async fn summary_follows_the_request_while_search_is_open() {
+        let _held = o2_enterprise::enterprise::license::TEST_STATICS_LOCK
+            .lock()
+            .await;
+        assert!(summary_wanted(Some(true), "acme"));
+        assert!(!summary_wanted(None, "acme"));
+        assert!(!summary_wanted(Some(false), "acme"));
+    }
+
+    #[tokio::test]
+    async fn summary_is_skipped_while_search_is_blocked() {
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        let _gate = close_search_gate_for_tests().await;
+        assert!(!summary_wanted(Some(true), "acme"));
+        assert!(summary_wanted(Some(true), config::META_ORG_ID));
     }
 }

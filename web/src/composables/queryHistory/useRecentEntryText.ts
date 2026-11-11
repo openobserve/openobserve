@@ -60,5 +60,11 @@ export const useRecentEntryText = () => {
     return `${ran} · ${span}`;
   };
 
-  return { zone, windowText, spanText };
+  const ranText = (entry: QueryHistoryEntry): string =>
+    t("recentSearches.ranLast", {
+      count: entry.run_count,
+      time: at(entry.updated_at).toFormat("HH:mm"),
+    });
+
+  return { zone, windowText, spanText, ranText };
 };

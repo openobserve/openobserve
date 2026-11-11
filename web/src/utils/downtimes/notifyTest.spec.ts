@@ -3,7 +3,6 @@
 import { describe, it, expect } from "vitest";
 import type { DowntimeDetail } from "@/services/downtimes";
 import {
-  DOWNTIME_EMAIL_TEMPLATE,
   DOWNTIME_TEMPLATE,
   downtimeVariables,
   renderDowntimeTemplate,
@@ -94,7 +93,7 @@ describe("downtime test send", () => {
     const slack = { name: "slack", type: "http", template: "mine" };
     expect(templateNameFor(slack, "{downtime_name} {downtime_event}")).toBe("mine");
     expect(templateNameFor(slack, "[{alert_status}] {alert_name}")).toBe(DOWNTIME_TEMPLATE);
-    expect(templateNameFor({ name: "mail", type: "email" })).toBe(DOWNTIME_EMAIL_TEMPLATE);
+    expect(templateNameFor({ name: "mail", type: "email" })).toBe("prebuilt_default");
   });
 
   it("builds the test request per destination type", () => {

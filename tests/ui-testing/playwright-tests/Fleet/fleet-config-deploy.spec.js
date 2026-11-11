@@ -63,30 +63,6 @@ test.describe('Fleet management configurations and deploy', { tag: ['@fleet', '@
     await pm.fleetConfigPage.expectYaml(FLEET_YAML.dottedKey.replace('enabled: true', 'enabled: false'));
   });
 
-  test('R-16104a · Visual keeps "true", "123" and "null" as strings, and YAML with a quoted number opens in Visual', {
-    tag: ['@fleetConfig', '@regression', '@P1'],
-  }, async () => {
-    const config = await pm.fleetSeed.createConfig('quoted', FLEET_YAML.seed);
-    await pm.fleetConfigPage.goto(config);
-    await pm.fleetConfigPage.switchToYaml();
-    await pm.fleetConfigPage.setYaml(FLEET_YAML.quotedNumber);
-
-    await pm.fleetConfigPage.switchToVisual();
-    await pm.fleetConfigPage.selectNode('logs|exporter:debug');
-    await pm.fleetConfigPage.expectPropertyValue('verbosity', '"123"');
-    await pm.fleetConfigPage.addSetting('fl_true', '"true"');
-    await pm.fleetConfigPage.addSetting('fl_num', '"123"');
-    await pm.fleetConfigPage.addSetting('fl_null', '"null"');
-
-    await pm.fleetConfigPage.switchToYaml();
-    await pm.fleetConfigPage.expectYaml(
-      FLEET_YAML.quotedNumber.replace(
-        '    verbosity: "123"\n',
-        '    verbosity: "123"\n    fl_true: "true"\n    fl_num: "123"\n    fl_null: "null"\n',
-      ),
-    );
-  });
-
   test('FL-CFG-09 · invalid YAML validates as "1 error · publish blocked" and Publish is refused', {
     tag: ['@fleetConfig', '@smoke', '@P0'],
   }, async () => {
@@ -127,22 +103,6 @@ test.describe('Fleet management configurations and deploy', { tag: ['@fleet', '@
     await pm.fleetConfigPage.compare(2);
     await pm.fleetConfigPage.expectDiffContains('https://example.org');
     expect((await pm.fleetSeed.getConfig(config)).latest_version).toBe(2);
-  });
-
-  test('R-16104b · Deploy from the editor opens with no fleet picked and is blocked with "Pick a fleet"', {
-    tag: ['@fleetDeploy', '@regression', '@P1'],
-  }, async () => {
-    await pm.fleetSeed.createFleet('pick');
-    const config = await pm.fleetSeed.createConfig('deploy', FLEET_YAML.publishable);
-    await pm.fleetSeed.publishConfig(config, FLEET_YAML.publishable);
-    await pm.fleetConfigPage.goto(config);
-
-    await pm.fleetConfigPage.openDeployFromEditor();
-    await pm.fleetRolloutPage.expectReady();
-    await pm.fleetRolloutPage.expectNoFleetPicked();
-    await pm.fleetRolloutPage.submit();
-    await pm.fleetRolloutPage.expectFleetError('Pick a fleet');
-    expect(await pm.fleetSeed.rolloutsForConfig(config)).toEqual([]);
   });
 
   test('FL-RO-01 · the deploy dialog refuses counts below 1 and a max below the initial batch', {

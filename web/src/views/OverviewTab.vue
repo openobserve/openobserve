@@ -359,6 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="svc in services"
               :key="svc.id"
+              :data-test="`overview-service-card-${svc.id}`"
               class="rounded-default border-border-default bg-surface-panel focus-visible:ring-button-ghost-focus-ring max-w-40 min-w-40 shrink-0 grow-0 basis-40 cursor-pointer border border-[0.0625em] px-3.5 py-3 transition-[background-color,box-shadow,outline-color] duration-150 focus-visible:ring-3 focus-visible:outline-none"
               tabindex="0"
               :class="[
@@ -418,7 +419,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-text-label text-xs">{{ t("overview.colErrorRate") }}</span>
                   <span
                     class="text-sm font-semibold tabular-nums"
-                    :class="svc.errorFlag ? 'text-error-600' : 'text-text-heading'"
+                    :class="SERVICE_ERROR_RATE_TEXT[svc.health]"
+                    :data-test="`overview-service-card-${svc.id}-error-rate`"
                   >
                     {{ svc.error_rate != null ? svc.error_rate.toFixed(1) + "%" : "—" }}
                   </span>
@@ -807,6 +809,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { isFiringOutcome, isErrorOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { useRouter } from "vue-router";
 import anomalyService from "@/services/anomaly_detection";
 import DateTime from "@/components/DateTime.vue";
@@ -850,9 +853,11 @@ import type { OrgOverview } from "@/ts/interfaces/overview";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
+import { serviceHealthFromErrorRate, type ServiceHealthStatus } from "@/utils/traces/serviceHealth";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";
+import analytics from "@/services/product_analytics";
 
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
@@ -952,8 +957,23 @@ const onDateChange = (value: any) => {
       timeRange: timeRange.value,
     }),
   );
+  if (value.userChangedValue) {
+    analytics.track("home_time_range_changed", { type: dateTimeType.value });
+  }
   loadAll();
 };
+
+interface ServiceCard {
+  id: string;
+  label: string;
+  requests: number;
+  error_rate: number;
+  stream_name?: string;
+  health: ServiceHealthStatus;
+  errorFlag: boolean;
+  latencyFlag: boolean;
+  latencyMultiplier: string | null;
+}
 
 // ── State ────────────────────────────────────────────────────────────────────
 const isLoading = ref(false);
@@ -961,7 +981,7 @@ const lastFetched = ref<Date | null>(null);
 const anomalies = ref<any[]>([]);
 const incidents = ref<any[]>([]);
 const incidentsTotal = ref(0);
-const services = ref<any[]>([]);
+const services = ref<ServiceCard[]>([]);
 const recentEvents = ref<any[]>([]);
 
 // True once any section has something to show. Gates the skeleton and the empty
@@ -1367,7 +1387,8 @@ const loadUserStreams = async (force = false) => {
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
 const loadAnomalies = async (force = false, current: () => boolean = () => true) => {
   sectionFailure.anomalies = null;
-  if (anomalyLocked.value) {
+  // the OSS build does not register the anomaly routes, and their 401 would end the session
+  if (!anomalyEnabled.value) {
     anomalies.value = [];
     anomalyConfigCount.value = null;
     return;
@@ -1624,18 +1645,20 @@ const loadServiceGraph = async (force = false, current: () => boolean = () => tr
       }
     }
 
-    services.value = nodes
-      .map((node) => {
-        const latInfo = latencyByNode.get(node.id);
-        const errorFlag = (node.error_rate ?? 0) >= 1;
-        const latencyFlag = !!latInfo;
-        return {
-          ...node,
-          errorFlag,
-          latencyFlag,
-          latencyMultiplier: latInfo ? latInfo.multiplier.toFixed(1) : null,
-        };
-      })
+    const cards = nodes.map((node) => {
+      const latInfo = latencyByNode.get(node.id);
+      const health = serviceHealthFromErrorRate(node.error_rate ?? 0);
+      const errorFlag = health !== "healthy";
+      const latencyFlag = !!latInfo;
+      return {
+        ...node,
+        health,
+        errorFlag,
+        latencyFlag,
+        latencyMultiplier: latInfo ? latInfo.multiplier.toFixed(1) : null,
+      };
+    });
+    services.value = cards
       // Show only services with at least one flag, then healthy ones after
       .sort((a, b) => {
         const aScore = (a.errorFlag ? 2 : 0) + (a.latencyFlag ? 1 : 0);
@@ -1646,6 +1669,13 @@ const loadServiceGraph = async (force = false, current: () => boolean = () => tr
         return a.id.localeCompare(b.id);
       })
       .slice(0, 12);
+    // The open side panel reads the selected card's numbers, so it must follow the refreshed card.
+    const selectedId = selectedService.value?.id;
+    if (selectedId) {
+      const refreshed = cards.find((c) => c.id === selectedId);
+      if (refreshed) selectedService.value = refreshed;
+      else closeServicePanel();
+    }
     await nextTick();
     onSvcScroll();
   } catch (err) {
@@ -1717,14 +1747,29 @@ const incidentIconClass = (severity: string) => {
   return "text-status-info-text";
 };
 
-const serviceCardClass = (svc: any) => {
-  if (svc.errorFlag && svc.error_rate >= 5) return "border-s-[0.1875em] border-s-error-600";
-  if (svc.errorFlag || svc.latencyFlag) return "border-s-[0.1875em] border-s-warning-600";
-  return "border-s-[0.1875em] border-s-status-positive";
+const SERVICE_CARD_BORDER: Record<ServiceHealthStatus, string> = {
+  critical: "border-s-[0.1875em] border-s-service-health-critical",
+  warning: "border-s-[0.1875em] border-s-service-health-warning",
+  degraded: "border-s-[0.1875em] border-s-service-health-degraded",
+  healthy: "border-s-[0.1875em] border-s-service-health-healthy",
 };
 
+const SERVICE_ERROR_RATE_TEXT: Record<ServiceHealthStatus, string> = {
+  critical: "text-service-health-critical",
+  warning: "text-service-health-warning",
+  degraded: "text-service-health-degraded",
+  healthy: "text-text-heading",
+};
+
+const serviceCardClass = (svc: { health: ServiceHealthStatus; latencyFlag: boolean }) =>
+  SERVICE_CARD_BORDER[svc.health === "healthy" && svc.latencyFlag ? "degraded" : svc.health];
+
 // ── Navigation ───────────────────────────────────────────────────────────────
+const trackDrilldown = (target: string, properties?: object) =>
+  analytics.track("home_overview_drilldown_clicked", { target, ...properties });
+
 const goToAlert = (item: any) => {
+  trackDrilldown("alert_history");
   selectedAlertForHistory.value = item.alertConfig ?? { name: item.alertName };
   selectedAlertIdForHistory.value = item.alertId ?? "";
   showAlertHistoryDrawer.value = true;
@@ -1736,6 +1781,7 @@ const goToService = (svc: any, e?: MouseEvent) => {
   e?.stopPropagation();
   // the service panel's View traces emits here too, outside this file's lock markup
   if (tracesLock.locked.value) return;
+  trackDrilldown("service_traces");
   let filter = sqlEquals("service_name", svc.label ?? svc.id);
   if (svc.errorFlag) filter += ` AND span_status = 'ERROR'`;
 
@@ -1761,6 +1807,7 @@ const openServicePanel = (svc: any) => {
   // clicking the card body opens the latency/info side panel.
   selectedService.value = svc;
   servicePanelVisible.value = true;
+  trackDrilldown("service_panel");
 };
 
 const closeServicePanel = () => {
@@ -1769,6 +1816,7 @@ const closeServicePanel = () => {
 };
 
 const goToIncident = (inc: any) => {
+  trackDrilldown("incident");
   router.push({
     name: "incidentDetail",
     params: { id: inc.id },
@@ -1788,23 +1836,28 @@ const hasEventStream = (ev: { service: string }) => ev.service !== "—";
 
 const goToAlertList = () => {
   if (alertsLocked.value) return;
+  trackDrilldown("alerts");
   router.push({ name: "alertList", query: { org_identifier: orgId.value } });
 };
 
 const goToAddAlert = () => {
   if (alertsLocked.value) return;
+  trackDrilldown("add_alert");
   router.push({ name: "addAlert", query: { org_identifier: orgId.value } });
 };
 
 const goToPipelines = () => {
+  trackDrilldown("pipelines");
   router.push({ name: "pipelines", query: { org_identifier: orgId.value } });
 };
 
 const goToStreams = () => {
+  trackDrilldown("streams");
   router.push({ name: "logstreams", query: { org_identifier: orgId.value } });
 };
 
 const goToIngestion = () => {
+  trackDrilldown("ingestion");
   router.push({ name: "ingestion", query: { org_identifier: orgId.value } });
 };
 
@@ -1816,6 +1869,7 @@ const onHealthOpen = (destination: OverviewDestination) => {
 
 const onSignalOpen = (signal: OverviewSignal) => {
   if (signal in signalLockedReasons.value) return;
+  trackDrilldown("signal", { signal });
   router.push({ name: signal, query: { org_identifier: orgId.value } });
 };
 
@@ -1831,10 +1885,12 @@ const onHeadlineSelect = (target: OverviewTarget) => {
 };
 
 const goToIncidentList = () => {
+  trackDrilldown("incidents");
   router.push({ name: "incidentList", query: { org_identifier: orgId.value, status: "open" } });
 };
 
 const goToAnomalies = () => {
+  trackDrilldown("anomalies");
   router.push({
     name: "alertList",
     query: { org_identifier: orgId.value, tab: "anomalyDetection" },
@@ -1843,11 +1899,13 @@ const goToAnomalies = () => {
 
 const goToLogs = () => {
   if (logsLock.locked.value) return;
+  trackDrilldown("logs");
   router.push({ name: "logs", query: { org_identifier: orgId.value } });
 };
 
 const goToServiceGraph = () => {
   if (tracesLock.locked.value) return;
+  trackDrilldown("service_graph");
   const query: Record<string, string> = {
     org_identifier: orgId.value,
     tab: "service-graph",
@@ -1874,11 +1932,27 @@ watch(
   },
 );
 
+// A sample load or removal that ends while Home is open must re-check the org, not wait for a reload
+const sampleSession = useSampleDataSession();
+watch(sampleSession.status, (now, was) => {
+  if (was === "loading" && now !== "idle" && sampleSession.loadingOrg.value === orgId.value)
+    loadAll(true);
+});
+watch(sampleSession.removals, ({ org }) => {
+  if (org === orgId.value) loadAll(true);
+});
+
 // zoConfig loads asynchronously after mount — retry incidents when it becomes available
 watch(isIncidentsEnabled, (enabled) => {
   if (!enabled || incidents.value.length > 0) return;
   // the earlier pass returned early and marked the section loaded, so re-arm its skeleton
   sectionState.incidents.loaded = false;
   void runSection("incidents", (current) => loadIncidents(false, current));
+});
+// a failed config fetch is retried after mount, so the flag can turn on once the first pass has skipped the section
+watch(anomalyEnabled, (enabled) => {
+  if (!enabled) return;
+  sectionState.anomalies.loaded = false;
+  void runSection("anomalies", (current) => loadAnomalies(false, current));
 });
 </script>

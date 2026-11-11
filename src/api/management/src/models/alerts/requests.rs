@@ -176,6 +176,9 @@ pub struct AnomalyAlertFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alert_window_recover_pct: Option<f64>,
     pub alert_enabled: Option<bool>,
+    /// Template override for anomaly messages; absent, null or "" uses the destination's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
 }
 
 /// HTTP request body for `UpdateAlert` endpoint.
@@ -415,6 +418,14 @@ pub struct UpdateAnomalyAlertFields {
     #[schema(value_type = Option<f64>)]
     pub alert_window_recover_pct: Option<Option<f64>>,
     pub alert_enabled: Option<bool>,
+    /// Absent leaves the stored template override; `null` or "" clears it.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<String>)]
+    pub template: Option<Option<String>>,
     pub enabled: Option<bool>,
     /// Moves the config to this folder. Naming a folder you cannot write to
     /// returns 403; omit it to leave the config where it is.
@@ -542,6 +553,7 @@ impl ListAlertsQuery {
         meta_alerts::ListAlertsParams {
             org_id: org_id.to_string(),
             folder_id: self.folder,
+            listable_folder_ids: None,
             name_substring: self.alert_name_substring,
             stream_type_and_name: self
                 .stream_type
@@ -556,6 +568,7 @@ impl ListAlertsQuery {
             // Resolved by the service layer, which owns the alert cache the
             // infra layer cannot reach (PT-8).
             tag_alert_ids: None,
+            excluded_alert_ids: Vec::new(),
             sort_by: match self.sort_by.as_deref() {
                 Some("priority") => Some(meta_alerts::AlertSortField::Priority),
                 Some("name") => Some(meta_alerts::AlertSortField::Name),

@@ -56,9 +56,10 @@ async fn cleanup_related_resources(
     // `delete_many_for_cascade` holds the organization graph lock and checks
     // every target before deleting the first, so a referenced sibling leaves
     // the entire stream-level cleanup untouched.
-    let alerts = db::alerts::alert::list(&org_id, Some(stream_type), Some(&stream_name))
-        .await
-        .map_err(|error| alert_cleanup_error(error.into()))?;
+    let alerts =
+        db::alerts::alert::list_fully_decoded(&org_id, Some(stream_type), Some(&stream_name))
+            .await
+            .map_err(|error| alert_cleanup_error(error.into()))?;
     let alert_ids = alerts
         .iter()
         .filter_map(|alert| alert.id)

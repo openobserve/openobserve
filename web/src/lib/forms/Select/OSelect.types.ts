@@ -2,7 +2,8 @@
 
 import type { I18nText } from "@/types/i18n";
 
-import type { InjectionKey } from "vue";
+import type { Component, InjectionKey } from "vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { FieldWidth } from "../Input/OInput.types";
 
 export type { SelectHeaderRowEmits, SelectHeaderRowProps } from "./OSelectHeaderRow.types";
@@ -70,6 +71,10 @@ export interface SelectOption {
   parentValue?: SelectValue;
   /** Extra text the search matches besides the label, e.g. a zone's legacy names. */
   searchText?: string;
+  /** Listbox mode: label shown in the list rows instead of `label`, which still names the selected value in the trigger. */
+  listLabel?: I18nText;
+  /** Listbox mode: small muted detail right-aligned in the list row, such as a UTC offset. */
+  suffix?: I18nText;
   [key: string]: unknown;
 }
 
@@ -223,6 +228,8 @@ export interface SelectSlots {
   chip?: (_scope: { label: string; value: SelectValue }) => unknown;
   /** Empty state — shown when no options match the search */
   empty?: () => unknown;
+  /** Listbox mode only: replaces an option row's label (its icon stays), handed the option as passed in. */
+  option?: (_scope: { option: SelectOption }) => unknown;
   /** Content before the options list */
   "before-options"?: () => unknown;
   /** Content after the options list */
@@ -245,6 +252,12 @@ export interface SelectItemProps {
   label?: I18nText;
   /** Prevents selection */
   disabled?: boolean;
+  /** Registry icon shown before the label */
+  icon?: IconName;
+  /** Raw Vue component shown before the label; wins over `icon` */
+  iconComponent?: Component;
+  /** Keeps a blank icon-sized slot when this item has no icon so labels align with iconned siblings */
+  reserveIconSpace?: boolean;
 }
 
 export interface SelectItemSlots {

@@ -764,6 +764,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
             o2_enterprise::enterprise::oncall::token::mark_spent(tag, expires_at);
         }));
     }
+    // On-call destination sends go through the shared notification path.
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::oncall::sender::register_oncall_sender(|n| {
+            Box::pin(openobserve_core::alerts::notifications::oncall::notify_destination(n))
+        });
+        if LOCAL_NODE.is_scheduler() {
+            tokio::spawn(
+                openobserve_core::alerts::notifications::oncall::log_mail_destination_policies(),
+            );
+        }
+    }
     // Every node: the validator, which reads the token cache, runs wherever HTTP is served.
     #[cfg(feature = "enterprise")]
     if openobserve_core::fleet::enabled() {
@@ -912,12 +924,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("system templates initialization failed");
 
-    // Give every org without a default_alert_template pointer one, pointing
-    // at the just-seeded o2_default_content. Best-effort: the compiled-in
-    // fallback (design §4.4) covers any org this misses.
-    if let Err(e) = alerts::notifications::org_default::backfill_org_default_templates().await {
-        log::error!("[TEMPLATES] default_alert_template backfill failed: {e}");
-    }
     #[cfg(feature = "enterprise")]
     if let Err(e) = alerts::alert_calibration::backfill_org_configs().await {
         log::error!("[alert_calibration] default config backfill failed: {e}");
@@ -1344,10 +1350,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
 
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_training_reporter(
-            |org_id, anomaly_id, anomaly_name, success, error_msg, start_us, end_us| {
+            |org_id, anomaly_id, anomaly_name, outcome, message, start_us, end_us| {
                 Box::pin(async move {
                     use config::meta::self_reporting::usage::{
                         RunOutcome, TriggerData, TriggerDataType,
+                    };
+                    // A data-readiness skip carries a reason, which must not read as an error.
+                    let (error, success_response) = if outcome == RunOutcome::Error {
+                        (message, None)
+                    } else {
+                        (None, message)
                     };
                     usage_reporting::publish_triggers_usage(TriggerData {
                         _timestamp: start_us,
@@ -1357,15 +1369,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         next_run_at: 0,
                         is_realtime: false,
                         is_silenced: false,
-                        status: if success {
-                            RunOutcome::Succeeded
-                        } else {
-                            RunOutcome::Error
-                        },
+                        status: outcome,
                         start_time: start_us,
                         end_time: end_us,
                         retries: 0,
-                        error: error_msg,
+                        error,
+                        success_response,
                         evaluation_took_in_secs: Some((end_us - start_us) as f64 / 1_000_000.0),
                         ..Default::default()
                     });
@@ -1742,6 +1751,7 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         )
         .await;
         tokio::task::spawn(db::license::watch());
+        tokio::task::spawn(db::license::watch_usage());
     }
 
     if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_scheduler() {

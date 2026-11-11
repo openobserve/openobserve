@@ -188,7 +188,7 @@ onUnmounted(() => {
           name="autorenew"
           size="sm"
           v-if="variant === 'loading'"
-          class="size-5 animate-spin"
+          class="o2-motion-keep size-5 animate-spin"
         />
         <OIcon name="check-circle" size="sm" v-else-if="variant === 'success'" class="size-5" />
         <OIcon name="cancel" size="sm" v-else-if="variant === 'error'" class="size-5" />

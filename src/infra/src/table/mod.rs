@@ -166,6 +166,7 @@ pub async fn migrate() -> Result<(), anyhow::Error> {
 async fn run_migrations(client: &DatabaseConnection) -> Result<(), anyhow::Error> {
     // Reading the history fails on the draft migrations' missing files, so forget them first.
     migration::forget_draft_migrations(client).await?;
+    migration::forget_renamed_migrations(client).await?;
     check_migration_history(client).await?;
     // This is a hack to fix the failing alerts migration
     // For postgres, we need to run the migration that populates the alerts table first.
@@ -273,6 +274,41 @@ where
         .await?;
     rows.iter()
         .map(|row| E::Model::from_query_result(row, ""))
+        .collect()
+}
+
+/// Converts rows one by one, logging and dropping each one that fails, so one row an older
+/// version cannot read (a newer condition operator, say) never fails the whole list.
+pub(crate) fn convert_skipping_unreadable<M, T, E: std::fmt::Display>(
+    store: &str,
+    rows: impl IntoIterator<Item = M>,
+    row_key: impl Fn(&M) -> String,
+    convert: impl Fn(M) -> Result<T, E>,
+) -> Vec<T> {
+    rows.into_iter()
+        .filter_map(|row| {
+            let key = row_key(&row);
+            convert(row)
+                .inspect_err(|e| log::error!("[{store}] skipped unreadable row {key}: {e}"))
+                .ok()
+        })
+        .collect()
+}
+
+/// Converts every row, failing on the first one this version cannot read, for reference checks.
+pub(crate) fn convert_failing_on_unreadable<M, T, E: std::fmt::Display>(
+    store: &str,
+    rows: impl IntoIterator<Item = M>,
+    row_key: impl Fn(&M) -> String,
+    convert: impl Fn(M) -> Result<T, E>,
+) -> Result<Vec<T>, crate::errors::Error> {
+    rows.into_iter()
+        .map(|row| {
+            let key = row_key(&row);
+            convert(row).map_err(|e| {
+                crate::errors::Error::Message(format!("[{store}] row {key} is unreadable: {e}"))
+            })
+        })
         .collect()
 }
 

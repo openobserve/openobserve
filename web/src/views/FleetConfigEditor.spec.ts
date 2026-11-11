@@ -29,6 +29,9 @@ import { CATALOG, graphToYaml, seedGraph } from "@/components/fleet/editor/edito
 import { SEEDS } from "@/components/fleet/editor/editorGraph.fixtures";
 import { setPendingImport } from "@/components/fleet/useFleetApi";
 import FleetConfigEditor from "./FleetConfigEditor.vue";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 type CapturedGuard = (to?: unknown, from?: unknown) => unknown;
 
@@ -314,6 +317,20 @@ describe("FleetConfigEditor", () => {
     expect(doc.service.extensions).toEqual(["health_check", "health_check/2"]);
   });
 
+  it("tracks a switch between Visual and YAML, but not a click on the current mode", async () => {
+    vi.mocked(fleet.getConfig).mockResolvedValue({
+      data: detail({ draft: draft("exporters:\n  debug: {}\n") }),
+    } as any);
+    wrapper = await mountEditor("edge");
+    vi.mocked(analytics.track).mockClear();
+    await toYaml(wrapper);
+    await toYaml(wrapper);
+    expect(analytics.track).toHaveBeenCalledTimes(1);
+    expect(analytics.track).toHaveBeenCalledWith("fleet_config_editor_mode_changed", {
+      mode: "yaml",
+    });
+  });
+
   it("saves the loaded YAML unchanged when nothing was edited", async () => {
     const text = "receivers:\n  otlp: {}   \n# trailing comment\n\n";
     vi.mocked(fleet.getConfig).mockResolvedValue({ data: detail({ draft: draft(text) }) } as any);
@@ -353,6 +370,22 @@ describe("FleetConfigEditor", () => {
   });
 
   describe("publish", () => {
+    it("refuses to publish the latest version's text until it changes", async () => {
+      vi.mocked(fleet.getConfig).mockResolvedValue({
+        data: detail({ latest_version: 2, versions: [published(2), published(1)] }),
+      } as any);
+      wrapper = await mountEditor("edge");
+      const button = () => wrapper.find('[data-test="fleet-config-editor-publish"]');
+      const editor = wrapper.findComponent({ name: "FleetCodeEditor" });
+      expect(button().attributes("disabled")).toBeDefined();
+      editor.vm.$emit("update:code", LOSSY + "# fixed\n");
+      await flushPromises();
+      expect(button().attributes("disabled")).toBeUndefined();
+      editor.vm.$emit("update:code", LOSSY);
+      await flushPromises();
+      expect(button().attributes("disabled")).toBeDefined();
+    });
+
     it("toasts the new version and leaves draft mode", async () => {
       vi.mocked(fleet.publishConfigVersion).mockResolvedValue({
         data: { version: 1, warnings: {} },

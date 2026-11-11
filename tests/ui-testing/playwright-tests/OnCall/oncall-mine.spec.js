@@ -134,6 +134,7 @@ test.describe('On-call — my duty, my inbox, my history', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
     const name = uniqueName(`${workerPrefix(testInfo)}_duty`);
+    const STAFFED_ROTATION = 'Primary';
     const me = process.env.ZO_ROOT_USER_EMAIL;
     expect(me, 'the suite runs as a real identity and the duty list is keyed on it').toBeTruthy();
 
@@ -142,7 +143,7 @@ test.describe('On-call — my duty, my inbox, my history', {
     await addTeamMembers(page, staffed.id, [me]);
     await setTeamSchedule(page, staffed.id, {
       timezone: 'UTC',
-      rotations: [rotation({ id: 'Primary', members: [me] })],
+      rotations: [rotation({ id: STAFFED_ROTATION, members: [me] })],
     });
 
     // And one the caller is on that staffs nobody — genuinely off duty, which
@@ -197,8 +198,9 @@ test.describe('On-call — my duty, my inbox, my history', {
     ).toBe(1);
 
     const staffedDuty = await pm.oncallMinePage.readDutyText(staffed.id);
+    // An on-call seat is labelled with the rotation the caller holds, so the definite answer is its name.
     expect(staffedDuty.toLowerCase(), 'a resolvable team must give a definite answer')
-      .toMatch(/on call/);
+      .toBe(STAFFED_ROTATION.toLowerCase());
     expect(staffedDuty.toLowerCase(), 'and it must not be the unknown state')
       .not.toContain('could not');
 
@@ -505,5 +507,17 @@ test.describe('On-call — my duty, my inbox, my history', {
       pm.oncallResponseDetailPage.getPriorCause(cause),
       'the Causes tab must name the cause this rule turned out to be last time',
     ).toBeVisible({ timeout: 30000 });
+  });
+
+  test('UN-01 with no provider the phone card takes no number and points at Telephony', {
+    tag: ['@P0'],
+  }, async () => {
+    await pm.oncallMinePage.goto(ORG);
+    // o2-enterprise#3420 D2: the spec's disabled card and sentence differ from the app's, so only the missing box and the link are read.
+    testLogger.info('Expect no number box and no way to add a phone (U3)');
+    await pm.oncallMinePage.expectNoProviderCard();
+
+    await pm.oncallMinePage.openTelephonyFromCard();
+    await pm.telephonySettingsPage.expectTitle('Telephony');
   });
 });

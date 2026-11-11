@@ -10,6 +10,7 @@ pub struct Model {
     pub rungs: String,
     pub destinations: String,
     pub l0_json: String,
+    pub template: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
 }

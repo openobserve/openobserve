@@ -30,8 +30,10 @@ import { gt } from "@/types/i18n";
 import {
   USER_DATA_STREAM_TYPES,
   isUserDataStream,
+  type StreamOwnership,
   type UserDataStreamType,
 } from "@/utils/internalStreams";
+import { isSampleStreamName } from "@/utils/sampleData/catalog";
 import { FIRST_EVENT_BUDGET, cadenceAt } from "./firstEventBudget";
 import {
   DEFAULT_INGEST_ALLOWED_IN_FUTURE_H,
@@ -48,6 +50,11 @@ import {
 import { markDetectionSeen, orgHasUserStreams, readFirstDataRecord } from "./useFirstDataNotice";
 
 export type StreamSignal = UserDataStreamType;
+
+// sample streams are user-type streams the app loads itself, so they never count as the first event
+const isWatchable = (stream: StreamOwnership, type: string) =>
+  isUserDataStream(stream, type) && !isSampleStreamName(stream.name ?? "");
+
 export type FirstEventState =
   "idle" | "waiting" | "received" | "rejected" | "no-requests" | "stopped";
 export type DiagnosisTrigger = "auto" | "troubleshoot";
@@ -78,11 +85,14 @@ export interface FirstEventWatchOptions {
   match?: Ref<"exact" | "keyword" | undefined>;
   /** Off for the pill display, which names no cause: no rejections read without a Troubleshoot. */
   autoDiagnosis?: Ref<boolean>;
+  /** Elapsed time without data before the first automatic rejections read; FIRST_EVENT_BUDGET.diagnosisAtMs when unset. */
+  diagnosisAtMs?: Ref<number | undefined>;
 }
 
 interface StreamRow {
   name: string;
   stream_type?: string;
+  is_internal?: boolean;
   stats?: { doc_num?: number; doc_time_min?: number; doc_time_max?: number };
 }
 
@@ -412,7 +422,7 @@ export function useFirstEventWatch(
       total = res.total;
       rows.push(
         ...(res.list as StreamRow[]).filter(
-          (s) => s?.name?.includes(keyword) && isUserDataStream(s.name, s.stream_type ?? ctx.type),
+          (s) => s?.name?.includes(keyword) && isWatchable(s, ctx.type),
         ),
       );
       if (offset + STREAM_PROBE_PAGE >= res.total) break;
@@ -496,7 +506,7 @@ export function useFirstEventWatch(
       sinceUs,
     };
     state.value = "received";
-    markDetectionSeen(ctx.org);
+    markDetectionSeen(ctx.org, { type: ctx.type, name: stream });
     halt();
     forgetEngagement();
   };
@@ -645,7 +655,7 @@ export function useFirstEventWatch(
       if (!list || stale(ctx)) return;
       known.total = res.total;
       for (const s of list) {
-        if (!known.names.has(s.name) && isUserDataStream(s.name, s.stream_type ?? type)) {
+        if (!known.names.has(s.name) && isWatchable(s, type)) {
           pending.set(s.name, s);
         }
       }
@@ -725,7 +735,9 @@ export function useFirstEventWatch(
   };
 
   const rejectionsDue = (): boolean => {
-    if (lastRejectionsReadMs === undefined) return elapsedMs() >= FIRST_EVENT_BUDGET.diagnosisAtMs;
+    if (lastRejectionsReadMs === undefined) {
+      return elapsedMs() >= (options.diagnosisAtMs?.value ?? FIRST_EVENT_BUDGET.diagnosisAtMs);
+    }
     return nowMs() - lastRejectionsReadMs >= FIRST_EVENT_BUDGET.rejectionsEveryMs;
   };
 

@@ -157,6 +157,15 @@ export const BADGE_GROUPS = {
       training: { variant: "warning-soft", labelKey: "components.badge.alertStatus.training" },
       failed: { variant: "error-soft", labelKey: "components.badge.alertStatus.failed" },
       disabled: { variant: "default-soft", labelKey: "components.badge.alertStatus.disabled" },
+      // Expected data states of an anomaly config: enabled and re-evaluated, so never error colours.
+      waitingfordata: {
+        variant: "default-soft",
+        labelKey: "components.badge.alertStatus.waitingForData",
+      },
+      notapplicable: {
+        variant: "default-soft",
+        labelKey: "components.badge.alertStatus.notApplicable",
+      },
       paused: { variant: "warning-soft", labelKey: "components.badge.alertStatus.paused" },
     },
   },
@@ -287,8 +296,32 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       covered: { variant: "success-soft", labelKey: "oncall.coverage_covered" },
-      gap: { variant: "warning-soft", labelKey: "oncall.coverage_gap" },
-      unreachable: { variant: "error-soft", labelKey: "oncall.coverage_unreachable" },
+      gap: { variant: "error-soft", labelKey: "oncall.coverage_gap" },
+      unreachable: { variant: "warning-soft", labelKey: "oncall.coverage_cantReach" },
+      allunreachable: { variant: "error-soft", labelKey: "oncall.coverage_unreachable" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // A routing rule's traffic verdict, from `ownership/stats`; never recomputed on the client.
+  oncallRuleHealth: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      active: { variant: "success-soft", labelKey: "oncall.ruleActive" },
+      shadowed: { variant: "warning-soft", labelKey: "oncall.ruleShadowed" },
+      neverused: { variant: "default-soft", labelKey: "oncall.ruleNeverMatchedYet" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Where an unowned signal landed: the catch-all paged somebody, or nobody was paged at all.
+  oncallUnroutedOutcome: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      defaultteam: { variant: "warning-soft", labelKey: "oncall.unroutedFilterDefault" },
+      nobody: { variant: "error-soft", labelKey: "oncall.unroutedPagedNobody" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1452,6 +1485,14 @@ export const BADGE_GROUPS = {
       failed: { variant: "error-soft", labelKey: "components.badge.anomalyStatus.failed" },
       waiting: { variant: "default-soft", labelKey: "components.badge.anomalyStatus.waiting" },
       disabled: { variant: "default-soft", labelKey: "components.badge.anomalyStatus.disabled" },
+      waitingfordata: {
+        variant: "default-soft",
+        labelKey: "components.badge.anomalyStatus.waitingForData",
+      },
+      notapplicable: {
+        variant: "default-soft",
+        labelKey: "components.badge.anomalyStatus.notApplicable",
+      },
     },
   },
 

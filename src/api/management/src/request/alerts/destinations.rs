@@ -320,7 +320,8 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "test"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn jira_setup(
@@ -397,7 +398,7 @@ async fn saved_token_refusal(
       ),
     request_body(content = inline(Destination), description = "Alert destination data. The 'template' field is required (use 'Default' for the built-in template).", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
@@ -414,6 +415,9 @@ pub async fn save_destination(
     // Check the module query parameter to determine if this is an alert or pipeline destination
     let module = query.get("module").map(|s| s.as_str());
     let is_alert = module != Some("pipeline");
+    if !is_alert && !cfg!(feature = "enterprise") {
+        return MetaHttpResponse::forbidden("Not supported in the open source version");
+    }
 
     let dest = match dest.into(org_id, is_alert) {
         Ok(dest) => dest,
@@ -451,7 +455,7 @@ pub async fn save_destination(
       ),
     request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
@@ -468,6 +472,9 @@ pub async fn update_destination(
     // Check the module query parameter to determine if this is an alert or pipeline destination
     let module = query.get("module").map(|s| s.as_str());
     let is_alert = module != Some("pipeline");
+    if !is_alert && !cfg!(feature = "enterprise") {
+        return MetaHttpResponse::forbidden("Not supported in the open source version");
+    }
 
     let dest = match dest.into(org_id, is_alert) {
         Ok(dest) => dest,
@@ -636,7 +643,7 @@ pub async fn list_destinations(
         ("destination_name" = String, Path, description = "Destination name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 409, description = "Conflict", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
@@ -778,6 +785,9 @@ pub struct TestSendRequest {
     /// The name of an already-saved template to test-send. Exactly one of
     /// `definition` / `template_name` must be set.
     pub template_name: Option<String>,
+    /// Which producer's sample to render with; absent means alert.
+    #[serde(default)]
+    pub kind: config::meta::alerts::notification_kind::NotificationKind,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -899,7 +909,7 @@ pub async fn test_send(
         return MetaHttpResponse::bad_request("Test-send is only supported for alert destinations");
     };
 
-    match core_test_send(&org_id, destination_type, &spec).await {
+    match core_test_send(&org_id, destination_type, &spec, req.kind).await {
         Ok(message) => MetaHttpResponse::json(TestSendResponse {
             success: true,
             message,
@@ -1230,6 +1240,12 @@ mod tests {
             status(DestinationError::JiraTokenChanged),
             StatusCode::BAD_REQUEST
         );
+        assert_eq!(
+            status(DestinationError::JiraAlertsUnsupported(
+                "'x' cannot become a Jira destination".to_string()
+            )),
+            StatusCode::BAD_REQUEST
+        );
     }
 
     #[test]
@@ -1267,5 +1283,48 @@ mod tests {
                 .await
                 .is_none()
         );
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn pipeline_destinations_are_refused_without_enterprise() {
+        use std::collections::HashMap;
+
+        use axum::extract::Query;
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::auth::UserEmail;
+
+        use super::{save_destination, update_destination};
+
+        let args = |module: &str| {
+            let query = HashMap::from([("module".to_string(), module.to_string())]);
+            let user = UserEmail {
+                user_id: "root@example.com".to_string(),
+            };
+            let dest =
+                serde_json::from_value(serde_json::json!({"name": "d", "type": "sns"})).unwrap();
+            (Query(query), Headers(user), Json(dest))
+        };
+        let path = || Path("default".to_string());
+        let named = || Path(("default".to_string(), "d".to_string()));
+        let refusal = async |resp: axum::response::Response| {
+            let status = resp.status();
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let says_oss = String::from_utf8_lossy(&body).contains("open source version");
+            (status, says_oss)
+        };
+        for (module, expected) in [
+            ("pipeline", (StatusCode::FORBIDDEN, true)),
+            ("alert", (StatusCode::BAD_REQUEST, false)),
+        ] {
+            let (query, user, dest) = args(module);
+            let saved = refusal(save_destination(path(), query, user, dest).await).await;
+            assert_eq!(saved, expected, "save module={module}");
+            let (query, user, dest) = args(module);
+            let updated = refusal(update_destination(named(), query, user, dest).await).await;
+            assert_eq!(updated, expected, "update module={module}");
+        }
     }
 }

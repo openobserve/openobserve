@@ -14,6 +14,8 @@ pub struct Model {
     pub sent_at: i64,
     pub destinations: Json,
     pub result: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub templates: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

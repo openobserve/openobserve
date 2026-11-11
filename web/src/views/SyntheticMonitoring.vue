@@ -184,10 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                → passing → unknown), with Total last. It replaces the status dropdown
                that used to hide these same counts inside its option labels. -->
           <template #subheader>
-            <div
-              class="px-page-edge border-table-row-divider border-b py-1.5"
-              data-test="synthetic-monitoring-summary"
-            >
+            <div data-test="synthetic-monitoring-summary">
               <OStatStrip
                 :items="summaryStats"
                 :loading="loading"
@@ -676,7 +673,7 @@ function mapMonitor(m: ApiMonitor) {
     type: m.type.toUpperCase(),
     interval: formatFrequency(m.frequency),
     status: normalizeMonitorStatus(m.status),
-    responseTime: m.last_response_ms !== null ? `${m.last_response_ms}ms` : null,
+    responseTime: m.last_response_ms,
     locations: m.locations,
     lastCheck: m.last_check_at !== null ? formatTimeAgo(m.last_check_at) : "—",
     // Raw microsecond epoch — drives the relative Last Check cell.

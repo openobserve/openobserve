@@ -835,7 +835,9 @@ fn validate_window(start_time: i64, end_time: i64) -> Result<(), &'static str> {
 async fn authorize_read(org_id: &str, user_id: &str, stream: &str) -> Result<(), Response> {
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(org_id, Some(stream)) {
+        if let Err(e) =
+            search_service::check_search_allowed(org_id, Some((stream, StreamType::Traces)))
+        {
             return Err(MetaHttpResponse::too_many_requests(e.to_string()));
         }
         if let Some(denied) = openobserve_core::authz::check_stream_permissions(
@@ -877,7 +879,7 @@ async fn authorize_read(org_id: &str, user_id: &str, stream: &str) -> Result<(),
     security(("Authorization" = [])),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"})),
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"description": "AI data health: count LLM spans with no model price, no agent identity, zero duration or no session id in a trace stream; pass agent to scope to one app", "category": "traces"}))
     )
 )]
 pub async fn get_data_health(

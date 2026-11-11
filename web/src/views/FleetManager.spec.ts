@@ -21,6 +21,9 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import FleetManager from "./FleetManager.vue";
 import { writeEditorDraft } from "@/utils/drafts/editorDraftStore";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/aws-exports", async (importOriginal) => {
   const actual: any = await importOriginal();
@@ -154,5 +157,6 @@ describe("FleetManager", () => {
       org_identifier: "acme",
       tab: "configurations",
     });
+    expect(analytics.track).toHaveBeenCalledWith("fleet_tab_switched", { tab: "configurations" });
   });
 });

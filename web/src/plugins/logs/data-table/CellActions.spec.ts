@@ -322,16 +322,16 @@ describe("CellActions in-place copy", () => {
     vi.clearAllMocks();
   });
 
-  it("copies the value itself and relabels the button Copied instead of emitting", async () => {
+  it("copies the value itself through the shared Copied bubble instead of emitting", async () => {
     clipboardMock.mockResolvedValue(true);
     const wrapper = mountComponent({ copyInPlace: true });
 
     await wrapper.find(COPY_BTN).trigger("click");
     await flushPromises();
 
-    expect(clipboardMock).toHaveBeenCalledWith('"200"', expect.any(Function), { silent: true });
+    expect(clipboardMock).toHaveBeenCalledWith('"200"', expect.any(Function));
     expect(wrapper.emitted("copy")).toBeUndefined();
-    expect(wrapper.find(COPY_BTN).attributes("aria-label")).toBe(copiedLabel());
+    expect(wrapper.find(COPY_BTN).attributes("aria-label")).not.toBe(copiedLabel());
   });
 
   it("keeps the copy label when the clipboard refuses", async () => {

@@ -221,15 +221,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTooltip>
             <span v-else class="inline-block" tabindex="0">
               <OButton
+                ref="viewLogsBtnRef"
                 variant="outline"
                 size="xs"
                 class="h-full text-xs!"
                 :disabled="isViewLogsDisabled"
-                :loading="config.isEnterprise === 'true' && correlationLoading"
+                :loading="viewLogsBusy"
+                :spinner="false"
                 @click.stop="viewSpanLogs"
                 data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
               >
-                {{ t("traces.viewLogs") }}
+                <span :class="['inline-flex items-center gap-1', !viewLogsSpinner && 'px-2']">
+                  <OIcon
+                    v-if="viewLogsSpinner"
+                    name="progress-activity"
+                    size="xs"
+                    class="o2-motion-keep shrink-0 animate-spin"
+                    aria-hidden="true"
+                    data-test="trace-details-sidebar-header-toolbar-view-logs-spinner"
+                  />
+                  {{ t("traces.viewLogs") }}
+                </span>
               </OButton>
               <OTooltip :content="viewLogsTooltipContent" />
             </span>
@@ -436,8 +448,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="px-page-edge span_details_tabs">
-      <OTabs v-model="activeTabModel" dense align="left" data-test="trace-details-sidebar-tabs">
+    <div class="px-page-edge span_details_tabs flex min-w-0 items-center gap-2">
+      <OTabs
+        v-model="activeTabModel"
+        dense
+        align="left"
+        class="min-w-0 shrink-0"
+        data-test="trace-details-sidebar-tabs"
+      >
         <!-- LLM Preview Tab (conditional - shown first for LLM traces) -->
         <OTab
           v-if="canPreviewSpan"
@@ -507,6 +525,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="font-normal! capitalize"
         />
       </OTabs>
+      <OInlineNotice
+        v-if="logsNotice"
+        class="ms-auto"
+        :variant="logsNotice.failed ? 'error' : 'warning'"
+        :text="logsNotice.text"
+        :action-label="serviceStreamsEnabled ? t('traces.openLogsTab') : undefined"
+        :data-test="
+          logsNotice.failed
+            ? 'traces-span-drawer-logs-failed-notice'
+            : 'traces-span-drawer-no-logs-notice'
+        "
+        action-data-test="traces-span-drawer-open-logs-tab"
+        @action="openLogsTab"
+      />
     </div>
     <OSeparator class="w-full" />
     <div
@@ -678,13 +710,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- View mode toggle toolbar -->
           <div class="flex h-fit! items-center justify-start pb-1.5!">
             <OToggleGroup v-model="attributesViewMode" class="rounded-default!">
-              <OToggleGroupItem value="json" size="xs" class="h-5! text-xs!">
+              <OToggleGroupItem
+                value="json"
+                size="xs"
+                class="h-5! text-xs!"
+                data-test="trace-details-sidebar-attributes-view-json"
+              >
                 <template #icon-left
                   ><OIcon name="data-object" size="xs" class="shrink-0"
                 /></template>
                 {{ t("common.json") }}
               </OToggleGroupItem>
-              <OToggleGroupItem value="table" size="xs" class="h-5! text-xs!">
+              <OToggleGroupItem
+                value="table"
+                size="xs"
+                class="h-5! text-xs!"
+                data-test="trace-details-sidebar-attributes-view-table"
+              >
                 <template #icon-left
                   ><OIcon name="table-chart" size="xs" class="shrink-0"
                 /></template>
@@ -1095,7 +1137,8 @@ import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { valueErrorCause } from "@/lib/data/Value/valueErrorCause";
 import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
 import { useAiIcon } from "@/composables/useAiIcon";
 import { buildSpanAiPayload } from "@/plugins/traces/utils/traceAiPayload";
@@ -1139,6 +1182,10 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
+import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
+import { LOADER_DELAY_MS } from "@/lib/styles/motion";
+import { announcePolite } from "@/lib/feedback/RegionStatus/announcer";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   TRACE_SERVICE_DETECTION_KEY,
@@ -1162,6 +1209,8 @@ const OPERATION_STATS_FALLBACK_WINDOW_US = 3_600_000_000;
 const OPERATION_STATS_FALLBACK_BUCKET_US = 600_000_000;
 const PROFILE_LINK_PAD_US = 60_000_000;
 const PROFILE_LINK_CONCURRENCY = 3;
+// Ruling 24: a fast lookup announces only its result.
+const FINDING_LOGS_ANNOUNCE_MS = 1000;
 
 interface OperationStats {
   n: number;
@@ -1260,6 +1309,7 @@ export default defineComponent({
   },
   components: {
     OSeparator,
+    OInlineNotice,
     OTabs,
     OTab,
     OTabPanels,
@@ -1641,13 +1691,9 @@ export default defineComponent({
     const { isDark: isDarkMode } = useTheme();
 
     // Check if View Logs button should be disabled
+    // Busy is shown by the button itself; the native disabled attribute would drop its focus.
     const isViewLogsDisabled = computed(() => {
       if (logsLocked.value) return true;
-      // Enterprise loading state
-      if (config.isEnterprise === "true" && correlationLoading.value) {
-        return true;
-      }
-
       // Non-enterprise mode with visible log stream selector, disable when no streams are selected
       return (
         config.isEnterprise !== "true" &&
@@ -1985,29 +2031,63 @@ export default defineComponent({
       },
     );
 
-    const viewSpanLogs = async () => {
-      if (config.isEnterprise === "true" && !correlationLicenseLocked.value) {
-        const clickedSpan = spanKey(props.span);
-        await loadCorrelation();
-        // The user moved to another span while this lookup ran: do nothing.
-        if (spanKey(props.span) !== clickedSpan) return;
-        if (correlationProps.value?.logStreams?.length) {
-          navigateToCorrelatedLogs(correlationProps.value);
-        } else {
-          // Nothing correlated to this span — say so instead of navigating to an
-          // empty Logs page. A failed lookup reports its own reason; a successful
-          // lookup that found nothing gets the plain "no correlated logs" wording.
-          toast({
-            variant: "warning",
-            message:
-              correlationFailed.value && correlationError.value
-                ? raw(correlationError.value)
-                : t("traces.noCorrelatedLogsFound"),
-          });
-        }
+    const viewLogsBtnRef = ref<any>(null);
+    // Counted, so an overlapping call (the tree's own View Logs) cannot clear another's busy state.
+    const viewLogsRuns = ref(0);
+    const viewLogsBusy = computed(() => viewLogsRuns.value > 0);
+    const viewLogsSpinner = useDelayedFlag(() => viewLogsBusy.value, LOADER_DELAY_MS);
+    const logsNotice = ref<{ failed: boolean; text: I18nText } | null>(null);
+
+    const openLogsTab = () => {
+      logsNotice.value = null;
+      emit("update:activeTab", "correlated-logs");
+    };
+
+    const findCorrelatedLogs = async (): Promise<void> => {
+      const clickedSpan = spanKey(props.span);
+      await loadCorrelation();
+      // The user moved to another span while this lookup ran: do nothing.
+      if (spanKey(props.span) !== clickedSpan) return;
+      // A failed lookup is a failure and reports its own reason.
+      if (correlationFailed.value && correlationError.value) {
+        toast({ variant: "warning", message: raw(correlationError.value) });
+        return;
+      }
+      const outcome = correlationProps.value?.logStreams?.length
+        ? await navigateToCorrelatedLogs(correlationProps.value)
+        : "none";
+      if (spanKey(props.span) !== clickedSpan) return;
+      if (outcome === "none") {
+        logsNotice.value = { failed: false, text: t("traces.noLogStreamForTrace") };
+      } else if (typeof outcome === "object") {
+        const cause = valueErrorCause(t, outcome.error);
+        logsNotice.value = {
+          failed: true,
+          text: t("components.value.couldntLoadTooltip", { cause }),
+        };
       } else {
-        const queryDetails = buildQueryDetails(props.span);
-        navigateToLogs(queryDetails);
+        return;
+      }
+      viewLogsBtnRef.value?.$el?.focus?.();
+    };
+
+    const viewSpanLogs = async () => {
+      if (config.isEnterprise !== "true" || correlationLicenseLocked.value) {
+        navigateToLogs(buildQueryDetails(props.span));
+        return;
+      }
+      logsNotice.value = null;
+      viewLogsRuns.value++;
+      const announced: { withdraw?: () => void } = {};
+      const speak = setTimeout(() => {
+        announced.withdraw = announcePolite(t("traces.findingLogsForTrace"));
+      }, FINDING_LOGS_ANNOUNCE_MS);
+      try {
+        await findCorrelatedLogs();
+      } finally {
+        clearTimeout(speak);
+        announced.withdraw?.();
+        viewLogsRuns.value--;
       }
     };
 
@@ -2360,6 +2440,8 @@ export default defineComponent({
           from: convertTimeFromNsToUs(props.span.start_time) - 3600000000,
           to: convertTimeFromNsToUs(props.span.end_time) + 3600000000,
           org_identifier: store.state.selectedOrganization.identifier,
+          // Apply & Search in the linked trace returns to the search tab the user came from.
+          tab: router.currentRoute.value.query.tab,
         };
 
         if (query.trace_id === props.span.trace_id) {
@@ -2507,6 +2589,13 @@ export default defineComponent({
     // Keyed by span so a mid-load View Logs awaits this span's lookup and never reuses another's.
     let correlationRequest: { key: string; promise: Promise<void> } | null = null;
     const spanKey = (span: any) => `${span?.trace_id ?? ""}/${span?.span_id ?? ""}`;
+    // A notice about one span must not stay under another.
+    watch(
+      () => spanKey(props.span),
+      () => {
+        logsNotice.value = null;
+      },
+    );
 
     /**
      * Load correlation data for this span (called when user clicks on correlation tabs)
@@ -2962,6 +3051,11 @@ export default defineComponent({
       viewLogsTooltipContent,
       logsLocked,
       logsLockedReason,
+      viewLogsBtnRef,
+      viewLogsBusy,
+      viewLogsSpinner,
+      logsNotice,
+      openLogsTab,
       serviceIconUrl,
       getImageURL,
       copyContentToClipboard,

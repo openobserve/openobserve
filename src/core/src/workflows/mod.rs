@@ -43,7 +43,7 @@ use crate::{
 pub mod http_trigger;
 pub mod runtime;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub struct InputMap {
     // even though a bad naming convention, node_map is
     error_node_map: HashMap<String, Vec<Value>>,
@@ -307,6 +307,9 @@ async fn validate_workflow(workflow: &Workflow, is_draft: bool) -> Result<(), an
 
         // for draft we allow invalid destination or functions
         if !is_draft {
+            node.data
+                .validate_operator_values()
+                .map_err(|e| anyhow::anyhow!("node {}: {e}", node.id))?;
             if let NodeData::Destination(ref destination) = node.data {
                 let (dest, _) = crate::alerts::destinations::get_with_template(
                     &workflow.org_id,
@@ -1098,7 +1101,7 @@ pub async fn retry_run(
 }
 
 // an error, not Ok, so alert history records the skipped delivery instead of a success
-fn require_workflows_license(entitled: bool) -> Result<(), anyhow::Error> {
+pub(crate) fn require_workflows_license(entitled: bool) -> Result<(), anyhow::Error> {
     if entitled {
         return Ok(());
     }

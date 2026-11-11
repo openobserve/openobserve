@@ -29,8 +29,6 @@ use crate::{
 };
 
 const PROVIDER_TEST_FAILURE_MESSAGE: &str = "Provider connection test failed";
-const SAVED_KEY_TARGET_CHANGED_MESSAGE: &str =
-    "Enter the API key again to test a changed provider type or endpoint";
 
 /// ListProviders
 #[utoipa::path(
@@ -272,7 +270,7 @@ pub async fn test_provider_config(
             Err(error) => return provider_test_error_response(error),
         };
         if !providers::may_reuse_saved_key(&provider, &stored) {
-            return MetaHttpResponse::bad_request(SAVED_KEY_TARGET_CHANGED_MESSAGE);
+            return MetaHttpResponse::bad_request(providers::SAVED_KEY_TARGET_CHANGED_MESSAGE);
         }
         provider.auth_config = stored.auth_config;
     }

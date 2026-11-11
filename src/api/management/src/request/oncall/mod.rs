@@ -26,7 +26,11 @@ use axum::{
 #[cfg(feature = "enterprise")]
 use axum::{http::StatusCode, response::IntoResponse};
 use common::meta::http::HttpResponse as MetaHttpResponse;
+#[cfg(feature = "enterprise")]
+use config::meta::feature::Feature;
 use config::meta::oncall::{PriorityRung, Rotation};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::license::check_features;
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 use openobserve_api_common::extractors::ValidatedJson;
@@ -68,6 +72,15 @@ const VOICE_ORG_INACTIVE: &str = "<Response><Say>This organization is no longer 
 #[cfg(feature = "enterprise")]
 const VOICE_ORG_UNREADABLE: &str = "<Response><Say>The organization could not be checked. \
      The page was not acknowledged.</Say><Hangup/></Response>";
+
+#[cfg(feature = "enterprise")]
+const VOICE_UNLICENSED: &str = "<Response><Say>On-Call is not included in this installation's \
+     license. The page was not acknowledged and stays open. No further calls will be \
+     made.</Say><Hangup/></Response>";
+
+#[cfg(feature = "enterprise")]
+const ACK_UNLICENSED: &str =
+    "On-Call is not included in this installation's license. This page was not acknowledged.";
 
 /// A second lock behind `route_permissions`, which is first-match-wins and silently shadowable.
 #[cfg(feature = "enterprise")]
@@ -165,18 +178,24 @@ pub struct SetScheduleRequest {
     pub rotations: Vec<Rotation>,
 }
 
-/// A full replace; which fields a preset takes is the catalogue's job to say, not this struct's.
+/// Replaces one rotation's shift rules or adds one; the catalogue says which fields apply.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct FromPresetRequest {
     /// Absent means the team's own zone; there is no per-user timezone to fall back on.
     #[serde(default)]
     pub timezone: Option<String>,
-    /// How long one shift lasts, on every layer the preset builds. Absent is a week.
+    /// How long one shift lasts, on every shift rule the preset builds. Absent is a week.
     #[serde(default)]
     pub handover_micros: Option<i64>,
     /// Absent is now, snapped to the last local Monday 00:00 so handovers land on a week boundary.
     #[serde(default)]
     pub anchor_micros: Option<i64>,
+    /// Replaces this rotation's shift rules; its id and name stay.
+    #[serde(default)]
+    pub rotation_id: Option<String>,
+    /// Adds a rotation with this name; setting both fields is a 400.
+    #[serde(default)]
+    pub new_rotation_name: Option<String>,
     #[serde(flatten)]
     pub spec: config::meta::oncall::PresetSpec,
 }
@@ -191,6 +210,10 @@ pub struct SetPolicyRequest {
     /// Absent leaves it unchanged, so editing rungs cannot silently un-configure L0.
     #[serde(default)]
     pub l0: Option<config::meta::oncall::L0Policy>,
+    /// Template override for on-call messages; absent leaves it, null or "" clears it.
+    #[serde(default, deserialize_with = "double_option")]
+    #[schema(value_type = Option<String>)]
+    pub template: Option<Option<String>>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -559,6 +582,18 @@ pub struct OwnershipStatsQuery {
     pub offset: Option<u64>,
 }
 
+// Only documents the stats body, which the handler extends with the paging it applied.
+#[cfg(feature = "enterprise")]
+#[derive(serde::Serialize, utoipa::ToSchema)]
+#[allow(dead_code)]
+struct OwnershipStatsBody {
+    #[serde(flatten)]
+    stats: o2_enterprise::enterprise::oncall::insight::OwnershipStats,
+    days: i64,
+    limit: usize,
+    offset: usize,
+}
+
 /// A missing or blank `auth_token` keeps the stored one; no `Debug`, since it carries the token.
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct PutTelephonyRequest {
@@ -593,9 +628,10 @@ fn to_response(e: anyhow::Error) -> Response {
         // Not 404: the record exists, and the honest answer is that working it is not theirs.
         Some(OncallError::NotOnThisTeam { .. }) => StatusCode::FORBIDDEN,
         // A conflict, not a 400: the caller fixes it by changing the org's state, not the request.
-        Some(OncallError::NameTaken(_)) | Some(OncallError::IsDefaultTeam(_)) => {
-            StatusCode::CONFLICT
-        }
+        Some(OncallError::NameTaken(_))
+        | Some(OncallError::IsDefaultTeam(_))
+        | Some(OncallError::TeamNamedByAlerts { .. })
+        | Some(OncallError::PathTaken(_)) => StatusCode::CONFLICT,
         Some(OncallError::Invalid(_)) => StatusCode::BAD_REQUEST,
         Some(OncallError::Verification(refusal)) => return refusal_response(refusal),
         Some(OncallError::Telephony(refusal)) => {
@@ -610,6 +646,23 @@ fn to_response(e: anyhow::Error) -> Response {
     }
     // Every remaining status is an `OncallError` whose message is written for the caller.
     MetaHttpResponse::error(status.as_u16(), e.to_string()).into_response()
+}
+
+/// A rule write's refusal; only an untyped error can be the unique index on (org_id, path).
+#[cfg(feature = "enterprise")]
+fn rule_write_response(e: anyhow::Error) -> Response {
+    if e.is::<o2_enterprise::enterprise::oncall::service::OncallError>() {
+        return to_response(e);
+    }
+    let text = e.to_string().to_lowercase();
+    if text.contains("unique") || text.contains("duplicate") {
+        return MetaHttpResponse::error(
+            StatusCode::CONFLICT.as_u16(),
+            "a rule already claims this path",
+        )
+        .into_response();
+    }
+    to_response(e)
 }
 
 /// The reason travels as a code so a client can word it, and the numbers so it need not parse.
@@ -805,7 +858,7 @@ async fn acknowledge_page(
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = CreateTeamRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Team),
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
         (status = 409, description = "Conflict", content_type = "application/json", body = Object),
     ),
@@ -852,7 +905,7 @@ pub async fn create_team(
     summary = "List on-call teams",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
-    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::Team>)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -891,7 +944,7 @@ pub async fn list_teams(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = String, Path, description = "Team ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Team)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "get"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -931,7 +984,7 @@ pub async fn get_team(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     request_body(content = UpdateTeamRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Team)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -979,7 +1032,11 @@ pub async fn update_team(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = String, Path, description = "Team ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
+        (status = 404, description = "Not found", content_type = "application/json", body = Object),
+        (status = 409, description = "Conflict: the org's default team, or named by alerts", content_type = "application/json", body = Object),
+    ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -1018,7 +1075,7 @@ pub async fn delete_team(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = String, Path, description = "Team ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::TeamMember>)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -1058,7 +1115,7 @@ pub async fn list_members(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     request_body(content = AddMembersRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::TeamMember>)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -1108,7 +1165,7 @@ pub async fn add_member(
         ("team_id" = String, Path, description = "Team ID"),
         ("user_email" = String, Query, description = "Member email"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -1202,7 +1259,7 @@ pub async fn get_schedule(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     request_body(content = SetScheduleRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Schedule)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -1246,7 +1303,7 @@ pub async fn set_schedule(
     summary = "The catalogue of schedule presets",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
-    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::PresetDescriptor>)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -1277,7 +1334,7 @@ pub async fn list_schedule_presets(
     context_path = "/api",
     tag = "OnCall",
     operation_id = "ApplyOnCallSchedulePreset",
-    summary = "Replace the shift rules of a team's primary rotation with ones built from a preset",
+    summary = "Build shift rules from a template, replacing a chosen rotation's or adding a rotation",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -1285,7 +1342,7 @@ pub async fn list_schedule_presets(
     ),
     request_body(content = FromPresetRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Schedule),
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
         (status = 404, description = "No such team", content_type = "application/json", body = Object),
     ),
@@ -1301,7 +1358,7 @@ pub async fn apply_schedule_preset(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        // It replaces the primary rotation's rules via `PUT /schedule`, so the same authority.
+        // It writes the schedule via `PUT /schedule`'s path, so the same authority.
         if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
@@ -1312,6 +1369,8 @@ pub async fn apply_schedule_preset(
             body.spec,
             body.handover_micros,
             body.anchor_micros,
+            body.rotation_id,
+            body.new_rotation_name,
             config::utils::time::now_micros(),
         )
         .await
@@ -1341,7 +1400,7 @@ pub async fn apply_schedule_preset(
         ("team_id" = String, Path, description = "Team ID"),
         ("at" = Option<i64>, Query, description = "Resolve at this instant (microseconds) instead of now"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::OnCallPosition>)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -1387,7 +1446,7 @@ pub async fn who_is_on_call(
     ),
     request_body(content = CreateOverrideRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::ScheduleOverride),
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
         (status = 404, description = "No such team", content_type = "application/json", body = Object),
     ),
@@ -1447,7 +1506,7 @@ pub async fn create_override(
         ("from" = Option<i64>, Query, description = "Window start (microseconds); requires `to`"),
         ("to" = Option<i64>, Query, description = "Window end (microseconds); requires `from`"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::ScheduleOverride>)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -1543,7 +1602,7 @@ pub async fn delete_override(
         ("rotation_id" = Option<String>, Query, description = "Rotation id or name; defaults to the team's primary"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::CoverageSegment>),
         (status = 400, description = "Window inverted or too long", content_type = "application/json", body = Object),
     ),
     extensions(
@@ -1595,7 +1654,7 @@ pub async fn get_resolved_schedule(
     ),
     request_body(content = PreviewResolvedScheduleRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::CoverageSegment>),
         (status = 400, description = "Window inverted or too long", content_type = "application/json", body = Object),
     ),
     extensions(
@@ -1634,7 +1693,7 @@ pub async fn preview_resolved_schedule(
     }
 }
 
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/oncall/teams/{team_id}/policy",
     context_path = "/api",
@@ -1646,12 +1705,12 @@ pub async fn preview_resolved_schedule(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = String, Path, description = "Team ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = o2_enterprise::enterprise::oncall::service::PolicyView)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
-)]
+))]
 pub async fn get_policy(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -1686,7 +1745,7 @@ pub async fn get_policy(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     request_body(content = SetPolicyRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::EscalationPolicy)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -1715,12 +1774,29 @@ pub async fn set_policy(
                 other => internal_error("set_policy node versions", &other),
             };
         }
+        // Checked before any write, written after the policy, so a refused policy leaves no half.
+        let template = body
+            .template
+            .clone()
+            .map(|t| t.map(|t| t.trim().to_string()).filter(|t| !t.is_empty()));
+        if let Some(Some(name)) = template.as_ref()
+            && let Err(e) = openobserve_core::alerts::templates::check_binding(
+                &org_id,
+                name,
+                config::meta::alerts::notification_kind::NotificationKind::OnCall,
+            )
+            .await
+        {
+            return MetaHttpResponse::bad_request(e.as_str());
+        }
+        // One write and one replication carry the rungs and the template together.
         match o2_enterprise::enterprise::oncall::service::set_policy(
             &org_id,
             &team_id,
             body.rungs,
             body.destinations,
             body.l0,
+            template,
         )
         .await
         {
@@ -2017,12 +2093,16 @@ fn broken_link(status: StatusCode, reason: &str) -> Response {
     html_page(status, ack_page::broken_link_html(reason, &pages))
 }
 
-/// The ack link's refusal for an inactive or unreadable org: the same HTML page, never JSON.
+/// The ack link's refusal for a locked license or a bad org: the same HTML page, never JSON.
 #[cfg(feature = "enterprise")]
 fn ack_status_refusal(
     org_id: &str,
+    licensed: bool,
     active: Result<bool, impl std::fmt::Display>,
 ) -> Option<Response> {
+    if !licensed {
+        return Some(broken_link(StatusCode::FORBIDDEN, ACK_UNLICENSED));
+    }
     match active {
         Ok(true) => None,
         Ok(false) => Some(broken_link(
@@ -2084,10 +2164,12 @@ pub async fn acknowledge(
             Ok(c) => c,
             Err(e) => return broken_link(StatusCode::UNAUTHORIZED, &e.to_string()),
         };
-        // After the signature, so an unsigned caller cannot probe whether the org exists.
-        if let Some(refusal) =
-            ack_status_refusal(&org_id, db::org_status::read_active(&org_id).await)
-        {
+        // After the signature, so an unsigned caller cannot probe the license or the org.
+        if let Some(refusal) = ack_status_refusal(
+            &org_id,
+            check_features(&[Feature::Oncall]),
+            db::org_status::read_active(&org_id).await,
+        ) {
             return refusal;
         }
         // Spent before the ack: expiry does not stop a replay, and a losing token must not act.
@@ -2186,9 +2268,11 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
             Ok(c) => c,
             Err(e) => return broken_link(StatusCode::UNAUTHORIZED, &e.to_string()),
         };
-        if let Some(refusal) =
-            ack_status_refusal(&org_id, db::org_status::read_active(&org_id).await)
-        {
+        if let Some(refusal) = ack_status_refusal(
+            &org_id,
+            check_features(&[Feature::Oncall]),
+            db::org_status::read_active(&org_id).await,
+        ) {
             return refusal;
         }
         let record =
@@ -2242,19 +2326,29 @@ pub async fn voice_ack(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        // An unsigned token skips the status read and is refused by the ack path itself.
-        let active = if voice_token_is_signed_for(&org_id, &token).await {
-            db::org_status::read_active(&org_id).await
-        } else {
-            Ok(true)
-        };
-        voice_ack_if_active(&org_id, &token, form, active).await
+        voice_ack_entitled(&org_id, &token, form, check_features(&[Feature::Oncall])).await
     }
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, token, form);
         MetaHttpResponse::forbidden("Not Supported")
     }
+}
+
+/// An unsigned token learns neither the org's status nor the license; the ack path refuses it.
+#[cfg(feature = "enterprise")]
+async fn voice_ack_entitled(
+    org_id: &str,
+    token: &str,
+    form: VoiceAckForm,
+    entitled: bool,
+) -> Response {
+    let (active, licensed) = if voice_token_is_signed_for(org_id, token).await {
+        (db::org_status::read_active(org_id).await, entitled)
+    } else {
+        (Ok(true), true)
+    };
+    voice_ack_if_active(org_id, token, form, active, licensed).await
 }
 
 /// Signature and org only; membership is left to the ack path, which reads it anyway.
@@ -2277,8 +2371,9 @@ async fn voice_ack_if_active(
     token: &str,
     form: VoiceAckForm,
     active: Result<bool, impl std::fmt::Display>,
+    licensed: bool,
 ) -> Response {
-    let twiml = match voice_status_refusal(org_id, active) {
+    let twiml = match voice_status_refusal(org_id, licensed, active) {
         Some(refusal) => refusal.to_string(),
         None => {
             o2_enterprise::enterprise::oncall::service::voice_acknowledge(
@@ -2391,12 +2486,16 @@ async fn end_ack_by_phone(
     .map_err(|e| anyhow::anyhow!("end the ack after a resolve by phone: {e:?}"))
 }
 
-/// TwiML refusal for an inactive or unreadable org, as `inactive_org_response` refuses email acks.
+/// TwiML refusal for a locked license or a bad org, as `ack_status_refusal` refuses email acks.
 #[cfg(feature = "enterprise")]
 fn voice_status_refusal(
     org_id: &str,
+    licensed: bool,
     active: Result<bool, impl std::fmt::Display>,
 ) -> Option<&'static str> {
+    if !licensed {
+        return Some(VOICE_UNLICENSED);
+    }
     match active {
         Ok(true) => None,
         Ok(false) => Some(VOICE_ORG_INACTIVE),
@@ -2697,7 +2796,7 @@ pub async fn get_response(
         ("response_id" = String, Path, description = "Response record ID"),
     ),
     request_body(content = ResolveRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Response)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -2778,7 +2877,7 @@ pub async fn resolve_response(
         ("response_id" = String, Path, description = "Response record ID"),
     ),
     request_body(content = AddNoteRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -2828,7 +2927,7 @@ pub async fn add_note(
         ("org_id" = String, Path, description = "Organization name"),
         ("incident_id" = String, Path, description = "Incident ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::Response>)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -2855,7 +2954,7 @@ pub async fn list_responses_for_incident(
     }
 }
 
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/oncall/responses/{response_id}/escalation",
     context_path = "/api",
@@ -2867,12 +2966,12 @@ pub async fn list_responses_for_incident(
         ("org_id" = String, Path, description = "Organization name"),
         ("response_id" = String, Path, description = "Response record ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = o2_enterprise::enterprise::oncall::escalation::EscalationProgress)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
-)]
+))]
 pub async fn get_escalation_progress(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -2973,7 +3072,7 @@ pub async fn list_escalation_progress(
     }
 }
 
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/oncall/responses/{response_id}/prior-causes",
     context_path = "/api",
@@ -2985,12 +3084,12 @@ pub async fn list_escalation_progress(
         ("org_id" = String, Path, description = "Organization name"),
         ("response_id" = String, Path, description = "Response record ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<o2_enterprise::enterprise::oncall::escalation::CauseGroup>)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
-)]
+))]
 pub async fn get_prior_causes(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -3226,7 +3325,7 @@ pub async fn unacknowledge_response(
         ("response_id" = String, Path, description = "Response record ID"),
     ),
     request_body(content = SnoozeRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Response)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -3278,7 +3377,7 @@ pub async fn snooze_response(
         ("org_id" = String, Path, description = "Organization name"),
         ("response_id" = String, Path, description = "Response record ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Response)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -3329,7 +3428,7 @@ pub async fn unsnooze_response(
         ("response_id" = String, Path, description = "Response record ID"),
     ),
     request_body(content = HandoffRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Response)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -3428,7 +3527,7 @@ pub async fn handoff_response(
         ("response_id" = String, Path, description = "Response record ID"),
     ),
     request_body(content = ConfirmRecoveryRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Response)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -3641,7 +3740,7 @@ pub async fn send_test_page(
         ("response_id" = String, Path, description = "Response record ID"),
         ("limit" = Option<u64>, Query, description = "Max records (default 10)"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::Response>)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -3699,7 +3798,7 @@ pub async fn get_response_history(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = Option<String>, Query, description = "Restrict to one team"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::OwnershipRule>)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -3744,7 +3843,7 @@ pub async fn list_ownership_rules(
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = CreateOwnershipRuleRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = Object),
+        (status = 200, description = "Success",  content_type = "application/json", body = config::meta::oncall::OwnershipRule),
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
         (status = 409, description = "Conflict", content_type = "application/json", body = Object),
     ),
@@ -3763,27 +3862,18 @@ pub async fn create_ownership_rule(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
+        // The firing path's own source, so a rule can name only what extraction produces.
+        let semantic_groups = db::system_settings::get_semantic_field_groups(&org_id).await;
         match o2_enterprise::enterprise::oncall::routing::create_rule(
             &org_id,
             &body.team_id,
             body.dimensions,
+            &semantic_groups,
         )
         .await
         {
             Ok(rule) => MetaHttpResponse::json(rule),
-            Err(e) => {
-                // The unique index on (org_id, path) refuses it, so it is a conflict, not a fault.
-                if e.to_string().to_lowercase().contains("unique")
-                    || e.to_string().to_lowercase().contains("duplicate")
-                {
-                    return MetaHttpResponse::error(
-                        StatusCode::CONFLICT.as_u16(),
-                        "another team already owns this path",
-                    )
-                    .into_response();
-                }
-                to_response(e)
-            }
+            Err(e) => rule_write_response(e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -3807,7 +3897,7 @@ pub async fn create_ownership_rule(
     ),
     request_body(content = CreateOwnershipRuleRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = Object),
+        (status = 200, description = "Success",  content_type = "application/json", body = config::meta::oncall::OwnershipRule),
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Conflict", content_type = "application/json", body = Object),
@@ -3827,30 +3917,20 @@ pub async fn update_ownership_rule(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "PUT").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
+        let semantic_groups = db::system_settings::get_semantic_field_groups(&org_id).await;
         match o2_enterprise::enterprise::oncall::routing::update_rule(
             &org_id,
             &rule_id,
             &body.team_id,
             body.dimensions,
+            &semantic_groups,
         )
         .await
         {
             Ok(Some(rule)) => MetaHttpResponse::json(rule),
             Ok(None) => MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Rule not found")
                 .into_response(),
-            Err(e) => {
-                // Same unique-index shape as create: a claimed path is a conflict, not a fault.
-                if e.to_string().to_lowercase().contains("unique")
-                    || e.to_string().to_lowercase().contains("duplicate")
-                {
-                    return MetaHttpResponse::error(
-                        StatusCode::CONFLICT.as_u16(),
-                        "another team already owns this path",
-                    )
-                    .into_response();
-                }
-                to_response(e)
-            }
+            Err(e) => rule_write_response(e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -3872,7 +3952,7 @@ pub async fn update_ownership_rule(
         ("org_id" = String, Path, description = "Organization name"),
         ("rule_id" = String, Path, description = "Rule ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -4094,7 +4174,7 @@ pub async fn preview_routing(
 }
 
 /// A native user can hold any string as an email, so an unreachable person can sit on a rota.
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/oncall/teams/{team_id}/reachability",
     context_path = "/api",
@@ -4107,14 +4187,14 @@ pub async fn preview_routing(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 200, description = "Success",   content_type = "application/json", body = o2_enterprise::enterprise::oncall::reachability::TeamReachability),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
-)]
+))]
 pub async fn get_team_reachability(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -4207,7 +4287,7 @@ pub async fn list_team_config_risks(
 }
 
 /// Counted in the database: the team most in need of the summary has the most rows.
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/oncall/teams/{team_id}/overview",
     context_path = "/api",
@@ -4221,14 +4301,14 @@ pub async fn list_team_config_risks(
         ("days" = Option<i64>, Query, description = "Window for the summary (default 7, max 366)"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 200, description = "Success",   content_type = "application/json", body = o2_enterprise::enterprise::oncall::insight::TeamOverview),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
-)]
+))]
 pub async fn get_team_overview(
     Path((org_id, team_id)): Path<(String, String)>,
     Query(q): Query<LookbackQuery>,
@@ -4257,7 +4337,7 @@ pub async fn get_team_overview(
 }
 
 /// Two bounded windows: what was carried is history, only the shifts ahead can change.
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/oncall/teams/{team_id}/load",
     context_path = "/api",
@@ -4271,14 +4351,14 @@ pub async fn get_team_overview(
         ("days" = Option<i64>, Query, description = "Window, backwards and forwards (default 30, max 366; the forward half is capped at 31 days by the schedule resolver)"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 200, description = "Success",   content_type = "application/json", body = o2_enterprise::enterprise::oncall::insight::TeamLoad),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
-)]
+))]
 pub async fn get_team_load(
     Path((org_id, team_id)): Path<(String, String)>,
     Query(q): Query<LookbackQuery>,
@@ -4305,7 +4385,7 @@ pub async fn get_team_load(
 }
 
 /// A dry run: no record, page, timer or token; `POST …/test-page` is what delivers.
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/oncall/teams/{team_id}/escalation-preview",
     context_path = "/api",
@@ -4320,7 +4400,7 @@ pub async fn get_team_load(
         ("at" = Option<i64>, Query, description = "Resolve at this instant (micros) instead of now"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 200, description = "Success",   content_type = "application/json", body = o2_enterprise::enterprise::oncall::insight::EscalationPreview),
         (status = 400, description = "Invalid",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
@@ -4328,7 +4408,7 @@ pub async fn get_team_load(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
-)]
+))]
 pub async fn get_escalation_preview(
     Path((org_id, team_id)): Path<(String, String)>,
     Query(q): Query<EscalationPreviewQuery>,
@@ -4359,7 +4439,7 @@ pub async fn get_escalation_preview(
 }
 
 /// A sibling, not a widening: the counts cost a grouped read the routing path must not pay.
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/oncall/ownership/stats",
     context_path = "/api",
@@ -4374,12 +4454,12 @@ pub async fn get_escalation_preview(
         ("limit" = Option<u64>, Query, description = "Page size (default 50, max 200)"),
         ("offset" = Option<u64>, Query, description = "Rules to skip"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = OwnershipStatsBody)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
-)]
+))]
 pub async fn list_ownership_rule_stats(
     Path(org_id): Path<String>,
     Query(q): Query<OwnershipStatsQuery>,
@@ -4681,7 +4761,7 @@ async fn may_touch_unavailability(org_id: &str, caller: &str, subject: &str, ver
         ("from" = Option<i64>, Query, description = "Window start (microseconds); requires `to`"),
         ("to" = Option<i64>, Query, description = "Window end (microseconds); requires `from`"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::Unavailability>)),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -4743,7 +4823,7 @@ pub async fn list_unavailability(
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = CreateUnavailabilityRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Unavailability),
         (status = 400, description = "Invalid", content_type = "application/json", body = Object),
     ),
     extensions(
@@ -5866,7 +5946,7 @@ pub async fn promote_to_incident(
 }
 
 /// Never carries a token or the deployment's Account SID.
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/telephony",
     context_path = "/api",
@@ -5876,14 +5956,14 @@ pub async fn promote_to_incident(
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 200, description = "Success",   content_type = "application/json", body = o2_enterprise::enterprise::oncall::telephony_settings::TelephonyView),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
-)]
+))]
 pub async fn get_telephony(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -5913,7 +5993,7 @@ pub async fn get_telephony(
 }
 
 /// Asks Twilio live about the account the org would page with; never carries a SID or token.
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/telephony/status",
     context_path = "/api",
@@ -5923,14 +6003,14 @@ pub async fn get_telephony(
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 200, description = "Success",   content_type = "application/json", body = o2_enterprise::enterprise::oncall::telephony_settings::TelephonyStatus),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
-)]
+))]
 pub async fn get_telephony_status(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -5960,7 +6040,7 @@ pub async fn get_telephony_status(
 }
 
 /// Saved only once Twilio reports the account active, and never without a master key.
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     put,
     path = "/{org_id}/telephony",
     context_path = "/api",
@@ -5971,7 +6051,7 @@ pub async fn get_telephony_status(
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = PutTelephonyRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 200, description = "Success",   content_type = "application/json", body = o2_enterprise::enterprise::oncall::telephony_settings::OrgTelephonyView),
         (status = 400, description = "Invalid, refused by Twilio, or no master key", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
@@ -5979,7 +6059,7 @@ pub async fn get_telephony_status(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
-)]
+))]
 pub async fn put_telephony(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -6069,6 +6149,28 @@ pub async fn delete_telephony(
 mod tests {
     use super::*;
 
+    /// A typed refusal keeps its own status even when its text says "unique".
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_rule_refusal_is_read_by_type_before_text() {
+        use o2_enterprise::enterprise::oncall::service::OncallError;
+        let invalid = OncallError::Invalid(
+            "`unique_id` is not a correlation field group in this org (field groups are ids \
+             like `service`, `k8s-cluster`)"
+                .into(),
+        );
+        let cases = [
+            (anyhow::Error::from(invalid), StatusCode::BAD_REQUEST),
+            (
+                anyhow::anyhow!("UNIQUE constraint failed: oncall_ownership_rules.path"),
+                StatusCode::CONFLICT,
+            ),
+        ];
+        for (e, want) in cases {
+            assert_eq!(rule_write_response(e).status(), want);
+        }
+    }
+
     async fn ack_replies(org: &str) -> Vec<(axum::http::StatusCode, Vec<u8>)> {
         let token = || AckQuery {
             token: "leaked".to_string(),
@@ -6151,7 +6253,7 @@ mod tests {
                 StatusCode::INTERNAL_SERVER_ERROR,
             ),
         ] {
-            let resp = ack_status_refusal("ack-org", active).expect("refused");
+            let resp = ack_status_refusal("ack-org", true, active).expect("refused");
             assert_eq!(resp.status(), status);
             assert_eq!(
                 resp.headers()[axum::http::header::CONTENT_TYPE],
@@ -6162,7 +6264,36 @@ mod tests {
                 .unwrap();
             assert!(String::from_utf8_lossy(&body).contains("This link no longer works"));
         }
-        assert!(ack_status_refusal("ack-org", Ok::<_, String>(true)).is_none());
+        assert!(ack_status_refusal("ack-org", true, Ok::<_, String>(true)).is_none());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_an_ack_link_on_a_locked_license_is_refused_with_html() {
+        let resp = ack_status_refusal("ack-org", false, Ok::<_, String>(true)).expect("refused");
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        assert_eq!(
+            resp.headers()[axum::http::header::CONTENT_TYPE],
+            "text/html; charset=utf-8"
+        );
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(String::from_utf8_lossy(&body).contains(ACK_UNLICENSED));
+    }
+
+    /// No test can lock a license, so the source pins that a bad signature is answered first.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_ack_links_read_the_license_only_after_the_signature() {
+        let source = include_str!("mod.rs");
+        for handler in ["pub async fn acknowledge(", "pub async fn ack_page("] {
+            let start = source.find(handler).unwrap();
+            let body = &source[start..start + source[start..].find("\n}\n").unwrap()];
+            let signature = body.find("service::ack_claims(").unwrap();
+            let license = body.find("check_features(&[Feature::Oncall])").unwrap();
+            assert!(signature < license, "{handler}");
+        }
     }
 
     #[cfg(feature = "enterprise")]
@@ -6171,8 +6302,30 @@ mod tests {
         let form = VoiceAckForm {
             digits: Some("1".to_string()),
         };
-        let resp = voice_ack_if_active("voice-org", "tok", form, Ok::<_, String>(false)).await;
+        let resp =
+            voice_ack_if_active("voice-org", "tok", form, Ok::<_, String>(false), true).await;
         assert_eq!(voice_reply(resp).await, VOICE_ORG_INACTIVE);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_voice_ack_of_a_signed_token_on_a_locked_license_is_refused_with_twiml() {
+        let form = VoiceAckForm {
+            digits: Some("1".to_string()),
+        };
+        let resp =
+            voice_ack_if_active("voice-org", "tok", form, Ok::<_, String>(true), false).await;
+        assert_eq!(voice_reply(resp).await, VOICE_UNLICENSED);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_voice_ack_of_an_unsigned_token_does_not_reveal_a_locked_license() {
+        let form = VoiceAckForm {
+            digits: Some("1".to_string()),
+        };
+        let resp = voice_ack_entitled("voice-org", "leaked", form, false).await;
+        assert_ne!(voice_reply(resp).await, VOICE_UNLICENSED);
     }
 
     #[cfg(feature = "enterprise")]
@@ -6181,7 +6334,7 @@ mod tests {
         let form = VoiceAckForm {
             digits: Some("1".to_string()),
         };
-        let resp = voice_ack_if_active("voice-org", "tok", form, Err("db down")).await;
+        let resp = voice_ack_if_active("voice-org", "tok", form, Err("db down"), true).await;
         assert_eq!(voice_reply(resp).await, VOICE_ORG_UNREADABLE);
     }
 
@@ -6189,7 +6342,7 @@ mod tests {
     #[tokio::test]
     async fn test_voice_ack_of_an_active_org_reaches_the_ack_path() {
         let form = VoiceAckForm { digits: None };
-        let resp = voice_ack_if_active("voice-org", "tok", form, Ok::<_, String>(true)).await;
+        let resp = voice_ack_if_active("voice-org", "tok", form, Ok::<_, String>(true), true).await;
         let twiml = voice_reply(resp).await;
         let expected = o2_enterprise::enterprise::oncall::service::voice_acknowledge(
             "voice-org",
@@ -6283,6 +6436,21 @@ mod tests {
         assert_eq!(body.anchor_micros, None);
         assert_eq!(body.spec.id(), config::meta::oncall::PresetId::FollowTheSun);
         assert_eq!(body.spec.members(), vec!["naoto@o2.ai", "lars@o2.ai"]);
+    }
+
+    /// The target fields are read beside the flattened preset, not swallowed by it.
+    #[test]
+    fn test_from_preset_body_reads_the_target_rotation() {
+        let body: FromPresetRequest = serde_json::from_str(
+            r#"{"preset":"weekday_weekend",
+                "rotation_id":"rot_b",
+                "new_rotation_name":"Tertiary",
+                "weekdays":{"members":["ana@o2.ai"]},
+                "weekend":{"members":["sam@o2.ai"]}}"#,
+        )
+        .unwrap();
+        assert_eq!(body.rotation_id.as_deref(), Some("rot_b"));
+        assert_eq!(body.new_rotation_name.as_deref(), Some("Tertiary"));
     }
 
     /// Everything but the preset and its groups is optional.
@@ -7313,6 +7481,7 @@ mod tests {
             }],
             destinations: None,
             l0: None,
+            template: None,
         };
         let response = set_policy(
             Path(("acme".to_string(), "t_dm8".to_string())),

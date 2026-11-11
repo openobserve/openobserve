@@ -18,10 +18,12 @@ import service_accounts from "./service_accounts";
 import { serviceAccountKeys } from "./service_accounts.querykeys";
 import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
-export const serviceAccountsQuery = (org: string) =>
+export const serviceAccountsQuery = (org: string, options?: { silentForbidden?: boolean }) =>
   queryOptions({
     queryKey: serviceAccountKeys.list(org),
-    queryFn: async (): Promise<any[]> => (await service_accounts.list(org)).data?.data ?? [],
+    queryFn: async (): Promise<any[]> =>
+      (await (options ? service_accounts.list(org, options) : service_accounts.list(org))).data
+        ?.data ?? [],
     staleTime: NORMAL_STALE_TIME,
   });
 
