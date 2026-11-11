@@ -328,37 +328,68 @@ describe("SlackConnectEmpty self-hosted (A1)", () => {
     expect(w.find('[data-test="slack-setup-app"]').classes()).not.toContain("bg-button-primary");
   });
 
-  it("tells two workspaces with one name apart by install date, and by app when the dates match (T4-22)", () => {
+  it("tells two workspaces with one name apart by app name and install date, never by app id (T4-22, F-N7)", () => {
     const NOV_1 = Date.UTC(2026, 10, 1, 12) * 1000;
     const NOV_5 = Date.UTC(2026, 10, 5, 12) * 1000;
     const w = mountEmpty({
       isCloud: false,
       available: [
-        { installation_id: "a", team_name: "Acme Corp", app_id: "A01", created_at: NOV_1 },
-        { installation_id: "b", team_name: "Acme Corp", app_id: "A02", created_at: NOV_5 },
-        { installation_id: "c", team_name: "Beta", app_id: "A03", created_at: NOV_1 },
-        { installation_id: "d", team_name: "Gamma", app_id: "A04", created_at: NOV_1 },
-        { installation_id: "e", team_name: "Gamma", app_id: "A05", created_at: NOV_1 + 60_000_000 },
+        {
+          installation_id: "a",
+          team_name: "Acme Corp",
+          app_id: "A01",
+          app_name: "Acme Insights",
+          created_at: NOV_1,
+        },
+        {
+          installation_id: "b",
+          team_name: "Acme Corp",
+          app_id: "A02",
+          app_name: "Acme Insights (staging)",
+          created_at: NOV_5,
+        },
+        {
+          installation_id: "c",
+          team_name: "Beta",
+          app_id: "A03",
+          app_name: "Beta app",
+          created_at: NOV_1,
+        },
+        {
+          installation_id: "d",
+          team_name: "Gamma",
+          app_id: "A04",
+          app_name: "",
+          created_at: NOV_1,
+        },
+        {
+          installation_id: "e",
+          team_name: "Gamma",
+          app_id: "A05",
+          created_at: NOV_1 + 3_600_000_000,
+        },
       ],
     });
     const detail = (id: string) => w.find(`[data-test="slack-available-detail-${id}"]`);
-    expect(detail("a").text()).toBe("Added Nov 1, 2026");
-    expect(detail("b").text()).toBe("Added Nov 5, 2026");
+    expect(detail("a").text()).toBe("Acme Insights · Added Nov 1, 2026");
+    expect(detail("b").text()).toBe("Acme Insights (staging) · Added Nov 5, 2026");
     expect(detail("c").exists()).toBe(false);
-    expect(detail("d").text()).toBe("Added Nov 1, 2026 · app A04");
-    expect(detail("e").text()).toBe("Added Nov 1, 2026 · app A05");
+    expect(detail("d").text()).toBe("Added Nov 1, 2026 at 12:00");
+    expect(detail("e").text()).toBe("Added Nov 1, 2026 at 13:00");
+    expect(w.text()).not.toMatch(/A0[1-5]/);
   });
 
-  it("names the app alone for a same-name workspace an older server sends without a date", () => {
+  it("names the app alone for a same-name workspace an older server sends without a date, and never its id", () => {
     const w = mountEmpty({
       isCloud: false,
       available: [
-        { installation_id: "a", team_name: "Acme Corp", app_id: "A01" },
-        { installation_id: "b", team_name: "Acme Corp" },
+        { installation_id: "a", team_name: "Acme Corp", app_id: "A01", app_name: "Acme Insights" },
+        { installation_id: "b", team_name: "Acme Corp", app_id: "A02" },
       ],
     });
-    expect(w.find('[data-test="slack-available-detail-a"]').text()).toBe("App A01");
+    expect(w.find('[data-test="slack-available-detail-a"]').text()).toBe("Acme Insights");
     expect(w.find('[data-test="slack-available-detail-b"]').exists()).toBe(false);
+    expect(w.text()).not.toContain("A01");
   });
 
   it("keeps Set up Slack app primary when no workspace is set up yet", () => {

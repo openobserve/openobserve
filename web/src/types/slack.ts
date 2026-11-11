@@ -313,6 +313,8 @@ export interface SlackAvailableInstallation {
   installation_id: string;
   team_name: string;
   app_id?: string;
+  /** The Slack app's display name its admin chose; empty when unknown. */
+  app_name?: string;
   /** Install time, Unix microseconds. */
   created_at?: number;
 }
