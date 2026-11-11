@@ -159,13 +159,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
     </template>
     <template #cell-incident="{ row }">
-      <OTruncatedText
-        as="p"
-        :lines="2"
-        class="text-text-heading py-1.5 leading-snug font-medium wrap-anywhere whitespace-normal"
-        data-test="autoobserve-live-issues-sentence"
-        >{{ row.sentence }}</OTruncatedText
-      >
+      <!-- The padding sits outside the clamp, which would otherwise show the top of line three in it. -->
+      <div class="py-1.5">
+        <OTruncatedText
+          as="p"
+          :lines="2"
+          class="text-text-heading leading-snug font-medium wrap-anywhere whitespace-normal"
+          data-test="autoobserve-live-issues-sentence"
+          >{{ row.sentence }}</OTruncatedText
+        >
+      </div>
     </template>
     <template #cell-severity="{ row }">
       <OTag type="severity" :value="row.severity" size="sm" />
@@ -179,10 +182,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="default-soft"
         shape="rounded"
         size="sm"
-        :label="row.stream"
+        class="max-w-full"
         :title="row.streamTitle"
         data-test="autoobserve-live-issues-stream"
-      />
+      >
+        <OTruncatedText as="span" data-test="autoobserve-live-issues-stream-text">{{
+          row.stream
+        }}</OTruncatedText>
+      </OTag>
     </template>
     <template #cell-page="{ row }">
       <OTag

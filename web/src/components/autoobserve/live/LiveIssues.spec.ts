@@ -485,6 +485,28 @@ describe("LiveIssues", () => {
       expect(w.get(sel("sentence")).classes()).toContain("wrap-anywhere");
     });
 
+    it("cuts a long stream name with an ellipsis inside the cell (T1-N7)", async () => {
+      const base = at(4, 1, "inc-long-stream");
+      const long = "k8s_cluster_e_namespace_g_payments_backend_ingest_and_enrichment_pipeline_logs";
+      api.mockResolvedValue(page([{ ...base, finding: { ...base.finding, stream_name: long } }]));
+      const w = mountTable();
+      await loaded();
+      const chip = w.get(sel("stream"));
+      expect(chip.classes()).toContain("max-w-full");
+      const text = chip.get('[data-test="autoobserve-live-issues-stream-text"]');
+      expect(text.classes()).toContain("truncate");
+      expect(text.text()).toBe(long);
+    });
+
+    it("keeps the two-line sentence clamp clear of the cell padding, so no third line peeks (F-N2)", async () => {
+      api.mockResolvedValue(page([at(4, 1)]));
+      const w = mountTable();
+      await loaded();
+      const sentence = w.get(sel("sentence"));
+      expect(sentence.classes().some((c) => /^p[ytb]?-/.test(c))).toBe(false);
+      expect(sentence.element.parentElement?.classList.contains("py-1.5")).toBe(true);
+    });
+
     it("the status filter says Open, the word the status chip uses", async () => {
       api.mockResolvedValue(page([at(4, 1)]));
       const w = mountTable();
