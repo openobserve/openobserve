@@ -1028,6 +1028,9 @@ impl Default for StatusStreaks {
     }
 }
 
+/// A signature value that [`streak_sig`] never returns, so the row reads as unsigned.
+const UNSIGNED: i64 = -1;
+
 impl StatusStreaks {
     fn sig(&self) -> i64 {
         streak_sig(self.down_runs, self.up_runs, self.run_ts, self.run_class)
@@ -1170,7 +1173,15 @@ pub async fn apply_replicated_streaks<C: ConnectionTrait>(
     next: &StatusStreaks,
 ) -> Result<bool, errors::Error> {
     if next.run_ts == 0 {
-        return update_last_check_status(conn, id, next.last_check_status).await;
+        // Only an older producer sends a badge-only message. It can stand for a recovery that did
+        // not move the stamp, so the row stops being signed.
+        let badge = update_last_check_status(conn, id, next.last_check_status).await?;
+        Entity::update_many()
+            .col_expr(Column::StatusStreakSig, Expr::value(UNSIGNED))
+            .filter(Column::Id.eq(id))
+            .exec(conn)
+            .await?;
+        return Ok(badge);
     }
     let res = Entity::update_many()
         .col_expr(Column::LastCheckStatus, Expr::value(next.last_check_status))
@@ -1180,7 +1191,11 @@ pub async fn apply_replicated_streaks<C: ConnectionTrait>(
         .col_expr(Column::LastRunClass, Expr::value(next.run_class))
         .col_expr(Column::LastRunClassAt, Expr::value(next.run_class_at))
         .col_expr(Column::LastTestedAt, Expr::value(next.tested_at))
-        .col_expr(Column::StatusStreakSig, Expr::value(next.sig()))
+        // A message from an older producer carries no proof that its stamp is complete.
+        .col_expr(
+            Column::StatusStreakSig,
+            Expr::value(if next.signed { next.sig() } else { UNSIGNED }),
+        )
         .col_expr(
             Column::UpdatedAt,
             Expr::value(config::utils::time::now_micros()),

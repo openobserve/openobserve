@@ -1976,6 +1976,7 @@ pub(crate) async fn publish_check_status(done: &synthetics_runs::RunFinalized) {
                 _streaks.run_class_at,
                 _streaks.tested_at,
                 _streaks.recovered_at,
+                true,
             )
             .await
     {

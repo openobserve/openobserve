@@ -349,6 +349,7 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
             run_class_at,
             tested_at,
             recovered_at,
+            signed,
         } => {
             let streaks = table::synthetics_checks::StatusStreaks {
                 last_check_status: status,
@@ -359,8 +360,7 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
                 run_class_at,
                 tested_at,
                 recovered_at,
-                // Written by this build, which signs it.
-                signed: true,
+                signed,
             };
             apply_last_check_status(conn, &org_id, &id, &streaks).await?;
         }
@@ -726,9 +726,42 @@ mod tests {
                 run_class: 0,
                 run_class_at: 0,
                 tested_at: 0,
+                recovered_at: 0,
+                signed: false,
                 ..
             }
         ));
+    }
+
+    #[tokio::test]
+    async fn a_message_from_an_older_producer_leaves_the_row_unsigned() {
+        let db = db_with_a_check(0).await;
+        let legacy = infra::table::synthetics_checks::StatusStreaks {
+            last_check_status: 3,
+            down_runs: 2,
+            run_ts: 200,
+            run_class: 3,
+            signed: false,
+            ..Default::default()
+        };
+        apply_last_check_status(&db, "org1", "check-1", &legacy)
+            .await
+            .unwrap();
+        assert!(!stored_streaks(&db).await.signed, "no hold may trust it");
+        let signed = infra::table::synthetics_checks::StatusStreaks {
+            run_ts: 300,
+            signed: true,
+            ..legacy
+        };
+        apply_last_check_status(&db, "org1", "check-1", &signed)
+            .await
+            .unwrap();
+        assert!(stored_streaks(&db).await.signed);
+        // A badge-only message comes only from an older producer.
+        apply_last_check_status(&db, "org1", "check-1", &status_only(1))
+            .await
+            .unwrap();
+        assert!(!stored_streaks(&db).await.signed);
     }
 
     #[tokio::test]
@@ -841,6 +874,7 @@ mod tests {
             run_class_at: 0,
             tested_at: 0,
             recovered_at: 0,
+            signed: true,
         })
         .unwrap();
         let msg = Message::new(
