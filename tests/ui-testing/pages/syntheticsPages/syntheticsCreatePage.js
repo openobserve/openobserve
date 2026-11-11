@@ -16,7 +16,7 @@
 // SyntheticsCreatePage — CreateProtocolCheck.vue (http/tcp/tls/ssh) and CreateBrowserTest.vue (gate → journey → configure).
 
 import { expect } from '@playwright/test';
-import { selectOSelectOption } from '../alertsPages/oselectHelpers.js';
+import { openOSelectDropdown, selectOSelectOption } from '../alertsPages/oselectHelpers.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 
@@ -46,6 +46,8 @@ export class SyntheticsCreatePage {
       sshSecretField: '[data-test="synthetics-check-ssh-secret-input-field"]',
       frequencyItem: (value) => `[data-test="synthetics-check-schedule-frequency-${value}-item"]`,
       customIntervalField: '[data-test="synthetics-check-schedule-custom-interval-value-input-field"]',
+      customIntervalUnitSelect: '[data-test="synthetics-check-schedule-custom-interval-unit-select"]',
+      cronTimezoneSelect: '[data-test="synthetics-check-schedule-timezone-select"]',
       cronField: '[data-test="synthetics-check-schedule-cron-input-field"]',
       cronError: '[data-test="synthetics-check-schedule-cron-error"]',
       basicAuthSwitch: '[data-test="synthetics-check-auth-network-basic-auth-switch-btn"]',
@@ -55,6 +57,8 @@ export class SyntheticsCreatePage {
       retriesDelayField: '[data-test="synthetics-check-retries-delay-input-field"]',
       alertThresholdField: '[data-test="synthetics-check-alerts-threshold-input-field"]',
       alertCooldownField: '[data-test="synthetics-check-alerts-cooldown-input-field"]',
+      alertTemplateRow: '[data-test="synthetics-check-alerts-template"]',
+      templateOverrideSelect: '[data-test="template-override-select"]',
       variablesToggleButton: '[data-test="synthetics-journey-toggle-variables-btn"]',
       variablesPanel: '[data-test="synthetics-check-variables-panel"]',
       variablesEmpty: '[data-test="synthetics-check-variables-panel-empty"]',
@@ -131,6 +135,34 @@ export class SyntheticsCreatePage {
     await expect(this.assertions().chips).toHaveCount(before + 1, { timeout: 10000 });
   }
 
+  async abandonAssertionAtValue(field, operator) {
+    const builder = this.assertions();
+    const before = await builder.chips.count();
+    await builder.openForNew();
+    await builder.pickField(field);
+    await builder.pickOperator(SYNTHETICS_OPERATOR_IDS[operator] ?? operator);
+    await expect(builder.suggestions).toBeVisible({ timeout: 10000 });
+    await this.page.locator(this.locators.nameField).click();
+    await expect(builder.suggestions).toBeHidden({ timeout: 10000 });
+    await expect(builder.chips).toHaveCount(before);
+  }
+
+  async removeAssertionAt(index) {
+    const before = await this.assertions().chips.count();
+    await this.assertions().removeChipAt(index);
+    await expect(this.assertions().chips).toHaveCount(before - 1, { timeout: 10000 });
+  }
+
+  async expectAssertionChips(assertions) {
+    const builder = this.assertions();
+    await expect(builder.chips).toHaveCount(assertions.length, { timeout: 30000 });
+    for (const [i, a] of assertions.entries()) {
+      await expect(builder.chipAt(i)).toHaveAttribute('data-test', `synthetics-check-http-assertions-chip-${a.field}`);
+      await builder.expectOperator(i, SYNTHETICS_OPERATOR_IDS[a.operator] ?? a.operator);
+      await builder.expectValue(i, String(a.value));
+    }
+  }
+
   async fillTcp(port) { await this.page.locator(this.locators.tcpPortField).fill(String(port)); }
 
   async fillTls({ port, minDays }) {
@@ -175,6 +207,54 @@ export class SyntheticsCreatePage {
   async setCustomInterval(minutes) {
     await this.page.locator(this.locators.frequencyItem('custom')).click();
     await this.page.locator(this.locators.customIntervalField).fill(String(minutes));
+  }
+
+  async setCustomIntervalWithUnit(value, unit) {
+    await this.setCustomInterval(value);
+    await selectOSelectOption(this.page, this.locators.customIntervalUnitSelect, unit);
+  }
+
+  async expectFrequencyPreset(preset) {
+    await expect(this.page.locator(this.locators.frequencyItem(preset))).toHaveAttribute('data-state', 'on', { timeout: 30000 });
+  }
+
+  async expectCustomInterval(value, unit) {
+    await this.expectFrequencyPreset('custom');
+    await expect(this.page.locator(this.locators.customIntervalField)).toHaveValue(String(value));
+    await this.expectSelectValue(this.locators.customIntervalUnitSelect, unit);
+  }
+
+  async setCronTimezone(zone) {
+    await this.pickFromLongSelect(this.locators.cronTimezoneSelect, zone);
+  }
+
+  async expectCronTimezone(zone) {
+    await this.expectSelectValue(this.locators.cronTimezoneSelect, zone);
+  }
+
+  async selectTemplateOverride(name) {
+    await expect(this.page.locator(this.locators.alertTemplateRow)).toBeVisible({ timeout: 30000 });
+    await this.pickFromLongSelect(this.locators.templateOverrideSelect, name);
+  }
+
+  async expectTemplateOverride(name) {
+    await expect(this.page.locator(this.locators.alertTemplateRow)).toBeVisible({ timeout: 30000 });
+    await this.expectSelectValue(this.locators.templateOverrideSelect, name);
+  }
+
+  async expectSelectValue(selectSelector, value) {
+    const trigger = this.page.locator(`${selectSelector} [data-test$="-trigger"]`).first();
+    await expect(trigger).toHaveAttribute('data-test-selected-value', value, { timeout: 30000 });
+  }
+
+  // Long lists are virtualised, so the option is only rendered once the search narrows the list to it.
+  async pickFromLongSelect(selectSelector, value) {
+    const name = selectSelector.match(/data-test="([^"]+)"/)[1];
+    const option = this.page.locator(`[data-test="${name}-option"][data-test-value="${value}"]`).first();
+    await openOSelectDropdown(this.page, this.page.locator(selectSelector));
+    await this.page.locator(`[data-test="${name}-search"]`).fill(value);
+    await option.click();
+    await this.expectSelectValue(selectSelector, value);
   }
 
   async setCron(expression) {
@@ -254,6 +334,20 @@ export class SyntheticsCreatePage {
     const response = await responsePromise;
     const text = await response.text();
     return { status: response.status(), text, body: (() => { try { return JSON.parse(text); } catch { return null; } })() };
+  }
+
+  async saveCapturingPayload() {
+    const isSave = (r) => {
+      const m = new URL(r.url()).pathname.match(/\/api\/[^/]+\/synthetics(\/[^/]+)?$/);
+      const method = typeof r.method === 'function' ? r.method() : r.request().method();
+      return !!m && ((method === 'POST' && !m[1]) || (method === 'PUT' && !!m[1]));
+    };
+    const requestPromise = this.page.waitForRequest(isSave, { timeout: 30000 });
+    const responsePromise = this.page.waitForResponse(isSave, { timeout: 30000 });
+    await this.page.locator(this.locators.saveButton).click();
+    const request = await requestPromise;
+    const response = await responsePromise;
+    return { payload: request.postDataJSON(), status: response.status() };
   }
 
   async save() { await this.page.locator(this.locators.saveButton).click(); }
