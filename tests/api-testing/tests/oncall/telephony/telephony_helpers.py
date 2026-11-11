@@ -285,6 +285,10 @@ def fire_page(env: TelephonyEnv, team: Team, *, name: str | None = None, priorit
         return env.oc.pages_for(alert_id)
 
     page = wait_until(_paged, timeout=PAGE_TIMEOUT, interval=PAGE_POLL, msg=f"a page for alert {alert_id}")[0]
+    # o2-enterprise#3486: acking before the firing is saved never acks the alert; multi-alert saves first.
+    if not (aggregation or {}).get("multi_alert"):
+        wait_until(lambda: alert_firing_since(env, alert_id), timeout=30, interval=1,
+                   msg=f"the firing of alert {alert_id} saved")
     return Fired(id=page["id"], alert_id=alert_id, alert_name=alert_name, stream=stream,
                  title=page.get("title") or "", rows=rows)
 
@@ -299,6 +303,13 @@ def timeline(env: TelephonyEnv, page_id: str) -> list[dict[str, Any]]:
     resp = env.oc.get_response(page_id)
     assert resp.status_code == 200, f"reading page {page_id}: {resp.status_code} {resp.text}"
     return resp.json()["events"]
+
+
+def alert_firing_since(env: TelephonyEnv, alert_id: str) -> int | None:
+    resp = env.oc.v2("GET", "alerts?folder=default&page_size=1000")
+    assert resp.status_code == 200, f"listing alerts: {resp.status_code} {resp.text}"
+    alerts = resp.json().get("list", [])
+    return next((a.get("firing_started_at") for a in alerts if a.get("alert_id") == alert_id), None)
 
 
 def alert_acks(env: TelephonyEnv, alert_id: str) -> list[dict[str, Any]]:
