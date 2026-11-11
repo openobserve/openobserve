@@ -19,7 +19,9 @@ import {
   epochMs,
   explorerOf,
   explorerTarget,
+  isSqlStatement,
   streamTypeOf,
+  whereClauseOf,
   type Explorer,
 } from "@/utils/assistant/explorerRoutes";
 import { b64DecodeUnicodeSafe } from "@/utils/formatters";
@@ -137,6 +139,11 @@ const SERVICES_TAB = "services-catalog";
 const SERVICE_GRAPH_TAB = "service-graph";
 
 const MAX_QUERY_CHARS = 20_000;
+
+const RELATIVE_PERIOD = /^\d+[smhdwM]$/;
+
+// One trace pinned by the WHERE clause: an id equality, with no OR that could widen it.
+const ONE_TRACE = /(?:^|\band\s+)trace_id\s*=\s*'([A-Za-z0-9-]{8,64})'/i;
 
 // Tools from MCP servers or other third parties carry a separator in their name; only O2's own tools route.
 const THIRD_PARTY_TOOL = /__|\.|:|\/|^mcp/i;
@@ -299,7 +306,8 @@ export function buildNavigationRoute(action: NavigationActionLike, org: string):
   const type = String(action.resource_type ?? "").toLowerCase();
   const target = (action.target ?? {}) as Record<string, unknown>;
   if (EXPLORERS.has(type) && (action.action === "load_query" || target.query !== undefined)) {
-    return explorerLink(explorerQueryOf(type as Explorer, target, org));
+    const query = explorerQueryOf(type as Explorer, target, org);
+    return (type === "traces" && traceLinkOf(query)) || explorerLink(query);
   }
   const ids = idsOf(target);
   const name = idText(target.name);
@@ -356,8 +364,9 @@ export function rebuildMarkdownTarget(resolved: ResolvedLink, org = ""): LinkTar
   if (explorer) {
     const text = decoded(query.query) ?? decoded(query.sql) ?? "";
     if (!text) return null;
+    const promql = explorer === "metrics" && firstOf(query.query_type) !== "sql";
     return explorerLink({
-      language: explorer === "metrics" ? "promql" : "sql",
+      language: promql && !isSqlStatement(text) ? "promql" : "sql",
       text,
       ...stringField("stream", idText(firstOf(query.stream))),
       ...stringField("streamType", streamTypeOf(firstOf(query.stream_type)) ?? explorer),
@@ -394,14 +403,29 @@ function explorerQueryOf(type: Explorer, target: Record<string, unknown>, org: s
     MAX_QUERY_CHARS,
   );
   const stream = Array.isArray(target.stream) ? target.stream.join(",") : target.stream;
+  const promql = type === "metrics" && target.sql_mode !== true && !isSqlStatement(text);
   return {
-    language: type === "metrics" ? "promql" : "sql",
+    language: promql ? "promql" : "sql",
     text,
     ...stringField("stream", idText(stream)),
     streamType: streamTypeOf(target.stream_type) ?? type,
     ...rangeOf(target.from, target.to),
     org,
   };
+}
+
+// A query for one trace opens its waterfall, which takes the range in microseconds.
+function traceLinkOf(query: QueryRef): LinkTarget | null {
+  const where = whereClauseOf(query.text);
+  const traceId = where && !/\bor\b/i.test(where) ? ONE_TRACE.exec(where)?.[1] : undefined;
+  if (!traceId) return null;
+  const ids: Record<string, string> = { trace_id: traceId };
+  if (query.stream) ids.stream = query.stream;
+  if (query.from && query.to) {
+    ids.from = String(query.from * 1000);
+    ids.to = String(query.to * 1000);
+  }
+  return routeLink("traceDetails", ids, traceId);
 }
 
 // The Traces page reads `tab`; only the two service views are reachable from a link.
@@ -521,10 +545,14 @@ function decoded(value: unknown): string | undefined {
   return out ? out.slice(0, MAX_QUERY_CHARS) : undefined;
 }
 
-function rangeOf(from: unknown, to: unknown): Pick<QueryRef, "from" | "to"> {
+// The agent also writes a relative window as `from: "2h", to: "now"`; it stays relative.
+function rangeOf(from: unknown, to: unknown): Pick<QueryRef, "from" | "to" | "period"> {
   const start = epochMs(from);
   const end = epochMs(to);
-  return start !== null && end !== null && end > start ? { from: start, to: end } : {};
+  if (start !== null && end !== null && end > start) return { from: start, to: end };
+  const period = typeof from === "string" ? from.trim() : "";
+  const open = to === undefined || to === null || to === "" || to === "now";
+  return open && RELATIVE_PERIOD.test(period) ? { period } : {};
 }
 
 function stringField<K extends string>(key: K, value: unknown): Partial<Record<K, string>> {

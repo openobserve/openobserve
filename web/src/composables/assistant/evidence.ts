@@ -14,7 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { ChatMessage, ContentBlock, NavigationAction } from "@/ts/interfaces/chat";
-import { epochMs, sqlStreamOf, streamTypeOf } from "@/utils/assistant/explorerRoutes";
+import {
+  epochMs,
+  isSqlStatement,
+  sqlStreamOf,
+  streamTypeOf,
+} from "@/utils/assistant/explorerRoutes";
 
 import type { QueryRef } from "./actions/types";
 import type { ContextChip } from "./context/types";
@@ -524,7 +529,7 @@ export function chipOpenQuery(chip: ContextChip, org: string): QueryRef | null {
       ? { from: ref.from, to: ref.to }
       : rowWindow(chip.data);
   return {
-    language: streamType === "metrics" && sql ? "promql" : "sql",
+    language: streamType === "metrics" && sql && !isSqlStatement(sql) ? "promql" : "sql",
     text: sql ? sql.slice(0, MAX_TEXT_CHARS) : `SELECT * FROM "${stream!.replace(/"/g, "")}"`,
     ...(stream && { stream }),
     ...(streamType && { streamType }),

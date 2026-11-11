@@ -37,6 +37,7 @@ import {
   turnAnnotationKey,
   windowsOf,
 } from "./evidence";
+import type { ContextChip } from "./context/types";
 import { projectRecord } from "./record";
 
 const US = 1000;
@@ -347,6 +348,31 @@ describe("toolLinksOf / chipOpenQuery", () => {
       "acme",
     );
     expect(query).toMatchObject({ stream: "default", from: FROM - 60_000, to: FROM + 60_000 });
+  });
+});
+
+describe("chipOpenQuery on a metrics stream", () => {
+  const chip = (data: string): ContextChip => ({
+    id: "q",
+    kind: "query",
+    label: raw("Query"),
+    ref: {
+      type: "query",
+      org: "default",
+      stream: "ta_persona_container_memory_working_set_bytes",
+      streamType: "metrics",
+    },
+    data,
+    sizeBytes: data.length,
+    provenance: "page",
+    sent: "whitelist",
+  });
+
+  it("opens a SQL query chip in the SQL editor, and PromQL as PromQL", () => {
+    const sql =
+      "SELECT pod, AVG(value) FROM ta_persona_container_memory_working_set_bytes GROUP BY pod";
+    expect(chipOpenQuery(chip(sql), "default")).toMatchObject({ language: "sql", text: sql });
+    expect(chipOpenQuery(chip("avg by (pod) (up)"), "default")?.language).toBe("promql");
   });
 });
 
