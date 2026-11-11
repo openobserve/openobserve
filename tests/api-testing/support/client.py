@@ -125,3 +125,8 @@ class OpenObserveClient:
     def otlp(self):
         from .endpoints.otlp import OtlpAPI
         return OtlpAPI(self)
+
+    @property
+    def synthetics(self):
+        from .endpoints.synthetics import SyntheticsAPI
+        return SyntheticsAPI(self)
