@@ -45,6 +45,7 @@ import {
   useRecentlyCreated,
 } from "./bulk/useRecentlyCreated";
 import { draftTarget, type AlertDraft } from "./targets/alertDraft";
+import { checkScopeMatch } from "./targets/scopeMatch";
 import type { ServiceAddress } from "./targets/serviceAddress";
 import { notifyOf, teamOf, type OwnedAlert } from "./targets/ownership";
 import { insightCtaLabel, type AiFinding, type CtaAction } from "./insightCta";
@@ -234,7 +235,10 @@ export const cantBuildKinds = async (
   const ruled = await Promise.all(
     kinds.map(async (kind) => {
       const draft = bulkRowOf(row, kind, []);
-      return cantBuild(draft, await read(org, draft.scope.stream)) ? kind : null;
+      const fields = await read(org, draft.scope.stream);
+      if (cantBuild(draft, fields)) return kind;
+      const scope = { ...(draft.scope as ServiceScope), schema: fields?.names };
+      return fields && (await checkScopeMatch(org, scope)) === "none" ? kind : null;
     }),
   );
   return new Set(ruled.filter((kind): kind is BulkKind => kind !== null));

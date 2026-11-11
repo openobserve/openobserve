@@ -14048,7 +14048,8 @@
           "noClusterField": "Stream {stream} has no cluster field, so this alert can't be limited to cluster {value}.",
           "noNamespaceField": "Stream {stream} has no namespace field, so this alert can't be limited to namespace {value}.",
           "schemaUnread": "Couldn't read the fields of stream {stream}, so this alert can't be checked. Close it and try again.",
-          "noDraft": "AutoObserve can't build this alert on the fields of stream {stream}. Write the query by hand."
+          "noDraft": "AutoObserve can't build this alert on the fields of stream {stream}. Write the query by hand.",
+          "noMatch": "No row in {stream} names {service} in 7 days, so this alert can never fire. Write the query by hand."
         }
       }
     },
@@ -34381,6 +34382,7 @@
         "schemaFailed": "Couldn't read the fields of stream {stream}, so this alert can't be checked. Reopen the review to try again.",
         "exists": "Already added as {name} in folder {folder}.",
         "existsFailed": "Couldn't read your alerts, so AutoObserve can't tell whether this one was already added. Reopen the review to try again.",
+        "noMatch": "No row in {stream} names {service} in 7 days, so an alert for it could never fire.",
         "noField": {
           "service": "Stream {stream} has no service field, so this alert can't be limited to {value}.",
           "cluster": "Stream {stream} has no cluster field, so this alert can't be limited to cluster {value}.",

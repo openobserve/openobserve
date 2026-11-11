@@ -27,6 +27,7 @@ import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
+import config from "@/aws-exports";
 import { useNow } from "@/composables/useNow";
 import {
   autoobserveCoverageQuery,
@@ -57,6 +58,9 @@ import {
 } from "./liveCopy";
 import { PAGED_CAP, failedDetail } from "./incidentsCopy";
 import { useRecentlyCreated } from "../insight/bulk/useRecentlyCreated";
+import { gapDraftScopes } from "../insight/kindCopy";
+import { readStreamFields } from "../insight/bulk/useBulkReview";
+import { probeScopes } from "../insight/targets/scopeMatch";
 
 export interface RailSource extends Required<SourceState> {
   requests: LiveRequest[];
@@ -230,6 +234,18 @@ export const useLiveAutoObserve = (options: { active?: () => boolean } = {}) => 
     }),
   );
   const retry = () => void Promise.all([coverage.refetch(), suggestions.refetch(), gaps.refetch()]);
+  // A draft whose filter keeps none of its stream's rows could never fire, so the cards stop counting it once checked.
+  watch(
+    () => [org.value, coverage.data.value?.rows, suggestions.data.value, gaps.data.value] as const,
+    ([orgId, rows, page, all]) => {
+      if (config.isEnterprise !== "true" || !orgId || !rows) return;
+      const listed = [...(page?.suggestions ?? []), ...(all?.suggestions ?? [])].filter(
+        (s) => s.kind === "coverage_gap" && s.status === "proposed",
+      );
+      void probeScopes(orgId, gapDraftScopes(t, listed, { rows }), readStreamFields);
+    },
+    { immediate: true },
+  );
   const coverageState = useKeptFailure(
     () => stateOf(coverage, retry),
     () => org.value,

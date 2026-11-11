@@ -22,6 +22,7 @@ import { baselineSql, errorFieldOf } from "@/utils/alerts/prefill/fromAutoObserv
 import { measureBaseline, type BaselineRequest } from "../targets/baseline";
 import { measuredThreshold } from "../targets/thresholds";
 import { loadOwnedAlerts, notifyOf, teamOf } from "../targets/ownership";
+import { checkScopeMatch, scopeIdOf, type ScopeMatch } from "../targets/scopeMatch";
 import destinationService from "@/services/alert_destination";
 import streamService from "@/services/stream";
 import { findExisting, loadExistingAlerts, type ExistingAlert } from "./existingAlerts";
@@ -59,10 +60,14 @@ export type RowBlock =
   | { code: "noBaseline"; kind: "errors" | "latency" }
   | { code: "noField"; part: "service" | "cluster" | "namespace"; value: string }
   | { code: "exists"; alert: ExistingAlert }
-  | { code: "existsFailed" };
+  | { code: "existsFailed" }
+  | { code: "noMatch" };
 
 /** The org's alerts a review checks its drafts against: null while they load, "failed" when they can't be read. */
 export type ExistingCheck = ExistingAlert[] | null | "failed";
+
+/** Whether each service scope's filter keeps rows of its stream, by scope; null when the check could not run. */
+export type ScopeMatches = Record<string, ScopeMatch | null>;
 
 /** Stream fields by `type/name`; null when they could not be read. */
 export type StreamSchemas = Record<string, string[] | null>;
@@ -166,6 +171,8 @@ const state = reactive({
   types: {} as StreamTypes,
   baselines: {} as RowBaselines,
   thresholds: {} as Record<string, number>,
+  /** Null until the review context loads; a scope not yet answered waits. */
+  matches: null as ScopeMatches | null,
   /** Team and destination read from each row's own alerts, keyed by row. */
   owned: {} as Record<string, Pick<BulkRow, "team" | "notify">>,
   existing: null as ExistingCheck,
@@ -249,6 +256,8 @@ interface RowContext {
   types: StreamTypes;
   baselines: RowBaselines;
   thresholds: Record<string, number>;
+  /** Left out, the scope's rows are not checked. */
+  matches?: ScopeMatches;
 }
 
 /** A row still waiting for its fields or its measurement, which may yet be created. */
@@ -296,6 +305,12 @@ const checkedPrefill = (kind: BulkKind, row: BulkRow, ctx: RowContext): Checked 
   // A row still waiting for its fields keeps a provisional prefill, so its period and rule show meanwhile.
   if (block?.code === "checking") return { prefill: buildPrefill(kind, leveled), block, ...levels };
   if (block) return { prefill: null, block, ...levels };
+  const match = ctx.matches ? ctx.matches[scopeIdOf(scope)] : null;
+  if (match === undefined) {
+    return { prefill: buildPrefill(kind, leveled), block: { code: "checking" }, ...levels };
+  }
+  // A filter that keeps none of the stream's rows makes an alert that can never fire.
+  if (match === "none") return { prefill: null, block: { code: "noMatch" }, ...none };
   // The error field is read off the stream's fields once they arrive, never guessed before.
   const errorField =
     kind === "errors" && !row.inputs?.errorField
@@ -388,6 +403,7 @@ export const reviewRowsOf = (
     baselines?: RowBaselines;
     thresholds?: Record<string, number>;
     owned?: Record<string, Pick<BulkRow, "team" | "notify">>;
+    matches?: ScopeMatches;
     /** Left out, nothing is checked; the review always passes it. */
     existing?: ExistingCheck;
   },
@@ -408,6 +424,7 @@ export const reviewRowsOf = (
       types: ctx.types ?? {},
       baselines: ctx.baselines ?? {},
       thresholds: ctx.thresholds ?? {},
+      matches: ctx.matches,
     });
     const { prefill, usual, threshold } = checked;
     const block =
@@ -542,6 +559,7 @@ const reviewRows = computed(() =>
         baselines: state.baselines,
         thresholds: state.thresholds,
         owned: state.owned,
+        matches: state.matches ?? undefined,
         existing: state.existing,
       })
     : [],
@@ -571,6 +589,7 @@ export const openBulkReview = (request: BulkReviewRequest): void => {
   state.baselines = {};
   state.thresholds = {};
   state.owned = {};
+  state.matches = null;
   state.existing = null;
   state.ticked = startTicks(reviewRows.value);
   collapseDefaults();
@@ -659,6 +678,7 @@ const readOwnership = async (
 export const loadReviewContext = async (org: string): Promise<void> => {
   stopLoads();
   const load = contextLoad;
+  state.matches = {};
   measuring = new AbortController();
   const { signal } = measuring;
   if (state.org !== org) {
@@ -672,6 +692,8 @@ export const loadReviewContext = async (org: string): Promise<void> => {
     (): ExistingCheck => "failed",
   );
   void existing.then((found) => load === contextLoad && applyExisting(found));
+  // Rows that arrived with their fields are checked now; the rest once their fields are read.
+  const early = matchRows(org, load, signal);
   const [folders, rights, schemas, owned] = await Promise.allSettled([
     commonService.list_Folders(org, "alerts", { skipAccessToast: true }),
     rightsSource(org),
@@ -689,11 +711,35 @@ export const loadReviewContext = async (org: string): Promise<void> => {
     }));
   }
   if (rights.status === "fulfilled") applyRights(rights.value);
+  await Promise.all([early, matchRows(org, load, signal)]);
+  if (load !== contextLoad) return;
   await measureRows(org, load, signal);
 };
 
 const applyOwnership = (owned: Record<string, Pick<BulkRow, "team" | "notify">>): void => {
   state.owned = owned;
+};
+
+/** Asks, a few scopes at a time, whether each row's filter keeps any of its stream's rows; a row it rules out is unticked. */
+const matchRows = async (org: string, load: number, signal: AbortSignal): Promise<void> => {
+  const scopes = (state.request?.rows ?? []).flatMap((r) => {
+    if (isSource(r.scope)) return [];
+    const schema = r.scope.schema ?? state.schemas[streamKeyOf(r.scope.stream)];
+    return schema && !scopeBlockOf(r.scope, schema) ? [{ ...r.scope, schema }] : [];
+  });
+  const due = uniqueBy(scopes, scopeIdOf).filter((s) => !(scopeIdOf(s) in (state.matches ?? {})));
+  for (let i = 0; i < due.length; i += SCHEMA_READS) {
+    await Promise.all(
+      due.slice(i, i + SCHEMA_READS).map(async (scope) => {
+        const value = await checkScopeMatch(org, scope, signal);
+        if (load === contextLoad && state.matches) state.matches[scopeIdOf(scope)] = value;
+      }),
+    );
+    if (load !== contextLoad) return;
+  }
+  for (const row of reviewRows.value) {
+    if (row.block?.code === "noMatch") state.ticked.delete(row.key);
+  }
 };
 
 /** Measures each waiting row's usual level, a few at a time; a row the week gave none is unticked until a threshold is set. */

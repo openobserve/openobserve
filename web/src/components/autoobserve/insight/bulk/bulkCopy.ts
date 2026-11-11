@@ -112,6 +112,10 @@ export const serviceLabel = (t: TranslateFn, row: ReviewRow, all: ReviewRow[]): 
   return raw(labelsOf(t, all).get(placeKey(row)) ?? row.service);
 };
 
+/** Why AutoObserve offers no alert for a service whose name no row of its stream carries. */
+export const noMatchLine = (t: TranslateFn, stream: string, service: I18nText | string): I18nText =>
+  t("insight.bulk.block.noMatch", { stream: raw(stream), service: raw(String(service)) });
+
 /** Why a row cannot be ticked: its stream fields, or a builder that could not make the alert. */
 export const blockLine = (t: TranslateFn, row: ReviewRow, all: ReviewRow[] = [row]): I18nText => {
   const block = row.block;
@@ -122,6 +126,7 @@ export const blockLine = (t: TranslateFn, row: ReviewRow, all: ReviewRow[] = [ro
   if (block.code === "schemaFailed") {
     return t("insight.bulk.block.schemaFailed", { stream: row.stream.name });
   }
+  if (block.code === "noMatch") return noMatchLine(t, row.stream.name, serviceLabel(t, row, all));
   if (block.code === "noBaseline") {
     return t(`insight.threshold.${block.kind}Reason`, { service: serviceLabel(t, row, all) });
   }

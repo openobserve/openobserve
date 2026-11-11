@@ -726,6 +726,14 @@ describe("CoverageServiceDrawer gap CTA counts what it can build (T2-11)", () =>
         ],
       },
     });
+    // The no-data draft's filter keeps the stream's rows, so only the errors draft is ruled out.
+    api.fetch.mockImplementation((_req: unknown, handlers: any) => {
+      handlers.data(null, {
+        type: "search_response_hits",
+        content: { results: { hits: [{ total: 10, matching: 10 }] } },
+      });
+      handlers.complete();
+    });
     const row = liveRow(
       { errors: cell("none"), latency: cell("covered", "checkout-p95"), absence: cell("none") },
       [{ type: "logs", name: "checkout_logs" }],

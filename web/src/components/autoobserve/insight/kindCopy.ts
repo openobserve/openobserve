@@ -33,6 +33,9 @@ import { logsForSources } from "./targets/logsTargets";
 import { notifyOf, teamOf } from "./targets/ownership";
 import type { BulkKind, BulkRow } from "./bulk/useBulkReview";
 import { addedNote, serviceKeyOf, useRecentlyCreated } from "./bulk/useRecentlyCreated";
+import { noMatchLine } from "./bulk/bulkCopy";
+import { knownMatch } from "./targets/scopeMatch";
+import type { ServiceScope } from "./bulk/bulkTargets";
 import { insightCtaLabel, type AiFinding, type CtaAction } from "./insightCta";
 import {
   destinationsTarget,
@@ -171,6 +174,10 @@ const streamOf = (row: AutoObserveCoverageRow, type: string) =>
 // Errors and no-data read rows, so a logs stream comes first and traces stand in when there are no logs.
 const rowStream = (row: AutoObserveCoverageRow) => streamOf(row, "logs") ?? streamOf(row, "traces");
 
+// Latency reads spans; errors and no-data read the row stream.
+const draftStream = (row: AutoObserveCoverageRow, kind: BulkKind) =>
+  kind === "latency" ? streamOf(row, "traces")! : rowStream(row)!;
+
 const scopeOf = (row: AutoObserveCoverageRow, stream: { type: string; name: string }) => ({
   service: row.service_name,
   ...(rowLabel.has(row) ? { label: rowLabel.get(row) } : {}),
@@ -212,16 +219,26 @@ const allDraftsOf = (row: AutoObserveCoverageRow, missing: GapClass[]): BulkKind
   return DRAFT_ORDER.filter((k) => kinds.includes(k));
 };
 
-/** A service's drafts split into those still to add and those added here that no pass has counted yet. */
-const draftsOf = (
-  org: string,
-  row: AutoObserveCoverageRow,
-  missing: GapClass[],
-): { open: BulkKind[]; added: BulkKind[] } => {
+interface DraftSplit {
+  open: BulkKind[];
+  added: BulkKind[];
+  /** Drafts whose filter keeps none of their stream's rows, so the alert could never fire. */
+  unmatched: BulkKind[];
+}
+
+const NO_DRAFTS: DraftSplit = { open: [], added: [], unmatched: [] };
+
+/** A service's drafts split into those still to add, those added here that no pass has counted yet, and those that match no rows. */
+const draftsOf = (org: string, row: AutoObserveCoverageRow, missing: GapClass[]): DraftSplit => {
   const key = serviceKeyOf(org, row.service_name, row.cluster, row.namespace);
   const all = allDraftsOf(row, missing);
   const added = all.filter((kind) => recently.has(key, kind));
-  return { open: all.filter((kind) => !added.includes(kind)), added };
+  const unmatched = all.filter(
+    (kind) =>
+      !added.includes(kind) && knownMatch(org, scopeOf(row, draftStream(row, kind))) === "none",
+  );
+  const open = all.filter((kind) => !added.includes(kind) && !unmatched.includes(kind));
+  return { open, added, unmatched };
 };
 
 const addedChip = (t: TranslateFn): NonNullable<KindCopy["chip"]> => ({
@@ -233,7 +250,7 @@ const addedChip = (t: TranslateFn): NonNullable<KindCopy["chip"]> => ({
 const bulkRow = (row: AutoObserveCoverageRow, kind: BulkKind): BulkRow => ({
   key: `${row.service_id}:${kind}`,
   kind,
-  scope: scopeOf(row, kind === "latency" ? streamOf(row, "traces")! : rowStream(row)!),
+  scope: scopeOf(row, draftStream(row, kind)),
   usually: null,
   ...ownership(row.service_name),
   ...(alertIdsOf(row).length ? { alertIds: alertIdsOf(row) } : {}),
@@ -294,7 +311,7 @@ const gapCopy = (
   const cells = cellsOf(s);
   const missing = GAP_CLASSES.filter((c) => cells[c]?.state !== "covered");
   const row = rowOf(t, s, ctx);
-  const split = row ? draftsOf(s.org, row, missing) : { open: [], added: [] };
+  const split = row ? draftsOf(s.org, row, missing) : NO_DRAFTS;
   const drafts = split.open;
   // Every draft was just added, so the card says so instead of offering them again.
   const added = !drafts.length && split.added.length > 0;
@@ -309,6 +326,11 @@ const gapCopy = (
       ? String(t("insight.kind.coverage_gap.next", { count: drafts.length }, drafts.length))
       : "",
     latencyBlocked ? String(t("insight.kind.coverage_gap.needsTraces")) : "",
+    row && split.unmatched.length
+      ? String(
+          noMatchLine(t, draftStream(row, split.unmatched[0]).name, rowLabel.get(row) ?? service),
+        )
+      : "",
   ].filter(Boolean);
   const cta = added
     ? null
@@ -797,6 +819,19 @@ const groupNames = (
   return { shown, named: listOf(zone.locale, [...shown, ...more], "conjunction") };
 };
 
+/** Every scope the gap cards would draft an alert on, so their rows can be checked before the cards count them. */
+export const gapDraftScopes = (
+  t: TranslateFn,
+  gaps: AutoObserveSuggestion[],
+  ctx: CtaContext,
+): ServiceScope[] =>
+  gaps.flatMap((s) => {
+    const row = s.kind === "coverage_gap" ? rowOf(t, s, ctx) : null;
+    if (!row) return [];
+    const missing = GAP_CLASSES.filter((c) => cellsOf(s)[c]?.state !== "covered");
+    return allDraftsOf(row, missing).map((kind) => scopeOf(row, draftStream(row, kind)));
+  });
+
 /** The one card for many coverage gaps: three names and a count, one review list, Review services and Ask AI. */
 export const gapGroupCopy = (
   t: TranslateFn,
@@ -808,7 +843,7 @@ export const gapGroupCopy = (
   const drafted = gaps.map((s) => {
     const row = rowOf(t, s, ctx);
     const missing = GAP_CLASSES.filter((c) => cellsOf(s)[c]?.state !== "covered");
-    return { s, row, ...(row ? draftsOf(s.org, row, missing) : { open: [], added: [] }) };
+    return { s, row, ...(row ? draftsOf(s.org, row, missing) : NO_DRAFTS) };
   });
   // A service with a just-added alert reads as watched on the coverage page, so the card stops counting it.
   const pending = drafted.filter((d) => !d.added.length);

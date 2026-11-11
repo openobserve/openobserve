@@ -135,6 +135,12 @@ const serviceScope = (s: ServiceScope): Scope => {
   return { where, warnings, blocked: false };
 };
 
+/** The filter a scoped alert puts on its stream, or null when the stream cannot be filtered to the service. */
+export const scopeWhereOf = (s: ServiceScope): string | null => {
+  const scope = serviceScope(s);
+  return scope.blocked ? null : scope.where.join(" AND ");
+};
+
 const errorPredicate = (pick: FieldPick): string => {
   const field = quoteField(pick.name);
   if (pick.kind === "span_status") return `${field} = 'ERROR'`;

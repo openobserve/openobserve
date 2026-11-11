@@ -32,7 +32,7 @@ export interface BaselineRequest {
   sql: string;
 }
 
-type Hit = Record<string, unknown>;
+export type Hit = Record<string, unknown>;
 
 const measured = new Map<string, { value: number; at: number }>();
 
@@ -79,11 +79,14 @@ export const measureBaseline = (
 /** Drops every kept level, so the next read measures again. */
 export const forgetBaselines = (): void => measured.clear();
 
-const readBaseline = (
+/** One aggregate query's rows over the 7 days before `end`; null when it failed or was stopped. */
+export const readHits = (
   org: string,
-  request: BaselineRequest,
+  streamType: string,
+  sql: string,
+  end: number,
   signal?: AbortSignal,
-): Promise<number | null> =>
+): Promise<Hit[] | null> =>
   new Promise((resolve) => {
     if (signal?.aborted) return resolve(null);
     const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
@@ -96,13 +99,12 @@ const readBaseline = (
       },
       { once: true },
     );
-    const end = Date.now() * 1000;
     let hits: Hit[] = [];
     void fetchQueryDataWithHttpStream(
       {
         queryReq: {
           query: {
-            sql: b64EncodeUnicode(request.sql),
+            sql: b64EncodeUnicode(sql),
             start_time: end - BASELINE_LOOKBACK_US,
             end_time: end,
             from: 0,
@@ -113,7 +115,7 @@ const readBaseline = (
         type: "search",
         traceId,
         org_id: org,
-        pageType: request.stream.type,
+        pageType: streamType,
         searchType: "ui",
       },
       {
@@ -124,7 +126,17 @@ const readBaseline = (
           hits = res.content?.streaming_aggs ? chunk : [...hits, ...chunk];
         },
         error: () => resolve(null),
-        complete: () => resolve(levelOf(request.kind, hits, end)),
+        complete: () => resolve(hits),
       },
     );
   });
+
+const readBaseline = async (
+  org: string,
+  request: BaselineRequest,
+  signal?: AbortSignal,
+): Promise<number | null> => {
+  const end = Date.now() * 1000;
+  const hits = await readHits(org, request.stream.type, request.sql, end, signal);
+  return hits ? levelOf(request.kind, hits, end) : null;
+};
