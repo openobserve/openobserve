@@ -54,7 +54,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OFormSection :title="t('alertCalibration.settings.runNowHeading')">
           <div class="flex flex-col gap-3">
-            <OText variant="body" as="p">{{ t("alertCalibration.runNowHint") }}</OText>
+            <OText v-if="canRun" variant="body" as="p">{{
+              t("alertCalibration.runNowHint")
+            }}</OText>
+            <p
+              v-else
+              class="text-text-secondary flex items-start gap-1.5 text-xs"
+              data-test="alert-calibration-settings-run-denied"
+            >
+              <OIcon name="lock" size="xs" class="mt-0.5 shrink-0" />
+              <span>{{ t("alertCalibration.runDenied") }}</span>
+            </p>
             <div v-if="canRun" class="flex flex-wrap items-center gap-3">
               <OButton
                 variant="outline"
@@ -94,6 +104,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { useOrgId } from "@/composables/query";

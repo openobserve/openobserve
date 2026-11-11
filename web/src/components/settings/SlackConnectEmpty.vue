@@ -74,6 +74,10 @@ const offered = computed(() =>
 );
 const addedDay = (micros: number): string =>
   new Intl.DateTimeFormat(locale.value, { dateStyle: "medium" }).format(micros / 1000);
+const addedTime = (micros: number): string =>
+  new Intl.DateTimeFormat(locale.value, { timeStyle: "short", hourCycle: "h23" }).format(
+    micros / 1000,
+  );
 // Only rows that share a name get a second line, so the usual single workspace keeps its layout.
 const offeredDetail = computed(() => {
   const detail = new Map<string, I18nText>();
@@ -83,15 +87,18 @@ const offeredDetail = computed(() => {
     const day = item.created_at ? addedDay(item.created_at) : null;
     const sameDay =
       day !== null && twins.some((o) => o.created_at && addedDay(o.created_at) === day);
-    if (day && sameDay && item.app_id)
-      detail.set(
-        item.installation_id,
-        t("slackApp.connect.addedOnApp", { date: raw(day), app: raw(item.app_id) }),
-      );
-    else if (day)
-      detail.set(item.installation_id, t("slackApp.connect.addedOn", { date: raw(day) }));
-    else if (item.app_id)
-      detail.set(item.installation_id, t("slackApp.connect.appId", { app: raw(item.app_id) }));
+    const added =
+      item.created_at && day
+        ? sameDay
+          ? t("slackApp.connect.addedOnAt", {
+              date: raw(day),
+              time: raw(addedTime(item.created_at)),
+            })
+          : t("slackApp.connect.addedOn", { date: raw(day) })
+        : null;
+    const app = item.app_name ? raw(item.app_name) : null;
+    const line = app && added ? t("slackApp.connect.appAndAdded", { app, added }) : (app ?? added);
+    if (line) detail.set(item.installation_id, line);
   }
   return detail;
 });

@@ -405,7 +405,8 @@ const useEnterpriseRoutes = () => {
         await facts.factsReady;
         return view;
       },
-      meta: { titleKey: "menu.autoobserve", allowOnEmptyData: true },
+      // Home, coverage, issues and What I've changed share this route but read different things.
+      meta: { titleKey: "menu.autoobserve", allowOnEmptyData: true, accessScopeQuery: ["page"] },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },

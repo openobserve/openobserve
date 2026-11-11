@@ -1031,5 +1031,13 @@ describe("useEnterpriseRoutes lazy loading", () => {
       config.default.isEnterprise = "true";
       expect(autoobserveRoutes().map((route: any) => route.name)).toContain("autoobserve");
     });
+
+    it("keeps each AutoObserve sub-page's access denials apart, so What I've changed never counts the home's (T3-N7)", async () => {
+      const config = await import("@/aws-exports");
+      config.default.isCloud = "false";
+      config.default.isEnterprise = "true";
+      const home = autoobserveRoutes().find((route: any) => route.name === "autoobserve");
+      expect(home.meta.accessScopeQuery).toEqual(["page"]);
+    });
   });
 });
