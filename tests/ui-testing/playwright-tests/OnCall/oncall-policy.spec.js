@@ -447,4 +447,65 @@ test.describe('On-call escalation policy editor', {
     expect(offered, 'both edges of the documented range must be reachable from the UI')
       .toEqual(expect.arrayContaining([BUDGET_MIN, BUDGET_MAX]));
   });
+
+  test('UN-02 SMS without Email warns and the save is held, while Webhook alone is fine', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    const name = uniqueName(`${workerPrefix(testInfo)}_tel_ticks`);
+    const { team } = await stageTeam(page, name, { memberCount: 1 });
+    const before = (await getPolicy(page, team.id)).rungs.find((rung) => rung.priority === 1);
+
+    await pm.oncallPolicyEditorPage.gotoEscalationTab(ORG, team.id);
+    await pm.oncallPolicyEditorPage.openEditor();
+    await pm.oncallPolicyEditorPage.selectPriority(1);
+    await pm.oncallPolicyEditorPage.setChannel(1, 'sms', true);
+    await pm.oncallPolicyEditorPage.setChannel(1, 'email', false);
+    testLogger.info('Expect the inline warning (D13, U4, guide 5)');
+    await pm.oncallPolicyEditorPage.expectPhoneWithoutEmailWarning(
+      'Texts and calls need Email too: people without a phone would get nothing.',
+    );
+
+    const refused = await pm.oncallPolicyEditorPage.savePolicyExpectingRefusal();
+    expect(refused === null || refused === 400, `the save must be refused, got HTTP ${refused}`).toBe(true);
+    await pm.oncallPolicyEditorPage.expectEditorVisible();
+    const after = (await getPolicy(page, team.id)).rungs.find((rung) => rung.priority === 1);
+    expect(after.channels, 'a refused save must leave the stored ticks alone').toEqual(before.channels);
+
+    await pm.oncallPolicyEditorPage.setChannel(1, 'sms', false);
+    await pm.oncallPolicyEditorPage.setChannel(1, 'voice', false);
+    await pm.oncallPolicyEditorPage.setChannel(1, 'webhook', true);
+    testLogger.info('Expect no warning for Webhook alone (D13)');
+    await pm.oncallPolicyEditorPage.expectNoPhoneWithoutEmailWarning();
+  });
+
+  test('UN-03 with no provider the Delivery tab says so, with the default ticks per priority', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    const name = uniqueName(`${workerPrefix(testInfo)}_tel_note`);
+    const { team } = await stageTeam(page, name, { memberCount: 1 });
+
+    await pm.oncallPolicyEditorPage.gotoEscalationTab(ORG, team.id);
+    const contact = await pm.oncallPolicyEditorPage.openEditorReadingContact();
+    expect(contact.phone_provider_available, 'the read the note hangs on').toBe(false);
+
+    await pm.oncallPolicyEditorPage.selectPriority(1);
+    testLogger.info('Expect the no-provider note and its link (guide 5)');
+    await pm.oncallPolicyEditorPage.expectNoProviderNote({
+      note: 'No phone provider is connected, so SMS and Voice are skipped and these pages go by email.',
+      link: /Connect one in Settings\s*(→|->)\s*Telephony/,
+    });
+
+    // o2-enterprise#3420 D6: the guide explains "Everyone paged" but the app dropped the hint, so the tab's words for it are not read.
+    testLogger.info('Expect P1 and P2 on all three, P3 on Email alone (D14, guide 5)');
+    for (const priority of [1, 2]) {
+      await pm.oncallPolicyEditorPage.selectPriority(priority);
+      await pm.oncallPolicyEditorPage.expectChannelTicked(priority, 'email', true);
+      await pm.oncallPolicyEditorPage.expectChannelTicked(priority, 'sms', true);
+      await pm.oncallPolicyEditorPage.expectChannelTicked(priority, 'voice', true);
+    }
+    await pm.oncallPolicyEditorPage.selectPriority(3);
+    await pm.oncallPolicyEditorPage.expectChannelTicked(3, 'email', true);
+    await pm.oncallPolicyEditorPage.expectChannelTicked(3, 'sms', false);
+    await pm.oncallPolicyEditorPage.expectChannelTicked(3, 'voice', false);
+  });
 });
