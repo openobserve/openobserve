@@ -62,7 +62,8 @@ test.describe("assistant gates", () => {
       "aria-label",
       "O2 Assistant, Enterprise and Cloud feature",
     );
-    await expect(assistant.v2Ids()).toHaveCount(0);
+    // The window layer's live region stays mounted on every edition so later announcements are heard.
+    await expect(assistant.v2Ids().and(page.locator(':not([role="status"])'))).toHaveCount(0);
     // WP-07: no object door renders on OSS, only the locked header button.
     await expect(page.locator('[data-test^="ai-entry-"]')).toHaveCount(0);
     await page.keyboard.press("ControlOrMeta+i");

@@ -896,6 +896,8 @@ jobs:
       - name: Start the Vite dev server against the binary
         env:
           VITE_OPENOBSERVE_ENDPOINT: http://localhost:5080
+          # Flows that do not rewrite the edition expect enterprise, and forceCloudBuild flips only isCloud.
+          VITE_OPENOBSERVE_ENTERPRISE: "true"
         run: |
           cd web && npm ci
           nohup npx vite --base /web/ --port 8093 --strictPort > ../vite.log 2>&1 &
