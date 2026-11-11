@@ -24,12 +24,8 @@ use super::{
 };
 use crate::alerts::notifications::{NotificationContext, resolve::RenderedContent};
 
-/// Adaptive Card TextBlocks render a small markdown subset and are NOT HTML —
-/// raw `<`/`&` are shown literally, so the escaping job here is to strip the
-/// markdown that Teams would misinterpret rather than to entity-encode.
-/// `markdown_to_plaintext` does exactly that: markup characters that came from
-/// authored markdown are consumed, and any characters that came from a data
-/// value are left as inert text.
+/// Body only: other surfaces hold raw values, and parsing them as markdown drops characters such as
+/// `>`.
 fn card_text(s: &str) -> String {
     markdown_to_plaintext(s)
 }
@@ -37,7 +33,7 @@ fn card_text(s: &str) -> String {
 pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext) -> Value {
     let mut body: Vec<Value> = vec![json!({
         "type": "TextBlock",
-        "text": card_text(&c.title),
+        "text": c.title,
         "weight": "Bolder",
         "size": "Large",
         "wrap": true,
@@ -54,7 +50,7 @@ pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext
         let facts: Vec<Value> = c
             .fields
             .iter()
-            .map(|(t, v)| json!({"title": card_text(t), "value": card_text(v)}))
+            .map(|(t, v)| json!({"title": t, "value": v}))
             .collect();
         body.push(json!({"type": "FactSet", "facts": facts}));
     }
@@ -63,7 +59,7 @@ pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext
         if !lines.is_empty() {
             body.push(json!({
                 "type": "TextBlock",
-                "text": lines.iter().map(|l| card_text(l)).collect::<Vec<_>>().join("\n\n"),
+                "text": lines.join("\n\n"),
                 "wrap": true,
             }));
         }
@@ -73,7 +69,7 @@ pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext
             .iter()
             .map(|row| {
                 row.iter()
-                    .map(|(k, v)| format!("{}: {}", card_text(k), card_text(v)))
+                    .map(|(k, v)| format!("{k}: {v}"))
                     .collect::<Vec<_>>()
                     .join(" · ")
             })
@@ -92,7 +88,7 @@ pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext
         body.push(json!({
             "type": "Image",
             "url": chart_url,
-            "altText": card_text(&c.title),
+            "altText": c.title,
         }));
     }
 
@@ -107,7 +103,7 @@ pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext
             let is_default_link = label.is_empty();
             let mut action = json!({
                 "type": "Action.OpenUrl",
-                "title": if is_default_link { DEFAULT_LINK_LABEL.to_string() } else { card_text(label) },
+                "title": if is_default_link { DEFAULT_LINK_LABEL.to_string() } else { label.clone() },
                 "url": url,
             });
             // Mirrors the Slack "primary"-style fix: the default
@@ -140,7 +136,7 @@ pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext
 pub fn render_teams_message_card(c: &RenderedContent) -> Value {
     // MessageCard `text` and `activityTitle` ARE rendered as HTML-ish markup
     // by the O365 connector, so values must be entity-encoded here.
-    let title = escape_html(&card_text(&c.title));
+    let title = escape_html(&c.title);
 
     let mut section = json!({
         "activityTitle": title,

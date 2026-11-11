@@ -293,6 +293,30 @@ pub fn markdown_to_html(md: &str) -> String {
             e
         }
         Event::Text(t) if in_code_block => Event::Text(unescape_markdown_source(&t).into()),
+        // Body links get the same scheme rule as the Links list, so `javascript:` never reaches an
+        // href.
+        Event::Start(Tag::Link {
+            link_type,
+            dest_url,
+            title,
+            id,
+        }) => Event::Start(Tag::Link {
+            link_type,
+            dest_url: super::safe_url(&dest_url).to_string().into(),
+            title,
+            id,
+        }),
+        Event::Start(Tag::Image {
+            link_type,
+            dest_url,
+            title,
+            id,
+        }) => Event::Start(Tag::Image {
+            link_type,
+            dest_url: super::safe_url(&dest_url).to_string().into(),
+            title,
+            id,
+        }),
         other => other,
     });
     let mut html = String::new();

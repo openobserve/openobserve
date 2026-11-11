@@ -44,6 +44,9 @@ use super::{context::NotificationContext, custom::scan_and_replace_var};
 /// Never blank, never literal braces.
 pub const UNMATCHED_MARKER: &str = "–";
 
+/// Families whose renderers send the body as plain text, so escaped values would show backslashes.
+const PLAIN_TEXT_BODY_FAMILIES: [&str; 3] = ["opsgenie", "pagerduty", "servicenow"];
+
 /// Fully resolved, still-raw content for one channel render.
 pub struct RenderedContent {
     /// Per-channel override already applied.
@@ -86,7 +89,11 @@ pub fn resolve_content(
     // markdown STRUCTURE into the author's document. Title, fields, links and
     // rows are NOT markdown-parsed and are deliberately left raw — escaping
     // them would surface literal backslashes to users.
-    let (body_markdown, mut unk) = substitute_markdown_body(&spec.body, ctx);
+    let (body_markdown, mut unk) = if PLAIN_TEXT_BODY_FAMILIES.contains(&channel_family) {
+        substitute_raw(&spec.body, ctx)
+    } else {
+        substitute_markdown_body(&spec.body, ctx)
+    };
     unknown_variables.append(&mut unk);
 
     let mut fields = Vec::new();
@@ -177,6 +184,11 @@ pub fn resolve_content(
         severity: ctx.level,
         unknown_variables,
     }
+}
+
+/// The body with markdown-escaped values, for surfaces that parse it as markdown on any family.
+pub fn escaped_body_markdown(spec: &ContentSpec, ctx: &NotificationContext) -> String {
+    substitute_markdown_body(&spec.body, ctx).0
 }
 
 /// Substitute `{var}` / `{var:N}` in `input` against a single row's full
