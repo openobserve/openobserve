@@ -98,6 +98,7 @@ pub const GEN_AI_UDS_KEEP_FIELDS: &[&str] = &[
     "gen_ai_usage_cost_net_cache_impact",
     // product reads outside the provisioned canonical set
     "gen_ai_system",
+    "gen_ai_model_name",
     "gen_ai_tool_call_id",
     "gen_ai_tool_call_arguments",
     "gen_ai_tool_call_result",
@@ -112,6 +113,20 @@ pub const GEN_AI_UDS_KEEP_FIELDS: &[&str] = &[
     "llm_input",
     "llm_output",
     "llm_usage_tokens_total",
+    "llm_request_parameters",
+    "llm_tool_call_id",
+    "llm_observation_type",
+    "llm_evaluation_quality_score",
+    "llm_evaluation_relevance",
+    "llm_evaluation_completeness",
+    "llm_evaluation_tool_effectiveness",
+    "llm_evaluation_groundedness",
+    "llm_evaluation_safety",
+    "llm_evaluation_duration_ms",
+    "llm_evaluation_commentary",
+    "llm_evaluator_name",
+    "llm_evaluator_version",
+    "llm_evaluator_type",
 ];
 
 /// Arrow columns provisioned on LLM streams, named per OTEL Gen-AI semconv after flattening.

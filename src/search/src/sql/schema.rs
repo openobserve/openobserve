@@ -43,66 +43,78 @@ pub fn generate_select_star_schema(
     for (name, schema) in schemas {
         let stream_settings = unwrap_stream_settings(schema.schema());
         let defined_schema_fields = get_stream_setting_defined_schema_fields(&stream_settings);
-        let uds_fields = effective_uds_fields(stream_type, &defined_schema_fields);
+        let table_type = name.get_stream_type(stream_type);
+        let uds_fields = effective_uds_fields(table_type, &defined_schema_fields);
+        // required names the schema lacks must not inflate the width decision
+        let uds_present: HashSet<String> = uds_fields
+            .iter()
+            .filter(|field| schema.contains_field(field))
+            .cloned()
+            .collect();
         let has_original_column = *has_original_column.get(&name).unwrap_or(&false);
         let need_all_column = columns
             .get(&name)
             .map(|cols| cols.contains(&cfg.common.column_all))
             .unwrap_or(false);
-        // check if it is user defined schema
-        if defined_schema_fields.is_empty() || uds_fields.len() > quick_mode_num_fields {
-            let quick_mode = quick_mode && schema.schema().fields().len() > quick_mode_num_fields;
-            // don't automatically skip _original for scheduled pipeline searches
-            let skip_original_column = !has_original_column
-                && !matches!(search_event_type, Some(SearchEventType::DerivedStream))
-                && (schema.contains_field(ORIGINAL_DATA_COL_NAME)
-                    || schema.contains_field(ALL_VALUES_COL_NAME));
-            if quick_mode || skip_original_column {
-                let fields = if quick_mode {
-                    let mut columns = columns.get(&name).cloned();
-                    // filter columns by the effective UDS fields
-                    if !defined_schema_fields.is_empty()
-                        && let Some(columns) = columns.as_mut()
-                    {
-                        columns.retain(|column| uds_fields.contains(column));
-                    }
-                    let fts_fields = get_stream_setting_fts_fields(&stream_settings);
-                    generate_quick_mode_fields(
-                        schema.schema(),
-                        columns,
-                        &fts_fields,
-                        skip_original_column,
-                        need_fst_fields,
-                        name.get_stream_type(stream_type),
-                    )
-                } else {
-                    // skip selecting "_original" column if `SELECT * ...`
-                    let mut fields = schema.schema().fields().iter().cloned().collect::<Vec<_>>();
-                    if !need_fst_fields {
-                        fields.retain(|field| {
-                            field.name() != ORIGINAL_DATA_COL_NAME
-                                && field.name() != ALL_VALUES_COL_NAME
-                        });
-                    }
-                    fields
-                };
-                let schema = Arc::new(SchemaCache::new(
-                    Schema::new(fields).with_metadata(schema.schema().metadata().clone()),
-                ));
-                used_schemas.insert(name, schema);
-            } else {
-                used_schemas.insert(name, schema);
-            }
-        } else {
+        let quick_active = quick_mode && schema.schema().fields().len() > quick_mode_num_fields;
+        // a wide effective schema only leaves the UDS projection when quick mode truncates it
+        if !defined_schema_fields.is_empty()
+            && !(uds_present.len() > quick_mode_num_fields && quick_active)
+        {
             used_schemas.insert(
                 name,
                 generate_user_defined_schema(
                     schema.as_ref(),
-                    stream_type,
+                    table_type,
                     defined_schema_fields,
                     need_all_column,
                 ),
             );
+            continue;
+        }
+        // don't automatically skip _original for scheduled pipeline searches
+        let skip_original_column = !has_original_column
+            && !matches!(search_event_type, Some(SearchEventType::DerivedStream))
+            && (schema.contains_field(ORIGINAL_DATA_COL_NAME)
+                || schema.contains_field(ALL_VALUES_COL_NAME));
+        if quick_active || skip_original_column {
+            let fields = if quick_active {
+                let mut columns = columns.get(&name).cloned();
+                // filter columns by the effective UDS fields present in the schema
+                if !defined_schema_fields.is_empty()
+                    && let Some(columns) = columns.as_mut()
+                {
+                    columns.retain(|column| {
+                        uds_present.contains(column)
+                            || (need_all_column && column == cfg.common.column_all.as_str())
+                    });
+                }
+                let fts_fields = get_stream_setting_fts_fields(&stream_settings);
+                generate_quick_mode_fields(
+                    schema.schema(),
+                    columns,
+                    &fts_fields,
+                    skip_original_column,
+                    need_fst_fields,
+                    table_type,
+                )
+            } else {
+                // skip selecting "_original" column if `SELECT * ...`
+                let mut fields = schema.schema().fields().iter().cloned().collect::<Vec<_>>();
+                if !need_fst_fields {
+                    fields.retain(|field| {
+                        field.name() != ORIGINAL_DATA_COL_NAME
+                            && field.name() != ALL_VALUES_COL_NAME
+                    });
+                }
+                fields
+            };
+            let schema = Arc::new(SchemaCache::new(
+                Schema::new(fields).with_metadata(schema.schema().metadata().clone()),
+            ));
+            used_schemas.insert(name, schema);
+        } else {
+            used_schemas.insert(name, schema);
         }
     }
     used_schemas
@@ -746,23 +758,98 @@ mod tests {
             defined.push(name);
         }
         fields.push(Arc::new(Field::new("trace_id", DataType::Utf8, true)));
+        fields.push(Arc::new(Field::new("packed_col", DataType::Utf8, true)));
+        let settings = config::meta::stream::StreamSettings {
+            defined_schema_fields: defined,
+            ..Default::default()
+        };
+        let metadata = std::collections::HashMap::from([(
+            "settings".to_string(),
+            config::utils::json::to_string(&settings).unwrap(),
+        )]);
         let name = TableReference::bare("profiles_stream");
-        let mut schemas = HashMap::new();
-        schemas.insert(
-            name.clone(),
-            Arc::new(SchemaCache::new(Schema::new(fields))),
-        );
+        let schema = Arc::new(SchemaCache::new(Schema::new_with_metadata(
+            fields, metadata,
+        )));
         let mut columns = HashMap::new();
         let mut requested = HashSet::new();
         requested.insert("trace_id".to_string());
         columns.insert(name.clone(), requested);
 
-        let result = generate_select_star_schema(
+        let mut schemas = HashMap::new();
+        schemas.insert(name.clone(), schema.clone());
+        let quick = generate_select_star_schema(
             schemas,
             &columns,
             HashMap::new(),
             true,
             StreamType::Profiles,
+            &None,
+            false,
+        );
+        let names: HashSet<_> = quick[&name]
+            .schema()
+            .fields()
+            .iter()
+            .map(|f| f.name().to_string())
+            .collect();
+        assert!(names.contains("trace_id"));
+        // saved + required crosses the cutoff, so quick mode truncates the saved tail
+        assert!(!names.contains(&format!("user_field_{}", cutoff - 1)));
+
+        let mut schemas = HashMap::new();
+        schemas.insert(name.clone(), schema);
+        let full = generate_select_star_schema(
+            schemas,
+            &columns,
+            HashMap::new(),
+            false,
+            StreamType::Profiles,
+            &None,
+            false,
+        );
+        let names: HashSet<_> = full[&name]
+            .schema()
+            .fields()
+            .iter()
+            .map(|f| f.name().to_string())
+            .collect();
+        // quick mode off: the UDS projection still applies, packed columns stay hidden
+        assert!(names.contains("trace_id"));
+        assert!(names.contains(&format!("user_field_{}", cutoff - 1)));
+        assert!(!names.contains("packed_col"));
+    }
+
+    #[test]
+    fn test_select_star_uses_table_stream_type_for_uds() {
+        let fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            Arc::new(Field::new("service_name", DataType::Utf8, true)),
+            Arc::new(Field::new("trace_id", DataType::Utf8, true)),
+        ];
+        let settings = config::meta::stream::StreamSettings {
+            defined_schema_fields: vec!["service_name".to_string()],
+            ..Default::default()
+        };
+        let metadata = std::collections::HashMap::from([(
+            "settings".to_string(),
+            config::utils::json::to_string(&settings).unwrap(),
+        )]);
+        let name = TableReference::partial("profiles", "p");
+        let mut schemas = HashMap::new();
+        schemas.insert(
+            name.clone(),
+            Arc::new(SchemaCache::new(Schema::new_with_metadata(
+                fields, metadata,
+            ))),
+        );
+
+        let result = generate_select_star_schema(
+            schemas,
+            &HashMap::new(),
+            HashMap::new(),
+            false,
+            StreamType::Logs,
             &None,
             false,
         );
@@ -774,7 +861,6 @@ mod tests {
             .map(|f| f.name().to_string())
             .collect();
         assert!(names.contains("trace_id"));
-        // saved + required crosses the cutoff, so quick mode truncates the saved tail
-        assert!(!names.contains(&format!("user_field_{}", cutoff - 1)));
+        assert!(names.contains("service_name"));
     }
 }
