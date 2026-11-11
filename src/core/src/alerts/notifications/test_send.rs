@@ -471,9 +471,8 @@ mod tests {
     }
 
     /// Requests that fail before dispatch do not use the caller's test-send quota.
-    // The guard only serializes tests that share RATE_LIMITER. This test runs
-    // on the single-threaded tokio test runtime, and no other task takes the
-    // lock while it awaits, so holding it across the await cannot deadlock.
+    // The guard only serializes tests; this single-threaded test has no other
+    // task that takes it, so holding it across the await cannot deadlock.
     #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn an_invalid_draft_or_a_platform_skip_does_not_count_against_the_limit() {
