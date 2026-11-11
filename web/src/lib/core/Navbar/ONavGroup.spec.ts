@@ -2062,6 +2062,41 @@ describe("ONavGroup", () => {
       expect(document.activeElement).toBe(tile());
     });
 
+    it("Enter on an item returns focus to the tile when the click has detail 1 (Firefox)", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const item = firstItem();
+      (item.element as HTMLElement).focus();
+      await item.trigger("keydown", { key: "Enter" });
+      click(item.element, 1);
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).toBe(tile());
+    });
+
+    it("Enter on the group tile leaves no flyout open when the click has detail 1 (Firefox)", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const tileEl = wrapper.find('[data-test="tile"]');
+      await tileEl.trigger("keydown", { key: "Enter" });
+      click(tileEl.element, 1);
+      await flushPromises();
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+    });
+
+    it("a mouse click after an arrow-key move is still a mouse choice", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const item = firstItem();
+      (item.element as HTMLElement).focus();
+      await item.trigger("keydown", { key: "ArrowDown" });
+      click(item.element, 1);
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).not.toBe(tile());
+    });
+
     it("a mouse choice closes the flyout but never moves focus to the tile", async () => {
       wrapper = mountGroup(true);
       await hoverOpen();

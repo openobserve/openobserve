@@ -539,7 +539,21 @@ function scheduleClose(event?: MouseEvent) {
   closeTimer = setTimeout(tryClose, CLOSE_DELAY);
 }
 
+// Firefox reports Enter on a link as a click with detail 1, so the keydown is the reliable signal.
+let activatedByKey = false;
+
+function noteActivationKey(event: KeyboardEvent) {
+  activatedByKey = event.key === "Enter" || event.key === " ";
+}
+
+function isKeyboardActivation(event?: MouseEvent): boolean {
+  const byKey = activatedByKey || event?.detail === 0;
+  activatedByKey = false;
+  return byKey;
+}
+
 function onTriggerClick() {
+  activatedByKey = false;
   if (isPinned.value) {
     close();
   } else {
@@ -548,9 +562,9 @@ function onTriggerClick() {
   }
 }
 
-// detail 0 is a keyboard activation: Enter navigates, so nothing should stay open.
+// A keyboard activation navigates, so nothing should stay open.
 function onLinkClick(event?: MouseEvent) {
-  if (event?.detail === 0) {
+  if (isKeyboardActivation(event)) {
     close();
     return;
   }
@@ -587,6 +601,7 @@ watch(openGroupKey, (key) => {
 });
 
 function onDocumentPointerDown(event: PointerEvent) {
+  activatedByKey = false;
   const target = event.target as Node;
   if (wrapperRef.value?.contains(target) || flyoutRef.value?.contains(target)) {
     return;
@@ -653,6 +668,7 @@ function onFlyoutTab(event: KeyboardEvent) {
 }
 
 function onFlyoutKeydown(event: KeyboardEvent) {
+  noteActivationKey(event);
   if (event.key === "Tab") {
     onFlyoutTab(event);
     return;
@@ -693,8 +709,9 @@ function onFlyoutKeydown(event: KeyboardEvent) {
 // The flyout is teleported, so the rail's capture listener never sees this click.
 const markRailNavigation = inject(RailNavigationMarkKey, null);
 
-// Keyboard choice (detail 0) returns focus to the tile; a mouse choice leaves it to the page.
+// A keyboard choice returns focus to the tile; a mouse choice leaves it to the page.
 function onChildClick(event: MouseEvent, child: SubnavChild) {
+  const byKey = isKeyboardActivation(event);
   if (child.locked) {
     event.preventDefault();
     close();
@@ -703,7 +720,7 @@ function onChildClick(event: MouseEvent, child: SubnavChild) {
   }
   markRailNavigation?.(event);
   close();
-  if (event.detail === 0) nextTick(() => focusTile());
+  if (byKey) nextTick(() => focusTile());
 }
 
 // Focus the hovered item so Enter activates it natively — but never yank
@@ -723,6 +740,7 @@ function onChildMouseenter(event: MouseEvent) {
     @mouseenter="scheduleOpen"
     @mouseleave="scheduleClose"
     @mousemove="onTileMousemove"
+    @keydown="noteActivationKey"
   >
     <!-- Link mode: a navigating MenuLink that also reveals sub-pages on hover.
          `active` is driven by "is any child active" so a group tile (e.g. Data,
