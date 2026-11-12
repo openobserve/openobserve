@@ -82,9 +82,7 @@ impl Link {
         self.role != LinkRole::Authored
     }
 
-    /// The label a human-facing channel shows; an empty one reads [`DEFAULT_LINK_LABEL`].
-    ///
-    /// [`DEFAULT_LINK_LABEL`]: super::render::DEFAULT_LINK_LABEL
+    /// The label a human-facing channel shows; an empty one reads the channel default.
     pub fn display_label(&self) -> &str {
         if self.label.is_empty() {
             super::render::DEFAULT_LINK_LABEL

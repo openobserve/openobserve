@@ -102,16 +102,34 @@ pub fn render_discord(c: &RenderedContent, ctx: &NotificationContext) -> Value {
         .filter(|(i, _)| Some(*i) != primary)
         .map(|(_, l)| l)
         .collect();
-    if !extra_links.is_empty() {
-        let extra_text = extra_links
+    let mut parts: Vec<(bool, String)> = extra_links
+        .iter()
+        .map(|link| {
+            let text = format!(
+                "[{}]({})",
+                escape_discord_markdown(link.display_label()),
+                safe_url(&link.url)
+            );
+            (link.reserved, text)
+        })
+        .collect();
+    // Authored links drop from the end first, so the object link survives long authored URLs.
+    let width = |parts: &[(bool, String)]| {
+        parts
             .iter()
-            .map(|link| {
-                format!(
-                    "[{}]({})",
-                    escape_discord_markdown(link.display_label()),
-                    safe_url(&link.url)
-                )
-            })
+            .map(|(_, t)| t.chars().count() + 3)
+            .sum::<usize>()
+    };
+    while width(&parts) > DESCRIPTION_MAX {
+        let Some(i) = parts.iter().rposition(|(reserved, _)| !reserved) else {
+            break;
+        };
+        parts.remove(i);
+    }
+    if !parts.is_empty() {
+        let extra_text = parts
+            .into_iter()
+            .map(|(_, t)| t)
             .collect::<Vec<_>>()
             .join(" · ");
         // The body yields room first, so a long body cannot push the object link out.

@@ -26,6 +26,12 @@ use crate::alerts::notifications::{
 
 const ALERT_URL: &str = "https://o2.acme.com/web/short/ab12";
 const DETAIL_URL: &str = "https://o2.acme.com/web/alerts/detail/7Kx2?org_identifier=acme";
+const BUTTON_FORMATS: [ChannelFormat; 4] = [
+    ChannelFormat::Slack,
+    ChannelFormat::TeamsAdaptiveCard,
+    ChannelFormat::TeamsMessageCard,
+    ChannelFormat::PagerDuty,
+];
 
 fn alert_ctx() -> NotificationContext {
     let mut ctx = synthetic_context(Some(config::meta::alerts::level::AlertLevel::Critical));
@@ -123,13 +129,6 @@ fn system_buttons(format: ChannelFormat, v: &Value) -> Vec<(String, String)> {
         other => panic!("{other:?} has no button list"),
     }
 }
-
-const BUTTON_FORMATS: [ChannelFormat; 4] = [
-    ChannelFormat::Slack,
-    ChannelFormat::TeamsAdaptiveCard,
-    ChannelFormat::TeamsMessageCard,
-    ChannelFormat::PagerDuty,
-];
 
 #[test]
 fn an_alert_shows_the_data_button_then_the_object_button_on_every_button_channel() {
@@ -438,4 +437,18 @@ fn slack_overflow_links_escape_their_url_for_mrkdwn() {
         context.last().unwrap()["elements"][0]["text"],
         "<https://wiki/a?x=1&amp;y=%3C2%3E%7Cz|D\u{ff5c}E>"
     );
+}
+
+#[test]
+fn long_authored_urls_never_push_the_object_link_out_of_discord() {
+    let long = format!("https://wiki/{}", "a".repeat(1_500));
+    let links = [
+        ("A", long.as_str()),
+        ("B", long.as_str()),
+        ("C", long.as_str()),
+    ];
+    let v = rendered(ChannelFormat::Discord, &alert_ctx(), &links);
+    let description = v["embeds"][0]["description"].as_str().unwrap();
+    assert!(description.chars().count() <= 4_096);
+    assert!(description.ends_with(&format!("[Open alert]({DETAIL_URL})")));
 }

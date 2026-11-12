@@ -534,14 +534,21 @@ fn open_label(ctx: &NotificationContext) -> String {
     }
 }
 
-/// The object button, unless a button of the custom body already opens that page.
+/// The object button; a custom button to that page takes the slot, so trimming cannot drop it.
 fn set_custom_detail(wire: &mut RenderedWire, ctx: &NotificationContext) {
     let Some(url) = detail_url(ctx) else {
         return;
     };
-    if wire.links.iter().all(|(_, u)| u.trim() != url) {
-        wire.detail_url = url.to_string();
-        wire.detail_label = ctx.alert_detail_label.clone();
+    match wire.links.iter().position(|(_, u)| u.trim() == url) {
+        Some(i) => {
+            let (label, own) = wire.links.remove(i);
+            wire.detail_url = own;
+            wire.detail_label = label;
+        }
+        None => {
+            wire.detail_url = url.to_string();
+            wire.detail_label = ctx.alert_detail_label.clone();
+        }
     }
 }
 
@@ -1346,7 +1353,9 @@ mod tests {
             ctx.alert_detail_url
         );
         let own = wire_from_custom(&body, &ctx);
-        assert!(own.detail_url.is_empty(), "{own:?}");
+        assert!(own.links.is_empty(), "{own:?}");
+        assert_eq!(own.detail_url, ctx.alert_detail_url);
+        assert_eq!(own.detail_label, "Mine");
     }
 
     #[test]

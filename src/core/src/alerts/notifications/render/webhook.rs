@@ -59,12 +59,8 @@
 //!
 //! [`DEFAULT_LINK_LABEL`]: super::DEFAULT_LINK_LABEL
 //!
-//! # Contract: the object link is in `context`, not in `links[]`
-//!
-//! `context.alert_url_label`, `context.alert_detail_url` and `context.alert_detail_label` name the
-//! data button and the page of the object that sent the message. They are additive keys, `null`
-//! when empty, so the envelope version stays 1. `links[]` keeps authored links and the empty-label
-//! alert link only, because a labelled system link would break the rule above.
+//! The object link is only in `context` (`alert_detail_url`, `alert_detail_label`, additive, null
+//! when empty), because a labelled system link in `links[]` would break the rule above.
 
 use serde_json::{Map, Value, json};
 

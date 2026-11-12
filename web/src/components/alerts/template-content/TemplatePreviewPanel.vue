@@ -588,6 +588,10 @@ const slackHiddenLinks = computed<string[]>(() => {
       if (el.url) shown.set(el.url, (shown.get(el.url) ?? 0) + 1);
     }
   }
+  for (const system of [previewModel.value.footer, previewModel.value.detail?.url]) {
+    const left = system ? (shown.get(system) ?? 0) : 0;
+    if (system && left > 0) shown.set(system, left - 1);
+  }
   return previewModel.value.links
     .filter((link) => {
       const left = shown.get(link.url) ?? 0;
