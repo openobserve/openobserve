@@ -59,6 +59,7 @@ export class AlertTemplatesPage {
         this.headerCheckbox = '[data-test="o2-table-select-all"]';
         this.addTemplateTitle = '[data-test="add-template-title"]';
         this.templateCancelBtn = '[data-test="add-template-cancel-btn"]';
+        this.toastDismissBtn = '[data-test="o-toast-dismiss"]';
         // Editor drafts: Cancel with unsaved changes opens the shared leave dialog
         this.draftLeaveDialog = '[data-test="editor-draft-leave-dialog"]';
         this.draftLeaveDiscardBtn = '[data-test="editor-draft-leave-dialog"] [data-test="o-dialog-neutral-btn"]';
@@ -1233,7 +1234,20 @@ export class AlertTemplatesPage {
         await this.page.waitForTimeout(2000);
     }
 
+    // Polls rather than loops over a count because a toast can auto-dismiss between the check and the click.
+    async dismissVisibleToasts() {
+        const closers = this.page.locator(this.toastDismissBtn).filter({ visible: true });
+        await expect(async () => {
+            if (await closers.count() > 0) {
+                await closers.first().click({ timeout: 2000 });
+            }
+            await expect(closers).toHaveCount(0, { timeout: 500 });
+        }).toPass({ timeout: 15000 });
+    }
+
     async clickTemplateCancelBtn() {
+        // Validation toasts sit over the form footer and a hovering mouse pauses their auto-dismiss timer.
+        await this.dismissVisibleToasts();
         await this.page.locator(this.templateCancelBtn).click();
         // Unsaved changes are discarded through the leave dialog so no draft is left behind.
         const asked = await this.page.locator(this.draftLeaveDialog)
