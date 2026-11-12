@@ -5,6 +5,7 @@
     "browser": "chrome",
     "run_files": [
       "alerts-help-drawer.spec.js",
+      "alerts-firing-tab.spec.js",
       "alerts-import.spec.js",
       "alerts-metrics-notification.spec.js",
       "dl-email-destinations.spec.js",
