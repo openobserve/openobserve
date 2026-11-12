@@ -98,7 +98,7 @@ const stateClasses = computed<string>(() => {
     return [
       "text-tabs-active-text cursor-not-allowed opacity-60",
       isVertical.value
-        ? "bg-tabs-active-bg before:bg-tabs-indicator before:absolute before:inset-y-1.5 before:start-0 before:w-1 before:rounded-full"
+        ? "bg-tabs-active-bg ring-tabs-indicator ring-1 ring-inset"
         : "border-b-2 border-transparent",
     ].join(" ");
   }
