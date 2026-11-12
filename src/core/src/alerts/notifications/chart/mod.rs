@@ -150,6 +150,13 @@ async fn fetch_series(org_id: &str, alert_id: &str, lookback_secs: u64) -> Optio
         return None;
     }
 
+    // A stream re-created after a delete lacks the column until a row carried it.
+    crate::self_reporting::triggers_schema::get(org_id)
+        .await
+        .ok()?
+        .field_with_name("actual_value")
+        .ok()?;
+
     let end_time = config::utils::time::now_micros();
     let start_time = end_time - (lookback_secs as i64) * 1_000_000;
     let sql = format!(
