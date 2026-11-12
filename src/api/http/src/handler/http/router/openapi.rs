@@ -1460,6 +1460,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::autoobserve::entity_types,
     openobserve_api_management::request::autoobserve::coverage,
     openobserve_api_management::request::autoobserve::coverage_history,
+    openobserve_api_management::request::autoobserve::writable_folders,
     openobserve_api_management::request::autoobserve::stream_volume,
     openobserve_api_management::request::autoobserve::suggestions,
     openobserve_api_management::request::autoobserve::decisions::preview_decision,

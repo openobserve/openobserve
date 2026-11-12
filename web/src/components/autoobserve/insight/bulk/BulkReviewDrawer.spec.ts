@@ -47,6 +47,9 @@ vi.mock("@/services/alerts", () => ({
   },
 }));
 vi.mock("@/services/common", () => ({ default: { list_Folders: api.folders } }));
+vi.mock("@/services/autoobserveFolders", () => ({
+  default: { writable: async () => ({ data: { folders: {} } }) },
+}));
 vi.mock("@/services/alert_destination", () => ({ default: { list: api.destinations } }));
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: api.copy }));
 vi.mock("@/services/stream", () => ({ default: { schema: api.schema } }));
