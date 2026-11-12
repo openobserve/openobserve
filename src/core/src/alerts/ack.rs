@@ -919,8 +919,14 @@ async fn firing_incident_checked(org_id: &str, alert_id: &str) -> Result<Option<
     if episode.is_some() {
         return Ok(episode);
     }
+    // A converted alert keeps its old incident open beside one of its current kind.
+    let cases = if db::alerts::alert::any_siem_alert(org_id, [alert_id]).await {
+        infra::table::alert_incidents::CaseFilter::OnlyCases
+    } else {
+        infra::table::alert_incidents::CaseFilter::NoCases
+    };
     Ok(
-        infra::table::alert_incidents::find_open_incident_containing_alert(org_id, alert_id)
+        infra::table::alert_incidents::find_open_incident_containing_alert(org_id, alert_id, cases)
             .await?
             .map(|m| m.id),
     )
@@ -2774,5 +2780,85 @@ mod tests {
             siem_evaluates_through_silence(&alert),
             cfg!(feature = "enterprise")
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_converted_alerts_firing_incident_is_the_one_of_its_current_kind() {
+        use infra::table::alert_incidents::{
+            CaseActivity, add_alert_to_incident, add_firing_to_case, create, create_security_case,
+        };
+        use sea_orm::ConnectionTrait;
+
+        let _db = crate::alerts::rca_runs::tests::db().await;
+        let conn = infra::db::get_orm_client_rw().await;
+        let backend = conn.get_database_backend();
+        let states = sea_orm::Schema::new(backend)
+            .create_table_from_entity(infra::table::entity::alert_states::Entity)
+            .if_not_exists()
+            .to_owned();
+        conn.execute(backend.build(&states)).await.unwrap();
+        let org = format!("ack_kind_{}", config::ider::uuid());
+        let ops = create(&org, "P3", serde_json::json!({}), "AlertId", 1, None)
+            .await
+            .unwrap();
+        add_alert_to_incident(&ops.id, "converted", "a", "internal", 1, "alert_id")
+            .await
+            .unwrap();
+        let activity = CaseActivity {
+            first_event_at: 2,
+            last_event_at: 2,
+            historical: false,
+        };
+        let case = create_security_case(
+            &org,
+            "P2",
+            serde_json::json!({}),
+            "AlertId",
+            activity,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        add_firing_to_case(
+            &case.id,
+            "converted",
+            "a",
+            "internal",
+            2,
+            "alert_id",
+            activity,
+        )
+        .await
+        .unwrap();
+
+        let plant = |siem: bool| {
+            let mut alert = config::meta::alerts::alert::Alert::default();
+            alert.org_id.clone_from(&org);
+            alert.context_attributes = siem.then(|| {
+                [(
+                    config::meta::alerts::alert::SIEM_ATTRIBUTE.to_string(),
+                    "true".to_string(),
+                )]
+                .into_iter()
+                .collect()
+            });
+            alert
+        };
+        for (siem, want) in [(true, &case.id), (false, &ops.id)] {
+            common::infra::config::ALERTS.write().await.insert(
+                db::alerts::alert::cache_alert_key(&org, "converted"),
+                (Default::default(), plant(siem)),
+            );
+            assert_eq!(
+                firing_incident_checked(&org, "converted")
+                    .await
+                    .unwrap()
+                    .as_ref(),
+                Some(want),
+                "siem={siem}"
+            );
+        }
     }
 }

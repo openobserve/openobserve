@@ -1852,6 +1852,7 @@ pub async fn try_auto_resolve_incident_for_external_alert(
     let Some(incident) = infra::table::alert_incidents::find_open_incident_containing_alert(
         org_id,
         external_alert_id,
+        infra::table::alert_incidents::CaseFilter::All,
     )
     .await?
     else {
@@ -2755,7 +2756,11 @@ async fn select_correlation_candidate<C: sea_orm::ConnectionTrait>(
         else {
             continue;
         };
-        if incident.status != "resolved" && candidate_can_join(&incident.group_values, incoming) {
+        // The projection may predate a manual attach that made this row a case.
+        if incident.status != "resolved"
+            && !incident.security_case
+            && candidate_can_join(&incident.group_values, incoming)
+        {
             return Ok(Some(incident));
         }
     }
@@ -8311,6 +8316,37 @@ mod tests {
                 .unwrap();
             assert_eq!(found.id, "older");
         }
+    }
+
+    #[tokio::test]
+    async fn an_ops_firing_skips_a_candidate_marked_a_case_after_its_projection() {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ActiveModelTrait, Set};
+
+        let db = correlation_db().await;
+        let row = store_correlation_incident(
+            &db,
+            "promoted",
+            1,
+            serde_json::json!({"service": "node-exporter"}),
+        )
+        .await;
+        let candidates = infra::table::alert_incidents::find_correlation_candidates_with(
+            &db,
+            "default",
+            infra::table::alert_incidents::CaseFilter::NoCases,
+        )
+        .await
+        .unwrap();
+        assert_eq!(candidates.len(), 1);
+        let mut active: alert_incidents::ActiveModel = row.into();
+        active.security_case = Set(true);
+        active.update(&db).await.unwrap();
+
+        let found = select_correlation_candidate(&db, "default", &node_exporter_dims(), candidates)
+            .await
+            .unwrap();
+        assert_eq!(found.map(|row| row.id), None);
     }
 
     #[tokio::test]
