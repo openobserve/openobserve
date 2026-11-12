@@ -108,6 +108,8 @@ export class DashboardPage {
     this.absoluteTab = page.locator(absoluteTabLocator);
 
     // Share / view dashboard locators
+    this.copyConfirmBubble = page.locator('[data-test="copy-confirm"][data-test-variant="success"]');
+    this.shareCopiedToast = page.locator('[data-test^="o-toast-"][data-test-variant="success"][data-test-message*="copied" i]');
     this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.dashboardNameTitle = page.locator('[data-test="dashboard-name-title"]');
 
@@ -418,6 +420,17 @@ export class DashboardPage {
     // Verify that the time filter displays "Past 30 Seconds"
     await expect(this.dateTimeButton).toContainText(Past30SecondsValue);
   }
+  async isCopyConfirmOnShareButton() {
+    const [bubble, button] = await Promise.all([
+      this.copyConfirmBubble.boundingBox({ timeout: 500 }).catch(() => null),
+      this.shareButton.boundingBox(),
+    ]);
+    if (!bubble || !button) return false;
+    const gapX = Math.max(button.x - (bubble.x + bubble.width), bubble.x - (button.x + button.width), 0);
+    const gapY = Math.max(button.y - (bubble.y + bubble.height), bubble.y - (button.y + button.height), 0);
+    return gapX <= 32 && gapY <= 32;
+  }
+
   async verifyShareDashboardLink(randomDashboardName){
     // readText() waits forever on Firefox's Paste prompt, so record what the app itself copies.
     await this.page.evaluate(() => {
@@ -459,6 +472,13 @@ export class DashboardPage {
     expect(response.status()).toBe(200);
     const shortUrl = (await response.json()).short_url;
     expect(shortUrl).toBeTruthy();
+    // The bubble lasts two seconds, and with no room beside the button the app shows the same confirmation as a toast.
+    await expect
+      .poll(async () => (await this.shareCopiedToast.count()) > 0 || (await this.isCopyConfirmOnShareButton()), {
+        timeout: 10000,
+        intervals: [100, 200, 400],
+      })
+      .toBe(true);
     let copiedUrl = "";
     await expect
       .poll(

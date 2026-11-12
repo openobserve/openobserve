@@ -291,7 +291,6 @@ export default class ChartTypeSelector {
           testLogger.error(`FAILED after ${maxRetries} attempts. Final options: ${finalOptions.join(', ')}`);
           throw error;
         }
-        // Close dropdown and wait for network before retry
         await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
         await this.page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
       }
@@ -869,10 +868,6 @@ export default class ChartTypeSelector {
     await fieldRow.waitFor({ state: "visible", timeout });
   }
 
-  /**
-   * Replace the panel query editor's SQL with the given query.
-   * @param {string} query - The SQL query to enter
-   */
   async enterCustomSQL(query) {
     await this.queryEditor.waitFor({ state: "visible", timeout: 10000 });
     await this.queryEditor.click();

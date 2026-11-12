@@ -252,15 +252,16 @@ class SchemaPage {
     async applyQuery() {
         testLogger.debug('Applying query with search response wait');
         // While an auto-run is in flight this test id is the Cancel button, so a click there sends no search; retry once the run settles.
+        let response;
         await expect(async () => {
             await expect(this.logsSearchBarRefreshBtn).not.toHaveText(/cancel/i, { timeout: 15000 });
             await expect(this.logsSearchBarRefreshBtn).toBeEnabled({ timeout: 15000 });
-            const [response] = await Promise.all([
+            [response] = await Promise.all([
                 this.page.waitForResponse(logData.applyQuery, { timeout: 15000 }),
                 this.logsSearchBarRefreshBtn.click(),
             ]);
-            expect(response.status()).toBe(200);
         }).toPass({ timeout: 90000 });
+        expect(response.status()).toBe(200);
     }
 
     // Navigate to streams page

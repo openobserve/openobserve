@@ -295,7 +295,6 @@ export class PipelinesEP {
         }
     }
 
-    // The import button stays disabled until validation finishes, so the error read after it is this click's result.
     // Logs instead of throwing: an afterEach error would count as the failure a test.fail() expects.
     async deleteImportPrerequisites(org, { functionName, destinationName }) {
         const api = new APICleanup(this.page);

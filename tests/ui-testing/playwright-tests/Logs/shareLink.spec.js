@@ -463,6 +463,7 @@ test.describe("Share Link Test Cases", () => {
 const path = require('path');
 const { ingestRows } = require('../utils/auto-run-helpers.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+const APICleanup = require('../../pages/apiCleanup.js');
 
 const LINK_ORG = getOrgIdentifier() || 'default';
 const LINK_RUN = Math.random().toString(36).slice(2, 7);
@@ -686,11 +687,8 @@ test.describe('Line links (4c Part C)', () => {
   });
 
   // The org is shared, so the view J-C17 saves must not outlive the run.
-  test.afterAll(async ({ request }) => {
-    if (!savedViewName) return;
-    const list = await request.get(`${process.env.ZO_BASE_URL}/api/${LINK_ORG}/savedviews`, { headers: getAuthHeaders() });
-    const view = list.ok() ? ((await list.json()).views ?? []).find((v) => v.view_name === savedViewName) : null;
-    if (view) await request.delete(`${process.env.ZO_BASE_URL}/api/${LINK_ORG}/savedviews/${view.view_id}`, { headers: getAuthHeaders() });
+  test.afterAll(async () => {
+    if (savedViewName) await new APICleanup().deleteSavedViewByName(savedViewName);
   });
 
   test('J-C1/J-C2/J-C5: the sharer copies a tied line; the recipient sees that exact line, A\'s columns, and a clean close', async ({

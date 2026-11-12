@@ -197,7 +197,6 @@ export default class DashboardShareExportPage {
     return this.page.locator(SELECTORS.ROLE_OPTION).first();
   }
 
-  /** Open a query-values variable and pick its first value, returning that value's label. */
   async selectFirstVariableValue(variableName, timeout = 30000) {
     const dropdown = this.getVariableDropdownInner(variableName);
     await dropdown.waitFor({ state: "visible", timeout });

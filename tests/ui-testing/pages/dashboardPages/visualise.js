@@ -384,12 +384,10 @@ export default class LogsVisualise {
     await new LogsPage(this.page).waitForSearchQueryCommitted(sqlQuery);
   }
 
-  /** Empty the VRL function editor. */
   async clearFunctionEditor() {
     await new MonacoEditorHelper(this.page).fillInputArea(this.functionEditor.first(), "");
   }
 
-  /** Wait until the VRL function editor is mounted and can take input. */
   async expectFunctionEditorReady() {
     await new MonacoEditorHelper(this.page).waitForReady(this.functionEditor.first());
   }

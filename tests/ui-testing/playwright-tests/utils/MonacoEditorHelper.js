@@ -48,7 +48,6 @@ class MonacoEditorHelper {
         return container.locator(this.selectors.inputArea);
     }
 
-    /** Wait until the editor in a container is mounted and its input textarea exists. */
     async waitForReady(container, timeout = 30000) {
         await container.locator(this.selectors.editor).first().waitFor({ state: 'visible', timeout });
         // Firefox renders the textarea 0px wide, so it never counts as visible; attached is the cross-browser signal.
