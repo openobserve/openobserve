@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OToggleGroupItem>
                     </template>
                   </OToggleGroup>
-                  <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
+                  <!-- flex-1 is basis-0, so below lg the full-width basis is what wraps the input before its scope chips spill. -->
                   <div class="min-w-0 flex-1 md:max-lg:basis-full">
                     <OInput
                       v-model="dynamicQueryModel"

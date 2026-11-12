@@ -41,9 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       supported here but not currently emitted by groupNavLinks.
          `pinBottom` groups float to the foot of the rail via the flex spacer. -->
     <div class="relative flex min-h-0 flex-1 flex-col gap-y-1">
-      <!-- Single selection pill: tracks the active rail tile and fades in on it on
-           navigation. Active MenuLinks defer their fill to this (see
-           RailIndicatorActiveKey). Snaps (no fade) on mount/reflow/reveal. -->
+      <!-- Active MenuLinks defer their fill to this pill (see RailIndicatorActiveKey). -->
       <div ref="indicatorRef" aria-hidden="true" :class="indicatorClass" :style="indicatorStyle" />
       <div
         v-if="loading"
@@ -179,11 +177,8 @@ const bottomEntries = computed(
     >[],
 );
 
-// ── Selection pill ──────────────────────────────────────────────────────────
-// One indicator tracks the active rail tile (.nav-menu-item--active) and fades in
-// on it when the route changes: animate only real selection changes; snap on mount,
-// reflow and reveal; skip measuring while the rail is hidden so a bogus 0-position
-// is never stored.
+// Animate only real selection changes (snap on mount, reflow and reveal); skip
+// measuring while the rail is hidden so a bogus 0-position is never stored.
 const router: any = useRouter();
 
 const navRef = ref<HTMLElement | null>(null);
