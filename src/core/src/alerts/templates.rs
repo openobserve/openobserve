@@ -32,6 +32,7 @@ use db::{
     alerts::templates::TemplateError,
     authz::{remove_ownership, set_ownership},
 };
+use infra::table::templates::NAME_MAX_CHARS;
 
 use crate::{
     alerts::notifications::default_template::{
@@ -97,6 +98,10 @@ pub async fn save(
     if template.name.contains('/') || is_ofga_unsupported(&template.name) {
         return Err(TemplateError::InvalidName);
     }
+    // Create only: older rows over the limit (SQLite does not enforce it) stay editable.
+    if create && template.name.chars().count() > NAME_MAX_CHARS {
+        return Err(TemplateError::NameTooLong(NAME_MAX_CHARS));
+    }
 
     if is_reserved_template_name(&template.name) {
         if create {
@@ -147,6 +152,10 @@ pub async fn save(
         // on every send: the author gets a fixable error instead of a
         // template whose link silently never works (#13742).
         spec.validate().map_err(TemplateError::InvalidContentSpec)?;
+        // Save only, not `validate()`: preview and test send still render a stored blank title.
+        if spec.title.trim().is_empty() {
+            return Err(TemplateError::EmptyTitle);
+        }
     } else if let TemplateType::Email { title } = &template.template_type
         && title.is_empty()
     {
@@ -1364,6 +1373,45 @@ mod tests {
         common::infra::config::ALERTS_TEMPLATES.insert(format!("{DEFAULT_ORG}/{name}"), shared);
         let err = delete("tpl_scope_acme", name, false).await.unwrap_err();
         assert!(matches!(err, TemplateError::NotFound), "{err}");
+    }
+
+    #[tokio::test]
+    async fn test_save_refuses_a_name_over_256_chars_on_create() {
+        let template = Template {
+            org_id: "tpl_long_acme".to_string(),
+            body: "{}".to_string(),
+            template_type: TemplateType::Http,
+            ..Default::default()
+        };
+        let err = save(&"é".repeat(257), template, None, None, true, false)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, TemplateError::NameTooLong(256)), "{err}");
+    }
+
+    /// A blank Content title is refused on save; 256 characters pass the name check first.
+    #[tokio::test]
+    async fn test_save_refuses_a_blank_content_title() {
+        for title in ["", "   "] {
+            let body = serde_json::json!({ "title": title, "body": "hi" }).to_string();
+            let template = Template {
+                org_id: "tpl_title_acme".to_string(),
+                body,
+                template_type: TemplateType::Http,
+                ..Default::default()
+            };
+            let err = save(
+                &"é".repeat(256),
+                template,
+                Some(TemplateKind::Content),
+                None,
+                true,
+                false,
+            )
+            .await
+            .unwrap_err();
+            assert!(matches!(err, TemplateError::EmptyTitle), "{title:?}: {err}");
+        }
     }
 
     #[test]
