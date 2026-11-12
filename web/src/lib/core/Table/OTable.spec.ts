@@ -1273,6 +1273,14 @@ describe("OTable", () => {
       expect(wrapper.find('[data-test="o2-table-error"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="o2-table-empty"]').exists()).toBe(false);
     });
+
+    it("emits retry from the error state's Retry, for client-side data too", async () => {
+      wrapper = mount(OTable, {
+        props: { data: [], columns: makeColumns(), error: "API Error", pagination: "client" },
+      });
+      await wrapper.find('[data-test="o2-table-error-retry-btn"]').trigger("click");
+      expect(wrapper.emitted("retry")).toHaveLength(1);
+    });
   });
 
   // ── Header over a non-row state ────────────────────────────

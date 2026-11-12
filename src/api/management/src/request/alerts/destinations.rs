@@ -844,6 +844,7 @@ pub async fn test_send(
 
     // Permission: destination WRITE, not template read — reading a template
     // must never by itself grant the ability to post into a channel.
+    // `use_self_parent` lets an org-wide `_all_` grant count, as in `can_write_destination`.
     #[cfg(feature = "enterprise")]
     if !check_permissions(
         &destination_name,
@@ -854,7 +855,7 @@ pub async fn test_send(
         None,
         false,
         false,
-        false,
+        true,
     )
     .await
     {

@@ -126,6 +126,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTabs>
     </div>
+
+    <!-- Pinned below the scrolling groups, e.g. the AI rail's Playground and Tools. -->
+    <div
+      v-if="$slots.footer"
+      class="border-border-default bg-surface-base shrink-0 border-t p-2.5"
+      data-test="section-rail-footer"
+    >
+      <slot name="footer" :collapsed="collapsed" />
+    </div>
   </FeatureLockExempt>
 </template>
 

@@ -41,6 +41,7 @@ use config::{
     },
 };
 use cron::Schedule;
+use datafusion::{common::SchemaError, error::DataFusionError};
 #[cfg(feature = "enterprise")]
 use db::workflows::{AssociationDeleteEvent, WorkflowTriggerType};
 use db::{
@@ -369,6 +370,11 @@ pub enum AlertError {
     MultiAlertGroupingError(String),
     #[error("Group by column {column} not found on stream {stream_name}")]
     GroupByColumnNotFound { column: String, stream_name: String },
+    /// A SQL multi-alert naming a column its stream has not received.
+    #[error(
+        "Stream {stream_name} has no field {field} yet. Alerts can only use fields that exist in the stream."
+    )]
+    FieldNotFound { field: String, stream_name: String },
     #[error("{reason}")]
     JiraDestinationNotSupported { destination: String, reason: String },
 }
@@ -526,6 +532,20 @@ fn validate_custom_group_by(
             column,
             stream_name: stream_name.to_owned(),
         })
+}
+
+fn multi_alert_plan_error(stream_name: &str, err: anyhow::Error) -> AlertError {
+    if let Some(DataFusionError::SchemaError(schema_err, _)) = err
+        .downcast_ref::<DataFusionError>()
+        .map(DataFusionError::find_root)
+        && let SchemaError::FieldNotFound { field, .. } = schema_err.as_ref()
+    {
+        return AlertError::FieldNotFound {
+            field: field.name.clone(),
+            stream_name: stream_name.to_owned(),
+        };
+    }
+    AlertError::MultiAlertGroupingError(err.to_string())
 }
 
 /// Structural half only: `{var}` tokens are unresolved until send time, so a body shaped right but
@@ -1169,7 +1189,7 @@ async fn prepare_alert(
                 .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
             let schema = get_result_schema(sql, false, true)
                 .await
-                .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
+                .map_err(|e| multi_alert_plan_error(stream_name, e))?;
 
             // this is mostly API check, FE already has a restriction
             if !schema.projections.contains(&agg.having.column) {
@@ -5176,13 +5196,21 @@ mod threshold_validation_tests {
 
 #[cfg(test)]
 mod group_by_validation_tests {
+    use std::sync::Arc;
+
     use arrow_schema::{DataType, Field, Schema};
     use config::{
         meta::alerts::{AggFunction, Aggregation, Condition, Operator, QueryType, alert::Alert},
         utils::json::json,
     };
+    use datafusion::{
+        common::{DFSchema, unqualified_field_not_found},
+        datasource::MemTable,
+        error::DataFusionError,
+        prelude::SessionContext,
+    };
 
-    use super::{AlertError, validate_custom_group_by};
+    use super::{AlertError, multi_alert_plan_error, validate_custom_group_by};
 
     fn schema() -> Schema {
         Schema::new(vec![
@@ -5239,6 +5267,54 @@ mod group_by_validation_tests {
         let mut alert = custom_alert(&["nonexistent"]);
         alert.query_condition.query_type = QueryType::SQL;
         assert!(validate_custom_group_by("svc", &schema(), &alert).is_ok());
+    }
+
+    fn assert_names_missing_field(err: AlertError) {
+        assert!(matches!(
+            &err,
+            AlertError::FieldNotFound { field, stream_name }
+                if field == "feature_name" && stream_name == "svc"
+        ));
+        assert_eq!(
+            err.to_string(),
+            "Stream svc has no field feature_name yet. Alerts can only use fields that exist in the stream."
+        );
+        let response = axum::response::Response::from(err);
+        assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_a_missing_field_is_named_not_quoted_from_the_planner() {
+        let err = unqualified_field_not_found("feature_name", &DFSchema::empty());
+        assert_names_missing_field(multi_alert_plan_error("svc", err.into()));
+        // Wrapped by the planner, the field is still found.
+        let err = unqualified_field_not_found("feature_name", &DFSchema::empty()).context("plan");
+        assert_names_missing_field(multi_alert_plan_error("svc", err.into()));
+    }
+
+    #[tokio::test]
+    async fn test_a_query_planned_on_a_missing_column_names_the_field() {
+        let ctx = SessionContext::new();
+        let table = MemTable::try_new(Arc::new(schema()), vec![vec![]]).unwrap();
+        ctx.register_table("svc", Arc::new(table)).unwrap();
+        let err = ctx
+            .state()
+            .create_logical_plan(
+                "SELECT feature_name, SUM(latency) AS spent FROM \"svc\" \
+                 WHERE feature_name = 'x' GROUP BY feature_name",
+            )
+            .await
+            .unwrap_err();
+        assert_names_missing_field(multi_alert_plan_error("svc", err.into()));
+    }
+
+    #[test]
+    fn test_other_planner_errors_stay_grouping_errors() {
+        let err = DataFusionError::Plan("bad".into());
+        assert!(matches!(
+            multi_alert_plan_error("svc", err.into()),
+            AlertError::MultiAlertGroupingError(msg) if msg.contains("bad")
+        ));
     }
 }
 
@@ -9490,6 +9566,55 @@ mod tests {
 
         assert!(
             matches!(res, Err(AlertError::RepeatSuppressionOnRealtimeAlert)),
+            "{res:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_names_a_multi_alert_field_the_stream_lacks() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_alert_save_missing_field";
+        let key = format!("{org_id}/{}/spans", StreamType::Traces);
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            key.clone(),
+            SchemaCache::new(arrow_schema::Schema::new(vec![
+                arrow_schema::Field::new("_timestamp", DataType::Int64, false),
+                arrow_schema::Field::new("trace_id", DataType::Utf8, true),
+                arrow_schema::Field::new("gen_ai_usage_cost", DataType::Float64, true),
+            ])),
+        );
+        let mut alert = Alert::default();
+        alert.stream_type = StreamType::Traces;
+        alert.trigger_condition.frequency = 60;
+        alert.query_condition.query_type = QueryType::SQL;
+        alert.query_condition.sql = Some(
+            "SELECT feature_name, SUM(gen_ai_usage_cost) AS spent FROM \"spans\" \
+             WHERE feature_name = 'x' GROUP BY feature_name"
+                .to_string(),
+        );
+        alert.query_condition.aggregation = Some(config::meta::alerts::Aggregation {
+            group_by: Some(vec![]),
+            function: config::meta::alerts::AggFunction::Count,
+            having: config::meta::alerts::Condition {
+                column: "spent".into(),
+                operator: config::meta::alerts::Operator::GreaterThanEquals,
+                value: json!(10),
+                ignore_case: false,
+                case_insensitive: None,
+            },
+            warning_value: None,
+            multi_alert: true,
+        });
+        let res = prepare_alert(org_id, "spans", "budget", &mut alert, true, false).await;
+        STREAM_SCHEMAS_LATEST.write().await.remove(&key);
+
+        assert!(
+            matches!(
+                &res,
+                Err(AlertError::FieldNotFound { field, stream_name })
+                    if field == "feature_name" && stream_name == "spans"
+            ),
             "{res:?}"
         );
     }

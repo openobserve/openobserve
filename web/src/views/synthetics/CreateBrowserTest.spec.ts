@@ -847,6 +847,26 @@ describe("CreateBrowserTest", () => {
       expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
+    // B1: the picker is on Configure, which Journey cannot reach, so a template refusal opens it.
+    it("opens Configure with the template refusal under the picker", async () => {
+      mockServiceUpdate.mockRejectedValue({
+        response: {
+          status: 400,
+          data: { message: "template 'ops-card' does not apply to synthetics" },
+        },
+      });
+      wrapper = await mountValidEdit();
+
+      await wrapper.find('[data-test="synthetics-create-save-continue-btn"]').trigger("click");
+      await flushPromises();
+
+      const configure = wrapper.findComponent('[data-test="synthetics-check-configure"]');
+      expect(configure.exists()).toBe(true);
+      expect((configure.props("validationErrors") as Record<string, string>).template).toBe(
+        "template 'ops-card' does not apply to synthetics",
+      );
+    });
+
     it("should not navigate when validation fails", async () => {
       mockServiceGet.mockResolvedValue({
         data: { name: "", url: "https://example.com", journey: [] },

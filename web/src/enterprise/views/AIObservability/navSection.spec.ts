@@ -11,6 +11,8 @@ describe("navSection", () => {
     ["aiLLMInsights", "llmInsights"],
     ["aiSessions", "sessions"],
     ["aiSessionDetails", "sessions"],
+    ["aiUsers", "users"],
+    ["aiBudgets", "budgets"],
     ["aiAgentGraph", "agentGraph"],
     ["aiAgentBehavior", "agentBehavior"],
     ["aiDiscovery", "discovery"],
@@ -29,6 +31,8 @@ describe("navSection", () => {
     ["aiRemoteTaskCreate", "remoteTasks"],
     ["aiRemoteTaskEdit", "remoteTasks"],
     ["aiRemoteTaskDetail", "remoteTasks"],
+    ["llmProviders", "llmProviders"],
+    ["genAiAgentMapping", "agentMapping"],
   ])("lights %s as %s", (routeName, expected) => {
     expect(navSection(routeName)).toBe(expected);
   });

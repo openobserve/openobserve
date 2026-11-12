@@ -252,7 +252,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
-import { dataTypeOf, entityId } from "../utils/evalEntity";
+import { dataTypeOf, entityId, scorerTypeOf } from "../utils/evalEntity";
 
 const props = defineProps<{
   row: ScoreConfig;
@@ -370,11 +370,6 @@ const tabs = computed(() => [
     count: usedByScorers.value.length,
   },
 ]);
-
-function scorerTypeOf(s: Scorer): "llm_judge" | "remote" {
-  const raw = valueOf<string>(s, "scorerType", "scorer_type") ?? "llm_judge";
-  return raw === "remote" ? "remote" : "llm_judge";
-}
 
 function formatTimestamp(microsOrMs: number): string {
   const ms = microsOrMs > 1e14 ? Math.round(microsOrMs / 1000) : microsOrMs;

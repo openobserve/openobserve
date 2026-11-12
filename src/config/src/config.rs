@@ -147,7 +147,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 147: index alert_incidents.last_alert_at over unresolved incidents.
 // 148: add alert_incidents.security_case, backfilled from SIEM detections and case group keys.
 // 149: add alert_incidents.historical, set on a security case only backfilled firings opened.
-pub const DB_SCHEMA_VERSION: u64 = 149;
+// 150: add budget to online_eval_jobs.
+pub const DB_SCHEMA_VERSION: u64 = 150;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

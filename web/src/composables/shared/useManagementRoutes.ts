@@ -68,6 +68,28 @@ const useManagementRoutes = () => {
           path: "alert_sources",
           redirect: (to: any) => ({ name: "alertSources", query: to.query }),
         },
+        // Redirects kept for bookmarks after these moved to /ai under the same route names.
+        {
+          path: "llm_providers",
+          redirect: (to: any) => ({ name: "llmProviders", query: to.query }),
+        },
+        {
+          path: "gen_ai_agent_mapping",
+          redirect: (to: any) => ({ name: "genAiAgentMapping", query: to.query }),
+        },
+        // LLM Model Pricing moved to the same Configure group (/ai/model-pricing).
+        {
+          path: "model_pricing",
+          redirect: (to: any) => ({ name: "modelPricing", query: to.query }),
+        },
+        {
+          path: "model_pricing/gaps",
+          redirect: (to: any) => ({ name: "modelPricingGaps", query: to.query }),
+        },
+        {
+          path: "model_pricing/edit",
+          redirect: (to: any) => ({ name: "modelPricingEditor", query: to.query }),
+        },
       ],
     },
   ];
@@ -116,73 +138,7 @@ const useManagementRoutes = () => {
     },
   });
 
-  // LLM Model Pricing, LLM Providers, GenAI Agent Mapping (used by the AI
-  // Observability / Online Evals flows), and the enterprise-only operations/
-  // security pages below are all always registered; a direct URL redirects
-  // to the shared locked page (see `withFeatureGate`) when the edition
-  // doesn't unlock them, instead of landing on the real page or a 404.
-  routes[0].children.push(
-    withLicenseFeature("ai_observability", {
-      path: "model_pricing",
-      name: "modelPricing",
-      meta: {
-        keepAlive: true,
-        titleKey: "settings.llmModelPricing",
-      },
-      component: () => import("@/components/settings/ModelPricingList.vue"),
-      beforeEnter: withFeatureGate("modelPricing", routeGuard),
-    }),
-  );
-  routes[0].children.push(
-    withLicenseFeature("ai_observability", {
-      path: "model_pricing/gaps",
-      name: "modelPricingGaps",
-      meta: {
-        keepAlive: true,
-        titleKey: "modelPricing.unpriced.title",
-      },
-      component: () => import("@/components/settings/ModelPricingGaps.vue"),
-      beforeEnter: withFeatureGate("modelPricing", routeGuard),
-    }),
-  );
-  routes[0].children.push(
-    withLicenseFeature("ai_observability", {
-      path: "model_pricing/edit",
-      name: "modelPricingEditor",
-      meta: {
-        titleKey: "routeTitles.modelPricingEditor",
-        accessScopeQuery: ["id"],
-      },
-      component: () => import("@/components/settings/ModelPricingEditor.vue"),
-      beforeEnter: withFeatureGate("modelPricing", routeGuard),
-    }),
-  );
-  routes[0].children.push(
-    withLicenseFeature("ai_observability", {
-      path: "llm_providers",
-      name: "llmProviders",
-      component: () => import("@/components/settings/LlmProvidersSettings.vue"),
-      // `/providers` is unregistered when the server reports `online_evals_enabled: false`.
-      meta: {
-        titleKey: "llmProviders.title",
-        requiresOnlineEvals: true,
-      },
-      beforeEnter: withFeatureGate("llmProviders", routeGuard),
-    }),
-  );
-  routes[0].children.push(
-    withLicenseFeature("ai_observability", {
-      path: "gen_ai_agent_mapping",
-      name: "genAiAgentMapping",
-      component: () => import("@/components/settings/GenAiAgentMappingSettings.vue"),
-      meta: {
-        keepAlive: true,
-        titleKey: "settings.genAiAgentMapping.title",
-      },
-      beforeEnter: withFeatureGate("genAiAgentMapping", routeGuard),
-    }),
-  );
-  // Registered in every build; slackRouteGuard and the rail both hide it unless the org config turns Slack on.
+  // Always registered so a direct URL hits the locked page; the guard and rail hide it unless Slack is on.
   routes[0].children.push({
     path: "slack",
     name: "slack",

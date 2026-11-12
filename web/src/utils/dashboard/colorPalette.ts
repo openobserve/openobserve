@@ -124,18 +124,9 @@ export const QUALITY_SCORE_LINE_COLOR = "#2563eb";
 /** Reference / threshold + p95 marker on the Quality trend + distribution charts. */
 export const CHART_THRESHOLD_COLOR = "#b25400";
 
-/** LLM Insights latency percentiles — a severity escalation, p50 → p99. */
-export const LLM_LATENCY_SERIES_COLORS = {
-  p50: "#64748b",
-  p90: "#f59e0b",
-  p95: "#f97316",
-  p99: "#ef4444",
-} as const;
-
 /** LLM Insights single-metric panel colours (mirror the KPI tile tones). */
 export const LLM_ERRORS_COLOR = "#ef4444";
-export const LLM_SPANS_COLOR = "#3b82f6";
-export const LLM_TOKENS_COLOR = "#a855f7";
+export const LLM_TRACES_COLOR = "#3b82f6";
 
 const isValidHexColor = (color: string): boolean => {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);

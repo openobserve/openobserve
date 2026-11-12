@@ -189,7 +189,7 @@ pub async fn get_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> Res
     tag = "EvalJobs",
     operation_id = "UpdateEvalJob",
     summary = "Update eval job",
-    description = "Updates the editable fields of an online eval job and bumps its version. The associated pipeline is re-reconciled if the job is active.",
+    description = "Updates the editable fields of an online eval job and bumps its version. The associated pipeline is re-reconciled if the job is active. Raising the daily budget of a job its budget paused above the spend it paused at resumes the job.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -210,21 +210,22 @@ pub async fn update_eval_job(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     axum::Json(body): axum::Json<EvalJobRequestBody>,
 ) -> Response {
+    let budget = body.budget_patch();
     let job = match infra::table::online_eval_jobs::OnlineEvalJob::try_from(body) {
         Ok(job) => job,
         Err(err) => return MetaHttpResponse::bad_request(err),
     };
     #[cfg(feature = "enterprise")]
-    let scorers_changed = match eval_jobs::get_job(&org_id, &job_id).await {
-        Ok(existing) => existing.scorers != job.scorers,
-        Err(_) => true,
+    let (scorers_changed, was_paused) = match eval_jobs::get_job(&org_id, &job_id).await {
+        Ok(existing) => (existing.scorers != job.scorers, existing.status == "paused"),
+        Err(_) => (true, false),
     };
     #[cfg(feature = "enterprise")]
     if scorers_changed && let Err(resp) = limit_scorers(&job.scorers) {
         return resp;
     }
     #[cfg(feature = "enterprise")]
-    let job = match eval_jobs::prepare_job_update(&org_id, &job_id, job).await {
+    let job = match eval_jobs::prepare_job_update(&org_id, &job_id, job, budget).await {
         Ok(job) => job,
         Err(err) => return err.into(),
     };
@@ -232,8 +233,11 @@ pub async fn update_eval_job(
     if let Err(resp) = guard_job(&org_id, &user_email.user_id, &job).await {
         return resp;
     }
+    // Lifting a budget pause is an activation, so the scorer check applies.
     #[cfg(feature = "enterprise")]
-    if scorers_changed
+    let resumes = was_paused && job.status == "active";
+    #[cfg(feature = "enterprise")]
+    if (scorers_changed || resumes)
         && let Err(resp) = guard_scorers(&org_id, &user_email.user_id, &job.scorers).await
     {
         return resp;
@@ -241,7 +245,7 @@ pub async fn update_eval_job(
     #[cfg(feature = "enterprise")]
     let updated = eval_jobs::store_job_update(job).await;
     #[cfg(not(feature = "enterprise"))]
-    let updated = eval_jobs::update_job(&org_id, &job_id, job).await;
+    let updated = eval_jobs::update_job(&org_id, &job_id, job, budget).await;
     match updated {
         Ok(j) => {
             let resp: EvalJobResponseBody = j.into();
@@ -328,7 +332,8 @@ pub async fn activate_eval_job(
     tag = "EvalJobs",
     operation_id = "PauseEvalJob",
     summary = "Pause eval job",
-    description = "Transitions an active eval job to the paused state.",
+    description = "Transitions an active eval job to the paused state. On a job its daily budget \
+                   paused, makes the pause the user's: the job no longer resumes at 00:00 UTC.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -644,6 +649,7 @@ mod tests {
             span_selector_bindings: None,
             trace_config: None,
             session_config: None,
+            budget: None,
             sampling_mode: "all".to_string(),
             sampling_value: serde_json::json!(1),
             status: "archived".to_string(),

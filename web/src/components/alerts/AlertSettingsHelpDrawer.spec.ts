@@ -85,6 +85,40 @@ describe("AlertSettingsHelpDrawer", () => {
     ]);
   });
 
+  // B30: a Content template stores a JSON spec; the preview shows its title and body.
+  it("previews a Content template as its title and body, not the raw JSON", async () => {
+    const spec = {
+      title: "Anomaly on {alert_name}",
+      title_overrides: {},
+      body: "Score is high",
+      fields: [],
+      rows: { enabled: false, max: 5, columns: null, format: null },
+      links: [],
+      chart: { enabled: false },
+    };
+    w = mountDrawer({
+      subject: "object",
+      currentTemplate: "card",
+      templates: [
+        { name: "card", kind: "content", body: JSON.stringify(spec) },
+        { name: "hook", kind: "custom", body: '{"text":"{alert_name}"}' },
+      ],
+      facts: { alert_name: "cpu" },
+    });
+    await w.setProps({ open: false });
+    await w.setProps({ open: true });
+    const box = w.find('[data-test="help-preview-box"]').text();
+    expect(box).toContain("Anomaly on cpu");
+    expect(box).toContain("Score is high");
+    expect(box).not.toContain("title_overrides");
+
+    (w.vm as any).previewTemplate = "hook";
+    await w.vm.$nextTick();
+    expect(
+      w.findAll('[data-test="help-preview-box"]').some((b) => b.text().includes('"text"')),
+    ).toBe(true);
+  });
+
   it("renders the current section for topic=template", () => {
     w = mountDrawer({ topic: "template" });
     expect(w.find('[data-test="help-current-section"]').exists()).toBe(true);

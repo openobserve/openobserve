@@ -13,7 +13,7 @@ export type EvalTargetScope = "span" | "trace" | "session";
 export type SamplingMode = "rate" | "all" | "count";
 export type ConfigurableSamplingMode = "rate" | "all";
 export type SamplingValue = number | { rate?: number; count?: number } | null;
-export type ScorerType = "llm_judge" | "remote";
+export type ScorerType = "llm_judge" | "remote" | "code";
 export type ScoreDataType = "numeric" | "categorical" | "boolean";
 
 export interface Provider {
@@ -156,6 +156,22 @@ export interface EvalJob {
   updated_at?: number;
   /** Persisted health state; absent until the backend first evaluates the job. */
   health?: EvalJobHealth | null;
+  /** Daily judge spend limit; absent on jobs saved before budgets. */
+  budget?: EvalJobBudget | null;
+}
+
+export type EvalBudgetAction = "pause" | "keep_running";
+
+export interface EvalJobBudget {
+  /** Judge spend allowed per UTC day, in USD. */
+  dailyUsd: number;
+  onReach: EvalBudgetAction;
+  /** Server-set while the budget holds the job paused, microseconds since epoch. */
+  pausedAt?: number | null;
+  /** Server-set with `pausedAt`: the day's judge spend when the budget paused the job, in USD. */
+  pausedSpendUsd?: number | null;
+  /** Server-set after "Resume until 00:00 UTC": the budget is lifted until then (µs). */
+  liftedUntil?: number | null;
 }
 
 export interface ExtraMetadataField {
@@ -185,7 +201,8 @@ export interface ScorerTestPayload {
     producesScoreConfigVersion?: number;
     template: string;
     outputSchema?: any;
-    params: Record<string, any>;
+    /** Absent for a Code scorer: its function needs no params. */
+    params?: Record<string, any>;
   };
   inputVariables: Record<string, any>;
 }
@@ -230,6 +247,7 @@ export interface EvalJobPayload {
   sessionConfig?: CompletionWindowConfig | null;
   samplingMode: ConfigurableSamplingMode;
   samplingValue: number | null;
+  budget?: Pick<EvalJobBudget, "dailyUsd" | "onReach"> | null;
 }
 
 export interface CompletionWindowConfig {

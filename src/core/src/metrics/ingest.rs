@@ -231,7 +231,11 @@ pub(super) async fn resolve_batch_schema<T>(
     .await?;
     drop(records);
     // the check that turned the UDS on projected the schema, which would drop unpacked columns
-    if let Some(fields) = newly_enabled_uds_fields(has_uds, stream_schema_map.get(stream_name)) {
+    if let Some(fields) = newly_enabled_uds_fields(
+        StreamType::Metrics,
+        has_uds,
+        stream_schema_map.get(stream_name),
+    ) {
         repack_records(rows.iter_mut().map(record), &fields);
         let records: Vec<_> = rows.iter_mut().map(|row| &*record(row)).collect();
         check_metrics_schema(

@@ -18,8 +18,8 @@ use config::meta::{
     pipeline::components::ScorerRef,
 };
 use infra::table::online_eval_jobs::{
-    JobInputMapping, SamplingMode, SessionEvalConfig, SpanSelector, SpanSelectorBindings,
-    TargetScope, TraceEvalConfig,
+    BudgetAction, BudgetPatch, EvalJobBudget, JobInputMapping, SamplingMode, SessionEvalConfig,
+    SpanSelector, SpanSelectorBindings, TargetScope, TraceEvalConfig,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -31,6 +31,58 @@ use utoipa::ToSchema;
 pub enum ScorerRefForm {
     Latest(String),
     Pinned { id: String, version: Option<i32> },
+}
+
+/// A job's daily judge spend limit in a create or update request.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EvalJobBudgetRequest {
+    /// Judge spend allowed per UTC day, in USD; must be positive.
+    pub daily_usd: f64,
+    /// Omitted on create means `pause`; omitted on update keeps the stored action.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_reach: Option<BudgetAction>,
+    /// Server-owned, as returned by a read; accepted so a read can be sent back, and ignored.
+    #[serde(default, skip_serializing)]
+    #[schema(value_type = Option<i64>)]
+    pub paused_at: Option<serde::de::IgnoredAny>,
+    /// Server-owned, as returned by a read; ignored.
+    #[serde(default, skip_serializing)]
+    #[schema(value_type = Option<f64>)]
+    pub paused_spend_usd: Option<serde::de::IgnoredAny>,
+    /// Server-owned, as returned by a read; ignored.
+    #[serde(default, skip_serializing)]
+    #[schema(value_type = Option<i64>)]
+    pub lifted_until: Option<serde::de::IgnoredAny>,
+}
+
+impl EvalJobBudgetRequest {
+    fn patch(&self) -> BudgetPatch {
+        BudgetPatch::Set {
+            daily_usd: self.daily_usd,
+            on_reach: self.on_reach,
+        }
+    }
+
+    /// A new job's budget: `pause` unless the request says otherwise, with no pause state.
+    fn into_budget(self) -> EvalJobBudget {
+        EvalJobBudget {
+            daily_usd: self.daily_usd,
+            on_reach: self.on_reach.unwrap_or_default(),
+            paused_at: None,
+            paused_spend_usd: None,
+            lifted_until: None,
+        }
+    }
+}
+
+/// `null` → `Some(None)`; an absent field stays `None` through `#[serde(default)]`.
+fn double_option<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    Deserialize::deserialize(deserializer).map(Some)
 }
 
 /// HTTP request body for creating or updating an Online Eval Job.
@@ -63,9 +115,28 @@ pub struct EvalJobRequestBody {
     #[serde(default)]
     #[schema(value_type = Option<Object>)]
     pub session_config: Option<SessionEvalConfig>,
+    /// Daily judge spend limit. On update, omitted keeps the stored one and `null` removes it.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<EvalJobBudgetRequest>, nullable)]
+    pub budget: Option<Option<EvalJobBudgetRequest>>,
     #[schema(value_type = String)]
     pub sampling_mode: SamplingMode,
     pub sampling_value: serde_json::Value,
+}
+
+impl EvalJobRequestBody {
+    /// What an update asks of the stored budget.
+    pub fn budget_patch(&self) -> BudgetPatch {
+        match &self.budget {
+            None => BudgetPatch::Keep,
+            Some(None) => BudgetPatch::Clear,
+            Some(Some(budget)) => budget.patch(),
+        }
+    }
 }
 
 /// HTTP response body for a single Online Eval Job.
@@ -93,6 +164,8 @@ pub struct EvalJobResponseBody {
     pub trace_config: Option<TraceEvalConfig>,
     #[schema(value_type = Option<Object>)]
     pub session_config: Option<SessionEvalConfig>,
+    #[schema(nullable)]
+    pub budget: Option<EvalJobBudget>,
     #[schema(value_type = String)]
     pub sampling_mode: SamplingMode,
     pub sampling_value: serde_json::Value,
@@ -216,6 +289,10 @@ impl TryFrom<EvalJobRequestBody> for infra::table::online_eval_jobs::OnlineEvalJ
             span_selector_bindings: value.span_selector_bindings,
             trace_config: value.trace_config,
             session_config: value.session_config,
+            budget: value
+                .budget
+                .flatten()
+                .map(EvalJobBudgetRequest::into_budget),
             sampling_mode: value.sampling_mode,
             sampling_value: value.sampling_value,
             status: "draft".to_string(),
@@ -253,6 +330,7 @@ impl From<infra::table::online_eval_jobs::OnlineEvalJob> for EvalJobResponseBody
             span_selector_bindings: value.span_selector_bindings,
             trace_config: value.trace_config,
             session_config: value.session_config,
+            budget: value.budget,
             sampling_mode: value.sampling_mode,
             sampling_value,
             status: value.status,
@@ -316,6 +394,7 @@ mod tests {
             span_selector_bindings: Default::default(),
             trace_config: None,
             session_config: None,
+            budget: None,
             sampling_mode: SamplingMode::Rate,
             sampling_value: serde_json::json!(0.1),
             status: "active".to_string(),
@@ -344,6 +423,7 @@ mod tests {
             span_selector_bindings: Default::default(),
             trace_config: None,
             session_config: None,
+            budget: None,
             sampling_mode: SamplingMode::All,
             sampling_value: serde_json::json!(null),
         };
@@ -377,6 +457,7 @@ mod tests {
             span_selector_bindings: Default::default(),
             trace_config: None,
             session_config: None,
+            budget: None,
             sampling_mode: SamplingMode::All,
             sampling_value: serde_json::Value::Null,
         };
@@ -475,6 +556,83 @@ mod tests {
         assert!(body.input_mapping.is_none());
         assert!(body.description.is_none());
         assert_eq!(body.target_scope, TargetScope::Span);
+    }
+
+    #[test]
+    fn test_eval_job_request_body_budget_ignores_client_pause_state() {
+        let json = r#"{
+            "name": "j",
+            "stream": "default",
+            "streamType": "traces",
+            "filterCondition": {},
+            "scorers": ["a"],
+            "budget": {"dailyUsd": 5, "onReach": "pause", "pausedAt": 1, "pausedSpendUsd": 6, "liftedUntil": 2},
+            "samplingMode": "rate",
+            "samplingValue": 0.1
+        }"#;
+        let body: EvalJobRequestBody = serde_json::from_str(json).unwrap();
+        let job = infra::table::online_eval_jobs::OnlineEvalJob::try_from(body).unwrap();
+        let budget = job.budget.clone().unwrap();
+        assert_eq!(budget.daily_usd, 5.0);
+        assert_eq!(
+            (
+                budget.paused_at,
+                budget.paused_spend_usd,
+                budget.lifted_until
+            ),
+            (None, None, None)
+        );
+
+        let response = serde_json::to_value(EvalJobResponseBody::from(job)).unwrap();
+        assert_eq!(
+            response["budget"],
+            serde_json::json!({"dailyUsd": 5.0, "onReach": "pause"})
+        );
+    }
+
+    #[test]
+    fn test_eval_job_request_body_budget_patch() {
+        let body = |budget: &str| {
+            serde_json::from_str::<EvalJobRequestBody>(&format!(
+                r#"{{"name": "j", "stream": "default", "streamType": "traces",
+                    "filterCondition": {{}}, "scorers": ["a"], "samplingMode": "rate",
+                    "samplingValue": 0.1 {budget}}}"#
+            ))
+        };
+        let patch = |budget: &str| body(budget).unwrap().budget_patch();
+
+        assert_eq!(patch(""), BudgetPatch::Keep);
+        assert_eq!(patch(r#", "budget": null"#), BudgetPatch::Clear);
+        assert_eq!(
+            patch(r#", "budget": {"dailyUsd": 7}"#),
+            BudgetPatch::Set {
+                daily_usd: 7.0,
+                on_reach: None
+            }
+        );
+        assert_eq!(
+            patch(r#", "budget": {"dailyUsd": 7, "onReach": "keep_running"}"#),
+            BudgetPatch::Set {
+                daily_usd: 7.0,
+                on_reach: Some(BudgetAction::KeepRunning)
+            }
+        );
+        // Unknown keys are refused, a snake_case action included, not dropped.
+        assert!(body(r#", "budget": {"dailyUsd": 5, "qaUnknown": 1}"#).is_err());
+        assert!(body(r#", "budget": {"dailyUsd": 5, "on_reach": "keep_running"}"#).is_err());
+
+        // A new job without a budget has none; one without an action pauses.
+        let job = |budget: &str| {
+            infra::table::online_eval_jobs::OnlineEvalJob::try_from(body(budget).unwrap()).unwrap()
+        };
+        assert!(job(r#", "budget": null"#).budget.is_none());
+        assert_eq!(
+            job(r#", "budget": {"dailyUsd": 5}"#)
+                .budget
+                .unwrap()
+                .on_reach,
+            BudgetAction::Pause
+        );
     }
 
     #[test]

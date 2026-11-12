@@ -108,7 +108,10 @@ pub async fn validate_query_fields(
                 Error::ErrorCode(ErrorCodes::SearchStreamNotFound(stream_name.to_string()))
             })?;
         let settings = infra::schema::get_settings(org_id, stream_name, target_stream_type).await;
-        let uds_fields = infra::schema::get_stream_setting_defined_schema_fields(&settings);
+        let uds_fields = schema::effective_uds_fields(
+            target_stream_type,
+            &infra::schema::get_stream_setting_defined_schema_fields(&settings),
+        );
 
         for field in target_fields {
             if is_system_field(&field) {
@@ -128,11 +131,14 @@ pub async fn validate_query_fields(
             }
 
             if !uds_fields.is_empty() && !uds_fields.contains(&field) {
-                let valid = uds_fields
+                let mut valid = schema
+                    .fields()
                     .iter()
-                    .map(|f| f.to_owned())
-                    .collect::<Vec<_>>()
-                    .join(", ");
+                    .map(|f| f.name().as_str())
+                    .filter(|name| uds_fields.contains(*name))
+                    .collect::<Vec<_>>();
+                valid.sort_unstable();
+                let valid = valid.join(", ");
                 return Err(Error::ErrorCode(ErrorCodes::SearchFieldNotFound(format!(
                     "No field named {field}. Field exists in the stream but not in its User-Defined Schema (UDS). Valid fields are {valid}.",
                 ))));
@@ -369,6 +375,46 @@ JOIN "test1" AS b"#;
             "Expected error about field not in UDS, got: {}",
             err_msg
         );
+    }
+
+    #[tokio::test]
+    async fn test_validate_query_fields_uds_hint_lists_real_fields_sorted() {
+        use arrow_schema::{DataType, Field, Schema};
+        use config::meta::stream::{StreamSettings, StreamType};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let cache_key = format!("test_org_uds_hint/{}/app", StreamType::Logs);
+        let schema = Schema::new(vec![
+            Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("zeta", DataType::Utf8, true),
+            Field::new("hidden", DataType::Utf8, true),
+            Field::new("alpha", DataType::Utf8, true),
+        ]);
+        STREAM_SCHEMAS_LATEST
+            .write()
+            .await
+            .insert(cache_key.clone(), SchemaCache::new(schema));
+        let settings = StreamSettings {
+            defined_schema_fields: vec!["zeta".into(), "ghost".into(), "alpha".into()],
+            ..Default::default()
+        };
+        infra::schema::put_stream_settings_batch(vec![(
+            cache_key.clone(),
+            std::sync::Arc::new(settings),
+        )])
+        .await;
+
+        let result = validate_query_fields(
+            "test_org_uds_hint",
+            "app",
+            StreamType::Logs,
+            r#"SELECT hidden FROM "app""#,
+        )
+        .await;
+        STREAM_SCHEMAS_LATEST.write().await.remove(&cache_key);
+
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("Valid fields are alpha, zeta."), "{msg}");
     }
 
     #[tokio::test]
