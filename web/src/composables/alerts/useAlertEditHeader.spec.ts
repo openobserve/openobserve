@@ -114,11 +114,14 @@ describe("useAlertEditHeader", () => {
 
   it("Unmute cancels the mute through the alert route and clears the state", async () => {
     createMute.mockResolvedValue({ downtime_id: "dt1", version: 1, ends_at: ENDS_AT });
-    endMute.mockResolvedValue(true);
+    endMute.mockResolvedValue("ok");
     const api = host();
     await api().muteFor(3600);
     expect(await api().unmute()).toBe(true);
-    expect(endMute).toHaveBeenCalledWith({ alertId: "a1", name: "errors", folderId: "f1" }, "dt1");
+    expect(endMute).toHaveBeenCalledWith(
+      { alertId: "a1", name: "errors", folderId: "f1" },
+      { id: "dt1", ends_at: ENDS_AT, version: 1 },
+    );
     expect(api().muted.value).toBeNull();
   });
 
