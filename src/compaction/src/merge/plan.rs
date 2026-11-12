@@ -13,14 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Turns one partition's files into merge batches: size-bounded groups, and
-//! for metrics the split that keeps legacy files out of hash-ordered merges.
+//! The merge rules: which rule a window follows, which files it reads and how they batch.
 
 use std::sync::Arc;
 
 use arrow_schema::Schema;
-use config::meta::stream::{FileKey, MergeStrategy};
-use metrics_index::MetricsFileLayout;
+#[cfg(feature = "enterprise")]
+use config::meta::promql::DownsamplingRule;
+use config::meta::stream::{FileKey, MergeStrategy, StreamType};
+use metrics_index::{MetricsFileLayout, metrics_index_stream};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
 use search::merge::MergeMode;
 
 use super::metrics::{MetricsIndexMergeScope, metrics_index_merge_scope, pre_merge_batches};
@@ -42,50 +45,134 @@ pub(super) struct BatchLimits<'a> {
     pub max_merge_groups: usize,
 }
 
-/// Splits a partition's files into merge batches: the legacy metrics files
-/// keep their classic size-bounded merges, everything else merges in `mode`.
-pub(super) async fn plan_batches(
-    files: Vec<FileKey>,
-    mode: &MergeMode,
-    limits: &BatchLimits<'_>,
-    schema: &Arc<Schema>,
-    stream: &str,
-) -> Vec<PlannedBatch> {
-    let (mode_files, mut legacy_files) = split_legacy_metrics(files, mode);
-    // a whole-hour query lists every file; the classic merge never rewrites the full-sized ones
-    legacy_files.retain(|f| f.meta.original_size <= limits.merge_max_original_size);
-    let mut batches: Vec<PlannedBatch> = size_bounded_groups(&legacy_files, limits)
-        .into_iter()
-        .map(|group| (group, MergeMode::Classic))
-        .collect();
+/// What one round merges in a partition of the window.
+#[derive(Debug)]
+pub(super) struct RoundPlan {
+    pub batches: Vec<PlannedBatch>,
+    /// These batches only prepare the window: it is planned again once they are committed.
+    pub needs_another_round: bool,
+}
 
-    let planned = match mode {
-        MergeMode::MetricsHashMerged => open_hour_batches(&mode_files, limits),
-        MergeMode::MetricsIndexed => closed_hour_batches(mode_files, limits, schema, stream).await,
+impl RoundPlan {
+    fn last(batches: Vec<PlannedBatch>) -> Self {
+        Self {
+            batches,
+            needs_another_round: false,
+        }
+    }
+}
+
+/// The rule one window (an hour or a day of a stream) merges under.
+#[derive(Debug, Clone)]
+pub(super) enum MergePolicy {
+    /// Groups up to the size target, each written in the given mode: logs, traces, plain metrics.
+    SizeBounded(MergeMode),
+    /// Open hour of a metrics-index stream: the pending ingester files become hash-merged files.
+    MetricsOpenHour,
+    /// Closed hour of a metrics-index stream: indexed files, after pre-merges while over the cap.
+    MetricsClosedHour,
+    /// Closed metrics window under a downsampling rule: every file in one batch.
+    #[cfg(feature = "enterprise")]
+    Downsampling(DownsamplingRule),
+}
+
+impl MergePolicy {
+    /// The rule for the window of `stream_name` that ends at `range_end_ts`, `closed` once settled.
+    pub(super) fn select(
+        stream_type: StreamType,
+        stream_name: &str,
+        schema: &Schema,
+        _range_end_ts: i64,
+        closed: bool,
+    ) -> Self {
         #[cfg(feature = "enterprise")]
-        MergeMode::Downsampling(_) => vec![(mode_files, mode.clone())],
-        MergeMode::Classic
-        | MergeMode::TraceTimeIndex
-        | MergeMode::FileList
-        | MergeMode::MetricsHashSorted => size_bounded_groups(&mode_files, limits)
-            .into_iter()
-            .map(|group| (group, mode.clone()))
-            .collect(),
-    };
-    // a branch may plan a batch of no files: nothing to merge
-    batches.extend(planned.into_iter().filter(|(files, _)| !files.is_empty()));
-    batches
+        if closed
+            && stream_type == StreamType::Metrics
+            && let Some(rule) = get_largest_downsampling_rule(stream_name, _range_end_ts)
+        {
+            return Self::Downsampling(rule.clone());
+        }
+        if metrics_index_stream(stream_type, schema) {
+            return if closed {
+                Self::MetricsClosedHour
+            } else {
+                Self::MetricsOpenHour
+            };
+        }
+        Self::SizeBounded(MergeMode::for_stream(stream_type, stream_name))
+    }
+
+    /// True when the rule plans over every file of the window, those at the size target included.
+    pub(super) fn reads_whole_window(&self) -> bool {
+        match self {
+            Self::SizeBounded(_) => false,
+            Self::MetricsOpenHour | Self::MetricsClosedHour => true,
+            #[cfg(feature = "enterprise")]
+            Self::Downsampling(_) => true,
+        }
+    }
+
+    /// The batches one partition's `files` merge in this round.
+    pub(super) async fn plan(
+        &self,
+        files: Vec<FileKey>,
+        limits: &BatchLimits<'_>,
+        schema: &Arc<Schema>,
+        stream: &str,
+    ) -> RoundPlan {
+        let mut plan = match self {
+            Self::SizeBounded(mode) => RoundPlan::last(size_bounded_batches(&files, limits, mode)),
+            Self::MetricsOpenHour => {
+                let (files, legacy_files) = split_legacy_metrics(files);
+                let mut batches = legacy_batches(legacy_files, limits);
+                batches.extend(open_hour_batches(&files, limits));
+                RoundPlan::last(batches)
+            }
+            Self::MetricsClosedHour => {
+                let (files, legacy_files) = split_legacy_metrics(files);
+                let mut batches = legacy_batches(legacy_files, limits);
+                let closed_hour = closed_hour_plan(files, limits, schema, stream).await;
+                batches.extend(closed_hour.batches);
+                RoundPlan {
+                    batches,
+                    needs_another_round: closed_hour.needs_another_round,
+                }
+            }
+            #[cfg(feature = "enterprise")]
+            Self::Downsampling(rule) => {
+                RoundPlan::last(vec![(files, MergeMode::Downsampling(rule.clone()))])
+            }
+        };
+        // a rule may plan a batch of no files: nothing to merge
+        plan.batches.retain(|(files, _)| !files.is_empty());
+        plan
+    }
 }
 
 /// Legacy metrics files never join a hash-ordered batch: sorting them would
-/// be a full sort of the hour. Returns `(files for the mode, legacy files)`.
-fn split_legacy_metrics(files: Vec<FileKey>, mode: &MergeMode) -> (Vec<FileKey>, Vec<FileKey>) {
-    if mode.metrics_file_layout().is_none() {
-        return (files, Vec::new());
-    }
+/// be a full sort of the hour. Returns `(hash-ordered files, legacy files)`.
+fn split_legacy_metrics(files: Vec<FileKey>) -> (Vec<FileKey>, Vec<FileKey>) {
     files
         .into_iter()
         .partition(|f| MetricsFileLayout::is_hash_ordered(&f.key))
+}
+
+/// The classic size-bounded merges the legacy files of a metrics-index hour keep.
+fn legacy_batches(mut files: Vec<FileKey>, limits: &BatchLimits<'_>) -> Vec<PlannedBatch> {
+    // a whole-hour query lists every file; the classic merge never rewrites the full-sized ones
+    files.retain(|f| f.meta.original_size <= limits.merge_max_original_size);
+    size_bounded_batches(&files, limits, &MergeMode::Classic)
+}
+
+fn size_bounded_batches(
+    files: &[FileKey],
+    limits: &BatchLimits<'_>,
+    mode: &MergeMode,
+) -> Vec<PlannedBatch> {
+    size_bounded_groups(files, limits)
+        .into_iter()
+        .map(|group| (group, mode.clone()))
+        .collect()
 }
 
 /// The open metrics hour: its pending ingester files merge into hash-merged output.
@@ -106,12 +193,12 @@ fn open_hour_batches(files: &[FileKey], limits: &BatchLimits<'_>) -> Vec<Planned
 }
 
 /// The closed metrics hour: a pre-merge while over the merge-group cap, else its indexed merge.
-async fn closed_hour_batches(
+async fn closed_hour_plan(
     mut files: Vec<FileKey>,
     limits: &BatchLimits<'_>,
     schema: &Arc<Schema>,
     stream: &str,
-) -> Vec<PlannedBatch> {
+) -> RoundPlan {
     let files = match metrics_index_merge_scope(&files, limits.max_file_size) {
         MetricsIndexMergeScope::Skip => Vec::new(),
         MetricsIndexMergeScope::LateFilesOnly => {
@@ -133,9 +220,11 @@ async fn closed_hour_batches(
 
     let pre_merge = pre_merge_batches(&files, limits.max_merge_groups, schema, stream).await;
     if pre_merge.is_empty() {
-        vec![(files, MergeMode::MetricsIndexed)]
-    } else {
-        pre_merge
+        return RoundPlan::last(vec![(files, MergeMode::MetricsIndexed)]);
+    }
+    RoundPlan {
+        batches: pre_merge,
+        needs_another_round: true,
     }
 }
 
@@ -252,6 +341,42 @@ mod tests {
             .collect()
     }
 
+    #[test]
+    fn test_select_policy_by_stream_and_window_state() {
+        let plain = Schema::empty();
+        let hashed = Schema::new(vec![arrow_schema::Field::new(
+            config::meta::promql::HASH_LABEL,
+            arrow_schema::DataType::UInt64,
+            false,
+        )]);
+        let select = |stream_type, name, schema, closed| {
+            MergePolicy::select(stream_type, name, schema, 0, closed)
+        };
+        assert!(matches!(
+            select(StreamType::Traces, "app", &plain, true),
+            MergePolicy::SizeBounded(MergeMode::Classic)
+        ));
+        assert!(matches!(
+            select(StreamType::Filelist, "x", &plain, false),
+            MergePolicy::SizeBounded(MergeMode::FileList)
+        ));
+        assert!(matches!(
+            select(StreamType::Metrics, "cpu", &plain, true),
+            MergePolicy::SizeBounded(MergeMode::Classic)
+        ));
+        assert!(matches!(
+            select(StreamType::Metrics, "cpu", &hashed, false),
+            MergePolicy::MetricsOpenHour
+        ));
+        assert!(matches!(
+            select(StreamType::Metrics, "cpu", &hashed, true),
+            MergePolicy::MetricsClosedHour
+        ));
+        assert!(!MergePolicy::SizeBounded(MergeMode::Classic).reads_whole_window());
+        assert!(MergePolicy::MetricsOpenHour.reads_whole_window());
+        assert!(MergePolicy::MetricsClosedHour.reads_whole_window());
+    }
+
     /// A closed hour with legacy and hash-ordered files: the legacy files get
     /// their classic size-bounded merge, the hash files one indexed batch, and
     /// no batch mixes the layouts (that would sort the whole hour).
@@ -263,14 +388,15 @@ mod tests {
             metrics_file("3.parquet", 300),
             metrics_file("hash-sorted-v1-4.parquet", 300),
         ];
-        let batches = plan_batches(
-            files,
-            &MergeMode::MetricsIndexed,
-            &limits(&MergeStrategy::FileSize, 0, false),
-            &schema(),
-            "test",
-        )
-        .await;
+        let batches = MergePolicy::MetricsClosedHour
+            .plan(
+                files,
+                &limits(&MergeStrategy::FileSize, 0, false),
+                &schema(),
+                "test",
+            )
+            .await
+            .batches;
         assert_eq!(batches.len(), 2, "{batches:?}");
         let (legacy, mode) = &batches[0];
         assert!(matches!(mode, MergeMode::Classic), "{mode}");
@@ -293,14 +419,15 @@ mod tests {
             .collect();
         files.push(metrics_file("hash-sorted-v1-5.parquet", 300));
         files.push(metrics_file("hash-sorted-v1-6.parquet", 300));
-        let batches = plan_batches(
-            files,
-            &MergeMode::MetricsHashMerged,
-            &limits(&MergeStrategy::FileTime, 0, true),
-            &schema(),
-            "test",
-        )
-        .await;
+        let batches = MergePolicy::MetricsOpenHour
+            .plan(
+                files,
+                &limits(&MergeStrategy::FileTime, 0, true),
+                &schema(),
+                "test",
+            )
+            .await
+            .batches;
         assert_eq!(batches.len(), 1, "{batches:?}");
         let (legacy, mode) = &batches[0];
         assert!(matches!(mode, MergeMode::Classic), "{mode}");
@@ -316,14 +443,15 @@ mod tests {
             metrics_file("2.parquet", 10),
             metrics_file("hash-sorted-v1-3.parquet", 300),
         ];
-        let batches = plan_batches(
-            files,
-            &MergeMode::MetricsIndexed,
-            &limits(&MergeStrategy::FileTime, 0, false),
-            &schema(),
-            "test",
-        )
-        .await;
+        let batches = MergePolicy::MetricsClosedHour
+            .plan(
+                files,
+                &limits(&MergeStrategy::FileTime, 0, false),
+                &schema(),
+                "test",
+            )
+            .await
+            .batches;
         assert_eq!(batches.len(), 1, "{batches:?}");
         assert!(matches!(batches[0].1, MergeMode::MetricsIndexed));
         assert_eq!(names(&batches[0].0), ["hash-sorted-v1-3.parquet"]);
@@ -338,14 +466,15 @@ mod tests {
             metrics_file("7.parquet", 300),
             metrics_file("8.parquet", 300),
         ];
-        let batches = plan_batches(
-            files,
-            &MergeMode::MetricsIndexed,
-            &limits(&MergeStrategy::FileSize, 0, false),
-            &schema(),
-            "test",
-        )
-        .await;
+        let batches = MergePolicy::MetricsClosedHour
+            .plan(
+                files,
+                &limits(&MergeStrategy::FileSize, 0, false),
+                &schema(),
+                "test",
+            )
+            .await
+            .batches;
         // the indexed files are left alone; the legacy pair still merges classic
         assert_eq!(batches.len(), 1, "{batches:?}");
         assert!(matches!(batches[0].1, MergeMode::Classic));
@@ -358,14 +487,15 @@ mod tests {
             metrics_file("indexed-v1-1.parquet", 300),
             metrics_file("hash-sorted-v1-2.parquet", 300),
         ];
-        let batches = plan_batches(
-            files,
-            &MergeMode::MetricsIndexed,
-            &limits(&MergeStrategy::FileSize, 0, false),
-            &schema(),
-            "test",
-        )
-        .await;
+        let batches = MergePolicy::MetricsClosedHour
+            .plan(
+                files,
+                &limits(&MergeStrategy::FileSize, 0, false),
+                &schema(),
+                "test",
+            )
+            .await
+            .batches;
         assert_eq!(batches.len(), 1);
         assert!(matches!(batches[0].1, MergeMode::MetricsIndexed));
         assert_eq!(names(&batches[0].0), ["hash-sorted-v1-2.parquet"]);
@@ -388,14 +518,10 @@ mod tests {
         files.push(metrics_file("legacy.parquet", 100));
         let strategy = MergeStrategy::FileTime;
         let limits = limits(&strategy, 0, true);
-        let batches = plan_batches(
-            files.clone(),
-            &MergeMode::MetricsHashMerged,
-            &limits,
-            &schema(),
-            "s",
-        )
-        .await;
+        let batches = MergePolicy::MetricsOpenHour
+            .plan(files.clone(), &limits, &schema(), "s")
+            .await
+            .batches;
         assert_eq!(batches.len(), 1, "{batches:?}");
         assert!(
             matches!(batches[0].1, MergeMode::MetricsHashMerged),
@@ -411,15 +537,11 @@ mod tests {
         );
         files.retain(|f| !f.key.ends_with("hash-sorted-v1-01.parquet"));
         assert!(
-            plan_batches(
-                files,
-                &MergeMode::MetricsHashMerged,
-                &limits,
-                &schema(),
-                "s"
-            )
-            .await
-            .is_empty(),
+            MergePolicy::MetricsOpenHour
+                .plan(files, &limits, &schema(), "s")
+                .await
+                .batches
+                .is_empty(),
             "fewer pending files than the minimum wait for more"
         );
     }
@@ -434,8 +556,10 @@ mod tests {
         ];
         let strategy = MergeStrategy::FileTime;
         let limits = limits(&strategy, 0, false);
-        let batches =
-            plan_batches(files, &MergeMode::MetricsIndexed, &limits, &schema(), "s").await;
+        let batches = MergePolicy::MetricsClosedHour
+            .plan(files, &limits, &schema(), "s")
+            .await
+            .batches;
         assert_eq!(batches.len(), 1, "{batches:?}");
         assert!(matches!(batches[0].1, MergeMode::MetricsIndexed));
         assert_eq!(

@@ -19,7 +19,9 @@ use ::datafusion::arrow::datatypes::Schema;
 use chrono::{DateTime, TimeZone, Utc};
 use config::{
     cluster, get_config,
-    meta::stream::{FileKey, FileListDeleted, MergeStrategy, PartitionTimeLevel, StreamType},
+    meta::stream::{
+        FileKey, FileListDeleted, MergeStrategy, PartitionTimeLevel, StreamSettings, StreamType,
+    },
     metrics,
     utils::{parquet::parse_file_key_columns, time::hour_micros},
 };
@@ -31,7 +33,6 @@ use infra::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
-use search::merge::MergeMode;
 use search_service::file_list;
 use tokio::{
     sync::{Semaphore, mpsc},
@@ -40,7 +41,7 @@ use tokio::{
 
 use super::{
     job::{job_range_end, job_time_level, scheduling_level},
-    plan::{BatchLimits, plan_batches},
+    plan::{BatchLimits, MergePolicy},
 };
 use crate::{
     bloom::compact::RetiredBlooms,
@@ -50,24 +51,86 @@ use crate::{
 /// Position of the hour directory in `files/{org}/{type}/{stream}/YYYY/MM/DD/HH/...`.
 const HOUR_SEGMENT: usize = 7;
 
-/// What one partition's merge round left behind.
-#[derive(Default)]
-struct PartitionOutcome {
-    retired_blooms: RetiredBlooms,
-    /// A closed hour only pre-merged into hash-merged files: the indexed merge is still due.
-    pre_merged: bool,
+/// What a worker returns for one batch: `(batch_id, new_files, retire_files)`.
+type BatchResult = Result<(usize, Vec<FileKey>, Vec<FileKey>), anyhow::Error>;
+
+/// One job's merge window: the stream, the range it covers and whether it is still open.
+struct MergeWindow {
+    org_id: String,
+    stream_type: StreamType,
+    stream_name: String,
+    /// The job offset, aligned to its hour.
+    offset: i64,
+    job_end: i64,
+    /// The range can still receive files: only full-size groups are sealed.
+    is_incremental: bool,
+    /// A daily day was written hourly: its files merge as one group, written to DD/00.
+    merges_by_day: bool,
+    date_start: String,
+    date_end: String,
+    /// End of the range the files are read from; the merge rule is selected by it.
+    range_end_ts: i64,
 }
 
-/// compactor run steps on a stream:
-/// 3. get a cluster lock for compactor stream
-/// 4. read last compacted offset: year/month/day/hour
-/// 5. read current hour all files
-/// 6. compact small files to big files -> COMPACTOR_MAX_FILE_SIZE
-/// 7. write to storage
-/// 8. delete small files keys & write big files keys, use transaction
-/// 9. delete small files from storage
-/// 10. update last compacted offset
-/// 11. release cluster lock
+impl MergeWindow {
+    fn resolve(
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        settings: Option<&StreamSettings>,
+        offset: i64,
+    ) -> Self {
+        let offset = offset - offset % hour_micros(1);
+        let job_level = scheduling_level(stream_type, settings, offset);
+        let job_end = job_range_end(offset, job_level);
+        let is_incremental = !crate::is_past_hour(job_end);
+        let partition_time_level = job_time_level(
+            stream_type,
+            offset,
+            !is_incremental,
+            get_partition_time_level_at(stream_type, settings, offset),
+            |max_ts| has_downsampling_rule(stream_name, max_ts),
+        );
+        let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
+        let (date_start, date_end) = if partition_time_level == PartitionTimeLevel::Daily {
+            (
+                offset_time.format("%Y/%m/%d/00").to_string(),
+                offset_time.format("%Y/%m/%d/23").to_string(),
+            )
+        } else {
+            (
+                offset_time.format("%Y/%m/%d/%H").to_string(),
+                offset_time.format("%Y/%m/%d/%H").to_string(),
+            )
+        };
+        Self {
+            org_id: org_id.to_string(),
+            stream_type,
+            stream_name: stream_name.to_string(),
+            offset,
+            job_end,
+            is_incremental,
+            merges_by_day: job_level == PartitionTimeLevel::Daily,
+            date_start,
+            date_end,
+            range_end_ts: job_range_end(offset, partition_time_level),
+        }
+    }
+
+    fn stream(&self) -> String {
+        format!("{}/{}/{}", self.org_id, self.stream_type, self.stream_name)
+    }
+}
+
+/// What one merge round left behind, for a partition or for the whole window.
+#[derive(Default)]
+struct RoundOutcome {
+    retired_blooms: RetiredBlooms,
+    /// The round only prepared the window: the job is re-armed instead of finished.
+    needs_another_round: bool,
+}
+
+/// Runs one merge round of a job's window: plan, merge, commit, then settle the job.
 pub async fn merge_by_stream(
     worker_tx: mpsc::Sender<(MergeSender, MergeBatch)>,
     org_id: &str,
@@ -76,16 +139,12 @@ pub async fn merge_by_stream(
     job_id: i64,
     offset: i64,
 ) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
     let start = std::time::Instant::now();
 
-    // get schema
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     if schema == Schema::empty() {
-        // the stream was deleted, mark the job as done
-        if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
-            log::error!("[COMPACTOR] set_job_done failed: {e}");
-        }
+        // the stream was deleted: nothing is left to merge
+        mark_job_done(job_id).await;
         return Ok(());
     }
 
@@ -93,252 +152,285 @@ pub async fn merge_by_stream(
         "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}"
     );
 
-    // an unsettled range can still receive files: seal full-size groups only
-    let offset = offset - offset % hour_micros(1);
     let settings = get_settings(org_id, stream_name, stream_type).await;
-    let settings = settings.as_deref();
-    let job_level = scheduling_level(stream_type, settings, offset);
-    let job_end = job_range_end(offset, job_level);
-    let is_incremental = !crate::is_past_hour(job_end);
-    // a daily day was written hourly: its files merge as one group, written to DD/00
-    let merges_by_day = job_level == PartitionTimeLevel::Daily;
-
-    // check offset
-    let partition_time_level = job_time_level(
+    let window = Arc::new(MergeWindow::resolve(
+        org_id,
         stream_type,
+        stream_name,
+        settings.as_deref(),
         offset,
-        !is_incremental,
-        get_partition_time_level_at(stream_type, settings, offset),
-        |max_ts| has_downsampling_rule(stream_name, max_ts),
-    );
-    let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
-    let (date_start, date_end) = if partition_time_level == PartitionTimeLevel::Daily {
-        (
-            offset_time.format("%Y/%m/%d/00").to_string(),
-            offset_time.format("%Y/%m/%d/23").to_string(),
-        )
-    } else {
-        (
-            offset_time.format("%Y/%m/%d/%H").to_string(),
-            offset_time.format("%Y/%m/%d/%H").to_string(),
-        )
-    };
-    // What this hour of files turns into. Decided once here — the workers and
-    // the merge only read it — from the end of the range, so a whole-hour
-    // mode applies to the hour as a unit.
-    let range_end_ts = job_range_end(offset, partition_time_level);
-    let mode = MergeMode::for_compactor(
+    ));
+    let policy = MergePolicy::select(
         stream_type,
         stream_name,
         &schema,
-        range_end_ts,
-        !is_incremental,
+        window.range_end_ts,
+        !window.is_incremental,
     );
-    // a whole-hour merge needs every file of the hour, even those already
-    // above the size target that a normal merge would leave alone
-    let max_original_size = if mode.merges_whole_batch() {
+    let files = window_files(&window, &policy).await?;
+    if files.is_empty() {
+        mark_job_done(job_id).await;
+        return Ok(());
+    }
+
+    let scan_schema = Arc::new(schema.with_metadata(Default::default()));
+    let outcome = merge_partitions(worker_tx, &window, &policy, scan_schema, files).await?;
+    build_blooms(&window, outcome.needs_another_round, outcome.retired_blooms).await;
+    settle_job(&window, job_id, outcome.needs_another_round).await;
+
+    let time = start.elapsed().as_secs_f64();
+    metrics::COMPACT_USED_TIME
+        .with_label_values(&[org_id, stream_type.as_str()])
+        .inc_by(time);
+
+    Ok(())
+}
+
+async fn mark_job_done(job_id: i64) {
+    if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
+        log::error!("[COMPACTOR] set_job_done failed: {e}");
+    }
+}
+
+/// The files of the window the policy plans over.
+async fn window_files(
+    window: &MergeWindow,
+    policy: &MergePolicy,
+) -> Result<Vec<FileKey>, anyhow::Error> {
+    let max_original_size = if policy.reads_whole_window() {
         i64::MAX
     } else {
         infra_file_list::merge_max_original_size()
     };
     let files = file_list::query_for_merge(
-        org_id,
-        stream_type,
-        stream_name,
-        &date_start,
-        &date_end,
+        &window.org_id,
+        window.stream_type,
+        &window.stream_name,
+        &window.date_start,
+        &window.date_end,
         max_original_size,
     )
     .await
     .map_err(|e| anyhow::anyhow!("query file list failed: {e}"))?;
 
     log::debug!(
-        "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] date range: [{date_start},{date_end}], files: {}",
+        "[COMPACTOR] merge_by_stream [{}] date range: [{},{}], files: {}",
+        window.stream(),
+        window.date_start,
+        window.date_end,
         files.len(),
     );
+    Ok(files)
+}
 
-    if files.is_empty() {
-        // update job status
-        if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
-            log::error!("[COMPACTOR] set_job_done failed: {e}");
-        }
-        return Ok(());
-    }
-
-    // do partition by partition key
-    let mut partition_files_with_size: HashMap<String, Vec<FileKey>> = HashMap::default();
+fn group_by_partition(files: Vec<FileKey>, window: &MergeWindow) -> HashMap<String, Vec<FileKey>> {
+    let mut partitions: HashMap<String, Vec<FileKey>> = HashMap::default();
     for file in files {
         let prefix = &file.key[..file.key.rfind('/').unwrap()];
-        let prefix = if merges_by_day {
+        let prefix = if window.merges_by_day {
             day_prefix(prefix)
         } else {
             prefix.to_string()
         };
-        partition_files_with_size
-            .entry(prefix)
-            .or_default()
-            .push(file);
+        partitions.entry(prefix).or_default().push(file);
     }
+    partitions
+}
 
-    let scan_schema = Arc::new(schema.clone().with_metadata(Default::default()));
-    // use multiple threads to merge
-    let semaphore = Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
-    let mut tasks = Vec::with_capacity(partition_files_with_size.len());
-    for (prefix, mut files_with_size) in partition_files_with_size.into_iter() {
-        let org_id = org_id.to_string();
-        let stream_name = stream_name.to_string();
-        let mode = mode.clone();
-        let scan_schema = scan_schema.clone();
+/// Merges every partition of the window, `file_merge_thread_num` of them at a time.
+async fn merge_partitions(
+    worker_tx: mpsc::Sender<(MergeSender, MergeBatch)>,
+    window: &Arc<MergeWindow>,
+    policy: &MergePolicy,
+    scan_schema: Arc<Schema>,
+    files: Vec<FileKey>,
+) -> Result<RoundOutcome, anyhow::Error> {
+    let semaphore = Arc::new(Semaphore::new(get_config().limit.file_merge_thread_num));
+    let partitions = group_by_partition(files, window);
+    let mut tasks = Vec::with_capacity(partitions.len());
+    for (prefix, files) in partitions {
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
-        let task: JoinHandle<anyhow::Result<PartitionOutcome>> = tokio::task::spawn(async move {
-            let cfg = get_config();
-            // sort by file size
-            let job_strategy = MergeStrategy::from(&cfg.compact.strategy);
-            match job_strategy {
-                MergeStrategy::FileSize => {
-                    files_with_size.sort_by_key(|k| k.meta.original_size);
-                }
-                MergeStrategy::FileTime => {
-                    files_with_size.sort_by_key(|k| k.meta.min_ts);
-                }
-                MergeStrategy::TimeRange => {
-                    files_with_size = sort_by_time_range(files_with_size);
-                }
-            }
-
-            let limits = BatchLimits {
-                strategy: &job_strategy,
-                max_file_size: cfg.compact.max_file_size,
-                max_group_files: cfg.compact.max_group_files,
-                is_incremental,
-                merge_max_original_size: infra_file_list::merge_max_original_size(),
-                max_merge_groups: cfg.compact.metrics_max_groups,
-            };
-            let stream = format!("{org_id}/{stream_type}/{stream_name}");
-            let planned =
-                plan_batches(files_with_size, &mode, &limits, &scan_schema, &stream).await;
-            // a closed hour plans hash-merged output only as a pre-merge for a later round
-            let pre_merged = !is_incremental
-                && planned
-                    .iter()
-                    .any(|(_, mode)| matches!(mode, MergeMode::MetricsHashMerged));
-            let batch_groups: Vec<MergeBatch> = planned
-                .into_iter()
-                .enumerate()
-                .map(|(batch_id, (files, mode))| MergeBatch {
-                    batch_id,
-                    org_id: org_id.clone(),
-                    stream_type,
-                    stream_name: stream_name.clone(),
-                    prefix: prefix.clone(),
-                    files,
-                    mode,
-                })
-                .collect();
-            if batch_groups.is_empty() {
-                return Ok(PartitionOutcome::default()); // no files need to merge
-            }
-
-            // send to worker
-            let batch_group_len = batch_groups.len();
-            let (inner_tx, mut inner_rx) = mpsc::channel(batch_group_len);
-            for batch in batch_groups.iter() {
-                if let Err(e) = worker_tx.send((inner_tx.clone(), batch.clone())).await {
-                    log::error!("[COMPACTOR] send batch to worker failed: {e}");
-                    return Err(anyhow::Error::msg("send batch to worker failed"));
-                }
-            }
-            let mut worker_results = Vec::with_capacity(batch_group_len);
-            for _ in 0..batch_group_len {
-                let result = inner_rx.recv().await.unwrap();
-                worker_results.push(result);
-            }
-
-            let mut last_error = None;
-            let mut check_guard = HashSet::with_capacity(batch_groups.len());
-            let mut retired_blooms = RetiredBlooms::default();
-            for ret in worker_results {
-                let (batch_id, new_files, retire_files) = match ret {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::error!("[COMPACTOR] merge files failed: {e}");
-                        last_error = Some(e);
-                        continue;
-                    }
-                };
-
-                if check_guard.contains(&batch_id) {
-                    log::warn!(
-                        "[COMPACTOR] merge files for stream: [{org_id}/{stream_type}/{stream_name}] found error files, batch_id: {batch_id} duplicate"
-                    );
-                    continue;
-                }
-                check_guard.insert(batch_id);
-
-                // retire the merged inputs and the gone files, never the planned batch
-                let events = retirement_events(new_files, &retire_files);
-                if events.is_empty() {
-                    continue;
-                }
-
-                // write file list to storage
-                if let Err(e) = write_file_list(&org_id, stream_type, &events).await {
-                    log::error!("[COMPACTOR] write file list failed: {e}");
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                    continue;
-                }
-
-                // drop the merged source files from this node's disk cache;
-                // on nodes that also serve queries they may still be in use
-                if cluster::LOCAL_NODE.is_compactor() && !cluster::LOCAL_NODE.is_querier() {
-                    file_data::delete::add(retire_files.iter().map(|f| f.key.clone()).collect());
-                }
-
-                // collect retired blooms after writing file list successfully
-                for file in retire_files.iter().filter(|f| f.meta.bloom_ver > 0) {
-                    // a `.bf` lives under the hour of the file it covers, not under the job's
-                    if let Ok((_, date, _)) = parse_file_key_columns(&file.key) {
-                        retired_blooms
-                            .entry(date)
-                            .or_default()
-                            .push(file.meta.bloom_ver);
-                    }
-                }
-            }
-            drop(permit);
-            if let Some(e) = last_error {
-                return Err(e);
-            }
-            Ok(PartitionOutcome {
-                retired_blooms,
-                pre_merged,
-            })
+        let window = window.clone();
+        let policy = policy.clone();
+        let scan_schema = scan_schema.clone();
+        let task: JoinHandle<anyhow::Result<RoundOutcome>> = tokio::task::spawn(async move {
+            let _permit = permit;
+            merge_partition(&worker_tx, &window, &policy, &scan_schema, prefix, files).await
         });
         tasks.push(task);
     }
 
-    // collect bloom files which need to be clean
-    let mut retired_blooms = RetiredBlooms::default();
-    let mut pre_merged = false;
+    let mut outcome = RoundOutcome::default();
     for task in tasks {
-        let outcome = task.await??;
-        pre_merged |= outcome.pre_merged;
-        for (date, bloom_vers) in outcome.retired_blooms {
-            retired_blooms.entry(date).or_default().extend(bloom_vers);
+        let partition = task.await??;
+        outcome.needs_another_round |= partition.needs_another_round;
+        for (date, bloom_vers) in partition.retired_blooms {
+            outcome
+                .retired_blooms
+                .entry(date)
+                .or_default()
+                .extend(bloom_vers);
         }
     }
+    Ok(outcome)
+}
 
-    // Build bloom filters for the current hour. Failures are non-fatal: files
-    // left at bloom_ver = 0 fall back to the regular Tantivy search path.
+/// One partition's round: plan its batches, run them on the workers, commit the results.
+async fn merge_partition(
+    worker_tx: &mpsc::Sender<(MergeSender, MergeBatch)>,
+    window: &MergeWindow,
+    policy: &MergePolicy,
+    scan_schema: &Arc<Schema>,
+    prefix: String,
+    files: Vec<FileKey>,
+) -> anyhow::Result<RoundOutcome> {
+    let cfg = get_config();
+    let strategy = MergeStrategy::from(&cfg.compact.strategy);
+    let limits = BatchLimits {
+        strategy: &strategy,
+        max_file_size: cfg.compact.max_file_size,
+        max_group_files: cfg.compact.max_group_files,
+        is_incremental: window.is_incremental,
+        merge_max_original_size: infra_file_list::merge_max_original_size(),
+        max_merge_groups: cfg.compact.metrics_max_groups,
+    };
+    let files = sort_for_strategy(files, &strategy);
+    let plan = policy
+        .plan(files, &limits, scan_schema, &window.stream())
+        .await;
+    let batches: Vec<MergeBatch> = plan
+        .batches
+        .into_iter()
+        .enumerate()
+        .map(|(batch_id, (files, mode))| MergeBatch {
+            batch_id,
+            org_id: window.org_id.clone(),
+            stream_type: window.stream_type,
+            stream_name: window.stream_name.clone(),
+            prefix: prefix.clone(),
+            files,
+            mode,
+        })
+        .collect();
+    if batches.is_empty() {
+        return Ok(RoundOutcome::default());
+    }
+
+    let results = run_batches(worker_tx, batches).await?;
+    let retired_blooms = commit_results(window, results).await?;
+    Ok(RoundOutcome {
+        retired_blooms,
+        needs_another_round: plan.needs_another_round,
+    })
+}
+
+fn sort_for_strategy(mut files: Vec<FileKey>, strategy: &MergeStrategy) -> Vec<FileKey> {
+    match strategy {
+        MergeStrategy::FileSize => files.sort_by_key(|k| k.meta.original_size),
+        MergeStrategy::FileTime => files.sort_by_key(|k| k.meta.min_ts),
+        MergeStrategy::TimeRange => files = sort_by_time_range(files),
+    }
+    files
+}
+
+/// Sends the batches to the merge workers and waits for every result.
+async fn run_batches(
+    worker_tx: &mpsc::Sender<(MergeSender, MergeBatch)>,
+    batches: Vec<MergeBatch>,
+) -> anyhow::Result<Vec<BatchResult>> {
+    let batch_num = batches.len();
+    let (inner_tx, mut inner_rx) = mpsc::channel(batch_num);
+    for batch in batches {
+        if let Err(e) = worker_tx.send((inner_tx.clone(), batch)).await {
+            log::error!("[COMPACTOR] send batch to worker failed: {e}");
+            return Err(anyhow::Error::msg("send batch to worker failed"));
+        }
+    }
+    let mut results = Vec::with_capacity(batch_num);
+    for _ in 0..batch_num {
+        results.push(inner_rx.recv().await.unwrap());
+    }
+    Ok(results)
+}
+
+/// Writes each merged batch to the file list; returns the blooms its retired files leave behind.
+async fn commit_results(
+    window: &MergeWindow,
+    results: Vec<BatchResult>,
+) -> anyhow::Result<RetiredBlooms> {
+    let mut last_error = None;
+    let mut check_guard = HashSet::with_capacity(results.len());
+    let mut retired_blooms = RetiredBlooms::default();
+    for ret in results {
+        let (batch_id, new_files, retire_files) = match ret {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("[COMPACTOR] merge files failed: {e}");
+                last_error = Some(e);
+                continue;
+            }
+        };
+
+        if check_guard.contains(&batch_id) {
+            log::warn!(
+                "[COMPACTOR] merge files for stream: [{}] found error files, batch_id: {batch_id} duplicate",
+                window.stream()
+            );
+            continue;
+        }
+        check_guard.insert(batch_id);
+
+        // retire the merged inputs and the gone files, never the planned batch
+        let events = retirement_events(new_files, &retire_files);
+        if events.is_empty() {
+            continue;
+        }
+
+        if let Err(e) = write_file_list(&window.org_id, window.stream_type, &events).await {
+            log::error!("[COMPACTOR] write file list failed: {e}");
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+
+        // on nodes that also serve queries the merged source files may still be in use
+        if cluster::LOCAL_NODE.is_compactor() && !cluster::LOCAL_NODE.is_querier() {
+            file_data::delete::add(retire_files.iter().map(|f| f.key.clone()).collect());
+        }
+
+        // only after the file list write: a failed batch keeps its files and their blooms
+        for file in retire_files.iter().filter(|f| f.meta.bloom_ver > 0) {
+            // a `.bf` lives under the hour of the file it covers, not under the job's
+            if let Ok((_, date, _)) = parse_file_key_columns(&file.key) {
+                retired_blooms
+                    .entry(date)
+                    .or_default()
+                    .push(file.meta.bloom_ver);
+            }
+        }
+    }
+    match last_error {
+        Some(e) => Err(e),
+        None => Ok(retired_blooms),
+    }
+}
+
+/// Builds the window's bloom filters; a failure only leaves files on the regular search path.
+async fn build_blooms(
+    window: &MergeWindow,
+    needs_another_round: bool,
+    retired_blooms: RetiredBlooms,
+) {
+    let stream = window.stream();
+    let date_start = &window.date_start;
     let build_start = std::time::Instant::now();
     match crate::bloom::compact::build_for_stream(
-        org_id,
-        stream_type,
-        stream_name,
-        &date_start,
-        // a pre-merged hour is rewritten next round: its blooms would go unreferenced at once
-        is_incremental || pre_merged,
+        &window.org_id,
+        window.stream_type,
+        &window.stream_name,
+        date_start,
+        // a window due another round is rewritten then: its blooms would go unreferenced at once
+        window.is_incremental || needs_another_round,
         retired_blooms,
     )
     .await
@@ -346,46 +438,45 @@ pub async fn merge_by_stream(
         Ok(false) => {}
         Ok(true) => {
             let build_time = build_start.elapsed().as_millis();
-            log::info!(
-                "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} took: {build_time} ms"
-            );
+            log::info!("[COMPACTOR] bloom build for {stream}/{date_start} took: {build_time} ms");
         }
         Err(e) => {
-            log::warn!(
-                "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} failed: {e}"
-            );
+            log::warn!("[COMPACTOR] bloom build for {stream}/{date_start} failed: {e}");
         }
     }
+}
 
+/// Marks the job done, re-arms it for another round, or leaves it Running for the retry.
+async fn settle_job(window: &MergeWindow, job_id: i64, needs_another_round: bool) {
+    let stream = window.stream();
+    let date_start = &window.date_start;
     // the range settled mid-round: stay Running so check_running_jobs re-arms a whole-range retry
-    if is_incremental && crate::is_past_hour(job_end) {
+    if window.is_incremental && crate::is_past_hour(window.job_end) {
         log::warn!(
-            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] range of {date_start} settled during the incremental round, job {job_id} is left for the retry"
+            "[COMPACTOR] merge_by_stream [{stream}] range of {date_start} settled during the incremental round, job {job_id} is left for the retry"
         );
-    } else if pre_merged {
+    } else if needs_another_round {
         log::info!(
-            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] {date_start} was pre-merged into hash-merged files, job {job_id} is re-armed for the indexed merge"
+            "[COMPACTOR] merge_by_stream [{stream}] {date_start} needs another merge round, job {job_id} is re-armed"
         );
         if let Err(e) = infra_file_list::set_job_pending(&[job_id], 0, None).await {
             log::error!("[COMPACTOR] set_job_pending failed: {e}");
         }
     } else if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
         log::error!("[COMPACTOR] set_job_done failed: {e}");
-    } else if is_incremental
-        && crate::is_past_hour(job_end)
+    } else if window.is_incremental
+        && crate::is_past_hour(window.job_end)
         // add_job does nothing on a Running row, so the scheduled pass may have just missed this one
-        && let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await
+        && let Err(e) = infra_file_list::add_job(
+            &window.org_id,
+            window.stream_type,
+            &window.stream_name,
+            window.offset,
+        )
+        .await
     {
         log::error!("[COMPACTOR] re-arm job {job_id} failed: {e}");
     }
-
-    // metrics
-    let time = start.elapsed().as_secs_f64();
-    metrics::COMPACT_USED_TIME
-        .with_label_values(&[org_id, stream_type.as_str()])
-        .inc_by(time);
-
-    Ok(())
 }
 
 fn has_downsampling_rule(_stream_name: &str, _max_ts: i64) -> bool {

@@ -924,13 +924,11 @@ mod tests {
                     let mut output = MergeOutput::for_compactor(StreamType::Metrics);
                     output.file_format = configured_format;
                     (
-                        MergeMode::for_compactor(
-                            StreamType::Metrics,
-                            "dispatch",
-                            &schema,
-                            0,
-                            closed_hour,
-                        ),
+                        if closed_hour {
+                            MergeMode::MetricsIndexed
+                        } else {
+                            MergeMode::MetricsHashMerged
+                        },
                         output,
                     )
                 };
