@@ -539,6 +539,15 @@ describe("AlertTargetsSelect — checkbox list", () => {
     expect(select(wrapper).exists()).toBe(true);
   });
 
+  it("keeps the checkboxes when workflows are locked and none is selected", () => {
+    const wrapper = createWrapper({
+      list: true,
+      workflowsLocked: true,
+      destinationOptions: ["slack", "email"],
+    });
+    expect(list(wrapper).exists()).toBe(true);
+  });
+
   it("keeps the dropdown when workflows add group headers", () => {
     const wrapper = createWrapper({
       list: true,

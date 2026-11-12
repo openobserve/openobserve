@@ -303,12 +303,12 @@ const options = computed(() => {
 const listOptions = computed(() =>
   options.value.filter((option): option is Option => !("header" in option)),
 );
-// Group headers and missing/locked badges only render in the dropdown, so the list is for plain destinations.
+// Workflow groups and missing/locked badges only render in the dropdown, so the list is for plain destinations.
 const showsList = computed(
   () =>
     props.list &&
     listOptions.value.length <= LIST_MAX &&
-    options.value.every((option) => !("header" in option) && !("badge" in option)),
+    listOptions.value.every((option) => !("badge" in option) && option.value.startsWith(DEST)),
 );
 
 // Split the tagged selection back into the two backend fields. Keep the control's
