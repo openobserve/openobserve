@@ -772,7 +772,6 @@ export const iconRegistry = {
   "support-agent": SupportAgentIcon,
   "cloud-sync": CloudSyncIcon,
 
-  // Batch 7: Starter packs on Home (2026-11-12)
   sensors: Sensors,
   "notifications-off": NotificationsOff,
 } as const satisfies Record<string, Component>;

@@ -117,9 +117,9 @@ const tiles = computed(() => {
           class="flex flex-col gap-1"
           :data-test="id('home-pack-card-streams')"
         >
-          <li v-for="stream in shownStreams" :key="stream" class="flex items-center gap-2">
+          <li v-for="stream in shownStreams" :key="stream" class="flex min-w-0 items-center gap-2">
             <span class="bg-status-positive h-1.5 w-1.5 shrink-0 rounded-full" />
-            <OText variant="mono">{{ raw(stream) }}</OText>
+            <OText variant="mono" class="min-w-0 truncate" :title="stream">{{ raw(stream) }}</OText>
           </li>
           <li v-if="moreStreams.length">
             <OPopover align="start" :aria-label="t('starterPacks.home.moreStreamsLabel')">
@@ -212,9 +212,11 @@ const tiles = computed(() => {
           {{ t("starterPacks.guide.whatGetsCreated") }}
         </OButton>
       </template>
-      <div class="flex flex-wrap justify-center gap-1">
+      <div
+        v-if="item.view.value === 'offer' && item.canHideForAll.value"
+        class="flex flex-wrap justify-center gap-1"
+      >
         <OButton
-          v-if="item.view.value === 'offer' && item.canHideForAll.value"
           variant="ghost"
           size="sm"
           :data-test="id('home-pack-card-hide-all-btn')"

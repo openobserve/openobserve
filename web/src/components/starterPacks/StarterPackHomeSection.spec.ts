@@ -1,3 +1,18 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick, ref, shallowRef } from "vue";
@@ -18,7 +33,9 @@ const fake = vi.hoisted(() => ({
   menu: null as any,
   org: null as any,
   push: vi.fn(async () => undefined),
+  copy: vi.fn(),
 }));
+vi.mock("@/utils/clipboard", () => ({ copyToClipboard: fake.copy }));
 vi.mock("@/composables/starterPacks/useStarterPackFlow", () => ({
   useStarterPackFlow: (_org: string, pack: { id: string }) => fake.flows[pack.id],
 }));
@@ -82,6 +99,7 @@ describe("StarterPackHomeSection", () => {
     fake.matchers = { kubernetes: matcherDouble(), hosts: matcherDouble() };
     fake.dismissal = dismissalDouble();
     fake.menu = dismissalDouble();
+    fake.copy.mockClear();
     fake.org = {
       hidden: ref(false),
       sharedOrg: ref(false),
@@ -102,6 +120,36 @@ describe("StarterPackHomeSection", () => {
     expect(has(wrapper, "home-pack-card")).toBe(true);
     expect(has(wrapper, "home-pack-offer-header")).toBe(true);
     expect(fake.flows.kubernetes.loadPreview).toHaveBeenCalled();
+  });
+
+  it("holds the skeleton until every pack has answered, so no row or badge moves", async () => {
+    fake.matchers.hosts.state.value = "checking";
+    const wrapper = await render([HOSTS_PACK, KUBERNETES_PACK]);
+    expect(has(wrapper, "home-pack-card-skeleton")).toBe(true);
+    expect(has(wrapper, "home-pack-offer")).toBe(false);
+    expect(has(wrapper, "home-pack-card")).toBe(false);
+    fake.matchers.hosts.state.value = "matched";
+    await nextTick();
+    expect(has(wrapper, "home-pack-card-skeleton")).toBe(false);
+    expect(has(wrapper, "home-pack-hosts-card-best")).toBe(true);
+    expect(has(wrapper, "home-pack-card-best")).toBe(false);
+  });
+
+  it("keeps the row, not the menu, while an install is still running", async () => {
+    const wrapper = await render();
+    fake.flows.kubernetes.running.value = true;
+    fake.flows.kubernetes.record.value = { status: "incomplete" };
+    await nextTick();
+    const home = homeOf(wrapper);
+    expect(wrapper.get('[data-test="home-pack-card"]').attributes("data-status")).toBe("running");
+    expect(has(wrapper, "home-pack-offer")).toBe(true);
+    expect(home.showMenu.value).toBe(false);
+    expect(home.setUp.value).toEqual([]);
+    fake.flows.kubernetes.record.value = { status: "complete" };
+    fake.flows.kubernetes.running.value = false;
+    await nextTick();
+    expect(has(wrapper, "home-pack-offer")).toBe(false);
+    expect(home.showMenu.value).toBe(true);
   });
 
   it("shows the tiles, the matched streams and Set up <pack>, then lands on the dashboard", async () => {
@@ -238,7 +286,12 @@ describe("StarterPackHomeSection", () => {
     expect(has(wrapper, "home-pack-card-copy-link-btn")).toBe(true);
   });
 
-  it("copies a link to the pack page, not the page the asker is on", () => {
-    expect(fake.flows.kubernetes.packLink()).toContain("/alert-library/packs/kubernetes");
+  it("copies the pack page link from the Copy link button of a pack the user may not create", async () => {
+    fake.flows.kubernetes.forbidden.value = true;
+    const wrapper = await render();
+    await wrapper.get('[data-test="home-pack-card-copy-link-btn"]').trigger("click");
+    expect(fake.copy).toHaveBeenCalledTimes(1);
+    expect(fake.copy.mock.calls[0][0]).toBe(fake.flows.kubernetes.packLink());
+    expect(fake.copy.mock.calls[0][0]).toContain("/alert-library/packs/kubernetes");
   });
 });

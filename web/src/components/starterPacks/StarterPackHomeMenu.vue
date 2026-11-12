@@ -16,16 +16,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import type { HomePack, HomePacks } from "@/composables/starterPacks/useHomePacks";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { safeTimezone } from "@/utils/dashboard/calendarPeriods";
+import { formatTimestampInTimezone } from "@/utils/date";
+import { resolveBrowserTimezone } from "@/utils/timezone";
 import { getImageURL } from "@/utils/zincutils";
+
+const STREAMS_SHOWN = 2;
 
 const props = defineProps<{ home: HomePacks }>();
 
 const { t } = useI18nTyped();
+const store = useStore();
 const open = ref(false);
 
 const rows = computed(() => [...props.home.offered.value, ...props.home.setUp.value]);
@@ -36,26 +43,31 @@ const label = computed(() =>
     : t("starterPacks.home.menuIdle"),
 );
 
-const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+const setUpWhen = (at: number | undefined): I18nText => {
+  if (!at) return t("starterPacks.home.setUpDone");
+  const zone = safeTimezone(resolveBrowserTimezone(store.state.timezone || "UTC"));
+  const day = formatTimestampInTimezone(at, "YYYY-MM-DD", zone);
+  if (day !== formatTimestampInTimezone(Date.now() * 1000, "YYYY-MM-DD", zone)) {
+    return t("starterPacks.home.setUpOn", { date: raw(day) });
+  }
+  const time = formatTimestampInTimezone(at, "HH:mm", zone);
+  return t("starterPacks.home.setUpToday", { time: raw(time) });
+};
 const setUpLine = (item: HomePack): I18nText => {
-  const at = item.flow.record.value?.installedAt;
-  const date = at ? new Date(at / 1000) : null;
-  const time = date?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) ?? "";
-  const when = !date
-    ? t("starterPacks.home.setUpDone")
-    : sameDay(date, new Date())
-      ? t("starterPacks.home.setUpToday", { time: raw(time) })
-      : t("starterPacks.home.setUpOn", { date: raw(date.toLocaleDateString()) });
+  const when = setUpWhen(item.flow.record.value?.installedAt);
   const silent = item.flow.alertsOff.value;
   return silent ? t("starterPacks.home.setUpSilent", { when, count: silent }, silent) : when;
 };
 const fitsLine = (item: HomePack): I18nText => {
+  const names = item.matcher.streams.value;
+  const shown = raw(names.slice(0, STREAMS_SHOWN).join(", "));
+  const more = names.length - STREAMS_SHOWN;
+  const streams =
+    more > 0 ? t("starterPacks.home.menuStreamsMore", { streams: shown, count: more }) : shown;
   const dashboards = item.flow.dashboardCount.value;
-  return t(
-    "starterPacks.home.menuOfferLine",
-    { count: dashboards, streams: raw(item.matcher.streams.value.join(", ")) },
-    dashboards,
-  );
+  return dashboards
+    ? t("starterPacks.home.menuOfferLine", { count: dashboards, streams }, dashboards)
+    : t("starterPacks.home.menuOfferFits", { streams });
 };
 
 const act = (work: () => unknown) => {
