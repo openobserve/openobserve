@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           :row-key="runKey"
           :loading="runs.loading.value"
-          :error="runs.error.value"
+          :error="runsError"
           pagination="client"
           :page-size="20"
           sorting="client"
@@ -122,11 +122,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alertCalibration.digests.noneFound") }}
             </OBadge>
             <OBadge
-              v-else
-              variant="error-soft"
+              v-else-if="row.finding_count === null"
+              variant="warning-soft"
               size="sm"
               shape="rounded"
-              :count="row.finding_count"
+            >
+              {{ visibilityCopy(t, row).pending.badge }}
+            </OBadge>
+            <OBadge
+              v-else
+              variant="warning-soft"
+              size="sm"
+              shape="rounded"
+              :count="row.finding_count ?? undefined"
             >
               {{ t("alertCalibration.digests.findings") }}
             </OBadge>
@@ -134,11 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-coverage="{ row }">
             <span class="relative inline-flex">
-              <OBadge
-                :variant="COVERAGE_BADGE[coverageVerdict(row)].variant"
-                size="sm"
-                shape="rounded"
-              >
+              <OBadge :variant="coverageBadge(row).variant" size="sm" shape="rounded">
                 {{ t(COVERAGE_BADGE[coverageVerdict(row)].labelKey) }}
               </OBadge>
               <OTooltip v-if="coverageNotes(t, row).length" side="left" max-width="25rem">
@@ -170,16 +174,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
-          <template #error="{ message }">
-            <OEmptyState
-              size="hero"
-              illustration="broken-panel"
-              variant="error"
-              :title="t('alertCalibration.digests.errorTitle')"
-              :description="raw(message)"
-              :action-label="t('alertCalibration.retry')"
-              action-icon="refresh"
-              @action="refresh"
+          <template #error>
+            <LiveNoticeState
+              size="block"
+              :notice="
+                readNotice(t, runs.error.value, t('alertCalibration.digests.loadFailedTitle'))
+              "
+              :detail="readFailedDetail(runs.error.value)"
+              :busy="runs.loading.value"
+              data-test="alert-calibration-digests-error"
+              retry-test="alert-calibration-digests-retry"
+              @retry="refresh"
             />
           </template>
 
@@ -215,6 +220,9 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
+import { readErrorCopy } from "@/services/alert_calibration";
+import LiveNoticeState from "@/components/autoobserve/live/LiveNoticeState.vue";
+import { readFailedDetail, readNotice } from "./notices";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import AlertCalibrationTabs from "./AlertCalibrationTabs.vue";
@@ -222,6 +230,7 @@ import AlertCalibrationActions from "./AlertCalibrationActions.vue";
 import AlertCalibrationLastRun from "./AlertCalibrationLastRun.vue";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
 import {
+  countOrDash,
   coverageNotes,
   coverageVerdict,
   isClean,
@@ -231,13 +240,14 @@ import {
   runKey,
   RUNS_LOOKBACK_DAYS,
   SEARCH_SIZE,
+  visibilityCopy,
   type RunRow,
 } from "./digests";
-import { COVERAGE_BADGE, formatMinutes, splitMinutes } from "./format";
+import { COVERAGE_BADGE, coverageBadge, formatMinutes, splitMinutes } from "./format";
 
 type Scope = "all" | "findings" | "gaps";
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 useLeaveIfAlertCalibrationOff("alertList");
 const router = useRouter();
 const { search: searchDigests, orgId } = useDigestSearch();
@@ -258,6 +268,7 @@ const runs = useLatestRead(async () => {
   return { emissions: emissions.length, rows: latestPerWindow(emissions) };
 });
 const rows = computed(() => runs.data.value?.rows ?? []);
+const runsError = computed(() => (runs.error.value ? readErrorCopy(t, runs.error.value) : null));
 
 const search = ref("");
 const scope = ref<Scope>("all");
@@ -293,10 +304,10 @@ const stats = computed<StatItem[]>(() => {
     {
       key: "latest",
       label: t("alertCalibration.digests.latestFindings"),
-      value: run ? run.finding_count : raw("—"),
-      sub: run ? t(COVERAGE_BADGE[coverageVerdict(run)].labelKey) : undefined,
+      value: countOrDash(run?.finding_count, locale.value),
+      sub: run ? t(coverageBadge(run).labelKey) : undefined,
       icon: "fact-check",
-      tone: run && run.finding_count > 0 ? "warning" : "neutral",
+      tone: (run?.finding_count ?? 0) > 0 ? "warning" : "neutral",
     },
     {
       key: "window",
@@ -307,15 +318,18 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "schedule",
-      label: t("alertCalibration.digests.schedule"),
+      // "1 · day between runs" reads as one phrase; an off schedule keeps its noun.
+      label: c?.enabled
+        ? t("alertCalibration.digests.betweenRuns", { unit: cadence.unit })
+        : t("alertCalibration.digests.schedule"),
       value: c ? (c.enabled ? cadence.count : t("alertCalibration.digests.off")) : raw("—"),
       sub: c
         ? c.enabled
-          ? cadence.unit
+          ? undefined
           : t("alertCalibration.digests.noScheduledRun")
         : t("alertCalibration.digests.notConfigured"),
       icon: "schedule",
-      tone: c?.enabled ? "success" : "neutral",
+      tone: "neutral",
     },
   ];
 });

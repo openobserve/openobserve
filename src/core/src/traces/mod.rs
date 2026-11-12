@@ -1923,9 +1923,11 @@ async fn write_traces(
     .await
     .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
     // the check that turned the UDS on projected the schema, which would drop unpacked columns
-    if let Some(fields) =
-        crate::ingestion::newly_enabled_uds_fields(has_uds, traces_schema_map.get(stream_name))
-    {
+    if let Some(fields) = crate::ingestion::newly_enabled_uds_fields(
+        StreamType::Traces,
+        has_uds,
+        traces_schema_map.get(stream_name),
+    ) {
         repack_for_new_uds(&mut json_data, &fields);
         check_batch_schema(
             org_id,

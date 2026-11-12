@@ -165,6 +165,31 @@ describe("useEditorDraft", () => {
   });
 
   describe("baseline and autosave", () => {
+    it("applyProgrammaticChange counts a change made before any input", async () => {
+      const draft = await startHost();
+      await draft.applyProgrammaticChange(() => {
+        form.name = "suggested";
+      });
+      expect(draft.hasUnsavedChanges()).toBe(true);
+
+      const result = leave();
+      await flushPromises();
+      expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+      draft.chooseLeave("stay");
+      expect(await result).toBe(false);
+      flushAutosave();
+      expect(readEditorDraft<Form>(editScope)?.data.name).toBe("suggested");
+
+      // A later load before the first input is still absorbed by the first-input baseline only when no change was applied.
+      wrapper!.unmount();
+      wrapper = null;
+      localStorage.clear();
+      form.name = "saved";
+      const plain = await startHost();
+      await edit({ name: "loaded later" });
+      expect(plain.hasUnsavedChanges()).toBe(false);
+    });
+
     it("ignores changes made before the user's first input", async () => {
       const draft = await startHost();
       await edit({ name: "loaded later" });

@@ -1057,7 +1057,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-else>
           <div class="flex w-full flex-col gap-2 overflow-hidden">
             <!-- Editor area — position:relative shell owns the size; inner absolute never leaks -->
-            <div class="relative h-80">
+            <div ref="sqlPromqlPreviewRef" class="relative h-80">
               <div class="absolute inset-0 flex overflow-hidden">
                 <!-- SQL/PromQL pane — with its own header -->
                 <div

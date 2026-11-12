@@ -97,9 +97,25 @@ import {
 import { AlertFocusManager } from "@/utils/alerts/focusManager";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
 import { isNotFoundError } from "@/utils/alerts/alertEditorDraft";
-import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
+import {
+  hasDeliveryTarget,
+  incidentReachGap,
+  reachesSomeone,
+  unreachableLine,
+} from "@/utils/alerts/deliveryTarget";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
-import type { AlertPrefill, AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
+import type {
+  AlertFieldPatch,
+  AlertPrefill,
+  AlertPrefillWarning,
+} from "@/ts/interfaces/alertPrefill";
+import { isEditHandoffPrefill } from "@/utils/alerts/alertEditHandoff";
+import { AUTOOBSERVE_SOURCE } from "@/utils/alerts/prefill/fromAutoObserve";
+import {
+  existingAlertRoute,
+  existingForSave,
+} from "@/components/autoobserve/insight/bulk/existingAlerts";
+import { noteSavedDraft } from "@/components/autoobserve/insight/bulk/useRecentlyCreated";
 import {
   forecastModeFields,
   parseForecastAlertPromql,
@@ -368,6 +384,17 @@ export const formForecastOf = (alert: any): ForecastAlert | null =>
     ? parseForecastAlertPromql(alert.query_condition.promql, alert.query_condition.promql_condition)
     : null;
 
+/** Copies a source's description and destinations from `meta`, since AlertPrefill has no field for either. */
+export const applyMetaSettings = (data: any, meta: AlertPrefill["meta"]): any => {
+  if (typeof meta?.description === "string" && meta.description)
+    data.description = meta.description;
+  const destinations = Array.isArray(meta?.destinations)
+    ? meta.destinations.filter((name): name is string => typeof name === "string" && name !== "")
+    : [];
+  if (destinations.length) data.destinations = [...new Set(destinations)];
+  return data;
+};
+
 /** Seeds a form value from a PromQL prefill; a generated forecast query opens Forecast mode. */
 export const applyPromqlPrefill = (data: any, prefill: AlertPrefill): any => {
   data.query_condition.type = "promql";
@@ -386,6 +413,63 @@ export const applyPromqlPrefill = (data: any, prefill: AlertPrefill): any => {
   return data;
 };
 
+/** A raw-SQL threshold the form must inject with the (async) SQL parser before seeding. */
+export const prefillSqlHaving = (
+  prefill: AlertPrefill,
+): { column: string; operator: string; value: number } | null => {
+  const having = prefill.meta?.sqlHaving as
+    { column: string; operator: string; value: number } | undefined;
+  return having?.column ? having : null;
+};
+
+/** Seeds a form value from a prefill, the one mapping the alert form and the bulk review share. */
+export const seedFormFromPrefill = (
+  data: any,
+  prefill: AlertPrefill,
+  opts: { sql: string; floorMinutes: number },
+): { aggregation: boolean; vrl: boolean } => {
+  if (prefill.name) data.name = prefill.name;
+  data.stream_type = prefill.streamType || data.stream_type;
+  data.stream_name = prefill.streamName;
+
+  if (prefill.queryType === "promql") {
+    applyPromqlPrefill(data, prefill);
+  } else if (prefill.queryType === "custom" && prefill.conditions) {
+    data.query_condition.type = "custom";
+    data.query_condition.conditions = cloneDeep(prefill.conditions);
+  } else {
+    data.query_condition.type = "sql";
+    data.query_condition.sql = opts.sql;
+  }
+
+  if (prefill.aggregation) data.query_condition.aggregation = cloneDeep(prefill.aggregation);
+  if (getAlertSource(prefill.source).metaSettings) applyMetaSettings(data, prefill.meta);
+  if (prefill.vrlFunction) data.query_condition.vrl_function = prefill.vrlFunction;
+
+  if (prefill.periodMinutes) data.trigger_condition.period = prefill.periodMinutes;
+  // The source's own schedule wins; the org's minimum evaluation frequency is the only floor.
+  if (prefill.frequencyMinutes) {
+    data.trigger_condition.frequency = Math.max(opts.floorMinutes, prefill.frequencyMinutes);
+  }
+  if (prefill.silenceMinutes !== undefined) data.trigger_condition.silence = prefill.silenceMinutes;
+  if (prefill.timezone) data.trigger_condition.timezone = prefill.timezone;
+  if (prefill.createsIncident) data.creates_incident = true;
+
+  // With a threshold inside the query (HAVING / promql condition) the trigger only needs one row.
+  const hasQueryThreshold =
+    !!prefill.promqlCondition ||
+    !!prefill.meta?.sqlHaving ||
+    (!!prefill.aggregation && !getAlertSource(prefill.source).aggregationIsSeed);
+  if (prefill.triggerThreshold !== undefined) {
+    data.trigger_condition.threshold = prefill.triggerThreshold;
+    if (prefill.triggerOperator) data.trigger_condition.operator = prefill.triggerOperator;
+  } else if (hasQueryThreshold) {
+    data.trigger_condition.threshold = 1;
+    data.trigger_condition.operator = ">=";
+  }
+  return { aggregation: !!prefill.aggregation, vrl: !!prefill.vrlFunction };
+};
+
 // ─── Composable ─────────────────────────────────────────────────────────────
 
 export interface AlertFormProps {
@@ -401,6 +485,11 @@ export interface AlertFormEmit {
   (e: "cancel:hideform"): void;
   (e: "refresh:destinations"): void;
   (e: "refresh:templates"): void;
+}
+
+interface SaveTarget {
+  org: string;
+  folder: string;
 }
 
 // The full value set held by the ONE OForm: the alert payload shape plus the
@@ -745,6 +834,79 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const isLoadingPrefill = ref(false);
   /** Lossy transforms the source adapter performed, surfaced in the form. */
   const prefillWarnings = ref<AlertPrefillWarning[]>([]);
+  // The surface that seeded this form, so a source can hold the form to its own rules.
+  const prefillSource = ref<string | null>(null);
+  // The service and check an AutoObserve draft was built for, remembered once it is saved.
+  const prefillMeta = ref<Record<string, unknown> | null>(null);
+  // An AutoObserve draft must reach a person: a target of its own, or an incident that pages on-call.
+  const autoObserveDraft = computed(
+    () => prefillSource.value === AUTOOBSERVE_SOURCE && !beingUpdated.value,
+  );
+  const reachGap = computed(() => incidentReachGap(store.state.zoConfig));
+  const destinationRequired = computed(
+    () => autoObserveDraft.value && !(formData.value?.creates_incident && reachGap.value === null),
+  );
+  const silentAutoObserveDraft = computed(
+    () => autoObserveDraft.value && !reachesSomeone(formData.value ?? {}, store.state.zoConfig),
+  );
+  /** A draft with no target of its own that still reaches on-call through its incident. */
+  const viaIncidentDraft = computed(
+    () =>
+      autoObserveDraft.value &&
+      !silentAutoObserveDraft.value &&
+      !hasDeliveryTarget(formData.value ?? {}),
+  );
+  const currentFolder = (): string =>
+    String(
+      (Array.isArray(activeFolderId.value) ? activeFolderId.value[0] : activeFolderId.value) ||
+        "default",
+    );
+  /** The org and folder a save writes to, read once when the save starts. */
+  const saveTargetNow = (): SaveTarget => ({
+    org: store.state.selectedOrganization.identifier,
+    folder: currentFolder(),
+  });
+  /** A save whose org or folder changed while it awaited writes nothing, rather than into the other org or folder. */
+  const blockMovedSave = (target: SaveTarget): boolean => {
+    if (
+      target.org === store.state.selectedOrganization.identifier &&
+      target.folder === currentFolder()
+    )
+      return false;
+    toast({ variant: "error", message: t("alerts.saveFailed") });
+    return true;
+  };
+  /** An AutoObserve draft whose alert the org already has, from any tab or user, is not saved twice. */
+  const blockAddedDraft = async (values: any, target: SaveTarget): Promise<boolean> => {
+    if (!autoObserveDraft.value) return false;
+    const { org } = target;
+    const found = await existingForSave(org, values ?? {}, target.folder);
+    if (!found) return false;
+    if (found === "unread") {
+      toast({ variant: "error", message: t("alerts.prefill.addedUnread") });
+      return true;
+    }
+    toast({
+      variant: "warning",
+      message: t("alerts.prefill.alreadyAdded", { name: found.name, folder: found.folderName }),
+      action: {
+        label: t("insight.bulk.openExisting"),
+        handler: () => void router.push(existingAlertRoute(org, found)),
+      },
+    });
+    return true;
+  };
+
+  /** Every save path (button, Enter, leave dialog, JSON) stops here, so the rule holds on all of them. */
+  const blockSilentDraft = (values: unknown): boolean => {
+    if (
+      !autoObserveDraft.value ||
+      reachesSomeone((values ?? {}) as Parameters<typeof reachesSomeone>[0], store.state.zoConfig)
+    )
+      return false;
+    toast({ variant: "error", message: unreachableLine(t, reachGap.value, 1) });
+    return true;
+  };
   /** Outcome of the anomaly edit fetch: "missing" when the server has no such config. */
   const anomalyLoadStatus = ref<"idle" | "loaded" | "missing" | "failed">("idle");
   // Late async seeding (timezone from the stored offset) that must land before the form counts as loaded.
@@ -1757,6 +1919,19 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const jsonEditorData = computed(() => stripFormExtras(cloneDeep(formData.value)));
 
   const saveAlertJson = async (json: any) => {
+    // Unparseable JSON falls through to the shared validation, which reports it.
+    const parsed = (() => {
+      try {
+        return JSON.parse(json);
+      } catch {
+        return null;
+      }
+    })();
+    const target = saveTargetNow();
+    const savedDraft = autoObserveDraft.value ? prefillMeta.value : null;
+    if (parsed && blockSilentDraft(parsed)) return;
+    if (parsed && (await blockAddedDraft(parsed, target))) return;
+    if (!props.isUpdated && blockMovedSave(target)) return;
     const saveContext: SaveAlertContext = {
       store,
       t,
@@ -1770,7 +1945,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       handleAlertError,
     };
 
-    const prepareAndSaveAlertFunction = (data: any) => prepareAndSaveAlertUtil(data, saveContext);
+    // The JSON check awaits the streams list too, so the org and folder are checked again right before the write.
+    const prepareAndSaveAlertFunction = async (data: any): Promise<void> => {
+      if (!props.isUpdated && blockMovedSave(target)) return;
+      if (await prepareAndSaveAlertUtil(data, saveContext)) noteSavedDraft(target.org, savedDraft);
+    };
 
     const jsonValidationContext: JsonValidationContext = {
       store,
@@ -1835,82 +2014,33 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         await Promise.resolve(updateStreams(false)).catch(() => undefined);
       }
 
-      if (prefill.queryType === "promql") {
-        applyPromqlPrefill(data, prefill);
-      } else if (prefill.queryType === "custom" && prefill.conditions) {
-        data.query_condition.type = "custom";
-        data.query_condition.conditions = cloneDeep(prefill.conditions);
-      } else {
-        data.query_condition.type = "sql";
-        let sql = prefill.sql ?? "";
-
-        // A raw-SQL threshold arrives as meta.sqlHaving because injecting it
-        // needs the SQL parser, which is async and lives here rather than in the
-        // (pure, synchronous) adapters.
-        const sqlHaving = prefill.meta?.sqlHaving as
-          { column: string; operator: string; value: number } | undefined;
-        if (sql && sqlHaving?.column) {
-          if (!parser) await importSqlParser();
-          sql = addHavingClauseToQuery(
-            sql,
-            sqlHaving.column,
-            sqlHaving.operator,
-            sqlHaving.value,
-            parser,
-          );
-        }
-
-        data.query_condition.sql = sql;
+      let sql = prefill.sql ?? "";
+      const sqlHaving = prefillSqlHaving(prefill);
+      // Only the SQL branch of seedFormFromPrefill reads the query, so only it needs the parser.
+      const seedsSql =
+        prefill.queryType !== "promql" && !(prefill.queryType === "custom" && prefill.conditions);
+      if (seedsSql && sql && sqlHaving) {
+        if (!parser) await importSqlParser();
+        sql = addHavingClauseToQuery(
+          sql,
+          sqlHaving.column,
+          sqlHaving.operator,
+          sqlHaving.value,
+          parser,
+        );
       }
-
-      if (prefill.aggregation) {
-        isAggregationEnabled.value = true;
-        data.query_condition.aggregation = cloneDeep(prefill.aggregation);
-      }
-
-      if (prefill.vrlFunction) {
-        showVrlFunction.value = true;
-        data.query_condition.vrl_function = prefill.vrlFunction;
-      }
-
-      if (prefill.periodMinutes) {
-        data.trigger_condition.period = prefill.periodMinutes;
-      }
-      if (prefill.frequencyMinutes) {
-        // The source's own schedule wins. The only floor is the org's minimum
-        // evaluation frequency, which is the rule the schema enforces on save;
-        // clamping to the form's DEFAULT instead (as this used to) silently
-        // overrode a curated alert that runs every minute with "every ten".
-        const floorMinutes = Math.max(1, Math.ceil(minAutoRefreshInterval() / 60));
-        data.trigger_condition.frequency = Math.max(floorMinutes, prefill.frequencyMinutes);
-      }
-      if (prefill.silenceMinutes !== undefined) {
-        data.trigger_condition.silence = prefill.silenceMinutes;
-      }
-      if (prefill.timezone) {
-        data.trigger_condition.timezone = prefill.timezone;
-      }
-
-      // A source that carries a real trigger says so explicitly, and is believed.
-      // Otherwise: with a threshold expressed inside the query (HAVING / promql
-      // condition), the trigger itself only needs "at least one row came back".
-      const hasQueryThreshold =
-        !!prefill.promqlCondition ||
-        !!prefill.meta?.sqlHaving ||
-        (!!prefill.aggregation && !getAlertSource(prefill.source).aggregationIsSeed);
-      if (prefill.triggerThreshold !== undefined) {
-        data.trigger_condition.threshold = prefill.triggerThreshold;
-        if (prefill.triggerOperator) {
-          data.trigger_condition.operator = prefill.triggerOperator;
-        }
-      } else if (hasQueryThreshold) {
-        data.trigger_condition.threshold = 1;
-        data.trigger_condition.operator = ">=";
-      }
+      const seeded = seedFormFromPrefill(data, prefill, {
+        sql,
+        floorMinutes: Math.max(1, Math.ceil(minAutoRefreshInterval() / 60)),
+      });
+      if (seeded.aggregation) isAggregationEnabled.value = true;
+      if (seeded.vrl) showVrlFunction.value = true;
 
       resetForm(data);
 
       prefillWarnings.value = prefill.warnings ?? [];
+      prefillSource.value = prefill.source;
+      prefillMeta.value = prefill.meta ?? null;
 
       toast({
         variant: "success",
@@ -1932,6 +2062,29 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     } finally {
       isLoadingPrefill.value = false;
     }
+  };
+
+  /** Writes a calibration patch into the loaded form field by field; unlike `resetForm` it keeps the baseline. */
+  const applyFieldPatch = (patch: AlertFieldPatch): void => {
+    if (patch.pendingPeriodSecs) {
+      const minutes = patch.pendingPeriodSecs.to / 60;
+      const settings = step4Ref.value as {
+        pendingPeriodUnit?: "minutes" | "hours";
+        onPendingPeriodUnitChange?: (unit: string) => void;
+      } | null;
+      let unit =
+        settings?.pendingPeriodUnit ?? pendingPeriodDisplay({ pending_period_sec: minutes }).mode;
+      // An hours field cannot show a part-hour suggestion as a whole number, so it switches to minutes.
+      if (unit === "hours" && minutes % 60 !== 0) {
+        settings?.onPendingPeriodUnitChange?.("minutes");
+        unit = "minutes";
+      }
+      setF("pending_period_sec", minutes);
+      setF("_ui.pendingPeriod", unit === "hours" ? minutes / 60 : minutes);
+    }
+    if (patch.keepFiringForSecs) setF("keep_firing_for", patch.keepFiringForSecs.to);
+    if (patch.silenceMinutes) setF("trigger_condition.silence", patch.silenceMinutes.to);
+    if (patch.destinations) setF("destinations", [...patch.destinations.to]);
   };
 
   // ── Wizard Navigation (kept for anomaly) ────────────────────────────────
@@ -2342,6 +2495,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // `form.state.values` — the synchronous source of truth (formData is its
   // reactive read-view and can lag by a tick after a just-written setF).
   const onSubmit = async () => {
+    const target = saveTargetNow();
     if (!runImperativeQueryChecks()) return false;
 
     if (
@@ -2500,12 +2654,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       });
       return request;
     } else {
-      payload.folder_id = activeFolderId.value;
-      callAlert = alertsService.create_by_alert_id(
-        store.state.selectedOrganization.identifier,
-        payload,
-        activeFolderId.value,
-      );
+      const savedDraft = autoObserveDraft.value ? prefillMeta.value : null;
+      if ((await blockAddedDraft(payload, target)) || blockMovedSave(target)) {
+        dismiss();
+        return false;
+      }
+      payload.folder_id = target.folder;
+      callAlert = alertsService.create_by_alert_id(target.org, payload, target.folder);
 
       // Same as the update branch: returned below so isSubmitting spans the request.
       const request = callAlert
@@ -2521,6 +2676,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               ? t("alerts.messages.alertSavedNoDestination")
               : t("alerts.messages.alertSaved"),
           });
+          noteSavedDraft(target.org, savedDraft);
           showSaveWarnings(res);
         })
         .catch((err: any) => {
@@ -2547,6 +2703,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // saveAnomalyDetection). The anomaly schema branch is pass-through, so this is
   // still reached in anomaly mode and delegates correctly.
   const performSave = async () => {
+    if (blockSilentDraft(formData.value)) return;
     if (isAnomalyMode.value) {
       await saveAnomalyDetection();
       return;
@@ -2569,7 +2726,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     const data: any = { ...defaultAlertValue(), ...cloneDeep(props.modelValue) };
 
     const route = router.currentRoute.value;
-    const hasPrefill = !!route.query.prefill;
+    // A calibration handoff edits the loaded alert after the draft guard starts; it never seeds a new one.
+    const hasPrefill =
+      !!route.query.prefill && !isEditHandoffPrefill(route.query.prefill, !!props.isUpdated);
 
     if (!props.isUpdated) {
       data.is_real_time = alertType.value === "realTime" ? true : false;
@@ -2913,6 +3072,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               },
             });
           }
+          if ((newVal as any).keepFiringForFieldRef) {
+            focusManager.registerField("keep_firing_for", {
+              ref: (newVal as any).keepFiringForFieldRef,
+              onBeforeFocus: () => {
+                activeTab.value = "condition";
+              },
+            });
+          }
         });
       }
     },
@@ -3244,6 +3411,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     validationErrors,
     isLoadingPrefill,
     prefillWarnings,
+    prefillSource,
     anomalyLoadStatus,
     formReady,
     activeFolderId,
@@ -3343,7 +3511,12 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     jsonEditorData,
     saveAlertJson,
     applyAlertPrefill,
+    applyFieldPatch,
     handleSave,
+    destinationRequired,
+    silentAutoObserveDraft,
+    viaIncidentDraft,
+    reachGap,
     queryModesWithContent,
     saveModeChoices,
     saveModeDialogOpen,

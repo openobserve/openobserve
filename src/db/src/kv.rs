@@ -30,7 +30,9 @@ fn mk_cache_key(org_id: &str, key: &str) -> String {
 
 pub async fn get(org_id: &str, key: &str) -> Result<Bytes, anyhow::Error> {
     let cache_key = mk_cache_key(org_id, key);
-    if let Some(it) = KVS.get(&cache_key) {
+    if cacheable(key)
+        && let Some(it) = KVS.get(&cache_key)
+    {
         return Ok(it.value().clone());
     }
 
@@ -40,7 +42,7 @@ pub async fn get(org_id: &str, key: &str) -> Result<Bytes, anyhow::Error> {
         None => return Err(anyhow::anyhow!("Key not found")),
     };
 
-    KVS.insert(cache_key, val.clone());
+    cache(cache_key, key, val.clone());
     Ok(val)
 }
 
@@ -50,26 +52,25 @@ pub async fn set(org_id: &str, key: &str, val: Bytes) -> Result<(), anyhow::Erro
         return Err(anyhow::anyhow!("org_id cannot contain '/' character"));
     }
 
-    let cache_key = mk_cache_key(org_id, key);
-
     infra::table::kv_store::set(org_id, key, &val).await?;
+    announce_put(org_id, key, val).await
+}
 
-    // Send to super cluster (if enabled)
-    #[cfg(feature = "enterprise")]
-    super_cluster::emit_put_event(org_id, key, val.clone()).await?;
-
-    // Publish event to coordinator for cluster cache synchronization
-    // NOTE: put_into_db_coordinator handles local vs cluster mode:
-    // - In local mode: stores actual value
-    // - In cluster mode: stores empty bytes (coordinator is just event bus)
-    // The actual KV data is stored in the kv_store table; watchers fetch from there.
-    let coord_key = format!("/kv/{}", cache_key);
-    if let Err(e) = put_into_db_coordinator(&coord_key, Bytes::new(), true, None).await {
-        log::error!("[KV] Failed to sync KV to coordinator: {coord_key} - {e}");
+/// Writes and replicates only while the stored value is `expected` (None: no row); false otherwise.
+pub async fn compare_and_set(
+    org_id: &str,
+    key: &str,
+    expected: Option<&[u8]>,
+    val: Bytes,
+) -> Result<bool, anyhow::Error> {
+    if org_id.contains('/') {
+        return Err(anyhow::anyhow!("org_id cannot contain '/' character"));
     }
-
-    KVS.insert(cache_key, val);
-    Ok(())
+    if !infra::table::kv_store::compare_and_set(org_id, key, expected, &val).await? {
+        return Ok(false);
+    }
+    announce_put(org_id, key, val).await?;
+    Ok(true)
 }
 
 pub async fn delete(org_id: &str, key: &str) -> Result<(), anyhow::Error> {
@@ -89,6 +90,86 @@ pub async fn delete(org_id: &str, key: &str) -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn compare_and_delete(
+    org_id: &str,
+    key: &str,
+    expected: &[u8],
+) -> Result<bool, anyhow::Error> {
+    if !infra::table::kv_store::compare_and_delete(org_id, key, expected).await? {
+        return Ok(false);
+    }
+    let cache_key = mk_cache_key(org_id, key);
+    KVS.remove(&cache_key);
+    super_cluster::emit_delete_event(org_id, key).await?;
+    let coord_key = format!("/kv/{cache_key}");
+    coordinator_notification(
+        key,
+        delete_from_db_coordinator(&coord_key, false, true, None).await,
+    )?;
+    Ok(true)
+}
+
+/// One region only, and the announcement carries no bytes: a late one cannot undo a newer write.
+#[cfg(feature = "enterprise")]
+pub async fn compare_and_mutate_guarded(
+    org_id: &str,
+    key: &str,
+    expected: Option<&[u8]>,
+    value: Option<Bytes>,
+    guard_key: &str,
+    guard: &[u8],
+) -> Result<bool, anyhow::Error> {
+    if org_id.contains('/') {
+        anyhow::bail!("org_id cannot contain '/' character");
+    }
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        anyhow::bail!("a guarded write is not replicated across regions");
+    }
+    if !o2_enterprise::enterprise::autoobserve::marks::compare_and_mutate_guarded(
+        org_id,
+        key,
+        expected,
+        value.as_deref(),
+        guard_key,
+        guard,
+    )
+    .await?
+    {
+        return Ok(false);
+    }
+    let cache_key = mk_cache_key(org_id, key);
+    KVS.remove(&cache_key);
+    let coord_key = format!("/kv/{cache_key}");
+    let announced = match value {
+        Some(_) => put_into_db_coordinator(&coord_key, Bytes::new(), true, None).await,
+        None => delete_from_db_coordinator(&coord_key, false, true, None).await,
+    };
+    coordinator_notification(key, announced)?;
+    Ok(true)
+}
+
+/// Deletes in this region only, and only while the row still holds `expected`.
+pub async fn compare_and_delete_in_region(
+    org_id: &str,
+    key: &str,
+    expected: &[u8],
+) -> Result<bool, anyhow::Error> {
+    if !infra::table::kv_store::compare_and_delete(org_id, key, expected).await? {
+        return Ok(false);
+    }
+    let cache_key = mk_cache_key(org_id, key);
+    KVS.remove(&cache_key);
+    let coord_key = format!("/kv/{cache_key}");
+    if let Err(e) = delete_from_db_coordinator(&coord_key, false, true, None).await {
+        log::error!("[KV] Failed to delete KV from coordinator: {coord_key} - {e}");
+    }
+    Ok(true)
 }
 
 pub async fn list_keys(org_id: &str, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
@@ -173,7 +254,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
-                KVS.insert(item_key.to_string(), item_value);
+                cache(item_key.to_string(), kv_key, item_value);
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
@@ -182,6 +263,65 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             db::Event::Empty => {}
         }
     }
+}
+
+async fn announce_put(org_id: &str, key: &str, val: Bytes) -> Result<(), anyhow::Error> {
+    let cache_key = mk_cache_key(org_id, key);
+
+    // Send to super cluster (if enabled)
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_put_event(org_id, key, val.clone()).await?;
+
+    // Publish event to coordinator for cluster cache synchronization
+    // NOTE: put_into_db_coordinator handles local vs cluster mode:
+    // - In local mode: stores actual value
+    // - In cluster mode: stores empty bytes (coordinator is just event bus)
+    // The actual KV data is stored in the kv_store table; watchers fetch from there.
+    let coord_key = format!("/kv/{}", cache_key);
+    coordinator_notification(
+        key,
+        put_into_db_coordinator(&coord_key, Bytes::new(), true, None).await,
+    )?;
+
+    cache(cache_key, key, val);
+    Ok(())
+}
+
+/// Every writer and filler of the node cache goes through here, so no path caches a mark.
+pub fn cache(cache_key: String, key: &str, val: Bytes) {
+    if cacheable(key) {
+        KVS.insert(cache_key, val);
+    } else {
+        KVS.remove(&cache_key);
+    }
+}
+
+/// A mark's bytes are never cached: a late fill could outlast a newer write; readers use the table.
+fn cacheable(key: &str) -> bool {
+    !(cfg!(feature = "enterprise") && key.starts_with(config::meta::autoobserve::KV_MARK_PREFIX))
+}
+
+fn coordinator_notification(
+    key: &str,
+    result: Result<(), infra::errors::Error>,
+) -> anyhow::Result<()> {
+    if let Err(error) = result {
+        log::error!("[KV] Failed to notify coordinator for {key}: {error}");
+        #[cfg(feature = "enterprise")]
+        {
+            use config::meta::autoobserve::{
+                DISMISSAL_PREFIX, KV_MARK_PREFIX, KV_SUGGESTION_PREFIX,
+            };
+
+            if [KV_MARK_PREFIX, KV_SUGGESTION_PREFIX, DISMISSAL_PREFIX]
+                .iter()
+                .any(|prefix| key.starts_with(prefix))
+            {
+                return Err(error.into());
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Super cluster support for KV operations
@@ -220,6 +360,77 @@ mod super_cluster {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn decision_publication_reports_coordinator_failure() {
+        use config::meta::autoobserve::{DISMISSAL_PREFIX, KV_MARK_PREFIX, KV_SUGGESTION_PREFIX};
+
+        for prefix in [KV_MARK_PREFIX, KV_SUGGESTION_PREFIX, DISMISSAL_PREFIX] {
+            let key = format!("{prefix}decision");
+            let error = infra::errors::Error::Message("coordinator unavailable".into());
+            assert!(coordinator_notification(&key, Err(error)).is_err(), "{key}");
+            assert!(coordinator_notification(&key, Ok(())).is_ok());
+        }
+        for key in [
+            "customer-key",
+            "_o2_ao/mark",
+            "_o2_ao/suggestion",
+            "_o2_ao/dismissal",
+        ] {
+            let error = infra::errors::Error::Message("coordinator unavailable".into());
+            assert!(coordinator_notification(key, Err(error)).is_ok(), "{key}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_guarded_write_caches_no_bytes_a_late_announcement_could_restore() {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        ONCE.get_or_init(|| async {
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+        let org = format!("t_guarded_{}", config::utils::time::now_micros());
+        let key = format!("{}guarded", config::meta::autoobserve::KV_MARK_PREFIX);
+        let cache_key = mk_cache_key(&org, &key);
+        infra::table::kv_store::set(&org, "intent", b"held")
+            .await
+            .unwrap();
+        KVS.insert(cache_key.clone(), Bytes::from_static(b"older"));
+        let accepted = Bytes::from_static(b"accepted");
+        assert!(
+            compare_and_mutate_guarded(&org, &key, None, Some(accepted), "intent", b"held")
+                .await
+                .unwrap()
+        );
+        assert!(KVS.get(&cache_key).is_none(), "the writer's bytes stay out");
+        assert_eq!(get(&org, &key).await.unwrap(), "accepted");
+        assert!(
+            compare_and_mutate_guarded(&org, &key, Some(b"accepted"), None, "intent", b"held")
+                .await
+                .unwrap()
+        );
+        assert!(KVS.get(&cache_key).is_none());
+        assert!(get(&org, &key).await.is_err());
+        set(&org, &key, Bytes::from_static(b"by hand"))
+            .await
+            .unwrap();
+        assert!(
+            KVS.get(&cache_key).is_none(),
+            "a plain mark write caches nothing"
+        );
+        assert_eq!(get(&org, &key).await.unwrap(), "by hand");
+        assert!(KVS.get(&cache_key).is_none(), "a mark read fills nothing");
+        cache(cache_key.clone(), &key, Bytes::from_static(b"late"));
+        assert!(KVS.get(&cache_key).is_none());
+        infra::table::kv_store::delete_by_org(&org).await.unwrap();
+    }
 
     #[test]
     fn test_mk_cache_key() {

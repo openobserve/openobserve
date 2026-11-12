@@ -135,6 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-destination-name-input"
                   name="name"
                   :label="t('alerts.name')"
+                  :maxlength="256"
                   required
                   tabindex="0"
                 />
@@ -292,6 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-destination-name-input"
                   name="name"
                   :label="t('alerts.name')"
+                  :maxlength="256"
                   required
                   tabindex="0"
                 />
@@ -313,6 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="add-destination-name-input"
                 name="name"
                 :label="t('alerts.name')"
+                :maxlength="256"
                 required
                 tabindex="0"
               />

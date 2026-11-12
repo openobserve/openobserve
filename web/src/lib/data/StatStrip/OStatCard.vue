@@ -239,12 +239,12 @@ const trendClass = computed(() =>
           :name="subIcon"
           size="xs"
           :label="sub"
-          class="text-text-label self-center max-lg:hidden"
+          class="text-text-secondary self-center max-lg:hidden"
           data-test="o-stat-card-sub-icon"
         >
           <OTooltip :content="subTooltip || sub" />
         </OIcon>
-        <OTruncatedText v-else-if="sub" class="text-text-label text-2xs max-lg:hidden">{{
+        <OTruncatedText v-else-if="sub" class="text-text-secondary text-2xs max-lg:hidden">{{
           sub
         }}</OTruncatedText>
       </div>

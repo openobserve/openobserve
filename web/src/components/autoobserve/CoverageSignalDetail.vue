@@ -19,18 +19,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-surface-subtle rounded-default flex flex-col gap-3 p-3"
     data-test="autoobserve-coverage-detail"
   >
+    <InsightBlock
+      v-if="insight"
+      :parts="insight"
+      variant="details"
+      flush
+      :pending="pending"
+      @cta="(cta) => emit('cta', cta)"
+      @secondary="(cta) => emit('cta', cta)"
+    />
     <ODescriptionList dense>
       <ODescriptionItem v-if="cell.detector" stacked :label="t('autoobserve.coverage.detector')">
         <OText variant="mono" class="block">{{ cell.detector }}</OText>
         <span class="text-text-secondary block text-xs">
           {{
-            cell.method === "anomaly"
+            cell.engine?.detectorKind ??
+            (cell.method === "anomaly"
               ? t("autoobserve.coverage.methodAnomaly")
-              : t("autoobserve.coverage.methodThreshold")
+              : t("autoobserve.coverage.methodThreshold"))
           }}
         </span>
       </ODescriptionItem>
-      <ODescriptionItem v-if="cell.detector" stacked :label="t('autoobserve.coverage.lastFired')">
+      <ODescriptionItem
+        v-if="cell.detector && lastFired"
+        stacked
+        :label="t('autoobserve.coverage.lastFired')"
+      >
         <span data-test="autoobserve-coverage-detail-last-fired">{{ lastFired }}</span>
       </ODescriptionItem>
       <ODescriptionItem v-if="cell.library" stacked :label="t('autoobserve.coverage.libraryEntry')">
@@ -47,11 +61,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}
       </ODescriptionItem>
       <ODescriptionItem
-        v-if="cell.reason && cell.state !== 'gap'"
+        v-if="!insight && cell.reason && (cell.state !== 'gap' || cell.engine)"
         stacked
         :label="t('autoobserve.coverage.reason')"
       >
         {{ cell.reason }}
+      </ODescriptionItem>
+      <ODescriptionItem
+        v-if="cell.engine && !(added && !cell.engine.monitors.length)"
+        stacked
+        :label="t('autoobserveLive.drawer.monitors')"
+        data-test="autoobserve-coverage-detail-monitors"
+      >
+        <span v-if="!cell.engine.monitors.length" class="text-text-secondary">{{
+          t("autoobserveLive.drawer.noMonitor")
+        }}</span>
+        <div
+          v-for="monitor in cell.engine.monitors"
+          :key="`${monitor.id}-${monitor.stateKey}`"
+          class="flex flex-col gap-0.5 py-0.5"
+        >
+          <span class="flex flex-wrap items-center gap-2">
+            <OText variant="mono" class="break-all">{{ monitor.name }}</OText>
+            <span class="text-text-secondary text-xs">{{
+              t("autoobserveLive.drawer.monitorLine", {
+                kind: monitor.kind,
+                state: monitor.state,
+              })
+            }}</span>
+          </span>
+          <span v-if="monitor.predicate" class="text-text-secondary text-xs break-words">{{
+            monitor.predicate
+          }}</span>
+        </div>
       </ODescriptionItem>
       <ODescriptionItem
         v-if="cell.alsoWatchedBy"
@@ -89,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         t("autoobserve.coverage.guardrails")
       }}
     </p>
-    <div v-if="config" class="flex flex-col gap-1">
+    <div v-if="config && (!cell.engine || nerd)" class="flex flex-col gap-1">
       <span class="text-text-secondary text-xs">{{ t("autoobserve.coverage.config") }}</span>
       <OCodeBlock
         :code="config"
@@ -104,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -113,16 +155,30 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import { seed } from "./coverageSeries";
-import { LEDGER_STATUS, type CoverageCell, type LedgerEntry, type Signal } from "./fixtures";
+import InsightBlock from "./insight/InsightBlock.vue";
+import type { InsightCta, InsightParts } from "./insight/insightCopy";
+import { useAutoObserveView } from "./v2/useAutoObserveView";
+import { LEDGER_STATUS, type CoverageCell, type EngineMonitor, type LedgerEntry } from "./fixtures";
 
 const props = defineProps<{
   cell: CoverageCell;
   service: string;
-  signal: Signal;
+  signal: string;
   ledger: LedgerEntry[];
+  insight?: InsightParts | null;
+  pending?: boolean;
+  /** When the live cell's alerts last fired, read from the alerts; absent until they are read. */
+  lastFired?: I18nText | null;
+  /** An alert for this check was just added and isn't counted yet. */
+  added?: boolean;
 }>();
 
+const emit = defineEmits<{ cta: [cta: InsightCta] }>();
+
 const { t } = useI18nTyped();
+// Monitor ids and kind keys are engine detail, so the live config block is for Nerd view only.
+const { view } = useAutoObserveView();
+const nerd = computed(() => view.value === "nerd");
 
 const ledgerTag = (id: string) => {
   const entry = props.ledger.find((e) => e.id === id);
@@ -132,6 +188,7 @@ const ledgerTag = (id: string) => {
 };
 
 const lastFired = computed(() => {
+  if (props.cell.engine) return props.lastFired ?? null;
   if (props.cell.state !== "watched") return t("autoobserve.coverage.never");
   const n = seed(`${props.service}:${props.signal}:fired`) % 6;
   if (n === 0) return t("autoobserve.coverage.never");
@@ -140,8 +197,22 @@ const lastFired = computed(() => {
     : t("autoobserve.coverage.daysAgo", { count: n }, n);
 });
 
+const engineConfig = (monitors: EngineMonitor[]) =>
+  monitors
+    .map((m) =>
+      [
+        `- monitor: ${m.name}`,
+        `  kind: ${m.kindKey}`,
+        `  id: ${m.id}`,
+        `  state: ${m.stateKey}`,
+        `  matched_by: ${JSON.stringify(m.predicate)}`,
+      ].join("\n"),
+    )
+    .join("\n");
+
 const config = computed(() => {
   const cell = props.cell;
+  if (cell.engine) return engineConfig(cell.engine.monitors);
   if (!cell.detector) return "";
   const baseline =
     cell.state === "learning" && cell.progress

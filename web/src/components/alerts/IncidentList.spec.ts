@@ -64,6 +64,7 @@ import { resetListViewState, useListViewState } from "@/composables/useListViewS
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import IncidentList from "./IncidentList.vue";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import incidentsService from "@/services/incidents";
 import downtimesService from "@/services/downtimes";
 import { queryClient } from "@/composables/query/queryClient";
@@ -1106,6 +1107,81 @@ describe("IncidentList.vue", () => {
       const cell = await mountWith(createIncident({ alert_groups: [], alert_count: 0 }));
       expect(cell.find('[data-test="incident-alert-group-chip"]').exists()).toBe(false);
       expect(cell.text()).toBe("0");
+    });
+  });
+
+  describe("Dimensions cell", () => {
+    const mountWith = async (group_values: Record<string, string>) => {
+      (incidentsService.list as any).mockResolvedValue({
+        data: { incidents: [createIncident({ id: "1", group_values })], total: 1 },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+      return {
+        chips: wrapper.findAllComponents(ODimensionChip),
+        more: wrapper.find('[data-test="incident-dimensions-more"]'),
+      };
+    };
+
+    it("a finding's chips read what, name, type everywhere", async () => {
+      const { chips, more } = await mountWith({
+        env: "prod",
+        stream_type: "logs",
+        stream_name: "checkout",
+        autoobserve_finding: "stream_silence",
+      });
+      expect(chips.map((c) => c.props("dimKey"))).toEqual(["autoobserve_finding", "stream_name"]);
+      expect(more.text()).toContain("+2 more");
+      expect(more.find('[data-test="o-tooltip"]').text().replace(/\s+/g, "")).toBe(
+        "StreamType=logsenv=prod",
+      );
+    });
+
+    it("another incident keeps the alphabetical chips", async () => {
+      const { chips, more } = await mountWith({ service: "api", env: "prod", cluster: "eu" });
+      expect(chips.map((c) => c.props("dimKey"))).toEqual(["cluster", "env"]);
+      expect(more.find('[data-test="o-tooltip"]').text().replace(/\s+/g, "")).toBe("service=api");
+    });
+
+    it("the list shows a finding's chips in words", async () => {
+      const { chips, more } = await mountWith({
+        autoobserve_finding: "stream_silence",
+        stream_type: "logs",
+        stream_name: "checkout",
+      });
+      expect(chips.map((c) => c.props("keyLabel"))).toEqual(["Finding", "Stream Name"]);
+      expect(chips.map((c) => c.props("dimKey"))).toEqual(["autoobserve_finding", "stream_name"]);
+      // The key and value segments render side by side, so text() joins them.
+      expect(chips.map((c) => c.text())).toEqual([
+        "Finding" + "Stopped sending data",
+        "Stream Name" + "checkout",
+      ]);
+      expect(chips.map((c) => c.props("tooltip"))).toEqual([false, false]);
+      expect(more.text()).toContain("+1 more");
+      expect(more.find('[data-test="o-tooltip"]').text().replace(/\s+/g, "")).toBe(
+        "StreamType=logs",
+      );
+      const shown = [
+        ...chips.map((c) => c.html()),
+        more.html(),
+        ...chips.map((c) => String(c.attributes("title") ?? "")),
+      ].join(" ");
+      expect(shown).not.toMatch(/autoobserve_finding|stream_name|stream_type|stream_silence/);
+    });
+
+    it("other incidents' chips are unchanged", async () => {
+      const { chips, more } = await mountWith({
+        "k8s-namespace": "prod",
+        service: "api",
+        stream_name: "s1",
+      });
+      expect(chips.map((c) => c.props("dimKey"))).toEqual(["k8s-namespace", "service"]);
+      expect(chips.map((c) => c.props("keyLabel"))).toEqual([undefined, undefined]);
+      expect(chips.map((c) => c.props("tooltip"))).toEqual([true, true]);
+      expect(chips.map((c) => c.text())).toEqual(["k8s-namespace" + "prod", "service" + "api"]);
+      expect(more.find('[data-test="o-tooltip"]').text().replace(/\s+/g, "")).toBe(
+        "stream_name=s1",
+      );
     });
   });
 });

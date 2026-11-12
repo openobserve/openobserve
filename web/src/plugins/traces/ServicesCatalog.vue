@@ -679,7 +679,11 @@ const viewState = useListViewState("servicesCatalog", {
   sortBy: "status",
   sortOrder: "desc" as "asc" | "desc",
 });
-const filterText = ref(viewState.filterText);
+// A link from another page (AutoObserve's service drawer) names the service to show.
+const linkedService = router.currentRoute.value?.query?.service;
+const filterText = ref(
+  typeof linkedService === "string" && linkedService ? linkedService : viewState.filterText,
+);
 const typeFilter = ref<TypeFilter>(viewState.typeFilter);
 const currentPage = ref(viewState.currentPage);
 const rowsPerPage = ref(viewState.rowsPerPage);

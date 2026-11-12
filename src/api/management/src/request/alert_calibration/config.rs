@@ -17,9 +17,22 @@
 
 use axum::{Json, extract::Path, response::Response};
 use common::meta::http::HttpResponse as MetaHttpResponse;
+use infra::table::entity::alert_calibration_configs::Model as ConfigModel;
 use o2_enterprise::enterprise::alert_calibration_service::{self, UpdateAlertCalibrationConfig};
+use openobserve_api_common::extractors::Headers;
+use serde::Serialize;
 
 use super::{deployment_disabled, error_response};
+use crate::{request::alert_grants::org_wide_allows, service::auth::UserEmail};
+
+/// The config and what this caller may do with it, so the page offers only what will be allowed.
+#[derive(Serialize)]
+struct ConfigView {
+    #[serde(flatten)]
+    config: ConfigModel,
+    can_edit: bool,
+    can_run: bool,
+}
 
 #[utoipa::path(
     get,
@@ -28,7 +41,7 @@ use super::{deployment_disabled, error_response};
     tag = "Alert Calibration",
     operation_id = "GetAlertCalibrationConfig",
     summary = "Get the org's alert calibration config",
-    description = "Returns the organization's alert calibration settings: whether it runs, how often, and how much history each run analyses.",
+    description = "Returns the organization's alert calibration settings: whether it runs, how often, and how much history each run analyses. `can_edit` and `can_run` say whether the caller may save the config and request a run, by the same checks those routes make.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -44,14 +57,27 @@ use super::{deployment_disabled, error_response};
         ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "list"}))
     )
 )]
-pub async fn get_alert_calibration_config(Path(org_id): Path<String>) -> Response {
+pub async fn get_alert_calibration_config(
+    Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
     if let Some(disabled) = deployment_disabled() {
         return disabled;
     }
-    match alert_calibration_service::get_config(&org_id).await {
-        Ok(config) => MetaHttpResponse::json(config),
-        Err(error) => error_response(&error),
-    }
+    let config = match alert_calibration_service::get_config(&org_id).await {
+        Ok(config) => config,
+        Err(error) => return error_response(&error),
+    };
+    // The PUT config and POST run routes check these grants on `alert_calibration:{org}`.
+    let (can_edit, can_run) = tokio::join!(
+        org_wide_allows(&org_id, &user.user_id, "alert_calibration", "PUT"),
+        org_wide_allows(&org_id, &user.user_id, "alert_calibration", "POST"),
+    );
+    MetaHttpResponse::json(ConfigView {
+        config,
+        can_edit,
+        can_run,
+    })
 }
 
 #[utoipa::path(
@@ -87,7 +113,51 @@ pub async fn update_alert_calibration_config(
         return disabled;
     }
     match alert_calibration_service::update_config(&org_id, update).await {
-        Ok(config) => MetaHttpResponse::json(config),
+        Ok(config) => {
+            if config.enabled {
+                prepare_writer_token(&org_id).await;
+            }
+            MetaHttpResponse::json(config)
+        }
         Err(error) => error_response(&error),
+    }
+}
+
+/// Made when calibration is turned on, so the first pass finds it in every ingester's cache.
+async fn prepare_writer_token(org_id: &str) {
+    use openobserve_core::ingestion::feature_writer::{self, FeatureWriter};
+    // Each pass looks the token up again and reports why it could not write, so this only logs.
+    if let Err(e) = feature_writer::token(FeatureWriter::AlertCalibration, org_id).await {
+        log::warn!("[alert_calibration] could not prepare the ingestion token for {org_id}: {e}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_config_carries_what_the_caller_may_do_beside_its_fields() {
+        let config = ConfigModel {
+            id: "c1".into(),
+            org: "demo-org".into(),
+            enabled: true,
+            frequency_minutes: 60,
+            window_minutes: 1440,
+            created_at: 1,
+            updated_at: 2,
+        };
+        let view = serde_json::to_value(ConfigView {
+            config,
+            can_edit: false,
+            can_run: true,
+        })
+        .unwrap();
+        assert_eq!(view["frequency_minutes"], 60);
+        assert_eq!(view["enabled"], true);
+        assert_eq!(
+            (&view["can_edit"], &view["can_run"]),
+            (&false.into(), &true.into())
+        );
     }
 }

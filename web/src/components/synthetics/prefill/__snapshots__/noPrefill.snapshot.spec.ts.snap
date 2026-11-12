@@ -1,0 +1,140 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`synthetic check form without an AutoObserve prefill > renders the configure column exactly as before 1`] = `"<o-splitter-stub modelvalue="70" horizontal="false" limits="55,85" unit="%" disable="false" separator="true" separatorclass="" separatorstyle="[object Object]" beforeclass="" afterclass="" class="h-full min-h-0"></o-splitter-stub>"`;
+
+exports[`synthetic check form without an AutoObserve prefill > renders the configure sections exactly as before 1`] = `
+[
+  "<div class="rounded-default border-border-default mb-4 border">
+  <div class="border-border-default flex items-center border-b px-3 py-2.5">
+    <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0"></div>
+    <h3 class="text-text-heading text-base font-semibold">synthetics.checkDetails.title</h3>
+  </div>
+  <div class="flex flex-col gap-4 px-3 py-2">
+    <o-input-stub modelvalue="HTTP Health Check" label="synthetics.checkDetails.name" errormessage="" placeholder="synthetics.checkDetails.namePlaceholder" type="text" error="false" clearable="false" revealable="false" disabled="false" required="true" autofocus="false" autogrow="false" rows="3" size="md" labelposition="outside" data-test="synthetics-check-details-name-input"></o-input-stub>
+    <o-select-stub label="synthetics.checkDetails.folder" options="[object Object]" errormessage="" placeholder="synthetics.checkDetails.folderPlaceholder" modelvalue="folder-1" multiple="false" searchable="true" searchdebounce="0" hideselected="false" collapsiblegroups="false" pinselectedingroups="false" selectall="false" creatable="false" labelkey="label" valuekey="value" required="false" error="false" clearable="false" disabled="false" size="md" appearance="field" labelposition="outside" loading="false" rowclicksingleselect="false" optiontooltip="false" data-test="synthetics-check-details-folder-select"></o-select-stub>
+    <o-switch-stub label="synthetics.checkDetails.enabled" modelvalue="true" labelposition="right" size="md" disabled="false" required="false" data-test="synthetics-check-details-enabled-switch"></o-switch-stub>
+    <o-template-input-stub modelvalue="https://example.com/health" label="synthetics.checkDetails.startingUrl" errormessage="" placeholder="synthetics.checkDetails.startingUrlPlaceholder" type="text" error="false" clearable="false" disabled="false" required="true" autofocus="false" autogrow="false" data-test="synthetics-check-details-url-input"></o-template-input-stub>
+    <o-input-stub modelvalue="Main endpoint health monitoring" label="synthetics.checkDetails.description" placeholder="synthetics.checkDetails.descriptionPlaceholder" type="textarea" error="false" clearable="false" revealable="false" disabled="false" required="false" autofocus="false" autogrow="false" rows="3" size="md" labelposition="outside" data-test="synthetics-check-details-description-textarea"></o-input-stub>
+    <div><label class="text-text-body mb-1 block text-sm font-medium">synthetics.checkDetails.tags</label>
+      <div class="mb-2 flex items-center gap-2">
+        <o-input-stub modelvalue="" placeholder="synthetics.checkDetails.tagPlaceholder" type="text" error="false" clearable="false" revealable="false" disabled="false" required="false" autofocus="false" autogrow="false" rows="3" size="md" labelposition="outside" data-test="synthetics-check-details-tag-input" class="flex-1"></o-input-stub>
+        <o-button-stub variant="outline" size="sm" disabled="false" focusableunavailable="false" loading="false" spinner="true" active="false" type="button" block="false" aschild="false" as="button" data-test="synthetics-check-details-add-tag-btn"></o-button-stub>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <o-tag-stub size="xs" type="selectionChip" hidezerocount="false" clickable="false" disabled="false" removable="false" emptylabel="—" class="px-2"></o-tag-stub>
+        <o-tag-stub size="xs" type="selectionChip" hidezerocount="false" clickable="false" disabled="false" removable="false" emptylabel="—" class="px-2"></o-tag-stub>
+      </div>
+    </div>
+  </div>
+</div>",
+  "<div class="rounded-default border-border-default mb-4 border">
+  <div class="border-border-default flex items-center border-b px-3 py-2.5">
+    <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0"></div>
+    <h3 class="text-text-heading text-base font-semibold">synthetics.locations.title</h3>
+  </div>
+  <div class="flex flex-col gap-3 px-3 py-2">
+    <div class="flex items-center gap-2">
+      <o-input-stub modelvalue="" placeholder="synthetics.locations.searchPlaceholder" type="search" error="false" clearable="false" revealable="false" disabled="false" required="false" autofocus="false" autogrow="false" rows="3" size="md" labelposition="outside" class="flex-1" data-test="synthetics-check-locations-search"></o-input-stub>
+      <o-button-stub iconleft="refresh" variant="outline" size="sm" disabled="false" focusableunavailable="false" loading="false" spinner="true" active="false" type="button" block="false" aschild="false" as="button" aria-label="common.refresh" data-test="synthetics-check-locations-refresh-btn"></o-button-stub>
+    </div>
+    <o-checkbox-group-stub modelvalue="private-mumbai-1" disabled="false" data-test="synthetics-check-locations-group">
+      <p class="text-text-secondary flex items-center gap-1 pb-1 text-xs"><span class="font-medium capitalize">synthetics.locations.publicTitle</span>
+        <o-tooltip-stub content="synthetics.locations.publicSubtitle" side="top" align="center" sideoffset="4" alignoffset="0" delay="300" maxwidth="20rem" disabled="false" hoverable="false" arrowclass="fill-surface-overlay" overflowonly="false" exclusive="false">
+          <o-icon-stub name="info" size="xs" class="text-text-secondary cursor-help"></o-icon-stub>
+        </o-tooltip-stub>
+      </p>
+      <div class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+        <o-checkbox-stub modelvalue="false" size="md" color="primary" disabled="false" required="false" data-test="synthetics-check-locations-option-us-east-1" class="min-w-0 pb-2" value="us-east-1"></o-checkbox-stub>
+        <o-checkbox-stub modelvalue="false" size="md" color="primary" disabled="false" required="false" data-test="synthetics-check-locations-option-eu-west-1" class="min-w-0 pb-2" value="eu-west-1"></o-checkbox-stub>
+        <o-checkbox-stub modelvalue="false" size="md" color="primary" disabled="false" required="false" data-test="synthetics-check-locations-option-ap-southeast-1" class="min-w-0 pb-2" value="ap-southeast-1"></o-checkbox-stub>
+      </div>
+      <div class="flex items-center justify-between pt-2 pb-1">
+        <p class="text-text-secondary flex items-center gap-1 text-xs"><span class="font-medium capitalize">synthetics.locations.privateTitle</span>
+          <o-tooltip-stub content="synthetics.locations.privateSubtitle" side="top" align="center" sideoffset="4" alignoffset="0" delay="300" maxwidth="20rem" disabled="false" hoverable="false" arrowclass="fill-surface-overlay" overflowonly="false" exclusive="false">
+            <o-icon-stub name="info" size="xs" class="text-text-secondary cursor-help"></o-icon-stub>
+          </o-tooltip-stub>
+        </p>
+        <o-button-stub variant="primary" size="xs" disabled="false" focusableunavailable="false" loading="false" spinner="true" active="false" type="button" block="false" aschild="false" as="button" data-test="synthetics-check-locations-new-location-btn">synthetics.locations.newLocation</o-button-stub>
+      </div>
+      <div class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+        <div class="flex min-w-0 items-start gap-2 pb-2">
+          <o-checkbox-stub modelvalue="false" size="md" color="primary" disabled="false" required="false" data-test="synthetics-check-locations-option-private-blr-1" class="min-w-0 flex-1" value="private-blr-1"></o-checkbox-stub>
+          <o-button-stub variant="outline" size="xs" disabled="false" focusableunavailable="false" loading="false" spinner="true" active="false" type="button" block="false" aschild="false" as="button" data-test="synthetics-check-locations-add-agent-private-blr-1">synthetics.locations.addAgent</o-button-stub>
+        </div>
+        <div class="flex min-w-0 items-start gap-2 pb-2">
+          <o-checkbox-stub modelvalue="false" size="md" color="primary" disabled="false" required="false" data-test="synthetics-check-locations-option-private-mumbai-1" class="min-w-0 flex-1" value="private-mumbai-1"></o-checkbox-stub>
+          <o-button-stub variant="outline" size="xs" disabled="false" focusableunavailable="false" loading="false" spinner="true" active="false" type="button" block="false" aschild="false" as="button" data-test="synthetics-check-locations-add-agent-private-mumbai-1">synthetics.locations.addAgent</o-button-stub>
+        </div>
+        <div class="flex min-w-0 items-start gap-2 pb-2">
+          <o-checkbox-stub modelvalue="false" size="md" color="primary" disabled="false" required="false" data-test="synthetics-check-locations-option-private-pending-1" class="min-w-0 flex-1" value="private-pending-1"></o-checkbox-stub>
+          <o-button-stub variant="outline" size="xs" disabled="false" focusableunavailable="false" loading="false" spinner="true" active="false" type="button" block="false" aschild="false" as="button" data-test="synthetics-check-locations-add-agent-private-pending-1">synthetics.locations.installAgent</o-button-stub>
+        </div>
+        <div class="flex min-w-0 items-start gap-2 pb-2">
+          <o-checkbox-stub modelvalue="false" size="md" color="primary" disabled="false" required="false" data-test="synthetics-check-locations-option-private-offline-1" class="min-w-0 flex-1" value="private-offline-1"></o-checkbox-stub>
+          <o-button-stub variant="outline" size="xs" disabled="false" focusableunavailable="false" loading="false" spinner="true" active="false" type="button" block="false" aschild="false" as="button" data-test="synthetics-check-locations-add-agent-private-offline-1">synthetics.locations.addAgent</o-button-stub>
+        </div>
+        <div class="flex min-w-0 items-start gap-2 pb-2">
+          <o-checkbox-stub modelvalue="false" size="md" color="primary" disabled="false" required="false" data-test="synthetics-check-locations-option-private-down-1" class="min-w-0 flex-1" value="private-down-1"></o-checkbox-stub>
+          <o-button-stub variant="outline" size="xs" disabled="false" focusableunavailable="false" loading="false" spinner="true" active="false" type="button" block="false" aschild="false" as="button" data-test="synthetics-check-locations-add-agent-private-down-1">synthetics.locations.addAgent</o-button-stub>
+        </div>
+      </div>
+    </o-checkbox-group-stub>
+  </div>
+</div>",
+  "<div class="rounded-default border-border-default mb-4 border">
+  <div class="border-border-default flex items-center border-b px-3 py-2.5">
+    <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0"></div>
+    <h3 class="text-text-heading text-base font-semibold">synthetics.scheduleAlert.schedule</h3>
+  </div>
+  <div class="flex flex-col gap-4 px-3 py-2">
+    <div class="flex flex-wrap items-end gap-8">
+      <div><label class="text-text-body mb-1 block text-sm font-medium">synthetics.scheduleAlert.frequency</label>
+        <o-toggle-group-stub type="single" modelvalue="5min" disabled="false" orientation="horizontal" variant="default" labelposition="left" reorderable="false" mobiledropdown="false" data-test="synthetics-check-schedule-frequency-toggle"></o-toggle-group-stub>
+      </div>
+      <div class="flex items-center gap-2">
+        <o-toggle-group-stub type="single" modelvalue="now" disabled="false" orientation="horizontal" variant="default" labelposition="left" reorderable="false" mobiledropdown="false" data-test="synthetics-check-schedule-start-type-toggle"></o-toggle-group-stub>
+        <o-icon-stub name="info-outline" size="sm" class="text-text-muted cursor-pointer"></o-icon-stub>
+      </div>
+    </div>
+  </div>
+</div>",
+  "<div class="rounded-default border-border-default mb-4 border" data-test="synthetics-check-alerts">
+  <div class="border-border-default flex items-center border-b px-3 py-2.5">
+    <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0"></div>
+    <h3 class="text-text-heading text-base font-semibold">synthetics.scheduleAlert.alerts</h3>
+  </div>
+  <div class="flex flex-col gap-4 px-3 py-2">
+    <alert-destinations-field-stub destinations="dest-1" workflows="" destinationoptions="ops-webhook" label="synthetics.scheduleAlert.destinations" tooltip="" placeholder="alerts.summary.noDestination" notifiesnobody="false" showstatus="false" targetrequired="false" supportsworkflows="false" data-test="synthetics-check-alerts-destinations"></alert-destinations-field-stub>
+    <div class="flex flex-wrap items-start gap-2" data-test="synthetics-check-alerts-template"><label class="text-text-heading flex h-9 w-47.5 items-center font-semibold">alerts.templateOverride.label</label>
+      <div class="min-w-0 flex-1 basis-60">
+        <template-override-picker-stub kind="synthetics" disabled="false" destinations="dest-1"></template-override-picker-stub>
+      </div>
+    </div>
+    <div class="flex flex-nowrap items-center gap-2"><label class="text-text-heading flex h-7 w-47.5 items-center font-semibold whitespace-nowrap">synthetics.scheduleAlert.alertedIfFails</label>
+      <o-input-stub modelvalue="3" placeholder="1" type="number" error="false" clearable="false" revealable="false" disabled="false" required="false" autofocus="false" autogrow="false" rows="3" size="md" labelposition="outside" class="w-25!" data-test="synthetics-check-alerts-threshold-input"></o-input-stub><span class="text-text-body text-sm whitespace-nowrap">synthetics.scheduleAlert.alertedIfFailsSuffix</span>
+    </div>
+    <div class="flex items-center gap-2"><label class="text-text-heading flex h-7 w-47.5 items-center font-semibold">synthetics.scheduleAlert.cooldownPeriod</label>
+      <div class="flex items-center">
+        <div class="w-21.75">
+          <o-input-stub modelvalue="5" min="0" type="number" error="false" clearable="false" revealable="false" disabled="false" required="false" autofocus="false" autogrow="false" rows="3" size="md" labelposition="outside" data-test="synthetics-check-alerts-cooldown-input"></o-input-stub>
+        </div>
+        <div class="text-text-body flex h-7 items-center justify-center ps-2 text-sm">synthetics.scheduleAlert.minutes</div>
+      </div>
+    </div>
+  </div>
+</div>",
+]
+`;
+
+exports[`synthetic check form without an AutoObserve prefill > renders the create page exactly as before 1`] = `
+"<div data-test="page" data-title="synthetics.newCheck.pageTitle {&quot;label&quot;:&quot;synthetics.newCheck.http&quot;}">
+  <div class="min-h-0 flex-1 overflow-y-auto">
+    <div data-test="synthetics-check-configure" loading-locations="false" folders-loading="false" validation-errors="[object Object]" allow-private-locations="true" class="w-full!">
+      <div validationerrors="[object Object]"></div>
+    </div>
+  </div>
+  <div class="border-border-default bg-surface-base flex shrink-0 items-center gap-2 border-t px-3 py-2.5"><span class="flex-1" aria-hidden="true"></span><button variant="ghost" size="sm" data-test="synthetics-create-cancel-btn">common.cancel</button><button variant="primary" size="sm" loading="false" data-test="synthetics-create-save-btn">synthetics.newCheck.saveAndExit</button></div>
+  <agent-setup-drawer-stub open="false"></agent-setup-drawer-stub>
+  <editor-draft-dialogs-stub draft="[object Object]"></editor-draft-dialogs-stub>
+</div>"
+`;

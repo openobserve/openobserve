@@ -31,7 +31,7 @@ use super::{
     context::NotificationContext,
     format::ChannelFormat,
     render::{RenderedMessage, markdown::markdown_to_html, render, severity_color},
-    resolve::{empty_variables, resolve_content},
+    resolve::{empty_variables, escaped_body_markdown, resolve_content},
 };
 
 #[derive(Debug, Clone, Deserialize, ToSchema)]
@@ -268,7 +268,7 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
 
     let preview_model = PreviewModel {
         title: content.title.clone(),
-        body_html: markdown_to_html(&content.body_markdown),
+        body_html: markdown_to_html(&escaped_body_markdown(&req.definition, &ctx)),
         fields: content
             .fields
             .iter()
@@ -700,5 +700,37 @@ mod tests {
             at(NotificationKind::Synthetics, Some(AlertLevel::Warning)),
             (Some(AlertLevel::Warning), notice)
         );
+    }
+
+    #[test]
+    fn plain_text_platform_bodies_are_raw_while_preview_html_stays_escaped() {
+        let definition = ContentSpec {
+            title: "t".into(),
+            body: "- {alert_operator} {alert_threshold}".into(),
+            ..Default::default()
+        };
+        for (channel, pointer) in [
+            ("opsgenie", "/description"),
+            ("pagerduty", "/payload/custom_details/body"),
+            ("servicenow", "/description"),
+        ] {
+            let resp = preview(&PreviewRequest {
+                definition: definition.clone(),
+                channel: channel.into(),
+                severity: Some("critical".into()),
+                sample: None,
+                kind: Default::default(),
+            })
+            .unwrap();
+            assert_eq!(
+                resp.payload.pointer(pointer).and_then(|v| v.as_str()),
+                Some("- >= 80"),
+                "{channel} payload"
+            );
+            assert_eq!(
+                resp.preview_model.body_html, "<ul>\n<li>&gt;= 80</li>\n</ul>\n",
+                "{channel} preview"
+            );
+        }
     }
 }

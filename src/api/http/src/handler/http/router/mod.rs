@@ -78,9 +78,10 @@ use {
     },
     openobserve_api_common::auth::delegation::DelegatedCaller,
     openobserve_api_management::request::{
-        ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
-        discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys, license, oncall,
-        playground, prompts, providers, quality, remote_tasks, score_configs, scorers, workflows,
+        ai, alert_calibration, annotation_queues, annotations, anomaly_detection, autoobserve,
+        datasets, discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys,
+        license, oncall, playground, prompts, providers, quality, remote_tasks, score_configs,
+        scorers, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -1291,6 +1292,28 @@ fn alert_calibration_routes(router: Router) -> Router {
         .route("/v2/{org_id}/alert_calibration/digests/records", get(alert_calibration::digests::get_run_records))
         .route("/v2/{org_id}/alert_calibration/digests/rules", get(alert_calibration::digests::count_findings_by_rule))
         .route("/v2/{org_id}/alert_calibration/digests/run", post(alert_calibration::digests::run_alert_calibration))
+        .route("/v2/{org_id}/alert_calibration/dismissals", get(alert_calibration::dismissals::list_dismissals))
+        .route("/v2/{org_id}/alert_calibration/findings/{finding_id}/dismiss", post(alert_calibration::dismissals::dismiss_finding))
+        .route("/v2/{org_id}/alert_calibration/dismissals/{id}/reopen", post(alert_calibration::dismissals::reopen_dismissal))
+}
+
+#[cfg(feature = "enterprise")]
+#[rustfmt::skip]
+fn autoobserve_routes(router: Router) -> Router {
+    router
+        .route("/v2/{org_id}/autoobserve/entity_types", get(autoobserve::entity_types))
+        .route("/v2/{org_id}/autoobserve/coverage", get(autoobserve::coverage))
+        .route("/v2/{org_id}/autoobserve/coverage/history", get(autoobserve::coverage_history))
+        .route("/v2/{org_id}/autoobserve/suggestions", get(autoobserve::suggestions))
+        .route("/v2/{org_id}/autoobserve/decisions", get(autoobserve::decisions::list_decisions).post(autoobserve::decisions::decide))
+        .route("/v2/{org_id}/autoobserve/decisions/preview", get(autoobserve::decisions::preview_decision))
+        .route("/v2/{org_id}/autoobserve/decisions/{decision_id}/undo", post(autoobserve::decisions::undo_decision))
+        .route("/v2/{org_id}/autoobserve/incidents", get(autoobserve::incidents::list_incidents))
+        .route("/v2/{org_id}/autoobserve/marks", get(autoobserve::list_marks))
+        .route("/v2/{org_id}/autoobserve/marks/{mark}/{entity_type}/{entity_id}", put(autoobserve::put_mark).delete(autoobserve::delete_mark))
+        .route("/v2/{org_id}/autoobserve/review", get(autoobserve::review::get_review))
+        .route("/v2/{org_id}/autoobserve/review/{decision_kind}/{cohort_id}", put(autoobserve::review::put_verdict))
+        .route("/v2/{org_id}/autoobserve/settings/paging", get(autoobserve::paging::get_paging_settings).put(autoobserve::paging::put_paging_settings))
 }
 
 #[rustfmt::skip]
@@ -1649,6 +1672,7 @@ fn service_route_table() -> Router {
 
             .route("/v2/{org_id}/alerts/history/summary", get(alerts::history_summary::get_alert_history_summary));
         router = alert_calibration_routes(router);
+        router = autoobserve_routes(router);
     }
 
     router = router
@@ -2890,6 +2914,22 @@ pub fn slack_routes() -> Router {
         .route("/{org_id}/slack/installations/{installation_id}/oncall-unlinked", get(set::oncall_unlinked))
         .route("/{org_id}/slack/installations/{installation_id}/oncall-unlinked/remind", post(set::remind_oncall_unlinked))
         .route("/{org_id}/slack/installations/{installation_id}/org-access", get(inst::get_org_access).put(inst::put_org_access))
+        .merge(slack_insights_routes())
+}
+
+// Private and before the next `pub fn`, so the ROUTE_PERMISSIONS router scrape still reads it.
+#[cfg(feature = "enterprise")]
+#[rustfmt::skip]
+fn slack_insights_routes() -> Router {
+    use slack::insights as ins;
+    Router::new()
+        .route("/{org_id}/slack/insights-settings", get(ins::get_insights_settings).put(ins::put_insights_settings))
+}
+
+// The OSS build has no insights feed, so the route is absent, not a stub.
+#[cfg(not(feature = "enterprise"))]
+fn slack_insights_routes() -> Router {
+    Router::new()
 }
 
 /// Create other service routes (AWS, GCP, RUM)
@@ -3308,6 +3348,22 @@ mod tests {
             .unwrap();
         let response = slack_routes().oneshot(req).await.unwrap();
         assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn the_insights_settings_route_is_absent_without_enterprise() {
+        for method in [Method::GET, Method::PUT] {
+            let req = Request::builder()
+                .method(method.clone())
+                .uri("/default/slack/insights-settings")
+                .header("user_id", "root@example.com")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from("{}"))
+                .unwrap();
+            let response = slack_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{method}");
+        }
     }
 
     /// Requests whose body or query axum's extractors refuse, one per extractor shape.
@@ -5980,7 +6036,8 @@ mod tests {
     fn slack_action_scope_routes_are_exactly() {
         use openobserve_api_common::auth::delegation::in_slack_action_scope;
 
-        let expected = [
+        #[allow(unused_mut)]
+        let mut expected = vec![
             "GET /v2/{org_id}/alerts/{alert_id}",
             "GET /v2/{org_id}/alerts/{alert_id}/acks",
             "GET /v2/{org_id}/alerts/{alert_id}/groups",
@@ -5995,6 +6052,12 @@ mod tests {
             "POST /{org_id}/oncall/responses/{response_id}/snooze",
             "POST /{org_id}/oncall/responses/{response_id}/unacknowledge",
         ];
+        #[cfg(feature = "enterprise")]
+        expected.extend([
+            "GET /v2/{org_id}/autoobserve/decisions/preview",
+            "POST /v2/{org_id}/autoobserve/decisions",
+            "POST /v2/{org_id}/autoobserve/decisions/{decision_id}/undo",
+        ]);
         assert_eq!(scope_allows(in_slack_action_scope), sorted(&expected));
     }
 

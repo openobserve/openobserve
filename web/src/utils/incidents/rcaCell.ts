@@ -16,11 +16,21 @@
 // List display reads only incident metadata; stale state is computed by the server.
 
 import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
-import type { Incident, RcaBand, RcaOutcome, RcaSummary } from "@/services/incidents";
+import type { Incident, RcaBand, RcaOutcome, RcaRunState, RcaSummary } from "@/services/incidents";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { timezoneAbbr } from "@/utils/formatters";
 
 export type RcaCellTone = "muted" | "warn" | "warn-strong" | "ok" | "err";
+
+// Strong warning uses the orange family of the list's P2 row rail.
+export const RCA_BADGE_VARIANT: Record<RcaCellTone, BadgeVariant> = {
+  muted: "default",
+  warn: "warning",
+  "warn-strong": "orange-outline",
+  ok: "success",
+  err: "error",
+};
 
 export interface RcaCellModel {
   /** `analyze`: the ghost "Analyze" button; `state`: a label pill with detail. */
@@ -90,7 +100,7 @@ const state = (
   showAnalyzeOnHover: false,
 });
 
-const OUTCOME: Record<RcaOutcome, { key: I18nKey; tone: RcaCellTone }> = {
+export const OUTCOME: Record<RcaOutcome, { key: I18nKey; tone: RcaCellTone }> = {
   root_cause_identified: {
     key: "alerts.incidents.aiAnalysis.outcome.rootCauseIdentified",
     tone: "ok",
@@ -106,6 +116,47 @@ const OUTCOME: Record<RcaOutcome, { key: I18nKey; tone: RcaCellTone }> = {
   inconclusive: { key: "alerts.incidents.aiAnalysis.outcome.inconclusive", tone: "warn" },
   blocked: { key: "alerts.incidents.aiAnalysis.outcome.blocked", tone: "warn-strong" },
 };
+
+// Mirrors the reasons stored in `rca_off_reason` (`src/core/src/alerts/incidents.rs:48-57`), bar `l0_off`.
+export type StoredNotRunReason =
+  "rca_disabled" | "ai_unavailable" | "quota_exceeded" | "cooling_down" | "start_failed";
+
+// Stored when the incident opened, so each detail reads in the past tense.
+export const NOT_RUN: Record<
+  StoredNotRunReason,
+  { label: I18nKey; tone: RcaCellTone; detail: I18nKey }
+> = {
+  rca_disabled: {
+    label: "alerts.incidents.aiAnalysis.notAnalyzed",
+    tone: "muted",
+    detail: "alerts.incidents.aiAnalysis.reason.rcaDisabled",
+  },
+  ai_unavailable: {
+    label: "alerts.incidents.aiAnalysis.notAnalyzed",
+    tone: "muted",
+    detail: "alerts.incidents.aiAnalysis.reason.aiUnavailable",
+  },
+  quota_exceeded: {
+    label: "alerts.incidents.aiAnalysis.notAnalyzed",
+    tone: "warn",
+    detail: "alerts.incidents.aiAnalysis.reason.quotaExceeded",
+  },
+  cooling_down: {
+    label: "alerts.incidents.aiAnalysis.notAnalyzed",
+    tone: "muted",
+    detail: "alerts.incidents.aiAnalysis.reason.coolingDown",
+  },
+  start_failed: {
+    label: "alerts.incidents.aiAnalysis.failed",
+    tone: "err",
+    detail: "alerts.incidents.aiAnalysis.reason.startFailed",
+  },
+};
+
+export const isStoredNotRunReason = (
+  reason: string | null | undefined,
+): reason is StoredNotRunReason =>
+  !!reason && Object.prototype.hasOwnProperty.call(NOT_RUN, reason);
 
 const BAND_KEY: Record<RcaBand, I18nKey> = {
   high: "alerts.incidents.aiAnalysis.band.high",
@@ -148,6 +199,13 @@ export function rcaCellModel(
             severity: String(incident.severity).toUpperCase(),
           }),
         ),
+        showAnalyzeOnHover: true,
+      };
+    }
+    if (isStoredNotRunReason(incident.rca_off_reason)) {
+      const notRun = NOT_RUN[incident.rca_off_reason];
+      return {
+        ...state(gt(notRun.label), notRun.tone, gt(notRun.detail)),
         showAnalyzeOnHover: true,
       };
     }
@@ -271,5 +329,5 @@ export function rcaCellModel(
 }
 
 /** True for a run the list polls for. */
-export const isLiveRca = (rca: RcaSummary | null | undefined): boolean =>
+export const isLiveRca = (rca: { state: RcaRunState | null } | null | undefined): boolean =>
   rca?.state === "running" || rca?.state === "waiting_input";

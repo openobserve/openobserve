@@ -111,19 +111,14 @@ pub async fn schema(
             })
             .ok();
     if !schema.settings.defined_schema_fields.is_empty() {
-        let mut schema_fields = schema
-            .schema
-            .iter()
-            .map(|f| (&f.name, f))
-            .collect::<HashMap<_, _>>();
         // internal columns are implicit in the UDS even when not persisted
         let internal_columns = schema.settings.uds_internal_columns();
+        let uds_fields =
+            schema::effective_uds_fields(stream_type, &schema.settings.defined_schema_fields);
         schema.uds_schema = schema
-            .settings
-            .defined_schema_fields
+            .schema
             .iter()
-            .chain(internal_columns.iter())
-            .filter_map(|f| schema_fields.remove(f))
+            .filter(|f| uds_fields.contains(&f.name) || internal_columns.contains(&f.name))
             .cloned()
             .collect::<Vec<_>>();
     }

@@ -24,7 +24,7 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { computed, onMounted, ref, watch, type Component } from "vue";
+import { computed, onMounted, provide, ref, watch, type Component } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -63,6 +63,15 @@ import CheckHttpConfig from "@/components/synthetics/configure/types/CheckHttpCo
 import CheckTcpConfig from "@/components/synthetics/configure/types/CheckTcpConfig.vue";
 import CheckTlsConfig from "@/components/synthetics/configure/types/CheckTlsConfig.vue";
 import CheckSshConfig from "@/components/synthetics/configure/types/CheckSshConfig.vue";
+import SyntheticPrefillFrame from "@/components/synthetics/prefill/SyntheticPrefillFrame.vue";
+import AfterSavePanel from "@/components/synthetics/prefill/AfterSavePanel.vue";
+import SyntheticPrefillBanner from "@/components/synthetics/prefill/SyntheticPrefillBanner.vue";
+import {
+  SYNTHETIC_PREFILL_VIEW,
+  autoObserveRoutes,
+  useSyntheticPrefill,
+} from "@/components/synthetics/prefill/useSyntheticPrefill";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const props = defineProps<{
   checkType: ProtocolCheckType;
@@ -114,13 +123,15 @@ function makeDefaultCheck(type: ProtocolCheckType): ProtocolCheck {
   };
 }
 
-const check = ref<ProtocolCheck>(makeDefaultCheck(props.checkType));
+const synthPrefill = useSyntheticPrefill({ checkType: props.checkType, editId: props.editId });
+const check = ref<ProtocolCheck>(synthPrefill.apply(makeDefaultCheck(props.checkType)));
 /** The check as the server returned it, kept unmodified so its draft hash is stable. */
 let serverCheck: ProtocolCheck | null = null;
 const isLoadingEdit = ref(false);
 const isSaving = ref(false);
 
 const headerTitle = computed(() => {
+  if (synthPrefill.prefill) return t("synthetics.prefill.pageTitle");
   if (isLoadingEdit.value) return t("synthetics.createBrowserTest.loading");
   if (props.editId)
     return check.value.name || t("synthetics.newCheck.pageTitle", { label: typeLabel.value });
@@ -142,13 +153,21 @@ const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? "",
 );
 
+const prefillRoutes = computed(() =>
+  synthPrefill.prefill
+    ? autoObserveRoutes(synthPrefill.prefill.service.name, orgIdentifier.value)
+    : null,
+);
+
 /**
  * Where every exit from this wizard lands — mirrors CreateBrowserTest.backTo.
  * Tracks `check.folder` so backing out after a folder change returns to the
  * folder the check now lives in, with `org_identifier` stamped from the store.
  */
-const backTo = computed(() =>
-  syntheticsListRoute({ orgIdentifier: orgIdentifier.value, folderId: check.value.folder }),
+const backTo = computed(
+  () =>
+    prefillRoutes.value?.service ??
+    syntheticsListRoute({ orgIdentifier: orgIdentifier.value, folderId: check.value.folder }),
 );
 
 /** Resolves once orgIdentifier is populated — on a hard reload or browser
@@ -219,12 +238,16 @@ async function fetchLocations() {
     locations.value = (((res.data ?? {}).locations ?? []) as SyntheticsLocation[]).filter(
       (l) =>
         l.enabled !== false &&
-        (l.kind !== "private" || (l.types ?? []).some((t) => t !== "browser")),
+        (l.kind !== "private" ||
+          (l.types ?? []).some((t) => t !== "browser") ||
+          synthPrefill.keepsAgentlessLocation(l)),
     );
+    applyPrefillChange(synthPrefill.reconcileLocations(check.value, locations.value));
   } catch (err: any) {
     // A 403 means the endpoint isn't available on this build; fall back to
     // empty silently for those, and only surface real failures.
     locations.value = [];
+    synthPrefill.markUnconfirmed("locations");
     if (err?.response?.status !== 403) {
       toast({ variant: "error", message: t("synthetics.locations.fetchFailed") });
     }
@@ -272,8 +295,10 @@ async function loadDestinations(force = false) {
     }
     const list = await queryClient.fetchQuery(options);
     destinations.value = list.map((d: any) => d.name as string);
+    applyPrefillChange(synthPrefill.reconcileDestinations(check.value, destinations.value));
   } catch {
     destinations.value = [];
+    synthPrefill.markUnconfirmed("destinations");
   }
 }
 
@@ -322,6 +347,14 @@ async function loadForEdit(id: string): Promise<boolean> {
 }
 
 const isDirty = ref(false);
+
+const prefillView = synthPrefill.viewOf(check, locations);
+provide(SYNTHETIC_PREFILL_VIEW, prefillView);
+const { lgUp } = useBreakpoint();
+
+function applyPrefillChange(next: ProtocolCheck | null) {
+  if (next) check.value = next;
+}
 
 function onConfigureUpdate(val: BrowserCheck) {
   check.value = val as ProtocolCheck;
@@ -463,7 +496,7 @@ async function saveCheck() {
   <OPageLayout
     :title="raw(headerTitle)"
     :back="{
-      label: t('synthetics.newCheck.back'),
+      label: synthPrefill.prefill ? t('synthetics.prefill.back') : t('synthetics.newCheck.back'),
       to: backTo,
       dataTest: 'synthetics-create-back-btn',
     }"
@@ -471,38 +504,51 @@ async function saveCheck() {
   >
     <CreateBrowserTestSkeleton v-if="isLoadingEdit" :rows="10" />
     <template v-else>
-      <div class="min-h-0 flex-1 overflow-y-auto">
-        <CheckConfigure
-          :check="check"
-          :check-type="checkType"
-          :locations="locations"
-          :loading-locations="locationsLoading"
-          :destinations="destinations"
-          :folders="folders"
-          :folders-loading="foldersLoading"
-          :validation-errors="{ ...validationErrors, ...reentryErrors }"
-          :allow-private-locations="privateLocationsEnabled"
-          class="w-full!"
-          @refresh:destinations="loadDestinations(true)"
-          @update:check="onConfigureUpdate"
-          @new-location="openAgentSetup()"
-          @add-agent="(id: string) => openAgentSetup(id)"
-          @refresh-locations="fetchLocations"
-        >
-          <template #type-config>
-            <component
-              :is="typeConfigCards[checkType]"
-              :check="check"
-              v-bind="
-                checkType === 'http'
-                  ? { validationErrors: { ...validationErrors, ...reentryErrors } }
-                  : {}
-              "
-              @update:check="onConfigureUpdate"
-            />
-          </template>
-        </CheckConfigure>
-      </div>
+      <SyntheticPrefillFrame :view="prefillView" :routes="prefillRoutes" :wide="lgUp">
+        <div class="min-h-0 flex-1 overflow-y-auto">
+          <CheckConfigure
+            :check="check"
+            :check-type="checkType"
+            :locations="locations"
+            :loading-locations="locationsLoading"
+            :destinations="destinations"
+            :folders="folders"
+            :folders-loading="foldersLoading"
+            :validation-errors="{ ...validationErrors, ...reentryErrors }"
+            :allow-private-locations="privateLocationsEnabled"
+            class="w-full!"
+            @refresh:destinations="loadDestinations(true)"
+            @update:check="onConfigureUpdate"
+            @new-location="openAgentSetup()"
+            @add-agent="(id: string) => openAgentSetup(id)"
+            @refresh-locations="fetchLocations"
+          >
+            <template #type-config>
+              <component
+                :is="typeConfigCards[checkType]"
+                :check="check"
+                v-bind="
+                  checkType === 'http'
+                    ? { validationErrors: { ...validationErrors, ...reentryErrors } }
+                    : {}
+                "
+                @update:check="onConfigureUpdate"
+              />
+            </template>
+            <template v-if="prefillView && prefillRoutes && !lgUp" #before-sections>
+              <SyntheticPrefillBanner
+                class="mb-4"
+                :service="prefillView.service"
+                :where="prefillView.where"
+                :routes="prefillRoutes"
+              />
+            </template>
+            <template v-if="prefillView && prefillRoutes && !lgUp" #after-sections>
+              <AfterSavePanel :view="prefillView" :service-route="prefillRoutes.service" />
+            </template>
+          </CheckConfigure>
+        </div>
+      </SyntheticPrefillFrame>
 
       <!-- Sticky footer -->
       <div

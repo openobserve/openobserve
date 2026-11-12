@@ -591,6 +591,20 @@ export default defineComponent({
       }
     };
 
+    // A hand-off's prefilled request goes before its chips, with the caret at its end, so the user edits it first.
+    const prependText = (text: string) => {
+      if (!editableDiv.value || !text) return;
+      const node = document.createTextNode(`${text} `);
+      editableDiv.value.insertBefore(node, editableDiv.value.firstChild);
+      const range = document.createRange();
+      range.setStart(node, text.length);
+      range.collapse(true);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      emitModelUpdate();
+    };
+
     // Clear all content
     const clear = () => {
       if (!editableDiv.value) return;
@@ -672,6 +686,7 @@ export default defineComponent({
       getPlainText,
       getMessageForBackend,
       setContent,
+      prependText,
       clear,
       showDetailCard,
       detailCardContent,

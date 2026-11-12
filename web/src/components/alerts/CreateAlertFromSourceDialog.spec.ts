@@ -164,6 +164,95 @@ describe("CreateAlertFromSourceDialog", () => {
     expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(true);
   });
 
+  describe("a source whose condition is inside its query (T2-23)", () => {
+    it("asks no Alert on question, and says the window is the alert's own", async () => {
+      const config = (await import("@/aws-exports")).default;
+      const was = config.isEnterprise;
+      config.isEnterprise = "true";
+      try {
+        wrapper = mountDialog(
+          prefill({ source: "autoobserve", periodMinutes: 15, triggerThreshold: 1 }),
+        );
+        expect(wrapper.find('[data-test="create-alert-threshold-shape"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="create-alert-window"]').text()).toBe("Last 15 minutes");
+      } finally {
+        config.isEnterprise = was;
+      }
+    });
+  });
+
+  describe("a threshold the source could not measure (F1)", () => {
+    const asking = (value: number | null) =>
+      prefill({
+        source: "autoobserve",
+        sql: 'SELECT count(*) AS errors FROM "app_traces"',
+        thresholdInput: {
+          label: "Fire above",
+          suffix: "errors an hour",
+          reason: "AutoObserve found no usual error count for svc-a over the last 7 days.",
+          value,
+        },
+      });
+
+    it("asks for it with the reason and keeps Continue off until it is set", async () => {
+      wrapper = mountDialog(asking(null));
+      const field = wrapper.find('[data-test="create-alert-threshold-value"]');
+      expect(field.exists()).toBe(true);
+      expect(wrapper.text()).toContain("errors an hour");
+      expect(wrapper.text()).toContain("no usual error count for svc-a");
+      expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(true);
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+      expect(wrapper.emitted("confirm")).toBeUndefined();
+    });
+
+    it("asks the source to rebuild with the typed threshold", async () => {
+      wrapper = mountDialog(asking(null));
+      await wrapper.find('[data-test="create-alert-threshold-value"] input').setValue("40");
+      expect(wrapper.emitted("rebuild")?.at(-1)).toEqual([{ threshold: 40 }]);
+    });
+
+    it("lets Continue through on a drafted 0 and shows why it fires on any error", () => {
+      wrapper = mountDialog(
+        prefill({
+          source: "autoobserve",
+          sql: 'SELECT count(*) AS errors FROM "app_traces" HAVING count(*) > 0',
+          thresholdInput: {
+            label: "Fire above",
+            suffix: "errors an hour",
+            reason: "AutoObserve found no usual error count for svc-a over the last 7 days.",
+            note: "This alert fires on any error.",
+            value: 0,
+          },
+        }),
+      );
+      expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(false);
+      expect(wrapper.text()).toContain("This alert fires on any error.");
+      expect(
+        (
+          wrapper.find('[data-test="create-alert-threshold-value"] input')
+            .element as HTMLInputElement
+        ).value,
+      ).toBe("0");
+    });
+
+    it("asks the source to rebuild with a cleared field as cleared, not as 0", async () => {
+      wrapper = mountDialog(asking(0));
+      await wrapper.find('[data-test="create-alert-threshold-value"] input').setValue("");
+      const [options] = wrapper.emitted("rebuild")!.at(-1) as [{ threshold: number }];
+      expect(options.threshold).toBeNaN();
+    });
+
+    it("lets Continue through once the rebuilt prefill carries the threshold", () => {
+      wrapper = mountDialog(asking(40));
+      expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(false);
+    });
+
+    it("shows no threshold field for a source that set its own", () => {
+      wrapper = mountDialog(prefill());
+      expect(wrapper.find('[data-test="create-alert-threshold-value"]').exists()).toBe(false);
+    });
+  });
+
   it("emits the prefill with the chosen threshold shape on confirm", async () => {
     wrapper = mountDialog(prefill());
     await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");

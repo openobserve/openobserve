@@ -18,11 +18,13 @@
       "alerts-chart-error-state.spec.js",
       "alertsPagination.spec.js",
       "alertTemplatesPagination.spec.js",
+      "alertTemplatesToolbar.spec.js",
       "alertDestinationsPagination.spec.js",
       "alerts-destinations-usage.spec.js",
       "alerts-no-destination.spec.js",
       "alerts-from-panel.spec.js",
       "alertCalibration.spec.js",
+      "alertCalibrationDismiss.spec.js",
       "alerts-content-templates.spec.js"
     ],
     "disabled": [
@@ -610,6 +612,19 @@
       "traces-autocomplete-suggestions.spec.js",
       "traces-autocomplete-filter-mode.spec.js",
       "traceDetails.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Ingestion-Onboarding",
+    "actual_folder": "Onboarding",
+    "browser": "chrome",
+    "run_files": [
+      "first-data-notice.spec.js",
+      "diagnosis.spec.js",
+      "first-event.spec.js",
+      "legacy-pages.spec.js",
+      "token-picker.spec.js"
     ],
     "disabled": []
   },

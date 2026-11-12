@@ -15,9 +15,14 @@
 
 //! The OSS half of alert calibration: the search the collector cannot reach, and the digest sink.
 
+pub mod applied;
+pub mod dismissals;
 pub mod sink;
 
-use std::pin::Pin;
+use std::{
+    collections::{BTreeSet, HashMap},
+    pin::Pin,
+};
 
 use config::{
     cluster::LOCAL_NODE,
@@ -29,7 +34,9 @@ use config::{
     },
 };
 use o2_enterprise::enterprise::{
-    alert_calibration_collect::collector::AlertCalibrationSearchPort, alert_calibration_service,
+    alert_calibration_collect::collector::{self, AlertCalibrationSearchPort},
+    alert_calibration_rules::context::DestinationCandidate,
+    alert_calibration_service,
 };
 use search_service::grpc_search::grpc_search;
 
@@ -60,6 +67,45 @@ impl AlertCalibrationSearchPort for SearchAdapter {
             .map_err(Into::into)
         })
     }
+
+    fn destinations_usable_by(
+        &self,
+        org_id: String,
+        user_id: String,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<String>, anyhow::Error>> + Send>> {
+        Box::pin(async move {
+            // A departed owner fails the lookup, so their alerts get no suggestion (P8a-D2).
+            if db::user::get(Some(&org_id), &user_id).await?.is_none() {
+                return Ok(Vec::new());
+            }
+            Ok(usable_destination_names(&org_id, &user_id)
+                .await?
+                .into_iter()
+                .collect())
+        })
+    }
+}
+
+/// The destinations `user_id` could pick in the alert editor, by the editor's own list.
+pub async fn usable_destination_names(
+    org_id: &str,
+    user_id: &str,
+) -> anyhow::Result<BTreeSet<String>> {
+    let permitted =
+        crate::authz::list_objects_for_user(org_id, user_id, "GET", "destination").await?;
+    Ok(super::destinations::list(org_id, Some("alert"), permitted)
+        .await?
+        .into_iter()
+        .map(|destination| destination.name)
+        .collect())
+}
+
+/// The named alerts' folder candidates from the live alerts, by each owner's own list.
+pub async fn live_destination_candidates(
+    org_id: &str,
+    alert_ids: &BTreeSet<String>,
+) -> anyhow::Result<HashMap<String, DestinationCandidate>> {
+    Ok(collector::live_destination_candidates(&SearchAdapter, org_id, alert_ids).await?)
 }
 
 /// Best effort: the startup backfill covers an org this misses.

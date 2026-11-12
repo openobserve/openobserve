@@ -132,6 +132,7 @@ export class LogsPage {
         this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
         this.searchStreamInput = '[data-test="streams-search-stream-input"] input';
         this.exploreButtonSelector = '[data-test="log-stream-explore-btn"]';
+        this.streamNameCell = '[data-test^="log-stream-name-cell-"]';
         this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.menuTransformEditorToggleBtn = '[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]';
         this.menuListSavedViewsBtn = '[data-test="logs-search-bar-menu-list-saved-views-btn"]';
@@ -3621,6 +3622,18 @@ export class LogsPage {
 
     async clickExploreButton() {
         return await this.page.locator(this.exploreButtonSelector).first().click({ force: true });
+    }
+
+    async expectStreamListFilteredBy(keyword) {
+        const matching = `[data-test*="${keyword}" i]`;
+        await expect(this.page.locator(`${this.streamNameCell}${matching}`).first()).toBeVisible();
+        // OTable keeps the previous rows inert during a slow filter fetch, and a click on them is silently dropped.
+        await expect(this.page.locator(`[data-test-stale] ${this.streamNameCell}, ${this.streamNameCell}:not(${matching})`)).toHaveCount(0);
+    }
+
+    async exploreFirstStreamAndExpectLogs() {
+        await this.page.locator(this.exploreButtonSelector).first().click();
+        await expect(this.page).toHaveURL(/\/logs(\?|$)/);
     }
 
     async waitForSavedViewsButton() {
