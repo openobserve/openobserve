@@ -29,6 +29,7 @@ use datafusion::{
     datasource::physical_plan::FileGroup,
     error::{DataFusionError, Result},
 };
+use hashbrown::HashMap;
 use infra::runtime::DATAFUSION_RUNTIME;
 use metrics_index::MetricsFileLayout;
 
@@ -53,6 +54,7 @@ pub async fn hash_merged_chains(
     if merged.is_empty() {
         return Some(Vec::new());
     }
+
     let merged_num = merged.len();
     let chains = DATAFUSION_RUNTIME
         .spawn(hash_ordered_chains(schema, merged))
@@ -86,7 +88,7 @@ async fn hash_ordered_chains(
     let listed = list_file_chains(session, schema, files.clone(), sort_order).await;
     file_list::clear(&trace_id);
 
-    let mut by_key: hashbrown::HashMap<String, FileKey> =
+    let mut by_key: HashMap<String, FileKey> =
         files.into_iter().map(|f| (f.key.clone(), f)).collect();
     let mut chains = Vec::new();
     for group in listed? {
@@ -122,11 +124,13 @@ async fn list_file_chains(
         .sort_order(sort_order)
         .build(get_config().limit.datafusion_min_partition_num)
         .await?;
+
     let state = ctx.state();
     let tables = TableBuilder::new()
         .sort_order(sort_order)
         .build(session, files, schema)
         .await?;
+
     let mut chains = Vec::new();
     for table in tables {
         let table = table.downcast_ref::<ListingTableAdapter>().ok_or_else(|| {

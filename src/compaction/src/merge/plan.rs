@@ -98,23 +98,12 @@ fn open_hour_batches(files: &[FileKey], limits: &BatchLimits<'_>) -> Vec<Planned
 
 /// The closed metrics hour: a pre-merge while over the merge-group cap, else its indexed merge.
 async fn closed_hour_batches(
-    files: Vec<FileKey>,
+    mut files: Vec<FileKey>,
     limits: &BatchLimits<'_>,
     schema: &Arc<Schema>,
     stream: &str,
 ) -> Vec<PlannedBatch> {
-    let files = indexed_hour_scope(files, limits.max_file_size, stream);
-    let pre_merge = pre_merge_batches(&files, limits.max_merge_groups, schema, stream).await;
-    if pre_merge.is_empty() {
-        vec![(files, MergeMode::MetricsIndexed)]
-    } else {
-        pre_merge
-    }
-}
-
-/// What a closed indexed metrics hour merges, see [`MetricsIndexMergeScope`].
-fn indexed_hour_scope(mut files: Vec<FileKey>, max_file_size: usize, stream: &str) -> Vec<FileKey> {
-    match metrics_index_merge_scope(&files, max_file_size) {
+    let files = match metrics_index_merge_scope(&files, limits.max_file_size) {
         MetricsIndexMergeScope::Skip => Vec::new(),
         MetricsIndexMergeScope::LateFilesOnly => {
             files.retain(|f| MetricsFileLayout::of(&f.key) != Some(MetricsFileLayout::Indexed));
@@ -131,8 +120,37 @@ fn indexed_hour_scope(mut files: Vec<FileKey>, max_file_size: usize, stream: &st
             );
             files
         }
+    };
+
+    let pre_merge = pre_merge_batches(&files, limits.max_merge_groups, schema, stream).await;
+    if pre_merge.is_empty() {
+        vec![(files, MergeMode::MetricsIndexed)]
+    } else {
+        pre_merge
     }
 }
+
+// /// What a closed indexed metrics hour merges, see [`MetricsIndexMergeScope`].
+// fn indexed_hour_scope(mut files: Vec<FileKey>, max_file_size: usize, stream: &str) ->
+// Vec<FileKey> {     match metrics_index_merge_scope(&files, max_file_size) {
+//         MetricsIndexMergeScope::Skip => Vec::new(),
+//         MetricsIndexMergeScope::LateFilesOnly => {
+//             files.retain(|f| MetricsFileLayout::of(&f.key) != Some(MetricsFileLayout::Indexed));
+//             log::debug!(
+//                 "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed late merge of {} files,
+// indexed files untouched",                 files.len()
+//             );
+//             files
+//         }
+//         MetricsIndexMergeScope::WholeHour => {
+//             log::debug!(
+//                 "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed fragmentation cap hit,
+// full rewrite of {} files",                 files.len()
+//             );
+//             files
+//         }
+//     }
+// }
 
 /// The hash-sorted files, once `min_files` piled up, in batches of at most `max_groups`.
 pub(super) fn ingester_batches(

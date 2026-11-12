@@ -75,8 +75,9 @@ pub(super) async fn pre_merge_batches(
     if max_groups == 0 || files.len() <= max_groups {
         return Vec::new();
     }
+
     let chains = hash_merged_chains(schema.clone(), files, stream).await;
-    let groups = pre_merge_groups(files, chains, max_groups);
+    let groups = split_into_pre_merge_groups(files, chains, max_groups);
     if !groups.is_empty() {
         log::info!(
             "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed merge of {} files exceeds {max_groups} merge groups, pre-merging in {} hash-merged batches first",
@@ -84,6 +85,7 @@ pub(super) async fn pre_merge_batches(
             groups.len()
         );
     }
+
     groups
         .into_iter()
         .map(|group| (group, MergeMode::MetricsHashMerged))
@@ -91,7 +93,7 @@ pub(super) async fn pre_merge_batches(
 }
 
 /// The pre-merge groups of `files`, empty while the hour holds at most `max_groups` merge groups.
-fn pre_merge_groups(
+fn split_into_pre_merge_groups(
     files: &[FileKey],
     hash_merged_chains: Option<Vec<Vec<FileKey>>>,
     max_groups: usize,
@@ -100,12 +102,14 @@ fn pre_merge_groups(
         // chains of unknown width are never rewritten: only fewer ingester files surely shrink it
         return ingester_batches(files, max_groups + 1, max_groups);
     };
+
     let mut groups: Vec<Vec<FileKey>> = files
         .iter()
         .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashSorted))
         .map(|f| vec![f.clone()])
         .collect();
     groups.extend(chains);
+
     let has_indexed = files
         .iter()
         .any(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::Indexed));
@@ -114,6 +118,7 @@ fn pre_merge_groups(
     if groups.len() + indexed_groups <= max_groups {
         return Vec::new();
     }
+
     // smallest first: the most groups collapse for the fewest bytes rewritten
     groups.sort_by_key(|group| group.iter().map(|f| f.meta.compressed_size).sum::<i64>());
     groups
@@ -228,13 +233,16 @@ mod tests {
             ],
             vec![hash_file("hash-merged-v1-c.parquet", 10)],
         ];
-        assert!(pre_merge_groups(&files, Some(chains.clone()), 7).is_empty());
+        assert!(split_into_pre_merge_groups(&files, Some(chains.clone()), 7).is_empty());
         assert!(
-            pre_merge_groups(&ingester_hour(3), Some(chains.clone()), 5).is_empty(),
+            split_into_pre_merge_groups(&ingester_hour(3), Some(chains.clone()), 5).is_empty(),
             "five groups without indexed files fit a cap of five"
         );
-        assert_eq!(pre_merge_groups(&files, Some(chains.clone()), 6).len(), 1);
-        let batches = pre_merge_groups(&files, Some(chains), 4);
+        assert_eq!(
+            split_into_pre_merge_groups(&files, Some(chains.clone()), 6).len(),
+            1
+        );
+        let batches = split_into_pre_merge_groups(&files, Some(chains), 4);
         assert_eq!(
             batches.len(),
             1,
