@@ -637,6 +637,8 @@ pub struct SearchPartitionRequest {
     pub sampling_ratio: Option<f64>,
     #[serde(default)]
     pub search_type: Option<SearchEventType>,
+    #[serde(default)]
+    pub timezone: Option<String>,
 }
 
 impl SearchPartitionRequest {
@@ -672,6 +674,7 @@ impl From<&Request> for SearchPartitionRequest {
             histogram_interval: req.query.histogram_interval,
             sampling_ratio: req.query.sampling_ratio,
             search_type: req.search_type,
+            timezone: req.query.timezone.clone(),
         }
     }
 }
@@ -2296,6 +2299,7 @@ mod tests {
             histogram_interval: 0,
             sampling_ratio: None,
             search_type: None,
+            timezone: None,
         };
 
         req.decode().unwrap();

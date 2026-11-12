@@ -29,6 +29,7 @@ use config::{
     meta::{
         dashboards::usage_report::DashboardInfo,
         function::RESULT_ARRAY_SKIP_VRL,
+        histogram_origin::histogram_bucket_offset,
         search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE, ResponseTook},
         self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, resolve_stream_names},
@@ -63,7 +64,7 @@ use crate::{
     self as SearchService,
     cache::{cacher::check_cache, result_utils::extract_timestamp_range},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    sql::RE_SELECT_FROM,
+    sql::{RE_SELECT_FROM, histogram::pin_histogram_timezone},
 };
 
 pub mod cacher;
@@ -71,7 +72,8 @@ pub mod multi;
 pub mod result_utils;
 
 // Define cache version
-const CACHE_VERSION: &str = "v4";
+// v5 keys the histogram offset into the hash; older entries may carry shifted labels.
+const CACHE_VERSION: &str = "v5";
 
 /// The hits a search was about to return when redaction could not run on them.
 #[cfg(any(feature = "vectorscan", test))]
@@ -149,6 +151,11 @@ pub async fn search(
     };
 
     let mut req = in_req.clone();
+    pin_histogram_timezone(
+        &mut req.query.sql,
+        &mut req.query.timezone,
+        req.query.end_time,
+    )?;
 
     // check the original query function first
     let mut query_fn = req
@@ -665,8 +672,22 @@ pub async fn prepare_cache_response(
         }
     }
 
+    if !use_cache && sql.histogram_offset != Some(0) {
+        return Ok((
+            MultiCachedQueryResponse {
+                ts_column,
+                is_descending,
+                order_by: sql.order_by,
+                ..Default::default()
+            },
+            true,
+        ));
+    }
+
     // #16175: sort, trim and cache checks compare ORDER BY with the column the hits carry
-    sql.order_by = result_utils::normalize_ts_order_by(&sql.order_by, &ts_column, &sql.aliases);
+    if sql.histogram_offset.is_some() {
+        sql.order_by = result_utils::normalize_ts_order_by(&sql.order_by, &ts_column, &sql.aliases);
+    }
 
     // Refine is_descending for histogram queries with non-timestamp ORDER BY
     is_descending = cacher::refine_is_descending_for_histogram(&sql, &ts_column, is_descending);
@@ -1039,24 +1060,14 @@ pub async fn write_results(
     }
 
     // 1. alignment time range for incomplete records for histogram
-    let mut accept_start_time = req_query_start_time;
-    let mut accept_end_time = req_query_end_time;
-    let mut need_adjust_end_time = false;
-    if is_aggregate
-        && let Some(interval) = res.histogram_interval
-        && interval > 0
-    {
-        let interval = interval * 1000 * 1000; // convert to microseconds
-        // next interval of start_time
-        if (accept_start_time % interval) != 0 {
-            accept_start_time = accept_start_time - (accept_start_time % interval) + interval;
-        }
-        // previous interval of end_time
-        if (accept_end_time % interval) != 0 {
-            need_adjust_end_time = true;
-            accept_end_time = accept_end_time - (accept_end_time % interval) - interval;
-        }
-    }
+    let (accept_start_time, accept_end_time, need_adjust_end_time) = match res.histogram_interval {
+        Some(interval) if is_aggregate && interval > 0 => histogram_cacheable_range(
+            req_query_start_time,
+            req_query_end_time,
+            interval * 1000 * 1000,
+        ),
+        _ => (req_query_start_time, req_query_end_time, false),
+    };
 
     // 2. check if need to remove records with discard_duration
     let delay_ts = second_micros(get_config().limit.cache_delay_secs);
@@ -1178,6 +1189,22 @@ async fn is_range_already_cached(query_key: &str, file_path: &str, meta: &Result
         cacher::remove_stale_cache_meta(file_path, &file_name, query_key, &m).await;
     }
     false
+}
+
+/// Shrinks `[start, end]` to whole `histogram()` buckets; the flag says whether the end moved.
+fn histogram_cacheable_range(start: i64, end: i64, interval: i64) -> (i64, i64, bool) {
+    let start_offset = histogram_bucket_offset(start, interval);
+    let start = if start_offset == 0 {
+        start
+    } else {
+        start - start_offset + interval
+    };
+    let end_offset = histogram_bucket_offset(end, interval);
+    if end_offset == 0 {
+        (start, end, false)
+    } else {
+        (start, end - end_offset - interval, true)
+    }
 }
 
 pub fn apply_vrl_to_response(
@@ -1460,6 +1487,133 @@ fn redaction_error(all_streams: &str, reason: &str) -> infra::errors::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_prepare_histogram_response_ordering() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "histogram_response_ordering";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org_id}/logs/t"),
+            SchemaCache::new(Schema::new(vec![Field::new(
+                TIMESTAMP_COL_NAME,
+                DataType::Int64,
+                false,
+            )])),
+        );
+        let cases = [("+08:00", false), ("+00:00", false), ("+08:00", true)];
+        let orders = [
+            ("", [30, 20, 10]),
+            (" ORDER BY ts ASC", [10, 20, 30]),
+            (" ORDER BY ts DESC", [30, 20, 10]),
+            (" ORDER BY c DESC", [20, 10, 30]),
+        ];
+        for (offset, mixed_offsets) in cases {
+            for (order, expected) in orders {
+                for use_cache in [false, true] {
+                    let filter = if mixed_offsets {
+                        " WHERE histogram(_timestamp, '1 hour', '+00:00') IS NOT NULL"
+                    } else {
+                        ""
+                    };
+                    let mut req = search::Request {
+                        query: search::Query {
+                            sql: format!(
+                                "SELECT histogram(_timestamp, '1 hour', '{offset}') AS ts, count(*) AS c FROM t{filter} GROUP BY ts{order}"
+                            ),
+                            start_time: 1_735_689_600_000_000,
+                            end_time: 1_735_776_000_000_000,
+                            size: 100,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    };
+                    let (prepared, should_exec_query) = prepare_cache_response(
+                        "histogram_response_ordering",
+                        org_id,
+                        StreamType::Logs,
+                        &mut req,
+                        use_cache,
+                    )
+                    .await
+                    .unwrap();
+                    let mut response = search::Response {
+                        hits: vec![
+                            json::json!({"ts": 20, "c": 3}),
+                            json::json!({"ts": 30, "c": 1}),
+                            json::json!({"ts": 10, "c": 2}),
+                        ],
+                        ..Default::default()
+                    };
+                    sort_response(
+                        prepared.is_descending,
+                        &mut response,
+                        &prepared.ts_column,
+                        &prepared.order_by,
+                    );
+                    let timestamps: Vec<_> = response
+                        .hits
+                        .iter()
+                        .map(|hit| hit["ts"].as_i64().unwrap())
+                        .collect();
+                    assert_eq!(
+                        timestamps, expected,
+                        "offset={offset}, mixed={mixed_offsets}, order={order}, use_cache={use_cache}"
+                    );
+                    assert_eq!(prepared.ts_column, "ts");
+                    assert!(should_exec_query);
+                    assert!(!prepared.has_cached_data);
+                    assert!(prepared.cached_response.is_empty());
+                    assert!(prepared.deltas.is_empty());
+                    if offset != "+00:00" || mixed_offsets {
+                        assert!(!prepared.cache_query_response);
+                        assert!(prepared.file_path.is_empty());
+                    }
+                }
+            }
+        }
+        STREAM_SCHEMAS_LATEST
+            .write()
+            .await
+            .remove(&format!("{org_id}/logs/t"));
+    }
+
+    #[test]
+    fn test_histogram_cacheable_range_snaps_to_histogram_grid() {
+        const HOUR: i64 = 3_600_000_000;
+        const DAY: i64 = 24 * HOUR;
+        // 2025-08-23 is a 30-day edge on the 2001 grid; 2025-09-09 is one on the epoch grid
+        let thirty_day_edge = 1_755_907_200_000_000;
+        let epoch_edge = 1_757_376_000_000_000;
+        let cases = [
+            (
+                epoch_edge,
+                epoch_edge + 60 * DAY,
+                30 * DAY,
+                (thirty_day_edge + 30 * DAY, thirty_day_edge + 30 * DAY, true),
+            ),
+            (
+                thirty_day_edge,
+                thirty_day_edge + 60 * DAY,
+                30 * DAY,
+                (thirty_day_edge, thirty_day_edge + 60 * DAY, false),
+            ),
+            (
+                epoch_edge + HOUR,
+                epoch_edge + 3 * DAY,
+                DAY,
+                (epoch_edge + DAY, epoch_edge + 3 * DAY, false),
+            ),
+        ];
+        for (start, end, interval, expected) in cases {
+            assert_eq!(
+                histogram_cacheable_range(start, end, interval),
+                expected,
+                "start={start}, end={end}, interval={interval}"
+            );
+        }
+    }
 
     #[test]
     fn test_any_stream_checks_every_joined_stream() {

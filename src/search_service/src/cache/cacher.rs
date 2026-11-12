@@ -20,7 +20,10 @@ use ::search::{
 use bytes::Bytes;
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::{search::Response, sql::OrderBy, stream::StreamType},
+    meta::{
+        histogram_origin::histogram_bucket_offset, search::Response, sql::OrderBy,
+        stream::StreamType,
+    },
     utils::{file::scan_files, json},
 };
 use infra::cache::{
@@ -159,10 +162,6 @@ pub async fn check_cache(
         };
     }
 
-    // Note: Both result_ts_col refinement and SQL modification (adding _timestamp to SELECT)
-    // are now done in prepare_cache_response() before calling this function.
-    // just use the refined result_ts_col that was passed in.
-
     // Check ts_col again, if it is still empty, return default
     if result_ts_col.is_empty() {
         return MultiCachedQueryResponse {
@@ -173,15 +172,19 @@ pub async fn check_cache(
 
     let mut histogram_interval = -1;
     if is_aggregate && let Some(interval) = sql.histogram_interval {
-        // Note: handle_histogram is now called in prepare_cache_response() before hash computation
-        // to ensure consistent hashing. We just need to update req.query.sql with the normalized
-        // SQL.
+        // The query must run the SQL prepare_cache_response normalized and hashed.
         req.query.sql = origin_sql.to_owned();
         histogram_interval = interval * 1000 * 1000; // in microseconds
     }
 
-    // Note: is_descending refinement for histogram queries is now done in prepare_cache_response()
-    // before calling this function, so we use the pre-refined value directly
+    if sql.histogram_offset != Some(0) {
+        return MultiCachedQueryResponse {
+            ts_column: result_ts_col.to_string(),
+            is_descending,
+            order_by: order_by.clone(),
+            ..Default::default()
+        };
+    }
 
     if is_aggregate && order_by.is_empty() && result_ts_col.is_empty() {
         return MultiCachedQueryResponse::default();
@@ -431,8 +434,8 @@ pub async fn get_cached_results(
             // check if the data is matching for histogram
             if cache_req.is_aggregate
                 && cache_req.histogram_interval > 0
-                && (m.start_time % cache_req.histogram_interval != 0
-                    || m.end_time % cache_req.histogram_interval != 0)
+                && (histogram_bucket_offset(m.start_time, cache_req.histogram_interval) != 0
+                    || histogram_bucket_offset(m.end_time, cache_req.histogram_interval) != 0)
             {
                 return false;
             }
@@ -1179,6 +1182,7 @@ mod tests {
             order_by: vec![("_timestamp".to_string(), OrderBy::Desc)],
             histogram_interval: None,
             timezone: None,
+            histogram_offset: Some(0),
             sorted_by_time: true,
             sampling_config: None,
         };
@@ -1226,6 +1230,7 @@ mod tests {
             order_by: vec![("_timestamp".to_string(), OrderBy::Asc)],
             histogram_interval: None,
             timezone: None,
+            histogram_offset: Some(0),
             sorted_by_time: true,
             sampling_config: None,
         };
@@ -1392,6 +1397,44 @@ mod tests {
         assert!(res.is_none());
         // the meta pointing at the missing file was removed on the miss
         assert!(!QUERY_RESULT_CACHE.read().await.contains_key(&query_key));
+    }
+
+    #[tokio::test]
+    async fn test_get_cached_results_picks_only_histogram_grid_entries() {
+        let file_path = "grid_org/logs/grid_stream/grid_hash";
+        let query_key = file_path.replace('/', "_");
+        let thirty_days = 2_592_000_000_000;
+        let on_grid = ResultCacheMeta {
+            start_time: 1_755_907_200_000_000,
+            end_time: 1_755_907_200_000_000 + thirty_days,
+            is_aggregate: true,
+            is_descending: false,
+        };
+        let epoch_grid = ResultCacheMeta {
+            start_time: 1_757_376_000_000_000,
+            end_time: 1_757_376_000_000_000 + thirty_days,
+            is_aggregate: true,
+            is_descending: false,
+        };
+        QUERY_RESULT_CACHE
+            .write()
+            .await
+            .insert(query_key.clone(), vec![on_grid.clone(), epoch_grid.clone()]);
+
+        let cache_req = CacheQueryRequest {
+            q_start_time: 1_755_000_000_000_000,
+            q_end_time: 1_760_000_000_000_000,
+            is_aggregate: true,
+            ts_column: "_timestamp".to_string(),
+            histogram_interval: thirty_days,
+            is_descending: false,
+            is_histogram_non_ts_order: false,
+        };
+        let res = get_cached_results("grid_trace", file_path, cache_req, None).await;
+        assert!(res.is_none());
+        // only the selected entry misses on disk and is healed away
+        let remaining = QUERY_RESULT_CACHE.read().await.get(&query_key).cloned();
+        assert_eq!(remaining, Some(vec![epoch_grid]));
     }
 
     #[tokio::test]

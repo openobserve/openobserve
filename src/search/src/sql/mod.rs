@@ -64,9 +64,6 @@ pub mod visitor;
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
 
-pub static RE_HISTOGRAM: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
-
 #[derive(Clone, Debug)]
 pub struct Sql {
     pub sql: String,
@@ -87,6 +84,8 @@ pub struct Sql {
     pub order_by: Vec<(String, OrderBy)>,
     pub histogram_interval: Option<i64>,
     pub timezone: Option<String>,
+    /// Shifted-time offset of every `histogram()` in microseconds; `None` when they disagree.
+    pub histogram_offset: Option<i64>,
     pub sorted_by_time: bool, // if only order by _timestamp
     pub sampling_config: Option<proto::cluster_rpc::SamplingConfig>,
 }
@@ -195,6 +194,14 @@ impl Sql {
                 "only SELECT queries are supported".to_string(),
             )));
         }
+
+        let reference_time = if query.end_time > 0 {
+            query.end_time
+        } else {
+            query.start_time
+        };
+        let histogram_offset =
+            histogram::histogram_offset(&statement, query.timezone.as_deref(), reference_time)?;
 
         //********************Change the sql start*********************************//
         // 2. rewrite track_total_hits
@@ -311,7 +318,6 @@ impl Sql {
                 }
             })
             .flatten();
-        let timezone = query.timezone.clone();
 
         //********************Change the sql start*********************************//
         // 11. add _timestamp and _o2_id if need
@@ -347,7 +353,8 @@ impl Sql {
             group_by,
             order_by,
             histogram_interval,
-            timezone,
+            timezone: query.timezone.clone(),
+            histogram_offset,
             sorted_by_time: need_sort_by_time,
             sampling_config: parse_sampling_config(
                 query,
@@ -544,17 +551,6 @@ mod tests {
         if let Some(caps) = RE_SELECT_FROM.captures(sql) {
             assert_eq!(caps.get(1).map(|m| m.as_str()), Some("a, b"));
         }
-    }
-
-    #[test]
-    fn test_re_histogram_matches() {
-        assert!(RE_HISTOGRAM.is_match("histogram(_timestamp, '1 hour')"));
-        assert!(RE_HISTOGRAM.is_match("HISTOGRAM(ts,'5 minute')"));
-    }
-
-    #[test]
-    fn test_re_histogram_no_match() {
-        assert!(!RE_HISTOGRAM.is_match("count(_timestamp)"));
     }
 
     #[test]
