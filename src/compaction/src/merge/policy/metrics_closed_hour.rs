@@ -195,7 +195,7 @@ mod tests {
     use config::meta::stream::{FileMeta, MergeStrategy};
 
     use super::{
-        super::{MergePolicy, test_utils::*},
+        super::{MergePolicy, tests::*},
         *,
     };
 

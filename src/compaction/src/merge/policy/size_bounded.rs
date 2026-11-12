@@ -78,7 +78,7 @@ fn size_bounded_groups(files: &[FileKey], limits: &BatchLimits<'_>) -> Vec<Vec<F
 
 #[cfg(test)]
 mod tests {
-    use super::{super::test_utils::*, *};
+    use super::{super::tests::*, *};
 
     #[test]
     fn test_size_bounded_groups_seal_rules() {

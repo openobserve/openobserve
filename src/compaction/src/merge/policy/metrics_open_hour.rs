@@ -57,7 +57,7 @@ mod tests {
     use config::meta::stream::MergeStrategy;
 
     use super::{
-        super::{MergePolicy, test_utils::*},
+        super::{MergePolicy, tests::*},
         *,
     };
 

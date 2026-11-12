@@ -13,16 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The merge rules, one file each: which rule a window follows is decided here, what the rule
-//! reads and how it batches lives in its own file.
+//! The merge rules: which rule a window follows is decided here, what a rule reads and how it
+//! batches lives in its own file.
 
-#[cfg(feature = "enterprise")]
-mod downsampling;
 mod metrics_closed_hour;
 mod metrics_open_hour;
 mod size_bounded;
-#[cfg(test)]
-mod test_utils;
 
 use std::sync::Arc;
 
@@ -116,7 +112,7 @@ impl MergePolicy {
             Self::MetricsOpenHour => metrics_open_hour::READS_WHOLE_WINDOW,
             Self::MetricsClosedHour => metrics_closed_hour::READS_WHOLE_WINDOW,
             #[cfg(feature = "enterprise")]
-            Self::Downsampling(_) => downsampling::READS_WHOLE_WINDOW,
+            Self::Downsampling(_) => true,
         }
     }
 
@@ -135,7 +131,9 @@ impl MergePolicy {
                 metrics_closed_hour::plan(files, limits, schema, stream).await
             }
             #[cfg(feature = "enterprise")]
-            Self::Downsampling(rule) => downsampling::plan(files, rule),
+            Self::Downsampling(rule) => {
+                RoundPlan::last(vec![(files, MergeMode::Downsampling(rule.clone()))])
+            }
         };
         // a rule may plan a batch of no files: nothing to merge
         plan.batches.retain(|(files, _)| !files.is_empty());
@@ -173,7 +171,77 @@ fn mergeable_chunks(files: Vec<FileKey>, max_files: usize) -> Vec<Vec<FileKey>> 
 
 #[cfg(test)]
 mod tests {
+    use config::meta::stream::FileMeta;
+
     use super::*;
+
+    pub(super) fn create_file_key(
+        key: &str,
+        min_ts: i64,
+        max_ts: i64,
+        original_size: i64,
+    ) -> FileKey {
+        FileKey {
+            id: 0,
+            account: "test_account".to_string(),
+            key: key.to_string(),
+            meta: FileMeta {
+                min_ts,
+                max_ts,
+                records: 100,
+                original_size,
+                compressed_size: original_size / 2,
+                index_size: 0,
+                mindex_size: 0,
+                flattened: false,
+                bloom_ver: 0,
+            },
+            deleted: false,
+            selection: None,
+            row_group_size: None,
+        }
+    }
+
+    pub(super) fn limits(
+        strategy: &MergeStrategy,
+        max_group_files: usize,
+        is_incremental: bool,
+    ) -> BatchLimits<'_> {
+        BatchLimits {
+            strategy,
+            max_file_size: 1000,
+            max_group_files,
+            is_incremental,
+            merge_max_original_size: 950,
+            max_merge_groups: 100,
+        }
+    }
+
+    pub(super) fn schema() -> Arc<Schema> {
+        Arc::new(Schema::empty())
+    }
+
+    pub(super) fn metrics_file(name: &str, size: i64) -> FileKey {
+        create_file_key(
+            &format!("files/default/metrics/m/2026/08/18/10/{name}"),
+            10,
+            20,
+            size,
+        )
+    }
+
+    pub(super) fn names(files: &[FileKey]) -> Vec<&str> {
+        files
+            .iter()
+            .map(|f| f.key.rsplit('/').next().unwrap())
+            .collect()
+    }
+
+    pub(super) fn hash_file(name: &str, compressed_size: i64) -> FileKey {
+        let mut file = metrics_file(name, compressed_size * 40);
+        file.meta.compressed_size = compressed_size;
+        file
+    }
 
     #[test]
     fn test_select_policy_by_stream_and_window_state() {
