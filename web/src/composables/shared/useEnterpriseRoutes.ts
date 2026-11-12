@@ -396,8 +396,17 @@ const useEnterpriseRoutes = () => {
     routes.push({
       path: "autoobserve",
       name: "autoobserve",
-      component: () => import("@/views/AutoObserveHome.vue"),
-      meta: { titleKey: "menu.autoobserve", allowOnEmptyData: true },
+      // The sample scenarios render synchronously, so their facts finish loading before the view does.
+      component: async () => {
+        const [view, facts] = await Promise.all([
+          import("@/views/AutoObserveHome.vue"),
+          import("@/components/autoobserve/data/facts"),
+        ]);
+        await facts.factsReady;
+        return view;
+      },
+      // Home, coverage, issues and What I've changed share this route but read different things.
+      meta: { titleKey: "menu.autoobserve", allowOnEmptyData: true, accessScopeQuery: ["page"] },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -406,6 +415,18 @@ const useEnterpriseRoutes = () => {
       path: "auto-observe-2",
       redirect: (to: any) => ({ name: "autoobserve", query: to.query }),
     });
+    // Test builds only: the bulk review drawer with fixture rows, before any page opens it.
+    if (import.meta.env.VITE_O2_UI_HARNESS === "true") {
+      routes.push({
+        path: "autoobserve/dev/bulk-review",
+        name: "autoobserveBulkReviewHarness",
+        component: () => import("@/components/autoobserve/insight/bulk/BulkReviewHarness.vue"),
+        meta: { allowOnEmptyData: true },
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      });
+    }
     // Every Fleet API answers 403 on OSS, so the routes (and with them the nav entry) exist only here.
     routes.push(
       {

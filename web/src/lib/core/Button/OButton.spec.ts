@@ -30,6 +30,16 @@ describe("OButton", () => {
 
   // --- Props ---
 
+  it("section-chip variant is a pill that marks the current section through aria-current", () => {
+    const classes = mount(OButton, {
+      props: { variant: "section-chip" },
+      attrs: { "aria-current": "location" },
+    }).classes();
+    expect(classes).toContain("!rounded-full");
+    expect(classes).toContain("aria-[current=location]:bg-surface-accent-active");
+    expect(classes).toContain("focus-visible:ring-3");
+  });
+
   it("cell variant keeps a visible focus ring and the control radius", () => {
     const classes = mount(OButton, { props: { variant: "cell" } }).classes();
     expect(classes).toContain("focus-visible:ring-3");
@@ -618,6 +628,7 @@ describe("OButton", () => {
     "outline-primary",
     "dashed",
     "pricing-chip",
+    "section-chip",
     "tint-teal",
     "tint-purple",
     "tint-blue",

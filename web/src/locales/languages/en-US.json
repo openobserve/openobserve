@@ -4915,7 +4915,7 @@
       "uploadingRules": "Please wait while uploading rules...",
       "errorUploadingRules": "Error while uploading rules",
       "errorParsingJson": "Error parsing JSON from file {name}",
-      "someValuesEmpty": "some values are empty please check",
+      "someValuesEmpty": "Some values are empty. Please check them.",
       "saveBeforeSwitchingTimeUnits": "Please save or cancel your changes before switching time units"
     },
     "addRolePage": {
@@ -7083,6 +7083,8 @@
     "splunkTokenCreateLabel": "Also create a Splunk HEC token",
     "splunkTokenCreateHint": "Lets Splunk forwarders and HEC clients send data to this organization.",
     "splunkTokenNone": "Not enabled",
+    "systemTokenTag": "System",
+    "systemTokenHint": "Used by an OpenObserve feature. Disable it to stop that feature's writes.",
     "splunkTokenGenerate": "Generate Splunk token",
     "splunkTokenRevoke": "Revoke Splunk token",
     "splunkTokenGenerated": "Splunk HEC token generated.",
@@ -11446,19 +11448,134 @@
     "SearchParquetFileNotFound": "Error: Search parquet file not found.",
     "SearchFieldHasNoCompatibleDataType": "Error: Search file has no compatible data type.",
     "SearchSQLExecuteError": "Error: Search SQL execute error.",
-    "SearchSQLCancelled": "Error: Search SQL was cancelled."
+    "SearchSQLCancelled": "Error: Search SQL was cancelled.",
+    "SearchStreamProtected": "Error: This stream holds internal records and can't be searched in Logs."
   },
   "alertCalibration": {
-    "title": "Alert Calibration",
+    "title": "Alert calibration",
     "subtitle": "How your alerts behave, measured from their own run history",
     "configure": "Configure",
     "runNow": "Run now",
     "runNowHint": "Asks for a run now instead of waiting for the next one. If a run is already due or in progress, it answers the request instead.",
-    "runRequested": "Run requested. Findings are written to the {stream} stream when it finishes.",
+    "runRequested": "Run requested. Its findings appear here when it finishes.",
     "runFailed": "The run could not be requested: {message}",
+    "runDenied": "You don't have permission to run Alert calibration. Ask an admin for edit access to it.",
     "runNeedsConfig": "Turn alert calibration on in its settings to run it.",
     "refresh": "Refresh",
     "retry": "Retry",
+    "apply": {
+      "button": "Review change",
+      "title": "Review change: {alert}",
+      "setting": "Setting",
+      "current": "Current",
+      "suggested": "Suggested",
+      "consequence": {
+        "pendingPeriod": "The alert fires only after its condition holds for {value}, so a real problem is reported up to {value} later.",
+        "keepFiringFor": "The alert stays firing for {value} after its condition clears, so a short recovery does not notify again. Recovery is reported up to {value} later.",
+        "silence": "After a notification, repeats are held for {value}, so a still-firing alert notifies less often.",
+        "destinations": "Notifications go to {list}."
+      },
+      "note": "You will review this change in Edit Alert. It takes effect only after you click Save.",
+      "continue": "Continue to Edit Alert",
+      "reviewInstead": "Review alert",
+      "stale": "This alert changed after the analysis: {setting} is now {current}, and the suggestion was based on {from}. Run calibration again for a new suggestion.",
+      "deleted": "This alert was deleted after the analysis.",
+      "denied": "You don't have access to this alert. Ask an admin for access to its folder.",
+      "failed": "Couldn't load this alert.",
+      "unsupported": "This suggestion applies only to scheduled alerts.",
+      "noDestination": "No destination",
+      "change": "{setting} {current} → {suggested}",
+      "more": "{count} more",
+      "editor": {
+        "applied": "Suggested by Alert calibration: {changes}. Review, then click Save.",
+        "review": "Opened from an Alert calibration finding.",
+        "notApplied": {
+          "draft": "The suggestion was not applied because this alert has unsaved changes. Save or discard them, then apply it again from the finding.",
+          "stale": "The suggestion was not applied because this alert changed after the analysis.",
+          "invalid": "The suggestion was not applied because it could not be read.",
+          "missingDestination": "{names} no longer exists, so destinations were not changed. Choose a destination. | {names} no longer exist, so destinations were not changed. Choose a destination."
+        }
+      }
+    },
+    "dismiss": {
+      "button": "Dismiss…",
+      "title": "Dismiss finding on {alert}",
+      "alertFallback": "this alert",
+      "scopeUntil": "Hidden for everyone in {org} until {date}, then shown again if it still fails. Recorded with your name and reason. Undo from Dismissed.",
+      "scopeNoEnd": "Hidden for everyone in {org} until someone undoes it. Recorded with your name and reason. Undo from Dismissed.",
+      "reason": "Reason",
+      "reasons": {
+        "expected": "Expected for this alert",
+        "known_issue": "Will fix later",
+        "not_useful": "Not needed",
+        "false_positive": "Wrong: this didn't happen",
+        "other": "Other"
+      },
+      "reasonUnknown": "Another reason",
+      "reasonRequired": "Choose a reason.",
+      "note": "Note",
+      "noteHelp": "Required when the reason is Other. Seen by you and by people who can dismiss findings.",
+      "noteRequired": "Add a note when the reason is Other.",
+      "noteTooLong": "Shorten the note to 500 characters or fewer.",
+      "duration": "Hide for",
+      "untilReopened": "Until undone",
+      "endsOn": "Hidden until {date}. After that, the finding shows again only if a later run still detects it.",
+      "endsNever": "Hidden until someone undoes it.",
+      "saved": "Dismissed until {date}. Find it under Dismissed.",
+      "savedNoEnd": "Dismissed until undone. Find it under Dismissed.",
+      "savedUndo": "Dismissed until {date}: {alert}.",
+      "savedUndoNoEnd": "Dismissed until undone: {alert}.",
+      "undo": "Undo",
+      "error": {
+        "denied": "You don't have permission to dismiss findings. Ask an admin for edit access to Alert calibration.",
+        "gone": "This alert no longer exists, or you can no longer see it. The page was refreshed.",
+        "changed": "This finding's dismissal changed while you were editing. The page now shows its current state; check it and dismiss again.",
+        "throttled": "Too many requests. Wait a moment, then try again.",
+        "failed": "The dismissal couldn't be saved. Your entries are kept; try again."
+      },
+      "filterOpen": "Open",
+      "filterDismissed": "Dismissed ({count}) | Dismissed ({count})",
+      "allOpenDismissed": "Nothing open. {count} dismissed finding is hidden; see Dismissed. | Nothing open. {count} dismissed findings are hidden; see Dismissed.",
+      "ruleAllDismissed": "Nothing open: {count} alert's finding is dismissed. | Nothing open: {count} alerts' findings are dismissed.",
+      "col": {
+        "alert": "Alert",
+        "finding": "Finding",
+        "reason": "Reason",
+        "note": "Note",
+        "by": "Dismissed by",
+        "until": "Hidden until"
+      },
+      "deletedAlert": "Deleted alert",
+      "noteHidden": "Hidden",
+      "noteHiddenHelp": "Only its author and people who can dismiss findings see the note.",
+      "byAgo": "{actor}, {time}",
+      "findingWithPattern": "{rule}: {pattern}",
+      "pattern": {
+        "ignored_matcher": "matcher ignored",
+        "empty_scope": "empty scope",
+        "source_inactive": "source inactive"
+      },
+      "badge": "Dismissed",
+      "badgeMarked": "Intended report",
+      "byActor": "Dismissed by {actor}",
+      "markedBy": "Marked as intended report by {actor}",
+      "foldUntil": "Hidden until {date}",
+      "foldUntilReopened": "Hidden until undone",
+      "emptyTitle": "No dismissed findings",
+      "emptyDescription": "Findings you dismiss are listed here until they end or are undone.",
+      "loadFailedTitle": "Couldn't load dismissed findings",
+      "statesUnknown": "Dismissed findings couldn't be loaded, so some findings below may already be dismissed.",
+      "capped": "Showing {shown} of {total} dismissed finding. | Showing {shown} of {total} dismissed findings.",
+      "endedNote": "Ended dismissals are not listed. Their findings return only when a later run detects them again.",
+      "reopen": "Undo",
+      "reopened": "Undone. The finding is shown again.",
+      "reopenChanged": "This dismissal changed since you loaded it. The list was refreshed; check it and try again.",
+      "reopenDenied": "You don't have permission to undo dismissals. Ask an admin for edit access to Alert calibration.",
+      "reopenGone": "This dismissal no longer exists, or you can no longer see its alert. The list was refreshed.",
+      "reopenFailed": "Nothing was undone. Try again.",
+      "stat": "Dismissed",
+      "statSub": "Hidden when this run was made"
+    },
     "tabs": {
       "runs": "Runs",
       "dashboard": "Dashboard"
@@ -11468,7 +11585,8 @@
       "minutes": "{count} minute | {count} minutes",
       "hours": "{count} hour | {count} hours",
       "days": "{count} day | {count} days",
-      "years": "{count} year | {count} years"
+      "years": "{count} year | {count} years",
+      "milliseconds": "{count} ms"
     },
     "unit": {
       "minutes": "minute | minutes",
@@ -11482,7 +11600,9 @@
       "noise": "Noise",
       "notifyFailed": "Notification failed",
       "schedulerHealth": "Scheduler lag",
-      "silent": "Silent"
+      "silent": "Silent",
+      "other": "Another rule",
+      "notWorking": "Alert not working"
     },
     "evidence": {
       "errors": "Errors",
@@ -11504,8 +11624,44 @@
       "lateEvaluations": "Late evaluations",
       "lateRatio": "Late share",
       "longestDelay": "Longest delay",
+      "evaluationDelay": "Evaluation delay",
+      "incidentLinkedFirings": "Incident-linked firings",
+      "deliveryAttemptRecords": "Delivery attempt records",
       "yes": "Yes",
-      "no": "No"
+      "no": "No",
+      "stream": "Stream",
+      "field": "Field",
+      "label": "Label",
+      "lastDataAt": "Last data",
+      "checkedAt": "Checked",
+      "searchedWindow": "Searched window",
+      "suggestedDestination": "Suggested destination",
+      "folderAlertsUsingIt": "Enabled alerts in this folder using it",
+      "errorClass": "Error type",
+      "classErrors": "Errors of this type",
+      "firstFailure": "First recorded failure",
+      "lastFailure": "Last recorded failure",
+      "lastSuccess": "Last recorded success",
+      "lastEdit": "Latest alert edit",
+      "errorSample": "Error message",
+      "queryTimeLimit": "Query time limit",
+      "successTimes": "Successful evaluation time",
+      "nearLimit": "Near the time limit",
+      "successTimesValue": "median {p50} · 90th percentile {p90} · longest {max}",
+      "nearLimitValue": "{count} of {total} successful evaluation took {near} or more | {count} of {total} successful evaluations took {near} or more",
+      "blipEpisodes": "Firings that ended",
+      "blipsWouldNotAlert": "Would not fire with the suggested hold",
+      "checkInterval": "Check interval",
+      "holdNow": "Hold for now",
+      "holdSuggested": "Suggested hold"
+    },
+    "errorClass": {
+      "streamMissing": "Stream not found",
+      "fieldMissing": "Field not found",
+      "syntax": "Query not valid",
+      "resourceTimeout": "Query timed out",
+      "resourceMemory": "Query ran out of memory",
+      "other": "Other error"
     },
     "actions": {
       "raiseThreshold": "Raise threshold",
@@ -11514,9 +11670,9 @@
       "lengthenEvaluationWindowDesc": "Widen the period so a short spike no longer trips the alert.",
       "enableDeduplication": "Turn on suppress repeats",
       "enableDeduplicationDesc": "Notify once per state change instead of on every evaluation.",
-      "reviewForDeletion": "Review for deletion",
+      "reviewForDeletion": "Review alert",
       "reviewForDeletionDesc": "Confirm the query still matches reality before retiring the alert.",
-      "fixAlertQuery": "Fix alert query",
+      "fixAlertQuery": "Review alert",
       "fixAlertQueryDesc": "The evaluation itself fails and never reaches a verdict.",
       "repairDestination": "Repair destination",
       "repairDestinationDesc": "Delivery fails on a destination the alert uses.",
@@ -11524,6 +11680,76 @@
       "attachDestinationDesc": "Give the alert somewhere to deliver to.",
       "scaleAlertScheduler": "Scale the alert scheduler",
       "scaleAlertSchedulerDesc": "Raise {concurrency}, add alert nodes, or raise {pullers}."
+    },
+    "insightActions": {
+      "reviewAlert": "Review alert",
+      "reviewQuery": "Review alert",
+      "reviewSettings": "Review alert",
+      "reviewThreshold": "Review alert",
+      "reviewGrouping": "Review alert",
+      "inspectPlatform": "Inspect platform",
+      "reviewSource": "Open in Logs"
+    },
+    "advice": {
+      "checkMissingStream": "Check the source the query reads: it does not exist.",
+      "checkMissingField": "Check the field the query filters on: none of its streams has it.",
+      "checkIgnoredLabel": "Check the label the query matches on: PromQL ignores it, so every series is watched.",
+      "checkFilterValues": "Check the query's filter values: no rows matched them in the searched window.",
+      "confirmQuietSource": "Confirm whether this source is expected to be quiet before changing the alert.",
+      "attachFolderDestination": "Other enabled alerts in this folder send to the suggested destination. It is a likely receiver, not a confirmed one: check it, or confirm this alert is meant to notify no one.",
+      "addDestination": "Add a destination in Edit Alert, or confirm this alert is meant to notify no one.",
+      "checkStreamNotFound": "Check the source the query reads: evaluations recorded it as not found.",
+      "checkFieldNotFound": "Check the fields the query uses: evaluations recorded one as not found.",
+      "checkQuerySyntax": "Check the alert's query: the search engine rejected it as not valid. The error does not say which part is wrong.",
+      "reduceQueryTime": "The query keeps reaching its time limit. Each option makes it cheaper and costs some coverage:",
+      "reduceQueryMemory": "The query keeps running out of memory. Each option makes it cheaper and costs some coverage:"
+    },
+    "resourceOption": {
+      "window": "Shorter query window",
+      "filter": "Narrower filter",
+      "frequency": "Less frequent runs",
+      "line": "{option}: {cost}"
+    },
+    "resourceCost": {
+      "windowOverlap": "Each run checks {period}, which overlaps the next run by {overlap}. Down to {frequency} it still checks all data, but the threshold then applies to {frequency}, not {period}.",
+      "windowGap": "Each run checks {period} of every {frequency}. A shorter window leaves more of each interval unchecked.",
+      "windowCron": "Each run checks less data, so data outside the shorter window is not checked.",
+      "windowRealTime": "Real-time alerts check each record as it arrives, so only a narrower filter applies.",
+      "filter": "Data the filter leaves out is no longer checked.",
+      "frequency": "A breach can wait up to the new interval before it is noticed (now {frequency}). Keep the window at least as long as the interval, or part of each interval goes unchecked.",
+      "frequencyCron": "A breach can wait longer before it is noticed. Keep the window at least as long as the gap between runs."
+    },
+    "limitation": {
+      "quietSource": "A quiet source can be a batch or cron job that is idle by design.",
+      "scanTruncated": "Wider searches timed out, so the empty answer covers less than the full 7 days.",
+      "noSuccessInWindow": "No successful evaluation is recorded in this window, so when it last worked is unknown.",
+      "failureMayPredateWindow": "Failures were already happening when this window began, so the first failure may be earlier.",
+      "editTimingOnly": "The latest edit is shown for timing only; it is not a confirmed cause.",
+      "limitMayDiffer": "These evaluations stopped before this node's query time limit, so another limit may have applied; the options still help.",
+      "searchedWindow": "Searched only the last {window}; rarer matching rows are not ruled out."
+    },
+    "qualityReason": {
+      "scanTruncated": "wider searches timed out",
+      "errorClassesCapped": "error types were not read: too many failing alerts",
+      "errorClassesTimedOut": "error types were not read in time",
+      "errorClassesFailed": "error types could not be read",
+      "evaluationTimesUnread": "evaluation times were not read",
+      "scheduleUnreadable": "the alert's schedule could not be read"
+    },
+    "headroom": {
+      "title": "Alert calibration",
+      "highest": "Hasn't fired in the last day. Its highest value was {value}, against {threshold}. | Hasn't fired in the last {days} days. Its highest value was {value}, against {threshold}.",
+      "lowest": "Hasn't fired in the last day. Its lowest value was {value}, against {threshold}. | Hasn't fired in the last {days} days. Its lowest value was {value}, against {threshold}.",
+      "threshold": "a threshold of {value}",
+      "warningThreshold": "its warning threshold of {value}",
+      "atLeast": "at least {value}",
+      "sentinel": "Quiet by design: its value stayed at 0, against {threshold}.",
+      "edited": "It was edited in this period, so earlier values are compared with the current threshold.",
+      "source": "From the calibration run of {date}. This is information, not a problem.",
+      "short": "Highest value {value} of {threshold}",
+      "shortLowest": "Lowest value {value}, {threshold}",
+      "shortThreshold": "threshold {value}",
+      "shortWarningThreshold": "warning threshold {value}"
     },
     "severity": {
       "high": "High",
@@ -11535,6 +11761,55 @@
       "high": "High confidence",
       "medium": "Medium confidence",
       "low": "Low confidence"
+    },
+    "tier": {
+      "a": "Confirmed condition",
+      "b": "Investigate",
+      "c": "Owner decision"
+    },
+    "tierHint": {
+      "a": "The evidence confirms this condition, and any change offered is a concrete setting.",
+      "b": "The evidence shows where, when and how widely it fails, but not why.",
+      "c": "The numbers are real, but whether to change the alert is the owner's call."
+    },
+    "quality": {
+      "partial": "Partial evidence",
+      "unavailable": "Evidence unavailable"
+    },
+    "skipReason": {
+      "insufficientHistory": "Too little history",
+      "insufficientSamples": "Too few samples",
+      "unmeasurableSignal": "A signal the rule needs is missing",
+      "alertDisabled": "Alert disabled",
+      "windowTooShort": "Window too short for the rule",
+      "unsupportedMode": "Alert mode not supported by the rule",
+      "incompleteOrSilenceCensoredHistory": "History incomplete or paused by a silence, so episode lengths are not real",
+      "noIncidentSignal": "No incidents, so nothing says whether firings were wanted",
+      "sentinelByDesign": "Quiet by design",
+      "enrichmentTimeout": "Evidence read timed out",
+      "other": "Another reason",
+      "healthySilence": "Ran cleanly and never fired; quiet is not a problem by itself",
+      "definitionNotChecked": "Definition not checked"
+    },
+    "notChecked": {
+      "title": "Definition not checked",
+      "why": "AutoObserve could not check what {count} alert reads, so a missing stream, field or label would go unnoticed. | AutoObserve could not check what {count} alerts read, so a missing stream, field or label would go unnoticed.",
+      "whyLabel": "Why",
+      "nextLabel": "Next",
+      "andMore": "and {count} more ·",
+      "showAll": "Show all {count}",
+      "cause": {
+        "probeTimeout": "The check timed out.",
+        "probeError": "The check failed with a search error.",
+        "probeRejected": "The search refused the check's query.",
+        "budgetExhausted": "The last check ran out of time before this alert.",
+        "unsupportedQuery": "The check can't read this kind of query yet.",
+        "other": "The check did not finish."
+      },
+      "next": {
+        "retry": "It is checked again within a day. If this keeps happening, narrow the query's filters so the check finishes.",
+        "query": "Review the query: the check skips it until it uses a plain stream and filters."
+      }
     },
     "coverage": {
       "full": "Full coverage",
@@ -11550,10 +11825,26 @@
       "definitionsWithoutFacts": "{count} alert had no trigger rows in the window, which is not counted as a gap. | {count} alerts had no trigger rows in the window, which is not counted as a gap.",
       "transitionsTruncated": "State transitions were truncated.",
       "countersTruncated": "Counters were truncated, so alerts past the cut were not judged.",
-      "errorClustersTruncated": "Error clusters were truncated."
+      "errorClustersTruncated": "Error clusters were truncated.",
+      "definitionChecksUnavailable": "Alert definition checks need AutoObserve, which is off. The other checks ran.",
+      "definitionChecksNotYet": "AutoObserve has not checked alert definitions in the last day, so they were not judged.",
+      "definitionChecksFailed": "Alert definition checks could not be read, so they were not judged.",
+      "definitionChecksTruncated": "Alert definition check results were truncated, so alerts past the cut were not judged.",
+      "errorClassesUnassessed": "Error types were not read for {count} alert, so its card shows counts only. | Error types were not read for {count} alerts, so their cards show counts only."
+    },
+    "readError": {
+      "forbidden": "You don't have access to Alert calibration. Ask an org admin for read access to it.",
+      "noAccessTitle": "You don't have access to Alert calibration",
+      "noAccessDescription": "Ask an org admin for read access to it.",
+      "unreachable": "Couldn't reach the server. Check your connection and try again.",
+      "failed": "Something went wrong while loading them. Try again in a moment.",
+      "runs": "Alert calibration runs couldn't be loaded. Try again in a moment.",
+      "run": "This run couldn't be loaded. Try again in a moment.",
+      "settings": "Alert calibration settings couldn't be loaded. Try again in a moment."
     },
     "digests": {
       "schedule": "Schedule",
+      "betweenRuns": "{unit} between runs",
       "off": "Off",
       "notConfigured": "Not configured",
       "noScheduledRun": "No scheduled run",
@@ -11564,7 +11855,7 @@
       "scopeAll": "All runs",
       "scopeFindings": "With findings",
       "scopeGaps": "Coverage gaps",
-      "searchPlaceholder": "Search runs by alert name",
+      "searchPlaceholder": "Search by alert name",
       "colRun": "Run",
       "colFindings": "Findings",
       "colCoverage": "Coverage",
@@ -11575,7 +11866,7 @@
       "emptyDescription": "Alert calibration writes a digest every time it runs. Run it now to see what it finds.",
       "filteredTitle": "No runs match this filter",
       "filteredDescription": "Widen the filter, or clear the search.",
-      "errorTitle": "Runs unavailable",
+      "loadFailedTitle": "Couldn't load runs",
       "runsCapped": "The runs search stopped at its latest {count} rows, so older runs are not listed.",
       "searchCapped": "The alert name search stopped at {count} matching runs, so other matching runs are not shown."
     },
@@ -11584,19 +11875,23 @@
       "titleLoading": "Digest",
       "subtitle": "Covers {start} to {end}, generated {time}",
       "back": "Digests",
-      "viewInLogs": "View in Logs",
-      "viewInLogsHint": "Opens this run's records in Logs",
       "unavailableTitle": "Digest unavailable",
-      "noRecords": "The {stream} stream has no records for this run.",
-      "loadFailed": "The digest could not be loaded: {message}",
+      "noRecords": "No records were found for this run.",
       "backToDigests": "Back to digests",
       "partialCoverage": "Partial coverage",
       "partialCoverageDesc": "This run could not see the whole window, so the counts below are a floor, not a total, and no finding is not a clearance.",
       "statFindings": "Findings",
       "statAlertsInScope": "Alerts in scope",
       "statDeclined": "Declined",
-      "statDeclinedSub": "Declined, not cleared",
-      "statDeclinedTooltip": "Rule and alert pairs a rule would not judge, because the alert had too little history or too few samples for it. A gate, not a clearance; the per-alert reasons are not written to the stream.",
+      "statDeclinedSub": "Not cleared",
+      "statDeclinedTooltip": "Rule and alert pairs a rule would not judge. A gate, not a clearance. A floor not met is only counted; a rule that could not run, or looked and declined, is listed below with its reason.",
+      "limitations": "Limits of the evidence",
+      "declinedHeading": "Declined with a reason",
+      "declinedDesc": "Rules that could not run for an alert, or looked and declined. This is not a clearance.",
+      "declinedCounted": "{count} routine decline counted, not listed | {count} routine declines counted, not listed",
+      "declinedSignal": "Signal: {signal}",
+      "declinedDetailOther": "More detail in Logs",
+      "showingSkipsCapped": "Showing {shown} of {total} declines: the search stopped at {count} records.",
       "statWindow": "Window",
       "findingsHeading": "Findings",
       "suggestionsOnly": "Suggestions only, nothing is applied automatically",
@@ -11614,11 +11909,14 @@
       "topOrgs": "Most affected orgs",
       "worstHours": "Worst hours",
       "proposedActions": "Proposed actions",
-      "openAlert": "Open alert"
+      "qualityReasons": "Reason: {reasons} | Reasons: {reasons}",
+      "openAlert": "Open alert",
+      "advice": "What to check"
     },
     "dashboard": {
       "latestRunAgo": "Latest run {time}",
       "findings": "Findings",
+      "openFindings": "Open findings",
       "alertsInScope": "Alerts in scope",
       "coverage": "Coverage",
       "attention": "What needs attention",
@@ -11632,10 +11930,16 @@
       "notEnabledTitle": "Alert calibration is not running for this organization",
       "notEnabledDescription": "Turn it on in the settings. The first run is due as soon as it is on.",
       "emptyTitle": "No runs in the last {days} days",
-      "emptyDescription": "The dashboard fills in once alert calibration has run."
+      "emptyDescription": "The dashboard fills in once alert calibration has run.",
+      "loadFailedTitle": "Couldn't load findings",
+      "findingGone": "This finding is no longer open.",
+      "findingDismissed": "This finding is dismissed. Undo it from Dismissed.",
+      "findingGoneScoped": "This finding is not open in the latest run, or it is on an alert you can't access.",
+      "applied": "Applied"
     },
     "lastRun": {
       "succeeded": "The last run succeeded {time}.",
+      "deferred": "Digest format upgraded. This run's results appear after the next run.",
       "failed": "The last run failed {time}, so the newest digest may be out of date: {error}",
       "none": "No run has been attempted yet."
     },
@@ -11659,12 +11963,21 @@
       "savedFirstRun": "Saved. The first run is due now.",
       "savedCadence": "Saved. The new cadence applies from the next run, and a shorter one can bring that run forward.",
       "saveFailed": "The settings could not be saved: {message}",
-      "loadFailed": "The settings could not be loaded: {message}",
       "lastSaved": "Last saved {time}",
+      "readOnly": "You can view these settings. Ask an admin for edit access to Alert calibration to change them.",
+      "saveDenied": "You don't have permission to change Alert calibration settings. Ask an admin for edit access to it.",
       "runNowHeading": "Run now",
-      "findingsDesc": "Findings are written to the {stream} stream of this organization and kept for that stream's retention. Alert calibration sends no notifications.",
+      "findingsKept": "Findings are kept with this organization's own records for its retention period. Alert calibration sends no notifications.",
       "frequencyRange": "Choose a cadence between 1 hour and 30 days.",
       "windowRange": "Choose a window between 1 minute and 90 days."
+    },
+    "visibility": {
+      "allClear": "No findings on the alerts you can access in the latest run.",
+      "nothingDescription": "Alert calibration found nothing on the alerts you can access in this run.",
+      "orgTotalHidden": "Shown only with access to every alert",
+      "showingCappedUnread": "Showing {shown} findings: the search stopped at {count} records.",
+      "countsPending": "Counts on the alerts you can access are not ready yet. Refresh shortly.",
+      "countsPendingBadge": "Pending"
     }
   },
   "alerts": {
@@ -12335,6 +12648,14 @@
         "unblockedBy": "unblocked by {user}",
         "until": "until {time}",
         "unavailable": "AI analysis is not available for this organization.",
+        "notAnalyzed": "Not analyzed",
+        "reason": {
+          "rcaDisabled": "AI analysis was off when this incident opened.",
+          "aiUnavailable": "AI analysis wasn't available when this incident opened.",
+          "quotaExceeded": "The organization had reached its AI analysis limit.",
+          "coolingDown": "An analysis had just run, so a new one did not start.",
+          "startFailed": "The analysis couldn't start."
+        },
         "outcome": {
           "rootCauseIdentified": "Root cause identified",
           "multipleRootCauses": "Multiple root causes",
@@ -12416,6 +12737,7 @@
       "rawPayloadTitle": "Raw alert payload",
       "rawPayloadError": "Failed to load the raw payload for this alert",
       "externalSourceTooltip": "Triggered by external alert source(s)",
+      "triggerSourceAutoObserve": "AutoObserve",
       "correlatedByServiceDiscovery": "Dimensions",
       "correlatedBySemanticGroups": "Dimensions",
       "correlatedByAlertId": "Alert ID",
@@ -12657,6 +12979,18 @@
       "initialTrigger": "Initial trigger",
       "noDimensionsAvailable": "No dimensions available",
       "noAlertDetailsAvailable": "No alert details available",
+      "findingDimension": "Finding",
+      "findingKind": {
+        "stream_silence": "Stopped sending data",
+        "stream_drop": "Volume dropped sharply",
+        "stream_rise": "Volume rose sharply",
+        "other": "Stream finding"
+      },
+      "findingDetailsHeader": "Finding details",
+      "findingWhatHappened": "What happened",
+      "findingStarted": "Started",
+      "findingNote": "AutoObserve opened this incident from a stream finding, so there is no alert rule to show.",
+      "findingNoteNoFacts": "AutoObserve opened this incident from a stream finding. Its stream details are not available.",
       "clickOnTriggerToViewDetails": "Click on a trigger in the table to view details",
       "refreshCorrelatedData": "Refresh correlated data",
       "showingCorrelatedTraces": "Showing correlated traces from incident timeframe",
@@ -13047,7 +13381,8 @@
       "suppressRepeats": "Suppress repeats",
       "suppressRepeatsTooltip": "Notify once when the alert starts firing or changes level, not on every evaluation. Leave it off to keep getting reminders after each silence period.",
       "keepFiringForInvalid": "Enter 0 or more seconds",
-      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)"
+      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)",
+      "targetRequiredNote": "Required. With no destination, this alert reaches no one."
     },
     "advanced": {
       "addVariable": "Add Variable",
@@ -13545,6 +13880,7 @@
       "rollupRow": "All groups (rollup)",
       "noHistoryTitle": "No transitions recorded",
       "noHistoryDescription": "Level changes appear here as groups start firing, escalate or recover.",
+      "noHistoryRetention": "Changes older than {count} day are not kept. | Changes older than {count} days are not kept.",
       "evaluationsView": "Evaluations",
       "levelChangesView": "Level changes",
       "noEvaluationsTitle": "No evaluations in this window",
@@ -13613,8 +13949,10 @@
       "rowTemplateHint": "Each series’ row reads like “reaches 90 in 3 days”. Rows show only in a destination template that includes {'{'}rows{'}'}."
     },
     "prefill": {
+      "addedUnread": "Couldn't read your alerts, so AutoObserve can't tell whether this one was already added. Nothing was saved; save again to retry.",
+      "alreadyAdded": "Already added as {name} in folder {folder}, so this alert wasn't saved again.",
       "dialog": {
-        "title": "Create alert",
+        "title": "Add alert",
         "continue": "Continue to alert",
         "queryChoiceLabel": "Alert on query",
         "queryChoiceOption": "{name}: {query}",
@@ -13625,6 +13963,7 @@
         "thresholdCount": "Count of rows",
         "windowLabel": "Window",
         "windowValue": "Last {minutes} minutes (from your time range)",
+        "windowOwn": "Last {minutes} minutes",
         "queryLabel": "Query",
         "queryCopied": "Query copied to clipboard",
         "patternsLabel": "Patterns",
@@ -13636,19 +13975,19 @@
       },
       "sources": {
         "default": {
-          "label": "Create Alert",
+          "label": "Add alert",
           "toast": "Query imported into the alert form"
         },
         "logs": {
-          "label": "Create Alert",
+          "label": "Add alert",
           "toast": "Query imported from your logs search"
         },
         "patterns": {
-          "label": "Create alert",
+          "label": "Add alert",
           "toast": "Query imported from the selected patterns"
         },
         "panel": {
-          "label": "Create Alert",
+          "label": "Add alert",
           "toast": "Query imported from dashboard panel: \"{sourceLabel}\""
         },
         "library": {
@@ -13656,7 +13995,7 @@
           "toast": "From Alert Library: {sourceLabel}"
         },
         "explorer": {
-          "label": "Create alert",
+          "label": "Add alert",
           "toast": "Query imported from the Metrics Explorer"
         },
         "dbm": {
@@ -13672,7 +14011,7 @@
           "toast": "Imported from Product Analytics: \"{sourceLabel}\""
         },
         "traces": {
-          "label": "Create alert",
+          "label": "Add alert",
           "toast": "Query imported from your traces search",
           "noStream": "Pick a stream first",
           "errorCount": "Error count",
@@ -13681,6 +14020,11 @@
         "ai": {
           "label": "Create alert",
           "toast": "Imported from AI Observability: \"{sourceLabel}\""
+        },
+        "autoobserve": {
+          "label": "Add alert",
+          "toast": "{sourceLabel}. Nothing is saved until you save.",
+          "sourceLabel": "Suggested by AutoObserve for {service}"
         }
       },
       "warnings": {
@@ -13730,8 +14074,35 @@
         "tracesNoMatches": "No matching spans yet, so the alert fires as soon as one appears.",
         "tracesStoredSpans": "Counts are of stored spans, so sampled traffic reads lower than it really is.",
         "tracesPeriodCapped": "The alert window was capped at {minutes} minutes to keep each check fast.",
-        "tracesNotRun": "This search has not been run yet, so the alert uses the filter in the editor."
+        "tracesNotRun": "This search has not been run yet, so the alert uses the filter in the editor.",
+        "autoobserve": {
+          "noService": "No service was named, so there is nothing to scope this alert to.",
+          "noServiceField": "{stream} has no service field, so this alert cannot be scoped to {service}.",
+          "scopeServiceOnly": "The stream's fields were not known, so this alert is scoped to {service} only, not to its cluster or namespace.",
+          "noBaseline": "No usual value is known for {service} yet, so the threshold is empty. Set it before saving.",
+          "latencyUnit": "{field} is read as milliseconds. Check its unit before saving.",
+          "noWorkload": "{stream} has no field naming the workload, so this alert cannot count restarts for {service} only.",
+          "noServiceLabel": "{stream} has no service or workload label, so this alert cannot be scoped to {service}.",
+          "noCluster": "{service}'s cluster is not known for {stream}, so this node alert would watch every cluster.",
+          "outageOther": "This alert covers {source} only; {count} other source stopped at the same time.",
+          "outageOthers": "This alert covers {source} only; {count} other sources stopped at the same time.",
+          "noClusterField": "Stream {stream} has no cluster field, so this alert can't be limited to cluster {value}.",
+          "noNamespaceField": "Stream {stream} has no namespace field, so this alert can't be limited to namespace {value}.",
+          "schemaUnread": "Couldn't read the fields of stream {stream}, so this alert can't be checked. Close it and try again.",
+          "noDraft": "AutoObserve can't build this alert on the fields of stream {stream}. Write the query by hand.",
+          "noMatch": "No row in {stream} names {service} in 7 days, so this alert can never fire. Write the query by hand."
+        }
       }
+    },
+    "reach": {
+      "bothOff": "Choose a destination for this alert. Incidents and on-call are off in this organization, so an alert with no destination reaches no one. | Choose a destination for these {count} alerts. Incidents and on-call are off in this organization, so an alert with no destination reaches no one.",
+      "incidentsOff": "Choose a destination for this alert. Incidents are off in this organization, so an alert with no destination reaches no one. | Choose a destination for these {count} alerts. Incidents are off in this organization, so an alert with no destination reaches no one.",
+      "noIncident": "Choose a destination for this alert, or turn on Creates Incident. With neither, it reaches no one. | Choose a destination for these {count} alerts, or turn on Creates Incident. With neither, they reach no one.",
+      "noTeam": "Choose a destination for this alert, or set up on-call. This organization has no on-call team, so its incident pages no one. | Choose a destination for these {count} alerts, or set up on-call. This organization has no on-call team, so their incidents page no one.",
+      "oncallOff": "Choose a destination for this alert. On-call is off in this organization, so an alert with no destination reaches no one. | Choose a destination for these {count} alerts. On-call is off in this organization, so an alert with no destination reaches no one.",
+      "setUpOncall": "Set up on-call",
+      "checkAgain": "Check again",
+      "viaIncident": "No destination: this alert opens an incident, and the incident pages on-call. | No destination for {count} alerts: each opens an incident, and the incident pages on-call."
     },
     "saveFailed": "Could not save the alert.",
     "loadFailed": "Could not load the alert.",
@@ -15886,7 +16257,7 @@
       "contractRevokedSuccess": "External contract revoked successfully.",
       "revokeContractError": "Failed to revoke external contract.",
       "enableByobTitle": "Enable BYOB",
-      "enablingStorage": "enabling storage settings...",
+      "enablingStorage": "Enabling storage settings...",
       "storageEnabledSuccess": "Storage settings enabled successfully.",
       "enableStorageError": "Failed to enable storage settings.",
       "processingTrialExtension": "Please wait while processing trial period extension request...",
@@ -21076,6 +21447,12 @@
     "executionErrorDesc": "An error occurred while executing your query.",
     "serverError": "Server error",
     "serverErrorDesc": "An internal error occurred on the server.",
+    "protectedStream": "Alert calibration records can't be searched here",
+    "protectedStreamDesc": "They are shown on the Alert calibration page, filtered to the alerts you can access.",
+    "openCalibration": "Open Alert calibration",
+    "openCalibrationDesc": "See the runs and findings you have access to",
+    "protectedStreamInternal": "Internal records can't be searched here",
+    "protectedStreamInternalDesc": "This stream holds records OpenObserve keeps for its own use, so search leaves it out.",
     "generic": "Query error",
     "genericDesc": "An error occurred while processing your query.",
     "configureResource": "Configure stream",
@@ -22014,6 +22391,76 @@
       "newPrivateLocation": "New private location",
       "publicSubtitle": "Cloud regions, always available",
       "privateSubtitle": "Location is ready when at least one of its agents is live"
+    },
+    "prefill": {
+      "pageTitle": "New synthetic check · HTTP",
+      "back": "AutoObserve",
+      "breadcrumbLabel": "Breadcrumb",
+      "breadcrumbRoot": "AutoObserve",
+      "breadcrumbPage": "New synthetic check",
+      "bannerLead": "Suggested by AutoObserve for {service}",
+      "banner": "{lead} ({where}). A synthetic check sends a request on a schedule and alerts when it fails. Fields marked Suggested were filled in from {service}'s data; check them, then save. Nothing is created until you click {save}.",
+      "bannerNoWhere": "{lead}. A synthetic check sends a request on a schedule and alerts when it fails. Fields marked Suggested were filled in from {service}'s data; check them, then save. Nothing is created until you click {save}.",
+      "wherePublic": "public address",
+      "whereClusterNamespace": "{cluster} / {namespace}",
+      "suggested": "Suggested",
+      "description": "Created from an AutoObserve suggestion for {service} on {date}.",
+      "descriptionNote": "Kept with the check, so reviewers can see where it came from.",
+      "folderNote": "Where {service}'s alert lives. | Where {service}'s {count} alerts live.",
+      "folderNoteAny": "Where {service}'s alerts live.",
+      "tagNote": "Links this check to {service} in AutoObserve, whatever its URL looks like.",
+      "source": {
+        "traces": "traces",
+        "logs": "logs"
+      },
+      "urlNotePrivate": "From {service}'s {source}: in-cluster address, port {port} and the health route {route}.",
+      "urlNotePrivateNoPort": "From {service}'s {source}: in-cluster address and the health route {route}.",
+      "urlNotePublic": "From {service}'s {source}: the public server address and its health route.",
+      "urlUnknown": "{service}'s URL isn't in its traces or logs, so you enter it; location, folder and destination are filled in.",
+      "connecting": "No agent has connected yet, so it can't run checks",
+      "unconfirmed": {
+        "locations": "Locations didn't load, so the suggested ones aren't confirmed. Refresh the list before you save.",
+        "destinations": "Destinations didn't load, so the suggested ones aren't confirmed. Refresh the list before you save."
+      },
+      "publicSkipped": "Not selected: {service} isn't reachable from the internet, so a public location would fail every run.",
+      "publicSkippedAgent": "Not selected: a private location runs this check; add a public one to also check {service} from the internet.",
+      "reachUnknown": "AutoObserve can't tell whether {service} is reachable from the internet, so choose the locations: a public one fails every run if it isn't.",
+      "privateSkipped": "Not selected: the address is public, so no agent inside your network is needed.",
+      "privateDefinition": "A private location is an agent inside your network that runs checks.",
+      "privateDefinitionWhere": "A private location is an agent inside your network that runs checks. {service} runs in {cluster}, and these agents run there too.",
+      "publicQuorum": "{count} regions far apart: the alert below needs {quorum} of them to fail, so one region's network trouble isn't read as an outage.",
+      "runsPerDay": "{count} run a day | {count} runs a day",
+      "runsPerDayRegions": "{count} runs a day across {locations} regions",
+      "runsPerDayLocations": "{count} runs a day across {locations} locations",
+      "alertLine": "Alert after {count} failed run. | Alert after {count} failed runs in a row.",
+      "alertLineQuorum": "Alert after {count} failed runs in a row from {quorum} of {total} locations.",
+      "destinationNote": "{service}'s alert notifies {destinations}. Change it if your team uses another. | {service}'s {count} alerts notify {destinations}. Change it if your team uses another.",
+      "destinationNoteAny": "{service}'s alerts notify {destinations}. Change it if your team uses another.",
+      "more": "{count} more",
+      "testNow": "Test now",
+      "testPassed": "Tested from {location} just now: {status} in {ms} ms.",
+      "testFailed": "Tested from {location} just now: {error}",
+      "after": {
+        "title": "After you save",
+        "runs": "The check runs {every} from {where}.",
+        "runsSuggested": "The check will run {every} from {where} if you keep the suggestion.",
+        "noLocation": "The check runs {every} once you pick a location.",
+        "everyMinutes": "every minute | every {count} minutes",
+        "onSchedule": "on its schedule",
+        "publicRegions": "{count} public region | {count} public regions",
+        "locations": "{count} location | {count} locations",
+        "waiting": "In AutoObserve, {service}'s synthetic check reads {state},",
+        "waitingState": "Waiting for first run",
+        "covered": "then {state} once a run succeeds.",
+        "coveredState": "Covered",
+        "notify": "If a run fails, {destinations} is notified. | If {count} runs in a row fail, {destinations} is notified.",
+        "notifyMany": "If a run fails, {destinations} are notified. | If {count} runs in a row fail, {destinations} are notified.",
+        "notifyNone": "If a run fails, no one is notified until you choose a destination. | If {count} runs in a row fail, no one is notified until you choose a destination.",
+        "notifySuggested": "If a run fails, {destinations} will be notified if you keep the suggestion. | If {count} runs in a row fail, {destinations} will be notified if you keep the suggestion.",
+        "notifyQuorum": "If {quorum} of the {total} locations fail {count} runs in a row, {destinations} is notified.",
+        "back": "Back to {link} after saving.",
+        "backLink": "{service} in AutoObserve"
+      }
     },
     "newCheck": {
       "comingSoon": "Coming Soon",
@@ -23212,6 +23659,7 @@
     },
     "time": {
       "openTimePicker": "Open time picker",
+      "invalid": "Enter a time as {format}.",
       "clear": "Clear",
       "am": "AM",
       "pm": "PM",
@@ -23867,9 +24315,9 @@
       "pipelinesExportedSuccessfully": "{count} pipeline exported successfully | {count} pipelines exported successfully",
       "functionsNotBundled": "{count} function could not be included in the export file: {names} | {count} functions could not be included in the export file: {names}",
       "pipelineDeletedSuccessfully": "Pipeline deleted successfully",
-      "deletingPipeline": "deleting pipeline...",
+      "deletingPipeline": "Deleting pipeline...",
       "pipelineCreatedSuccessfully": "Pipeline created successfully",
-      "savingPipeline": "saving pipeline...",
+      "savingPipeline": "Saving pipeline...",
       "stateResumed": "{name} state resumed successfully",
       "statePaused": "{name} state paused successfully"
     },
@@ -29827,7 +30275,7 @@
     },
     "issues": {
       "subtitle": "Incidents grouped and investigated by the SRE agent. One notification per problem; the cause is attached, or follows in the same thread if triage times out or fails.",
-      "open": "Open",
+      "open": "Open incident",
       "recent": "Resolved",
       "all": "All",
       "heldForDigest": "Held for Friday's summary",
@@ -29882,7 +30330,7 @@
       "waitingForOk": "Waiting for your OK",
       "proposedFix": "Proposed fix",
       "unfoldTab": "How it unfolded",
-      "seeEvidence": "See the evidence ({count}) →"
+      "seeEvidence": "See all"
     },
     "unfold": {
       "hint": "Read left to right: what changed, the signals it set off, then what reached your team. Select a card for its firings.",
@@ -29969,9 +30417,6 @@
       "never": "Never",
       "hoursAgo": "1 hour ago | {count} hours ago",
       "daysAgo": "1 day ago | {count} days ago",
-      "fixNoLink": "Add service.name label",
-      "fixStopped": "Check the collector",
-      "fixQueued": "Mock only: “{action}” for {service} was not sent anywhere",
       "viewLabel": "Coverage view",
       "viewMap": "Map",
       "viewTable": "Table",
@@ -30014,12 +30459,13 @@
       "chartBelow": "{metric}, {value} now, below normal range",
       "chartWithin": "{metric}, {value} now, within normal range",
       "tipNormal": "Normal {low} – {high}",
-      "openTraces": "Traces",
+      "openTraces": "Open in Traces",
       "openCatalog": "Service Catalog",
+      "openLogs": "Open in Logs",
       "rangeLabel": "Time range",
       "logPatternsValue": "{known} known · {fresh} new today",
       "drawerSubtitle": "{stream} · {detectors} · {library}",
-      "badgeNotWatched": "Not watched",
+      "badgeNotWatched": "Coverage gap",
       "signalsWatched": "Signals watched",
       "chipAria": "{signal}: {state}",
       "deltaUp": "Up {change} since the start of the range",
@@ -30216,6 +30662,421 @@
       "nextStep": "Next step",
       "fullReport": "Full report",
       "fullReportHint": "Everything above as one document, ready to copy or download"
+    }
+  },
+  "autoobserveLive": {
+    "where": "{cluster} / {namespace}",
+    "topbar": {
+      "checked": "Checked {ago}",
+      "firstCheck": "First check in progress"
+    },
+    "retry": "Retry",
+    "classes": {
+      "errors": "Errors",
+      "latency": "Latency",
+      "saturation": "Saturation",
+      "absence": "Stops sending",
+      "external_probe": "Synthetic check",
+      "workload_health": "Restarts",
+      "node": "Nodes"
+    },
+    "classesInline": {
+      "errors": "errors",
+      "latency": "latency",
+      "saturation": "saturation",
+      "absence": "absence",
+      "external_probe": "external probes",
+      "workload_health": "workload health",
+      "node": "node health"
+    },
+    "states": {
+      "covered": "Watched",
+      "weak": "Weak",
+      "silent": "Silent",
+      "blind": "Blind",
+      "unmapped": "Unmapped",
+      "none": "None"
+    },
+    "monitorKinds": {
+      "alert": "Alert",
+      "anomaly_detector": "Anomaly detector",
+      "slo": "SLO",
+      "synthetic": "Synthetic"
+    },
+    "coverage": {
+      "summaryWatched": "{watched} of {total} watched · {pct}%",
+      "splitLabel": "{watched} watched, {gaps} with a coverage gap",
+      "stateWatched": "Watched",
+      "stateGap": "Coverage gap",
+      "columns": {
+        "where": "Where",
+        "state": "State",
+        "lastChecked": "Last checked"
+      },
+      "loading": "Loading coverage",
+      "loaded": "Coverage loaded",
+      "sentence": {
+        "allWatched": "I'm watching your 1 service. | I'm watching all {total} of your services.",
+        "allGaps": "Your 1 service has a coverage gap. | All {total} of your services have a coverage gap.",
+        "watching": "I'm watching {watched} of your {total} services.",
+        "gaps": "{count} has a coverage gap. | {count} have a coverage gap.",
+        "mixed": "{watching} {gaps}"
+      },
+      "gapAdded": "Added an alert for {checks}. AutoObserve counts it at its next check. | Added alerts for {checks}. AutoObserve counts them at its next check.",
+      "gapNone": "No alert watches {checks}",
+      "searchPlaceholder": "Search service, cluster or namespace",
+      "labelNamespace": "{name} · {namespace}",
+      "labelPlace": "{name} · {cluster} · {namespace}",
+      "noNamespace": "no namespace",
+      "noCluster": "no cluster",
+      "noMatch": "No service, cluster or namespace matches “{query}”",
+      "showAll": "Show all",
+      "bucketThree": "3 or more",
+      "bucketTwo": "2",
+      "bucketOne": "1",
+      "filterHides": "No service is {state}",
+      "filterHidesSearch": "{count} service matches “{query}”, but it isn't {state} | {count} services match “{query}”, but none is {state}"
+    },
+    "cell": {
+      "noClass": "AutoObserve doesn't check this signal yet",
+      "tipNoClass": "{signal}: AutoObserve doesn't check this yet",
+      "gap": {
+        "weak": "{signal}: only {monitor}, a broad alert, may notice a problem; it isn't scoped to this service | {signal}: only {monitor}, broad alerts, may notice a problem; they aren't scoped to this service",
+        "silent": "{signal}: {monitor} matches, but it notifies no one | {signal}: {monitor} match, but they notify no one",
+        "blind": "{signal}: {monitor} matches, but it can't see its data | {signal}: {monitor} match, but they can't see their data",
+        "unmapped": "{signal}: {monitor} may match, but its scope couldn't be tied to a service | {signal}: {monitor} may match, but their scope couldn't be tied to a service",
+        "none": "{signal}: no alert watches this"
+      },
+      "added": "Added"
+    },
+    "drawer": {
+      "moreChecks": "Other checks",
+      "chartNoData": "Chart not available yet",
+      "monitors": "Alerts",
+      "monitorLine": "{kind} · {state}",
+      "noMonitor": "No alert matches"
+    },
+    "charts": {
+      "empty1h": "No data from {service} in the last hour",
+      "empty24h": "No data from {service} in the last 24 h",
+      "empty7d": "No data from {service} in the last 7 days",
+      "emptyPartial1h": "No data from {service} in the searched part of the last hour",
+      "emptyPartial24h": "No data from {service} in the searched part of the last 24 h",
+      "emptyPartial7d": "No data from {service} in the searched part of the last 7 days",
+      "noSpanStatus": "No span status in {stream}",
+      "noLevel": "No log level in {stream}",
+      "noDuration": "No duration field in {stream}",
+      "noTraces": "Latency is charted from traces. {service} sends none.",
+      "noMatch": "This service can't be matched to its streams",
+      "failedQuery": "Couldn't load this chart from {stream}",
+      "failedMatch": "Couldn't look up the streams of {service}",
+      "partial": "Partial data",
+      "wide": "Includes other services that share this stream",
+      "loading": "Loading {metric}",
+      "summary": "{metric}, {value} now",
+      "summaryNone": "{metric}, nothing measured in the newest bucket"
+    },
+    "suggestions": {
+      "serviceMeta": "{where}, about {traffic} events an hour",
+      "trafficOnly": "About {traffic} events an hour",
+      "kinds": {
+        "coverage_gap": "Coverage gap",
+        "no_absence_check": "Missing alert",
+        "silent_coverage": "Notifies no one",
+        "coverage_lost": "Coverage lost",
+        "blind_guardrail": "Not working",
+        "discovery_unusable": "Data quality",
+        "alert_no_destination": "Notifies no one",
+        "alert_notify_failed": "Notification failed",
+        "other": "Other"
+      },
+      "severity": {
+        "high": "High",
+        "medium": "Medium"
+      },
+      "confidence": {
+        "sufficient": "Strong evidence",
+        "suggestive": "Some evidence",
+        "insufficient": "Weak evidence"
+      },
+      "body": {
+        "coverageGap": "Nothing watches {service}",
+        "noAbsenceNone": "Nothing alerts if {service} stops sending data",
+        "noAbsenceWeak": "Only a broad alert would notice if {service} stops sending data",
+        "noAbsenceSilent": "The check that would notice {service} going quiet notifies no one",
+        "noAbsenceBlind": "The check that would notice {service} going quiet can't see its data",
+        "silentCoverage": "{monitor} watches {classes} on {count} service but notifies no one | {monitor} watches {classes} on {count} services but notifies no one",
+        "silentWhy": "{monitor} would notice {services} stopping, but it notifies no one.",
+        "silentWhyNoNames": "{monitor} would notice a service stopping, but it notifies no one.",
+        "silentNext": "Give it a destination.",
+        "undeliverable": "{monitor} can't reach {destination}",
+        "undeliverableWhy": "{destination} takes tickets, not alerts. | {destination} take tickets, not alerts.",
+        "undeliverableNext": "Add a webhook or email next to it; {destination} stays. | Add a webhook or email next to them; {destination} stay.",
+        "coverageLost": "{service} lost its {classes} alert on {day}",
+        "blindStreamMissing": "{monitor} reads {detail}, which doesn't exist",
+        "blindNoData": "{monitor} reads {detail}, which has no recent data",
+        "blindEmptyScope": "{monitor} filters to rows that never arrive",
+        "blindUnknownField": "{monitor} filters on {field}, a field its stream doesn't have",
+        "blindIgnoredMatcher": "{monitor} matches on {label}, a label no series has, so it watches every series",
+        "discovery": "Only {good} of {active} discovered services are usable, so gap rankings are partial",
+        "alertSyntax": "{monitor} has a query that does not parse",
+        "alertTimeout": "{monitor} keeps timing out before it finishes",
+        "alertMemory": "{monitor} keeps running out of memory",
+        "alertOtherError": "{monitor} keeps failing with an error",
+        "alertNotWorkingGeneric": "{monitor} is not working",
+        "alertNoDestination": "{monitor} fired and notifies no one",
+        "alertNotifyFailed": "{monitor} fired, and {failed} of {tried} notification failed. | {monitor} fired, and {failed} of {tried} notifications failed.",
+        "alertNotifyFailedNoCounts": "{monitor} fired, and its notifications failed.",
+        "alertStreamGone": "{monitor} keeps failing because its stream doesn't exist",
+        "alertFieldGone": "{monitor} keeps failing because a field it uses doesn't exist",
+        "other": "I found something this page can't show yet"
+      },
+      "detail": {
+        "cell": "{check}: {state}",
+        "cells": "What the engine found: {cells}.",
+        "services": "Services it matches include {services}.",
+        "text": "Engine detail: {detail}",
+        "quality": "Discovery is running in {mode} mode.",
+        "none": "The engine sent no more detail.",
+        "joined": "{first} {rest}"
+      },
+      "analysedAt": "From the calibration run {ago}",
+      "neverFired": "Never fired",
+      "lastFired": "Last fired {time}",
+      "accept": "Accept",
+      "dismiss": "Dismiss…",
+      "accepted": "Accepted in this preview; nothing was sent",
+      "dismissed": "Dismissed in this preview; nothing was sent",
+      "loading": "Loading suggestions",
+      "loaded": "Suggestions loaded",
+      "more": "and {count} more | and {count} more",
+      "moreNames": "{count} more | {count} more",
+      "whyNext": "{why} {next}",
+      "seeAll": "See all",
+      "drawerTitle": "Suggestions",
+      "drawerLine": "Ranked by what matters most first. Open a row for what I found.",
+      "focusGone": "This suggestion is no longer open.",
+      "clearKind": "Show all suggestions",
+      "kindEmptyTitle": "No open suggestions of the kind {kind}",
+      "kindEmptyDesc": "{count} other suggestion is open. | {count} other suggestions are open.",
+      "folder": "Folder {folder}",
+      "columns": {
+        "suggestion": "Suggestion",
+        "where": "Where",
+        "kind": "Kind",
+        "severity": "Severity"
+      }
+    },
+    "notice": {
+      "offTitle": "AutoObserve isn't turned on",
+      "details": "Details",
+      "refreshFailed": "Refresh failed at {failedAt} · showing {what} from {dataAt}",
+      "what": {
+        "coverage": "coverage",
+        "suggestions": "suggestions",
+        "incidents": "paged findings",
+        "issues": "issues",
+        "history": "history"
+      },
+      "coverage": {
+        "deniedTitle": "You don't have permission to see coverage",
+        "deniedDesc": "Coverage counts the monitors in every folder, so it needs permission to view all alerts in this organization, not only some folders. Ask an organization admin for it.",
+        "offDesc": "An administrator turns it on for this deployment. Coverage appears here after its first check.",
+        "unavailableTitle": "Coverage is temporarily unavailable",
+        "unavailableDesc": "AutoObserve isn't answering right now. This usually clears within a minute or two.",
+        "failedTitle": "Couldn't load coverage",
+        "failedDesc": "Something went wrong while loading it. Try again in a moment.",
+        "noPassTitle": "No check has finished in the last day",
+        "noPassDesc": "Coverage appears here after my next check of your services finishes. If AutoObserve was just turned on, the first check can take a while.",
+        "noPassAction": "How I check coverage",
+        "noServicesTitle": "No services found yet",
+        "noServicesDesc": "My last check, {when}, found no services. Services appear here once they send logs, metrics or traces that name a service.",
+        "noServicesAction": "How I find services"
+      },
+      "suggestions": {
+        "deniedTitle": "You don't have permission to see suggestions",
+        "deniedDesc": "Seeing them needs permission to view alerts in this organization. Ask an organization admin for it.",
+        "offDesc": "Suggestions appear here after an administrator turns it on for this deployment.",
+        "unavailableTitle": "Suggestions are temporarily unavailable",
+        "unavailableDesc": "AutoObserve isn't answering right now. This usually clears within a minute or two.",
+        "failedTitle": "Couldn't load suggestions",
+        "failedDesc": "Something went wrong while loading them. Try again in a moment.",
+        "emptyTitle": "No suggestions right now",
+        "emptyDesc": "I'll add one here when I find a gap in what your monitors cover.",
+        "pageEmptyTitle": "The top suggestions were already handled",
+        "pageEmptyDesc": "Open the full list for the ones still waiting."
+      },
+      "history": {
+        "deniedTitle": "You don't have permission to see history",
+        "deniedDesc": "History lists the incidents AutoObserve opened, so seeing it needs permission to list incidents in this organization. Ask an organization admin for it.",
+        "offDesc": "History appears here after an administrator turns it on for this deployment.",
+        "unavailableTitle": "History is temporarily unavailable",
+        "unavailableDesc": "AutoObserve isn't answering right now. This usually clears within a minute or two.",
+        "failedTitle": "Couldn't load history",
+        "failedDesc": "Something went wrong while loading it. Try again in a moment."
+      },
+      "incidents": {
+        "deniedTitle": "You don't have permission to see paged findings",
+        "deniedDesc": "Paged findings open incidents, so seeing them needs permission to list incidents in this organization. Ask an organization admin for it.",
+        "offDesc": "Paged findings appear here after an administrator turns it on for this deployment.",
+        "unavailableTitle": "Paged findings are temporarily unavailable",
+        "unavailableDesc": "AutoObserve isn't answering right now. This usually clears within a minute or two.",
+        "failedTitle": "Couldn't load paged findings",
+        "failedDesc": "Something went wrong while loading them. Try again in a moment."
+      },
+      "issues": {
+        "deniedTitle": "You don't have permission to see issues",
+        "deniedDesc": "Issues are incidents AutoObserve opened, so seeing them needs permission to list incidents in this organization. Ask an organization admin for it.",
+        "offDesc": "Issues appear here after an administrator turns it on for this deployment.",
+        "unavailableTitle": "Issues are temporarily unavailable",
+        "unavailableDesc": "AutoObserve isn't answering right now. This usually clears within a minute or two.",
+        "failedTitle": "Couldn't load issues",
+        "failedDesc": "Something went wrong while loading them. Try again in a moment."
+      }
+    },
+    "time": {
+      "justNow": "just now",
+      "ago": "{time} ago"
+    },
+    "history": {
+      "incident": "Opened an incident: {title}",
+      "dismissed": "{actor} dismissed {title}",
+      "accepted": "{actor} marked {title} as an intended report",
+      "changed": "{actor} changed {title}",
+      "denied": {
+        "incidents": "Incidents aren't listed: you don't have permission to see them.",
+        "decisions": "Decisions aren't listed: you don't have permission to see them."
+      },
+      "untitled": "a suggestion",
+      "openIncident": "Open incident",
+      "newest": "Showing the {count} newest. Older incidents are on the Issues page.",
+      "loading": "Loading history",
+      "loaded": "History loaded"
+    },
+    "incidents": {
+      "title": "Paged findings",
+      "subtitle": "Findings that opened an incident for your on-call team, with its analysis.",
+      "pagingNote": "Paging is off for this organization, so AutoObserve opens no incidents.",
+      "sharedFor": "{label}: {reason}",
+      "finding": {
+        "stream_silence": "{stream} ({type}) stopped sending data",
+        "stream_drop": "{stream} ({type}) volume dropped sharply",
+        "stream_rise": "{stream} ({type}) volume rose sharply"
+      },
+      "opened": "Incident opened {when}",
+      "openIncident": "Open incident",
+      "viewAnalysis": "View analysis",
+      "newFindings": "{count} new finding | {count} new findings",
+      "showNew": "Show",
+      "more": "Showing the {count} newest",
+      "seeAll": "See all incidents",
+      "seeAllIssues": "See all issues",
+      "failedDetail": {
+        "status": "The request failed with status {status} at {time}.",
+        "noResponse": "The request got no response at {time}."
+      },
+      "analysis": {
+        "notRunDetail": "No analysis has started. Open the incident to start one.",
+        "disabledDetail": "AI analysis is turned off for this deployment.",
+        "offOther": "Automatic analysis did not run for this incident.",
+        "failedDetail": "The analysis stopped before it finished. View it for details."
+      },
+      "empty": {
+        "title": "Nothing has paged anyone",
+        "desc": "When a stream stops or its volume changes sharply, its incident and analysis show here."
+      },
+      "emptyOff": {
+        "title": "Paging is off",
+        "desc": "AutoObserve records stream findings for this organization but opens no incidents. An administrator turns paging on."
+      },
+      "loading": "Loading paged findings…",
+      "loaded": "Paged findings loaded",
+      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
+      "routing": "Set up on-call routing"
+    },
+    "issues": {
+      "searchPlaceholder": "Search what happened or a stream",
+      "columns": {
+        "incident": "What happened",
+        "severity": "Severity",
+        "status": "Status",
+        "stream": "Stream",
+        "opened": "Opened",
+        "analysis": "Analysis",
+        "page": "Who was paged"
+      },
+      "count": "No issues | {count} issue | {count} issues",
+      "capNote": "Showing the newest {count} issues. Narrow the range to see older ones.",
+      "emptyRange": "No issues {within}",
+      "streamType": "{type} stream",
+      "streamMore": "{stream} +{count}",
+      "filterOpen": "Open",
+      "loading": "Loading issues…",
+      "loaded": "Issues loaded",
+      "page": {
+        "unrouted": "Nobody paged",
+        "failed": "Paging failed",
+        "pending": "Not confirmed yet"
+      },
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "shared": {
+        "rcaDisabled": "AI analysis was off when these incidents opened.",
+        "aiUnavailable": "AI analysis wasn't available when these incidents opened.",
+        "quotaExceeded": "The organization had reached its AI analysis limit when these incidents opened.",
+        "coolingDown": "An analysis had just run, so no new one started for these incidents.",
+        "startFailed": "The analyses couldn't start.",
+        "offOther": "Automatic analysis did not run for these incidents.",
+        "disabled": "AI analysis is turned off for this deployment.",
+        "notRun": "No analysis has started. Open an incident to start one.",
+        "failed": "These analyses stopped before they finished. View one for details."
+      }
+    },
+    "surfaces": {
+      "changes": {
+        "title": "No changes yet",
+        "desc": "AutoObserve suggests fixes but hasn't changed any alert or setting. When it makes a change, it shows here with whether it worked. For now, review its suggestions and apply the ones you want.",
+        "action": "Review suggestions"
+      },
+      "history": {
+        "title": "No history yet",
+        "desc": "What AutoObserve finds, what it changes and what you decide will be listed here, newest first. Today its findings open incidents, which are on the Issues page.",
+        "action": "Open issues"
+      },
+      "scenario": {
+        "tag": "Live data",
+        "text": "You're seeing this organization's live data. Sample scenarios aren't shown here.",
+        "action": "How it works"
+      },
+      "settings": {
+        "title": "Nothing to set here yet",
+        "desc": "An administrator turns AutoObserve and its paging on for this deployment. Who it notifies and how far it acts on its own will be set here once those controls exist.",
+        "action": "How it works"
+      }
+    },
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "deniedTitle": "You don't have permission to see the paging setting",
+      "deniedDesc": "Paging is set once for the whole organization. Ask an organization admin for access.",
+      "failedTitle": "Couldn't load the paging setting",
+      "failedDesc": "Something went wrong while loading it. Try again in a moment.",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
+    },
+    "learning": {
+      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
+      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
+      "emptyTitle": "Learning your streams",
+      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
+      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
+      "until": "Learning until {date} · {streams}",
+      "streams": "Learning {count} stream | Learning {count} streams",
+      "streamUntil": "until {date}"
     }
   },
   "autoobserve2": {
@@ -30829,15 +31690,15 @@
       "intro": "Here's what I do, in five steps.",
       "gotIt": "Got it",
       "s1Title": "I find your services",
-      "s1": "I look through the data you already send and find every service in it. When a new one appears, I start watching it the same day; you don't need to ask.",
-      "s2Title": "I watch them",
-      "s2": "I learn what normal looks like for each service: its errors, slowness and traffic for each hour of the day, with weekly patterns sharpening over time. Until I know, I use basic safety checks.",
-      "s3Title": "I stay quiet unless it's real",
-      "s3": "Most odd moments aren't problems. I page your team when something hurts customers, send a message that won't wake anyone for smaller issues, and keep minor things for the Friday summary.",
-      "s4Title": "I explain every page",
-      "s4": "Every message says what broke, since when, and my best read on why, with how sure I am.",
-      "s5Title": "I fix what you've allowed",
-      "s5": "I only fix things you've said I may. A fix that works earns a little trust, and one that doesn't help counts against me. If I keep needing the same fix, that's a bug I report to your team, not a habit I automate."
+      "s1": "I look through the data you already send and find the services in it. A new service shows up after my next check; you don't need to add it.",
+      "s2Title": "I learn what normal looks like",
+      "s2": "I learn how much data each stream normally sends from 14 days of its history. Until a stream has that history, I say it is still learning and don't judge it.",
+      "s3Title": "I page only when a stream stops",
+      "s3": "When a stream stops sending data, I open an incident and, if paging is on, page the on-call team that owns the service. Sharp drops and rises show as findings and never page. Smaller things wait for the daily digest.",
+      "s4Title": "I say what happened",
+      "s4": "Every incident says what stopped and since when. With AI analysis on, it also carries a best read on why.",
+      "s5Title": "You decide what changes",
+      "s5": "I suggest alerts for what nothing watches and fixes for alerts that can't fire. Nothing changes until you review and apply it, and you can undo what you applied."
     },
     "topbar": {
       "brand": "AutoObserve",
@@ -30854,9 +31715,9 @@
     },
     "view": {
       "standard": "Standard",
-      "nerd": "Nerd",
+      "nerd": "Detailed",
       "standardTooltip": "Standard view gives the short read: what needs you and what happened in the last 7 days",
-      "nerdTooltip": "Nerd view shows every detector, loop and setting in full",
+      "nerdTooltip": "The detailed view shows every detector, loop and setting in full",
       "label": "View"
     },
     "rail": {
@@ -30951,6 +31812,7 @@
     "connect": {
       "title": "Connect a Slack workspace",
       "description": "Your team asks OpenObserve questions from Slack and gets answers with their own permissions.",
+      "autoobserveHint": "Once connected, AutoObserve can post a daily digest to a channel you pick.",
       "stepCheckTitle": "Check this server",
       "stepCreateTitle": "Create the app",
       "stepInstallTitle": "Install and link people",
@@ -30969,6 +31831,9 @@
       "existingTitle": "Workspaces already set up on this server",
       "selfHostedPrivacy": "OpenObserve creates and installs your own Slack app; nothing is shared with a third party.",
       "connectExisting": "Connect this org",
+      "addedOn": "Added {date}",
+      "addedOnAt": "Added {date} at {time}",
+      "appAndAdded": "{app} · {added}",
       "alreadyInstalled": "{team} is already installed for another organization. Connect this org to use it.",
       "connectedTitle": "Connected to {team}",
       "connectedDestination": "Alerts post to #{channel} · each person gets one DM saying who they are linked as",
@@ -31316,7 +32181,93 @@
       "loadFailed": "Couldn't load your linked accounts"
     },
     "workspaces": {
-      "addAnother": "Add another workspace"
+      "addAnother": "Add another workspace",
+      "noAccess": "Slack settings need the Manage Slack permission. Ask an admin of this organization."
+    },
+    "sections": {
+      "onThisPage": "On this page",
+      "general": "General",
+      "generalDescription": "Applies to everything the Slack app does in this organization: the workspace, channel defaults, linking and help.",
+      "autoobserve": "AutoObserve",
+      "autoobserveDescription": "What AutoObserve posts to Slack, and what people may do there. One channel gets a daily digest of what AutoObserve found and posts about outages nobody was notified about. It never reads messages in the channel, never pages anyone and never opens incidents."
+    },
+    "insights": {
+      "channel": "Channel",
+      "channelHelp": "Where the digest and outage posts go. Nothing posts until a channel is picked.",
+      "channelHelpShort": "Where the digest and outage posts go.",
+      "workspace": "Workspace",
+      "channelEmpty": "OpenObserve isn't in any channel yet.",
+      "channelNoMatch": "OpenObserve isn't in a channel named like that.",
+      "channelEmptyHint": "In Slack, type /invite {'@'}OpenObserve in the channel you want, then search again. A new channel can take up to 10 minutes to show.",
+      "picked": "✓ Picked",
+      "privateChannel": "Private",
+      "alertRoutes": "{count} alert route posts here | {count} alert routes post here",
+      "lastDigest": "Last digest {when}: {counts}.",
+      "lastDigestIn": "Last digest {when} in {channel}.",
+      "lastDigestNoCounts": "Last digest {when}.",
+      "openLastDigest": "Open last digest",
+      "today": "today {time}",
+      "onDate": "{date} {time}",
+      "counts": {
+        "needsAttention": "{count} needs attention | {count} need attention",
+        "suggestions": "{count} suggestion | {count} suggestions",
+        "calibrationRuns": "{count} calibration run | {count} calibration runs",
+        "calibrationFindings": "{count} calibration finding | {count} calibration findings"
+      },
+      "noChannel": "Nothing posts yet: no channel is picked.",
+      "noChannelCounts": "AutoObserve has {attention} and {suggestions} in {org} today.",
+      "thingsNeedAttention": "{count} thing that needs attention | {count} things that need attention",
+      "thingsNeedAttentionAtLeast": "{count}+ things that need attention",
+      "pickHint": "Pick the channel your on-call team reads.",
+      "pickChannel": "Pick a channel",
+      "moveNote": "One organization posts to one channel. Picking a channel in {workspace} moves the posts there.",
+      "anotherWorkspace": "another workspace",
+      "removed": "Nothing posts: the Slack app was removed from {workspace}, so today's digest wasn't sent. Your choices are kept. Reinstall the app in General to resume.",
+      "removedWithCounts": "Nothing posts: the Slack app was removed from {workspace}, so today's digest ({counts}) wasn't sent. Your choices are kept. Reinstall the app in General to resume.",
+      "goToReinstall": "Go to Reinstall",
+      "digestTime": "Daily digest time",
+      "digestHelp": "Once a day, only when something is open. A day with nothing open posts nothing. The time keeps its time zone; a new setting starts in your browser's zone.",
+      "digestHelpShort": "Once a day, only when something is open.",
+      "timeAndZone": "Time and time zone",
+      "time": "Digest time",
+      "zone": "Time zone",
+      "timeInvalid": "Choose a digest time as HH:MM.",
+      "trial": "Post trial findings as they happen",
+      "trialHelp": "Checks in their 28-day trial are not proven yet. Off: what they find waits for the digest, with how often they were right. On: an outage they find posts right away, at most 5 an hour; it still doesn't page anyone.",
+      "trialOffShort": "Off: what checks in their 28-day trial find waits for the digest.",
+      "trialOnShort": "On: an outage found by a check in its 28-day trial posts right away.",
+      "allow": "Allow changes from Slack",
+      "allowHelp": "Covers the Dismiss button on findings posted to Slack. Off: Slack shows findings and suggestions read-only, with Open in OpenObserve. On: people with permission can dismiss from Slack after seeing what changes; each dismissal names who made it and can be undone.",
+      "allowOffShort": "Off: Dismiss is read-only in Slack.",
+      "allowOnShort": "On: people with permission can dismiss from Slack.",
+      "on": "On",
+      "off": "Off",
+      "noChannelValue": "No channel",
+      "unsaved": "Nothing is saved until you save.",
+      "removedFooter": "Settings can't change while the app is removed.",
+      "saved": "AutoObserve settings saved",
+      "locked": "You can't change these settings.",
+      "lockedDetail": "They need the Manage Slack permission.",
+      "askAdmin": "Ask an admin of this organization.",
+      "editLabel": {
+        "channel": "Channel",
+        "digestTime": "Digest time",
+        "trial": "Post trial findings",
+        "allow": "Changes from Slack"
+      },
+      "edit": "{field} → {value}",
+      "failed": {
+        "title": "AutoObserve settings weren't saved:",
+        "stale": "someone else changed these settings. Refresh and try again.",
+        "yourEdits": "Your edit: {edits}. | Your edits: {edits}.",
+        "noAnswer": "OpenObserve didn't answer. Your changes are still here; save again.",
+        "notInChannel": "OpenObserve isn't in {channel}, so it can't post there. In Slack, type /invite {'@'}OpenObserve in {channel}, then save again.",
+        "forbidden": "they need the Manage Slack permission. Ask an admin of this organization.",
+        "refused": "OpenObserve refused them: {reason}. Your changes are still here.",
+        "unknown": "something went wrong. Your changes are still here; save again.",
+        "refreshFailed": "Refresh didn't work either. Try again.",
+        "refresh": "Refresh"
+      }
     },
     "orgAccess": {
       "title": "Organizations",
@@ -33336,5 +34287,575 @@
     "recentRow": "Recent search",
     "deletedQuery": "Deleted {query}",
     "undo": "Undo"
+  },
+  "insight": {
+    "targets": {
+      "origin": "Created from an AutoObserve suggestion for {service} on {date}.",
+      "syntheticName": "{service} health",
+      "team": {
+        "none": "No team yet",
+        "folderReason": "Where {service}'s alert lives. | Where {service}'s {count} alerts live.",
+        "defaultReason": "No owner is known for {service}, so it uses the org default folder."
+      },
+      "notify": {
+        "reason": "{service}'s alert notifies {destination}. | {service}'s {count} alerts notify {destination}."
+      },
+      "editor": {
+        "review": "Opened from an AutoObserve suggestion.",
+        "applied": "Suggested by AutoObserve: {changes}. Review, then click Save."
+      }
+    },
+    "chip": {
+      "notWorking": "Not working"
+    },
+    "labels": {
+      "why": "Why",
+      "next": "Next",
+      "details": "Details",
+      "nextStep": "Next step"
+    },
+    "alert": {
+      "why": "{failed} of {total} run failed since {time} with {errorType}; the last good run was {lastGood}. | {failed} of {total} runs failed since {time} with {errorType}; the last good run was {lastGood}.",
+      "whyNever": "{failed} of {total} run failed since {time}, so it cannot fire. | {failed} of {total} runs failed since {time}, so it cannot fire.",
+      "whyCount": "{failed} of {total} run failed in the last calibration window. | {failed} of {total} runs failed in the last calibration window.",
+      "whyEmptyScope": "No rows matched its filters in the last {window}, so it cannot fire.",
+      "whyNoDestination": "It fired {count} time in the last calibration window, and no one was notified. | It fired {count} times in the last calibration window, and no one was notified.",
+      "nextNoDestination": "Choose who gets notified.",
+      "nextNotifyFailed": "Check its destination.",
+      "errorType": {
+        "stream_missing": "stream-not-found errors",
+        "field_missing": "field-not-found errors",
+        "syntax": "query syntax errors",
+        "resource_timeout": "timeouts",
+        "resource_memory": "out-of-memory errors",
+        "other": "errors"
+      }
+    },
+    "actions": {
+      "openInLogs": "Open in Logs",
+      "openInCalibration": "Open in Alert calibration",
+      "dismiss": "Dismiss…"
+    },
+    "note": {
+      "reviewQuery": "Opens the alert editor at the query. Nothing is saved until you save.",
+      "reviewThreshold": "Opens the alert editor at the threshold. Nothing is saved until you save.",
+      "reviewSettings": "Opens the alert editor at its settings. Nothing is saved until you save.",
+      "reviewAlert": "Opens the alert editor. Nothing is saved until you save.",
+      "openInLogs": "Opens Logs on {stream}, from an hour before its last data.",
+      "openInLogsRun": "Opens Logs on {stream} over the window the last run checked.",
+      "openInLogsHour": "Opens Logs on {stream} for the last hour.",
+      "addAlert": "Opens the alert form filled in. Nothing is saved until you save.",
+      "addHeartbeat": "Opens the alert form filled in from the job's own schedule. Nothing is saved until you save.",
+      "reviewAndAdd": "Opens a list of {count} alert AutoObserve filled in. Nothing is saved until you click Add alerts. | Opens a list of {count} alerts AutoObserve filled in. Nothing is saved until you click Add alerts.",
+      "chooseWho": "Opens the alert editor at who gets notified. Nothing is saved until you save.",
+      "openSourceLogs": "Opens Logs on {source}'s last rows, from 6 hours before it stopped.",
+      "addSynthetic": "Opens the synthetic check form filled in. Nothing is saved until you save.",
+      "setUpKubernetes": "Opens Kubernetes setup for its cluster."
+    },
+    "bulk": {
+      "alertsPage": "Alerts",
+      "title": {
+        "no_data": "Add {count} no-data alert | Add {count} no-data alerts",
+        "source": "Add {count} no-data alert | Add {count} no-data alerts",
+        "errors": "Add {count} errors alert | Add {count} errors alerts",
+        "latency": "Add {count} latency alert | Add {count} latency alerts"
+      },
+      "rule": {
+        "no_data": "Each fires when its service sends no rows for {duration}.",
+        "source": "Each fires when its source sends no rows for {duration}.",
+        "errors": "Each fires when its service logs more than 3 times its usual errors in an hour.",
+        "latency": "Each fires when its service's p95 latency passes twice its usual value."
+      },
+      "ruleTail": "Untick any you don't want. Nothing is saved until you click Add alerts.",
+      "groupBy": "Group by",
+      "groupByOption": {
+        "team": "Owner",
+        "folder": "Folder",
+        "cluster": "Cluster"
+      },
+      "groupHint": "Owner, folder and destination come from where each service's alerts already are. Change them per group.",
+      "groupHintOther": "Change the folder and destination per group.",
+      "column": {
+        "service": "Service",
+        "stream": "Stream",
+        "firesWhen": "Fires when",
+        "usually": "Usually"
+      },
+      "tickGroup": "Tick every alert in {group}",
+      "tickRow": "Tick {service}, {alert}",
+      "teamName": "Owner: {team}",
+      "noTeam": "No owner yet",
+      "noTeamWhy": "No owner is known for these, so they use the org default.",
+      "chooseFolder": "Choose a folder and destination",
+      "noCluster": "No cluster",
+      "folder": "folder {folder}",
+      "folderDefault": "folder {folder} (org default)",
+      "folders": "{count} folders",
+      "notifies": "notifies {destinations}",
+      "notifiesNone": "notifies no one",
+      "notifiesSome": "{count} of {total} notify {destinations}",
+      "notifiesViaIncident": "pages on-call through an incident",
+      "ticked": "{ticked} of {count} ticked",
+      "nothingToAdd": "nothing to add",
+      "needsThreshold": "{count} alert needs a threshold before it can be added. | {count} alerts need a threshold before they can be added.",
+      "change": "Change folder or destination",
+      "changeFolder": "Folder",
+      "changeDestinations": "Destinations",
+      "changeDone": "Done",
+      "showGroup": "Show all {count}",
+      "hideGroup": "Hide",
+      "locked": "You can't write to folder {folder}. Its admins can add these.",
+      "copyRequest": "Copy request",
+      "request": "Please add {count} no-data alert in folder {folder}: {services}. AutoObserve found that nothing alerts if it stops sending. | Please add {count} no-data alerts in folder {folder}: {services}. AutoObserve found that nothing alerts if they stop sending.",
+      "requestCopied": "Request copied",
+      "rights": "You can add {can} of {total}. {locked} is in {where}, where you can't write. It stays in the list so you can send the request to its admins. | You can add {can} of {total}. {locked} are in {where}, where you can't write. They stay in the list so you can send the request to its admins.",
+      "firesWhen": {
+        "noRows": "no rows for {duration}",
+        "noSpans": "no spans for {duration}",
+        "errors": "errors above {count} an hour",
+        "latency": "p95 above {value}"
+      },
+      "minutes": "{count} min",
+      "hours": "{count} hour | {count} hours",
+      "usually": "{rate} an hour",
+      "unsureTail": "Unticked: check before adding.",
+      "cantBuild": "AutoObserve can't build this alert from this stream's fields. Add it by hand in Alerts.",
+      "cantBuildIn": "AutoObserve can't build this from the stream's fields. Add it by hand in {alerts}.",
+      "block": {
+        "checking": "Checking the stream's fields…",
+        "schemaFailed": "Couldn't read the fields of stream {stream}, so this alert can't be checked. Reopen the review to try again.",
+        "exists": "Already added as {name} in folder {folder}.",
+        "existsFailed": "Couldn't read your alerts, so AutoObserve can't tell whether this one was already added. Reopen the review to try again.",
+        "noMatch": "No row in {stream} names {service} in 7 days, so an alert for it could never fire.",
+        "noField": {
+          "service": "Stream {stream} has no service field, so this alert can't be limited to {value}.",
+          "cluster": "Stream {stream} has no cluster field, so this alert can't be limited to cluster {value}.",
+          "namespace": "Stream {stream} has no namespace field, so this alert can't be limited to namespace {value}."
+        }
+      },
+      "whereFolder": "folder {folder}",
+      "whereFolders": "folders {folders}",
+      "footer": "{count} alert will be created in {where}. | {count} alerts will be created in {where}.",
+      "footerSplit": "{count} alerts will be created: {parts}.",
+      "footerPart": "{count} in folder {folder}",
+      "footerRest": "{count} in {folders} more folders",
+      "footerOrigin": "Each description says it came from an AutoObserve suggestion.",
+      "footerNone": "Nothing is ticked, so nothing will be created.",
+      "existsAll": "This alert was already added, so there's nothing to add. | All {count} alerts in this list were already added, so there's nothing to add.",
+      "existsSome": "{count} was already added and is left out. | {count} were already added and are left out.",
+      "skipped": "{count} already existed and was skipped. | {count} already existed and were skipped.",
+      "create": "Add alerts",
+      "cancel": "Cancel",
+      "close": "Close",
+      "status": {
+        "queued": "Waiting",
+        "creating": "Creating",
+        "created": "Created",
+        "failed": "Not created",
+        "exists": "Already added"
+      },
+      "partial": "{failed} of {total} alerts wasn't created. | {failed} of {total} alerts weren't created.",
+      "createdIn": "{count} was created in {where}. | {count} were created in {where}.",
+      "failure": "{service}: {reason}.",
+      "reason": {
+        "forbidden": "{denied} The alert was going to folder {folder}",
+        "duplicate": "an alert named {name} already exists in folder {folder}",
+        "timeout": "the server didn't answer in time",
+        "invalid": "the server refused it as invalid",
+        "missing": "its stream or folder no longer exists",
+        "server": "the server failed while saving it"
+      },
+      "retryOne": "Retry {service}",
+      "retryAll": "Retry {count}",
+      "openExisting": "Open alert",
+      "toast": "{count} alert created in {where}. | {count} alerts created in {where}.",
+      "undoHint": "Undo works until you leave this page.",
+      "undo": "Undo",
+      "undone": "{count} alert removed. | {count} alerts removed.",
+      "undoFailed": "{failed} of {total} alerts couldn't be removed. Remove them from Alerts.",
+      "more": "{count} more",
+      "usuallyLatency": "p95 {value} ms"
+    },
+    "decisions": {
+      "reasons": {
+        "not_needed": "Not needed",
+        "planned_work": "Planned work",
+        "false_positive": "Wrong: this didn't happen",
+        "will_fix_later": "Will fix later",
+        "intended_report": "Marked as intended report",
+        "other": "Other",
+        "expected": "Expected",
+        "unknown": "Other reason"
+      },
+      "untitled": "An item that is no longer listed",
+      "you": "you",
+      "undo": "Undo",
+      "retry": "Retry",
+      "namesMore": "{names} and {count} more",
+      "askOwners": "{refusal}: {names}.",
+      "dismiss": {
+        "title": "Dismiss “{title}”?",
+        "button": "Dismiss",
+        "reason": "Why",
+        "falsePositiveHelp": "Tells us, so the check gets better.",
+        "until": "until",
+        "untilDate": "End date",
+        "untilTime": "End time",
+        "reasonRequired": "Choose why you are dismissing it.",
+        "untilRequired": "Choose when the planned work ends.",
+        "untilInvalid": "Choose an end time within the next 7 days.",
+        "durationRequired": "Choose how long to hide it.",
+        "noteHelp": "Seen by you and by people who can dismiss findings.",
+        "effectUntil": "Hidden for everyone in {org} until {when}, then shown again if it is still true. Recorded with your name and reason. Undo from Dismissed.",
+        "effectUndone": "Hidden for everyone in {org} until someone undoes it. Recorded with your name and reason. Undo from Dismissed.",
+        "effectLoading": "Checking what this changes…",
+        "effectNeedsChoice": "Finish the choices above to see what this hides.",
+        "effectFailed": "Couldn't check what this changes, so nothing can be dismissed yet. Close and try again."
+      },
+      "saved": {
+        "until": "Dismissed until {when}: {title}.",
+        "noEnd": "Dismissed: {title}.",
+        "markedOne": "{title} marked as intended report.",
+        "marked": "{count} alert marked as intended report. | {count} alerts marked as intended reports.",
+        "applied": "Applied to {title}.",
+        "appliedEditor": "Saved and recorded for {title}.",
+        "notRecorded": "Saved. This change was not recorded, so it can't be undone from AutoObserve."
+      },
+      "undone": {
+        "one": "Undone: {title} is shown again.",
+        "many": "Undone: {count} item is shown again. | Undone: {count} items are shown again.",
+        "applyOne": "Undone: {title} is back to how it was.",
+        "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
+      },
+      "error": {
+        "changed": "This changed since you opened it. Refresh and try again.",
+        "gone": "This is no longer listed. Refresh and try again.",
+        "invalid": "This couldn't be saved as entered. Check it and try again.",
+        "denied": "You don't have permission to change this.",
+        "throttled": "Too many changes at once. Wait a moment and try again.",
+        "failed": "This couldn't be saved. Try again."
+      },
+      "undoError": {
+        "changed": "This changed since it was saved, so nothing was undone. Refresh and try again.",
+        "gone": "This is no longer dismissed, so there is nothing to undo.",
+        "failed": "Nothing was undone. Try again.",
+        "already": "Already undone. Nothing changed."
+      },
+      "undoPartial": {
+        "summary": "{done} of {total} undone. Not undone: {names}.",
+        "changed": "It changed since it was saved; refresh to see it. | They changed since they were saved; refresh to see them.",
+        "gone": "It is no longer dismissed. | They are no longer dismissed."
+      },
+      "mark": {
+        "action": "Mark as intended report",
+        "title": "Mark alert as intended report | Mark alerts as intended reports",
+        "intro": "It stops showing as noise. | They stop showing as noise.",
+        "keeps": "The alert keeps sending exactly as before. | The alerts keep sending exactly as before.",
+        "untick": "Untick any that are not meant as reports.",
+        "team": "{team} team",
+        "folder": "folder {folder}",
+        "canMark": "You can mark {count} of {total}.",
+        "locked": "{alerts} stays as it is. | {alerts} stay as they are.",
+        "recorded": "Recorded with your name. Undo from Dismissed at any time.",
+        "button": "Mark {count} as intended",
+        "failed": "{failed} of {total} weren't marked: {names}.",
+        "loading": "Checking which alerts you can mark…",
+        "loadFailed": "Couldn't check which alerts you can mark. Close and try again."
+      },
+      "kind": {
+        "suggestion": "Suggestion",
+        "alert_finding": "Alert finding"
+      },
+      "list": {
+        "title": "Dismissed suggestions and alert findings",
+        "filterAll": "All",
+        "filterSuggestion": "Suggestions",
+        "filterAlertFinding": "Alert findings",
+        "summary": "{reason} · by {actor}, {when}",
+        "until": "shown again {when} if still true",
+        "untilUndone": "until someone undoes it",
+        "empty": "Nothing is dismissed or marked.",
+        "emptySuggestion": "No suggestion is dismissed.",
+        "emptyAlertFinding": "No alert finding is dismissed or marked.",
+        "loadFailed": "Couldn't load what is dismissed.",
+        "range": "{from}–{to} of {total}",
+        "previous": "Previous page",
+        "next": "Next page"
+      },
+      "apply": {
+        "edit": "Edit in alert editor",
+        "button": "Apply",
+        "where": "Folder {folder} · notifies {destinations}",
+        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
+        "whereNoOne": "Folder {folder} · notifies no one",
+        "whereTeamNoOne": "Folder {folder} · team {team} · notifies no one",
+        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
+        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
+        "changed": "This alert changed. Open it to review.",
+        "loading": "Checking what this changes…",
+        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
+        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
+        "cardNote": "Shows what changes before anything is saved.",
+        "gone": "This suggestion is no longer available. Open the alert to review it."
+      },
+      "applied": {
+        "title": "Applied changes",
+        "by": "by {actor} at {when}",
+        "undoneBy": "undone by {actor} at {when}",
+        "undone": "Undone",
+        "you": "you"
+      }
+    },
+    "cta": {
+      "openInLogs": "Open in Logs",
+      "openInTraces": "Open in Traces",
+      "addAlert": "Add alert",
+      "reviewAndAddAlerts": "Review and add alerts",
+      "addSyntheticCheck": "Add synthetic check",
+      "reviewChange": "Review change",
+      "reviewAlert": "Review alert",
+      "chooseWhoGetsNotified": "Choose who gets notified",
+      "setUpData": "Set up data",
+      "openIncident": "Open incident",
+      "openAlert": "Open alert",
+      "openService": "Open service",
+      "reviewServices": "Review services",
+      "openInCalibration": "Open in Alert calibration",
+      "askAi": "Ask AI",
+      "askAdmins": "Ask admins",
+      "dismiss": "Dismiss…",
+      "markIntendedReport": "Mark as intended report",
+      "reviewAndMarkIntendedReports": "Review and mark as intended reports",
+      "undo": "Undo",
+      "copyLink": "Copy link",
+      "copyRequest": "Copy request",
+      "seeAll": "See all"
+    },
+    "locked": {
+      "add": "You can't add alerts in folder {folder}. Ask an admin of this organization.",
+      "addTeam": "You can't add alerts in folder {folder}. Ask its owners: {team} admins.",
+      "change": "You can't change alerts in folder {folder}. Ask an admin of this organization.",
+      "changeTeam": "You can't change alerts in folder {folder}. Ask its owners: {team} admins.",
+      "addSyntheticCheck": "You can't add synthetic checks. Ask an admin of this organization."
+    },
+    "ai": {
+      "chip": "AutoObserve finding · {subject}",
+      "coverage_gap": {
+        "ask": "Set up alerts for {service}. It has no alert for {classes}.",
+        "volume": "It sends about {count} events an hour to {stream}.",
+        "draft": "Draft the missing alerts scoped to this service, show them to me, and don't save until I say so.",
+        "groupAsk": "Set up alerts for {count} services that nothing watches, starting with {names}. Draft the missing alerts for each, show them to me, and don't save until I say so."
+      },
+      "no_data": {
+        "ask": "Create a no-data alert for {service}: fire when it sends nothing for {minutes} minutes.",
+        "volume": "Its usual volume is about {count} events an hour. Show me the draft and don't save until I say so."
+      },
+      "silent": {
+        "ask": "Alert {monitor} notifies no one. Who in this folder should it notify? Suggest a change and don't save it."
+      },
+      "coverage_lost": {
+        "ask": "What changed in the alerts that watched {service}? Draft what would put it back, and don't save it."
+      },
+      "blind_guardrail": {
+        "ask": "Alert {monitor} reads {detail}, which has no data it can use. Suggest the stream or field that replaced it, and don't save the change."
+      },
+      "discovery_unusable": {
+        "ask": "Most of my telemetry lacks service.name. How do I add it in my collector?"
+      },
+      "source_silence": {
+        "ask": "{source} stopped sending to {stream} at {time} while the rest of the stream kept flowing. Help me find why, and draft a no-data alert for it without saving it."
+      },
+      "heartbeat_on_success": {
+        "ask": "Create an alert that fires when {job}'s success line is missing. Show me the draft and don't save until I say so."
+      },
+      "alert_not_working": {
+        "ask": "Alert {alert} can't fire: {why} Suggest a corrected query, show it to me, and don't save until I say so."
+      },
+      "cell": {
+        "errors": "Create an errors alert for {service} at 3 times its usual error rate. Show me the draft and don't save until I say so.",
+        "latency": "Create a latency alert for {service} at 2 times its usual p95. Show me the draft and don't save until I say so.",
+        "tracing": "How do I send traces for {service}?",
+        "kubernetes": "How do I send Kubernetes metrics for {service}?",
+        "saturation": "Create an alert on memory use for {service} at 90% of its limit, from the Kubernetes metrics this org already sends. Don't save it.",
+        "node": "Create an alert on the nodes {service} runs on at 90% of capacity. Don't save it.",
+        "restarts": "Alert me when {service}'s pods restart more than usual. Show me the draft and don't save it.",
+        "synthetic": "Set up a synthetic check for {service}'s health endpoint. Show me the draft and don't save it."
+      },
+      "paged": {
+        "stream_silence": "{stream} ({type}) stopped sending at {time}. What could stop it, and what should I check first?",
+        "stream_drop": "{stream} ({type}) dropped sharply at {time}. What could cause it, and what should I check first?",
+        "stream_rise": "{stream} ({type}) rose sharply at {time}. What could cause it, and what should I check first?"
+      },
+      "calibration": {
+        "failure": "Alert {alert} {what}. Suggest a corrected query, show it to me, and don't save until I say so."
+      }
+    },
+    "kind": {
+      "chip": {
+        "notWatched": "Coverage gap",
+        "missingAlert": "Missing alert",
+        "notifiesNoOne": "Notifies no one",
+        "stoppedSending": "Stopped sending",
+        "dataQuality": "Data quality"
+      },
+      "traffic": {
+        "handles": "It handles about {count} events an hour.",
+        "usually": "It usually sends about {count} events an hour."
+      },
+      "classes": {
+        "why": {
+          "errors": "its errors",
+          "latency": "its latency",
+          "absence": "whether it stops sending"
+        },
+        "ai": {
+          "errors": "errors",
+          "latency": "latency",
+          "absence": "stopping"
+        },
+        "name": {
+          "errors": "Errors",
+          "latency": "Latency",
+          "absence": "Stops sending"
+        }
+      },
+      "detail": {
+        "noAlert": "{check}: no alert.",
+        "cantMeasure": "{check}: can't measure yet, {service} sends no traces."
+      },
+      "coverage_gap": {
+        "headline": "Nothing watches {service}",
+        "why": "No alert watches {classes}.",
+        "next": "Add the alert AutoObserve drafted. | Add the {count} alerts AutoObserve drafted.",
+        "needsTraces": "Latency needs traces first.",
+        "groupAdded": "Added alerts for {count} service | Added alerts for {count} services",
+        "groupHeadline": "Nothing watches {count} services",
+        "groupTraffic": "They handle about {count} events an hour together.",
+        "groupNext": "Add the alert AutoObserve drafted. | Add the {count} alerts AutoObserve drafted, in one list grouped by team."
+      },
+      "no_absence_check": {
+        "why": "Nothing alerts if {service} stops sending.",
+        "why_weak": "Only {monitor} would notice, and it watches the whole stream.",
+        "why_blind": "{monitor} would notice, but it can't see {service}'s data.",
+        "whySilent": "{monitor} would notice {service} stopping, but it notifies no one.",
+        "next": "Add a no-data alert: it fires when {service} sends nothing for {minutes} minutes.",
+        "nextSilent": "Give it someone to notify."
+      },
+      "coverage_lost": {
+        "why": "Something changed in the alerts that watched it.",
+        "next": "Add it back, or check what changed in the alert that watched it."
+      },
+      "blind_guardrail": {
+        "nextStream": "Point it at the stream that replaced {detail}, or delete it.",
+        "nextScope": "Check its filter: as written it matches nothing it should.",
+        "nextField": "Fix the field its query filters on."
+      },
+      "discovery_unusable": {
+        "headline": "Only {good} of {active} services AutoObserve found are usable",
+        "why": "Most of their data has no service name, so the list of gaps is incomplete.",
+        "next": "Send service.name on your traces and logs."
+      },
+      "source_silence": {
+        "headline": "{source} stopped sending to {stream}",
+        "since": "Since {time}.",
+        "usual": "It usually sends about {count} rows a day; the rest of {stream} kept flowing.",
+        "more": "And {count} more sources in this stream. | And {count} more sources in {streams} streams.",
+        "nextSender": "Check the agent or collector on {source}.",
+        "nextGap": "It's back. Check what the gap left out."
+      },
+      "heartbeat_on_success": {
+        "headline": "Nothing alerts if job {job} stops succeeding",
+        "why": "Its success line has appeared on the last day. | Its success line has appeared on each of the last {days} days.",
+        "next": "Add an alert that fires when its success line doesn't appear."
+      },
+      "cell": {
+        "falls": {
+          "weak": "Only {monitor}, a broad alert, watches {what}, and it isn't scoped to this service. | Only {monitor}, broad alerts, watch {what}, and they aren't scoped to this service.",
+          "silent": "{monitor} watches {what}, but it notifies no one. | {monitor} watch {what}, but they notify no one.",
+          "blind": "{monitor} watches {what}, but it can't see this service's data. | {monitor} watch {what}, but they can't see this service's data.",
+          "unmapped": "{monitor} may watch {what}, but its scope couldn't be tied to this service. | {monitor} may watch {what}, but their scope couldn't be tied to this service."
+        },
+        "watchWhat": {
+          "errors": "{service}'s errors",
+          "latency": "{service}'s latency",
+          "absence": "whether {service} stops sending"
+        },
+        "justAdded": "Added. AutoObserve counts it at its next check, within about 5 minutes. | Added. AutoObserve counts them at its next check, within about 5 minutes.",
+        "errorsWhy": "No alert watches {service}'s errors.",
+        "errorsNext": "Add an errors alert at 3 times its usual rate.",
+        "latencyWhy": "No alert watches {service}'s latency.",
+        "latencyNext": "Add a latency alert at 2 times its usual p95.",
+        "latencyNoTraces": "Latency is charted from traces. {service} sends none.",
+        "noMetrics": "No CPU or memory data arrives for {service}, so this can't be watched yet.",
+        "noRestartEvents": "No restart events arrive for {service}, so its restarts can't be watched yet.",
+        "saturationWhy": "No alert watches memory or CPU for {service}. Container memory arrives in {stream}.",
+        "saturationNext": "Add a memory alert at 90% of its limit.",
+        "nodeWhy": "No alert watches the nodes {service} runs on. Node data arrives in {stream}.",
+        "nodeNext": "Add a node alert at 90% of capacity.",
+        "restartsWhy": "No alert watches restarts of {service}.",
+        "restartsNext": "Add an alert that fires when its pods restart 3 times in 10 minutes.",
+        "syntheticWhy": "Nothing checks {service} from outside. A synthetic check sends a request every few minutes and notices an outage even when the service sends nothing.",
+        "syntheticNext": "Add a synthetic check on its health endpoint."
+      },
+      "paged": {
+        "page": {
+          "paged": "Paged {team}",
+          "pagedTeam": "Paged the on-call team",
+          "unrouted": "Nobody was paged: when it stopped, no on-call team owned this service and the org had no default team.",
+          "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand.",
+          "pending": "Paging on-call: the on-call service hasn't confirmed the page yet."
+        },
+        "nextRouting": "Set up on-call routing so the next stop pages someone.",
+        "recoveredAt": "Back at {time}.",
+        "stream_silence": {
+          "headline": "{count} streams stopped sending data",
+          "why": "No data has arrived on {stream} ({type}) since {time}.",
+          "whyMany": "{streams} have sent no data since {time}.",
+          "next": "Check the sender or collector that writes it. The incident resolves once data arrives again.",
+          "nextMany": "One cause is likely, such as a shared collector.",
+          "whyOne": "{stream} has sent no data since {time}.",
+          "recovered": "{stream} ({type}) is sending data again. It stopped at {time}.",
+          "recoveredMany": "{streams} are sending data again. They stopped at {time}.",
+          "recoveredSome": "Sending again: {streams}."
+        },
+        "stream_drop": {
+          "headline": "{count} streams dropped sharply",
+          "why": "{stream} ({type}) has received much less data than usual since {time}.",
+          "whyMany": "{streams} have received much less data than usual since {time}.",
+          "next": "Check whether a sender stopped or a filter changed.",
+          "nextMany": "One cause is likely, such as a shared collector or filter.",
+          "whyOne": "{stream} has received much less data than usual since {time}.",
+          "recovered": "{stream} ({type}) is back to its usual volume. It dropped at {time}.",
+          "recoveredMany": "{streams} are back to their usual volume. They dropped at {time}.",
+          "recoveredSome": "Back to usual: {streams}."
+        },
+        "stream_rise": {
+          "headline": "{count} streams rose sharply",
+          "why": "{stream} ({type}) has received much more data than usual since {time}.",
+          "whyMany": "{streams} have received much more data than usual since {time}.",
+          "next": "Check for a retry loop or a new sender writing to it.",
+          "nextMany": "One cause is likely, such as a shared sender retrying.",
+          "whyOne": "{stream} has received much more data than usual since {time}.",
+          "recovered": "{stream} ({type}) is back to its usual volume. It rose at {time}.",
+          "recoveredMany": "{streams} are back to their usual volume. They rose at {time}.",
+          "recoveredSome": "Back to usual: {streams}."
+        }
+      }
+    },
+    "threshold": {
+      "label": "Fire above",
+      "errorsSuffix": "errors an hour",
+      "latencySuffix": "ms (p95)",
+      "errorsReason": "AutoObserve found no usual error count for {service} over the last 7 days. Set a threshold to add this alert.",
+      "latencyReason": "AutoObserve found no usual latency for {service} over the last 7 days. Set a threshold to add this alert.",
+      "measuring": "Measuring the usual level over the last 7 days…",
+      "noUsual": "None in 7 days",
+      "placeholder": "Set a threshold",
+      "placeholderShort": "Set value",
+      "required": "Set a threshold",
+      "invalid": "Enter a number above 0.",
+      "invalidErrors": "Enter 0 or more.",
+      "anyErrorNote": "AutoObserve found no errors for {service} in the last 7 days, so this alert fires on any error. Raise the threshold if some errors are normal."
+    }
   }
 }

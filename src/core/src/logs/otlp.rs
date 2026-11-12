@@ -156,8 +156,10 @@ pub async fn handle_request(
     let stream_name = in_stream_name
         .map(|name| format_stream_name(name.to_string()))
         .unwrap_or_else(|| "default".to_string());
-    // _o2_dbm_server is written by OTLP collectors, so only the chat-events stream is refused here.
-    if is_protected_ai_chat_stream(&stream_name) {
+    // Only streams O2 alone writes are refused; OTLP collectors write _o2_dbm_server.
+    if is_protected_ai_chat_stream(&stream_name)
+        || config::meta::self_reporting::usage::is_feature_writer_stream(&stream_name)
+    {
         return Err(Error::IngestionError(format!(
             "stream '{stream_name}' is reserved and cannot be ingested into"
         )));
@@ -1927,5 +1929,26 @@ mod tests {
             "columns for stream test_org_id/logs/test_columns_limit, only {limit} columns accept"
         )));
         assert!(status.message.contains("ZO_COLS_PER_RECORD_LIMIT"));
+    }
+
+    #[tokio::test]
+    async fn otlp_refuses_feature_writer_streams_for_every_caller() {
+        use config::meta::self_reporting::usage::is_feature_writer_stream;
+        for stream in ["_o2_alert_calibration_digests", "_o2_autoobserve_health"] {
+            let err = handle_request(
+                0,
+                "demo-org",
+                ExportLogsServiceRequest::default(),
+                Some(stream),
+                "collector@example.com",
+                OtlpRequestType::Grpc,
+            )
+            .await
+            .err()
+            .unwrap_or_else(|| panic!("{stream} was accepted"));
+            assert!(err.to_string().contains("is reserved"), "{stream}: {err}");
+        }
+        assert!(!is_feature_writer_stream("_o2_dbm_server"));
+        assert!(!is_feature_writer_stream("default"));
     }
 }

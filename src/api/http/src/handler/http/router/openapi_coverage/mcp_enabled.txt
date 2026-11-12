@@ -6,6 +6,20 @@ ent ActivateRemoteTaskSigningCandidate
 all AddPanel
 oss AddUserToOrg
 all AssumeServiceAccount
+ent AutoObserveCoverage
+ent AutoObserveCoverageHistory
+ent AutoObserveDecide
+ent AutoObserveDeleteMark
+ent AutoObserveEntityTypes
+ent AutoObserveListDecisions
+ent AutoObserveListIncidents
+ent AutoObserveListMarks
+ent AutoObservePreviewDecision
+ent AutoObservePutMark
+ent AutoObservePutVerdict
+ent AutoObserveReview
+ent AutoObserveSuggestions
+ent AutoObserveUndoDecision
 all CancelAlertMute
 ent CancelAnomalyTraining
 all CancelDowntime
@@ -75,6 +89,7 @@ all DeleteSyntheticsEnvironmentVariable
 all DeleteSyntheticsVariable
 ent DetectAnomalies
 ent DiscardRemoteTaskDraft
+ent DismissAlertCalibrationFinding
 all DowntimeResources
 all DowntimeValues
 all DuplicateSyntheticsEnvironment
@@ -189,6 +204,7 @@ all GetUserGroups
 all GetUserRoles
 all JiraDestinationSetup
 all ListAlertAcks
+ent ListAlertCalibrationDismissals
 ent ListAlertCalibrationRuns
 ent ListAlertCalibrationRunsForAlert
 all ListAlertTags
@@ -279,6 +295,7 @@ oss RemoveUserFromOrg
 all RenameFleet
 all RenameFleetCollector
 all RenameOrganization
+ent ReopenAlertCalibrationDismissal
 ent ReplaceRemoteTaskAuthSecret
 ent ReplaceRemoteTaskHeaderSecret
 all RestartFleetCollector

@@ -31,6 +31,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import { formatTimeAgoUs } from "@/utils/synthetics/format";
 import { locationLiveStatus as liveStatus } from "@/utils/synthetics/locationLiveStatus";
+import SuggestedChip from "../prefill/SuggestedChip.vue";
+import { useSyntheticPrefillView } from "../prefill/useSyntheticPrefill";
 
 const props = defineProps<{
   check: BrowserCheck;
@@ -53,6 +55,13 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const prefill = useSyntheticPrefillView();
+const prefillView = computed(() => prefill?.value ?? null);
+
+/** A row keeps its Suggested chip while it is still ticked. */
+function isSuggestedLocation(id: string): boolean {
+  return !!prefillView.value?.chosenLocations.has(id) && props.check.locations.includes(id);
+}
 
 // ── Search ────────────────────────────────────────────────────────────────────
 
@@ -420,9 +429,16 @@ const selectedLocations = computed({
               class="min-w-0 pb-2"
             >
               <template #label>
-                <span class="flex items-center gap-1.5">
+                <span
+                  class="flex items-center gap-1.5"
+                  :class="prefillView ? 'flex-wrap' : undefined"
+                >
                   <OIcon :name="locationIcon(location.provider)" size="sm" />
                   {{ locationDisplayName(location) }}
+                  <SuggestedChip
+                    v-if="isSuggestedLocation(location.id)"
+                    :data-test="`synthetics-prefill-location-chip-${location.id}`"
+                  />
                 </span>
               </template>
             </OCheckbox>
@@ -472,7 +488,10 @@ const selectedLocations = computed({
                 >
                   <template #label>
                     <span class="flex flex-col gap-0.5">
-                      <span class="flex items-center gap-1.5">
+                      <span
+                        class="flex items-center gap-1.5"
+                        :class="prefillView ? 'flex-wrap' : undefined"
+                      >
                         <OIcon
                           :name="status.icon"
                           size="sm"
@@ -487,6 +506,10 @@ const selectedLocations = computed({
                         >
                           {{ status.label }}
                         </OBadge>
+                        <SuggestedChip
+                          v-if="isSuggestedLocation(location.id)"
+                          :data-test="`synthetics-prefill-location-chip-${location.id}`"
+                        />
                       </span>
                       <span class="text-text-label text-xs">
                         {{ agents.statusText
@@ -517,7 +540,11 @@ const selectedLocations = computed({
                         :class="status.messageClass"
                         :data-test="`synthetics-check-locations-warning-${location.id}`"
                       >
-                        {{ status.message }}
+                        {{
+                          status.tier === "connecting" && prefillView
+                            ? prefillView.connecting
+                            : status.message
+                        }}
                       </span>
                     </span>
                   </template>
@@ -570,6 +597,27 @@ const selectedLocations = computed({
           data-test="synthetics-check-locations-empty"
         >
           {{ t("synthetics.locations.empty") }}
+        </div>
+
+        <p
+          v-if="prefillView?.unconfirmed.locations"
+          class="text-status-warning-text text-xs"
+          data-test="synthetics-prefill-unconfirmed-locations"
+        >
+          {{ prefillView.unconfirmed.locations }}
+        </p>
+
+        <div
+          v-if="prefillView?.locationNotes.length"
+          class="text-text-secondary flex flex-col gap-1 text-xs"
+        >
+          <p
+            v-for="note in prefillView.locationNotes"
+            :key="note.key"
+            :data-test="`synthetics-prefill-location-note-${note.key}`"
+          >
+            <span class="font-medium">{{ note.label }}</span> · {{ note.text }}
+          </p>
         </div>
 
         <!-- ── Validation error ──────────────────────────────────────────────── -->

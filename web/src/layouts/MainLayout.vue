@@ -533,6 +533,7 @@ export default defineComponent({
       chipName?: string;
       newChat?: boolean;
       context?: Record<string, unknown> | null;
+      prompt?: string;
     } | null>(null);
     let customOrganization = Object.prototype.hasOwnProperty.call(
       router.currentRoute.value.query,
@@ -1867,6 +1868,7 @@ export default defineComponent({
         chipName: string;
         newChat: boolean;
         context: Record<string, unknown> | null;
+        prompt?: string;
       } | null = null;
       if (value && typeof value === "object" && "query" in value) {
         text = value.query;
@@ -1876,6 +1878,7 @@ export default defineComponent({
             chipName: value.chipName,
             newChat: !!value.newChat,
             context: value.context && typeof value.context === "object" ? value.context : null,
+            ...(typeof value.prompt === "string" && value.prompt ? { prompt: value.prompt } : {}),
           };
         }
       }

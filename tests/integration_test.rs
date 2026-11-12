@@ -312,6 +312,9 @@ mod tests {
             env::set_var("ZO_SYNTHETICS_ENABLED", "true");
             env::set_var("ZO_SKIP_SSRF_CHECKS", "true");
             env::set_var("O2_ORG_DELETION_GRACE_PERIOD_DAYS", "0");
+            // Cases run pipeline triggers themselves; a background claim would run them twice.
+            env::set_var("ZO_SCHEDULER_PER_MODULE_PULLERS", "true");
+            env::set_var("ZO_SCHEDULER_DERIVED_STREAM_INTERVAL", "86400");
 
             env_logger::init_from_env(
                 env_logger::Env::new().default_filter_or(&get_config().log.level),

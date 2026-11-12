@@ -33,11 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="error"
         data-test="alert-calibration-settings-load-error"
       >
-        {{
-          t("alertCalibration.settings.loadFailed", {
-            message: loadErrorMessage(configQuery.error.value),
-          })
-        }}
+        {{ readErrorCopy(t, configQuery.error.value, "settings") }}
         <template #actions>
           <OButton variant="outline" size="sm" @click="reload">{{
             t("alertCalibration.retry")
@@ -50,12 +46,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alertCalibration.settings.noConfig") }}
         </OBanner>
 
-        <AlertCalibrationSettingsForm :key="config?.updated_at ?? 'defaults'" :config="config" />
+        <AlertCalibrationSettingsForm
+          :key="config?.updated_at ?? 'defaults'"
+          :config="config"
+          :read-only="!canEdit"
+        />
 
         <OFormSection :title="t('alertCalibration.settings.runNowHeading')">
           <div class="flex flex-col gap-3">
-            <OText variant="body" as="p">{{ t("alertCalibration.runNowHint") }}</OText>
-            <div class="flex flex-wrap items-center gap-3">
+            <OText v-if="canRun" variant="body" as="p">{{
+              t("alertCalibration.runNowHint")
+            }}</OText>
+            <p
+              v-else
+              class="text-text-secondary flex items-start gap-1.5 text-xs"
+              data-test="alert-calibration-settings-run-denied"
+            >
+              <OIcon name="lock" size="xs" class="mt-0.5 shrink-0" />
+              <span>{{ t("alertCalibration.runDenied") }}</span>
+            </p>
+            <div v-if="canRun" class="flex flex-wrap items-center gap-3">
               <OButton
                 variant="outline"
                 size="sm-action"
@@ -76,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-subtle border-s-border-strong border-s-4 px-3 py-2"
             >
               <OText variant="meta" as="p">
-                {{ t("alertCalibration.settings.findingsDesc", { stream: DIGEST_STREAM }) }}
+                {{ t("alertCalibration.settings.findingsKept") }}
               </OText>
             </blockquote>
           </div>
@@ -94,15 +104,18 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { useOrgId } from "@/composables/query";
-import { raw, useI18nTyped } from "@/types/i18n";
-import { errorMessage } from "@/services/alert_calibration";
+import { useI18nTyped } from "@/types/i18n";
+import { readErrorCopy } from "@/services/alert_calibration";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
-import { useRequestAlertCalibrationRun } from "@/composables/alertCalibration/useRequestAlertCalibrationRun";
+import {
+  useAlertCalibrationRights,
+  useRequestAlertCalibrationRun,
+} from "@/composables/alertCalibration/useRequestAlertCalibrationRun";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
-import { DIGEST_STREAM } from "./digests";
 import AlertCalibrationLastRun from "./AlertCalibrationLastRun.vue";
 import AlertCalibrationSettingsForm from "./AlertCalibrationSettingsForm.vue";
 
@@ -114,8 +127,7 @@ const orgId = useOrgId();
 const configQuery = useQuery(() => alertCalibrationConfigQuery(orgId.value));
 const config = computed(() => configQuery.data.value ?? null);
 const { pending, runNow } = useRequestAlertCalibrationRun();
-
-const loadErrorMessage = (error: unknown) => raw(errorMessage(error));
+const { canRun, canEdit } = useAlertCalibrationRights();
 
 const reload = () => void configQuery.refetch();
 
