@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[
       fill ? 'items-start' : 'items-center',
       !inPair && !bare && 'border-border-default border-b px-3 py-3 last:border-b-0',
-      !inPair && bare && 'py-3',
+      !inPair && bare && 'py-2',
       disabled && 'opacity-60',
     ]"
     :data-test="dataTest"

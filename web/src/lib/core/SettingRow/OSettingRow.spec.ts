@@ -15,7 +15,7 @@ describe("OSettingRow", () => {
       global: { provide: { [SETTING_ROW_BARE_KEY as symbol]: true } },
     });
     const classes = wrapper.find('[data-test="row"]').classes();
-    expect(classes).toContain("py-3");
+    expect(classes).toContain("py-2");
     expect(classes).not.toContain("border-b");
     expect(classes).not.toContain("px-3");
   });
