@@ -389,10 +389,23 @@ impl Pipeline {
                     node.id
                 ));
             }
+            if let NodeData::Query(query) = &node.data
+                && query
+                    .query_condition
+                    .sql
+                    .as_deref()
+                    .is_some_and(crate::meta::self_reporting::protected_streams::sql_reads_digest)
+            {
+                return Err(anyhow!(
+                    "Stream {} is internal and cannot be used in a pipeline",
+                    crate::meta::alerts::alert_calibration::DIGEST_STREAM
+                ));
+            }
             let NodeData::Stream(params) = &node.data else {
                 continue;
             };
-            if crate::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+            // A node on a protected stream would copy its rows past their only reader.
+            if crate::meta::self_reporting::protected_streams::is_read_protected_stream(
                 &params.stream_name,
             ) {
                 return Err(anyhow!(
@@ -419,6 +432,15 @@ impl Pipeline {
                         "DerivedStream source's TriggerCondition period missing or is 0"
                     ));
                 }
+                derived_stream
+                    .trigger_condition
+                    .validate_threshold_operator()
+                    .and_then(|_| {
+                        derived_stream
+                            .query_condition
+                            .validate_threshold_operators()
+                    })
+                    .map_err(|e| anyhow!("DerivedStream source: {e}"))?;
                 self.source = PipelineSource::Scheduled(derived_stream);
             }
             _ => return Err(anyhow!("Source must be either a StreamNode or QueryNode")),
@@ -436,6 +458,9 @@ impl Pipeline {
                 if has_empty_conditions {
                     return Err(anyhow!("ConditionNode must have non-empty conditions"));
                 }
+                condition_params
+                    .validate_operator_values()
+                    .map_err(|e| anyhow!("ConditionNode {}: {e}", node.id))?;
             }
 
             if let NodeData::Stream(stream_params) = &mut node.data {
@@ -632,7 +657,7 @@ where
             "scheduled" => {
                 let derived_stream_raw: String = row.try_get("derived_stream")?;
                 let derived_stream: DerivedStream = json::from_str(&derived_stream_raw)
-                    .expect("Deserializing DerivedStream from ROW error");
+                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
                 PipelineSource::Scheduled(derived_stream)
             }
             _ => return Err(sqlx::Error::ColumnNotFound("Invalid source type".into())),
@@ -642,8 +667,8 @@ where
             let nodes_raw: String = row.try_get("nodes")?;
             let edges_raw: String = row.try_get("edges")?;
             (
-                json::from_str(&nodes_raw).expect("Deserializing Nodes from ROW error"),
-                json::from_str(&edges_raw).expect("Deserializing Edges from ROW error"),
+                json::from_str(&nodes_raw).map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+                json::from_str(&edges_raw).map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
             )
         };
 
@@ -1321,6 +1346,63 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_rejects_extended_operator_in_scheduled_source_trigger() {
+        let derived_stream = |operator| DerivedStream {
+            org_id: "test_org".to_string(),
+            stream_type: StreamType::Logs,
+            query_condition: QueryCondition {
+                sql: Some("SELECT * FROM test_stream".to_string()),
+                ..Default::default()
+            },
+            trigger_condition: TriggerCondition {
+                period: 5,
+                operator,
+                ..Default::default()
+            },
+            tz_offset: 0,
+            delay: None,
+            start_at: None,
+        };
+        let pipeline = |operator| Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source: PipelineSource::Scheduled(derived_stream(operator)),
+            kind: PipelineKind::User,
+            nodes: vec![
+                Node::new(
+                    "1".to_string(),
+                    NodeData::Query(derived_stream(operator)),
+                    0.0,
+                    0.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::Stream(StreamParams::new("test_org", "out", StreamType::Logs)),
+                    0.0,
+                    0.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![Edge::new("1".to_string(), "2".to_string())],
+        };
+        let err = pipeline(crate::meta::alerts::Operator::NotIn)
+            .validate()
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("DerivedStream source"), "{err}");
+        let ok = pipeline(crate::meta::alerts::Operator::GreaterThanEquals).validate();
+        assert!(ok.as_ref().map_or_else(
+            |e| !e.to_string().contains("not supported in the"),
+            |_| true
+        ));
+    }
+
+    #[test]
     fn test_pipeline_get_metadata_by_stream_params() {
         let mut node = Node::new(
             "1".to_string(),
@@ -1902,6 +1984,7 @@ mod tests {
                         operator: crate::meta::alerts::Operator::EqualTo,
                         value: serde_json::json!("x"),
                         ignore_case: false,
+                        case_insensitive: None,
                     },
                 ),
             }),
@@ -2265,6 +2348,115 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(err.contains("internal"), "{err}");
+    }
+
+    #[test]
+    fn a_pipeline_cannot_use_the_calibration_digest_stream() {
+        let stream = |id: &str, name: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::Stream(StreamParams::new("ops", name, StreamType::Logs)),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let mut pipeline = Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "ops".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "ops",
+                "_o2_alert_calibration_digests",
+                StreamType::Logs,
+            )),
+            kind: PipelineKind::User,
+            nodes: vec![
+                stream("1", "_o2_alert_calibration_digests"),
+                stream("2", "pay"),
+            ],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+                source_handle: None,
+            }],
+        };
+        let err = pipeline.validate().unwrap_err().to_string();
+        assert!(
+            err.contains("is internal and cannot be used in a pipeline"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_scheduled_pipeline_query_cannot_read_the_calibration_digest_stream() {
+        let query = |sql: &str| {
+            Node::new(
+                "1".to_string(),
+                NodeData::Query(DerivedStream {
+                    org_id: "ops".to_string(),
+                    stream_type: StreamType::Logs,
+                    query_condition: QueryCondition {
+                        sql: Some(sql.to_string()),
+                        ..Default::default()
+                    },
+                    trigger_condition: TriggerCondition {
+                        period: 5,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let pipeline = |sql: &str| Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "ops".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::new("ops", "default", StreamType::Logs)),
+            kind: PipelineKind::User,
+            nodes: vec![
+                query(sql),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::Stream(StreamParams::new("ops", "pay", StreamType::Logs)),
+                    0.0,
+                    0.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+                source_handle: None,
+            }],
+        };
+        for sql in [
+            r#"SELECT * FROM "_o2_alert_calibration_digests""#,
+            r#"SELECT * FROM "default" WHERE x IN (SELECT alert_id FROM "_o2_alert_calibration_digests")"#,
+        ] {
+            let err = pipeline(sql).validate().unwrap_err().to_string();
+            assert!(
+                err.contains("_o2_alert_calibration_digests is internal and cannot be used"),
+                "{sql}: {err}"
+            );
+        }
+        let err = pipeline(r#"SELECT * FROM "default""#)
+            .validate()
+            .err()
+            .map(|e| e.to_string())
+            .unwrap_or_default();
+        assert!(!err.contains("is internal"), "{err}");
     }
 
     #[test]

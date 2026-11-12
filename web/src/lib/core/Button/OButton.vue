@@ -13,6 +13,9 @@ import {
 import { UNNAMED_ICON_ONLY_DELAY_MS, warnIfUnnamedIconOnly } from "./iconOnlyName";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useFeatureLock } from "@/composables/useFeatureLock";
+import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
+import { LOADER_DELAY_MS } from "@/lib/styles/motion";
+import { activates } from "./activation";
 
 defineOptions({ inheritAttrs: false });
 
@@ -24,6 +27,7 @@ const props = withDefaults(defineProps<ButtonProps>(), {
   disabled: false,
   focusableUnavailable: false,
   loading: false,
+  spinner: true,
   active: false,
   block: false,
 });
@@ -36,6 +40,10 @@ const isDisabled = computed(() => props.disabled || locked.value);
 // No native `disabled` reaches an anchor or a slotted child, so a locked one is styled and blocked by hand.
 const lockedLink = computed(() => locked.value && (props.as !== "button" || !!props.asChild));
 const unavailable = computed(() => isDisabled.value && props.focusableUnavailable);
+// A busy button stays focusable (no native disabled), so it looks and acts unavailable without losing focus.
+const inactive = computed(() => unavailable.value || props.loading);
+// The button is busy at once; the spinner waits so a fast action never flashes one.
+const showSpinner = useDelayedFlag(() => props.loading && props.spinner, LOADER_DELAY_MS);
 const reasonId = computed(() => props.descriptionId ?? `${id}-reason`);
 const rootRef = ref<{ $el?: Element } | null>(null);
 // Labels that arrive with data are not unnamed, so the dev check waits for them.
@@ -331,6 +339,15 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "enabled:hover:border-accent enabled:hover:text-accent enabled:hover:bg-button-ghost-hover-bg",
     "disabled:opacity-60",
   ].join(" "),
+  "section-chip": [
+    "bg-transparent text-text-body border border-border-default whitespace-nowrap",
+    "!rounded-full !h-auto !py-1 !px-3 !text-sm",
+    "enabled:hover:bg-button-ghost-hover-bg",
+    "aria-[current=location]:bg-surface-accent-active aria-[current=location]:border-button-outline-hover-border",
+    "aria-[current=location]:text-text-heading aria-[current=location]:font-semibold",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
   // tint-*: soft categorical badge fill for tiles that identify an entity by colour, e.g. a cluster code.
   "tint-teal": [
     "bg-badge-teal-soft-bg text-badge-teal-soft-text border-0",
@@ -359,6 +376,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
 };
 
 const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
+  "section-chip": "opacity-60",
   primary: "bg-button-primary-disabled text-button-primary-foreground",
   secondary: "bg-button-secondary-disabled text-text-disabled",
   outline: "opacity-50",
@@ -483,11 +501,11 @@ const classes = computed<string[]>(() => [
   "outline-none",
   // A hugging ring vanishes on accent fills, so the outline sits off a gap; ring-0! mutes the per-variant rings.
   "focus-visible:outline-2! focus-visible:outline-solid! focus-visible:outline-offset-2! focus-visible:outline-focus-ring-accent! focus-visible:ring-0!",
-  unavailable.value || lockedLink.value
+  inactive.value || lockedLink.value
     ? "cursor-not-allowed!"
     : "disabled:cursor-not-allowed enabled:cursor-pointer",
   // Variant + size (active overrides variant to primary appearance)
-  unavailable.value || lockedLink.value
+  inactive.value || lockedLink.value
     ? unavailableClasses.value
     : props.active
       ? activeClasses
@@ -496,7 +514,7 @@ const classes = computed<string[]>(() => [
 ]);
 
 function handleKeydown(event: KeyboardEvent): void {
-  if (unavailable.value && (event.key === "Enter" || event.key === " ")) {
+  if (inactive.value && activates(event)) {
     event.preventDefault();
     event.stopImmediatePropagation();
   }
@@ -515,7 +533,7 @@ function isInert(): boolean {
 
 function handleClick(event: MouseEvent): void {
   if (isDisabled.value || props.loading) {
-    if (unavailable.value || lockedLink.value) {
+    if (inactive.value || lockedLink.value) {
       event.preventDefault();
       event.stopImmediatePropagation();
     }
@@ -532,11 +550,7 @@ function handleClick(event: MouseEvent): void {
     :as-child="asChild"
     :class="classes"
     :type="as === 'button' ? type : undefined"
-    :disabled="
-      as === 'button'
-        ? (isDisabled && !focusableUnavailable) || (loading && !unavailable)
-        : undefined
-    "
+    :disabled="as === 'button' ? isDisabled && !focusableUnavailable : undefined"
     :aria-disabled="isDisabled || loading || undefined"
     :aria-busy="loading || undefined"
     data-o2-btn
@@ -549,15 +563,17 @@ function handleClick(event: MouseEvent): void {
   >
     <!-- Loading spinner overlay — centered, absolute, shown only when loading -->
     <span
-      v-if="loading"
+      v-if="loading && showSpinner"
       class="pointer-events-none absolute inset-0 flex items-center justify-center"
       aria-hidden="true"
     >
-      <OIcon name="progress-activity" size="sm" class="animate-spin" />
+      <OIcon name="progress-activity" size="sm" class="o2-motion-keep animate-spin" />
     </span>
 
     <!-- Keep display:contents while loading: a wrapper that later loses its box strands a child-mode OTooltip anchored to it at (0,0) -->
-    <span :class="loading ? 'contents text-transparent [&>*]:opacity-0' : 'contents'">
+    <span
+      :class="loading && showSpinner ? 'contents text-transparent [&>*]:opacity-0' : 'contents'"
+    >
       <slot name="icon-left">
         <OIcon
           v-if="iconLeft"

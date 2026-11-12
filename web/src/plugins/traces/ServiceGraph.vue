@@ -314,6 +314,7 @@
                 :time-range="sidePanelTimeRange"
                 :visible="showSidePanel"
                 :stream-filter="selectedStreamFilter"
+                :agent-scope="agentScope"
                 :container-el="graphContainerRef"
                 @close="handleCloseSidePanel"
                 @view-traces="$emit('view-traces', $event)"
@@ -483,6 +484,15 @@ export default defineComponent({
       type: String as PropType<string | null>,
       default: null,
     },
+    // env/version may be UNSET (not set); null outside Agent mode.
+    agentScope: {
+      type: Object as PropType<{
+        name: string;
+        env: string | null;
+        version: string | null;
+      } | null>,
+      default: null,
+    },
     // Optional external time window (Agent Graph page owns its own date picker
     // via useAiDateController). When set it drives the topology query instead of
     // the shared traces store's `searchObj.data.datetime` — otherwise the page's
@@ -528,11 +538,18 @@ export default defineComponent({
     // Node side panel state
     const selectedNode = ref<any>(null);
     const showSidePanel = ref(false);
-    // Stored relative start/end go stale, so the panel resolves "now" when it opens or the range changes.
-    const sidePanelTimeRange = ref(getEffectiveTimeRange(searchObj.data.datetime));
+    // Stored relative start/end go stale, so "now" is resolved on each call.
+    const effectiveTimeRange = () =>
+      props.timeRange && props.timeRange.startTime && props.timeRange.endTime
+        ? { startTime: props.timeRange.startTime, endTime: props.timeRange.endTime }
+        : getEffectiveTimeRange(searchObj.data.datetime);
+    // The panel resolves its window when it opens or the range changes.
+    const sidePanelTimeRange = ref(effectiveTimeRange());
     watch(
       () => [
         selectedNode.value,
+        props.timeRange?.startTime,
+        props.timeRange?.endTime,
         searchObj.data.datetime.type,
         searchObj.data.datetime.relativeTimePeriod,
         searchObj.data.datetime.startTime,
@@ -540,7 +557,7 @@ export default defineComponent({
       ],
       () => {
         if (selectedNode.value) {
-          sidePanelTimeRange.value = getEffectiveTimeRange(searchObj.data.datetime);
+          sidePanelTimeRange.value = effectiveTimeRange();
         }
       },
     );
@@ -1569,12 +1586,7 @@ export default defineComponent({
           throw new Error(t("traces.serviceGraph.noOrganizationSelected"));
         }
 
-        // Prefer the parent-supplied window (Agent Graph page's date picker); fall
-        // back to the shared traces datetime (Traces Service Graph tab).
-        const { startTime, endTime } =
-          props.timeRange && props.timeRange.startTime && props.timeRange.endTime
-            ? props.timeRange
-            : getEffectiveTimeRange(searchObj.data.datetime);
+        const { startTime, endTime } = effectiveTimeRange();
 
         // /topology/current reads the rollup metrics, so a load never re-scans raw traces.
         const streamName =

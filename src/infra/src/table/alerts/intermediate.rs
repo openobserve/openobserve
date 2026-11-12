@@ -290,6 +290,8 @@ pub struct QueryCondition {
     pub operator: ConditionOperator,
     pub value: JsonValue,
     pub ignore_case: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub case_insensitive: Option<bool>,
 }
 
 impl From<MetaCondition> for QueryCondition {
@@ -299,6 +301,7 @@ impl From<MetaCondition> for QueryCondition {
             operator: value.operator.into(),
             value: value.value,
             ignore_case: value.ignore_case,
+            case_insensitive: value.case_insensitive,
         }
     }
 }
@@ -310,6 +313,7 @@ impl From<QueryCondition> for MetaCondition {
             operator: value.operator.into(),
             value: value.value,
             ignore_case: value.ignore_case,
+            case_insensitive: value.case_insensitive,
         }
     }
 }
@@ -342,6 +346,18 @@ pub enum ConditionOperator {
     IsEmpty,
     #[serde(rename = "is_not_empty")]
     IsNotEmpty,
+    #[serde(rename = "in")]
+    In,
+    #[serde(rename = "not_in")]
+    NotIn,
+    #[serde(rename = "starts_with")]
+    StartsWith,
+    #[serde(rename = "ends_with")]
+    EndsWith,
+    #[serde(rename = "re_match")]
+    ReMatch,
+    #[serde(rename = "re_not_match")]
+    ReNotMatch,
 }
 
 impl From<MetaOperator> for ConditionOperator {
@@ -359,6 +375,12 @@ impl From<MetaOperator> for ConditionOperator {
             MetaOperator::IsNotNull => Self::IsNotNull,
             MetaOperator::IsEmpty => Self::IsEmpty,
             MetaOperator::IsNotEmpty => Self::IsNotEmpty,
+            MetaOperator::In => Self::In,
+            MetaOperator::NotIn => Self::NotIn,
+            MetaOperator::StartsWith => Self::StartsWith,
+            MetaOperator::EndsWith => Self::EndsWith,
+            MetaOperator::ReMatch => Self::ReMatch,
+            MetaOperator::ReNotMatch => Self::ReNotMatch,
         }
     }
 }
@@ -378,6 +400,12 @@ impl From<ConditionOperator> for MetaOperator {
             ConditionOperator::IsNotNull => Self::IsNotNull,
             ConditionOperator::IsEmpty => Self::IsEmpty,
             ConditionOperator::IsNotEmpty => Self::IsNotEmpty,
+            ConditionOperator::In => Self::In,
+            ConditionOperator::NotIn => Self::NotIn,
+            ConditionOperator::StartsWith => Self::StartsWith,
+            ConditionOperator::EndsWith => Self::EndsWith,
+            ConditionOperator::ReMatch => Self::ReMatch,
+            ConditionOperator::ReNotMatch => Self::ReNotMatch,
         }
     }
 }
@@ -1468,6 +1496,7 @@ mod tests {
             operator: MetaOperator::EqualTo,
             value: serde_json::json!("error"),
             ignore_case: false,
+            case_insensitive: None,
         };
         let qc = QueryCondition::from(meta);
         assert_eq!(qc.column, "level");
@@ -1482,6 +1511,7 @@ mod tests {
             operator: ConditionOperator::GreaterThan,
             value: serde_json::json!(500),
             ignore_case: true,
+            case_insensitive: None,
         };
         let meta = MetaCondition::from(qc);
         assert_eq!(meta.column, "status");
@@ -1503,6 +1533,7 @@ mod tests {
                 operator: MetaOperator::GreaterThanEquals,
                 value: serde_json::json!(10),
                 ignore_case: false,
+                case_insensitive: None,
             },
         };
         let qa = QueryAggregation::from(meta);
@@ -1527,6 +1558,7 @@ mod tests {
                 operator: ConditionOperator::LessThan,
                 value: serde_json::json!(100),
                 ignore_case: false,
+                case_insensitive: None,
             },
         };
         let meta = MetaAggregation::from(qa);

@@ -965,6 +965,28 @@ pub async fn names_using_template<C: ConnectionTrait>(
         .await?)
 }
 
+/// The template each check in scope names, one entry per check, for the template list's usage
+/// counts.
+pub async fn templates_in_use<C: ConnectionTrait>(
+    conn: &C,
+    org_id: Option<&str>,
+) -> Result<Vec<String>, errors::Error> {
+    let mut query = Entity::find()
+        .select_only()
+        .column(Column::Template)
+        .filter(Column::Template.is_not_null());
+    if let Some(org) = org_id {
+        query = query.filter(Column::OrgId.eq(org));
+    }
+    Ok(query
+        .into_tuple::<Option<String>>()
+        .all(conn)
+        .await?
+        .into_iter()
+        .flatten()
+        .collect())
+}
+
 /// The status badge and the status page run streaks, as one completed run leaves them.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct StatusStreaks {
@@ -2109,6 +2131,32 @@ pub(crate) mod tests {
         );
         assert!(
             names_using_template(&db, Some("other"), "ops-card")
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn templates_in_use_lists_one_entry_per_check_in_scope() {
+        use sea_orm::{ActiveModelTrait, IntoActiveModel};
+
+        let db = db_with_one_check(0).await;
+        assert!(templates_in_use(&db, None).await.unwrap().is_empty());
+        let mut am = make_model().into_active_model();
+        am.template = Set(Some("ops-card".to_string()));
+        am.update(&db).await.unwrap();
+        assert_eq!(
+            templates_in_use(&db, Some("org1")).await.unwrap(),
+            vec!["ops-card".to_string()]
+        );
+        // No scope is the default org's view: every org's checks count.
+        assert_eq!(
+            templates_in_use(&db, None).await.unwrap(),
+            vec!["ops-card".to_string()]
+        );
+        assert!(
+            templates_in_use(&db, Some("other"))
                 .await
                 .unwrap()
                 .is_empty()

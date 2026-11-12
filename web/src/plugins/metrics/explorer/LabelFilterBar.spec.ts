@@ -15,14 +15,19 @@
 
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, vi, afterEach } from "vitest";
+import { nextTick } from "vue";
 import LabelFilterBar from "./LabelFilterBar.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import QueryFilterBar from "@/components/filterBar/QueryFilterBar.vue";
+import type { FilterGroup, FilterNode } from "@/utils/query/filterBar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { raw } from "@/types/i18n";
 import type { LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
 
-const createWrapper = (props: Record<string, any> = {}) =>
-  mount(LabelFilterBar, {
+let wrapper: VueWrapper<any> | null = null;
+
+const createWrapper = (props: Record<string, any> = {}) => {
+  wrapper = mount(LabelFilterBar, {
     props: {
       filters: [] as LabelFilter[],
       labelNames: ["job", "instance", "code"],
@@ -31,583 +36,397 @@ const createWrapper = (props: Record<string, any> = {}) =>
       loadValues: vi.fn().mockResolvedValue(["api", "web"]),
       ...props,
     },
-    global: {
-      plugins: [i18n, store],
-    },
+    global: { plugins: [i18n, store] },
     attachTo: document.body,
   });
-
-/** Clicks "+ Filter", which drops straight into the label step. */
-const openPicker = async (wrapper: VueWrapper<any>) => {
-  await wrapper.find('[data-test="metrics-explorer-label-add"]').trigger("click");
-  await flushPromises();
+  return wrapper;
 };
 
-/** The whole add flow: pick a label, then a value. No confirm step. */
-const pickFilter = async (
-  wrapper: VueWrapper<any>,
-  label: string,
-  value: string,
-  operator?: string,
-) => {
-  await openPicker(wrapper);
-  await wrapper.vm.onLabelPicked(label);
+const filter = (label: string, value: string, operator?: string): LabelFilter => ({
+  label: raw(label),
+  value,
+  ...(operator ? { operator } : {}),
+});
+
+const input = () =>
+  (document.body.querySelector<HTMLInputElement>('[data-test="metrics-explorer-label-search"]') ??
+    document.body.querySelector<HTMLInputElement>('[data-test="metrics-explorer-label-input"]'))!;
+
+async function focus() {
+  await wrapper!.find('[data-test="metrics-explorer-label-input"]').trigger("click");
   await flushPromises();
-  if (operator) wrapper.vm.draftOperator = operator;
-  await wrapper.vm.onValuePicked(value);
+}
+
+async function type(text: string) {
+  input().value = text;
+  input().dispatchEvent(new Event("input"));
   await flushPromises();
-};
+}
+
+async function press(key: string) {
+  input().dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+  await flushPromises();
+  await nextTick();
+}
+
+const rowKeys = () =>
+  Array.from(
+    document.body.querySelectorAll('[data-test^="metrics-explorer-label-suggest-item-"]'),
+  ).map((row) =>
+    row.getAttribute("data-test")!.replace("metrics-explorer-label-suggest-item-", ""),
+  );
+
+afterEach(() => {
+  wrapper?.unmount();
+  wrapper = null;
+  document.body.innerHTML = "";
+});
 
 describe("LabelFilterBar", () => {
-  let wrapper: VueWrapper<any>;
-
-  afterEach(() => {
-    wrapper?.unmount();
+  it("renders one chip per matcher, keyed by label for the e2e page object", () => {
+    createWrapper({ filters: [filter("job", "api"), filter("job", "web", "!=")] });
+    const chips = wrapper!.findAll('[data-test="metrics-explorer-label-chip-job"]');
+    expect(chips).toHaveLength(2);
+    expect(chips[0].text()).toContain("job");
+    expect(chips[0].text()).toContain("api");
+    expect(chips[1].text()).toContain("!=");
   });
 
-  describe("chips", () => {
-    it("renders a chip per active filter", () => {
-      wrapper = createWrapper({
-        filters: [
-          { label: "job", value: "api", operator: "=" },
-          { label: "code", value: "500", operator: "=" },
-        ],
-      });
-
-      expect(wrapper.find('[data-test="metrics-explorer-label-chip-job"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="metrics-explorer-label-chip-code"]').exists()).toBe(true);
-    });
-
-    it("renders the chip as `label = value`", () => {
-      wrapper = createWrapper({
-        filters: [{ label: "job", value: "api", operator: "=" }],
-      });
-
-      const chip = wrapper.find('[data-test="metrics-explorer-label-chip-job"]');
-      expect(chip.text().replace(/\s+/g, " ")).toContain("job = api");
-    });
-
-    it("defaults the operator to = when the filter omits it", () => {
-      wrapper = createWrapper({
-        filters: [{ label: "job", value: "api" } as LabelFilter],
-      });
-
-      const chip = wrapper.find('[data-test="metrics-explorer-label-chip-job"]');
-      expect(chip.text().replace(/\s+/g, " ")).toContain("job = api");
-    });
-
-    it("emits remove with the WHOLE matcher, not just the label", async () => {
-      // A label can carry several matchers, so the label alone does not identify
-      // a chip — removing by label would take out every filter on that label.
-      const filter = { label: "job", value: "api", operator: "=" };
-      wrapper = createWrapper({ filters: [filter] });
-
-      await wrapper.find('[data-test="metrics-explorer-label-chip-remove-job"]').trigger("click");
-
-      expect(wrapper.emitted("remove")).toBeTruthy();
-      expect(wrapper.emitted("remove")![0]).toEqual([filter]);
-    });
-
-    it("renders several matchers on the SAME label as separate chips", async () => {
-      // `status=~"5.."` AND `status!="503"` is the point of having four
-      // operators. Keying the v-for on the label collapsed the two onto one key.
-      const filters: LabelFilter[] = [
-        { label: "status", value: "5..", operator: "=~" },
-        { label: "status", value: "503", operator: "!=" },
-      ];
-      wrapper = createWrapper({ filters });
-
-      const text = wrapper
-        .find('[data-test="metrics-explorer-label-filter-bar"]')
-        .text()
-        .replace(/\s+/g, " ");
-      expect(text).toContain("status =~ 5..");
-      expect(text).toContain("status != 503");
-
-      // ...and removing one names WHICH one.
-      await wrapper
-        .findAll('[data-test="metrics-explorer-label-chip-remove-status"]')[1]
-        .trigger("click");
-      expect(wrapper.emitted("remove")![0]).toEqual([filters[1]]);
-    });
-
-    it("renders no chips when there are no filters", () => {
-      wrapper = createWrapper({ filters: [] });
-      expect(wrapper.findAll('[data-test^="metrics-explorer-label-chip-"]')).toHaveLength(0);
-    });
+  it("sits flush in its row like the Logs bar, with no input frame of its own", () => {
+    createWrapper({ filters: [filter("job", "api")] });
+    const field = wrapper!.find('[data-test="metrics-explorer-label-field"]');
+    expect(field.classes()).not.toContain("border");
+    expect(field.classes()).not.toContain("bg-input-bg");
   });
 
-  describe("schema loading indicator", () => {
-    it("shows the indicator while membership is resolving", () => {
-      wrapper = createWrapper({ schemaLoading: true });
-      expect(wrapper.find('[data-test="metrics-explorer-label-schema-loading"]').exists()).toBe(
-        true,
-      );
-    });
-
-    it("hides the indicator when membership is resolved", () => {
-      wrapper = createWrapper({ schemaLoading: false });
-      expect(wrapper.find('[data-test="metrics-explorer-label-schema-loading"]').exists()).toBe(
-        false,
-      );
-    });
+  it("defaults a filter without an operator to =", () => {
+    createWrapper({ filters: [filter("job", "api")] });
+    expect(wrapper!.find('[data-test="metrics-explorer-label-chip-job"]').text()).toContain("=");
   });
 
-  describe("picker", () => {
-    it("emits focus-picker the first time the + Filter button is clicked", async () => {
-      wrapper = createWrapper();
-      await openPicker(wrapper);
-      expect(wrapper.emitted("focus-picker")).toHaveLength(1);
-    });
-
-    it("re-emits focus-picker on EVERY open, so a cleared list can reload", async () => {
-      // The names are window-scoped: a range change drops them. A one-shot
-      // emit (what this used to assert) left the picker saying "No options
-      // found" for the rest of the page. The parent's loader dedupes, so
-      // re-emitting costs nothing when the names are already there.
-      wrapper = createWrapper();
-      await openPicker(wrapper);
-      await wrapper.vm.cancel();
-      await openPicker(wrapper);
-      expect(wrapper.emitted("focus-picker")).toHaveLength(2);
-    });
-
-    it("goes straight to the label step — no intermediate panel", async () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('[data-test="metrics-explorer-label-picker-label"]').exists()).toBe(
-        false,
-      );
-
-      await openPicker(wrapper);
-
-      expect(wrapper.find('[data-test="metrics-explorer-label-picker-label"]').exists()).toBe(true);
-      // The + Filter button is replaced by the step, not stacked under a popup.
-      expect(wrapper.find('[data-test="metrics-explorer-label-add"]').exists()).toBe(false);
-    });
-
-    it("auto-advances from label to value", async () => {
-      // Picking a label is not a filter on its own, so making the user click
-      // onward would be asking for a decision they already made.
-      wrapper = createWrapper();
-      await openPicker(wrapper);
-      await wrapper.vm.onLabelPicked("job");
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="metrics-explorer-label-picker-value"]').exists()).toBe(true);
-    });
-
-    it("returns to the + Filter button after a filter is added", async () => {
-      wrapper = createWrapper();
-      await pickFilter(wrapper, "job", "api");
-
-      expect(wrapper.find('[data-test="metrics-explorer-label-add"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="metrics-explorer-label-picker-value"]').exists()).toBe(
-        false,
-      );
-    });
+  it("emits focus-picker on every open so label names load lazily", async () => {
+    createWrapper();
+    await focus();
+    await press("Escape");
+    await focus();
+    expect(wrapper!.emitted("focus-picker")).toHaveLength(2);
   });
 
-  describe("value suggestions", () => {
-    it("calls loadValues with the picked label", async () => {
-      const loadValues = vi.fn().mockResolvedValue(["api", "web"]);
-      wrapper = createWrapper({ loadValues });
-
-      await openPicker(wrapper);
-      await wrapper.vm.onLabelPicked("job");
-      await flushPromises();
-
-      expect(loadValues).toHaveBeenCalledWith("job");
-    });
-
-    it("does not show the unavailable hint when suggestions load", async () => {
-      wrapper = createWrapper({
-        loadValues: vi.fn().mockResolvedValue(["api", "web"]),
-      });
-
-      await openPicker(wrapper);
-      await wrapper.vm.onLabelPicked("job");
-      await flushPromises();
-
-      expect(
-        wrapper.find('[data-test="metrics-explorer-label-picker-no-suggestions"]').exists(),
-      ).toBe(false);
-    });
-
-    it("shows the unavailable hint when loadValues resolves empty", async () => {
-      wrapper = createWrapper({ loadValues: vi.fn().mockResolvedValue([]) });
-
-      await openPicker(wrapper);
-      await wrapper.vm.onLabelPicked("job");
-      await flushPromises();
-
-      expect(
-        wrapper.find('[data-test="metrics-explorer-label-picker-no-suggestions"]').text(),
-      ).toContain("No suggestions");
-    });
-
-    it("shows the unavailable hint when loadValues rejects", async () => {
-      wrapper = createWrapper({
-        loadValues: vi.fn().mockRejectedValue(new Error("boom")),
-      });
-
-      await openPicker(wrapper);
-      await wrapper.vm.onLabelPicked("job");
-      await flushPromises();
-
-      expect(
-        wrapper.find('[data-test="metrics-explorer-label-picker-no-suggestions"]').exists(),
-      ).toBe(true);
-    });
-
-    describe("follow the value scope", () => {
-      const valueOptions = () =>
-        wrapper
-          .findAllComponents(OSelect)
-          .find((select) => select.props("creatable"))!
-          .props("options")
-          .map((o: { value: string }) => o.value);
-
-      it("reloads the open draft's suggestions and leaves the draft and filters alone", async () => {
-        const filters: LabelFilter[] = [{ label: "job", value: "api", operator: "=" }];
-        const loadValues = vi
-          .fn()
-          .mockResolvedValueOnce(["docker-host"])
-          .mockResolvedValueOnce(["docker-host", "host-a"]);
-        wrapper = createWrapper({ filters, loadValues, valueScope: "container" });
-
-        // Idle: nothing to refresh.
-        await wrapper.setProps({ valueScope: "process" });
-        expect(loadValues).not.toHaveBeenCalled();
-
-        await openPicker(wrapper);
-        await wrapper.vm.onLabelPicked("host_name");
-        await flushPromises();
-        wrapper.vm.draftOperator = "!=";
-        expect(valueOptions()).toEqual(["docker-host"]);
-
-        await wrapper.setProps({ valueScope: "system" });
-        await flushPromises();
-
-        expect(loadValues).toHaveBeenCalledTimes(2);
-        expect(valueOptions()).toEqual(["docker-host", "host-a"]);
-        expect(wrapper.emitted("add")).toBeUndefined();
-        expect(wrapper.emitted("remove")).toBeUndefined();
-        expect(wrapper.emitted("clear-all")).toBeUndefined();
-
-        // Free text still commits, with the operator picked before the refresh.
-        await wrapper.vm.onValueCreated("host-c");
-        expect(wrapper.emitted("add")![0]).toEqual([
-          { label: "host_name", value: "host-c", operator: "!=" },
-        ]);
-      });
-
-      it("drops an answer that lands after the scope changed", async () => {
-        let answerOldScope!: (values: string[]) => void;
-        const loadValues = vi
-          .fn()
-          .mockReturnValueOnce(new Promise((resolve) => (answerOldScope = resolve)))
-          .mockResolvedValueOnce(["host-a"]);
-        wrapper = createWrapper({ loadValues, valueScope: "container" });
-
-        await openPicker(wrapper);
-        const picked = wrapper.vm.onLabelPicked("host_name");
-        await wrapper.setProps({ valueScope: "system" });
-        await flushPromises();
-
-        answerOldScope(["docker-host"]);
-        await picked;
-        await flushPromises();
-
-        expect(valueOptions()).toEqual(["host-a"]);
-      });
-    });
+  it("adds a matcher with the keyboard and asks loadValues for that label", async () => {
+    const loadValues = vi.fn().mockResolvedValue(["api", "web"]);
+    createWrapper({ loadValues });
+    await focus();
+    await type("job");
+    await press("Enter");
+    expect(rowKeys()).toEqual(["eq", "neq", "regex", "not_regex", "in", "not_in"]);
+    await press("Enter");
+    await vi.waitFor(() => expect(rowKeys()).toContain("api"));
+    expect(loadValues).toHaveBeenCalledWith("job");
+    await press("Enter");
+    expect(wrapper!.emitted("add")).toEqual([[{ label: "job", operator: "=", value: "api" }]]);
   });
 
-  describe("operators", () => {
-    it("defaults to =", async () => {
-      wrapper = createWrapper();
-      await pickFilter(wrapper, "job", "api");
-
-      expect(wrapper.emitted("add")![0]).toEqual([{ label: "job", value: "api", operator: "=" }]);
-    });
-
-    it.each(["!=", "=~", "!~"])("carries the %s matcher", async (operator) => {
-      // All four are valid PromQL matchers and buildSelector accepts them, so a
-      // regex filter must reach the query untouched.
-      wrapper = createWrapper();
-      await pickFilter(wrapper, "pod", "web-.*", operator);
-
-      expect(wrapper.emitted("add")![0]).toEqual([{ label: "pod", value: "web-.*", operator }]);
-    });
-
-    it("resets the operator to = for the next filter", async () => {
-      wrapper = createWrapper();
-      await pickFilter(wrapper, "pod", "web-.*", "=~");
-      await pickFilter(wrapper, "job", "api");
-
-      expect(wrapper.emitted("add")![1]).toEqual([{ label: "job", value: "api", operator: "=" }]);
-    });
+  it("asks for a label's values again after the window changes, through the same loader", async () => {
+    let range = "15m";
+    const loadValues = vi.fn(async () => [`api-${range}`]);
+    createWrapper({ loadValues });
+    await focus();
+    await type("job");
+    await press("Enter");
+    await press("Enter");
+    await vi.waitFor(() => expect(rowKeys()).toContain("api-15m"));
+    await press("Escape");
+    await press("Escape");
+    range = "7d";
+    await focus();
+    await type("job");
+    await press("Enter");
+    await press("Enter");
+    await vi.waitFor(() => expect(rowKeys()).toContain("api-7d"));
+    expect(loadValues).toHaveBeenCalledTimes(2);
   });
 
-  describe("adding a filter", () => {
-    it("commits on value selection — there is no Add button", async () => {
-      wrapper = createWrapper();
-      await pickFilter(wrapper, "job", "api");
+  describe("follow the value scope", () => {
+    it("reloads the open value step and keeps the draft and filters", async () => {
+      const loadValues = vi
+        .fn()
+        .mockResolvedValueOnce(["docker-host"])
+        .mockResolvedValueOnce(["docker-host", "host-a"]);
+      createWrapper({ filters: [filter("job", "api")], loadValues, valueScope: "container" });
 
-      expect(wrapper.emitted("add")).toBeTruthy();
-      expect(wrapper.find('[data-test="metrics-explorer-label-picker-apply"]').exists()).toBe(
-        false,
-      );
-    });
-
-    // The hard requirement: suggestions are best-effort, the filter is not.
-    it("still adds a free-text value when loadValues REJECTS", async () => {
-      wrapper = createWrapper({
-        loadValues: vi.fn().mockRejectedValue(new Error("network down")),
-      });
-
-      await openPicker(wrapper);
-      await wrapper.vm.onLabelPicked("job");
+      await wrapper!.setProps({ valueScope: "process" });
       await flushPromises();
-      await wrapper.vm.onValueCreated("typed-by-hand");
-      await flushPromises();
+      expect(loadValues).not.toHaveBeenCalled();
 
-      expect(wrapper.emitted("add")![0]).toEqual([
-        { label: "job", value: "typed-by-hand", operator: "=" },
+      await focus();
+      await type("instance");
+      await press("Enter");
+      await press("ArrowDown");
+      await press("Enter");
+      await vi.waitFor(() => expect(rowKeys()).toEqual(["docker-host"]));
+
+      await wrapper!.setProps({ valueScope: "system" });
+      await vi.waitFor(() => expect(rowKeys()).toEqual(["docker-host", "host-a"]));
+      expect(loadValues).toHaveBeenCalledTimes(2);
+      expect(wrapper!.emitted("add")).toBeUndefined();
+      expect(wrapper!.emitted("remove")).toBeUndefined();
+
+      await type("host-c");
+      await press("Enter");
+      expect(wrapper!.emitted("add")![0]).toEqual([
+        { label: "instance", operator: "!=", value: "host-c" },
       ]);
     });
 
-    it("still adds a free-text value when loadValues resolves empty", async () => {
-      wrapper = createWrapper({ loadValues: vi.fn().mockResolvedValue([]) });
+    it("drops an answer that lands after the scope changed", async () => {
+      let answerOldScope!: (values: string[]) => void;
+      const loadValues = vi
+        .fn()
+        .mockReturnValueOnce(new Promise((resolve) => (answerOldScope = resolve)))
+        .mockResolvedValueOnce(["host-a"]);
+      createWrapper({ loadValues, valueScope: "container" });
 
-      await openPicker(wrapper);
-      await wrapper.vm.onLabelPicked("instance");
-      await flushPromises();
-      await wrapper.vm.onValueCreated("10.0.0.1:9100");
-      await flushPromises();
+      await focus();
+      await type("instance");
+      await press("Enter");
+      await press("Enter");
+      await vi.waitFor(() => expect(loadValues).toHaveBeenCalledTimes(1));
+      await wrapper!.setProps({ valueScope: "system" });
+      await vi.waitFor(() => expect(rowKeys()).toEqual(["host-a"]));
 
-      expect(wrapper.emitted("add")![0]).toEqual([
-        { label: "instance", value: "10.0.0.1:9100", operator: "=" },
-      ]);
-    });
-
-    it("does not emit add for an empty value", async () => {
-      wrapper = createWrapper();
-      await openPicker(wrapper);
-      await wrapper.vm.onLabelPicked("job");
+      answerOldScope(["docker-host"]);
       await flushPromises();
-      await wrapper.vm.onValuePicked("");
-      await flushPromises();
-
-      expect(wrapper.emitted("add")).toBeFalsy();
+      expect(rowKeys()).toEqual(["host-a"]);
     });
   });
 
-  describe("label name validation", () => {
-    // The PromQL selector builder throws on these by design — reject in the UI.
-    const invalid = ["1job", "job-name", "job name", "job.name", "", "job!"];
+  it.each([
+    ["neq", "!="],
+    ["regex", "=~"],
+    ["not_regex", "!~"],
+  ])("carries the %s matcher as %s", async (operator, symbol) => {
+    createWrapper();
+    await focus();
+    await type("job");
+    await press("Enter");
+    const index = rowKeys().indexOf(operator);
+    for (let i = 0; i < index; i++) await press("ArrowDown");
+    await press("Enter");
+    await type("x");
+    await press("Enter");
+    expect(wrapper!.emitted("add")![0][0]).toEqual({ label: "job", operator: symbol, value: "x" });
+  });
 
-    it.each(invalid)("rejects the invalid label name %j", async (name) => {
-      wrapper = createWrapper();
-
-      await openPicker(wrapper);
-      await wrapper.vm.onLabelPicked(name);
-      await flushPromises();
-      await wrapper.vm.onValueCreated("api");
-      await flushPromises();
-
-      expect(wrapper.emitted("add")).toBeFalsy();
+  it("shows a plain alternation as IN, and keeps a real pattern as a regex", () => {
+    createWrapper({
+      filters: [filter("job", "a\\.b|c", "=~"), filter("pod", "api-.*", "=~")],
     });
+    const job = wrapper!.find('[data-test="metrics-explorer-label-chip-job"]').text();
+    expect(job).toContain("IN");
+    expect(job).toContain("a.b, c");
+    expect(wrapper!.find('[data-test="metrics-explorer-label-chip-pod-operator"]').text()).toBe(
+      "=~",
+    );
+  });
 
-    it("shows an inline error instead of emitting add", async () => {
-      wrapper = createWrapper();
-
-      await openPicker(wrapper);
-      await wrapper.vm.onLabelPicked("job-name");
-      await flushPromises();
-      await wrapper.vm.onValueCreated("api");
-      await flushPromises();
-
-      expect(wrapper.emitted("add")).toBeFalsy();
-      expect(wrapper.find('[role="alert"]').text()).toContain("Invalid label name");
-      // We stay on the label step so the user can correct it — an invalid label
-      // must never advance to the value step.
-      expect(wrapper.find('[data-test="metrics-explorer-label-picker-label"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="metrics-explorer-label-picker-value"]').exists()).toBe(
-        false,
-      );
-    });
-
-    const valid = ["job", "_private", "job_name", "Job2", "__name"];
-
-    it.each(valid)("accepts the valid label name %j", async (name) => {
-      wrapper = createWrapper();
-
-      await pickFilter(wrapper, name, "api");
-
-      expect(wrapper.emitted("add")![0]).toEqual([{ label: name, value: "api", operator: "=" }]);
+  it("turns is any of into an escaped regex alternation", async () => {
+    createWrapper({ loadValues: vi.fn().mockResolvedValue([]) });
+    await focus();
+    await type("job");
+    await press("Enter");
+    await type("any");
+    await press("Enter");
+    await type("a.b");
+    await press("Enter");
+    await type("c");
+    await press("Enter");
+    await press("Enter");
+    expect(wrapper!.emitted("add")![0][0]).toEqual({
+      label: "job",
+      operator: "=~",
+      value: "a\\.b|c",
     });
   });
 
-  /**
-   * Chips are ANDed — PromQL matchers in one selector always are, and this
-   * engine rejects `or` matchers outright. Two adjacent chips read equally like
-   * "either of these", and that reading is always wrong, so the row says it.
-   */
-  describe("the AND between chips is stated, not inferred", () => {
-    const ands = (w: VueWrapper<any>) => w.findAll('[data-test="metrics-explorer-label-and"]');
-
-    it("says nothing for a single chip — there is no conjunction yet", () => {
-      wrapper = createWrapper({
-        filters: [{ label: "pod", operator: "=", value: "api-1" }],
-      });
-      expect(ands(wrapper)).toHaveLength(0);
-    });
-
-    it("separates each pair — N chips get N-1 ANDs", () => {
-      wrapper = createWrapper({
-        filters: [
-          { label: "pod", operator: "=", value: "api-1" },
-          { label: "status", operator: "=~", value: "5.." },
-          { label: "job", operator: "!=", value: "canary" },
-        ],
-      });
-      expect(ands(wrapper)).toHaveLength(2);
-      expect(ands(wrapper)[0].text()).toBe("and");
-    });
-
-    it("points at the regex escape hatch for anyone who wanted OR", () => {
-      wrapper = createWrapper({
-        filters: [
-          { label: "pod", operator: "=", value: "api-1" },
-          { label: "job", operator: "=", value: "web" },
-        ],
-      });
-      // A user who reads "and" and wanted "or" needs to be told what to do
-      // instead — `=~` is the only way to say it.
-      expect(ands(wrapper)[0].attributes("title")).toContain("=~");
-    });
+  it("still adds a typed value when loadValues rejects", async () => {
+    createWrapper({ loadValues: vi.fn().mockRejectedValue(new Error("boom")) });
+    await focus();
+    await type("job=api");
+    await press("Enter");
+    expect(wrapper!.emitted("add")![0][0]).toEqual({ label: "job", operator: "=", value: "api" });
   });
 
-  /**
-   * The empty-row typewriter hint.
-   *
-   * It sits OUTSIDE the picker's v-if/v-else-if chain. An earlier attempt put it
-   * between the `+ Filter` button and the label step, which silently broke the
-   * chain and rendered the button and the value picker at once — so the last test
-   * here guards the structure, not just the hint.
-   */
-  describe("the empty filter row types a hint", () => {
-    const hint = (w: VueWrapper<any>) => w.find('[data-test="metrics-explorer-label-hint"]');
+  it("offers a label that is not loaded yet and refuses an invalid PromQL name", async () => {
+    createWrapper({ labelNames: [] });
+    await focus();
+    await type("pod");
+    expect(rowKeys()).toHaveLength(1);
+    await type("job-name");
+    expect(rowKeys()).toHaveLength(0);
+  });
 
-    it("shows on an idle, unfiltered row", () => {
-      wrapper = createWrapper({ filters: [] });
-      expect(hint(wrapper).exists()).toBe(true);
-    });
+  it("emits remove with the whole matcher", async () => {
+    const target = filter("job", "web", "!=");
+    createWrapper({ filters: [filter("job", "api"), target] });
+    const chips = wrapper!.findAll('[data-test="metrics-explorer-label-chip-job"]');
+    await chips[1].find('[data-test="metrics-explorer-label-chip-job-remove"]').trigger("click");
+    expect(wrapper!.emitted("remove")).toEqual([[target]]);
+  });
 
-    it("is decorative — never announced, never clickable", () => {
-      wrapper = createWrapper({ filters: [] });
-      // It duplicates what `+ Filter` already says, and swallowing a click on the
-      // row's dead space would be worse than useless.
-      expect(hint(wrapper).attributes("aria-hidden")).toBe("true");
-      expect(hint(wrapper).classes()).toContain("pointer-events-none");
-    });
+  it("emits replace when a chip is edited, so it keeps its place", async () => {
+    const original = filter("job", "api");
+    createWrapper({ filters: [original, filter("code", "200")] });
+    await wrapper!.find('[data-test="metrics-explorer-label-chip-job-value"]').trigger("click");
+    await flushPromises();
+    await type("web");
+    await press("Enter");
+    expect(wrapper!.emitted("replace")).toEqual([
+      [original, { label: "job", operator: "=", value: "web" }],
+    ]);
+    expect(wrapper!.emitted("remove")).toBeUndefined();
+    expect(wrapper!.emitted("add")).toBeUndefined();
+  });
 
-    it("yields its width rather than pushing + Filter along the row", () => {
-      wrapper = createWrapper({ filters: [] });
-      const classes = hint(wrapper).classes();
+  it("emits clear-all from the clear button when several filters are set", async () => {
+    createWrapper({ filters: [filter("job", "api"), filter("code", "200")] });
+    await wrapper!.find('[data-test="metrics-explorer-label-clear"]').trigger("click");
+    expect(wrapper!.emitted("clear-all")).toHaveLength(1);
+    expect(wrapper!.emitted("remove")).toBeUndefined();
+  });
 
-      // The shared typewriter rule is `nowrap` + `ellipsis`, which only clips
-      // once something BOUNDS the width. Without these the hint took its full
-      // intrinsic width and shoved the button — the hint must always be what
-      // gives, never the control.
-      expect(classes).toContain("min-w-0");
-      expect(classes).toContain("overflow-hidden");
-    });
-
-    it("yields the row once a filter exists — the chips are what the row is for", () => {
-      wrapper = createWrapper({
-        filters: [{ label: "pod", operator: "=", value: "api-1" }],
-      });
-      expect(hint(wrapper).exists()).toBe(false);
-    });
-
-    it("gets out of the way while the picker is open", async () => {
-      wrapper = createWrapper({ filters: [] });
-      await wrapper.find('[data-test="metrics-explorer-label-add"]').trigger("click");
-      await flushPromises();
-
-      expect(hint(wrapper).exists()).toBe(false);
-    });
-
-    it("does not break the picker's v-if chain (+ Filter and the picker are exclusive)", async () => {
-      wrapper = createWrapper({ filters: [] });
-      // Both visible at once is the signature of a broken chain — it is exactly
-      // what happened when this hint was first placed inside it.
-      await wrapper.find('[data-test="metrics-explorer-label-add"]').trigger("click");
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="metrics-explorer-label-add"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="metrics-explorer-label-picker-label"]').exists()).toBe(true);
-    });
+  it("draws no AND/OR between matchers: PromQL ANDs them", () => {
+    createWrapper({ filters: [filter("job", "api"), filter("code", "200")] });
+    expect(wrapper!.find('[data-test="metrics-explorer-label-mode"]').exists()).toBe(false);
+    expect(wrapper!.find('[data-test^="metrics-explorer-label-connector-"]').exists()).toBe(false);
   });
 
   describe("OR groups", () => {
+    const DT = "metrics-explorer-label";
     const grouped: LabelFilter[] = [
       { label: "job", value: "api", operator: "=" } as LabelFilter,
       { label: "code", value: "500", operator: "=", group: 1 } as LabelFilter,
       { label: "env", value: "prod", operator: "=", group: 2, negate: true } as LabelFilter,
     ];
+    const bar = () => wrapper!.findComponent(QueryFilterBar);
+    const treeOf = () => bar().props("modelValue") as FilterGroup;
+    const chipIn = (field: string, values: string[]): FilterNode => ({
+      kind: "condition",
+      id: `new-${field}`,
+      connector: "AND",
+      field,
+      operator: "eq",
+      values,
+    });
+    const addToGroup = async (groupIndex: number, node: FilterNode) => {
+      const tree = treeOf();
+      const items = tree.items.map((item, i) =>
+        i === groupIndex && item.kind === "group"
+          ? { ...item, items: [...item.items, node] }
+          : item,
+      );
+      bar().vm.$emit("update:modelValue", { ...tree, items });
+      await flushPromises();
+    };
 
-    it("offers an OR group only once there is a filter to OR against", async () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('[data-test="metrics-explorer-label-add-group"]').exists()).toBe(false);
-      await wrapper.setProps({ filters: grouped.slice(0, 1) });
-      expect(wrapper.find('[data-test="metrics-explorer-label-add-group"]').exists()).toBe(true);
+    it("offers + OR group only once there is a filter to OR against", async () => {
+      createWrapper();
+      expect(wrapper!.find(`[data-test="${DT}-add-group"]`).exists()).toBe(false);
+      await wrapper!.setProps({ filters: grouped.slice(0, 1) });
+      await flushPromises();
+      expect(wrapper!.find(`[data-test="${DT}-add-group"]`).exists()).toBe(true);
     });
 
-    it("adds the next filter as a new OR group", async () => {
-      wrapper = createWrapper({ filters: grouped });
-      await wrapper.find('[data-test="metrics-explorer-label-add-group"]').trigger("click");
+    it("adds the next filter as a new OR group from the + OR group button", async () => {
+      createWrapper({ filters: grouped });
+      await wrapper!.find(`[data-test="${DT}-add-group"]`).trigger("click");
       await flushPromises();
-      await wrapper.vm.onLabelPicked("code");
-      await flushPromises();
-      await wrapper.vm.onValuePicked("503");
-      await flushPromises();
-      expect(wrapper.emitted("add")![0]).toEqual([
+      await type("code");
+      await press("Enter");
+      await press("Enter");
+      await type("503");
+      await press("Enter");
+      expect(wrapper!.emitted("add")![0]).toEqual([
         { label: "code", value: "503", operator: "=", group: 3 },
       ]);
     });
 
+    it("adds into an existing group from its + button, negated when the group is", async () => {
+      createWrapper({ filters: grouped });
+      await wrapper!.find(`[data-test="${DT}-group-add-2"]`).trigger("click");
+      await flushPromises();
+      await type("instance");
+      await press("Enter");
+      await press("Enter");
+      await type("web");
+      await press("Enter");
+      expect(wrapper!.emitted("add")![0]).toEqual([
+        { label: "instance", value: "web", operator: "=", group: 2, negate: true },
+      ]);
+    });
+
+    it("hides labels the group uses and keeps the ones other groups use", async () => {
+      createWrapper({ filters: grouped, labelNames: ["job", "code", "env", "instance"] });
+      await wrapper!.find(`[data-test="${DT}-group-add-1"]`).trigger("click");
+      await flushPromises();
+      expect(rowKeys()).toEqual(expect.arrayContaining(["job", "env", "instance"]));
+      expect(rowKeys()).not.toContain("code");
+    });
+
+    it("still reaches a used label typed in full, so a label can repeat in the base list", async () => {
+      createWrapper({ filters: grouped.slice(0, 1) });
+      await focus();
+      expect(rowKeys()).not.toContain("job");
+      await type("job");
+      expect(rowKeys()).toContain("job");
+    });
+
+    it("adds the next filter as a new OR group from a typed (", async () => {
+      createWrapper({ filters: grouped });
+      await focus();
+      await type("(");
+      await type("code");
+      await press("Enter");
+      await press("Enter");
+      await type("503");
+      await press("Enter");
+      expect(wrapper!.emitted("add")![0]).toEqual([
+        { label: "code", value: "503", operator: "=", group: 3 },
+      ]);
+    });
+
+    it("keeps a group opened with no filter yet, and the base list as it was", async () => {
+      createWrapper({ filters: grouped.slice(0, 1) });
+      await focus();
+      await type("(");
+      expect(treeOf().items.some((item) => item.kind === "group")).toBe(true);
+      expect(wrapper!.emitted("add")).toBeUndefined();
+    });
+
     it("adds into an existing group, negated when the group is", async () => {
-      wrapper = createWrapper({ filters: grouped });
-      await wrapper.find('[data-test="metrics-explorer-label-group-add-2"]').trigger("click");
-      await flushPromises();
-      await wrapper.vm.onLabelPicked("instance");
-      await flushPromises();
-      await wrapper.vm.onValuePicked("a");
-      await flushPromises();
-      expect(wrapper.emitted("add")![0]).toEqual([
+      createWrapper({ filters: grouped });
+      await addToGroup(2, chipIn("instance", ["a"]));
+      expect(wrapper!.emitted("add")![0]).toEqual([
         { label: "instance", value: "a", operator: "=", group: 2, negate: true },
       ]);
     });
 
     it("renders groups joined by or and emits negate-group from the NOT toggle", async () => {
-      wrapper = createWrapper({ filters: grouped });
-      expect(wrapper.find('[data-test="metrics-explorer-label-group-join-1"]').text()).toBe(
-        "and any of",
-      );
-      expect(wrapper.find('[data-test="metrics-explorer-label-group-join-2"]').text()).toBe("or");
-      expect(wrapper.find('[data-test="metrics-explorer-label-group-2"]').text()).toContain(
-        "env = prod",
-      );
+      createWrapper({ filters: grouped });
+      expect(wrapper!.find(`[data-test="${DT}-group-join-1"]`).text()).toBe("and any of");
+      expect(wrapper!.find(`[data-test="${DT}-group-join-2"]`).text()).toBe("or");
+      expect(wrapper!.find(`[data-test="${DT}-group-2"]`).text()).toContain("env");
 
-      await wrapper.find('[data-test="metrics-explorer-label-group-not-1"]').trigger("click");
-      await wrapper.find('[data-test="metrics-explorer-label-group-not-2"]').trigger("click");
-      expect(wrapper.emitted("negate-group")).toEqual([
+      await wrapper!.find(`[data-test="${DT}-group-not-1"]`).trigger("click");
+      await wrapper!.setProps({
+        filters: grouped.map((f) => (f.group === 1 ? { ...f, negate: true } : f)),
+      });
+      await wrapper!.find(`[data-test="${DT}-group-not-2"]`).trigger("click");
+      expect(wrapper!.emitted("negate-group")).toEqual([
         [1, true],
         [2, false],
       ]);
+      expect(wrapper!.emitted("remove")).toBeUndefined();
+      expect(wrapper!.emitted("add")).toBeUndefined();
     });
 
     it("refuses an add that expands past the branch cap, and says so", async () => {
@@ -616,17 +435,13 @@ describe("LabelFilterBar", () => {
         (_, i) =>
           ({ label: `l${i}`, value: "x", operator: "=", group: 1, negate: true }) as LabelFilter,
       );
-      wrapper = createWrapper({ filters: negated });
-      await wrapper.find('[data-test="metrics-explorer-label-group-add-1"]').trigger("click");
-      await flushPromises();
-      await wrapper.vm.onLabelPicked("job");
-      await flushPromises();
-      await wrapper.vm.onValuePicked("api");
-      await flushPromises();
-      expect(wrapper.emitted("add")).toBeUndefined();
+      createWrapper({ filters: negated });
+      await addToGroup(0, chipIn("job", ["api"]));
+      expect(wrapper!.emitted("add")).toBeUndefined();
       expect(
-        wrapper.find('[data-test="metrics-explorer-label-too-many-branches"]').text(),
+        wrapper!.find('[data-test="metrics-explorer-label-too-many-branches"]').text(),
       ).toContain("17");
+      expect(wrapper!.findAll('[data-test="metrics-explorer-label-chip-job"]')).toHaveLength(0);
     });
   });
 });

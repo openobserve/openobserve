@@ -113,6 +113,9 @@ export async function deleteDashboard(page, dashboardName) {
     .locator('xpath=ancestor::*[starts-with(@data-test,"o2-table-row-")]')
     .locator('[data-test="dashboard-delete"]');
   await deleteButton.waitFor({ state: 'visible', timeout: 10000 });
+  // A prior delete leaves pointer and focus on the row that slid up; its bottom-side tooltip covers this button until mouseleave and blur.
+  await nameCell.hover();
+  await deleteButton.focus();
   await deleteButton.click();
 
   // Wait for the confirmation dialog to ensure it is fully rendered

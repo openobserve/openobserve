@@ -123,6 +123,8 @@ import {
 } from "@/test/unit/fixtures/rcaThread";
 import type { RcaLiveEvent } from "@/services/incidents";
 import awsConfig from "@/aws-exports";
+import { formatToReadable } from "@/utils/date";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 // Test data factory
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
@@ -1411,6 +1413,157 @@ describe("IncidentDetailDrawer.vue", () => {
 
       expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "incidentList" }));
       expect(incidentsService.cancelRca).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("A finding's incident", () => {
+    const FINDING = {
+      autoobserve_finding: "stream_silence",
+      stream_type: "logs",
+      stream_name: "checkout",
+    };
+    const findingTrigger = (at: number): IncidentAlert => ({
+      ...createAlert({
+        alert_id: "autoobserve:f1",
+        alert_name: "checkout (logs) stopped sending data",
+        alert_fired_at: at,
+        correlation_reason: "alert_id",
+        created_at: at,
+      }),
+      alert_kind: "autoobserve",
+    });
+    const openOn = async (tab: string, data: Partial<IncidentWithAlerts>) => {
+      (incidentsService.get as any).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "inc-1", ...data }),
+      });
+      wrapper = await createWrapper({}, {}, "inc-1");
+      await flushPromises();
+      wrapper.vm.activeTab = tab;
+      await flushPromises();
+    };
+    const byTest = (id: string) => wrapper.find(`[data-test="${id}"]`);
+    const RAW = /autoobserve_finding|stream_name|stream_type|stream_silence/;
+
+    it("the Dimensions panel reads a finding in words", async () => {
+      // The key order a live server sends, which is not the display order.
+      const SERVER_ORDER = {
+        stream_name: "checkout",
+        stream_type: "logs",
+        autoobserve_finding: "stream_silence",
+      };
+      await openOn("overview", { group_values: SERVER_ORDER, triggers: [findingTrigger(5)] });
+      const rows = wrapper
+        .findAll('[data-test="incident-dimension-row"]')
+        .map((row) => row.text().replace(/\s+/g, " "));
+      expect(rows).toEqual([
+        "Finding: Stopped sending data",
+        "Stream Name: checkout",
+        "Stream Type: logs",
+      ]);
+      expect(rows.join(" ")).not.toMatch(RAW);
+      wrapper.unmount();
+
+      (serviceStreamsApi.getSemanticGroups as any).mockResolvedValue({
+        data: [{ id: "service", display: "Service Name", fields: ["service"] }],
+      });
+      await openOn("overview", { group_values: { service: "api" } });
+      expect(
+        wrapper
+          .findAll('[data-test="incident-dimension-row"]')
+          .map((row) => row.text().replace(/\s+/g, " ")),
+      ).toEqual(["Service Name: api"]);
+    });
+
+    it("a finding's side panel shows the finding", async () => {
+      const at = 1762300000000000;
+      // A finding that fired twice started at its first firing.
+      await openOn("alertTriggers", {
+        group_values: FINDING,
+        alerts: [],
+        triggers: [findingTrigger(at + 600_000_000), findingTrigger(at)],
+      });
+      expect(byTest("incident-trigger-details-header").text()).toBe("Finding details");
+      const panel = byTest("incident-finding-details");
+      expect(panel.find('[data-test="incident-finding-what"]').text()).toBe("Stopped sending data");
+      const streamType = panel.findComponent(OTag);
+      expect(streamType.props("type")).toBe("streamType");
+      expect(streamType.props("value")).toBe("logs");
+      expect(streamType.text()).toBe("Logs");
+      expect(panel.find('[data-test="incident-finding-stream-name"]').text()).toBe("checkout");
+      expect(panel.find('[data-test="incident-finding-started"]').text()).toBe(
+        formatToReadable(at),
+      );
+      const note = panel.find('[data-test="incident-finding-note"]');
+      expect(note.text()).toBe(
+        "AutoObserve opened this incident from a stream finding, so there is no alert rule to show.",
+      );
+      expect(note.classes()).not.toContain("italic");
+      expect(note.classes().some((c) => c.startsWith("text-status-error"))).toBe(false);
+      expect(byTest("incident-trigger-details-body").text()).not.toContain(
+        "No alert details available",
+      );
+      expect(panel.html()).not.toMatch(RAW);
+    });
+
+    it("unreadable facts show one neutral line", async () => {
+      await openOn("alertTriggers", {
+        group_values: {},
+        alerts: [],
+        triggers: [findingTrigger(5)],
+      });
+      const body = byTest("incident-trigger-details-body");
+      expect(body.classes()).toEqual(["flex-1", "overflow-auto", "p-3"]);
+      expect(body.text()).toBe(
+        "AutoObserve opened this incident from a stream finding. Its stream details are not available.",
+      );
+      const note = body.find('[data-test="incident-finding-note"]');
+      expect(note.classes()).not.toContain("italic");
+      expect(note.classes().some((c) => c.startsWith("text-status-error"))).toBe(false);
+      expect(body.find('[data-test="incident-finding-what"]').exists()).toBe(false);
+    });
+
+    it("an alert incident's side panel is unchanged", async () => {
+      await openOn("alertTriggers", {
+        group_values: { service: "api" },
+        alerts: [],
+        triggers: [createAlert({ alert_id: "a1", alert_name: "ops_quiet" })],
+      });
+      expect(byTest("incident-trigger-details-header").text()).toBe("Alert Details");
+      expect(byTest("incident-trigger-details-body").text()).toBe("No alert details available");
+      expect(byTest("incident-finding-details").exists()).toBe(false);
+      wrapper.unmount();
+
+      await openOn("alertTriggers", {
+        group_values: { service: "api" },
+        alerts: [{ id: "a1", name: "ops_quiet" }] as never,
+        triggers: [createAlert({ alert_id: "a1", alert_name: "ops_quiet" })],
+      });
+      expect(byTest("incident-trigger-details-body").text()).toBe(
+        "Click on a trigger in the table to view details",
+      );
+    });
+
+    it("an AutoObserve trigger lists the finding as its labels", async () => {
+      await openOn("alertTriggers", {
+        group_values: FINDING,
+        alerts: [],
+        triggers: [
+          findingTrigger(5),
+          {
+            ...createAlert({ alert_id: "ext-1", alert_name: "payments latency", created_at: 6 }),
+            alert_kind: "external",
+            detected_source: "webhook",
+            labels: { env: "prod" },
+          },
+        ],
+      });
+      const labels = wrapper
+        .findAll("tbody tr")
+        .map((row) => row.findAll('[data-test="trigger-label-chip"]').map((chip) => chip.text()));
+      expect(labels).toEqual([
+        ["Finding=Stopped sending data", "Stream Name=checkout", "Stream Type=logs"],
+        ["env=prod"],
+      ]);
     });
   });
 

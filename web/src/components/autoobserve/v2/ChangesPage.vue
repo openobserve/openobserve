@@ -20,29 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="autoobserve2-activity-page"
   >
     <header
-      class="border-border-subtle rounded-surface from-ai-accent/15 via-surface-base to-ingest-accent-teal/15 dark:from-ai-accent/25 dark:via-surface-base dark:to-ingest-accent-teal/20 flex flex-col gap-5 border bg-linear-to-br px-4 pt-3 pb-5 shadow-xs sm:px-6 sm:pb-6"
+      v-if="changes.length"
+      class="bg-surface-base border-border-subtle rounded-surface flex flex-col gap-5 border px-4 py-5 shadow-xs sm:px-6"
     >
-      <OButton
-        variant="ghost"
-        size="xs"
-        icon-left="arrow-back"
-        class="-ms-2 self-start"
-        data-test="autoobserve2-activity-back"
-        @click="emit('back')"
-      >
-        {{ t("autoobserve2.coveragePage.back") }}
-      </OButton>
-      <div class="flex flex-col gap-1.5">
-        <h1
-          class="text-text-heading text-2xl leading-tight font-semibold tracking-tight sm:text-3xl"
-          data-test="autoobserve2-activity-title"
-        >
-          {{ t("autoobserve2.activityPage.title") }}
-        </h1>
-        <p class="text-text-body flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-          {{ t("autoobserve2.activityPage.stats.window") }}
-        </p>
-      </div>
       <dl
         v-if="changes.length"
         class="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4"
@@ -72,13 +52,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </dl>
     </header>
 
-    <p
-      v-if="!changes.length"
-      class="text-text-secondary bg-surface-base border-border-subtle rounded-surface border px-5 py-6 text-sm shadow-xs"
-      data-test="autoobserve2-activity-empty"
-    >
-      {{ t("autoobserve2.activityPage.empty.scenario") }}
-    </p>
+    <slot v-if="!changes.length" name="empty">
+      <p
+        class="text-text-secondary bg-surface-base border-border-subtle rounded-surface border px-5 py-6 text-sm shadow-xs"
+        data-test="autoobserve2-activity-empty"
+      >
+        {{ t("autoobserve2.activityPage.empty.scenario") }}
+      </p>
+    </slot>
     <template v-else>
       <OToggleGroup
         :model-value="filter"
@@ -118,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`autoobserve2-activity-day-${group.day}`"
         >
           <h2
-            class="bg-surface-base border-border-subtle text-text-secondary sticky top-2 z-20 self-start rounded-full border px-3 py-1 text-xs font-semibold tracking-wider uppercase shadow-xs"
+            class="bg-surface-base border-border-subtle text-text-secondary sticky top-2 z-20 self-start rounded-full border px-3 py-1 text-xs font-semibold shadow-xs"
           >
             {{ t(DAY_LABEL[group.day]) }}
           </h2>
@@ -149,7 +130,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -176,7 +156,6 @@ import {
 const props = defineProps<{ ledger: LedgerEntry[]; scenario: Scenario; highlightId?: string }>();
 
 const emit = defineEmits<{
-  back: [];
   "update-entry": [id: string, patch: Partial<LedgerEntry>];
 }>();
 

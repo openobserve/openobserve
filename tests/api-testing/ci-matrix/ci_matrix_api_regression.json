@@ -52,6 +52,13 @@
       "target": "tests/regression/test_promql_mixed_case_metric_name.py",
       "server_env": "ZO_FORMAT_STREAM_NAME_TO_LOWERCASE=false",
       "category": "api_integration_tests"
+    },
+    {
+      "label": "multialert_notify_cap",
+      "_comment": "openobserve#14407 needs a per-evaluation notification cap, which defaults to 0 (unlimited).",
+      "target": "tests/regression/test_multialert_notify_cap.py",
+      "server_env": "ZO_ALERT_MAX_GROUP_NOTIFICATIONS_PER_EVAL=2",
+      "category": "api_integration_tests"
     }
   ]
 }

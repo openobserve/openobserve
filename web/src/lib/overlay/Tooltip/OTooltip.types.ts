@@ -49,6 +49,8 @@ export interface TooltipProps {
   open?: boolean;
   /** Extra CSS class applied to the tooltip bubble element */
   contentClass?: string;
+  /** Fill class for the arrow, so it matches a `contentClass` background */
+  arrowClass?: string;
   /**
    * Renders a keyboard-shortcut hint (OShortcut keycaps) after the content.
    * Accepts a pre-symbolised string (`"⌘⇧A"`) or an array of keycaps
@@ -63,6 +65,8 @@ export interface TooltipProps {
   shortcutId?: string;
   /** Open only when the trigger's text is actually cut off; without `content` it shows that text. */
   overflowOnly?: boolean;
+  /** Closes when another exclusive tooltip opens, so a row's tooltips never show side by side. */
+  exclusive?: boolean;
   /** Element to position against, for one tooltip shared by many targets; visibility then follows `open` alone. */
   anchor?: HTMLElement | null;
 }

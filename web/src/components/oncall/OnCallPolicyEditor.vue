@@ -466,6 +466,7 @@
                     kind="on_call"
                     :model-value="templateOverride"
                     :destinations="templateDestinations"
+                    :server-error="templateError"
                     @update:model-value="templateOverride = $event"
                   />
                 </div>
@@ -615,6 +616,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import TemplateOverridePicker from "@/components/alerts/TemplateOverridePicker.vue";
+import { templateBindingError } from "@/utils/alerts/templateBindingError";
 import { isSlackAppDestination } from "@/utils/slackAppDestination";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
@@ -791,6 +793,8 @@ const saveChannelWrite = useMutation(() => setTeamChannelMutation(orgId.value, p
 
 /// The team's room, read whole with its provenance.
 const teamChannel = ref<TeamChannel | null>(null);
+/// Whether that read finished: until it does, the room and so the picker's visibility are unknown.
+const teamChannelRead = ref<"pending" | "loaded" | "failed">("pending");
 const teamChannelDraft = ref<string[]>([]);
 /// "Use the policy's list" pressed: Save sends `null`, which is a different fact from an empty list.
 const channelBackToPolicy = ref(false);
@@ -817,6 +821,17 @@ const roomDestinations = computed(() =>
 // Room posts render with the policy's template too, so the picker shows without a webhook rung.
 const templateEnabled = computed(() => webhookEnabled.value || roomDestinations.value.length > 0);
 
+// Cleared only for a confirmed empty room: a pending, failed or unsaved channel can still use it.
+const templateConfirmedOff = computed(
+  () => !templateEnabled.value && teamChannelRead.value === "loaded" && !teamChannelDirty.value,
+);
+
+/// The server's refusal of the picked template, shown under the picker until the pick changes.
+const templateError = ref<string | null>(null);
+watch(templateOverride, () => {
+  templateError.value = null;
+});
+
 const templateDestinations = computed(() => {
   const paged = webhookEnabled.value ? destinations.value : [];
   return [...new Set([...paged, ...roomDestinations.value])].map((name) => ({
@@ -835,19 +850,26 @@ function usePolicyChannel() {
   channelBackToPolicy.value = true;
 }
 
-// Uncached read-modify-write: a stale entry would seed the draft and be saved back.
+// Uncached read-modify-write; each read is numbered so a slower earlier read cannot win.
+let teamChannelReadId = 0;
 async function fetchTeamChannel() {
+  const readId = ++teamChannelReadId;
+  teamChannelRead.value = "pending";
   try {
     const res = await oncallService.getTeamChannel({
       org_identifier: orgId.value,
       team_id: props.teamId,
     });
+    if (readId !== teamChannelReadId) return;
     teamChannel.value = res.data ?? null;
     teamChannelDraft.value = [...(res.data?.destinations ?? [])];
     channelBackToPolicy.value = false;
+    teamChannelRead.value = "loaded";
   } catch (err) {
+    if (readId !== teamChannelReadId) return;
     noteDenial(err);
     teamChannel.value = null;
+    teamChannelRead.value = "failed";
   }
 }
 
@@ -1283,23 +1305,36 @@ async function save(): Promise<boolean> {
     return false;
   }
   saving.value = true;
+  // A refusal names the template sent; a pick made during the request is not the one refused.
+  const submittedTemplate = templateOverride.value;
+  const policyPayload = {
+    rungs: draft.value,
+    destinations: destinations.value,
+    template: templateConfirmedOff.value ? null : templateOverride.value,
+    ...(l0Touched.value && l0Draft.value ? { l0: l0Draft.value } : {}),
+  };
+  let channelWritten = false;
   try {
-    await savePolicyWrite.mutateAsync({
-      rungs: draft.value,
-      destinations: destinations.value,
-      template: templateOverride.value,
-      ...(l0Touched.value && l0Draft.value ? { l0: l0Draft.value } : {}),
-    });
+    await savePolicyWrite.mutateAsync(policyPayload);
     if (!(await saveChannelAfterPolicy())) {
       emit("policy-written");
       return false;
+    }
+    // The saved channel emptied the room, so the kept override is released now, not on the next Save.
+    if (policyPayload.template !== null && templateConfirmedOff.value) {
+      channelWritten = true;
+      await savePolicyWrite.mutateAsync({ ...policyPayload, template: null });
+      if (templateOverride.value === submittedTemplate) templateOverride.value = null;
     }
     toast({ variant: "success", message: t("oncall.policySaved") });
     policyDraft.markSaved();
     emit("saved");
     return true;
   } catch (err: unknown) {
+    if (channelWritten) emit("policy-written");
     noteConfigurationDenied(err);
+    if (templateOverride.value === submittedTemplate)
+      templateError.value = templateBindingError(err);
     toast({
       variant: "error",
       message: raw(serverMessageOf(err)) || t("oncall.savePolicyFailed"),

@@ -4,6 +4,31 @@
 
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
+
+// Saved anomaly operator spellings (lower-cased) to the filter builder's operator ids.
+const ANOMALY_OPERATOR_IDS = {
+    '=': 'eq',
+    '<>': 'neq',
+    '!=': 'neq',
+    '>': 'gt',
+    '>=': 'gte',
+    '<': 'lt',
+    '<=': 'lte',
+    in: 'in',
+    'not in': 'not_in',
+    contains: 'contains',
+    str_match: 'contains',
+    str_match_ignore_case: 'contains_ci',
+    'not contains': 'not_contains',
+    'starts with': 'starts_with',
+    'ends with': 'ends_with',
+    re_match: 'regex',
+    re_not_match: 'not_regex',
+    'is null': 'is_null',
+    'is not null': 'is_not_null',
+    match_all: 'match_all',
+};
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 const { cleanupTestAnomalies: apiCleanupTestAnomalies } = require('../../playwright-tests/utils/api-helper.js');
 const { discardEditorDraftIfAsked } = require('../alertsPages/editorDraftHelpers.js');
@@ -50,9 +75,7 @@ class AnomalyDetectionPage {
 
             // Detection config step
             queryTabs: '[data-test="anomaly-query-tabs"]',
-            filterRow: '[data-test="anomaly-filter-row"]',
-            filterRowRemove: '[data-test="anomaly-filter-row-remove"]',
-            filterAdd: '[data-test="anomaly-filter-add"]',
+            filterBuilder: '[data-test="anomaly-filter-builder-root"]',
             customSql: '[data-test="anomaly-custom-sql"]',
             customSqlRequiredError: '[data-test="anomaly-custom-sql-required-error"]',
             customSqlTimestampError: '[data-test="anomaly-custom-sql-timestamp-alias-error"]',
@@ -126,9 +149,7 @@ class AnomalyDetectionPage {
             sensitivityTierItem: (k) => `[data-test="anomaly-sensitivity-tier-${k}"]`,
             budgetTierItem: (value) => `[data-test="anomaly-budget-tier-${value}"]`,
             queryTab: (mode) => `[data-test="anomaly-query-tab-${mode}"]`,
-            filterField: (idx) => `[data-test="anomaly-filter-field-${idx}"]`,
-            filterOperator: (idx) => `[data-test="anomaly-filter-operator-${idx}"]`,
-            filterValue: (idx) => `[data-test="anomaly-filter-value-${idx}"]`,
+            filterChip: (field) => `[data-test="anomaly-filter-builder-chip-${field}"]`,
             chartRangeItem: (v) => `[data-test="alerts-anomalydetectionchart-range-${v}"]`,
             chartInternals: '[data-test="alerts-anomalydetectionchart-internals"]',
             chartPanel: (key) => `[data-test="alerts-anomalydetectionchart-${key}"]`,
@@ -433,32 +454,33 @@ class AnomalyDetectionPage {
 
     // Filters
 
+    filterBuilder() {
+        return new FilterBuilderDriver(this.page, 'anomaly-filter-builder');
+    }
+
+    /** One chip per saved filter row. */
     getFilterRows() {
-        return this.page.locator(this.selectors.filterRow);
+        return this.filterBuilder().chips;
     }
 
     /**
-     * Append one filter row. Value is skipped for Is Null / Is Not Null, whose
-     * value input is not rendered at all.
+     * Append one filter through the shared filter builder. `operator` takes the saved
+     * spelling (=, <>, IN, Contains, Is Null, ...); `value` a string, or a list for IN / NOT IN.
      */
     async addFilter(field, operator = '=', value = null) {
         const before = await this.getFilterRows().count();
-        await this.page.locator(this.selectors.filterAdd).click();
+        const id = ANOMALY_OPERATOR_IDS[String(operator).toLowerCase()];
+        if (!id) throw new Error(`Unknown anomaly filter operator: ${operator}`);
+        let values = [];
+        if (Array.isArray(value)) values = value.map(String);
+        else if (value !== null) values = [String(value)];
+        await this.filterBuilder().addCondition({ field, operator: id, values });
         await expect(this.getFilterRows()).toHaveCount(before + 1, { timeout: 10000 });
-
-        const idx = before;
-        await this.selectOptionByValue(this.selectors.filterField(idx), field);
-        if (operator !== '=') {
-            await this.selectOptionByValue(this.selectors.filterOperator(idx), operator);
-        }
-        if (value !== null) {
-            await this.fillFormInput(this.selectors.filterValue(idx), value);
-        }
         testLogger.info('Added filter', { field, operator, value });
     }
 
-    async removeFilter(index = 0) {
-        await this.page.locator(this.selectors.filterRowRemove).nth(index).click();
+    async removeFilter(field, nth = 0) {
+        await this.filterBuilder().removeChip(field, nth);
     }
 
     // Sensitivity

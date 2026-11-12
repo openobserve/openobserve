@@ -199,7 +199,11 @@ pub fn build_llm_trace_query(
     };
 
     if validated.has_gen_ai {
-        let usage = |column: &str| validated.usage_sum(column);
+        // Same per-trace rule as Session Detail and Users: LLM calls, else the top-level agents.
+        let usage =
+            |column: &str| crate::traces::session::usage_rule(column, validated.has_operation_name);
+        let agent_parents =
+            crate::traces::session::agent_parents_join(&stream_ident, validated.layout(), None);
         let total_tokens_expr = if validated.has_total_tokens {
             format!(
                 "{} as gen_ai_usage_details_total",
@@ -223,7 +227,7 @@ pub fn build_llm_trace_query(
             array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
             {first_msg_clause} as gen_ai_input_messages, \
             {extra_selects} \
-            FROM {stream_ident}",
+            FROM {stream_ident}{agent_parents}",
             validated.unpriced_selects()
         )
     } else {
@@ -392,22 +396,38 @@ mod tests {
     }
 
     #[test]
-    fn test_build_llm_trace_query_sums_only_llm_call_spans() {
+    fn test_build_llm_trace_query_applies_the_per_trace_usage_rule() {
         let mut validated = schema_compat::ValidatedLlmSchema::fallback(true);
         validated.has_total_tokens = true;
         validated.has_operation_name = true;
+        validated.has_parent_span = true;
         let sql = build_llm_trace_query("default", &validated, "count(*) AS span_count");
         let llm_call = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name IN \
                         ('chat', 'text_completion', 'generate_content', 'embeddings'))";
+        // Fall back to top-level agents so a nested agent is not counted twice.
         for (column, alias) in [
             ("gen_ai_usage_input_tokens", "gen_ai_usage_details_input"),
             ("gen_ai_usage_output_tokens", "gen_ai_usage_details_output"),
             ("gen_ai_usage_total_tokens", "gen_ai_usage_details_total"),
             ("gen_ai_usage_cost", "gen_ai_usage_cost_details"),
         ] {
-            let expected = format!("sum(CASE WHEN {llm_call} THEN {column} ELSE 0 END) as {alias}");
+            let expected = format!(
+                "COALESCE(NULLIF(sum(CASE WHEN {llm_call} THEN {column} ELSE 0 END), 0), \
+                 sum(CASE WHEN gen_ai_operation_name = 'invoke_agent' AND agent_parent_span IS NULL \
+                 THEN {column} END), 0) as {alias}"
+            );
             assert!(sql.contains(&expected), "{sql}");
         }
+        // The plan appends its WHERE after the stream and its agent-parent join.
+        assert!(
+            sql.ends_with(
+                "FROM \"default\" LEFT JOIN (SELECT DISTINCT trace_id AS agent_parent_trace, \
+                 span_id AS agent_parent_span FROM \"default\" \
+                 WHERE gen_ai_operation_name = 'invoke_agent') AS agent_parents \
+                 ON trace_id = agent_parent_trace AND reference_parent_span_id = agent_parent_span"
+            ),
+            "{sql}"
+        );
     }
 
     #[test]

@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "source": "autoobserve",
+  "sourceLabel": "Suggested by AutoObserve for svc-ingest-b",
+  "name": "svc-ingest-b_no_data",
+  "streamType": "logs",
+  "streamName": "ingest_b",
+  "queryType": "sql",
+  "sql": "SELECT count(*) AS row_count FROM \"ingest_b\" WHERE \"service_name\" = 'svc-ingest-b' HAVING count(*) = 0",
+  "periodMinutes": 15,
+  "frequencyMinutes": 5,
+  "silenceMinutes": 60,
+  "thresholdShape": "count",
+  "createsIncident": true,
+  "triggerThreshold": 1,
+  "triggerOperator": ">=",
+  "warnings": [],
+  "meta": {
+    "check": "no_data",
+    "threshold": 0,
+    "description": "Created from an AutoObserve suggestion for svc-ingest-b on Nov 6.",
+    "folderId": "ops",
+    "destinations": [
+      "ops-webhook"
+    ],
+    "service": {
+      "name": "svc-ingest-b",
+      "cluster": null,
+      "namespace": null
+    }
+  }
+}

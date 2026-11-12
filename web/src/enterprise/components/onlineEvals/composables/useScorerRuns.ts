@@ -5,6 +5,7 @@
 
 import { computed, ref, watch, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import {
   buildEvaluatorAgentFilterWhere,
   combineWhere,
@@ -46,10 +47,6 @@ const EMPTY_KPIS: RunKpis = {
   avgLatencyMs: null,
   failureCount: null,
 };
-
-function escapeSqlString(s: string): string {
-  return s.replace(/'/g, "''");
-}
 
 function toNumber(v: unknown): number | null {
   if (v == null) return null;
@@ -167,7 +164,7 @@ export function useScorerRuns(
     const id = scorerId.value;
     if (!id) return null;
     const where = combineWhere(
-      `CAST(attributes_scorer_id AS VARCHAR) = '${escapeSqlString(id)}'`,
+      `CAST(attributes_scorer_id AS VARCHAR) = ${sqlLiteral(id)}`,
       buildEvaluatorAgentFilterWhere(agentFilter?.value ?? null),
     );
     return [
@@ -187,7 +184,7 @@ export function useScorerRuns(
     const id = scorerId.value;
     if (!id) return null;
     const where = combineWhere(
-      `CAST(attributes_scorer_id AS VARCHAR) = '${escapeSqlString(id)}'`,
+      `CAST(attributes_scorer_id AS VARCHAR) = ${sqlLiteral(id)}`,
       buildEvaluatorAgentFilterWhere(agentFilter?.value ?? null),
     );
     return [

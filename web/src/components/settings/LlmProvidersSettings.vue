@@ -5,14 +5,14 @@
       :org-id="orgId"
       :mode="formPage.mode"
       :row="formPage.row"
-      @saved="handleSaved"
-      @cancel="closeForm"
+      @saved="leaveForm"
+      @cancel="leaveForm"
     />
 
     <OPageLayout
       v-else
       icon="smart-toy"
-      :subtitle="t('settings.llmProvidersSettings.subtitle')"
+      :subtitle="t('llmProviders.subtitle')"
       bleed
       :scroll="false"
     >
@@ -226,6 +226,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { forbiddenState } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
+import { isSameOriginRedirect } from "@/utils/safeUrl";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -397,15 +398,17 @@ function openEdit(row: Provider) {
   pushRouteAction({ action: "update", id: String(row.id) });
 }
 
-function closeForm() {
-  formPage.value = null;
-  clearRouteAction();
+// Only an in-app `return_to` path is followed.
+function returnTarget(): string | null {
+  const to = route.query.return_to;
+  return typeof to === "string" && to.startsWith("/") && isSameOriginRedirect(to) ? to : null;
 }
 
-// The save mutation's `invalidates` already refetches the list.
-function handleSaved() {
+function leaveForm() {
   formPage.value = null;
-  clearRouteAction();
+  const to = returnTarget();
+  if (to) router.push(to).catch(() => {});
+  else clearRouteAction();
 }
 
 function syncFromRoute() {

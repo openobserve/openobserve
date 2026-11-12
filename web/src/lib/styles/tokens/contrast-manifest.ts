@@ -602,13 +602,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     themes: ["light"],
   },
   {
-    fg: "--color-datepicker-error-text",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["dark"],
-  },
-  {
     fg: "--color-datepicker-focus-border",
     category: "pending",
     why: "fails the threshold against the page surface it is painted on",
@@ -1081,6 +1074,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     bg: "--color-checkbox-checked-bg",
     category: "text",
     why: "the tick is drawn inside the checked box",
+  },
+  {
+    fg: "--color-copy-confirm-text",
+    bg: "--color-copy-confirm-bg",
+    category: "text",
+    why: "the copy bubble's label is painted on the bubble's own inverse fill",
   },
   {
     fg: "--color-dag-node-agent-text",

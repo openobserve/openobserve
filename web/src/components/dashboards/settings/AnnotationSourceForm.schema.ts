@@ -25,7 +25,6 @@ import {
   defaultAnnotationSourceColor,
   pruneBlankAnnotationConditions,
 } from "@/utils/dashboard/annotationSources";
-import { ensureIds } from "@/utils/alerts/alertDataTransforms";
 import { getUUID } from "@/utils/zincutils";
 
 /** A row of the panel picker: a time-series panel, or a tab heading when the dashboard has several. */
@@ -44,11 +43,12 @@ const annotationConditionLeafSchema: z.ZodType<AnnotationConditionLeaf> = z.obje
   filterType: z.literal("condition"),
   column: z.string(),
   operator: z.string(),
-  value: z.string(),
+  value: z.union([z.string(), z.array(z.union([z.string(), z.number()]))]),
+  case_insensitive: z.boolean().optional(),
   logicalOperator: z.enum(["AND", "OR"]),
-});
+}) as unknown as z.ZodType<AnnotationConditionLeaf>;
 
-/** The alerts condition-tree shape (FilterGroup.vue's v2 format): a group of leaves and/or nested groups. */
+/** The alerts condition-tree shape (the engine V2 tree): a group of leaves and/or nested groups. */
 const annotationConditionGroupSchema: z.ZodType<AnnotationConditionGroup> = z.lazy(() =>
   z.object({
     groupId: z.string().optional(),
@@ -142,11 +142,22 @@ export const annotationSourceDefaults = (colorIndex = 0): AnnotationSourceFormVa
   panelsAll: true,
 });
 
-/** A saved tree may be missing client-only ids (groupId/id) or carry the backend's operator casing. */
+/** The saved tree is kept as loaded so an untouched source saves back unchanged. */
 const loadAnnotationFilters = (filters: AnnotationSource["filters"]): AnnotationConditionGroup =>
   filters && filters.filterType === "group"
-    ? (ensureIds(cloneDeep(filters)) as AnnotationConditionGroup)
+    ? (cloneDeep(filters) as AnnotationConditionGroup)
     : emptyAnnotationFilterGroup();
+
+type AnnotationNode = AnnotationConditionGroup | AnnotationConditionLeaf;
+
+// The backend stores a leaf value as text, so an `in` / `not_in` list is saved as a JSON array string.
+const listValuesAsText = (node: AnnotationNode): AnnotationNode => {
+  if (node.filterType === "condition") {
+    const value: unknown = node.value;
+    return Array.isArray(value) ? { ...node, value: JSON.stringify(value) } : node;
+  }
+  return { ...node, conditions: (node.conditions ?? []).map(listValuesAsText) };
+};
 
 export const annotationSourceToFormValues = (
   source: AnnotationSource,
@@ -182,7 +193,9 @@ export const formValuesToAnnotationSource = (
     mode: value.mode,
     streamType: value.streamType,
     stream: value.stream,
-    filters: pruneBlankAnnotationConditions(value.filters as AnnotationConditionGroup),
+    filters: listValuesAsText(
+      pruneBlankAnnotationConditions(value.filters as AnnotationConditionGroup),
+    ) as AnnotationConditionGroup,
     ...(value.mode === "sql" && query ? { query } : {}),
     title: value.title.trim(),
     ...(description ? { description } : {}),

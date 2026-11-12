@@ -40,7 +40,7 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::ingestion::check_ingestion_allowed;
 pub use openobserve_core::traces::{
     agent_signals::{compare_agent_versions, get_agent_signals},
-    service_graph::{self, get_current_topology, get_edge_history},
+    service_graph,
 };
 use openobserve_core::{auth::UserEmail, traces};
 use tracing::{Instrument, Span};
@@ -422,6 +422,24 @@ pub async fn get_latest_traces_stream(
     };
     let context = list::TraceSearchContext::new(org_id, stream_name, user_id.to_string(), trace_id);
     list::stream_response(context, plan, http_span)
+}
+
+/// Documented on [`service_graph::api::get_current_topology`]; the graph is scoped to the user.
+pub async fn get_current_topology(
+    Path(org_id): Path<String>,
+    axum::extract::Query(query): axum::extract::Query<service_graph::api::ServiceGraphQuery>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    service_graph::get_current_topology(&org_id, &user_email.user_id, query).await
+}
+
+/// Documented on [`service_graph::api::get_edge_history`]; the trend is scoped to the user.
+pub async fn get_edge_history(
+    Path(org_id): Path<String>,
+    axum::extract::Query(query): axum::extract::Query<service_graph::api::EdgeHistoryQuery>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    service_graph::get_edge_history(&org_id, &user_email.user_id, query).await
 }
 
 fn record_latest_traces_metrics(org_id: &str, status: &str, elapsed: f64) {

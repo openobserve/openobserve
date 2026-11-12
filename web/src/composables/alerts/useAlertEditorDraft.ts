@@ -16,6 +16,7 @@
 import { nextTick, ref, type Ref } from "vue";
 import type { RouteLocationNormalized } from "vue-router";
 import { useEditorDraft, type EditorDraftController } from "@/composables/useEditorDraft";
+import { hasEditorDraft } from "@/utils/drafts/editorDraftStore";
 import type { useAlertForm } from "@/composables/useAlertForm";
 import {
   ALERT_DRAFT_KIND,
@@ -51,6 +52,9 @@ export interface AlertEditorDraft {
   formKey: Ref<number>;
   start: () => Promise<void>;
   handleSaved: (folderId?: string) => void;
+  /** Whether this alert has a stored draft, continued or kept; read after `start`. */
+  hasStoredDraft: () => boolean;
+  applyProgrammaticChange: EditorDraftController["applyProgrammaticChange"];
 }
 
 // The list hosts the editor on its own path, so opening or closing it only changes these query keys.
@@ -181,5 +185,25 @@ export const useAlertEditorDraft = ({
     onSaved(folderId, { navigate: true });
   };
 
-  return { draft, formKey, start, handleSaved };
+  const hasStoredDraft = () => {
+    const id = entityId();
+    return (
+      id !== null &&
+      hasEditorDraft({
+        kind: ALERT_DRAFT_KIND,
+        org: String(form.store.state.selectedOrganization?.identifier ?? ""),
+        entityId: id,
+        userEmail: String(form.store.state.userInfo?.email ?? ""),
+      })
+    );
+  };
+
+  return {
+    draft,
+    formKey,
+    start,
+    handleSaved,
+    hasStoredDraft,
+    applyProgrammaticChange: draft.applyProgrammaticChange,
+  };
 };

@@ -112,6 +112,122 @@ describe("OTooltip", () => {
       wrapper.unmount();
     });
 
+    it("closes once the pointer moves off the trigger even when mouseleave never fires", async () => {
+      const wrapper = mount(
+        {
+          render: () =>
+            h("button", { "data-testid": "t" }, [h(OTooltip, { content: "Hello", delay: 10 })]),
+        },
+        { attachTo: document.body },
+      );
+      const trigger = wrapper.find('[data-testid="t"]').element;
+      try {
+        trigger.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+        trigger.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 60));
+        await nextTick();
+        expect(document.body.textContent).toContain("Hello");
+
+        document.body.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 60));
+        await nextTick();
+        expect(document.body.textContent).not.toContain("Hello");
+
+        trigger.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+        document.body.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 60));
+        await nextTick();
+        expect(document.body.textContent).not.toContain("Hello");
+      } finally {
+        wrapper.unmount();
+      }
+    });
+
+    const mountPauseAndMarker = (extra: Record<string, unknown>) =>
+      mount(
+        {
+          render: () =>
+            h("div", [
+              h("button", { "data-testid": "pause" }, [
+                h(OTooltip, { content: "Pause alert", delay: 10, ...extra }),
+              ]),
+              h(
+                OTooltip,
+                { content: "Couldn't pause", delay: 10, ...extra },
+                {
+                  default: () => h("span", { "data-testid": "marker", tabindex: 0 }, "!"),
+                },
+              ),
+            ]),
+        },
+        { attachTo: document.body },
+      );
+
+    it("closes the open exclusive tooltip when another one opens, so only one shows at a time", async () => {
+      const wrapper = mountPauseAndMarker({ exclusive: true });
+
+      const pause = wrapper.find('[data-testid="pause"]').element;
+      pause.dispatchEvent(new FocusEvent("focus"));
+      await new Promise((r) => setTimeout(r, 60));
+      await nextTick();
+      expect(document.body.textContent).toContain("Pause alert");
+
+      const marker = wrapper.find('[data-testid="marker"]').element;
+      await hover(marker);
+      await nextTick();
+      expect(marker.getAttribute("data-state")).not.toBe("closed");
+      expect(document.body.textContent).not.toContain("Pause alert");
+
+      pause.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 60));
+      await nextTick();
+      expect(document.body.textContent).toContain("Pause alert");
+      expect(marker.getAttribute("data-state")).toBe("closed");
+
+      wrapper.unmount();
+    });
+
+    it("leaves tooltips that don't opt in to exclusive alone when another opens", async () => {
+      const wrapper = mountPauseAndMarker({});
+
+      const pause = wrapper.find('[data-testid="pause"]').element;
+      pause.dispatchEvent(new FocusEvent("focus"));
+      await new Promise((r) => setTimeout(r, 60));
+      await nextTick();
+      const marker = wrapper.find('[data-testid="marker"]').element;
+      await hover(marker);
+      await nextTick();
+
+      expect(marker.getAttribute("data-state")).not.toBe("closed");
+      expect(document.body.textContent).toContain("Pause alert");
+
+      wrapper.unmount();
+    });
+
+    it("keeps a caller-controlled bubble (the copy bubble) open while an exclusive tooltip opens", async () => {
+      const anchor = document.createElement("div");
+      document.body.appendChild(anchor);
+      const onUpdate = vi.fn();
+      const bubble = mount(OTooltip, {
+        props: { anchor, open: true, content: "Copied", "onUpdate:open": onUpdate },
+        attachTo: document.body,
+      });
+      const wrapper = mountPauseAndMarker({ exclusive: true });
+      await nextTick();
+      expect(document.body.textContent).toContain("Copied");
+
+      const marker = wrapper.find('[data-testid="marker"]').element;
+      await hover(marker);
+      await nextTick();
+      expect(marker.getAttribute("data-state")).not.toBe("closed");
+      expect(document.body.textContent).toContain("Copied");
+      expect(onUpdate).not.toHaveBeenCalledWith(false);
+
+      wrapper.unmount();
+      bubble.unmount();
+      anchor.remove();
+    });
+
     // A kept-alive page deactivates without unmounting, and a detached trigger
     // never fires `mouseleave` — so a tooltip open at the moment of a tab
     // switch survived it. Observable on RETURN: without the onDeactivated

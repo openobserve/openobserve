@@ -29,7 +29,7 @@ use config::{
 use dashmap::DashMap;
 use tokio::sync::OnceCell;
 
-// Stable org cells keep failures retryable and make success a node-lifetime no-op.
+// Per-org cells keep failures retryable; later calls only re-check the stream exists.
 static INITIALIZATION_CACHE: Lazy<InitializationCache> = Lazy::new(InitializationCache::default);
 
 #[derive(Default)]
@@ -38,13 +38,17 @@ struct InitializationCache {
 }
 
 impl InitializationCache {
-    async fn run<Initialize, InitializeFuture>(
+    /// Runs `initialize` once per org, and again if the stream was deleted since.
+    async fn run<Exists, ExistsFuture, Initialize, InitializeFuture>(
         &self,
         org_id: &str,
+        exists: Exists,
         initialize: Initialize,
     ) -> Result<()>
     where
-        Initialize: FnOnce() -> InitializeFuture,
+        Exists: FnOnce() -> ExistsFuture,
+        ExistsFuture: Future<Output = bool>,
+        Initialize: Fn() -> InitializeFuture,
         InitializeFuture: Future<Output = Result<()>>,
     {
         let initialization = self
@@ -52,7 +56,13 @@ impl InitializationCache {
             .entry(org_id.to_string())
             .or_insert_with(|| Arc::new(OnceCell::new()))
             .clone();
-        initialization.get_or_try_init(initialize).await.map(|_| ())
+        if initialization.initialized() && !exists().await {
+            return initialize().await;
+        }
+        initialization
+            .get_or_try_init(&initialize)
+            .await
+            .map(|_| ())
     }
 }
 
@@ -63,24 +73,36 @@ fn expected_llm_scores_schema() -> Result<arrow_schema::Schema> {
 /// Initialize the canonical `_llm_scores` schema once per org; the watcher converges caches.
 pub async fn ensure_llm_scores_stream_initialized(org_id: &str) -> Result<()> {
     INITIALIZATION_CACHE
-        .run(org_id, || async {
-            initialize_llm_scores_stream_schema(org_id)
-                .await
-                .inspect_err(|e| {
-                    log::warn!(
-                        "[LLM-SCORES] Failed to initialize _llm_scores stream schema for org {org_id}: {e}"
-                    );
-                })?;
-            initialize_experiment_id_index(org_id)
-                .await
-                .inspect_err(|e| {
-                    log::warn!(
-                        "[LLM-SCORES] Failed to initialize experiment_id index for org {org_id}: {e}"
-                    );
-                })?;
-            Ok(())
-        })
+        .run(
+            org_id,
+            || llm_scores_stream_exists(org_id),
+            || initialize_llm_scores_stream(org_id),
+        )
         .await
+}
+
+async fn llm_scores_stream_exists(org_id: &str) -> bool {
+    infra::schema::get_cache(org_id, llm_scores::LLM_SCORES_STREAM, StreamType::Logs)
+        .await
+        .is_ok_and(|schema| !schema.schema().fields().is_empty())
+}
+
+async fn initialize_llm_scores_stream(org_id: &str) -> Result<()> {
+    initialize_llm_scores_stream_schema(org_id)
+        .await
+        .inspect_err(|e| {
+            log::warn!(
+                "[LLM-SCORES] Failed to initialize _llm_scores stream schema for org {org_id}: {e}"
+            );
+        })?;
+    initialize_experiment_id_index(org_id)
+        .await
+        .inspect_err(|e| {
+            log::warn!(
+                "[LLM-SCORES] Failed to initialize experiment_id index for org {org_id}: {e}"
+            );
+        })?;
+    Ok(())
 }
 
 async fn initialize_experiment_id_index(org_id: &str) -> Result<()> {
@@ -185,12 +207,20 @@ mod tests {
             let attempts = Arc::clone(&attempts);
             tokio::spawn(async move {
                 cache
-                    .run("legacy-org", || async move {
-                        attempts.fetch_add(1, Ordering::SeqCst);
-                        started.notify_one();
-                        release.notified().await;
-                        Ok(())
-                    })
+                    .run(
+                        "legacy-org",
+                        || async { true },
+                        move || {
+                            let (attempts, started, release) =
+                                (attempts.clone(), started.clone(), release.clone());
+                            async move {
+                                attempts.fetch_add(1, Ordering::SeqCst);
+                                started.notify_one();
+                                release.notified().await;
+                                Ok(())
+                            }
+                        },
+                    )
                     .await
             })
         };
@@ -201,10 +231,17 @@ mod tests {
             let attempts = Arc::clone(&attempts);
             tokio::spawn(async move {
                 cache
-                    .run("legacy-org", || async move {
-                        attempts.fetch_add(1, Ordering::SeqCst);
-                        Ok(())
-                    })
+                    .run(
+                        "legacy-org",
+                        || async { true },
+                        move || {
+                            let attempts = attempts.clone();
+                            async move {
+                                attempts.fetch_add(1, Ordering::SeqCst);
+                                Ok(())
+                            }
+                        },
+                    )
                     .await
             })
         };
@@ -224,26 +261,67 @@ mod tests {
     #[tokio::test]
     async fn failed_initialization_is_returned_and_retried() {
         let cache = InitializationCache::default();
-        let attempts = AtomicUsize::new(0);
+        let attempts = &AtomicUsize::new(0);
 
         let error = cache
-            .run("retry-org", || async {
-                attempts.fetch_add(1, Ordering::SeqCst);
-                anyhow::bail!("transient failure")
-            })
+            .run(
+                "retry-org",
+                || async { true },
+                move || async move {
+                    attempts.fetch_add(1, Ordering::SeqCst);
+                    anyhow::bail!("transient failure")
+                },
+            )
             .await
             .unwrap_err();
         assert_eq!(error.to_string(), "transient failure");
 
         cache
-            .run("retry-org", || async {
-                attempts.fetch_add(1, Ordering::SeqCst);
-                Ok(())
-            })
+            .run(
+                "retry-org",
+                || async { true },
+                move || async move {
+                    attempts.fetch_add(1, Ordering::SeqCst);
+                    Ok(())
+                },
+            )
             .await
             .unwrap();
         assert_eq!(attempts.load(Ordering::SeqCst), 2);
     }
+
+    #[tokio::test]
+    async fn a_stream_deleted_after_initialization_is_initialized_again() {
+        let cache = InitializationCache::default();
+        let attempts = &AtomicUsize::new(0);
+        let existence_checks = &AtomicUsize::new(0);
+        let initialize = move || async move {
+            attempts.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        };
+        let exists = move |present: bool| {
+            move || async move {
+                existence_checks.fetch_add(1, Ordering::SeqCst);
+                present
+            }
+        };
+
+        // The first call initializes without asking whether the stream exists.
+        cache.run("org", exists(false), initialize).await.unwrap();
+        assert_eq!(attempts.load(Ordering::SeqCst), 1);
+        assert_eq!(existence_checks.load(Ordering::SeqCst), 0);
+
+        // While the stream exists, later calls do not touch the schema.
+        cache.run("org", exists(true), initialize).await.unwrap();
+        assert_eq!(attempts.load(Ordering::SeqCst), 1);
+
+        // Once it is deleted, the canonical schema is applied again, every time it is missing.
+        cache.run("org", exists(false), initialize).await.unwrap();
+        assert_eq!(attempts.load(Ordering::SeqCst), 2);
+        cache.run("org", exists(true), initialize).await.unwrap();
+        assert_eq!(attempts.load(Ordering::SeqCst), 2);
+    }
+
     #[test]
     fn test_llm_score_reflection_has_all_fields() {
         let sample = LlmScoreRecord::init_for_reflection();

@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="[
           'o2-empty-state__inline-icon inline-flex items-center justify-center rounded-full',
           sizeClass.iconWrap,
+          inlineIconTone,
         ]"
       >
         <OIcon :name="inlineIcon" :size="size === 'inline' ? 'lg' : 'xl'" />
@@ -223,6 +224,8 @@ const props = withDefaults(
     filtered?: boolean;
     /** Force the dot-grid backdrop on/off (default: on for hero/block). */
     backdrop?: boolean;
+    /** Tint the `inline` icon red for an `error` variant; off keeps the grey circle. */
+    toneIcon?: boolean;
   }>(),
   { size: "block", actionId: "primary", secondaryActionId: "secondary" },
 );
@@ -307,6 +310,11 @@ const inlineIcon = computed<IconName | undefined>(() => {
   // sensible default icon per tone
   return variant.value === "error" ? "error-outline" : "search-off";
 });
+const inlineIconTone = computed(() =>
+  props.toneIcon && variant.value === "error"
+    ? "bg-status-error-bg text-status-error-text"
+    : "bg-surface-subtle text-text-secondary",
+);
 
 // --- prefers-reduced-motion -------------------------------------------------
 const animated = ref(true);
@@ -410,7 +418,7 @@ const SIZE_MAP: Record<
     description: raw("text-xs"),
     illustrationWidth: 0,
     illustration: "",
-    iconWrap: "w-12 h-12 bg-surface-subtle text-text-secondary mb-0.5",
+    iconWrap: "w-12 h-12 mb-0.5",
   },
 };
 const sizeClass = computed(() => SIZE_MAP[size.value]);

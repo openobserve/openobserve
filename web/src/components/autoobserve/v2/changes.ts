@@ -30,6 +30,8 @@ import type { FixPhase } from "./useDecisions";
 
 export type ChangeFilter = "all" | "fixes" | "watching" | "tuning";
 export type ChangeKind = "fix" | "permission" | "watching" | "tuning";
+// A suggestion that notifies no one is a failure, a look no ledger change ever wears.
+export type LookKind = ChangeKind | "notify";
 export type ChangeState = "applying" | "worked" | "done" | "review" | "didntHelp" | "undone";
 
 export interface Change {
@@ -53,7 +55,7 @@ export const FILTER_LABEL: Record<ChangeFilter, I18nKey> = {
   tuning: "autoobserve2.activityPage.filters.tuning",
 };
 
-export const KIND_LOOK: Record<ChangeKind, { icon: IconName; badge: string; accent: string }> = {
+export const KIND_LOOK: Record<LookKind, { icon: IconName; badge: string; accent: string }> = {
   fix: {
     icon: "build",
     badge:
@@ -77,6 +79,12 @@ export const KIND_LOOK: Record<ChangeKind, { icon: IconName; badge: string; acce
     badge:
       "from-badge-amber-soft-bg to-ingest-accent-amber/25 text-badge-amber-soft-text ring-ingest-accent-amber/30",
     accent: "bg-ingest-accent-amber",
+  },
+  notify: {
+    icon: "notifications",
+    badge:
+      "from-badge-amber-soft-bg to-badge-amber-soft-text/25 text-badge-amber-soft-text ring-badge-amber-soft-text/30",
+    accent: "bg-badge-amber-soft-text",
   },
 };
 
@@ -115,7 +123,8 @@ export const STATE_LOOK: Record<
   undone: { variant: "purple-soft", key: "autoobserve2.activityPage.status.undone", icon: "undo" },
 };
 
-const FACTS: Record<string, LedgerFact> = Object.fromEntries(LEDGER.map((f) => [f.id, f]));
+// Read on use, since the sample ledger loads after this module; every entry comes from it.
+const factOf = (id: string): LedgerFact => LEDGER.find((f) => f.id === id) as LedgerFact;
 
 // The investigation loop's only change is an alert-query fix, so it reads as alert tuning.
 const kindOf = (fact: LedgerFact): ChangeKind => {
@@ -150,7 +159,7 @@ export const isChange = (entry: LedgerEntry) =>
 // An answered request happened now, so it moves to today however old the proposal is.
 export const toChanges = (ledger: LedgerEntry[], phases: Record<string, FixPhase>): Change[] =>
   ledger.filter(isChange).map((entry) => {
-    const fact = FACTS[entry.id];
+    const fact = factOf(entry.id);
     return {
       entry,
       fact,

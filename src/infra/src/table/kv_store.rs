@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set, sea_query::Expr,
+};
 
 use super::entity::kv_store::{ActiveModel, Column, Entity, Model};
 use crate::{
@@ -60,6 +62,58 @@ pub async fn set(org_id: &str, key: &str, value: &[u8]) -> Result<(), errors::Er
     Ok(())
 }
 
+/// Writes only while the row still holds `expected` (None: no row), so a stale writer is refused.
+pub async fn compare_and_set(
+    org_id: &str,
+    key: &str,
+    expected: Option<&[u8]>,
+    value: &[u8],
+) -> Result<bool, errors::Error> {
+    compare_and_set_in(get_orm_client_rw().await, org_id, key, expected, value).await
+}
+
+/// `compare_and_set` on `conn`, so a caller's transaction holds it with its other writes.
+pub async fn compare_and_set_in<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    key: &str,
+    expected: Option<&[u8]>,
+    value: &[u8],
+) -> Result<bool, errors::Error> {
+    let now = chrono::Utc::now().timestamp_micros();
+    let written = match expected {
+        None => {
+            let row = ActiveModel {
+                org_id: Set(org_id.to_string()),
+                key: Set(key.to_string()),
+                value: Set(value.to_vec()),
+                created_at: Set(now),
+                updated_at: Set(now),
+            };
+            Entity::insert(row)
+                .on_conflict(
+                    sea_orm::sea_query::OnConflict::columns([Column::OrgId, Column::Key])
+                        .do_nothing()
+                        .to_owned(),
+                )
+                .exec_without_returning(client)
+                .await?
+        }
+        Some(expected) => {
+            Entity::update_many()
+                .col_expr(Column::Value, Expr::value(value.to_vec()))
+                .col_expr(Column::UpdatedAt, Expr::value(now))
+                .filter(Column::OrgId.eq(org_id))
+                .filter(Column::Key.eq(key))
+                .filter(Column::Value.eq(expected.to_vec()))
+                .exec(client)
+                .await?
+                .rows_affected
+        }
+    };
+    Ok(written == 1)
+}
+
 /// Deletes a KV entry by org_id and key
 pub async fn delete(org_id: &str, key: &str) -> Result<(), errors::Error> {
     // Get client first, then acquire lock to prevent deadlock
@@ -71,6 +125,23 @@ pub async fn delete(org_id: &str, key: &str) -> Result<(), errors::Error> {
         .exec(client)
         .await?;
     Ok(())
+}
+
+/// Deletes only while the row still holds `expected`, so a newer write is never removed.
+pub async fn compare_and_delete(
+    org_id: &str,
+    key: &str,
+    expected: &[u8],
+) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let removed = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Key.eq(key))
+        .filter(Column::Value.eq(expected.to_vec()))
+        .exec(client)
+        .await?
+        .rows_affected;
+    Ok(removed == 1)
 }
 
 /// Lists all keys for an org_id with optional prefix filter
@@ -144,5 +215,58 @@ mod tests {
         assert_eq!(removed, ["a", "b"]);
         assert!(left.is_empty());
         assert_eq!(kept, ["a"]);
+    }
+
+    #[tokio::test]
+    async fn a_compare_and_set_writes_only_over_the_expected_value() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_kv_cas");
+        assert!(compare_and_set(&org, "k", None, b"v1").await.unwrap());
+        assert!(!compare_and_set(&org, "k", None, b"v2").await.unwrap());
+        assert!(
+            !compare_and_set(&org, "k", Some(b"v0"), b"v2")
+                .await
+                .unwrap()
+        );
+        assert_eq!(get(&org, "k").await.unwrap().unwrap().value, b"v1");
+        assert!(
+            compare_and_set(&org, "k", Some(b"v1"), b"v1")
+                .await
+                .unwrap()
+        );
+        assert!(
+            compare_and_set(&org, "k", Some(b"v1"), b"v2")
+                .await
+                .unwrap()
+        );
+        assert!(
+            !compare_and_set(&org, "k", Some(b"v1"), b"v3")
+                .await
+                .unwrap()
+        );
+        assert_eq!(get(&org, "k").await.unwrap().unwrap().value, b"v2");
+        assert!(
+            !compare_and_set(&org, "gone", Some(b"v1"), b"v2")
+                .await
+                .unwrap()
+        );
+        assert!(get(&org, "gone").await.unwrap().is_none());
+        delete_by_org(&org).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_compare_and_delete_removes_only_the_expected_value() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_kv_cad");
+        set(&org, "k", b"v2").await.unwrap();
+        assert!(!compare_and_delete(&org, "k", b"v1").await.unwrap());
+        assert_eq!(get(&org, "k").await.unwrap().unwrap().value, b"v2");
+        assert!(compare_and_delete(&org, "k", b"v2").await.unwrap());
+        assert!(get(&org, "k").await.unwrap().is_none());
+        assert!(!compare_and_delete(&org, "k", b"v2").await.unwrap());
     }
 }

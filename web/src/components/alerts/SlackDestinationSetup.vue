@@ -361,6 +361,7 @@ onMounted(() => {
         data-test="add-destination-name-input"
         name="name"
         :label="t('alerts.name')"
+        :maxlength="256"
         required
       />
     </div>

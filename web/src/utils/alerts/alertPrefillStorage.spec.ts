@@ -3,9 +3,15 @@ import {
   ALERT_PREFILL_KEY,
   clearAlertPrefill,
   readAlertPrefill,
+  takeAlertEditHandoff,
+  writeAlertEditHandoff,
   writeAlertPrefill,
 } from "./alertPrefillStorage";
-import { ALERT_PREFILL_VERSION, type AlertPrefill } from "@/ts/interfaces/alertPrefill";
+import {
+  ALERT_PREFILL_VERSION,
+  type AlertEditHandoff,
+  type AlertPrefill,
+} from "@/ts/interfaces/alertPrefill";
 
 const prefill: AlertPrefill = {
   version: ALERT_PREFILL_VERSION,
@@ -16,6 +22,14 @@ const prefill: AlertPrefill = {
   queryType: "sql",
   sql: 'SELECT * FROM "k8s_logs"',
   warnings: [],
+};
+
+const handoff: AlertEditHandoff = {
+  version: ALERT_PREFILL_VERSION,
+  source: "calibration",
+  target: { alertId: "a1", findingId: "f1" },
+  focus: "pending_period",
+  patch: { pendingPeriodSecs: { from: 60, to: 120 } },
 };
 
 describe("alertPrefillStorage", () => {
@@ -71,5 +85,35 @@ describe("alertPrefillStorage", () => {
       clearAlertPrefill();
       clearAlertPrefill();
     }).not.toThrow();
+  });
+
+  describe("edit handoff", () => {
+    it("a calibration handoff never seeds the create form", () => {
+      writeAlertEditHandoff(handoff);
+      expect(readAlertPrefill()).toBeNull();
+      expect(sessionStorage.getItem(ALERT_PREFILL_KEY)).not.toBeNull();
+    });
+
+    it("is read once for its own alert, then cleared", () => {
+      writeAlertEditHandoff(handoff);
+      expect(takeAlertEditHandoff("a1")).toEqual(handoff);
+      expect(sessionStorage.getItem(ALERT_PREFILL_KEY)).toBeNull();
+      expect(takeAlertEditHandoff("a1")).toBeNull();
+    });
+
+    it("clears a handoff for another alert or version without returning it", () => {
+      writeAlertEditHandoff(handoff);
+      expect(takeAlertEditHandoff("a2")).toBeNull();
+      expect(sessionStorage.getItem(ALERT_PREFILL_KEY)).toBeNull();
+      writeAlertEditHandoff({ ...handoff, version: 9 as never });
+      expect(takeAlertEditHandoff("a1")).toBeNull();
+      expect(sessionStorage.getItem(ALERT_PREFILL_KEY)).toBeNull();
+    });
+
+    it("leaves a create prefill for the create form", () => {
+      writeAlertPrefill(prefill);
+      expect(takeAlertEditHandoff("a1")).toBeNull();
+      expect(readAlertPrefill()).toEqual(prefill);
+    });
   });
 });

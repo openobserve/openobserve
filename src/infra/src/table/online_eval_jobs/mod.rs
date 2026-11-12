@@ -16,7 +16,8 @@
 use std::collections::BTreeMap;
 
 use config::meta::{
-    pipeline::components::ScorerRef,
+    alerts::{ConditionGroup, ConditionList},
+    pipeline::components::{ConditionParams, ScorerRef},
     self_reporting::{evaluator::EVALUATOR_STREAM, llm_scores::LLM_SCORES_STREAM},
 };
 use sea_orm::{
@@ -141,12 +142,135 @@ impl std::fmt::Display for TargetScope {
     }
 }
 
-/// Valid state transitions. Maps from current state to allowed next states.
+/// `paused → paused` turns a budget pause into a user's, so no auto-resume at 00:00 UTC.
 pub fn is_valid_transition(from: &str, to: &str) -> bool {
     matches!(
         (from, to),
-        ("draft", "active") | ("active", "paused") | ("paused", "active") | (_, "archived")
+        ("draft", "active")
+            | ("active", "paused")
+            | ("paused", "paused")
+            | ("paused", "active")
+            | (_, "archived")
     )
+}
+
+const DAY_US: i64 = 24 * 60 * 60 * 1_000_000;
+
+/// 00:00 UTC of the day `at_us` falls in; Unix time has no leap seconds, so days are exact.
+pub fn utc_day_start_us(at_us: i64) -> i64 {
+    at_us - at_us.rem_euclid(DAY_US)
+}
+
+/// What the health pass does once a job's judge spend for the day reaches its budget.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum BudgetAction {
+    /// Pause until 00:00 UTC; the first health pass of the next day resumes the job.
+    #[default]
+    Pause,
+    /// Keep scoring; the job only reads as over budget.
+    KeepRunning,
+}
+
+/// A job's daily judge spend limit; one budget covers all regions.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EvalJobBudget {
+    /// Judge spend allowed per UTC day, in USD.
+    pub daily_usd: f64,
+    #[serde(default)]
+    pub on_reach: BudgetAction,
+    /// When the health pass paused the job for this budget, in microseconds. Server-owned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paused_at: Option<i64>,
+    /// The day's judge spend when the health pass paused the job, in USD. Server-owned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paused_spend_usd: Option<f64>,
+    /// Server-owned "resume until 00:00 UTC" time (µs) before which the budget does not apply.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lifted_until: Option<i64>,
+}
+
+/// What a job update asks of its budget.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BudgetPatch {
+    /// The request has no `budget`: the stored one keeps applying.
+    Keep,
+    /// `"budget": null`: the job has no budget.
+    Clear,
+    /// A new limit; an omitted action keeps the stored one (`pause` when there is none).
+    Set {
+        daily_usd: f64,
+        on_reach: Option<BudgetAction>,
+    },
+}
+
+impl BudgetPatch {
+    /// The job's budget after the update. A new limit keeps the stored pause state.
+    pub fn apply(self, stored: Option<&EvalJobBudget>) -> Option<EvalJobBudget> {
+        match self {
+            Self::Keep => stored.cloned(),
+            Self::Clear => None,
+            Self::Set {
+                daily_usd,
+                on_reach,
+            } => Some(
+                EvalJobBudget {
+                    daily_usd,
+                    on_reach: on_reach.or(stored.map(|b| b.on_reach)).unwrap_or_default(),
+                    paused_at: None,
+                    paused_spend_usd: None,
+                    lifted_until: None,
+                }
+                .with_server_state_of(stored),
+            ),
+        }
+    }
+}
+
+impl EvalJobBudget {
+    /// A request sets the limit and action only; the pause state stays the stored job's.
+    pub fn with_server_state_of(mut self, stored: Option<&EvalJobBudget>) -> Self {
+        self.paused_at = stored.and_then(|b| b.paused_at);
+        self.paused_spend_usd = stored.and_then(|b| b.paused_spend_usd);
+        self.lifted_until = stored.and_then(|b| b.lifted_until);
+        self
+    }
+
+    /// A job this budget paused may run again once its limit is above the spend it paused at.
+    pub fn allows_resume(&self) -> bool {
+        self.paused_spend_usd
+            .is_some_and(|spent| self.daily_usd > spent)
+    }
+
+    /// Budget after `new_status`; only budget pauses set `paused_at`, so user pauses never resume.
+    pub fn after_transition(
+        mut self,
+        new_status: &str,
+        budget_spend: Option<f64>,
+        now_us: i64,
+    ) -> Self {
+        match new_status {
+            "paused" => {
+                self.paused_at = budget_spend.map(|_| now_us);
+                self.paused_spend_usd = budget_spend;
+                // The budget only pauses a job it is not lifted for, so any lift has ended.
+                if budget_spend.is_some() {
+                    self.lifted_until = None;
+                }
+            }
+            "active" => {
+                let today = utc_day_start_us(now_us);
+                if self.paused_at.is_some_and(|at| at >= today) && !self.allows_resume() {
+                    self.lifted_until = Some(today + DAY_US);
+                }
+                self.paused_at = None;
+                self.paused_spend_usd = None;
+            }
+            _ => {}
+        }
+        self
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -170,6 +294,8 @@ pub struct OnlineEvalJob {
     pub trace_config: Option<TraceEvalConfig>,
     #[serde(default)]
     pub session_config: Option<SessionEvalConfig>,
+    #[serde(default)]
+    pub budget: Option<EvalJobBudget>,
     pub sampling_mode: SamplingMode,
     pub sampling_value: serde_json::Value,
     pub status: String,
@@ -220,10 +346,69 @@ impl OnlineEvalJob {
         if is_reserved_eval_source_stream(&self.stream) {
             return Err("Internal streams cannot be used as online eval sources");
         }
+        if !is_readable_condition(&self.filter_condition) {
+            return Err(
+                "Filter condition is invalid or uses an operator this version does not support",
+            );
+        }
         self.validate_target_scope()?;
         self.validate_span_selectors()?;
         self.sampling_rate()?;
+        if self
+            .budget
+            .as_ref()
+            .is_some_and(|b| !(b.daily_usd.is_finite() && b.daily_usd > 0.0))
+        {
+            return Err("Daily budget must be a positive amount");
+        }
         Ok(())
+    }
+
+    /// Extended-operator value checks on the job filter, end signals and span selector filters.
+    pub fn validate_operator_values(&self) -> Result<(), String> {
+        validate_condition_json_operator_values(&self.filter_condition)?;
+        let end_signals = [
+            self.trace_config
+                .as_ref()
+                .and_then(|c| c.end_signal.as_ref()),
+            self.session_config
+                .as_ref()
+                .and_then(|c| c.end_signal.as_ref()),
+        ];
+        for signal in end_signals.into_iter().flatten() {
+            validate_condition_json_operator_values(signal)?;
+        }
+        self.span_selectors.iter().try_for_each(|selector| {
+            validate_condition_json_operator_values(&selector.filter_condition)
+        })
+    }
+
+    /// Names the first set condition this version cannot parse; an unparsed filter would match all.
+    pub fn unreadable_condition(&self) -> Option<&'static str> {
+        let end_signal = |signal: Option<&serde_json::Value>| {
+            signal.is_some_and(|signal| !is_readable_condition(signal))
+        };
+        if !is_readable_condition(&self.filter_condition) {
+            Some("filter condition")
+        } else if end_signal(
+            self.trace_config
+                .as_ref()
+                .and_then(|c| c.end_signal.as_ref()),
+        ) || end_signal(
+            self.session_config
+                .as_ref()
+                .and_then(|c| c.end_signal.as_ref()),
+        ) {
+            Some("end signal")
+        } else if self
+            .span_selectors
+            .iter()
+            .any(|selector| !is_readable_condition(&selector.filter_condition))
+        {
+            Some("span selector filter")
+        } else {
+            None
+        }
     }
 
     pub fn validate_for_activation(&self) -> Result<(), &'static str> {
@@ -382,6 +567,9 @@ impl From<Model> for OnlineEvalJob {
             session_config: model
                 .session_config
                 .and_then(|config| serde_json::from_value(config).ok()),
+            budget: model
+                .budget
+                .and_then(|budget| serde_json::from_str(&budget).ok()),
             sampling_mode: model.sampling_mode.parse().unwrap_or_default(),
             sampling_value: model.sampling_value,
             status: model.status,
@@ -435,6 +623,7 @@ pub async fn add(job: &OnlineEvalJob) -> Result<(), errors::Error> {
             .session_config
             .as_ref()
             .map(|config| serde_json::json!(config))),
+        budget: Set(budget_json(job.budget.as_ref())),
         sampling_mode: Set(job.sampling_mode.to_string()),
         sampling_value: Set(job.sampling_value.clone()),
         status: Set(job.status.clone()),
@@ -475,6 +664,7 @@ pub async fn update(job: &OnlineEvalJob) -> Result<(), errors::Error> {
             .session_config
             .as_ref()
             .map(|config| serde_json::json!(config))),
+        budget: Set(budget_json(job.budget.as_ref())),
         sampling_mode: Set(job.sampling_mode.to_string()),
         sampling_value: Set(job.sampling_value.clone()),
         status: Set(job.status.clone()),
@@ -549,7 +739,8 @@ pub async fn get_by_status(
     Ok(records)
 }
 
-/// Skips jobs of an org that is being deleted or has no organizations row.
+/// Skips jobs of an org that is being deleted or has no organizations row, and jobs with a
+/// condition this version cannot read, which would otherwise run unfiltered.
 pub async fn get_active_trace_session() -> Result<Vec<OnlineEvalJob>, errors::Error> {
     use sea_orm::sea_query::{Expr, Query};
 
@@ -571,12 +762,9 @@ pub async fn get_active_trace_session() -> Result<Vec<OnlineEvalJob>, errors::Er
         )
         .order_by(Column::CreatedAt, Order::Desc)
         .all(client)
-        .await?
-        .into_iter()
-        .map(OnlineEvalJob::from)
-        .collect();
+        .await?;
 
-    Ok(records)
+    Ok(runnable_jobs(records))
 }
 
 /// Jobs the health pass measures, across all orgs; paused ones settle to "no recent runs".
@@ -617,6 +805,35 @@ pub async fn get_by_stream(
 
 fn scorer_refs_contain(scorers: &[ScorerRef], scorer_entity_id: &str) -> bool {
     scorers.iter().any(|scorer| scorer.id == scorer_entity_id)
+}
+
+/// Unset ("all") or a shape the reconciler and scheduler parse; anything else they treat as
+/// match-all.
+fn is_readable_condition(condition: &serde_json::Value) -> bool {
+    condition.is_null()
+        || condition.as_object().is_some_and(|o| o.is_empty())
+        || condition
+            .get("type")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|v| v.eq_ignore_ascii_case("all"))
+        || serde_json::from_value::<ConditionParams>(condition.clone()).is_ok()
+        || serde_json::from_value::<ConditionGroup>(condition.clone()).is_ok()
+        || serde_json::from_value::<ConditionList>(condition.clone()).is_ok()
+}
+
+fn runnable_jobs(models: Vec<Model>) -> Vec<OnlineEvalJob> {
+    crate::table::convert_skipping_unreadable(
+        "online_eval_jobs",
+        models,
+        |m| format!("org={} id={}", m.org_id, m.id),
+        |m| {
+            let job = OnlineEvalJob::from(m);
+            match job.unreadable_condition() {
+                Some(what) => Err(format!("its {what} cannot be read by this version")),
+                None => Ok(job),
+            }
+        },
+    )
 }
 
 pub async fn has_non_archived_by_scorer_ref(
@@ -665,11 +882,16 @@ pub async fn exists(id: &str) -> Result<bool, errors::Error> {
     Ok(record.is_some())
 }
 
-/// Update only the status and pipeline_id fields of a job.
+fn budget_json(budget: Option<&EvalJobBudget>) -> Option<String> {
+    budget.and_then(|budget| serde_json::to_string(budget).ok())
+}
+
+/// Update only status, pipeline_id and budget; the budget carries the transition's pause state.
 pub async fn update_status(
     id: &str,
     status: &str,
     pipeline_id: Option<&str>,
+    budget: Option<&EvalJobBudget>,
     updated_at: i64,
 ) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
@@ -682,6 +904,7 @@ pub async fn update_status(
     let update = ActiveModel {
         status: Set(status.to_string()),
         pipeline_id: Set(pipeline_id.map(|pid| pid.to_string())),
+        budget: Set(budget_json(budget)),
         updated_at: Set(updated_at),
         ..model.into()
     };
@@ -727,6 +950,7 @@ mod tests {
             span_selector_bindings: None,
             trace_config: None,
             session_config: None,
+            budget: None,
             sampling_mode: "rate".to_string(),
             sampling_value: serde_json::json!({"rate": 0.1}),
             status: "draft".to_string(),
@@ -735,6 +959,120 @@ mod tests {
             created_at: 1000,
             updated_at: 2000,
         }
+    }
+
+    fn future_operator(condition: serde_json::Value) -> serde_json::Value {
+        let mut condition = condition;
+        condition["conditions"]["conditions"][0]["operator"] = serde_json::json!("future_op");
+        condition
+    }
+
+    fn with_operator(operator: &str) -> serde_json::Value {
+        let mut condition = end_signal();
+        condition["conditions"]["conditions"][0]["operator"] = serde_json::json!(operator);
+        condition
+    }
+
+    #[test]
+    fn test_extended_operators_in_filter_end_signals_and_selectors_are_readable() {
+        let mut job = trace_job_with_selector();
+        job.filter_condition = with_operator("in");
+        job.trace_config = Some(TraceEvalConfig {
+            end_signal: Some(with_operator("starts_with")),
+            ..Default::default()
+        });
+        job.span_selectors[0].filter_condition = with_operator("re_match");
+        job.span_selectors[0].filter_condition["conditions"]["conditions"][0]["case_insensitive"] =
+            serde_json::json!(true);
+        assert_eq!(job.unreadable_condition(), None);
+        assert!(job.validate().is_ok());
+    }
+
+    #[test]
+    fn test_an_unreadable_filter_fails_validation_instead_of_matching_all() {
+        let mut job = OnlineEvalJob::from(make_model());
+        for unset in [
+            serde_json::Value::Null,
+            serde_json::json!({}),
+            serde_json::json!({"type": "all"}),
+        ] {
+            job.filter_condition = unset;
+            assert!(job.validate().is_ok());
+            assert_eq!(job.unreadable_condition(), None);
+        }
+        job.filter_condition = end_signal();
+        assert!(job.validate().is_ok());
+
+        job.filter_condition = future_operator(end_signal());
+        assert!(job.validate().is_err());
+        assert_eq!(job.unreadable_condition(), Some("filter condition"));
+
+        job.filter_condition = serde_json::json!({"filterType": "group", "logicalOperator": "AND",
+            "conditions": [{"filterType": "condition", "column": "span_id",
+                            "operator": "is_not_null", "value": "", "logicalOperator": "AND"}]});
+        assert!(job.validate().is_ok());
+        // The scheduler cannot parse this field/operator shape, so it would match every span.
+        job.filter_condition =
+            serde_json::json!({"type": "condition", "field": "span_id", "operator": "exists"});
+        assert!(job.validate().is_err());
+    }
+
+    #[test]
+    fn test_unreadable_end_signal_and_selector_filters_are_named() {
+        let mut model = make_model();
+        model.target_scope = "trace".to_string();
+        model.trace_config = Some(serde_json::json!({"endSignal": future_operator(end_signal())}));
+        let job = OnlineEvalJob::from(model);
+        assert_eq!(job.unreadable_condition(), Some("end signal"));
+
+        let mut job = trace_job_with_selector();
+        assert_eq!(job.unreadable_condition(), None);
+        job.span_selectors[0].filter_condition = future_operator(end_signal());
+        assert_eq!(job.unreadable_condition(), Some("span selector filter"));
+    }
+
+    #[test]
+    fn test_runnable_jobs_skip_and_log_jobs_with_unreadable_conditions() {
+        crate::table::testing::capture_error_logs();
+        let mut good = make_model();
+        good.id = "job-good".to_string();
+        let mut bad = make_model();
+        bad.id = "job-in-filter".to_string();
+        bad.filter_condition = future_operator(end_signal());
+
+        let ids: Vec<String> = runnable_jobs(vec![good, bad])
+            .into_iter()
+            .map(|job| job.id)
+            .collect();
+
+        assert_eq!(ids, ["job-good"]);
+        let logged = crate::table::testing::logged_errors_containing("id=job-in-filter");
+        assert!(
+            logged.iter().any(|l| l.contains("filter condition")),
+            "{logged:?}"
+        );
+    }
+
+    #[test]
+    fn test_validate_operator_values_checks_filter_and_end_signal() {
+        let mut job = OnlineEvalJob::from(make_model());
+        assert!(job.validate_operator_values().is_ok());
+
+        job.filter_condition = end_signal();
+        assert!(job.validate_operator_values().is_ok());
+
+        let mut bad_signal = end_signal();
+        bad_signal["conditions"]["conditions"][0]["operator"] = serde_json::json!("re_match");
+        bad_signal["conditions"]["conditions"][0]["value"] = serde_json::json!("(");
+        job.trace_config = Some(TraceEvalConfig {
+            end_signal: Some(bad_signal.clone()),
+            ..TraceEvalConfig::default()
+        });
+        assert!(job.validate_operator_values().is_err());
+
+        job.trace_config = None;
+        job.filter_condition = bad_signal["conditions"].clone();
+        assert!(job.validate_operator_values().is_err());
     }
 
     #[test]
@@ -868,6 +1206,8 @@ mod tests {
         assert!(is_valid_transition("draft", "active"));
         assert!(is_valid_transition("active", "paused"));
         assert!(is_valid_transition("paused", "active"));
+        // Keep paused: a budget pause becomes the user's.
+        assert!(is_valid_transition("paused", "paused"));
         assert!(!is_valid_transition("active", "degraded"));
         assert!(is_valid_transition("draft", "archived"));
         assert!(is_valid_transition("active", "archived"));
@@ -914,6 +1254,7 @@ mod tests {
                 max_age_secs: 5,
                 end_signal: None,
             }),
+            budget: None,
             sampling_mode: SamplingMode::All,
             sampling_value: serde_json::json!(null),
             status: "draft".to_string(),
@@ -1090,6 +1431,169 @@ mod tests {
             job.validate(),
             Err("Span Selectors are supported only for trace eval jobs")
         );
+    }
+
+    fn budget(paused_at: Option<i64>) -> EvalJobBudget {
+        EvalJobBudget {
+            daily_usd: 5.0,
+            on_reach: BudgetAction::Pause,
+            paused_at,
+            paused_spend_usd: None,
+            lifted_until: None,
+        }
+    }
+
+    const DAY: i64 = 24 * 60 * 60 * 1_000_000;
+
+    #[test]
+    fn test_utc_day_start() {
+        assert_eq!(utc_day_start_us(3 * DAY + 17), 3 * DAY);
+        assert_eq!(utc_day_start_us(3 * DAY), 3 * DAY);
+    }
+
+    #[test]
+    fn test_budget_pause_state_follows_transitions() {
+        let now = 10 * DAY + 5;
+        // Only a budget pause auto-resumes; it also ends an expired lift.
+        let mut expired_lift = budget(None);
+        expired_lift.lifted_until = Some(10 * DAY);
+        let paused = expired_lift.after_transition("paused", Some(6.21), now);
+        assert_eq!(
+            (
+                paused.paused_at,
+                paused.paused_spend_usd,
+                paused.lifted_until
+            ),
+            (Some(now), Some(6.21), None)
+        );
+        let mut lifted = budget(None);
+        lifted.lifted_until = Some(11 * DAY);
+        let user_paused = lifted.after_transition("paused", None, now);
+        assert_eq!(
+            (user_paused.paused_at, user_paused.paused_spend_usd),
+            (None, None)
+        );
+        assert_eq!(user_paused.lifted_until, Some(11 * DAY));
+        // Keep paused turns a budget pause into the user's: it no longer resumes on its own.
+        let kept = budget(None)
+            .after_transition("paused", Some(6.21), 10 * DAY + 1)
+            .after_transition("paused", None, now);
+        assert_eq!((kept.paused_at, kept.paused_spend_usd), (None, None));
+
+        // Resumed the day it paused, still over its limit: the budget is lifted until 00:00 UTC.
+        let same_day = budget(None)
+            .after_transition("paused", Some(6.21), 10 * DAY + 1)
+            .after_transition("active", None, now);
+        assert_eq!(
+            (same_day.paused_at, same_day.paused_spend_usd),
+            (None, None)
+        );
+        assert_eq!(same_day.lifted_until, Some(11 * DAY));
+        // A pause recorded without its spend is lifted the same way.
+        let unknown_spend = budget(Some(10 * DAY + 1)).after_transition("active", None, now);
+        assert_eq!(unknown_spend.lifted_until, Some(11 * DAY));
+
+        // The next day's resume starts a fresh day under the budget.
+        let next_day = budget(None)
+            .after_transition("paused", Some(6.21), 9 * DAY + 1)
+            .after_transition("active", None, now);
+        assert_eq!(next_day.paused_at, None);
+        assert_eq!(next_day.lifted_until, None);
+    }
+
+    #[test]
+    fn test_raised_budget_resumes_under_the_new_limit() {
+        let now = 10 * DAY + 5;
+        let paused = budget(None).after_transition("paused", Some(6.21), 10 * DAY + 1);
+        assert!(!paused.allows_resume());
+
+        // Raised above the spend it paused at: it may run, and the new limit applies today.
+        let mut raised = budget(None);
+        raised.daily_usd = 20.0;
+        let raised = raised.with_server_state_of(Some(&paused));
+        assert!(raised.allows_resume());
+        let resumed = raised.after_transition("active", None, now);
+        assert_eq!(
+            (
+                resumed.paused_at,
+                resumed.paused_spend_usd,
+                resumed.lifted_until
+            ),
+            (None, None, None)
+        );
+
+        // Raised only to the spend: it stays paused, and a resume lifts the budget.
+        let mut matched = budget(None);
+        matched.daily_usd = 6.21;
+        let matched = matched.with_server_state_of(Some(&paused));
+        assert!(!matched.allows_resume());
+        assert_eq!(
+            matched.after_transition("active", None, now).lifted_until,
+            Some(11 * DAY)
+        );
+
+        // A job the user paused never resumes on a budget edit.
+        let mut user_paused = budget(None);
+        user_paused.daily_usd = 20.0;
+        assert!(!user_paused.allows_resume());
+    }
+
+    #[test]
+    fn test_budget_patch_keeps_clears_or_sets_over_the_stored_budget() {
+        let mut stored = budget(Some(7));
+        stored.on_reach = BudgetAction::KeepRunning;
+        stored.paused_spend_usd = Some(6.0);
+        stored.lifted_until = Some(9);
+
+        assert_eq!(BudgetPatch::Keep.apply(Some(&stored)), Some(stored.clone()));
+        assert_eq!(BudgetPatch::Keep.apply(None), None);
+        assert_eq!(BudgetPatch::Clear.apply(Some(&stored)), None);
+
+        // A new limit keeps the stored pause state, and an omitted action the stored one.
+        let set = |on_reach| BudgetPatch::Set {
+            daily_usd: 10.0,
+            on_reach,
+        };
+        let merged = set(None).apply(Some(&stored)).unwrap();
+        assert_eq!(
+            (
+                merged.daily_usd,
+                merged.on_reach,
+                merged.paused_at,
+                merged.paused_spend_usd,
+                merged.lifted_until
+            ),
+            (10.0, BudgetAction::KeepRunning, Some(7), Some(6.0), Some(9))
+        );
+        let paused = set(Some(BudgetAction::Pause)).apply(Some(&stored)).unwrap();
+        assert_eq!(paused.on_reach, BudgetAction::Pause);
+        // A first budget pauses by default and has no pause state.
+        let first = set(None).apply(None).unwrap();
+        assert_eq!(
+            (first.on_reach, first.paused_at, first.lifted_until),
+            (BudgetAction::Pause, None, None)
+        );
+    }
+
+    #[test]
+    fn test_budget_must_be_positive_and_old_rows_have_none() {
+        let mut job = OnlineEvalJob::from(make_model());
+        assert!(job.budget.is_none());
+        job.budget = Some(EvalJobBudget {
+            daily_usd: 0.0,
+            ..budget(None)
+        });
+        assert_eq!(
+            job.validate(),
+            Err("Daily budget must be a positive amount")
+        );
+
+        let mut model = make_model();
+        model.budget = Some(r#"{"dailyUsd": 5, "onReach": "keep_running"}"#.to_string());
+        let job = OnlineEvalJob::from(model);
+        let budget = job.budget.as_ref().unwrap();
+        assert_eq!(budget.on_reach, BudgetAction::KeepRunning);
+        assert!(job.validate().is_ok());
     }
 
     #[test]

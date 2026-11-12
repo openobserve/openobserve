@@ -49,6 +49,7 @@ profiling = ["cpu-profiling", "openobserve-core/profiling"]
 anyhow.workspace = true
 arrow-schema.workspace = true
 async-stream.workspace = true
+async-trait.workspace = true
 audit = { workspace = true, optional = true }
 axum.workspace = true
 axum-extra.workspace = true
@@ -83,6 +84,7 @@ opentelemetry.workspace = true
 promql-service.workspace = true
 regex.workspace = true
 reqwest.workspace = true
+schema.workspace = true
 search.workspace = true
 search_service.workspace = true
 sea-orm.workspace = true
@@ -108,3 +110,4 @@ infra = { workspace = true, features = ["test-utils"] }
 o2_enterprise = { workspace = true, default-features = false, features = ["test-utils"] }
 openobserve-core = { workspace = true, features = ["test-utils"] }
 proto.workspace = true
+tower.workspace = true

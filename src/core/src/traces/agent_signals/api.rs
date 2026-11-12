@@ -89,17 +89,14 @@ pub async fn get_agent_signals(
         let src = src.replace('\'', "");
         filters.push_str(&format!(" AND source_stream = '{src}'"));
     }
-    let sql = format!(
-        "SELECT * FROM \"{stream_name}\" \
-         WHERE _timestamp >= {start_time} AND _timestamp < {end_time} AND {filters} \
-         ORDER BY _timestamp DESC LIMIT 10000"
-    );
-
     // If the stream doesn't exist yet (feature never ran), return an empty list.
-    let schema = infra::schema::get(&org_id, stream_name, StreamType::Logs).await;
-    if schema.is_err() {
+    let Ok(schema) = infra::schema::get(&org_id, stream_name, StreamType::Logs).await else {
         return MetaHttpResponse::json(serde_json::json!({ "signals": [] }));
-    }
+    };
+    let fields: Vec<&str> = schema.fields().iter().map(|f| f.name().as_str()).collect();
+    let Some(sql) = signals_rollup_sql(start_time, end_time, &filters, &fields) else {
+        return MetaHttpResponse::json(serde_json::json!({ "signals": [] }));
+    };
 
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -163,6 +160,62 @@ pub async fn get_agent_signals(
     MetaHttpResponse::forbidden("Not Supported")
 }
 
+/// Each hourly window writes one row per combination of these columns.
+#[cfg(any(feature = "enterprise", test))]
+const SIGNAL_DIMENSIONS: [&str; 7] = [
+    "source_stream",
+    "signal_type",
+    "agent_name",
+    "gen_ai_agent_env",
+    "gen_ai_agent_version",
+    "tool_name",
+    "fail_class",
+];
+
+/// Additive measures, summed over the range's windows.
+#[cfg(any(feature = "enterprise", test))]
+const SIGNAL_MEASURES: [&str; 6] = [
+    "count",
+    "calls",
+    "distinct_traces",
+    "cost",
+    "tokens",
+    "errors",
+];
+
+/// Columns the stream lacks are omitted since naming one fails the query.
+#[cfg(any(feature = "enterprise", test))]
+fn signals_rollup_sql(
+    start_time: i64,
+    end_time: i64,
+    filters: &str,
+    fields: &[&str],
+) -> Option<String> {
+    if !fields.contains(&"signal_type") {
+        return None;
+    }
+    let dims: Vec<String> = SIGNAL_DIMENSIONS
+        .iter()
+        .filter(|d| fields.contains(*d))
+        .map(|d| format!("\"{d}\""))
+        .collect();
+    let mut select = dims.clone();
+    select.extend(
+        SIGNAL_MEASURES
+            .iter()
+            .filter(|m| fields.contains(*m))
+            .map(|m| format!("SUM(\"{m}\") AS \"{m}\"")),
+    );
+    select.push("MAX(_timestamp) AS _timestamp".to_string());
+    Some(format!(
+        "SELECT {} FROM \"_agent_signals\" \
+         WHERE _timestamp >= {start_time} AND _timestamp < {end_time} AND {filters} \
+         GROUP BY {} LIMIT 10000",
+        select.join(", "),
+        dims.join(", ")
+    ))
+}
+
 /// How far back (µs) to read a version's rollup rows from `_agent_signals`.
 ///
 /// CRITICAL: `_agent_signals` rows are stamped at ROLLUP-PROCESSING time
@@ -185,6 +238,7 @@ const COMPARE_ROLLUP_LOOKBACK_MICROS: i64 = 30 * 24 * 60 * 60 * 1_000_000;
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct CompareArm {
     pub agent_name: String,
+    /// `None` = any env; `""` = the env-less variant (spans without an env).
     pub env: Option<String>,
     pub version: Option<String>,
     /// Span-time window of the version (kept for the response's window cards);
@@ -281,22 +335,23 @@ fn aggregate_failure_hits(hits: &[serde_json::Value]) -> std::collections::HashM
     map
 }
 
-#[cfg(feature = "enterprise")]
-async fn fetch_arm_aggregate(org_id: &str, arm: &CompareArm) -> ArmAggregate {
-    use config::meta::stream::StreamType;
-
-    let stream_name = "_agent_signals";
-
+/// Without a `gen_ai_agent_env` column every row is env-less, so no env clause is added.
+#[cfg(any(feature = "enterprise", test))]
+fn arm_filters(org_id: &str, signal_type: &str, arm: &CompareArm, has_env_field: bool) -> String {
     let mut filters = format!(
-        "org_id = '{}' AND signal_type = 'cost' AND agent_name = '{}'",
+        "org_id = '{}' AND signal_type = '{signal_type}' AND agent_name = '{}'",
         org_id.replace('\'', ""),
         arm.agent_name.replace('\'', "")
     );
-    if let Some(env) = arm.env.as_deref() {
-        filters.push_str(&format!(
+    match arm.env.as_deref() {
+        Some("") if has_env_field => {
+            filters.push_str(" AND (gen_ai_agent_env IS NULL OR gen_ai_agent_env = '')")
+        }
+        Some("") | None => {}
+        Some(env) => filters.push_str(&format!(
             " AND gen_ai_agent_env = '{}'",
             env.replace('\'', "")
-        ));
+        )),
     }
     if let Some(version) = arm.version.as_deref() {
         filters.push_str(&format!(
@@ -304,6 +359,21 @@ async fn fetch_arm_aggregate(org_id: &str, arm: &CompareArm) -> ArmAggregate {
             version.replace('\'', "")
         ));
     }
+    filters
+}
+
+#[cfg(feature = "enterprise")]
+async fn fetch_arm_aggregate(org_id: &str, arm: &CompareArm) -> ArmAggregate {
+    use config::meta::stream::StreamType;
+
+    let stream_name = "_agent_signals";
+
+    let schema = match infra::schema::get(org_id, stream_name, StreamType::Logs).await {
+        Ok(s) => s,
+        Err(_) => return ArmAggregate::default(),
+    };
+    let has_env_field = schema.field_with_name("gen_ai_agent_env").is_ok();
+    let filters = arm_filters(org_id, "cost", arm, has_env_field);
 
     // Select `_timestamp` so the fold can dedup to ONE row per rollup window.
     // The rollup stamps every row of a window at its window-end `ts`, so a
@@ -324,11 +394,6 @@ async fn fetch_arm_aggregate(org_id: &str, arm: &CompareArm) -> ArmAggregate {
          ORDER BY _timestamp DESC \
          LIMIT 10000"
     );
-
-    let schema = infra::schema::get(org_id, stream_name, StreamType::Logs).await;
-    if schema.is_err() {
-        return ArmAggregate::default();
-    }
 
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -370,23 +435,12 @@ async fn fetch_arm_failures(
 
     let stream_name = "_agent_signals";
 
-    let mut filters = format!(
-        "org_id = '{}' AND signal_type = 'failure' AND agent_name = '{}'",
-        org_id.replace('\'', ""),
-        arm.agent_name.replace('\'', "")
-    );
-    if let Some(env) = arm.env.as_deref() {
-        filters.push_str(&format!(
-            " AND gen_ai_agent_env = '{}'",
-            env.replace('\'', "")
-        ));
-    }
-    if let Some(version) = arm.version.as_deref() {
-        filters.push_str(&format!(
-            " AND gen_ai_agent_version = '{}'",
-            version.replace('\'', "")
-        ));
-    }
+    let schema = match infra::schema::get(org_id, stream_name, StreamType::Logs).await {
+        Ok(s) => s,
+        Err(_) => return std::collections::HashMap::new(),
+    };
+    let has_env_field = schema.field_with_name("gen_ai_agent_env").is_ok();
+    let filters = arm_filters(org_id, "failure", arm, has_env_field);
 
     // Select `_timestamp` so the fold can dedup to ONE row per rollup window.
     // The rollup stamps every row of a window at its window-end `ts`, so a
@@ -405,11 +459,6 @@ async fn fetch_arm_failures(
          ORDER BY _timestamp DESC \
          LIMIT 10000"
     );
-
-    let schema = infra::schema::get(org_id, stream_name, StreamType::Logs).await;
-    if schema.is_err() {
-        return std::collections::HashMap::new();
-    }
 
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -574,6 +623,61 @@ pub async fn compare_agent_versions(
 #[cfg(test)]
 mod compare_tests {
     use super::*;
+
+    fn arm(env: Option<&str>) -> CompareArm {
+        CompareArm {
+            agent_name: "omp".into(),
+            env: env.map(String::from),
+            version: Some("2.0".into()),
+            start_time: 0,
+            end_time: 0,
+        }
+    }
+
+    #[test]
+    fn signals_rollup_sql_sums_windows_per_identity_over_present_columns() {
+        let fields = [
+            "_timestamp",
+            "org_id",
+            "source_stream",
+            "signal_type",
+            "agent_name",
+            "tool_name",
+            "calls",
+            "distinct_traces",
+            "count",
+        ];
+        let sql = signals_rollup_sql(1, 2, "org_id = 'o'", &fields).unwrap();
+        assert!(sql.contains(
+            "GROUP BY \"source_stream\", \"signal_type\", \"agent_name\", \"tool_name\" LIMIT"
+        ));
+        assert!(sql.contains("SUM(\"calls\") AS \"calls\""));
+        assert!(sql.contains("SUM(\"count\") AS \"count\""));
+        // Columns the stream lacks are never named.
+        assert!(!sql.contains("gen_ai_agent_env"));
+        assert!(!sql.contains("cost"));
+        assert!(!sql.contains("SELECT *"));
+        assert!(sql.contains("_timestamp >= 1 AND _timestamp < 2 AND org_id = 'o'"));
+    }
+
+    #[test]
+    fn signals_rollup_sql_is_none_before_any_signal_is_written() {
+        assert!(signals_rollup_sql(1, 2, "1=1", &["_timestamp", "org_id"]).is_none());
+    }
+
+    #[test]
+    fn arm_filters_scope_env_variants() {
+        let env_less = arm_filters("o", "cost", &arm(Some("")), true);
+        assert!(env_less.contains("gen_ai_agent_env IS NULL"));
+        assert!(!env_less.contains("gen_ai_agent_env = 'production'"));
+        // No env column: every row is env-less, and the column can't be named.
+        assert!(!arm_filters("o", "cost", &arm(Some("")), false).contains("gen_ai_agent_env"));
+        // None keeps "any env".
+        assert!(!arm_filters("o", "cost", &arm(None), true).contains("gen_ai_agent_env"));
+        let prod = arm_filters("o", "failure", &arm(Some("production")), true);
+        assert!(prod.contains("gen_ai_agent_env = 'production'"));
+        assert!(!prod.contains("IS NULL"));
+    }
 
     #[test]
     fn aggregate_cost_hits_sums_moments_and_collects_sketches() {

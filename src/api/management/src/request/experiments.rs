@@ -245,6 +245,7 @@ fn experiment_summary_body(
         task_outcomes,
         score_outcomes,
         score_summaries,
+        client_score_summaries,
         aggregate_summary,
         scorer_definitions,
     } = summary;
@@ -262,6 +263,8 @@ fn experiment_summary_body(
         task_outcomes: task_outcomes.map(Into::into),
         score_outcomes: score_outcomes.map(Into::into),
         score_summaries,
+        client_score_summaries: client_score_summaries
+            .map(|summaries| summaries.into_iter().map(Into::into).collect()),
         aggregate_summary: aggregate_summary.map(Into::into),
     }
 }

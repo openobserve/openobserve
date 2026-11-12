@@ -178,6 +178,13 @@ const SLACK_ACTION_SCOPE: &[ScopeRoute] = &[
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("snooze")], POST),
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("acknowledge")], POST),
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("unacknowledge")], POST),
+    // Slack never lists decisions, so the list route stays out of the token's reach.
+    #[cfg(feature = "enterprise")]
+    v2(&[Param, Lit("autoobserve"), Lit("decisions"), Lit("preview")], GET),
+    #[cfg(feature = "enterprise")]
+    v2(&[Param, Lit("autoobserve"), Lit("decisions")], POST),
+    #[cfg(feature = "enterprise")]
+    v2(&[Param, Lit("autoobserve"), Lit("decisions"), Param, Lit("undo")], POST),
 ];
 
 /// Set only by the validator; a request extension, so a client can never supply it.

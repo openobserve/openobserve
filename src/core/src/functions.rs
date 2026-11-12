@@ -544,7 +544,7 @@ async fn get_dependencies(
     org_id: &str,
     func_name: &str,
 ) -> Result<Vec<PipelineDependencyItem>, infra::errors::Error> {
-    let mut pipelines = infra::pipeline::list_by_org(org_id).await?;
+    let mut pipelines = infra::pipeline::list_by_org_fully_decoded(org_id).await?;
     pipelines.retain(|pl| pl.contains_function(func_name));
     Ok(pipelines
         .into_iter()

@@ -36,6 +36,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          `sessions-*` for the count/badges — so those two are passed explicitly to
          stay byte-identical. solidAgentTrigger keeps the "All Agents" empty state
          in solid text (Sessions never dimmed it). -->
+    <!-- Debounced 300 ms like the Streams search; the term lives in useSessions so Back restores the filtered page. -->
+    <div
+      v-if="!(streamsLoaded && availableStreams.length === 0)"
+      class="px-page-edge shrink-0 pt-2"
+    >
+      <label :for="SEARCH_INPUT_ID" class="sr-only">
+        {{ t("traces.sessionsList.search.placeholder") }}
+      </label>
+      <OSearchInput
+        :id="SEARCH_INPUT_ID"
+        v-model="searchKeyword"
+        :placeholder="t('traces.sessionsList.search.placeholder')"
+        :title="t('traces.sessionsList.search.title')"
+        clearable
+        :debounce="300"
+        class="w-full"
+        data-test="sessions-list-search"
+      />
+      <!-- Exact user from a `?user=` link (Users page "Sessions"). -->
+      <OTag
+        v-if="searchUser"
+        variant="primary-soft"
+        :label="t('traces.sessionsList.search.user', { user: searchUser })"
+        removable
+        :remove-label="t('traces.sessionsList.search.clearUser')"
+        class="mt-2"
+        data-test="sessions-list-user-filter"
+        @remove="clearUserFilter"
+      />
+    </div>
     <AiScopeBar
       v-if="!(streamsLoaded && availableStreams.length === 0)"
       :filter-mode="filterMode"
@@ -61,38 +91,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :envs="envs"
       :agent-names="agentNames"
       :versions="versions"
+      :agent-streams="agentStreams"
+      :selected-agent-stream="effectiveStream"
       :selected-stream-count="selectedStreamCount"
       :streams-loaded="streamsLoaded"
       :agents-loaded="agentsLoaded"
       @filter-mode-change="onFilterModeChange"
+      @update:selected-agent-stream="selectedAgentStream = $event"
       @agent-pick="modeExplicit = true"
       @stream-change="onStreamChange"
     >
-      <!-- List search — one box, matched against the user id OR the
-           conversation text server-side (whichever the stream has). Live,
-           debounced (300ms — same as the Streams list's search), same
-           pattern as LogStream.vue: no Enter/run-query affordance, a settled
-           value just re-fetches. The applied term lives in useSessions'
-           singleton next to the page/size so back-navigation restores the
-           filtered page. -->
-      <template #trailing>
-        <div class="flex min-w-0 flex-1 items-center gap-2">
-          <label :for="SEARCH_INPUT_ID" class="sr-only">
-            {{ t("traces.sessionsList.search.placeholder") }}
-          </label>
-          <OSearchInput
-            :id="SEARCH_INPUT_ID"
-            v-model="searchKeyword"
-            :placeholder="t('traces.sessionsList.search.placeholder')"
-            :title="t('traces.sessionsList.search.title')"
-            size="sm"
-            clearable
-            :debounce="300"
-            class="w-full"
-            data-test="sessions-list-search"
-          />
-        </div>
-      </template>
     </AiScopeBar>
 
     <!-- Stream mode because these LLM spans carry no agent identity. -->
@@ -208,7 +216,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="row.firstUserMessage" class="text-text-secondary text-xs">
           {{ row.firstUserMessage }}
         </span>
+        <!-- A message that was only harness text says so and names the tag. -->
+        <span v-else-if="row.harnessOnly" class="text-text-muted text-xs">
+          {{ t("readableSessions.onlyHarness", { tag: `<${row.harnessOnly}>` }) }}
+        </span>
         <span v-else class="text-text-muted text-xs">—</span>
+        <span
+          v-if="row.harnessHidden && row.firstUserMessage"
+          class="text-2xs text-text-muted block"
+          :data-test="`sessions-list-harness-hidden-${row.sessionId}`"
+        >
+          {{ t("readableSessions.hidden", { n: row.harnessHidden }, row.harnessHidden) }}
+        </span>
+      </template>
+
+      <template #cell-title="{ row }">
+        <span class="text-text-body text-xs font-medium">{{ row.title }}</span>
       </template>
 
       <!-- Turns -->
@@ -293,6 +316,7 @@ import {
   agentIdentityKey,
   type ScopeMode,
 } from "@/enterprise/composables/useAgentScope";
+import { replaceRouteQuery } from "@/utils/url/replaceRouteQuery";
 import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";
 import AiAgentsLoadError from "@/enterprise/components/AIObservability/AiAgentsLoadError.vue";
 import {
@@ -346,6 +370,7 @@ const {
   currentPage,
   rowsPerPage,
   searchKeyword,
+  searchUser,
   sortBy,
   sortOrder,
   agents,
@@ -371,18 +396,23 @@ const urlKeyword = normalizeSearchTerm(
 // Matched server-side against the user id OR the conversation text,
 // whichever the stream has.
 const SEARCH_INPUT_ID = "sessions-list-search";
-// A term in the URL overrides whatever the singleton holds: a pasted link
-// must reproduce its filtered view. When it differs from what the cached rows
-// were fetched with, the cache guard in `loadSessions` is bypassed once so the
-// mount fetch runs with the URL's term instead of restoring the stale page.
+// A URL term overrides the singleton and bypasses the cache guard once, so a pasted link reproduces its view.
 let searchChangedByUrl = false;
-if (urlKeyword && urlKeyword !== searchKeyword.value) {
+if (urlKeyword && (urlKeyword !== searchKeyword.value || !window.history.state?.forward)) {
   searchKeyword.value = urlKeyword;
+  searchChangedByUrl = true;
+}
+// The URL alone owns `?user=`: a link without it shows every user.
+const urlUser = normalizeSearchTerm(typeof route.query.user === "string" ? route.query.user : "");
+if (urlUser !== searchUser.value) {
+  searchUser.value = urlUser;
   searchChangedByUrl = true;
 }
 const searchActive = computed(() => searchKeyword.value.length > 0);
 const activeSearch = computed<SessionSearch | undefined>(() =>
-  searchActive.value ? { keyword: searchKeyword.value || undefined } : undefined,
+  searchActive.value || searchUser.value
+    ? { keyword: searchKeyword.value || undefined, user: searchUser.value || undefined }
+    : undefined,
 );
 
 const activeStream = ref<string>(
@@ -442,13 +472,15 @@ const modeExplicit = ref(explicitMode !== null);
 // so it only seeds the mode a back-navigation's cached rows show; the next load
 // that runs decides from its own window's list.
 let modeSettledOrg: string | null = null;
-// Env/name/version to seed the cascade with once the list is available: the
-// URL deep-link first (any of agent/env/version), else the persisted last
-// selection, never a mix of the two. Resolved via `selectAgentByScope`, then
-// cleared.
-const pendingScope = ref<{ env: string; name: string; version: string } | null>(
+// Seeded from the URL deep-link or else the persisted selection, never a mix of the two.
+const pendingScope = ref<{ env: string; name: string; version: string; stream?: string } | null>(
   urlScope.agent || urlScope.env || urlScope.version
-    ? { env: urlScope.env, name: urlScope.agent, version: urlScope.version }
+    ? {
+        env: urlScope.env,
+        name: urlScope.agent,
+        version: urlScope.version,
+        stream: urlScope.agentStream,
+      }
     : localStorage.getItem(AGENT_LS_KEY)
       ? {
           env: localStorage.getItem(ENV_LS_KEY) || "",
@@ -501,6 +533,8 @@ const {
   selectedEnv,
   selectedAgentName,
   selectedVersion,
+  agentStreams,
+  selectedAgentStream,
   selectAgentByName,
   selectAgentByScope,
 } = useAgentScope({
@@ -522,8 +556,8 @@ const {
 // cleared once `agents` was ready to resolve it.
 function seedPendingCascade() {
   if (!pendingScope.value || agents.value.length === 0) return;
-  const { env, name, version } = pendingScope.value;
-  selectAgentByScope(env, name, version);
+  const { env, name, version, stream } = pendingScope.value;
+  selectAgentByScope(env, name, version, stream);
   pendingScope.value = null;
 }
 
@@ -577,12 +611,25 @@ const tableColumns = computed(() =>
       id: "userId",
       header: t("traces.sessionsList.columns.user"),
       accessorKey: "userId",
-      // Email-identity width preset; OUserCell truncates + tooltips beyond it.
-      size: COL.email,
+      // OUserCell truncates + tooltips beyond this width.
+      size: 180,
       sortable: true,
       hideable: true,
       meta: { align: "left" },
     },
+    ...(sessions.value.some((s) => s.title)
+      ? [
+          {
+            id: "title",
+            header: t("readableSessions.title"),
+            accessorKey: "title",
+            size: COL.name,
+            sortable: false,
+            hideable: true,
+            meta: { align: "left" as const },
+          },
+        ]
+      : []),
     {
       id: "firstUserMessage",
       header: t("traces.sessionsList.columns.firstMessage"),
@@ -591,7 +638,7 @@ const tableColumns = computed(() =>
       // Flex columns collapse to `minSize` when the table overflows horizontally;
       // pin a floor so the message stays readable instead of clipping to "Han…".
       // The user drives how much they want to see via resize, capped by maxSize.
-      minSize: 200,
+      minSize: 160,
       maxSize: 600,
       sortable: false,
       hideable: true,
@@ -605,6 +652,25 @@ const tableColumns = computed(() =>
       sortable: true,
       hideable: true,
       meta: { align: "right" },
+    },
+    {
+      id: "cost",
+      header: t("traces.sessionsList.columns.cost"),
+      accessorKey: "cost",
+      // Fits "≥ $0.0000 partial" and "cost unknown" (unpriced tokens).
+      size: 150,
+      sortable: true,
+      hideable: true,
+      meta: { align: "right" },
+    },
+    {
+      id: "status",
+      header: t("traces.sessionsList.columns.status"),
+      accessorKey: "status",
+      size: 100,
+      sortable: true,
+      hideable: true,
+      meta: { align: "left", disableCellAction: true },
     },
     {
       id: "durationNanos",
@@ -624,25 +690,6 @@ const tableColumns = computed(() =>
       sortable: true,
       hideable: true,
       meta: { align: "right" },
-    },
-    {
-      id: "cost",
-      header: t("traces.sessionsList.columns.cost"),
-      accessorKey: "cost",
-      // Fits "≥ $0.0000 partial" and "cost unknown" (unpriced tokens, AIO-16).
-      size: 150,
-      sortable: true,
-      hideable: true,
-      meta: { align: "right" },
-    },
-    {
-      id: "status",
-      header: t("traces.sessionsList.columns.status"),
-      accessorKey: "status",
-      size: 100,
-      sortable: true,
-      hideable: true,
-      meta: { align: "left", disableCellAction: true },
     },
     {
       id: "lastSeenNanos",
@@ -689,19 +736,26 @@ function formatTokens(n: number): string {
 }
 
 function syncFilterUrl() {
-  const query = scopeUrlQuery(route.query, {
-    mode: filterMode.value,
-    explicit: modeExplicit.value,
-    stream: activeStream.value,
-    agent: selectedAgent.value
-      ? { name: selectedAgent.value.name, env: selectedEnv.value, version: selectedVersion.value }
-      : null,
+  void replaceRouteQuery(router, route, (current) => {
+    const query = scopeUrlQuery(current, {
+      mode: filterMode.value,
+      explicit: modeExplicit.value,
+      stream: activeStream.value,
+      agent: selectedAgent.value
+        ? {
+            name: selectedAgent.value.name,
+            env: selectedEnv.value,
+            version: selectedVersion.value,
+            stream: selectedAgentStream.value,
+          }
+        : null,
+    });
+    if (searchKeyword.value) query.keyword = searchKeyword.value;
+    else delete query.keyword;
+    if (searchUser.value) query.user = searchUser.value;
+    else delete query.user;
+    return query;
   });
-  // Only the applied term — so the filtered view has a link and survives a
-  // reload, and a cleared box leaves no stale param behind.
-  if (searchKeyword.value) query.keyword = searchKeyword.value;
-  else delete query.keyword;
-  router.replace({ query }).catch(() => {});
 }
 
 function clearSessionRows() {
@@ -740,8 +794,9 @@ async function loadSessions(
   searchChangedByUrl = false;
   // An org switch invalidates the list (see the guard above); the search
   // belonged to the previous org's data, so it goes with it.
-  if (loadedOrg.value && loadedOrg.value !== orgId && searchActive.value) {
-    searchKeyword.value = "";
+  if (loadedOrg.value && loadedOrg.value !== orgId) {
+    if (searchActive.value) searchKeyword.value = "";
+    searchUser.value = "";
   }
 
   // Hold the table skeleton across the whole load. We await the stream list and
@@ -804,6 +859,8 @@ async function loadSessions(
   const stream = effectiveStream.value;
   if (!stream) {
     clearSessionRows();
+    // Stamp the org so the cache guard does not serve this empty list to the previous org.
+    loadedOrg.value = orgId;
     loading.value = false; // nothing to fetch — release the held skeleton
     return;
   }
@@ -832,6 +889,12 @@ watch(searchKeyword, () => {
 
 function clearSearch() {
   searchKeyword.value = "";
+}
+
+function clearUserFilter() {
+  searchUser.value = "";
+  currentPage.value = 1;
+  loadSessions(undefined, undefined, true);
 }
 
 // Filter / pagination changes are deliberate user actions — force a re-fetch

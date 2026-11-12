@@ -14,9 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { defineComponent, h, KeepAlive, nextTick, reactive, ref } from "vue";
+import { defineComponent, h, KeepAlive, nextTick, reactive, ref, watch } from "vue";
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import Index from "@/plugins/traces/Index.vue";
+import {
+  reportTracesChartRefreshFailed,
+  startTracesChartLoad,
+} from "@/plugins/traces/metrics/tracesFailedRefreshHold";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -244,14 +248,19 @@ describe("Traces page load states", () => {
   });
 
   describe("no false onboarding on a cold load", () => {
-    it("shows the loading state, not the no-streams onboarding, while the parser loads", async () => {
+    it("shows the results layout pending, not the no-streams onboarding, while the parser loads", async () => {
       mockLoadTracesParser.mockReturnValue(new Promise(() => {}));
       wrapper = mount(Index, { attachTo: node, global: globalOptions });
       await flushPromises();
 
-      expect(wrapper.find('[data-test="traces-search-loading"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-search-result"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-search-loading"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="traces-no-streams-in-org-text"]').exists()).toBe(false);
-      expect(mockGetStreams).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="traces-no-stream-selected-text"]').exists()).toBe(false);
+      // The parser loads alongside the stream list; only the search waits for it.
+      expect(mockGetStreams).toHaveBeenCalledTimes(1);
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(searchObj.loadingStream).toBe(true);
     });
 
     it("shows the onboarding once the stream list settles with no streams", async () => {
@@ -598,13 +607,13 @@ describe("Traces page load states", () => {
       parser.resolve();
       await flushPromises();
 
-      expect(mockGetStreams).not.toHaveBeenCalled();
+      // The stream list loaded alongside the parser; the search, which needs the parser, never started.
+      expect(mockGetStreams).toHaveBeenCalledTimes(1);
       expect(mockFetch).not.toHaveBeenCalled();
 
       show.value = true;
       await flushPromises();
       await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
-      expect(mockGetStreams).toHaveBeenCalledTimes(1);
       expect(searchObj.data.stream.selectedStream.value).toBe("default");
     });
 
@@ -753,12 +762,16 @@ describe("Traces page load states", () => {
 
       expect(searchObj.data.stream.selectedStreamFields).toEqual([]);
       expect((searchObj.data.datetime as any).queryRangeRestrictionInHour).toBeUndefined();
-      expect(mockFetch).not.toHaveBeenCalled();
+      // The search starts without waiting for the schema; leaving cancelled it.
+      expect(callsOfType("main")).toHaveLength(1);
+      expect(mockCancel).toHaveBeenCalled();
 
       show.value = true;
       await flushPromises();
-      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
-      expect(searchObj.data.stream.selectedStreamFields.length).toBeGreaterThan(0);
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(2));
+      await waitFor(() =>
+        expect(searchObj.data.stream.selectedStreamFields.length).toBeGreaterThan(0),
+      );
     });
 
     it("starts no search when it leaves during a filter handoff's stream load", async () => {
@@ -794,7 +807,6 @@ describe("Traces page load states", () => {
       parser.resolve();
       await flushPromises();
 
-      expect(mockGetStreams).not.toHaveBeenCalled();
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -812,6 +824,422 @@ describe("Traces page load states", () => {
       });
 
       expect(searchObj.data.queryResults.hits).toEqual([]);
+    });
+  });
+  describe("steady loading (T-1, T-2)", () => {
+    const settle = async () => {
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      lastCall("main")[1].complete(null);
+      lastCall("count")[1].complete(null);
+      await flushPromises();
+    };
+    const recordLoadingStream = () => {
+      const seen: boolean[] = [];
+      const stop = watch(
+        () => searchObj.loadingStream,
+        (value) => seen.push(value),
+        { flush: "sync" },
+      );
+      return { seen, stop };
+    };
+    const leaveAndReturn = async (show: { value: boolean }, query?: Record<string, string>) => {
+      show.value = false;
+      await flushPromises();
+      if (query) setRouteQuery(query);
+      show.value = true;
+      await flushPromises();
+    };
+
+    it("requests the cold load once each: list, schema, search, count", async () => {
+      setRouteQuery({ stream: "default", period: "15m" });
+      mountKeptAlive();
+      await settle();
+
+      expect(mockGetStreams).toHaveBeenCalledTimes(1);
+      expect(mockGetStream).toHaveBeenCalledTimes(1);
+      expect(callsOfType("main")).toHaveLength(1);
+      expect(callsOfType("count")).toHaveLength(1);
+    });
+
+    it("starts the search without waiting for the schema when sorting by time", async () => {
+      setRouteQuery({ stream: "default", period: "15m" });
+      mockGetStream.mockReturnValue(new Promise(() => {}));
+      mountKeptAlive();
+
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      expect(searchObj.loadingStream).toBe(false);
+    });
+
+    it("waits for the schema when the sort column has to be checked against it", async () => {
+      setRouteQuery({ stream: "default", period: "15m" });
+      searchObj.meta.resultGrid.sortBy = "service_name";
+      let answer!: (value: unknown) => void;
+      mockGetStream.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+      mountKeptAlive();
+      await flushPromises();
+      expect(callsOfType("main")).toHaveLength(0);
+
+      answer(streamList.list[0]);
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+    });
+
+    it("keeps the rail's fields on screen while a reload refreshes them", async () => {
+      setRouteQuery({ stream: "default", period: "15m" });
+      const { show } = mountKeptAlive();
+      await settle();
+      // The search no longer waits for the fields, so they may land after it.
+      await waitFor(() =>
+        expect(searchObj.data.stream.selectedStreamFields.length).toBeGreaterThan(0),
+      );
+      const before = searchObj.data.stream.selectedStreamFields;
+      let answer!: (value: unknown) => void;
+      mockGetStream.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+
+      await leaveAndReturn(show, { stream: "default", period: "1h" });
+      expect(searchObj.data.stream.selectedStreamFields).toBe(before);
+
+      answer(streamList.list[0]);
+      await waitFor(() =>
+        expect(searchObj.data.stream.selectedStreamFields.length).toBeGreaterThan(0),
+      );
+    });
+
+    it.each([
+      ["as linked", { org_identifier: "default" }],
+      [
+        "as the route guard delivers it, with the default tab",
+        { org_identifier: "default", tab: "spans" },
+      ],
+    ])(
+      "treats a bare menu URL (%s) as the view it had: no reload, no search, URL put back",
+      async (_, menuQuery) => {
+        const shown = { stream: "default", period: "15m", org_identifier: "default" };
+        setRouteQuery(shown);
+        const { show } = mountKeptAlive();
+        await settle();
+        mockGetStreams.mockClear();
+        mockFetch.mockClear();
+        const replace = vi.mocked(router.replace);
+        replace.mockClear();
+        const loading = recordLoadingStream();
+
+        await leaveAndReturn(show, menuQuery);
+        loading.stop();
+
+        expect(mockGetStreams).not.toHaveBeenCalled();
+        expect(mockFetch).not.toHaveBeenCalled();
+        expect(replace).toHaveBeenCalledWith({ query: shown });
+        expect(loading.seen).not.toContain(true);
+      },
+    );
+
+    it("refreshes the stream's schema behind a menu return: one request, fields kept, nothing else", async () => {
+      const shown = { stream: "default", period: "15m", org_identifier: "default" };
+      setRouteQuery(shown);
+      const { show } = mountKeptAlive();
+      await settle();
+      await waitFor(() =>
+        expect(searchObj.data.stream.selectedStreamFields.length).toBeGreaterThan(0),
+      );
+      const before = searchObj.data.stream.selectedStreamFields;
+      const hitsBefore = searchObj.data.queryResults;
+      mockGetStreams.mockClear();
+      mockGetStream.mockClear();
+      mockFetch.mockClear();
+      let answer!: (value: unknown) => void;
+      mockGetStream.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+      const fieldCounts: number[] = [];
+      const stopFields = watch(
+        () => searchObj.data.stream.selectedStreamFields.length,
+        (n) => fieldCounts.push(n),
+        { flush: "sync" },
+      );
+      const loading = recordLoadingStream();
+
+      await leaveAndReturn(show, { org_identifier: "default" });
+      expect(mockGetStream).toHaveBeenCalledTimes(1);
+      expect(mockGetStream).toHaveBeenCalledWith("default", "traces", true);
+      expect(searchObj.data.stream.selectedStreamFields).toBe(before);
+
+      answer({
+        ...streamList.list[0],
+        schema: [...streamList.list[0].schema, { name: "new_field", type: "Utf8" }],
+      });
+      await waitFor(() =>
+        expect(
+          searchObj.data.stream.selectedStreamFields.map((field: any) => field.name),
+        ).toContain("new_field"),
+      );
+      stopFields();
+      loading.stop();
+
+      expect(fieldCounts).not.toContain(0);
+      expect(loading.seen).not.toContain(true);
+      expect(mockGetStreams).not.toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(searchObj.data.queryResults).toBe(hitsBefore);
+    });
+
+    it("refreshes nothing on a Back to the same URL", async () => {
+      setRouteQuery({ stream: "default", period: "15m" });
+      const { show } = mountKeptAlive();
+      await settle();
+      await waitFor(() =>
+        expect(searchObj.data.stream.selectedStreamFields.length).toBeGreaterThan(0),
+      );
+      mockGetStream.mockClear();
+      mockFetch.mockClear();
+
+      await leaveAndReturn(show);
+
+      expect(mockGetStream).not.toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("reloads a changed query behind the kept results without raising loadingStream", async () => {
+      setRouteQuery({ stream: "default", period: "15m" });
+      const { show } = mountKeptAlive();
+      await settle();
+      mockFetch.mockClear();
+      const loading = recordLoadingStream();
+
+      await leaveAndReturn(show, { stream: "default", period: "1h" });
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      loading.stop();
+
+      expect(loading.seen).not.toContain(true);
+    });
+
+    describe("the rail's fields belong to their stream", () => {
+      const other = {
+        ...streamList.list[0],
+        name: "other",
+        schema: [{ name: "only_in_other", type: "Utf8" }],
+      };
+      const fieldNames = () =>
+        searchObj.data.stream.selectedStreamFields.map((field: any) => field.name);
+      const loadDefault = async () => {
+        setRouteQuery({ stream: "default", period: "15m" });
+        wrapper = mount(Index, { attachTo: node, global: globalOptions });
+        await waitFor(() => expect(fieldNames()).toContain("trace_id"));
+      };
+      const selectStream = (name: string) => {
+        searchObj.data.stream.selectedStream = { label: name, value: name };
+      };
+
+      it("drops the old stream's fields at once and keeps none when the new schema fails", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        await loadDefault();
+        mockGetStream.mockRejectedValue(new Error("schema"));
+
+        selectStream("other");
+        const switching = wrapper!.vm.onChangeStream();
+        expect(searchObj.data.stream.selectedStreamFields).toEqual([]);
+        await switching;
+        await flushPromises();
+
+        expect(searchObj.data.stream.selectedStreamFields).toEqual([]);
+        expect((searchObj.meta as any).loadingFields).toBe(false);
+      });
+
+      it("keeps the same stream's fields while its schema reloads and when the reload fails", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        await loadDefault();
+        const before = searchObj.data.stream.selectedStreamFields;
+        mockGetStream.mockRejectedValue(new Error("schema"));
+
+        const reloading = wrapper!.vm.extractFields();
+        expect(searchObj.data.stream.selectedStreamFields).toBe(before);
+        await reloading;
+
+        expect(searchObj.data.stream.selectedStreamFields).toBe(before);
+      });
+
+      it("never lets an older stream's schema land over a newer stream's", async () => {
+        await loadDefault();
+        let answerDefault!: (value: unknown) => void;
+        mockGetStream.mockImplementation((name: string) =>
+          name === "other"
+            ? Promise.resolve(other)
+            : new Promise((resolve) => (answerDefault = resolve)),
+        );
+
+        const first = wrapper!.vm.extractFields();
+        selectStream("other");
+        await wrapper!.vm.extractFields();
+        expect(fieldNames()).toContain("only_in_other");
+
+        answerDefault({
+          ...streamList.list[0],
+          schema: [{ name: "only_in_default", type: "Utf8" }],
+        });
+        await first;
+        await flushPromises();
+        expect(fieldNames()).toContain("only_in_other");
+        expect(fieldNames()).not.toContain("only_in_default");
+        expect((searchObj.meta as any).loadingFields).toBe(false);
+      });
+    });
+
+    it("ignores the server's progress events, so the results line keeps one mode", async () => {
+      setRouteQuery({ stream: "default", period: "15m" });
+      wrapper = mount(Index, { attachTo: node, global: globalOptions });
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      lastCall("main")[1].data(null, { type: "event_progress", content: { percent: 40 } });
+      await flushPromises();
+
+      expect((searchObj.meta as any).searchProgress).toBeUndefined();
+      expect(searchObj.loading).toBe(true);
+      expect(searchObj.data.queryResults.hits).toEqual([]);
+    });
+
+    describe("a failed re-run of the same view", () => {
+      const hitsOf = (ids: string[]) => ({
+        type: "search_response_hits",
+        content: { results: { hits: ids.map((trace_id) => ({ trace_id })) } },
+      });
+
+      const loadRows = async () => {
+        setRouteQuery({ stream: "default", period: "15m" });
+        wrapper = mount(Index, { attachTo: node, global: globalOptions });
+        await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+        lastCall("main")[1].data(null, hitsOf(["t1", "t2"]));
+        lastCall("main")[1].complete(null);
+        lastCall("count")[1].complete(null);
+        await flushPromises();
+        expect(searchObj.data.queryResults.hits).toHaveLength(2);
+      };
+
+      it("keeps the rows and marks the refresh failed instead of the error page", async () => {
+        await loadRows();
+        searchObj.data.queryResults.errorCount = 3;
+        searchObj.meta.resultGrid.showPagination = true;
+        wrapper!.vm.getQueryData();
+        lastCall("main")[1].error(null, { content: { message: "boom", code: 500 } });
+        await flushPromises();
+
+        expect(searchObj.data.queryResults.hits).toHaveLength(2);
+        expect((searchObj.meta as any).refreshFailedAt).toEqual(expect.any(Number));
+        expect(searchObj.data.errorMsg).toBe("");
+        expect(searchObj.loading).toBe(false);
+        expect(searchObj.data.queryResults.countPending).toBe(false);
+        expect(searchObj.data.queryResults.errorCount).toBe(3);
+        expect(searchObj.meta.resultGrid.showPagination).toBe(true);
+      });
+
+      it("shows the error, not the old rows under the new order, when a re-sort fails", async () => {
+        await loadRows();
+        searchObj.meta.resultGrid.sortOrder = "asc";
+        wrapper!.vm.getQueryData(false, true);
+        await waitFor(() => expect(callsOfType("main")).toHaveLength(2));
+        lastCall("main")[1].error(null, { content: { message: "sort failed", code: 500 } });
+        await flushPromises();
+
+        expect(searchObj.data.queryResults.hits).toEqual([]);
+        expect(searchObj.data.errorMsg).toContain("sort failed");
+        expect((searchObj.meta as any).refreshFailedAt ?? null).toBeNull();
+      });
+
+      it("puts the pager back on the page the kept rows were read with", async () => {
+        await loadRows();
+        searchObj.data.resultGrid.currentPage = 2;
+        wrapper!.vm.getQueryData(true);
+        lastCall("main")[1].data(null, hitsOf(["p3a", "p3b"]));
+        lastCall("main")[1].complete(null);
+        await flushPromises();
+
+        wrapper!.vm.runQueryFn();
+        expect(searchObj.data.resultGrid.currentPage).toBe(0);
+        lastCall("main")[1].error(null, { content: { message: "boom", code: 500 } });
+        await flushPromises();
+
+        expect(searchObj.data.queryResults.hits.map((hit: any) => hit.trace_id)).toEqual([
+          "p3a",
+          "p3b",
+        ]);
+        expect(searchObj.data.resultGrid.currentPage).toBe(2);
+        expect((searchObj.meta as any).refreshFailedAt).toEqual(expect.any(Number));
+      });
+
+      it("keeps page 1 for page 1's rows when a refresh fails after rows of its own", async () => {
+        await loadRows();
+        wrapper!.vm.runQueryFn();
+        lastCall("main")[1].data(null, hitsOf(["n1"]));
+        lastCall("main")[1].error(null, { content: { message: "boom", code: 500 } });
+        await flushPromises();
+
+        expect(searchObj.data.queryResults.hits.map((hit: any) => hit.trace_id)).toEqual([
+          "t1",
+          "t2",
+        ]);
+        expect(searchObj.data.resultGrid.currentPage).toBe(0);
+      });
+
+      it("pages the window of the kept rows after a refresh with a new window fails", async () => {
+        await loadRows();
+        const shownQuery = { ...searchObj.data.queryPayload.query };
+        searchObj.data.datetime.type = "absolute";
+        searchObj.data.datetime.startTime = shownQuery.start_time + 86_400_000_000;
+        searchObj.data.datetime.endTime = shownQuery.end_time + 86_400_000_000;
+        wrapper!.vm.getQueryData();
+        lastCall("main")[1].error(null, { content: { message: "boom", code: 500 } });
+        await flushPromises();
+        expect(searchObj.data.queryResults.hits).toHaveLength(2);
+
+        searchObj.data.resultGrid.currentPage = 1;
+        wrapper!.vm.getQueryData(true);
+        const payload = lastCall("main")[0].queryReq;
+        const query = payload.query ?? payload;
+        expect(query.start_time).toBe(shownQuery.start_time);
+        expect(query.end_time).toBe(shownQuery.end_time);
+      });
+
+      it("clears the failed mark when a later run lands", async () => {
+        await loadRows();
+        wrapper!.vm.getQueryData();
+        lastCall("main")[1].error(null, { content: { message: "boom", code: 500 } });
+        wrapper!.vm.getQueryData();
+        lastCall("main")[1].complete(null);
+        expect((searchObj.meta as any).refreshFailedAt).toBeNull();
+      });
+
+      it("keeps the failed mark when only a chart's refresh failed and the rows landed", async () => {
+        await loadRows();
+        wrapper!.vm.getQueryData();
+        startTracesChartLoad(searchObj as any);
+        reportTracesChartRefreshFailed(searchObj as any);
+        lastCall("main")[1].data(null, hitsOf(["n1"]));
+        lastCall("main")[1].complete(null);
+        await flushPromises();
+
+        expect(searchObj.data.queryResults.hits.map((hit: any) => hit.trace_id)).toEqual(["n1"]);
+        expect(searchObj.data.errorMsg).toBe("");
+        expect((searchObj.meta as any).refreshFailedAt).toEqual(expect.any(Number));
+      });
+
+      it("clears a chart's failed mark when a later run's charts and rows land", async () => {
+        await loadRows();
+        wrapper!.vm.getQueryData();
+        startTracesChartLoad(searchObj as any);
+        reportTracesChartRefreshFailed(searchObj as any);
+        lastCall("main")[1].complete(null);
+        wrapper!.vm.getQueryData();
+        startTracesChartLoad(searchObj as any);
+        lastCall("main")[1].complete(null);
+
+        expect((searchObj.meta as any).refreshFailedAt).toBeNull();
+      });
+
+      it("shows the error page when the failing run asked for another query", async () => {
+        await loadRows();
+        searchObj.data.editorValue = "service_name='x'";
+        wrapper!.vm.getQueryData();
+        lastCall("main")[1].error(null, { content: { message: "boom", code: 400 } });
+        await flushPromises();
+
+        expect(searchObj.data.errorMsg).toContain("boom");
+        expect((searchObj.meta as any).refreshFailedAt ?? null).toBeNull();
+      });
     });
   });
 });

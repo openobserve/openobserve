@@ -31,27 +31,25 @@
 //! Chat API (which scopes by owner) is the only reader. The query is planned
 //! again in spawned tasks, where the task-local is gone, so the leader
 //! carries the mark on the internal request
-//! (`datafusion::request::Request::chat_history_reader`).
+//! (`datafusion::request::Request::protected_reader`).
 //! [`is_protected_ai_chat_stream`] additionally keeps it out of stream
 //! listing/management and realtime pipelines.
 
-pub const AI_CHAT_EVENTS_STREAM: &str = "_o2_ai_chat_events";
+use super::protected_streams::{ProtectedReader, as_reader, current_reader};
 
-tokio::task_local! {
-    static CHAT_HISTORY_READER: ();
-}
+pub const AI_CHAT_EVENTS_STREAM: &str = "_o2_ai_chat_events";
 
 /// Run `fut` as the Chat API's history reader — the only code allowed to
 /// query the chat-events stream. A task-local rather than a request field:
 /// nothing a client sends, and no stored alert, dashboard or pipeline, can
 /// set it.
 pub async fn as_chat_history_reader<F: std::future::Future>(fut: F) -> F::Output {
-    CHAT_HISTORY_READER.scope((), fut).await
+    as_reader(ProtectedReader::ChatHistory, fut).await
 }
 
 /// Whether the current task is the Chat API's history reader.
 pub fn is_chat_history_reader() -> bool {
-    CHAT_HISTORY_READER.try_with(|_| ()).is_ok()
+    current_reader() == Some(ProtectedReader::ChatHistory)
 }
 
 /// Whether `stream_name` is the protected chat-events stream.
