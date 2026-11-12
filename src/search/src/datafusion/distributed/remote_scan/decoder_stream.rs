@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fmt::Debug, pin::Pin, sync::atomic::Ordering, task::Poll, time::Duration};
+use std::{fmt::Debug, pin::Pin, sync::atomic::Ordering, task::Poll};
 
 use arrow::array::RecordBatch;
 use arrow_flight::{FlightData, error::Result};
@@ -30,7 +30,10 @@ use futures::{Stream, StreamExt, ready};
 use tonic::Streaming;
 
 use crate::{
-    datafusion::distributed::remote_scan::query_context::{QueryContext, process_partial_err},
+    datafusion::distributed::{
+        analyze::profile::REMOTE_PROFILE_TIMEOUT,
+        remote_scan::query_context::{QueryContext, process_partial_err},
+    },
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 
@@ -87,9 +90,7 @@ impl FlightDecoderStream {
             }
         }
     }
-}
 
-impl FlightDecoderStream {
     /// Reads the rest of the stream for its messages; the batches nobody asked for are dropped.
     async fn drain(mut self) {
         log::info!(
@@ -267,11 +268,11 @@ impl Drop for FlightDecoderStream {
 /// last messages, its profile among them, still arrive.
 pub struct DrainOnDrop {
     stream: Option<FlightDecoderStream>,
-    drain: Option<Duration>,
+    drain: bool,
 }
 
 impl DrainOnDrop {
-    pub fn new(stream: FlightDecoderStream, drain: Option<Duration>) -> Self {
+    pub fn new(stream: FlightDecoderStream, drain: bool) -> Self {
         Self {
             stream: Some(stream),
             drain,
@@ -299,8 +300,10 @@ impl Stream for DrainOnDrop {
 
 impl Drop for DrainOnDrop {
     fn drop(&mut self) {
-        if let (Some(stream), Some(timeout)) = (self.stream.take(), self.drain) {
-            tokio::spawn(tokio::time::timeout(timeout, stream.drain()));
+        if let Some(stream) = self.stream.take()
+            && self.drain
+        {
+            tokio::spawn(tokio::time::timeout(REMOTE_PROFILE_TIMEOUT, stream.drain()));
         }
     }
 }

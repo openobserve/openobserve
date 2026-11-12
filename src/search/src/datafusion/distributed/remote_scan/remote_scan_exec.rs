@@ -41,7 +41,7 @@ use rand::prelude::SliceRandom;
 use super::node::RemoteScanNode;
 use crate::datafusion::{
     distributed::{
-        analyze::profile::{NodeProfileRecorder, REMOTE_PROFILE_TIMEOUT},
+        analyze::profile::NodeProfileRecorder,
         codec::get_physical_extension_codec,
         remote_scan::{
             decoder_stream::{DrainOnDrop, FlightDecoderStream},
@@ -384,8 +384,7 @@ async fn get_remote_batch(
         .with_node_profile(recorder);
 
     let stream = FlightDecoderStream::new(stream, schema.clone(), metrics, query_context);
-    let drain = is_analyze.then_some(REMOTE_PROFILE_TIMEOUT);
-    let mut stream = DrainOnDrop::new(stream, drain);
+    let mut stream = DrainOnDrop::new(stream, is_analyze);
     let stream = async_stream::stream! {
         let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(timeout));
         pin_mut!(timeout);
