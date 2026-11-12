@@ -349,6 +349,7 @@ import {
 import {
   buildPromqlValueEntries,
   parsePromqlValueContext,
+  promqlValueFilter,
   resolvePromqlLabelValues,
   type PromqlValueContext,
 } from "@/composables/usePromqlSuggestions";
@@ -1683,8 +1684,12 @@ export default defineComponent({
       ): Promise<any[] | null> => {
         const org = store.state.selectedOrganization?.identifier;
         if (!org) return [];
+        const typed = promqlValueFilter(context);
         const outcome = await awaitValues(config, token, (options) =>
-          resolvePromqlLabelValues(org, context.metric, context.label, options),
+          resolvePromqlLabelValues(org, context.metric, context.label, {
+            ...options,
+            prefix: typed,
+          }),
         );
         // Another organization's label values must never appear in this one's menu.
         if (outcome === null || store.state.selectedOrganization?.identifier !== org) return null;
@@ -1700,6 +1705,7 @@ export default defineComponent({
           hasOpenQuote: context.hasOpenQuote,
           closingQuoteAhead: lineAfterCaret(model, position).startsWith('"'),
           range: caretRange(position, context.typed.length),
+          typed,
         });
         return [...values, ...capRow(context.label, outcome.length, position)];
       };

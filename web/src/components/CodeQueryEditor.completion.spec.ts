@@ -2008,6 +2008,68 @@ describe("P0-4 — PromQL label values come from the provider", () => {
       expect(noMenu.suggestions).toEqual([]);
     },
   );
+
+  it(
+    "sends the typed label value as the lookup prefix and keeps only matching rows",
+    { timeout: 30000 },
+    async () => {
+      const api = await import("monaco-editor/esm/vs/editor/editor.api");
+      const { resolvePromqlLabelValues } = await import("@/composables/usePromqlSuggestions");
+      const createFn = vi.mocked(api.editor.create);
+      const registerFn = vi.mocked(api.languages.registerCompletionItemProvider);
+      const before = createFn.mock.calls.length;
+      spy = vi
+        .spyOn(document, "getElementById")
+        .mockImplementation(() => document.createElement("div"));
+      const store = createStore({
+        state: { theme: "light", selectedOrganization: { identifier: "myorg" } },
+      });
+      mount(CodeQueryEditor, {
+        props: { editorId: "promql-contains", language: "promql", query: "", keywords: [] },
+        global: { plugins: [store] },
+      });
+      await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+        timeout: 15000,
+        interval: 25,
+      });
+      const model = createdEditors.at(-1)!.getModel();
+      const provide = registerFn.mock.calls.filter((c) => c[0] === "promql").at(-1)![1]
+        .provideCompletionItems;
+      const hit = "deploy-ft-k8s-meg-rd-5041-leader-open-close-emails-300400";
+      const miss = "deploy-ft-k8s-meg-rd-1042-leader-open-close-emails-100200";
+      const lookup = vi.mocked(resolvePromqlLabelValues);
+      lookup.mockImplementation(async () => [miss, hit]);
+      model.getWordUntilPosition.mockReturnValue({ word: "", startColumn: 1, endColumn: 1 });
+      const ask = async (text: string) => {
+        model.getValueInRange.mockReturnValue(text);
+        model.getLineContent.mockReturnValue(`${text}"}`);
+        const result = await provide(model, { lineNumber: 1, column: text.length + 1 }, {}, {});
+        return result.suggestions.filter((s: any) => !isHeader(s));
+      };
+      try {
+        const eq = await ask('repro_13984_metric{job_id="5041');
+        expect(lookup).toHaveBeenLastCalledWith(
+          expect.any(String),
+          "repro_13984_metric",
+          "job_id",
+          expect.objectContaining({ prefix: "5041" }),
+        );
+        expect(eq.map(nameOf)).toEqual([`"${hit}"`]);
+        expect(eq[0].filterText).toBe("5041");
+        expect(eq[0].insertText).toBe(`${hit}"`);
+
+        const re = await ask('repro_13984_metric{job_id=~"5041');
+        expect(lookup.mock.calls.at(-1)![3]).toMatchObject({ prefix: "5041" });
+        expect(re.map(nameOf)).toEqual([`"${hit}"`]);
+
+        const pattern = await ask('repro_13984_metric{job_id=~"50.*');
+        expect(lookup.mock.calls.at(-1)![3]).toMatchObject({ prefix: "" });
+        expect(pattern.map(nameOf)).toEqual([`"${miss}"`, `"${hit}"`]);
+      } finally {
+        lookup.mockImplementation(async () => ["api-gateway", "chat-service"]);
+      }
+    },
+  );
 });
 
 // Runs after the PromQL block: each language's provider keeps the store of the first editor that registered it.

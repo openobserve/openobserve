@@ -1,15 +1,20 @@
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import {
+  FIELD_VALUES_REQUEST_SIZE,
+  fieldValuesTruncated,
   fieldValuesUnavailable,
   getFieldValuesForSuggestion,
   pendingFieldValues,
   requestFieldValues,
+  requestFieldValuesMatching,
   type ValueLookupOptions,
 } from "@/composables/fieldValueStore";
 import { nextTick, ref } from "vue";
 import { PROMQL_CATALOG } from "@/utils/query/promqlCompletion";
 import { SORT_LANE } from "@/utils/query/sqlCompletion";
+import { matchesTyped, prefixMatchesFirst } from "@/utils/query/editorProviders";
+import { needsPrefixLookup } from "@/utils/fieldValueUtils";
 
 // Columns a metrics stream carries that are not labels. `value` is the sample,
 // `_timestamp` the clock, `__hash__` internal, and `__name__` the metric the
@@ -22,6 +27,8 @@ export interface PromqlValueContext {
   metric: string;
   label: string;
   hasOpenQuote: boolean;
+  /** `=~` or `!~`, where the typed text is a regex fragment. */
+  regex: boolean;
   typed: string;
 }
 
@@ -30,7 +37,7 @@ export const parsePromqlValueContext = (textBeforeCursor: string): PromqlValueCo
   if (open < 0 || textBeforeCursor.lastIndexOf("}") > open) return null;
   const matcher = textBeforeCursor
     .slice(open + 1)
-    .match(/(\w+)\s*(?:=~|!=|!~|=)\s*(?:"((?:[^"\\]|\\.)*)|([\w.:-]*))$/);
+    .match(/(\w+)\s*(=~|!=|!~|=)\s*(?:"((?:[^"\\]|\\.)*)|([\w.:-]*))$/);
   if (!matcher) return null;
   // Without a metric there is no stream to read, and nothing honest to offer.
   const metric = textBeforeCursor.slice(0, open).match(/([A-Za-z_:][\w:]*)\s*$/)?.[1];
@@ -38,9 +45,27 @@ export const parsePromqlValueContext = (textBeforeCursor: string): PromqlValueCo
   return {
     metric,
     label: matcher[1],
-    hasOpenQuote: matcher[2] !== undefined,
-    typed: matcher[2] ?? matcher[3] ?? "",
+    hasOpenQuote: matcher[3] !== undefined,
+    regex: matcher[2].endsWith("~"),
+    typed: matcher[3] ?? matcher[4] ?? "",
   };
+};
+
+const REGEX_META = /[.*+?^${}()|[\]\\]/;
+
+/** The typed text as a plain substring; a regex fragment that is more than text cannot be one. */
+export const promqlValueFilter = ({ regex, typed }: PromqlValueContext): string =>
+  regex && REGEX_META.test(typed) ? "" : typed.trim();
+
+// Under the editor's 1 s value budget, so values already in hand beat the still-loading row.
+const LOCAL_VALUES_KEYWORD_WAIT_MS = 800;
+
+const withinKeywordWait = (lookup: Promise<string[]>): Promise<string[]> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const wait = new Promise<string[]>((resolve) => {
+    timer = setTimeout(() => resolve([]), LOCAL_VALUES_KEYWORD_WAIT_MS);
+  });
+  return Promise.race([lookup, wait]).finally(() => clearTimeout(timer));
 };
 
 export const resolvePromqlLabelValues = async (
@@ -50,12 +75,23 @@ export const resolvePromqlLabelValues = async (
   options: ValueLookupOptions = {},
 ): Promise<string[]> => {
   const ctx = { org, streamType: "metrics", streamName: metric };
+  const typed = options.prefix?.trim() ?? "";
   const cached = await getFieldValuesForSuggestion(ctx, label).catch(() => [] as string[]);
-  if (cached.length) return cached;
-  const fetched = await requestFieldValues(ctx, label, options);
-  // A request still answering after its timeout has not shown the label to be empty.
-  const slow = !fetched.length && pendingFieldValues(ctx, label);
-  const answer = slow ? await slow : fetched;
+  if (cached.length && !typed) return cached;
+  let answer = cached;
+  if (!cached.length) {
+    const fetched = await requestFieldValues(ctx, label, options);
+    // A request still answering after its timeout has not shown the label to be empty.
+    const slow = !fetched.length && pendingFieldValues(ctx, label);
+    answer = slow ? await slow : fetched;
+  }
+  // A persisted list carries no truncation mark, so a full page of it may be hiding matches too.
+  const truncated = fieldValuesTruncated(ctx, label) || cached.length >= FIELD_VALUES_REQUEST_SIZE;
+  if (typed && needsPrefixLookup(typed, truncated, answer)) {
+    const lookup = requestFieldValuesMatching(ctx, label, typed, options);
+    const matched = await (answer.length ? withinKeywordWait(lookup) : lookup);
+    answer = [...new Set([...answer, ...matched])];
+  }
   if (!answer.length && fieldValuesUnavailable(ctx, label)) {
     throw new Error("label values unavailable");
   }
@@ -69,16 +105,21 @@ export const buildPromqlValueEntries = (
     hasOpenQuote,
     closingQuoteAhead = false,
     range,
-  }: { hasOpenQuote: boolean; closingQuoteAhead?: boolean; range?: Record<string, number> },
-): any[] =>
-  values.map((value, index) => {
+    typed = "",
+  }: {
+    hasOpenQuote: boolean;
+    closingQuoteAhead?: boolean;
+    range?: Record<string, number>;
+    typed?: string;
+  },
+): any[] => {
+  const entries = values.map((value) => {
     const literal = value.replace(/[\\"]/g, "\\$&");
     const entry: any = {
       name: value,
       label: `"${literal}"`,
       kind: "Value",
       insertText: hasOpenQuote ? `${literal}"` : `"${literal}"`,
-      sortText: `\u0000${String(index).padStart(6, "0")}`,
       filterText: hasOpenQuote ? value : `"${value}"`,
     };
     if (hasOpenQuote && closingQuoteAhead && range) {
@@ -86,6 +127,19 @@ export const buildPromqlValueEntries = (
     }
     return entry;
   });
+  const kept = typed
+    ? prefixMatchesFirst(
+        entries.filter((entry) => matchesTyped(entry, typed)),
+        typed,
+      )
+    : entries;
+  return kept.map((entry, index) => ({
+    ...entry,
+    sortText: `\u0000${String(index).padStart(6, "0")}`,
+    // Monaco's fuzzy filter would rescore what we already matched, so sortText alone orders the kept rows.
+    ...(typed ? { filterText: typed } : {}),
+  }));
+};
 
 const usePromqlSuggestions = () => {
   const autoCompleteData = ref({

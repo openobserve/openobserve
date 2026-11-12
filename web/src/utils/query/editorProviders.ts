@@ -1015,7 +1015,7 @@ export const matchesTyped = (entry: LooseEntry, typed: string): boolean => {
 };
 
 // Stable: prefix matches keep their order ahead of values that only contain the typed text.
-const prefixMatchesFirst = (entries: LooseEntry[], typed: string): LooseEntry[] => {
+export const prefixMatchesFirst = (entries: LooseEntry[], typed: string): LooseEntry[] => {
   const word = typedWord(typed);
   if (!word) return entries;
   const prefixed = (entry: LooseEntry) => startsWithWord(matchText(entry), word);
