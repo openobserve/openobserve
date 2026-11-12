@@ -2182,7 +2182,7 @@ pub struct Common {
     /// server legitimately needs to send notifications to itself.
     #[env_config(name = "ZO_SSRF_ALLOW_LOOPBACK", default = false)]
     pub ssrf_allow_loopback: bool,
-    // This will completely skip ssrf checks, not just localhost
+    /// Skips SSRF checks and lets any org's VRL call `http_request`, `dns_lookup`, `reverse_dns`.
     #[env_config(name = "ZO_SKIP_SSRF_CHECKS", default = false)]
     pub skip_ssrf_checks: bool,
     /// Comma-separated CIDRs that only send-only destinations may reach; changes need a restart.
@@ -3544,6 +3544,12 @@ pub struct Compact {
     pub pending_jobs_metric_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_GROUP_FILES", default = 10000)]
     pub max_group_files: usize,
+    #[env_config(
+        name = "ZO_COMPACT_METRICS_MAX_GROUPS",
+        default = 100,
+        help = "Max sorted inputs (ingester files plus chains of already merged files) one metrics merge opens at once; a closed hour holding more is first pre-merged into hash-merged files. 0 disables the cap, other values below 10 are raised to 10"
+    )]
+    pub metrics_max_groups: usize,
     #[env_config(
         name = "ZO_COMPACT_RETENTION_ALLOWED_HOURS",
         default = "",
@@ -5202,6 +5208,10 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.compact.old_data_min_files < 1 {
         cfg.compact.old_data_min_files = 10;
+    }
+    // 0 disables the cap; a smaller cap would pre-merge an hour over too many rounds
+    if (1..10).contains(&cfg.compact.metrics_max_groups) {
+        cfg.compact.metrics_max_groups = 10;
     }
     if cfg.compact.file_list_deleted_batch_size == 0 {
         cfg.compact.file_list_deleted_batch_size = 1000;

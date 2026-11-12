@@ -51,7 +51,7 @@ const run = async () => {
   });
   const wrapper = mount(Host, { global: { plugins: [store] } });
   await flushPromises();
-  return { api, wrapper };
+  return { api, wrapper, store };
 };
 
 describe("useQuickMute", () => {
@@ -101,6 +101,26 @@ describe("useQuickMute", () => {
     expect(String(toast.mock.calls[0][0].message)).toContain("12:00 UTC");
     await api.mute([{ module: "alerts", ids: ["a1"] }], (SERVER_NOW + 20 * 3_600_000) * 1000);
     expect(String(toast.mock.calls[1][0].message)).toContain("06:00 tomorrow");
+    wrapper.unmount();
+  });
+
+  it("links the View downtime toast to the folder and org the mute was filed in", async () => {
+    const { api, wrapper, store } = await run();
+    const id = await api.mute(
+      [{ module: "anomaly_detections", ids: ["x1"] }],
+      (SERVER_NOW + 3_600_000) * 1000,
+      undefined,
+      "ops",
+    );
+    expect(id).toBe("d9");
+    // The org changes before the click: the link still names the org the mute is in.
+    store.state.selectedOrganization.identifier = "other";
+    toast.mock.calls.at(-1)?.[0].action?.handler();
+    expect(push).toHaveBeenCalledWith({
+      name: "downtimeDetail",
+      params: { id: "d9" },
+      query: { org_identifier: "acme", folder: "ops" },
+    });
     wrapper.unmount();
   });
 });

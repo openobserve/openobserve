@@ -322,8 +322,12 @@ export const extendAlertMuteMutation = (org: string) =>
 
 export const cancelAlertMuteMutation = (org: string) =>
   mutationOptions({
-    mutationFn: (vars: { alertId: string; downtimeId: string; folderId?: string }) =>
-      alerts.cancelAlertMute(org, vars.alertId, vars.downtimeId, vars.folderId),
+    mutationFn: (vars: {
+      alertId: string;
+      downtimeId: string;
+      folderId?: string;
+      version?: number;
+    }) => alerts.cancelAlertMute(org, vars.alertId, vars.downtimeId, vars.folderId, vars.version),
     meta: {
       invalidates: [alertKeys.all(org), downtimeKeys.all(org), announcementKeys.all(org)],
       silentError: true,

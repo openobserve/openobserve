@@ -4,7 +4,7 @@
     {
       "label": "default",
       "_comment": "Files that need no server env of their own.",
-      "target": "tests/regression/test_histogram_bucket_count_matches_total.py tests/regression/test_grpc_ingest_org_binding.py tests/regression/test_topk_aggregate_error_reported.py",
+      "target": "tests/regression/test_histogram_bucket_count_matches_total.py tests/regression/test_grpc_ingest_org_binding.py tests/regression/test_topk_aggregate_error_reported.py tests/regression/test_fractional_epoch_timestamp.py",
       "server_env": "",
       "category": "api_integration_tests"
     },

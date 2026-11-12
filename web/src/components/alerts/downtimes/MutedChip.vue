@@ -20,17 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="inline-flex min-w-12 shrink-4"
     :data-test="dataTest"
   >
-    <RouterLink
-      v-if="detailRoute"
-      :to="detailRoute"
-      class="inline-flex max-w-full min-w-0"
+    <a
+      v-if="link"
+      :href="link.href"
+      class="focus-visible:outline-focus-ring-accent rounded-default inline-flex max-w-full min-w-0 no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
       :data-test="`${dataTest}-link`"
-      @click.stop
+      @click.stop="openDowntime"
     >
       <OTag type="downtimeStatus" value="active" class="max-w-full min-w-0">
         <span class="truncate">{{ label }}</span>
       </OTag>
-    </RouterLink>
+    </a>
     <OTag v-else type="downtimeStatus" value="active" class="max-w-full min-w-0">
       <span class="truncate">{{ label }}</span>
     </OTag>
@@ -39,8 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { RouterLink } from "vue-router";
+import { computed, getCurrentInstance } from "vue";
+import type { Router } from "vue-router";
+import type { Store } from "vuex";
 import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
 import { useI18nTyped } from "@/types/i18n";
 import type { ActiveDowntime } from "@/services/downtimes";
@@ -49,6 +50,7 @@ import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import { formatDuration, formatWindowTime } from "@/utils/downtimes/schedule";
 import { groupRefLabels } from "@/utils/alerts/ackState";
+import { downtimeLink } from "@/utils/downtimes/link";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
@@ -63,9 +65,28 @@ const props = withDefaults(
 const { t } = useI18nTyped();
 const viewerZone = useViewerTimezone();
 
-// The chip carries no folder, so it links only when the lookup knows the row; else it stays plain.
+// Read from the app, not injected, so a chip mounted without a router stays plain text.
+const app = getCurrentInstance()?.appContext.config.globalProperties;
+const router = app?.$router as Router | undefined;
+const store = app?.$store as Store<any> | undefined;
+
+// An older node sends no folder; then the chip links only when the lookup knows the row, else it stays plain.
 const lookup = useDowntimeLookup(true);
-const detailRoute = computed(() => lookup.detailRoute(props.downtime.id));
+const link = computed(() => {
+  if (!router) return null;
+  const to = props.downtime.folder_id
+    ? downtimeLink(props.downtime, store?.state?.selectedOrganization?.identifier ?? "")
+    : lookup.detailRoute(props.downtime.id);
+  return to ? { to, href: router.resolve(to).href } : null;
+});
+
+// A modifier or middle click stays the browser's, so it can open the link in a new tab.
+const openDowntime = (event: MouseEvent) => {
+  if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)
+    return;
+  event.preventDefault();
+  if (link.value) void router?.push(link.value.to);
+};
 
 // The banner's skew-corrected clock, so chip and banner end at the same instant.
 const { remainingSecs } = useCountdown(() => props.downtime.ends_at, serverNowMs);

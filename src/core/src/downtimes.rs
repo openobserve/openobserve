@@ -281,10 +281,17 @@ pub async fn update(
 }
 
 /// Ends an active window now or calls off a scheduled one; the row stays for history.
-pub async fn cancel(org: &str, user_id: &str, id: &str) -> Result<Downtime, DowntimeError> {
+pub async fn cancel(
+    org: &str,
+    user_id: &str,
+    id: &str,
+    version: Option<i64>,
+) -> Result<Downtime, DowntimeError> {
     ensure_enabled()?;
     let before = load(org, id).await?;
     access::authorize_row(org, user_id, &before, "PUT").await?;
+    // The same row goes to the guarded write, so an edit after this check also fails.
+    check_version(version, &before)?;
     cancel_row(org, user_id, before).await
 }
 
@@ -3228,6 +3235,149 @@ mod tests {
             .unwrap();
         assert_eq!(stored.schedule.ends_at, Some(window.end + HOUR));
         assert!(body_of("pub async fn extend(").contains("extend_follow_up(org, user_id, &before"));
+    }
+
+    #[tokio::test]
+    async fn a_cancel_at_a_stale_version_or_after_a_later_edit_leaves_the_downtime_live() {
+        use infra::table::{
+            downtimes::{self as table, Guard},
+            entity::{downtimes as entity, folders},
+        };
+        use sea_orm::{ConnectionTrait, Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(folders::Entity),
+            schema.create_table_from_entity(entity::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        let default = Folder {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: DEFAULT_FOLDER.to_string(),
+            description: String::new(),
+            icon: None,
+        };
+        infra::table::folders::get_or_create_with(&db, "acme", default, FolderType::Downtimes)
+            .await
+            .unwrap();
+        let mut mute = row(vec![TargetModule::AnomalyDetections], 0, 10 * HOUR);
+        mute.version = 1;
+        mute.updated_at = 1;
+        table::put_with(&db, &mute).await.unwrap();
+
+        let read = table::get_with(&db, "acme", "d1").await.unwrap().unwrap();
+        assert!(matches!(
+            check_version(Some(0), &read),
+            Err(DowntimeError::Conflict(_))
+        ));
+        check_version(Some(1), &read).unwrap();
+        // A teammate widens the mute after the check: the cancel's guarded write must lose.
+        let widened = Downtime {
+            version: 2,
+            updated_at: 2,
+            ..read.clone()
+        };
+        assert!(
+            table::write_with(&db, &widened, Guard::Unchanged(1), &[], 2)
+                .await
+                .unwrap()
+        );
+        let after = cancelled(&read, "ops", 3);
+        assert!(
+            !table::write_with(&db, &after, Guard::Unchanged(read.updated_at), &[], 3)
+                .await
+                .unwrap()
+        );
+        let stored = table::get_with(&db, "acme", "d1").await.unwrap().unwrap();
+        assert_eq!(stored.version, 2);
+        assert!(stored.cancelled_at.is_none(), "the downtime stays live");
+
+        assert!(
+            body_of("async fn cancel_row(").contains("set_if_unchanged(&after, before.updated_at")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_versioned_cancel_refuses_a_stale_version_and_ends_at_a_current_or_absent_one() {
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org = format!("versioned_cancel_{}", now_micros());
+        let root = "root-versioned-cancel@example.com";
+        crate::common::infra::config::ORG_USERS.insert(
+            format!("{}/{root}", config::DEFAULT_ORG),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: String::new(),
+                rum_token: None,
+                org_id: config::DEFAULT_ORG.to_string(),
+                email: root.to_string(),
+                created_at: 0,
+                allow_static_token: false,
+            },
+        );
+        infra::table::folders::get_or_create(&org, folder(DEFAULT_FOLDER), FolderType::Downtimes)
+            .await
+            .unwrap();
+        let now = now_micros();
+        let conn = infra::db::get_orm_client_rw().await;
+        let mut versions = HashMap::new();
+        for id in ["stale", "current", "absent"] {
+            let mut mute = row(
+                vec![TargetModule::AnomalyDetections],
+                now - HOUR,
+                now + 10 * HOUR,
+            );
+            mute.id = id.to_string();
+            mute.org = org.clone();
+            infra::table::downtimes::put_with(conn, &mute)
+                .await
+                .unwrap();
+            let stored = infra::table::downtimes::get_rw(&org, id)
+                .await
+                .unwrap()
+                .unwrap();
+            versions.insert(id, stored.version);
+        }
+        let live = |id: &'static str| {
+            let org = org.clone();
+            async move {
+                let stored = infra::table::downtimes::get_rw(&org, id)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                stored.cancelled_at.is_none()
+            }
+        };
+
+        let refused = cancel(&org, root, "stale", Some(versions["stale"] - 1)).await;
+        assert!(
+            matches!(refused, Err(DowntimeError::Conflict(_))),
+            "{refused:?}"
+        );
+        assert!(
+            live("stale").await,
+            "a refused cancel leaves the downtime live"
+        );
+
+        let ended = cancel(&org, root, "current", Some(versions["current"]))
+            .await
+            .unwrap();
+        assert!(ended.cancelled_at.is_some());
+        assert!(!live("current").await);
+
+        cancel(&org, root, "absent", None).await.unwrap();
+        assert!(
+            !live("absent").await,
+            "a caller with no version still cancels"
+        );
     }
 
     fn body_of(head: &str) -> &'static str {
