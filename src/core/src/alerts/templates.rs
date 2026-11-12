@@ -135,7 +135,7 @@ pub async fn save(
         None => requested_applies_to.unwrap_or_default(),
     };
     if let Some(existing) = &existing {
-        check_narrowing(existing, &template.applies_to).await?;
+        check_narrowing(existing, &template.applies_to, is_root).await?;
     }
 
     if template.kind == TemplateKind::Content {
@@ -201,11 +201,11 @@ pub async fn delete(org_id: &str, name: &str, is_root: bool) -> Result<(), Templ
     let existing = db::alerts::templates::get(org_id, name).await?;
     let owner = write_org(org_id, &existing.org_id, is_root)?;
     let used = used_by(&owner, name).await?;
-    if let Some(by) = used.bindings_outside_caches() {
+    if let Some(by) = used.bindings_outside_caches(&owner, is_root) {
         return Err(TemplateError::DeleteWithBinding(by));
     }
     let owners = owners_to_disown(&owner, name).await?;
-    db::alerts::templates::delete(&owner, name).await?;
+    db::alerts::templates::delete_as(&owner, name, is_root).await?;
     for owner in owners {
         remove_ownership(&owner, "templates", Authz::new(name)).await;
     }
@@ -243,17 +243,46 @@ pub(crate) fn dropped_kinds(
 async fn check_narrowing(
     existing: &Template,
     applies_to: &[NotificationKind],
+    is_root: bool,
 ) -> Result<(), TemplateError> {
     for kind in dropped_kinds(&existing.applies_to, applies_to) {
         let by = bindings_for(&existing.org_id, &existing.name, kind).await?;
         if !by.is_empty() {
             return Err(TemplateError::InUseForKind {
                 kind: kind.as_str().to_string(),
-                by: by.join(", "),
+                by: describe_bindings(&by, &existing.org_id, is_root),
             });
         }
     }
     Ok(())
+}
+
+/// One reference to a template: the org that holds it and how an error names it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Binding {
+    pub(crate) org: String,
+    pub(crate) label: String,
+}
+
+impl Binding {
+    fn new(org: String, label: String) -> Self {
+        Self { org, label }
+    }
+}
+
+/// Error text for `bindings`. A `default` template is shared, so its bindings can sit in other
+/// orgs. Only root, or a caller in the binding's own org, sees the name; the rest is a count.
+/// A non-root caller only reaches a template of its own org (`write_org`), so `caller_org` is
+/// the template's org.
+pub(crate) fn describe_bindings(bindings: &[Binding], caller_org: &str, is_root: bool) -> String {
+    let (shown, hidden): (Vec<&Binding>, Vec<&Binding>) = bindings
+        .iter()
+        .partition(|b| is_root || b.org == caller_org);
+    let mut parts: Vec<String> = shown.into_iter().map(|b| b.label.clone()).collect();
+    if !hidden.is_empty() {
+        parts.push(format!("{} in another organization", hidden.len()));
+    }
+    parts.join(", ")
 }
 
 /// A `default` template is shared, so its bindings are looked up in every org.
@@ -266,53 +295,60 @@ pub(crate) async fn bindings_for(
     org_id: &str,
     name: &str,
     kind: NotificationKind,
-) -> Result<Vec<String>, TemplateError> {
+) -> Result<Vec<Binding>, TemplateError> {
     let mut by = Vec::new();
     match kind {
         NotificationKind::Anomaly => {
             let db_conn = infra::db::get_orm_client_ro().await;
-            for (_, config) in infra::table::anomaly_detection::config::names_using_template(
+            for (org, config) in infra::table::anomaly_detection::config::names_using_template(
                 db_conn,
                 binding_scope(org_id),
                 name,
             )
             .await?
             {
-                by.push(format!("anomaly config '{config}'"));
+                by.push(Binding::new(org, format!("anomaly config '{config}'")));
             }
         }
         NotificationKind::Synthetics => {
             let db_conn = infra::db::get_orm_client_ro().await;
-            for (_, check) in infra::table::synthetics_checks::names_using_template(
+            for (org, check) in infra::table::synthetics_checks::names_using_template(
                 db_conn,
                 binding_scope(org_id),
                 name,
             )
             .await?
             {
-                by.push(format!("synthetics check '{check}'"));
+                by.push(Binding::new(org, format!("synthetics check '{check}'")));
             }
         }
         NotificationKind::OnCall => {
-            for (_, team) in
+            for (org, team) in
                 infra::table::oncall_policies::teams_using_template(binding_scope(org_id), name)
                     .await?
             {
-                by.push(format!("on-call policy of team '{team}'"));
+                by.push(Binding::new(
+                    org,
+                    format!("on-call policy of team '{team}'"),
+                ));
             }
         }
         NotificationKind::Alert => {
             let (_, alerts) = db::alerts::templates::cached_references(org_id, name).await;
-            by.extend(alerts.into_iter().map(|a| format!("alert '{a}'")));
+            by.extend(
+                alerts
+                    .into_iter()
+                    .map(|(org, a)| Binding::new(org, format!("alert '{a}'"))),
+            );
             let db_conn = infra::db::get_orm_client_ro().await;
-            for (_, composite) in infra::table::alert_composites::names_using_template(
+            for (org, composite) in infra::table::alert_composites::names_using_template(
                 db_conn,
                 binding_scope(org_id),
                 name,
             )
             .await?
             {
-                by.push(format!("composite alert '{composite}'"));
+                by.push(Binding::new(org, format!("composite alert '{composite}'")));
             }
         }
         _ => {}
@@ -330,50 +366,52 @@ pub struct UsedBy {
     pub on_call: usize,
     pub composites: usize,
     #[serde(skip)]
-    binding_names: Vec<String>,
+    binding_names: Vec<Binding>,
 }
 
 impl UsedBy {
-    /// The references the cached delete guard does not see, as one message.
-    fn bindings_outside_caches(&self) -> Option<String> {
-        (!self.binding_names.is_empty()).then(|| self.binding_names.join(", "))
+    /// The references the cached delete guard does not see, as one message for the caller.
+    fn bindings_outside_caches(&self, caller_org: &str, is_root: bool) -> Option<String> {
+        (!self.binding_names.is_empty())
+            .then(|| describe_bindings(&self.binding_names, caller_org, is_root))
     }
 }
 
 pub async fn used_by(org_id: &str, name: &str) -> Result<UsedBy, TemplateError> {
     let (destinations, alerts) = db::alerts::templates::cached_references(org_id, name).await;
-    let anomaly_names: Vec<String> = infra::table::anomaly_detection::config::names_using_template(
+    let anomaly_names: Vec<Binding> =
+        infra::table::anomaly_detection::config::names_using_template(
+            infra::db::get_orm_client_ro().await,
+            binding_scope(org_id),
+            name,
+        )
+        .await?
+        .into_iter()
+        .map(|(org, config)| Binding::new(org, format!("anomaly config '{config}'")))
+        .collect();
+    let synthetics_names: Vec<Binding> = infra::table::synthetics_checks::names_using_template(
         infra::db::get_orm_client_ro().await,
         binding_scope(org_id),
         name,
     )
     .await?
     .into_iter()
-    .map(|(_, config)| format!("anomaly config '{config}'"))
+    .map(|(org, check)| Binding::new(org, format!("synthetics check '{check}'")))
     .collect();
-    let synthetics_names: Vec<String> = infra::table::synthetics_checks::names_using_template(
-        infra::db::get_orm_client_ro().await,
-        binding_scope(org_id),
-        name,
-    )
-    .await?
-    .into_iter()
-    .map(|(_, check)| format!("synthetics check '{check}'"))
-    .collect();
-    let on_call_names: Vec<String> =
+    let on_call_names: Vec<Binding> =
         infra::table::oncall_policies::teams_using_template(binding_scope(org_id), name)
             .await?
             .into_iter()
-            .map(|(_, team)| format!("on-call policy of team '{team}'"))
+            .map(|(org, team)| Binding::new(org, format!("on-call policy of team '{team}'")))
             .collect();
-    let composite_names: Vec<String> = infra::table::alert_composites::names_using_template(
+    let composite_names: Vec<Binding> = infra::table::alert_composites::names_using_template(
         infra::db::get_orm_client_ro().await,
         binding_scope(org_id),
         name,
     )
     .await?
     .into_iter()
-    .map(|(_, composite)| format!("composite alert '{composite}'"))
+    .map(|(org, composite)| Binding::new(org, format!("composite alert '{composite}'")))
     .collect();
     Ok(UsedBy {
         destinations: destinations.len(),
@@ -879,7 +917,144 @@ mod tests {
         let bound = bindings_for(&org, &name, NotificationKind::Alert)
             .await
             .unwrap();
-        assert_eq!(bound, vec!["composite alert 'the composite'".to_string()]);
+        assert_eq!(
+            bound,
+            vec![Binding::new(
+                org.clone(),
+                "composite alert 'the composite'".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn describe_bindings_names_only_what_the_caller_may_see() {
+        let labels = [
+            "anomaly config 'a'",
+            "synthetics check 'c'",
+            "on-call policy of team 't'",
+            "composite alert 'x'",
+            "alert 'y'",
+        ];
+        for label in labels {
+            let own = vec![Binding::new(DEFAULT_ORG.to_string(), label.to_string())];
+            let other = vec![Binding::new("acme".to_string(), label.to_string())];
+            // Same org and root see the name.
+            assert_eq!(describe_bindings(&own, DEFAULT_ORG, false), label);
+            assert_eq!(describe_bindings(&other, DEFAULT_ORG, true), label);
+            // A non-root caller of another org gets a count only.
+            assert_eq!(
+                describe_bindings(&other, DEFAULT_ORG, false),
+                "1 in another organization"
+            );
+        }
+        let mixed = vec![
+            Binding::new(DEFAULT_ORG.to_string(), "alert 'mine'".to_string()),
+            Binding::new("acme".to_string(), "alert 'theirs'".to_string()),
+            Binding::new("beta".to_string(), "alert 'more'".to_string()),
+        ];
+        assert_eq!(
+            describe_bindings(&mixed, DEFAULT_ORG, false),
+            "alert 'mine', 2 in another organization"
+        );
+        assert_eq!(
+            describe_bindings(&mixed, DEFAULT_ORG, true),
+            "alert 'mine', alert 'theirs', alert 'more'"
+        );
+    }
+
+    /// A non-root `default` admin must not read another org's binding names (B41).
+    #[tokio::test]
+    async fn test_a_shared_template_hides_another_orgs_binding_names() {
+        use infra::table::entity::alert_composites;
+        use sea_orm::ActiveValue::Set;
+
+        if !meta_store().await {
+            return;
+        }
+        let suffix = config::utils::time::now_micros();
+        let (other, name) = (format!("t_b41_org_{suffix}"), format!("t_b41_{suffix}"));
+        let template = Template {
+            org_id: DEFAULT_ORG.to_string(),
+            name: name.clone(),
+            body: "{}".to_string(),
+            is_default: true,
+            ..Default::default()
+        };
+        infra::table::templates::put(template.clone())
+            .await
+            .unwrap();
+        let composite = alert_composites::ActiveModel {
+            id: Set(format!("t_b41_id_{suffix}")),
+            org: Set(other.clone()),
+            folder_id: Set("default".to_string()),
+            name: Set("secret composite".to_string()),
+            description: Set(None),
+            expression: Set("true".to_string()),
+            warning_counts_as_firing: Set(false),
+            stale_child_policy: Set(0),
+            destinations: Set(serde_json::json!([])),
+            template: Set(Some(name.clone())),
+            context_attributes: Set(None),
+            enabled: Set(true),
+            silence_seconds: Set(0),
+            creates_incident: Set(false),
+            workflows: Set(serde_json::json!([])),
+            priority: Set(None),
+            tags: Set(None),
+            owner: Set(None),
+            last_edited_by: Set(None),
+            updated_at: Set(None),
+            evaluation_generation: Set(0),
+            pending_period_sec: Set(0),
+            incident_title_template: Set(None),
+        };
+        infra::table::alert_composites::create_with_children(
+            infra::db::get_orm_client_rw().await,
+            composite,
+            vec![],
+        )
+        .await
+        .unwrap();
+
+        // Single and bulk delete both run `delete`.
+        let refused = delete(DEFAULT_ORG, &name, false).await;
+        assert!(
+            matches!(&refused, Err(TemplateError::DeleteWithBinding(by)) if by == "1 in another organization"),
+            "{refused:?}"
+        );
+        let refused = delete(DEFAULT_ORG, &name, true).await;
+        assert!(
+            matches!(&refused, Err(TemplateError::DeleteWithBinding(by)) if by.contains("secret composite")),
+            "{refused:?}"
+        );
+
+        // Narrowing `applies_to` off `alert`.
+        let narrowed = save(
+            &name,
+            template.clone(),
+            None,
+            Some(vec![NotificationKind::Incident]),
+            false,
+            false,
+        )
+        .await;
+        assert!(
+            matches!(&narrowed, Err(TemplateError::InUseForKind { by, .. }) if by == "1 in another organization"),
+            "{narrowed:?}"
+        );
+        let narrowed = save(
+            &name,
+            template,
+            None,
+            Some(vec![NotificationKind::Incident]),
+            false,
+            true,
+        )
+        .await;
+        assert!(
+            matches!(&narrowed, Err(TemplateError::InUseForKind { by, .. }) if by.contains("secret composite")),
+            "{narrowed:?}"
+        );
     }
 
     #[tokio::test]
