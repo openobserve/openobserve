@@ -257,9 +257,10 @@ class APICleanup {
      * @param {number} count
      * @param {string} prefix - Alert name prefix (deterministic ordering by name); also used
      *   to derive the source stream name
+     * @param {{enabledCount?: number}} [options] - The first `enabledCount` alerts are created enabled
      * @returns {Promise<Array<{alertId: string, name: string}>>}
      */
-    async seedAlertsInFolder(folderId, count, prefix) {
+    async seedAlertsInFolder(folderId, count, prefix, { enabledCount = 0 } = {}) {
         const streamName = `${prefix}_stream`;
         await this._fetch(`${ingestBase(this.baseUrl)}/api/${this.org}/${streamName}/_json`, {
             method: 'POST',
@@ -292,7 +293,7 @@ class APICleanup {
                     period: 10, operator: '>=', threshold: 3, frequency: 10, cron: '',
                     frequency_type: 'minutes', silence: 10, timezone: 'UTC', align_time: true,
                 },
-                destinations: [destinationName], context_attributes: {}, row_template: '', enabled: false,
+                destinations: [destinationName], context_attributes: {}, row_template: '', enabled: i < enabledCount,
             };
             const response = await this._fetch(
                 `${this.baseUrl}/api/v2/${this.org}/alerts?folder=${folderId}`,
@@ -949,6 +950,123 @@ class APICleanup {
             testLogger.error('Failed to delete pipeline', { pipelineId, error: error.message });
             return { code: 500, error: error.message };
         }
+    }
+
+    /**
+     * Seed realtime pipelines, the first `activeCount` enabled and the rest paused.
+     * @returns {Promise<{pipelines: Array<{id: string, name: string, enabled: boolean}>, streams: string[]}>}
+     */
+    async seedPipelinesMix(prefix, activeCount, pausedCount) {
+        const pipelines = [];
+        const streams = [];
+        for (let i = 0; i < activeCount + pausedCount; i++) {
+            const name = `${prefix}_p${i}`;
+            // A stream keeps one realtime pipeline, so each pipeline gets its own source.
+            const source = `${name}_src`;
+            await this.ingestData(source, [{ message: 'quick filter cards seed row' }]);
+            await this.waitForStreamSchema(source);
+            streams.push(source);
+            await this.createPlainPipeline(name, source);
+            const created = (await this.listPipelinesStrict()).find((p) => p.name === name);
+            if (!created) throw new Error(`seedPipelinesMix: pipeline ${name} missing after create`);
+            const enabled = i < activeCount;
+            if (!enabled) await this.setPipelineEnabled(created.pipeline_id, false);
+            pipelines.push({ id: created.pipeline_id, name, enabled });
+        }
+        return { pipelines, streams };
+    }
+
+    /** Pipelines of the org; throws instead of returning [] so a count oracle never reads a failed call as empty. */
+    async listPipelinesStrict() {
+        const response = await this._fetch(`${this.baseUrl}/api/${this.org}/pipelines`, {
+            method: 'GET',
+            headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) throw new Error(`listPipelinesStrict: HTTP ${response.status} — ${await response.text()}`);
+        return (await response.json()).list || [];
+    }
+
+    async setPipelineEnabled(pipelineId, enabled) {
+        const response = await this._fetch(
+            `${this.baseUrl}/api/${this.org}/pipelines/${pipelineId}/enable?value=${enabled}&from_now=true`,
+            { method: 'PUT', headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' } },
+        );
+        if (!response.ok) throw new Error(`setPipelineEnabled: HTTP ${response.status} — ${await response.text()}`);
+    }
+
+    /**
+     * The org's pipelines grouped the way the list's state cards count them.
+     * @returns {Promise<{errored: string[], paused: string[], active: string[], total: string[]}>} pipeline names
+     */
+    async pipelineNamesByState() {
+        const groups = { errored: [], paused: [], active: [], total: [] };
+        for (const p of await this.listPipelinesStrict()) {
+            const state = p.last_error ? 'errored' : p.enabled ? 'active' : 'paused';
+            groups[state].push(p.name);
+            groups.total.push(p.name);
+        }
+        return groups;
+    }
+
+    /**
+     * Publish a public link on a dashboard.
+     * @param {{expiresAt?: number}} [options] - Expiry in microseconds since epoch
+     * @returns {Promise<{id: string, name: string, dashboardId: string}>}
+     */
+    async createPublicLink(dashboardId, name, { expiresAt = null } = {}) {
+        const range = { type: 'relative', secs: 3600 };
+        const payload = {
+            name, visibility: 'public', time_range: { ranges: [range], default: range },
+            frozen_variables: {}, refresh_secs: 300, ...(expiresAt ? { expires_at: expiresAt } : {}),
+        };
+        const response = await this._fetch(`${this.baseUrl}/api/${this.org}/dashboards/${dashboardId}/public_links`, {
+            method: 'POST',
+            headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) throw new Error(`createPublicLink: HTTP ${response.status} — ${await response.text()}`);
+        const link = await response.json();
+        return { id: link.id, name, dashboardId };
+    }
+
+    async pausePublicLink(dashboardId, linkId) {
+        const response = await this._fetch(`${this.baseUrl}/api/${this.org}/dashboards/${dashboardId}/public_links/${linkId}/pause`, {
+            method: 'POST',
+            headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) throw new Error(`pausePublicLink: HTTP ${response.status} — ${await response.text()}`);
+    }
+
+    async deletePublicLink(dashboardId, linkId) {
+        const response = await this._fetch(`${this.baseUrl}/api/${this.org}/dashboards/${dashboardId}/public_links/${linkId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) testLogger.error('Failed to delete public link', { linkId, status: response.status });
+    }
+
+    /** Every public link of the org with its server-derived status; throws on a failed call. */
+    async listPublicLinksStrict() {
+        const response = await this._fetch(`${this.baseUrl}/api/${this.org}/public_dashboards`, {
+            method: 'GET',
+            headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) throw new Error(`listPublicLinksStrict: HTTP ${response.status} — ${await response.text()}`);
+        return (await response.json()).list || [];
+    }
+
+    /** @returns {Promise<{live: string[], not_viewed: string[], paused: string[], expired: string[], all: string[]}>} link ids */
+    async publicLinkIdsByStatus() {
+        const groups = { live: [], not_viewed: [], paused: [], expired: [], all: [] };
+        for (const link of await this.listPublicLinksStrict()) {
+            if (groups[link.status]) groups[link.status].push(link.id);
+            groups.all.push(link.id);
+        }
+        return groups;
+    }
+
+    async publicLinkStatus(linkId) {
+        return (await this.listPublicLinksStrict()).find((link) => link.id === linkId)?.status ?? null;
     }
 
     /**
