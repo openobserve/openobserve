@@ -182,7 +182,12 @@ pub async fn set(template: Template) -> Result<Template, TemplateError> {
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
-    check_not_in_use(org_id, name).await?;
+    delete_as(org_id, name, false).await
+}
+
+/// Deletes the template; the in-use error names another org's reference only for root.
+pub async fn delete_as(org_id: &str, name: &str, is_root: bool) -> Result<(), TemplateError> {
+    check_not_in_use(org_id, name, is_root).await?;
 
     if !table::templates::delete(org_id, name).await? {
         return Err(TemplateError::NotFound);
@@ -392,32 +397,45 @@ pub fn get_parsed_content(template: &Template) -> Result<Arc<ContentSpec>, serde
     Ok(spec)
 }
 
-async fn check_not_in_use(org_id: &str, name: &str) -> Result<(), TemplateError> {
-    for dest in DESTINATIONS.iter() {
-        if references_from(org_id, dest.key())
-            && matches!(&dest.module, Module::Alert { template: Some(t), .. } if t == name)
-        {
-            return Err(TemplateError::DeleteWithDestination(dest.name.clone()));
-        }
+async fn check_not_in_use(org_id: &str, name: &str, is_root: bool) -> Result<(), TemplateError> {
+    let (destinations, alerts) = cached_references(org_id, name).await;
+    if let Some(by) = visible_reference(&destinations, org_id, is_root) {
+        return Err(TemplateError::DeleteWithDestination(by));
     }
-    let alerts_cache = ALERTS.read().await;
-    for (key, (_folder, alert)) in alerts_cache.iter() {
-        if references_from(org_id, key) && alert.template.as_deref() == Some(name) {
-            return Err(TemplateError::DeleteWithAlert(alert.name.clone()));
-        }
+    if let Some(by) = visible_reference(&alerts, org_id, is_root) {
+        return Err(TemplateError::DeleteWithAlert(by));
     }
     Ok(())
 }
 
-/// Cached destinations and alerts that name the template, scoped like the delete guard.
-pub async fn cached_references(org_id: &str, name: &str) -> (Vec<String>, Vec<String>) {
+/// The org part of an `{org}/...` cache key.
+fn cache_key_org(cache_key: &str) -> &str {
+    cache_key.split('/').next().unwrap_or_default()
+}
+
+/// How the delete guard names `refs` to the caller: the first name root or a caller of the same
+/// org may see, else a count of the references held by other orgs.
+fn visible_reference(refs: &[(String, String)], org_id: &str, is_root: bool) -> Option<String> {
+    let visible = |org: &str| is_root || org == org_id;
+    if let Some((_, name)) = refs.iter().find(|(org, _)| visible(org)) {
+        return Some(name.clone());
+    }
+    (!refs.is_empty()).then(|| format!("{} in another organization", refs.len()))
+}
+
+/// `(org, name)` of cached destinations and alerts that name the template, scoped like the
+/// delete guard.
+pub async fn cached_references(
+    org_id: &str,
+    name: &str,
+) -> (Vec<(String, String)>, Vec<(String, String)>) {
     let destinations = DESTINATIONS
         .iter()
         .filter(|dest| {
             references_from(org_id, dest.key())
                 && matches!(&dest.module, Module::Alert { template: Some(t), .. } if t == name)
         })
-        .map(|dest| dest.name.clone())
+        .map(|dest| (cache_key_org(dest.key()).to_string(), dest.name.clone()))
         .collect();
     let alerts = ALERTS
         .read()
@@ -426,8 +444,33 @@ pub async fn cached_references(org_id: &str, name: &str) -> (Vec<String>, Vec<St
         .filter(|(key, (_, alert))| {
             references_from(org_id, key) && alert.template.as_deref() == Some(name)
         })
-        .map(|(_, (_, alert))| alert.name.clone())
+        .map(|(key, (_, alert))| (cache_key_org(key).to_string(), alert.name.clone()))
         .collect();
+    (destinations, alerts)
+}
+
+/// `cached_references` counted for every template name at once, in one pass over each cache.
+pub async fn cached_reference_counts(
+    org_id: &str,
+) -> (HashMap<String, usize>, HashMap<String, usize>) {
+    let mut destinations: HashMap<String, usize> = HashMap::new();
+    for dest in DESTINATIONS.iter() {
+        if let Module::Alert {
+            template: Some(t), ..
+        } = &dest.module
+            && references_from(org_id, dest.key())
+        {
+            *destinations.entry(t.clone()).or_default() += 1;
+        }
+    }
+    let mut alerts: HashMap<String, usize> = HashMap::new();
+    for (key, (_, alert)) in ALERTS.read().await.iter() {
+        if let Some(t) = alert.template.as_deref()
+            && references_from(org_id, key)
+        {
+            *alerts.entry(t.to_string()).or_default() += 1;
+        }
+    }
     (destinations, alerts)
 }
 
@@ -636,12 +679,12 @@ mod tests {
     async fn test_check_not_in_use_ignores_a_prefix_sibling_org() {
         seed_destination("tpl_scope_acme2", "d", "tpl_scope_prefix_tpl");
         assert!(
-            check_not_in_use("tpl_scope_acme", "tpl_scope_prefix_tpl")
+            check_not_in_use("tpl_scope_acme", "tpl_scope_prefix_tpl", false)
                 .await
                 .is_ok()
         );
         assert!(matches!(
-            check_not_in_use("tpl_scope_acme2", "tpl_scope_prefix_tpl").await,
+            check_not_in_use("tpl_scope_acme2", "tpl_scope_prefix_tpl", false).await,
             Err(TemplateError::DeleteWithDestination(d)) if d == "d"
         ));
     }
@@ -650,7 +693,7 @@ mod tests {
     async fn test_check_not_in_use_sees_every_org_for_a_default_template() {
         seed_destination("tpl_scope_other", "d", "tpl_scope_shared_dest");
         assert!(matches!(
-            check_not_in_use(DEFAULT_ORG, "tpl_scope_shared_dest").await,
+            check_not_in_use(DEFAULT_ORG, "tpl_scope_shared_dest", true).await,
             Err(TemplateError::DeleteWithDestination(d)) if d == "d"
         ));
 
@@ -662,13 +705,65 @@ mod tests {
             .await
             .insert("tpl_scope_other/a1".to_string(), (Folder::default(), alert));
         assert!(matches!(
-            check_not_in_use(DEFAULT_ORG, "tpl_scope_shared_alert").await,
+            check_not_in_use(DEFAULT_ORG, "tpl_scope_shared_alert", true).await,
             Err(TemplateError::DeleteWithAlert(a)) if a == "a"
         ));
         assert!(
-            check_not_in_use("tpl_scope_unrelated", "tpl_scope_shared_alert")
+            check_not_in_use("tpl_scope_unrelated", "tpl_scope_shared_alert", false)
                 .await
                 .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_check_not_in_use_hides_another_orgs_name_from_a_non_root_caller() {
+        seed_destination("tpl_redact_other", "secret_dest", "tpl_redact_dest");
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_redact_dest", false).await,
+            Err(TemplateError::DeleteWithDestination(d)) if d == "1 in another organization"
+        ));
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_redact_dest", true).await,
+            Err(TemplateError::DeleteWithDestination(d)) if d == "secret_dest"
+        ));
+        seed_destination(DEFAULT_ORG, "own_dest", "tpl_redact_own");
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_redact_own", false).await,
+            Err(TemplateError::DeleteWithDestination(d)) if d == "own_dest"
+        ));
+
+        let mut alert = Alert::default();
+        alert.name = "secret_alert".to_string();
+        alert.template = Some("tpl_redact_alert".to_string());
+        ALERTS.write().await.insert(
+            "tpl_redact_other/a1".to_string(),
+            (Folder::default(), alert),
+        );
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_redact_alert", false).await,
+            Err(TemplateError::DeleteWithAlert(a)) if a == "1 in another organization"
+        ));
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_redact_alert", true).await,
+            Err(TemplateError::DeleteWithAlert(a)) if a == "secret_alert"
+        ));
+        // A same-org reference is named even when another org's is also cached.
+        seed_destination("tpl_redact_other", "secret_mixed", "tpl_redact_mixed");
+        seed_destination(DEFAULT_ORG, "own_mixed", "tpl_redact_mixed");
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_redact_mixed", false).await,
+            Err(TemplateError::DeleteWithDestination(d)) if d == "own_mixed"
+        ));
+        seed_destination("tpl_redact_other2", "secret_two", "tpl_redact_dest");
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_redact_dest", false).await,
+            Err(TemplateError::DeleteWithDestination(d)) if d == "2 in another organization"
+        ));
+        let (dests, alerts) = cached_references(DEFAULT_ORG, "tpl_redact_alert").await;
+        assert!(dests.is_empty());
+        assert_eq!(
+            alerts,
+            vec![("tpl_redact_other".to_string(), "secret_alert".to_string())]
         );
     }
 

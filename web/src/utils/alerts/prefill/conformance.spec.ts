@@ -35,6 +35,7 @@ import { buildDbmPrefill } from "./fromDbm";
 import { buildDbmLockPrefill } from "./fromDbmLocks";
 import { buildPrefillFromRumFunnel } from "./fromRumFunnel";
 import { buildPrefillFromTraces } from "./fromTraces";
+import { buildAiPrefill } from "./fromAi";
 
 interface AdapterCase {
   /** Registered source id. */
@@ -56,6 +57,14 @@ interface AdapterCase {
 }
 
 const ADAPTERS: AdapterCase[] = [
+  {
+    name: "ai",
+    healthy: () =>
+      buildAiPrefill({ kind: "failure_rate", stream: "default", agent: "research-agent" }),
+    // Pack stream and query make even a degenerate input yield a runnable alert.
+    degenerate: () => buildAiPrefill({ kind: "repeated_tool_calls", stream: "s" }),
+    blocks: false,
+  },
   {
     name: "panel",
     healthy: () =>

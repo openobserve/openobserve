@@ -26,6 +26,9 @@ const leafPreview = (item: any): string => {
   if (isUnaryOperator(operator)) {
     return `${column} ${unaryOperatorText(operator)}`;
   }
+  if (Array.isArray(item.value)) {
+    return `${column} ${operator} (${item.value.map((v: unknown) => `'${v}'`).join(", ")})`;
+  }
   const value =
     item.value !== undefined && item.value !== null && item.value !== "" ? `'${item.value}'` : "''";
   return `${column} ${operator} ${value}`;

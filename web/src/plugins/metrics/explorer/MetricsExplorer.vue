@@ -94,9 +94,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroupItem>
       </OToggleGroup>
 
-      <!-- The filter control has its own row below (see `metrics-explorer-
-           filter-row`). This spacer is what pins the time cluster right. -->
-      <div class="flex-1 max-md:hidden" />
+      <div class="@container flex min-w-0 flex-1 items-center justify-end ps-3 max-md:hidden">
+        <template v-if="isGridMode && !detailOpen && failedSummary">
+          <ODataAge
+            :at="failedSummary.dataFrom"
+            :failed-at="failedSummary.failedAt"
+            :failed-count="failedSummary.count"
+            :failed-total="failedSummary.total"
+            class="@max-2xl:hidden"
+            data-test="metrics-explorer-refresh-failed"
+            @retry="() => onRefresh()"
+          />
+          <ODataAge
+            :at="failedSummary.dataFrom"
+            :failed-at="failedSummary.failedAt"
+            :failed-count="failedSummary.count"
+            :failed-total="failedSummary.total"
+            compact
+            class="@2xl:hidden"
+            data-test="metrics-explorer-refresh-failed-short"
+            @retry="() => onRefresh()"
+          />
+        </template>
+        <ORegionStatus
+          v-else-if="isGridMode && rangeStatusShown"
+          noun="charts"
+          :elapsed-seconds="region.elapsedSeconds.value"
+          :message="rangeStatusText"
+          data-test="metrics-explorer-range-status"
+        />
+        <ORegionStatus
+          v-else-if="isGridMode"
+          noun="charts"
+          :elapsed-seconds="region.elapsedSeconds.value"
+          data-test="metrics-explorer-long-wait"
+        />
+      </div>
 
       <div class="flex shrink-0 items-center gap-2 max-md:ms-auto max-md:gap-1">
         <OPageHeaderStatus />
@@ -223,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     -->
     <div
       v-if="isGridMode"
-      class="border-border-default flex shrink-0 items-center gap-2 border-b p-1.5"
+      class="border-border-default flex shrink-0 items-center gap-2 border-b px-1.5 py-0.75"
       data-test="metrics-explorer-filter-row"
     >
       <!-- No "Filters" caption: the chips already read `action = accept_challenge`
@@ -239,6 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @focus-picker="grid.loadLabelNames"
         @add="onAddLabelFilter"
         @remove="onRemoveLabelFilter"
+        @replace="onReplaceLabelFilter"
         @negate-group="onNegateLabelGroup"
         @clear-all="onClearLabelFilters"
       />
@@ -440,9 +474,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             aria-live="polite"
             data-test="metrics-explorer-count"
-            class="text-text-secondary shrink-0 text-xs whitespace-nowrap tabular-nums"
-            >{{ resultCountLabel }}</span
+            class="text-text-secondary min-w-[12ch] shrink-0 text-end text-xs whitespace-nowrap tabular-nums"
+            :class="{ [STALE_DIM]: settledCount.dimmed.value }"
+            :aria-busy="settledCount.state.value.loading ? 'true' : undefined"
           >
+            <template v-if="settledCount.state.value.loading">
+              <OSkeleton type="text" animation="none" class="inline-block h-3 w-10 align-middle" />
+            </template>
+            <template v-else>{{ settledCount.state.value.value }}</template>
+          </span>
 
           <OToggleGroup
             :model-value="[...grid.usageFilters.value]"
@@ -627,7 +667,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              that would actually change anything right now: each card is gated
              on its own cause being active. "Clear all filters" is always last. -->
           <OEmptyState
-            v-else-if="!visibleCards.length"
+            v-else-if="!gridItems.length"
             size="block"
             preset="no-search-results"
             :title="t('metrics.explorer.noMatch')"
@@ -661,26 +701,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 gridTemplateColumns: isGrid ? `repeat(${columns}, minmax(0, 1fr))` : undefined,
               }"
             >
-              <MetricCard
+              <template
                 v-for="(card, offset) in rowsOfCards[row.index]"
-                :key="card.name"
-                :card="card"
-                :preview="grid.previews.value[card.name]"
-                :queries="queriesFor(card)"
-                :index="row.index * columns + offset"
-                :time-range="grid.timeRange.value"
-                :exemplars-eligible="grid.exemplarEligible(card)"
-                :exemplars-on="grid.exemplarsEnabled(card.name)"
-                :exemplars-swaps-variant="grid.exemplarSwapsVariant(card)"
-                :exemplars="grid.exemplarStateOf(card.name)"
-                @toggle-exemplars="grid.toggleExemplars"
-                @retry-exemplars="grid.retryExemplars"
-                @visible="onCardVisible"
-                @hidden="onCardHidden"
-                @refresh="grid.refreshCard"
-                @open-detail="openDetail"
-                @zoom="onCardZoom"
-              />
+                :key="card?.name ?? `placeholder-${row.index * columns + offset}`"
+              >
+                <div
+                  v-if="!card"
+                  class="border-border-default rounded-default flex h-full flex-col overflow-hidden border"
+                  data-test="metrics-explorer-card-placeholder"
+                >
+                  <PanelBar class="gap-2">
+                    <OSkeleton type="text" animation="none" class="h-3 w-40" aria-hidden="true" />
+                  </PanelBar>
+                  <!-- A slot is only drawn while the grid's emptiness sweep is still running. -->
+                  <div class="relative min-h-0 flex-1">
+                    <LoadingProgress :loading="true" :loading-progress-percentage="0" />
+                    <PanelChartPlaceholder />
+                  </div>
+                </div>
+                <MetricCard
+                  v-else
+                  :card="card"
+                  :preview="grid.previews.value[card.name]"
+                  :queries="queriesFor(card)"
+                  :index="row.index * columns + offset"
+                  :time-range="grid.timeRange.value"
+                  :exemplars-eligible="grid.exemplarEligible(card)"
+                  :exemplars-on="grid.exemplarsEnabled(card.name)"
+                  :exemplars-swaps-variant="grid.exemplarSwapsVariant(card)"
+                  :exemplars="grid.exemplarStateOf(card.name)"
+                  @toggle-exemplars="grid.toggleExemplars"
+                  @retry-exemplars="grid.retryExemplars"
+                  @visible="onCardVisible"
+                  @hidden="onCardHidden"
+                  @refresh="grid.refreshCard"
+                  @open-detail="openDetail"
+                  @zoom="onCardZoom"
+                />
+              </template>
             </div>
           </div>
 
@@ -713,6 +771,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :card="detailCard"
       :metric-name="detailMetric ?? ''"
       :loading="detailLoading"
+      :labels-pending="detailSchemasPending"
+      :range-changing="!!rangeChange"
+      :seed="detailSeed"
       :tab="detailTab"
       :breakdown-label="breakdownLabel"
       :compare="compareOffset"
@@ -743,6 +804,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :exemplars-swaps-variant="!!detailCard && grid.exemplarSwapsVariant(detailCard)"
       :exemplars="detailMetric ? grid.exemplarStateOf(detailMetric) : undefined"
       @close="closeDetail"
+      @overview-status="onDetailOverviewStatus"
       @open-visualize="onDetailOpenVisualize"
       @toggle-favorite="detailMetric && grid.toggleFavorite(detailMetric)"
       @configure="detailCard && onConfigure(detailCard)"
@@ -818,6 +880,17 @@ import OCheckboxGroup from "@/lib/forms/Checkbox/OCheckboxGroup.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import ODataAge from "@/lib/core/RefreshButton/ODataAge.vue";
+import ORegionStatus from "@/lib/feedback/RegionStatus/ORegionStatus.vue";
+import { useRegionLoading } from "@/lib/feedback/RegionStatus/useRegionLoading";
+import PanelBar from "@/components/common/PanelBar.vue";
+import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
+import { useSettledValue } from "@/composables/useSettledValue";
+import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
+import { STALE_DIM, STALE_DIM_DELAY_MS } from "@/lib/styles/motion";
+import { formatRangeLength, formatRefreshFailed } from "@/utils/formatters";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
@@ -838,7 +911,7 @@ import AddToDashboard from "../AddToDashboard.vue";
 import PrefixFilterPanel from "./PrefixFilterPanel.vue";
 import LabelFilterBar from "./LabelFilterBar.vue";
 import FunctionConfigDialog from "./FunctionConfigDialog.vue";
-import MetricDetailView from "./MetricDetailView.vue";
+import MetricDetailView, { type DetailStatus } from "./MetricDetailView.vue";
 import ExplorerSavedViews from "./ExplorerSavedViews.vue";
 import QueryHistoryDrawer from "../QueryHistoryDrawer.vue";
 import RecentSearchesButton from "@/components/queryHistory/RecentSearchesButton.vue";
@@ -848,6 +921,7 @@ import { metricsEditorIsEmpty, metricsEditorIsEmptyWith } from "@/utils/queryHis
 
 import useMetricsExplorerGrid, {
   PAGE_SIZE_INCREMENT,
+  hasSamples,
   type LabelFilter,
   type QueryWindow,
 } from "@/composables/metrics/useMetricsExplorerGrid";
@@ -877,7 +951,7 @@ import {
 } from "@/utils/dashboard/urlTimeParams";
 import { pickerSavedDate } from "@/utils/metrics/queryHistory";
 import type { ExplorerViewState } from "@/utils/metrics/explorerSavedView";
-import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
+import { operandStreamsOf, type MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import analytics from "@/services/product_analytics";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -906,6 +980,12 @@ export default defineComponent({
   name: "MetricsExplorer",
   components: {
     OPageHeaderStatus,
+    OSkeleton,
+    ODataAge,
+    ORegionStatus,
+    PanelBar,
+    LoadingProgress,
+    PanelChartPlaceholder,
     FirstDataPanel,
     DateTimePickerDashboard,
     AutoRefreshInterval,
@@ -974,7 +1054,14 @@ export default defineComponent({
     const isGrid = computed(() => grid.viewMode.value === "grid");
     // The rendered slice. Colour index is a card's position here, which is a
     // prefix of the full sorted set, so colours stay stable as pages are added.
-    const visibleCards = computed(() => grid.pagedCards.value);
+    const visibleCards = computed(() => grid.displayed.value.cards);
+    // `null` marks a slot with no card to draw: not known yet (trailing), or known empty while the slice settles.
+    const gridItems = computed<(MetricCardModel | null)[]>(() => [
+      ...visibleCards.value.map((card) =>
+        grid.displayed.value.emptyHeld.has(card.name) ? null : card,
+      ),
+      ...Array.from({ length: grid.displayed.value.placeholders }, () => null),
+    ]);
 
     const refreshing = ref(false);
     // Swapping the grid for the spinner during a refresh's stream reload unmounts every card, emptying `onScreen` before the re-query runs.
@@ -986,7 +1073,7 @@ export default defineComponent({
     // `visibleCards.length > 0` implies not-loading, not-errored, and — in
     // Workspace — that favorites matched, so it's exactly the grid's own branch.
     const gridVisible = computed(
-      () => !showLoading.value && !grid.loadError.value && visibleCards.value.length > 0,
+      () => !showLoading.value && !grid.loadError.value && gridItems.value.length > 0,
     );
 
     // Just the count. It used to append "· N no-data hidden", but the checkbox
@@ -995,13 +1082,26 @@ export default defineComponent({
     // it. The exact number still appears where it is actually needed: the empty
     // state, where it explains why the grid has nothing in it.
     // Matches, not the loaded page: unqueried candidates count, known-empty ones do not while "With data" is on.
-    const resultCountLabel = computed(() => {
-      const shown = grid.filteredCards.value.length;
+    const countText = (shown: number) => {
       const total = grid.cards.value.length;
       return shown === total
         ? total.toLocaleString()
         : `${shown.toLocaleString()} of ${total.toLocaleString()}`;
-    });
+    };
+    const resultCountLabel = computed(() => countText(grid.filteredCards.value.length));
+    // Written once per settled sweep, never decremented card by card; the total is unknown, not 0, until the list first loads.
+    const listSettled = ref(grid.cards.value.length > 0);
+    watch(
+      () => grid.loading.value,
+      (on, was) => {
+        if (was && !on) listSettled.value = true;
+      },
+    );
+    const settledCount = useSettledValue(() => ({
+      value: countText(grid.filteredCards.value.length),
+      busy: grid.holding.value || !listSettled.value,
+      key: grid.pageSlice.value.map((card) => card.name).join("|"),
+    }));
 
     /* ---------------------------------------------------------- toolbar */
 
@@ -1096,6 +1196,91 @@ export default defineComponent({
     const forecastHorizon = ref<ForecastHorizon | null>(null);
     const detailOpen = computed(() => isGridMode.value && !!detailMetric.value);
 
+    // One page-level sentence for every card whose refresh failed over a kept chart (ruling 18).
+    const failedSummary = computed(() => {
+      const shown = visibleCards.value.map((card) => grid.previews.value[card.name]);
+      const failed = shown.filter((preview) => preview?.stale && preview.failedAt);
+      if (!failed.length) return null;
+      return {
+        failedAt: Math.max(...failed.map((preview) => preview!.failedAt ?? 0)),
+        dataFrom: Math.min(...failed.map((preview) => preview!.lastTriggeredAt ?? Date.now())),
+        count: failed.length,
+        total: shown.filter((preview) => preview?.results?.length).length,
+      };
+    });
+
+    // Only a running request counts: a kept chart off screen re-queries when it is next seen, not now.
+    const isRangeLoading = (name: string) => {
+      const preview = grid.previews.value[name];
+      return !!preview?.windowStale && preview.status === "loading";
+    };
+    /** Window lengths (s) of a range change still landing: "Showing last {from} · loading last {to}". */
+    const rangeChange = ref<{ from: number; to: number } | null>(null);
+    /** The detail's main chart, which stands for the page while the detail covers the paused grid. */
+    const detailChartStatus = ref<DetailStatus>({
+      loading: false,
+      drawn: false,
+      failed: false,
+      failure: null,
+    });
+    const onDetailOverviewStatus = (status: DetailStatus) => {
+      detailChartStatus.value = status;
+    };
+    // A range change still landing belongs to the surface it started on.
+    watch(detailOpen, () => {
+      rangeChange.value = null;
+    });
+    const rangeLoading = computed(() => {
+      if (!rangeChange.value) return false;
+      if (detailOpen.value) return detailChartStatus.value.loading;
+      return grid.holding.value || visibleCards.value.some((card) => isRangeLoading(card.name));
+    });
+    const rangeStatusShown = useDelayedFlag(() => rangeLoading.value, STALE_DIM_DELAY_MS);
+    const rangeWords = (spoken: boolean) => {
+      const change = rangeChange.value;
+      if (!change) return null;
+      return {
+        from: formatRangeLength(t, change.from, { spoken }),
+        to: formatRangeLength(t, change.to, { spoken }),
+      };
+    };
+    const rangeStatusText = computed(() => {
+      const words = rangeWords(false);
+      return words ? t("regionStatus.rangeChange", words) : null;
+    });
+
+    const region = useRegionLoading({
+      busy: () =>
+        isGridMode.value && (rangeLoading.value || (!detailOpen.value && refreshing.value)),
+      noun: "charts",
+      loading: () => {
+        const words = rangeWords(true);
+        return words ? t("regionStatus.rangeChangeSpoken", words) : null;
+      },
+      result: () => {
+        const words = rangeWords(true);
+        if (!words || (detailOpen.value && detailChartStatus.value.failed)) return null;
+        return t("regionStatus.rangeSettled", { to: words.to });
+      },
+      // The open detail owns the outcome; the paused grid's failures are not on screen.
+      error: () => {
+        if (detailOpen.value) return detailChartStatus.value.failure;
+        const summary = failedSummary.value;
+        return summary
+          ? formatRefreshFailed(t, {
+              failedAt: summary.failedAt,
+              dataFrom: summary.dataFrom,
+              count: summary.count,
+              total: summary.total,
+            })
+          : null;
+      },
+    });
+    // After the region helper has read the settle words above.
+    watch(rangeLoading, (on) => {
+      if (!on) rangeChange.value = null;
+    });
+
     const setMode = (v: boolean | AcceptableValue | AcceptableValue[]) => {
       if (v !== "explore" && v !== "visualize" && v !== "workspace") return;
       // Pause BEFORE the mode flips, synchronously. The watcher below also keeps
@@ -1156,9 +1341,9 @@ export default defineComponent({
 
     const rowsOfCards = computed(() => {
       const size = columns.value;
-      const out: MetricCardModel[][] = [];
-      for (let i = 0; i < visibleCards.value.length; i += size) {
-        out.push(visibleCards.value.slice(i, i + size));
+      const out: (MetricCardModel | null)[][] = [];
+      for (let i = 0; i < gridItems.value.length; i += size) {
+        out.push(gridItems.value.slice(i, i + size));
       }
       return out;
     });
@@ -1415,6 +1600,12 @@ export default defineComponent({
       await requestOnScreen({ skipCache: true });
     };
 
+    const onReplaceLabelFilter = async (previous: LabelFilter, next: LabelFilter) => {
+      await grid.replaceLabelFilter(previous, next);
+      trackFilter("label");
+      await requestOnScreen({ skipCache: true });
+    };
+
     const onRemoveLabelFilter = async (filter: LabelFilter) => {
       grid.removeLabelFilter(filter);
       await requestOnScreen({ skipCache: true });
@@ -1602,17 +1793,18 @@ export default defineComponent({
         : null,
     );
 
-    // Stream loading omits schemas, which Breakdown and Related both need.
+    // Stream loading omits schemas; Breakdown needs only this metric's own, so the view never waits on the org's.
     const detailSchemasPending = ref(false);
     let detailSchemaGeneration = 0;
     watch(
-      detailMetric,
+      () => detailCard.value?.name,
       async (name) => {
-        if (!name) return;
+        const card = detailCard.value;
+        if (!name || !card) return;
         const generation = ++detailSchemaGeneration;
         detailSchemasPending.value = true;
         try {
-          await grid.ensureSchemas();
+          await grid.ensureStreamSchemas([card.name, ...operandStreamsOf(card)]);
         } finally {
           if (generation === detailSchemaGeneration) detailSchemasPending.value = false;
         }
@@ -1621,7 +1813,19 @@ export default defineComponent({
     );
     const firstLoadPending = computed(() => grid.loading.value && !grid.cards.value.length);
     // Only the first load: a manual refresh must not remount the open view behind a spinner.
-    const detailLoading = computed(() => firstLoadPending.value || detailSchemasPending.value);
+    const detailLoading = computed(() => firstLoadPending.value);
+
+    // The card's drawn series, so the detail chart has something real in its first frame (M-5).
+    const detailSeed = computed(() => {
+      const name = detailMetric.value;
+      const preview = name ? grid.previews.value[name] : undefined;
+      if (!preview || preview.status === "error" || !preview.results?.some(hasSamples)) return null;
+      return {
+        results: preview.results,
+        timeRange: preview.cachedTimeRange ?? grid.timeRange.value,
+        lastTriggeredAt: preview.lastTriggeredAt,
+      };
+    });
 
     /** A card's current query, its ⚙ override and any NaN-guard / widening included. */
     const chartOf = (card: MetricCardModel) => {
@@ -2130,7 +2334,11 @@ export default defineComponent({
       dateTimePickerRef.value?.setSavedDate?.(pickerSavedDate(date));
     };
 
-    const syncTimeRange = (opts?: { keepPreviews?: boolean; keepPage?: boolean }) => {
+    const syncTimeRange = (opts?: {
+      keepPreviews?: boolean;
+      keepPage?: boolean;
+      windowChanged?: boolean;
+    }) => {
       const consumable = dateTimePickerRef.value?.getConsumableDateTime?.();
       if (!consumable) return;
       grid.setTimeRange({ start_time: consumable.startTime, end_time: consumable.endTime }, opts);
@@ -2146,7 +2354,18 @@ export default defineComponent({
       // to a skeleton on each refresh.
       if (refreshing.value) return;
 
-      syncTimeRange(zooming ? { keepPage: true } : undefined);
+      const from = grid.rangeSeconds.value;
+      const drawn = detailOpen.value
+        ? detailChartStatus.value.drawn
+        : visibleCards.value.some((card) => grid.previews.value[card.name]?.results?.length);
+      syncTimeRange({
+        keepPreviews: true,
+        windowChanged: true,
+        ...(zooming && { keepPage: true }),
+      });
+      const to = grid.rangeSeconds.value;
+      // Named only when charts are kept and the lengths differ; "last 1 h · loading last 1 h" says nothing.
+      rangeChange.value = drawn && from !== to ? { from, to } : null;
       // A deliberate change of window must reach the backend — repainting the
       // persisted result would hand the user back the data they just moved away
       // from.
@@ -2453,7 +2672,18 @@ export default defineComponent({
       virtualizer,
       onDataScope,
       visibleCards,
+      gridItems,
       gridVisible,
+      settledCount,
+      STALE_DIM,
+      failedSummary,
+      rangeStatusShown,
+      rangeStatusText,
+      rangeChange,
+      region,
+      detailSeed,
+      detailSchemasPending,
+      onDetailOverviewStatus,
       showLoading,
       resultCountLabel,
       rails,
@@ -2469,6 +2699,7 @@ export default defineComponent({
       onSuffixChange,
       onAddLabelFilter,
       onRemoveLabelFilter,
+      onReplaceLabelFilter,
       onNegateLabelGroup,
       onClearLabelFilters,
       sortOptions,

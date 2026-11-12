@@ -1228,7 +1228,7 @@ async fn delete_org_search_jobs(org_id: &str) -> Result<(), anyhow::Error> {
 
 async fn delete_org_pipelines(org_id: &str) -> Result<(), anyhow::Error> {
     // Through the service layer, so triggers, backfill jobs, ownership and caches go cluster-wide.
-    let pipelines = infra::pipeline::list_by_org(org_id).await?;
+    let pipelines = infra::pipeline::list_by_org_fully_decoded(org_id).await?;
     for p in pipelines {
         let id = p.id.clone();
         crate::pipeline::delete_listed_pipeline(p)
@@ -1711,6 +1711,8 @@ async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
     {
         use o2_enterprise::enterprise::common::auditor;
         audit::audit(auditor::AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: actor.to_string(),
             org_id: org_id.to_string(),
             _timestamp: config::utils::time::now_micros(),

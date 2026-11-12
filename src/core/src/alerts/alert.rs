@@ -41,6 +41,7 @@ use config::{
     },
 };
 use cron::Schedule;
+use datafusion::{common::SchemaError, error::DataFusionError};
 #[cfg(feature = "enterprise")]
 use db::workflows::{AssociationDeleteEvent, WorkflowTriggerType};
 use db::{
@@ -134,6 +135,9 @@ pub enum AlertError {
 
     #[error("Alerts cannot be defined on the internal stream '{0}'")]
     ProtectedStream(String),
+
+    #[error("Invalid alert condition: {0}")]
+    InvalidCondition(String),
 
     /// The warning/critical pair is invalid for the chosen operator.
     /// "Less severe" is direction-dependent — see `level::validate_thresholds`.
@@ -366,6 +370,11 @@ pub enum AlertError {
     MultiAlertGroupingError(String),
     #[error("Group by column {column} not found on stream {stream_name}")]
     GroupByColumnNotFound { column: String, stream_name: String },
+    /// A SQL multi-alert naming a column its stream has not received.
+    #[error(
+        "Stream {stream_name} has no field {field} yet. Alerts can only use fields that exist in the stream."
+    )]
+    FieldNotFound { field: String, stream_name: String },
     #[error("{reason}")]
     JiraDestinationNotSupported { destination: String, reason: String },
 }
@@ -523,6 +532,20 @@ fn validate_custom_group_by(
             column,
             stream_name: stream_name.to_owned(),
         })
+}
+
+fn multi_alert_plan_error(stream_name: &str, err: anyhow::Error) -> AlertError {
+    if let Some(DataFusionError::SchemaError(schema_err, _)) = err
+        .downcast_ref::<DataFusionError>()
+        .map(DataFusionError::find_root)
+        && let SchemaError::FieldNotFound { field, .. } = schema_err.as_ref()
+    {
+        return AlertError::FieldNotFound {
+            field: field.name.clone(),
+            stream_name: stream_name.to_owned(),
+        };
+    }
+    AlertError::MultiAlertGroupingError(err.to_string())
 }
 
 /// Structural half only: `{var}` tokens are unresolved until send time, so a body shaped right but
@@ -957,6 +980,16 @@ async fn prepare_alert(
     if alert.name.contains('/') {
         return Err(AlertError::AlertNameContainsForwardSlash);
     }
+    if let Some(conditions) = alert.query_condition.conditions.as_ref() {
+        conditions
+            .validate_operator_values()
+            .map_err(AlertError::InvalidCondition)?;
+    }
+    alert
+        .trigger_condition
+        .validate_threshold_operator()
+        .and_then(|_| alert.query_condition.validate_threshold_operators())
+        .map_err(AlertError::InvalidCondition)?;
     // A realtime alert sees every ingested row, so one on chat history would exfiltrate it.
     // Case-insensitive, so no spelling of the chat stream slips through.
     if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
@@ -1156,7 +1189,7 @@ async fn prepare_alert(
                 .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
             let schema = get_result_schema(sql, false, true)
                 .await
-                .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
+                .map_err(|e| multi_alert_plan_error(stream_name, e))?;
 
             // this is mostly API check, FE already has a restriction
             if !schema.projections.contains(&agg.having.column) {
@@ -1797,6 +1830,21 @@ fn readable_folder_grants(
         readable.push(format!("alert:_all_{org_id}"));
     }
     readable
+}
+
+/// Folder ids out of `afolder:` grants; `None` when one of them is the org-wide grant.
+#[cfg(any(feature = "enterprise", test))]
+fn listable_folder_ids(org_id: &str, objects: &[String]) -> Option<Vec<String>> {
+    if objects.contains(&format!("afolder:_all_{org_id}")) {
+        return None;
+    }
+    Some(
+        objects
+            .iter()
+            .filter_map(|object| object.strip_prefix("afolder:"))
+            .map(str::to_string)
+            .collect(),
+    )
 }
 
 /// Deletes an alert by its KSUID primary key, unconditionally.
@@ -2587,9 +2635,19 @@ fn incident_path_notified(
     match outcome {
         Outcome::NewIncidentCreated { .. }
         | Outcome::NewAlertTypeJoined { .. }
-        | Outcome::SeverityEscalated { .. } => true,
+        | Outcome::SeverityEscalated { .. }
+        | Outcome::FiredAfterReopen { .. } => true,
         Outcome::ExistingAlertRepeated { .. } => false,
     }
+}
+
+/// `FiredAfterReopen` notifies destinations but pages nobody, so the manual trigger still pages.
+#[cfg(feature = "enterprise")]
+fn incident_path_paged(
+    outcome: &config::meta::alerts::incidents::IncidentCorrelationOutcome,
+) -> bool {
+    use config::meta::alerts::incidents::IncidentCorrelationOutcome as Outcome;
+    !matches!(outcome, Outcome::FiredAfterReopen { .. }) && incident_path_notified(outcome)
 }
 
 pub async fn trigger_by_id<C: ConnectionTrait>(
@@ -2609,7 +2667,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // For creates_incident=true alerts the incident correlation path handles
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
-    let (incident_notified, incident_notify_error) = if alert.creates_incident
+    let (incident_notified, incident_paged, incident_notify_error) = if alert.creates_incident
         && crate::alerts::incidents::incidents_enabled()
     {
         let synthetic_row = manual_trigger_row(&alert);
@@ -2637,6 +2695,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
                 );
                 (
                     incident_path_notified(&correlated.outcome),
+                    incident_path_paged(&correlated.outcome),
                     correlated.notify_error,
                 )
             }
@@ -2645,17 +2704,17 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
                     "No incident correlation for manually triggered alert {org_id}/{}",
                     alert.name
                 );
-                (false, None)
+                (false, false, None)
             }
             Err(e) => {
                 log::error!(
                     "Error correlating manual trigger to incident, falling back to direct notification: {e}"
                 );
-                (false, None)
+                (false, false, None)
             }
         }
     } else {
-        (false, None)
+        (false, false, None)
     };
 
     #[cfg(not(feature = "enterprise"))]
@@ -2676,7 +2735,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // somebody checks a new on-call alert pages before trusting it, and it only
     // answers that question if it pages.
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::oncall::is_enabled() && !incident_notified {
+    if o2_enterprise::enterprise::oncall::is_enabled() && !incident_paged {
         crate::alerts::scheduler::handlers::page_for_alert_firing(&trace_id, &alert, &rows).await;
     }
     #[cfg(feature = "enterprise")]
@@ -4674,6 +4733,22 @@ pub(super) fn to_float(val: &Value) -> f64 {
         val.as_str().unwrap_or_default().parse().unwrap_or_default()
     }
 }
+
+/// Alert folders the user may list, whatever `list_only_permitted` says; `None` is every folder.
+#[cfg(feature = "enterprise")]
+pub async fn listable_alert_folders(
+    org_id: &str,
+    user_id: &str,
+) -> Result<Option<Vec<String>>, AlertError> {
+    let folder_type = o2_openfga::meta::mapping::OFGA_MODELS
+        .get("alert_folders")
+        .map_or("afolder", |model| model.key);
+    let objects = db::authz::list_permitted_objects(org_id, user_id, "LIST", folder_type)
+        .await
+        .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?;
+    Ok(objects.and_then(|objects| listable_folder_ids(org_id, &objects)))
+}
+
 #[cfg(not(feature = "enterprise"))]
 pub async fn permitted_alerts(
     _org_id: &str,
@@ -4908,6 +4983,7 @@ mod threshold_validation_tests {
                 operator: config::meta::alerts::Operator::GreaterThan,
                 value: json!(90),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: None,
             multi_alert: true,
@@ -4927,6 +5003,7 @@ mod threshold_validation_tests {
             operator: config::meta::alerts::Operator::GreaterThan,
             value: json!(10),
             ignore_case: false,
+            case_insensitive: None,
         });
         alert.query_condition.promql_multi_alert = true;
         alert.trigger_condition.operator = config::meta::alerts::Operator::GreaterThanEquals;
@@ -5119,13 +5196,21 @@ mod threshold_validation_tests {
 
 #[cfg(test)]
 mod group_by_validation_tests {
+    use std::sync::Arc;
+
     use arrow_schema::{DataType, Field, Schema};
     use config::{
         meta::alerts::{AggFunction, Aggregation, Condition, Operator, QueryType, alert::Alert},
         utils::json::json,
     };
+    use datafusion::{
+        common::{DFSchema, unqualified_field_not_found},
+        datasource::MemTable,
+        error::DataFusionError,
+        prelude::SessionContext,
+    };
 
-    use super::{AlertError, validate_custom_group_by};
+    use super::{AlertError, multi_alert_plan_error, validate_custom_group_by};
 
     fn schema() -> Schema {
         Schema::new(vec![
@@ -5145,6 +5230,7 @@ mod group_by_validation_tests {
                 operator: Operator::GreaterThan,
                 value: json!(100),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: None,
             multi_alert: false,
@@ -5182,14 +5268,60 @@ mod group_by_validation_tests {
         alert.query_condition.query_type = QueryType::SQL;
         assert!(validate_custom_group_by("svc", &schema(), &alert).is_ok());
     }
+
+    fn assert_names_missing_field(err: AlertError) {
+        assert!(matches!(
+            &err,
+            AlertError::FieldNotFound { field, stream_name }
+                if field == "feature_name" && stream_name == "svc"
+        ));
+        assert_eq!(
+            err.to_string(),
+            "Stream svc has no field feature_name yet. Alerts can only use fields that exist in the stream."
+        );
+        let response = axum::response::Response::from(err);
+        assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_a_missing_field_is_named_not_quoted_from_the_planner() {
+        let err = unqualified_field_not_found("feature_name", &DFSchema::empty());
+        assert_names_missing_field(multi_alert_plan_error("svc", err.into()));
+        // Wrapped by the planner, the field is still found.
+        let err = unqualified_field_not_found("feature_name", &DFSchema::empty()).context("plan");
+        assert_names_missing_field(multi_alert_plan_error("svc", err.into()));
+    }
+
+    #[tokio::test]
+    async fn test_a_query_planned_on_a_missing_column_names_the_field() {
+        let ctx = SessionContext::new();
+        let table = MemTable::try_new(Arc::new(schema()), vec![vec![]]).unwrap();
+        ctx.register_table("svc", Arc::new(table)).unwrap();
+        let err = ctx
+            .state()
+            .create_logical_plan(
+                "SELECT feature_name, SUM(latency) AS spent FROM \"svc\" \
+                 WHERE feature_name = 'x' GROUP BY feature_name",
+            )
+            .await
+            .unwrap_err();
+        assert_names_missing_field(multi_alert_plan_error("svc", err.into()));
+    }
+
+    #[test]
+    fn test_other_planner_errors_stay_grouping_errors() {
+        let err = DataFusionError::Plan("bad".into());
+        assert!(matches!(
+            multi_alert_plan_error("svc", err.into()),
+            AlertError::MultiAlertGroupingError(msg) if msg.contains("bad")
+        ));
+    }
 }
 
 #[cfg(test)]
 mod send_path_tests {
     use config::meta::destinations::{Endpoint, HTTPType, Template, TemplateKind};
 
-    #[cfg(feature = "enterprise")]
-    use super::incident_path_notified;
     #[cfg(feature = "enterprise")]
     use super::is_license_denial;
     use super::{
@@ -5198,6 +5330,8 @@ mod send_path_tests {
         send_attempted, send_discord_with_attachment, send_error_message, send_failure_message,
         send_http_notification, workflows_denial_as_warning,
     };
+    #[cfg(feature = "enterprise")]
+    use super::{incident_path_notified, incident_path_paged};
     use crate::{
         alerts::notifications::platform::{Platform, send_resolve},
         ssrf_test_support::{hanging_server, isolated, secret_server, truncated_server},
@@ -5637,6 +5771,23 @@ mod send_path_tests {
 
     #[cfg(feature = "enterprise")]
     #[test]
+    fn a_firing_after_reopen_skips_destinations_but_still_pages() {
+        use config::meta::alerts::incidents::IncidentCorrelationOutcome as Outcome;
+
+        let outcome = Outcome::FiredAfterReopen {
+            incident_id: "i1".to_string(),
+            service_name: "svc".to_string(),
+        };
+        assert!(incident_path_notified(&outcome));
+        assert!(!incident_path_paged(&outcome));
+        assert!(!incident_path_paged(&Outcome::ExistingAlertRepeated {
+            incident_id: "i1".to_string(),
+            service_name: "svc".to_string(),
+        }));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
     fn outcomes_that_really_notify_still_suppress_the_duplicate() {
         use config::meta::alerts::incidents::IncidentCorrelationOutcome as Outcome;
 
@@ -5685,6 +5836,25 @@ mod folder_grant_tests {
         let all = strings(&["afolder:_all_o"]);
         let granted = readable_folder_grants("o", all.clone(), &all);
         assert!(granted.contains(&"alert:_all_o".to_string()));
+    }
+
+    #[test]
+    fn test_listable_folders_are_the_granted_folder_ids() {
+        let listable = listable_folder_ids("o", &strings(&["afolder:a", "afolder:b"]));
+        assert_eq!(listable, Some(strings(&["a", "b"])));
+    }
+
+    #[test]
+    fn test_org_wide_list_grant_leaves_folders_unrestricted() {
+        let listable = listable_folder_ids("o", &strings(&["afolder:a", "afolder:_all_o"]));
+        assert_eq!(listable, None);
+    }
+
+    #[test]
+    fn test_no_list_grant_lists_no_folder() {
+        assert_eq!(listable_folder_ids("o", &[]), Some(vec![]));
+        let other_org = listable_folder_ids("o", &strings(&["afolder:_all_other"]));
+        assert_eq!(other_org, Some(strings(&["_all_other"])));
     }
 
     #[test]
@@ -6124,6 +6294,7 @@ mod tests {
             operator: Operator::Contains,
             value: json!("enrique"),
             ignore_case: false,
+            case_insensitive: None,
         };
         let sql = build_expr(&condition, "", &DataType::Utf8).unwrap();
         assert_eq!(sql, "str_match(\"auth_username\", 'enrique')");
@@ -8174,6 +8345,7 @@ mod tests {
                 operator: config::meta::alerts::Operator::GreaterThanEquals,
                 value: json!(85.5),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: Some(70.0),
             multi_alert: false,
@@ -8552,6 +8724,7 @@ mod tests {
             operator: config::meta::alerts::Operator::LessThanEquals,
             value: json!(7),
             ignore_case: false,
+            case_insensitive: None,
         });
         alert.query_condition.promql = Some(
             "((disk_used) >= 0.9) * 0 or clamp_min(ceil((0.9 - (disk_used)) / (deriv((disk_used)[2d:15m]) > 0) / 8640 - 1e-6) / 10, 0) or ((disk_used) * 0 + 36500)".into(),
@@ -9145,6 +9318,7 @@ mod tests {
                 operator: config::meta::alerts::Operator::GreaterThanEquals,
                 value: json!(85.5),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: None,
             multi_alert: false,
@@ -9250,6 +9424,92 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn prepare_alert_rejects_an_extended_operator_outside_the_condition_tree() {
+        use config::meta::alerts::{AggFunction, Aggregation, Condition};
+
+        let cond = |operator| Condition {
+            column: "v".to_string(),
+            operator,
+            value: serde_json::json!(1),
+            ignore_case: false,
+            case_insensitive: None,
+        };
+        let err = prepare_schedule(|a| a.trigger_condition.operator = Operator::In).await;
+        assert!(
+            matches!(&err, AlertError::InvalidCondition(m) if m.contains("trigger condition")),
+            "{err:?}"
+        );
+        let err = prepare_schedule(|a| {
+            a.query_condition.promql_condition = Some(cond(Operator::ReMatch));
+        })
+        .await;
+        assert!(
+            matches!(&err, AlertError::InvalidCondition(m) if m.contains("PromQL condition")),
+            "{err:?}"
+        );
+        let err = prepare_schedule(|a| {
+            a.query_condition.aggregation = Some(Aggregation {
+                group_by: None,
+                function: AggFunction::Count,
+                having: cond(Operator::StartsWith),
+                warning_value: None,
+                multi_alert: false,
+            });
+        })
+        .await;
+        assert!(
+            matches!(&err, AlertError::InvalidCondition(m) if m.contains("aggregation having")),
+            "{err:?}"
+        );
+        let err = prepare_schedule(|a| {
+            a.trigger_condition.frequency = 60;
+            a.query_condition.promql_condition = Some(cond(Operator::GreaterThan));
+        })
+        .await;
+        assert!(!matches!(err, AlertError::InvalidCondition(_)), "{err:?}");
+    }
+
+    fn with_condition_operator(alert: &mut Alert, operator: &str) {
+        alert.query_condition.conditions = Some(
+            serde_json::from_value(serde_json::json!({"version": 2, "conditions": {
+                "filterType": "group", "logicalOperator": "AND", "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": operator,
+                     "value": ["error"], "logicalOperator": "AND"}]}}))
+            .unwrap(),
+        );
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_accepts_an_in_condition() {
+        let err = prepare_schedule(|a| {
+            a.trigger_condition.frequency = 60;
+            with_condition_operator(a, "in");
+        })
+        .await;
+        assert!(!matches!(err, AlertError::InvalidCondition(_)), "{err:?}");
+    }
+
+    fn with_case_insensitive_contains(alert: &mut Alert) {
+        alert.query_condition.conditions = Some(
+            serde_json::from_value(serde_json::json!({"version": 2, "conditions": {
+                "filterType": "group", "logicalOperator": "AND", "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": "contains",
+                     "value": "err", "case_insensitive": true, "logicalOperator": "AND"}]}}))
+            .unwrap(),
+        );
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_accepts_a_case_insensitive_condition() {
+        let err = prepare_schedule(|a| {
+            a.trigger_condition.frequency = 60;
+            with_case_insensitive_contains(a);
+        })
+        .await;
+        assert!(!matches!(err, AlertError::InvalidCondition(_)), "{err:?}");
+    }
+
+    #[tokio::test]
     async fn prepare_alert_rejects_an_out_of_range_frequency() {
         let err = prepare_schedule(|a| a.trigger_condition.frequency = i64::MAX).await;
         assert!(matches!(err, AlertError::FrequencyOutOfRange), "{err:?}");
@@ -9306,6 +9566,55 @@ mod tests {
 
         assert!(
             matches!(res, Err(AlertError::RepeatSuppressionOnRealtimeAlert)),
+            "{res:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_names_a_multi_alert_field_the_stream_lacks() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_alert_save_missing_field";
+        let key = format!("{org_id}/{}/spans", StreamType::Traces);
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            key.clone(),
+            SchemaCache::new(arrow_schema::Schema::new(vec![
+                arrow_schema::Field::new("_timestamp", DataType::Int64, false),
+                arrow_schema::Field::new("trace_id", DataType::Utf8, true),
+                arrow_schema::Field::new("gen_ai_usage_cost", DataType::Float64, true),
+            ])),
+        );
+        let mut alert = Alert::default();
+        alert.stream_type = StreamType::Traces;
+        alert.trigger_condition.frequency = 60;
+        alert.query_condition.query_type = QueryType::SQL;
+        alert.query_condition.sql = Some(
+            "SELECT feature_name, SUM(gen_ai_usage_cost) AS spent FROM \"spans\" \
+             WHERE feature_name = 'x' GROUP BY feature_name"
+                .to_string(),
+        );
+        alert.query_condition.aggregation = Some(config::meta::alerts::Aggregation {
+            group_by: Some(vec![]),
+            function: config::meta::alerts::AggFunction::Count,
+            having: config::meta::alerts::Condition {
+                column: "spent".into(),
+                operator: config::meta::alerts::Operator::GreaterThanEquals,
+                value: json!(10),
+                ignore_case: false,
+                case_insensitive: None,
+            },
+            warning_value: None,
+            multi_alert: true,
+        });
+        let res = prepare_alert(org_id, "spans", "budget", &mut alert, true, false).await;
+        STREAM_SCHEMAS_LATEST.write().await.remove(&key);
+
+        assert!(
+            matches!(
+                &res,
+                Err(AlertError::FieldNotFound { field, stream_name })
+                    if field == "feature_name" && stream_name == "spans"
+            ),
             "{res:?}"
         );
     }

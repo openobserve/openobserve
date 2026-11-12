@@ -128,6 +128,8 @@ export interface SearchStreamResult {
   hits: PlanHit[];
   /** The query failed; the stream reports this in an `error` event of a 200 response. */
   error?: string;
+  /** The run was partial or reported errors; holds the server's message, which can be empty. */
+  warning?: string;
   took?: number;
   took_detail?: TookDetail;
   scan_size?: number;
@@ -424,9 +426,9 @@ const CATEGORY_RULES: [RegExp, OperatorCategory][] = [
   [/Filter/i, "filter"],
   [/Join/i, "join"],
   [/Aggregate|Window/i, "agg"],
-  [/Sort|TopK/i, "sort"],
-  [/Repartition|Coalesce|Union|Interleave|Exchange|Merge/i, "exchange"],
-  [/Projection/i, "projection"],
+  [/Sort|TopK|Limit/i, "sort"],
+  [/Repartition|Coalesce|Union|Interleave|Exchange|Merge|SharedSubplan/i, "exchange"],
+  [/Projection|Unnest/i, "projection"],
   [/DataSource|Parquet|MemTable|Memory|Scan|Empty|PlaceholderRow|Tantivy|Wal/i, "scan"],
 ];
 
@@ -671,7 +673,15 @@ function mergeStreamEvent(merged: SearchStreamResult, event: Record<string, unkn
   for (const key of ["took", "scan_size", "scan_records", "scan_files"] as const) {
     if (typeof results[key] === "number") merged[key] = results[key] as number;
   }
+  const warning = partialWarning(results);
+  if (warning || (warning === "" && merged.warning === undefined)) merged.warning = warning;
   return found || results.total !== undefined;
+}
+
+function partialWarning(results: Record<string, unknown>): string | undefined {
+  const errors = [results.function_error].flat().filter((v) => typeof v === "string" && v);
+  if (errors.length) return errors.join("\n");
+  return results.is_partial === true ? "" : undefined;
 }
 
 /** Reads the structured profile from the phase-0 hit; null on older servers or bad JSON. */
@@ -1293,6 +1303,23 @@ export function summarizeProfile(
   };
 }
 
+const KEEPS_EVERY_ROW: OperatorCategory[] = ["remote", "exchange", "projection", "sort"];
+
+/** The limit on the query's result: the first `fetch` under the root that no row-changing operator sits above. */
+function resultFetch(model: ProfileModel): number | null {
+  let op: ProfileOperator | undefined = model.operators[model.rootId];
+  while (op) {
+    const fetch = planFetch(op.detail);
+    if (fetch !== null) return fetch;
+    const singleInput = op.childIds.length === 1 || !!op.remoteStageId;
+    if (!singleInput || !KEEPS_EVERY_ROW.includes(op.category) || /Unnest/i.test(op.name)) {
+      return null;
+    }
+    op = model.operators[op.childIds[0]];
+  }
+  return null;
+}
+
 /** What a plain EXPLAIN plan tells before it runs: streams, operator split, limit and scan pushdown. */
 export function summarizePlan(model: ProfileModel): PlanSummary {
   const ops = model.order.map((id) => model.operators[id]);
@@ -1302,7 +1329,7 @@ export function summarizePlan(model: ProfileModel): PlanSummary {
     streams: [...new Set(scans.map((s) => s.stream).filter(Boolean))],
     leaderOps: leader.length,
     remoteOps: ops.length - leader.length,
-    fetch: planFetch(model.operators[model.rootId].detail),
+    fetch: resultFetch(model),
     scans,
     leaderCategories: [
       ...new Set(leader.filter((op) => op.category !== "remote").map((op) => op.category)),

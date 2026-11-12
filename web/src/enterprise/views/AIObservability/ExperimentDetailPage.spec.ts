@@ -342,6 +342,43 @@ describe("ExperimentDetailPage", () => {
     expect(scores.text()).toContain("25 scored · 0 failed · 1 pending · 0 skipped · 4 unscored");
   });
 
+  // An SDK run with no pinned Scorer whose code reports its own Scores.
+  it("shows client-reported score summaries, and keeps the scoring card when they are all there is", async () => {
+    const experiment = makeExperiment({ id: "exp-1", name: "sdk run", datasetId: "ds-1" });
+    get.mockResolvedValue(
+      makeExperimentDetail(experiment, {
+        results: {
+          executions: [],
+          scores: [],
+          scoringProgress: { completed: 0, total: 0, skipped: 0 },
+          scoreSummaries: [],
+          clientScoreSummaries: [
+            {
+              scoreConfigId: "cfg-quality",
+              scoreConfigName: "quality",
+              clientScorerKey: "ci_judge",
+              sampleCount: 10,
+              value: { kind: "numeric", mean: 0.42 },
+            },
+          ],
+        },
+      }),
+    );
+
+    const wrapper = mount(ExperimentDetailPage);
+    await flushPromises();
+
+    const scores = wrapper.get('[data-test="ai-experiment-detail-scoring"]');
+    expect(scores.text()).toContain("10");
+    expect(scores.text()).toContain("Reported by your code · 1 dimension");
+    const client = wrapper.get(
+      '[data-test="ai-experiment-detail-client-score-cfg-quality-ci_judge"]',
+    );
+    expect(client.text()).toContain("quality · client");
+    expect(client.text()).toContain("0.42");
+    expect(client.text()).toContain("10 scores · key ci_judge");
+  });
+
   it("reads as prose: humanized task type and singular counts", async () => {
     const experiment = makeExperiment({ id: "exp-1", name: "run one", datasetId: "ds-1" });
     experiment.task = {

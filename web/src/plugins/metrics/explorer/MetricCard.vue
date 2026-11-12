@@ -49,9 +49,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`metrics-explorer-card-title-${card.name}`"
           @click="$emit('open-detail', card)"
         >
-          <OTruncatedText class="text-compact text-text-heading font-medium tracking-[0.02em]">{{
-            card.name
-          }}</OTruncatedText>
+          <!-- Cut in the middle: similar names differ at their end (_count, _sum, _total). -->
+          <span class="text-compact text-text-heading flex min-w-0 font-medium tracking-[0.02em]">
+            <OTruncatedText v-if="!titleParts.tail" class="min-w-0">{{
+              titleParts.head
+            }}</OTruncatedText>
+            <template v-else>
+              <OTooltip :content="raw(card.name)" :disabled="!titleCut" />
+              <span
+                ref="titleHead"
+                class="min-w-0 overflow-hidden whitespace-nowrap"
+                :data-test="`metrics-explorer-card-title-head-${card.name}`"
+                >{{ titleHeadShown }}</span
+              >
+              <span class="shrink-0 whitespace-pre">{{ titleParts.tail }}</span>
+            </template>
+          </span>
         </OButton>
         <!-- Badge text is never the sole carrier of meaning — the card's aria
              label spells the type out too. -->
@@ -67,10 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            spacer, then the action row). -->
       <div class="flex-1" />
 
-      <!-- The right-hand cluster: the query function · unit, Drill down, then
-           the freshness clock. None of it truncates; the metric name is what
-           gives way when the row runs short. -->
-      <div class="flex shrink-0 flex-nowrap items-center">
+      <div ref="headerCluster" class="flex shrink-0 flex-nowrap items-center">
         <span
           v-if="restInfo"
           class="text-2xs text-text-secondary whitespace-nowrap opacity-70"
@@ -104,6 +114,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTooltip>
         </OButton>
 
+        <span
+          class="inline-grid shrink-0 items-center justify-items-start"
+          :data-test="`metrics-explorer-card-age-slot-${card.name}`"
+        >
+          <ODataAgeFailedReserve class="ms-1.5 [grid-area:1/1] @max-md/panelbar:hidden" />
+          <ODataAge
+            class="ms-1.5 shrink-0 [grid-area:1/1] @max-md/panelbar:hidden"
+            :class="!ageShown && !failedMarker && 'invisible'"
+            :at="preview?.lastTriggeredAt ?? null"
+            :failed-at="failedMarker ? (preview?.failedAt ?? null) : null"
+            :detail="failedMarker ? staleDetail : undefined"
+            short
+            :data-test="
+              failedMarker
+                ? `metrics-explorer-card-refresh-failed-${card.name}`
+                : `metrics-explorer-card-data-age-${card.name}`
+            "
+            @activate="copyErrorReport"
+          />
+        </span>
+        <ODataAge
+          class="ms-1.5 shrink-0 @md/panelbar:hidden"
+          :class="!ageShown && !failedMarker && 'invisible'"
+          :at="preview?.lastTriggeredAt ?? null"
+          :failed-at="failedMarker ? (preview?.failedAt ?? null) : null"
+          :detail="failedMarker ? staleDetail : undefined"
+          short
+          icon-only
+          :data-test="
+            failedMarker
+              ? `metrics-explorer-card-refresh-failed-icon-${card.name}`
+              : `metrics-explorer-card-data-age-icon-${card.name}`
+          "
+          @activate="copyErrorReport"
+        />
+
         <!-- One labelled entry, always visible, instead of a hover row of
              unlabelled icons: ⚙, exemplars, Open in Visualize and the star all
              live in the detail view this opens. -->
@@ -116,7 +162,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`metrics-explorer-card-details-${card.name}`"
           @click="$emit('open-detail', card)"
         >
-          {{ t("metrics.explorer.card.drillDown") }}
+          <span class="@max-md/panelbar:hidden">{{ t("metrics.explorer.card.drillDown") }}</span>
+          <OTooltip :content="t('metrics.explorer.card.drillDown')" />
         </OButton>
 
         <!-- An on toggle stays visible at rest so the viewer can see why markers are drawn. -->
@@ -196,27 +243,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTooltip :content="t('metrics.explorer.card.refreshToApplyTimeRange')" />
         </OButton>
-
-        <!-- A card restored from cache says how old its data really is instead of passing it off as live. -->
-        <span
-          v-if="preview?.lastTriggeredAt"
-          class="lastRefreshedAt ms-1.25 me-0.5 shrink-0 overflow-hidden text-[smaller] text-ellipsis whitespace-nowrap"
-          :data-test="`metrics-explorer-card-last-refreshed-${card.name}`"
-        >
-          <span class="me-0.5 inline-flex align-middle">
-            <OIcon name="schedule" size="xs" />
-            <OTooltip side="bottom" align="end">
-              <template #content
-                >{{ t("metrics.metricCard.lastRefreshed") }}
-                <RelativeTime :timestamp="preview.lastTriggeredAt"
-              /></template>
-            </OTooltip>
-          </span>
-          <RelativeTime
-            :timestamp="preview.lastTriggeredAt"
-            :full-time-prefix="t('metrics.explorer.card.lastRefreshedPrefix')"
-          />
-        </span>
       </div>
     </PanelBar>
 
@@ -320,9 +346,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            dashboard panel's first load. (The trailing skeleton below stays for
            IDLE cards — the below-the-fold not-yet-queried state a dashboard
            panel does not have.) -->
-      <div
+      <PanelChartPlaceholder
         v-else-if="preview?.status === 'loading' && !preview.results.length"
-        class="h-full"
         :data-test="`metrics-explorer-card-skeleton-${card.name}`"
       />
 
@@ -391,7 +416,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <MetricCardChart
-        v-else-if="preview?.results?.length"
+        v-else-if="showsChart && preview"
+        :class="{ [STALE_DIM]: windowDimmed }"
+        :aria-busy="windowStale ? 'true' : undefined"
+        :data-state="windowDimmed ? 'stale' : undefined"
         :results="preview.results"
         :queries="chartQueries"
         :chart-type="preview.chartType"
@@ -405,11 +433,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :injected-exemplars="exemplarsOn ? exemplars : undefined"
         @error="renderError = String($event ?? '')"
         @zoom="$emit('zoom', $event)"
+        @painted="chartPainted = true"
       />
 
-      <div v-else class="h-full">
-        <OSkeleton type="rect" animation="none" class="h-full w-full" />
-      </div>
+      <PanelChartPlaceholder v-else :data-test="`metrics-explorer-card-skeleton-${card.name}`" />
 
       <!-- The chart is real, but it came from a re-query. Say so rather than
            silently showing data the plain query did not produce. -->
@@ -431,7 +458,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- A refresh that fails on top of a good result keeps the old chart up,
            so this badge is the ONLY place its error can be read. -->
       <div
-        v-if="preview?.stale"
+        v-if="preview?.stale && !failedMarker"
         class="absolute top-0.5 right-0.5 opacity-60"
         :data-test="`metrics-explorer-card-stale-${card.name}`"
       >
@@ -470,10 +497,13 @@ import {
 import { raw, useI18nTyped } from "@/types/i18n";
 import useTheme from "@/composables/useTheme";
 import MetricCardChart from "./MetricCardChart.vue";
-import RelativeTime from "@/components/common/RelativeTime.vue";
+import ODataAge from "@/lib/core/RefreshButton/ODataAge.vue";
+import ODataAgeFailedReserve from "@/lib/core/RefreshButton/ODataAgeFailedReserve.vue";
+import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
+import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
+import { STALE_DIM, STALE_DIM_DELAY_MS } from "@/lib/styles/motion";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
@@ -486,17 +516,22 @@ import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { withSourceStreams } from "@/utils/metrics/metricsHandoff";
 import { hasSamples, type CardPreview } from "@/composables/metrics/useMetricsExplorerGrid";
+import { useMiddleCut } from "@/composables/metrics/useMiddleCut";
 import ExemplarToggle from "@/components/dashboards/exemplars/ExemplarToggle.vue";
 import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
+
+// Long enough for a metric's distinguishing end, e.g. "seconds_count"; a shorter name is never split.
+const TITLE_TAIL_CHARS = 14;
 
 export default defineComponent({
   name: "MetricCard",
   components: {
     MetricCardChart,
-    RelativeTime,
+    ODataAge,
+    ODataAgeFailedReserve,
+    PanelChartPlaceholder,
     OButton,
     OIcon,
-    OSkeleton,
     OEmptyState,
     LoadingProgress,
     PanelBar,
@@ -572,6 +607,26 @@ export default defineComponent({
      * effect (so a ⚙ override is visible on the card rather than silently
      * identical to the default), then the unit.
      */
+    const titleParts = computed(() => {
+      const name = props.card.name;
+      if (name.length <= TITLE_TAIL_CHARS * 2) return { head: name, tail: "" };
+      // The tail starts at its word's underscore, so every cut reads "…_seconds_bucket".
+      const at =
+        name[name.length - TITLE_TAIL_CHARS - 1] === "_"
+          ? -TITLE_TAIL_CHARS - 1
+          : -TITLE_TAIL_CHARS;
+      return { head: name.slice(0, at), tail: name.slice(at) };
+    });
+
+    const titleHead = ref<HTMLElement | null>(null);
+    const headerCluster = ref<HTMLElement | null>(null);
+    // The title's room changes with the card's width and with what the right-hand cluster shows.
+    const { shown: titleHeadShown, cut: titleCut } = useMiddleCut(
+      () => titleParts.value.head,
+      titleHead,
+      () => [root.value, headerCluster.value],
+    );
+
     const restInfo = computed(() => {
       const fn = props.preview?.footerLabel || props.card.footerLabel;
       return [fn, unitLabel.value].filter(Boolean).join(" · ");
@@ -606,6 +661,12 @@ export default defineComponent({
       const body = failure ? `${preamble}\n\n${failure}` : preamble;
       return `${body}\n\n${t("metrics.explorer.card.staleClickToCopy")}`;
     });
+    /** The header marker already says the refresh failed, so its tooltip adds only the error and how to copy it. */
+    const staleDetail = computed(() =>
+      [errorTooltip.value, t("metrics.explorer.card.staleClickToCopy")]
+        .filter(Boolean)
+        .join("\n\n"),
+    );
 
     /**
      * The failure as something you can paste into a bug report.
@@ -649,6 +710,7 @@ export default defineComponent({
      * the tile's own Retry.
      */
     const renderError = ref("");
+    const failedMarker = computed(() => !!props.preview?.stale && !!props.preview.failedAt);
     watch(
       () => props.preview?.results,
       () => {
@@ -666,7 +728,10 @@ export default defineComponent({
      */
     const isEmpty = computed(() => {
       const preview = props.preview;
-      if (!preview || preview.status !== "done") return false;
+      if (!preview) return false;
+      // A reload keeps the answer on screen, so a kept answer with no samples is never drawn as a chart with no line.
+      const kept = preview.status === "loading" && preview.results.length > 0;
+      if (preview.status !== "done" && !kept) return false;
       return !preview.results.some(hasSamples);
     });
 
@@ -676,6 +741,19 @@ export default defineComponent({
      * strictly narrower case than `isEmpty`, and the template tests it first.
      */
     const isSparse = computed(() => !!props.preview?.sparse && isEmpty.value);
+
+    const showsChart = computed(() => {
+      const preview = props.preview;
+      if (props.card.unsupported || !preview?.results?.length) return false;
+      if (preview.status === "unavailable" || preview.status === "error") return false;
+      return !isEmpty.value && !renderError.value;
+    });
+    // "Updated" stays invisible, not absent, until the first frame: no claim over a blank body (M-4), and its width is held.
+    const chartPainted = ref(false);
+    watch(showsChart, (shown) => {
+      if (!shown) chartPainted.value = false;
+    });
+    const ageShown = computed(() => !showsChart.value || chartPainted.value);
 
     /**
      * The window the chart's x-axis is drawn against: the one this data was
@@ -695,6 +773,12 @@ export default defineComponent({
      * the window that is actually true of the data.
      */
     const dataTimeRange = computed(() => props.preview?.cachedTimeRange ?? props.timeRange);
+
+    // Only a different window dims; a same-window refresh swaps in place (ruling 10).
+    const windowStale = computed(
+      () => props.preview?.status === "loading" && !!props.preview.windowStale,
+    );
+    const windowDimmed = useDelayedFlag(() => windowStale.value, STALE_DIM_DELAY_MS);
 
     // Lazy queries: only cards in (or within one viewport of) the scroll window
     // fetch anything.
@@ -735,13 +819,26 @@ export default defineComponent({
       o2Unit,
       bucketO2Unit,
       restInfo,
+      titleParts,
+      titleHead,
+      headerCluster,
+      titleHeadShown,
+      titleCut,
       errorTooltip,
       staleTooltip,
+      staleDetail,
       errorReport,
       copyErrorReport,
       isEmpty,
+      showsChart,
+      chartPainted,
+      ageShown,
+      failedMarker,
       isSparse,
       dataTimeRange,
+      windowStale,
+      windowDimmed,
+      STALE_DIM,
       renderError,
       onRetryRender,
     };

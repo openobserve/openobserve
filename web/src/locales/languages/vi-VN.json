@@ -1712,7 +1712,9 @@
       "rerunCancelled": "Đã hủy chạy lại sau {elapsed}. Đang hiển thị kết quả trước đó.",
       "rerunCancelledNow": "Đã hủy chạy lại. Đang hiển thị kết quả trước đó.",
       "analyzeSucceeded": "Lần chạy trước thành công",
-      "analyzeFailedShort": "Lần chạy trước thất bại"
+      "analyzeFailedShort": "Lần chạy trước thất bại",
+      "analyzeWarned": "Lần chạy gần nhất hoàn tất kèm cảnh báo",
+      "analyzePartial": "Lần chạy đã hoàn tất nhưng kết quả có thể chưa đầy đủ."
     },
     "errorDeletingSavedView": "Lỗi khi xóa chế độ xem đã lưu.",
     "errorCreatingSavedView": "Lỗi khi tạo chế độ xem đã lưu.",
@@ -3353,7 +3355,8 @@
         "edit": "Chỉnh sửa",
         "identityRowForm": "Trên thẻ này, quy tắc danh tính áp dụng từ sự kiện được nhận diện đầu tiên",
         "newUsersOnly": "Chỉ người dùng mới",
-        "newUsersSessionsTip": "Chỉ người dùng mới chỉ hoạt động trong chế độ Người dùng"
+        "newUsersSessionsTip": "Chỉ người dùng mới chỉ hoạt động trong chế độ Người dùng",
+        "fieldMissingOn": "{field}: trường không có trong stream này"
       },
       "appFilters": {
         "hiddenLabel": "Bị ẩn bởi bộ lọc ứng dụng:",
@@ -13585,6 +13588,8 @@
     "sloColumn": "SLO",
     "sloKind": "Loại điều kiện",
     "sloLongWindow": "Cửa sổ dài",
+    "configNotSet": "Chưa đặt",
+    "openSlo": "Mở SLO",
     "sloShortWindow": "Cửa sổ ngắn",
     "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây.",
     "seconds": "Giây",
@@ -16549,7 +16554,6 @@
     "errorSpans": "Span lỗi",
     "filterByErrors": "Lọc theo lỗi",
     "clearErrorFilter": "Xóa bộ lọc lỗi",
-    "updatingResults": "Đang cập nhật kết quả",
     "error": "LỖI",
     "errorCount": "{n} LỖI | {n} LỖI",
     "success": "THÀNH CÔNG",
@@ -32540,5 +32544,11 @@
     "recentRow": "Tìm kiếm gần đây",
     "deletedQuery": "Đã xóa {query}",
     "undo": "Hoàn tác"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Giữ mẫu trong tối đa {max} ký tự.",
+      "regexInvalid": "Mẫu này không hợp lệ hoặc không được hỗ trợ. Không thể dùng lookahead, lookbehind và tham chiếu ngược."
+    }
   }
 }

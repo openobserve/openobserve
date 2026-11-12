@@ -70,6 +70,8 @@ impl FlightDecoderStream {
                 self.query_context.node_profile.record_plan(metrics);
             }
             CustomMessage::PeakMemory(peak_memory) => {
+                self.scan_stats.peak_memory_usage =
+                    self.scan_stats.peak_memory_usage.max(peak_memory as i64);
                 self.query_context
                     .peak_memory
                     .fetch_max(peak_memory, Ordering::Relaxed);

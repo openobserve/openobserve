@@ -327,6 +327,8 @@ vi.mock("@/plugins/traces/composables/useTracesAlertAction", async () => {
 
 // ---------------------------------------------------------------------------
 // Import the component AFTER all vi.mock declarations.
+import queryHistory from "@/services/query_history";
+import { queryClient } from "@/composables/query/queryClient";
 // ---------------------------------------------------------------------------
 import SearchBar from "@/plugins/traces/SearchBar.vue";
 import analytics from "@/services/product_analytics";
@@ -1085,7 +1087,7 @@ describe("SearchBar", () => {
       expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
     });
 
-    it("should stay in place but disabled while a search is loading", async () => {
+    it("stays in place, aria-disabled and inert to clicks, while a search is loading", async () => {
       applySearch();
       searchObjInstance.loading = true;
       wrapper = mountSearchBar();
@@ -1093,7 +1095,17 @@ describe("SearchBar", () => {
 
       const btn = wrapper.find('[data-test="insights-button"]');
       expect(btn.exists()).toBe(true);
-      expect(btn.attributes("disabled")).toBeDefined();
+      expect(btn.attributes("aria-disabled")).toBe("true");
+      expect(btn.attributes("disabled")).toBeUndefined();
+      await btn.trigger("click");
+      expect(wrapper.emitted("drill-down")).toBeUndefined();
+      expect(wrapper.find('[data-test="insights-button-placeholder"]').exists()).toBe(false);
+
+      searchObjInstance.loading = false;
+      await flushPromises();
+      expect(btn.attributes("aria-disabled")).toBeUndefined();
+      await btn.trigger("click");
+      expect(wrapper.emitted("drill-down")).toHaveLength(1);
     });
 
     it("should be hidden when the org has no trace streams", async () => {
@@ -1121,6 +1133,77 @@ describe("SearchBar", () => {
 
       await wrapper.find('[data-test="insights-button"]').trigger("click");
       expect(wrapper.emitted("drill-down")).toHaveLength(1);
+    });
+
+    describe("reserved slot while results load (200% zoom shift)", () => {
+      const placeholder = () => wrapper.find('[data-test="insights-button-placeholder"]');
+
+      it.each([
+        ["streams are loading", () => (searchObjInstance.loadingStream = true)],
+        ["the search errored", () => (searchObjInstance.data.errorMsg = "boom")],
+      ])("holds an invisible, inert placeholder in the button's place while %s", async (_, set) => {
+        applySearch();
+        set();
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
+        expect(placeholder().exists()).toBe(true);
+        expect(placeholder().classes()).toContain("invisible");
+        expect(placeholder().attributes("aria-hidden")).toBe("true");
+        expect(placeholder().attributes("inert")).toBeDefined();
+        const toggleGroup = wrapper.find(".o-toggle-group-stub").element;
+        expect(toggleGroup.nextElementSibling).toBe(placeholder().element);
+      });
+
+      it("reserves nothing when the button shows, or when the org has no trace streams", async () => {
+        applySearch();
+        wrapper = mountSearchBar();
+        await flushPromises();
+        expect(placeholder().exists()).toBe(false);
+        wrapper.unmount();
+
+        applySearch();
+        searchObjInstance.data.stream.streamLists = [];
+        wrapper = mountSearchBar();
+        await flushPromises();
+        expect(placeholder().exists()).toBe(false);
+        expect((wrapper.vm as any).drillDownSlot).toBe(false);
+      });
+
+      it.each(["service-graph", "services-catalog"] as const)(
+        "reserves nothing in %s mode",
+        async (mode) => {
+          searchObjInstance.meta.searchMode = mode;
+          applySearch();
+          searchObjInstance.loading = true;
+          wrapper = mountSearchBar();
+          await flushPromises();
+
+          expect(placeholder().exists()).toBe(false);
+        },
+      );
+
+      it("budgets the toolbar the same while loading as once the button shows", async () => {
+        const widthSpy = mockToolbarWidth(714);
+        try {
+          applySearch();
+          wrapper = mountSearchBar();
+          await flushPromises();
+          const shown = (wrapper.vm as any).shouldHideToolbarButtonText;
+          wrapper.unmount();
+
+          applySearch();
+          searchObjInstance.loadingStream = true;
+          wrapper = mountSearchBar();
+          await flushPromises();
+
+          expect((wrapper.vm as any).shouldHideToolbarButtonText).toBe(shown);
+          expect(placeholder().text().includes("traces.drillDown")).toBe(!shown);
+        } finally {
+          widthSpy.mockRestore();
+        }
+      });
     });
   });
 
@@ -1253,6 +1336,39 @@ describe("SearchBar", () => {
 
       expect(wrapper.emitted("searchdata")).toBeTruthy();
       expect(wrapper.emitted("searchdata")).toHaveLength(1);
+    });
+
+    it("moves focus from Run to Cancel and back as the run starts and ends", async () => {
+      wrapper = mountSearchBar({ isLoading: false });
+      await flushPromises();
+      const run = () => wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
+      const cancel = () => wrapper.find('[data-test="traces-search-bar-cancel-btn"]');
+      (run().element as HTMLElement).focus();
+      expect(document.activeElement).toBe(run().element);
+
+      await wrapper.setProps({ isLoading: true });
+      await flushPromises();
+      expect(cancel().exists()).toBe(true);
+      expect(cancel().attributes("aria-busy")).toBe("true");
+      expect(document.activeElement).toBe(cancel().element);
+
+      await wrapper.setProps({ isLoading: false });
+      await flushPromises();
+      expect(document.activeElement).toBe(run().element);
+    });
+
+    it("leaves focus alone when it was outside the run control", async () => {
+      wrapper = mountSearchBar({ isLoading: false });
+      await flushPromises();
+      const outside = document.createElement("button");
+      document.body.appendChild(outside);
+      outside.focus();
+
+      await wrapper.setProps({ isLoading: true });
+      await flushPromises();
+
+      expect(document.activeElement).toBe(outside);
+      outside.remove();
     });
 
     it("should show cancel button when isLoading prop is true on enterprise", async () => {
@@ -1701,6 +1817,36 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
+  describe("filter builder growth", () => {
+    let rectSpy: ReturnType<typeof vi.spyOn> | undefined;
+
+    afterEach(() => {
+      rectSpy?.mockRestore();
+      localStorage.removeItem("o2.traces.queryInput");
+    });
+
+    it("reports how far the builder grew past one line, and null once the editor is back", async () => {
+      localStorage.setItem("o2.traces.queryInput", "builder");
+      rectSpy = vi
+        .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+        .mockImplementation(function (this: HTMLElement) {
+          const builder = this.getAttribute("data-test") === "traces-search-bar-filter-builder";
+          return { height: builder ? 84 : 0, width: 0 } as DOMRect;
+        });
+      searchObjInstance.meta.showQuery = true;
+      searchObjInstance.meta.sqlMode = false;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      // Three 1.875rem lines measure 84px; one line is the pane's own height.
+      expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([54]);
+      await wrapper.find('[data-test="traces-search-bar-filter-builder-toggle"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([null]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   describe("plain-English filter (Ask AI) on the query editor", () => {
     const editor = () => wrapper.findComponent({ ref: "queryEditorRef" });
 
@@ -1758,6 +1904,36 @@ describe("SearchBar", () => {
         message: "traces.nlNeedsSql",
         variant: "warning",
       });
+    });
+
+    it("keeps the builder toggle beside the AI button in both modes, and hides it in AI mode", async () => {
+      store.state.zoConfig.ai_enabled = true;
+      searchObjInstance.meta.showQuery = true;
+      searchObjInstance.meta.sqlMode = false;
+      localStorage.setItem("o2.traces.queryInput", "query");
+      try {
+        wrapper = mountSearchBar();
+        await flushPromises();
+        const toggle = () => wrapper.find('[data-test="traces-search-bar-filter-builder-toggle"]');
+        expect(toggle().attributes("style")).toContain("right: 2.375rem");
+
+        await toggle().trigger("click");
+        await flushPromises();
+        expect(toggle().attributes("style")).toContain("right: 2.375rem");
+        expect(wrapper.find('[data-test="traces-search-bar-filter-builder-ai-btn"]').exists()).toBe(
+          true,
+        );
+
+        await wrapper
+          .find('[data-test="traces-search-bar-filter-builder-ai-btn"]')
+          .trigger("click");
+        await flushPromises();
+        editor().vm.$emit("update:nlpMode", true);
+        await flushPromises();
+        expect(toggle().exists()).toBe(false);
+      } finally {
+        localStorage.removeItem("o2.traces.queryInput");
+      }
     });
   });
 
@@ -2906,7 +3082,11 @@ describe("SearchBar", () => {
       await flushPromises();
       searchObjInstance.data.editorValue = "";
       searchObjInstance.meta.queryEditorPlaceholderFlag = true;
-      const vm = wrapper.vm as unknown as { recentFocusOpen: boolean };
+      const vm = wrapper.vm as unknown as {
+        recentFocusOpen: boolean;
+        toggleFilterBuilder: () => void;
+      };
+      vm.toggleFilterBuilder();
       vm.recentFocusOpen = false;
       await flushPromises();
       expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
@@ -2918,6 +3098,88 @@ describe("SearchBar", () => {
       vm.recentFocusOpen = false;
       await flushPromises();
       expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
+    });
+
+    it("types no placeholder while the stream loads, so a restored query paints first", async () => {
+      searchObjInstance.loadingStream = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      searchObjInstance.data.editorValue = "";
+      searchObjInstance.meta.queryEditorPlaceholderFlag = true;
+      await flushPromises();
+      expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(false);
+
+      searchObjInstance.loadingStream = false;
+      await flushPromises();
+      expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
+    });
+
+    it("never starts typing Select a stream first while the stream list may still pick one", async () => {
+      vi.useFakeTimers();
+      try {
+        searchObjInstance.loadingStream = true;
+        searchObjInstance.data.stream.selectedStream = { label: "", value: "" };
+        wrapper = mountSearchBar();
+        await vi.advanceTimersByTimeAsync(5000);
+        const typed = () => wrapper.find(".query-editor-placeholder-typewriter").text?.() ?? "";
+        expect((wrapper.vm as any).traceEditorPlaceholder).not.toMatch(/^Sel/);
+
+        searchObjInstance.data.stream.selectedStream = { label: "default", value: "default" };
+        searchObjInstance.loadingStream = false;
+        for (let i = 0; i < 20; i++) {
+          await vi.advanceTimersByTimeAsync(100);
+          expect(typed()).not.toMatch(/^Sel/);
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("recent searches with the filter builder on", () => {
+    const entry = {
+      id: "a",
+      source: "traces",
+      query: "service_name = 'api'",
+      status: "ok",
+      starred: false,
+      context: {},
+      updated_at: Date.now() * 1000,
+      created_at: Date.now() * 1000,
+      run_count: 1,
+    };
+    const DT = "traces-search-bar-filter-builder-bar";
+    const row = (key: string) =>
+      document.body.querySelector<HTMLElement>(`[data-test="${DT}-suggest-item-${key}"]`);
+
+    it("lists them above the fields and hands the picked row to the page", async () => {
+      const list = vi
+        .spyOn(queryHistory, "list")
+        .mockResolvedValue({ data: [entry] } as Awaited<ReturnType<typeof queryHistory.list>>);
+      const count = vi
+        .spyOn(queryHistory, "count")
+        .mockResolvedValue({ data: { count: 0 } } as Awaited<
+          ReturnType<typeof queryHistory.count>
+        >);
+      store.state.zoConfig.query_history_enabled = true;
+      queryClient.clear();
+      localStorage.removeItem("o2.traces.queryInput");
+      searchObjInstance.data.editorValue = "";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      document.body.querySelector<HTMLInputElement>(`[data-test="${DT}-input"]`)!.click();
+      await vi.waitFor(() => expect(row("extra-recent-a")).not.toBeNull());
+      row("extra-recent-a")!.click();
+      await flushPromises();
+
+      expect(wrapper.emitted("recent-restore")![0].slice(0, 1)).toEqual([
+        expect.objectContaining({ id: "a" }),
+      ]);
+      expect(wrapper.emitted("recent-restore")![0][2]).toBe(true);
+      delete store.state.zoConfig.query_history_enabled;
+      list.mockRestore();
+      count.mockRestore();
     });
   });
 

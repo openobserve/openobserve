@@ -12,8 +12,26 @@ import { createStore } from "vuex";
 import ScorerFormPage from "./ScorerFormPage.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import onlineEvalsService from "@/services/online-evals.service";
 import i18n from "@/locales";
+import { CODE_SCORER_STARTERS } from "../utils/codeScorerStarters";
+
+// Monaco does not run in jsdom; a plain textarea stands in for the code editor.
+vi.mock("@/components/CodeQueryEditor.vue", async () => {
+  const { h } = await import("vue");
+  return {
+    // Lets defineAsyncComponent unwrap `default` instead of using the namespace.
+    __esModule: true,
+    default: {
+      name: "CodeQueryEditor",
+      props: ["query"],
+      render(this: any) {
+        return h("textarea", { value: this.query });
+      },
+    },
+  };
+});
 
 vi.mock("@/services/online-evals.service", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -346,6 +364,68 @@ describe("ScorerFormPage", () => {
       expect(onlineEvalsService.scorers.update).toHaveBeenCalledTimes(1);
       const [, , payload] = (onlineEvalsService.scorers.update as any).mock.calls[0];
       expect(payload.scorer.params.auth).toBeUndefined();
+    });
+  });
+
+  describe("code scorer", () => {
+    const starter = (key: string) => CODE_SCORER_STARTERS.find((s) => s.key === key)!.source;
+
+    it("opens on the JSON is valid starter with no provider field", async () => {
+      wrapper = createWrapper({ scorerType: "code" });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="scorer-form-code-section"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="scorer-form-provider-select"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="scorer-form-endpoint-section"]').exists()).toBe(false);
+      expect(oform(wrapper).form.state.values.template).toBe(starter("json_is_valid"));
+      expect(wrapper.find('[data-test="scorer-form-code-variables"]').text()).toContain("output");
+      expect(wrapper.find('[data-test="scorer-form-code-sandbox-note"]').exists()).toBe(true);
+    });
+
+    it("fills the function, name and description from a picked starter", async () => {
+      wrapper = createWrapper({ scorerType: "code" });
+      await flushPromises();
+      const picker = wrapper
+        .findAllComponents(OSelect)
+        .find((c: any) => c.props("options")?.some((o: any) => o.value === "exact_match"));
+      picker!.vm.$emit("update:modelValue", "exact_match");
+      await flushPromises();
+
+      const values = oform(wrapper).form.state.values;
+      expect(values.template).toBe(starter("exact_match"));
+      expect(values.name).toBe("exact_match");
+      expect(values.description).toBeTruthy();
+      expect(wrapper.find('[data-test="scorer-form-code-variables"]').text()).toContain(
+        "expected_output",
+      );
+    });
+
+    it("saves a code scorer without provider params", async () => {
+      wrapper = createWrapper({ scorerType: "code" });
+      setField(wrapper, "name", "answer_is_json");
+      setField(wrapper, "producesScoreConfigId", "sc1");
+      await submit(wrapper);
+
+      expect(onlineEvalsService.scorers.create).toHaveBeenCalledTimes(1);
+      const [, payload] = (onlineEvalsService.scorers.create as any).mock.calls[0];
+      expect(payload.scorer).toEqual({
+        type: "code",
+        producesScoreConfigId: "sc1",
+        producesScoreConfigVersion: null,
+        template: starter("json_is_valid"),
+      });
+    });
+
+    it("refuses a function whose score parameters cannot be read", async () => {
+      wrapper = createWrapper({ scorerType: "code" });
+      setField(wrapper, "name", "answer_is_json");
+      setField(wrapper, "template", "function check(output) { return true; }");
+      await flushPromises();
+      expect(wrapper.find('[data-test="scorer-form-code-signature-error"]').exists()).toBe(true);
+
+      await submit(wrapper);
+      expect(oform(wrapper).form.state.isValid).toBe(false);
+      expect(onlineEvalsService.scorers.create).not.toHaveBeenCalled();
     });
   });
 

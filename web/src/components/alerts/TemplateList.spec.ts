@@ -83,6 +83,17 @@ describe("Alert List", async () => {
     vi.clearAllMocks();
   });
 
+  // B27: other kinds skip a prebuilt channel template, so its row says Alert; prebuilt_default serves all.
+  it("names Alert for a prebuilt channel row and All kinds for prebuilt_default", () => {
+    const vm = wrapper.vm as any;
+    expect(
+      String(vm.appliesToText({ name: "prebuilt_slack", isPrebuilt: true, applies_to: [] })),
+    ).toBe("Alert");
+    expect(
+      String(vm.appliesToText({ name: "prebuilt_default", isPrebuilt: true, applies_to: [] })),
+    ).toBe("All kinds");
+  });
+
   it("shows each template's kinds and counts the user templates that apply to every kind", async () => {
     const vm = wrapper.vm as any;
     const userAllKinds = vm.templates.filter(
@@ -184,6 +195,9 @@ describe("Alert List", async () => {
     const deleteAlert = vi.spyOn(templateService, "delete");
     const listTemplates = vi.spyOn(templateService, "list");
     let listCallsBeforeDelete = 0;
+    // The page's own list reads; the dependency graph's usage read is a separate request.
+    const plainListCalls = () =>
+      listTemplates.mock.calls.filter((args: any[]) => !args[0]?.include_usage).length;
     beforeEach(async () => {
       const templatesUrl = `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates`;
       global.server.use(
@@ -197,7 +211,7 @@ describe("Alert List", async () => {
           ),
         ),
       );
-      listCallsBeforeDelete = listTemplates.mock.calls.length;
+      listCallsBeforeDelete = plainListCalls();
 
       // Click the delete button — only visible once skeleton is cleared (done in outer beforeEach).
       await wrapper
@@ -217,7 +231,7 @@ describe("Alert List", async () => {
 
     it("drops the deleted row in place, leaving the rest of the list alone", () => {
       // The mutation's invalidation refetches the mounted list in the background; the splice keeps the row gone meanwhile.
-      expect(listTemplates.mock.calls.length).toBe(listCallsBeforeDelete + 1);
+      expect(plainListCalls()).toBe(listCallsBeforeDelete + 1);
       const body = wrapper
         .find('[data-test="alert-templates-list-table"]')
         .find('[data-test="o2-table-body"]');
@@ -392,6 +406,39 @@ describe("TemplateList pagination persistence", () => {
     expect(pushedQuery.action).toBeUndefined();
     expect(pushedQuery.name).toBeUndefined();
   });
+
+  it("toggleTemplateEditor drops applies_to when closing, so the next new template starts on Inferred", async () => {
+    (router as any).currentRoute.value.query = {};
+    wrapper = mountComponent();
+    await flushPromises();
+    (wrapper.vm as any).showTemplateEditor = true;
+    (router as any).currentRoute.value.query = {
+      action: "add",
+      applies_to: "anomaly",
+      page: "2",
+      org_identifier: "test-org",
+    };
+    const pushSpy = vi.spyOn(router, "push");
+
+    (wrapper.vm as any).toggleTemplateEditor();
+
+    const pushedQuery = pushSpy.mock.calls[0][0].query;
+    expect(pushedQuery.applies_to).toBeUndefined();
+    expect(pushedQuery.page).toBe("2");
+  });
+
+  it("editTemplate(null) keeps applies_to, which the picker's create link passes", async () => {
+    (router as any).currentRoute.value.query = { applies_to: "anomaly" };
+    wrapper = mountComponent();
+    await flushPromises();
+    const pushSpy = vi.spyOn(router, "push").mockImplementation((() => Promise.resolve()) as any);
+
+    (wrapper.vm as any).editTemplate(null);
+
+    expect(pushSpy.mock.calls[0][0].query.applies_to).toBe("anomaly");
+    pushSpy.mockRestore();
+    (router as any).currentRoute.value.query = {};
+  });
 });
 
 describe("alertTemplates view state restore", () => {
@@ -405,6 +452,63 @@ describe("alertTemplates view state restore", () => {
   beforeEach(() => resetListViewState());
 
   afterEach(() => viewWrapper?.unmount());
+
+  it("restores the Applies to filter after navigation", async () => {
+    (router as any).currentRoute.value.query = {};
+    viewWrapper = mountComponent();
+    (viewWrapper.vm as any).appliesToFilter = "downtime";
+    await flushPromises();
+    viewWrapper.unmount();
+
+    viewWrapper = mountComponent();
+    expect((viewWrapper.vm as any).appliesToFilter).toBe("downtime");
+  });
+
+  it("prefers a valid applies_to in the address over the kept filter, and ignores an invalid one", () => {
+    useListViewState("alertTemplates", { appliesTo: "downtime" });
+    (router as any).currentRoute.value.query = { applies_to: "anomaly" };
+    viewWrapper = mountComponent();
+    expect((viewWrapper.vm as any).appliesToFilter).toBe("anomaly");
+    viewWrapper.unmount();
+
+    (router as any).currentRoute.value.query = { applies_to: "nonsense" };
+    viewWrapper = mountComponent();
+    expect((viewWrapper.vm as any).appliesToFilter).toBe("downtime");
+    (router as any).currentRoute.value.query = {};
+  });
+
+  it("says no template matches the filter, and its clear action resets the filter too", async () => {
+    const org = store.state.selectedOrganization.identifier;
+    global.server.use(
+      http.get(`${store.state.API_ENDPOINT}/api/${org}/alerts/templates`, () =>
+        HttpResponse.json([{ name: "alert_only", type: "http", body: "", applies_to: ["alert"] }]),
+      ),
+    );
+    queryClient.removeQueries({ queryKey: templateKeys.list(org), exact: true });
+    useListViewState("alertTemplates", { appliesTo: "downtime" });
+    (router as any).currentRoute.value.query = {};
+    try {
+      viewWrapper = mountComponent();
+      await vi.waitFor(() => expect((viewWrapper.vm as any).templates.length).toBe(1));
+      await flushPromises();
+      const vm = viewWrapper.vm as any;
+      expect(vm.visibleRows).toEqual([]);
+      await vi.waitFor(() =>
+        expect(viewWrapper.findComponent({ name: "OEmptyState" }).exists()).toBe(true),
+      );
+      const empty = viewWrapper.findComponent({ name: "OEmptyState" });
+      expect(empty.props("filtered")).toBe(true);
+
+      vm.filterQuery = "x";
+      empty.vm.$emit("action", "clear-filters");
+      await flushPromises();
+      expect(vm.appliesToFilter).toBe("any");
+      expect(vm.filterQuery).toBe("");
+    } finally {
+      global.server.resetHandlers();
+      queryClient.removeQueries({ queryKey: templateKeys.list(org), exact: true });
+    }
+  });
 
   it("restores search, tab, page size and sort", () => {
     useListViewState("alertTemplates", {

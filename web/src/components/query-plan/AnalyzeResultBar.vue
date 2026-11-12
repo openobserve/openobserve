@@ -19,8 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-surface-base border-border-default flex h-10 shrink-0 items-center gap-2.5 border-b px-4 text-xs"
     data-test="query-plan-analyze-bar"
   >
-    <OBadge size="sm" variant="success-soft" class="shrink-0">
-      <OIcon name="check-circle" size="xs" />
+    <OBadge
+      size="sm"
+      :variant="warning ? 'warning-soft' : 'success-soft'"
+      class="shrink-0"
+      :data-test="`query-plan-analyze-bar-${warning ? 'warning' : 'success'}`"
+    >
+      <OIcon :name="warning ? 'warning' : 'check-circle'" size="xs" />
       {{ command }}
     </OBadge>
     <OTruncatedText class="text-text-secondary flex-1" data-test="query-plan-analyze-bar-summary">{{
@@ -51,6 +56,8 @@ const props = defineProps<{
   took: string | null;
   nodes: number;
   busy: boolean;
+  /** The run was partial or reported errors, so it must not read as a success. */
+  warning: boolean;
 }>();
 
 const emit = defineEmits<{ rerun: [] }>();

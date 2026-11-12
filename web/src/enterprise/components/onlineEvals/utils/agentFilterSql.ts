@@ -1,13 +1,10 @@
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { formatAgentOption } from "@/plugins/traces/agentOptionFormat";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 
 export const ALL_AGENTS_VALUE = "__all__";
 
 export type AgentFilterSelection = GenAiAgentListItem;
-
-function escapeSqlString(value: string): string {
-  return value.replace(/'/g, "''");
-}
 
 export function agentFilterKey(agent: AgentFilterSelection): string {
   const identity = agent.id ? `id:${agent.id}` : `name:${agent.name}`;
@@ -29,7 +26,7 @@ export function buildEvaluatorAgentFilterWhere(
   const field = agent.id ? "attributes_target_agent_id" : "attributes_target_agent_name";
   const value = agent.id ?? agent.name;
   if (!value) return null;
-  return `${field} = '${escapeSqlString(String(value))}'`;
+  return `${field} = ${sqlLiteral(value)}`;
 }
 
 export function combineWhere(...clauses: Array<string | null | undefined>): string | null {

@@ -1712,7 +1712,9 @@
       "rerunCancelled": "Erneute Ausführung nach {elapsed} abgebrochen. Die vorherigen Ergebnisse werden angezeigt.",
       "rerunCancelledNow": "Erneute Ausführung abgebrochen. Die vorherigen Ergebnisse werden angezeigt.",
       "analyzeSucceeded": "Letzter Lauf erfolgreich",
-      "analyzeFailedShort": "Letzter Lauf fehlgeschlagen"
+      "analyzeFailedShort": "Letzter Lauf fehlgeschlagen",
+      "analyzeWarned": "Letzter Lauf mit Warnungen abgeschlossen",
+      "analyzePartial": "Der Lauf wurde abgeschlossen, aber die Ergebnisse sind möglicherweise unvollständig."
     },
     "errorDeletingSavedView": "Fehler beim Löschen der gespeicherten Ansicht.",
     "errorCreatingSavedView": "Fehler beim Erstellen der gespeicherten Ansicht.",
@@ -3353,7 +3355,8 @@
         "edit": "Bearbeiten",
         "identityRowForm": "Auf dieser Karte gelten Identitätsregeln ab dem ersten identifizierten Ereignis",
         "newUsersOnly": "Nur neue Benutzer",
-        "newUsersSessionsTip": "„Nur neue Benutzer“ funktioniert nur im Benutzermodus"
+        "newUsersSessionsTip": "„Nur neue Benutzer“ funktioniert nur im Benutzermodus",
+        "fieldMissingOn": "{field}: Feld nicht in diesem Stream"
       },
       "appFilters": {
         "hiddenLabel": "Ausgeblendet durch App-Filter:",
@@ -13585,6 +13588,8 @@
     "sloColumn": "SLO",
     "sloKind": "Bedingungstyp",
     "sloLongWindow": "Langes Zeitfenster",
+    "configNotSet": "Nicht festgelegt",
+    "openSlo": "SLO öffnen",
     "sloShortWindow": "Kurzes Zeitfenster",
     "sloCloneDisabled": "SLO-Alarme werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden.",
     "seconds": "Sekunden",
@@ -16549,7 +16554,6 @@
     "errorSpans": "Fehler-Spans",
     "filterByErrors": "Nach Fehlern filtern",
     "clearErrorFilter": "Fehlerfilter löschen",
-    "updatingResults": "Ergebnisse werden aktualisiert",
     "error": "FEHLER",
     "errorCount": "{n} FEHLER | {n} FEHLER",
     "success": "ERFOLG",
@@ -32540,5 +32544,11 @@
     "recentRow": "Letzte Suche",
     "deletedQuery": "Gelöscht: {query}",
     "undo": "Rückgängig"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Verwenden Sie für das Muster höchstens {max} Zeichen.",
+      "regexInvalid": "Dieses Muster ist ungültig oder wird nicht unterstützt. Lookahead, Lookbehind und Rückverweise können nicht verwendet werden."
+    }
   }
 }

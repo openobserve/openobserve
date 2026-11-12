@@ -1712,7 +1712,9 @@
       "rerunCancelled": "أُلغيت إعادة التشغيل بعد {elapsed}. يتم عرض النتائج السابقة.",
       "rerunCancelledNow": "أُلغيت إعادة التشغيل. يتم عرض النتائج السابقة.",
       "analyzeSucceeded": "نجح التشغيل الأخير",
-      "analyzeFailedShort": "فشل التشغيل الأخير"
+      "analyzeFailedShort": "فشل التشغيل الأخير",
+      "analyzeWarned": "اكتمل التشغيل الأخير مع تحذيرات",
+      "analyzePartial": "اكتمل التشغيل، لكن النتائج قد تكون غير مكتملة."
     },
     "errorDeletingSavedView": "خطأ أثناء حذف العرض المحفوظ.",
     "errorCreatingSavedView": "خطأ أثناء إنشاء عرض محفوظ.",
@@ -3353,7 +3355,8 @@
         "edit": "تعديل",
         "identityRowForm": "في هذه البطاقة، تُطبَّق قواعد الهوية بدءًا من أول حدث مُعرّف",
         "newUsersOnly": "المستخدمون الجدد فقط",
-        "newUsersSessionsTip": "يعمل خيار المستخدمون الجدد فقط في وضع المستخدمين"
+        "newUsersSessionsTip": "يعمل خيار المستخدمون الجدد فقط في وضع المستخدمين",
+        "fieldMissingOn": "{field}: الحقل غير موجود في هذا الجدول"
       },
       "appFilters": {
         "hiddenLabel": "مخفية بواسطة مرشحات التطبيق:",
@@ -13585,6 +13588,8 @@
     "sloColumn": "SLO",
     "sloKind": "نوع الشرط",
     "sloLongWindow": "نافذة طويلة",
+    "configNotSet": "غير محدد",
+    "openSlo": "فتح SLO",
     "sloShortWindow": "نافذة قصيرة",
     "sloCloneDisabled": "تنبيهات SLO تنشأ على صفحة SLO الخاصة بهم، لذا لا يمكن استنساخها من هنا.",
     "seconds": "ثوانٍ",
@@ -16549,7 +16554,6 @@
     "errorSpans": "امتدادات الأخطاء",
     "filterByErrors": "التصفية حسب الأخطاء",
     "clearErrorFilter": "مسح فلتر الخطأ",
-    "updatingResults": "جارٍ تحديث النتائج",
     "error": "خطأ",
     "errorCount": "أخطاء {n} | {n}",
     "success": "النجاح",
@@ -32540,5 +32544,11 @@
     "recentRow": "بحث حديث",
     "deletedQuery": "تم حذف {query}",
     "undo": "تراجع"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "اجعل النمط {max} حرفًا أو أقل.",
+      "regexInvalid": "هذا النمط غير صالح أو غير مدعوم. لا يمكن استخدام البحث الأمامي أو البحث الخلفي أو المراجع الخلفية."
+    }
   }
 }

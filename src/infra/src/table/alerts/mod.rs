@@ -463,21 +463,32 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Lists alerts.
+/// Lists alerts; a row this version cannot read is logged and skipped.
 pub async fn list<C: ConnectionTrait>(
     conn: &C,
     params: ListAlertsParams,
 ) -> Result<Vec<(MetaFolder, MetaAlert)>, errors::Error> {
-    let alerts = list_models(conn, params)
-        .await?
-        .into_iter()
-        .map(|(f, a)| {
-            let f = MetaFolder::from(f);
-            let a = MetaAlert::try_from(a)?;
-            Ok((f, a))
-        })
-        .collect::<Result<_, errors::Error>>()?;
-    Ok(alerts)
+    let models = list_models(conn, params).await?;
+    Ok(super::convert_skipping_unreadable(
+        "alerts",
+        models,
+        |(_, a)| alert_row_key(a),
+        |(f, a)| MetaAlert::try_from(a).map(|a| (MetaFolder::from(f), a)),
+    ))
+}
+
+/// Lists alerts like `list` but fails on a row this version cannot read, for reference checks.
+pub async fn list_fully_decoded<C: ConnectionTrait>(
+    conn: &C,
+    params: ListAlertsParams,
+) -> Result<Vec<(MetaFolder, MetaAlert)>, errors::Error> {
+    let models = list_models(conn, params).await?;
+    super::convert_failing_on_unreadable(
+        "alerts",
+        models,
+        |(_, a)| alert_row_key(a),
+        |(f, a)| MetaAlert::try_from(a).map(|a| (MetaFolder::from(f), a)),
+    )
 }
 
 /// Lists every alert in the org as [`AlertSummaryRow`], selecting only the columns it needs.
@@ -625,14 +636,15 @@ pub async fn last_written_us<C: ConnectionTrait>(
         .and_then(|m| m.updated_at))
 }
 
-/// Lists all alerts.
+/// Lists all alerts; a row this version cannot read is logged and skipped.
 pub async fn list_all<C: ConnectionTrait>(conn: &C) -> Result<Vec<MetaAlert>, errors::Error> {
-    let alerts = list_all_models(conn)
-        .await?
-        .into_iter()
-        .map(MetaAlert::try_from)
-        .collect::<Result<_, errors::Error>>()?;
-    Ok(alerts)
+    let models = list_all_models(conn).await?;
+    Ok(super::convert_skipping_unreadable(
+        "alerts",
+        models,
+        alert_row_key,
+        MetaAlert::try_from,
+    ))
 }
 
 /// Tries to get an alert ORM entity and its parent folder ORM entity.
@@ -704,6 +716,20 @@ async fn list_models<C: ConnectionTrait>(
         query.filter(folders::Column::FolderId.eq(folder_id))
     } else {
         query
+    };
+    let query = match &params.listable_folder_ids {
+        None => query,
+        // `IN ()` is not portable, and no filter would list every folder.
+        Some(ids) if ids.is_empty() => {
+            query.filter(alerts::Column::Id.eq(TAG_FILTER_NO_MATCH_SENTINEL))
+        }
+        Some(ids) => {
+            let mut cond = Condition::any();
+            for chunk in ids.chunks(TAG_ID_PREDICATE_CHUNK) {
+                cond = cond.add(folders::Column::FolderId.is_in(chunk.to_vec()));
+            }
+            query.filter(cond)
+        }
     };
 
     // Apply the optional alert name substring filter.
@@ -883,6 +909,10 @@ async fn list_models<C: ConnectionTrait>(
         .filter_map(|(d, maybe_f)| maybe_f.map(|f| (f, d)))
         .collect();
     Ok(folders_and_dashboards)
+}
+
+fn alert_row_key(alert: &alerts::Model) -> String {
+    format!("org={} id={}", alert.org, alert.id)
 }
 
 /// Lists all alert ORM models.
@@ -2365,6 +2395,34 @@ pub(super) mod tests {
             );
         }
 
+        #[tokio::test]
+        async fn listable_folders_scope_a_cross_folder_list() {
+            let db = db_with_folder().await;
+            seed_folder(&db, FOLDER_B_PK, ORG, "team-a").await;
+            let (in_default, in_team) = (alert_id(), alert_id());
+            insert_alert(&db, AlertSpec::plain(&in_default, "p0")).await;
+            insert_alert(
+                &db,
+                AlertSpec::plain(&in_team, "p1").in_folder(ORG, FOLDER_B_PK),
+            )
+            .await;
+
+            let unrestricted = ListAlertsParams::new(ORG);
+            assert_eq!(ids_of(&db, unrestricted).await.len(), 2);
+
+            let one = ListAlertsParams::new(ORG).within_folders(vec!["team-a".to_string()]);
+            assert_eq!(ids_of(&db, one).await, vec![in_team]);
+
+            let none = ListAlertsParams::new(ORG).within_folders(vec![]);
+            assert!(
+                ids_of(&db, none).await.is_empty(),
+                "no listable folder must list nothing, not everything"
+            );
+
+            let other = ListAlertsParams::new(ORG).within_folders(vec!["team-z".to_string()]);
+            assert!(ids_of(&db, other).await.is_empty());
+        }
+
         /// Ordering must survive the new predicate — including the deliberate
         /// cross-database "unset priority sorts last" CASE, which nothing else
         /// in the repo covers.
@@ -2426,6 +2484,115 @@ pub(super) mod tests {
             params.slo_id = Some(SLO_A.to_string());
 
             assert_eq!(ids_of(&db, params).await, vec![a1]);
+        }
+
+        mod unreadable_rows {
+            use std::str::FromStr;
+
+            use super::*;
+            use crate::table::{
+                alerts::{get_by_id, list, list_all, list_fully_decoded},
+                testing::{capture_error_logs, logged_errors_containing},
+            };
+
+            fn new_operator_conditions() -> serde_json::Value {
+                serde_json::json!({"version": 2, "conditions": {
+                    "filterType": "group", "logicalOperator": "AND",
+                    "conditions": [{"filterType": "condition", "column": "level",
+                                    "operator": "future_op", "value": ["error"],
+                                    "logicalOperator": "AND"}]
+                }})
+            }
+
+            async fn insert_with_conditions(
+                db: &DatabaseConnection,
+                id: &str,
+                conditions: serde_json::Value,
+            ) {
+                let mut model = make_model(id);
+                model.org = ORG.to_string();
+                model.folder_id = FOLDER_A_PK.to_string();
+                model.name = format!("alert-{id}");
+                model.query_conditions = Some(conditions);
+                alerts::Entity::insert(alerts::ActiveModel::from(model))
+                    .exec(db)
+                    .await
+                    .unwrap();
+            }
+
+            /// Three rows: one readable, one with an operator this version lacks, one junk.
+            async fn db_with_unreadable_rows() -> (DatabaseConnection, [String; 3]) {
+                let db = db_with_folder().await;
+                let ids = [alert_id(), alert_id(), alert_id()];
+                insert_alert(&db, AlertSpec::plain(&ids[0], "good")).await;
+                insert_with_conditions(&db, &ids[1], new_operator_conditions()).await;
+                insert_with_conditions(&db, &ids[2], serde_json::json!(42)).await;
+                (db, ids)
+            }
+
+            #[tokio::test]
+            async fn list_skips_and_logs_rows_it_cannot_read() {
+                capture_error_logs();
+                let (db, [good, new_op, junk]) = db_with_unreadable_rows().await;
+
+                let listed: Vec<String> = list(&db, ListAlertsParams::new(ORG))
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|(_, a)| a.id.unwrap().to_string())
+                    .collect();
+
+                assert_eq!(listed, vec![good]);
+                let logged = logged_errors_containing(&new_op);
+                assert!(
+                    logged
+                        .iter()
+                        .any(|l| l.contains(ORG) && l.contains("unknown variant `future_op`")),
+                    "{logged:?}"
+                );
+                assert!(!logged_errors_containing(&junk).is_empty());
+            }
+
+            #[tokio::test]
+            async fn list_fully_decoded_fails_on_a_row_it_cannot_read() {
+                let (db, [good, ..]) = db_with_unreadable_rows().await;
+                let err = list_fully_decoded(&db, ListAlertsParams::new(ORG))
+                    .await
+                    .unwrap_err()
+                    .to_string();
+                assert!(err.contains("unreadable"), "{err}");
+
+                let db = db_with_folder().await;
+                insert_alert(&db, AlertSpec::plain(&good, "good")).await;
+                let listed = list_fully_decoded(&db, ListAlertsParams::new(ORG))
+                    .await
+                    .unwrap();
+                assert_eq!(listed.len(), 1);
+            }
+
+            #[tokio::test]
+            async fn list_all_skips_rows_it_cannot_read() {
+                let (db, [good, ..]) = db_with_unreadable_rows().await;
+                let listed: Vec<String> = list_all(&db)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|a| a.id.unwrap().to_string())
+                    .collect();
+                assert_eq!(listed, vec![good]);
+            }
+
+            #[tokio::test]
+            async fn get_by_id_of_an_unreadable_row_is_an_error() {
+                let (db, [good, new_op, _]) = db_with_unreadable_rows().await;
+                let get = |id: &str| get_by_id(&db, ORG, Ksuid::from_str(id).unwrap());
+                assert!(get(&good).await.unwrap().is_some());
+                let err = get(&new_op).await.unwrap_err();
+                assert!(
+                    err.to_string().contains("unknown variant `future_op`"),
+                    "{err}"
+                );
+            }
         }
 
         #[tokio::test]

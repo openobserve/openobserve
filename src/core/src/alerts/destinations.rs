@@ -164,6 +164,29 @@ async fn existing(
     }
 }
 
+/// An alert saved against a webhook skipped the Jira checks, so a turn into Jira runs them now.
+async fn check_jira_conversion(
+    destination: &Destination,
+    previous: Option<&Destination>,
+) -> Result<(), DestinationError> {
+    if !super::notifications::jira::becomes_jira(destination, previous) {
+        return Ok(());
+    }
+    let conn = infra::db::get_orm_client_ro().await;
+    let alerts = db::alerts::alert::list_with_folders_fully_decoded(
+        conn,
+        config::meta::alerts::alert::ListAlertsParams::new(&destination.org_id),
+    )
+    .await?;
+    match super::notifications::jira::conversion_refusal(
+        &destination.name,
+        alerts.iter().map(|(_, alert)| alert),
+    ) {
+        Some(refusal) => Err(DestinationError::JiraAlertsUnsupported(refusal)),
+        None => Ok(()),
+    }
+}
+
 pub async fn save(
     name: &str,
     destination: Destination,
@@ -273,6 +296,7 @@ pub async fn save_in(
         super::slack_destination::check_save(env, &destination, target, previous.as_ref()).await?;
     }
     super::notifications::jira::keep_saved_token(&mut destination, previous.as_ref())?;
+    check_jira_conversion(&destination, previous.as_ref()).await?;
 
     // For prebuilt destinations, ensure template exists before saving destination
     // This implements template reuse: multiple destinations can share the same prebuilt template

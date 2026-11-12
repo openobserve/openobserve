@@ -1712,7 +1712,9 @@
       "rerunCancelled": "Heruitvoering geannuleerd na {elapsed}. De vorige resultaten worden getoond.",
       "rerunCancelledNow": "Heruitvoering geannuleerd. De vorige resultaten worden getoond.",
       "analyzeSucceeded": "Laatste uitvoering geslaagd",
-      "analyzeFailedShort": "Laatste uitvoering mislukt"
+      "analyzeFailedShort": "Laatste uitvoering mislukt",
+      "analyzeWarned": "Laatste run voltooid met waarschuwingen",
+      "analyzePartial": "De run is voltooid, maar de resultaten zijn mogelijk onvolledig."
     },
     "errorDeletingSavedView": "Fout bij het verwijderen van de opgeslagen weergave.",
     "errorCreatingSavedView": "Fout bij het aanmaken van een opgeslagen weergave.",
@@ -3353,7 +3355,8 @@
         "edit": "Bewerken",
         "identityRowForm": "Op deze kaart gelden identiteitsregels vanaf de eerste geïdentificeerde gebeurtenis",
         "newUsersOnly": "Alleen nieuwe gebruikers",
-        "newUsersSessionsTip": "Alleen nieuwe gebruikers werkt alleen in de modus Gebruikers"
+        "newUsersSessionsTip": "Alleen nieuwe gebruikers werkt alleen in de modus Gebruikers",
+        "fieldMissingOn": "{field}: veld niet in deze stream"
       },
       "appFilters": {
         "hiddenLabel": "Verborgen door app-filters:",
@@ -13585,6 +13588,8 @@
     "sloColumn": "SLO",
     "sloKind": "Conditietype",
     "sloLongWindow": "Lang venster",
+    "configNotSet": "Niet ingesteld",
+    "openSlo": "SLO openen",
     "sloShortWindow": "Kort venster",
     "sloCloneDisabled": "SLO-alarmen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond.",
     "seconds": "Seconden",
@@ -16549,7 +16554,6 @@
     "errorSpans": "Foutspans",
     "filterByErrors": "Filteren op fouten",
     "clearErrorFilter": "Foutfilter wissen",
-    "updatingResults": "Resultaten bijwerken",
     "error": "FOUT",
     "errorCount": "{n} FOUT | {n} FOUTEN",
     "success": "SUCCES",
@@ -32540,5 +32544,11 @@
     "recentRow": "Recente zoekopdracht",
     "deletedQuery": "{query} verwijderd",
     "undo": "Ongedaan maken"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Gebruik maximaal {max} tekens voor het patroon.",
+      "regexInvalid": "Dit patroon is ongeldig of wordt niet ondersteund. Lookahead, lookbehind en terugverwijzingen kunnen niet worden gebruikt."
+    }
   }
 }

@@ -101,8 +101,10 @@ uuid.workspace = true
 zip.workspace = true
 
 [dev-dependencies]
+async-trait.workspace = true
 cron.workspace = true
 jsonschema = { version = "0.38", default-features = false }
 infra = { workspace = true, features = ["test-utils"] }
 o2_enterprise = { workspace = true, default-features = false, features = ["test-utils"] }
 openobserve-core = { workspace = true, features = ["test-utils"] }
+proto.workspace = true

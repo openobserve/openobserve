@@ -141,6 +141,16 @@ describe("UnpricedModelsTable", () => {
     expect(wrapper.find('[data-test="model-pricing-unpriced-banner"]').exists()).toBe(true);
   });
 
+  // The pinned Actions column fits a 1024 px window only while the label stays short.
+  it("labels Keep briefly and names the matched price in its tooltip", async () => {
+    wrapper = mountTab();
+    const approximate = await waitForRow(wrapper, "gpt-5.4-mini");
+    const keep = approximate.find('[data-test="model-pricing-unpriced-keep-btn"]');
+
+    expect(keep.text()).toBe("Keep prices");
+    expect(keep.findComponent({ name: "OTooltip" }).props("content")).toBe("Keep GPT-5.4 prices");
+  });
+
   it("shows how many agents the server left out of a capped list", async () => {
     const [first, second] = unpricedResponse.models;
     wrapper = mountTab([
@@ -195,7 +205,9 @@ describe("UnpricedModelsTable", () => {
   it("holds the skeleton, not the all-priced state, while the stream list loads", async () => {
     wrapper = mountTab([], { streams: [], streamsLoaded: false, stream: "", loaded: false });
     await flushPromises();
-    expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true),
+    );
     expect(wrapper.find('[data-test="model-pricing-unpriced-empty"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="model-pricing-unpriced-no-streams"]').exists()).toBe(false);
   });
@@ -203,7 +215,9 @@ describe("UnpricedModelsTable", () => {
   it("holds the skeleton, not the all-priced state, until the first read succeeds", async () => {
     wrapper = mountTab([], { loading: true, loaded: false });
     await flushPromises();
-    expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true),
+    );
     expect(wrapper.find('[data-test="model-pricing-unpriced-empty"]').exists()).toBe(false);
   });
 

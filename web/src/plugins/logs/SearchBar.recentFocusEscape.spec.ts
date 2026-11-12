@@ -81,7 +81,9 @@ describe("logs recent-searches focus dropdown and the editor's Escape", () => {
     });
     const vm = wrapper.vm as unknown as FocusDropdownVm & {
       searchObj: { data: { editorValue: string }; meta: Record<string, unknown> };
+      toggleFilterBuilder: () => void;
     };
+    vm.toggleFilterBuilder();
     vm.searchObj.data.editorValue = "";
     vm.searchObj.meta.queryEditorPlaceholderFlag = true;
     vm.searchObj.meta.nlpMode = false;

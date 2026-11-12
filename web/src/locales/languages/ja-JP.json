@@ -1712,7 +1712,9 @@
       "rerunCancelled": "{elapsed} 後に再実行をキャンセルしました。前回の結果を表示しています。",
       "rerunCancelledNow": "再実行をキャンセルしました。前回の結果を表示しています。",
       "analyzeSucceeded": "前回の実行は成功しました",
-      "analyzeFailedShort": "前回の実行は失敗しました"
+      "analyzeFailedShort": "前回の実行は失敗しました",
+      "analyzeWarned": "前回の実行は警告付きで完了しました",
+      "analyzePartial": "実行は完了しましたが、結果が不完全な可能性があります。"
     },
     "errorDeletingSavedView": "保存されたビューを削除中にエラーが発生しました。",
     "errorCreatingSavedView": "保存済みビューの作成中にエラーが発生しました。",
@@ -3353,7 +3355,8 @@
         "edit": "編集",
         "identityRowForm": "このカードでは、ID ルールは最初に識別されたイベントから適用されます",
         "newUsersOnly": "新規ユーザーのみ",
-        "newUsersSessionsTip": "「新規ユーザーのみ」はユーザーモードでのみ機能します"
+        "newUsersSessionsTip": "「新規ユーザーのみ」はユーザーモードでのみ機能します",
+        "fieldMissingOn": "{field}: このストリームに存在しないフィールド"
       },
       "appFilters": {
         "hiddenLabel": "アプリフィルターによる非表示:",
@@ -13585,6 +13588,8 @@
     "sloColumn": "SLO",
     "sloKind": "条件タイプ",
     "sloLongWindow": "長期ウィンドウ",
+    "configNotSet": "未設定",
+    "openSlo": "SLO を開く",
     "sloShortWindow": "短期ウィンドウ",
     "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。",
     "seconds": "秒",
@@ -16549,7 +16554,6 @@
     "errorSpans": "エラースパン",
     "filterByErrors": "エラーで絞り込む",
     "clearErrorFilter": "エラーフィルターをクリア",
-    "updatingResults": "結果を更新中",
     "error": "エラー",
     "errorCount": "{n} エラー | {n} エラー",
     "success": "成功",
@@ -32540,5 +32544,11 @@
     "recentRow": "最近の検索",
     "deletedQuery": "{query} を削除しました",
     "undo": "元に戻す"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "パターンは{max}文字以内にしてください。",
+      "regexInvalid": "このパターンは無効か、サポートされていません。先読み、後読み、後方参照は使用できません。"
+    }
   }
 }

@@ -3179,6 +3179,22 @@ pub async fn list_alerts(
     let name_substring = query.alert_name_substring.clone();
     let enabled_filter = query.enabled;
     let page_size_and_idx = query.page_size.map(|s| (s, query.page_idx.unwrap_or(0)));
+    // The route check is skipped for a cross-folder read, so the handler is the only folder gate.
+    #[cfg(feature = "enterprise")]
+    let listable_folders = if folder_slug.is_none() {
+        match alert::listable_alert_folders(&org_id, &user_email.user_id).await {
+            // No listable folder is no access to alerts, which the skipped route check refused.
+            Ok(Some(folders)) if folders.is_empty() => {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
+            Ok(folders) => folders,
+            Err(e) => return e.into(),
+        }
+    } else {
+        None
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let listable_folders: Option<Vec<String>> = None;
 
     // Resolve the tag filter to an alert-ID set BEFORE building the query
     // (PT-8): the tags column is JSON, and the filter must enter the SQL as an
@@ -3194,6 +3210,9 @@ pub async fn list_alerts(
     let mut params = query.into(&org_id);
     #[cfg(feature = "enterprise")]
     let mut params = query.into(&org_id);
+    if let Some(folders) = &listable_folders {
+        params = params.within_folders(folders.clone());
+    }
 
     if !requested_tags.is_empty() {
         // `Some(empty)` is meaningful: no alert carries these tags, so the
@@ -3352,12 +3371,14 @@ pub async fn list_alerts(
             {
                 continue;
             }
-            if !visible_alert(
-                &visibility,
-                &definition.id,
-                &definition.folder_id,
-                &definition.name,
-            ) {
+            if !in_listable_folder(&listable_folders, &definition.folder_id)
+                || !visible_alert(
+                    &visibility,
+                    &definition.id,
+                    &definition.folder_id,
+                    &definition.name,
+                )
+            {
                 continue;
             }
             let folder_name = folder_names
@@ -3402,6 +3423,7 @@ pub async fn list_alerts(
             anomaly_list_items(&org_id, &configs)
                 .await
                 .into_iter()
+                .filter(|item| in_listable_folder(&listable_folders, &item.folder_id))
                 .filter(|item| anomaly_row_visible(&visibility, item))
                 .filter(|item| enabled_filter.is_none_or(|enabled| item.enabled == enabled))
                 .filter(|item| match &priority_filter {
@@ -3465,6 +3487,12 @@ pub async fn list_alerts(
         list,
         status_unavailable,
     })
+}
+
+fn in_listable_folder(listable_folders: &Option<Vec<String>>, folder_id: &str) -> bool {
+    listable_folders
+        .as_ref()
+        .is_none_or(|folders| folders.iter().any(|folder| folder == folder_id))
 }
 
 // The anomaly merge has no permission filter of its own, unlike the SQL path.
@@ -4812,9 +4840,9 @@ mod tests {
         BulkDeleteRequest, GetAlertResponseBody, HashMap, Headers, Json, Ksuid,
         ListAlertsResponseBodyItem, MetaAlert, ONCALL_LOCKED_WARNING, Path, Query, UserEmail,
         WORKFLOWS_LOCKED_WARNING, anomaly_row_visible, composite_created_response,
-        composite_save_warnings, composite_updated_response, delete_alert_bulk, known_target_names,
-        locked_target_ids, locked_target_warnings, resolve_generate_sql, save_warnings,
-        visible_alert,
+        composite_save_warnings, composite_updated_response, delete_alert_bulk, in_listable_folder,
+        known_target_names, locked_target_ids, locked_target_warnings, resolve_generate_sql,
+        save_warnings, visible_alert,
     };
 
     fn row(name: &str, extra: serde_json::Value) -> ListAlertsResponseBodyItem {
@@ -5210,6 +5238,15 @@ mod tests {
             status(AlertError::CreateAlreadyExists),
             StatusCode::CONFLICT
         );
+    }
+
+    #[test]
+    fn test_cross_folder_list_keeps_only_listable_folders() {
+        let listable = Some(vec!["mine".to_string()]);
+        assert!(in_listable_folder(&listable, "mine"));
+        assert!(!in_listable_folder(&listable, "other"));
+        assert!(!in_listable_folder(&Some(vec![]), "mine"));
+        assert!(in_listable_folder(&None, "other"));
     }
 
     #[test]

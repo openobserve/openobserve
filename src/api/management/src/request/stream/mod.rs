@@ -762,6 +762,8 @@ pub(crate) async fn audit_security_change(
 
     log::info!("[SECURITY] {org_id}/{stream_name} security source changed by {user_id}: {change}");
     audit::audit(auditor::AuditMessage {
+        login_ip: None,
+        user_agent: None,
         user_email: user_id.to_string(),
         org_id: org_id.to_string(),
         _timestamp: config::utils::time::now_micros(),

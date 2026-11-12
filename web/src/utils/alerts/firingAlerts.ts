@@ -27,6 +27,7 @@ export interface FiringRow {
   folder_name: string;
   name: string;
   alert_type: string;
+  enabled?: boolean;
   stream_name?: string;
   priority?: number;
   last_outcome?: string;
@@ -75,14 +76,19 @@ export const durationLabel = (elapsedMs: number): string => {
 export const firingForLabel = (startedAtMicros: number | undefined, nowMs: number): string =>
   startedAtMicros === undefined ? "—" : durationLabel(nowMs - startedAtMicros / 1000);
 
+// Disabling keeps the stored firing on purpose, so the list is what hides it.
+const isLive = (row: FiringRow): boolean => row.enabled !== false;
+
 /** The list's open-firing rule: an errored run during a firing observed no recovery. */
 export const isFiringNow = (row: FiringRow): boolean =>
-  row.last_outcome === "firing" ||
-  row.last_outcome === "notify_failed" ||
-  row.firing_started_at != null ||
-  (row.last_outcome === "error" && (row.groups_firing ?? 0) > 0);
+  isLive(row) &&
+  (row.last_outcome === "firing" ||
+    row.last_outcome === "notify_failed" ||
+    row.firing_started_at != null ||
+    (row.last_outcome === "error" && (row.groups_firing ?? 0) > 0));
 
-const isNotDelivered = (row: FiringRow): boolean => row.last_outcome === "notify_failed";
+const isNotDelivered = (row: FiringRow): boolean =>
+  isLive(row) && row.last_outcome === "notify_failed";
 
 // Partly acked stays actionable: a page keeps paging while any group is unacked.
 const isFullyAcked = (row: FiringRow): boolean => {

@@ -1712,7 +1712,9 @@
       "rerunCancelled": "{elapsed} 후에 다시 실행이 취소되었습니다. 이전 결과를 표시합니다.",
       "rerunCancelledNow": "다시 실행이 취소되었습니다. 이전 결과를 표시합니다.",
       "analyzeSucceeded": "마지막 실행 성공",
-      "analyzeFailedShort": "마지막 실행 실패"
+      "analyzeFailedShort": "마지막 실행 실패",
+      "analyzeWarned": "마지막 실행이 경고와 함께 완료되었습니다",
+      "analyzePartial": "실행이 완료되었지만 결과가 불완전할 수 있습니다."
     },
     "errorDeletingSavedView": "저장된 뷰를 삭제하는 중 오류가 발생했습니다.",
     "errorCreatingSavedView": "저장된 뷰를 만드는 중 오류가 발생했습니다.",
@@ -3353,7 +3355,8 @@
         "edit": "편집",
         "identityRowForm": "이 카드에서는 첫 번째 식별된 이벤트부터 ID 규칙이 적용됩니다",
         "newUsersOnly": "신규 사용자만",
-        "newUsersSessionsTip": "신규 사용자만은 사용자 모드에서만 작동합니다"
+        "newUsersSessionsTip": "신규 사용자만은 사용자 모드에서만 작동합니다",
+        "fieldMissingOn": "{field}: 이 스트림에 없는 필드"
       },
       "appFilters": {
         "hiddenLabel": "앱 필터로 숨겨짐:",
@@ -13585,6 +13588,8 @@
     "sloColumn": "SLO",
     "sloKind": "조건 유형",
     "sloLongWindow": "긴 기간",
+    "configNotSet": "설정되지 않음",
+    "openSlo": "SLO 열기",
     "sloShortWindow": "짧은 기간",
     "sloCloneDisabled": "SLO 알림은 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다.",
     "seconds": "초",
@@ -16549,7 +16554,6 @@
     "errorSpans": "오류 스팬",
     "filterByErrors": "오류별 필터링",
     "clearErrorFilter": "오류 필터 지우기",
-    "updatingResults": "결과 업데이트 중",
     "error": "오류",
     "errorCount": "{n} 오류 | {n} 오류",
     "success": "성공",
@@ -32540,5 +32544,11 @@
     "recentRow": "최근 검색",
     "deletedQuery": "{query} 삭제됨",
     "undo": "실행 취소"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "패턴은 {max}자 이하로 입력하세요.",
+      "regexInvalid": "이 패턴은 잘못되었거나 지원되지 않습니다. 전방 탐색, 후방 탐색, 역참조는 사용할 수 없습니다."
+    }
   }
 }

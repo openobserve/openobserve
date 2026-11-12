@@ -21,7 +21,8 @@ import { useSanitizedHtml } from "../composables/useSanitizedHtml";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
-import { OTableCellActionsKey, OTableOverflowTooltipKey } from "../OTable.types";
+import { OTableCellActionsKey, OTableOverflowTooltipKey, OTableStaleKey } from "../OTable.types";
+import { injectContextMenuRootContext } from "reka-ui";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useI18nTyped } from "@/types/i18n";
@@ -303,11 +304,16 @@ function handleClick() {
 
 const { t } = useI18nTyped();
 
+const stale = inject(OTableStaleKey, null);
+const rowContextMenu = injectContextMenuRootContext(null);
+
 // Right-click. Emitted as plain values (not the TanStack cell) so a consumer's
 // context menu keeps rendering correctly even after the virtualizer recycles
-// the row underneath it. The event is NOT prevented — the consumer decides
+// the row underneath it. Outside a refetch the event is NOT prevented — the consumer decides
 // whether to open a menu or leave the native one alone.
-function handleContextMenu() {
+function handleContextMenu(event: MouseEvent) {
+  // The menu would act on a row about to be replaced; reka-ui skips opening a prevented event.
+  if (stale?.value && rowContextMenu) event.preventDefault();
   emit("cell-contextmenu", {
     columnId: props.cell.column.id,
     row: props.row.original,
@@ -457,6 +463,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
   <td
     ref="cellEl"
     :data-test="`o2-table-cell-${cell.column.id}`"
+    :inert="stale && isAction ? true : undefined"
     :class="[
       // Base text color for the whole cell so custom `#cell-*` slots (which skip
       // the default text wrapper) still inherit the theme-aware primary color
@@ -520,6 +527,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
           type="button"
           class="rounded-default text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body inline-flex h-4.5 w-4.5 cursor-pointer items-center justify-center border-0 bg-transparent p-0"
           :data-test="`o2-table-tree-toggle-${cell.column.id}`"
+          :aria-label="treeMeta?.isExpanded ? t('common.collapse') : t('common.expand')"
           :aria-expanded="treeMeta?.isExpanded ? 'true' : 'false'"
           @click="onTreeToggle"
         >

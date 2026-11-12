@@ -818,6 +818,8 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             });
 
             audit(AuditMessage {
+                login_ip: None,
+                user_agent: None,
                 user_email,
                 org_id,
                 _timestamp: now_micros(),
@@ -1425,6 +1427,8 @@ fn service_route_table() -> Router {
         .route("/{org_id}/llm/models/unpriced", get(model_pricing::list_unpriced))
         // AI data health checks (LLM Insights strip, instrument skill)
         .route("/{org_id}/gen_ai/data_health", get(gen_ai_health::get_data_health))
+        // Harness text hidden server side for Session Detail and the settings test
+        .route("/{org_id}/settings/gen_ai/harness_strip", post(openobserve_api_management::request::gen_ai::strip_harness_text))
         .route("/{org_id}/llm/models/test", post(model_pricing::test_model_match))
         .route("/{org_id}/llm/models/{model_id}", get(model_pricing::get).put(model_pricing::update).delete(model_pricing::delete))
 

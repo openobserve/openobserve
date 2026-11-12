@@ -1,8 +1,14 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
+const { getOrCreateRumToken } = require('../../../utils/rum-token-api.js');
+const { pinnedCdnSdkVersion } = require('../../../utils/rum-sdk-version.js');
+const { waitForStreamRows } = require('../../../utils/rum-stream-verify.js');
+const { validatedOrgId, validatedBaseUrl } = require('../../../utils/rum-env.js');
 
 const APP_DIR = path.resolve(__dirname, 'multi-tab-replay');
+const SDK_CACHE_DIR = path.resolve(__dirname, '../../../../node_modules/.cache/o2-rum-sdk');
 const CDN = 'https://browsersdk.openobserve.ai';
 const SDK_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
 const SDK_PATH_PATTERN = /^[A-Za-z0-9_-][A-Za-z0-9._-]*(\/[A-Za-z0-9_-][A-Za-z0-9._-]*)*\.js$/;
@@ -41,15 +47,78 @@ function fetchSdkFile(version, rel, cache) {
   return cache.get(key);
 }
 
+/** Renames the unpacked `pkgDir` to `dir` in whole, replacing once a `dir` that an older or interrupted unpack left without the bundle. */
+function installSdkPackage(pkgDir, dir, entry) {
+  try {
+    fs.renameSync(pkgDir, dir);
+    return;
+  } catch {
+    // Another worker renamed the same version in first, and its copy is identical.
+    if (fs.existsSync(entry)) return;
+  }
+  discardIncompleteSdkDir(dir, entry);
+  try {
+    fs.renameSync(pkgDir, dir);
+  } catch (err) {
+    if (!fs.existsSync(entry)) throw err;
+  }
+}
+
+// Moved aside before deletion, so a complete copy another worker renamed in meanwhile is put back instead of lost.
+function discardIncompleteSdkDir(dir, entry) {
+  const aside = `${dir}.stale-${process.pid}-${Date.now()}`;
+  try {
+    fs.renameSync(dir, aside);
+  } catch {
+    return;
+  }
+  if (fs.existsSync(path.join(aside, path.relative(dir, entry)))) {
+    try {
+      fs.renameSync(aside, dir);
+      return;
+    } catch {
+      // The target already holds another worker's complete copy, so this one is a duplicate.
+    }
+  }
+  fs.rmSync(aside, { recursive: true, force: true });
+}
+
+/** The SDK's browser bundle at `version`, unpacked once from its npm package, so serving it needs no CDN. */
+function localSdkBundleDir(version) {
+  if (!SDK_VERSION_PATTERN.test(version || '')) throw new Error(`sdkVersion must be x.y.z, got "${version}"`);
+  const dir = path.join(SDK_CACHE_DIR, version);
+  const entry = path.join(dir, 'bundle', 'openobserve-rum.js');
+  if (fs.existsSync(entry)) return path.dirname(entry);
+  fs.mkdirSync(SDK_CACHE_DIR, { recursive: true });
+  // Parallel workers each unpack into their own temp dir and rename it in whole, so none ever deletes or reads a half bundle.
+  const tmp = fs.mkdtempSync(path.join(SDK_CACHE_DIR, `${version}-`));
+  try {
+    const packed = execFileSync('npm', ['pack', `@openobserve/browser-rum@${version}`, '--json', '--pack-destination', tmp], { encoding: 'utf8', timeout: 120000 });
+    execFileSync('tar', ['-xzf', path.join(tmp, JSON.parse(packed)[0].filename), '-C', tmp]);
+    installSdkPackage(path.join(tmp, 'package'), dir, entry);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+  return path.dirname(entry);
+}
+
+function readLocalSdk(dir) {
+  const files = new Map([['openobserve-rum.js', fs.readFileSync(path.join(dir, 'openobserve-rum.js'))]]);
+  for (const name of fs.readdirSync(path.join(dir, 'chunks'))) {
+    files.set(`chunks/${name}`, fs.readFileSync(path.join(dir, 'chunks', name)));
+  }
+  return files;
+}
+
 function pageWithConfig(file, cfg) {
   const json = JSON.stringify(cfg).replace(/</g, '\\u003c');
   const html = fs.readFileSync(path.join(APP_DIR, file), 'utf8');
   return html.replace('<!--O2_CONFIG-->', () => `<script>window.__O2_CONFIG__=${json};</script>`);
 }
 
-/** Serves the two pages with the CDN SDK proxied same-origin, because the CDN's lazy recorder chunk fails a cross-origin import(). */
+/** Serves the two pages with the SDK same-origin, from `sdkDir` or proxied from the CDN, because the lazy recorder chunk fails a cross-origin import(). */
 function startMultiTabReplayServer(opts) {
-  if (!SDK_VERSION_PATTERN.test(opts.sdkVersion || '')) {
+  if (!opts.sdkDir && !SDK_VERSION_PATTERN.test(opts.sdkVersion || '')) {
     return Promise.reject(new Error(`sdkVersion must be x.y.z, got "${opts.sdkVersion}"`));
   }
   const cfg = {
@@ -62,6 +131,11 @@ function startMultiTabReplayServer(opts) {
   };
   const cache = new Map();
   // Files are read once here, so no part of a request URL ever reaches a filesystem path.
+  const local = opts.sdkDir ? readLocalSdk(opts.sdkDir) : null;
+  const sdkFile = (rel) => {
+    if (!local) return fetchSdkFile(opts.sdkVersion, rel, cache);
+    return local.has(rel) ? Promise.resolve(local.get(rel)) : Promise.reject(new Error(`${rel} is not in ${opts.sdkDir}`));
+  };
   const routes = new Map([
     ...Object.entries(PAGES).map(([url, file]) => [url, { type: 'text/html; charset=utf-8', body: pageWithConfig(file, cfg) }]),
     ...Object.entries(STATIC).map(([url, [file, type]]) => [url, { type, body: fs.readFileSync(path.join(APP_DIR, file)) }]),
@@ -80,7 +154,7 @@ function startMultiTabReplayServer(opts) {
         res.writeHead(404).end('Not found');
         return;
       }
-      const body = await fetchSdkFile(opts.sdkVersion, rel, cache);
+      const body = await sdkFile(rel);
       res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8' }).end(body);
     } catch (err) {
       res.writeHead(502).end(String(err && err.message));
@@ -95,8 +169,8 @@ function startMultiTabReplayServer(opts) {
         origin,
         ordersUrl: `${origin}/orders.html`,
         catalogueUrl: `${origin}/catalogue.html`,
-        sdkUrl: `${CDN}/${opts.sdkVersion}/openobserve-rum.js`,
-        sdkDownloadError: () => fetchSdkFile(opts.sdkVersion, 'openobserve-rum.js', cache).then(() => '', (err) => String(err?.message || err)),
+        sdkUrl: opts.sdkDir ? path.join(opts.sdkDir, 'openobserve-rum.js') : `${CDN}/${opts.sdkVersion}/openobserve-rum.js`,
+        sdkDownloadError: () => sdkFile('openobserve-rum.js').then(() => '', (err) => String(err?.message || err)),
         close: () => new Promise((done) => server.close(() => done())),
       });
     });
@@ -180,4 +254,125 @@ async function recordTwoTabSession(context, server, org) {
   };
 }
 
-module.exports = { startMultiTabReplayServer, recordTwoTabSession, ORDERS_TAB, CATALOGUE_TAB };
+/** Answers the `dropUpload`-th replay upload (1-based) with a fake 200, so that segment never reaches storage; 0 drops none. */
+async function dropReplayUpload(page, dropUpload) {
+  let uploads = 0;
+  await page.route(/\/rum\/v1\/[^/]+\/replay/, (route) => {
+    uploads += 1;
+    return uploads === dropUpload ? route.fulfill({ status: 200, body: '{}' }) : route.continue();
+  });
+}
+
+async function waitForRecorder(page, url) {
+  const recorder = page.waitForResponse((r) => r.url().includes('/sdk/chunks/recorder-') && r.ok(), { timeout: 30000 });
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  await recorder;
+  await page.waitForFunction(() => Boolean(window.O2_RUM?.getInternalContext()?.session_id), null, { timeout: 30000 });
+}
+
+/** Records one tab that places orders over `ordersSegments` uploads, then moves to the catalogue page, which opens a new view with a fresh full snapshot. */
+async function recordPageChangeSession(context, server, org, { dropUpload = 0, ordersSegments = 3 } = {}) {
+  const page = await context.newPage();
+  await dropReplayUpload(page, dropUpload);
+  let uploads = 0;
+  await waitForRecorder(page, server.ordersUrl);
+  for (let i = 0; i < ordersSegments; i += 1) {
+    const upload = nextReplayUpload(page, org);
+    await placeOrders(page, 2);
+    await upload;
+    uploads += 1;
+  }
+  const orders = await rumContext(page);
+
+  await waitForRecorder(page, server.catalogueUrl);
+  const catalogueUpload = nextReplayUpload(page, org);
+  await browseProducts(page, PLAN.products);
+  await catalogueUpload;
+  // A live session's newest segment is held back by the player, so one more segment must follow the last product.
+  const trailing = nextReplayUpload(page, org);
+  await page.locator(SELECTORS.heading).hover();
+  await page.locator(SELECTORS.nextProductBtn).hover();
+  await trailing;
+  uploads += 2;
+  const catalogue = await rumContext(page);
+  await page.close();
+  return {
+    sessionId: catalogue.session_id,
+    ordersViewId: orders.view.id,
+    catalogueViewId: catalogue.view.id,
+    sameSession: orders.session_id === catalogue.session_id,
+    uploads,
+  };
+}
+
+/** Records each scenario's options as its own page-change session, in a fresh context, with the SDK served from its local bundle. */
+async function recordPageChangeScenarios(browser, scenarios, { appId }) {
+  const base = validatedBaseUrl();
+  const org = validatedOrgId();
+  const tokenPage = await browser.newPage();
+  const clientToken = await getOrCreateRumToken(tokenPage).finally(() => tokenPage.close());
+  if (!clientToken) throw new Error('Precondition: a RUM token must exist');
+
+  const server = await startMultiTabReplayServer({
+    clientToken,
+    org,
+    site: base.replace(/^https?:\/\//, ''),
+    insecureHTTP: base.startsWith('http://'),
+    service: appId,
+    applicationId: appId,
+    // The player is under test, not the SDK delivery, so a CDN outage must not fail the recording.
+    sdkDir: localSdkBundleDir(pinnedCdnSdkVersion()),
+  });
+  try {
+    const sdkError = await server.sdkDownloadError();
+    if (sdkError) throw new Error(`The RUM browser SDK could not be loaded from ${server.sdkUrl}, so no replay can be recorded: ${sdkError}`);
+    const sessions = {};
+    for (const [name, opts] of Object.entries(scenarios)) {
+      const context = await browser.newContext();
+      try {
+        sessions[name] = await recordPageChangeSession(context, server, org, opts);
+      } finally {
+        await context.close();
+      }
+    }
+    return sessions;
+  } finally {
+    await server.close();
+  }
+}
+
+/** Waits for a recorded session's `stored` segments in _sessionreplay and returns its playable span and each view's segment indexes. */
+async function readStoredReplay(browser, recorded, stored) {
+  const probe = await browser.newPage();
+  let rows;
+  try {
+    rows = await waitForStreamRows(probe, {
+      sql: `SELECT start, view_id, index_in_view FROM "_sessionreplay" WHERE session_id = '${recorded.sessionId}' ORDER BY start`,
+      minRows: stored,
+      timeoutMs: 60000,
+    });
+  } finally {
+    await probe.close();
+  }
+  const starts = rows.map((r) => Number(r.start));
+  const firstStartMs = Math.min(...starts);
+  const viewIndexes = (viewId) => rows.filter((r) => r.view_id === viewId).map((r) => Number(r.index_in_view)).sort((a, b) => a - b);
+  return {
+    firstStartMs,
+    // A live session's newest segment is held back by the player, so the last start bounds what can play.
+    playableEndSec: Math.floor((Math.max(...starts) - firstStartMs) / 1000) - 1,
+    ordersIndexes: viewIndexes(recorded.ordersViewId),
+    catalogueIndexes: viewIndexes(recorded.catalogueViewId),
+  };
+}
+
+module.exports = {
+  startMultiTabReplayServer,
+  localSdkBundleDir,
+  recordTwoTabSession,
+  recordPageChangeSession,
+  recordPageChangeScenarios,
+  readStoredReplay,
+  ORDERS_TAB,
+  CATALOGUE_TAB,
+};

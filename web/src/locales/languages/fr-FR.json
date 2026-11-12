@@ -1712,7 +1712,9 @@
       "rerunCancelled": "Nouvelle exécution annulée après {elapsed}. Affichage des résultats précédents.",
       "rerunCancelledNow": "Nouvelle exécution annulée. Affichage des résultats précédents.",
       "analyzeSucceeded": "La dernière exécution a réussi",
-      "analyzeFailedShort": "La dernière exécution a échoué"
+      "analyzeFailedShort": "La dernière exécution a échoué",
+      "analyzeWarned": "Dernière exécution terminée avec des avertissements",
+      "analyzePartial": "L'exécution est terminée, mais ses résultats peuvent être incomplets."
     },
     "errorDeletingSavedView": "Erreur lors de la suppression de la vue enregistrée.",
     "errorCreatingSavedView": "Erreur lors de la création de la vue enregistrée.",
@@ -3353,7 +3355,8 @@
         "edit": "Modifier",
         "identityRowForm": "Sur cette carte, les règles d'identité s'appliquent à partir du premier événement identifié",
         "newUsersOnly": "Nouveaux utilisateurs uniquement",
-        "newUsersSessionsTip": "Nouveaux utilisateurs uniquement fonctionne en mode Utilisateurs"
+        "newUsersSessionsTip": "Nouveaux utilisateurs uniquement fonctionne en mode Utilisateurs",
+        "fieldMissingOn": "{field}: champ absent de ce flux"
       },
       "appFilters": {
         "hiddenLabel": "Masqué par les filtres d'application :",
@@ -13585,6 +13588,8 @@
     "sloColumn": "SLO",
     "sloKind": "Type de condition",
     "sloLongWindow": "Fenêtre longue",
+    "configNotSet": "Non défini",
+    "openSlo": "Ouvrir le SLO",
     "sloShortWindow": "Fenêtre courte",
     "sloCloneDisabled": "Les alertes SLO sont créées sur leur page SLO, elles ne peuvent donc pas être clonées depuis ici.",
     "seconds": "Secondes",
@@ -16549,7 +16554,6 @@
     "errorSpans": "Spans d'erreur",
     "filterByErrors": "Filtrer par erreur",
     "clearErrorFilter": "Effacer le filtre d'erreur",
-    "updatingResults": "Mise à jour des résultats",
     "error": "ERREUR",
     "errorCount": "{n} ERREUR | {n} ERREURS",
     "success": "SUCCÈS",
@@ -32540,5 +32544,11 @@
     "recentRow": "Recherche récente",
     "deletedQuery": "Recherche supprimée : {query}",
     "undo": "Annuler"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Limitez le motif à {max} caractères.",
+      "regexInvalid": "Ce motif est invalide ou non pris en charge. Les assertions avant, les assertions arrière et les références arrière ne peuvent pas être utilisées."
+    }
   }
 }

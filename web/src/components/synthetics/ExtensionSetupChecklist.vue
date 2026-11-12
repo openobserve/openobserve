@@ -291,7 +291,7 @@ function refreshPage() {
           <OIcon
             name="progress-activity"
             size="sm"
-            class="flex-shrink-0 animate-spin"
+            class="o2-motion-keep flex-shrink-0 animate-spin"
             aria-hidden="true"
           />
           {{

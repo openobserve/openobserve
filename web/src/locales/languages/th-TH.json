@@ -1712,7 +1712,9 @@
       "rerunCancelled": "ยกเลิกการรันใหม่หลังจาก {elapsed} กำลังแสดงผลลัพธ์ก่อนหน้า",
       "rerunCancelledNow": "ยกเลิกการรันใหม่แล้ว กำลังแสดงผลลัพธ์ก่อนหน้า",
       "analyzeSucceeded": "การรันครั้งล่าสุดสำเร็จ",
-      "analyzeFailedShort": "การรันครั้งล่าสุดล้มเหลว"
+      "analyzeFailedShort": "การรันครั้งล่าสุดล้มเหลว",
+      "analyzeWarned": "การรันล่าสุดเสร็จสิ้นพร้อมคำเตือน",
+      "analyzePartial": "การรันเสร็จสิ้นแล้ว แต่ผลลัพธ์อาจไม่ครบถ้วน"
     },
     "errorDeletingSavedView": "Error while deleting saved view.",
     "errorCreatingSavedView": "Error while creating saved view.",
@@ -13583,6 +13585,8 @@
     "sloColumn": "SLO",
     "sloKind": "Condition type",
     "sloLongWindow": "Long window",
+    "configNotSet": "ไม่ได้ตั้งค่า",
+    "openSlo": "เปิด SLO",
     "sloShortWindow": "Short window",
     "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here.",
     "seconds": "Seconds",
@@ -16547,7 +16551,6 @@
     "errorSpans": "Error Spans",
     "filterByErrors": "Filter by errors",
     "clearErrorFilter": "Clear error filter",
-    "updatingResults": "กำลังอัปเดตผลลัพธ์",
     "error": "ERROR",
     "errorCount": "{n} ERROR | {n} ERRORS",
     "success": "SUCCESS",

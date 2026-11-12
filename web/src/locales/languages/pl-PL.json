@@ -1712,7 +1712,9 @@
       "rerunCancelled": "Ponowne uruchomienie anulowano po {elapsed}. Wyświetlane są poprzednie wyniki.",
       "rerunCancelledNow": "Ponowne uruchomienie anulowano. Wyświetlane są poprzednie wyniki.",
       "analyzeSucceeded": "Ostatnie uruchomienie powiodło się",
-      "analyzeFailedShort": "Ostatnie uruchomienie nie powiodło się"
+      "analyzeFailedShort": "Ostatnie uruchomienie nie powiodło się",
+      "analyzeWarned": "Ostatnie uruchomienie zakończone z ostrzeżeniami",
+      "analyzePartial": "Uruchomienie zakończyło się, ale wyniki mogą być niepełne."
     },
     "errorDeletingSavedView": "Błąd podczas usuwania zapisanego widoku.",
     "errorCreatingSavedView": "Błąd podczas tworzenia zapisanego widoku.",
@@ -3353,7 +3355,8 @@
         "edit": "Edytuj",
         "identityRowForm": "Na tej karcie reguły tożsamości działają od pierwszego zidentyfikowanego zdarzenia",
         "newUsersOnly": "Tylko nowi użytkownicy",
-        "newUsersSessionsTip": "Opcja „Tylko nowi użytkownicy” działa tylko w trybie Użytkownicy"
+        "newUsersSessionsTip": "Opcja „Tylko nowi użytkownicy” działa tylko w trybie Użytkownicy",
+        "fieldMissingOn": "{field}: pole nie występuje w tym strumieniu"
       },
       "appFilters": {
         "hiddenLabel": "Ukryte przez filtry aplikacji:",
@@ -13585,6 +13588,8 @@
     "sloColumn": "SLO",
     "sloKind": "Typ warunku",
     "sloLongWindow": "Długie okno",
+    "configNotSet": "Nie ustawiono",
+    "openSlo": "Otwórz SLO",
     "sloShortWindow": "Krótkie okno",
     "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować.",
     "seconds": "Sekundy",
@@ -16549,7 +16554,6 @@
     "errorSpans": "Spany z błędami",
     "filterByErrors": "Filtruj według błędów",
     "clearErrorFilter": "Wyczyść filtr błędów",
-    "updatingResults": "Aktualizowanie wyników",
     "error": "BŁĄD",
     "errorCount": "{n} BŁĄD | BŁĘDY: {n}",
     "success": "SUKCES",
@@ -32540,5 +32544,11 @@
     "recentRow": "Ostatnie wyszukiwanie",
     "deletedQuery": "Usunięto {query}",
     "undo": "Cofnij"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Wzorzec może mieć najwyżej {max} znaków.",
+      "regexInvalid": "Ten wzorzec jest nieprawidłowy lub nieobsługiwany. Nie można używać lookahead, lookbehind ani odwołań wstecznych."
+    }
   }
 }

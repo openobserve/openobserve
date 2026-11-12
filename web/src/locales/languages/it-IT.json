@@ -1712,7 +1712,9 @@
       "rerunCancelled": "Nuova esecuzione annullata dopo {elapsed}. Vengono mostrati i risultati precedenti.",
       "rerunCancelledNow": "Nuova esecuzione annullata. Vengono mostrati i risultati precedenti.",
       "analyzeSucceeded": "Ultima esecuzione riuscita",
-      "analyzeFailedShort": "Ultima esecuzione non riuscita"
+      "analyzeFailedShort": "Ultima esecuzione non riuscita",
+      "analyzeWarned": "Ultima esecuzione completata con avvisi",
+      "analyzePartial": "L'esecuzione è terminata, ma i risultati potrebbero essere incompleti."
     },
     "errorDeletingSavedView": "Errore durante l'eliminazione della vista salvata.",
     "errorCreatingSavedView": "Errore durante la creazione della vista salvata.",
@@ -3353,7 +3355,8 @@
         "edit": "Modifica",
         "identityRowForm": "In questa scheda, le regole di identità si applicano dal primo evento identificato",
         "newUsersOnly": "Solo nuovi utenti",
-        "newUsersSessionsTip": "Solo nuovi utenti funziona solo in modalità Utenti"
+        "newUsersSessionsTip": "Solo nuovi utenti funziona solo in modalità Utenti",
+        "fieldMissingOn": "{field}: campo non presente in questo stream"
       },
       "appFilters": {
         "hiddenLabel": "Nascosto dai filtri dell'app:",
@@ -13585,6 +13588,8 @@
     "sloColumn": "SLO",
     "sloKind": "Tipo di condizione",
     "sloLongWindow": "Finestra lunga",
+    "configNotSet": "Non impostato",
+    "openSlo": "Apri SLO",
     "sloShortWindow": "Finestra breve",
     "sloCloneDisabled": "Gli avvisi SLO vengono creati nella loro pagina SLO, quindi non possono essere clonati da qui.",
     "seconds": "Secondi",
@@ -16549,7 +16554,6 @@
     "errorSpans": "Span con errore",
     "filterByErrors": "Filtra per errori",
     "clearErrorFilter": "Cancella filtro errori",
-    "updatingResults": "Aggiornamento risultati",
     "error": "ERRORE",
     "errorCount": "{n} ERRORE | {n} ERRORI",
     "success": "SUCCESSO",
@@ -32540,5 +32544,11 @@
     "recentRow": "Ricerca recente",
     "deletedQuery": "Eliminata {query}",
     "undo": "Annulla"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Usa al massimo {max} caratteri nel pattern.",
+      "regexInvalid": "Questo pattern non è valido o non è supportato. Non è possibile usare lookahead, lookbehind e riferimenti all'indietro."
+    }
   }
 }

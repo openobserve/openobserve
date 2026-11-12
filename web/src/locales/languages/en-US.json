@@ -772,6 +772,13 @@
     }
   },
   "common": {
+    "loadingNoun": "Loading {noun}…",
+    "loadingNouns": {
+      "spans": "spans",
+      "traces": "traces",
+      "logs": "logs",
+      "charts": "charts"
+    },
     "dismiss": "Dismiss",
     "exitFullscreen": "Exit full screen",
     "moreActions": "More actions",
@@ -1050,6 +1057,7 @@
       "redirecting": "Redirecting..."
     },
     "copied": "Copied",
+    "couldntCopy": "Couldn't copy",
     "copiedExclaim": "Copied!",
     "clearAll": "Clear All",
     "unknown": "Unknown",
@@ -1241,6 +1249,98 @@
       "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser, or discard them.",
       "retentionInBrowser": "Changes are kept in this browser for {days} days, or until you sign out. Only the {max} newest of each kind are kept.",
       "dotUndated": "Unsaved draft"
+    }
+  },
+  "filterBar": {
+    "ariaLabel": "Filter by field",
+    "placeholder": "Filter by field, or type field=value. Press Enter to run",
+    "addFilter": "Add filter",
+    "searchFields": "Search fields",
+    "searchLabels": "Search labels",
+    "searchOperators": "Search conditions",
+    "searchValue": "Search or type a value",
+    "searchValues": "Search values",
+    "textField": "Text",
+    "useValue": "Use \"{value}\"",
+    "useField": "Use field \"{field}\"",
+    "useLabel": "Use label \"{field}\"",
+    "searchText": "Search all text for \"{text}\"",
+    "emptyValue": "(empty)",
+    "loadingFields": "Loading fields…",
+    "noFields": "No matching fields",
+    "noValues": "No suggestions. Type a value and press Enter",
+    "noOperators": "No matching conditions",
+    "removeFilter": "Remove filter",
+    "clearAll": "Clear all filters",
+    "toggleConnector": "Switch between AND and OR",
+    "selectedCount": "No values selected | {count} value selected | {count} values selected",
+    "query": "Query",
+    "builderTooltip": "Build filters by picking fields, conditions and values",
+    "queryTooltip": "Write the query yourself",
+    "queryNotParsableShort": "The builder can't show this query:",
+    "clearAndBuild": "Clear and build",
+    "where": "Where",
+    "addCondition": "Add condition",
+    "addGroup": "Add group",
+    "startGroup": "Start a group",
+    "addBelow": "Add condition below",
+    "ungroup": "Ungroup",
+    "collapseGroup": "Collapse group",
+    "expandGroup": "Expand group",
+    "moreInGroup": "{count} more",
+    "groupHasIssues": "Something in this group needs fixing",
+    "chooseField": "Choose a field",
+    "chooseValue": "Choose a value",
+    "lockedFilter": "This filter can't be edited here. It is kept as saved; remove it to drop it",
+    "limits": {
+      "conditions": "Up to {count} filter | Up to {count} filters",
+      "values": "Up to {count} value | Up to {count} values"
+    },
+    "validation": {
+      "incomplete": "Finish this filter or remove it",
+      "required": "Add at least one filter",
+      "uniqueField": "{field} already has a filter; edit that one or remove this one",
+      "oneUsageCondition": "A tier takes one usage condition; turn this one into a rule or remove it",
+      "rumField": "Use a built-in field or a column of lowercase letters, digits and underscores, up to 128 characters",
+      "valueLength": "Each value needs 1 to {max} characters",
+      "regexLength": "Keep the pattern to {max} characters or fewer",
+      "regexInvalid": "This pattern is invalid or not supported. Lookahead, lookbehind and backreferences cannot be used."
+    },
+    "operatorNames": {
+      "containsIgnoreCase": "Contains (ignore case)",
+      "notStartsWith": "Not Starts With",
+      "notEndsWith": "Not Ends With",
+      "isEmpty": "Is Empty",
+      "isNotEmpty": "Is Not Empty"
+    },
+    "types": {
+      "string": "Text",
+      "number": "Number",
+      "boolean": "Boolean"
+    },
+    "operators": {
+      "eq": "is",
+      "neq": "is not",
+      "gt": "greater than",
+      "gte": "greater than or equal",
+      "lt": "less than",
+      "lte": "less than or equal",
+      "contains": "contains",
+      "containsIgnoreCase": "contains, ignoring case",
+      "notContains": "does not contain",
+      "startsWith": "starts with",
+      "notStartsWith": "does not start with",
+      "endsWith": "ends with",
+      "notEndsWith": "does not end with",
+      "in": "is any of",
+      "notIn": "is none of",
+      "regex": "matches regex",
+      "notRegex": "does not match regex",
+      "isNull": "has no value",
+      "isNotNull": "has a value",
+      "isEmpty": "is blank or has no value",
+      "isNotEmpty": "has a value that is not blank",
+      "matchAll": "matches text"
     }
   },
   "flow": {
@@ -1712,7 +1812,9 @@
       "rerunCancelled": "Re-run cancelled after {elapsed}. Showing the previous results.",
       "rerunCancelledNow": "Re-run cancelled. Showing the previous results.",
       "analyzeSucceeded": "Last run succeeded",
-      "analyzeFailedShort": "Last run failed"
+      "analyzeFailedShort": "Last run failed",
+      "analyzeWarned": "Last run finished with warnings",
+      "analyzePartial": "The run finished, but its results may be incomplete."
     },
     "errorDeletingSavedView": "Error while deleting saved view.",
     "errorCreatingSavedView": "Error while creating saved view.",
@@ -3302,6 +3404,7 @@
         "inThisView": "In this view",
         "pagesFunnelNote": "A funnel step that names a hidden page still matches.",
         "fieldMissing": "field not in this stream",
+        "fieldMissingOn": "{field}: field not in this stream",
         "field": "Field",
         "match": "Match",
         "values": "Values",
@@ -11524,6 +11627,13 @@
     }
   },
   "alerts": {
+    "rowAction": {
+      "leftFilter": "No longer matches filter",
+      "pausedLeftFilter": "{name} paused. No longer matches filter | {count} alerts paused. No longer match filter",
+      "resumedLeftFilter": "{name} resumed. No longer matches filter | {count} alerts resumed. No longer match filter",
+      "bulkPauseFailed": "{failed} of {total} alert couldn't be paused | {failed} of {total} alerts couldn't be paused",
+      "bulkResumeFailed": "{failed} of {total} alert couldn't be resumed | {failed} of {total} alerts couldn't be resumed"
+    },
     "firing": {
       "title": "Firing",
       "drawer": {
@@ -13526,6 +13636,10 @@
           "noStream": "Pick a stream first",
           "errorCount": "Error count",
           "errorRate": "Error rate"
+        },
+        "ai": {
+          "label": "Create alert",
+          "toast": "Imported from AI Observability: \"{sourceLabel}\""
         }
       },
       "warnings": {
@@ -13553,6 +13667,8 @@
         "dbmServerVantage": "This measures what the database server itself reported about locks, not how long your application waited. Do not compare it with query latency alerts.",
         "dbmLockSampling": "Lock activity is sampled on an interval, so contention that started and cleared between two samples was never recorded. A quiet alert is not proof there was no blocking.",
         "dbmNoInstance": "No single database instance was identified, so this alert watches every instance of this engine.",
+        "aiAllAgents": "No agent was in scope, so this alert watches every agent on the stream, one row per agent.",
+        "aiAllAgentsByModel": "No agent was in scope, so this alert watches every agent on the stream, one row per model.",
         "rumFunnelSnapshot": "This alert keeps a copy of the funnel's SQL. Later edits to the funnel or its named events do not change it.",
         "rumFunnelSteps": "A funnel needs at least two steps before it can alert on conversion.",
         "textFilterDropped": "Your search filter was not carried over because this stream has no full-text search (FTS) fields. Add it to the alert query if you need it.",
@@ -13583,6 +13699,8 @@
     "sloColumn": "SLO",
     "sloKind": "Condition type",
     "sloLongWindow": "Long window",
+    "configNotSet": "Not set",
+    "openSlo": "Open SLO",
     "sloShortWindow": "Short window",
     "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here.",
     "seconds": "Seconds",
@@ -14193,7 +14311,8 @@
       "webhookOnly": "(webhook only)",
       "emailOnly": "(email only)",
       "snsOnly": "(SNS only)",
-      "stale": "Template {name} no longer exists. Pick another one or clear the field.",
+      "stale": "Template {name} is not available for this kind. Pick another one or clear the field.",
+      "clear": "Clear",
       "willUse": "Will use: {template}",
       "willUsePerDestination": "Will use, per destination:",
       "willUseRow": "{destination}: {template}",
@@ -14402,7 +14521,7 @@
     "systemReadOnlyEdit": "Prebuilt template — editing is disabled. Clone it to make a modifiable copy.",
     "systemReadOnlyDelete": "Prebuilt template — deleting is disabled. Clone it to make a modifiable copy.",
     "prebuiltBadge": "Prebuilt",
-    "prebuiltBadgeHint": "Managed by the system. You can edit, but deletion is disabled.",
+    "prebuiltBadgeHint": "Managed by the system. You cannot edit or delete it. Clone it to make a modifiable copy.",
     "customBadge": "Custom",
     "filterAll": "All",
     "filterPrebuilt": "Prebuilt",
@@ -14537,6 +14656,7 @@
     "appliesToInferred": "Inferred from the variables in the body",
     "appliesToManual": "Chosen by you",
     "appliesToReset": "Reset to inferred",
+    "appliesToAllHint": "No kind is ticked, so this template applies to all kinds.",
     "previewKind": "Kind",
     "previewForbidden": "You do not have permission to preview templates",
     "previewFailed": "Preview failed: {message}",
@@ -14981,7 +15101,9 @@
           "empty": "No related metrics",
           "sharedLabels": "Shares {labels}",
           "noSharedLabels": "No shared labels"
-        }
+        },
+        "previewStatus": "Showing list preview · loading full chart",
+        "previewKept": "Showing list preview"
       },
       "variants": {
         "stddev": "Std dev",
@@ -15315,7 +15437,7 @@
     "groupGeneral": "General",
     "groupAccessSecurity": "Access & Security",
     "groupDestinations": "Destinations",
-    "groupDataAI": "Data & AI",
+    "groupData": "Data",
     "groupOperations": "Operations",
     "groupSynthetics": "Synthetics",
     "groupIntegrations": "Integrations",
@@ -15333,7 +15455,6 @@
     "storageSettingsDesc": "Per-organization storage configuration",
     "modelPricingDesc": "LLM model cost configuration",
     "correlationSettingsDesc": "Telemetry correlation configuration",
-    "llmProvidersDesc": "LLM providers for online evaluations",
     "queryManagementDesc": "Inspect and cancel running queries",
     "nodesDesc": "Cluster nodes and their health",
     "licenseDesc": "Enterprise license details",
@@ -15478,37 +15599,6 @@
     "errorUpdatingImage": "Error while updating image.",
     "fileFormatConstraint": "(Only .png, .jpg, .jpeg, .gif, .bmp formats & Max Size: 150x30px)",
     "filesValidationFailed": "{count} file did not pass validation constraints | {count} files did not pass validation constraints",
-    "genAiAgentMapping": {
-      "tabLabel": "GenAI Agent Mapping",
-      "title": "GenAI Agent Mapping",
-      "description": "Configure fallback telemetry attributes used to normalize agent identity for LLM traces and evaluations.",
-      "agentNameFields": "Agent name fallback fields",
-      "agentNameHelp": "Incoming attributes to use as fallbacks for gen_ai.agent.name.",
-      "agentNameInfo": "Checked only when the standard gen_ai.agent.name attribute is missing or empty. Add one incoming telemetry attribute per line.",
-      "agentIdFields": "Agent ID fallback fields",
-      "agentIdHelp": "Incoming attributes to use as fallbacks for gen_ai.agent.id.",
-      "agentIdInfo": "Checked only when the standard gen_ai.agent.id attribute is missing or empty. Add one incoming telemetry attribute per line.",
-      "envFields": "Environment fallback fields",
-      "envHelp": "Incoming attributes to use as the agent's environment.",
-      "envInfo": "Checked only when the standard deployment.environment.name attribute is missing or empty. Add one incoming telemetry attribute per line.",
-      "versionFields": "Version fallback fields",
-      "versionHelp": "Incoming attributes to use as the agent's version.",
-      "versionInfo": "Checked only when the standard gen_ai.agent.version attribute is missing or empty. Add one incoming telemetry attribute per line.",
-      "alwaysAppliedStandard": "Standard (checked first):",
-      "applyDefaults": "Apply defaults",
-      "resetToEmpty": "Reset to empty",
-      "clearRegistry": "Clear registry",
-      "clearRegistryTitle": "Clear agent registry?",
-      "clearRegistryDescription": "This deletes all discovered GenAI agent registry rows for this organization. New matching traces will repopulate the registry during ingestion.",
-      "clearRegistryConfirm": "Clear registry",
-      "saved": "GenAI agent mapping saved successfully",
-      "clearRegistrySuccess": "GenAI agent registry cleared. Deleted {deletedCount} stored agents and {bufferCount} queued observations.",
-      "loadFailed": "Failed to load GenAI agent mapping",
-      "saveFailed": "Failed to save GenAI agent mapping",
-      "clearRegistryFailed": "Failed to clear GenAI agent registry",
-      "defaultsLoadFailed": "Failed to load GenAI agent mapping defaults",
-      "defaultsFetchFailed": "Failed to fetch defaults ({status})"
-    },
     "correlation": {
       "identityConfigNoSets": "Configure at least one identity set before saving.",
       "discoveredServicesTab": "Discovered Services",
@@ -15615,9 +15705,6 @@
       "close": "Close",
       "fileCounterLabel": "{constraint} {filesNumber} file {'|'} {totalSize}"
     },
-    "llmProvidersSettings": {
-      "subtitle": "LLM providers for online evaluations"
-    },
     "modelPricingEditor": {
       "copySuffix": " (Copy)"
     },
@@ -15704,9 +15791,6 @@
       "alreadyExists": "Pattern \"{name}\" already exists. Please use a different name.",
       "importPatternFailed": "Failed to import pattern \"{name}\": {error}",
       "createFailed": "Regex pattern - {index}: \"{name}\" creation failed --> \n Reason: {error}"
-    },
-    "index": {
-      "genAiAgentMappingDesc": "Map GenAI spans to agent identifiers"
     },
     "organizationManagementPage": {
       "setUsageLimits": "Set Usage Limits",
@@ -16509,6 +16593,9 @@
     "noLogsAvailableForService": "No Logs available for this service",
     "noCorrelatedLogsFound": "No correlated logs found for this span",
     "spanHasNoLogsShowingTrace": "This span has no logs. Showing logs for the whole trace.",
+    "noLogStreamForTrace": "No log stream has logs for this trace.",
+    "openLogsTab": "Open Logs tab",
+    "findingLogsForTrace": "Finding logs for this trace…",
     "noData": {
       "title": "Start sending traces to {product}",
       "description": "No trace streams found in this organization yet. Instrument your services and traces will appear here automatically.",
@@ -16547,7 +16634,6 @@
     "errorSpans": "Error Spans",
     "filterByErrors": "Filter by errors",
     "clearErrorFilter": "Clear error filter",
-    "updatingResults": "Updating results",
     "error": "ERROR",
     "errorCount": "{n} ERROR | {n} ERRORS",
     "success": "SUCCESS",
@@ -16628,7 +16714,9 @@
         "title": "Match sessions whose user ID or conversation text contains the text",
         "noResultsTitle": "No sessions match your search",
         "noResultsDescription": "Try a different term, or a wider time range.",
-        "clear": "Clear search"
+        "clear": "Clear search",
+        "user": "User: {user}",
+        "clearUser": "Show all users"
       }
     },
     "sessionDetail": {
@@ -16652,6 +16740,9 @@
       },
       "expandToView": "Expand To View Response",
       "noTurnsMatch": "No Turns Match Your Filters",
+      "olderTurnsNotice": "Showing the newest {loaded} of {total} turns. Totals, errors and hotspots cover the loaded turns.",
+      "loadOlderTurns": "Load Older Turns",
+      "loadOlderTurnsFailed": "Failed to load older turns",
       "viewCollapsed": "Collapsed",
       "viewPretty": "Pretty",
       "rail": {
@@ -16660,7 +16751,8 @@
         "toolHotspots": "Tool Hotspots",
         "call": "{n} call | {n} calls",
         "usedIn": "Used In",
-        "noTools": "No Tool Calls In This Session"
+        "noTools": "No Tool Calls In This Session",
+        "toolsFailed": "Leaves out {n} turn whose spans failed to load | Leaves out {n} turns whose spans failed to load"
       },
       "kpi": {
         "turns": "Turns",
@@ -16672,11 +16764,15 @@
       },
       "kpiSub": {
         "turns": "Complete Session · {duration}",
+        "turnsLoaded": "Newest {loaded} Loaded · {duration}",
         "errorsLead": "{errors} of {total} · Turns",
+        "errorsLeadLoaded": "{errors} of {total} · Loaded Turns",
         "errorsLeadMany": "{errors} of {total} Turns",
+        "errorsLeadManyLoaded": "{errors} of {total} Loaded Turns",
         "filterErrors": "Filter Errors",
         "resetFilters": "Reset Filters",
         "errorsNone": "No Errors · {total} Turns",
+        "errorsNoneLoaded": "No Errors · {total} Loaded Turns",
         "latencyLead": "Avg Turn {avg} · Slowest {slowest} ·",
         "costLead": "Peak {peak} ·",
         "tokens": "{ratio}% Cached",
@@ -16698,6 +16794,7 @@
       "statusOk": "Ok",
       "statusError": "Error",
       "noUserMessage": "No user message captured for this turn.",
+      "spansFailed": "This turn's spans failed to load.",
       "noAssistantMessage": "No assistant response captured for this turn.",
       "roles": {
         "user": "User",
@@ -16850,15 +16947,6 @@
       "outputTokens": "Output Tokens",
       "cost": "Cost"
     },
-    "lLMErrorTable": {
-      "noData": "No data",
-      "noErrorsInRange": "No errors in this time range",
-      "loadFailed": "Could not load recent errors",
-      "time": "Time",
-      "service": "Service",
-      "operation": "Operation",
-      "traceId": "Trace ID"
-    },
     "lLMInsightsDashboard": {
       "stream": "Stream",
       "agent": "Agent",
@@ -16867,15 +16955,14 @@
       "failedToLoad": "Failed to load Insights",
       "retry": "Retry",
       "noAgentsInRange": "No Agents In This Range",
-      "noAgentsDescription": "No GenAI agents were detected for the selected time window. Try a wider range, switch to the Stream tab, or configure agent mapping in settings.",
+      "noAgentsDescription": "No GenAI agents were detected for the selected time window. Try a wider range, switch to the Stream tab, or configure Agent Mapping.",
       "viewByStream": "View by Stream",
       "totalCost": "Total Cost",
       "totalTokens": "Total Tokens",
       "totalTraces": "Total Traces",
       "p95Latency": "P95 Latency",
       "errorRate": "Error Rate",
-      "timeAxis": "Time",
-      "errorsSeries": "errors"
+      "timeAxis": "Time"
     },
     "searchBar": {
       "streamNotFound": "Stream not found"
@@ -16944,7 +17031,9 @@
       "openSpanDetails": "Open span details",
       "arguments": "Arguments",
       "result": "Result",
-      "empty": "(empty)"
+      "empty": "(empty)",
+      "noResult": "No result recorded",
+      "showJson": "Show all {n} lines"
     },
     "threadView": {
       "historicalIcon": "↶",
@@ -17854,6 +17943,7 @@
       "defaultTierPrices": "in {input} / out {output} per 1M",
       "notPriced": "not priced",
       "createPrice": "Create price",
+      "keepPricesButton": "Keep prices",
       "keepPrices": "Keep {name} prices",
       "mute": "Mute",
       "muteConfirmTitle": "Mute this model?",
@@ -17926,13 +18016,16 @@
       "monitor": "Monitor",
       "annotate": "Annotate",
       "evaluate": "Evaluate",
-      "experiment": "Experiment"
+      "experiment": "Experiment",
+      "configure": "Configure"
     },
     "nav": {
       "llmInsights": "Insights",
       "sessions": "Sessions",
       "agentGraph": "Agent Graph",
       "agentBehavior": "Agent Behavior",
+      "users": "Users",
+      "budgets": "Budgets",
       "discovery": "Discovery",
       "queues": "Queues",
       "datasets": "Datasets",
@@ -17943,7 +18036,11 @@
       "scoreConfigs": "Score Configs",
       "remoteTasks": "Remote Tasks",
       "playground": "Playground",
-      "prompts": "Prompts"
+      "prompts": "Prompts",
+      "agents": "Agents",
+      "costUsage": "Cost & Usage",
+      "evaluations": "Evaluations",
+      "tools": "Tools"
     },
     "promptManagement": {
       "subtitle": "Create, version, and release reusable prompts.",
@@ -18165,6 +18262,13 @@
       "tagsHelp": "Tags organize prompts. Labels such as production point to a specific version.",
       "settingsSaved": "Prompt settings saved.",
       "settingsSaveError": "Could not save prompt settings."
+    },
+    "itemSubtitle": {
+      "agents": "See what your agents call, and where they loop or fail",
+      "costUsage": "See who uses your agents, what they cost, and cap the spend",
+      "evaluations": "Score live traffic and run the jobs that score it",
+      "scorers": "The scorers that grade LLM outputs and the rubrics they score with",
+      "experiments": "Run agents over datasets, and the HTTP services they call"
     },
     "subtitle": {
       "llmInsights": "Track latency, errors, tokens, and cost across your LLM traffic",
@@ -18572,7 +18676,7 @@
         "providerEndpointLabel": "Endpoint:",
         "providerDefaultModelLabel": "Default model:",
         "providerHelp": "Choose the LLM Provider this experiment calls. Manage providers in {settingsLink}.",
-        "providerHelpSettingsLink": "Settings",
+        "providerHelpLink": "LLM Providers",
         "temperatureLabel": "Temperature",
         "temperatureHelp": "0–2. Higher varies the output.",
         "temperatureDeterministic": "0 — the model answers the same way every time.",
@@ -18685,6 +18789,8 @@
         "taskDistribution": "{succeeded} succeeded · {failed} failed · {pending} pending · {skipped} skipped",
         "scoreOutcomeDistribution": "{scored} scored · {failed} failed · {pending} pending · {skipped} skipped · {unscored} unscored",
         "scoringDistribution": "{success} successful · {failed} failed · {pending} pending · {skipped} skipped",
+        "clientScoresDistribution": "Reported by your code · {count} dimension | Reported by your code · {count} dimensions",
+        "clientScoreFooter": "{count} score · key {key} | {count} scores · key {key}",
         "compare": "Compare",
         "comparePicker": {
           "title": "Compare Against a Baseline",
@@ -18937,10 +19043,12 @@
       "env": "Env",
       "agent": "Agent",
       "version": "Version",
+      "stream": "Stream",
+      "streamHint": "This agent version sends traces to {count} streams. The one it has used longest is shown unless you pick another.",
       "agentIdHint": "Agent ID: {ids}",
       "noAgentIdentity": "No agent identity found",
       "noAgentIdentityDescription": "These LLM spans carry no agent name, so they are shown by stream. Map the attribute that names your agent to view them by agent.",
-      "noAgentIdentityAction": "Open GenAI Agent Mapping"
+      "noAgentIdentityAction": "Open Agent Mapping"
     },
     "agentGraph": {
       "stream": "Stream",
@@ -18956,35 +19064,45 @@
       },
       "tokenTrend": {
         "title": "Token trend",
-        "subtitle": "tokens by model"
-      },
-      "spanTrend": {
-        "title": "Span trend",
-        "subtitle": "span count by kind"
+        "subtitle": "input and output tokens",
+        "input": "Input",
+        "output": "Output"
       },
       "latencyByModel": {
-        "title": "Latency by model",
-        "subtitle": "p50 / p90 / p95 / p99"
+        "title": "Latency trend",
+        "subtitle": "p95 by model"
       },
       "tracesOverTime": {
-        "title": "Requests over time",
-        "subtitle": "request count by service"
+        "title": "Traces over time",
+        "subtitle": "OK and errored traces",
+        "ok": "OK",
+        "errored": "Errored"
       },
-      "errorsOverTime": {
-        "title": "Errors over time",
-        "subtitle": "error count"
+      "topErrors": {
+        "title": "Top errors",
+        "subtitle": "top 10 error messages by traces hit",
+        "empty": "No errors in this window",
+        "loadFailed": "Could not load the errors",
+        "noMessage": "No error message",
+        "columns": {
+          "message": "Error",
+          "where": "Where",
+          "traces": "Traces",
+          "last": "Last seen"
+        }
       },
-      "spansByModel": {
-        "title": "Spans by model",
-        "subtitle": "call count per model"
-      },
-      "tokensByModel": {
-        "title": "Tokens by model",
-        "subtitle": "total tokens per model"
-      },
-      "recentErrors": {
-        "title": "Recent errors",
-        "subtitle": "last 10 failed spans"
+      "failingTools": {
+        "title": "Failing tools",
+        "subtitle": "top 10 tools by failed calls",
+        "empty": "No tool call failed in this window",
+        "loadFailed": "Could not load the failing tools",
+        "columns": {
+          "tool": "Tool",
+          "failures": "Failed calls",
+          "rate": "Failure rate",
+          "traces": "Traces",
+          "last": "Last failure"
+        }
       }
     },
     "behavior": {
@@ -19017,12 +19135,12 @@
       "colErrors": "Errors",
       "detail": {
         "title": "Signal details",
-        "tracesTitle": "Traces",
+        "tracesTitle": "Traces with errors from this agent",
         "tracesHint": "Click a trace to open it",
         "worstLoopTraces": "Worst traces (most repeats first)",
         "topCostTraces": "Most expensive traces",
         "noTraces": "No traces found for this signal",
-        "errorsTitle": "What the errors say",
+        "errorsTitle": "All errors for this agent",
         "noErrors": "No error messages captured — open a trace to inspect",
         "colTraceId": "Trace",
         "colSpans": "Spans",
@@ -19036,8 +19154,10 @@
         "failHeadline": "{agent} hit {count} “{cls}” errors.",
         "costHeadline": "{agent}: ${cost} spend · {tokens} tokens · {errors} errors.",
         "loopExplain": "A high repeat rate usually means the agent isn't caching results or is retrying. Open the worst traces below to see the repeated calls.",
-        "failExplain": "These are the actual error messages behind this failure class — read them to find the fix, or open a trace to see where it happened.",
-        "costExplain": "These traces drove this agent's spend. Open the most expensive ones to see what ran."
+        "failExplain": "These are all of this agent's error messages, from every failure class, not only this one. Read them to find the fix, or open a trace to see where it happened.",
+        "costExplain": "These traces drove this agent's spend. Open the most expensive ones to see what ran.",
+        "explain": "Explain with O2 AI",
+        "explainHelp": "O2 AI investigates this signal from its error messages and worst traces, reaches past the AI spans into logs, metrics, Kubernetes and deploys, and cites its evidence."
       }
     },
     "versionCompare": {
@@ -19959,7 +20079,7 @@
         "producesEmpty": "This scorer doesn't write to any Score Config.",
         "promptSection": "Judge Prompt",
         "requestTemplateSection": "Request Template",
-        "variablesSuffix": "variables",
+        "variablesSuffix": "variable | variables",
         "outputSchemaSection": "Output Schema",
         "usedByIntro": "Jobs and experiments that reference this scorer.",
         "usedByEmpty": "No jobs or experiments reference this scorer yet.",
@@ -20021,7 +20141,7 @@
       },
       "noProviders": {
         "title": "Add a Provider First",
-        "description": "Scorers need an LLM Provider (OpenAI, Anthropic, etc.) to run. Add a provider in Settings before creating scorers."
+        "description": "Scorers need an LLM Provider (OpenAI, Anthropic, etc.) to run. Add one under LLM Providers before creating scorers."
       },
       "import": {
         "title": "Import Scorer",
@@ -20058,7 +20178,7 @@
       "editTitleLlm": "Update LLM Judge Scorer",
       "descriptionPlaceholder": "A short summary of what this scorer measures.",
       "providerHelp": "Choose the LLM Provider this judge calls. Manage providers in {settingsLink}.",
-      "providerHelpSettingsLink": "Settings",
+      "providerHelpLink": "LLM Providers",
       "refreshProviders": "Refresh Providers",
       "selectedPrefix": "Selected:",
       "endpointLabel": "Endpoint:",
@@ -20168,6 +20288,8 @@
         "emptySuffix": " to the scorer template to test with sample fields.",
         "runButton": "Run test",
         "disabledHint": "Fill in name, provider, template, and every variable value to run a test.",
+        "disabledHintCode": "Fill in name, the score function, and every variable value to run a test.",
+        "emptyCode": "Give function score(...) parameters, for example function score(output), to test it with sample values.",
         "stateRunning": "Running scorer test...",
         "successHeader": "Success",
         "errorHeader": "Test failed",
@@ -20363,7 +20485,7 @@
         }
       },
       "inputMapping": {
-        "title": "Prompt variables",
+        "title": "Scorer variables",
         "hint": {
           "span": "Map each variable to a span attribute.",
           "trace": "Map each variable to a system-provided value or span attribute.",
@@ -20377,7 +20499,7 @@
         },
         "selectScorers": "Select scorers to configure their mappings.",
         "noVariables": "This scorer has no template variables to map.",
-        "variableCount": "{count} variables",
+        "variableCount": "{count} variable | {count} variables",
         "systemProvided": {
           "about": "About system-provided values",
           "title": "{scope} system values",
@@ -20463,6 +20585,7 @@
           }
         },
         "matchedError": "Couldn't load the match count",
+        "noSessionColumn": "This stream has no session id column (session_id or gen_ai_conversation_id), so sessions can't be counted or estimated.",
         "matchedIncomplete": "Finish the filter condition to update the count.",
         "summaryTitle": "Summary",
         "summaryName": "Name",
@@ -20520,6 +20643,7 @@
   "llmProviders": {
     "tabLabel": "LLM Providers",
     "title": "LLM Providers",
+    "subtitle": "LLM providers for online evaluations",
     "newButton": "New Provider",
     "searchPlaceholder": "Search providers",
     "defaultBadge": "Default",
@@ -20534,6 +20658,45 @@
       "title": "No LLM Providers Yet",
       "description": "LLM Providers store the connection details (base URL + credentials) for the language models your LLM Judge scorers call. Add one to start running judge-based evaluations."
     }
+  },
+  "genAiAgentMapping": {
+    "tabLabel": "Agent Mapping",
+    "title": "Agent Mapping",
+    "subtitle": "How agent identity, cost attribution and session titles are read from telemetry",
+    "identity": {
+      "title": "Agent identity fields",
+      "help": "How OpenObserve names each agent and reads its environment and version. It reads the standard attribute first. When a span does not have it, the first fallback field the span carries is used.",
+      "agentName": "Agent name",
+      "agentId": "Agent ID",
+      "env": "Environment",
+      "version": "Version"
+    },
+    "agentNameFields": "Agent name fallback fields",
+    "agentNameHelp": "Incoming attributes to use as fallbacks for gen_ai.agent.name.",
+    "agentNameInfo": "Checked only when the standard gen_ai.agent.name attribute is missing or empty. Add one incoming telemetry attribute per line.",
+    "agentIdFields": "Agent ID fallback fields",
+    "agentIdHelp": "Incoming attributes to use as fallbacks for gen_ai.agent.id.",
+    "agentIdInfo": "Checked only when the standard gen_ai.agent.id attribute is missing or empty. Add one incoming telemetry attribute per line.",
+    "envFields": "Environment fallback fields",
+    "envHelp": "Incoming attributes to use as the agent's environment.",
+    "envInfo": "Checked only when the standard deployment.environment.name attribute is missing or empty. Add one incoming telemetry attribute per line.",
+    "versionFields": "Version fallback fields",
+    "versionHelp": "Incoming attributes to use as the agent's version.",
+    "versionInfo": "Checked only when the standard gen_ai.agent.version attribute is missing or empty. Add one incoming telemetry attribute per line.",
+    "alwaysAppliedStandard": "Standard (checked first):",
+    "applyDefaults": "Apply defaults",
+    "resetToEmpty": "Reset to empty",
+    "clearRegistry": "Clear registry",
+    "clearRegistryTitle": "Clear agent registry?",
+    "clearRegistryDescription": "This deletes all discovered GenAI agent registry rows for this organization. New matching traces will repopulate the registry during ingestion.",
+    "clearRegistryConfirm": "Clear registry",
+    "saved": "Agent mapping saved",
+    "unsavedConfirm": "Your agent mapping changes are not saved. Discard them?",
+    "clearRegistrySuccess": "GenAI agent registry cleared. Deleted {deletedCount} stored agents and {bufferCount} queued observations.",
+    "saveFailed": "Failed to save agent mapping",
+    "clearRegistryFailed": "Failed to clear GenAI agent registry",
+    "defaultsLoadFailed": "Failed to load agent mapping defaults",
+    "defaultsFetchFailed": "Failed to fetch defaults ({status})"
   },
   "logs": {
     "noData": {
@@ -20905,6 +21068,39 @@
       "notANumber": "{value} is text, but the field it is compared with holds numbers. Use a number without quotes.",
       "functionArgs": "The values passed to {name} don't match what the function accepts. Check how many values it takes and their types.",
       "notGrouped": "{name} is selected without being grouped or aggregated. Add it to {groupBy}, or remove it from the selected columns."
+    }
+  },
+  "dataAge": {
+    "updated": "Updated {time}",
+    "withZone": "{age} · {timeZone}",
+    "refreshUpdated": "Refresh, updated {time} {timeZone}",
+    "refreshFailed": "Refresh failed at {failedAt} · showing data from {dataFrom}",
+    "refreshFailedCharts": "Refresh failed at {failedAt} for {count} of {total} chart · showing data from {dataFrom} | Refresh failed at {failedAt} for {count} of {total} charts · showing data from {dataFrom}",
+    "refreshFailedShort": "Refresh failed"
+  },
+  "regionStatus": {
+    "elapsed": "{status} {seconds} s",
+    "searchingPartitions": "Searching {done} of {total} partitions · {seconds} s",
+    "stillLoading": "Still loading {noun}, {seconds} seconds",
+    "partitions": "{done} of {total} partitions",
+    "partialTooltip": "The search stopped after {done} of {total} partitions, so the count and rows cover only those. Narrow the time range to search everything.",
+    "found": "{count} {noun} found",
+    "foundPartial": "{count} {noun} found, partial: {done} of {total} partitions",
+    "rangeChange": "Showing last {from} · loading last {to}",
+    "rangeChangeSpoken": "Showing last {from}, loading last {to}",
+    "rangeSettled": "Charts updated for last {to}",
+    "chartsLoaded": "Charts loaded",
+    "rangeLength": {
+      "seconds": "{count} s",
+      "minutes": "{count} min",
+      "hours": "{count} h",
+      "days": "{count} d"
+    },
+    "rangeLengthSpoken": {
+      "seconds": "{count} second | {count} seconds",
+      "minutes": "{count} minute | {count} minutes",
+      "hours": "{count} hour | {count} hours",
+      "days": "{count} day | {count} days"
     }
   },
   "refreshButton": {
@@ -22850,6 +23046,14 @@
     }
   },
   "components": {
+    "value": {
+      "noValue": "No value",
+      "couldntLoad": "Couldn't load",
+      "couldntLoadTooltip": "Couldn't load: {cause}. Refresh to try again.",
+      "causeTimeout": "the request timed out",
+      "causeServer": "the server returned an error",
+      "causeAccess": "you don't have access to this data"
+    },
     "codeBlock": {
       "terminal": "Terminal",
       "tokenLink": "org token · {name}",
@@ -23357,6 +23561,9 @@
         "past": "Past days",
         "ended": "Ended"
       }
+    },
+    "chartPlaceholder": {
+      "loading": "Loading chart"
     }
   },
   "functions": {
@@ -31184,6 +31391,560 @@
       "remindFailed": "Could not send reminders"
     }
   },
+  "readableSessions": {
+    "title": "Title",
+    "hidden": "{n} harness block hidden | {n} harness blocks hidden",
+    "onlyHarness": "Only harness text: {tag}",
+    "show": "Show",
+    "settings": {
+      "title": "Harness text by agent",
+      "help": "Text matching these patterns is hidden in session titles, first messages and turn previews. Stored spans are not changed.",
+      "addAgent": "Add agent",
+      "agent": "Agent",
+      "duplicateAgent": "This agent has another row. Keep one row per agent.",
+      "patterns": "Wrapper patterns, one per line",
+      "patternsHelp": "tag {'<'}name{'>'} hides {'<'}name{'>'}…{'<'}/name{'>'} blocks; regex {'<'}expression{'>'} hides matches.",
+      "codingAgentDefaults": "Coding-agent defaults",
+      "test": "Test on recent sessions",
+      "remove": "Remove agent",
+      "matches": "{matched} of {total} recent sessions match",
+      "before": "Before",
+      "after": "After",
+      "testFailed": "Could not read recent sessions",
+      "titleSource": "Session title",
+      "titleSourceHelp": "A Title column on Sessions. The first request costs nothing.",
+      "titleOff": "Off",
+      "titleFirstRequest": "First request, trimmed"
+    }
+  },
+  "traceIssues": {
+    "tab": "Issues",
+    "count": "{n} issue | {n} issues",
+    "rules": {
+      "repeated_tool_calls": "Repeated tool calls",
+      "repeated_failing_tool_calls": "Repeated failing tool calls"
+    },
+    "severity": {
+      "repeated_tool_calls": "High",
+      "repeated_failing_tool_calls": "Medium"
+    },
+    "repeated": "{tool} ran {calls} times in this trace. The rule fires at {threshold}. {errors} of the calls ended in an error.",
+    "failing": "{tool} failed {errors} times in this trace. The rule fires at {threshold} failed calls.",
+    "evidence": "Evidence",
+    "call": "call {n}",
+    "ruleSource": "Rule from the ai-agents pack, at its default threshold"
+  },
+  "llmAttribution": {
+    "settings": {
+      "title": "Cost attribution fields",
+      "help": "The span contract for cost by user, tenant and feature. OpenObserve reads the standard attribute first. When a span does not have it, the first fallback field the span or its resource carries is copied to the standard attribute at ingest. Low coverage: if your spans carry the value under another name, add that name as a fallback. If they do not carry it at all, set the standard attribute in your instrumentation.",
+      "field": "Field",
+      "standard": "Standard (checked first)",
+      "fallbacks": "Fallback fields, comma separated",
+      "fallbacksFor": "Fallback fields for {dim}",
+      "coverage": "Traces with a value, past 24 hours",
+      "note": "Fallbacks apply to spans ingested after you save. Spans already stored keep their attributes."
+    },
+    "mapAttributes": "Map attributes",
+    "title": "Cost by",
+    "summary": "{total} · {share}% of spend has a {dim}",
+    "dims": {
+      "model": "Model",
+      "tenant": "Tenant",
+      "feature": "Feature",
+      "user": "User"
+    },
+    "value": "Value",
+    "cost": "Cost",
+    "share": "Share",
+    "tokens": "Tokens",
+    "traces": "Traces",
+    "more": "{n} more",
+    "unattributed": "Unattributed",
+    "empty": "No LLM spend in this window",
+    "loadFailed": "Could not load the cost breakdown",
+    "unset": "No span in this stream sets {attribute} yet.",
+    "noneInWindow": "None of these traces sets {attribute}.",
+    "mapLink": "Map an existing field to {attribute}",
+    "about": {
+      "model": "Spend per model, read from the {attribute} attribute of each LLM call.",
+      "user": "Spend per end user of your app, read from the {attribute} span attribute.",
+      "tenant": "Spend per customer account, for an app that serves several customers, read from the {attribute} span attribute.",
+      "feature": "Spend per feature of your app that calls a model, such as chat or search, read from the {attribute} span attribute."
+    },
+    "users": {
+      "title": "Users",
+      "subtitle": "See who uses your agents and what they cost",
+      "stream": "Stream",
+      "agent": "Agent",
+      "search": "Search by user id",
+      "empty": "No spans with user.id in this window",
+      "sessions": "Sessions",
+      "sessionsCol": "Sessions",
+      "lastSeen": "Last seen",
+      "count": "{n} user · sorted by cost | {n} users · sorted by cost",
+      "capped": "Top {n} users by cost. Search or filter to find others.",
+      "loadFailed": "Could not load users",
+      "noStream": "No LLM traces yet",
+      "noStreamHint": "Send traces from an LLM app to this organization to see its users here.",
+      "sessionsNoTenant": "Sessions has no tenant filter: it lists all of this user's sessions."
+    }
+  },
+  "aiBudgets": {
+    "title": "Budgets",
+    "subtitle": "Spend limits per agent, feature and user, with a signal your gateway can enforce",
+    "new": "New budget",
+    "create": "Create budget",
+    "edit": "Edit budget",
+    "save": "Save budget",
+    "nameTaken": "A budget named {name} already exists",
+    "budget": "Budget",
+    "spentLimit": "Spent / limit",
+    "state": "State",
+    "states": {
+      "under": "Under",
+      "warning": "Warning",
+      "over": "Over | {n} over | {n} over",
+      "unknown": "Unknown"
+    },
+    "readFailed": "Could not read spend",
+    "noAccess": "No access to {stream}",
+    "legacyEdit": "Created before one-alert budgets. Delete and re-create it to edit.",
+    "empty": "No budgets yet. A budget warns at 80% and signals at 100%.",
+    "noStream": "No LLM trace stream in this organization yet. A budget reads spend from one: send LLM traces first.",
+    "signalNote": "A budget is one alert: warning at 80%, critical at 100%. Point it at your gateway's webhook (LiteLLM, Portkey) and stop calls on critical. OpenObserve never blocks a call.",
+    "unpriced": "{n} call has no price this month. It is not counted in any budget. | {n} calls have no price this month. They are not counted in any budget.",
+    "name": "Name",
+    "limits": "What it limits",
+    "noValues": "Nothing seen in this stream in the last 30 days. Type a value to budget it.",
+    "fieldMissing": "Stream {stream} has no field {field} yet. Budgets can only be scoped to fields that exist in the stream.",
+    "limit": "Limit (USD)",
+    "period": "Period",
+    "periods": { "day": "Day", "month": "Month", "hour": "Hour" },
+    "scopes": {
+      "agent": "Agent",
+      "feature": "Feature",
+      "oneUser": "User",
+      "user": "Each user",
+      "model": "Model",
+      "session": "Session burn rate"
+    },
+    "eachScope": "{scope} · per {period} · {stream}",
+    "valueScope": "{scope} = {value} · per {period} · {stream}",
+    "spentOf": "{spent} / {limit} · {pct}%",
+    "spentEach": "{limit} each · {over} of {keys} over · largest {largest}",
+    "destination": "Destination",
+    "destinationHelp": "Gets both levels: warning at 80%, critical at 100%. A gateway webhook stops the calls on critical.",
+    "folderDescription": "Budget alerts (warning at 80%, critical at 100%)",
+    "created": "Created budget {name}: one alert in AI budgets",
+    "updated": "Updated budget {name}",
+    "deleteTitle": "Delete budget {name}?",
+    "deleteMessage": "Its alert is deleted too, so a gateway listening for it gets no more signals. | Its {count} alerts are deleted too, so a gateway listening for them gets no more signals.",
+    "deleted": "Deleted budget {name}"
+  },
+  "releaseWatch": {
+    "title": "Release watch · {agent} {version}",
+    "regressions": "{n} regression | {n} regressions",
+    "clean": "No regression",
+    "firstSeen": "First seen {at}",
+    "compared": "Compared with {prev} over each version's first 3 hours: {before} and {after} sessions.",
+    "metrics": {
+      "failureRate": "Error rate",
+      "costPerSession": "Cost / session",
+      "p95": "P95 latency"
+    },
+    "was": "was {value} · {verdict}",
+    "verdicts": {
+      "regressed": "regressed",
+      "improved": "improved",
+      "nochange": "no change",
+      "indicative": "indicative"
+    },
+    "introduced": "Introduced: {cls} in {n} trace. Not seen in {prev}. | Introduced: {cls} in {n} traces. Not seen in {prev}.",
+    "openCompare": "Open compare",
+    "mute": "Mute this version",
+    "muted": "Release watch muted for {agent} {version}.",
+    "unmute": "Unmute"
+  },
+  "aiAlertPack": {
+    "open": "Catch loops and errors",
+    "title": "Install AI agent alerts",
+    "subtitle": "Alert pack ai-agents · reads the gen_ai spans of the stream you pick",
+    "stream": "Trace stream",
+    "noTraceStream": "No trace stream yet. Send gen_ai spans to a trace stream, then install the alerts that read it.",
+    "destination": "Destination",
+    "noDestination": "No destination (add one later)",
+    "reliabilityRules": "Reliability rules · one row per trace, agent and tool",
+    "templates": "AI templates · one row per agent, model or config",
+    "runsNow": "Runs now",
+    "install": "Install {n} alert | Install {n} alerts",
+    "summary": "Adds {n} alert to the folder {folder}. The other {waiting} wait for their data and are not installed yet. | Adds {n} alerts to the folder {folder}. The other {waiting} wait for their data and are not installed yet.",
+    "installed": "Installed",
+    "allInstalled": "All installed",
+    "skipped": "{n} is already installed and is skipped. | {n} are already installed and are skipped.",
+    "nothingToAdd": "Every alert that can run is already installed. The other {waiting} wait for their data.",
+    "folderDescription": "Alerts from the ai-agents pack",
+    "installedAll": "Installed {n} alert in {folder} | Installed {n} alerts in {folder}",
+    "installedSome": "Installed {n} alert. Not installed: {failed} | Installed {n} alerts. Not installed: {failed}",
+    "installFailed": "Could not install the alerts: {reason}",
+    "waits": {
+      "trustabl": "Waits for trustabl.* fields",
+      "binding": "Waits for a binding event",
+      "scores": "Waits for scores",
+      "traceStream": "Waits for a trace stream",
+      "evaluator": "Waits for evaluator spans",
+      "perConfig": "Set up per config on Quality"
+    },
+    "rules": {
+      "repeatedToolCalls": {
+        "title": "Repeated tool calls",
+        "when": "Same tool called 10+ times in one trace"
+      },
+      "repeatedFailingToolCalls": {
+        "title": "Repeated failing tool calls",
+        "when": "Same tool fails 3+ times in one trace"
+      },
+      "toolLoop": { "title": "tool_loop", "when": "Same input 3+ times in the last 5 tool calls" },
+      "retryStorm": { "title": "retry_storm", "when": "One call retried 4+ times" },
+      "falseIdempotent": {
+        "title": "false_idempotent",
+        "when": "Same input, different outputs, no side effect"
+      },
+      "dspmUnbound": { "title": "dspm_unbound", "when": "A run has no data_security binding" },
+      "policyAbsent": {
+        "title": "policy_absent",
+        "when": "A run has no sandbox or content_safety binding"
+      },
+      "failureRate": {
+        "title": "Error rate",
+        "when": "Over 5% of traces have an errored span, 50+ traces, per agent (last 30 min)"
+      },
+      "cost": { "title": "Hourly cost", "when": "A model's spend over the last hour is above $5" },
+      "scoreDrop": {
+        "title": "Score drop",
+        "when": "A score config's healthy rate falls below its target"
+      },
+      "evaluatorLag": {
+        "title": "Evaluator lag",
+        "when": "Scores arrive more than 10 min after their targets (p95)"
+      }
+    }
+  },
+  "oneClickEval": {
+    "title": "Evaluate {agent}",
+    "titleAll": "Evaluate traces",
+    "noStream": "No LLM trace stream in this organization yet. Send LLM traces, then evaluate them here.",
+    "subtitle": "Creates a scorer, a score config and a sampled job",
+    "start": "Start evaluating",
+    "fullForm": "Open full job form",
+    "what": "What to check",
+    "catalogFailed": "The judge library could not be loaded. Use the full job form.",
+    "judge": "Judge model",
+    "provider": {
+      "testing": "Testing…",
+      "ok": "Connected",
+      "failed": "Did not answer"
+    },
+    "noProvider": "No LLM provider is set up for judges yet.",
+    "addProvider": "Add provider",
+    "stream": "Trace stream",
+    "sample": "Sample",
+    "estimate": "≈ {traces} trace a day is scored. | ≈ {traces} traces a day are scored.",
+    "mapping": "Field mapping, automatic",
+    "mappingInput": "the root LLM call's input",
+    "mappingOutput": "the root LLM call's output",
+    "created": "Started {name}. Scores appear as traces complete.",
+    "failed": "Could not start the evaluation: {reason}",
+    "evaluate": "Evaluate {agent}…",
+    "anAgent": "your traces",
+    "headerAction": "Evaluate an agent",
+    "headerActionAgent": "Evaluate {agent}",
+    "emptyActionDesc": "Pick a built-in judge; the scorer, score config and a sampled job are created for you",
+    "manual": "Set up a job manually"
+  },
+  "aiTraceDrawer": {
+    "title": "Trace {id}",
+    "trace": "Trace",
+    "evaluatorTrace": "Evaluator trace",
+    "previousScore": "Previous score",
+    "nextScore": "Next score"
+  },
+  "llmInsightsDrill": {
+    "all": "All",
+    "searchPlaceholder": "Filter traces by span fields, e.g. gen_ai_response_model = 'claude-opus-5-5' and user_id = 'u_1', then press Enter",
+    "searchApply": "Apply",
+    "searchClear": "Clear the filter",
+    "searchFailed": "This filter did not run: {reason}",
+    "title": "{panel} · {series}",
+    "window": "{from} to {to}",
+    "trace": "Trace",
+    "cost": "Cost",
+    "duration": "Duration",
+    "empty": "No traces match this selection",
+    "loadFailed": "Could not load the matching traces",
+    "capped": "Showing the newest {n} traces. Open in Traces for all of them.",
+    "filterToThis": "Filter Insights to this"
+  },
+  "requestTimeline": {
+    "took": "{step} took {duration}.",
+    "failedAfter": "{step} failed after {duration}.",
+    "causeDb": "{time} of it was one {system} query, {name} on {target}.",
+    "cause": "{time} of it was {name} on {target}.",
+    "causeBare": "{time} of it was {name}.",
+    "causeDbGroup": "{time} of it was {count} {system} queries, {name} on {target}.",
+    "causeGroup": "{time} of it was {count} calls to {name} on {target}.",
+    "causeBareGroup": "{time} of it was {count} calls to {name}.",
+    "selfModel": "All of it was the model call.",
+    "selfWork": "The step itself held the time, not a child span.",
+    "sameSteps": "{count} identical steps, each: {sentence}",
+    "logsAndMetrics": "Logs and metrics",
+    "locked": "Correlated logs, metrics and pod state need an enterprise license.",
+    "lanesEmpty": "No correlated logs or metrics for these services.",
+    "lanesFailed": "Could not load correlated logs or metrics.",
+    "logsLane": "Logs {services}",
+    "podLane": "Pod {pod}",
+    "podHealthy": "healthy",
+    "podRestarted": "restarted",
+    "podOomKilled": "OOMKilled",
+    "podSentenceHealthy": "Pod {pod} stayed healthy.",
+    "podSentenceRestarted": "Pod {pod} restarted around this call.",
+    "podSentenceOomKilled": "Pod {pod} was OOMKilled around this call.",
+    "metricMax": "max {value}",
+    "behindThisStep": "Behind this step",
+    "openInWaterfall": "Open in waterfall"
+  },
+  "experimentsAtScale": {
+    "groupBy": "Group by",
+    "groupByOption": {
+      "pr": "Pull request",
+      "branch": "Branch",
+      "commit": "Commit",
+      "none": "None"
+    },
+    "sort": "Sort",
+    "sortOption": {
+      "recent": "Newest first",
+      "regressions": "Regressions first"
+    },
+    "prGroup": "PR #{pr}",
+    "noGroup": {
+      "pr": "No pull request",
+      "branch": "No branch",
+      "commit": "No commit"
+    },
+    "groupRuns": "{count} run | {count} runs",
+    "groupBranch": "{runs} · branch {branch}",
+    "groupCommit": "{runs} · all on commit {commit}",
+    "regressedCount": "{count} regressed",
+    "improvedCount": "{count} improved",
+    "vsBaseline": "vs baseline",
+    "outcome": {
+      "regressed": "Regressed",
+      "improved": "Improved",
+      "unchanged": "Within noise"
+    },
+    "headline": "{score} {delta} pts",
+    "headlineRelative": "{score} {delta}%",
+    "deltaTooltip": "{delta} pts against the baseline. A move past {threshold} pts counts, the same rule as Compare.",
+    "deltaTooltipRelative": "{delta}% of the baseline's value. This score has no range, so a move past {threshold}% of the baseline counts, the same rule as Compare.",
+    "sharedCases": "Over {count} shared case | Over {count} shared cases",
+    "sharedCasesExcluded": "Over {count} shared case · {excluded} excluded | Over {count} shared cases · {excluded} excluded",
+    "sharedCasesTooltip": "This run and the baseline ran different dataset versions or filters, so it is judged only on the cases both ran.",
+    "foldCount": "× {count}",
+    "foldTooltip": "{count} run of this name on one commit finished, and it stands for the others; expand to see each. | {count} runs of this name on one commit finished. The latest one stands for them and the spread covers them; expand to see each.",
+    "foldTooltipIncomplete": "{counted} Not counted: {incomplete}.",
+    "withIncomplete": "{runs} ({incomplete})",
+    "incomplete": {
+      "cancelled": "{count} cancelled",
+      "failed": "{count} failed",
+      "inProgress": "{count} in progress"
+    },
+    "spread": "{count} runs: {range}",
+    "newerRerun": "Latest re-run: {status}",
+    "newerRerunTooltip": "The newest re-run did not complete, so this row shows the latest completed run.",
+    "scoreErrors": "{count} row errored | {count} rows errored",
+    "scoreErrorsTooltip": "The scorer failed on these rows. The value covers the other rows, and this score casts no vote against the baseline.",
+    "tasksFailed": "{count} of {total} task failed | {count} of {total} tasks failed",
+    "baselineTaskFailures": "{count} task failed in this run, and a baseline must have none. | {count} tasks failed in this run, and a baseline must have none.",
+    "trendTitle": "Trend against the baseline",
+    "trendScore": "Score",
+    "trendShareOption": "{score} · % healthy",
+    "trendBaseline": "Baseline {name} · {value}",
+    "trendNoisePts": "Noise ±{value} pts",
+    "trendNoise": "Noise ±{value}",
+    "trendAria": "{score} across {count} runs against the baseline at {value}, {regressed} regressed and {improved} improved",
+    "clientScore": "{score} · client",
+    "clientScoreTooltip": "Reported by your own code (client key {key}), on this Score Config's scale and judged by its health policy."
+  },
+  "codeScorer": {
+    "typeDialogIntro": "Choose the scorer type. All three are first-class options.",
+    "typeTitle": "Code",
+    "typeDescription": "Run a short JavaScript function inside OpenObserve. No provider, no token cost.",
+    "typeCta": "Write Code",
+    "createTitle": "New Code Scorer",
+    "editTitle": "Update Code Scorer",
+    "codeSection": "Code",
+    "startFromLabel": "Start from",
+    "startFromPlaceholder": "Pick a starter check",
+    "languageLabel": "Language",
+    "languageJavascript": "JavaScript",
+    "functionLabel": "Function",
+    "variablesLabel": "Variables in this function:",
+    "returnHint": "Return true or false for a Boolean config, a number for Numeric, or a category for Categorical.",
+    "sandboxTitle": "Sandbox",
+    "sandboxNote": "No network or file access. 100 ms and 10 MB per call.",
+    "signatureRequired": "Declare function score(...) with plain parameter names, for example function score(output).",
+    "resultCost": "Cost",
+    "resultCostFree": "$0",
+    "functionSection": "Function",
+    "summaryLabel": "Code",
+    "libraryGroup": "Code checks",
+    "libraryGroupNote": "No provider · $0 a run",
+    "libraryJudgeGroup": "LLM judge scorers from the catalog",
+    "replaceTitle": "Replace your function?",
+    "replaceMessage": "The {starter} starter replaces the function you edited.",
+    "replaceConfirm": "Replace",
+    "starters": {
+      "json_is_valid": {
+        "title": "JSON is valid",
+        "description": "The output parses as JSON."
+      },
+      "matches_json_schema": {
+        "title": "Matches JSON schema",
+        "description": "The output fits a schema you paste."
+      },
+      "matches_regex": {
+        "title": "Matches regex",
+        "description": "The output matches, or must not match, a pattern."
+      },
+      "cost_at_most": {
+        "title": "Cost at most",
+        "description": "Trace cost stays under a limit, $0.05 by default."
+      },
+      "latency_at_most": {
+        "title": "Latency at most",
+        "description": "Trace duration stays under a limit, 10 s by default."
+      },
+      "exact_match": {
+        "title": "Exact match",
+        "description": "The output equals the expected output. For experiments."
+      }
+    }
+  },
+  "evalSpend": {
+    "cost": {
+      "title": "Cost",
+      "basis": "From the last 7 days of matched traffic",
+      "setPrice": "Set a price in Model Pricing",
+      "scopes": {
+        "span": "spans",
+        "trace": "traces",
+        "session": "sessions"
+      },
+      "scope": {
+        "span": "span",
+        "trace": "trace",
+        "session": "session"
+      },
+      "scored": "Scored a day",
+      "scoredNote": "{percent}% of {n} {scope} a day",
+      "perDay": "Judge cost a day",
+      "cannot": "Cannot estimate",
+      "noJudge": "No LLM judge in this job",
+      "noCalls": "No judge calls yet to estimate from",
+      "busiest": "Busiest day {amount}",
+      "perTarget": "Per {scope}",
+      "tokens": "≈ {tokens} tokens to {model}"
+    },
+    "budget": {
+      "enabled": "Limit daily judge spend",
+      "label": "Daily budget, all regions",
+      "help": "New jobs start at {amount}. Resets at 00:00 UTC.",
+      "validation": "Enter a budget above 0",
+      "onReach": "When the budget is reached",
+      "actions": {
+        "pause": {
+          "label": "Pause until 00:00 UTC",
+          "help": "Pauses within about a minute of reaching the budget; scores already queued still finish. The job resumes on its own."
+        },
+        "keep_running": {
+          "label": "Keep running",
+          "help": "The job keeps scoring and shows as over budget."
+        }
+      }
+    },
+    "preview": {
+      "note": "Updates as you change the filter, sampling or scorers.",
+      "estimating": "Estimating cost…",
+      "cannot": "Cost cannot be estimated",
+      "perDay": "≈ {amount} a day"
+    },
+    "list": {
+      "spendToday": "Spend today",
+      "spendUnknown": "Unknown",
+      "spendUnknownHint": "Could not read today's judge spend.",
+      "spendNoAccess": "No access",
+      "spendNoAccessHint": "You cannot read the _evaluator stream, so today's judge spend is unknown.",
+      "unpriced": "≥ {spent} · {n} unpriced call | ≥ {spent} · {n} unpriced calls",
+      "unpricedHint": "Some judge calls have no price, so today's spend is at least the priced part shown, and the daily budget cannot count the unpriced calls. Set a price in Model Pricing.",
+      "pausedBudget": "Paused · budget",
+      "resumeToday": "Resume until 00:00 UTC",
+      "keepPaused": "Keep paused",
+      "keepPausedHint": "Stays paused until you resume it, instead of resuming at 00:00 UTC.",
+      "editBudget": "Edit budget",
+      "banner": "{name} paused at {time} UTC when today's judge spend reached {amount}. It resumes at 00:00 UTC, in {hours} h {minutes} m.",
+      "liftedUntil": "Budget lifted until 00:00 UTC"
+    },
+    "oneClick": {
+      "budget": "Pauses within about a minute of reaching a {amount} daily budget; scores already queued still finish.",
+      "unpriced": "No price for {model}: the {amount} daily budget can't be enforced, and the job scores at any volume."
+    }
+  },
+  "evalWorkload": {
+    "tab": "Workload",
+    "stopped": {
+      "text": "No scores since {time}, {ago}. Traffic did not stop: {n} {scope} matched since then.",
+      "lastError": "The latest judge calls failed with {kind}.",
+      "fixProvider": "Fix provider",
+      "viewFailures": "View failures"
+    },
+    "lag": {
+      "title": "Score lag · p95",
+      "note": "target time → score written",
+      "minutes": "{n} min"
+    },
+    "throughput": {
+      "title": "Throughput",
+      "note": "scores per {per} · {n} in window"
+    },
+    "errors": {
+      "title": "Judge errors",
+      "none": "No failed calls in this window",
+      "alertAt": "alert at {pct}%"
+    },
+    "spend": {
+      "title": "Judge spend",
+      "note": "per {per} · {today} today",
+      "noteBudget": "per {per} · {today} today of {budget}",
+      "noteUnpriced": "per {per} · ≥ {today} today · {n} unpriced call the budget cannot count | per {per} · ≥ {today} today · {n} unpriced calls the budget cannot count",
+      "noteUnknown": "per {per} · today's spend could not be read",
+      "noteNoAccess": "per {per} · no access to _evaluator: today's spend is unknown",
+      "notePending": "per {per}"
+    },
+    "alerts": {
+      "title": "Alerts for this job"
+    },
+    "pack": {
+      "scoresStopped": {
+        "title": "Eval job: scores stopped",
+        "when": "No score for 30 min from a job that scored in the same hour yesterday"
+      },
+      "judgeErrorRate": {
+        "title": "Eval job: judge error rate",
+        "when": "Over 20% of judge calls fail, 3+ calls, per job (last 30 min)"
+      }
+    }
+  },
   "llmDataTrust": {
     "noModelName": "(no model name)",
     "topModels": "{models} (top {shown} of {total})",
@@ -31195,20 +31956,16 @@
       "unknownTooltip": "Cost unknown. No price for {models}: none of the {tokens} tokens in this {scope} has a cost.",
       "scopeSession": "session",
       "scopeTrace": "trace",
+      "scopeRow": "row",
       "unknownModel": "an unnamed model",
       "addPrice": "Add a price"
     },
     "tile": {
       "unpricedTokens": "{tokens} tokens unpriced",
       "unpricedTooltip": "Cost is a lower bound: {tokens} tokens on {models} have no price. Open the Unpriced tab in LLM Model Pricing.",
-      "pricedSinceTooltip": "Cost is a lower bound: {tokens} tokens on {models} were recorded before a price was added and keep no cost."
-    },
-    "chart": {
-      "costMissing": "Not in this chart: {models}. {tokens} tokens have no price.",
-      "costMissingPricedSince": "Not in this chart: {models}. {tokens} tokens were recorded before a price was added.",
-      "unpricedModels": "Unpriced: {models}",
-      "pricedSinceModels": "Recorded before a price was added: {models}",
-      "addPrice": "Add a price"
+      "pricedSinceTooltip": "Cost is a lower bound: {tokens} tokens on {models} were recorded before a price was added and keep no cost.",
+      "unpricedWindow": "{tokens} unpriced in this time range",
+      "unpricedWindowTooltip": "{tokens} tokens on {models} have no price in this time range. This count ignores the filters, so the filtered cost may or may not include them. Open the Unpriced tab in LLM Model Pricing."
     },
     "health": {
       "title": "Data health",
@@ -31239,7 +31996,7 @@
           "label": "Missing agent identity",
           "detail": "{affected} of {total} LLM spans ({pct}) have no gen_ai.agent.name, so agent views miss them.",
           "pass": "Every LLM span carries an agent name or id.",
-          "fix": "Open GenAI Agent Mapping"
+          "fix": "Open Agent Mapping"
         },
         "zero_duration_spans": {
           "label": "Zero-duration spans",

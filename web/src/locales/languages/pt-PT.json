@@ -1712,7 +1712,9 @@
       "rerunCancelled": "Nova execução cancelada após {elapsed}. A mostrar os resultados anteriores.",
       "rerunCancelledNow": "Nova execução cancelada. A mostrar os resultados anteriores.",
       "analyzeSucceeded": "A última execução foi bem-sucedida",
-      "analyzeFailedShort": "A última execução falhou"
+      "analyzeFailedShort": "A última execução falhou",
+      "analyzeWarned": "Última execução concluída com avisos",
+      "analyzePartial": "A execução terminou, mas os resultados podem estar incompletos."
     },
     "errorDeletingSavedView": "Erro ao eliminar a visualização guardada.",
     "errorCreatingSavedView": "Erro ao criar a visualização guardada.",
@@ -3353,7 +3355,8 @@
         "edit": "Editar",
         "identityRowForm": "Neste cartão, as regras de identidade se aplicam a partir do primeiro evento identificado",
         "newUsersOnly": "Apenas novos utilizadores",
-        "newUsersSessionsTip": "Apenas novos utilizadores funciona no modo Utilizadores"
+        "newUsersSessionsTip": "Apenas novos utilizadores funciona no modo Utilizadores",
+        "fieldMissingOn": "{field}: campo não está neste stream"
       },
       "appFilters": {
         "hiddenLabel": "Oculto pelos filtros do aplicativo:",
@@ -13585,6 +13588,8 @@
     "sloColumn": "SLO",
     "sloKind": "Tipo de condição",
     "sloLongWindow": "Janela longa",
+    "configNotSet": "Não definido",
+    "openSlo": "Abrir SLO",
     "sloShortWindow": "Janela curta",
     "sloCloneDisabled": "Os alertas de SLO são criados na sua página de SLO, portanto não podem ser clonados daqui.",
     "seconds": "Segundos",
@@ -16549,7 +16554,6 @@
     "errorSpans": "Spans com erro",
     "filterByErrors": "Filtrar por erros",
     "clearErrorFilter": "Limpar filtro de erro",
-    "updatingResults": "A atualizar resultados",
     "error": "ERRO",
     "errorCount": "{n} ERRO | {n} ERROS",
     "success": "SUCESSO",
@@ -32540,5 +32544,11 @@
     "recentRow": "Pesquisa recente",
     "deletedQuery": "Eliminada {query}",
     "undo": "Desfazer"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Use no máximo {max} caracteres no padrão.",
+      "regexInvalid": "Este padrão é inválido ou não é suportado. Não é possível usar lookahead, lookbehind nem referências anteriores."
+    }
   }
 }

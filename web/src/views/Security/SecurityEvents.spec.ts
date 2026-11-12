@@ -172,7 +172,8 @@ vi.mock("@/lib/overlay/Drawer/ODrawer.vue", async () => {
 
 import SecurityEvents from "./SecurityEvents.vue";
 
-const OKTA_ROWS = Array.from({ length: 50 }, (_, i) =>
+// Paging is asserted on the request, so a few rows stand in for a page and keep each table render cheap.
+const OKTA_ROWS = Array.from({ length: 5 }, (_, i) =>
   oktaEvent({ _timestamp: Date.now() * 1000 - i * 1_000_000, actor_alternateid: `u${i}@acme.io` }),
 );
 const OKTA_FIELDS = Object.keys(oktaEvent());
@@ -295,6 +296,7 @@ describe("SecurityEvents", () => {
     expect(first.sql).toMatch(/ORDER BY _timestamp DESC$/);
   });
 
+  // Two server round trips after a full mount: ~4.3 s on a loaded CI shard, near the 5 s default.
   it("pages and sorts on the server without re-running the timeline", async () => {
     const w = await mountView("?stream=okta_auth&period=1h");
     const histograms = () =>
@@ -312,7 +314,7 @@ describe("SecurityEvents", () => {
     expect(histograms()).toBe(before);
     // The histogram's 120 is the exact total the pager offers.
     expect(table.props("total")).toBe(120);
-  });
+  }, 15000);
 
   it("adds a builder filter from a pivot and re-queries", async () => {
     const w = await mountView("?stream=okta_auth&period=1h");

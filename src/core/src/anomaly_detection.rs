@@ -3850,18 +3850,31 @@ pub async fn send_anomaly_alert(
     destination_id: String,
     actx: o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
 ) -> anyhow::Result<bool> {
-    use crate::alerts::notifications::notify::{NotifyError, SkipReason, notify};
+    use crate::alerts::notifications::notify::notify;
     let org_id = actx.org_id.clone();
     let explicit =
         crate::alerts::notifications::org_default::load_override(&org_id, actx.template.as_deref())
             .await;
     let mut ctx = anomaly_notification_context(&actx);
-    match notify(&org_id, &destination_id, &explicit, None, &mut ctx).await {
-        Ok(_) => Ok(true),
+    let result = notify(&org_id, &destination_id, &explicit, None, &mut ctx)
+        .await
+        .map(|_| ());
+    anomaly_send_outcome(result, &actx.anomaly_id)
+}
+
+/// Unsendable destinations (missing, pipeline, no org member recipient) skip as `Ok(false)`.
+#[cfg(feature = "enterprise")]
+fn anomaly_send_outcome(
+    result: Result<(), crate::alerts::notifications::notify::NotifyError>,
+    anomaly_id: &str,
+) -> anyhow::Result<bool> {
+    use crate::alerts::notifications::notify::{NotifyError, SkipReason};
+    match result {
+        Ok(()) => Ok(true),
         Err(NotifyError::Skipped(SkipReason::NoOrgMemberRecipient)) => Ok(false),
         Err(NotifyError::Skipped(_)) => Ok(true),
         Err(e @ (NotifyError::DestinationNotFound(_) | NotifyError::NotAlertDestination(_))) => {
-            log::warn!("[anomaly_detection {}] {e}", actx.anomaly_id);
+            log::warn!("[anomaly_detection {anomaly_id}] {e}");
             Ok(false)
         }
         Err(NotifyError::Rejected { status, body }) => Err(
@@ -8741,5 +8754,29 @@ mod tests {
             let err = checked_create_body(&mut req).unwrap_err().to_string();
             assert!(err.contains("one SELECT"), "{err}");
         }
+    }
+
+    /// A pipeline destination (and a missing one) is a skip, not a retryable error (B39).
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn unsendable_destinations_are_skips_not_errors() {
+        use crate::alerts::notifications::notify::{NotifyError, SkipReason};
+        let skip = |e: NotifyError| super::anomaly_send_outcome(Err(e), "a1").unwrap();
+        assert!(!skip(NotifyError::NotAlertDestination("pipe".into())));
+        assert!(!skip(NotifyError::DestinationNotFound("gone".into())));
+        assert!(!skip(NotifyError::Skipped(
+            SkipReason::NoOrgMemberRecipient
+        )));
+        assert!(super::anomaly_send_outcome(Ok(()), "a1").unwrap());
+        assert!(
+            super::anomaly_send_outcome(
+                Err(NotifyError::Rejected {
+                    status: 503,
+                    body: String::new()
+                }),
+                "a1"
+            )
+            .is_err()
+        );
     }
 }

@@ -127,8 +127,9 @@ async fn ensure_pipeline(
     job: &OnlineEvalJob,
     desired_enabled: bool,
 ) -> Result<String, ReconcileError> {
-    job.validate()
-        .map_err(|error| ReconcileError::Other(error.to_string()))?;
+    if let Err(error) = job.validate() {
+        return disable_unbuildable_pipeline(job, desired_enabled, error).await;
+    }
     match job.pipeline_id.as_deref() {
         None => {
             // First-time provisioning.
@@ -174,6 +175,22 @@ async fn ensure_pipeline(
 
             Ok(pipeline_id.to_string())
         }
+    }
+}
+
+// A paused job that no longer validates must still stop its pipeline, which would match everything.
+async fn disable_unbuildable_pipeline(
+    job: &OnlineEvalJob,
+    desired_enabled: bool,
+    error: &str,
+) -> Result<String, ReconcileError> {
+    let pipeline_id = match job.pipeline_id.as_deref() {
+        Some(pipeline_id) if !desired_enabled => pipeline_id,
+        _ => return Err(ReconcileError::Other(error.to_string())),
+    };
+    match crate::pipeline::enable_pipeline(&job.org_id, pipeline_id, false, false).await {
+        Ok(()) | Err(PipelineError::NotFound(_)) => Ok(pipeline_id.to_string()),
+        Err(e) => Err(e.into()),
     }
 }
 
@@ -348,6 +365,7 @@ fn build_system_id_check_condition() -> ConditionParams {
                     operator: Operator::NotEqualTo,
                     value: serde_json::Value::String(String::new()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
                 ConditionItem::Condition(ConditionItemCondition {
@@ -355,6 +373,7 @@ fn build_system_id_check_condition() -> ConditionParams {
                     operator: Operator::NotEqualTo,
                     value: serde_json::Value::String(String::new()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
             ],
@@ -443,6 +462,7 @@ mod tests {
             span_selector_bindings: Default::default(),
             trace_config: None,
             session_config: None,
+            budget: None,
             sampling_mode: SamplingMode::Rate,
             sampling_value: serde_json::json!({"rate": 0.25}),
             status: "active".to_string(),

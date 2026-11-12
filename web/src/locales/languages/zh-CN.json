@@ -1712,7 +1712,9 @@
       "rerunCancelled": "重新运行已在 {elapsed} 后取消。正在显示之前的结果。",
       "rerunCancelledNow": "重新运行已取消。正在显示之前的结果。",
       "analyzeSucceeded": "上次运行成功",
-      "analyzeFailedShort": "上次运行失败"
+      "analyzeFailedShort": "上次运行失败",
+      "analyzeWarned": "上次运行已完成，但有警告",
+      "analyzePartial": "运行已完成，但结果可能不完整。"
     },
     "errorDeletingSavedView": "删除保存的视图时出错。",
     "errorCreatingSavedView": "创建保存的视图时出错。",
@@ -3353,7 +3355,8 @@
         "edit": "编辑",
         "identityRowForm": "在此卡片上，身份规则从第一个已识别事件开始应用",
         "newUsersOnly": "仅新用户",
-        "newUsersSessionsTip": "“仅新用户”仅在用户模式下有效"
+        "newUsersSessionsTip": "“仅新用户”仅在用户模式下有效",
+        "fieldMissingOn": "{field}: 字段不在此数据流中"
       },
       "appFilters": {
         "hiddenLabel": "被应用过滤器隐藏：",
@@ -13585,6 +13588,8 @@
     "sloColumn": "SLO",
     "sloKind": "条件类型",
     "sloLongWindow": "长窗口",
+    "configNotSet": "未设置",
+    "openSlo": "打开 SLO",
     "sloShortWindow": "短窗口",
     "sloCloneDisabled": "SLO 告警是在其 SLO 页面上创建的，因此无法从此处克隆。",
     "seconds": "秒",
@@ -16549,7 +16554,6 @@
     "errorSpans": "错误 Span",
     "filterByErrors": "按错误筛选",
     "clearErrorFilter": "清除错误过滤器",
-    "updatingResults": "正在更新结果",
     "error": "错误",
     "errorCount": "{n} 个错误 | {n} 个错误",
     "success": "成功",
@@ -32540,5 +32544,11 @@
     "recentRow": "最近搜索",
     "deletedQuery": "已删除 {query}",
     "undo": "撤销"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "模式最多 {max} 个字符。",
+      "regexInvalid": "此模式无效或不受支持。不能使用先行断言、后行断言和反向引用。"
+    }
   }
 }

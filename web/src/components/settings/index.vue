@@ -26,11 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
 
-    <!-- A section whose API needs online evaluations, on a server with them off. -->
-    <OnlineEvalsDisabled v-if="onlineEvalsRouteOff" />
     <!-- Form-style sections (general, org params, license, domain): a section
          header above a centered reading column. -->
-    <div v-else-if="isConstrainedSection" class="flex h-full min-h-0 flex-col">
+    <div v-if="isConstrainedSection" class="flex h-full min-h-0 flex-col">
       <OPageHeader
         :title="raw(activeSectionItem?.label || '')"
         :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
@@ -74,8 +72,6 @@ import { getImageURL } from "@/utils/zincutils";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { featureState, menuState } from "@/utils/featureGate";
 import { isSlackSettingsVisible, readSlackOrgConfig } from "@/utils/slackSettings";
-import { useOnlineEvalsRouteOff } from "@/composables/shared/useOnlineEvalsGate";
-import OnlineEvalsDisabled from "@/components/OnlineEvalsDisabled.vue";
 
 export default defineComponent({
   name: "AppSettings",
@@ -84,7 +80,6 @@ export default defineComponent({
     ConstrainedPage,
     OPageLayout,
     SectionRail,
-    OnlineEvalsDisabled,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -109,10 +104,6 @@ export default defineComponent({
       pipelineDestinations: "pipeline_destinations",
       telephonySettings: "telephony",
       alertTemplates: "templates",
-      modelPricing: "model_pricing",
-      modelPricingEditor: "model_pricing",
-      modelPricingGaps: "model_pricing",
-      llmProviders: "llm_providers",
       storageSettings: "storageSettings",
       cipherKeys: "cipher-keys",
       license: "license",
@@ -120,7 +111,6 @@ export default defineComponent({
       regexPatterns: "regex_patterns",
       syntheticsLocations: "synthetics_locations",
       correlationSettings: "correlation_settings",
-      genAiAgentMapping: "gen_ai_agent_mapping",
       slack: "slack",
     };
 
@@ -144,7 +134,6 @@ export default defineComponent({
     ]);
     const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
     const FULL_WIDTH_SECTIONS = new Set(["password_policy", "license", "slack"]);
-    const onlineEvalsRouteOff = useOnlineEvalsRouteOff();
 
     const slackVisible = computed(() => {
       const edition = buildFeatureGateContext(store.state.zoConfig);
@@ -226,7 +215,7 @@ export default defineComponent({
       "Access & Security",
       "Destinations",
       "Integrations",
-      "Data & AI",
+      "Data",
       "Operations",
       "Synthetics",
       "Account",
@@ -251,10 +240,7 @@ export default defineComponent({
       const pipelineDestinationsAccess = checkFeatureAccess("pipelineDestinations", featureGateCtx);
       const oncallAccess = checkFeatureAccess("oncall", featureGateCtx);
       const storageSettingsAccess = checkFeatureAccess("storageSettings", featureGateCtx);
-      const modelPricingAccess = checkFeatureAccess("modelPricing", featureGateCtx);
       const correlationSettingsAccess = checkFeatureAccess("correlationSettings", featureGateCtx);
-      const llmProvidersAccess = checkFeatureAccess("llmProviders", featureGateCtx);
-      const genAiAgentMappingAccess = checkFeatureAccess("genAiAgentMapping", featureGateCtx);
       const queryManagementAccess = checkFeatureAccess("queryManagement", featureGateCtx);
       const nodesAccess = checkFeatureAccess("nodes", featureGateCtx);
       const licenseAccess = checkFeatureAccess("license", featureGateCtx);
@@ -272,7 +258,6 @@ export default defineComponent({
       const queryManagementLicense = featureState(z?.features, "query_management");
       const byobLicense = featureState(z?.features, "byob");
       const oncallLicense = menuState(z?.features, "oncall", z?.oncall_enabled !== false);
-      const aiObsLicense = menuState(z?.features, "ai_observability", !!z?.online_evals_enabled);
       const alertsLocked = featureState(z?.features, "alerts") === "locked";
 
       const items: (SectionHubItem & { group: string })[] = [
@@ -421,20 +406,7 @@ export default defineComponent({
           lockedMessage: storageSettingsAccess.message,
           licenseLocked: byobLicense === "locked",
           dataTest: "storage-settings-tab",
-          group: "Data & AI",
-        },
-        {
-          key: "model_pricing",
-          label: t("settings.llmModelPricing"),
-          description: t("settings.modelPricingDesc"),
-          icon: "paid",
-          to: { name: "modelPricing", query: { org_identifier: org } },
-          visible: !!z.model_pricing_enabled && modelPricingAccess.visible,
-          locked: !modelPricingAccess.allowed,
-          lockedMessage: modelPricingAccess.message,
-          licenseLocked: featureState(z?.features, "ai_observability") === "locked",
-          dataTest: "model-pricing-tab",
-          group: "Data & AI",
+          group: "Data",
         },
         {
           key: "correlation_settings",
@@ -447,33 +419,7 @@ export default defineComponent({
           lockedMessage: correlationSettingsAccess.message,
           licenseLocked: correlationLicense === "locked" && alertsLocked,
           dataTest: "correlation-settings-tab",
-          group: "Data & AI",
-        },
-        {
-          key: "llm_providers",
-          label: t("llmProviders.tabLabel"),
-          description: t("settings.llmProvidersDesc"),
-          icon: "smart-toy",
-          to: { name: "llmProviders", query: { org_identifier: org } },
-          visible: aiObsLicense !== "hidden" && llmProvidersAccess.visible,
-          locked: !llmProvidersAccess.allowed,
-          lockedMessage: llmProvidersAccess.message,
-          licenseLocked: aiObsLicense === "locked",
-          dataTest: "llm-providers-tab",
-          group: "Data & AI",
-        },
-        {
-          key: "gen_ai_agent_mapping",
-          label: t("settings.genAiAgentMapping.tabLabel"),
-          description: t("settings.index.genAiAgentMappingDesc"),
-          icon: "smart-toy",
-          to: { name: "genAiAgentMapping", query: { org_identifier: org } },
-          visible: aiObsLicense !== "hidden" && genAiAgentMappingAccess.visible,
-          locked: !genAiAgentMappingAccess.allowed,
-          lockedMessage: genAiAgentMappingAccess.message,
-          licenseLocked: aiObsLicense === "locked",
-          dataTest: "gen-ai-agent-mapping-tab",
-          group: "Data & AI",
+          group: "Data",
         },
         {
           key: "queryManagement",
@@ -564,7 +510,7 @@ export default defineComponent({
         "Access & Security": t("settings.groupAccessSecurity"),
         Destinations: t("settings.groupDestinations"),
         Integrations: t("settings.groupIntegrations"),
-        "Data & AI": t("settings.groupDataAI"),
+        Data: t("settings.groupData"),
         Operations: t("settings.groupOperations"),
         Synthetics: t("settings.groupSynthetics"),
         Account: t("settings.groupAccount"),
@@ -585,7 +531,6 @@ export default defineComponent({
       activeSection,
       isConstrainedSection,
       FULL_WIDTH_SECTIONS,
-      onlineEvalsRouteOff,
       activeSectionItem,
       sectionGroups,
       handleSettingsRouting,
