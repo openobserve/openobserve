@@ -5,27 +5,11 @@ import { PipelineDestinations } from '../../pages/pipelinesPages/pipelineDestina
 import testLogger from '../utils/test-logger.js';
 const path = require('path');
 const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
-const APICleanup = require('../../pages/apiCleanup.js');
 
 test.describe.configure({ mode: 'parallel' });
 
 const IMPORT_ORG = process.env["ORGNAME"] || "default";
-
-// Fails once #16694 is fixed: that is the signal to delete this branch and its callers.
-async function expectOrgIdBugAndCleanUp(pipelinesEP, apiCleanup, { pipelineName, functionName, destinationName }) {
-    let failure;
-    try {
-        await pipelinesEP.expectImportBlockedByOrgId(IMPORT_ORG);
-        expect((await apiCleanup.fetchPipelines()).map((p) => p.name)).not.toContain(pipelineName);
-    } catch (error) {
-        failure = error;
-    }
-    const destinationDeleted = await apiCleanup.deletePipelineDestination(destinationName);
-    const functionDeleted = await apiCleanup.deleteFunctionInOrg(IMPORT_ORG, functionName);
-    if (failure) throw failure;
-    expect(destinationDeleted.code, `delete destination ${destinationName}`).toBe(200);
-    expect(functionDeleted.code, `delete function ${functionName}`).toBe(200);
-}
+const ORG_ID_BUG = 'openobserve/openobserve#16694: import keeps remote_stream nodes in the fixture\'s "default" org, so outside it the Organization Id error never clears';
 
 // Use stored authentication state from global setup instead of logging in each test
 const authFile = path.join(__dirname, '../utils/auth/user.json');
@@ -37,10 +21,11 @@ test.use({
 });
 
 test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipelinesImport'] }, () => {
-    let pipelinesEP, ingestionPage, pipelineDestinations;
+    let pipelinesEP, ingestionPage, pipelineDestinations, importPrerequisites;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
+        importPrerequisites = undefined;
         // Auth is handled via storageState - no login needed
         ingestionPage = new IngestionPage(page);
         pipelinesEP = new PipelinesEP(page);
@@ -54,6 +39,13 @@ test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipeline
         await page.goto(`${process.env["ZO_BASE_URL"]}/web/?org_identifier=${process.env["ORGNAME"]}`);
         // Best-effort: a loaded ENT runner never lets this page idle, and every test navigates away from it at once
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    });
+
+    // A #16694 expected failure stops before the end of the flow, and cleanup.spec sweeps these function names only in "default".
+    test.afterEach(async () => {
+        if (IMPORT_ORG !== "default" && importPrerequisites) {
+            await pipelinesEP.deleteImportPrerequisites(IMPORT_ORG, importPrerequisites);
+        }
     });
 
     test("Import RealTime Pipeline from URL, download and delete imported pipeline", async ({ page }) => {
@@ -140,10 +132,12 @@ test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipeline
 
     test("Import Scheduled Pipeline from URL, download and delete imported pipeline", async ({ page }) => {
         test.skip(isCloudEnvironment(), 'Pipeline import not functional on cloud — imported pipelines do not appear in list');
+        test.fail(IMPORT_ORG !== "default", ORG_ID_BUG);
 
         const randomPipeline = `scheurl${Math.floor(Math.random() * 1000)}`;
         const randomFirstFunction = `first${Math.floor(Math.random() * 1000)}`;
         const randomPipelineDestination = `destination${Math.floor(Math.random() * 1000)}`;
+        importPrerequisites = { functionName: randomFirstFunction, destinationName: randomPipelineDestination };
         
         await pipelineDestinations.navigateToManagement();
         await pipelineDestinations.navigateToPipelineDestinations();    
@@ -161,11 +155,6 @@ test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipeline
 
         await pipelinesEP.fillScheduledPipelineDetails(randomPipeline, randomFirstFunction, randomPipelineDestination);
         await pipelinesEP.importJsonButtonPipeline();
-        // #16694: import keeps remote_stream nodes in the fixture's "default" org, so outside it the Organization Id error never clears.
-        if (IMPORT_ORG !== "default") {
-            await expectOrgIdBugAndCleanUp(pipelinesEP, new APICleanup(page), { pipelineName: randomPipeline, functionName: randomFirstFunction, destinationName: randomPipelineDestination });
-            return;
-        }
         // Wait for pipeline to appear in the list after import
         await pipelinesEP.waitForPipelineInList(randomPipeline);
 
@@ -181,10 +170,12 @@ test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipeline
 
     test("Import Scheduled Pipeline from JSON file, download and delete imported pipeline", async ({ page }) => {
         test.skip(isCloudEnvironment(), 'Pipeline import not functional on cloud — imported pipelines do not appear in list');
+        test.fail(IMPORT_ORG !== "default", ORG_ID_BUG);
 
         const randomPipeline = `schefile${Math.floor(Math.random() * 1000)}`;
         const randomFirstFunction = `first${Math.floor(Math.random() * 1000)}`;
         const randomPipelineDestination = `destination${Math.floor(Math.random() * 1000)}`;
+        importPrerequisites = { functionName: randomFirstFunction, destinationName: randomPipelineDestination };
         
         await pipelineDestinations.navigateToManagement();
         await pipelineDestinations.navigateToPipelineDestinations();    
@@ -203,11 +194,6 @@ test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipeline
 
         await pipelinesEP.fillScheduledPipelineDetails(randomPipeline, randomFirstFunction, randomPipelineDestination);
         await pipelinesEP.importJsonButtonPipeline();
-        // #16694: import keeps remote_stream nodes in the fixture's "default" org, so outside it the Organization Id error never clears.
-        if (IMPORT_ORG !== "default") {
-            await expectOrgIdBugAndCleanUp(pipelinesEP, new APICleanup(page), { pipelineName: randomPipeline, functionName: randomFirstFunction, destinationName: randomPipelineDestination });
-            return;
-        }
         // Wait for pipeline to appear in the list after import
         await pipelinesEP.waitForPipelineInList(randomPipeline);
 

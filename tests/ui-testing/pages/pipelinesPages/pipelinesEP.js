@@ -1,6 +1,8 @@
 
 import { expect } from '@playwright/test';
 import { openNavFlyoutChild } from '../commonActions.js';
+const APICleanup = require('../apiCleanup.js');
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 
 export class PipelinesEP {
@@ -38,11 +40,6 @@ export class PipelinesEP {
         this.importOrgIdTrigger = page.locator('[data-test="pipeline-import-org-id-input-trigger"]');
         this.importOrgIdSearch = page.locator('[data-test="pipeline-import-org-id-input-search"]');
         this.importOrgIdOption = (org) => page.locator(`[data-test="pipeline-import-org-id-input-option"][data-test-value="${org}"]`);
-        this.importOrgIdError = (org) => page
-            .locator('[data-test^="pipeline-import-error-"]')
-            .filter({ hasText: 'Organization Id is mandatory' })
-            .filter({ hasText: new RegExp(`should be equal to ${org}\\b`) })
-            .first();
         // Stream picker is OSelect (Reka Listbox) post-migration.
         this.menuScroll = '[data-test$="-popover"], [role="listbox"]';
         this.menuItem = '[data-test$="-option"]';
@@ -299,9 +296,13 @@ export class PipelinesEP {
     }
 
     // The import button stays disabled until validation finishes, so the error read after it is this click's result.
-    async expectImportBlockedByOrgId(org) {
-        await expect(this.page.locator(this.importJsonButton)).toBeEnabled({ timeout: 30000 });
-        await expect(this.importOrgIdError(org)).toBeVisible();
+    // Logs instead of throwing: an afterEach error would count as the failure a test.fail() expects.
+    async deleteImportPrerequisites(org, { functionName, destinationName }) {
+        const api = new APICleanup(this.page);
+        const destination = await api.deletePipelineDestination(destinationName);
+        if (destination.code !== 200) testLogger.warn('Import cleanup: destination not deleted', { destinationName, code: destination.code });
+        const fn = await api.deleteFunctionInOrg(org, functionName);
+        if (fn.code !== 200) testLogger.warn('Import cleanup: function not deleted', { org, functionName, code: fn.code });
     }
 
     async importJsonButtonPipeline() {
