@@ -243,5 +243,214 @@
   "sns_firing": {
     "subject": "🔴 High error rate firing",
     "message": "🔴 High error rate firing\n\nError rate above 5% for 5 minutes\n\nLevel: P2\nEvent: Firing\nStream: web-logs\nThreshold: > 5\nValue: 12.4\nTime: 2026-11-02 10:05:00 UTC\n\nOpen incident: https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme\nOpen alert: https://o2.acme.com/web/alerts/detail/7Kx2?org_identifier=acme"
+  },
+  "teams_adaptive_firing": {
+    "type": "message",
+    "attachments": [
+      {
+        "contentType": "application/vnd.microsoft.card.adaptive",
+        "contentUrl": null,
+        "content": {
+          "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+          "type": "AdaptiveCard",
+          "version": "1.4",
+          "body": [
+            {
+              "type": "TextBlock",
+              "text": "🔴 High error rate firing",
+              "weight": "Bolder",
+              "size": "Large",
+              "wrap": true
+            },
+            {
+              "type": "TextBlock",
+              "text": "Error rate above 5% for 5 minutes",
+              "wrap": true
+            },
+            {
+              "type": "FactSet",
+              "facts": [
+                {
+                  "title": "Level",
+                  "value": "P2"
+                },
+                {
+                  "title": "Event",
+                  "value": "Firing"
+                },
+                {
+                  "title": "Stream",
+                  "value": "web-logs"
+                },
+                {
+                  "title": "Threshold",
+                  "value": "> 5"
+                },
+                {
+                  "title": "Value",
+                  "value": "12.4"
+                },
+                {
+                  "title": "Time",
+                  "value": "2026-11-02 10:05:00 UTC"
+                }
+              ]
+            },
+            {
+              "type": "TextBlock",
+              "text": "host: web-1 · errors: 9\n\nhost: web-2 · errors: 3",
+              "wrap": true
+            }
+          ],
+          "actions": [
+            {
+              "type": "Action.OpenUrl",
+              "title": "Open incident",
+              "url": "https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme",
+              "style": "positive"
+            },
+            {
+              "type": "Action.OpenUrl",
+              "title": "Open alert",
+              "url": "https://o2.acme.com/web/alerts/detail/7Kx2?org_identifier=acme"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "teams_message_firing": {
+    "@type": "MessageCard",
+    "@context": "http://schema.org/extensions",
+    "summary": "🔴 High error rate firing",
+    "sections": [
+      {
+        "activityTitle": "🔴 High error rate firing",
+        "markdown": false,
+        "text": "Error rate above 5% for 5 minutes<br><br>host: web-1 &middot; errors: 9<br>host: web-2 &middot; errors: 3",
+        "facts": [
+          {
+            "name": "Level",
+            "value": "P2"
+          },
+          {
+            "name": "Event",
+            "value": "Firing"
+          },
+          {
+            "name": "Stream",
+            "value": "web-logs"
+          },
+          {
+            "name": "Threshold",
+            "value": "&gt; 5"
+          },
+          {
+            "name": "Value",
+            "value": "12.4"
+          },
+          {
+            "name": "Time",
+            "value": "2026-11-02 10:05:00 UTC"
+          }
+        ]
+      }
+    ],
+    "potentialAction": [
+      {
+        "@type": "OpenUri",
+        "name": "Open incident",
+        "targets": [
+          {
+            "os": "default",
+            "uri": "https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme"
+          }
+        ]
+      },
+      {
+        "@type": "OpenUri",
+        "name": "Open alert",
+        "targets": [
+          {
+            "os": "default",
+            "uri": "https://o2.acme.com/web/alerts/detail/7Kx2?org_identifier=acme"
+          }
+        ]
+      }
+    ]
+  },
+  "discord_firing": {
+    "embeds": [
+      {
+        "title": "🔴 High error rate firing",
+        "description": "Error rate above 5\\% for 5 minutes\n\n[Open alert](https://o2.acme.com/web/alerts/detail/7Kx2?org_identifier=acme)",
+        "fields": [
+          {
+            "name": "Level",
+            "value": "P2",
+            "inline": true
+          },
+          {
+            "name": "Event",
+            "value": "Firing",
+            "inline": true
+          },
+          {
+            "name": "Stream",
+            "value": "web\\-logs",
+            "inline": true
+          },
+          {
+            "name": "Threshold",
+            "value": "\\> 5",
+            "inline": true
+          },
+          {
+            "name": "Value",
+            "value": "12\\.4",
+            "inline": true
+          },
+          {
+            "name": "Time",
+            "value": "2026\\-11\\-02 10\\:05\\:00 UTC",
+            "inline": true
+          },
+          {
+            "name": "Data",
+            "value": "`host` web\\-1 · `errors` 9\n`host` web\\-2 · `errors` 3",
+            "inline": false
+          }
+        ],
+        "url": "https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme"
+      }
+    ]
+  },
+  "pagerduty_firing": {
+    "event_action": "trigger",
+    "payload": {
+      "summary": "🔴 High error rate firing",
+      "source": "web-logs",
+      "severity": "critical",
+      "custom_details": {
+        "Level": "P2",
+        "Event": "Firing",
+        "Stream": "web-logs",
+        "Threshold": "> 5",
+        "Value": "12.4",
+        "Time": "2026-11-02 10:05:00 UTC",
+        "body": "Error rate above 5% for 5 minutes"
+      }
+    },
+    "links": [
+      {
+        "href": "https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme",
+        "text": "Open incident"
+      },
+      {
+        "href": "https://o2.acme.com/web/alerts/detail/7Kx2?org_identifier=acme",
+        "text": "Open alert"
+      }
+    ],
+    "dedup_key": "inc_7f3a"
   }
 }

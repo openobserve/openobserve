@@ -175,10 +175,7 @@ fn build_test_message_with_title(
     spec.validate().map_err(TestSendError::InvalidContent)?;
 
     let format = derive_channel_format(dest_type);
-    let ctx: NotificationContext = match kind {
-        NotificationKind::Alert => synthetic_context(Some(AlertLevel::Critical)),
-        kind => super::examples::example_context(kind, false),
-    };
+    let ctx = test_context(kind);
     let mut content = resolve_content(spec, &ctx, format.channel_family());
     content.title = format!("{TEST_MARKER}{}", content.title);
     let title = content.title.clone();
@@ -187,6 +184,14 @@ fn build_test_message_with_title(
         render(format, &content, &ctx).map_err(|e| TestSendError::RenderFailed(e.to_string()))?;
 
     Ok((title, rendered))
+}
+
+/// The sample a test-send renders: the alert fixture, or the kind's own example.
+fn test_context(kind: NotificationKind) -> NotificationContext {
+    match kind {
+        NotificationKind::Alert => synthetic_context(Some(AlertLevel::Critical)),
+        kind => super::examples::example_context(kind, false),
+    }
 }
 
 /// Build the `[TEST] `-marked message and dispatch it to the real
@@ -199,6 +204,15 @@ pub async fn test_send(
     spec: &ContentSpec,
     kind: NotificationKind,
 ) -> Result<String, TestSendError> {
+    if let DestinationType::SlackApp(target) = dest_type {
+        spec.validate().map_err(TestSendError::InvalidContent)?;
+        let ctx = test_context(kind);
+        let content = resolve_content(spec, &ctx, "slack");
+        let wire = crate::alerts::slack_publish::wire_from_content(&content, &ctx);
+        return crate::alerts::slack_publish::send_test_wire(org_id, target, wire)
+            .await
+            .map_err(|e| TestSendError::DispatchFailed(e.to_string()));
+    }
     let (title, rendered) = build_test_message_with_title(dest_type, spec, kind)?;
     dispatch_test_message(org_id, dest_type, &title, rendered)
         .await

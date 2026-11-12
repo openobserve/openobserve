@@ -901,13 +901,8 @@ fn description(ctx: &NotificationContext) -> String {
         text_line("Current value", &ctx.alert_agg_value),
         line("Started", &started),
         text_line("Alert description", &ctx.alert_description),
-        line(primary_label(ctx), &ctx.alert_url),
-        detail_line(ctx),
     ];
-    let head = cut(
-        &head.into_iter().flatten().collect::<Vec<_>>().join("\n"),
-        DESCRIPTION_MAX_CHARS,
-    );
+    let head = with_links(head.into_iter().flatten().collect(), ctx);
 
     let footer = line("\nSee all rows in OpenObserve", &ctx.alert_url).unwrap_or_default();
     let reserved = format!("\n\nFirst {MAX_ROWS} rows:\n{{noformat}}\n\n{{noformat}}{footer}");
@@ -952,13 +947,32 @@ fn anomaly_description(ctx: &NotificationContext) -> String {
         line("Window start", &millis(&ctx.alert_start_time_millis)),
         line("Window end", &millis(&ctx.alert_end_time_millis)),
         text_line("Details", &ctx.alert_description),
-        line(primary_label(ctx), &ctx.alert_url),
-        detail_line(ctx),
     ];
-    cut(
-        &lines.into_iter().flatten().collect::<Vec<_>>().join("\n"),
-        DESCRIPTION_MAX_CHARS,
-    )
+    with_links(lines.into_iter().flatten().collect(), ctx)
+}
+
+/// The text lines cut to leave room for the link lines, which are never cut away.
+fn with_links(lines: Vec<String>, ctx: &NotificationContext) -> String {
+    let links: Vec<String> = [
+        (!ctx.alert_url.is_empty()).then(|| format!("{}: {}", primary_label(ctx), ctx.alert_url)),
+        detail_line(ctx),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    let links = links.join("\n");
+    let room = DESCRIPTION_MAX_CHARS.saturating_sub(links.chars().count() + 1);
+    let text = cut(&lines.join("\n"), room);
+    match (text.is_empty(), links.is_empty()) {
+        (_, true) => text,
+        (true, false) => cut(&links, DESCRIPTION_MAX_CHARS),
+        (false, false) => format!("{text}\n{links}"),
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn description_for_test(ctx: &NotificationContext) -> String {
+    description(ctx)
 }
 
 /// The data link label: the kind's own, else the label Jira issues always carried.

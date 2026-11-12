@@ -394,3 +394,48 @@ fn an_authored_link_to_the_detail_page_shows_once_and_keeps_its_slot() {
         .collect();
     assert_eq!(labels, vec!["A", "B", "C", "D", "My alert", ""]);
 }
+
+#[test]
+fn a_long_body_never_pushes_the_object_link_out_of_discord_or_jira() {
+    let mut ctx = alert_ctx();
+    let mut spec = compiled_default_content();
+    spec.links.clear();
+    spec.body = "x".repeat(10_000);
+    let content = resolve_content(&spec, &ctx, "discord");
+    let RenderedMessage::Http { body } = render(ChannelFormat::Discord, &content, &ctx).unwrap()
+    else {
+        panic!("discord renders http");
+    };
+    let v: Value = serde_json::from_str(&body).unwrap();
+    let description = v["embeds"][0]["description"].as_str().unwrap();
+    assert!(description.chars().count() <= 4_096);
+    assert!(
+        description.ends_with(&format!("[Open alert]({DETAIL_URL})")),
+        "{}",
+        &description[description.len() - 80..]
+    );
+    ctx.alert_description = "y".repeat(40_000);
+    let jira = crate::alerts::notifications::jira::description_for_test(&ctx);
+    assert!(
+        jira.contains(&format!("View logs: {ALERT_URL}")),
+        "{}",
+        &jira[..200]
+    );
+    assert!(jira.contains(&format!("Open alert: {DETAIL_URL}")));
+}
+
+#[test]
+fn slack_overflow_links_escape_their_url_for_mrkdwn() {
+    let links = [
+        ("A", "https://x/a"),
+        ("B", "https://x/b"),
+        ("C", "https://x/c"),
+        ("D|E", "https://wiki/a?x=1&y=<2>|z"),
+    ];
+    let v = rendered(ChannelFormat::Slack, &alert_ctx(), &links);
+    let context = slack_blocks(&v, "context");
+    assert_eq!(
+        context.last().unwrap()["elements"][0]["text"],
+        "<https://wiki/a?x=1&amp;y=%3C2%3E%7Cz|D\u{ff5c}E>"
+    );
+}

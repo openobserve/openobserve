@@ -341,7 +341,18 @@ pub async fn send_test_now(
         alert_name: title.to_string(),
         ..Default::default()
     };
-    let mut wire = wire_from_custom(body, &ctx);
+    send_test_wire(org_id, target, wire_from_custom(body, &ctx)).await
+}
+
+/// A content template's test-send as the live path builds it: buttons from the resolved links.
+pub async fn send_test_wire(
+    org_id: &str,
+    target: &SlackAppTarget,
+    mut wire: RenderedWire,
+) -> anyhow::Result<String> {
+    if let Some(reason) = unavailable_reason(org_id) {
+        return Err(anyhow::anyhow!(reason));
+    }
     if !wire
         .title
         .starts_with(crate::alerts::notifications::TEST_MARKER)
@@ -440,13 +451,22 @@ pub fn wire_from_content(c: &RenderedContent, ctx: &NotificationContext) -> Rend
         }
         body.push_str(&lines.join("\n"));
     }
+    // An authored stand-in rides as the object button, so trimming the stored links cannot drop it.
+    let detail = c
+        .links
+        .iter()
+        .find(|l| l.role == LinkRole::Detail)
+        .or_else(|| {
+            c.links
+                .iter()
+                .find(|l| l.role == LinkRole::Authored && l.reserved)
+        });
     let links = c
         .links
         .iter()
-        .filter(|l| l.role == LinkRole::Authored)
+        .filter(|l| l.role == LinkRole::Authored && Some(*l) != detail)
         .map(|l| (l.label.clone(), l.url.clone()))
         .collect();
-    let detail = c.links.iter().find(|l| l.role == LinkRole::Detail);
     RenderedWire {
         title: c.title.clone(),
         body,
@@ -1306,11 +1326,9 @@ mod tests {
             unknown_variables: vec![],
         };
         let wire = wire_from_content(&content, &ctx);
-        assert_eq!(
-            wire.links,
-            vec![("My alert".to_string(), ctx.alert_detail_url.clone())]
-        );
-        assert!(wire.detail_url.is_empty(), "{wire:?}");
+        assert!(wire.links.is_empty(), "{wire:?}");
+        assert_eq!(wire.detail_url, ctx.alert_detail_url);
+        assert_eq!(wire.detail_label, "My alert");
         assert_eq!(wire.open_label, DEFAULT_LINK_LABEL);
     }
 

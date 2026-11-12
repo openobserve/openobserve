@@ -107,6 +107,9 @@ pub(crate) fn apply_custom_template_plain(
     };
     let mut resp = tpl
         // Newer tokens run first so a value inserted below is never re-scanned for them.
+        .replace("{alert_url_label}", &esc(&ctx.alert_url_label))
+        .replace("{alert_detail_url}", &esc(&ctx.alert_detail_url))
+        .replace("{alert_detail_label}", &esc(&ctx.alert_detail_label))
         .replace("{notification_kind}", ctx.kind.as_str())
         .replace("{notification_event}", ctx.event.as_str())
         .replace("{notification_kind_label}", ctx.kind.label())
@@ -167,9 +170,6 @@ pub(crate) fn apply_custom_template_plain(
         )
         .replace("{alert_end_time_millis}", &esc(&ctx.alert_end_time_millis))
         .replace("{alert_url}", &esc(&ctx.alert_url))
-        .replace("{alert_url_label}", &esc(&ctx.alert_url_label))
-        .replace("{alert_detail_url}", &esc(&ctx.alert_detail_url))
-        .replace("{alert_detail_label}", &esc(&ctx.alert_detail_label))
         .replace("{alert_trigger_time}", &evaluation_timestamp.to_string())
         .replace(
             "{alert_trigger_time_millis}",
@@ -1137,5 +1137,28 @@ mod golden {
         };
         let rendered = apply_custom_template(r#"{"text":"{alert_name}"}"#, &ctx, false);
         assert_eq!(rendered, r#"{"text":"cpu-{notification_kind}"}"#);
+        let ctx = NotificationContext {
+            alert_name: "cpu-{alert_url_label}".into(),
+            alert_url: "https://o2/s/1".into(),
+            alert_url_label: "View logs".into(),
+            alert_detail_url: "https://o2/web/alerts/detail/a1".into(),
+            alert_detail_label: "Open alert".into(),
+            ..Default::default()
+        };
+        let rendered =
+            apply_custom_template(r#"{"t":"{alert_name}","u":"{alert_url}"}"#, &ctx, false);
+        assert_eq!(
+            rendered,
+            r#"{"t":"cpu-{alert_url_label}","u":"https://o2/s/1"}"#
+        );
+        let rendered = apply_custom_template(
+            "{alert_url_label} {alert_url} {alert_detail_label} {alert_detail_url}",
+            &ctx,
+            false,
+        );
+        assert_eq!(
+            rendered,
+            "View logs https://o2/s/1 Open alert https://o2/web/alerts/detail/a1"
+        );
     }
 }

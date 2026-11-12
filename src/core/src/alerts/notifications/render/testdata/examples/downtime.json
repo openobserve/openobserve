@@ -188,5 +188,156 @@
   "sns_firing": {
     "subject": "🔵 Nightly database upgrade started",
     "message": "🔵 Nightly database upgrade started\n\nCHG-1042 Postgres 17 upgrade\n\nEvent: Started\nWindow: 2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC\nMuted: alerts, synthetics checks\nTime: 2026-11-02 22:00:00 UTC\n\nOpen downtime: https://o2.acme.com/web/downtimes/dt_4k2?org_identifier=acme"
+  },
+  "teams_adaptive_firing": {
+    "type": "message",
+    "attachments": [
+      {
+        "contentType": "application/vnd.microsoft.card.adaptive",
+        "contentUrl": null,
+        "content": {
+          "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+          "type": "AdaptiveCard",
+          "version": "1.4",
+          "body": [
+            {
+              "type": "TextBlock",
+              "text": "🔵 Nightly database upgrade started",
+              "weight": "Bolder",
+              "size": "Large",
+              "wrap": true
+            },
+            {
+              "type": "TextBlock",
+              "text": "CHG-1042 Postgres 17 upgrade",
+              "wrap": true
+            },
+            {
+              "type": "FactSet",
+              "facts": [
+                {
+                  "title": "Event",
+                  "value": "Started"
+                },
+                {
+                  "title": "Window",
+                  "value": "2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC"
+                },
+                {
+                  "title": "Muted",
+                  "value": "alerts, synthetics checks"
+                },
+                {
+                  "title": "Time",
+                  "value": "2026-11-02 22:00:00 UTC"
+                }
+              ]
+            }
+          ],
+          "actions": [
+            {
+              "type": "Action.OpenUrl",
+              "title": "Open downtime",
+              "url": "https://o2.acme.com/web/downtimes/dt_4k2?org_identifier=acme",
+              "style": "positive"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "teams_message_firing": {
+    "@type": "MessageCard",
+    "@context": "http://schema.org/extensions",
+    "summary": "🔵 Nightly database upgrade started",
+    "sections": [
+      {
+        "activityTitle": "🔵 Nightly database upgrade started",
+        "markdown": false,
+        "text": "CHG-1042 Postgres 17 upgrade",
+        "facts": [
+          {
+            "name": "Event",
+            "value": "Started"
+          },
+          {
+            "name": "Window",
+            "value": "2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC"
+          },
+          {
+            "name": "Muted",
+            "value": "alerts, synthetics checks"
+          },
+          {
+            "name": "Time",
+            "value": "2026-11-02 22:00:00 UTC"
+          }
+        ]
+      }
+    ],
+    "potentialAction": [
+      {
+        "@type": "OpenUri",
+        "name": "Open downtime",
+        "targets": [
+          {
+            "os": "default",
+            "uri": "https://o2.acme.com/web/downtimes/dt_4k2?org_identifier=acme"
+          }
+        ]
+      }
+    ]
+  },
+  "discord_firing": {
+    "embeds": [
+      {
+        "title": "🔵 Nightly database upgrade started",
+        "description": "CHG\\-1042 Postgres 17 upgrade",
+        "fields": [
+          {
+            "name": "Event",
+            "value": "Started",
+            "inline": true
+          },
+          {
+            "name": "Window",
+            "value": "2026\\-11\\-02 22\\:00 UTC to 2026\\-11\\-03 00\\:00 UTC",
+            "inline": true
+          },
+          {
+            "name": "Muted",
+            "value": "alerts\\, synthetics checks",
+            "inline": true
+          },
+          {
+            "name": "Time",
+            "value": "2026\\-11\\-02 22\\:00\\:00 UTC",
+            "inline": true
+          }
+        ],
+        "url": "https://o2.acme.com/web/downtimes/dt_4k2?org_identifier=acme"
+      }
+    ]
+  },
+  "pagerduty_firing": {
+    "event_action": "trigger",
+    "payload": {
+      "summary": "🔵 Nightly database upgrade started",
+      "source": "OpenObserve",
+      "severity": "error",
+      "custom_details": {
+        "Event": "Started",
+        "Window": "2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC",
+        "Muted": "alerts, synthetics checks",
+        "Time": "2026-11-02 22:00:00 UTC",
+        "body": "CHG-1042 Postgres 17 upgrade"
+      }
+    },
+    "links": [
+      {
+        "href": "https://o2.acme.com/web/downtimes/dt_4k2?org_identifier=acme",
+        "text": "Open downtime"
+      }
+    ]
   }
 }

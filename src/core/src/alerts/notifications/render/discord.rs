@@ -114,7 +114,10 @@ pub fn render_discord(c: &RenderedContent, ctx: &NotificationContext) -> Value {
             })
             .collect::<Vec<_>>()
             .join(" · ");
-        description = clamp(&format!("{description}\n\n{extra_text}"), DESCRIPTION_MAX);
+        // The body yields room first, so a long body cannot push the object link out.
+        let room = DESCRIPTION_MAX.saturating_sub(extra_text.chars().count() + 2);
+        let body = clamp(&c.body_markdown, room.max(1));
+        description = clamp(&format!("{body}\n\n{extra_text}"), DESCRIPTION_MAX);
     }
 
     let mut fields: Vec<Value> = c

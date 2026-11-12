@@ -229,5 +229,213 @@
   "sns_firing": {
     "subject": "🔴 checkout API failing",
     "message": "🔴 checkout API failing\n\ncheckout API is failing\nconnection timed out after 10s\n\nEvent: Firing\nCheck: checkout API (http)\nTarget: https://shop.acme.com/api/health\nStatus: Failing\nLocations: 1 of 2 failed: us-east-1\nEnvironments: production\nError: connection timed out after 10s\nTime: 2026-11-02 10:05:00 UTC\n\nOpen check: https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme"
+  },
+  "teams_adaptive_firing": {
+    "type": "message",
+    "attachments": [
+      {
+        "contentType": "application/vnd.microsoft.card.adaptive",
+        "contentUrl": null,
+        "content": {
+          "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+          "type": "AdaptiveCard",
+          "version": "1.4",
+          "body": [
+            {
+              "type": "TextBlock",
+              "text": "🔴 checkout API failing",
+              "weight": "Bolder",
+              "size": "Large",
+              "wrap": true
+            },
+            {
+              "type": "TextBlock",
+              "text": "checkout API is failing\nconnection timed out after 10s",
+              "wrap": true
+            },
+            {
+              "type": "FactSet",
+              "facts": [
+                {
+                  "title": "Event",
+                  "value": "Firing"
+                },
+                {
+                  "title": "Check",
+                  "value": "checkout API (http)"
+                },
+                {
+                  "title": "Target",
+                  "value": "https://shop.acme.com/api/health"
+                },
+                {
+                  "title": "Status",
+                  "value": "Failing"
+                },
+                {
+                  "title": "Locations",
+                  "value": "1 of 2 failed: us-east-1"
+                },
+                {
+                  "title": "Environments",
+                  "value": "production"
+                },
+                {
+                  "title": "Error",
+                  "value": "connection timed out after 10s"
+                },
+                {
+                  "title": "Time",
+                  "value": "2026-11-02 10:05:00 UTC"
+                }
+              ]
+            }
+          ],
+          "actions": [
+            {
+              "type": "Action.OpenUrl",
+              "title": "Open check",
+              "url": "https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme",
+              "style": "positive"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "teams_message_firing": {
+    "@type": "MessageCard",
+    "@context": "http://schema.org/extensions",
+    "summary": "🔴 checkout API failing",
+    "sections": [
+      {
+        "activityTitle": "🔴 checkout API failing",
+        "markdown": false,
+        "text": "checkout API is failing<br>connection timed out after 10s",
+        "facts": [
+          {
+            "name": "Event",
+            "value": "Firing"
+          },
+          {
+            "name": "Check",
+            "value": "checkout API (http)"
+          },
+          {
+            "name": "Target",
+            "value": "https://shop.acme.com/api/health"
+          },
+          {
+            "name": "Status",
+            "value": "Failing"
+          },
+          {
+            "name": "Locations",
+            "value": "1 of 2 failed: us-east-1"
+          },
+          {
+            "name": "Environments",
+            "value": "production"
+          },
+          {
+            "name": "Error",
+            "value": "connection timed out after 10s"
+          },
+          {
+            "name": "Time",
+            "value": "2026-11-02 10:05:00 UTC"
+          }
+        ]
+      }
+    ],
+    "potentialAction": [
+      {
+        "@type": "OpenUri",
+        "name": "Open check",
+        "targets": [
+          {
+            "os": "default",
+            "uri": "https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme"
+          }
+        ]
+      }
+    ]
+  },
+  "discord_firing": {
+    "embeds": [
+      {
+        "title": "🔴 checkout API failing",
+        "description": "checkout API is failing\nconnection timed out after 10s",
+        "fields": [
+          {
+            "name": "Event",
+            "value": "Firing",
+            "inline": true
+          },
+          {
+            "name": "Check",
+            "value": "checkout API \\(http\\)",
+            "inline": true
+          },
+          {
+            "name": "Target",
+            "value": "https\\:\\/\\/shop\\.acme\\.com\\/api\\/health",
+            "inline": true
+          },
+          {
+            "name": "Status",
+            "value": "Failing",
+            "inline": true
+          },
+          {
+            "name": "Locations",
+            "value": "1 of 2 failed\\: us\\-east\\-1",
+            "inline": true
+          },
+          {
+            "name": "Environments",
+            "value": "production",
+            "inline": true
+          },
+          {
+            "name": "Error",
+            "value": "connection timed out after 10s",
+            "inline": true
+          },
+          {
+            "name": "Time",
+            "value": "2026\\-11\\-02 10\\:05\\:00 UTC",
+            "inline": true
+          }
+        ],
+        "url": "https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme"
+      }
+    ]
+  },
+  "pagerduty_firing": {
+    "event_action": "trigger",
+    "payload": {
+      "summary": "🔴 checkout API failing",
+      "source": "https://shop.acme.com/api/health",
+      "severity": "critical",
+      "custom_details": {
+        "Event": "Firing",
+        "Check": "checkout API (http)",
+        "Target": "https://shop.acme.com/api/health",
+        "Status": "Failing",
+        "Locations": "1 of 2 failed: us-east-1",
+        "Environments": "production",
+        "Error": "connection timed out after 10s",
+        "Time": "2026-11-02 10:05:00 UTC",
+        "body": "checkout API is failing\nconnection timed out after 10s"
+      }
+    },
+    "links": [
+      {
+        "href": "https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme",
+        "text": "Open check"
+      }
+    ],
+    "dedup_key": "chk_9d"
   }
 }

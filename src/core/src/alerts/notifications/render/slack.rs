@@ -221,9 +221,10 @@ pub(crate) fn overflow_context_block(links: &[(&Link, &str)]) -> Option<Value> {
     Some(json!({"type": "context", "elements": elements}))
 }
 
-/// `|`, `<` and `>` end a mrkdwn link, so they are percent-encoded in its URL.
+/// Slack decodes `&amp;` in mrkdwn, and `|`, `<` and `>` end a link, so the URL escapes all four.
 fn mrkdwn_link_url(url: &str) -> String {
-    url.replace('|', "%7C")
+    url.replace('&', "&amp;")
+        .replace('|', "%7C")
         .replace('<', "%3C")
         .replace('>', "%3E")
 }

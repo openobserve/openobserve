@@ -1,0 +1,440 @@
+{
+  "slack_firing": {
+    "blocks": [
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*<https://example.openobserve.ai/alerts/sample|🔴 Sample CPU alert firing>*"
+        }
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "cpu &gt; 80 for 10m"
+        }
+      },
+      {
+        "type": "section",
+        "fields": [
+          {
+            "type": "mrkdwn",
+            "text": "*Level*\nCritical"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Event*\nFiring"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Stream*\napp_logs"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Threshold*\n &gt;= 80"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Value*\n92.5"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Time*\n2026-08-01 10:10:00 UTC"
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "`host` web-1 · `cpu` 92.5\n`host` web-2 · `cpu` 88.1"
+        }
+      },
+      {
+        "type": "actions",
+        "elements": [
+          {
+            "type": "button",
+            "text": {
+              "type": "plain_text",
+              "text": "View logs"
+            },
+            "url": "https://example.openobserve.ai/alerts/sample",
+            "style": "primary"
+          },
+          {
+            "type": "button",
+            "text": {
+              "type": "plain_text",
+              "text": "Open alert"
+            },
+            "url": "https://example.openobserve.ai/web/alerts/detail/sample?org_identifier=default"
+          }
+        ]
+      }
+    ]
+  },
+  "slack_resolved": {
+    "blocks": [
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*<https://example.openobserve.ai/alerts/sample|🟢 Sample CPU alert firing>*"
+        }
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "cpu &gt; 80 for 10m"
+        }
+      },
+      {
+        "type": "section",
+        "fields": [
+          {
+            "type": "mrkdwn",
+            "text": "*Level*\nOk"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Event*\nResolved"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Stream*\napp_logs"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Threshold*\n &gt;= 80"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Value*\n92.5"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Time*\n2026-08-01 10:10:00 UTC"
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "`host` web-1 · `cpu` 92.5\n`host` web-2 · `cpu` 88.1"
+        }
+      },
+      {
+        "type": "actions",
+        "elements": [
+          {
+            "type": "button",
+            "text": {
+              "type": "plain_text",
+              "text": "View logs"
+            },
+            "url": "https://example.openobserve.ai/alerts/sample",
+            "style": "primary"
+          },
+          {
+            "type": "button",
+            "text": {
+              "type": "plain_text",
+              "text": "Open alert"
+            },
+            "url": "https://example.openobserve.ai/web/alerts/detail/sample?org_identifier=default"
+          }
+        ]
+      }
+    ]
+  },
+  "webhook_firing": {
+    "version": 1,
+    "title": "🔴 Sample CPU alert firing",
+    "body_markdown": "cpu \\> 80 for 10m",
+    "fields": {
+      "Level": "Critical",
+      "Event": "Firing",
+      "Stream": "app_logs",
+      "Threshold": ">= 80",
+      "Value": "92.5",
+      "Time": "2026-08-01 10:10:00 UTC"
+    },
+    "rows": [
+      {
+        "host": "web-1",
+        "cpu": 92.5
+      },
+      {
+        "host": "web-2",
+        "cpu": 88.1
+      }
+    ],
+    "links": [
+      {
+        "label": "",
+        "url": "https://example.openobserve.ai/alerts/sample"
+      }
+    ],
+    "severity": "critical",
+    "chart_url": null,
+    "context": {
+      "org_name": "default",
+      "stream_type": "logs",
+      "stream_name": "app_logs",
+      "alert_name": "Sample CPU alert",
+      "alert_type": "scheduled",
+      "alert_period": "10",
+      "alert_operator": ">=",
+      "alert_threshold": "80",
+      "alert_count": "2",
+      "alert_agg_value": "92.5",
+      "alert_level": "critical",
+      "alert_status": "firing",
+      "episode_id": null,
+      "recovery_reason": null,
+      "alert_priority": "P1",
+      "alert_tags": "infra, prod",
+      "alert_threshold_crit": "90",
+      "alert_threshold_warn": "80",
+      "alert_warning_threshold": "80",
+      "alert_start_time": "2026-08-01T10:00:00",
+      "alert_end_time": "2026-08-01T10:10:00",
+      "alert_url": "https://example.openobserve.ai/alerts/sample",
+      "alert_url_label": "View logs",
+      "alert_detail_url": "https://example.openobserve.ai/web/alerts/detail/sample?org_identifier=default",
+      "alert_detail_label": "Open alert",
+      "alert_trigger_time_str": "2026-08-01T10:10:00",
+      "alert_time": "2026-08-01T10:10:00",
+      "alert_description": "cpu > 80 for 10m",
+      "host": [
+        "web-1",
+        "web-2"
+      ],
+      "cpu": [
+        "92.5",
+        "88.1"
+      ]
+    }
+  },
+  "email_firing": {
+    "subject": "🔴 Sample CPU alert firing",
+    "html": "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"border-collapse:collapse;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#202124;\"><tr><td style=\"padding:16px;\"><h2 style=\"margin:0 0 8px 0;font-size:20px;line-height:1.3;color:#202124;\">🔴 Sample CPU alert firing</h2><div style=\"margin:16px 0;color:#202124;\"><p>cpu &gt; 80 for 10m</p></div><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;margin:16px 0;\"><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Level</td><td style=\"padding:4px 0;color:#202124;\">Critical</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Event</td><td style=\"padding:4px 0;color:#202124;\">Firing</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Stream</td><td style=\"padding:4px 0;color:#202124;\">app_logs</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Threshold</td><td style=\"padding:4px 0;color:#202124;\">&gt;= 80</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Value</td><td style=\"padding:4px 0;color:#202124;\">92.5</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Time</td><td style=\"padding:4px 0;color:#202124;\">2026-08-01 10:10:00 UTC</td></tr></table><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;margin:16px 0;\"><tr><th align=\"left\" style=\"padding:6px 12px 6px 0;border-bottom:1px solid #DADCE0;color:#5F6368;font-weight:600;\">host</th><th align=\"left\" style=\"padding:6px 12px 6px 0;border-bottom:1px solid #DADCE0;color:#5F6368;font-weight:600;\">cpu</th></tr><tr><td style=\"padding:6px 12px 6px 0;border-bottom:1px solid #DADCE0;color:#202124;\">web-1</td><td style=\"padding:6px 12px 6px 0;border-bottom:1px solid #DADCE0;color:#202124;\">92.5</td></tr><tr><td style=\"padding:6px 12px 6px 0;border-bottom:1px solid #DADCE0;color:#202124;\">web-2</td><td style=\"padding:6px 12px 6px 0;border-bottom:1px solid #DADCE0;color:#202124;\">88.1</td></tr></table><div style=\"margin:16px 0;\"><a href=\"https://example.openobserve.ai/alerts/sample\" style=\"display:inline-block;margin:0 8px 8px 0;padding:8px 16px;background-color:#2EB67D;border-radius:4px;color:#FFFFFF;font-weight:600;text-decoration:none;\">View logs</a><a href=\"https://example.openobserve.ai/web/alerts/detail/sample?org_identifier=default\" style=\"display:inline-block;margin:0 8px 8px 0;padding:8px 16px;border:1px solid #DADCE0;border-radius:4px;color:#1A73E8;text-decoration:none;\">Open alert</a></div><div style=\"margin:24px 0 0 0;padding-top:12px;border-top:1px solid #DADCE0;color:#5F6368;font-size:12px;\">Sent by OpenObserve.</div></td></tr></table>",
+    "text": "🔴 Sample CPU alert firing\n\ncpu > 80 for 10m\n\nLevel: Critical\nEvent: Firing\nStream: app_logs\nThreshold: >= 80\nValue: 92.5\nTime: 2026-08-01 10:10:00 UTC\n\nhost: web-1 | cpu: 92.5\nhost: web-2 | cpu: 88.1\n\nView logs: https://example.openobserve.ai/alerts/sample\nOpen alert: https://example.openobserve.ai/web/alerts/detail/sample?org_identifier=default\n\nSent by OpenObserve."
+  },
+  "sns_firing": {
+    "subject": "🔴 Sample CPU alert firing",
+    "message": "🔴 Sample CPU alert firing\n\ncpu > 80 for 10m\n\nLevel: Critical\nEvent: Firing\nStream: app_logs\nThreshold: >= 80\nValue: 92.5\nTime: 2026-08-01 10:10:00 UTC\n\nView logs: https://example.openobserve.ai/alerts/sample\nOpen alert: https://example.openobserve.ai/web/alerts/detail/sample?org_identifier=default"
+  },
+  "teams_adaptive_firing": {
+    "type": "message",
+    "attachments": [
+      {
+        "contentType": "application/vnd.microsoft.card.adaptive",
+        "contentUrl": null,
+        "content": {
+          "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+          "type": "AdaptiveCard",
+          "version": "1.4",
+          "body": [
+            {
+              "type": "TextBlock",
+              "text": "🔴 Sample CPU alert firing",
+              "weight": "Bolder",
+              "size": "Large",
+              "wrap": true
+            },
+            {
+              "type": "TextBlock",
+              "text": "cpu > 80 for 10m",
+              "wrap": true
+            },
+            {
+              "type": "FactSet",
+              "facts": [
+                {
+                  "title": "Level",
+                  "value": "Critical"
+                },
+                {
+                  "title": "Event",
+                  "value": "Firing"
+                },
+                {
+                  "title": "Stream",
+                  "value": "app_logs"
+                },
+                {
+                  "title": "Threshold",
+                  "value": ">= 80"
+                },
+                {
+                  "title": "Value",
+                  "value": "92.5"
+                },
+                {
+                  "title": "Time",
+                  "value": "2026-08-01 10:10:00 UTC"
+                }
+              ]
+            },
+            {
+              "type": "TextBlock",
+              "text": "host: web-1 · cpu: 92.5\n\nhost: web-2 · cpu: 88.1",
+              "wrap": true
+            }
+          ],
+          "actions": [
+            {
+              "type": "Action.OpenUrl",
+              "title": "View logs",
+              "url": "https://example.openobserve.ai/alerts/sample",
+              "style": "positive"
+            },
+            {
+              "type": "Action.OpenUrl",
+              "title": "Open alert",
+              "url": "https://example.openobserve.ai/web/alerts/detail/sample?org_identifier=default"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "teams_message_firing": {
+    "@type": "MessageCard",
+    "@context": "http://schema.org/extensions",
+    "summary": "🔴 Sample CPU alert firing",
+    "sections": [
+      {
+        "activityTitle": "🔴 Sample CPU alert firing",
+        "markdown": false,
+        "text": "cpu &gt; 80 for 10m<br><br>host: web-1 &middot; cpu: 92.5<br>host: web-2 &middot; cpu: 88.1",
+        "facts": [
+          {
+            "name": "Level",
+            "value": "Critical"
+          },
+          {
+            "name": "Event",
+            "value": "Firing"
+          },
+          {
+            "name": "Stream",
+            "value": "app_logs"
+          },
+          {
+            "name": "Threshold",
+            "value": "&gt;= 80"
+          },
+          {
+            "name": "Value",
+            "value": "92.5"
+          },
+          {
+            "name": "Time",
+            "value": "2026-08-01 10:10:00 UTC"
+          }
+        ]
+      }
+    ],
+    "potentialAction": [
+      {
+        "@type": "OpenUri",
+        "name": "View logs",
+        "targets": [
+          {
+            "os": "default",
+            "uri": "https://example.openobserve.ai/alerts/sample"
+          }
+        ]
+      },
+      {
+        "@type": "OpenUri",
+        "name": "Open alert",
+        "targets": [
+          {
+            "os": "default",
+            "uri": "https://example.openobserve.ai/web/alerts/detail/sample?org_identifier=default"
+          }
+        ]
+      }
+    ]
+  },
+  "discord_firing": {
+    "embeds": [
+      {
+        "title": "🔴 Sample CPU alert firing",
+        "description": "cpu \\> 80 for 10m\n\n[Open alert](https://example.openobserve.ai/web/alerts/detail/sample?org_identifier=default)",
+        "fields": [
+          {
+            "name": "Level",
+            "value": "Critical",
+            "inline": true
+          },
+          {
+            "name": "Event",
+            "value": "Firing",
+            "inline": true
+          },
+          {
+            "name": "Stream",
+            "value": "app\\_logs",
+            "inline": true
+          },
+          {
+            "name": "Threshold",
+            "value": "\\>\\= 80",
+            "inline": true
+          },
+          {
+            "name": "Value",
+            "value": "92\\.5",
+            "inline": true
+          },
+          {
+            "name": "Time",
+            "value": "2026\\-08\\-01 10\\:10\\:00 UTC",
+            "inline": true
+          },
+          {
+            "name": "Data",
+            "value": "`host` web\\-1 · `cpu` 92\\.5\n`host` web\\-2 · `cpu` 88\\.1",
+            "inline": false
+          }
+        ],
+        "url": "https://example.openobserve.ai/alerts/sample"
+      }
+    ]
+  },
+  "pagerduty_firing": {
+    "event_action": "trigger",
+    "payload": {
+      "summary": "🔴 Sample CPU alert firing",
+      "source": "app_logs",
+      "severity": "critical",
+      "custom_details": {
+        "Level": "Critical",
+        "Event": "Firing",
+        "Stream": "app_logs",
+        "Threshold": ">= 80",
+        "Value": "92.5",
+        "Time": "2026-08-01 10:10:00 UTC",
+        "body": "cpu > 80 for 10m"
+      }
+    },
+    "links": [
+      {
+        "href": "https://example.openobserve.ai/alerts/sample",
+        "text": "View logs"
+      },
+      {
+        "href": "https://example.openobserve.ai/web/alerts/detail/sample?org_identifier=default",
+        "text": "Open alert"
+      }
+    ]
+  }
+}

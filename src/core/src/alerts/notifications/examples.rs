@@ -690,6 +690,7 @@ mod tests {
         resolve::resolve_content,
     };
 
+    const EXAMPLE_ALERT: &str = include_str!("render/testdata/examples/alert.json");
     const EXAMPLE_ANOMALY: &str = include_str!("render/testdata/examples/anomaly.json");
     const EXAMPLE_INCIDENT: &str = include_str!("render/testdata/examples/incident.json");
     const EXAMPLE_SYNTHETICS: &str = include_str!("render/testdata/examples/synthetics.json");
@@ -723,7 +724,25 @@ mod tests {
             "webhook_firing": rendered(kind, false, ChannelFormat::Webhook),
             "email_firing": rendered(kind, false, ChannelFormat::Email),
             "sns_firing": rendered(kind, false, ChannelFormat::Sns),
+            "teams_adaptive_firing": rendered(kind, false, ChannelFormat::TeamsAdaptiveCard),
+            "teams_message_firing": rendered(kind, false, ChannelFormat::TeamsMessageCard),
+            "discord_firing": rendered(kind, false, ChannelFormat::Discord),
+            "pagerduty_firing": rendered(kind, false, ChannelFormat::PagerDuty),
         })
+    }
+
+    #[test]
+    fn golden_example_alert_has_the_data_and_object_buttons() {
+        let want: serde_json::Value = serde_json::from_str(EXAMPLE_ALERT).unwrap();
+        assert_eq!(example(NotificationKind::Alert), want);
+        let actions = want["slack_firing"]["blocks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|b| b["type"] == "actions")
+            .unwrap();
+        assert_eq!(actions["elements"][0]["text"]["text"], "View logs");
+        assert_eq!(actions["elements"][1]["text"]["text"], "Open alert");
     }
 
     #[test]
@@ -830,6 +849,7 @@ mod tests {
         );
         std::fs::create_dir_all(dir).unwrap();
         for (kind, file) in [
+            (NotificationKind::Alert, "alert.json"),
             (NotificationKind::Anomaly, "anomaly.json"),
             (NotificationKind::Incident, "incident.json"),
             (NotificationKind::Synthetics, "synthetics.json"),
