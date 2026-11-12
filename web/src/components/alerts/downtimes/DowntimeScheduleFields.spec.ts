@@ -18,6 +18,8 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent } from "vue";
 import store from "@/test/unit/helpers/store";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import ODate from "@/lib/forms/Date/ODate.vue";
+import OTime from "@/lib/forms/Time/OTime.vue";
 import { defaultDowntimeValues } from "@/utils/downtimes/downtimeForm";
 import DowntimeScheduleFields from "./DowntimeScheduleFields.vue";
 
@@ -53,11 +55,37 @@ describe("DowntimeScheduleFields, a moved start", () => {
     return { wrapper, api };
   };
 
+  // The user's pick, as the date or time control emits it.
+  const pick = async (wrapper: ReturnType<typeof mount>, name: string, value: string) => {
+    const control = [...wrapper.findAllComponents(ODate), ...wrapper.findAllComponents(OTime)].find(
+      (c) => c.props("name") === name,
+    );
+    expect(control).toBeTruthy();
+    control!.vm.$emit("update:modelValue", value);
+    await flushPromises();
+  };
+
   it("moves the end by the same amount, so the window keeps its length", async () => {
     const { wrapper, api } = await mountOnce();
-    api.setFieldValue("schedule.start_date", "2026-11-22");
-    await flushPromises();
+    await pick(wrapper, "schedule.start_date", "2026-11-22");
+    expect(api.state.values.schedule.start_date).toBe("2026-11-22");
     expect(api.state.values.schedule.end_date).toBe("2026-11-22");
+    expect(api.state.values.schedule.end_time).toBe("03:00");
+    await pick(wrapper, "schedule.start_time", "23:30");
+    expect(api.state.values.schedule.end_date).toBe("2026-11-23");
+    expect(api.state.values.schedule.end_time).toBe("00:30");
+    wrapper.unmount();
+  });
+
+  it("keeps the loaded end on a reset that changes only the start", async () => {
+    const { wrapper, api } = await mountOnce();
+    api.reset({
+      ...api.state.values,
+      schedule: { ...api.state.values.schedule, start_time: "01:00" },
+    });
+    await flushPromises();
+    expect(api.state.values.schedule.start_time).toBe("01:00");
+    expect(api.state.values.schedule.end_date).toBe("2026-11-12");
     expect(api.state.values.schedule.end_time).toBe("03:00");
     wrapper.unmount();
   });

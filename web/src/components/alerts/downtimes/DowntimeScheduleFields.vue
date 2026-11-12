@@ -39,12 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('alerts.downtimes.scheduleForm.startDate')"
           required
           data-test="downtime-schedule-start-date"
+          @update:model-value="onStartChange('start_date', $event)"
         />
         <OFormTime
           name="schedule.start_time"
           :label="t('alerts.downtimes.scheduleForm.startTime')"
           required
           data-test="downtime-schedule-start-time"
+          @update:model-value="onStartChange('start_time', $event)"
         />
       </div>
       <div class="flex flex-wrap items-start gap-3 max-md:flex-col">
@@ -131,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, inject, watch } from "vue";
+import { computed, inject } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
@@ -166,29 +168,24 @@ const repeat = computed(() => schedule.value?.repeat);
 
 const REPEATS: readonly Repeat[] = ["none", "daily", "weekly"];
 
-// A moved one-time start moves the end by the same amount, so the window keeps its length.
-// A loaded row or a reset changes the end too, so only a change of the start alone moves it.
-watch(
-  () => {
-    const s = schedule.value;
-    return s ? [s.repeat, s.timezone, s.start_date, s.start_time, s.end_date, s.end_time] : null;
-  },
-  (next, prev) => {
-    if (!next || !prev) return;
-    const [repeat, zone, startDate, startTime, endDate, endTime] = next;
-    const [prevRepeat, prevZone, prevDate, prevTime, prevEndDate, prevEndTime] = prev;
-    if (repeat !== "none" || prevRepeat !== "none" || zone !== prevZone) return;
-    if (startDate === prevDate && startTime === prevTime) return;
-    if (endDate !== prevEndDate || endTime !== prevEndTime) return;
-    const oldStart = localToUtcMicros(prevDate, prevTime, zone);
-    const oldEnd = localToUtcMicros(endDate, endTime, zone);
-    const newStart = localToUtcMicros(startDate, startTime, zone);
-    if (oldStart === null || oldEnd === null || newStart === null || oldEnd <= oldStart) return;
-    const end = utcMicrosToLocal(newStart + (oldEnd - oldStart), zone);
-    form.setFieldValue("schedule.end_date", end.date);
-    form.setFieldValue("schedule.end_time", end.time);
-  },
-);
+// A start the user moves moves the end by the same amount, so the window keeps its length.
+// It runs from the start controls, not a watcher, so a loaded row or a reset moves nothing.
+// The control calls this before the form stores the new start, so `schedule` still holds the old one.
+const onStartChange = (part: "start_date" | "start_time", value: unknown) => {
+  const s = schedule.value;
+  if (!s || s.repeat !== "none" || typeof value !== "string" || value === s[part]) return;
+  const zone = s.timezone;
+  const oldStart = localToUtcMicros(s.start_date, s.start_time, zone);
+  const oldEnd = localToUtcMicros(s.end_date, s.end_time, zone);
+  const newStart =
+    part === "start_date"
+      ? localToUtcMicros(value, s.start_time, zone)
+      : localToUtcMicros(s.start_date, value, zone);
+  if (oldStart === null || oldEnd === null || newStart === null || oldEnd <= oldStart) return;
+  const end = utcMicrosToLocal(newStart + (oldEnd - oldStart), zone);
+  form.setFieldValue("schedule.end_date", end.date);
+  form.setFieldValue("schedule.end_time", end.time);
+};
 
 // Only a user pick resets the dates; a loaded row sets the repeat without passing through here.
 const onRepeatChange = (next: unknown) => {
