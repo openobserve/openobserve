@@ -431,9 +431,8 @@ jobs:
       - name: Type-check (any error fails)
         working-directory: web
         env:
-          # vue-tsc peaks around 3GB on this project; the runner's default heap
-          # ceiling is ~4GB, which OOMs (exit 134) instead of reporting errors.
-          NODE_OPTIONS: "--max-old-space-size=8192"
+          # vue-tsc needs ~8 GB of heap here (main alone peaks at 7.9 GB); a lower cap OOMs with exit 134.
+          NODE_OPTIONS: "--max-old-space-size=12288"
         run: npm run type-check:app
 
   unit_tests_summary:
