@@ -376,6 +376,10 @@ describe("AddAlert (OForm owner)", () => {
       expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ message: "SQL query cannot be empty." }),
       );
+      const condition = wrapper.vm.sectionItems.find(
+        (item: { id: string }) => item.id === "condition",
+      );
+      expect(condition.state).toBe("error");
     });
 
     it("blocks a SQL save while a SQL validation error is present", async () => {
@@ -400,6 +404,10 @@ describe("AddAlert (OForm owner)", () => {
           message: "Please fix the SQL error before saving.",
         }),
       );
+      const condition = wrapper.vm.sectionItems.find(
+        (item: { id: string }) => item.id === "condition",
+      );
+      expect(condition.state).toBe("error");
     });
 
     it("blocks a PromQL save when the PromQL query is empty", async () => {
