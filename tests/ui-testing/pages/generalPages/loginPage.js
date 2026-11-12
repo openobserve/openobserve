@@ -21,7 +21,7 @@ export class LoginPage {
 
   // A form login lands in the user's default org; reload with ORGNAME so menu navigation stays in the test org.
   async openOrgHome(baseUrl = process.env["ZO_BASE_URL"]) {
-    const org = process.env["ORGNAME"];
+    const org = process.env["ORGNAME"] || 'default';
     await this.page.goto(`${baseUrl}/web/?org_identifier=${encodeURIComponent(org)}`, {
       waitUntil: 'domcontentloaded',
       timeout: 30000
