@@ -712,6 +712,7 @@ mod tests {
                 fields: vec![("host".into(), "h1".into())],
                 links: vec![("Runbook".into(), "https://r".into())],
                 open_url: "https://o2/alerts/a1".into(),
+                ..Default::default()
             }),
             chart_png_b64: None,
             level: AlertLevel::Critical,
