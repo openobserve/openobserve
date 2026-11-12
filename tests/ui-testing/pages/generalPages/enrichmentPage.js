@@ -482,6 +482,9 @@ class EnrichmentPage {
         await this.dateTimeAbsoluteTab.waitFor({ state: 'visible', timeout: 10000 });
         await this.dateTimeAbsoluteTab.click();
         await expect(this.dateTimeStartTimeInput.first()).toBeVisible({ timeout: 10000 });
+        // Callers click the results table next; an open picker can sit over its first row.
+        await this.page.keyboard.press('Escape');
+        await expect(this.dateTimeStartTimeInput.first()).toBeHidden({ timeout: 10000 });
     }
 
     // VRL Query Methods
