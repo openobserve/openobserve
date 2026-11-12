@@ -297,27 +297,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let (org_id, name) =
-                    match super::destinations::parse_event_key(TEMPLATE_WATCHER_PREFIX, &ev.key) {
-                        Ok(parsed) => parsed,
-                        Err(e) => {
-                            log::error!("{e}");
-                            continue;
-                        }
-                    };
-                let item_value: Template = match table::templates::get(org_id, name).await {
-                    Ok(Some(val)) => val,
-                    Ok(None) => {
-                        log::error!("Template not found in db, org_id: {org_id}");
-                        continue;
-                    }
-                    Err(e) => {
-                        log::error!("Error getting from db: org_id: {org_id}, error: {e}");
-                        continue;
-                    }
-                };
-                let cache_key = format!("{org_id}/{name}");
-                apply_template_cache_event(&cache_key, Some(&item_value));
+                if let Some((cache_key, item_value)) = put_event_entry(&ev.key).await {
+                    apply_template_cache_event(&cache_key, Some(&item_value));
+                }
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(TEMPLATE_WATCHER_PREFIX).unwrap();
@@ -613,6 +595,31 @@ async fn names_shared_with_live_orgs(
         .await?
         .into_iter()
         .collect())
+}
+
+/// The row a Put event caches, as `(cache_key, template)`; `None` when it has no row of its own.
+async fn put_event_entry(event_key: &str) -> Option<(String, Template)> {
+    let (org_id, name) =
+        match super::destinations::parse_event_key(TEMPLATE_WATCHER_PREFIX, event_key) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                log::error!("{e}");
+                return None;
+            }
+        };
+    let template = match table::templates::get_own(org_id, name).await {
+        Ok(Some(val)) => val,
+        Ok(None) => {
+            log::error!("Template not found in db, org_id: {org_id}");
+            return None;
+        }
+        Err(e) => {
+            log::error!("Error getting from db: org_id: {org_id}, error: {e}");
+            return None;
+        }
+    };
+    let cache_key = format!("{}/{}", template.org_id, template.name);
+    Some((cache_key, template))
 }
 
 /// The owners of the template's tuples: the org, and the name, which older releases wrote as org.
@@ -1011,6 +1018,31 @@ mod tests {
         })
         .await
         .unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_put_event_caches_only_the_row_its_own_org_holds() {
+        if !meta_store().await {
+            return;
+        }
+        let suffix = config::utils::time::now_micros();
+        let owner = format!("t_tpl_put_owner_{suffix}");
+        let other = format!("t_tpl_put_other_{suffix}");
+        let name = format!("t_tpl_put_{suffix}");
+        put_template(DEFAULT_ORG, &name).await;
+
+        // `other` holds no row of that name, so the default fallback would cache the shared
+        // `default` row under `other/name` and shadow the shared entry.
+        let entry = put_event_entry(&format!("{TEMPLATE_WATCHER_PREFIX}{other}/{name}")).await;
+        assert!(entry.is_none(), "cached {entry:?}");
+
+        let entry =
+            put_event_entry(&format!("{TEMPLATE_WATCHER_PREFIX}{DEFAULT_ORG}/{name}")).await;
+        assert_eq!(entry.map(|e| e.0), Some(format!("{DEFAULT_ORG}/{name}")));
+
+        put_template(&owner, &name).await;
+        let entry = put_event_entry(&format!("{TEMPLATE_WATCHER_PREFIX}{owner}/{name}")).await;
+        assert_eq!(entry.map(|e| e.0), Some(format!("{owner}/{name}")));
     }
 
     #[tokio::test]

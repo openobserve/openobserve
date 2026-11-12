@@ -183,6 +183,160 @@ describe("Alert List", async () => {
     expect(dialog.props("okVariant")).toBe("destructive");
   });
 
+  it("keeps the Applies to filter at field width, so the search box has room", () => {
+    const filter = wrapper.find('[data-test="template-list-applies-to-filter"]');
+    expect(filter.classes()).toContain("w-field-width-sm");
+    expect(filter.classes()).toContain("shrink-0");
+    expect(filter.classes()).not.toContain("w-full");
+  });
+
+  describe("selection follows the visible rows", () => {
+    const rows = [
+      { name: "every", type: "http", body: "", applies_to: [] },
+      { name: "anomaly_only", type: "http", body: "", applies_to: ["anomaly"] },
+      { name: "alert_only", type: "http", body: "", applies_to: ["alert"] },
+    ];
+    const listKey = () => templateKeys.list(store.state.selectedOrganization.identifier);
+    // What the server lists; a test can change it to model a delete.
+    let serverRows: any[] = rows;
+    beforeEach(() => {
+      serverRows = rows;
+      // A refetch after a delete must return these rows, not the shared fixture.
+      global.server.use(
+        http.get(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates`,
+          () => HttpResponse.json(serverRows),
+        ),
+      );
+    });
+    afterEach(async () => {
+      // The tab, search, and filter persist across mounts; reset them.
+      const vm = wrapper.vm as any;
+      vm.activeTab = "all";
+      vm.filterQuery = "";
+      vm.appliesToFilter = "any";
+      await flushPromises();
+      // Drop these rows, so the next mount fetches the shared fixture.
+      global.server.resetHandlers();
+      queryClient.removeQueries({ queryKey: listKey() });
+    });
+    const selectAll = async (vm: any) => {
+      // Wait for the refetch, so a late response cannot replace these rows.
+      await queryClient.refetchQueries({ queryKey: listKey() });
+      await flushPromises();
+      expect(vm.templates.map((r: any) => r.name)).toEqual(rows.map((r) => r.name));
+      vm.handleSelectedIdsUpdate(rows.map((r) => r.name));
+      await flushPromises();
+      expect(vm.selectedTemplateIds).toEqual(rows.map((r) => r.name));
+    };
+
+    it("drops a selected row that the Applies to filter hides, and does not bring it back", async () => {
+      const vm = wrapper.vm as any;
+      await selectAll(vm);
+      vm.appliesToFilter = "alert";
+      await flushPromises();
+      expect(vm.selectedTemplateIds).toEqual(["every", "alert_only"]);
+      vm.appliesToFilter = "any";
+      await flushPromises();
+      expect(vm.selectedTemplateIds).toEqual(["every", "alert_only"]);
+    });
+
+    it("drops a selected row that the search hides", async () => {
+      const vm = wrapper.vm as any;
+      await selectAll(vm);
+      vm.filterQuery = "anomaly";
+      await flushPromises();
+      expect(vm.selectedTemplateIds).toEqual(["anomaly_only"]);
+    });
+
+    it("clears the selection when the Prebuilt tab hides every custom row", async () => {
+      const vm = wrapper.vm as any;
+      await selectAll(vm);
+      vm.activeTab = "prebuilt";
+      await flushPromises();
+      expect(vm.selectedTemplateIds).toEqual([]);
+    });
+
+    it("keeps a selection on page 1 and page 2 while paging through the table", async () => {
+      const vm = wrapper.vm as any;
+      serverRows = Array.from({ length: 25 }, (_, i) => ({
+        name: `row_${String(i).padStart(2, "0")}`,
+        type: "http",
+        body: "",
+        applies_to: [],
+      }));
+      await queryClient.refetchQueries({ queryKey: listKey() });
+      await flushPromises();
+      // Past OTable's skeleton hold, so the rows render.
+      vi.advanceTimersByTime(SKELETON_HOLD_MS);
+      await flushPromises();
+      expect(vm.templates).toHaveLength(25);
+      // Mocked so the URL rewrite does not leak a navigation into later tests.
+      const replaceSpy = vi
+        .spyOn(router, "replace")
+        .mockImplementation((() => Promise.resolve()) as any);
+      const body = () =>
+        wrapper
+          .find('[data-test="alert-templates-list-table"]')
+          .find('[data-test="o2-table-body"]');
+      try {
+        expect(body().text()).toContain("row_00");
+        expect(body().text()).not.toContain("row_24");
+        vm.handleSelectedIdsUpdate(["row_00", "row_24"]);
+        await flushPromises();
+
+        const pager = wrapper.findComponent({ name: "OTablePagination" });
+        pager.vm.$emit("next-page");
+        vi.advanceTimersByTime(10);
+        await flushPromises();
+        expect(body().text()).toContain("row_24");
+        expect(body().text()).not.toContain("row_00");
+        expect(vm.selectedTemplateIds).toEqual(["row_00", "row_24"]);
+
+        pager.vm.$emit("prev-page");
+        vi.advanceTimersByTime(10);
+        await flushPromises();
+        expect(body().text()).toContain("row_00");
+        expect(vm.selectedTemplateIds).toEqual(["row_00", "row_24"]);
+      } finally {
+        replaceSpy.mockRestore();
+      }
+      // Rendering 25 rows twice takes longer than the default 5 seconds.
+    }, 20000);
+
+    it("bulk deletes only the visible selection and keeps a failed row selected for retry", async () => {
+      const vm = wrapper.vm as any;
+      await selectAll(vm);
+      vm.appliesToFilter = "alert";
+      await flushPromises();
+      const bulk = vi.spyOn(templateService, "bulkDelete").mockResolvedValue({
+        data: { successful: ["every"], unsuccessful: ["alert_only"] },
+      } as any);
+      // The server no longer lists the deleted row.
+      serverRows = rows.filter((r) => r.name !== "every");
+      vm.bulkDeleteTemplates();
+      await flushPromises();
+      expect(bulk).toHaveBeenCalledTimes(1);
+      expect(bulk.mock.calls[0][1]).toEqual({ ids: ["every", "alert_only"] });
+      // Wait for the refetch the delete started, then check the selection survived it.
+      await vi.waitFor(() =>
+        expect(queryClient.getQueryState(listKey())?.fetchStatus).toBe("idle"),
+      );
+      await flushPromises();
+      expect(vm.templates.map((r: any) => r.name)).toEqual(["anomaly_only", "alert_only"]);
+      expect(vm.selectedTemplateIds).toEqual(["alert_only"]);
+
+      // Retry sends only the row that failed.
+      bulk.mockResolvedValue({ data: { successful: ["alert_only"], unsuccessful: [] } } as any);
+      vm.bulkDeleteTemplates();
+      await flushPromises();
+      expect(bulk).toHaveBeenCalledTimes(2);
+      expect(bulk.mock.calls[1][1]).toEqual({ ids: ["alert_only"] });
+      expect(vm.selectedTemplateIds).toEqual([]);
+      bulk.mockRestore();
+    });
+  });
+
   it("uses a destructive confirm for bulk delete", () => {
     const dialog = wrapper
       .findAllComponents({ name: "ConfirmDialog" })

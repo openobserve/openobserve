@@ -145,7 +145,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 labelKey="label"
                 valueKey="value"
                 size="sm"
-                class="w-44 shrink-0"
+                width="sm"
+                class="shrink-0"
                 :aria-label="t('alert_templates.appliesTo')"
                 data-test="template-list-applies-to-filter"
               />
@@ -1002,6 +1003,15 @@ const visibleRows = computed(() => {
         : byTab.filter((row) => templateAppliesTo(row, filter));
   if (!filterQuery.value) return byKind;
   return filterData(byKind, filterQuery.value);
+});
+// Unselect rows that tab, filter, or search hide; selections on other pages stay.
+watch(visibleRows, (rows) => {
+  if (!selectedTemplates.value.length) return;
+  const visible = new Map(rows.map((r: any) => [r.name, r]));
+  const kept = selectedTemplates.value
+    .map((tpl: any) => visible.get(tpl.name))
+    .filter((r: any) => r && !r.isPrebuilt);
+  if (kept.length !== selectedTemplates.value.length) selectedTemplates.value = kept;
 });
 const openBulkDeleteDialog = () => {
   confirmBulkDelete.value = true;
