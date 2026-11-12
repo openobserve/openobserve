@@ -384,7 +384,14 @@ export interface ValueEntryOptions {
   /** Without it the value itself decides whether to quote. */
   fieldType?: string;
   pattern?: boolean;
+  /** The text typed so far; a value that only contains it is ranked after those starting with it. */
+  typed?: string;
 }
+
+const typedWord = (typed: string): string => typed.replace(/^%+|%+$/g, "").toLowerCase();
+
+const startsWithWord = (text: string, word: string): boolean =>
+  text.startsWith(word) || text.split("_").some((segment) => segment.startsWith(word));
 
 const looksBare = (value: string): boolean =>
   (value !== "" && !Number.isNaN(Number(value))) || value === "true" || value === "false";
@@ -395,17 +402,22 @@ const likeLiteral = (value: string): string =>
 
 export const buildValueEntries = (
   values: string[],
-  { hasOpenQuote, closingQuoteAhead = false, range, fieldType, pattern = false }: ValueEntryOptions,
+  {
+    hasOpenQuote,
+    closingQuoteAhead = false,
+    range,
+    fieldType,
+    pattern = false,
+    typed = "",
+  }: ValueEntryOptions,
 ): LooseEntry[] => {
   const kind = columnKind(fieldType);
-  return values.map((value, index) => {
+  const entries = values.map((value) => {
     const entry: LooseEntry = {
       name: value,
       label: value,
       kind: "Value",
       insertText: value,
-      // An escape, not a raw NUL: a literal one makes the file binary to git.
-      sortText: `\u0000${String(index).padStart(6, "0")}`,
       filterText: value,
     };
 
@@ -432,6 +444,20 @@ export const buildValueEntries = (
     }
     return entry;
   });
+  const filtered = !!typedWord(typed);
+  const kept = filtered
+    ? prefixMatchesFirst(
+        entries.filter((entry) => matchesTyped(entry, typed)),
+        typed,
+      )
+    : entries;
+  return kept.map((entry, index) => ({
+    ...entry,
+    // An escape, not a raw NUL: a literal one makes the file binary to git.
+    sortText: `\u0000${String(index).padStart(6, "0")}`,
+    // Monaco's fuzzy filter would rescore what we already matched, so every kept row scores alike and sortText decides.
+    ...(filtered ? { filterText: typed } : {}),
+  }));
 };
 
 export type ValueStatus = "loading" | "empty" | "failed" | "cap";
@@ -970,7 +996,6 @@ const isStatusEntry = (entry: LooseEntry): boolean => String(entryName(entry)).s
 const matchText = (entry: LooseEntry): string =>
   String(entryName(entry)).replace(/^'|'$/g, "").toLowerCase();
 
-/** Case-insensitive prefix of the name or of any `_` segment; LIKE wildcards around the typed text are ignored. */
 // CAST is catalogued as a keyword but is a call, and an aggregate is never a comparison operand.
 const VALUE_KEYWORD_CALLS = new Set(["cast"]);
 
@@ -981,11 +1006,20 @@ export const isValueFunction = (entry: LooseEntry | null | undefined): boolean =
   return entry.kind === "Keyword" && VALUE_KEYWORD_CALLS.has(entryName(entry).toLowerCase());
 };
 
+/** Case-insensitive prefix of the name or of any `_` segment, or for a value anywhere inside as the server's keyword match is; LIKE wildcards are ignored. */
 export const matchesTyped = (entry: LooseEntry, typed: string): boolean => {
-  const word = typed.replace(/^%+|%+$/g, "").toLowerCase();
+  const word = typedWord(typed);
   if (!word) return true;
   const text = matchText(entry);
-  return text.startsWith(word) || text.split("_").some((segment) => segment.startsWith(word));
+  return startsWithWord(text, word) || (entry.kind === "Value" && text.includes(word));
+};
+
+// Stable: prefix matches keep their order ahead of values that only contain the typed text.
+const prefixMatchesFirst = (entries: LooseEntry[], typed: string): LooseEntry[] => {
+  const word = typedWord(typed);
+  if (!word) return entries;
+  const prefixed = (entry: LooseEntry) => startsWithWord(matchText(entry), word);
+  return [...entries.filter(prefixed), ...entries.filter((entry) => !prefixed(entry))];
 };
 
 const groupHeader = (
@@ -1030,8 +1064,9 @@ const isCapEntry = (entry: LooseEntry): boolean => entryName(entry) === "\u0000c
 export const groupEntries = (groups: SuggestGroup[], options: GroupOptions): LooseEntry[] =>
   groups.flatMap((group, index) => {
     const status = group.entries.filter(isStatusEntry);
-    const members = group.entries.filter(
-      (entry) => !isStatusEntry(entry) && matchesTyped(entry, options.typed),
+    const members = prefixMatchesFirst(
+      group.entries.filter((entry) => !isStatusEntry(entry) && matchesTyped(entry, options.typed)),
+      options.typed,
     );
     // The cap counts the values shown, so it goes with them; a loading or empty row stands alone.
     const statusShown = members.length ? status : status.filter((entry) => !isCapEntry(entry));

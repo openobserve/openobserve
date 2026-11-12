@@ -1641,10 +1641,7 @@ export default defineComponent({
         if (!resolver || typedIsColumn || unknownField) return fields;
 
         const outcome = await awaitValues(config, token, (options) =>
-          resolver(context.field, {
-            ...options,
-            prefix: context.hasOpenQuote ? context.typed : "",
-          }),
+          resolver(context.field, { ...options, prefix: context.typed }),
         );
         if (outcome === null) return null;
         if (outcome === "nolookup") return fields;
@@ -1671,6 +1668,7 @@ export default defineComponent({
           range: caretRange(position, context.typed.length),
           fieldType,
           pattern: context.operator === "like",
+          typed: context.typed,
         });
         return [...values, ...fields, ...capRow(context.field, outcome.length, position)];
       };
