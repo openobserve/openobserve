@@ -2623,8 +2623,8 @@ export default defineComponent({
     // left-section content, used only to decide how many pinned items fit before
     // they would clip. Hidden pinned items stay reachable inside the More menu.
     const PIN_BUTTON_WIDTH = computed(() => (windowWidth.value < 1366 ? 72 : 84));
-    const SAVED_VIEWS_PIN_WIDTH = 93;
-    const SYNTAX_GUIDE_LABEL_WIDTH = 108;
+    const SAVED_VIEWS_PIN_WIDTH = computed(() => (windowWidth.value < 1366 ? 93 : 105));
+    const SYNTAX_GUIDE_LABEL_WIDTH = computed(() => (windowWidth.value < 1366 ? 119 : 131));
     const SYNTAX_GUIDE_ICON_WIDTH = 40;
     const PIN_ITEM_GAP = 8;
 
@@ -2701,9 +2701,9 @@ export default defineComponent({
       if (isPinned("histogram")) res.histogram = tryFit(PIN_BUTTON_WIDTH.value);
       if (isPinned("sqlMode")) res.sqlMode = tryFit(PIN_BUTTON_WIDTH.value);
       if (isPinned("quickMode")) res.quickMode = tryFit(PIN_BUTTON_WIDTH.value);
-      if (isPinned("savedViews")) res.savedViews = tryFit(SAVED_VIEWS_PIN_WIDTH);
+      if (isPinned("savedViews")) res.savedViews = tryFit(SAVED_VIEWS_PIN_WIDTH.value);
       if (isPinned("syntaxGuide")) {
-        if (tryFit(SYNTAX_GUIDE_LABEL_WIDTH)) {
+        if (tryFit(SYNTAX_GUIDE_LABEL_WIDTH.value)) {
           res.syntaxGuide = true;
         } else if (tryFit(SYNTAX_GUIDE_ICON_WIDTH)) {
           res.syntaxGuide = true;
