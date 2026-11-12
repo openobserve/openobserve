@@ -1446,6 +1446,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     infra::storage::del_org_prefix_strict(org_id, &format!("synthetics/{org_id}/"))
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/synthetics_artifacts: {e}"))?;
+    infra::storage::del_org_prefix_strict(org_id, &format!("rum_replay_resources/{org_id}/"))
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/rum_replay_resources: {e}"))?;
     delete_org_workflow_http_triggers(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/workflow_http_triggers: {e}"))?;
