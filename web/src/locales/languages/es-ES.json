@@ -25813,7 +25813,7 @@
       "previewSubtitle": "No se escribe nada hasta que confirmes.",
       "previewLoading": "Comprobando qué cambiaría al adjuntar…",
       "attaching": "Adjuntando paquete…",
-      "attachingHint": "Adjuntando: se están creando la función y la canalización. Tarda unos segundos; la fila se actualiza al terminar.",
+      "attachingHint": "Adjuntando: se están creando la función y el pipeline. Tarda unos segundos; la fila se actualiza al terminar.",
       "previewPack": "Paquete",
       "previewClasses": "Clase OCSF que escribe",
       "previewFunction": "Función",
