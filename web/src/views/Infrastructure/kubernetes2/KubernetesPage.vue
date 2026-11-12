@@ -49,16 +49,8 @@ import {
   toggleMaximized,
   toggleMinimized,
 } from "./dockState";
-import K8sClusterHotbar from "./K8sClusterHotbar.vue";
 import K8sResourceTree from "./K8sResourceTree.vue";
-import {
-  buildTree,
-  clusterCodes,
-  clusterSeen,
-  clusterStatsOf,
-  clusterTone,
-  nodeSummary,
-} from "./k8sTree";
+import { buildTree, clusterSeen, clusterStatsOf, clusterTone, nodeSummary } from "./k8sTree";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { buildPaletteItems, mergePaletteItems, type PaletteItem } from "./k8sPalette";
@@ -126,19 +118,12 @@ const clusterOptions = computed(() => k8s.clusters.value.map((c) => ({ label: ra
 
 const stats = computed(() => clusterStatsOf(k8s.clusterResults.value, k8s.effectiveCluster.value));
 
-const hotbarClusters = computed(() => {
-  const codes = clusterCodes(k8s.clusters.value);
-  return k8s.clusters.value.map((name) => {
-    const own = clusterStatsOf(k8s.clusterResults.value, name);
-    const total = own?.nodes ?? 0;
-    return {
-      name,
-      code: codes[name],
-      tone: clusterTone(own),
-      nodes: total ? { total, ready: Math.max(total - (own?.nodesBad ?? 0), 0) } : null,
-    };
-  });
-});
+const pickerClusters = computed(() =>
+  k8s.clusters.value.map((name) => ({
+    name,
+    tone: clusterTone(clusterStatsOf(k8s.clusterResults.value, name)),
+  })),
+);
 
 const treeGroups = computed(() =>
   buildTree({
@@ -351,15 +336,8 @@ watch(
 );
 
 const paletteOpen = ref(false);
-const paletteGroup = ref<"clusters" | null>(null);
 
 const openPalette = () => {
-  paletteGroup.value = null;
-  paletteOpen.value = true;
-};
-
-const openClusterSwitcher = () => {
-  paletteGroup.value = "clusters";
   paletteOpen.value = true;
 };
 
@@ -545,18 +523,15 @@ k8s.loadStreams();
     </template>
 
     <div v-if="ready" class="flex h-full min-h-0" data-test="k8s2-shell">
-      <K8sClusterHotbar
-        :clusters="hotbarClusters"
-        :active="k8s.effectiveCluster.value"
-        @select="onCluster"
-        @all="openClusterSwitcher"
-      />
       <K8sResourceTree
         class="max-md:hidden"
         :groups="treeGroups"
         :active="state.view"
         :nodes="treeNodes"
+        :clusters="pickerClusters"
+        :cluster="k8s.effectiveCluster.value"
         @select="onView"
+        @cluster="onCluster"
       />
       <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col" data-k8s2-body data-test="k8s2-body">
         <OBanner
@@ -734,7 +709,6 @@ k8s.loadStreams();
     <K8sCommandPalette
       v-if="ready"
       v-model:open="paletteOpen"
-      :group="paletteGroup"
       :items="paletteItems"
       :loading="paletteIndex.loading.value"
       :index-failed="paletteIndex.failed.value"
