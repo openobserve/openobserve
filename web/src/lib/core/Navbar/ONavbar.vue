@@ -364,7 +364,7 @@ onBeforeUnmount(() => {
 // on the near-black rail.
 const indicatorClass = computed(() => [
   "pointer-events-none absolute left-0 top-0 z-0 rounded-surface border border-accent",
-  "bg-surface-base shadow-xs dark:bg-tabs-active-bg dark:shadow-none",
+  "bg-surface-base shadow-xs dark:bg-surface-accent-active dark:shadow-none",
   indicatorVisible.value ? "opacity-100" : "opacity-0",
 ]);
 
