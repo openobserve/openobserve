@@ -81,10 +81,8 @@ impl MergeMode {
         }
     }
 
-    /// True when the whole hour must be merged as one batch — every file of
-    /// the hour, including ones already above the size target, and regardless
-    /// of `ZO_COMPACT_MAX_FILE_SIZE` (the writer splits the output itself).
-    pub fn merges_whole_batch(&self) -> bool {
+    /// True when a batch of one file is still merged: the mode changes what the file holds.
+    pub fn rewrites_single_file(&self) -> bool {
         match self {
             #[cfg(feature = "enterprise")]
             Self::Downsampling(_) => true,
@@ -260,9 +258,9 @@ mod tests {
             MergeMode::for_stream(StreamType::Filelist, "x"),
             MergeMode::FileList
         ));
-        assert!(!MergeMode::Classic.merges_whole_batch());
-        assert!(MergeMode::MetricsIndexed.merges_whole_batch());
-        assert!(!MergeMode::MetricsHashSorted.merges_whole_batch());
+        assert!(!MergeMode::Classic.rewrites_single_file());
+        assert!(MergeMode::MetricsIndexed.rewrites_single_file());
+        assert!(!MergeMode::MetricsHashSorted.rewrites_single_file());
         assert_eq!(
             MergeMode::Classic.input_sort_order(&[]),
             FileSortOrder::TimestampDesc

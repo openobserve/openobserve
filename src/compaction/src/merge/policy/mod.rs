@@ -25,11 +25,17 @@ use std::sync::Arc;
 use arrow_schema::Schema;
 #[cfg(feature = "enterprise")]
 use config::meta::promql::DownsamplingRule;
-use config::meta::stream::{FileKey, MergeStrategy, StreamType};
+use config::{
+    Config,
+    meta::stream::{FileKey, MergeStrategy, PartitionTimeLevel, StreamType},
+    utils::time::day_micros,
+};
 use metrics_index::{MetricsFileLayout, metrics_index_stream};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
 use search::merge::MergeMode;
+
+use super::job::job_range_end;
 
 /// One planned merge: the files and the mode they merge in.
 pub(super) type PlannedBatch = (Vec<FileKey>, MergeMode);
@@ -45,6 +51,23 @@ pub(super) struct BatchLimits<'a> {
     pub merge_max_original_size: i64,
     /// Most sorted inputs (merge groups) one metrics merge may open; 0 is no cap.
     pub max_merge_groups: usize,
+}
+
+impl<'a> BatchLimits<'a> {
+    pub(super) fn from_config(
+        cfg: &Config,
+        strategy: &'a MergeStrategy,
+        is_incremental: bool,
+    ) -> Self {
+        Self {
+            strategy,
+            max_file_size: cfg.compact.max_file_size,
+            max_group_files: cfg.compact.max_group_files,
+            is_incremental,
+            merge_max_original_size: infra::file_list::merge_max_original_size(),
+            max_merge_groups: cfg.compact.metrics_max_groups,
+        }
+    }
 }
 
 /// What one round merges in a partition of the window.
@@ -141,6 +164,32 @@ impl MergePolicy {
     }
 }
 
+/// The level the window is read at: a closed 00:00 metrics job spans its day once `has_rule(day
+/// end)`.
+pub(super) fn window_level(
+    stream_type: StreamType,
+    offset: i64,
+    closed: bool,
+    day_level: PartitionTimeLevel,
+    has_rule: impl Fn(i64) -> bool,
+) -> PartitionTimeLevel {
+    if closed
+        && stream_type == StreamType::Metrics
+        && offset % day_micros(1) == 0
+        && has_rule(job_range_end(offset, PartitionTimeLevel::Daily))
+    {
+        return PartitionTimeLevel::Daily;
+    }
+    day_level
+}
+
+pub(super) fn has_downsampling_rule(_stream_name: &str, _max_ts: i64) -> bool {
+    #[cfg(feature = "enterprise")]
+    return get_largest_downsampling_rule(_stream_name, _max_ts).is_some();
+    #[cfg(not(feature = "enterprise"))]
+    false
+}
+
 /// Legacy metrics files never join a hash-ordered batch: sorting them would
 /// be a full sort of the hour. Returns `(hash-ordered files, legacy files)`.
 fn split_legacy_metrics(files: Vec<FileKey>) -> (Vec<FileKey>, Vec<FileKey>) {
@@ -171,7 +220,8 @@ fn mergeable_chunks(files: Vec<FileKey>, max_files: usize) -> Vec<Vec<FileKey>> 
 
 #[cfg(test)]
 mod tests {
-    use config::meta::stream::FileMeta;
+    use chrono::{TimeZone, Utc};
+    use config::{meta::stream::FileMeta, utils::time::hour_micros};
 
     use super::*;
 
@@ -277,5 +327,35 @@ mod tests {
         assert!(!MergePolicy::SizeBounded(MergeMode::Classic).reads_whole_window());
         assert!(MergePolicy::MetricsOpenHour.reads_whole_window());
         assert!(MergePolicy::MetricsClosedHour.reads_whole_window());
+    }
+
+    #[test]
+    fn test_window_level_whole_day_only_for_downsampling() {
+        let day = Utc
+            .with_ymd_and_hms(2026, 8, 18, 0, 0, 0)
+            .unwrap()
+            .timestamp_micros();
+        let day_end = day + day_micros(1) - 1;
+        let metrics = StreamType::Metrics;
+
+        // the rule is asked about the end of the day, not of hour 00
+        let hourly = PartitionTimeLevel::Hourly;
+        let level = window_level(metrics, day, true, hourly, |max_ts| max_ts == day_end);
+        assert_eq!(level, PartitionTimeLevel::Daily);
+
+        // no rule for the day end: the plain hour-00 merge stays hourly
+        let level = window_level(metrics, day, true, hourly, |_| false);
+        assert_eq!(level, PartitionTimeLevel::Hourly);
+        // other hours, open hours and other stream types never widen
+        let level = window_level(metrics, day + hour_micros(5), true, hourly, |_| true);
+        assert_eq!(level, PartitionTimeLevel::Hourly);
+        let level = window_level(metrics, day, false, hourly, |_| true);
+        assert_eq!(level, PartitionTimeLevel::Hourly);
+        let level = window_level(StreamType::Logs, day, true, hourly, |_| true);
+        assert_eq!(level, PartitionTimeLevel::Hourly);
+        // the level of the day holds without a rule, whatever the job
+        let daily = PartitionTimeLevel::Daily;
+        let level = window_level(StreamType::Logs, day, false, daily, |_| false);
+        assert_eq!(level, PartitionTimeLevel::Daily);
     }
 }

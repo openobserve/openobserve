@@ -31,8 +31,6 @@ use infra::{
     file_list as infra_file_list,
     schema::{get_partition_time_level_at, get_settings},
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
 use search_service::file_list;
 use tokio::{
     sync::{Semaphore, mpsc},
@@ -40,8 +38,8 @@ use tokio::{
 };
 
 use super::{
-    job::{job_range_end, job_time_level, scheduling_level},
-    policy::{BatchLimits, MergePolicy},
+    job::{job_range_end, scheduling_level},
+    policy::{BatchLimits, MergePolicy, has_downsampling_rule, window_level},
 };
 use crate::{
     bloom::compact::RetiredBlooms,
@@ -84,7 +82,7 @@ impl MergeWindow {
         let job_level = scheduling_level(stream_type, settings, offset);
         let job_end = job_range_end(offset, job_level);
         let is_incremental = !crate::is_past_hour(job_end);
-        let partition_time_level = job_time_level(
+        let partition_time_level = window_level(
             stream_type,
             offset,
             !is_incremental,
@@ -287,14 +285,7 @@ async fn merge_partition(
 ) -> anyhow::Result<RoundOutcome> {
     let cfg = get_config();
     let strategy = MergeStrategy::from(&cfg.compact.strategy);
-    let limits = BatchLimits {
-        strategy: &strategy,
-        max_file_size: cfg.compact.max_file_size,
-        max_group_files: cfg.compact.max_group_files,
-        is_incremental: window.is_incremental,
-        merge_max_original_size: infra_file_list::merge_max_original_size(),
-        max_merge_groups: cfg.compact.metrics_max_groups,
-    };
+    let limits = BatchLimits::from_config(&cfg, &strategy, window.is_incremental);
     let files = sort_for_strategy(files, &strategy);
     let plan = policy
         .plan(files, &limits, scan_schema, &window.stream())
@@ -477,13 +468,6 @@ async fn settle_job(window: &MergeWindow, job_id: i64, needs_another_round: bool
     {
         log::error!("[COMPACTOR] re-arm job {job_id} failed: {e}");
     }
-}
-
-fn has_downsampling_rule(_stream_name: &str, _max_ts: i64) -> bool {
-    #[cfg(feature = "enterprise")]
-    return get_largest_downsampling_rule(_stream_name, _max_ts).is_some();
-    #[cfg(not(feature = "enterprise"))]
-    false
 }
 
 async fn write_file_list(

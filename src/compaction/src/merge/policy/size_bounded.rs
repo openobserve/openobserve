@@ -35,7 +35,24 @@ pub(super) fn batches(
 ) -> Vec<PlannedBatch> {
     size_bounded_groups(files, limits)
         .into_iter()
+        .map(|group| within_size_target(group, limits.max_file_size as i64))
+        // a group cut down to one file has nothing left to merge with
+        .filter(|group| group.len() > 1)
         .map(|group| (group, mode.clone()))
+        .collect()
+}
+
+/// The leading files of `group` whose original and compressed sizes both sum within the target.
+fn within_size_target(group: Vec<FileKey>, max_file_size: i64) -> Vec<FileKey> {
+    let mut original_size = 0;
+    let mut compressed_size = 0;
+    group
+        .into_iter()
+        .take_while(|file| {
+            original_size += file.meta.original_size;
+            compressed_size += file.meta.compressed_size;
+            original_size <= max_file_size && compressed_size <= max_file_size
+        })
         .collect()
 }
 
@@ -95,5 +112,24 @@ mod tests {
         // a group cap seals every two files
         let capped = size_bounded_groups(&files, &limits(&MergeStrategy::FileTime, 2, false));
         assert_eq!(capped.len(), 2);
+    }
+
+    #[test]
+    fn test_batches_stop_at_the_compressed_size_target() {
+        let mut files: Vec<FileKey> = (1..=3)
+            .map(|i| metrics_file(&format!("{i}.parquet"), 300))
+            .collect();
+        for file in &mut files {
+            file.meta.compressed_size = 450;
+        }
+        let limits = limits(&MergeStrategy::FileTime, 0, false);
+        // 900 original bytes fit the 1000 target, 1350 compressed bytes do not
+        let planned = batches(&files, &limits, &MergeMode::Classic);
+        assert_eq!(planned.len(), 1);
+        assert_eq!(names(&planned[0].0), ["1.parquet", "2.parquet"]);
+        // a group cut down to one file is dropped
+        files.truncate(2);
+        files[1].meta.compressed_size = 600;
+        assert!(batches(&files, &limits, &MergeMode::Classic).is_empty());
     }
 }
