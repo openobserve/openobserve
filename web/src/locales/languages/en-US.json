@@ -2065,6 +2065,7 @@
     "slos": "SLOs",
     "reliability": "Reliability",
     "onCall": "On-Call",
+    "response": "Response",
     "toggleNavigation": "Toggle navigation",
     "ingestionText": "Ingestion",
     "navigationLink": "Navigation link",

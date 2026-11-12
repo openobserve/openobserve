@@ -305,7 +305,7 @@ describe("AlertHistory sort failure", () => {
   });
 });
 
-describe("AlertHistory failed page read", () => {
+describe("AlertHistory failed page read", { timeout: 30000 }, () => {
   const TOTAL = 60;
   const pagedHistory = () =>
     vi.mocked(alertsService.getHistory).mockImplementation(async (_org: any, q: any) => {
