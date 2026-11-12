@@ -50,8 +50,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
+import { coverageWord } from "../live/liveCopy";
 
-const props = defineProps<{ watching: number; learning: number; unseen: number }>();
+const props = defineProps<{
+  watching: number;
+  learning: number;
+  gaps: number;
+  live?: boolean;
+}>();
 
 const emit = defineEmits<{ select: [filter: "watching" | "learning" | "attention"] }>();
 
@@ -61,11 +67,13 @@ const { t } = useI18nTyped();
 const shown = computed(() =>
   [
     {
-      key: "watching",
+      key: props.live ? "watched" : "watching",
       count: props.watching,
-      color: "bg-status-positive",
+      color: "bg-badge-success-soft-text",
       filter: "watching" as const,
-      label: t("autoobserve2.coverageDrawer.legend.watching"),
+      label: props.live
+        ? coverageWord(t, "watched")
+        : t("autoobserve2.coverageDrawer.legend.watching"),
     },
     {
       key: "learning",
@@ -75,11 +83,11 @@ const shown = computed(() =>
       label: t("autoobserve2.coverageDrawer.legend.learning"),
     },
     {
-      key: "unseen",
-      count: props.unseen,
-      color: "bg-status-warning-text",
+      key: props.live ? "gap" : "unseen",
+      count: props.gaps,
+      color: "bg-badge-amber-soft-text",
       filter: "attention" as const,
-      label: t("autoobserve2.coverageDrawer.legend.unseen"),
+      label: props.live ? coverageWord(t, "gap") : t("autoobserve2.coverageDrawer.legend.unseen"),
     },
   ].filter((seg) => seg.count > 0),
 );

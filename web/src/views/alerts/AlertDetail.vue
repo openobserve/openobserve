@@ -392,6 +392,7 @@
           <OTabPanel name="configuration" stretch>
             <OContent class="h-full overflow-y-auto py-4">
               <AlertConfigSummary v-if="alert" :alert="alert" :slo-name="sloName" />
+              <AlertCalibrationHeadroomCard v-if="alert && !isAnomalyAlert" :alert-id="alertId" />
             </OContent>
           </OTabPanel>
         </OTabPanels>
@@ -415,6 +416,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import AlertConfigSummary from "@/components/alerts/AlertConfigSummary.vue";
+import AlertCalibrationHeadroomCard from "@/components/alert_calibration/AlertCalibrationHeadroomCard.vue";
 import AlertEvaluationHistory from "@/components/alerts/AlertEvaluationHistory.vue";
 import AlertGroupChart from "@/components/alerts/AlertGroupChart.vue";
 import AlertGroupHistory from "@/components/alerts/AlertGroupHistory.vue";

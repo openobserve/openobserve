@@ -98,6 +98,7 @@ import AlertService from "@/services/alerts";
 import DowntimeService from "@/services/downtimes";
 import { queryClient } from "@/composables/query/queryClient";
 import { alertKeys } from "@/services/alerts.querykeys";
+import { fenceAlertWrite } from "@/services/alerts.readFence";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { setMutationNotifier } from "@/composables/query/queryClient";
 import { announcePolite } from "@/lib/feedback/RegionStatus/announcer";
@@ -1210,6 +1211,42 @@ describe("AlertList - router query behaviors", () => {
     expect(pushedQuery.alert_id).toBeUndefined();
   });
 
+  it("a folder read answered after an AutoObserve Apply or Undo does not refill the rows with the old alert (F2)", async () => {
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    const org = store.state.selectedOrganization.identifier;
+    let answerLate: (value: any) => void = () => {};
+    (alertsSvc.listByFolderId as any)
+      .mockReturnValueOnce(new Promise((resolve) => (answerLate = resolve)))
+      .mockResolvedValue({ data: { list: [{ ...alertsDB[0], name: "After apply" }] } });
+    const read = wrapper.vm.getAlertsFn(store, "default", "", true, "", true);
+    await flushPromises();
+    await fenceAlertWrite(queryClient, org, async () => "applied");
+    answerLate({ data: { list: [{ ...alertsDB[0], name: "Before apply" }] } });
+    await read;
+    await flushPromises();
+    const rows = store.state.organizationData.allAlertsListByFolderId.default;
+    expect(rows.map((r: any) => r.name)).toEqual(["After apply"]);
+  });
+
+  it("an editor opened from the list during an AutoObserve Apply gets the applied alert (F2)", async () => {
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    const org = store.state.selectedOrganization.identifier;
+    let answerLate: (value: any) => void = () => {};
+    (alertsSvc.get_by_alert_id as any)
+      .mockReturnValueOnce(new Promise((resolve) => (answerLate = resolve)))
+      .mockResolvedValue({ data: { ...alertsDB[0], alert_id: "a9", name: "After apply" } });
+    wrapper.vm.router.currentRoute.value.query = { action: "update", alert_id: "a9" };
+    const open = wrapper.vm.handleActionQuery("update");
+    await flushPromises();
+    await fenceAlertWrite(queryClient, org, async () => "applied");
+    answerLate({ data: { ...alertsDB[0], alert_id: "a9", name: "Before apply" } });
+    await open;
+    await flushPromises();
+    expect(wrapper.vm.formData?.name).toBe("After apply");
+  });
+
   // The editor opens an alert from its detail cache (getAlertById), and a save
   // reaches the list through update:list → refreshList.
   it("refreshList marks cached alert copies stale so reopening the editor shows the save", async () => {
@@ -1697,6 +1734,38 @@ describe("AlertList - row actions keep the view", () => {
     expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
     expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
 
+    await wrapper.vm.refreshAlerts();
+    await flushPromises();
+    expect(names(wrapper)).not.toContain("Alert 6");
+  });
+
+  it("keeps a row paused when an AutoObserve Apply makes a refresh in flight read again and the re-read lags", async () => {
+    const wrapper = await mountOnPageTwo();
+    const org = store.state.selectedOrganization.identifier;
+    const read = deferred<any>();
+    const stale = alertsDB.map((a) => ({ ...a }));
+    alertsSvc.listByFolderId.mockImplementationOnce(() => read.promise);
+    const refresh = wrapper.vm.refreshAlerts();
+    await flushPromises();
+
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    const lagging = stale.map((a) =>
+      a.name === "Alert 8" ? { ...a, name: "Alert 8 applied" } : a,
+    );
+    alertsSvc.listByFolderId.mockImplementation(async () => ({ data: { list: lagging } }));
+    await fenceAlertWrite(queryClient, org, async () => "applied");
+    read.resolve({ data: { list: stale } });
+    await refresh;
+    await flushPromises();
+
+    expect(names(wrapper)).toContain("Alert 8 applied");
+    expect(names(wrapper)).toContain("Alert 6");
+    expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
+    expect(errorToasts()).toEqual([]);
+
+    alertsSvc.listByFolderId.mockImplementation(async () => ({ data: { list: alertsDB } }));
     await wrapper.vm.refreshAlerts();
     await flushPromises();
     expect(names(wrapper)).not.toContain("Alert 6");

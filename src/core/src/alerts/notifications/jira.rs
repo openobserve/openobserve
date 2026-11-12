@@ -24,6 +24,7 @@ use std::{
 };
 
 use anyhow::{Result, anyhow, bail};
+pub use config::meta::destinations::JIRA_DESTINATION_TYPE as DESTINATION_TYPE;
 use config::{
     meta::{
         alerts::alert::Alert,
@@ -44,8 +45,6 @@ use reqwest::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 
 use super::{NotificationContext, STATUS_RESOLVED};
-
-pub const DESTINATION_TYPE: &str = "jira";
 
 pub const UNSUPPORTED_SENDER: &str =
     "Jira destinations only accept alert, composite alert, incident and anomaly notifications.";
@@ -233,7 +232,7 @@ fn misconfigured(message: String) -> anyhow::Error {
 }
 
 pub fn is_jira(endpoint: &Endpoint) -> bool {
-    endpoint.destination_type.as_deref() == Some(DESTINATION_TYPE)
+    endpoint.is_jira()
 }
 
 /// Comment on the open issue for this alert, incident or anomaly, or create one; never on recovery.

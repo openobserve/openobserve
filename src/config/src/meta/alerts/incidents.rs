@@ -515,6 +515,9 @@ pub enum AlertKind {
     #[default]
     Internal,
     External,
+    /// A finding AutoObserve paged for; snake_case would read `auto_observe`.
+    #[serde(rename = "autoobserve")]
+    AutoObserve,
 }
 
 impl AlertKind {
@@ -522,12 +525,14 @@ impl AlertKind {
         match self {
             AlertKind::Internal => "internal",
             AlertKind::External => "external",
+            AlertKind::AutoObserve => "autoobserve",
         }
     }
 
     pub fn from_stored(s: &str) -> Self {
         match s {
             "external" => AlertKind::External,
+            "autoobserve" => AlertKind::AutoObserve,
             _ => AlertKind::Internal,
         }
     }
@@ -2491,6 +2496,19 @@ mod tests {
         assert_eq!(AlertKind::from_stored("internal"), AlertKind::Internal);
         assert_eq!(AlertKind::from_stored("garbage"), AlertKind::Internal); // safe default
         assert_eq!(AlertKind::External.as_str(), "external");
+    }
+
+    #[test]
+    fn the_autoobserve_kind_round_trips() {
+        let kind = AlertKind::AutoObserve;
+        assert_eq!(kind.as_str(), "autoobserve");
+        assert_eq!(serde_json::to_string(&kind).unwrap(), "\"autoobserve\"");
+        assert_eq!(
+            serde_json::from_str::<AlertKind>("\"autoobserve\"").unwrap(),
+            kind
+        );
+        assert_eq!(AlertKind::from_stored(kind.as_str()), kind);
+        assert_eq!(AlertKind::from_stored("x"), AlertKind::Internal);
     }
 
     #[test]

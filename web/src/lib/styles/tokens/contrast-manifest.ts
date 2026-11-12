@@ -602,13 +602,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     themes: ["light"],
   },
   {
-    fg: "--color-datepicker-error-text",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["dark"],
-  },
-  {
     fg: "--color-datepicker-focus-border",
     category: "pending",
     why: "fails the threshold against the page surface it is painted on",

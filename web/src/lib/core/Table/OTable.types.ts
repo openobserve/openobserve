@@ -15,7 +15,7 @@ import type { TooltipSide } from "@/lib/overlay/Tooltip/OTooltip.types";
  * semantic ramp (`--color-priority-p*`) rather than a status tone — a P1 row is
  * not "an error", it is a P1.
  */
-export type RowRailTone = StatTone | "p1" | "p2" | "p3" | "p4" | "p5";
+export type RowRailTone = StatTone | "amber" | "p1" | "p2" | "p3" | "p4" | "p5";
 
 /** How a row is de-emphasised. One value today; a union so it can grow. */
 export type RowTone = "muted";
@@ -57,6 +57,8 @@ export const ROW_RAIL_TONE_CLASS: Record<RowRailTone, string> = {
   teal: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-badge-teal-soft-text",
   purple: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-badge-purple-soft-text",
   neutral: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-border-default",
+  // The amber of a Coverage gap chip, so a gap row's rail matches its chip.
+  amber: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-badge-amber-soft-text",
 };
 
 /** Tone → utility classes for a de-emphasised row. */

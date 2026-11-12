@@ -78,6 +78,7 @@ const alerts = {
     query?: string,
     alert_type?: string,
     include_dependencies?: boolean,
+    options?: { silentForbidden?: boolean },
   ) => {
     let url = `/api/v2/${org_identifier}/alerts?sort_by=${sort_by}&desc=${desc}&name=${name}`;
     if (folder_id) {
@@ -94,7 +95,7 @@ const alerts = {
     if (include_dependencies) {
       url += `&include_dependencies=true`;
     }
-    return http().get(url);
+    return options ? http().get(url, options) : http().get(url);
   },
   create: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
     return http()
@@ -184,17 +185,20 @@ const alerts = {
         return res;
       });
   },
-  delete_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
+  delete_by_alert_id: (
+    org_identifier: string,
+    alert_id: string,
+    folder_id?: any,
+    options?: { silentForbidden?: boolean },
+  ) => {
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http()
-      .delete(url)
-      .then((res) => {
-        analytics.track("alert_deleted", { count: 1 });
-        return res;
-      });
+    return (options ? http().delete(url, options) : http().delete(url)).then((res) => {
+      analytics.track("alert_deleted", { count: 1 });
+      return res;
+    });
   },
   toggle_state_by_alert_id: (
     org_identifier: string,
@@ -257,7 +261,12 @@ const alerts = {
       `/api/v2/${org_identifier}/alerts?slo_id=${encodeURIComponent(slo_id)}&alert_type=slo`,
     );
   },
-  get_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
+  get_by_alert_id: (
+    org_identifier: string,
+    alert_id: string,
+    folder_id?: any,
+    options?: { silentForbidden?: boolean },
+  ) => {
     // A teardown-time watcher can reach here with no id; that must not become
     // a GET /alerts/undefined on the wire.
     if (!alert_id) return Promise.reject(new Error("alert_id is required"));
@@ -265,7 +274,7 @@ const alerts = {
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().get(url);
+    return options ? http().get(url, options) : http().get(url);
   },
   validateComposite: (
     org_identifier: string,

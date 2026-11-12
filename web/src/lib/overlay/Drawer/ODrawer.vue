@@ -515,6 +515,7 @@ watch(shown, (open) => {
               <OTruncatedText
                 v-if="subTitle"
                 class="text-dialog-content-text mt-0.5 block text-xs opacity-70"
+                :data-test="subTitleDataTest"
               >
                 {{ subTitle }}
               </OTruncatedText>

@@ -120,11 +120,6 @@ function resumeTimer(id: string): void {
   record.timer = setTimeout(() => dismiss(record.id), record.remainingTimeout);
 }
 
-function capitalizeFirst(str: I18nText): I18nText {
-  if (!str) return str;
-  return (str.charAt(0).toUpperCase() + str.slice(1)) as I18nText;
-}
-
 function toast(options: ToastOptions): DismissFn {
   const variant: ToastVariant = options.variant ?? "default";
   // The license warning toast already names the features a refused request needed.
@@ -156,8 +151,9 @@ function toast(options: ToastOptions): DismissFn {
   const record: ToastRecord = {
     id,
     variant,
-    message: capitalizeFirst(options.message),
-    title: options.title ? capitalizeFirst(options.title) : undefined,
+    // Shown as written: a message often starts with a name (alert, stream, user) that must not be recased.
+    message: options.message,
+    title: options.title,
     timeout,
     position,
     open: true,
@@ -188,8 +184,8 @@ function updateToast(
 ): void {
   const record = toastRecords.find((r) => r.id === id);
   if (!record) return;
-  if (updates.title !== undefined) record.title = capitalizeFirst(updates.title);
-  if (updates.message !== undefined) record.message = capitalizeFirst(updates.message);
+  if (updates.title !== undefined) record.title = updates.title;
+  if (updates.message !== undefined) record.message = updates.message;
   if (updates.details !== undefined) record.details = updates.details;
   if (updates.titleCount !== undefined) record.titleCount = updates.titleCount;
 }

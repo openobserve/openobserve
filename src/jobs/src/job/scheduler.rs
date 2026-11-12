@@ -49,6 +49,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                     .await?;
             if clusters.iter().any(|c| c.name == exist_cluster_name) {
                 log::info!("[SCHEDULER] is running in cluster: {exist_cluster_name}");
+                run_region_local();
                 return Ok(());
             }
         }
@@ -127,4 +128,23 @@ pub async fn run() -> Result<(), anyhow::Error> {
 /// Runs the schedule jobs
 async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
     service::alerts::scheduler::run().await
+}
+
+/// The elected region runs every global lane; this one still claims its own AutoObserve row.
+#[cfg(feature = "enterprise")]
+fn run_region_local() {
+    if !o2_enterprise::enterprise::autoobserve::is_enabled() {
+        return;
+    }
+    tokio::task::spawn(service::alerts::scheduler::run_region_local());
+    spawn_pausable_job!(
+        "scheduler_watch_timeout_autoobserve",
+        get_config().limit.scheduler_watch_interval,
+        {
+            let module = config::meta::triggers::TriggerModule::AutoObserve;
+            if let Err(e) = infra::scheduler::watch_timeout_module(module).await {
+                log::error!("[SCHEDULER] watch AutoObserve timeout jobs error: {e}");
+            }
+        }
+    );
 }

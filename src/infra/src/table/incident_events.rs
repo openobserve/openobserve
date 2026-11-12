@@ -302,6 +302,20 @@ pub async fn append(
     append_with(get_orm_client_rw().await, org_id, incident_id, event).await
 }
 
+/// A persisted resolution timestamp lets retries repair a missing event without duplicating it.
+pub async fn ensure_resolved(
+    org_id: &str,
+    incident_id: &str,
+    resolved_at: i64,
+    user_id: &str,
+) -> Result<(), sea_orm::DbErr> {
+    let txn = get_orm_client_rw().await.begin().await?;
+    let mut event = IncidentEvent::resolved(Some(user_id.to_string()));
+    event.timestamp = resolved_at;
+    append_once_in(&txn, org_id, incident_id, event, true).await?;
+    txn.commit().await
+}
+
 /// [append] on a given connection, in its own transaction (a savepoint when `db` is one).
 pub async fn append_with<C: TransactionTrait>(
     db: &C,
@@ -322,11 +336,24 @@ pub async fn append_in(
     incident_id: &str,
     event: IncidentEvent,
 ) -> Result<(), sea_orm::DbErr> {
+    append_once_in(txn, org_id, incident_id, event, false).await
+}
+
+async fn append_once_in(
+    txn: &DatabaseTransaction,
+    org_id: &str,
+    incident_id: &str,
+    event: IncidentEvent,
+    resolution: bool,
+) -> Result<(), sea_orm::DbErr> {
     let row = locked_row(txn, org_id, incident_id).one(txn).await?;
 
     match row {
         Some(model) => {
             let mut events = decode_events(org_id, incident_id, &model.events);
+            if resolution && has_resolution(&events, event.timestamp) {
+                return Ok(());
+            }
             events.push(event);
             let events_json = encode_events(&events)?;
 
@@ -346,6 +373,16 @@ pub async fn append_in(
         }
     }
     Ok(())
+}
+
+fn has_resolution(events: &[IncidentEvent], resolved_at: i64) -> bool {
+    events.iter().any(|event| {
+        event.timestamp >= resolved_at
+            && matches!(
+                event.event_type,
+                config::meta::alerts::incidents::IncidentEventType::Resolved { .. }
+            )
+    })
 }
 
 /// Row lock so concurrent rewrites cannot drop each other's event; SQLite has no `FOR UPDATE`.
@@ -433,6 +470,156 @@ mod tests {
     use config::meta::alerts::incidents::IncidentEventType;
 
     use super::*;
+
+    /// SQLite, then a Postgres schema of its own when `ZO_META_POSTGRES_DSN` is set.
+    async fn event_backends() -> Vec<(&'static str, sea_orm::DatabaseConnection, Option<String>)> {
+        use sea_orm::{ConnectOptions, Database};
+
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let mut out = vec![("sqlite", Database::connect(opts).await.unwrap(), None)];
+        if let Some(schema) = event_schema().await {
+            out.insert(
+                0,
+                ("postgres", schema_connection(&schema).await, Some(schema)),
+            );
+        }
+        for (_, db, _) in &out {
+            let backend = db.get_database_backend();
+            let table =
+                sea_orm::Schema::new(backend).create_table_from_entity(incident_events::Entity);
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        out
+    }
+
+    /// A fresh schema on `ZO_META_POSTGRES_DSN`; the SQLite lane sets the variable empty.
+    async fn event_schema() -> Option<String> {
+        let dsn = std::env::var("ZO_META_POSTGRES_DSN").unwrap_or_default();
+        if dsn.trim().is_empty() {
+            return None;
+        }
+        let schema = format!("iev_test_{}", config::ider::generate().to_ascii_lowercase());
+        let admin = sea_orm::Database::connect(&dsn).await.unwrap();
+        let create = format!(r#"CREATE SCHEMA "{schema}""#);
+        admin.execute_unprepared(&create).await.unwrap();
+        Some(schema)
+    }
+
+    async fn schema_connection(schema: &str) -> sea_orm::DatabaseConnection {
+        let mut options =
+            sea_orm::ConnectOptions::new(std::env::var("ZO_META_POSTGRES_DSN").unwrap());
+        options
+            .max_connections(1)
+            .set_schema_search_path(schema.to_string());
+        sea_orm::Database::connect(options).await.unwrap()
+    }
+
+    async fn drop_event_schema(schema: Option<String>) {
+        let Some(schema) = schema else {
+            return;
+        };
+        let admin = sea_orm::Database::connect(std::env::var("ZO_META_POSTGRES_DSN").unwrap())
+            .await
+            .unwrap();
+        let drop = format!(r#"DROP SCHEMA "{schema}" CASCADE"#);
+        admin.execute_unprepared(&drop).await.unwrap();
+        println!("postgres arm ran");
+    }
+
+    async fn resolutions(db: &sea_orm::DatabaseConnection) -> Vec<IncidentEvent> {
+        let row = incident_events::Entity::find()
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap();
+        decode_events("demo-org", "incident", &row.events)
+    }
+
+    fn resolution_at(timestamp: i64) -> IncidentEvent {
+        let mut event = IncidentEvent::resolved(None);
+        event.timestamp = timestamp;
+        event
+    }
+
+    #[tokio::test]
+    async fn resolution_event_repair_survives_rollback_and_retries() {
+        for (backend, db, schema) in event_backends().await {
+            append_with(&db, "demo-org", "incident", IncidentEvent::created())
+                .await
+                .unwrap();
+            let event = resolution_at(100);
+            let interrupted = db.begin().await.unwrap();
+            append_once_in(&interrupted, "demo-org", "incident", event.clone(), true)
+                .await
+                .unwrap();
+            interrupted.rollback().await.unwrap();
+            for _ in 0..2 {
+                let retry = db.begin().await.unwrap();
+                append_once_in(&retry, "demo-org", "incident", event.clone(), true)
+                    .await
+                    .unwrap();
+                retry.commit().await.unwrap();
+            }
+            let events = resolutions(&db).await;
+            assert_eq!(events.len(), 2, "{backend}");
+            assert!(has_resolution(&events, 100), "{backend}");
+            assert!(
+                !has_resolution(&events, 101),
+                "{backend}: a later resolution needs its own event"
+            );
+            let later = db.begin().await.unwrap();
+            append_once_in(&later, "demo-org", "incident", resolution_at(101), true)
+                .await
+                .unwrap();
+            later.commit().await.unwrap();
+            assert!(has_resolution(&resolutions(&db).await, 101), "{backend}");
+            drop_event_schema(schema).await;
+        }
+    }
+
+    /// SQLite's write pool has one connection, so two writes there cannot overlap at all.
+    #[tokio::test]
+    async fn an_event_written_while_a_repair_holds_the_row_keeps_both_on_postgres() {
+        let Some(schema) = event_schema().await else {
+            println!("postgres arm skipped: ZO_META_POSTGRES_DSN is unset");
+            return;
+        };
+        let (db, other) = (
+            schema_connection(&schema).await,
+            schema_connection(&schema).await,
+        );
+        let backend = db.get_database_backend();
+        let table = sea_orm::Schema::new(backend).create_table_from_entity(incident_events::Entity);
+        db.execute(backend.build(&table)).await.unwrap();
+        append_with(&db, "demo-org", "incident", IncidentEvent::created())
+            .await
+            .unwrap();
+        let repair = db.begin().await.unwrap();
+        append_once_in(&repair, "demo-org", "incident", resolution_at(100), true)
+            .await
+            .unwrap();
+        let comment = IncidentEvent::comment("someone@example.com", "still looking");
+        let second = append_with(&other, "demo-org", "incident", comment);
+        tokio::pin!(second);
+        let early = tokio::time::timeout(std::time::Duration::from_millis(500), &mut second).await;
+        assert!(early.is_err(), "the second write waits on the row lock");
+        repair.commit().await.unwrap();
+        second.await.unwrap();
+        let events = resolutions(&db).await;
+        assert!(
+            has_resolution(&events, 100),
+            "the overlapping write kept the repair"
+        );
+        assert_eq!(events.len(), 3, "created, the resolution, the comment");
+        let retry = db.begin().await.unwrap();
+        append_once_in(&retry, "demo-org", "incident", resolution_at(100), true)
+            .await
+            .unwrap();
+        retry.commit().await.unwrap();
+        assert_eq!(resolutions(&db).await.len(), 3, "the retry records it once");
+        drop_event_schema(Some(schema)).await;
+    }
 
     #[test]
     fn test_decode_events_preserves_unknown_and_skips_non_objects() {

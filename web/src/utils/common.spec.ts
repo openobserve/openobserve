@@ -265,6 +265,10 @@ describe("Common Utils", () => {
       expect(logsErrorMessage(20004)).toBe("message.SearchFieldNotFound");
     });
 
+    it("20014 maps to the protected-stream message", () => {
+      expect(logsErrorMessage(20014)).toBe("message.SearchStreamProtected");
+    });
+
     it("should return empty string for unknown error codes", () => {
       expect(logsErrorMessage(99999)).toBe("");
       expect(logsErrorMessage(0)).toBe("");

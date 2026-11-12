@@ -880,25 +880,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="flex flex-col"
                         >
                           <div
-                            v-for="(value, key) in incidentDetails.group_values"
-                            :key="key"
+                            v-for="(dim, index) in dimensionRows"
+                            :key="dim.key"
                             class="border-border-default flex gap-2 border-b py-2.5"
-                            :class="{
-                              'border-b-0':
-                                key ===
-                                Object.keys(incidentDetails.group_values)[
-                                  Object.keys(incidentDetails.group_values).length - 1
-                                ],
-                            }"
+                            :class="{ 'border-b-0': index === dimensionRows.length - 1 }"
+                            data-test="incident-dimension-row"
                           >
                             <div
                               :class="'text-text-secondary'"
                               class="min-w-fit text-xs font-medium capitalize"
                             >
-                              {{ getSemanticGroupDisplayName(key) }}:
+                              {{ dim.label }}:
                             </div>
                             <div :class="'text-text-body'" class="flex-1 text-xs break-words">
-                              {{ value }}
+                              {{ dim.value }}
                             </div>
                           </div>
                         </div>
@@ -987,7 +982,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ]"
                   >
                     <IncidentAlertTriggersTable
-                      :triggers="triggers"
+                      :triggers="tableTriggers"
                       :isDarkMode="isDarkMode"
                       @row-click="handleTriggerRowClick"
                     />
@@ -1009,15 +1004,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ]"
                     >
                       <OIcon name="info" size="sm" class="opacity-80" />
-                      <span :class="'text-text-secondary'" class="text-sm font-semibold">
-                        {{ t("alerts.incidents.alertDetailsHeader") }}
+                      <span
+                        :class="'text-text-secondary'"
+                        class="text-sm font-semibold"
+                        data-test="incident-trigger-details-header"
+                      >
+                        {{
+                          isFinding
+                            ? t("alerts.incidents.findingDetailsHeader")
+                            : t("alerts.incidents.alertDetailsHeader")
+                        }}
                       </span>
                     </div>
                     <!-- Content -->
-                    <div class="flex-1 overflow-auto p-3">
+                    <div class="flex-1 overflow-auto p-3" data-test="incident-trigger-details-body">
+                      <!-- A finding has no alert rule behind it, so the panel shows the finding. -->
+                      <IncidentFindingDetails
+                        v-if="isFinding && (!alerts || alerts.length === 0)"
+                        :facts="findingFactsShown"
+                      />
+
                       <!-- No alerts available -->
                       <div
-                        v-if="!alerts || alerts.length === 0"
+                        v-else-if="!alerts || alerts.length === 0"
                         :class="'text-text-muted'"
                         class="text-sm italic"
                       >
@@ -1537,6 +1546,15 @@ import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
 import IncidentTimeline from "./IncidentTimeline.vue";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
+import IncidentFindingDetails from "./IncidentFindingDetails.vue";
+import {
+  AUTOOBSERVE_TRIGGER_KIND,
+  dimensionDisplay,
+  findingFacts,
+  findingLabels,
+  isFindingIncident,
+  orderedDimensionKeys,
+} from "@/utils/incidents/findingDimensions";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import { contextRegistry, createIncidentsContextProvider } from "@/composables/contextProviders";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1616,6 +1634,7 @@ export default defineComponent({
     CorrelatedLogsTable,
     IncidentServiceGraph,
     IncidentAlertTriggersTable,
+    IncidentFindingDetails,
     IncidentRCAAnalysis,
     IncidentTimeline,
     CustomChartRenderer,
@@ -1863,6 +1882,31 @@ export default defineComponent({
     const getSemanticGroupDisplayName = (id: string): string => {
       return semanticGroupDisplayMap.value.get(id) || id;
     };
+
+    const isFinding = computed(() =>
+      isFindingIncident(incidentDetails.value?.group_values, triggers.value),
+    );
+    const findingFactsShown = computed(() =>
+      findingFacts(t, incidentDetails.value?.group_values, triggers.value),
+    );
+    const dimensionRows = computed(() => {
+      const groupValues = incidentDetails.value?.group_values ?? {};
+      return orderedDimensionKeys(groupValues, triggers.value).map((key) => {
+        const shown = dimensionDisplay(t, groupValues, key, groupValues[key], triggers.value);
+        return { key, label: shown.label ?? getSemanticGroupDisplayName(key), value: shown.value };
+      });
+    });
+    // The server sends a finding's trigger with no labels; the finding's own dimensions are its labels.
+    const tableTriggers = computed(() => {
+      const labels = findingLabels(t, incidentDetails.value?.group_values);
+      if (!labels) return triggers.value;
+      return triggers.value.map((trigger) =>
+        trigger.alert_kind === AUTOOBSERVE_TRIGGER_KIND &&
+        !(trigger.labels && Object.keys(trigger.labels).length)
+          ? { ...trigger, labels }
+          : trigger,
+      );
+    });
 
     // Identity set + chip dimensions powering the "View by" subject tabs in the
     // embedded TelemetryCorrelationDashboard (metrics tab). Without matchedSetId
@@ -3233,6 +3277,10 @@ export default defineComponent({
       handleStatusChange,
       handleSeverityChange,
       handleTriggerRowClick,
+      isFinding,
+      findingFactsShown,
+      dimensionRows,
+      tableTriggers,
       getStatusLabel,
       formatPeriod,
       formatFrequency,

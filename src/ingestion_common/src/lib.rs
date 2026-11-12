@@ -31,6 +31,8 @@ pub enum SystemJobType {
     SelfReporting,
     InternalGrpc,
     AnomalyDetection,
+    AlertCalibration,
+    AutoObserve,
 }
 
 impl SystemJobType {
@@ -42,6 +44,8 @@ impl SystemJobType {
             SystemJobType::SelfReporting => "self_reporting",
             SystemJobType::InternalGrpc => "internal_grpc",
             SystemJobType::AnomalyDetection => "anomaly_detection",
+            SystemJobType::AlertCalibration => "alert_calibration",
+            SystemJobType::AutoObserve => "autoobserve",
         }
     }
 }
