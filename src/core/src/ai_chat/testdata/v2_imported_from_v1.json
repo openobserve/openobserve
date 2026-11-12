@@ -1,0 +1,334 @@
+{
+ "events": [
+  {
+   "id": "evt_0",
+   "aggregateID": "ses_e30b5950effevROIZYVIBlyCvH",
+   "seq": 0,
+   "type": "session.created.2",
+   "data": {
+    "info": {
+     "id": "ses_e30b5950effevROIZYVIBlyCvH",
+     "projectID": "80f7b333ad0563226a5dcecfc4cd1ca772286d61",
+     "title": "v1 read",
+     "cost": 0.00107724,
+     "tokens": {
+      "input": 6496,
+      "output": 85,
+      "reasoning": 0,
+      "cache": {
+       "read": 17280,
+       "write": 0
+      }
+     },
+     "time": {
+      "created": 1794479123185,
+      "updated": 1794479146115
+     },
+     "agent": "build",
+     "model": {
+      "providerID": "deepseek",
+      "id": "deepseek-flash",
+      "variant": "none"
+     },
+     "location": {
+      "directory": "__WORKSPACE__"
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_1",
+   "aggregateID": "ses_e30b5950effevROIZYVIBlyCvH",
+   "seq": 1,
+   "type": "message.updated.2",
+   "data": {
+    "message": {
+     "id": "msg_1cf4a6b4e001pbeSmovKMbKGff",
+     "type": "user",
+     "text": "Use the bash tool to run `cat note.txt`, then reply with only the code word.",
+     "time": {
+      "created": 1794479123278
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_2",
+   "aggregateID": "ses_e30b5950effevROIZYVIBlyCvH",
+   "seq": 2,
+   "type": "message.updated.2",
+   "data": {
+    "message": {
+     "id": "msg_1cf4a6bda001G6G70VpU4gIGfi",
+     "type": "assistant",
+     "agent": "build",
+     "model": {
+      "providerID": "deepseek",
+      "id": "deepseek-flash",
+      "variant": "none"
+     },
+     "content": [
+      {
+       "type": "tool",
+       "id": "call_00_t8lyRhq60cul0gbJhPxy6576",
+       "name": "bash",
+       "state": {
+        "status": "completed",
+        "input": {
+         "command": "cat note.txt"
+        },
+        "content": [
+         {
+          "type": "text",
+          "text": "The secret code word is PELICAN-42.\n"
+         }
+        ],
+        "metadata": {
+         "output": "The secret code word is PELICAN-42.\n",
+         "exit": 0,
+         "truncated": false
+        }
+       },
+       "time": {
+        "created": 1794479125152,
+        "completed": 1794479125178
+       }
+      }
+     ],
+     "cost": 0.0009033,
+     "tokens": {
+      "input": 5870,
+      "output": 38,
+      "reasoning": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     },
+     "time": {
+      "created": 1794479123418,
+      "completed": 1794479125234
+     },
+     "finish": "tool-calls"
+    }
+   }
+  },
+  {
+   "id": "evt_3",
+   "aggregateID": "ses_e30b5950effevROIZYVIBlyCvH",
+   "seq": 3,
+   "type": "message.updated.2",
+   "data": {
+    "message": {
+     "id": "msg_1cf4a72f3001WwDH0HKB4THl3C",
+     "type": "assistant",
+     "agent": "build",
+     "model": {
+      "providerID": "deepseek",
+      "id": "deepseek-flash",
+      "variant": "none"
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "PELICAN-42"
+      }
+     ],
+     "cost": 4.653e-05,
+     "tokens": {
+      "input": 171,
+      "output": 6,
+      "reasoning": 0,
+      "cache": {
+       "read": 5760,
+       "write": 0
+      }
+     },
+     "time": {
+      "created": 1794479125235,
+      "completed": 1794479126551
+     },
+     "finish": "stop"
+    }
+   }
+  },
+  {
+   "id": "evt_4",
+   "aggregateID": "ses_e30b5950effevROIZYVIBlyCvH",
+   "seq": 4,
+   "type": "message.updated.2",
+   "data": {
+    "message": {
+     "id": "msg_1cf4ab8aa0016N0CBZEU7UUgG1",
+     "type": "user",
+     "text": "Now run `wc -c note.txt` with bash and reply with only the number.",
+     "time": {
+      "created": 1794479143082
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_5",
+   "aggregateID": "ses_e30b5950effevROIZYVIBlyCvH",
+   "seq": 5,
+   "type": "message.updated.2",
+   "data": {
+    "message": {
+     "id": "msg_1cf4ab8ad001GhSt7XVu4NOpYE",
+     "type": "assistant",
+     "agent": "build",
+     "model": {
+      "providerID": "deepseek",
+      "id": "deepseek-flash",
+      "variant": "none"
+     },
+     "content": [
+      {
+       "type": "tool",
+       "id": "call_00_BGyNPmH0WM8Vl6X9mRir1177",
+       "name": "bash",
+       "state": {
+        "status": "completed",
+        "input": {
+         "command": "wc -c note.txt"
+        },
+        "content": [
+         {
+          "type": "text",
+          "text": "      36 note.txt\n"
+         }
+        ],
+        "metadata": {
+         "output": "      36 note.txt\n",
+         "exit": 0,
+         "truncated": false
+        }
+       },
+       "time": {
+        "created": 1794479144707,
+        "completed": 1794479144716
+       }
+      }
+     ],
+     "cost": 7.113e-05,
+     "tokens": {
+      "input": 199,
+      "output": 40,
+      "reasoning": 0,
+      "cache": {
+       "read": 5760,
+       "write": 0
+      }
+     },
+     "time": {
+      "created": 1794479143085,
+      "completed": 1794479144778
+     },
+     "finish": "tool-calls"
+    }
+   }
+  },
+  {
+   "id": "evt_6",
+   "aggregateID": "ses_e30b5950effevROIZYVIBlyCvH",
+   "seq": 6,
+   "type": "message.updated.2",
+   "data": {
+    "message": {
+     "id": "msg_1cf4abf4b001kikmEjFuWvDo5U",
+     "type": "assistant",
+     "agent": "build",
+     "model": {
+      "providerID": "deepseek",
+      "id": "deepseek-flash",
+      "variant": "none"
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "36"
+      }
+     ],
+     "cost": 5.628e-05,
+     "tokens": {
+      "input": 256,
+      "output": 1,
+      "reasoning": 0,
+      "cache": {
+       "read": 5760,
+       "write": 0
+      }
+     },
+     "time": {
+      "created": 1794479144779,
+      "completed": 1794479146113
+     },
+     "finish": "stop"
+    }
+   }
+  },
+  {
+   "id": "evt_7",
+   "aggregateID": "ses_e30b5950effevROIZYVIBlyCvH",
+   "seq": 7,
+   "type": "message.updated.2",
+   "data": {
+    "message": {
+     "id": "msg_1cf4abf4b001kikmEjFuWvDo5Un",
+     "type": "system",
+     "text": "The available tools have changed.\n\nThe `bash` tool is now `shell` and must be called by that name.",
+     "time": {
+      "created": 1794479144779
+     }
+    }
+   }
+  }
+ ],
+ "expected": {
+  "turns": [
+   {
+    "user_message_id": "msg_1cf4a6b4e001pbeSmovKMbKGff",
+    "created": 1794479123278,
+    "user": {
+     "text": "Use the bash tool to run `cat note.txt`, then reply with only the code word.",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "message_delta",
+      "content": "PELICAN-42"
+     },
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "first_seq": 1,
+    "last_seq": 3
+   },
+   {
+    "user_message_id": "msg_1cf4ab8aa0016N0CBZEU7UUgG1",
+    "created": 1794479143082,
+    "user": {
+     "text": "Now run `wc -c note.txt` with bash and reply with only the number.",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "message_delta",
+      "content": "36"
+     },
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "first_seq": 4,
+    "last_seq": 7
+   }
+  ],
+  "title": "v1 read",
+  "last_seq": 7
+ }
+}
