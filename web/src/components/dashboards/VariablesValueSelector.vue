@@ -17,15 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-if="variablesData.values?.length > 0" class="mt-2 flex flex-wrap gap-x-4 gap-y-2">
     <div
       v-for="(item, index) in variablesData.values"
-      v-show="!isVariableOffTab(item)"
+      v-show="!isVariableOffTab(item) && !isVariableOmitted(item)"
       :key="item.name + index"
       :data-test="`dashboard-variable-${item.name}-container`"
     >
-      <div
-        v-if="item.type == 'query_values'"
-        class="max-w-[40rem] min-w-37.5"
-        v-show="!isVariableOmitted(item)"
-      >
+      <div v-if="item.type == 'query_values'" class="max-w-[40rem] min-w-37.5">
         <VariableQueryValueSelector
           v-show="!item.hideOnDashboard"
           v-model="item.value"
@@ -76,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="item.type == 'date'" class="max-w-[40rem] min-w-37.5">
         <ODate
           v-show="!item.hideOnDashboard"
-          class="me-4 mt-1 w-37.5!"
+          class="w-37.5!"
           v-model="item.value"
           :label="item.label || item.name"
           label-position="inside"
