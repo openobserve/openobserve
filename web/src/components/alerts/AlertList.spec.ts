@@ -615,6 +615,56 @@ describe("AlertList - data fetching and columns", () => {
     expect(ids).toContain("tags");
   });
 
+  describe("tags cell", () => {
+    const tagged = async (tags: string[]) => {
+      alertsDB = [makeAlert(1, { name: "tagged" })];
+      const wrapper: any = await mountAlertList();
+      await waitData(wrapper);
+      wrapper.vm.filteredResults = wrapper.vm.filteredResults.map((row: any) => ({ ...row, tags }));
+      wrapper.vm.activeTab = "all";
+      await flushPromises();
+      return wrapper;
+    };
+
+    let widthSpies: { mockRestore(): void }[] = [];
+    const mockCellWidths = () => {
+      widthSpies = [
+        vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(100),
+        vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(60),
+      ];
+    };
+
+    afterEach(() => widthSpies.forEach((spy) => spy.mockRestore()));
+
+    it("collapses what does not fit into +N with the full list in its tooltip", async () => {
+      mockCellWidths();
+      const wrapper = await tagged(["prod", "team:checkout", "tier:1"]);
+      const more = wrapper.find('[data-test="fit-items-more"]');
+      expect(more.text()).toBe("+2");
+      expect(more.findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "prod, team:checkout, tier:1",
+      );
+    });
+
+    it("shows every tag with no +N when they fit", async () => {
+      const wrapper = await tagged(["prod", "team:checkout", "tier:1", "eu"]);
+      expect(wrapper.findAll('[data-test="alert-list-tagged-tag"]')).toHaveLength(4);
+      expect(wrapper.find('[data-test="fit-items-more"]').exists()).toBe(false);
+    });
+
+    it("keeps a long tag's text in a truncating span inside a width-capped chip", async () => {
+      const wrapper = await tagged(["a-very-long-tag-name"]);
+      const chip = wrapper.find('[data-test="alert-list-tagged-tag"]');
+      expect(chip.classes()).toContain("max-w-full");
+      expect(chip.find("span.truncate").text()).toBe("a-very-long-tag-name");
+    });
+
+    it("keeps the dash when there are no tags", async () => {
+      const wrapper = await tagged([]);
+      expect(wrapper.find('[data-test="fit-items"]').exists()).toBe(false);
+    });
+  });
+
   it("renders the summary strip with operational counts", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
