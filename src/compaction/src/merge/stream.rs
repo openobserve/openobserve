@@ -41,7 +41,7 @@ use tokio::{
 
 use super::{
     job::{job_range_end, job_time_level, scheduling_level},
-    plan::{BatchLimits, MergePolicy},
+    policy::{BatchLimits, MergePolicy},
 };
 use crate::{
     bloom::compact::RetiredBlooms,
