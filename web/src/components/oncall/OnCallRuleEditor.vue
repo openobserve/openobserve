@@ -153,6 +153,7 @@ import type {
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useLicenseLock } from "@/composables/useFeatureLock";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import {
   START_PICKER_DROPDOWN_STYLE,
   claimableDimensions,
@@ -216,6 +217,7 @@ const emit = defineEmits<{
   (e: "save", draft: RuleDraft): void;
   /** The complete conditions changed; debounced, empty when there is nothing to ask. */
   (e: "preview", dimensions: Record<string, string>): void;
+  (e: "licenseDenied", features: string[]): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -313,6 +315,10 @@ const onCallQuery = useQuery(() =>
     retry: false,
   }),
 );
+watch(onCallQuery.error, (err) => {
+  const denied = licenseDeniedFeatures(err);
+  if (denied) emit("licenseDenied", denied);
+});
 
 /// Hidden when the reader may not see the schedule: a wrong or empty name is worse than none.
 const onCallEmails = computed<string[]>(() => {

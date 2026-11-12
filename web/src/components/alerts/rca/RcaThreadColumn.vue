@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.incidents.rcaSteer.agentNote", { note: entry.item.agent_note }) }}
             </p>
             <OButton
-              v-if="rcaSteerOffersReanalyze(entry.item)"
+              v-if="canReanalyze && rcaSteerOffersReanalyze(entry.item)"
               data-test="rca-thread-steer-reanalyze"
               variant="outline"
               size="sm"
@@ -362,6 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ refusal.text }}
       </p>
       <OButton
+        v-if="canReanalyze"
         data-test="rca-thread-refusal-reanalyze"
         class="self-start"
         variant="outline"
@@ -446,6 +447,8 @@ const props = withDefaults(
     runState: RcaRunState | null;
     /** Resume can continue the thread's run, so its note is not final. */
     canResume?: boolean;
+    /** A new run can start, so a message the run did not take can seed one. */
+    canReanalyze?: boolean;
     /** "Auto on incident open", "Re-analyze by j.okafor", … */
     triggerLabel?: I18nText | null;
     /** `rca_runs.context_used` of the thread's run, when known. */
@@ -470,6 +473,7 @@ const props = withDefaults(
   }>(),
   {
     canResume: false,
+    canReanalyze: true,
     triggerLabel: null,
     contextUsed: null,
     runStats: null,

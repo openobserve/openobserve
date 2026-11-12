@@ -463,6 +463,7 @@ import {
   stopChoices,
   stopConsequence,
 } from "@/utils/oncall";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import { serverMessageOf } from "@/utils/slackLink";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 
@@ -490,6 +491,7 @@ const emit = defineEmits<{
   "open-members": [];
   /** A hand-edited policy pages the rotation being removed; it has to be edited first. */
   "open-policy": [];
+  licenseDenied: [features: string[]];
 }>();
 
 const { t } = useI18nTyped();
@@ -622,7 +624,9 @@ watch(editing, async (isOpen) => {
     editorAbsences.value = await queryClient.fetchQuery(
       unavailabilityQuery(orgId.value, undefined, now, now + ABSENCE_HORIZON_DAYS * 86_400_000_000),
     );
-  } catch {
+  } catch (err) {
+    const denied = licenseDeniedFeatures(err);
+    if (denied) emit("licenseDenied", denied);
     editorAbsences.value = [];
   }
 });
@@ -721,6 +725,9 @@ const preview = useRotationPreview({
   teamId: () => props.teamId,
   timezone: () => props.timezone,
   nowMicros: () => nowMicros.value,
+});
+watch(preview.licenseDenied, (denied) => {
+  if (denied) emit("licenseDenied", denied);
 });
 
 const activeRule = computed(() => active.value?.shift_rules[Number(activeRuleTab.value)] ?? null);

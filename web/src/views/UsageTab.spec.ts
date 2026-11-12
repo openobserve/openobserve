@@ -154,6 +154,31 @@ function mountUsageTab() {
 describe("UsageTab", () => {
   let wrapper: VueWrapper;
 
+  it("switches to the meta org before Renew license opens the license page", async () => {
+    const { zoConfig, organizations } = store.state;
+    store.state.zoConfig = { ...zoConfig, meta_org: "_meta" };
+    store.state.organizations = [{ id: 7, identifier: "_meta", name: "_meta" }];
+    const dispatch = vi.spyOn(store, "dispatch").mockResolvedValue(undefined);
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+    wrapper = mountUsageTab();
+    await flushPromises();
+
+    wrapper.findComponent({ name: "LicensePeriod" }).vm.$emit("renew");
+
+    expect(dispatch).toHaveBeenCalledWith(
+      "setSelectedOrganization",
+      expect.objectContaining({ identifier: "_meta" }),
+    );
+    expect(push).toHaveBeenCalledWith({
+      name: "license",
+      query: { org_identifier: "_meta" },
+    });
+    dispatch.mockRestore();
+    push.mockRestore();
+    store.state.zoConfig = zoConfig;
+    store.state.organizations = organizations;
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     // Re-apply mocks that vi.clearAllMocks() strips

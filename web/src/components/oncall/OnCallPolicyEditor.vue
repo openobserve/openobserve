@@ -649,6 +649,7 @@ import {
   priorityLabel,
   resolveLadder,
 } from "@/utils/oncall";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import { serverMessageOf } from "@/utils/slackLink";
 
 const props = withDefaults(
@@ -677,7 +678,13 @@ const emit = defineEmits<{
   "policy-written": [];
   "update:open": [boolean];
   "open-members": [];
+  licenseDenied: [features: string[]];
 }>();
+
+function noteDenial(err: unknown) {
+  const denied = licenseDeniedFeatures(err);
+  if (denied) emit("licenseDenied", denied);
+}
 
 interface PolicyDraftData {
   rungs: PriorityRung[];
@@ -754,6 +761,7 @@ const contactRead = useQuery(() =>
   }),
 );
 const noProvider = computed(() => contactRead.data.value?.phone_provider_available === false);
+watch(contactRead.error, noteDenial);
 
 const savePolicyWrite = useMutation(() => setTeamPolicyMutation(orgId.value, props.teamId));
 const saveChannelWrite = useMutation(() => setTeamChannelMutation(orgId.value, props.teamId));
@@ -796,7 +804,8 @@ async function fetchTeamChannel() {
     teamChannel.value = res.data ?? null;
     teamChannelDraft.value = [...(res.data?.destinations ?? [])];
     channelBackToPolicy.value = false;
-  } catch {
+  } catch (err) {
+    noteDenial(err);
     teamChannel.value = null;
   }
 }
@@ -863,7 +872,8 @@ async function saveTeamSlack(slack: Omit<SetTeamChannelBody, "destinations">) {
 /// Routing screen.
 const { config: routingConfig, load: loadRoutingConfig } = useOnCallRoutingConfig();
 async function fetchRoutingConfig() {
-  await loadRoutingConfig(orgId.value);
+  const denied = await loadRoutingConfig(orgId.value);
+  if (denied) emit("licenseDenied", denied);
 }
 
 const defaultTeamMissing = computed(
@@ -1220,7 +1230,8 @@ async function fetchMembers() {
       label: raw(m.user_email),
       value: m.user_email,
     }));
-  } catch {
+  } catch (err) {
+    noteDenial(err);
     memberOptions.value = [];
   }
 }
@@ -1230,7 +1241,8 @@ async function fetchMembers() {
 async function fetchOnCallNow() {
   try {
     onCallNow.value = await queryClient.fetchQuery(whoIsOnCallQuery(orgId.value, props.teamId));
-  } catch {
+  } catch (err) {
+    noteDenial(err);
     onCallNow.value = [];
   }
 }

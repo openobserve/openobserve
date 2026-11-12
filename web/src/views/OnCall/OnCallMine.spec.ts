@@ -16,8 +16,10 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
+import * as toastModule from "@/lib/feedback/Toast/useToast";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import OnCallMine from "@/views/OnCall/OnCallMine.vue";
@@ -26,6 +28,7 @@ import { axiosReply, deferredReply } from "@/test/unit/helpers/mockService";
 vi.mock("@/services/oncall", () => ({
   default: {
     myOnCall: vi.fn(),
+    myDeliveries: vi.fn(),
     listTeams: vi.fn(),
     whoIsOnCall: vi.fn(),
     resolvedSchedule: vi.fn(),
@@ -149,6 +152,34 @@ const MINE = {
 };
 
 const render = () => mount(OnCallMine, { global: { plugins: [i18n, store], stubs } });
+
+const DENIAL = {
+  response: {
+    status: 403,
+    data: {
+      code: 40001,
+      message: "Features not included in your license: oncall",
+      error_detail: "oncall",
+    },
+  },
+};
+
+function expectLocked(wrapper: ReturnType<typeof render>) {
+  const lock = wrapper.findComponent(LicenseDeniedState);
+  expect(lock.props("features")).toEqual(["oncall"]);
+  expect(lock.attributes("data-test")).toBe("oncall-mine-license-denied");
+  for (const gone of [
+    "oncall-mine-teams",
+    "oncall-mine-teams-error",
+    "oncall-phone-card",
+    "oncall-mine-refresh",
+    "oncall-mine-away",
+    "oncall-mine-clear-away",
+    "oncall-mine-body",
+  ]) {
+    expect(wrapper.find(`[data-test="${gone}"]`).exists()).toBe(false);
+  }
+}
 
 describe("OnCallMine", () => {
   beforeEach(() => {
@@ -465,6 +496,135 @@ describe("OnCallMine", () => {
 
     expect(wrapper.find('[data-test="oncall-mine-teams-error"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-mine-team-team_1"]').exists()).toBe(true);
+  });
+
+  /// Try again cannot work against a license, so the whole body is the lock rather than two error cards.
+  describe("a license denial", () => {
+    it("replaces the body when the first load is denied", async () => {
+      queryClient.clear();
+      service.myOnCall.mockRejectedValueOnce(DENIAL);
+      const wrapper = render();
+      await flushPromises();
+
+      expectLocked(wrapper);
+    });
+
+    it("replaces the teams when a refresh is denied", async () => {
+      queryClient.clear();
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-mine-team-team_1"]').exists()).toBe(true);
+
+      service.myOnCall.mockRejectedValueOnce(DENIAL);
+      await wrapper.find('[data-test="oncall-mine-refresh"]').trigger("click");
+      await flushPromises();
+
+      expectLocked(wrapper);
+    });
+
+    /// The teams can come from cache while the inbox reaches the server first, and one denial is the whole page's answer.
+    it("replaces the body when only the deliveries read is denied", async () => {
+      queryClient.clear();
+      service.myDeliveries.mockRejectedValueOnce(DENIAL);
+      const wrapper = mount(OnCallMine, {
+        global: {
+          plugins: [i18n, store],
+          stubs: { ...stubs, OnCallMyDeliveries: false, OTable: true, OCheckbox: true },
+        },
+      });
+      await flushPromises();
+
+      expectLocked(wrapper);
+    });
+
+    /// One denial answers for the page, so the teams read landing later must not bring the body back.
+    it.each([
+      ["fails", { response: { status: 500, data: {} } }],
+      ["succeeds", null],
+    ])("keeps the inbox's lock when the teams read then %s", async (_name, failure) => {
+      queryClient.clear();
+      let settle = (_err: unknown) => {};
+      service.myOnCall.mockImplementationOnce(
+        () =>
+          new Promise((resolve, reject) => {
+            settle = (err) => (err ? reject(err) : resolve({ data: MINE } as any));
+          }),
+      );
+      service.myDeliveries.mockRejectedValueOnce(DENIAL);
+      const wrapper = mount(OnCallMine, {
+        global: {
+          plugins: [i18n, store],
+          stubs: { ...stubs, OnCallMyDeliveries: false, OTable: true, OCheckbox: true },
+        },
+      });
+      await flushPromises();
+      expectLocked(wrapper);
+
+      settle(failure);
+      await flushPromises();
+
+      expectLocked(wrapper);
+      expect(service.myDeliveries).toHaveBeenCalledTimes(1);
+    });
+
+    /// These run after the teams answered, and each swallows its own failure, so a cached teams read hides the denial.
+    it.each(["whoIsOnCall", "resolvedSchedule", "listTeams", "listUnavailability"] as const)(
+      "replaces the body when only %s is denied",
+      async (read) => {
+        service.whoIsOnCall.mockResolvedValue(axiosReply([]));
+        service[read].mockRejectedValueOnce(DENIAL);
+        const wrapper = render();
+        await flushPromises();
+
+        expectLocked(wrapper);
+      },
+    );
+
+    /// The phone and setup reads are the cards' own, so each has to say so.
+    it.each(["OnCallPhoneCard", "OnCallSetupBanner"])(
+      "replaces the body when the %s reports a denial",
+      async (name) => {
+        const wrapper = render();
+        await flushPromises();
+
+        wrapper.findComponent({ name }).vm.$emit("licenseDenied", ["oncall"]);
+        await flushPromises();
+
+        expectLocked(wrapper);
+      },
+    );
+
+    it("locks without the cover form or an error toast when the cover read is denied", async () => {
+      const me = store.state.userInfo.email;
+      const now = Date.now() * 1000;
+      service.whoIsOnCall.mockResolvedValue(
+        axiosReply([{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: me }]),
+      );
+      service.resolvedSchedule.mockResolvedValue(
+        axiosReply([{ rotation_id: "r1", from: now - 1, to: now + 3_600_000_000, user_email: me }]),
+      );
+      service.listMembers.mockRejectedValueOnce(DENIAL);
+      service.getSchedule.mockResolvedValue(axiosReply({ rotations: [{ id: "r1" }] }));
+      const wrapper = render();
+      await flushPromises();
+      const errors = vi.spyOn(toastModule, "toast");
+
+      await wrapper.find('[data-test="oncall-mine-cover-team_1"]').trigger("click");
+      await flushPromises();
+
+      expectLocked(wrapper);
+      expect(wrapper.find('[data-test="cover-form"]').exists()).toBe(false);
+      expect(errors).not.toHaveBeenCalled();
+    });
+
+    it("keeps the teams on screen when those reads fail for another reason", async () => {
+      service.listTeams.mockRejectedValueOnce({ response: { status: 500, data: {} } });
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.findComponent(LicenseDeniedState).exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-mine-team-team_1"]').exists()).toBe(true);
+    });
   });
 
   /// Shown only while Slack is on; members hear nothing about Slack otherwise.
