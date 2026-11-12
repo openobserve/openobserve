@@ -44,7 +44,7 @@ async function waitForInstantQuery(request, query, timeout = 60_000) {
     .toBeGreaterThan(0);
 }
 
-// PromQL skips unflushed data unless the window ends near now, so the 10m-shifted window lags ingest by ~max_file_retention_time.
+// Where 3×ZO_MAX_FILE_RETENTION_TIME is under 10m this window ends before PromQL's WAL floor, so its rows show only once flushed.
 async function waitForShiftedRange(request, query, timeout = 120_000) {
   await expect
     .poll(
@@ -58,7 +58,7 @@ async function waitForShiftedRange(request, query, timeout = 120_000) {
     .toBeGreaterThan(0);
 }
 
-// Shift by minutes: a window ending past ~30m ago skips the WAL, and back-dated rows reach storage late.
+// Shift by minutes: PromQL reads unflushed rows only for a window ending after now − 3×ZO_MAX_FILE_RETENTION_TIME (30m by default).
 async function seedTimeShiftMetric(request) {
   const now = Date.now();
   const rows = [];
