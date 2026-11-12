@@ -4,6 +4,7 @@
 const { expect } = require("@playwright/test");
 const testLogger = require("../../playwright-tests/utils/test-logger.js");
 const MonacoEditorHelper = require("../../playwright-tests/utils/MonacoEditorHelper.js");
+const { getAuthHeaders, getOrgIdentifier } = require("../../playwright-tests/utils/cloud-auth.js");
 import { answerPanelDraftRestore } from "./panel-leave-dialog.js";
 import DashboardactionPage from "./dashboard-panel-actions.js";
 
@@ -268,9 +269,14 @@ export default class ChartTypeSelector {
         await streamOption.click();
         return; // Success
       } catch (error) {
-        // The stream list is cached for minutes from page load (and fetched at boot when restricted routes are on), so a stream ingested after navigation only shows after a reload.
+        // With ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA on, the stream list is fetched at boot, so a stream ingested after navigation shows only after a reload.
         const missingFromList = (await popover.isVisible()) && (await streamOption.count()) === 0;
-        if (!reloaded && missingFromList && (await this.reloadPanelEditorKeepingSelections())) {
+        if (
+          !reloaded &&
+          missingFromList &&
+          (await this.isRestrictedRoutesOnEmptyDataOn()) &&
+          (await this.reloadPanelEditorKeepingSelections())
+        ) {
           reloaded = true;
           if (await isAlreadySelected()) return;
           attempt--;
@@ -292,7 +298,22 @@ export default class ChartTypeSelector {
     }
   }
 
-  // A reload drops in-memory editor state, so it runs only where that state can be read back and re-applied.
+  async isRestrictedRoutesOnEmptyDataOn() {
+    if (this.restrictedRoutesOnEmptyData !== undefined) return this.restrictedRoutesOnEmptyData;
+    const org = new URL(this.page.url()).searchParams.get("org_identifier") || getOrgIdentifier() || "default";
+    const res = await this.page.request
+      .get(`${process.env.ZO_BASE_URL}/api/${org}/config`, { headers: getAuthHeaders() })
+      .catch(() => null);
+    if (!res?.ok()) {
+      testLogger.warn(`selectStream: GET /api/${org}/config answered ${res ? `HTTP ${res.status()}` : "no response"}, treating restricted routes as off`);
+      this.restrictedRoutesOnEmptyData = false;
+    } else {
+      this.restrictedRoutesOnEmptyData = (await res.json().catch(() => ({})))?.restricted_routes_on_empty_data === true;
+    }
+    return this.restrictedRoutesOnEmptyData;
+  }
+
+  // A reload re-applies only chart type, stream type and panel name; any other setting it would reset makes it throw instead.
   async reloadPanelEditorKeepingSelections() {
     if (!/\/dashboards\/add_panel/.test(this.page.url())) return false;
     if ((await this.page.locator('[data-test="dashboard-panel-query-tab-1"]').count()) > 0) {
@@ -309,6 +330,7 @@ export default class ChartTypeSelector {
       "stream type",
     );
     const panelName = await this.readPanelName();
+    const unrestored = await this.readUnrestoredEditorState();
     testLogger.info(`selectStream: stream missing from the cached list, reloading the panel editor (chart=${chartType}, streamType=${streamType}, panelName=${panelName})`);
     await this.page.reload({ waitUntil: "domcontentloaded" });
     await this.page.locator('[data-test="index-dropdown-stream"]').waitFor({ state: "visible", timeout: 30000 });
@@ -322,7 +344,26 @@ export default class ChartTypeSelector {
     if (panelName && (await this.readPanelName()) !== panelName) {
       await new DashboardactionPage(this.page).addPanelName(panelName);
     }
+    const after = await this.readUnrestoredEditorState();
+    if (JSON.stringify(after) !== JSON.stringify(unrestored)) {
+      throw new Error(`selectStream: reloading the panel editor reset settings this helper does not restore (before ${JSON.stringify(unrestored)}, after ${JSON.stringify(after)})`);
+    }
     return true;
+  }
+
+  async readUnrestoredEditorState() {
+    const attr = async (selector, name) => {
+      const el = this.page.locator(selector).first();
+      return (await el.count()) ? el.getAttribute(name, { timeout: 5000 }) : null;
+    };
+    const timeRange = this.page.locator('[data-test="date-time-btn"]').first();
+    return {
+      sql: await attr('[data-test="dashboard-sql-query-type"]', "data-state"),
+      promql: await attr('[data-test="dashboard-promql-query-type"]', "data-state"),
+      builder: await attr('[data-test="dashboard-builder-query-type"]', "data-state"),
+      custom: await attr('[data-test="dashboard-custom-query-type"]', "data-state"),
+      timeRange: (await timeRange.count()) ? (await timeRange.innerText({ timeout: 5000 })).trim() : null,
+    };
   }
 
   async readEditorAttribute(locator, attribute, label) {
