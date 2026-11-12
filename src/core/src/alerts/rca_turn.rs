@@ -89,10 +89,9 @@ use crate::ai_chat::{
     cancel::cancel_chat_turn,
     fork,
     rca_ledger::{RunTranscript, TranscriptQuestion, decode_run},
-    rca_thread::{
-        SUBMIT_REPORT, ThreadPart, ThreadStats, ToolPart, project_rca_thread, updated_part,
-    },
+    rca_thread::{SUBMIT_REPORT, ThreadPart, ThreadStats, ToolPart, project_rca_thread},
     read_committed_events,
+    record_v2::event_parts,
 };
 
 /// The user text of the one continuation turn.
@@ -1566,17 +1565,17 @@ struct Progress {
 impl Progress {
     fn of(events: &[DurableEvent]) -> Self {
         let mut progress = Self::default();
-        for part in events.iter().filter_map(updated_part) {
+        for part in events.iter().flat_map(event_parts) {
             let Some(id) = part.get("id").and_then(Value::as_str) else {
                 continue;
             };
             if part.get("type").and_then(Value::as_str) == Some("step-finish") {
-                if let Some(tokens) = Tokens::of(part) {
+                if let Some(tokens) = Tokens::of(&part) {
                     progress.tokens.push((id.to_string(), tokens));
                 }
                 continue;
             }
-            if let Some(call) = ToolPart::of(part) {
+            if let Some(call) = ToolPart::of(&part) {
                 let kind = call.kind();
                 if kind != ThreadPart::Hidden {
                     progress.parts.push((id.to_string(), kind));

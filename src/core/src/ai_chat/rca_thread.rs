@@ -1745,4 +1745,27 @@ pub(crate) mod tests {
             assert_eq!(thread.stats.duration_ms, last - T, "{turns:?}");
         }
     }
+
+    /// o2-ai's 2.x records of a run thread like its 1.x events; 2.x text items carry no times.
+    #[test]
+    fn a_2x_run_threads_like_its_1x_source() {
+        let without_times = |mut thread: RcaThread| {
+            for step in &mut thread.steps {
+                step.ended_at = None;
+            }
+            thread.stats.duration_ms = 0;
+            thread
+        };
+        let v1 = rca_session();
+        let v2 = crate::ai_chat::record_v2::tests::to_v2(&v1);
+        assert!(v2.len() < v1.len());
+        for (active, show_tool_io) in [(false, false), (true, true)] {
+            let expected = project_rca_thread(&v1, &[], active, show_tool_io);
+            let actual = project_rca_thread(&v2, &[], active, show_tool_io);
+            assert_eq!(without_times(actual), without_times(expected));
+        }
+        let thread = project_rca_thread(&v2, &[], false, false);
+        assert_eq!(thread.stats.tool_calls, VISIBLE_TOOL_CALLS);
+        assert!(thread.report_submitted);
+    }
 }

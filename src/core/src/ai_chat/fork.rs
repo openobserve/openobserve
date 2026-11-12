@@ -36,10 +36,9 @@ use sha2::{Digest, Sha256};
 use super::{
     REFRESH_BATCH, StreamChatStore,
     projection::truthy,
-    rca_thread::{
-        RECORD_STEP, SUBMIT_REPORT, ThreadPart, ToolPart, rca_stage, step_title, updated_part,
-    },
+    rca_thread::{RECORD_STEP, SUBMIT_REPORT, ThreadPart, ToolPart, rca_stage, step_title},
     read_committed_events,
+    record_v2::{event_parts, record_message},
 };
 
 /// An opencode id: 4-letter family, `_`, 12 time-ordered chars and a 14-char base62 tail; others
@@ -108,10 +107,12 @@ pub fn plan_resume(events: &[DurableEvent]) -> Result<ResumePlan, ResumeRefusal>
     let mut by_call_id: HashMap<String, usize> = HashMap::new();
     // The first visible tool row: before every step, the thread shows it in an implicit step.
     let mut first_row_seq: Option<i64> = None;
-    for event in events {
-        let Some(part) = updated_part(event) else {
-            continue;
-        };
+    let parts: Vec<(i64, Cow<'_, Map<String, Value>>)> = events
+        .iter()
+        .flat_map(|event| event_parts(event).into_iter().map(|part| (event.seq, part)))
+        .collect();
+    for (seq, part) in &parts {
+        let seq = *seq;
         let Some(call) = ToolPart::of(part) else {
             continue;
         };
@@ -126,7 +127,7 @@ pub fn plan_resume(events: &[DurableEvent]) -> Result<ResumePlan, ResumeRefusal>
             RECORD_STEP => {}
             _ => {
                 if first_row_seq.is_none() && call.kind() == ThreadPart::Row {
-                    first_row_seq = Some(event.seq);
+                    first_row_seq = Some(seq);
                 }
                 continue;
             }
@@ -137,7 +138,7 @@ pub fn plan_resume(events: &[DurableEvent]) -> Result<ResumePlan, ResumeRefusal>
         let index = *by_call_id.entry(call.call_id()).or_insert_with(|| {
             calls.push(StepCall {
                 message_id,
-                opened_seq: event.seq,
+                opened_seq: seq,
                 first_seq: None,
                 status: "",
                 stage: None,
@@ -148,7 +149,7 @@ pub fn plan_resume(events: &[DurableEvent]) -> Result<ResumePlan, ResumeRefusal>
         let step = &mut calls[index];
         step.status = call.status;
         if step.first_seq.is_none() && matches!(call.status, "running" | "completed") {
-            step.first_seq = Some(event.seq);
+            step.first_seq = Some(seq);
         }
         step.stage = call.arg("stage").or(step.stage);
         step.title = call.arg("title").or(step.title);
@@ -221,13 +222,12 @@ fn only_text_before(events: &[DurableEvent], message_id: &str, from: i64, to: i6
         if message_of(event).is_some_and(|id| id != message_id) {
             return false;
         }
-        let Some(part) = updated_part(event) else {
-            continue;
-        };
-        match part.get("type").and_then(Value::as_str) {
-            Some("text") => visible |= is_visible_text(part),
-            Some("reasoning" | "step-start") => {}
-            _ => return false,
+        for part in event_parts(event) {
+            match part.get("type").and_then(Value::as_str) {
+                Some("text") => visible |= is_visible_text(&part),
+                Some("reasoning" | "step-start") => {}
+                _ => return false,
+            }
         }
     }
     visible
@@ -247,6 +247,9 @@ fn is_visible_text(part: &Map<String, Value>) -> bool {
 /// The opencode message an event belongs to: a message's own update, or one of its parts.
 fn message_of(event: &DurableEvent) -> Option<&str> {
     let data = &event.data;
+    if let Some(message) = record_message(event) {
+        return message.get("id").and_then(Value::as_str);
+    }
     if event.event_type.starts_with("message.updated") {
         return data["info"]["id"].as_str();
     }
@@ -1523,5 +1526,55 @@ pub(crate) mod tests {
             assert!(store.calls.lock().is_empty());
         }
         assert!(org_sessions(&org).await.is_empty());
+    }
+
+    /// A 2.x record holds a whole message, so the cut drops the last step's message whole.
+    #[test]
+    fn a_2x_run_resumes_before_the_message_of_its_last_step() {
+        let events = crate::ai_chat::record_v2::tests::to_v2(&three_steps());
+        assert_eq!(message_of(&events[3]), Some("msg_a3"));
+        let plan = plan_resume(&events).unwrap();
+        assert_eq!(
+            plan,
+            ResumePlan {
+                cut_seq: 2,
+                reused_steps: 2,
+                from_step: planned(3, Some("changes"), "Check recent deploys"),
+            }
+        );
+        assert_eq!(
+            titles(&events[..=2]),
+            ["Load incident context", "Check pool saturation"]
+        );
+        assert_eq!(reusable_steps(&events), Some(2));
+    }
+
+    #[test]
+    fn a_2x_fork_rewrites_message_ids_and_projects_the_same_turns() {
+        let events = crate::ai_chat::record_v2::tests::golden_events("v2_readtool.json");
+        let fork = rewrite_ids(events.clone(), "fork-a");
+        let (source, copy) = (
+            crate::ai_chat::projection::project(&events),
+            crate::ai_chat::projection::project(&fork),
+        );
+        let id = |turns: &Value| {
+            turns["turns"][0]["user_message_id"]
+                .as_str()
+                .unwrap()
+                .to_string()
+        };
+        assert_ne!(id(&copy), id(&source));
+        assert_eq!(message_of(&fork[1]), Some(id(&copy).as_str()));
+        assert_eq!(copy["turns"][0]["frames"], source["turns"][0]["frames"]);
+        assert_eq!(copy["title"], source["title"]);
+        let ids = |events: &[DurableEvent]| -> HashSet<String> {
+            events
+                .iter()
+                .filter_map(message_of)
+                .map(str::to_string)
+                .collect()
+        };
+        assert_eq!(ids(&fork).len(), ids(&events).len());
+        assert!(ids(&fork).is_disjoint(&ids(&events)));
     }
 }

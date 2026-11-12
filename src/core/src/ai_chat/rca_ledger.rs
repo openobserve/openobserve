@@ -35,9 +35,9 @@ use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
 use super::{
     projection::{Folded, obj},
     rca_thread::{
-        SUBMIT_REPORT, ThreadPart, ToolPart, error_text, key_arg, ms_to_us, tool_body,
-        updated_part, user_text,
+        SUBMIT_REPORT, ThreadPart, ToolPart, error_text, key_arg, ms_to_us, tool_body, user_text,
     },
+    record_v2::event_parts,
 };
 
 const RECORD_HYPOTHESIS: &str = "record_hypothesis";
@@ -211,11 +211,13 @@ fn closes_question(call: &ToolPart<'_>) -> bool {
 /// Decode the committed events of an RCA session.
 pub fn decode_run(events: &[DurableEvent]) -> RunTranscript {
     let folded = Folded::fold(events);
-    let seqs: HashMap<&str, i64> = events
+    let seqs: HashMap<String, i64> = events
         .iter()
-        .filter_map(|event| {
-            let id = updated_part(event)?.get("id")?.as_str()?;
-            Some((id, event.seq))
+        .flat_map(|event| {
+            let ids = event_parts(event)
+                .into_iter()
+                .filter_map(|part| Some(part.get("id")?.as_str()?.to_string()));
+            ids.map(|id| (id, event.seq)).collect::<Vec<_>>()
         })
         .collect();
 
@@ -322,6 +324,8 @@ pub fn decode_run(events: &[DurableEvent]) -> RunTranscript {
         }
     }
     transcript.calls.sort_by_key(|call| call.seq);
+    // A 2.x record holds a whole message: of its calls, the later one is the later submit.
+    submits.reverse();
     submits.sort_by_key(|(seq, _)| std::cmp::Reverse(*seq));
     transcript.submit = submits.iter().find_map(|(_, input)| parse_submit(input));
     acks.sort_by_key(|(seq, _)| *seq);
@@ -1502,5 +1506,43 @@ pub(crate) mod tests {
             Some("call_prt_q1"),
             "only a completed call is a sentinel"
         );
+    }
+
+    /// One 2.x record holds every call of a message; the last completed report still wins.
+    #[test]
+    fn a_2x_run_decodes_like_its_1x_source() {
+        let mut s = ledger_session(&["context", "topology", "context"]);
+        let first = json!({"markdown": "first", "verdict": verdict(H1, "low", "inconclusive")});
+        submit(&mut s, "prt_p1", "completed", first, 4_000);
+        let second =
+            json!({"markdown": "second", "verdict": verdict(H1, "high", "root_cause_identified")});
+        submit(&mut s, "prt_p2", "completed", second, 4_100);
+        submit(
+            &mut s,
+            "prt_p3",
+            "error",
+            json!({"markdown": "third"}),
+            4_200,
+        );
+        ask(
+            &mut s,
+            "msg_a1",
+            "prt_q1",
+            "When did checkout-api deploy?",
+            4_300,
+        );
+        let v2 = crate::ai_chat::record_v2::tests::to_v2(&s.events);
+        let without_seqs = |mut run: RunTranscript| {
+            for call in &mut run.calls {
+                call.seq = 0;
+            }
+            run
+        };
+        let expected = decode_run(&s.events);
+        let actual = decode_run(&v2);
+        assert_eq!(actual.submit.as_ref().unwrap().markdown, "second");
+        assert_eq!(actual.calls.len(), 4);
+        assert!(actual.open_question.is_some());
+        assert_eq!(without_seqs(actual), without_seqs(expected));
     }
 }
