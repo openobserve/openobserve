@@ -392,6 +392,10 @@ export default class LogsVisualise {
     await new MonacoEditorHelper(this.page).waitForReady(this.functionEditor.first());
   }
 
+  async expectFunctionEditorContains(text) {
+    await expect(this.functionEditor.first().locator(".view-lines")).toContainText(text);
+  }
+
   // Open the first VRL Function Editor
   async vrlFunctionEditor(vrl) {
     const editorLines = this.functionEditor.first().locator(".view-lines");

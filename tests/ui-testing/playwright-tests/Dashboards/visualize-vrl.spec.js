@@ -807,7 +807,7 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
 
     // Verify the VRL content was entered
-    await pm.logsVisualise.expectFunctionEditorReady();
+    await pm.logsVisualise.expectFunctionEditorContains(simpleVrlFunction);
   });
 
 });
