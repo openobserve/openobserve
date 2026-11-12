@@ -16,6 +16,7 @@
 use std::sync::LazyLock as Lazy;
 
 use anyhow::Result;
+use arrow_schema::Schema;
 use config::{
     meta::{
         self_reporting::usage::{self},
@@ -74,6 +75,32 @@ pub async fn ensure_triggers_stream_initialized(org_id: &str) -> Result<()> {
 /// Forget that the org's triggers stream was set up, so a reused org id is set up again.
 pub(crate) fn forget_org(org_id: &str) {
     INITIALIZED_ORGS.remove(org_id);
+}
+
+/// The org's triggers stream schema, empty when the stream does not exist.
+pub async fn get(org_id: &str) -> infra::errors::Result<Schema> {
+    infra::schema::get(org_id, usage::TRIGGERS_STREAM, StreamType::Logs).await
+}
+
+/// `required` plus each `optional` column the schema has, as nulls never add a field.
+pub fn present_columns(required: &str, optional: &[&str], schema: &Schema) -> String {
+    let mut columns = required.to_string();
+    for column in optional {
+        if schema.field_with_name(column).is_ok() {
+            columns.push_str(", ");
+            columns.push_str(column);
+        }
+    }
+    columns
+}
+
+/// `column`, or `_timestamp` when it is an `optional` column the schema lacks.
+pub fn sortable_column<'a>(column: &'a str, optional: &[&str], schema: &Schema) -> &'a str {
+    if optional.contains(&column) && schema.field_with_name(column).is_err() {
+        "_timestamp"
+    } else {
+        column
+    }
 }
 
 /// Internal function that performs the actual schema initialization.
@@ -234,6 +261,38 @@ mod tests {
 
         // Verify it's marked as initialized
         assert!(INITIALIZED_ORGS.contains(test_org));
+    }
+
+    #[test]
+    fn present_columns_adds_only_the_optional_columns_the_stream_has() {
+        use arrow_schema::{DataType, Field};
+
+        let schema = Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("error", DataType::Utf8, true),
+        ]);
+        assert_eq!(
+            present_columns("_timestamp", &["error", "source_node"], &schema),
+            "_timestamp, error"
+        );
+        assert_eq!(present_columns("_timestamp", &[], &schema), "_timestamp");
+    }
+
+    #[test]
+    fn sortable_column_falls_back_only_for_a_missing_optional_column() {
+        use arrow_schema::{DataType, Field};
+
+        let schema = Schema::new(vec![Field::new("query_took", DataType::Int64, true)]);
+        let optional = ["query_took", "source_node"];
+        assert_eq!(
+            sortable_column("source_node", &optional, &schema),
+            "_timestamp"
+        );
+        assert_eq!(
+            sortable_column("query_took", &optional, &schema),
+            "query_took"
+        );
+        assert_eq!(sortable_column("retries", &optional, &schema), "retries");
     }
 
     #[test]

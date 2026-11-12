@@ -31,7 +31,9 @@ use config::{
     utils::time::now_micros,
 };
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::{alerts::alert::get_by_id, auth::UserEmail};
+use openobserve_core::{
+    alerts::alert::get_by_id, auth::UserEmail, self_reporting::triggers_schema as trigger_stream,
+};
 use search_service as SearchService;
 use search_service::query_range::get_settings_max_query_range;
 use serde::{Deserialize, Serialize};
@@ -81,7 +83,7 @@ const SUCCESS_RESPONSE_MAX_CHARS: usize = 500;
 const HISTORY_COLUMNS: &str =
     "_timestamp, org, key, status, is_realtime, is_silenced, start_time, end_time, retries";
 
-/// The anomaly reads' columns a stream may lack, added by [present_columns] when present.
+/// The anomaly reads' columns a stream may lack, added only when present.
 const OPTIONAL_ANOMALY_COLUMNS: [&str; 3] =
     ["evaluation_took_in_secs", "error", "success_response"];
 
@@ -434,13 +436,15 @@ pub async fn get_alert_history(
             });
         }
 
-        let schema = match triggers_schema(
-            infra::schema::get(&org_id, TRIGGERS_STREAM, StreamType::Logs).await,
-        ) {
+        let schema = match read_triggers_schema(&org_id).await {
             Ok(schema) => schema,
             Err(response) => return response,
         };
-        let columns = present_columns("_timestamp, status", &OPTIONAL_ANOMALY_COLUMNS, &schema);
+        let columns = trigger_stream::present_columns(
+            "_timestamp, status",
+            &OPTIONAL_ANOMALY_COLUMNS,
+            &schema,
+        );
         let sort_column = sortable_column(sort_column, &schema);
         let data_sql = format!(
             "SELECT {columns} FROM \"{TRIGGERS_STREAM}\" WHERE {where_clause} \
@@ -696,12 +700,10 @@ pub async fn get_alert_history(
     let synthetics_readable =
         query.downtime_id.is_some() && reads_every_synthetic(&org_id, &user_email.user_id).await;
     let modules = history_modules(query.downtime_id.is_some(), synthetics_readable);
-    let triggers_schema =
-        match triggers_schema(infra::schema::get(&org_id, TRIGGERS_STREAM, StreamType::Logs).await)
-        {
-            Ok(schema) => schema,
-            Err(response) => return response,
-        };
+    let triggers_schema = match read_triggers_schema(&org_id).await {
+        Ok(schema) => schema,
+        Err(response) => return response,
+    };
     if query
         .downtime_id
         .as_deref()
@@ -1092,6 +1094,10 @@ async fn every_synthetic_readable(
     }
 }
 
+async fn read_triggers_schema(org_id: &str) -> Result<Schema, Response> {
+    triggers_schema(trigger_stream::get(org_id).await)
+}
+
 /// The triggers stream's schema; a failed read is a server error, never an empty stream.
 fn triggers_schema(read: infra::errors::Result<Schema>) -> Result<Schema, Response> {
     read.map_err(|e| {
@@ -1102,30 +1108,11 @@ fn triggers_schema(read: infra::errors::Result<Schema>) -> Result<Schema, Respon
 
 /// [HISTORY_COLUMNS] plus each optional column the stream has, which may lack any of them.
 fn history_columns(schema: &Schema) -> String {
-    present_columns(HISTORY_COLUMNS, &OPTIONAL_HISTORY_COLUMNS, schema)
+    trigger_stream::present_columns(HISTORY_COLUMNS, &OPTIONAL_HISTORY_COLUMNS, schema)
 }
 
-/// `required` plus the `optional` columns the schema has, as a missing column fails the query.
-fn present_columns(required: &str, optional: &[&str], schema: &Schema) -> String {
-    let mut columns = required.to_string();
-    for column in optional {
-        if schema.field_with_name(column).is_ok() {
-            columns.push_str(", ");
-            columns.push_str(column);
-        }
-    }
-    columns
-}
-
-/// A sort on a column the stream lacks fails the query, so it falls back to `_timestamp`.
 fn sortable_column(sort_column: &'static str, schema: &Schema) -> &'static str {
-    if OPTIONAL_HISTORY_COLUMNS.contains(&sort_column)
-        && schema.field_with_name(sort_column).is_err()
-    {
-        "_timestamp"
-    } else {
-        sort_column
-    }
+    trigger_stream::sortable_column(sort_column, &OPTIONAL_HISTORY_COLUMNS, schema)
 }
 
 fn capped_success_response(text: &str) -> String {
@@ -1262,13 +1249,11 @@ pub async fn get_all_anomaly_history(
     // Fetch more rows than limit*max_configs so we have headroom to fill each config bucket.
     // We cap at 5000 to avoid oversized responses.
     let fetch_size = (limit * 200).min(5000);
-    let schema =
-        match triggers_schema(infra::schema::get(&org_id, TRIGGERS_STREAM, StreamType::Logs).await)
-        {
-            Ok(schema) => schema,
-            Err(response) => return response,
-        };
-    let columns = present_columns(
+    let schema = match read_triggers_schema(&org_id).await {
+        Ok(schema) => schema,
+        Err(response) => return response,
+    };
+    let columns = trigger_stream::present_columns(
         "_timestamp, key, status",
         &OPTIONAL_ANOMALY_COLUMNS,
         &schema,
@@ -2332,7 +2317,11 @@ mod tests {
         let field = |name: &str| Field::new(name, DataType::Utf8, true);
         let bare = Schema::new(vec![field("_timestamp"), field("key"), field("status")]);
         assert_eq!(
-            present_columns("_timestamp, key, status", &OPTIONAL_ANOMALY_COLUMNS, &bare),
+            trigger_stream::present_columns(
+                "_timestamp, key, status",
+                &OPTIONAL_ANOMALY_COLUMNS,
+                &bare
+            ),
             "_timestamp, key, status"
         );
         let full = Schema::new(
@@ -2343,7 +2332,7 @@ mod tests {
                 .collect::<Vec<_>>(),
         );
         assert_eq!(
-            present_columns("_timestamp, status", &OPTIONAL_ANOMALY_COLUMNS, &full),
+            trigger_stream::present_columns("_timestamp, status", &OPTIONAL_ANOMALY_COLUMNS, &full),
             "_timestamp, status, evaluation_took_in_secs, error, success_response"
         );
     }
