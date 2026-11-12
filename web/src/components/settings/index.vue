@@ -115,6 +115,7 @@ export default defineComponent({
       llmProviders: "llm_providers",
       storageSettings: "storageSettings",
       cipherKeys: "cipher-keys",
+      aiToolsets: "ai_toolsets",
       license: "license",
       orgnizationManagement: "organization_management",
       regexPatterns: "regex_patterns",
@@ -245,6 +246,7 @@ export default defineComponent({
       // folds the "Cloud never offers this" distinction into `.visible`, so
       // nothing here re-derives its own `!isCloud` check anymore.
       const cipherKeysAccess = checkFeatureAccess("cipherKeys", featureGateCtx);
+      const aiToolsetsAccess = checkFeatureAccess("aiToolsets", featureGateCtx);
       const regexPatternsAccess = checkFeatureAccess("regexPatterns", featureGateCtx);
       const domainManagementAccess = checkFeatureAccess("domainManagement", featureGateCtx);
       const passwordPolicyAccess = checkFeatureAccess("passwordPolicy", featureGateCtx);
@@ -270,6 +272,8 @@ export default defineComponent({
         z?.service_streams_enabled !== false,
       );
       const queryManagementLicense = featureState(z?.features, "query_management");
+      const aiToolsetsLicense = featureState(z?.features, "ai_toolsets");
+      const aiAssistantLicense = featureState(z?.features, "ai_assistant");
       const byobLicense = featureState(z?.features, "byob");
       const oncallLicense = menuState(z?.features, "oncall", z?.oncall_enabled !== false);
       const aiObsLicense = menuState(z?.features, "ai_observability", !!z?.online_evals_enabled);
@@ -474,6 +478,22 @@ export default defineComponent({
           licenseLocked: aiObsLicense === "locked",
           dataTest: "gen-ai-agent-mapping-tab",
           group: "Data & AI",
+        },
+        {
+          key: "ai_toolsets",
+          label: t("aiToolset.header"),
+          description: t("settings.aiToolsetsDesc"),
+          icon: "smart-toy",
+          to: { name: "aiToolsets", query: { org_identifier: org } },
+          visible:
+            aiToolsetsLicense !== "hidden" &&
+            aiAssistantLicense !== "hidden" &&
+            aiToolsetsAccess.visible,
+          locked: !aiToolsetsAccess.allowed,
+          lockedMessage: aiToolsetsAccess.message,
+          licenseLocked: aiToolsetsLicense === "locked" || aiAssistantLicense === "locked",
+          dataTest: "ai-toolsets-tab",
+          group: "Integrations",
         },
         {
           key: "queryManagement",
