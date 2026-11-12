@@ -284,8 +284,8 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   {
     fg: "--color-timeline-dot-fg",
     bg: "--color-timeline-dot-primary",
-    category: "non-text",
-    why: "the glyph is drawn inside the timeline dot",
+    category: "text",
+    why: "a timeline label pill draws its time inside the dot",
   },
   {
     fg: "--color-timeline-dot-fg",
