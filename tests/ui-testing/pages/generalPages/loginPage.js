@@ -190,8 +190,10 @@ export class LoginPage {
     // Wait for page to stabilize before checking for internal login button
     await this.page.waitForLoadState('domcontentloaded');
     
-    if (await this.page.getByText('Login as internal user').isVisible()) {
-      await this.page.getByText('Login as internal user').click();
+    // getByText resolves to OButton's display:contents label span, which has no box, so Firefox reports it outside the viewport.
+    const internalUserButton = this.page.locator('[data-test="login-as-internal-user"]');
+    if (await internalUserButton.isVisible()) {
+      await internalUserButton.click();
       await this.page.waitForURL(process.env["ZO_BASE_URL_SC_UI"] + "/web/login", {
         waitUntil: "domcontentloaded",
       });
