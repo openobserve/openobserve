@@ -31,7 +31,6 @@ use datafusion::{
 };
 use hashbrown::HashMap;
 use infra::runtime::DATAFUSION_RUNTIME;
-use metrics_index::MetricsFileLayout;
 
 use crate::datafusion::{
     datasource::listing_adapter::ListingTableAdapter,
@@ -40,24 +39,19 @@ use crate::datafusion::{
     storage::{file_list, format_location},
 };
 
-/// The sorted chains of the hash-merged files among `files`; `None` when they cannot be read.
-pub async fn hash_merged_chains(
+/// The sorted chains of the hash-ordered `files`; `None` when their statistics cannot be read.
+pub async fn hash_ordered_chains(
     schema: Arc<Schema>,
-    files: &[FileKey],
+    files: Vec<FileKey>,
     stream: &str,
 ) -> Option<Vec<Vec<FileKey>>> {
-    let merged: Vec<FileKey> = files
-        .iter()
-        .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashMerged))
-        .cloned()
-        .collect();
-    if merged.is_empty() {
+    if files.is_empty() {
         return Some(Vec::new());
     }
 
-    let merged_num = merged.len();
+    let file_num = files.len();
     let chains = DATAFUSION_RUNTIME
-        .spawn(hash_ordered_chains(schema, merged))
+        .spawn(read_chains(schema, files))
         .await
         .map_err(|e| e.to_string())
         .and_then(|chains| chains.map_err(|e| e.to_string()));
@@ -65,7 +59,7 @@ pub async fn hash_merged_chains(
         Ok(chains) => Some(chains),
         Err(e) => {
             log::warn!(
-                "[COMPACTOR] merge_by_stream [{stream}] chaining {merged_num} hash-merged files by statistics failed: {e}"
+                "[COMPACTOR] merge_by_stream [{stream}] chaining {file_num} files by statistics failed: {e}"
             );
             None
         }
@@ -73,10 +67,7 @@ pub async fn hash_merged_chains(
 }
 
 /// The sorted chains a hash-ordered merge of `files` reads: each chain is one input it keeps open.
-async fn hash_ordered_chains(
-    schema: Arc<Schema>,
-    files: Vec<FileKey>,
-) -> Result<Vec<Vec<FileKey>>> {
+async fn read_chains(schema: Arc<Schema>, files: Vec<FileKey>) -> Result<Vec<Vec<FileKey>>> {
     let sort_order = FileSortOrder::HashTimestampAsc;
     let session = Session {
         id: ider::generate(),
@@ -105,7 +96,7 @@ async fn hash_ordered_chains(
     }
     if !by_key.is_empty() {
         return Err(DataFusionError::Plan(format!(
-            "hash_ordered_chains: {} file(s) missing from the listed files",
+            "read_chains: {} file(s) missing from the listed files",
             by_key.len()
         )));
     }
@@ -207,7 +198,7 @@ mod tests {
                 rounds.push(put_file(&account, &name, hashes, EnabledStatistics::Page).await);
             }
         }
-        let chains = hash_ordered_chains(schema(), rounds).await.unwrap();
+        let chains = read_chains(schema(), rounds).await.unwrap();
         let mut names: Vec<Vec<&str>> = chains
             .iter()
             .map(|chain| {
@@ -232,7 +223,7 @@ mod tests {
             let name = format!("hash-merged-v1-n{i}.parquet");
             bare.push(put_file(&account, &name, [1, 9], EnabledStatistics::None).await);
         }
-        let err = hash_ordered_chains(schema(), bare).await.unwrap_err();
+        let err = read_chains(schema(), bare).await.unwrap_err();
         assert!(err.to_string().contains("statistics"), "{err}");
     }
 }

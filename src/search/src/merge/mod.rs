@@ -25,7 +25,7 @@ mod single_file;
 use std::sync::Arc;
 
 use arrow::array::RecordBatch;
-pub use chains::hash_merged_chains;
+pub use chains::hash_ordered_chains;
 use config::{get_config, meta::stream::FileMeta};
 use datafusion::{
     arrow::datatypes::Schema,

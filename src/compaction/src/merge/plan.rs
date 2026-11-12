@@ -90,7 +90,12 @@ fn split_legacy_metrics(files: Vec<FileKey>, mode: &MergeMode) -> (Vec<FileKey>,
 
 /// The open metrics hour: its pending ingester files merge into hash-merged output.
 fn open_hour_batches(files: &[FileKey], limits: &BatchLimits<'_>) -> Vec<PlannedBatch> {
-    ingester_batches(files, OPEN_HOUR_MERGE_FILES, limits.max_merge_groups)
+    let pending: Vec<FileKey> = files
+        .iter()
+        .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashSorted))
+        .cloned()
+        .collect();
+    capped_batches(pending, OPEN_HOUR_MERGE_FILES, limits.max_merge_groups)
         .into_iter()
         .map(|pending| (pending, MergeMode::MetricsHashMerged))
         .collect()
@@ -152,25 +157,20 @@ async fn closed_hour_batches(
 //     }
 // }
 
-/// The hash-sorted files, once `min_files` piled up, in batches of at most `max_groups`.
-pub(super) fn ingester_batches(
-    files: &[FileKey],
+/// `files`, once `min_files` piled up, in batches of at most `max_groups`.
+pub(super) fn capped_batches(
+    files: Vec<FileKey>,
     min_files: usize,
     max_groups: usize,
 ) -> Vec<Vec<FileKey>> {
-    let pending: Vec<FileKey> = files
-        .iter()
-        .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashSorted))
-        .cloned()
-        .collect();
-    if pending.len() < min_files {
+    if files.len() < min_files {
         return Vec::new();
     }
     if max_groups == 0 {
-        return vec![pending];
+        return vec![files];
     }
     // a lone trailing file has nothing to merge with and waits for the next round
-    pending
+    files
         .chunks(max_groups)
         .filter(|chunk| chunk.len() > 1)
         .map(<[FileKey]>::to_vec)
