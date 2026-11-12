@@ -40,7 +40,7 @@ use tokio::{
 
 use super::{
     job::{job_range_end, job_time_level, scheduling_level},
-    plan::{BatchLimits, exceeds_merge_groups, plan_batches},
+    plan::{BatchLimits, plan_batches},
 };
 use crate::{
     bloom::compact::OrphanBlooms,
@@ -216,13 +216,8 @@ pub async fn merge_by_stream(
                 max_merge_groups: cfg.compact.metrics_max_groups,
             };
             let stream = format!("{org_id}/{stream_type}/{stream_name}");
-            // footers are read only for an hour that could exceed the cap
-            let chains = if exceeds_merge_groups(files_with_size.len(), &mode, &limits) {
-                search::merge::hash_merged_chains(scan_schema, &files_with_size, &stream).await
-            } else {
-                None
-            };
-            let planned = plan_batches(files_with_size, &mode, &limits, chains, &stream);
+            let planned =
+                plan_batches(files_with_size, &mode, &limits, &scan_schema, &stream).await;
             // a closed hour plans hash-merged output only as a pre-merge for a later round
             let pre_merged = !is_incremental
                 && planned
