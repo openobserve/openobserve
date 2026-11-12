@@ -689,7 +689,12 @@ const viewState = useListViewState("servicesCatalog", {
 });
 // While the search shows the link's service, the user's own filter is what persists, until they edit the search.
 let persistedFilterText = viewState.filterText;
-const transientFilter = ref<string | null>(props.initialService || null);
+// A link from another page (AutoObserve's service drawer) can also name the service in the URL.
+const linkedService = router.currentRoute.value?.query?.service;
+const transientFilter = ref<string | null>(
+  props.initialService ||
+    (typeof linkedService === "string" && linkedService ? linkedService : null),
+);
 const filterText = ref(transientFilter.value ?? viewState.filterText);
 const typeFilter = ref<TypeFilter>(viewState.typeFilter);
 const currentPage = ref(viewState.currentPage);

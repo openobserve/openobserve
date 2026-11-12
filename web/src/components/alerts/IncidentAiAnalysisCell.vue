@@ -72,6 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :dot="!model.spinner && !model.locked"
           clickable
+          :aria-describedby="model.detail || model.rerunNote ? detailId : undefined"
           class="max-w-full min-w-0"
           :data-tone="model.tone"
           data-test="incident-ai-analysis-label"
