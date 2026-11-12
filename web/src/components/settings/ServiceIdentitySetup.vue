@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("settings.correlation.service")
                   }}</span>
                   {{ t("settings.serviceIdentitySetup.fieldAlias") }}
-                  <span class="text-xs opacity-60"
+                  <span class="text-text-secondary text-xs"
                     >({{ detectedServiceFields.length + unseenServiceFields.length }})</span
                   >
                 </template>
@@ -438,7 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="check-circle" size="sm" />
             <div class="text-compact min-w-0 flex-1 leading-tight">
               {{ t("settings.serviceIdentitySetup.workloadDetectedUsingFields") }}
-              <span class="text-xs opacity-60">({{ trackedAliasIds.length }})</span>
+              <span class="text-text-secondary text-xs">({{ trackedAliasIds.length }})</span>
             </div>
             <OIcon
               :name="trackedAliasExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'"

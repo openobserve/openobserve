@@ -156,9 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="lockedLabel" />
             </span>
           </div>
-          <!-- Fixed-height subtitle band: keeps the <h1> at an identical Y whether
-             the subtitle is present or not, so the title doesn't appear to shift
-             when navigating between views. Content is vertically centered. -->
+          <!-- A page without a subtitle centres its title lower than one with a subtitle. -->
           <OText
             v-if="hasSubtitle()"
             variant="meta"

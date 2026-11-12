@@ -28,7 +28,7 @@ const router = createRouter({
 });
 
 // The view-mode OToggleGroup is 34px tall (28px sm items + 2px track padding each side + 1px border each side).
-const TOGGLE_GROUP_HEIGHT_CLASS = "h-[2.125rem]!";
+const TOGGLE_GROUP_HEIGHT_CLASS = "h-8.5";
 
 describe("SearchBar — toolbar controls match the view-mode toggle height", () => {
   let wrapper: VueWrapper<any> | undefined;
@@ -41,7 +41,9 @@ describe("SearchBar — toolbar controls match the view-mode toggle height", () 
       vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
         this: HTMLElement,
       ) {
-        const isToolbarBar = this.classList.contains("border-b-card-glass-border");
+        const isToolbarBar =
+          this.classList.contains("border-border-default") &&
+          this.classList.contains("overflow-hidden");
         return { width: isToolbarBar ? toolbarWidth : 0 } as DOMRect;
       });
     }
@@ -121,20 +123,19 @@ describe("SearchBar — toolbar controls match the view-mode toggle height", () 
         "logs-search-bar-more-options-btn",
         "logs-search-bar-share-link-btn",
       ]) {
-        expect(classesOf(dataTest)).toContain("size-[2.125rem]!");
+        expect(classesOf(dataTest)).toContain("h-8.5");
       }
       for (const dataTest of [
         "logs-search-bar-function-editor-pinned-btn",
-        "logs-search-bar-date-time-dropdown",
         "logs-search-bar-refresh-btn",
-        "logs-search-bar-refresh-cache-dropdown-trigger",
       ]) {
         expect(classesOf(dataTest)).toContain(TOGGLE_GROUP_HEIGHT_CLASS);
       }
+      expect(classesOf("logs-search-bar-refresh-cache-dropdown-trigger")).toContain("size-8.5");
+      expect(classesOf("logs-search-bar-date-time-dropdown")).toContain("h-8.5!");
       const runButton = wrapper.get('[data-test="logs-search-bar-refresh-btn"]').element;
-      expect(runButton.nextElementSibling!.classList).toContain(TOGGLE_GROUP_HEIGHT_CLASS);
-      const interval = wrapper.get('[data-test="logs-search-bar-refresh-interval-btn"]').element;
-      expect(interval.parentElement!.classList).toContain("*:size-[2.125rem]!");
+      expect(runButton.nextElementSibling!.classList).toContain("h-8.5!");
+      expect(classesOf("logs-search-bar-refresh-interval-btn")).toContain("size-8.5");
       // A 1px group border around 2rem buttons makes the function selector 34px.
       for (const dataTest of [
         "logs-search-bar-function-dropdown",

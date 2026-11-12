@@ -254,7 +254,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </div>
               <div class="flex items-center gap-2">
-                <span class="text-xs opacity-60">{{ t("alerts.advanced.templateType") }}</span>
+                <span class="text-text-secondary text-xs">{{
+                  t("alerts.advanced.templateType")
+                }}</span>
                 <OFormToggleGroup
                   data-test="add-alert-row-template-type-toggle"
                   name="row_template_type"

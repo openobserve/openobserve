@@ -70,32 +70,25 @@ const baseClasses = computed<string>(() =>
     // Named group so the grip (and consumer affordances like a rename pencil)
     // can fade in on tab hover without colliding with consumer `group` usage.
     "group/otab",
-    "relative items-center gap-1.5",
-    isVertical.value ? "flex justify-start" : "inline-flex justify-center",
-    // Horizontal inset. A vertical (side-rail) tab is a selectable PILL, so the
-    // rail container insets it (px-1.5) to give the pill breathing room from the
-    // rail edges. With that 6px container inset + the tab's own 2px active border
-    // + this ps-1, the label lands on the page-edge grid line (12px) while the
-    // pill never touches the rail edge. Rails add the px-1.5; tabs don't hand-roll
-    // their own padding override.
-    // Reorderable tabs widen the left inset to a 0.75rem gutter that hosts the
-    // hover-revealed drag grip. The gutter is tied to `reorderable` (not
-    // per-press state), so a tab is pixel-identical at rest, on hover, and
-    // while its label is being edited — the grip only ever changes opacity.
+    "relative items-center",
+    isVertical.value ? "flex justify-start gap-2" : "inline-flex justify-center gap-1.5",
+    // The rail's px-1 plus this px-2 puts a vertical tab's icon on the 12px page-edge grid line.
+    // Reorderable tabs keep a fixed 0.75rem gutter for the grip, so hovering or editing never shifts the label.
     isReorderable.value
       ? "ps-3 pe-2"
       : isVertical.value
-        ? "ps-1 pe-2"
+        ? "px-2"
         : slots.trailing
           ? "ps-2 pe-1"
           : "px-2",
-    "font-normal text-sm whitespace-nowrap",
+    isVertical.value && isActive.value ? "font-medium" : "font-normal",
+    "text-sm whitespace-nowrap",
     isVertical.value ? "rounded-default" : "rounded-t-default",
     "outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke] duration-(--duration-hover-out) hover:duration-(--duration-hover-in)",
     "select-none",
     "focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-focus-ring-accent",
     // The horizontal strip scrolls on x, which clips y as well, so an outside outline would lose its bottom edge.
-    isVertical.value ? "focus-visible:outline-offset-2" : "focus-visible:-outline-offset-2",
+    isVertical.value ? "focus-visible:outline-offset-0" : "focus-visible:-outline-offset-2",
   ].join(" "),
 );
 
@@ -105,45 +98,41 @@ const stateClasses = computed<string>(() => {
     return [
       "text-tabs-active-text cursor-not-allowed opacity-60",
       isVertical.value
-        ? "bg-tabs-active-bg border-s-2 border-tabs-indicator"
+        ? "bg-tabs-active-bg ring-tabs-indicator ring-1 ring-inset"
         : "border-b-2 border-transparent",
     ].join(" ");
   }
   if (isDisabled.value) {
-    return [
-      "text-tabs-disabled-text cursor-not-allowed opacity-60",
-      // Keep the transparent left border so disabled items don't shift width.
-      isVertical.value ? "border-s-2 border-transparent" : "",
-    ].join(" ");
+    return "text-tabs-disabled-text cursor-not-allowed opacity-60";
   }
   if (isActive.value) {
     // Horizontal tabs: colored text only. The active underline is a single
     // shared bar in OTabs that slides between tabs, so each tab keeps a
     // transparent 2px border (layout parity with inactive) rather than drawing
     // its own colored one.
-    // Vertical tabs (side rail): tint bg + primary text + a colored left accent
-    // border that reads as the active rail marker.
     return [
       "text-tabs-active-text cursor-pointer",
       isVertical.value
-        ? "bg-tabs-active-bg border-s-2 border-tabs-indicator"
+        ? "bg-tabs-active-bg ring-tabs-indicator ring-1 ring-inset"
         : "border-b-2 border-transparent",
     ].join(" ");
   }
-  return [
-    "text-tabs-inactive-text cursor-pointer",
-    isVertical.value
-      ? "enabled:hover:text-tabs-hover-text enabled:hover:bg-tabs-hover-bg"
-      : "enabled:hover:text-tabs-hover-text",
-    // Transparent border (left for vertical, bottom for horizontal) keeps inactive
-    // items the same size as the active one — no layout shift on activation.
-    isVertical.value ? "border-s-2 border-transparent" : "border-b-2 border-transparent",
-  ].join(" ");
+  if (isVertical.value) {
+    return "text-text-body cursor-pointer enabled:hover:text-tabs-hover-text enabled:hover:bg-tabs-rail-hover-bg";
+  }
+  return "text-tabs-inactive-text cursor-pointer enabled:hover:text-tabs-hover-text border-b-2 border-transparent";
 });
+
+// A muted glyph lets the rail's labels lead; the active tab's icon inherits its accent text.
+const iconToneClass = computed<string>(() =>
+  isVertical.value && !isActive.value && !isDisabled.value
+    ? "text-text-secondary group-hover/otab:text-tabs-hover-text"
+    : "",
+);
 
 const heightClasses = computed<string>(() => {
   if (isVertical.value) {
-    return isDense.value ? "py-1.5" : "py-2";
+    return "py-1.5";
   }
   return isDense.value ? "h-8" : "h-10";
 });
@@ -228,11 +217,13 @@ const heightClasses = computed<string>(() => {
             :name="icon as any"
             size="sm"
             class="o-tab__icon shrink-0"
+            :class="iconToneClass"
           />
           <!-- Fallback: Material icon font glyph (legacy underscore names) -->
           <span
             v-else-if="icon"
             class="o-tab__icon material-icons-outlined shrink-0 text-base leading-none"
+            :class="iconToneClass"
             >{{ icon }}</span
           >
         </slot>

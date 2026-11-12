@@ -17,11 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="logs-search-bar-component" id="searchBarComponent">
     <div
-      class="solid border-b-card-glass-border m-0! flex w-full items-center! overflow-hidden border-b p-1.5! max-md:flex-wrap max-md:gap-y-1 max-md:overflow-visible"
+      class="solid border-border-default m-0! flex w-full items-center! overflow-hidden border-b p-1.5! max-md:flex-wrap max-md:gap-y-1 max-md:overflow-visible"
     >
       <div
         ref="toolbarLeftRef"
-        class="flex min-w-0 flex-1 flex-nowrap items-center gap-1 max-md:w-full max-md:flex-none"
+        class="flex min-w-0 flex-1 flex-nowrap items-center gap-2 max-md:w-full max-md:flex-none"
       >
         <!-- Collapsible region — clips its overflow so the More button (a
              shrink-0 sibling below) always stays visible. Pinned items hide via
@@ -30,15 +30,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              sits right after the pinned items instead of being pushed to the
              far right; it still shrinks + clips when content overflows. -->
         <div
-          class="-my-1 flex min-w-0 flex-initial flex-nowrap items-center gap-1 overflow-hidden py-1"
+          class="-my-1 flex min-w-0 flex-initial flex-nowrap items-center gap-2 overflow-hidden py-1"
         >
           <!-- View Mode: Dropdown when very narrow, Toggle Group otherwise -->
           <ODropdown v-if="toolbarToggleAsDropdown" side="bottom" align="start">
             <template #trigger>
               <OButton
                 data-test="logs-view-mode-dropdown-btn"
-                size="xs"
-                class="h-[2.125rem]!"
+                size="sm-toolbar"
                 variant="outline"
                 icon-right="arrow-drop-down"
               >
@@ -65,8 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OToggleGroupItem
               data-test="logs-logs-toggle"
+              :aria-label="t('common.search')"
               value="logs"
-              size="sm"
+              size="toolbar"
               :tooltip="toolbarToggleIconOnly ? t('common.search') : undefined"
             >
               <template #icon-left>
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : undefined
               "
               value="visualize"
-              size="sm"
+              size="toolbar"
             >
               <template #icon-left>
                 <OIcon name="timeline" size="sm" class="shrink-0" />
@@ -101,18 +101,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OToggleGroupItem
               data-test="logs-build-toggle"
+              :aria-label="t('search.buildQuery')"
               value="build"
-              size="sm"
+              size="toolbar"
               :tooltip="toolbarToggleIconOnly ? t('search.buildQuery') : undefined"
             >
               <template #icon-left>
-                <OIcon name="build" size="sm" class="shrink-0" />
+                <OIcon name="show-chart" size="sm" class="shrink-0" />
               </template>
               <span v-if="!toolbarToggleIconOnly">{{ t("search.buildQuery") }}</span>
             </OToggleGroupItem>
 
             <OToggleGroupItem
               data-test="logs-drilldown-toggle"
+              :aria-label="t('search.drillDown')"
               :disabled="searchObj.meta.sqlMode"
               :tooltip="
                 searchObj.meta.sqlMode
@@ -122,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : undefined
               "
               value="drilldown"
-              size="sm"
+              size="toolbar"
             >
               <template #icon-left>
                 <OIcon name="query-stats" size="sm" class="shrink-0" />
@@ -132,8 +134,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OToggleGroupItem
               data-test="logs-patterns-toggle"
+              :aria-label="t('search.showPatternsLabel')"
               value="patterns"
-              size="sm"
+              size="toolbar"
               :tooltip="
                 patternsAccess.allowed && toolbarToggleIconOnly
                   ? t('search.showPatternsLabel')
@@ -153,8 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="!toolbarMoveResetToMenu"
             data-test="logs-search-bar-reset-filters-btn"
-            size="xs"
-            class="h-[2.125rem]!"
+            :size="shouldHideToolbarButtonText ? 'icon-toolbar' : 'sm-toolbar'"
             variant="outline"
             @click="resetFilters"
           >
@@ -173,9 +175,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showPinnedHistogram"
             as="div"
             data-test="logs-search-bar-histogram-btn"
-            size="xs"
+            size="sm-toolbar"
             variant="outline"
-            class="h-[2.125rem]! gap-1.5"
             @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
           >
             <OSwitch
@@ -200,9 +201,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showPinnedSqlMode"
             as="div"
             data-test="logs-search-bar-sql-mode-pinned-btn"
-            size="xs"
+            size="sm-toolbar"
             variant="outline"
-            class="h-[2.125rem]! gap-1.5"
             @click="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
           >
             <OSwitch
@@ -221,9 +221,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showPinnedQuickMode"
             as="div"
             data-test="logs-search-bar-quick-mode-pinned-btn"
-            size="xs"
+            size="sm-toolbar"
             variant="outline"
-            class="h-[2.125rem]! gap-1.5"
             @click="handleQuickMode"
           >
             <OSwitch
@@ -257,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   data-test="logs-search-bar-saved-views-pinned-list-btn"
                   variant="ghost"
-                  size="xs-grouped"
+                  size="sm-toolbar"
                   class="h-8!"
                 >
                   <OIcon name="saved-search" size="sm" />
@@ -318,10 +317,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
-              class="rounded-default hover:bg-button-outline-hover-bg h-[2.125rem]! p-1! text-xs font-medium [border:0.0625rem_solid_var(--color-button-outline-border)]! [transition:all_0.2s_ease] max-md:ms-auto"
+              class="max-md:ms-auto"
               icon-left="more-horiz"
               variant="outline"
-              size="xs"
+              size="sm-toolbar"
             >
               {{ t("search.menuMore") }}
             </OButton>
@@ -564,7 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         ref="toolbarRightRef"
-        class="flex flex-shrink-0 items-center gap-1 max-md:w-full max-md:justify-end"
+        class="flex flex-shrink-0 items-center gap-2 max-md:w-full max-md:justify-end"
       >
         <OPageHeaderStatus />
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
@@ -587,9 +586,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-more-options-btn"
-              class="download-logs-btn hover:bg-interactive-hover-bg! order-4 size-[2.125rem]!"
+              class="download-logs-btn hover:bg-interactive-hover-bg! order-4"
               variant="outline"
-              size="icon-toolbar"
+              size="icon-md"
             >
               <OIcon name="menu" size="sm" />
               <OTooltip max-width="7rem" :content="t('search.moreActions')" />
@@ -850,19 +849,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-share-link-btn"
           :url="shareURL"
           variant="outline"
-          size="icon-toolbar"
+          size="icon-md"
           :disabled="!!shareReason"
           :tooltip="shareReason || undefined"
-          class="order-3 size-[2.125rem]!"
+          class="order-3"
         />
         <!-- Function Editor (pinned) — sits to the left of the date picker -->
         <OButton
           v-if="showPinnedFunctionEditor"
           as="div"
           data-test="logs-search-bar-function-editor-pinned-btn"
-          size="xs"
+          size="sm-toolbar"
           variant="outline"
-          class="order-1 me-1 h-[2.125rem]! gap-1.5"
+          class="order-1"
           @click="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
         >
           <OSwitch
@@ -893,12 +892,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
             :disable="disable"
-            class="h-[2.125rem]!"
+            class="h-8.5!"
           />
         </div>
 
         <div class="search-time order-2">
-          <div class="flex">
+          <div class="flex gap-2">
             <OTooltip
               v-if="
                 config.isEnterprise == 'true' &&
@@ -907,7 +906,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :content="superClusterLockedReason"
             >
-              <span class="me-1 inline-flex">
+              <span class="inline-flex">
                 <OButton
                   variant="outline"
                   size="sm"
@@ -928,7 +927,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </OTooltip>
             <OButtonGroup
-              class="border-card-glass-border me-1 border p-0"
+              class="border-card-glass-border border p-0"
               v-else-if="
                 config.isEnterprise == 'true' &&
                 Object.keys(store.state.regionInfo).length > 0 &&
@@ -987,7 +986,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.cancel')"
                   variant="ghost"
                   size="sm-toolbar"
-                  class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                  class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -1004,13 +1003,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ t("search.runQuery") }}
                 </OButton>
-                <OSeparator class="h-[2.125rem]! w-px" vertical />
+                <OSeparator class="h-8.5! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
                       variant="ghost"
-                      size="icon-xs"
-                      class="h-[2.125rem]!"
+                      size="icon-toolbar"
                       :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
@@ -1048,7 +1046,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   :title="t('search.cancel')"
                   size="sm-toolbar"
-                  class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                  class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -1066,13 +1064,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ t("search.runQuery") }}
                 </OButton>
-                <OSeparator class="h-[2.125rem]! w-px" vertical />
+                <OSeparator class="h-8.5! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
                       variant="ghost"
-                      size="icon-xs"
-                      class="h-[2.125rem]!"
+                      size="icon-toolbar"
                       :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
@@ -1112,7 +1109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 :title="t('search.cancel')"
                 size="sm-toolbar"
-                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-default h-[2.125rem]! w-[5.875rem]! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-default min-w-[5.875rem] [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                 @click="autoRun.engine.cancelGeneration(null, { cause: 'user' })"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -1123,7 +1120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="primary"
                 :title="t('search.cancel')"
                 size="sm-toolbar"
-                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                 @click="cancelRun"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -1136,7 +1133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="showRunQueryPending ? 'pending' : 'primary'"
                 :title="t('search.runQuery')"
                 size="sm-toolbar"
-                class="rounded-s-default! relative h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                class="rounded-s-default! relative min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                 :class="[
                   showRunQueryPending
                     ? ''
@@ -1173,15 +1170,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OSeparator
                 v-if="!showRunQueryPending || isRunQueryCancelShown"
-                class="h-[2.125rem]! w-px"
+                class="h-8.5! w-px"
                 vertical
               />
               <ODropdown align="end" side="bottom">
                 <template #trigger>
                   <OButton
                     :variant="showRunQueryPending && !isRunQueryCancelShown ? 'pending' : 'ghost'"
-                    size="icon-xs"
-                    class="h-[2.125rem]!"
+                    size="icon-toolbar"
                     :aria-label="t('search.refreshCacheAndRunQuery')"
                     data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                     :class="[
@@ -1242,7 +1238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
               <!-- Compact Auto Refresh Button -->
               <AutoRefreshInterval
-                class="ms-1 *:size-[2.125rem]!"
+                class="ms-2"
                 v-model="searchObj.meta.refreshInterval"
                 :trigger="true"
                 :is-compact="true"
@@ -2615,13 +2611,6 @@ export default defineComponent({
     // Responsive toolbar — width tracking via shared composable
     const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive();
 
-    // Approximate rendered widths of left-section content at each collapse state:
-    // Each threshold has a small buffer (+16px) so collapse fires before clipping.
-    const shouldHideToolbarButtonText = computed(() => availableLeftWidth.value < 810);
-    const toolbarToggleIconOnly = computed(() => availableLeftWidth.value < 658);
-    const toolbarMoveResetToMenu = computed(() => availableLeftWidth.value < 288);
-    const toolbarToggleAsDropdown = computed(() => availableLeftWidth.value < 216);
-
     // ── Pinned toolbar items ──────────────────────────────────────────────
     // Items pinned out of the "More" menu render as fixed-position toolbar
     // controls. They share the left section with the toggle group / reset, so we
@@ -2633,21 +2622,58 @@ export default defineComponent({
     // Approximate rendered widths (px) of each pinned control and of the fixed
     // left-section content, used only to decide how many pinned items fit before
     // they would clip. Hidden pinned items stay reachable inside the More menu.
-    const PIN_ITEM_WIDTH = { histogram: 46, sqlMode: 46, quickMode: 46, savedViews: 89 };
-    const SYNTAX_GUIDE_LABEL_WIDTH = 108;
+    // Toolbar buttons narrow their padding below 85.5rem (OButton sm-toolbar).
+    const isNarrowToolbar = computed(() => windowWidth.value < 1368);
+    const PIN_BUTTON_WIDTH = computed(() => (isNarrowToolbar.value ? 72 : 76));
+    const SAVED_VIEWS_PIN_WIDTH = computed(() => (isNarrowToolbar.value ? 93 : 97));
+    const SYNTAX_GUIDE_LABEL_WIDTH = computed(() => (isNarrowToolbar.value ? 119 : 123));
     const SYNTAX_GUIDE_ICON_WIDTH = 40;
-    const PIN_ITEM_GAP = 4;
+    const PIN_ITEM_GAP = 8;
+
+    // Rendered widths (px) of the left-section controls at the 34px toolbar size; collapse
+    // thresholds derive from them so they cannot drift apart when a control is resized.
+    const TOGGLE_LABELS_WIDTH = computed(() => (isNarrowToolbar.value ? 367 : 383));
+    const TOGGLE_ICONS_WIDTH = 168;
+    const TOGGLE_DROPDOWN_WIDTH = 120;
+    const RESET_LABEL_WIDTH = computed(() => (isNarrowToolbar.value ? 77 : 81));
+    const RESET_ICON_WIDTH = 34;
+    const MORE_BUTTON_WIDTH = computed(() => (isNarrowToolbar.value ? 73 : 77));
+    const TOOLBAR_GAP = 8;
+    const COLLAPSE_BUFFER = 16;
+
+    // The default-pinned histogram keeps its slot ahead of button labels.
+    const leftContentWidth = (toggleWidth: number, resetWidth: number) =>
+      toggleWidth +
+      resetWidth +
+      MORE_BUTTON_WIDTH.value +
+      2 * TOOLBAR_GAP +
+      (isPinned("histogram") ? TOOLBAR_GAP + PIN_BUTTON_WIDTH.value : 0) +
+      COLLAPSE_BUFFER;
+    const shouldHideToolbarButtonText = computed(
+      () =>
+        availableLeftWidth.value <
+        leftContentWidth(TOGGLE_LABELS_WIDTH.value, RESET_LABEL_WIDTH.value),
+    );
+    const toolbarToggleIconOnly = computed(
+      () =>
+        availableLeftWidth.value < leftContentWidth(TOGGLE_LABELS_WIDTH.value, RESET_ICON_WIDTH),
+    );
+    const toolbarMoveResetToMenu = computed(() => availableLeftWidth.value < 288);
+    const toolbarToggleAsDropdown = computed(() => availableLeftWidth.value < 216);
 
     // Width consumed by the always-present left content (toggle group in its
     // current collapse state, reset) plus the reserved More button.
     const baseReservedWidth = computed(() => {
       let w = 0;
-      if (toolbarToggleAsDropdown.value) w += 120;
-      else if (toolbarToggleIconOnly.value) w += 230;
-      else w += 440;
-      if (!toolbarMoveResetToMenu.value) w += shouldHideToolbarButtonText.value ? 40 : 88;
-      w += 92; // More button (always visible)
-      w += 24; // inter-item gaps / padding buffer
+      if (toolbarToggleAsDropdown.value) w += TOGGLE_DROPDOWN_WIDTH;
+      else if (toolbarToggleIconOnly.value) w += TOGGLE_ICONS_WIDTH;
+      else w += TOGGLE_LABELS_WIDTH.value;
+      if (!toolbarMoveResetToMenu.value) {
+        w +=
+          (shouldHideToolbarButtonText.value ? RESET_ICON_WIDTH : RESET_LABEL_WIDTH.value) +
+          TOOLBAR_GAP;
+      }
+      w += MORE_BUTTON_WIDTH.value + 2 * TOOLBAR_GAP;
       return w;
     });
 
@@ -2676,12 +2702,12 @@ export default defineComponent({
         }
         return false;
       };
-      if (isPinned("histogram")) res.histogram = tryFit(PIN_ITEM_WIDTH.histogram);
-      if (isPinned("sqlMode")) res.sqlMode = tryFit(PIN_ITEM_WIDTH.sqlMode);
-      if (isPinned("quickMode")) res.quickMode = tryFit(PIN_ITEM_WIDTH.quickMode);
-      if (isPinned("savedViews")) res.savedViews = tryFit(PIN_ITEM_WIDTH.savedViews);
+      if (isPinned("histogram")) res.histogram = tryFit(PIN_BUTTON_WIDTH.value);
+      if (isPinned("sqlMode")) res.sqlMode = tryFit(PIN_BUTTON_WIDTH.value);
+      if (isPinned("quickMode")) res.quickMode = tryFit(PIN_BUTTON_WIDTH.value);
+      if (isPinned("savedViews")) res.savedViews = tryFit(SAVED_VIEWS_PIN_WIDTH.value);
       if (isPinned("syntaxGuide")) {
-        if (tryFit(SYNTAX_GUIDE_LABEL_WIDTH)) {
+        if (tryFit(SYNTAX_GUIDE_LABEL_WIDTH.value)) {
           res.syntaxGuide = true;
         } else if (tryFit(SYNTAX_GUIDE_ICON_WIDTH)) {
           res.syntaxGuide = true;
@@ -2716,7 +2742,7 @@ export default defineComponent({
             },
           ]
         : []),
-      { value: "build", icon: "build", label: t("search.buildQuery"), disabled: false },
+      { value: "build", icon: "show-chart", label: t("search.buildQuery"), disabled: false },
       {
         value: "drilldown",
         icon: "query-stats",

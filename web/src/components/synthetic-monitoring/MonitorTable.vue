@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-else
           :variant="(row as any).enabled ? 'ghost-destructive' : 'ghost'"
-          size="icon-sm"
+          size="icon-xs-sq"
           :icon-left="(row as any).enabled ? 'pause' : 'play-arrow'"
           class="max-md:hidden"
           :data-test="`${dataTest}-${(row as any).enabled ? 'pause' : 'enable'}-btn`"
@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Edit -->
         <OButton
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs-sq"
           icon-left="edit"
           class="max-md:hidden"
           :data-test="`${dataTest}-edit-btn`"
@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Duplicate -->
         <OButton
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs-sq"
           icon-left="content-copy"
           class="max-md:hidden"
           :data-test="`${dataTest}-duplicate-btn`"
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OButton
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs-sq"
           icon-left="drive-file-move"
           class="max-md:hidden"
           :data-test="`${dataTest}-move-btn`"
@@ -351,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-else
               variant="ghost"
-              size="icon-sm"
+              size="icon-xs-sq"
               icon-left="more-vert"
               :data-test="`${dataTest}-more-btn`"
               @click.stop

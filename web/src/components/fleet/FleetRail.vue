@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
 
-    <div class="flex items-center gap-1.5 px-1.5 pb-1.5 max-md:pt-1.5">
+    <div class="flex items-center gap-1.5 px-1 pb-1.5 max-md:pt-1.5">
       <OSearchInput
         v-model="search"
         class="w-full max-md:hidden"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div class="min-h-0 flex-1 overflow-y-auto px-1.5 max-md:hidden">
+    <div class="min-h-0 flex-1 overflow-y-auto px-1 max-md:hidden">
       <OEmptyState
         v-if="forbidden"
         size="inline"
