@@ -2029,15 +2029,17 @@ pub async fn update_incident_metadata(
 
 pub async fn find_correlation_candidates(
     org_id: &str,
+    cases: CaseFilter,
 ) -> Result<Vec<CorrelationCandidate>, errors::Error> {
-    find_correlation_candidates_with(get_orm_client_ro().await, org_id).await
+    find_correlation_candidates_with(get_orm_client_ro().await, org_id, cases).await
 }
 
 pub async fn find_correlation_candidates_with<C: ConnectionTrait>(
     client: &C,
     org_id: &str,
+    cases: CaseFilter,
 ) -> Result<Vec<CorrelationCandidate>, errors::Error> {
-    correlation_candidates_query(org_id)
+    correlation_candidates_query(org_id, cases)
         .into_model::<CorrelationCandidate>()
         .all(client)
         .await
@@ -2208,16 +2210,22 @@ fn with_alert_kind(alert_kind: &str) -> sea_orm::sea_query::SelectStatement {
         .to_owned()
 }
 
-fn correlation_candidates_query(org_id: &str) -> sea_orm::Select<alert_incidents::Entity> {
-    alert_incidents::Entity::find()
+fn correlation_candidates_query(
+    org_id: &str,
+    cases: CaseFilter,
+) -> sea_orm::Select<alert_incidents::Entity> {
+    let mut query = alert_incidents::Entity::find()
         .select_only()
         .columns([
             alert_incidents::Column::Id,
             alert_incidents::Column::GroupValues,
         ])
         .filter(alert_incidents::Column::OrgId.eq(org_id))
-        .filter(alert_incidents::Column::Status.ne("resolved"))
-        .order_by_desc(alert_incidents::Column::CreatedAt)
+        .filter(alert_incidents::Column::Status.ne("resolved"));
+    if let Some(condition) = case_condition(cases) {
+        query = query.filter(condition);
+    }
+    query.order_by_desc(alert_incidents::Column::CreatedAt)
 }
 
 fn stale_incidents_query(cutoff: i64) -> sea_orm::Select<alert_incidents::Entity> {
@@ -3007,7 +3015,9 @@ mod tests {
         .await
         .unwrap();
 
-        let candidates = find_correlation_candidates_with(&db, "acme").await.unwrap();
+        let candidates = find_correlation_candidates_with(&db, "acme", CaseFilter::All)
+            .await
+            .unwrap();
         assert_eq!(
             candidates
                 .iter()
@@ -3018,7 +3028,7 @@ mod tests {
         assert_eq!(candidates[0].group_values, serde_json::json!({"ns": "dev"}));
         assert_eq!(candidates[2].group_values, serde_json::json!({}));
         assert!(
-            find_correlation_candidates_with(&db, "absent")
+            find_correlation_candidates_with(&db, "absent", CaseFilter::All)
                 .await
                 .unwrap()
                 .is_empty()
@@ -3026,10 +3036,48 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ops_correlation_candidates_leave_out_security_cases() {
+        let db = incidents_db().await;
+        let row = |historical| {
+            new_incident(
+                "acme",
+                "P2",
+                serde_json::json!({}),
+                "AlertId",
+                (1, 1),
+                None,
+                None,
+                historical,
+            )
+        };
+        let case = row(Some(false)).insert(&db).await.unwrap();
+        let ops = row(None).insert(&db).await.unwrap();
+        assert!(case.security_case && !ops.security_case);
+
+        let ids = |cases| {
+            let db = &db;
+            async move {
+                let mut ids: Vec<String> = find_correlation_candidates_with(db, "acme", cases)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|row| row.id)
+                    .collect();
+                ids.sort();
+                ids
+            }
+        };
+        let mut both = vec![case.id, ops.id.clone()];
+        both.sort();
+        assert_eq!(ids(CaseFilter::All).await, both);
+        assert_eq!(ids(CaseFilter::NoCases).await, vec![ops.id]);
+    }
+
+    #[tokio::test]
     async fn correlation_candidates_propagate_database_errors() {
         let db = Database::connect("sqlite::memory:").await.unwrap();
         assert!(matches!(
-            find_correlation_candidates_with(&db, "acme").await,
+            find_correlation_candidates_with(&db, "acme", CaseFilter::All).await,
             Err(Error::DbError(DbError::SeaORMError(_)))
         ));
     }
@@ -3039,7 +3087,7 @@ mod tests {
         use sea_orm::{DbBackend, QueryTrait};
 
         for backend in [DbBackend::Sqlite, DbBackend::Postgres] {
-            let stmt = correlation_candidates_query("acme").build(backend);
+            let stmt = correlation_candidates_query("acme", CaseFilter::All).build(backend);
             assert!(
                 stmt.sql.starts_with(
                     r#"SELECT "alert_incidents"."id", "alert_incidents"."group_values" FROM "alert_incidents" WHERE "#
@@ -3060,6 +3108,13 @@ mod tests {
             assert!(!stmt.sql.contains("@>"), "{}", stmt.sql);
             assert!(!stmt.sql.contains("<@"), "{}", stmt.sql);
             assert_eq!(stmt.values.unwrap().0, ["acme".into(), "resolved".into()]);
+
+            let ops = correlation_candidates_query("acme", CaseFilter::NoCases).build(backend);
+            assert!(ops.sql.contains(r#""security_case" = "#), "{}", ops.sql);
+            assert_eq!(
+                ops.values.unwrap().0,
+                ["acme".into(), "resolved".into(), false.into()]
+            );
         }
     }
 
