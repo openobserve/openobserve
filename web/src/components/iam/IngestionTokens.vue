@@ -104,14 +104,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-name="{ row }">
-            <span class="font-medium">{{ row.name }}</span>
+            <span
+              v-if="isSystemIngestionToken(row)"
+              class="inline-flex max-w-full min-w-0 items-center gap-2"
+            >
+              <span class="min-w-0 truncate font-medium">
+                {{ row.name }}
+                <OTooltip overflow-only />
+              </span>
+              <span
+                class="inline-flex shrink-0 items-center gap-1"
+                :data-test="`ingestion-token-${row.name}-system`"
+              >
+                <OTag variant="default-soft" size="sm" :label="t('ingestion.systemTokenTag')" />
+                <OIcon name="info-outline" size="sm" class="text-text-secondary cursor-help" />
+                <OTooltip :content="t('ingestion.systemTokenHint')" />
+              </span>
+            </span>
+            <span v-else class="font-medium">{{ row.name }}</span>
           </template>
 
           <!-- Copy yields a ready-to-paste "Basic base64(name:token)" credential
                (OCodeCell copies exactly what it shows), so no manual email +
                base64 step is needed. -->
           <template #cell-token="{ row }">
-            <OCodeCell :value="toBasicAuth(row.name, row.token)" :tooltip="false" />
+            <OCodeCell
+              :value="
+                isReservedIngestionTokenName(row.name) ? null : toBasicAuth(row.name, row.token)
+              "
+              :tooltip="false"
+            />
           </template>
 
           <template #cell-splunk_token="{ row }">
@@ -131,7 +153,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-actions="{ row }">
+            <span v-if="isReservedIngestionTokenName(row.name)" class="inline-block size-8" />
             <OButton
+              v-else
               :data-test="`ingestion-token-${row.name}-splunk`"
               :icon-left="row.splunk_token ? 'link-off' : 'link'"
               :variant="row.splunk_token ? 'ghost-destructive' : 'ghost'"
@@ -311,6 +335,11 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { getBasicAuth } from "@/utils/auth";
+import {
+  isReservedIngestionTokenName,
+  isSystemIngestionToken,
+  pickableIngestionTokens,
+} from "@/utils/ingestionTokens";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { forbiddenState } from "@/utils/featureGate";
@@ -509,7 +538,7 @@ export default defineComponent({
         showCreateForm.value = false;
         showRevealedDialog.value = true;
         await fetchTokens();
-        store.dispatch("setOrgTokens", tokens.value);
+        store.dispatch("setOrgTokens", pickableIngestionTokens(tokens.value));
         toast({
           variant: "success",
           message: t("ingestion.tokenCreatedSuccess"),
@@ -532,7 +561,7 @@ export default defineComponent({
         await setIngestionTokenEnabled.mutateAsync({ name, enabled });
         analytics.track(enabled ? "ingestion_token_enabled" : "ingestion_token_disabled");
         await fetchTokens();
-        store.dispatch("setOrgTokens", tokens.value);
+        store.dispatch("setOrgTokens", pickableIngestionTokens(tokens.value));
         toast({
           variant: "success",
           message: enabled
@@ -652,6 +681,8 @@ export default defineComponent({
       hecUrl,
       copyToken,
       toBasicAuth,
+      isSystemIngestionToken,
+      isReservedIngestionTokenName,
     };
   },
 });

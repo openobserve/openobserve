@@ -1237,6 +1237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { alertDetailQuery } from "@/services/alerts.queries";
 import { alertsListQuery } from "@/services/alerts.queries";
+import { fetchAlertRead } from "@/services/alerts.readFence";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { anomalyKeys } from "@/services/anomaly_detection.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
@@ -2641,7 +2642,7 @@ export default defineComponent({
           refetchType: "none",
         });
       const read = trackListRead(opts.queryKey, fetchStart);
-      const pending = queryClient.fetchQuery(opts);
+      const pending = fetchAlertRead(queryClient, org, opts);
 
       loading.value = !painted;
       fetching.value = true;
@@ -2738,9 +2739,8 @@ export default defineComponent({
         // Cached for the editor-open path only. The read-modify-write in
         // WorkflowLinkAlertsDialog deliberately still goes straight to the
         // service — a stale alert there would overwrite someone else's edit.
-        const data = await queryClient.fetchQuery(
-          alertDetailQuery(store.state.selectedOrganization.identifier, id),
-        );
+        const org = store.state.selectedOrganization.identifier;
+        const data = await fetchAlertRead(queryClient, org, alertDetailQuery(org, id));
         dismiss();
         return data;
       } catch (error) {

@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :width="layout.width"
       :height="layout.height"
       :viewBox="`0 0 ${layout.width} ${layout.height}`"
-      class="block overflow-visible"
+      class="block max-w-full overflow-visible"
       role="group"
       :aria-label="label"
     >
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onBeforeUnmount, onMounted, ref, useId } from "vue";
 import type { I18nText } from "@/types/i18n";
 import OText from "@/lib/core/Typography/OText.vue";
-import { LINE_HEIGHT, canLabel, fitLabel, type MeasureText } from "./hexLabel";
+import { LINE_HEIGHT, canLabel, fitLabels, type MeasureText } from "./hexLabel";
 
 export type HexClass = "watched" | "learning" | "gap" | "none" | "s1" | "s2" | "s3" | "s4" | "s5";
 
@@ -146,7 +146,7 @@ const emit = defineEmits<{ select: [key: string] }>();
 const FILL: Record<HexClass, string> = {
   watched: "fill-badge-success-soft-text/15 stroke-badge-success-soft-text/30",
   learning: "stroke-status-neutral-text/60",
-  gap: "fill-status-warning-text stroke-status-warning-text",
+  gap: "fill-badge-amber-soft-text stroke-badge-amber-soft-text",
   none: "fill-status-neutral-text stroke-transparent",
   s1: "fill-map-seq-1 stroke-transparent",
   s2: "fill-map-seq-2 stroke-transparent",
@@ -158,7 +158,7 @@ const FILL: Record<HexClass, string> = {
 const SWATCH: Record<HexClass, string> = {
   watched: "bg-badge-success-soft-text/15 border border-badge-success-soft-text/60",
   learning: "bg-badge-default-soft-bg border border-dashed border-status-neutral-text",
-  gap: "bg-status-warning-text",
+  gap: "bg-badge-amber-soft-text",
   none: "bg-status-neutral-text",
   s1: "bg-map-seq-1",
   s2: "bg-map-seq-2",
@@ -240,11 +240,17 @@ const measureText: MeasureText = (text, font) => {
   return width;
 };
 
-const labelFor = (item: HexItem, r: number) => {
+const labelsFor = (items: HexItem[], r: number) => {
   // The straight sides of a pointy hex span its middle radius, so text stays inside that band.
   const room = 0.74 * SQRT3 * r;
-  if (!canLabel(room, measureText)) return null;
-  return fitLabel(item.key, room, r, Math.min(MAX_FONT, 0.24 * r), measureText);
+  if (!canLabel(room, measureText)) return items.map(() => null);
+  return fitLabels(
+    items.map((item) => item.key),
+    room,
+    r,
+    Math.min(MAX_FONT, 0.24 * r),
+    measureText,
+  );
 };
 
 // Hexes shrink as the service count grows, then stretch so whole columns fill the width.
@@ -263,7 +269,8 @@ const layout = computed(() => {
   const r = R - GAP / SQRT3;
   let row = 0;
   let col = 0;
-  const hexes = props.items.map((item) => {
+  const labels = labelsFor(props.items, r);
+  const hexes = props.items.map((item, i) => {
     if (col >= (row % 2 && cols > 1 ? cols - 1 : cols)) {
       row++;
       col = 0;
@@ -278,7 +285,7 @@ const layout = computed(() => {
       cy,
       path: hexPath(cx, cy, r),
       ring: hexPath(cx, cy, r + 2.5),
-      label: labelFor(item, r),
+      label: labels[i],
     };
   });
   return {

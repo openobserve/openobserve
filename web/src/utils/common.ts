@@ -106,6 +106,7 @@ export const logsErrorMessage = (code: number) => {
     20007: "SearchFieldHasNoCompatibleDataType",
     20008: "SearchSQLExecuteError",
     20009: "SearchSQLCancelled",
+    20014: "SearchStreamProtected",
   };
 
   if (messages[code] != undefined) {

@@ -19,4 +19,6 @@ export const alertCalibrationKeys = {
   all: (org: string) => orgKey(org, "alertCalibration"),
   config: (org: string) => orgKey(org, "alertCalibration", "config"),
   status: (org: string) => orgKey(org, "alertCalibration", "status"),
+  dismissals: (org: string) => orgKey(org, "alertCalibration", "dismissals"),
+  headroom: (org: string, alertId: string) => orgKey(org, "alertCalibration", "headroom", alertId),
 };

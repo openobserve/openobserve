@@ -8,6 +8,7 @@ const props = withDefaults(defineProps<TextProps>(), {
   variant: "body",
   truncate: false,
   nowrap: false,
+  wrap: false,
   tooltip: undefined,
 });
 
@@ -89,7 +90,9 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
 };
 
 const classes = computed(() => [
-  variantClasses[props.variant ?? "body"],
+  props.wrap
+    ? variantClasses[props.variant ?? "body"].replace(/\bleading-(none|tight)\b/, "leading-normal")
+    : variantClasses[props.variant ?? "body"],
   props.truncate ? "truncate max-w-full overflow-hidden" : "",
   props.nowrap ? "whitespace-nowrap" : "",
 ]);

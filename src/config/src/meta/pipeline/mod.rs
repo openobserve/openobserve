@@ -389,10 +389,23 @@ impl Pipeline {
                     node.id
                 ));
             }
+            if let NodeData::Query(query) = &node.data
+                && query
+                    .query_condition
+                    .sql
+                    .as_deref()
+                    .is_some_and(crate::meta::self_reporting::protected_streams::sql_reads_digest)
+            {
+                return Err(anyhow!(
+                    "Stream {} is internal and cannot be used in a pipeline",
+                    crate::meta::alerts::alert_calibration::DIGEST_STREAM
+                ));
+            }
             let NodeData::Stream(params) = &node.data else {
                 continue;
             };
-            if crate::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+            // A node on a protected stream would copy its rows past their only reader.
+            if crate::meta::self_reporting::protected_streams::is_read_protected_stream(
                 &params.stream_name,
             ) {
                 return Err(anyhow!(
@@ -2335,6 +2348,115 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(err.contains("internal"), "{err}");
+    }
+
+    #[test]
+    fn a_pipeline_cannot_use_the_calibration_digest_stream() {
+        let stream = |id: &str, name: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::Stream(StreamParams::new("ops", name, StreamType::Logs)),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let mut pipeline = Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "ops".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "ops",
+                "_o2_alert_calibration_digests",
+                StreamType::Logs,
+            )),
+            kind: PipelineKind::User,
+            nodes: vec![
+                stream("1", "_o2_alert_calibration_digests"),
+                stream("2", "pay"),
+            ],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+                source_handle: None,
+            }],
+        };
+        let err = pipeline.validate().unwrap_err().to_string();
+        assert!(
+            err.contains("is internal and cannot be used in a pipeline"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_scheduled_pipeline_query_cannot_read_the_calibration_digest_stream() {
+        let query = |sql: &str| {
+            Node::new(
+                "1".to_string(),
+                NodeData::Query(DerivedStream {
+                    org_id: "ops".to_string(),
+                    stream_type: StreamType::Logs,
+                    query_condition: QueryCondition {
+                        sql: Some(sql.to_string()),
+                        ..Default::default()
+                    },
+                    trigger_condition: TriggerCondition {
+                        period: 5,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let pipeline = |sql: &str| Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "ops".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::new("ops", "default", StreamType::Logs)),
+            kind: PipelineKind::User,
+            nodes: vec![
+                query(sql),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::Stream(StreamParams::new("ops", "pay", StreamType::Logs)),
+                    0.0,
+                    0.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+                source_handle: None,
+            }],
+        };
+        for sql in [
+            r#"SELECT * FROM "_o2_alert_calibration_digests""#,
+            r#"SELECT * FROM "default" WHERE x IN (SELECT alert_id FROM "_o2_alert_calibration_digests")"#,
+        ] {
+            let err = pipeline(sql).validate().unwrap_err().to_string();
+            assert!(
+                err.contains("_o2_alert_calibration_digests is internal and cannot be used"),
+                "{sql}: {err}"
+            );
+        }
+        let err = pipeline(r#"SELECT * FROM "default""#)
+            .validate()
+            .err()
+            .map(|e| e.to_string())
+            .unwrap_or_default();
+        assert!(!err.contains("is internal"), "{err}");
     }
 
     #[test]

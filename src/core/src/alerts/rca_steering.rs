@@ -1336,6 +1336,7 @@ pub async fn cancel_waiting_on_resolve(
     org_id: &str,
     incident_id: &str,
     user_id: &str,
+    resolution: &infra::table::alert_incidents::Episode,
 ) -> anyhow::Result<Option<String>> {
     // The primary: the resolve just committed, and a question may have just paused the run.
     let Some(incident) = alert_incidents::get_rw(org_id, incident_id).await? else {
@@ -1347,7 +1348,8 @@ pub async fn cancel_waiting_on_resolve(
     let Some(run) = runs_table::get_rw(org_id, &run_id).await? else {
         return Ok(None);
     };
-    cancel_waiting_run(org_id, incident_id, user_id, run).await
+    let resolution = Some(resolution.clone());
+    cancel_waiting_run(org_id, incident_id, user_id, run, resolution).await
 }
 
 async fn cancel_waiting_run(
@@ -1355,6 +1357,7 @@ async fn cancel_waiting_run(
     incident_id: &str,
     user_id: &str,
     run: RunRow,
+    resolution: Option<infra::table::alert_incidents::Episode>,
 ) -> anyhow::Result<Option<String>> {
     let run_id = run.run_id.clone();
     let item = runs_table::to_item(&run);
@@ -1374,6 +1377,8 @@ async fn cancel_waiting_run(
         event: Some(IncidentEvent::ai_analysis_cancelled(Some(
             user_id.to_string(),
         ))),
+        // A reopen after the resolve may have given the incident a run this must not end.
+        episode: resolution,
         ..Default::default()
     };
     // The update refuses a run that left `waiting_input` since the read (an answer resumed it).
@@ -1646,6 +1651,11 @@ mod tests {
         };
         assert!(rca_runs::update_run(&org, &run_id, patch).await.unwrap());
         (org, inc, run_id)
+    }
+
+    /// The incident's status episode as its last status write left it.
+    async fn resolution_of(org: &str, inc: &str) -> infra::table::alert_incidents::Episode {
+        infra::table::alert_incidents::Episode::of(&incident_row(org, inc).await)
     }
 
     /// Pause the run on [QUESTION] as the finalizer's write does.
@@ -2786,10 +2796,38 @@ mod tests {
         );
         assert_eq!(current(&org, &working_row.steer_id).await, working_row);
         assert_eq!(
-            cancel_waiting_on_resolve(&org, &inc, OTHER).await.unwrap(),
+            cancel_waiting_on_resolve(&org, &inc, OTHER, &resolution_of(&org, &inc).await)
+                .await
+                .unwrap(),
             None,
             "a second resolve finds nothing to cancel"
         );
+    }
+
+    #[tokio::test]
+    async fn a_resolves_cancel_landing_after_a_reopen_leaves_the_reopened_incidents_run() {
+        use infra::table::alert_incidents::{Episode, update_status};
+
+        let _db = db().await;
+        let (org, inc, run_id) = live_run().await;
+        pause(&org, &run_id).await;
+        let resolved = Episode::of(&update_status(&org, &inc, "resolved").await.unwrap());
+        update_status(&org, &inc, "open").await.unwrap();
+        let before = timeline(&org, &inc).await.len();
+        assert_eq!(
+            cancel_waiting_on_resolve(&org, &inc, OTHER, &resolved)
+                .await
+                .unwrap(),
+            None,
+            "the resolution it served ended"
+        );
+        assert_eq!(stored(&org, &run_id).await.state, RunState::WaitingInput);
+        assert_eq!(timeline(&org, &inc).await.len(), before, "no cancel event");
+
+        let again = Episode::of(&update_status(&org, &inc, "resolved").await.unwrap());
+        let cancelled = cancel_waiting_on_resolve(&org, &inc, OTHER, &again).await;
+        assert_eq!(cancelled.unwrap(), Some(run_id.clone()));
+        assert_eq!(stored(&org, &run_id).await.state, RunState::Cancelled);
     }
 
     #[tokio::test]
@@ -2801,7 +2839,9 @@ mod tests {
         assert!(runs_table::resume_waiting(&org, &run_id).await.unwrap());
         let before = timeline(&org, &inc).await;
         assert_eq!(
-            cancel_waiting_run(&org, &inc, OTHER, seen).await.unwrap(),
+            cancel_waiting_run(&org, &inc, OTHER, seen, None)
+                .await
+                .unwrap(),
             None
         );
         assert_eq!(stored(&org, &run_id).await.state, RunState::Running);

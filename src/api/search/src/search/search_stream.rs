@@ -474,6 +474,11 @@ pub async fn search_http2_stream(
             StreamPermissionResourceType::Search
         };
 
+    #[cfg(not(feature = "enterprise"))]
+    if let Some(res) = crate::search::digest_query_refusal(&req.query.sql, stream_type, &trace_id) {
+        return res;
+    }
+
     #[cfg(feature = "enterprise")]
     if let Some(res) = crate::search::check_sql_stream_permissions(
         &req.query.sql,
@@ -854,6 +859,28 @@ pub async fn values_http2_stream(
     // Get stream name directly from the values request
     let stream_names = vec![values_req.stream_name.clone()];
 
+    // The generated SQL embeds the caller's WHERE, so a subquery can name the digest too.
+    if let Some(res) = crate::search::digest_query_refusal(&req.query.sql, stream_type, &trace_id) {
+        #[cfg(feature = "enterprise")]
+        report_to_audit(
+            user_id,
+            org_id.clone(),
+            trace_id,
+            res.status().into(),
+            Some("Unauthorized Access".to_string()),
+            "POST".to_string(),
+            format!("/api/{}/_values_stream", org_id),
+            query
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&"),
+            body_bytes.clone(),
+        )
+        .await;
+        return res;
+    }
+
     // Check permissions for each stream
     #[cfg(feature = "enterprise")]
     for stream_name in stream_names.iter() {
@@ -1019,4 +1046,93 @@ async fn get_sql(
     search_type: Option<SearchEventType>,
 ) -> Result<search::sql::Sql, infra::errors::Error> {
     search::sql::Sql::new(&query.clone().into(), org_id, stream_type, search_type).await
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{
+        body::Bytes,
+        extract::{Path, Query},
+        http::{HeaderMap, StatusCode},
+    };
+    use hashbrown::HashMap;
+    use openobserve_api_common::extractors::Headers;
+    use openobserve_core::auth::UserEmail;
+
+    const DIGEST: &str = "_o2_alert_calibration_digests";
+
+    fn caller() -> Headers<UserEmail> {
+        Headers(UserEmail {
+            user_id: "user@example.com".to_string(),
+        })
+    }
+
+    async fn assert_protected(resp: axum::response::Response) {
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        let code = resp
+            .headers()
+            .get(crate::common::meta::http::ERROR_HEADER)
+            .map(|v| v.to_str().unwrap().to_string());
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert_eq!(code.as_deref(), Some("20014"), "{body}");
+    }
+
+    // Enterprise answers the same refusal from its audited stream-permission check.
+    #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
+    #[tokio::test]
+    async fn search_stream_refuses_a_digest_query_with_403_before_streaming() {
+        let body = serde_json::json!({
+            "query": {
+                "sql": format!(r#"SELECT * FROM "{DIGEST}""#),
+                "start_time": 1,
+                "end_time": 2,
+            }
+        });
+        let resp = super::search_http2_stream(
+            Path("default".to_string()),
+            Query(HashMap::new()),
+            caller(),
+            HeaderMap::new(),
+            Bytes::from(body.to_string()),
+        )
+        .await;
+        assert_protected(resp).await;
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn values_stream_refuses_the_digest_with_403_before_streaming() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let schema = Schema::new(vec![
+            Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("rule_id", DataType::Utf8, true),
+        ]);
+        STREAM_SCHEMAS_LATEST
+            .write()
+            .await
+            .insert(format!("default/logs/{DIGEST}"), SchemaCache::new(schema));
+        let body = serde_json::json!({
+            "fields": ["rule_id"],
+            "no_count": false,
+            "start_time": 1,
+            "end_time": 2,
+            "stream_name": DIGEST,
+            "stream_type": "logs",
+            "sql": "",
+        });
+        let resp = super::values_http2_stream(
+            Path("default".to_string()),
+            Query(HashMap::new()),
+            caller(),
+            HeaderMap::new(),
+            Bytes::from(body.to_string()),
+        )
+        .await;
+        assert_protected(resp).await;
+    }
 }

@@ -210,6 +210,34 @@ describe("IncidentAiAnalysisCell (RR-33)", () => {
     );
   });
 
+  it("a stored not-run reason shows the card's words, with Analyze one hover away", () => {
+    const wrapper = mount(IncidentAiAnalysisCell, {
+      props: {
+        incident: { ...incident, rca_off_reason: "quota_exceeded" } as Incident,
+        rcaEnabled: true,
+        now: Date.now(),
+      },
+      global: { plugins: [store] },
+    });
+    const badge = wrapper.get('[data-test="incident-ai-analysis-label"]');
+    expect(badge.text()).toBe("Not analyzed");
+    expect(badge.attributes("data-tone")).toBe("warn");
+    expect(wrapper.get('[data-test="incident-ai-analysis-detail"]').text()).toBe(
+      "The organization had reached its AI analysis limit.",
+    );
+    // The cell is narrow, so a cut detail must still be readable in full.
+    expect(
+      wrapper
+        .find('[data-test="incident-ai-analysis-detail"] [data-test="o-truncated-text"]')
+        .exists(),
+    ).toBe(true);
+    expect(wrapper.find('[data-test="incident-ai-analysis-hover-analyze-btn"]').exists()).toBe(
+      true,
+    );
+    expect(wrapper.find('[data-test="incident-ai-analysis-analyze-btn"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("quota_exceeded");
+  });
+
   it("the state badge is named by its visible label and described by the detail", () => {
     const now = Date.now();
     const failedRerun = {

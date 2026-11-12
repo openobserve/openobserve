@@ -13,28 +13,63 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { useMutation } from "@tanstack/vue-query";
+import { computed, ref } from "vue";
+import { useMutation, useQuery } from "@tanstack/vue-query";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOrgId } from "@/composables/query";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { errorMessage } from "@/services/alert_calibration";
-import { requestAlertCalibrationRunMutation } from "@/services/alert_calibration.queries";
-import { DIGEST_STREAM } from "@/components/alert_calibration/digests";
+import { errorMessage, httpStatus } from "@/services/alert_calibration";
+import {
+  alertCalibrationConfigQuery,
+  requestAlertCalibrationRunMutation,
+} from "@/services/alert_calibration.queries";
+
+// A refused run or save stays refused for the session, also on a server whose config read does not say so up front.
+const deniedOrgs = ref<ReadonlySet<string>>(new Set());
+const configDeniedOrgs = ref<ReadonlySet<string>>(new Set());
+
+/** Tests only: the memory outlives a component. */
+export const resetRunDenials = (): void => {
+  deniedOrgs.value = new Set();
+  configDeniedOrgs.value = new Set();
+};
+
+export const markConfigDenied = (org: string): void => {
+  configDeniedOrgs.value = new Set([...configDeniedOrgs.value, org]);
+};
+
+/** What this reader may do here, from the config read and from any refusal this session. */
+export function useAlertCalibrationRights() {
+  const orgId = useOrgId();
+  const configRead = useQuery(() => alertCalibrationConfigQuery(orgId.value));
+  const canRun = computed(() => configRead.data.value?.can_run !== false);
+  const canEdit = computed(
+    () => configRead.data.value?.can_edit !== false && !configDeniedOrgs.value.has(orgId.value),
+  );
+  return { canRun, canEdit };
+}
 
 /** A run lands in the digest stream later, so a request only says it was queued. */
 export function useRequestAlertCalibrationRun() {
   const { t } = useI18nTyped();
   const orgId = useOrgId();
   const run = useMutation(() => requestAlertCalibrationRunMutation(orgId.value));
+  const denied = computed(() => deniedOrgs.value.has(orgId.value));
 
   async function runNow() {
+    const org = orgId.value;
     try {
       await run.mutateAsync();
       toast({
-        message: t("alertCalibration.runRequested", { stream: DIGEST_STREAM }),
+        message: t("alertCalibration.runRequested"),
         variant: "success",
       });
     } catch (error) {
+      if (httpStatus(error) === 403) {
+        deniedOrgs.value = new Set([...deniedOrgs.value, org]);
+        toast({ message: t("alertCalibration.runDenied"), variant: "error" });
+        return;
+      }
       toast({
         message: t("alertCalibration.runFailed", { message: raw(errorMessage(error)) }),
         variant: "error",
@@ -42,5 +77,5 @@ export function useRequestAlertCalibrationRun() {
     }
   }
 
-  return { pending: run.isPending, runNow };
+  return { pending: run.isPending, denied, runNow };
 }
