@@ -467,6 +467,19 @@ describe("useAlertActions", () => {
     expect(await api.endMute(target, mute)).toBe("failed");
   });
 
+  it("replaces the changed-mute toast, so View downtime opens the latest mute", async () => {
+    const dismiss = vi.fn();
+    vi.mocked(toast).mockReturnValue(dismiss as any);
+    vi.mocked(alerts.cancelAlertMute).mockRejectedValue(
+      httpError(409, { code: "version_changed", version: 5, ends_at: 9 }),
+    );
+    const api = mountActions();
+    await api.endMute(target, { id: "d1", ends_at: 1, version: 4 });
+    expect(dismiss).not.toHaveBeenCalled();
+    await api.endMute(target, { id: "d2", ends_at: 1, version: 4 });
+    expect(dismiss).toHaveBeenCalledTimes(1);
+  });
+
   it("answers Extend with ok, conflict or failed", async () => {
     const api = mountActions();
     const mute = { id: "d1", ends_at: 1, version: 3 };

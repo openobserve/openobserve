@@ -3295,13 +3295,88 @@ mod tests {
         assert_eq!(stored.version, 2);
         assert!(stored.cancelled_at.is_none(), "the downtime stays live");
 
-        let cancel = body_of("pub async fn cancel(");
-        let check = cancel
-            .find("check_version(version, &before)?")
-            .expect("checked");
-        assert!(check < cancel.find("cancel_row(org, user_id, before)").unwrap());
         assert!(
             body_of("async fn cancel_row(").contains("set_if_unchanged(&after, before.updated_at")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_versioned_cancel_refuses_a_stale_version_and_ends_at_a_current_or_absent_one() {
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org = format!("versioned_cancel_{}", now_micros());
+        let root = "root-versioned-cancel@example.com";
+        crate::common::infra::config::ORG_USERS.insert(
+            format!("{}/{root}", config::DEFAULT_ORG),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: String::new(),
+                rum_token: None,
+                org_id: config::DEFAULT_ORG.to_string(),
+                email: root.to_string(),
+                created_at: 0,
+                allow_static_token: false,
+            },
+        );
+        infra::table::folders::get_or_create(&org, folder(DEFAULT_FOLDER), FolderType::Downtimes)
+            .await
+            .unwrap();
+        let now = now_micros();
+        let conn = infra::db::get_orm_client_rw().await;
+        let mut versions = HashMap::new();
+        for id in ["stale", "current", "absent"] {
+            let mut mute = row(
+                vec![TargetModule::AnomalyDetections],
+                now - HOUR,
+                now + 10 * HOUR,
+            );
+            mute.id = id.to_string();
+            mute.org = org.clone();
+            infra::table::downtimes::put_with(conn, &mute)
+                .await
+                .unwrap();
+            let stored = infra::table::downtimes::get_rw(&org, id)
+                .await
+                .unwrap()
+                .unwrap();
+            versions.insert(id, stored.version);
+        }
+        let live = |id: &'static str| {
+            let org = org.clone();
+            async move {
+                let stored = infra::table::downtimes::get_rw(&org, id)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                stored.cancelled_at.is_none()
+            }
+        };
+
+        let refused = cancel(&org, root, "stale", Some(versions["stale"] - 1)).await;
+        assert!(
+            matches!(refused, Err(DowntimeError::Conflict(_))),
+            "{refused:?}"
+        );
+        assert!(
+            live("stale").await,
+            "a refused cancel leaves the downtime live"
+        );
+
+        let ended = cancel(&org, root, "current", Some(versions["current"]))
+            .await
+            .unwrap();
+        assert!(ended.cancelled_at.is_some());
+        assert!(!live("current").await);
+
+        cancel(&org, root, "absent", None).await.unwrap();
+        assert!(
+            !live("absent").await,
+            "a caller with no version still cancels"
         );
     }
 

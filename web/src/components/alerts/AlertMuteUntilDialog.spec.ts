@@ -65,13 +65,13 @@ describe("AlertMuteUntilDialog", () => {
     wrapper.unmount();
   });
 
-  it("stays open on conflict and lets its screen refresh", async () => {
+  it("closes on conflict and lets its screen refresh, since its version is stale", async () => {
     extend.mockResolvedValue("conflict");
     const wrapper = await mountDialog();
     await submit();
     expect(extend).toHaveBeenCalledTimes(1);
     expect(wrapper.emitted("done")).toBeUndefined();
-    expect(wrapper.emitted("update:open")).toBeUndefined();
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
     expect(wrapper.emitted("settled")).toHaveLength(1);
     wrapper.unmount();
   });

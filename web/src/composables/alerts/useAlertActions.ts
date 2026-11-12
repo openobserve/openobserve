@@ -367,9 +367,13 @@ export function useAlertActions() {
         }
       : {};
 
+  // Same-text toasts merge and keep the first action, so a new one replaces the last one.
+  let dismissChanged: (() => void) | undefined;
+
   const endFailureToast = (err: unknown, downtime: AlertMuteRef) => {
     if (alertActionErrorOf(err)?.code === "version_changed") {
-      toast({
+      dismissChanged?.();
+      dismissChanged = toast({
         variant: "error",
         message: t("toastMessages.downtimes.muteChangedOpen"),
         ...openDowntime(downtime),

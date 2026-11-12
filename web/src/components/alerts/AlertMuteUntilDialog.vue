@@ -104,10 +104,10 @@ const form = useOForm<ExtendForm>({
     const target = props.target;
     if (!target || !props.downtime || until === null) return;
     const result = await actions.extend(target, props.downtime, { endsAt: until });
-    // No answer means nothing changed, so only a refusal makes the screen refresh.
+    // No answer means nothing changed. A refusal leaves the row's version stale, so it closes too.
+    if (result === "failed") return;
     if (result === "conflict") emit("settled");
-    if (result !== "ok") return;
-    emit("done");
+    else emit("done");
     emit("update:open", false);
   },
 });

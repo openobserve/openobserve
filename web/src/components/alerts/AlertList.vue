@@ -2937,9 +2937,11 @@ export default defineComponent({
       openMuteDialog(selectedAlerts.value);
     };
 
-    const openExtendUntil = (row: any) => {
+    const openExtendUntil = async (row: any) => {
       if (!isAlertScopedMute(row)) {
-        void downtimeRowActions.openExtendUntil(row.active_downtime);
+        // The list loads without a query observer, so a refused open refreshes it here.
+        const opened = await downtimeRowActions.openExtendUntil(row.active_downtime);
+        if (opened === "conflict") await refreshAlerts();
         return;
       }
       extendUntilRow.value = row;

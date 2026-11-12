@@ -167,12 +167,22 @@ pub async fn unmute(
     ack::authorize(target, actor, Act::Mute)
         .await
         .map_err(MuteError::from)?;
+    let after = end_seen_quick_mute(target, downtime_id, version, actor).await?;
+    lifecycle::on_view_changed(&target.org_id, &target.alert_id, single_group(&after)).await;
+    Ok(after)
+}
+
+/// [unmute] after its authorization: the version guards the same row the cancel writes.
+async fn end_seen_quick_mute(
+    target: &AckTarget,
+    downtime_id: &str,
+    version: Option<i64>,
+    actor: &str,
+) -> Result<Downtime, MuteError> {
     let row = quick_mute_of(target, downtime_id).await?;
     // The shape check ignores the groups, so a mute widened since the list loaded needs this.
     check_seen_version(version, &row)?;
-    let after = downtimes::cancel_quick_mute(&target.org_id, actor, row).await?;
-    lifecycle::on_view_changed(&target.org_id, &target.alert_id, single_group(&after)).await;
-    Ok(after)
+    Ok(downtimes::cancel_quick_mute(&target.org_id, actor, row).await?)
 }
 
 /// Cancels the Until-it-clears mutes a clear ends (§6.3), before anything reads downtimes for it.
@@ -620,7 +630,7 @@ mod tests {
     }
 
     #[test]
-    fn an_unmute_at_a_stale_version_is_a_409_before_anything_is_cancelled() {
+    fn a_seen_version_other_than_the_row_is_a_409() {
         let mut r = row(Some(vec![group("k1")]), None);
         r.version = 3;
         assert!(check_seen_version(None, &r).is_ok());
@@ -632,14 +642,88 @@ mod tests {
                 ..
             }))
         ));
-        let src = include_str!("mute.rs");
-        let body = &src[src.find("pub async fn unmute(").unwrap()..];
-        let body = &body[..body.find("\n}\n").unwrap()];
-        let check = body
-            .find("check_seen_version(version, &row)?")
-            .expect("checked");
-        let cancel = body.find("cancel_quick_mute(").expect("cancelled");
-        assert!(check < cancel, "the check uses the row the cancel writes");
+    }
+
+    #[tokio::test]
+    async fn an_unmute_at_a_stale_version_is_a_409_and_the_mute_stays_live() {
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org = format!("versioned_unmute_{}", now_micros());
+        let folder = config::meta::folder::Folder {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: DEFAULT_FOLDER.to_string(),
+            description: String::new(),
+            icon: None,
+        };
+        infra::table::folders::get_or_create(
+            &org,
+            folder,
+            config::meta::folder::FolderType::Downtimes,
+        )
+        .await
+        .unwrap();
+        let mut on = target(true);
+        on.org_id = org.clone();
+        let now = now_micros();
+        let conn = infra::db::get_orm_client_rw().await;
+        let mut versions = BTreeMap::new();
+        for id in ["stale", "current", "absent"] {
+            let mut mute = row(None, None);
+            mute.id = id.to_string();
+            mute.org = org.clone();
+            mute.schedule.starts_at = now - HOUR;
+            mute.schedule.ends_at = Some(now + HOUR);
+            mute.schedule.duration_secs = 2 * 3600;
+            infra::table::downtimes::put_with(conn, &mute)
+                .await
+                .unwrap();
+            let stored = infra::table::downtimes::get_rw(&org, id)
+                .await
+                .unwrap()
+                .unwrap();
+            versions.insert(id, stored.version);
+        }
+        let live = |id: &'static str| {
+            let org = org.clone();
+            async move {
+                let stored = infra::table::downtimes::get_rw(&org, id)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                stored.cancelled_at.is_none()
+            }
+        };
+
+        let refused = end_seen_quick_mute(&on, "stale", Some(versions["stale"] - 1), "ops").await;
+        assert!(
+            matches!(
+                refused,
+                Err(MuteError::Conflict(
+                    AlertMuteConflict::VersionChanged { .. }
+                ))
+            ),
+            "{refused:?}"
+        );
+        assert!(live("stale").await, "a refused unmute leaves the mute live");
+
+        let ended = end_seen_quick_mute(&on, "current", Some(versions["current"]), "ops")
+            .await
+            .unwrap();
+        assert!(ended.cancelled_at.is_some());
+        assert!(!live("current").await);
+
+        end_seen_quick_mute(&on, "absent", None, "ops")
+            .await
+            .unwrap();
+        assert!(
+            !live("absent").await,
+            "a caller with no version still unmutes"
+        );
     }
 
     #[test]

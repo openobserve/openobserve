@@ -162,4 +162,39 @@ describe("useDowntimeRowActions", () => {
     expect(api.extendUntilOpen.value).toBe(true);
     expect(api.extendUntilRow.value).toMatchObject({ id: "d1", version: 3 });
   });
+  it("reads the stored window fresh each time Extend until opens", async () => {
+    vi.mocked(downtimes.get).mockResolvedValue({
+      data: { id: "d1", folder_id: "ops", version: 3, current_window: { start: 1, end: 2 } },
+    } as any);
+    const api = mountActions();
+    expect(await api.openExtendUntil(mute)).toBe("ok");
+    vi.mocked(downtimes.get).mockResolvedValue({
+      data: { id: "d1", folder_id: "ops", version: 4, current_window: { start: 1, end: 5 } },
+    } as any);
+    expect(await api.openExtendUntil({ ...mute, version: 4 })).toBe("ok");
+    expect(downtimes.get).toHaveBeenCalledTimes(2);
+    expect(api.extendUntilRow.value).toMatchObject({ version: 4, current_window: { end: 5 } });
+  });
+
+  it("tells a refused Extend until open from no answer, so its screen can refresh", async () => {
+    const api = mountActions();
+    vi.mocked(downtimes.get).mockRejectedValueOnce(httpError(404));
+    expect(await api.openExtendUntil(mute)).toBe("conflict");
+    vi.mocked(downtimes.get).mockRejectedValueOnce(new Error("Network Error"));
+    expect(await api.openExtendUntil(mute)).toBe("failed");
+    expect(api.extendUntilOpen.value).toBe(false);
+  });
+
+  it("replaces the changed-mute toast, so View downtime opens the latest row", async () => {
+    const dismiss = vi.fn();
+    vi.mocked(toast).mockReturnValue(dismiss as any);
+    vi.mocked(downtimes.cancel).mockRejectedValue(httpError(409));
+    const api = mountActions();
+    await api.end(mute);
+    expect(dismiss).not.toHaveBeenCalled();
+    await api.end({ ...mute, id: "d2" });
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    lastToast()?.action?.handler();
+    expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ params: { id: "d2" } }));
+  });
 });

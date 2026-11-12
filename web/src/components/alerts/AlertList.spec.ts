@@ -3785,6 +3785,21 @@ describe("AlertList — Acknowledge and alert-scoped Mute (MK-3)", () => {
     cancel.mockRestore();
   });
 
+  it("refreshes the list when Extend until cannot read a refused mute, not when no answer came", async () => {
+    const get = vi
+      .spyOn(DowntimeService, "get")
+      .mockRejectedValueOnce({ response: { status: 404, data: {} } })
+      .mockRejectedValueOnce(new Error("Network"));
+    const { wrapper } = await loadAckRows();
+    const loads = alertsSvc.listByFolderId.mock.calls.length;
+    await wrapper.vm.openExtendUntil(anomalyRow());
+    const afterRefusal = alertsSvc.listByFolderId.mock.calls.length;
+    expect(afterRefusal).toBeGreaterThan(loads);
+    await wrapper.vm.openExtendUntil(anomalyRow());
+    expect(alertsSvc.listByFolderId.mock.calls.length).toBe(afterRefusal);
+    get.mockRestore();
+  });
+
   it("keeps the list as it is when End mute got no answer", async () => {
     const cancel = vi.spyOn(DowntimeService, "cancel").mockRejectedValue(new Error("Network"));
     const { wrapper } = await loadAckRows();

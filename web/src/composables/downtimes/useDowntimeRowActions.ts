@@ -54,11 +54,15 @@ export function useDowntimeRowActions() {
     }
   };
 
+  // Same-text toasts merge and keep the first action, so a new 409 replaces the last one.
+  let dismissChanged: (() => void) | undefined;
+
   const failed = (err: unknown, downtime: MuteRow, fallback: "cancel" | "extend") => {
     const status = failureStatus(err);
     if (status !== undefined) refetchLists();
     if (status === 409) {
-      toast({
+      dismissChanged?.();
+      dismissChanged = toast({
         variant: "error",
         message: t("toastMessages.downtimes.muteChangedOpen"),
         action: {
@@ -122,15 +126,18 @@ export function useDowntimeRowActions() {
   };
 
   /** Extend until… needs the stored window; the row's version still guards the write. */
-  const openExtendUntil = async (downtime: ActiveDowntime) => {
+  const openExtendUntil = async (downtime: ActiveDowntime): Promise<MuteActionResult> => {
     try {
-      const row = await queryClient.fetchQuery(
-        downtimeDetailQuery(orgId.value, downtime.id, downtime.folder_id || undefined),
-      );
+      // A fresh read, so the dialog's bounds match the window the version guards.
+      const row = await queryClient.fetchQuery({
+        ...downtimeDetailQuery(orgId.value, downtime.id, downtime.folder_id || undefined),
+        staleTime: 0,
+      });
       extendUntilRow.value = { ...row, version: downtime.version ?? row.version };
       extendUntilOpen.value = true;
+      return "ok";
     } catch (err: unknown) {
-      failed(err, downtime, "extend");
+      return failed(err, downtime, "extend");
     }
   };
 
