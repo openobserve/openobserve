@@ -1058,7 +1058,7 @@ pub fn api_endpoint() -> String {
 
 /// A device class with its viewport dimensions — returned by the capabilities
 /// endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SyntheticsDevice {
     pub id: String,
     pub label: String,

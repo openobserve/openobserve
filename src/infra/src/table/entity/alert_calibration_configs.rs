@@ -2,8 +2,17 @@
 
 use sea_orm::entity::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    DeriveEntityModel,
+    serde::Serialize,
+    serde::Deserialize,
+    utoipa::ToSchema,
+)]
 #[sea_orm(table_name = "alert_calibration_configs")]
+#[schema(as = AlertCalibrationOrgConfig)]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,

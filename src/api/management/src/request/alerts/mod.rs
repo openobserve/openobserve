@@ -103,6 +103,41 @@ const ANOMALY_EXPORT_STRIPPED_KEYS: &[&str] = &[
     "last_recovery_notified_at",
 ];
 
+#[derive(serde::Serialize, utoipa::ToSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+enum CloneAlertVariants {
+    Scheduled(Box<MetaAlert>),
+    Composite(ClonedCompositeAlert),
+    #[cfg(feature = "enterprise")]
+    Anomaly(ClonedAnomalyConfig),
+}
+
+config::any_of_schema!(CloneAlertAnswer, CloneAlertVariants);
+
+#[derive(serde::Serialize, utoipa::ToSchema)]
+#[allow(dead_code)]
+struct ClonedCompositeAlert {
+    id: String,
+    name: String,
+    alert_type: String,
+}
+
+#[cfg(feature = "enterprise")]
+#[derive(serde::Serialize, utoipa::ToSchema)]
+#[allow(dead_code)]
+struct ClonedAnomalyConfig {
+    anomaly_id: String,
+    org_id: String,
+    name: String,
+    stream_name: String,
+    stream_type: String,
+    folder_id: String,
+    status: String,
+    enabled: bool,
+    alert_enabled: bool,
+}
+
 /// Reject an `oncall_team` that names no on-call team in this organization.
 ///
 /// A mistyped or cross-org team id is not a loud failure later: routing takes
@@ -210,7 +245,7 @@ fn strip_anomaly_runtime_state(obj: &mut serde_json::Map<String, serde_json::Val
       ),
     request_body(content = inline(CreateAlertRequestBody), description = "Alert data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
     ),
@@ -850,7 +885,11 @@ fn composite_field_error(
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = inline(ValidateCompositeRequestBody), content_type = "application/json"),
-    responses((status = 200, body = crate::models::alerts::responses::CompositeValidationResponse))
+    responses((status = 200, body = crate::models::alerts::responses::CompositeValidationResponse)),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"}))
+    )
 )]
 pub async fn validate_composite_alert(
     Path(org_id): Path<String>,
@@ -1036,7 +1075,11 @@ pub async fn validate_composite_alert(
         ("org_id" = String, Path, description = "Organization name"),
         ("alert_id" = String, Path, description = "Alert or composite alert ID"),
     ),
-    responses((status = 200, body = crate::models::alerts::responses::CompositeReferencesResponse))
+    responses((status = 200, body = crate::models::alerts::responses::CompositeReferencesResponse)),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
+    )
 )]
 pub async fn get_composite_references(
     Path((org_id, alert_id)): Path<(String, String)>,
@@ -1839,13 +1882,14 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     ),
     request_body(content = inline(CloneAlertRequestBody), description = "Clone options", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = CloneAlertAnswer),
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn clone_alert(
@@ -2098,7 +2142,7 @@ pub async fn clone_alert(
       ),
     request_body(content = inline(UpdateAlertRequestBody), description = "Alert data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
     ),
@@ -2298,7 +2342,7 @@ async fn build_and_run_anomaly_update(
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 409, description = "Referenced by composite alerts", content_type = "application/json", body = Object),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
@@ -2654,6 +2698,10 @@ pub struct AlertTagCount {
         (status = 200, description = "Success", content_type = "application/json", body = Vec<AlertTagCount>),
         (status = 403, description = "Forbidden", content_type = "application/json"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
+    )
 )]
 pub async fn list_alert_tags(
     Path(org_id): Path<String>,
@@ -3506,7 +3554,7 @@ async fn enrich_with_incidents(
         EnableAlertQuery,
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = EnableAlertResponseBody),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
@@ -3634,7 +3682,7 @@ pub async fn enable_alert(
     ),
     request_body(content = inline(AlertBulkEnableRequest), description = "Alert id list", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = AlertBulkEnableResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
@@ -3904,13 +3952,14 @@ pub async fn trigger_alert(
         ("alert_id" = String, Path, description = "Anomaly detection alert ID"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Not an anomaly detection alert", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn retrain_alert(
@@ -3984,7 +4033,7 @@ pub async fn retrain_alert(
     ),
     request_body(content = inline(MoveAlertsRequestBody), description = "Identifies alerts and the destination folder", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
@@ -4154,7 +4203,7 @@ pub async fn move_alerts(
         (status = 500, description = "Internal server error", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "generate_sql"})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
         ("x-o2-mcp" = json!({"description": "Generate SQL from natural language", "category": "alerts"}))
     )
 )]

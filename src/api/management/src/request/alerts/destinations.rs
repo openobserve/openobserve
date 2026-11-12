@@ -320,7 +320,8 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "test"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn jira_setup(
@@ -397,7 +398,7 @@ async fn saved_token_refusal(
       ),
     request_body(content = inline(Destination), description = "Alert destination data. The 'template' field is required (use 'Default' for the built-in template).", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
@@ -451,7 +452,7 @@ pub async fn save_destination(
       ),
     request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
@@ -636,7 +637,7 @@ pub async fn list_destinations(
         ("destination_name" = String, Path, description = "Destination name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 409, description = "Conflict", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),

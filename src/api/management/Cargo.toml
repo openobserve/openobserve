@@ -102,5 +102,6 @@ zip.workspace = true
 
 [dev-dependencies]
 cron.workspace = true
+jsonschema = { version = "0.38", default-features = false }
 infra = { workspace = true, features = ["test-utils"] }
 openobserve-core = { workspace = true, features = ["test-utils"] }
