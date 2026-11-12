@@ -65,6 +65,11 @@ export const HOSTS_PACK: StarterPack = {
   alerts: PLACEHOLDER_HOST_ALERT_IDS,
   savedViews: [],
   collectorRoute: "ingestFromLinux",
+  logo: "images/common/linux.svg",
+  tiles: {
+    dashboard: "starterPacks.hosts.tileDashboard",
+    alert: "starterPacks.hosts.tileAlerts",
+  },
   signals: [
     "system_cpu_time",
     "system_memory_usage",

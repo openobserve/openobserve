@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-wrap items-center justify-end gap-2"
     >
       <div class="flex items-center gap-2">
+        <StarterPackHomeMenu v-if="homePacks?.showMenu.value" :home="homePacks" />
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
           :loading="isLoading || overviewState.loading"
@@ -206,6 +207,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('overview.activeIncidents')"
     />
 
+    <section v-else-if="homePacks?.silent.value.length" data-test="overview-pack-silent-alerts">
+      <div v-if="isIncidentsEnabled" class="mb-2 flex min-h-8 items-center gap-2 ps-1">
+        <OText variant="card-title">{{ t("overview.activeIncidents") }}</OText>
+      </div>
+      <StarterPackSilentAlerts :items="homePacks.silent.value" :incidents="isIncidentsEnabled" />
+    </section>
     <OverviewSectionEmpty
       v-else-if="showSectionEmpty('incidents')"
       section="incidents"
@@ -805,7 +812,16 @@ import { orgSummaryQuery } from "@/services/organizations.queries";
 import { STREAM_PROBE_PAGE, streamPageQuery, streamProbeQuery } from "@/services/stream.queries";
 import { readFirstDataRecord } from "@/composables/firstEvent/useFirstDataNotice";
 import { USER_DATA_STREAM_TYPES, userDataStreams } from "@/utils/internalStreams";
-import { ref, reactive, computed, defineAsyncComponent, onMounted, watch, nextTick } from "vue";
+import {
+  ref,
+  reactive,
+  computed,
+  defineAsyncComponent,
+  inject,
+  onMounted,
+  watch,
+  nextTick,
+} from "vue";
 
 import { raw, useI18nTyped } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
@@ -836,6 +852,9 @@ import OverviewSignalCards from "./overview/OverviewSignalCards.vue";
 import OverviewAskAiButton from "./overview/OverviewAskAiButton.vue";
 import { buildOverviewAskAi, type OverviewAskAiTarget } from "./overview/overviewAskAi";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import StarterPackHomeMenu from "@/components/starterPacks/StarterPackHomeMenu.vue";
+import StarterPackSilentAlerts from "@/components/starterPacks/StarterPackSilentAlerts.vue";
+import { HOME_PACKS } from "@/composables/starterPacks/useHomePacks";
 import { OVERVIEW_TOP, orgOverviewQuery } from "@/services/overview.queries";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { safeTimezone } from "@/utils/dashboard/calendarPeriods";
@@ -862,6 +881,8 @@ const AlertHistoryDrawer = defineAsyncComponent(
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+const homePackState = inject(HOME_PACKS, null);
+const homePacks = computed(() => homePackState?.value ?? null);
 
 const emit = defineEmits<{ sendToAiChat: [payload: AiChatHandoff] }>();
 
