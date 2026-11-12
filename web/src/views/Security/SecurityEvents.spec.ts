@@ -296,6 +296,7 @@ describe("SecurityEvents", () => {
     expect(first.sql).toMatch(/ORDER BY _timestamp DESC$/);
   });
 
+  // Two server round trips after a full mount: ~4.3 s on a loaded CI shard, near the 5 s default.
   it("pages and sorts on the server without re-running the timeline", async () => {
     const w = await mountView("?stream=okta_auth&period=1h");
     const histograms = () =>
@@ -313,7 +314,7 @@ describe("SecurityEvents", () => {
     expect(histograms()).toBe(before);
     // The histogram's 120 is the exact total the pager offers.
     expect(table.props("total")).toBe(120);
-  });
+  }, 15000);
 
   it("adds a builder filter from a pivot and re-queries", async () => {
     const w = await mountView("?stream=okta_auth&period=1h");

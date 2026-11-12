@@ -177,6 +177,14 @@ describe("ModelPricingGaps", () => {
     expect(vi.mocked(modelPricingService.listUnpriced).mock.calls.length).toBeGreaterThan(calls);
   });
 
+  it("shows the no-access state, not a retryable load error, when the read is denied", async () => {
+    vi.mocked(modelPricingService.listUnpriced).mockRejectedValue({ response: { status: 403 } });
+    w = mountPage();
+    await vi.waitFor(() => expect(w.find('[data-test="o2-table-forbidden"]').exists()).toBe(true));
+    expect(w.find('[data-test="model-pricing-unpriced-error"]').exists()).toBe(false);
+    expect(w.find('[data-test="o2-empty-state-action-retry"]').exists()).toBe(false);
+  });
+
   it("Back returns to the price list", async () => {
     w = mountPage();
     await flushPromises();

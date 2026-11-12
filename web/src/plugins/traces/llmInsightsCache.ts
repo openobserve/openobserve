@@ -13,26 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * In-memory, selection-scoped caches for the two LLM Insights data paths the
- * dashboards' IndexedDB panel cache can't cover: the **KPI strip** (fetched by
- * the dashboard via `useLLMInsights`) and the **error table** (fetched by the
- * table via `useLLMStreamQuery`). The chart panels reuse the dashboards'
- * own IndexedDB cache instead.
- *
- * Both caches key identically — org + stream + agent + time window — via
- * `selectionKey`, so a tab toggle back to the same selection is an instant hit
- * and a new selection/window is a clean miss that refetches.
- *
- * These are **module singletons** on purpose: they must survive a component
- * remount. The error table is recreated on every tab toggle (the dashboard
- * keys panels by selection), and a `Map` declared inside a component's
- * `setup()` would be reset to empty each time and never hit. Module scope means
- * one shared instance for the page's lifetime; cleared only on a full reload.
- *
- * Bounded (`MAX_ENTRIES`) so a long session that visits many windows can't grow
- * without limit — the oldest entry is evicted FIFO when full.
- */
+/** Module singleton: panels remount on every tab toggle, so a per-setup `Map` would never hit. */
 import { quantizeRange } from "@/composables/query/queryClient";
 import type { LLMKPI, LLMSparklineSeries } from "./composables/useLLMInsights";
 
@@ -91,6 +72,3 @@ export function createSelectionCache<T>() {
 
 /** KPI summary numbers per selection+window (dashboard-owned fetch). */
 export const kpiCache = createSelectionCache<KpiSnapshot>();
-
-/** Recent-error rows per selection+window (error table's own fetch). */
-export const errorRowsCache = createSelectionCache<any[]>();
