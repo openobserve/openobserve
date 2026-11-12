@@ -245,7 +245,8 @@ pub struct DowntimeRequest {
     pub show_banner: bool,
     #[serde(default)]
     pub notifications: Option<DowntimeNotifications>,
-    /// The version the edit was loaded at; a newer stored row makes the edit a 409.
+    /// The version the edit was loaded at; required on update, and a newer stored row makes the
+    /// edit a 409. Extend accepts it optionally.
     #[serde(default)]
     pub version: Option<i64>,
     #[serde(default)]
@@ -777,6 +778,16 @@ pub enum AlertMuteConflict {
 
 pub fn default_folder() -> String {
     DEFAULT_FOLDER.to_string()
+}
+
+/// The local date of an instant in a schedule's zone; `None` for an unknown zone.
+pub fn local_date(micros: i64, timezone: &str) -> Option<chrono::NaiveDate> {
+    let tz: chrono_tz::Tz = timezone.parse().ok()?;
+    Some(
+        chrono::DateTime::from_timestamp_micros(micros)?
+            .with_timezone(&tz)
+            .date_naive(),
+    )
 }
 
 /// Labels are display only, so two lists naming the same groups cover the same.

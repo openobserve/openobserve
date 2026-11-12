@@ -14132,6 +14132,7 @@
         "endInPast": "The end time is in the past. Pick an end time after now.",
         "pastSloOnly": "This window is in the past. It only corrects SLO data.",
         "neverProducesWindow": "This schedule never produces a window.",
+        "lockedAfterStart": "Locked after the first window starts. Duplicate to change it.",
         "conditionRequired": "Add a condition, or remove the condition block.",
         "pairKey": "Choose a dimension for every row.",
         "pairOperator": "Use = or != in a downtime condition.",
@@ -14248,7 +14249,9 @@
       },
       "confirmDelete": {
         "title": "Delete downtime",
-        "message": "Are you sure you want to delete the {name} downtime? Its history is removed too. This cannot be undone."
+        "message": "Are you sure you want to delete the {name} downtime? Its history is removed too. This cannot be undone.",
+        "ok": "Delete downtime",
+        "keep": "Keep"
       },
       "copyOf": "Copy of {name}",
       "form": {
@@ -24427,6 +24430,8 @@
       "cancelled": "Downtime cancelled",
       "cancelledMany": "{count} downtime cancelled | {count} downtimes cancelled",
       "cancelFailed": "Could not cancel the downtime",
+      "cancelPartial": "{cancelled} cancelled, {failed} failed: {reason}",
+      "cancelPartialNoReason": "{cancelled} cancelled, {failed} failed.",
       "extended": "Extended until {time}",
       "extendedFollowUp": "Created {name}, running until {time}",
       "extendFailed": "Could not extend the downtime",
