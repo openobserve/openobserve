@@ -15,6 +15,7 @@
 
 mod file;
 mod job;
+mod partition;
 mod policy;
 mod stream;
 
