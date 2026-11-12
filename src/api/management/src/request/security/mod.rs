@@ -133,28 +133,14 @@ pub async fn guard_siem_ids<'a>(
     guard_siem(org_id, user_id, method, touches_siem).await
 }
 
-/// True when the incident is a security case: its durable marker, else a live detection's firing.
+/// True when the incident carries the durable case marker; a failed read counts as a case.
 #[cfg(feature = "enterprise")]
 pub async fn incident_touches_siem(org_id: &str, incident_id: &str) -> bool {
-    use infra::table::alert_incidents;
-
-    match alert_incidents::security_case_of(org_id, incident_id).await {
-        Ok(Some(true)) => return true,
-        Ok(None) => return false,
-        Ok(Some(false)) => {}
+    // A converted alert's old firings predate its detection, so the alert's kind cannot decide.
+    match infra::table::alert_incidents::security_case_of(org_id, incident_id).await {
+        Ok(marked) => marked.unwrap_or(false),
         Err(e) => {
             log::error!("[SECURITY] reading the case marker of {org_id}/{incident_id}: {e}");
-            return true;
-        }
-    }
-    // Never marks: the firings may predate the alert becoming a detection, and rows cannot tell.
-    match alert_incidents::get_incident_alerts(incident_id).await {
-        Ok(links) => {
-            db::alerts::alert::any_siem_alert(org_id, links.iter().map(|l| l.alert_id.as_str()))
-                .await
-        }
-        Err(e) => {
-            log::error!("[SECURITY] reading the firings of {org_id}/{incident_id}: {e}");
             true
         }
     }
@@ -975,81 +961,15 @@ pub(crate) mod tests {
             );
         }
 
-        /// A detection firing beside the open ops incident its alert fired into before.
-        async fn fire_detection_beside_its_ops_incident(org: &str, id: &str) {
-            let (_, alert) = common::infra::config::ALERTS
-                .read()
-                .await
-                .get(&db::alerts::alert::cache_alert_key(org, id))
-                .cloned()
-                .unwrap();
-            let row = serde_json::json!({"_timestamp": 2})
-                .as_object()
-                .unwrap()
-                .clone();
-            openobserve_core::alerts::incidents::correlate_alert_to_incident(
-                &alert,
-                &row,
-                std::slice::from_ref(&row),
-                2,
-                None,
-                None,
-                None,
-                None,
-            )
-            .await
-            .unwrap();
-        }
-
-        // Its alert became a detection after firing as ops, so the incident still holds ops
-        // firings.
+        // A converted detection's old incident holds only ops firings, so only the marker decides.
         #[tokio::test]
-        async fn test_viewing_an_ops_incident_never_hands_it_to_a_detection() {
-            use infra::table::alert_incidents::{CaseFilter, get_rw};
-
+        async fn test_an_unmarked_incident_is_no_case() {
             let org = format!("gate_{}", config::ider::uuid());
             let id = plant_siem_detection(&org).await;
             let incident = unmarked_case(&org, &id).await;
-            incident_touches_siem(&org, &incident).await;
-            fire_detection_beside_its_ops_incident(&org, &id).await;
-
-            let stored = get_rw(&org, &incident).await.unwrap().unwrap();
-            assert_eq!((stored.security_case, stored.alert_count), (false, 1));
-            let (cases, _) = openobserve_core::alerts::incidents::list_incidents_filtered(
-                &org,
-                None,
-                CaseFilter::OnlyCases,
-                10,
-                0,
-            )
-            .await
-            .unwrap();
-            assert_eq!(cases.len(), 1);
-            assert_ne!(cases[0].id, incident);
-        }
-
-        #[tokio::test]
-        async fn test_a_detections_case_lookup_skips_its_old_ops_incident() {
-            use infra::table::alert_incidents::{CaseFilter, find_open_incident_containing_alert};
-
-            let org = format!("gate_{}", config::ider::uuid());
-            let id = plant_siem_detection(&org).await;
-            let ops = unmarked_case(&org, &id).await;
-            fire_detection_beside_its_ops_incident(&org, &id).await;
-
-            let case = find_open_incident_containing_alert(&org, &id, CaseFilter::OnlyCases)
-                .await
-                .unwrap()
-                .unwrap();
-            assert!(case.security_case);
-            assert_ne!(case.id, ops);
-        }
-
-        #[tokio::test]
-        async fn test_an_incident_no_detection_fired_into_is_no_case() {
-            let org = format!("gate_{}", config::ider::uuid());
-            let incident = unmarked_case(&org, "2ops").await;
             assert!(!incident_touches_siem(&org, &incident).await);
+            let marked = infra::table::alert_incidents::security_case_of(&org, &incident).await;
+            assert_eq!(marked.unwrap(), Some(false), "a read never marks");
             assert!(!incident_touches_siem(&org, "missing").await);
         }
     }

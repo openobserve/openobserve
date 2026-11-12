@@ -614,6 +614,7 @@ pub(crate) mod tests {
                     schema.create_table_from_entity(oncall_responses::Entity),
                     schema.create_table_from_entity(ai_chat_sessions::Entity),
                     schema.create_table_from_entity(ai_chat_turns::Entity),
+                    schema.create_table_from_entity(infra::table::entity::alert_states::Entity),
                 ] {
                     conn.execute(backend.build(table.if_not_exists()))
                         .await

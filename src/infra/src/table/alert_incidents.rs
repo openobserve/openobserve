@@ -68,6 +68,25 @@ pub enum CaseFilter {
     NoCases,
 }
 
+impl CaseFilter {
+    /// An alert's own incidents: a detection's are security cases, any other alert's never are.
+    pub fn of_kind(detection: bool) -> Self {
+        if detection {
+            Self::OnlyCases
+        } else {
+            Self::NoCases
+        }
+    }
+
+    pub fn keeps(self, security_case: bool) -> bool {
+        match self {
+            Self::All => true,
+            Self::OnlyCases => security_case,
+            Self::NoCases => !security_case,
+        }
+    }
+}
+
 /// A security firing's evidence span and whether only a backfill over past data found it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CaseActivity {
@@ -1522,34 +1541,7 @@ pub async fn find_open_incident_by_alert_id(
     cases: CaseFilter,
 ) -> Result<Option<alert_incidents::Model>, errors::Error> {
     // The primary: a replica behind a just-opened incident would let the next firing open another.
-    let client = get_orm_client_rw().await;
-
-    // Step 1: find all incident IDs that reference this alert_id in the junction table
-    let rows = alert_incident_alerts::Entity::find()
-        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
-        .all(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
-    if rows.is_empty() {
-        return Ok(None);
-    }
-
-    let incident_ids: Vec<String> = rows.into_iter().map(|r| r.incident_id).collect();
-
-    // Step 2: find the open AlertId incident from those IDs
-    let mut query = alert_incidents::Entity::find()
-        .filter(alert_incidents::Column::OrgId.eq(org_id))
-        .filter(alert_incidents::Column::Status.ne("resolved"))
-        .filter(alert_incidents::Column::KeyType.eq("AlertId"))
-        .filter(alert_incidents::Column::Id.is_in(incident_ids));
-    if let Some(condition) = case_condition(cases) {
-        query = query.filter(condition);
-    }
-    query
-        .one(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+    find_open_incident_by_alert_id_with(get_orm_client_rw().await, org_id, alert_id, cases).await
 }
 
 /// Every open AlertId incident holding a firing of `alert_id`.
@@ -1558,24 +1550,7 @@ pub async fn find_open_incidents_by_alert_id(
     alert_id: &str,
     cases: CaseFilter,
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
-    let client = get_orm_client_ro().await;
-    let holding = alert_incident_alerts::Entity::find()
-        .select_only()
-        .column(alert_incident_alerts::Column::IncidentId)
-        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
-        .into_query();
-    let mut query = alert_incidents::Entity::find()
-        .filter(alert_incidents::Column::OrgId.eq(org_id))
-        .filter(alert_incidents::Column::Status.ne("resolved"))
-        .filter(alert_incidents::Column::KeyType.eq("AlertId"))
-        .filter(alert_incidents::Column::Id.in_subquery(holding));
-    if let Some(condition) = case_condition(cases) {
-        query = query.filter(condition);
-    }
-    query
-        .all(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+    find_open_incidents_by_alert_id_with(get_orm_client_ro().await, org_id, alert_id, cases).await
 }
 
 /// The incident holding this exact firing, whatever its status or key type, read on the primary.
@@ -1651,31 +1626,8 @@ pub async fn find_open_incident_containing_alert(
     alert_id: &str,
     cases: CaseFilter,
 ) -> Result<Option<alert_incidents::Model>, errors::Error> {
-    let client = get_orm_client_ro().await;
-
-    let rows = alert_incident_alerts::Entity::find()
-        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
-        .all(client)
+    find_open_incident_containing_alert_with(get_orm_client_ro().await, org_id, alert_id, cases)
         .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
-    if rows.is_empty() {
-        return Ok(None);
-    }
-
-    let incident_ids: Vec<String> = rows.into_iter().map(|r| r.incident_id).collect();
-
-    let mut query = alert_incidents::Entity::find()
-        .filter(alert_incidents::Column::OrgId.eq(org_id))
-        .filter(alert_incidents::Column::Status.ne("resolved"))
-        .filter(alert_incidents::Column::Id.is_in(incident_ids));
-    if let Some(condition) = case_condition(cases) {
-        query = query.filter(condition);
-    }
-    query
-        .one(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
 /// The incidents among `ids` in this org, by id, read in one query.
@@ -1698,35 +1650,12 @@ pub async fn get_many(
         .collect())
 }
 
-/// [`find_open_incident_containing_alert`] for many alerts in two queries, by alert id.
+/// [`find_open_incident_containing_alert`] for many alerts in two queries, each by its own filter.
 pub async fn find_open_incidents_containing_alerts(
     org_id: &str,
-    alert_ids: &[String],
+    alerts: &HashMap<String, CaseFilter>,
 ) -> Result<HashMap<String, alert_incidents::Model>, errors::Error> {
-    if alert_ids.is_empty() {
-        return Ok(HashMap::new());
-    }
-    let client = get_orm_client_ro().await;
-    let links = alert_incident_alerts::Entity::find()
-        .filter(alert_incident_alerts::Column::AlertId.is_in(alert_ids.to_vec()))
-        .all(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    let incident_ids: Vec<String> = links.iter().map(|l| l.incident_id.clone()).collect();
-    let open: HashMap<String, alert_incidents::Model> = alert_incidents::Entity::find()
-        .filter(alert_incidents::Column::OrgId.eq(org_id))
-        .filter(alert_incidents::Column::Status.ne("resolved"))
-        .filter(alert_incidents::Column::Id.is_in(incident_ids))
-        .all(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
-        .into_iter()
-        .map(|incident| (incident.id.clone(), incident))
-        .collect();
-    Ok(links
-        .into_iter()
-        .filter_map(|l| open.get(&l.incident_id).cloned().map(|m| (l.alert_id, m)))
-        .collect())
+    find_open_incidents_containing_alerts_with(get_orm_client_ro().await, org_id, alerts).await
 }
 
 /// The resolved incidents among the alert's `limit` latest firings, newest first.
@@ -2261,6 +2190,130 @@ fn topology_for_storage(
         node.display_name = None;
     }
     serde_json::to_value(&stored)
+}
+
+async fn find_open_incident_by_alert_id_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    alert_id: &str,
+    cases: CaseFilter,
+) -> Result<Option<alert_incidents::Model>, errors::Error> {
+    // Step 1: find all incident IDs that reference this alert_id in the junction table
+    let rows = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    if rows.is_empty() {
+        return Ok(None);
+    }
+
+    let incident_ids: Vec<String> = rows.into_iter().map(|r| r.incident_id).collect();
+
+    // Step 2: find the open AlertId incident from those IDs
+    let mut query = alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .filter(alert_incidents::Column::KeyType.eq("AlertId"))
+        .filter(alert_incidents::Column::Id.is_in(incident_ids));
+    if let Some(condition) = case_condition(cases) {
+        query = query.filter(condition);
+    }
+    query
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+async fn find_open_incidents_by_alert_id_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    alert_id: &str,
+    cases: CaseFilter,
+) -> Result<Vec<alert_incidents::Model>, errors::Error> {
+    let holding = alert_incident_alerts::Entity::find()
+        .select_only()
+        .column(alert_incident_alerts::Column::IncidentId)
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .into_query();
+    let mut query = alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .filter(alert_incidents::Column::KeyType.eq("AlertId"))
+        .filter(alert_incidents::Column::Id.in_subquery(holding));
+    if let Some(condition) = case_condition(cases) {
+        query = query.filter(condition);
+    }
+    query
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+async fn find_open_incident_containing_alert_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    alert_id: &str,
+    cases: CaseFilter,
+) -> Result<Option<alert_incidents::Model>, errors::Error> {
+    let rows = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    if rows.is_empty() {
+        return Ok(None);
+    }
+
+    let incident_ids: Vec<String> = rows.into_iter().map(|r| r.incident_id).collect();
+
+    let mut query = alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .filter(alert_incidents::Column::Id.is_in(incident_ids));
+    if let Some(condition) = case_condition(cases) {
+        query = query.filter(condition);
+    }
+    query
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+async fn find_open_incidents_containing_alerts_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    alerts: &HashMap<String, CaseFilter>,
+) -> Result<HashMap<String, alert_incidents::Model>, errors::Error> {
+    if alerts.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let links = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::AlertId.is_in(alerts.keys().cloned()))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    let incident_ids: Vec<String> = links.iter().map(|l| l.incident_id.clone()).collect();
+    let open: HashMap<String, alert_incidents::Model> = alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .filter(alert_incidents::Column::Id.is_in(incident_ids))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .into_iter()
+        .map(|incident| (incident.id.clone(), incident))
+        .collect();
+    Ok(links
+        .into_iter()
+        .filter_map(|l| {
+            let incident = open.get(&l.incident_id)?;
+            let keeps = alerts.get(&l.alert_id)?.keeps(incident.security_case);
+            keeps.then(|| (l.alert_id, incident.clone()))
+        })
+        .collect())
 }
 
 #[cfg(test)]
@@ -3051,10 +3104,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ops_correlation_candidates_leave_out_security_cases() {
+    async fn every_lookup_keeps_cases_and_ops_incidents_apart() {
+        use std::collections::BTreeSet;
+
         let db = incidents_db().await;
-        let row = |historical| {
-            new_incident(
+        let backend = db.get_database_backend();
+        let links = Schema::new(backend).create_table_from_entity(alert_incident_alerts::Entity);
+        db.execute(backend.build(&links)).await.unwrap();
+        let mut ids = HashMap::new();
+        for (kind, case_historical) in [("case", Some(false)), ("ops", None)] {
+            let row = new_incident(
                 "acme",
                 "P2",
                 serde_json::json!({}),
@@ -3062,30 +3121,45 @@ mod tests {
                 (1, 1),
                 None,
                 None,
-                historical,
-            )
-        };
-        let case = row(Some(false)).insert(&db).await.unwrap();
-        let ops = row(None).insert(&db).await.unwrap();
-        assert!(case.security_case && !ops.security_case);
-
-        let ids = |cases| {
-            let db = &db;
-            async move {
-                let mut ids: Vec<String> = find_correlation_candidates_with(db, "acme", cases)
-                    .await
-                    .unwrap()
-                    .into_iter()
-                    .map(|row| row.id)
-                    .collect();
-                ids.sort();
-                ids
+                case_historical,
+            );
+            let row = row.insert(&db).await.unwrap();
+            alert_incident_alerts::ActiveModel {
+                incident_id: Set(row.id.clone()),
+                alert_id: Set("a1".to_string()),
+                alert_fired_at: Set(1),
+                alert_name: Set("a1".to_string()),
+                alert_kind: Set("internal".to_string()),
+                correlation_reason: Set(None),
+                created_at: Set(1),
+                resolved_at: Set(None),
             }
-        };
-        let mut both = vec![case.id, ops.id.clone()];
-        both.sort();
-        assert_eq!(ids(CaseFilter::All).await, both);
-        assert_eq!(ids(CaseFilter::NoCases).await, vec![ops.id]);
+            .insert(&db)
+            .await
+            .unwrap();
+            ids.insert(kind, row.id);
+        }
+
+        for (cases, kinds) in [
+            (CaseFilter::All, &["case", "ops"][..]),
+            (CaseFilter::OnlyCases, &["case"]),
+            (CaseFilter::NoCases, &["ops"]),
+        ] {
+            let want: BTreeSet<String> = kinds.iter().map(|k| ids[k].clone()).collect();
+            let candidates = find_correlation_candidates_with(&db, "acme", cases).await;
+            let candidates = candidates.unwrap().into_iter().map(|c| c.id).collect();
+            assert_eq!(want, candidates, "{cases:?}");
+            let by_alert = find_open_incidents_by_alert_id_with(&db, "acme", "a1", cases).await;
+            let by_alert = by_alert.unwrap().into_iter().map(|c| c.id).collect();
+            assert_eq!(want, by_alert, "{cases:?}");
+            let one = find_open_incident_by_alert_id_with(&db, "acme", "a1", cases).await;
+            assert!(want.contains(&one.unwrap().unwrap().id), "{cases:?}");
+            let one = find_open_incident_containing_alert_with(&db, "acme", "a1", cases).await;
+            assert!(want.contains(&one.unwrap().unwrap().id), "{cases:?}");
+            let many = HashMap::from([("a1".to_string(), cases)]);
+            let many = find_open_incidents_containing_alerts_with(&db, "acme", &many).await;
+            assert!(want.contains(&many.unwrap()["a1"].id), "{cases:?}");
+        }
     }
 
     #[tokio::test]
@@ -3123,13 +3197,6 @@ mod tests {
             assert!(!stmt.sql.contains("@>"), "{}", stmt.sql);
             assert!(!stmt.sql.contains("<@"), "{}", stmt.sql);
             assert_eq!(stmt.values.unwrap().0, ["acme".into(), "resolved".into()]);
-
-            let ops = correlation_candidates_query("acme", CaseFilter::NoCases).build(backend);
-            assert!(ops.sql.contains(r#""security_case" = "#), "{}", ops.sql);
-            assert_eq!(
-                ops.values.unwrap().0,
-                ["acme".into(), "resolved".into(), false.into()]
-            );
         }
     }
 

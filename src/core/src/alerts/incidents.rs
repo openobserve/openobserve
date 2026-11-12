@@ -1852,7 +1852,7 @@ pub async fn try_auto_resolve_incident_for_external_alert(
     let Some(incident) = infra::table::alert_incidents::find_open_incident_containing_alert(
         org_id,
         external_alert_id,
-        infra::table::alert_incidents::CaseFilter::All,
+        infra::table::alert_incidents::CaseFilter::NoCases,
     )
     .await?
     else {
@@ -2756,7 +2756,7 @@ async fn select_correlation_candidate<C: sea_orm::ConnectionTrait>(
         else {
             continue;
         };
-        // The projection may predate a manual attach that made this row a case.
+        // The candidate list can be older than the row's case marker.
         if incident.status != "resolved"
             && !incident.security_case
             && candidate_can_join(&incident.group_values, incoming)
@@ -2765,6 +2765,22 @@ async fn select_correlation_candidate<C: sea_orm::ConnectionTrait>(
         }
     }
     Ok(None)
+}
+
+/// The open ops incident an ops firing on `incoming` joins by its dimensions.
+async fn select_ops_incident<C: sea_orm::ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    incoming: &HashMap<String, String>,
+) -> Result<Option<infra::table::entity::alert_incidents::Model>, infra::errors::Error> {
+    // Joining would re-key a case to ops dimensions, and its detection could no longer find it.
+    let candidates = infra::table::alert_incidents::find_correlation_candidates_with(
+        client,
+        org_id,
+        infra::table::alert_incidents::CaseFilter::NoCases,
+    )
+    .await?;
+    select_correlation_candidate(client, org_id, incoming, candidates).await
 }
 
 /// What joining the open incident an alert id matched did.
@@ -2865,7 +2881,7 @@ async fn resolve_firing(
         done.unpublished = true;
     }
 
-    if fired_by_detection(org_id, incident_id).await? {
+    if is_security_case(org_id, incident_id).await? {
         return Ok(done);
     }
 
@@ -2879,10 +2895,10 @@ async fn resolve_firing(
     Ok(done)
 }
 
-/// A detection's incident is an analyst's to close, even one opened before cases were marked.
-async fn fired_by_detection(org_id: &str, incident_id: &str) -> Result<bool, anyhow::Error> {
-    let links = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
-    Ok(db::alerts::alert::any_siem_alert(org_id, links.iter().map(|l| l.alert_id.as_str())).await)
+/// A case is an analyst's to close; the marker decides, since an alert can change kind later.
+async fn is_security_case(org_id: &str, incident_id: &str) -> Result<bool, anyhow::Error> {
+    let marked = infra::table::alert_incidents::security_case_of(org_id, incident_id).await?;
+    Ok(marked.unwrap_or(false))
 }
 
 /// Resolves a recovered incident and runs its follow-up steps; `repair` re-runs them if resolved.
@@ -3354,22 +3370,6 @@ fn finding_lock_key(org_id: &str, subject_id: &str) -> String {
     format!("/autoobserve/finding/{org_id}/{subject_id}")
 }
 
-/// The open ops incident an ops firing on `incoming` joins by its dimensions.
-async fn select_ops_incident<C: sea_orm::ConnectionTrait>(
-    client: &C,
-    org_id: &str,
-    incoming: &HashMap<String, String>,
-) -> Result<Option<infra::table::entity::alert_incidents::Model>, infra::errors::Error> {
-    // Joining would re-key a case to ops dimensions, and its detection could no longer find it.
-    let candidates = infra::table::alert_incidents::find_correlation_candidates_with(
-        client,
-        org_id,
-        infra::table::alert_incidents::CaseFilter::NoCases,
-    )
-    .await?;
-    select_correlation_candidate(client, org_id, incoming, candidates).await
-}
-
 /// A muted firing never sends, and an acknowledged incident already has a person on it.
 fn reopen_can_send(
     incident: &infra::table::entity::alert_incidents::Model,
@@ -3410,11 +3410,7 @@ async fn find_or_create_incident(
         }
         (KeyType::AlertId, None) => {
             // An alert switched between SIEM and ops must not keep firing into the other kind.
-            let cases = if subject.security_case {
-                infra::table::alert_incidents::CaseFilter::OnlyCases
-            } else {
-                infra::table::alert_incidents::CaseFilter::NoCases
-            };
+            let cases = infra::table::alert_incidents::CaseFilter::of_kind(subject.security_case);
             infra::table::alert_incidents::find_open_incident_by_alert_id(
                 org_id,
                 &subject.id,
@@ -7739,45 +7735,17 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn an_incident_a_security_detection_fired_into_gets_its_link_resolved_and_stays_open()
-        {
+        async fn a_security_case_gets_its_link_resolved_and_stays_open() {
             let _db = store().await;
             let (org, pager) = (new_org(), Pager::default());
             let f = finding(&org, ONSET);
             let id = open(&f, &pager).await.unwrap();
-            let mut detection = config::meta::alerts::alert::Alert::default();
-            detection.org_id.clone_from(&org);
-            detection.context_attributes = Some(
-                [(
-                    config::meta::alerts::alert::SIEM_ATTRIBUTE.to_string(),
-                    "true".to_string(),
-                )]
-                .into_iter()
-                .collect(),
-            );
-            common::infra::config::ALERTS.write().await.insert(
-                db::alerts::alert::cache_alert_key(&org, "siem-detection"),
-                (Default::default(), detection),
-            );
-            infra::table::alert_incidents::add_alert_to_incident(
-                &id,
-                "siem-detection",
-                "brute force",
-                AlertKind::Internal.as_str(),
-                ONSET,
-                "alert_id",
-            )
-            .await
-            .unwrap();
-            infra::table::alert_incidents::resolve_alert_firings(&id, "siem-detection", BACK)
+            infra::table::alert_incidents::mark_security_case(&org, &id)
                 .await
                 .unwrap();
             let resolved = resolve_finding_firing(&org, &f.subject_id, ONSET, BACK).await;
-            assert!(
-                !resolved.unwrap(),
-                "a detection's incident is an analyst's to close"
-            );
-            assert_eq!(links_resolved_at(&id).await, [Some(BACK), Some(BACK)]);
+            assert!(!resolved.unwrap(), "a case is an analyst's to close");
+            assert_eq!(links_resolved_at(&id).await, [Some(BACK)]);
             assert_ne!(status(&org, &id).await, "resolved");
             assert!(!resolved_by_system(&org, &id).await);
         }
@@ -7855,6 +7823,8 @@ mod tests {
         }
     }
 
+    use infra::table::alert_incidents::{CaseFilter, find_correlation_candidates_with};
+
     use super::*;
 
     async fn correlation_db() -> sea_orm::DatabaseConnection {
@@ -7923,13 +7893,9 @@ mod tests {
             )
             .await
             .unwrap();
-            let candidates = infra::table::alert_incidents::find_correlation_candidates_with(
-                &db,
-                "default",
-                infra::table::alert_incidents::CaseFilter::All,
-            )
-            .await
-            .unwrap();
+            let candidates = find_correlation_candidates_with(&db, "default", CaseFilter::All)
+                .await
+                .unwrap();
             let found = select_correlation_candidate(&db, "default", &incoming, candidates)
                 .await
                 .unwrap();
@@ -7941,332 +7907,140 @@ mod tests {
         }
     }
 
-    /// An unresolved incident shaped as a firing with no dimensions writes it: AlertId, `{}`.
-    async fn store_alert_id_incident(
-        db: &sea_orm::DatabaseConnection,
-        id: &str,
-        created_at: i64,
-        security_case: bool,
-    ) -> infra::table::entity::alert_incidents::Model {
-        use infra::table::entity::alert_incidents;
-        use sea_orm::ActiveModelTrait;
-
-        let mut row = incident(None);
-        row.id = id.to_string();
-        row.created_at = created_at;
-        row.key_type = config::meta::alerts::incidents::KeyType::AlertId.to_string();
-        row.security_case = security_case;
-        let active: alert_incidents::ActiveModel = row.into();
-        active.reset_all().insert(db).await.unwrap()
-    }
-
-    fn node_exporter_dims() -> HashMap<String, String> {
-        [
-            ("k8s-cluster", "production"),
-            ("k8s-namespace", "openobserve-collector"),
-            ("service", "node-exporter"),
-        ]
-        .into_iter()
-        .map(|(k, v)| (k.to_string(), v.to_string()))
-        .collect()
-    }
-
-    // An ops firing that joined a no-entity detection case re-keyed it, so the detection lost it.
     #[tokio::test]
-    async fn an_ops_firing_never_joins_a_detection_case_with_no_entity() {
-        let db = correlation_db().await;
-        store_alert_id_incident(&db, "vpc-case", 2, true).await;
-
-        let found = select_ops_incident(&db, "default", &node_exporter_dims())
-            .await
-            .unwrap();
-        assert_eq!(found.map(|row| row.id), None);
-
-        store_correlation_incident(
-            &db,
-            "ops",
-            1,
-            serde_json::json!({"service": "node-exporter"}),
-        )
-        .await;
-        let found = select_ops_incident(&db, "default", &node_exporter_dims())
-            .await
-            .unwrap();
-        assert_eq!(found.map(|row| row.id).as_deref(), Some("ops"));
-    }
-
-    fn ops_subject(org: &str) -> CorrelationSubject<'static> {
-        CorrelationSubject {
-            id: "go-gc".to_string(),
-            name: "go_gc_rate_high".to_string(),
-            org_id: org.to_string(),
-            kind: config::meta::alerts::incidents::AlertKind::Internal,
-            base_destinations: vec![],
-            severity: None,
-            title_inputs: None,
-            case_title: None,
-            siem_case_window: None,
-            security_case: false,
-            historical: false,
-            case_activity: None,
-            case_entity: None,
-            incident_id: None,
-            fence: None,
-        }
-    }
-
-    async fn correlate_node_exporter_firing(org: &str) -> Correlation {
-        find_or_create_incident(
-            org,
-            &node_exporter_dims(),
-            config::meta::alerts::incidents::KeyType::Primary,
-            &ops_subject(org),
-            2,
-            "service_discovery",
-            "node-exporter",
-            None,
-            None,
-        )
-        .await
-        .unwrap()
-    }
-
-    #[tokio::test]
-    async fn an_ops_firing_opens_its_own_incident_beside_a_detection_case() {
-        use infra::table::alert_incidents::{
-            CaseActivity, add_firing_to_case, create_security_case, get_rw,
+    async fn a_firing_joins_acks_and_resolves_only_incidents_of_its_own_kind() {
+        use config::meta::alerts::{
+            alert::{Alert, SIEM_ATTRIBUTE},
+            incidents::KeyType,
         };
-
-        let _db = crate::alerts::rca_runs::tests::db().await;
-        let org = format!("ops_beside_case_{}", config::ider::uuid());
-        let activity = CaseActivity {
-            first_event_at: 1,
-            last_event_at: 1,
-            historical: false,
-        };
-        let case = create_security_case(
-            &org,
-            "P2",
-            serde_json::json!({}),
-            "AlertId",
-            activity,
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-        add_firing_to_case(
-            &case.id, "vpc-det", "vpc", "internal", 1, "alert_id", activity,
-        )
-        .await
-        .unwrap();
-
-        let correlation = correlate_node_exporter_firing(&org).await;
-
-        assert!(correlation.created);
-        assert_ne!(correlation.outcome.incident_id(), case.id);
-        let stored = get_rw(&org, &case.id).await.unwrap().unwrap();
-        assert_eq!(
-            (stored.group_values, stored.key_type),
-            (serde_json::json!({}), "AlertId".to_string())
-        );
-    }
-
-    #[tokio::test]
-    async fn an_ops_firing_still_upgrades_an_ops_incident_with_no_dimensions() {
-        use infra::table::alert_incidents::{add_alert_to_incident, create, get_rw};
-
-        let _db = crate::alerts::rca_runs::tests::db().await;
-        let org = format!("ops_upgrade_{}", config::ider::uuid());
-        let ops = create(&org, "P3", serde_json::json!({}), "AlertId", 1, None)
-            .await
-            .unwrap();
-        add_alert_to_incident(&ops.id, "gc-other", "gc", "internal", 1, "alert_id")
-            .await
-            .unwrap();
-
-        let correlation = correlate_node_exporter_firing(&org).await;
-
-        assert!(!correlation.created);
-        assert_eq!(correlation.outcome.incident_id(), ops.id);
-        let stored = get_rw(&org, &ops.id).await.unwrap().unwrap();
-        assert_eq!(
-            (stored.group_values, stored.key_type),
-            (
-                serde_json::to_value(node_exporter_dims()).unwrap(),
-                "Primary".to_string()
-            )
-        );
-    }
-
-    // An ops incident can carry a detection's entity keys, and marking it would turn it into a
-    // case.
-    #[tokio::test]
-    async fn a_detection_never_takes_an_ops_incident_on_its_entity() {
-        use infra::table::alert_incidents::{CaseActivity, create, get_rw};
-
-        const HOUR: i64 = 3_600_000_000;
-        let _db = crate::alerts::rca_runs::tests::db().await;
-        let org = format!("siem_skips_ops_{}", config::ider::uuid());
-        let entity: HashMap<String, String> =
-            [("security_host".to_string(), "web-1".to_string())].into();
-        let dims = serde_json::to_value(&entity).unwrap();
-        create(&org, "P3", dims, "Primary", HOUR, None)
-            .await
-            .unwrap();
-
-        let found = find_open_siem_case(&org, &entity, (HOUR, HOUR), HOUR)
-            .await
-            .unwrap();
-        assert_eq!(found.map(|row| row.id), None);
-
-        let detection = CorrelationSubject {
-            siem_case_window: Some(HOUR),
-            security_case: true,
-            case_activity: Some(CaseActivity {
-                first_event_at: HOUR,
-                last_event_at: HOUR,
-                historical: false,
-            }),
-            ..ops_subject(&org)
-        };
-        let correlation = find_or_create_incident(
-            &org,
-            &entity,
-            config::meta::alerts::incidents::KeyType::Primary,
-            &detection,
-            HOUR,
-            "entity",
-            "web-1",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-        assert!(correlation.created);
-        let case = get_rw(&org, correlation.outcome.incident_id())
-            .await
-            .unwrap()
-            .unwrap();
-        assert!(case.security_case);
-        let found = find_open_siem_case(&org, &entity, (HOUR, HOUR), HOUR)
-            .await
-            .unwrap();
-        assert_eq!(found.map(|row| row.id), Some(case.id));
-    }
-
-    // An alert switched from SIEM to ops while its case is open must stop firing into the case.
-    #[tokio::test]
-    async fn an_ops_alert_id_firing_never_joins_a_case_its_alert_fired_into() {
-        use infra::table::alert_incidents::{
-            CaseActivity, add_firing_to_case, create_security_case,
-        };
-
-        let _db = crate::alerts::rca_runs::tests::db().await;
-        let org = format!("ops_skips_case_{}", config::ider::uuid());
-        let activity = CaseActivity {
-            first_event_at: 1,
-            last_event_at: 1,
-            historical: false,
-        };
-        let case = create_security_case(
-            &org,
-            "P2",
-            serde_json::json!({}),
-            "AlertId",
-            activity,
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-        add_firing_to_case(
-            &case.id,
-            "go-gc",
-            "go_gc_rate_high",
-            "internal",
-            1,
-            "alert_id",
-            activity,
-        )
-        .await
-        .unwrap();
-
-        let correlation = find_or_create_incident(
-            &org,
-            &HashMap::new(),
-            config::meta::alerts::incidents::KeyType::AlertId,
-            &ops_subject(&org),
-            2,
-            "alert_id",
-            "go",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-        assert!(correlation.created);
-        assert_ne!(correlation.outcome.incident_id(), case.id);
-    }
-
-    // An alert switched from ops to SIEM must open a case, not mark its open ops incident.
-    #[tokio::test]
-    async fn a_detection_never_takes_an_ops_incident_its_alert_fired_into() {
         use infra::table::alert_incidents::{CaseActivity, add_alert_to_incident, create, get_rw};
+        use svix_ksuid::{Ksuid, KsuidLike};
 
         const HOUR: i64 = 3_600_000_000;
         let _db = crate::alerts::rca_runs::tests::db().await;
-        let org = format!("case_skips_ops_{}", config::ider::uuid());
-        let ops = create(&org, "P3", serde_json::json!({}), "AlertId", 1, None)
+        let service = HashMap::from([("service".to_string(), "node-exporter".to_string())]);
+        let host = HashMap::from([("security_host".to_string(), "web-1".to_string())]);
+        let none = HashMap::new();
+        // (existing is a case, firing is a detection, its case window, key type, dimensions);
+        // no key type sends the firing through the alert's own mapping to a subject.
+        for (case, detection, window, key_type, dims) in [
+            (true, false, None, Some(KeyType::Primary), &service),
+            (true, false, None, Some(KeyType::AlertId), &none),
+            (false, true, Some(HOUR), Some(KeyType::Primary), &host),
+            (false, true, Some(HOUR), Some(KeyType::AlertId), &none),
+            (false, true, None, Some(KeyType::AlertId), &none),
+            (false, true, None, None, &none),
+        ] {
+            let org = format!("kinds_{}", config::ider::uuid());
+            let mut alert = Alert::default();
+            alert.id = Some(Ksuid::new(None, None));
+            alert.org_id.clone_from(&org);
+            alert.name = "a1".to_string();
+            let id = alert.get_unique_key();
+            let stored = serde_json::to_value(if case { &none } else { dims }).unwrap();
+            let kind = if case {
+                KeyType::AlertId
+            } else {
+                key_type.unwrap_or(KeyType::AlertId)
+            };
+            let existing = create(&org, "P2", stored.clone(), &kind.to_string(), 1, None)
+                .await
+                .unwrap();
+            if case {
+                infra::table::alert_incidents::mark_security_case(&org, &existing.id)
+                    .await
+                    .unwrap();
+            }
+            add_alert_to_incident(&existing.id, &id, "a1", "internal", 1, "alert_id")
+                .await
+                .unwrap();
+            let key = db::alerts::alert::cache_alert_key(&org, &id);
+            let plant = |detection: bool| {
+                let mut alert = alert.clone();
+                alert.context_attributes =
+                    detection.then(|| [(SIEM_ATTRIBUTE.into(), "true".into())].into());
+                let entry = (key.clone(), (Default::default(), alert.clone()));
+                async move {
+                    let mut alerts = common::infra::config::ALERTS.write().await;
+                    alerts.extend([entry]);
+                    alert
+                }
+            };
+            let alert = plant(detection).await;
+            let row = (case, detection, window, key_type);
+
+            let joined = if let Some(key_type) = key_type {
+                let subject = CorrelationSubject {
+                    id: id.clone(),
+                    name: "a1".to_string(),
+                    org_id: org.clone(),
+                    kind: config::meta::alerts::incidents::AlertKind::Internal,
+                    base_destinations: vec![],
+                    severity: None,
+                    title_inputs: None,
+                    case_title: None,
+                    siem_case_window: window,
+                    security_case: detection,
+                    historical: false,
+                    case_activity: detection.then_some(CaseActivity {
+                        first_event_at: 2,
+                        last_event_at: 2,
+                        historical: false,
+                    }),
+                    case_entity: None,
+                    incident_id: None,
+                    fence: None,
+                };
+                find_or_create_incident(&org, dims, key_type, &subject, 2, "t", "s", None, None)
+                    .await
+                    .unwrap()
+                    .outcome
+                    .incident_id()
+                    .to_string()
+            } else {
+                let fired = serde_json::Map::from_iter([("_timestamp".to_string(), 2.into())]);
+                let rows = std::slice::from_ref(&fired);
+                correlate_alert_to_incident(&alert, &fired, rows, 2, None, None, None, None)
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .outcome
+                    .incident_id()
+                    .to_string()
+            };
+
+            assert_ne!(joined, existing.id, "{row:?}");
+            let joined_row = get_rw(&org, &joined).await.unwrap().unwrap();
+            assert_eq!(joined_row.security_case, detection, "{row:?}");
+            let acked = crate::alerts::ack::firing_incident(&org, &id).await;
+            assert_eq!(acked.as_deref(), Some(joined.as_str()), "{row:?}");
+            plant(!detection).await;
+            let acked = crate::alerts::ack::firing_incident(&org, &id).await;
+            assert_eq!(acked.as_deref(), Some(existing.id.as_str()), "{row:?}");
+            plant(detection).await;
+            resolve_firing(
+                &org,
+                &existing.id,
+                &id,
+                3,
+                false,
+                None,
+                &ClusterIncidentTurns,
+            )
             .await
             .unwrap();
-        add_alert_to_incident(
-            &ops.id,
-            "go-gc",
-            "go_gc_rate_high",
-            "internal",
-            1,
-            "alert_id",
-        )
-        .await
-        .unwrap();
-
-        let found = find_open_detection_case(&org, "go-gc", (1, 1), HOUR)
-            .await
-            .unwrap();
-        assert_eq!(found.map(|row| row.id), None);
-
-        let detection = CorrelationSubject {
-            security_case: true,
-            case_activity: Some(CaseActivity {
-                first_event_at: 2,
-                last_event_at: 2,
-                historical: false,
-            }),
-            ..ops_subject(&org)
-        };
-        let correlation = find_or_create_incident(
-            &org,
-            &HashMap::new(),
-            config::meta::alerts::incidents::KeyType::AlertId,
-            &detection,
-            2,
-            "alert_id",
-            "go",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-        assert!(correlation.created);
-        assert_ne!(correlation.outcome.incident_id(), ops.id);
-        let case = get_rw(&org, correlation.outcome.incident_id())
-            .await
-            .unwrap()
-            .unwrap();
-        assert!(case.security_case);
+            common::infra::config::ALERTS.write().await.remove(&key);
+            let after = get_rw(&org, &existing.id).await.unwrap().unwrap();
+            assert_eq!(
+                (
+                    after.group_values,
+                    after.security_case,
+                    after.status == "resolved"
+                ),
+                (stored, case, !case),
+                "{row:?}"
+            );
+        }
     }
 
     #[tokio::test]
@@ -8278,12 +8052,14 @@ mod tests {
         let incoming = serde_json::from_value(same.clone()).unwrap();
         let changes = [
             None,
-            Some(("default", "resolved", same.clone())),
-            Some(("other", "open", same.clone())),
-            Some(("default", "open", serde_json::json!({"ns": "dev"}))),
+            Some(("default", "resolved", false, same.clone())),
+            Some(("other", "open", false, same.clone())),
+            Some(("default", "open", true, same.clone())),
+            Some(("default", "open", false, serde_json::json!({"ns": "dev"}))),
             Some((
                 "default",
                 "open",
+                false,
                 serde_json::json!({"ns": "prod", "db": "redis"}),
             )),
         ];
@@ -8291,17 +8067,14 @@ mod tests {
             let db = correlation_db().await;
             store_correlation_incident(&db, "older", 1, same.clone()).await;
             let newest = store_correlation_incident(&db, "newest", 2, same.clone()).await;
-            let candidates = infra::table::alert_incidents::find_correlation_candidates_with(
-                &db,
-                "default",
-                infra::table::alert_incidents::CaseFilter::All,
-            )
-            .await
-            .unwrap();
-            if let Some((org, status, dimensions)) = change {
+            let candidates = find_correlation_candidates_with(&db, "default", CaseFilter::All)
+                .await
+                .unwrap();
+            if let Some((org, status, case, dimensions)) = change {
                 let mut active: alert_incidents::ActiveModel = newest.into();
                 active.org_id = Set(org.to_string());
                 active.status = Set(status.to_string());
+                active.security_case = Set(case);
                 active.group_values = Set(dimensions);
                 active.update(&db).await.unwrap();
             } else {
@@ -8319,37 +8092,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_ops_firing_skips_a_candidate_marked_a_case_after_its_projection() {
-        use infra::table::entity::alert_incidents;
-        use sea_orm::{ActiveModelTrait, Set};
-
-        let db = correlation_db().await;
-        let row = store_correlation_incident(
-            &db,
-            "promoted",
-            1,
-            serde_json::json!({"service": "node-exporter"}),
-        )
-        .await;
-        let candidates = infra::table::alert_incidents::find_correlation_candidates_with(
-            &db,
-            "default",
-            infra::table::alert_incidents::CaseFilter::NoCases,
-        )
-        .await
-        .unwrap();
-        assert_eq!(candidates.len(), 1);
-        let mut active: alert_incidents::ActiveModel = row.into();
-        active.security_case = Set(true);
-        active.update(&db).await.unwrap();
-
-        let found = select_correlation_candidate(&db, "default", &node_exporter_dims(), candidates)
-            .await
-            .unwrap();
-        assert_eq!(found.map(|row| row.id), None);
-    }
-
-    #[tokio::test]
     async fn correlation_selection_returns_current_compatible_dimensions() {
         use infra::table::entity::alert_incidents;
         use sea_orm::{ActiveModelTrait, Set};
@@ -8358,13 +8100,9 @@ mod tests {
         let original = serde_json::json!({"ns": "prod", "cluster": "a", "pod": "p1"});
         let current = serde_json::json!({"ns": "prod"});
         let row = store_correlation_incident(&db, "newest", 1, original).await;
-        let candidates = infra::table::alert_incidents::find_correlation_candidates_with(
-            &db,
-            "default",
-            infra::table::alert_incidents::CaseFilter::All,
-        )
-        .await
-        .unwrap();
+        let candidates = find_correlation_candidates_with(&db, "default", CaseFilter::All)
+            .await
+            .unwrap();
         let mut active: alert_incidents::ActiveModel = row.into();
         active.group_values = Set(current.clone());
         active.update(&db).await.unwrap();
@@ -9654,7 +9392,6 @@ mod tests {
     #[tokio::test]
     async fn an_incident_alert_with_no_destination_and_no_service_still_opens_an_incident() {
         use config::meta::alerts::{QueryCondition, QueryType};
-        use infra::table::alert_incidents::CaseFilter;
         use svix_ksuid::{Ksuid, KsuidLike};
 
         use crate::alerts::rca_runs::tests::db;
@@ -9699,7 +9436,6 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn rows_past_the_entity_cap_never_file_under_an_overflow_host() {
-        use infra::table::alert_incidents::CaseFilter;
         use o2_enterprise::enterprise::security::cases::MAX_ENTITY_PARTITIONS;
         use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -9756,7 +9492,6 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_backfill_keeps_old_evidence_out_of_the_current_case() {
-        use infra::table::alert_incidents::CaseFilter;
         use svix_ksuid::{Ksuid, KsuidLike};
 
         use crate::alerts::rca_runs::tests::db;

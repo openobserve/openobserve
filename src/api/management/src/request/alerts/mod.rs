@@ -3890,11 +3890,13 @@ async fn enrich_with_incidents(
         })
         .collect();
     let episodes: Vec<String> = firing.iter().filter_map(|(_, e)| e.clone()).collect();
-    let unlinked: Vec<String> = firing
-        .iter()
-        .filter(|(_, e)| e.is_none())
-        .map(|(id, _)| id.clone())
-        .collect();
+    // A converted alert keeps its old incident open beside one of its current kind.
+    let mut unlinked = StdHashMap::new();
+    for (id, _) in firing.iter().filter(|(_, e)| e.is_none()) {
+        let detection = db::alerts::alert::any_siem_alert(org_id, [id.as_str()]).await;
+        let cases = infra::table::alert_incidents::CaseFilter::of_kind(detection);
+        unlinked.insert(id.clone(), cases);
+    }
     let by_episode = infra::table::alert_incidents::get_many(org_id, &episodes).await?;
     let by_alert =
         infra::table::alert_incidents::find_open_incidents_containing_alerts(org_id, &unlinked)
