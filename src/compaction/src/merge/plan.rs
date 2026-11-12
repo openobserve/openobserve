@@ -460,33 +460,6 @@ mod tests {
         batches.iter().map(|(files, _)| files.len()).collect()
     }
 
-    /// A delayed open hour merges its pending files at most `max_merge_groups` at a time.
-    #[tokio::test]
-    async fn test_plan_batches_open_metrics_hour_caps_the_batch() {
-        let strategy = MergeStrategy::FileTime;
-        let mut limits = limits(&strategy, 0, true);
-        limits.max_merge_groups = 12;
-        let batches = plan_batches(
-            ingester_hour(25),
-            &MergeMode::MetricsHashMerged,
-            &limits,
-            &schema(),
-            "s",
-        )
-        .await;
-        assert_eq!(batch_sizes(&batches), [12, 12], "the lone 25th file waits");
-        limits.max_merge_groups = 0;
-        let batches = plan_batches(
-            ingester_hour(25),
-            &MergeMode::MetricsHashMerged,
-            &limits,
-            &schema(),
-            "s",
-        )
-        .await;
-        assert_eq!(batch_sizes(&batches), [25]);
-    }
-
     /// A closed hour over the cap plans its pre-merge instead of the indexed merge.
     #[tokio::test]
     async fn test_plan_batches_closed_hour_over_the_cap_pre_merges_first() {

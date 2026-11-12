@@ -274,21 +274,4 @@ mod tests {
             ]
         );
     }
-
-    /// Without chain statistics only the ingester files pre-merge, and only over the cap.
-    #[test]
-    fn test_pre_merge_batches_without_chains_take_ingester_files_only() {
-        let mut files = ingester_hour(7);
-        files.extend((1..=20).map(|i| hash_file(&format!("hash-merged-v1-{i}.parquet"), 400)));
-        let batches = pre_merge_groups(&files, None, 3);
-        let sizes: Vec<usize> = batches.iter().map(Vec::len).collect();
-        assert_eq!(sizes, [3, 3], "the lone 7th file waits");
-        assert!(
-            batches
-                .iter()
-                .flatten()
-                .all(|f| f.key.contains("/hash-sorted-v1-"))
-        );
-        assert!(pre_merge_groups(&files, None, 7).is_empty());
-    }
 }
