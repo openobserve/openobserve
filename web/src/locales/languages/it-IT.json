@@ -2149,7 +2149,27 @@
       "view": "Vista",
       "frustration": "Frustrazione",
       "failedRequest": "Richieste non riuscite",
-      "noResponse": "Nessuna risposta"
+      "noResponse": "Nessuna risposta",
+      "noResponseStatus": "0 — Nessuna risposta",
+      "failedRequestDetails": "Dettagli della richiesta non riuscita",
+      "browserStatus": "Stato del browser",
+      "serverStatus": "Stato del server",
+      "noServerSpanFound": "Nessuno span server trovato",
+      "noServerSpanHint": "Uno span mancante può anche significare campionamento, ritardo nell'ingestione, una route non strumentata o conservazione.",
+      "unknownNoTrace": "Sconosciuto (nessuna traccia)",
+      "unknown": "Sconosciuto",
+      "abortedByApp": "interrotta dall'app",
+      "method": "Metodo",
+      "url": "URL",
+      "duration": "Durata",
+      "timing": "Tempi",
+      "timingDns": "DNS",
+      "timingConnect": "Connessione",
+      "timingSsl": "SSL",
+      "timingFirstByte": "Primo byte",
+      "timingDownload": "Download",
+      "size": "Dimensione",
+      "initiatedBy": "Avviata da"
     },
     "replayCanvasNotRecorded": "Contenuto del canvas non registrato",
     "actionOnTarget": "{action} su \"{target}\"",
@@ -2258,7 +2278,8 @@
       "showElements": "Mostra elementi",
       "markerLabel": "Posizione {rank}, {name}, {count} clic | Posizione {rank}, {name}, {count} clic",
       "markerLabelFrustrated": "Posizione {rank}, {name}, {count} clic, {frustrated} frustrati | Posizione {rank}, {name}, {count} clic, {frustrated} frustrati",
-      "markerClicks": "{count} clic | {count} clic"
+      "markerClicks": "{count} clic | {count} clic",
+      "noReplayLegacySdk": "Le istantanee della pagina richiedono un RUM SDK più recente. Il session replay registrato qui proviene da un SDK precedente, quindi non c'è alcuno screenshot su cui disegnare."
     },
     "analytics": {
       "title": "Analisi di prodotto",
@@ -6233,7 +6254,14 @@
       "askAiRejected": "le richieste vengono rifiutate con {status} {reason} su {path}.",
       "askAiNoRequests": "non è arrivato nulla e nessuna richiesta è stata rifiutata.",
       "askAiUnavailable": "non è stato possibile leggere le richieste rifiutate, quindi la causa non è nota.",
-      "thisGuide": "un'origine dati"
+      "thisGuide": "un'origine dati",
+      "hintWaitingAfter": "Diventa verde da solo quando arriva il primo record. Se non arriva nulla entro {elapsed}, mostra cosa è andato storto; Risoluzione dei problemi controlla ora.",
+      "idleInPrompt": "{stream} riceve già dati. I controlli iniziano quando copi il prompt.",
+      "idleMatchesPrompt": "Gli stream corrispondenti ricevono già dati. I controlli iniziano quando copi il prompt.",
+      "idleNewPrompt": "I controlli iniziano quando copi il prompt.",
+      "fixInvalidCredentialsPrompt": "Il token nel tuo .env non corrisponde al token dell'organizzazione {token}. Scarica di nuovo il file .env e chiedi al tuo agente di programmazione di eseguire nuovamente la richiesta.",
+      "fixInvalidCredentialsPromptUnnamed": "Il token nel tuo .env non corrisponde al token corrente di questa organizzazione. Scarica di nuovo il file .env e chiedi al tuo agente di programmazione di eseguire nuovamente la richiesta.",
+      "copyPrompt": "Copia prompt"
     },
     "firstDataNotice": {
       "pill": "I tuoi primi dati sono arrivati",
@@ -6385,7 +6413,18 @@
         "envButton": "Scarica .env",
         "promptTitle": "Incolla questo in {client1}, {client2} o {client3}",
         "promptLabel": "Prompt",
-        "promptCopied": "Prompt copiato"
+        "promptCopied": "Prompt copiato",
+        "health": {
+          "title": "Stato dei dati AI",
+          "scopeAgent": "Span dall'agente {agent} in {stream} dall'inizio del controllo",
+          "scopeStream": "Span in {stream} dall'inizio del controllo",
+          "checking": "Verifica dello stato dei dati AI…",
+          "checkAgain": "Controlla di nuovo",
+          "checkAgainHint": "Dopo che il tuo agente di programmazione modifica il codice ed esegue un'altra richiesta, controlla di nuovo.",
+          "unsupported": "Questa versione di OpenObserve non controlla lo stato dei dati AI. Il tuo primo span è arrivato, quindi il tracciamento funziona.",
+          "error": "Impossibile eseguire i controlli dello stato dei dati AI. Il tuo primo span è arrivato, quindi il tracciamento funziona.",
+          "noGenAiSpans": "Sono arrivati degli span, ma nessuno è una chiamata LLM, quindi il client LLM non è strumentato. Chiedi al tuo agente di programmazione di strumentare il client LLM ed eseguire una richiesta, poi controlla di nuovo."
+        }
       }
     },
     "header": "Origini dei dati",
@@ -9964,7 +10003,28 @@
     "secondsAgo": "{count} s fa",
     "minutesAgo": "{count} min fa",
     "hoursAgo": "{count} h fa",
-    "daysAgo": "{count} g fa"
+    "daysAgo": "{count} g fa",
+    "cards": {},
+    "state": {},
+    "time": {},
+    "level": {},
+    "sections": {},
+    "alerts": {},
+    "dataHealth": {
+      "status": {}
+    },
+    "streams": {},
+    "signals": {
+      "openAria": {}
+    },
+    "storage": {},
+    "limit": {},
+    "empty": {},
+    "stale": {},
+    "status": {
+      "items": {}
+    },
+    "timeRange": {}
   },
   "chatHistory": {
     "title": "Chat",
@@ -12238,7 +12298,13 @@
       "suppressRepeats": "Sopprimi ripetizioni",
       "suppressRepeatsTooltip": "Notifica una volta quando l'avviso inizia a essere attivo o cambia livello, non a ogni valutazione. Lascialo disattivato per continuare a ricevere promemoria dopo ogni periodo di silenzio.",
       "keepFiringForInvalid": "Inserisci 0 o più secondi",
-      "keepFiringForTooLong": "Inserisci al massimo 86400 secondi (24 ore)"
+      "keepFiringForTooLong": "Inserisci al massimo 86400 secondi (24 ore)",
+      "helpApplyToObject": "Usa questo template",
+      "helpTemplateExplainObject": "Un template è il messaggio che viene inviato: il testo più le variabili. Selezionarne uno qui sostituisce il template di ogni destinazione, solo per questa configurazione.",
+      "helpTemplateWhenDescObject": "Lascia vuoto questo campo e ogni destinazione usa il proprio template, se si applica a questo tipo, poi il messaggio predefinito. Imposta un override per inviare un unico messaggio a ogni destinazione compatibile.",
+      "helpCurrentHeadingObject": "Cosa viene inviato ora",
+      "helpCurrentOverrideSome": "Le destinazioni compatibili usano questo template:",
+      "helpCurrentResolved": "Nessun override impostato. Ogni destinazione usa:"
     },
     "advanced": {
       "addVariable": "Aggiungi variabile",
@@ -13432,7 +13498,8 @@
             "ended": "Terminato",
             "cancelled": "Annullato",
             "extended": "Esteso"
-          }
+          },
+          "template": "Template"
         },
         "test": {
           "send": "Invia test",
@@ -13502,7 +13569,43 @@
       "firingFor": "attivo per {duration}",
       "incident": "Incidente"
     },
-    "priorityUnsetPagesAs": "Non impostata (avvisa come P2)"
+    "priorityUnsetPagesAs": "Non impostata (avvisa come P2)",
+    "notificationKinds": {
+      "alert": "Avviso",
+      "incident": "Incidente",
+      "anomaly": "Anomalia",
+      "synthetics": "Synthetics",
+      "downtime": "Downtime",
+      "on_call": "Reperibilità"
+    },
+    "templateOverride": {
+      "label": "Override del template",
+      "placeholder": "Usa il template della destinazione",
+      "help": "Sostituisce il template della destinazione per i messaggi di tipo {kind}. Non è possibile scegliere template predefiniti; copiarne prima uno.",
+      "empty": "Nessun template si applica ancora a {kind}.",
+      "create": "Crea template",
+      "loadFailed": "Impossibile caricare i template",
+      "forbidden": "Per elencare i template serve l'autorizzazione di lettura dei template",
+      "mismatch": "Non si adatta a {count} delle tue destinazioni ({names}); queste useranno il proprio template.",
+      "groupContent": "Contenuto",
+      "groupCustom": "Personalizzato",
+      "webhookOnly": "(solo webhook)",
+      "emailOnly": "(solo email)",
+      "snsOnly": "(solo SNS)",
+      "stale": "Il template {name} non esiste più. Scegline un altro o svuota il campo.",
+      "willUse": "Verrà usato: {template}",
+      "willUsePerDestination": "Verrà usato, per destinazione:",
+      "willUseRow": "{destination}: {template}",
+      "templateWithSource": "{name} ({source})",
+      "builtIn": "Messaggio predefinito di tipo {kind}",
+      "sourceExplicit": "questa sovrascrittura",
+      "sourceDestination": "template della destinazione",
+      "sourceOrgDefault": "predefinito dell'organizzazione",
+      "sourceCompiled": "predefinito",
+      "sourcePlatformResolve": "risoluzione della piattaforma",
+      "sourceLegacy": "payload legacy",
+      "sourceLegacyPayload": "il payload JSON proprio del tipo (webhook generico)"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Apri",
@@ -13822,7 +13925,26 @@
     "testSendConfirm": "Questo invierà un vero messaggio al canale selezionato, contrassegnato [TEST].",
     "testSendSuccess": "Messaggio di test inviato",
     "testSendRateLimited": "Troppi invii di test — attendi un momento e riprova.",
-    "testSendNoDestination": "Seleziona prima una destinazione"
+    "testSendNoDestination": "Seleziona prima una destinazione",
+    "playgroundLabel": "Playground",
+    "playgroundHelp": "Qui non viene inviato nulla.",
+    "emptyVariables": "Vuoti per {kind}: {names}",
+    "appliesTo": "Si applica a",
+    "appliesToAll": "Tutti i tipi",
+    "appliesToAny": "Qualsiasi tipo",
+    "allKindsNotice": "Template che si applicano a ogni tipo: {count}. Le relative destinazioni li usano anche per messaggi di anomalia, Synthetics, reperibilità, downtime e incidente. Rivedili.",
+    "allKindsNoticeReview": "Rivedi",
+    "appliesToInferred": "Dedotto dalle variabili nel corpo",
+    "appliesToManual": "Scelto da te",
+    "appliesToReset": "Ripristina al valore dedotto",
+    "previewKind": "Tipo",
+    "previewForbidden": "Non hai l'autorizzazione per visualizzare l'anteprima dei template",
+    "previewFailed": "Anteprima non riuscita: {message}",
+    "severityFailed": "Non riuscito",
+    "severityDegraded": "Degradato",
+    "severityFlaky": "Instabile",
+    "severityRecovered": "Ripristinato",
+    "variableGroupCommon": "Comuni"
   },
   "alert_sources": {
     "header": "Sorgenti di avvisi esterne",
@@ -14078,7 +14200,12 @@
     "severityErrorDescription": "Incidenti di errore standard",
     "severityWarningDescription": "Incidenti di livello di avviso",
     "severityInfoDescription": "Incidenti informativi",
-    "urlRecipientsChannel": "URL / destinatari / canale"
+    "urlRecipientsChannel": "URL / destinatari / canale",
+    "payloadFormat": "Formato payload",
+    "payloadFormatAuto": "Automatico",
+    "payloadFormatLegacy": "JSON legacy",
+    "payloadFormatRendered": "Template renderizzato",
+    "payloadFormatHelp": "Automatico invia il vecchio corpo JSON per i messaggi di anomalia, Synthetics e reperibilità finché non viene associato un template. Memorizzato come chiave di metadati payload_format."
   },
   "pipeline_destinations": {
     "header": "Destinazioni pipeline",
@@ -27324,7 +27451,9 @@
     "claimSignalsFailedPaths": "Impossibile assegnare {paths}",
     "claimSignalsMorePaths": "{paths} e altri {count}",
     "toastSignalsClaimedPartly": "{claimed} di {count} segnale ora va a {team}; impossibile assegnare {paths} | {claimed} di {count} segnali ora vanno a {team}; impossibile assegnare {paths}",
-    "scopeNotSeenYet": "Non ancora visto nei tuoi dati"
+    "scopeNotSeenYet": "Non ancora visto nei tuoi dati",
+    "deliveryTemplate": "Template: {templates}",
+    "policyMailBanner": "Le destinazioni Email e SNS ricevono notifiche da questa versione: {names}."
   },
   "paidUsage": {
     "consentTitle": "Attivare l'utilizzo a pagamento dell'IA?",

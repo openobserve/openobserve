@@ -2149,7 +2149,27 @@
       "view": "Vue",
       "frustration": "Frustration",
       "failedRequest": "Requêtes échouées",
-      "noResponse": "Aucune réponse"
+      "noResponse": "Aucune réponse",
+      "noResponseStatus": "0 — Aucune réponse",
+      "failedRequestDetails": "Détails de la requête échouée",
+      "browserStatus": "Statut du navigateur",
+      "serverStatus": "Statut du serveur",
+      "noServerSpanFound": "Aucun span serveur trouvé",
+      "noServerSpanHint": "Un span manquant peut aussi signifier de l'échantillonnage, un retard d'ingestion, une route non instrumentée ou de la rétention.",
+      "unknownNoTrace": "Inconnu (aucune trace)",
+      "unknown": "Inconnu",
+      "abortedByApp": "interrompu par l'application",
+      "method": "Méthode",
+      "url": "URL",
+      "duration": "Durée",
+      "timing": "Chronométrage",
+      "timingDns": "DNS",
+      "timingConnect": "Connexion",
+      "timingSsl": "SSL",
+      "timingFirstByte": "Premier octet",
+      "timingDownload": "Téléchargement",
+      "size": "Taille",
+      "initiatedBy": "Initié par"
     },
     "replayCanvasNotRecorded": "Contenu du canvas non enregistré",
     "actionOnTarget": "{action} sur « {target} »",
@@ -2258,7 +2278,8 @@
       "showElements": "Afficher les éléments",
       "markerLabel": "Rang {rank}, {name}, {count} clic | Rang {rank}, {name}, {count} clics",
       "markerLabelFrustrated": "Rang {rank}, {name}, {count} clic, {frustrated} frustrés | Rang {rank}, {name}, {count} clics, {frustrated} frustrés",
-      "markerClicks": "{count} clic | {count} clics"
+      "markerClicks": "{count} clic | {count} clics",
+      "noReplayLegacySdk": "Les instantanés de page nécessitent un SDK RUM plus récent. La relecture de session enregistrée ici provient d'un SDK plus ancien, il n'y a donc pas de capture d'écran sur laquelle dessiner."
     },
     "analytics": {
       "title": "Analytique produit",
@@ -6233,7 +6254,14 @@
       "askAiRejected": "les requêtes sont refusées avec {status} {reason} sur {path}.",
       "askAiNoRequests": "rien n'est arrivé et aucune requête n'a été refusée.",
       "askAiUnavailable": "les requêtes rejetées n'ont pas pu être lues, aucune cause n'est donc connue.",
-      "thisGuide": "une source de données"
+      "thisGuide": "une source de données",
+      "hintWaitingAfter": "Ceci passe au vert tout seul dès que le premier enregistrement arrive. Si rien n'arrive dans {elapsed}, il indique ce qui a échoué ; Dépanner vérifie maintenant.",
+      "idleInPrompt": "{stream} reçoit déjà des données. Les vérifications démarrent lorsque vous copiez le prompt.",
+      "idleMatchesPrompt": "Les flux correspondants reçoivent déjà des données. Les vérifications démarrent lorsque vous copiez le prompt.",
+      "idleNewPrompt": "Les vérifications démarrent lorsque vous copiez le prompt.",
+      "fixInvalidCredentialsPrompt": "Le token dans votre .env ne correspond pas au token d'organisation {token}. Téléchargez à nouveau le .env et demandez à votre agent de codage de relancer la requête.",
+      "fixInvalidCredentialsPromptUnnamed": "Le token dans votre .env ne correspond pas au token actuel de cette organisation. Téléchargez à nouveau le .env et demandez à votre agent de codage de relancer la requête.",
+      "copyPrompt": "Copier le prompt"
     },
     "firstDataNotice": {
       "pill": "Vos premières données sont arrivées",
@@ -6385,7 +6413,18 @@
         "envButton": "Télécharger .env",
         "promptTitle": "Collez ceci dans {client1}, {client2} ou {client3}",
         "promptLabel": "Invite",
-        "promptCopied": "Invite copiée"
+        "promptCopied": "Invite copiée",
+        "health": {
+          "title": "Santé des données IA",
+          "scopeAgent": "Spans de l'agent {agent} dans {stream} depuis le début de la vérification",
+          "scopeStream": "Spans dans {stream} depuis le début de la vérification",
+          "checking": "Vérification de la santé des données IA…",
+          "checkAgain": "Vérifier à nouveau",
+          "checkAgainHint": "Une fois que votre agent de codage a modifié le code et exécuté une autre requête, vérifiez à nouveau.",
+          "unsupported": "Cette version d'OpenObserve ne vérifie pas la santé des données IA. Votre premier span est arrivé, le traçage fonctionne donc.",
+          "error": "Les vérifications de la santé des données IA n'ont pas pu s'exécuter. Votre premier span est arrivé, le traçage fonctionne donc.",
+          "noGenAiSpans": "Des spans sont arrivés, mais aucun n'est un appel LLM : le client LLM n'est donc pas instrumenté. Demandez à votre agent de codage d'instrumenter le client LLM, d'exécuter une requête, puis vérifiez à nouveau."
+        }
       }
     },
     "header": "Sources de données",
@@ -9964,7 +10003,28 @@
     "secondsAgo": "il y a {count}s",
     "minutesAgo": "il y a {count}m",
     "hoursAgo": "il y a {count}h",
-    "daysAgo": "il y a {count}d"
+    "daysAgo": "il y a {count}d",
+    "cards": {},
+    "state": {},
+    "time": {},
+    "level": {},
+    "sections": {},
+    "alerts": {},
+    "dataHealth": {
+      "status": {}
+    },
+    "streams": {},
+    "signals": {
+      "openAria": {}
+    },
+    "storage": {},
+    "limit": {},
+    "empty": {},
+    "stale": {},
+    "status": {
+      "items": {}
+    },
+    "timeRange": {}
   },
   "chatHistory": {
     "title": "Discussions",
@@ -12238,7 +12298,13 @@
       "suppressRepeats": "Suppression des répétitions",
       "suppressRepeatsTooltip": "Notifier une seule fois lorsque l'alerte commence à se déclencher ou change de niveau, et non à chaque évaluation. Laissez cette option désactivée pour continuer à recevoir des rappels après chaque période de silence.",
       "keepFiringForInvalid": "Saisissez 0 seconde ou plus",
-      "keepFiringForTooLong": "Saisissez au maximum 86400 secondes (24 heures)"
+      "keepFiringForTooLong": "Saisissez au maximum 86400 secondes (24 heures)",
+      "helpApplyToObject": "Utiliser ce modèle",
+      "helpTemplateExplainObject": "Un modèle est le message qui est envoyé : le texte plus les variables. En choisir un ici remplace le modèle propre à chaque destination, pour cette configuration uniquement.",
+      "helpTemplateWhenDescObject": "Laissez ce champ vide et chaque destination utilise son propre modèle s'il s'applique à ce type, puis le message intégré. Définissez un remplacement pour envoyer un seul message à toutes les destinations compatibles.",
+      "helpCurrentHeadingObject": "Ce qui est envoyé actuellement",
+      "helpCurrentOverrideSome": "Les destinations compatibles utilisent ce modèle :",
+      "helpCurrentResolved": "Aucun remplacement défini. Chaque destination utilise :"
     },
     "advanced": {
       "addVariable": "Ajouter une variable",
@@ -13432,7 +13498,8 @@
             "ended": "Terminé",
             "cancelled": "Annulé",
             "extended": "Prolongé"
-          }
+          },
+          "template": "Modèle"
         },
         "test": {
           "send": "Envoyer un test",
@@ -13502,7 +13569,43 @@
       "firingFor": "déclenchée depuis {duration}",
       "incident": "Incident"
     },
-    "priorityUnsetPagesAs": "Non défini (alerte en P2)"
+    "priorityUnsetPagesAs": "Non défini (alerte en P2)",
+    "notificationKinds": {
+      "alert": "Alerte",
+      "incident": "Incident",
+      "anomaly": "Anomalie",
+      "synthetics": "Synthétiques",
+      "downtime": "Période de maintenance",
+      "on_call": "Astreinte"
+    },
+    "templateOverride": {
+      "label": "Remplacement du modèle",
+      "placeholder": "Utiliser le modèle de la destination",
+      "help": "Remplace le modèle de la destination pour les messages {kind}. Les modèles prédéfinis ne peuvent pas être choisis ; copiez-en un d'abord.",
+      "empty": "Aucun modèle ne s'applique encore à {kind}.",
+      "create": "Créer un modèle",
+      "loadFailed": "Impossible de charger les modèles",
+      "forbidden": "Lister les modèles nécessite la permission de lecture des modèles",
+      "mismatch": "Ne correspond pas à {count} de vos destinations ({names}) ; celles-ci reviennent à leur propre modèle.",
+      "groupContent": "Contenu",
+      "groupCustom": "Personnalisé",
+      "webhookOnly": "(webhook uniquement)",
+      "emailOnly": "(e-mail uniquement)",
+      "snsOnly": "(SNS uniquement)",
+      "stale": "Le modèle {name} n'existe plus. Choisissez-en un autre ou videz le champ.",
+      "willUse": "Utilisera : {template}",
+      "willUsePerDestination": "Utilisation, par destination :",
+      "willUseRow": "{destination} : {template}",
+      "templateWithSource": "{name} ({source})",
+      "builtIn": "Message {kind} intégré",
+      "sourceExplicit": "cette substitution",
+      "sourceDestination": "modèle de la destination",
+      "sourceOrgDefault": "valeur par défaut de l'organisation",
+      "sourceCompiled": "intégré",
+      "sourcePlatformResolve": "résolution par la plateforme",
+      "sourceLegacy": "charge utile héritée",
+      "sourceLegacyPayload": "la charge utile JSON propre au type (webhook générique)"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Ouvrir",
@@ -13822,7 +13925,26 @@
     "testSendConfirm": "Cela enverra un vrai message au canal sélectionné, marqué [TEST].",
     "testSendSuccess": "Message de test envoyé",
     "testSendRateLimited": "Trop d'envois de test — veuillez patienter un moment et réessayer",
-    "testSendNoDestination": "Sélectionnez d'abord une destination"
+    "testSendNoDestination": "Sélectionnez d'abord une destination",
+    "playgroundLabel": "Bac à sable",
+    "playgroundHelp": "Rien n'est envoyé ici.",
+    "emptyVariables": "Vides pour {kind} : {names}",
+    "appliesTo": "S'applique à",
+    "appliesToAll": "Tous les types",
+    "appliesToAny": "N'importe quel type",
+    "allKindsNotice": "Modèles s'appliquant à tous les types : {count}. Leurs destinations les utilisent aussi pour les messages d'anomalie, de synthétiques, d'astreinte, de période de maintenance et d'incident. Vérifiez-les.",
+    "allKindsNoticeReview": "Vérifier",
+    "appliesToInferred": "Déduit des variables du corps",
+    "appliesToManual": "Choisi par vous",
+    "appliesToReset": "Rétablir la déduction",
+    "previewKind": "Type",
+    "previewForbidden": "Vous n'avez pas la permission de prévisualiser les modèles",
+    "previewFailed": "Échec de l'aperçu : {message}",
+    "severityFailed": "Échec",
+    "severityDegraded": "Dégradé",
+    "severityFlaky": "Instable",
+    "severityRecovered": "Rétabli",
+    "variableGroupCommon": "Commun"
   },
   "alert_sources": {
     "header": "Sources d'alerte externes",
@@ -14078,7 +14200,12 @@
     "severityErrorDescription": "Incidents d'erreur standard",
     "severityWarningDescription": "Incidents de niveau d'avertissement",
     "severityInfoDescription": "Incidents informatifs",
-    "urlRecipientsChannel": "URL / destinataires / canal"
+    "urlRecipientsChannel": "URL / destinataires / canal",
+    "payloadFormat": "Format de la charge utile",
+    "payloadFormatAuto": "Automatique",
+    "payloadFormatLegacy": "JSON hérité",
+    "payloadFormatRendered": "Modèle rendu",
+    "payloadFormatHelp": "Automatique envoie l'ancien corps JSON pour les messages d'anomalie, de synthétiques et d'astreinte tant qu'aucun modèle n'est associé. Stocké sous la clé de métadonnées payload_format."
   },
   "pipeline_destinations": {
     "header": "Destinations des pipelines",
@@ -27324,7 +27451,9 @@
     "claimSignalsFailedPaths": "Impossible d'attribuer {paths}",
     "claimSignalsMorePaths": "{paths} et {count} de plus",
     "toastSignalsClaimedPartly": "{claimed} signal sur {count} est désormais envoyé à {team} ; impossible d'attribuer {paths} | {claimed} signaux sur {count} sont désormais envoyés à {team} ; impossible d'attribuer {paths}",
-    "scopeNotSeenYet": "Pas encore vu dans vos données"
+    "scopeNotSeenYet": "Pas encore vu dans vos données",
+    "deliveryTemplate": "Modèle : {templates}",
+    "policyMailBanner": "Les destinations e-mail et SNS reçoivent les notifications de cette version : {names}."
   },
   "paidUsage": {
     "consentTitle": "Activer l'utilisation payante de l'IA ?",

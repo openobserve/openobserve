@@ -397,6 +397,37 @@ describe("AnalyticsPaths", () => {
     expect(pathSqls()).toEqual([]);
   });
 
+  it.each([
+    ["30d", false],
+    ["1d", true],
+  ])("the no-entry-pages widen button at a %s range is present: %s", async (period, shown) => {
+    entryRows = [];
+    await mountPaths(() => {
+      useProductAnalytics().setScope({
+        datetime: { valueType: "relative", relativeTimePeriod: period, startTime: 0, endTime: 0 },
+      });
+    });
+    expect(wrapper!.find('[data-test="rum-analytics-paths-no-anchor"]').exists()).toBe(true);
+    expect(
+      wrapper!.find('[data-test="rum-analytics-paths-no-anchor-widen-range-btn"]').exists(),
+    ).toBe(shown);
+  });
+
+  it.each([
+    ["30d", false],
+    ["1d", true],
+  ])("the empty-flow widen button at a %s range is present: %s", async (period, shown) => {
+    pathRows = [];
+    await mountPaths(() => {
+      useProductAnalytics().setScope({
+        datetime: { valueType: "relative", relativeTimePeriod: period, startTime: 0, endTime: 0 },
+      });
+      useProductAnalytics().paths.value = COHORT_DEF();
+    });
+    expect(wrapper!.find('[data-test="rum-analytics-paths-empty"]').exists()).toBe(true);
+    expect(wrapper!.find('[data-test="rum-analytics-paths-widen-range-btn"]').exists()).toBe(shown);
+  });
+
   it("a cold tab anchors at the top entry page", async () => {
     await mountPaths();
     expect(useProductAnalytics().paths.value.anchor).toEqual({ kind: "p", key: "/web/login" });

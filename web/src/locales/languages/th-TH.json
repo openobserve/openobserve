@@ -2149,7 +2149,27 @@
       "view": "ดู",
       "frustration": "Frustration",
       "failedRequest": "คำขอที่ล้มเหลว",
-      "noResponse": "ไม่มีการตอบสนอง"
+      "noResponse": "ไม่มีการตอบสนอง",
+      "noResponseStatus": "0 — ไม่มีการตอบสนอง",
+      "failedRequestDetails": "รายละเอียดคำขอที่ล้มเหลว",
+      "browserStatus": "สถานะเบราว์เซอร์",
+      "serverStatus": "สถานะเซิร์ฟเวอร์",
+      "noServerSpanFound": "ไม่พบสแปนเซิร์ฟเวอร์",
+      "noServerSpanHint": "สแปนที่หายไปอาจหมายถึงการสุ่มตัวอย่าง ความล่าช้าในการนำเข้าข้อมูล เส้นทางที่ไม่ได้ติดตั้งเครื่องมือตรวจวัด หรือการเก็บรักษาข้อมูล",
+      "unknownNoTrace": "ไม่ทราบ (ไม่มีเทรซ)",
+      "unknown": "ไม่ทราบ",
+      "abortedByApp": "ถูกยกเลิกโดยแอป",
+      "method": "เมธอด",
+      "url": "URL",
+      "duration": "ระยะเวลา",
+      "timing": "การจับเวลา",
+      "timingDns": "DNS",
+      "timingConnect": "เชื่อมต่อ",
+      "timingSsl": "SSL",
+      "timingFirstByte": "ไบต์แรก",
+      "timingDownload": "ดาวน์โหลด",
+      "size": "ขนาด",
+      "initiatedBy": "เริ่มต้นโดย"
     },
     "replayCanvasNotRecorded": "ไม่ได้บันทึกเนื้อหา Canvas",
     "actionOnTarget": "{action} on \"{target}\"",
@@ -2258,7 +2278,8 @@
       "showElements": "แสดงองค์ประกอบ",
       "markerLabel": "อันดับ {rank}, {name}, {count} การคลิก | อันดับ {rank}, {name}, {count} การคลิก",
       "markerLabelFrustrated": "อันดับ {rank}, {name}, {count} การคลิก, หงุดหงิด {frustrated} ครั้ง | อันดับ {rank}, {name}, {count} การคลิก, หงุดหงิด {frustrated} ครั้ง",
-      "markerClicks": "{count} การคลิก | {count} การคลิก"
+      "markerClicks": "{count} การคลิก | {count} การคลิก",
+      "noReplayLegacySdk": "สแนปช็อตของหน้าต้องใช้ RUM SDK เวอร์ชันใหม่กว่า การเล่นเซสชันที่บันทึกไว้ที่นี่มาจาก SDK เวอร์ชันเก่า จึงไม่มีสกรีนช็อตให้แสดงผล"
     },
     "analytics": {
       "title": "Product analytics",
@@ -6233,7 +6254,14 @@
       "askAiRejected": "requests are refused with {status} {reason} on {path}.",
       "askAiNoRequests": "nothing has arrived and no request was refused.",
       "askAiUnavailable": "rejected requests could not be read, so no cause is known.",
-      "thisGuide": "a data source"
+      "thisGuide": "a data source",
+      "hintWaitingAfter": "สถานะนี้จะเปลี่ยนเป็นสีเขียวเองเมื่อมีข้อมูลแรกเข้ามา หากไม่มีข้อมูลเข้ามาภายใน {elapsed} ระบบจะแสดงว่าอะไรผิดพลาด; การแก้ไขปัญหาจะเริ่มตรวจสอบทันที",
+      "idleInPrompt": "{stream} ได้รับข้อมูลอยู่แล้ว การตรวจสอบจะเริ่มเมื่อคุณคัดลอกพรอมต์",
+      "idleMatchesPrompt": "สตรีมที่ตรงกันได้รับข้อมูลอยู่แล้ว การตรวจสอบจะเริ่มเมื่อคุณคัดลอกพรอมต์",
+      "idleNewPrompt": "การตรวจสอบจะเริ่มเมื่อคุณคัดลอกพรอมต์",
+      "fixInvalidCredentialsPrompt": "โทเค็นใน .env ของคุณไม่ตรงกับโทเค็นองค์กร {token} โปรดดาวน์โหลด .env อีกครั้ง และขอให้เอเจนต์เขียนโค้ดของคุณเรียกใช้คำขออีกครั้ง",
+      "fixInvalidCredentialsPromptUnnamed": "โทเค็นใน .env ของคุณไม่ตรงกับโทเค็นปัจจุบันขององค์กรนี้ โปรดดาวน์โหลด .env อีกครั้ง และขอให้เอเจนต์เขียนโค้ดของคุณเรียกใช้คำขออีกครั้ง",
+      "copyPrompt": "คัดลอกพรอมต์"
     },
     "firstDataNotice": {
       "pill": "Your first data arrived",
@@ -6385,7 +6413,18 @@
         "envButton": "ดาวน์โหลด .env",
         "promptTitle": "วางข้อความนี้ใน {client1}, {client2} หรือ {client3}",
         "promptLabel": "พรอมต์",
-        "promptCopied": "คัดลอกพรอมต์แล้ว"
+        "promptCopied": "คัดลอกพรอมต์แล้ว",
+        "health": {
+          "title": "สถานะสุขภาพข้อมูล AI",
+          "scopeAgent": "สแปนจากเอเจนต์ {agent} ใน {stream} ตั้งแต่เริ่มการตรวจสอบ",
+          "scopeStream": "สแปนใน {stream} ตั้งแต่เริ่มการตรวจสอบ",
+          "checking": "กำลังตรวจสอบสุขภาพข้อมูล AI…",
+          "checkAgain": "ตรวจสอบอีกครั้ง",
+          "checkAgainHint": "หลังจากเอเจนต์เขียนโค้ดของคุณแก้ไขโค้ดและเรียกใช้คำขออื่นแล้ว ให้ตรวจสอบอีกครั้ง",
+          "unsupported": "OpenObserve เวอร์ชันนี้ไม่ตรวจสอบสุขภาพข้อมูล AI สแปนแรกของคุณมาถึงแล้ว ดังนั้นการเทรซจึงทำงานได้",
+          "error": "ไม่สามารถดำเนินการตรวจสอบสุขภาพข้อมูล AI ได้ สแปนแรกของคุณมาถึงแล้ว ดังนั้นการเทรซจึงทำงานได้",
+          "noGenAiSpans": "มีสแปนเข้ามาแล้ว แต่ไม่มีสแปนใดเป็นการเรียก LLM ดังนั้นไคลเอนต์ LLM จึงยังไม่ได้ติดตั้งเครื่องมือตรวจวัด ขอให้เอเจนต์เขียนโค้ดของคุณติดตั้งเครื่องมือตรวจวัดให้ไคลเอนต์ LLM เรียกใช้คำขอ แล้วตรวจสอบอีกครั้ง"
+        }
       }
     },
     "header": "Data sources",
@@ -9962,7 +10001,28 @@
     "secondsAgo": "{count}s ago",
     "minutesAgo": "{count}m ago",
     "hoursAgo": "{count}h ago",
-    "daysAgo": "{count}d ago"
+    "daysAgo": "{count}d ago",
+    "cards": {},
+    "state": {},
+    "time": {},
+    "level": {},
+    "sections": {},
+    "alerts": {},
+    "dataHealth": {
+      "status": {}
+    },
+    "streams": {},
+    "signals": {
+      "openAria": {}
+    },
+    "storage": {},
+    "limit": {},
+    "empty": {},
+    "stale": {},
+    "status": {
+      "items": {}
+    },
+    "timeRange": {}
   },
   "chatHistory": {
     "title": "Chats",
@@ -12236,7 +12296,13 @@
       "suppressRepeats": "ระงับการแจ้งซ้ำ",
       "suppressRepeatsTooltip": "แจ้งเตือนเพียงครั้งเดียวเมื่อการแจ้งเตือนเข้าสู่สถานะกำลังแจ้งเตือนหรือเปลี่ยนระดับ ไม่ใช่ทุกครั้งที่มีการประเมิน หากปิดไว้จะยังได้รับการเตือนซ้ำหลังช่วงปิดเสียงแจ้งเตือนแต่ละครั้ง",
       "keepFiringForInvalid": "Enter 0 or more seconds",
-      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)"
+      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)",
+      "helpApplyToObject": "ใช้เทมเพลตนี้",
+      "helpTemplateExplainObject": "เทมเพลตคือข้อความที่จะถูกส่ง: ข้อความพร้อมตัวแปร การเลือกเทมเพลตที่นี่จะแทนที่เทมเพลตของแต่ละปลายทาง เฉพาะกับการกำหนดค่านี้เท่านั้น",
+      "helpTemplateWhenDescObject": "ปล่อยช่องนี้ว่างไว้ แล้วแต่ละปลายทางจะใช้เทมเพลตของตนเองหากใช้กับชนิดนี้ได้ จากนั้นจึงใช้ข้อความที่มีมาให้ ตั้งค่าการแทนที่เพื่อส่งข้อความเดียวไปยังทุกปลายทางที่เข้ากันได้",
+      "helpCurrentHeadingObject": "สิ่งที่ส่งอยู่ในขณะนี้",
+      "helpCurrentOverrideSome": "ปลายทางที่เข้ากันได้ใช้เทมเพลตนี้:",
+      "helpCurrentResolved": "ไม่ได้ตั้งค่าการแทนที่ แต่ละปลายทางใช้:"
     },
     "advanced": {
       "addVariable": "Add Variable",
@@ -13430,7 +13496,8 @@
             "ended": "Ended",
             "cancelled": "Cancelled",
             "extended": "Extended"
-          }
+          },
+          "template": "เทมเพลต"
         },
         "test": {
           "send": "Send test",
@@ -13500,7 +13567,43 @@
       "firingFor": "firing for {duration}",
       "incident": "Incident"
     },
-    "priorityUnsetPagesAs": "ไม่ได้ตั้งค่า (แจ้งเตือนเรียกเวรเป็น P2)"
+    "priorityUnsetPagesAs": "ไม่ได้ตั้งค่า (แจ้งเตือนเรียกเวรเป็น P2)",
+    "notificationKinds": {
+      "alert": "การแจ้งเตือน",
+      "incident": "เหตุการณ์ขัดข้อง",
+      "anomaly": "ความผิดปกติ",
+      "synthetics": "การตรวจสอบสังเคราะห์ (Synthetics)",
+      "downtime": "ช่วงเวลาปิดปรับปรุง",
+      "on_call": "เวรประจำการ (On-Call)"
+    },
+    "templateOverride": {
+      "label": "การแทนที่เทมเพลต",
+      "placeholder": "ใช้เทมเพลตของปลายทาง",
+      "help": "แทนที่เทมเพลตของปลายทางสำหรับข้อความ {kind} ไม่สามารถเลือกเทมเพลตสำเร็จรูปได้ ต้องคัดลอกก่อน",
+      "empty": "ยังไม่มีเทมเพลตที่ใช้กับ {kind}",
+      "create": "สร้างเทมเพลต",
+      "loadFailed": "ไม่สามารถโหลดเทมเพลตได้",
+      "forbidden": "การแสดงรายการเทมเพลตต้องมีสิทธิ์อ่านเทมเพลต",
+      "mismatch": "ไม่ตรงกับปลายทาง {count} รายการของคุณ ({names}) ปลายทางเหล่านั้นจะใช้เทมเพลตของตัวเองแทน",
+      "groupContent": "เนื้อหา",
+      "groupCustom": "กำหนดเอง",
+      "webhookOnly": "(เฉพาะ webhook)",
+      "emailOnly": "(เฉพาะอีเมล)",
+      "snsOnly": "(เฉพาะ SNS)",
+      "stale": "ไม่พบเทมเพลต {name} อีกแล้ว โปรดเลือกเทมเพลตอื่นหรือล้างข้อมูลในช่องนี้",
+      "willUse": "จะใช้: {template}",
+      "willUsePerDestination": "จะใช้ตามปลายทางแต่ละรายการ:",
+      "willUseRow": "{destination}: {template}",
+      "templateWithSource": "{name} ({source})",
+      "builtIn": "ข้อความ {kind} แบบในตัว",
+      "sourceExplicit": "การแทนที่นี้",
+      "sourceDestination": "เทมเพลตของปลายทาง",
+      "sourceOrgDefault": "ค่าเริ่มต้นขององค์กร",
+      "sourceCompiled": "ในตัว",
+      "sourcePlatformResolve": "การกำหนดจากแพลตฟอร์ม",
+      "sourceLegacy": "เพย์โหลดแบบเดิม",
+      "sourceLegacyPayload": "เพย์โหลด JSON ของชนิดนั้นเอง (webhook ทั่วไป)"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Open",
@@ -13820,7 +13923,26 @@
     "testSendConfirm": "This will post a real message to the selected channel, marked [TEST].",
     "testSendSuccess": "Test message sent",
     "testSendRateLimited": "Too many test-sends — please wait a moment and try again",
-    "testSendNoDestination": "Select a destination first"
+    "testSendNoDestination": "Select a destination first",
+    "playgroundLabel": "พื้นที่ทดลอง",
+    "playgroundHelp": "ไม่มีการส่งข้อมูลใด ๆ จากที่นี่",
+    "emptyVariables": "ว่างสำหรับ {kind}: {names}",
+    "appliesTo": "ใช้กับ",
+    "appliesToAll": "ทุกชนิด",
+    "appliesToAny": "ชนิดใดก็ได้",
+    "allKindsNotice": "เทมเพลตที่ใช้กับทุกชนิด: {count} รายการ ปลายทางที่ใช้เทมเพลตเหล่านี้จะใช้เทมเพลตดังกล่าวกับข้อความแจ้งความผิดปกติ ข้อความการตรวจสอบสังเคราะห์ (Synthetics) ข้อความเวรประจำการ (On-Call) ข้อความช่วงเวลาปิดปรับปรุง และข้อความเหตุการณ์ขัดข้องด้วย โปรดตรวจทาน",
+    "allKindsNoticeReview": "ตรวจทาน",
+    "appliesToInferred": "อนุมานจากตัวแปรในเนื้อความ",
+    "appliesToManual": "คุณเป็นผู้เลือก",
+    "appliesToReset": "รีเซ็ตกลับเป็นค่าที่อนุมาน",
+    "previewKind": "ชนิด",
+    "previewForbidden": "คุณไม่มีสิทธิ์ดูตัวอย่างเทมเพลต",
+    "previewFailed": "ดูตัวอย่างไม่สำเร็จ: {message}",
+    "severityFailed": "ล้มเหลว",
+    "severityDegraded": "เสื่อมประสิทธิภาพ",
+    "severityFlaky": "ไม่เสถียร",
+    "severityRecovered": "กลับมาปกติ",
+    "variableGroupCommon": "ทั่วไป"
   },
   "alert_sources": {
     "header": "External Alert Sources",
@@ -14076,7 +14198,12 @@
     "severityErrorDescription": "Standard error incidents",
     "severityWarningDescription": "Warning level incidents",
     "severityInfoDescription": "Informational incidents",
-    "urlRecipientsChannel": "URL / recipients / channel"
+    "urlRecipientsChannel": "URL / recipients / channel",
+    "payloadFormat": "รูปแบบเพย์โหลด",
+    "payloadFormatAuto": "อัตโนมัติ",
+    "payloadFormatLegacy": "JSON แบบเดิม",
+    "payloadFormatRendered": "เทมเพลตที่เรนเดอร์แล้ว",
+    "payloadFormatHelp": "โหมดอัตโนมัติจะส่งเนื้อหา JSON แบบเดิมสำหรับข้อความแจ้งความผิดปกติ ข้อความการตรวจสอบสังเคราะห์ (Synthetics) และข้อความเวรประจำการ (On-Call) จนกว่าจะแนบเทมเพลต ระบบจัดเก็บเป็นคีย์เมทาดาทา payload_format"
   },
   "pipeline_destinations": {
     "header": "Pipeline Destinations",
@@ -27322,7 +27449,9 @@
     "claimSignalsFailedPaths": "ไม่สามารถรับดูแล {paths}",
     "claimSignalsMorePaths": "{paths} และอีก {count} รายการ",
     "toastSignalsClaimedPartly": "สัญญาณ {claimed} จาก {count} รายการส่งไปที่ {team} แล้ว; ไม่สามารถรับดูแล {paths} | สัญญาณ {claimed} จาก {count} รายการส่งไปที่ {team} แล้ว; ไม่สามารถรับดูแล {paths}",
-    "scopeNotSeenYet": "ยังไม่พบในข้อมูลของคุณ"
+    "scopeNotSeenYet": "ยังไม่พบในข้อมูลของคุณ",
+    "deliveryTemplate": "เทมเพลต: {templates}",
+    "policyMailBanner": "ปลายทางอีเมลและ SNS จะได้รับการแจ้งเตือนเรียกเวรจากเวอร์ชันนี้: {names}."
   },
   "paidUsage": {
     "consentTitle": "Turn on paid AI usage?",

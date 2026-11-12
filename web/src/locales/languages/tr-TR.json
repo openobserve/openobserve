@@ -2149,7 +2149,27 @@
       "view": "Görünüm",
       "frustration": "Hayal kırıklığı",
       "failedRequest": "Başarısız istekler",
-      "noResponse": "Yanıt yok"
+      "noResponse": "Yanıt yok",
+      "noResponseStatus": "0 — Yanıt yok",
+      "failedRequestDetails": "Başarısız istek ayrıntıları",
+      "browserStatus": "Tarayıcı durumu",
+      "serverStatus": "Sunucu durumu",
+      "noServerSpanFound": "Sunucu span'i bulunamadı",
+      "noServerSpanHint": "Eksik bir span örnekleme, veri alımı gecikmesi, enstrümantasyonu yapılmamış bir rota veya saklama süresi anlamına da gelebilir.",
+      "unknownNoTrace": "Bilinmiyor (iz yok)",
+      "unknown": "Bilinmiyor",
+      "abortedByApp": "uygulama tarafından iptal edildi",
+      "method": "Yöntem",
+      "url": "URL",
+      "duration": "Süre",
+      "timing": "Zamanlama",
+      "timingDns": "DNS",
+      "timingConnect": "Bağlanma",
+      "timingSsl": "SSL",
+      "timingFirstByte": "İlk bayt",
+      "timingDownload": "İndirme",
+      "size": "Boyut",
+      "initiatedBy": "Başlatan"
     },
     "replayCanvasNotRecorded": "Canvas içeriği kaydedilmedi",
     "actionOnTarget": "\"{target}\" üzerinde {action}",
@@ -2258,7 +2278,8 @@
       "showElements": "Öğeleri göster",
       "markerLabel": "Sıra {rank}, {name}, {count} tıklama | Sıra {rank}, {name}, {count} tıklama",
       "markerLabelFrustrated": "Sıra {rank}, {name}, {count} tıklama, {frustrated} hüsrana uğramış | Sıra {rank}, {name}, {count} tıklama, {frustrated} hüsrana uğramış",
-      "markerClicks": "{count} tıklama | {count} tıklama"
+      "markerClicks": "{count} tıklama | {count} tıklama",
+      "noReplayLegacySdk": "Sayfa anlık görüntüleri daha yeni bir RUM SDK gerektirir. Burada kaydedilen oturum tekrarı daha eski bir SDK'dan geldiği için üzerine çizilecek ekran görüntüsü yok."
     },
     "analytics": {
       "title": "Ürün analitiği",
@@ -6233,7 +6254,14 @@
       "askAiRejected": "istekler {path} üzerinde {status} {reason} ile reddediliyor.",
       "askAiNoRequests": "hiçbir şey ulaşmadı ve hiçbir istek reddedilmedi.",
       "askAiUnavailable": "reddedilen istekler okunamadı, bu yüzden neden bilinmiyor.",
-      "thisGuide": "bir veri kaynağı"
+      "thisGuide": "bir veri kaynağı",
+      "hintWaitingAfter": "İlk kayıt geldiğinde bu kendiliğinden yeşile döner. {elapsed} içinde hiçbir şey gelmezse neyin ters gittiğini gösterir; Sorun Giderme hemen kontrol eder.",
+      "idleInPrompt": "{stream} zaten veri alıyor. İstem metnini kopyaladığınızda kontroller başlar.",
+      "idleMatchesPrompt": "Eşleşen akışlar zaten veri alıyor. İstem metnini kopyaladığınızda kontroller başlar.",
+      "idleNewPrompt": "İstem metnini kopyaladığınızda kontroller başlar.",
+      "fixInvalidCredentialsPrompt": ".env dosyanızdaki token, {token} kuruluş token'ıyla eşleşmiyor. .env dosyasını yeniden indirin ve kodlama aracınızdan isteği tekrar çalıştırmasını isteyin.",
+      "fixInvalidCredentialsPromptUnnamed": ".env dosyanızdaki token bu kuruluşun geçerli token'ıyla eşleşmiyor. .env dosyasını yeniden indirin ve kodlama aracınızdan isteği tekrar çalıştırmasını isteyin.",
+      "copyPrompt": "İstem metnini kopyala"
     },
     "firstDataNotice": {
       "pill": "İlk veriniz ulaştı",
@@ -6385,7 +6413,18 @@
         "envButton": ".env indir",
         "promptTitle": "Bunu {client1}, {client2} veya {client3} içine yapıştırın",
         "promptLabel": "İstem",
-        "promptCopied": "İstem kopyalandı"
+        "promptCopied": "İstem kopyalandı",
+        "health": {
+          "title": "Yapay zeka veri sağlığı",
+          "scopeAgent": "Kontrol başladığından beri {stream} içindeki {agent} aracısından gelen span'ler",
+          "scopeStream": "Kontrol başladığından beri {stream} içindeki span'ler",
+          "checking": "Yapay zeka veri sağlığı kontrol ediliyor…",
+          "checkAgain": "Tekrar kontrol et",
+          "checkAgainHint": "Kodlama aracınız kodu değiştirip başka bir istek çalıştırdıktan sonra tekrar kontrol edin.",
+          "unsupported": "Bu OpenObserve sürümü yapay zeka veri sağlığını kontrol etmez. İlk span'iniz geldi, yani izleme çalışıyor.",
+          "error": "Yapay zeka veri sağlığı kontrolleri çalıştırılamadı. İlk span'iniz geldi, yani izleme çalışıyor.",
+          "noGenAiSpans": "Span'ler geldi ancak hiçbiri bir LLM çağrısı değil, bu yüzden LLM istemcisi enstrümante edilmemiş. Kodlama aracınızdan LLM istemcisini enstrümante etmesini ve bir istek çalıştırmasını isteyin, sonra tekrar kontrol edin."
+        }
       }
     },
     "header": "Veri kaynakları",
@@ -9964,7 +10003,28 @@
     "secondsAgo": "{count} sn önce",
     "minutesAgo": "{count} dk önce",
     "hoursAgo": "{count} sa önce",
-    "daysAgo": "{count} gün önce"
+    "daysAgo": "{count} gün önce",
+    "cards": {},
+    "state": {},
+    "time": {},
+    "level": {},
+    "sections": {},
+    "alerts": {},
+    "dataHealth": {
+      "status": {}
+    },
+    "streams": {},
+    "signals": {
+      "openAria": {}
+    },
+    "storage": {},
+    "limit": {},
+    "empty": {},
+    "stale": {},
+    "status": {
+      "items": {}
+    },
+    "timeRange": {}
   },
   "chatHistory": {
     "title": "Sohbetler",
@@ -12238,7 +12298,13 @@
       "suppressRepeats": "Tekrarları bastır",
       "suppressRepeatsTooltip": "Uyarı tetiklenmeye başladığında veya seviye değiştirdiğinde bir kez bildir; her değerlendirmede değil. Her sessizlik döneminden sonra hatırlatma almaya devam etmek için kapalı bırakın.",
       "keepFiringForInvalid": "0 veya daha fazla saniye girin",
-      "keepFiringForTooLong": "En fazla 86400 saniye (24 saat) girin"
+      "keepFiringForTooLong": "En fazla 86400 saniye (24 saat) girin",
+      "helpApplyToObject": "Bu şablonu kullan",
+      "helpTemplateExplainObject": "Şablon, gönderilen mesajdır: metin artı değişkenler. Burada bir tane seçmek, yalnızca bu yapılandırma için her hedefin kendi şablonunun yerini alır.",
+      "helpTemplateWhenDescObject": "Bunu boş bırakırsanız, her hedef bu türe uyuyorsa önce kendi şablonunu, ardından yerleşik mesajı kullanır. Uyan her hedefe tek bir mesaj göndermek için bir geçersiz kılma ayarlayın.",
+      "helpCurrentHeadingObject": "Bunun şu anda gönderdiği",
+      "helpCurrentOverrideSome": "Uyan hedefler bu şablonu kullanır:",
+      "helpCurrentResolved": "Geçersiz kılma ayarlanmadı. Her hedef şunu kullanır:"
     },
     "advanced": {
       "addVariable": "Değişken Ekle",
@@ -13432,7 +13498,8 @@
             "ended": "Bitti",
             "cancelled": "İptal edildi",
             "extended": "Uzatıldı"
-          }
+          },
+          "template": "Şablon"
         },
         "test": {
           "send": "Test gönder",
@@ -13502,7 +13569,43 @@
       "firingFor": "{duration} süredir tetiklenmiş",
       "incident": "Vaka"
     },
-    "priorityUnsetPagesAs": "Ayarlanmadı (P2 olarak çağırır)"
+    "priorityUnsetPagesAs": "Ayarlanmadı (P2 olarak çağırır)",
+    "notificationKinds": {
+      "alert": "Uyarı",
+      "incident": "Vaka",
+      "anomaly": "Anomali",
+      "synthetics": "Sentetikler",
+      "downtime": "Bakım penceresi",
+      "on_call": "Nöbet"
+    },
+    "templateOverride": {
+      "label": "Şablon geçersiz kılma",
+      "placeholder": "Hedefin şablonunu kullan",
+      "help": "{kind} iletileri için hedef şablonunu geçersiz kılar. Hazır şablonlar seçilemez; önce birini kopyalayın.",
+      "empty": "Henüz {kind} için geçerli şablon yok.",
+      "create": "Şablon oluştur",
+      "loadFailed": "Şablonlar yüklenemedi",
+      "forbidden": "Şablonları listelemek için şablon okuma izni gerekir",
+      "mismatch": "Hedeflerinizden {count} tanesine uymuyor ({names}); bunlar kendi şablonlarına geri döner.",
+      "groupContent": "İçerik",
+      "groupCustom": "Özel",
+      "webhookOnly": "(yalnızca webhook)",
+      "emailOnly": "(yalnızca e-posta)",
+      "snsOnly": "(yalnızca SNS)",
+      "stale": "{name} şablonu artık mevcut değil. Başka bir tane seçin veya alanı temizleyin.",
+      "willUse": "Kullanılacak: {template}",
+      "willUsePerDestination": "Hedef başına kullanılacak:",
+      "willUseRow": "{destination}: {template}",
+      "templateWithSource": "{name} ({source})",
+      "builtIn": "Yerleşik {kind} iletisi",
+      "sourceExplicit": "bu geçersiz kılma",
+      "sourceDestination": "hedef şablonu",
+      "sourceOrgDefault": "kuruluş varsayılanı",
+      "sourceCompiled": "yerleşik",
+      "sourcePlatformResolve": "platform çözümlemesi",
+      "sourceLegacy": "eski yük",
+      "sourceLegacyPayload": "türün kendi JSON yükü (genel webhook)"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Aç",
@@ -13822,7 +13925,26 @@
     "testSendConfirm": "Bu, seçilen kanala [TEST] olarak işaretlenmiş gerçek bir mesaj gönderir.",
     "testSendSuccess": "Test mesajı gönderildi",
     "testSendRateLimited": "Çok fazla test gönderimi — lütfen bir an bekleyin ve tekrar deneyin",
-    "testSendNoDestination": "Önce bir hedef seçin"
+    "testSendNoDestination": "Önce bir hedef seçin",
+    "playgroundLabel": "Deneme alanı",
+    "playgroundHelp": "Buradan hiçbir şey gönderilmez.",
+    "emptyVariables": "{kind} için boş: {names}",
+    "appliesTo": "Şunlara uygulanır",
+    "appliesToAll": "Tüm türler",
+    "appliesToAny": "Herhangi bir tür",
+    "allKindsNotice": "Her türe uygulanan şablonlar: {count}. Hedefleri bunları anomali, sentetikler, nöbet, bakım penceresi ve vaka iletileri için de kullanır. Bunları gözden geçirin.",
+    "allKindsNoticeReview": "Gözden geçir",
+    "appliesToInferred": "Gövdedeki değişkenlerden çıkarıldı",
+    "appliesToManual": "Sizin seçiminiz",
+    "appliesToReset": "Çıkarılan değere sıfırla",
+    "previewKind": "Tür",
+    "previewForbidden": "Şablonları önizleme izniniz yok",
+    "previewFailed": "Önizleme başarısız: {message}",
+    "severityFailed": "Başarısız",
+    "severityDegraded": "Kötüleşmiş",
+    "severityFlaky": "Kararsız",
+    "severityRecovered": "Düzeldi",
+    "variableGroupCommon": "Genel"
   },
   "alert_sources": {
     "header": "Harici Uyarı Kaynakları",
@@ -14078,7 +14200,12 @@
     "severityErrorDescription": "Standart hata vakaları",
     "severityWarningDescription": "Uyarı düzeyi vakaları",
     "severityInfoDescription": "Bilgilendirme vakaları",
-    "urlRecipientsChannel": "URL / alıcılar / kanal"
+    "urlRecipientsChannel": "URL / alıcılar / kanal",
+    "payloadFormat": "Yük biçimi",
+    "payloadFormatAuto": "Otomatik",
+    "payloadFormatLegacy": "Eski JSON",
+    "payloadFormatRendered": "İşlenmiş şablon",
+    "payloadFormatHelp": "Otomatik, bir şablon eklenene kadar anomali, sentetikler ve nöbet iletileri için eski JSON gövdesini gönderir. Meta veri anahtarı payload_format olarak saklanır."
   },
   "pipeline_destinations": {
     "header": "İşlem Hattı Hedefleri",
@@ -27324,7 +27451,9 @@
     "claimSignalsFailedPaths": "{paths} sahiplenilemedi",
     "claimSignalsMorePaths": "{paths} ve {count} tane daha",
     "toastSignalsClaimedPartly": "{count} sinyalden {claimed} tanesi artık {team} ekibine gidiyor; {paths} sahiplenilemedi | {count} sinyalden {claimed} tanesi artık {team} ekibine gidiyor; {paths} sahiplenilemedi",
-    "scopeNotSeenYet": "Verilerinizde henüz görülmedi"
+    "scopeNotSeenYet": "Verilerinizde henüz görülmedi",
+    "deliveryTemplate": "Şablon: {templates}",
+    "policyMailBanner": "E-posta ve SNS hedefleri bu sürümden çağrı alır: {names}."
   },
   "paidUsage": {
     "consentTitle": "Ücretli Yapay Zeka kullanımı açılsın mı?",

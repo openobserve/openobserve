@@ -2149,7 +2149,27 @@
       "view": "Lượt xem",
       "frustration": "Bực bội",
       "failedRequest": "Yêu cầu thất bại",
-      "noResponse": "Không có phản hồi"
+      "noResponse": "Không có phản hồi",
+      "noResponseStatus": "0 — Không phản hồi",
+      "failedRequestDetails": "Chi tiết yêu cầu thất bại",
+      "browserStatus": "Trạng thái trình duyệt",
+      "serverStatus": "Trạng thái máy chủ",
+      "noServerSpanFound": "Không tìm thấy span máy chủ",
+      "noServerSpanHint": "Span bị thiếu cũng có thể là do lấy mẫu, độ trễ tiếp nhận dữ liệu, một tuyến chưa được đo hoặc thời gian lưu giữ.",
+      "unknownNoTrace": "Không xác định (không có trace)",
+      "unknown": "Không xác định",
+      "abortedByApp": "bị ứng dụng hủy",
+      "method": "Phương thức",
+      "url": "URL",
+      "duration": "Thời lượng",
+      "timing": "Thời gian",
+      "timingDns": "DNS",
+      "timingConnect": "Kết nối",
+      "timingSsl": "SSL",
+      "timingFirstByte": "Byte đầu tiên",
+      "timingDownload": "Tải xuống",
+      "size": "Kích thước",
+      "initiatedBy": "Khởi tạo bởi"
     },
     "replayCanvasNotRecorded": "Nội dung canvas không được ghi lại",
     "actionOnTarget": "{action} trên \"{target}\"",
@@ -2258,7 +2278,8 @@
       "showElements": "Hiện phần tử",
       "markerLabel": "Hạng {rank}, {name}, {count} lượt nhấp | Hạng {rank}, {name}, {count} lượt nhấp",
       "markerLabelFrustrated": "Hạng {rank}, {name}, {count} lượt nhấp, {frustrated} bực bội | Hạng {rank}, {name}, {count} lượt nhấp, {frustrated} bực bội",
-      "markerClicks": "{count} lượt nhấp | {count} lượt nhấp"
+      "markerClicks": "{count} lượt nhấp | {count} lượt nhấp",
+      "noReplayLegacySdk": "Ảnh chụp trang cần RUM SDK mới hơn. Bản phát lại phiên được ghi ở đây đến từ SDK cũ hơn, nên không có ảnh chụp màn hình để vẽ lên."
     },
     "analytics": {
       "title": "Phân tích sản phẩm",
@@ -6233,7 +6254,14 @@
       "askAiRejected": "các yêu cầu bị từ chối với {status} {reason} trên {path}.",
       "askAiNoRequests": "chưa có gì đến và không có yêu cầu nào bị từ chối.",
       "askAiUnavailable": "không thể đọc các yêu cầu bị từ chối, nên không xác định được nguyên nhân.",
-      "thisGuide": "một nguồn dữ liệu"
+      "thisGuide": "một nguồn dữ liệu",
+      "hintWaitingAfter": "Mục này tự chuyển xanh khi bản ghi đầu tiên đến. Nếu không có gì đến trong {elapsed}, mục này hiển thị lỗi; Khắc phục sự cố sẽ kiểm tra ngay.",
+      "idleInPrompt": "{stream} đã nhận dữ liệu. Quá trình kiểm tra sẽ bắt đầu khi bạn sao chép lời nhắc.",
+      "idleMatchesPrompt": "Các stream khớp đã nhận dữ liệu. Quá trình kiểm tra sẽ bắt đầu khi bạn sao chép lời nhắc.",
+      "idleNewPrompt": "Quá trình kiểm tra sẽ bắt đầu khi bạn sao chép lời nhắc.",
+      "fixInvalidCredentialsPrompt": "Token trong tệp .env của bạn không khớp với token tổ chức {token}. Hãy tải lại tệp .env và yêu cầu coding agent chạy lại yêu cầu.",
+      "fixInvalidCredentialsPromptUnnamed": "Token trong tệp .env của bạn không khớp với token hiện tại của tổ chức này. Hãy tải lại tệp .env và yêu cầu coding agent chạy lại yêu cầu.",
+      "copyPrompt": "Sao chép lời nhắc"
     },
     "firstDataNotice": {
       "pill": "Dữ liệu đầu tiên của bạn đã đến",
@@ -6385,7 +6413,18 @@
         "envButton": "Tải xuống .env",
         "promptTitle": "Dán nội dung này vào {client1}, {client2} hoặc {client3}",
         "promptLabel": "Prompt",
-        "promptCopied": "Đã sao chép prompt"
+        "promptCopied": "Đã sao chép prompt",
+        "health": {
+          "title": "Tình trạng dữ liệu AI",
+          "scopeAgent": "Các span từ agent {agent} trong {stream} kể từ khi bắt đầu kiểm tra",
+          "scopeStream": "Các span trong {stream} kể từ khi bắt đầu kiểm tra",
+          "checking": "Đang kiểm tra tình trạng dữ liệu AI…",
+          "checkAgain": "Kiểm tra lại",
+          "checkAgainHint": "Sau khi coding agent của bạn sửa mã và chạy một yêu cầu khác, hãy kiểm tra lại.",
+          "unsupported": "Phiên bản OpenObserve này không kiểm tra tình trạng dữ liệu AI. Span đầu tiên của bạn đã đến, nên quá trình trace hoạt động.",
+          "error": "Không thể chạy kiểm tra tình trạng dữ liệu AI. Span đầu tiên của bạn đã đến, nên quá trình trace hoạt động.",
+          "noGenAiSpans": "Các span đã đến, nhưng không có span nào là cuộc gọi LLM, nên ứng dụng khách LLM chưa được gắn công cụ đo. Hãy yêu cầu coding agent của bạn gắn công cụ đo cho ứng dụng khách LLM, chạy một yêu cầu rồi kiểm tra lại."
+        }
       }
     },
     "header": "Nguồn dữ liệu",
@@ -9964,7 +10003,28 @@
     "secondsAgo": "{count} giây trước",
     "minutesAgo": "{count} phút trước",
     "hoursAgo": "{count} giờ trước",
-    "daysAgo": "{count} ngày trước"
+    "daysAgo": "{count} ngày trước",
+    "cards": {},
+    "state": {},
+    "time": {},
+    "level": {},
+    "sections": {},
+    "alerts": {},
+    "dataHealth": {
+      "status": {}
+    },
+    "streams": {},
+    "signals": {
+      "openAria": {}
+    },
+    "storage": {},
+    "limit": {},
+    "empty": {},
+    "stale": {},
+    "status": {
+      "items": {}
+    },
+    "timeRange": {}
   },
   "chatHistory": {
     "title": "Trò chuyện",
@@ -12238,7 +12298,13 @@
       "suppressRepeats": "Chặn thông báo lặp lại",
       "suppressRepeatsTooltip": "Chỉ thông báo một lần khi cảnh báo bắt đầu kích hoạt hoặc thay đổi mức độ, không phải ở mỗi lần đánh giá. Giữ tùy chọn này ở trạng thái tắt để tiếp tục nhận nhắc nhở sau mỗi khoảng thời gian im lặng.",
       "keepFiringForInvalid": "Nhập 0 giây hoặc nhiều hơn",
-      "keepFiringForTooLong": "Nhập tối đa 86400 giây (24 giờ)"
+      "keepFiringForTooLong": "Nhập tối đa 86400 giây (24 giờ)",
+      "helpApplyToObject": "Dùng mẫu này",
+      "helpTemplateExplainObject": "Mẫu là thông điệp được gửi đi: văn bản cùng các biến. Chọn một mẫu ở đây sẽ thay thế mẫu riêng của từng đích, chỉ cho cấu hình này.",
+      "helpTemplateWhenDescObject": "Để trống mục này và mỗi đích sẽ dùng mẫu riêng của nó nếu mẫu đó áp dụng cho loại này, nếu không thì dùng thông điệp tích hợp. Đặt ghi đè để gửi một thông điệp đến mọi đích phù hợp.",
+      "helpCurrentHeadingObject": "Nội dung gửi hiện tại",
+      "helpCurrentOverrideSome": "Các đích phù hợp dùng mẫu này:",
+      "helpCurrentResolved": "Chưa đặt ghi đè. Mỗi đích sẽ dùng:"
     },
     "advanced": {
       "addVariable": "Thêm biến",
@@ -13432,7 +13498,8 @@
             "ended": "Đã kết thúc",
             "cancelled": "Đã hủy",
             "extended": "Đã gia hạn"
-          }
+          },
+          "template": "Mẫu"
         },
         "test": {
           "send": "Gửi thử",
@@ -13502,7 +13569,43 @@
       "firingFor": "đang kích hoạt trong {duration}",
       "incident": "Sự cố"
     },
-    "priorityUnsetPagesAs": "Chưa đặt (cảnh báo ở mức P2)"
+    "priorityUnsetPagesAs": "Chưa đặt (cảnh báo ở mức P2)",
+    "notificationKinds": {
+      "alert": "Cảnh báo",
+      "incident": "Sự cố",
+      "anomaly": "Bất thường",
+      "synthetics": "Synthetics",
+      "downtime": "Thời gian bảo trì",
+      "on_call": "Trực"
+    },
+    "templateOverride": {
+      "label": "Ghi đè mẫu",
+      "placeholder": "Dùng template của đích",
+      "help": "Ghi đè template của đích cho tin nhắn {kind}. Không thể chọn template dựng sẵn; hãy sao chép một template trước.",
+      "empty": "Chưa có template nào áp dụng cho {kind}.",
+      "create": "Tạo template",
+      "loadFailed": "Không thể tải template",
+      "forbidden": "Liệt kê template cần quyền đọc template",
+      "mismatch": "Không phù hợp với {count} đích của bạn ({names}); các đích đó sẽ quay về template riêng của chúng.",
+      "groupContent": "Nội dung",
+      "groupCustom": "Tùy chỉnh",
+      "webhookOnly": "(chỉ webhook)",
+      "emailOnly": "(chỉ email)",
+      "snsOnly": "(chỉ SNS)",
+      "stale": "Template {name} không còn tồn tại. Hãy chọn template khác hoặc xóa trường này.",
+      "willUse": "Sẽ dùng: {template}",
+      "willUsePerDestination": "Sẽ dùng, theo từng đích:",
+      "willUseRow": "{destination}: {template}",
+      "templateWithSource": "{name} ({source})",
+      "builtIn": "Tin nhắn {kind} dựng sẵn",
+      "sourceExplicit": "ghi đè này",
+      "sourceDestination": "template của đích",
+      "sourceOrgDefault": "mặc định của tổ chức",
+      "sourceCompiled": "dựng sẵn",
+      "sourcePlatformResolve": "nền tảng phân giải",
+      "sourceLegacy": "payload kiểu cũ",
+      "sourceLegacyPayload": "payload JSON riêng của loại này (webhook chung)"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Mở",
@@ -13822,7 +13925,26 @@
     "testSendConfirm": "Thao tác này sẽ đăng một tin nhắn thực tế tới kênh đã chọn, được đánh dấu [TEST].",
     "testSendSuccess": "Tin nhắn kiểm tra đã được gửi",
     "testSendRateLimited": "Quá nhiều lần gửi kiểm tra — vui lòng chờ một lát và thử lại",
-    "testSendNoDestination": "Chọn một đích trước"
+    "testSendNoDestination": "Chọn một đích trước",
+    "playgroundLabel": "Playground",
+    "playgroundHelp": "Không có gì ở đây được gửi đi.",
+    "emptyVariables": "Trống cho {kind}: {names}",
+    "appliesTo": "Áp dụng cho",
+    "appliesToAll": "Tất cả các loại",
+    "appliesToAny": "Mọi loại",
+    "allKindsNotice": "Số template áp dụng cho mọi loại: {count}. Các đích của chúng cũng dùng chúng cho tin nhắn bất thường, synthetics, trực, thời gian bảo trì và sự cố. Hãy xem lại.",
+    "allKindsNoticeReview": "Xem lại",
+    "appliesToInferred": "Suy ra từ các biến trong nội dung",
+    "appliesToManual": "Do bạn chọn",
+    "appliesToReset": "Đặt lại về suy luận",
+    "previewKind": "Loại",
+    "previewForbidden": "Bạn không có quyền xem trước template",
+    "previewFailed": "Xem trước thất bại: {message}",
+    "severityFailed": "Thất bại",
+    "severityDegraded": "Suy giảm",
+    "severityFlaky": "Chập chờn",
+    "severityRecovered": "Đã phục hồi",
+    "variableGroupCommon": "Chung"
   },
   "alert_sources": {
     "header": "Nguồn cảnh báo bên ngoài",
@@ -14078,7 +14200,12 @@
     "severityErrorDescription": "Sự cố lỗi tiêu chuẩn",
     "severityWarningDescription": "Sự cố mức cảnh báo",
     "severityInfoDescription": "Sự cố thông tin",
-    "urlRecipientsChannel": "URL / người nhận / kênh"
+    "urlRecipientsChannel": "URL / người nhận / kênh",
+    "payloadFormat": "Định dạng payload",
+    "payloadFormatAuto": "Tự động",
+    "payloadFormatLegacy": "JSON kiểu cũ",
+    "payloadFormatRendered": "Template đã kết xuất",
+    "payloadFormatHelp": "Tự động gửi nội dung JSON cũ cho tin nhắn bất thường, synthetics và trực cho đến khi có template được gắn. Được lưu dưới khóa metadata payload_format."
   },
   "pipeline_destinations": {
     "header": "Đích Pipeline",
@@ -27324,7 +27451,9 @@
     "claimSignalsFailedPaths": "Không thể nhận {paths}",
     "claimSignalsMorePaths": "{paths} và {count} mục khác",
     "toastSignalsClaimedPartly": "{claimed} trong {count} tín hiệu giờ được gửi đến {team}; không thể nhận {paths} | {claimed} trong {count} tín hiệu giờ được gửi đến {team}; không thể nhận {paths}",
-    "scopeNotSeenYet": "Chưa thấy trong dữ liệu của bạn"
+    "scopeNotSeenYet": "Chưa thấy trong dữ liệu của bạn",
+    "deliveryTemplate": "Template: {templates}",
+    "policyMailBanner": "Các đích Email và SNS nhận thông báo trực từ phiên bản này: {names}."
   },
   "paidUsage": {
     "consentTitle": "Bật sử dụng AI trả phí?",
