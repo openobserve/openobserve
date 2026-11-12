@@ -29,7 +29,7 @@ export function railGate(gate: GateCode): boolean {
 /** What Home can offer: the agent, the agent out of credits, no agent here, or the Open Source build. */
 export type AgentHomeState = "loading" | "ai" | "budget" | "noai" | "oss";
 
-/** Why the Ask box is Go to only; null while the agent can answer. */
+/** Why the Ask box is unavailable; null while the agent can answer. */
 export type AskOffReason =
   "budget" | "oss" | "not_entitled" | "not_configured" | "off_for_org" | "no_permission";
 

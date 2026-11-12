@@ -15,29 +15,12 @@
 
 import { computed, shallowRef } from "vue";
 
-const goToHandlers = new Set<GoToHandler>();
 const overviewFocusHandlers = new Set<() => void>();
 // The Set is not reactive, so its size is mirrored for callers that gate on a listener.
 const overviewFocusCount = shallowRef(0);
 
 /** True while a Home Ask box listens for `/`, so the key is only captured when something answers it. */
 export const overviewFocusListening = computed(() => overviewFocusCount.value > 0);
-
-export type GoToSource = "shortcut" | "editor";
-
-type GoToHandler = (source: GoToSource) => void;
-
-/** Asks the layout to open Go to; a no-op while nothing listens. */
-export function requestGoTo(source: GoToSource): void {
-  for (const handler of [...goToHandlers]) handler(source);
-}
-
-export function onGoToRequest(handler: GoToHandler): () => void {
-  goToHandlers.add(handler);
-  return () => {
-    goToHandlers.delete(handler);
-  };
-}
 
 /** Focuses the Home Ask box (the `/` key); false when none is mounted. */
 export function requestOverviewFocus(): boolean {

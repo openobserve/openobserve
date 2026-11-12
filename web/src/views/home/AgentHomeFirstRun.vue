@@ -42,11 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OText variant="body">{{ t("home.agent.firstRun.note") }}</OText>
         </div>
       </div>
-      <AssistantLauncher layout="overview" :go-to-only="offReason !== null">
-        <template #note>
-          <AgentHomeAskNote v-if="offReason" :reason="offReason" :org="org" />
-        </template>
-      </AssistantLauncher>
+      <AgentHomeAskNote v-if="offReason" :reason="offReason" :org="org" />
+      <AssistantLauncher v-else layout="overview" />
     </div>
   </section>
 </template>

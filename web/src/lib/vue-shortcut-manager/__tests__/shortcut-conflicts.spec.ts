@@ -18,7 +18,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { isAssistantV2, resetAssistantV2ForTests } from "@/composables/assistant/flags";
 
 import {
-  GO_TO_EDITOR_ACTION_ID,
   SHORTCUT_REGISTRY,
   getShortcutDef,
   getShortcutDisplay,
@@ -117,24 +116,5 @@ describe("shortcut conflict audit (10 §6.4)", () => {
       resolveShortcutKeys(getShortcutDef(id)!, true),
     );
     expect(assistantKeys).not.toContain("meta+k");
-  });
-
-  it("binds goTo globally on the palette chord, so the scoped K8s palette still wins inside kubernetes", () => {
-    for (const mac of [false, true]) {
-      const key = mac ? "meta+k" : "ctrl+k";
-      const bindings = visibleBindings(mac);
-      expect(bindings).toContain(`global ${key}`);
-      expect(bindings).toContain(`kubernetes ${key}`);
-      expect(bindings.filter((b) => b === `global ${key}`)).toHaveLength(1);
-    }
-    expect(getShortcutDef("goTo")?.scope).toBeUndefined();
-    expect(getShortcutDef("k8sPalette")?.scope).toBe("kubernetes");
-  });
-
-  it("lists the editor Go to action id on the goTo chord", () => {
-    expect(GO_TO_EDITOR_ACTION_ID).toBe("o2.goTo");
-    const def = getShortcutDef("goTo")!;
-    expect(resolveShortcutKeys(def, true)).toEqual(["meta+k"]);
-    expect(resolveShortcutKeys(def, false)).toEqual(["ctrl+k"]);
   });
 });

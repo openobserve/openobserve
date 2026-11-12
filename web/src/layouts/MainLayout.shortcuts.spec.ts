@@ -22,7 +22,6 @@ import router from "@/test/unit/helpers/router";
 import { getManager, resetManager } from "@/lib/vue-shortcut-manager";
 import config from "@/aws-exports";
 import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
-import { onOverviewFocusRequest, requestGoTo } from "@/composables/goto/goToRequests";
 
 vi.mock("@/services/config", () => ({
   default: { get_config_full: vi.fn(() => new Promise(() => {})) },
@@ -38,11 +37,6 @@ const StubDiv = defineComponent({ setup: () => () => h("div") });
 // Any page but Home, where Ctrl+B switches Home's tab instead. The real Logs page is a lazy import
 // heavy enough to outlast the test timeout on a busy machine.
 router.addRoute({ path: "/not-home", name: "notHome", component: StubDiv });
-const PaletteStub = defineComponent({
-  name: "GoToPalette",
-  props: { open: Boolean, homeReturn: { type: Object, default: null } },
-  setup: () => () => h("div", { "data-test": "go-to-palette-stub" }),
-});
 
 function mountMainLayout() {
   return mount(MainLayout, {
@@ -62,7 +56,6 @@ function mountMainLayout() {
         ManagementIcon: StubDiv,
         ODialog: StubDiv,
         "router-view": StubDiv,
-        GoToPalette: PaletteStub,
         HomeReturnBar: StubDiv,
         AssistantSidebarHost: StubDiv,
         AssistantWindowLayer: StubDiv,
@@ -137,77 +130,5 @@ describe("MainLayout — AI chat shortcut gate", () => {
 
     ctrlB()!.handler();
     expect(store.state.isAiChatEnabled).toBe(true);
-  });
-});
-
-describe("MainLayout — Go to shortcut", () => {
-  let wrapper: VueWrapper | undefined;
-  let stopFocus: (() => void) | undefined;
-
-  const goTo = () => getManager()?.getById("goTo");
-  const palette = () => wrapper!.findComponent(PaletteStub);
-  const mountV2 = async (on: boolean, routeName = "logs") => {
-    window.__O2_ASSISTANT_V2__ = on;
-    resetAssistantV2ForTests();
-    wrapper = mountMainLayout();
-    await router.push({ name: routeName });
-    await flushPromises();
-  };
-
-  beforeEach(() => {
-    resetManager();
-  });
-
-  afterEach(() => {
-    stopFocus?.();
-    stopFocus = undefined;
-    wrapper?.unmount();
-    wrapper = undefined;
-    delete window.__O2_ASSISTANT_V2__;
-    resetAssistantV2ForTests();
-    resetManager();
-  });
-
-  it("opens the palette on ⌘K away from Home, with no way back", async () => {
-    await mountV2(true);
-    expect(goTo()?.allowInInput).toBe(true);
-    expect(palette().exists()).toBe(false);
-    goTo()!.handler(new KeyboardEvent("keydown"));
-    await flushPromises();
-    expect(palette().props("open")).toBe(true);
-    expect(palette().props("homeReturn")).toBeNull();
-  });
-
-  it("opens the palette for the editor's request too", async () => {
-    await mountV2(true);
-    requestGoTo("editor");
-    await flushPromises();
-    expect(palette().props("open")).toBe(true);
-  });
-
-  it("opens the palette on Home even while the Ask box listens, since / is its own key", async () => {
-    const focus = vi.fn();
-    stopFocus = onOverviewFocusRequest(focus);
-    await mountV2(true, "home");
-    goTo()!.handler(new KeyboardEvent("keydown"));
-    await flushPromises();
-    expect(focus).not.toHaveBeenCalled();
-    expect(palette().props("open")).toBe(true);
-  });
-
-  it("opens the palette on Home and marks the trip", async () => {
-    await mountV2(true, "home");
-    goTo()!.handler(new KeyboardEvent("keydown"));
-    await flushPromises();
-    expect(palette().props("open")).toBe(true);
-    expect(palette().props("homeReturn")).toEqual({ focus: "ask" });
-  });
-
-  it("binds nothing when v2 is off", async () => {
-    await mountV2(false);
-    expect(goTo()).toBeUndefined();
-    requestGoTo("editor");
-    await flushPromises();
-    expect(palette().exists()).toBe(false);
   });
 });

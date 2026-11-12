@@ -17,9 +17,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import CodeQueryEditor from "./CodeQueryEditor.vue";
 import { createStore } from "vuex";
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
-import { onGoToRequest } from "@/composables/goto/goToRequests";
-import { GO_TO_EDITOR_ACTION_ID } from "@/lib/vue-shortcut-manager/shortcutRegistry";
 
 // Stable model instance. CodeQueryEditor's completion provider answers only for
 // its OWN model (`if (own && model !== own) return { suggestions: [] }`), so a
@@ -805,52 +802,6 @@ describe("CodeQueryEditor", () => {
     it("binds no assistant action without a chord", async () => {
       await mountAndSetup();
       expect(assistantAction()).toBeUndefined();
-    });
-
-    describe("Go to chord", () => {
-      const goToAction = () =>
-        (mockEditorObj.addAction.mock.calls as unknown as [any][])
-          .map(([action]) => action)
-          .find((action) => action.id === GO_TO_EDITOR_ACTION_ID);
-
-      afterEach(() => {
-        delete window.__O2_ASSISTANT_V2__;
-        resetAssistantV2ForTests();
-      });
-
-      it("binds ⌘K as the o2.goTo action under v2 and asks the layout for Go to", async () => {
-        window.__O2_ASSISTANT_V2__ = true;
-        resetAssistantV2ForTests();
-        const sources: string[] = [];
-        const off = onGoToRequest((source) => sources.push(source));
-        await mountAndSetup();
-        const action = goToAction();
-        expect(action.id).toBe("o2.goTo");
-        expect(action.keybindings).toEqual([2048 | 41]);
-        action.run();
-        expect(sources).toEqual(["editor"]);
-        off();
-      });
-
-      it("leaves ⌘K to Monaco when v2 is off", async () => {
-        window.__O2_ASSISTANT_V2__ = false;
-        resetAssistantV2ForTests();
-        await mountAndSetup();
-        expect(goToAction()).toBeUndefined();
-      });
-
-      it("disposes the action with the editor", async () => {
-        window.__O2_ASSISTANT_V2__ = true;
-        resetAssistantV2ForTests();
-        const dispose = vi.fn();
-        mockEditorObj.addAction.mockImplementation((() => ({ dispose })) as any);
-        const wrapper = await mountAndSetup();
-        expect(goToAction()).toBeDefined();
-        wrapper.unmount();
-        shortcutWrapper = null;
-        expect(dispose).toHaveBeenCalled();
-        mockEditorObj.addAction.mockImplementation(() => ({ dispose: vi.fn() }));
-      });
     });
 
     it("should bind the shortcut through onKeyDown, not addCommand", async () => {
