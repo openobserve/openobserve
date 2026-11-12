@@ -1,13 +1,10 @@
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { formatAgentOption } from "@/plugins/traces/agentOptionFormat";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 
 export const ALL_AGENTS_VALUE = "__all__";
 
 export type AgentFilterSelection = GenAiAgentListItem;
-
-function escapeSqlString(value: string): string {
-  return value.replace(/'/g, "''");
-}
 
 export function agentFilterKey(agent: AgentFilterSelection): string {
   const identity = agent.id ? `id:${agent.id}` : `name:${agent.name}`;
@@ -21,39 +18,15 @@ export function agentFilterLabel(agent: AgentFilterSelection): string {
   return formatAgentOption(agent);
 }
 
-// `_llm_scores` and `_evaluator` carry the agent identity denormalized onto
-// every row at ingest, so a selected agent is filtered inline on those columns
-// — no trace_id subquery against the source stream. Agent id is preferred over
-// name (names are display labels); we fall back to name only when id is absent.
-export function buildScoresAgentFilterWhere(
-  agent: AgentFilterSelection | null | undefined,
-): string | null {
-  if (!agent) return null;
-  const field = agent.id ? "agent_id" : "agent_name";
-  const value = agent.id ?? agent.name;
-  if (!value) return null;
-  // env/version are denormalized onto every _llm_scores row (agent_env /
-  // agent_version), so a selected (agent, env, version) variant filters by exact
-  // match — same as agent_id. Rows written before this change have NULL columns
-  // and won't match a version filter until the target is re-evaluated.
-  const clauses = [`${field} = '${escapeSqlString(String(value))}'`];
-  if (agent.version) {
-    clauses.push(`agent_version = '${escapeSqlString(String(agent.version))}'`);
-  }
-  if (agent.env) {
-    clauses.push(`agent_env = '${escapeSqlString(String(agent.env))}'`);
-  }
-  return clauses.join(" AND ");
-}
-
+// `_evaluator` carries the target agent on every run, so a selected agent filters inline, id before name.
 export function buildEvaluatorAgentFilterWhere(
-  agent: AgentFilterSelection | null | undefined,
+  agent: Pick<AgentFilterSelection, "id" | "name"> | null | undefined,
 ): string | null {
   if (!agent) return null;
   const field = agent.id ? "attributes_target_agent_id" : "attributes_target_agent_name";
   const value = agent.id ?? agent.name;
   if (!value) return null;
-  return `${field} = '${escapeSqlString(String(value))}'`;
+  return `${field} = ${sqlLiteral(value)}`;
 }
 
 export function combineWhere(...clauses: Array<string | null | undefined>): string | null {

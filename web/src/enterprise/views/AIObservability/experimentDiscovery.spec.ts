@@ -14,7 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { comparisonEligibility, experimentEvidence, groupExperiments } from "./experimentDiscovery";
+import {
+  clientScoreKey,
+  comparisonEligibility,
+  experimentCostText,
+  experimentEvidence,
+  groupExperiments,
+  scoreColumnLabel,
+} from "./experimentDiscovery";
+import type { TranslateFn } from "@/types/i18n";
 import { makeExperiment } from "./experimentTestFixtures";
 
 const experiment = (id: string, datasetId: string, createdAt: number) =>
@@ -124,10 +132,35 @@ describe("experiment discovery", () => {
       completedSlots: 1,
       totalSlots: 2,
       cost: null,
+      costIncomplete: false,
       scores: [
-        { name: "quality", kind: "numeric", value: 0.75, sampleCount: 2 },
-        { name: "approved", kind: "boolean", trueCount: 1, falseCount: 1, sampleCount: 2 },
         {
+          key: "quality",
+          scoreConfigId: null,
+          clientScorerKey: null,
+          name: "quality",
+          kind: "numeric",
+          value: 0.75,
+          sampleCount: 2,
+          errorCount: 0,
+          pendingCount: 0,
+        },
+        {
+          key: "approved",
+          scoreConfigId: null,
+          clientScorerKey: null,
+          name: "approved",
+          kind: "boolean",
+          trueCount: 1,
+          falseCount: 1,
+          sampleCount: 2,
+          errorCount: 0,
+          pendingCount: 0,
+        },
+        {
+          key: "label",
+          scoreConfigId: null,
+          clientScorerKey: null,
           name: "label",
           kind: "categorical",
           values: [
@@ -135,8 +168,50 @@ describe("experiment discovery", () => {
             { value: "bad", count: 1 },
           ],
           sampleCount: 3,
+          errorCount: 0,
+          pendingCount: 0,
         },
       ],
     });
+  });
+
+  // An SDK run that scores in its own process pins no Scorer.
+  it("gives each client-reported dimension its own column, keyed by Score Config and client key", () => {
+    const client = (clientScorerKey: string, mean: number) => ({
+      scoreConfigId: "cfg-quality",
+      scoreConfigName: "quality",
+      clientScorerKey,
+      sampleCount: 4,
+      value: { kind: "numeric", mean },
+    });
+    const row = makeExperiment({
+      scoreSummaries: [],
+      clientScoreSummaries: [client("exact", 0.5), client("fuzzy", 0.75)],
+    });
+
+    const scores = experimentEvidence(row).scores;
+    expect(scores.map(({ key, name, clientScorerKey }) => [key, name, clientScorerKey])).toEqual([
+      [clientScoreKey("cfg-quality", "exact"), "quality", "exact"],
+      [clientScoreKey("cfg-quality", "fuzzy"), "quality", "fuzzy"],
+    ]);
+    expect(scores[0]).toMatchObject({ kind: "numeric", value: 0.5, scoreConfigId: "cfg-quality" });
+
+    const t = ((key: string, named?: { score?: string }) =>
+      `${key}:${named?.score}`) as unknown as TranslateFn;
+    expect(scoreColumnLabel(scores[0], t)).toBe("experimentsAtScale.clientScore:quality");
+    expect(scoreColumnLabel({ name: "quality", clientScorerKey: null }, t)).toBe("quality");
+  });
+
+  it("reads an incomplete cost as a floor, and a zero floor as unknown rather than free", () => {
+    const t = ((key: string, named?: { cost?: string }) =>
+      named?.cost ? `${key}:${named.cost}` : key) as unknown as TranslateFn;
+    expect(experimentCostText(null, false, t)).toBe("—");
+    expect(experimentCostText(0, false, t)).toBe("$0.0000");
+    expect(experimentCostText(0.12, false, t)).toBe("$0.1200");
+    expect(experimentCostText(0.12, true, t)).toBe(
+      "aiObservability.experiments.costAtLeast:$0.1200",
+    );
+    expect(experimentCostText(0, true, t)).toBe("aiObservability.experiments.costUnknown");
+    expect(experimentCostText(null, true, t)).toBe("aiObservability.experiments.costUnknown");
   });
 });

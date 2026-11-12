@@ -13,24 +13,82 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { useMutation } from "@tanstack/vue-query";
-import { useOrgId } from "@/composables/query/useOrgId";
-import { recordQueryHistoryMutation } from "@/services/query_history.queries";
-import { buildHistoryEntry } from "@/utils/metrics/queryHistory";
+import { nextTick, watch } from "vue";
+import { useRecentSearches } from "@/composables/queryHistory/useRecentSearches";
+import {
+  buildMetricsRecord,
+  metricsRunError,
+  withRunResult,
+  type MetricsPanelState,
+  type PanelErrorDetail,
+} from "@/utils/queryHistory/metrics";
+import { runResultFromError, type RunError } from "@/utils/queryHistory/recentSearches";
+import type { QueryHistoryRecordBody } from "@/services/query_history";
 import type { SelectedDate } from "@/utils/dashboard/urlTimeParams";
 
-/** Fire-and-forget: a failed record is only logged and never reaches the run. */
-export const useQueryHistoryRecorder = () => {
-  const orgId = useOrgId();
-  const recordEntry = useMutation(() => recordQueryHistoryMutation(orgId.value));
+interface RecordedPanel extends MetricsPanelState {
+  meta?: { dateTime?: { start_time?: unknown; end_time?: unknown } };
+}
 
-  const record = (dashboardPanelData: any, selectedDate: Partial<SelectedDate> | null) => {
-    const entry = buildHistoryEntry(dashboardPanelData, selectedDate);
-    if (!entry) return;
-    recordEntry.mutateAsync(entry).catch((err) => {
-      console.error("Failed to record query history", err);
-    });
+interface PendingRun {
+  body: QueryHistoryRecordBody;
+  started: boolean;
+}
+
+// Panel pages build these Dates from microseconds, so getTime() is already microseconds.
+const toMicros = (value: unknown): number | null => {
+  const us = value instanceof Date ? value.getTime() : Number.NaN;
+  return Number.isFinite(us) ? us : null;
+};
+
+/** Records a user's Run once the panel request settles; a failed record never reaches the run. */
+export const useQueryHistoryRecorder = (isLoading: () => boolean) => {
+  const recent = useRecentSearches();
+  let pending: PendingRun | null = null;
+  // Mirrors the panel's error: the panel emits only on change, so a repeat of the same error keeps it.
+  let panelError: RunError | null = null;
+
+  const settle = (body: QueryHistoryRecordBody) => {
+    const result = panelError ? runResultFromError(panelError) : { status: "ok" as const };
+    if (result) recent.record(withRunResult(body, result));
   };
 
-  return { record };
+  watch(isLoading, (loading) => {
+    if (!pending) return;
+    if (loading) {
+      pending.started = true;
+      return;
+    }
+    if (!pending.started) return;
+    const { body } = pending;
+    pending = null;
+    // The panel's error arrives through its own watcher in the same flush as the loading change.
+    nextTick(() => settle(body));
+  });
+
+  /** Captures the run as dispatched; it is recorded when the panel's request settles. */
+  const record = (
+    dashboardPanelData: RecordedPanel,
+    selectedDate: Partial<SelectedDate> | null,
+  ) => {
+    const startUs = toMicros(dashboardPanelData?.meta?.dateTime?.start_time);
+    const endUs = toMicros(dashboardPanelData?.meta?.dateTime?.end_time);
+    const body = buildMetricsRecord({
+      panel: dashboardPanelData,
+      selectedDate,
+      window: startUs !== null && endUs !== null ? { startUs, endUs } : null,
+    });
+    pending = body ? { body, started: isLoading() } : null;
+  };
+
+  const onPanelError = (detail: PanelErrorDetail | string | null | undefined) => {
+    panelError = metricsRunError(detail);
+  };
+
+  /** A cancelled run is never recorded. */
+  const cancel = () => {
+    pending = null;
+  };
+
+  return { record, onPanelError, cancel };
 };

@@ -14,18 +14,23 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import type { SyntheticsVariable } from "@/types/synthetics";
 
-const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
-vi.mock("@/composables/useConfirmDialog", () => ({
-  useConfirmDialog: () => ({ confirm: confirmMock }),
+const { deleteEnvironmentVariable } = vi.hoisted(() => ({
+  deleteEnvironmentVariable: vi.fn(),
 }));
-vi.mock("@/services/synthetics", () => ({ default: {} }));
+vi.mock("@/services/synthetics", () => ({ default: { deleteEnvironmentVariable } }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 import SyntheticsVariablesList from "./SyntheticsVariablesList.vue";
+
+const ODialogStub = {
+  props: ["open", "title", "primaryButtonLabel", "primaryButtonVariant"],
+  emits: ["click:primary", "click:secondary", "update:open"],
+  template: '<div v-if="open" v-bind="$attrs"><slot /></div>',
+};
 
 const OBadgeStub = {
   props: ["variant", "size"],
@@ -57,6 +62,7 @@ function mountList(variables: SyntheticsVariable[]) {
       provide: { store: { state: { selectedOrganization: { identifier: "default" } } } },
       stubs: {
         OBadge: OBadgeStub,
+        ODialog: ODialogStub,
         OTooltip: { template: "<span><slot /></span>" },
         SyntheticsVariableForm: true,
         SyntheticsSplitVariableDialog: true,
@@ -142,7 +148,6 @@ describe("SyntheticsVariablesList — check-count plurals", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    confirmMock.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -166,13 +171,15 @@ describe("SyntheticsVariablesList — check-count plurals", () => {
     expect(wrapper.find(usageCell).text()).toBe("2 checks");
   });
 
+  const deleteDialog = () => wrapper.find('[data-test="synthetics-variable-delete-dialog"]');
+
   it("asks the delete confirm in the singular for one referencing check", async () => {
     wrapper = mountList([variable({ used_by_checks: 1 })]);
     await wrapper.find(deleteBtn).trigger("click");
 
-    expect(confirmMock).toHaveBeenCalledTimes(1);
-    const message = String(confirmMock.mock.calls[0][0].message);
-    expect(message).toContain("BASE_URL");
+    const message = deleteDialog().text();
+    expect(wrapper.find('[data-test="synthetics-variable-delete-name"]').text()).toBe("BASE_URL");
+    expect(message).toContain("The BASE_URL variable is referenced by 1 check.");
     expect(message).toContain("1 check");
     expect(message).not.toContain("1 checks");
     expect(message).toContain("It will resolve it as literal text until you update it");
@@ -183,10 +190,60 @@ describe("SyntheticsVariablesList — check-count plurals", () => {
     wrapper = mountList([variable({ used_by_checks: 3 })]);
     await wrapper.find(deleteBtn).trigger("click");
 
-    expect(confirmMock).toHaveBeenCalledTimes(1);
-    const message = String(confirmMock.mock.calls[0][0].message);
+    const message = deleteDialog().text();
     expect(message).toContain("3 checks");
     expect(message).toContain("They will resolve it as literal text until you update them");
+  });
+});
+
+describe("SyntheticsVariablesList — delete dialog", () => {
+  let wrapper: VueWrapper;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  const dialog = () => wrapper.findComponent(ODialogStub);
+
+  it("names an unused variable in bold behind a destructive confirm", async () => {
+    wrapper = mountList([variable()]);
+    await wrapper.find(deleteBtn).trigger("click");
+
+    expect(dialog().props("open")).toBe(true);
+    expect(dialog().props("primaryButtonVariant")).toBe("destructive");
+    const name = wrapper.find('[data-test="synthetics-variable-delete-name"]');
+    expect(name.text()).toBe("BASE_URL");
+    expect(name.classes()).toContain("font-semibold");
+    expect(dialog().text()).toBe("Delete the BASE_URL variable?");
+    expect(deleteEnvironmentVariable).not.toHaveBeenCalled();
+  });
+
+  it("deletes only after the confirm, forcing when checks use it", async () => {
+    deleteEnvironmentVariable.mockResolvedValue({});
+    wrapper = mountList([variable({ used_by_checks: 2 })]);
+    await wrapper.find(deleteBtn).trigger("click");
+    dialog().vm.$emit("click:primary");
+    await flushPromises();
+
+    expect(deleteEnvironmentVariable).toHaveBeenCalledWith("default", "staging", "v1", true);
+    expect(dialog().props("open")).toBe(false);
+    expect(wrapper.emitted("refresh")).toHaveLength(1);
+  });
+
+  it("closes without deleting on cancel", async () => {
+    wrapper = mountList([variable()]);
+    await wrapper.find(deleteBtn).trigger("click");
+    dialog().vm.$emit("click:secondary");
+    await flushPromises();
+
+    expect(dialog().props("open")).toBe(false);
+    expect(deleteEnvironmentVariable).not.toHaveBeenCalled();
+    // The closing dialog still fades out, so its message must not blank.
+    expect((wrapper.vm as any).deleteShown.name).toBe("BASE_URL");
   });
 });
 

@@ -254,11 +254,7 @@ impl MigrationTrait for Migration {
                             .null(),
                     )
                     // A handoff starts a new run, so its ladder begins at rung one.
-                    .col(
-                        ColumnDef::new(OncallResponses::LadderRun)
-                            .integer()
-                            .null(),
-                    )
+                    .col(ColumnDef::new(OncallResponses::LadderRun).integer().null())
                     // Distinct from acking: the page is still nobody's, it is just not shouting.
                     .col(
                         ColumnDef::new(OncallResponses::SnoozedUntil)
@@ -289,7 +285,11 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(ColumnDef::new(OncallResponses::AckedBy).string().null())
-                    .col(ColumnDef::new(OncallResponses::AckedAt).big_integer().null())
+                    .col(
+                        ColumnDef::new(OncallResponses::AckedAt)
+                            .big_integer()
+                            .null(),
+                    )
                     .col(
                         ColumnDef::new(OncallResponses::ClosedAt)
                             .big_integer()
@@ -391,7 +391,11 @@ impl MigrationTrait for Migration {
                             .string()
                             .null(),
                     )
-                    .col(ColumnDef::new(OncallResponseEvents::Channel).integer().null())
+                    .col(
+                        ColumnDef::new(OncallResponseEvents::Channel)
+                            .integer()
+                            .null(),
+                    )
                     .col(
                         ColumnDef::new(OncallResponseEvents::Delivered)
                             .boolean()

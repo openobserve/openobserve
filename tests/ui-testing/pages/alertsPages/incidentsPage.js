@@ -76,4 +76,34 @@ export class IncidentsPage {
       || (await empty.isVisible().catch(() => false));
     expect(ok, 'the incident list must render either rows or its empty state').toBe(true);
   }
+
+  _incidentRow(text) {
+    return this.page.locator(this.incidentTable).locator('[data-test^="o2-table-row-"]').filter({ hasText: text });
+  }
+
+  async searchIncidents(text) {
+    await this.page.locator('[data-test="incident-search-input-field"]').fill(text);
+    await expect(this._incidentRow(text).first()).toBeVisible({ timeout: 20000 });
+  }
+
+  async expectMutedTag(rowText, label) {
+    await expect(this._incidentRow(rowText).first().locator('[data-test="incident-list-muted"]')).toHaveText(label, { timeout: 20000 });
+  }
+
+  async expectNoMutedTag(rowText) {
+    await expect(this._incidentRow(rowText).first()).toBeVisible({ timeout: 20000 });
+    await expect(this._incidentRow(rowText).first().locator('[data-test="incident-list-muted"]')).toHaveCount(0);
+  }
+
+  async openIncidentRow(rowText) {
+    await this._incidentRow(rowText).first().click();
+  }
+
+  async expectMutedBanner(prefix) {
+    await expect(this.page.locator('[data-test="incident-detail-muted-banner"]')).toContainText(prefix, { timeout: 20000 });
+  }
+
+  async clickMutedViewDowntime() {
+    await this.page.locator('[data-test="incident-detail-muted-view"]').click();
+  }
 }

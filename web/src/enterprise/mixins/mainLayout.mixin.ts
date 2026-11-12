@@ -1,6 +1,4 @@
 import { ref, Ref } from "vue";
-import { useRouter } from "vue-router";
-import config from "@/aws-exports";
 import { useStore } from "vuex";
 
 import {
@@ -8,16 +6,14 @@ import {
   getImageURL,
   useLocalOrganization,
   invalidateLoginData,
-  useLocalCurrentUser,
-  useLocalUserInfo,
 } from "@/utils/zincutils";
+import { expireSession } from "@/utils/sessionServices";
 import organizationService from "@/services/organizations";
 import userService from "@/services/users";
 import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 
 const MainLayoutCloudMixin = {
   setup() {
-    const router = useRouter();
     const store = useStore();
     const orgOptions = ref([{ label: Number, value: String }]);
     const selectedOrg: Ref<string> = ref("");
@@ -130,16 +126,11 @@ const MainLayoutCloudMixin = {
         });
     };
 
-    const signout = async () => {
-      if (config.isEnterprise == "true") {
-        invalidateLoginData();
-      }
-      store.dispatch("logout");
-
-      useLocalCurrentUser("", true);
-      useLocalUserInfo("", true);
-
-      router.push("/logout");
+    // The server refused this user's organizations: the session ends as an expired one does, with no leave dialog offering a Save that cannot work.
+    const signout = () => {
+      // In every build, since expireSession leaves the backend auth cookie in place.
+      invalidateLoginData();
+      expireSession(store);
     };
 
     return {

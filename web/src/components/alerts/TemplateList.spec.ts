@@ -14,15 +14,35 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
+import { mount, flushPromises, DOMWrapper, type VueWrapper } from "@vue/test-utils";
+import type { RouteLocationNormalizedLoaded } from "vue-router";
 import TemplateList from "./TemplateList.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { http, HttpResponse } from "msw";
 import templateService from "@/services/alert_templates";
 import alertsFixture from "@/test/unit/mockData/alerts";
 import router from "@/test/unit/helpers/router";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
+import { queryClient } from "@/composables/query/queryClient";
+import { templateKeys } from "@/services/alert_templates.querykeys";
+import type { Template } from "@/ts/interfaces";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
+
+interface TemplateListVm {
+  showTemplateEditor: boolean;
+  editingTemplate: Template | null;
+  cloningTemplate: boolean;
+  cloningSource: string | null;
+  templates: Template[];
+  lastUpdatedAt: number;
+  cloneTemplate: (template: Template) => void;
+}
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -63,6 +83,55 @@ describe("Alert List", async () => {
     vi.clearAllMocks();
   });
 
+  // B27: other kinds skip a prebuilt channel template, so its row says Alert; prebuilt_default serves all.
+  it("names Alert for a prebuilt channel row and All kinds for prebuilt_default", () => {
+    const vm = wrapper.vm as any;
+    expect(
+      String(vm.appliesToText({ name: "prebuilt_slack", isPrebuilt: true, applies_to: [] })),
+    ).toBe("Alert");
+    expect(
+      String(vm.appliesToText({ name: "prebuilt_default", isPrebuilt: true, applies_to: [] })),
+    ).toBe("All kinds");
+  });
+
+  it("shows each template's kinds and counts the user templates that apply to every kind", async () => {
+    const vm = wrapper.vm as any;
+    const userAllKinds = vm.templates.filter(
+      (tpl: any) => !tpl.isPrebuilt && !tpl.applies_to?.length,
+    );
+    expect(userAllKinds.length).toBeGreaterThan(0);
+    expect(wrapper.find('[data-test="alert-template-list-Template2-applies-to"]').text()).toBe(
+      "All kinds",
+    );
+    const notice = wrapper.find('[data-test="template-list-all-kinds-notice"]');
+    expect(notice.text()).toContain(`Templates that apply to every kind: ${userAllKinds.length}.`);
+
+    await wrapper.find('[data-test="template-list-all-kinds-review"]').trigger("click");
+    expect(vm.activeTab).toBe("custom");
+    expect(vm.appliesToFilter).toBe("all_kinds");
+
+    await wrapper.find('[data-test="template-list-all-kinds-dismiss"]').trigger("click");
+    expect(wrapper.find('[data-test="template-list-all-kinds-notice"]').exists()).toBe(false);
+    expect(localStorage.getItem(vm.allKindsNoticeKey)).toBe("1");
+    localStorage.removeItem(vm.allKindsNoticeKey);
+  });
+
+  it("filters the rows by the kind they apply to", async () => {
+    const vm = wrapper.vm as any;
+    queryClient.setQueryData(templateKeys.list(store.state.selectedOrganization.identifier), [
+      { name: "every", type: "http", body: "", applies_to: [] },
+      { name: "anomaly_only", type: "http", body: "", applies_to: ["anomaly"] },
+      { name: "alert_only", type: "http", body: "", applies_to: ["alert"] },
+    ]);
+    await flushPromises();
+    vm.appliesToFilter = "anomaly";
+    await flushPromises();
+    expect(vm.visibleRows.map((r: any) => r.name)).toEqual(["every", "anomaly_only"]);
+    vm.appliesToFilter = "all_kinds";
+    await flushPromises();
+    expect(vm.visibleRows.map((r: any) => r.name)).toEqual(["every"]);
+  });
+
   it("titles itself with the SECTION, so the peer tabs never move", () => {
     // All four alerting pages carry this identical string: the title block
     // sizes to its content, so a per-page title would shift the tab strip
@@ -101,11 +170,188 @@ describe("Alert List", async () => {
     expect(tableData[2].text()).toContain("Template2");
   });
 
+  it("names the template and uses a destructive confirm", async () => {
+    await wrapper
+      .find('[data-test="alert-template-list-Template2-delete-template"]')
+      .trigger("click");
+    await flushPromises();
+
+    const dialog = wrapper
+      .findAllComponents({ name: "ConfirmDialog" })
+      .find((c: any) => c.props("messageKeypath") === "alert_templates.deleteTemplateMessage");
+    expect(dialog.props("messageName")).toBe("Template2");
+    expect(dialog.props("okVariant")).toBe("destructive");
+  });
+
+  it("keeps the Applies to filter at field width, so the search box has room", () => {
+    const filter = wrapper.find('[data-test="template-list-applies-to-filter"]');
+    expect(filter.classes()).toContain("w-field-width-sm");
+    expect(filter.classes()).toContain("shrink-0");
+    expect(filter.classes()).not.toContain("w-full");
+  });
+
+  describe("selection follows the visible rows", () => {
+    const rows = [
+      { name: "every", type: "http", body: "", applies_to: [] },
+      { name: "anomaly_only", type: "http", body: "", applies_to: ["anomaly"] },
+      { name: "alert_only", type: "http", body: "", applies_to: ["alert"] },
+    ];
+    const listKey = () => templateKeys.list(store.state.selectedOrganization.identifier);
+    // What the server lists; a test can change it to model a delete.
+    let serverRows: any[] = rows;
+    beforeEach(() => {
+      serverRows = rows;
+      // A refetch after a delete must return these rows, not the shared fixture.
+      global.server.use(
+        http.get(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates`,
+          () => HttpResponse.json(serverRows),
+        ),
+      );
+    });
+    afterEach(async () => {
+      // The tab, search, and filter persist across mounts; reset them.
+      const vm = wrapper.vm as any;
+      vm.activeTab = "all";
+      vm.filterQuery = "";
+      vm.appliesToFilter = "any";
+      await flushPromises();
+      // Drop these rows, so the next mount fetches the shared fixture.
+      global.server.resetHandlers();
+      queryClient.removeQueries({ queryKey: listKey() });
+    });
+    const selectAll = async (vm: any) => {
+      // Wait for the refetch, so a late response cannot replace these rows.
+      await queryClient.refetchQueries({ queryKey: listKey() });
+      await flushPromises();
+      expect(vm.templates.map((r: any) => r.name)).toEqual(rows.map((r) => r.name));
+      vm.handleSelectedIdsUpdate(rows.map((r) => r.name));
+      await flushPromises();
+      expect(vm.selectedTemplateIds).toEqual(rows.map((r) => r.name));
+    };
+
+    it("drops a selected row that the Applies to filter hides, and does not bring it back", async () => {
+      const vm = wrapper.vm as any;
+      await selectAll(vm);
+      vm.appliesToFilter = "alert";
+      await flushPromises();
+      expect(vm.selectedTemplateIds).toEqual(["every", "alert_only"]);
+      vm.appliesToFilter = "any";
+      await flushPromises();
+      expect(vm.selectedTemplateIds).toEqual(["every", "alert_only"]);
+    });
+
+    it("drops a selected row that the search hides", async () => {
+      const vm = wrapper.vm as any;
+      await selectAll(vm);
+      vm.filterQuery = "anomaly";
+      await flushPromises();
+      expect(vm.selectedTemplateIds).toEqual(["anomaly_only"]);
+    });
+
+    it("clears the selection when the Prebuilt tab hides every custom row", async () => {
+      const vm = wrapper.vm as any;
+      await selectAll(vm);
+      vm.activeTab = "prebuilt";
+      await flushPromises();
+      expect(vm.selectedTemplateIds).toEqual([]);
+    });
+
+    it("keeps a selection on page 1 and page 2 while paging through the table", async () => {
+      const vm = wrapper.vm as any;
+      serverRows = Array.from({ length: 25 }, (_, i) => ({
+        name: `row_${String(i).padStart(2, "0")}`,
+        type: "http",
+        body: "",
+        applies_to: [],
+      }));
+      await queryClient.refetchQueries({ queryKey: listKey() });
+      await flushPromises();
+      // Past OTable's skeleton hold, so the rows render.
+      vi.advanceTimersByTime(SKELETON_HOLD_MS);
+      await flushPromises();
+      expect(vm.templates).toHaveLength(25);
+      // Mocked so the URL rewrite does not leak a navigation into later tests.
+      const replaceSpy = vi
+        .spyOn(router, "replace")
+        .mockImplementation((() => Promise.resolve()) as any);
+      const body = () =>
+        wrapper
+          .find('[data-test="alert-templates-list-table"]')
+          .find('[data-test="o2-table-body"]');
+      try {
+        expect(body().text()).toContain("row_00");
+        expect(body().text()).not.toContain("row_24");
+        vm.handleSelectedIdsUpdate(["row_00", "row_24"]);
+        await flushPromises();
+
+        const pager = wrapper.findComponent({ name: "OTablePagination" });
+        pager.vm.$emit("next-page");
+        vi.advanceTimersByTime(10);
+        await flushPromises();
+        expect(body().text()).toContain("row_24");
+        expect(body().text()).not.toContain("row_00");
+        expect(vm.selectedTemplateIds).toEqual(["row_00", "row_24"]);
+
+        pager.vm.$emit("prev-page");
+        vi.advanceTimersByTime(10);
+        await flushPromises();
+        expect(body().text()).toContain("row_00");
+        expect(vm.selectedTemplateIds).toEqual(["row_00", "row_24"]);
+      } finally {
+        replaceSpy.mockRestore();
+      }
+      // Rendering 25 rows twice takes longer than the default 5 seconds.
+    }, 20000);
+
+    it("bulk deletes only the visible selection and keeps a failed row selected for retry", async () => {
+      const vm = wrapper.vm as any;
+      await selectAll(vm);
+      vm.appliesToFilter = "alert";
+      await flushPromises();
+      const bulk = vi.spyOn(templateService, "bulkDelete").mockResolvedValue({
+        data: { successful: ["every"], unsuccessful: ["alert_only"] },
+      } as any);
+      // The server no longer lists the deleted row.
+      serverRows = rows.filter((r) => r.name !== "every");
+      vm.bulkDeleteTemplates();
+      await flushPromises();
+      expect(bulk).toHaveBeenCalledTimes(1);
+      expect(bulk.mock.calls[0][1]).toEqual({ ids: ["every", "alert_only"] });
+      // Wait for the refetch the delete started, then check the selection survived it.
+      await vi.waitFor(() =>
+        expect(queryClient.getQueryState(listKey())?.fetchStatus).toBe("idle"),
+      );
+      await flushPromises();
+      expect(vm.templates.map((r: any) => r.name)).toEqual(["anomaly_only", "alert_only"]);
+      expect(vm.selectedTemplateIds).toEqual(["alert_only"]);
+
+      // Retry sends only the row that failed.
+      bulk.mockResolvedValue({ data: { successful: ["alert_only"], unsuccessful: [] } } as any);
+      vm.bulkDeleteTemplates();
+      await flushPromises();
+      expect(bulk).toHaveBeenCalledTimes(2);
+      expect(bulk.mock.calls[1][1]).toEqual({ ids: ["alert_only"] });
+      expect(vm.selectedTemplateIds).toEqual([]);
+      bulk.mockRestore();
+    });
+  });
+
+  it("uses a destructive confirm for bulk delete", () => {
+    const dialog = wrapper
+      .findAllComponents({ name: "ConfirmDialog" })
+      .find((c: any) => c.props("title") === i18n.global.t("alert_templates.deleteTemplatesTitle"));
+    expect(dialog.props("okVariant")).toBe("destructive");
+  });
+
   describe("When user clicks on delete alert", () => {
     const template_name = "Template2";
     const deleteAlert = vi.spyOn(templateService, "delete");
     const listTemplates = vi.spyOn(templateService, "list");
     let listCallsBeforeDelete = 0;
+    // The page's own list reads; the dependency graph's usage read is a separate request.
+    const plainListCalls = () =>
+      listTemplates.mock.calls.filter((args: any[]) => !args[0]?.include_usage).length;
     beforeEach(async () => {
       const templatesUrl = `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates`;
       global.server.use(
@@ -119,7 +365,7 @@ describe("Alert List", async () => {
           ),
         ),
       );
-      listCallsBeforeDelete = listTemplates.mock.calls.length;
+      listCallsBeforeDelete = plainListCalls();
 
       // Click the delete button — only visible once skeleton is cleared (done in outer beforeEach).
       await wrapper
@@ -139,7 +385,7 @@ describe("Alert List", async () => {
 
     it("drops the deleted row in place, leaving the rest of the list alone", () => {
       // The mutation's invalidation refetches the mounted list in the background; the splice keeps the row gone meanwhile.
-      expect(listTemplates.mock.calls.length).toBe(listCallsBeforeDelete + 1);
+      expect(plainListCalls()).toBe(listCallsBeforeDelete + 1);
       const body = wrapper
         .find('[data-test="alert-templates-list-table"]')
         .find('[data-test="o2-table-body"]');
@@ -277,6 +523,19 @@ describe("TemplateList pagination persistence", () => {
     const pushedQuery = pushSpy.mock.calls[0][0].query;
     expect(pushedQuery.page).toBe("3");
     expect(pushedQuery.action).toBe("add");
+    expect(pushedQuery.clone).toBe("Template2");
+  });
+
+  it("cuts a clone name to the 256-character server limit", async () => {
+    (router as any).currentRoute.value.query = {};
+    wrapper = mountComponent();
+    await flushPromises();
+
+    (wrapper.vm as any).cloneTemplate({ name: "é".repeat(250) });
+
+    const name = (wrapper.vm as any).editingTemplate.name as string;
+    expect(Array.from(name)).toHaveLength(256);
+    expect(name.startsWith("Copy_of_")).toBe(true);
   });
 
   it("importTemplate preserves the page query param", async () => {
@@ -313,6 +572,39 @@ describe("TemplateList pagination persistence", () => {
     expect(pushedQuery.action).toBeUndefined();
     expect(pushedQuery.name).toBeUndefined();
   });
+
+  it("toggleTemplateEditor drops applies_to when closing, so the next new template starts on Inferred", async () => {
+    (router as any).currentRoute.value.query = {};
+    wrapper = mountComponent();
+    await flushPromises();
+    (wrapper.vm as any).showTemplateEditor = true;
+    (router as any).currentRoute.value.query = {
+      action: "add",
+      applies_to: "anomaly",
+      page: "2",
+      org_identifier: "test-org",
+    };
+    const pushSpy = vi.spyOn(router, "push");
+
+    (wrapper.vm as any).toggleTemplateEditor();
+
+    const pushedQuery = pushSpy.mock.calls[0][0].query;
+    expect(pushedQuery.applies_to).toBeUndefined();
+    expect(pushedQuery.page).toBe("2");
+  });
+
+  it("editTemplate(null) keeps applies_to, which the picker's create link passes", async () => {
+    (router as any).currentRoute.value.query = { applies_to: "anomaly" };
+    wrapper = mountComponent();
+    await flushPromises();
+    const pushSpy = vi.spyOn(router, "push").mockImplementation((() => Promise.resolve()) as any);
+
+    (wrapper.vm as any).editTemplate(null);
+
+    expect(pushSpy.mock.calls[0][0].query.applies_to).toBe("anomaly");
+    pushSpy.mockRestore();
+    (router as any).currentRoute.value.query = {};
+  });
 });
 
 describe("alertTemplates view state restore", () => {
@@ -326,6 +618,63 @@ describe("alertTemplates view state restore", () => {
   beforeEach(() => resetListViewState());
 
   afterEach(() => viewWrapper?.unmount());
+
+  it("restores the Applies to filter after navigation", async () => {
+    (router as any).currentRoute.value.query = {};
+    viewWrapper = mountComponent();
+    (viewWrapper.vm as any).appliesToFilter = "downtime";
+    await flushPromises();
+    viewWrapper.unmount();
+
+    viewWrapper = mountComponent();
+    expect((viewWrapper.vm as any).appliesToFilter).toBe("downtime");
+  });
+
+  it("prefers a valid applies_to in the address over the kept filter, and ignores an invalid one", () => {
+    useListViewState("alertTemplates", { appliesTo: "downtime" });
+    (router as any).currentRoute.value.query = { applies_to: "anomaly" };
+    viewWrapper = mountComponent();
+    expect((viewWrapper.vm as any).appliesToFilter).toBe("anomaly");
+    viewWrapper.unmount();
+
+    (router as any).currentRoute.value.query = { applies_to: "nonsense" };
+    viewWrapper = mountComponent();
+    expect((viewWrapper.vm as any).appliesToFilter).toBe("downtime");
+    (router as any).currentRoute.value.query = {};
+  });
+
+  it("says no template matches the filter, and its clear action resets the filter too", async () => {
+    const org = store.state.selectedOrganization.identifier;
+    global.server.use(
+      http.get(`${store.state.API_ENDPOINT}/api/${org}/alerts/templates`, () =>
+        HttpResponse.json([{ name: "alert_only", type: "http", body: "", applies_to: ["alert"] }]),
+      ),
+    );
+    queryClient.removeQueries({ queryKey: templateKeys.list(org), exact: true });
+    useListViewState("alertTemplates", { appliesTo: "downtime" });
+    (router as any).currentRoute.value.query = {};
+    try {
+      viewWrapper = mountComponent();
+      await vi.waitFor(() => expect((viewWrapper.vm as any).templates.length).toBe(1));
+      await flushPromises();
+      const vm = viewWrapper.vm as any;
+      expect(vm.visibleRows).toEqual([]);
+      await vi.waitFor(() =>
+        expect(viewWrapper.findComponent({ name: "OEmptyState" }).exists()).toBe(true),
+      );
+      const empty = viewWrapper.findComponent({ name: "OEmptyState" });
+      expect(empty.props("filtered")).toBe(true);
+
+      vm.filterQuery = "x";
+      empty.vm.$emit("action", "clear-filters");
+      await flushPromises();
+      expect(vm.appliesToFilter).toBe("any");
+      expect(vm.filterQuery).toBe("");
+    } finally {
+      global.server.resetHandlers();
+      queryClient.removeQueries({ queryKey: templateKeys.list(org), exact: true });
+    }
+  });
 
   it("restores search, tab, page size and sort", () => {
     useListViewState("alertTemplates", {
@@ -355,5 +704,256 @@ describe("alertTemplates view state restore", () => {
     expect(saved.filterQuery).toBe("abc");
     expect(saved.tab).toBe("prebuilt");
     expect(saved.pageSize).toBe(100);
+  });
+});
+
+describe("TemplateList drafts", () => {
+  let wrapper: VueWrapper;
+  const scope = (entityId: string | null): EditorDraftScope => ({
+    kind: "alert_template",
+    org: "default",
+    entityId,
+    userEmail: "example@gmail.com",
+  });
+
+  beforeEach(async () => {
+    localStorage.clear();
+    writeEditorDraft(scope(null), { data: {} });
+    writeEditorDraft(scope("Template2"), { data: {} });
+    router.currentRoute.value.query = {};
+    resetListViewState();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    wrapper = mount(TemplateList, {
+      attachTo: "#app",
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+    await flushPromises();
+    vi.advanceTimersByTime(SKELETON_HOLD_MS);
+    await flushPromises();
+  });
+
+  afterEach(() => {
+    wrapper.unmount();
+    vi.useRealTimers();
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it("marks the Add button and the drafted row only", () => {
+    const add = wrapper.get('[data-test="template-list-add-btn"]');
+    expect(add.find('[data-test="template-list-add-draft-dot"]').exists()).toBe(true);
+    expect(add.attributes("aria-label")).toContain("unsaved draft");
+    expect(wrapper.find('[data-test="alert-template-list-Template2-draft-dot"]').exists()).toBe(
+      true,
+    );
+    expect(wrapper.find('[data-test="alert-template-list-Template3-draft-dot"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("marks the clone action of a template whose clone has a kept draft", async () => {
+    writeEditorDraft({ ...scope(null), variant: "clone:Template2" }, { data: {} });
+    await flushPromises();
+
+    const clone = wrapper.get('[data-test="alert-template-list-Template2-clone-template"]');
+    expect(clone.find('[data-test="alert-template-list-Template2-clone-draft-dot"]').exists()).toBe(
+      true,
+    );
+    expect(clone.attributes("aria-label")).toMatch(/^Clone · unsaved draft · .*\d/);
+    // Sighted users read the same dated name in the button's own tooltip, not a bare native title.
+    expect(clone.attributes("title")).toBeUndefined();
+    const tip = clone.findComponent(OTooltip);
+    expect(tip.props("content")).toBe(clone.attributes("aria-label"));
+    expect(
+      wrapper.find('[data-test="alert-template-list-Template3-clone-draft-dot"]').exists(),
+    ).toBe(false);
+    const plain = wrapper.get('[data-test="alert-template-list-Template3-clone-template"]');
+    expect(plain.findComponent(OTooltip).props("content")).toBe("Clone");
+  });
+
+  it("marks the phone row menu and its Clone item for a kept clone draft", async () => {
+    writeEditorDraft({ ...scope(null), variant: "clone:Template2" }, { data: {} });
+    await flushPromises();
+
+    const triggers = wrapper.findAll('[data-test="alert-template-list-row-more-actions"]');
+    const trigger = triggers.find((t: DOMWrapper<Element>) =>
+      t.find('[data-test="alert-template-list-Template2-more-actions-draft-dot"]').exists(),
+    );
+    expect(trigger?.attributes("aria-label")).toMatch(/^More actions · unsaved draft · .*\d/);
+    expect(trigger?.attributes("title")).toBeUndefined();
+    expect(wrapper.findAll('[data-test$="-more-actions-draft-dot"]').length).toBe(1);
+
+    await trigger!.trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    const item = document.body.querySelector(
+      '[data-test="alert-template-list-Template2-clone-template-menu"]',
+    );
+    const menuDot = item?.querySelector(
+      '[data-test="alert-template-list-Template2-clone-template-menu-draft-dot"]',
+    );
+    expect(menuDot?.getAttribute("aria-label")).toMatch(/^Unsaved draft · .*\d/);
+  });
+
+  it("drops a deleted template's draft", async () => {
+    const templatesUrl = `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates`;
+    global.server.use(
+      http.delete(`${templatesUrl}/Template2`, () => HttpResponse.json({ code: 200 })),
+      http.get(templatesUrl, () =>
+        HttpResponse.json(
+          alertsFixture.templates.get.filter((tpl: { name: string }) => tpl.name !== "Template2"),
+        ),
+      ),
+    );
+    await wrapper
+      .find('[data-test="alert-template-list-Template2-delete-template"]')
+      .trigger("click");
+    await flushPromises();
+    await new DOMWrapper(document.body).find('[data-test="o-dialog-primary-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(readEditorDraft(scope("Template2"))).toBeNull();
+    expect(readEditorDraft(scope(null))).not.toBeNull();
+  });
+});
+
+describe("TemplateList refetch while the editor is open", () => {
+  let wrapper: VueWrapper | null = null;
+  let routeName: RouteLocationNormalizedLoaded["name"];
+  const route = () => router.currentRoute.value;
+  const vm = () => wrapper!.vm as unknown as TemplateListVm;
+
+  const mountAt = async (query: Record<string, string>) => {
+    route().query = query;
+    wrapper = mount(TemplateList, {
+      attachTo: "#app",
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+    await vi.waitFor(() => expect(vm().showTemplateEditor).toBe(true), { timeout: 3000 });
+    // AddTemplate is an async component, so it can land after the list says the editor is open.
+    await vi.waitFor(
+      () => expect(wrapper!.findComponent({ name: "AddTemplate" }).exists()).toBe(true),
+      { timeout: 3000 },
+    );
+    await flushPromises();
+  };
+
+  const refetch = async () => {
+    const { queryClient } = await import("@/composables/query/queryClient");
+    const before = vm().lastUpdatedAt;
+    await queryClient.refetchQueries();
+    await vi.waitFor(() => expect(vm().lastUpdatedAt).not.toBe(before), { timeout: 3000 });
+    await flushPromises();
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    resetListViewState();
+    // Pinned: a real navigation through the app router lands at an unpredictable moment and rewrites the query.
+    vi.spyOn(router, "push").mockImplementation((() => Promise.resolve()) as never);
+    vi.spyOn(router, "replace").mockImplementation((() => Promise.resolve()) as never);
+    // AddTemplate runs drafts only on its own route.
+    routeName = route().name;
+    route().name = "alertTemplates";
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+    route().name = routeName;
+  });
+
+  it("keeps the edit open on the same template", async () => {
+    await mountAt({ action: "update", name: "Template2" });
+    expect(vm().editingTemplate?.name).toBe("Template2");
+
+    await refetch();
+
+    expect(vm().showTemplateEditor).toBe(true);
+    expect(vm().editingTemplate?.name).toBe("Template2");
+    expect(wrapper!.findComponent({ name: "AddTemplate" }).exists()).toBe(true);
+  });
+
+  it("keeps a new template open", async () => {
+    await mountAt({ action: "add" });
+
+    await refetch();
+
+    expect(vm().showTemplateEditor).toBe(true);
+    expect(vm().editingTemplate).toBeNull();
+  });
+
+  it("opens a clone on its own draft slot, never offering the new-template draft", async () => {
+    writeEditorDraft(
+      { kind: "alert_template", org: "default", entityId: null, userEmail: "example@gmail.com" },
+      { data: {} },
+    );
+    route().query = {};
+    wrapper = mount(TemplateList, {
+      attachTo: "#app",
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+    await vi.waitFor(() => expect(vm().templates.length).toBeGreaterThan(0), {
+      timeout: 3000,
+    });
+    const source = vm().templates[0].name;
+    vm().cloneTemplate(vm().templates[0]);
+    await vi.waitFor(
+      () => expect(wrapper!.findComponent({ name: "AddTemplate" }).exists()).toBe(true),
+      { timeout: 3000 },
+    );
+    await flushPromises();
+
+    expect(wrapper!.findComponent({ name: "AddTemplate" }).props("cloneSource")).toBe(source);
+    expect(document.body.querySelector('[data-test="editor-draft-restore-dialog"]')).toBeNull();
+  });
+
+  it("reopens a clone from its URL on reload and offers the clone's own draft", async () => {
+    writeEditorDraft(
+      {
+        kind: "alert_template",
+        org: "default",
+        entityId: null,
+        userEmail: "example@gmail.com",
+        variant: "clone:Template2",
+      },
+      { data: {} },
+    );
+    await mountAt({ action: "add", clone: "Template2" });
+
+    expect(vm().cloningTemplate).toBe(true);
+    expect(vm().editingTemplate?.name).toBe("Copy_of_Template2");
+    expect(wrapper!.findComponent({ name: "AddTemplate" }).props("cloneSource")).toBe("Template2");
+    await vi.waitFor(() =>
+      expect(
+        document.body.querySelector('[data-test="editor-draft-restore-dialog"]'),
+      ).not.toBeNull(),
+    );
+
+    await refetch();
+    expect(vm().showTemplateEditor).toBe(true);
+    expect(vm().cloningSource).toBe("Template2");
+  });
+
+  it("keeps a clone open with its copied content", async () => {
+    route().query = {};
+    wrapper = mount(TemplateList, {
+      attachTo: "#app",
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+    await vi.waitFor(() => expect(vm().templates.length).toBeGreaterThan(0), {
+      timeout: 3000,
+    });
+    vm().cloneTemplate(vm().templates[0]);
+    route().query = {
+      action: "add",
+      clone: vm().templates[0].name,
+    };
+    await flushPromises();
+
+    await refetch();
+
+    expect(vm().showTemplateEditor).toBe(true);
+    expect(vm().cloningTemplate).toBe(true);
+    expect(vm().editingTemplate?.name).toMatch(/^Copy_of_/);
   });
 });

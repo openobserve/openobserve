@@ -196,13 +196,13 @@ export const convertSQLChartData = async (
   if (!["metric", "gauge"].includes(panelSchema.type)) {
     options.series = options.series.filter((it: any) => it.data?.length);
   }
+  // A heatmap's x is categorical, so it zooms and syncs only when its columns carry times.
+  const heatmapTimeX = panelSchema.type === "heatmap" && !!extras?.heatmapTimeAxis;
   // allowed to zoom, only if timeseries
-  options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
+  options.toolbox.show = options.toolbox.show && (isTimeSeriesFlag || heatmapTimeX);
 
   if (
-    ["area", "area-stacked", "bar", "h-bar", "line", "scatter", "stacked", "h-stacked"].includes(
-      panelSchema.type,
-    ) &&
+    ["area", "area-stacked", "bar", "line", "scatter", "stacked"].includes(panelSchema.type) &&
     isTimeSeriesFlag &&
     !panelSchema.config.trellis?.layout
   ) {
@@ -265,7 +265,7 @@ export const convertSQLChartData = async (
     extras: {
       ...extras,
       panelId: panelSchema?.id,
-      isTimeSeries: isTimeSeriesFlag,
+      isTimeSeries: isTimeSeriesFlag || heatmapTimeX,
     },
   };
 };

@@ -18,7 +18,7 @@
 use std::collections::HashMap;
 
 use config::meta::{
-    downtimes::{Downtime, DowntimeSchedule, Repeat},
+    downtimes::{Downtime, DowntimeSchedule, MuteSource, Repeat},
     folder::{DEFAULT_FOLDER, FolderType},
 };
 use sea_orm::{
@@ -157,7 +157,7 @@ pub async fn release_folder(org: &str, folder_pk: &str) -> Result<bool, errors::
 }
 
 /// Removes every row of an org and returns the removed ids.
-pub async fn delete_by_org(org: &str) -> Result<Vec<String>, errors::Error> {
+pub async fn delete_by_org(org: &str) -> Result<Vec<(String, String)>, errors::Error> {
     let client = get_orm_client_rw().await;
     delete_by_org_with(client, org).await
 }
@@ -277,6 +277,9 @@ pub async fn put_with<C: ConnectionTrait>(
                     Column::Reason,
                     Column::Condition,
                     Column::Targets,
+                    Column::AlertGroups,
+                    Column::EndOnClear,
+                    Column::MuteSource,
                     Column::ShowBanner,
                     Column::Repeat,
                     Column::StartsAt,
@@ -548,6 +551,9 @@ pub async fn insert_tombstone_with<C: ConnectionTrait>(
     deleted_at: i64,
 ) -> Result<bool, errors::Error> {
     let tombstone = ActiveModel {
+        alert_groups: Set(None),
+        end_on_clear: Set(None),
+        mute_source: Set(None),
         id: Set(id.to_string()),
         org: Set(org.to_string()),
         folder_id: Set(folder_pk.to_string()),
@@ -651,26 +657,47 @@ pub async fn move_to_folder_with<C: ConnectionTrait>(
     Ok(res.rows_affected)
 }
 
-pub async fn delete_by_org_with<C: ConnectionTrait>(
+pub async fn list_references_by_org_with<C: ConnectionTrait>(
     conn: &C,
     org: &str,
-) -> Result<Vec<String>, errors::Error> {
-    let ids: Vec<String> = Entity::find()
+) -> Result<Vec<(String, String)>, errors::Error> {
+    let rows = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .column(Column::FolderId)
         .filter(Column::Org.eq(org))
+        .into_tuple::<(String, String)>()
         .all(conn)
-        .await?
+        .await?;
+    let pks = rows.iter().map(|(_, folder)| folder.clone()).collect();
+    let slugs = folder_slugs_for_ids(conn, pks).await?;
+    Ok(rows
         .into_iter()
-        .map(|m| m.id)
-        .collect();
+        .map(|(id, folder)| (id, slugs.get(&folder).cloned().unwrap_or(folder)))
+        .collect())
+}
+
+/// Deletes every row of the org, tombstones included; returns each `(id, folder_id)`.
+pub async fn delete_by_org_with<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org: &str,
+) -> Result<Vec<(String, String)>, errors::Error> {
+    let txn = conn.begin().await?;
     notifications::Entity::delete_many()
         .filter(notifications::Column::Org.eq(org))
-        .exec(conn)
+        .exec(&txn)
         .await?;
-    Entity::delete_many()
-        .filter(Column::Org.eq(org))
-        .exec(conn)
-        .await?;
-    Ok(ids)
+    let delete = Entity::delete_many().filter(Column::Org.eq(org));
+    let removed = super::delete_returning_models(&txn, delete).await?;
+    let slugs = folder_slugs(&txn, &removed).await?;
+    txn.commit().await?;
+    Ok(removed
+        .into_iter()
+        .map(|m| {
+            let folder_id = slugs.get(&m.folder_id).cloned().unwrap_or(m.folder_id);
+            (m.id, folder_id)
+        })
+        .collect())
 }
 
 /// One compare-and-swap against `stored`; `None` when another write moved the row first.
@@ -775,6 +802,17 @@ fn to_active_model(d: &Downtime, folder_pk: String) -> Result<ActiveModel, error
         reason: Set(d.reason.clone()),
         condition: Set(d.condition.as_ref().map(serde_json::to_value).transpose()?),
         targets: Set(serde_json::to_value(&d.targets)?),
+        alert_groups: Set(d
+            .alert_groups
+            .as_ref()
+            .map(serde_json::to_string)
+            .transpose()?),
+        end_on_clear: Set(d
+            .end_on_clear
+            .as_ref()
+            .map(serde_json::to_string)
+            .transpose()?),
+        mute_source: Set(d.source.map(|s| s.as_str().to_string())),
         show_banner: Set(d.show_banner),
         repeat: Set(d.schedule.repeat.to_i16()),
         starts_at: Set(d.schedule.starts_at),
@@ -807,6 +845,17 @@ fn from_model(m: Model, folder_id: String) -> Result<Downtime, errors::Error> {
     Ok(Downtime {
         condition: m.condition.map(serde_json::from_value).transpose()?,
         targets: serde_json::from_value(m.targets)?,
+        alert_groups: m
+            .alert_groups
+            .as_deref()
+            .map(serde_json::from_str)
+            .transpose()?,
+        end_on_clear: m
+            .end_on_clear
+            .as_deref()
+            .map(serde_json::from_str)
+            .transpose()?,
+        source: m.mute_source.as_deref().and_then(MuteSource::parse),
         schedule: DowntimeSchedule {
             repeat,
             starts_at: m.starts_at,
@@ -868,19 +917,29 @@ async fn folder_slugs<C: ConnectionTrait>(
     conn: &C,
     models: &[Model],
 ) -> Result<HashMap<String, String>, errors::Error> {
-    if models.is_empty() {
+    let pks = models.iter().map(|m| m.folder_id.clone()).collect();
+    folder_slugs_for_ids(conn, pks).await
+}
+
+async fn folder_slugs_for_ids<C: ConnectionTrait>(
+    conn: &C,
+    mut pks: Vec<String>,
+) -> Result<HashMap<String, String>, errors::Error> {
+    if pks.is_empty() {
         return Ok(HashMap::new());
     }
-    let mut pks: Vec<String> = models.iter().map(|m| m.folder_id.clone()).collect();
     pks.sort_unstable();
     pks.dedup();
     Ok(folders::Entity::find()
+        .select_only()
+        .column(folders::Column::Id)
+        .column(folders::Column::FolderId)
         .filter(folders::Column::Id.is_in(pks))
         .filter(folders::Column::Type.eq(folder_type_into_i16(FolderType::Downtimes)))
+        .into_tuple::<(String, String)>()
         .all(conn)
         .await?
         .into_iter()
-        .map(|f| (f.id, f.folder_id))
         .collect())
 }
 
@@ -930,6 +989,9 @@ mod tests {
 
     fn downtime(id: &str, repeat: Repeat, ends_at: Option<i64>) -> Downtime {
         Downtime {
+            alert_groups: None,
+            end_on_clear: None,
+            source: None,
             id: id.to_string(),
             org: "acme".to_string(),
             folder_id: "default".to_string(),
@@ -986,6 +1048,7 @@ mod tests {
             sent_at: 1,
             destinations: serde_json::json!(["slack"]),
             result: Some("ok".to_string()),
+            templates: None,
         };
         super::super::downtime_notifications::insert_if_absent_with(db, &record)
             .await
@@ -1504,9 +1567,44 @@ mod tests {
         log_sent(&db, "acme", "d1").await;
         log_sent(&db, "other", "d2").await;
 
-        assert_eq!(delete_by_org_with(&db, "acme").await.unwrap(), ["d1"]);
+        let removed = delete_by_org_with(&db, "acme").await.unwrap();
+        assert_eq!(removed.len(), 1);
+        assert_eq!(removed[0].0, "d1");
         assert_eq!(ids(&list_all_with(&db).await.unwrap()), ["d2"]);
         assert_eq!(logged(&db).await, ["d2"]);
+    }
+
+    #[tokio::test]
+    async fn raw_org_references_include_malformed_rows_and_tombstones() {
+        let db = db().await;
+        for id in ["d1", "d2", "malformed"] {
+            put_with(&db, &downtime(id, Repeat::None, Some(11 * DAY)))
+                .await
+                .unwrap();
+        }
+        Entity::update_many()
+            .col_expr(Column::Repeat, Expr::value(999_i16))
+            .filter(Column::Id.eq("malformed"))
+            .exec(&db)
+            .await
+            .unwrap();
+        let mut foreign = downtime("d3", Repeat::None, Some(11 * DAY));
+        foreign.org = "other".to_string();
+        put_with(&db, &foreign).await.unwrap();
+        delete_with(&db, "acme", "d2").await.unwrap().unwrap();
+
+        let mut listed = list_references_by_org_with(&db, "acme").await.unwrap();
+        listed.sort();
+        let expected: Vec<_> = ["d1", "d2", "malformed"]
+            .into_iter()
+            .map(|id| (id.to_string(), "default".to_string()))
+            .collect();
+        assert_eq!(listed, expected);
+        assert_eq!(ids(&list_with(&db, "acme", None).await.unwrap()), ["d1"]);
+        let mut removed = delete_by_org_with(&db, "acme").await.unwrap();
+        removed.sort();
+        assert_eq!(removed, expected);
+        assert_eq!(ids(&list_all_with(&db).await.unwrap()), ["d3"]);
     }
 
     /// The test schema with `downtimes_folder_fk` enforced, as the migration creates it.

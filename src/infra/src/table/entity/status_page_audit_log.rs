@@ -1,7 +1,4 @@
-//! `SeaORM` Entity for the status_page_audit_log table.
-//!
-//! Append-only ledger of uptime-affecting mutations (R-4). No update/delete
-//! path exists — the table op layer only inserts.
+//! Append-only status-page audit ledger (R-4); only an org deletion removes its rows.
 
 use sea_orm::entity::prelude::*;
 

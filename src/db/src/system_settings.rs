@@ -24,6 +24,10 @@ use std::sync::Arc;
 use common::infra::config::SYSTEM_SETTINGS;
 use config::meta::system_settings::{SettingScope, SystemSetting};
 use infra::{errors::Result, table::system_settings as db};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::{
+    common::config::get_config as get_o2_config, super_cluster::queue::SystemSettingMessage,
+};
 
 /// Watcher prefix for system settings events
 const SYSTEM_SETTINGS_WATCHER_PREFIX: &str = "/system_settings/";
@@ -38,6 +42,53 @@ fn cache_key(
     let org = org_id.unwrap_or("_");
     let user = user_id.unwrap_or("_");
     format!("{}:{}:{}:{}", scope.as_str(), org, user, key)
+}
+
+/// The cache key of a stored row; an unknown scope reads as `System`, as `model_to_setting` does.
+fn row_cache_key((scope, org_id, user_id, key): &db::SettingRowKey) -> String {
+    let scope = scope.parse().unwrap_or(SettingScope::System);
+    cache_key(&scope, org_id.as_deref(), user_id.as_deref(), key)
+}
+
+fn has_separate_read_replica(meta_store: &str, dsn: &str, ro_dsn: &str) -> bool {
+    use config::meta::meta_store::MetaStore;
+
+    MetaStore::from(meta_store) == MetaStore::PostgreSQL && !ro_dsn.is_empty() && ro_dsn != dsn
+}
+
+/// Caches the stored row on this node and tells this region's other nodes to reload it.
+async fn cache_and_announce(stored: &SystemSetting) {
+    let cache_k = cache_key(
+        &stored.scope,
+        stored.org_id.as_deref(),
+        stored.user_id.as_deref(),
+        &stored.setting_key,
+    );
+    SYSTEM_SETTINGS
+        .write()
+        .await
+        .insert(cache_k.clone(), stored.clone());
+
+    let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
+    if let Err(e) = infra::coordinator::emit_put(&event_key).await {
+        log::error!("Failed to emit system settings put event: {}", e);
+    }
+}
+
+/// Drops the row from this node's cache and tells this region's other nodes to drop it.
+async fn uncache_and_announce(
+    scope: &SettingScope,
+    org_id: Option<&str>,
+    user_id: Option<&str>,
+    key: &str,
+) {
+    let cache_k = cache_key(scope, org_id, user_id, key);
+    SYSTEM_SETTINGS.write().await.remove(&cache_k);
+
+    let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
+    if let Err(e) = infra::coordinator::emit_delete(&event_key).await {
+        log::error!("Failed to emit system settings delete event: {}", e);
+    }
 }
 
 /// Get a single setting from the populated in-memory cache, without a database lookup.
@@ -156,25 +207,9 @@ pub async fn set(setting: &SystemSetting) -> Result<SystemSetting> {
     let result = db::set(setting)
         .await
         .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
-
-    // Update local cache
-    let cache_k = cache_key(
-        &result.scope,
-        result.org_id.as_deref(),
-        result.user_id.as_deref(),
-        &result.setting_key,
-    );
-    SYSTEM_SETTINGS
-        .write()
-        .await
-        .insert(cache_k.clone(), result.clone());
-
-    // Emit event to update cache on other cluster nodes
-    let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
-    if let Err(e) = infra::coordinator::system_settings::emit_put_event(&event_key).await {
-        log::error!("Failed to emit system settings put event: {}", e);
-    }
-
+    cache_and_announce(&result).await;
+    #[cfg(feature = "enterprise")]
+    publish(put_message(&result)).await;
     Ok(result)
 }
 
@@ -183,8 +218,7 @@ pub async fn set(setting: &SystemSetting) -> Result<SystemSetting> {
 /// For a setting whose absence has a defined meaning: caching that meaning stops every subsequent
 /// [`get`] falling through to a database read that can only return nothing. A real row, written
 /// here or on any other node, replaces it through [`set`] or [`watch`].
-#[cfg(feature = "enterprise")]
-pub(crate) async fn set_only_cached(setting: &SystemSetting) {
+pub async fn set_only_cached(setting: &SystemSetting) {
     let cache_k = cache_key(
         &setting.scope,
         setting.org_id.as_deref(),
@@ -207,53 +241,73 @@ pub async fn delete(
     let result = db::delete(scope, org_id, user_id, key)
         .await
         .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
-
-    // Remove from local cache
-    let cache_k = cache_key(scope, org_id, user_id, key);
-    SYSTEM_SETTINGS.write().await.remove(&cache_k);
-
-    // Emit event to update cache on other cluster nodes
-    let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
-    if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
-        log::error!("Failed to emit system settings delete event: {}", e);
-    }
-
+    uncache_and_announce(scope, org_id, user_id, key).await;
+    #[cfg(feature = "enterprise")]
+    publish(delete_message(scope, org_id, key)).await;
     Ok(result)
+}
+
+/// Applies an org setting written in another region; false when the stored row is newer.
+pub async fn apply_replicated_put(setting: &SystemSetting) -> Result<bool> {
+    if setting.scope != SettingScope::Org {
+        return Err(infra::errors::Error::Message(format!(
+            "only org settings replicate, got scope {}",
+            setting.scope.as_str()
+        )));
+    }
+    // Through `infra`, not `set`: `set` would publish the row to the other regions again.
+    let Some(stored) = db::apply_replicated(setting)
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?
+    else {
+        return Ok(false);
+    };
+    cache_and_announce(&stored).await;
+    Ok(true)
+}
+
+/// Applies an org setting delete made in another region.
+pub async fn apply_replicated_delete(org_id: &str, key: &str) -> Result<bool> {
+    let removed = db::delete(&SettingScope::Org, Some(org_id), None, key)
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+    uncache_and_announce(&SettingScope::Org, Some(org_id), None, key).await;
+    Ok(removed)
 }
 
 /// Delete all settings for an organization
 pub async fn delete_org_settings(org_id: &str) -> Result<u64> {
-    let result = db::delete_org_settings(org_id)
+    // Read before the delete: other nodes may cache rows this node never loaded.
+    let stored = db::list_keys_by_org(org_id)
         .await
         .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
-
-    // Clear org settings from cache, then emit events after releasing lock
-    let keys_to_remove: Vec<String> = {
-        let mut cache = SYSTEM_SETTINGS.write().await;
-        let keys: Vec<String> = cache
-            .iter()
-            .filter(|(k, _)| k.split(':').nth(1) == Some(org_id))
-            .map(|(k, _)| k.clone())
-            .collect();
-        for key in &keys {
-            cache.remove(key);
-        }
-        keys
-    }; // Lock released here
-
-    // Emit events without holding lock
-    for key in &keys_to_remove {
-        let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, key);
-        if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
-            log::error!(
-                "Failed to emit system settings delete event for {}: {}",
-                key,
-                e
-            );
-        }
+    let mut keys: Vec<String> = SYSTEM_SETTINGS
+        .read()
+        .await
+        .keys()
+        .filter(|k| k.split(':').nth(1) == Some(org_id))
+        .cloned()
+        .collect();
+    keys.extend(stored.iter().map(row_cache_key));
+    keys.sort();
+    keys.dedup();
+    // Events before the row delete, so a failed one leaves the rows for the retry to list.
+    evict_settings(&keys).await?;
+    let deleted = db::delete_org_settings(org_id)
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+    // The delete names any row the listing missed; that row is evicted only after it.
+    let missed: Vec<String> = deleted
+        .iter()
+        .map(row_cache_key)
+        .filter(|key| keys.binary_search(key).is_err())
+        .collect();
+    evict_settings(&missed).await?;
+    // A read miss before the delete can refill the caches, and no retry lists a deleted row.
+    if let Err(e) = evict_settings(&keys).await {
+        log::warn!("[SYSTEM_SETTINGS] eviction after the org {org_id} row delete failed: {e}");
     }
-
-    Ok(result)
+    Ok(deleted.len() as u64)
 }
 
 /// Delete all settings for a user in an organization
@@ -282,7 +336,7 @@ pub async fn delete_user_settings(org_id: &str, user_id: &str) -> Result<u64> {
     // Emit events without holding lock
     for key in &keys_to_remove {
         let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, key);
-        if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
+        if let Err(e) = infra::coordinator::emit_delete(&event_key).await {
             log::error!(
                 "Failed to emit system settings delete event for {}: {}",
                 key,
@@ -350,8 +404,13 @@ pub async fn invalidate_all_cache() {
 pub async fn get_semantic_field_groups(org_id: &str) -> Vec<config::meta::correlation::FieldAlias> {
     use config::meta::{correlation::FieldAlias, system_settings::keys::SEMANTIC_FIELD_GROUPS};
 
-    // Try to get from settings v2 (org level)
-    if let Ok(Some(setting)) = get_resolved(Some(org_id), None, SEMANTIC_FIELD_GROUPS).await
+    let setting = match get_resolved(Some(org_id), None, SEMANTIC_FIELD_GROUPS).await {
+        Ok(Some(setting)) => Some(setting),
+        // Empty means "use the defaults" here, and caching it spares every later read two misses.
+        Ok(None) => cache_semantic_field_groups_miss(org_id).await,
+        Err(_) => None,
+    };
+    if let Some(setting) = setting
         && let Ok(groups) = serde_json::from_value::<Vec<FieldAlias>>(setting.setting_value)
         && !groups.is_empty()
     {
@@ -360,6 +419,15 @@ pub async fn get_semantic_field_groups(org_id: &str) -> Vec<config::meta::correl
 
     // Fall back to enterprise defaults
     get_default_semantic_field_groups()
+}
+
+/// Whether this is the stand-in cached for an org with no saved semantic field groups.
+pub fn is_absent_semantic_field_groups(setting: &SystemSetting) -> bool {
+    use config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS;
+
+    setting.setting_key == SEMANTIC_FIELD_GROUPS
+        && setting.created_at == 0
+        && setting.updated_at == 0
 }
 
 /// Get the Gen-AI agent fallback mapping config for an organization.
@@ -378,9 +446,14 @@ pub async fn get_gen_ai_agent_mapping_config(
         get_cached(&SettingScope::Org, Some(org_id), None, GEN_AI_AGENT_MAPPING).await
         && let Ok(config) = serde_json::from_value::<GenAiAgentMappingConfig>(setting.setting_value)
         && let Ok(config) = config.normalize_and_validate()
-        && !config.is_all_empty()
     {
-        return config;
+        if !config.is_all_empty() {
+            return config;
+        }
+        // Only attribution fallbacks saved: keep them on top of the identity defaults.
+        let mut defaults = get_default_gen_ai_agent_mapping_config();
+        defaults.attribution_fields = config.attribution_fields;
+        return defaults;
     }
 
     get_default_gen_ai_agent_mapping_config()
@@ -534,14 +607,27 @@ pub async fn get_service_identity_config(
         system_settings::SettingScope,
     };
 
+    let cfg = config::get_config();
+    // The watcher reloads from a separate read replica, which can lag a save and pin a stale row.
+    let stored = if has_separate_read_replica(
+        &cfg.common.meta_store,
+        &cfg.common.meta_postgres_dsn,
+        &cfg.common.meta_postgres_ro_dsn,
+    ) {
+        db::get(&SettingScope::Org, Some(org_id), None, "service_identity")
+            .await
+            .ok()
+            .flatten()
+    } else {
+        get_cached(&SettingScope::Org, Some(org_id), None, "service_identity").await
+    };
     // Intentionally kept here since there's no way to satisfy non-enterprise path
     // TODO: move the entire module to enterprise so that there's no access restrictions
     #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
-    let mut config = match db::get(&SettingScope::Org, Some(org_id), None, "service_identity").await
-    {
-        Ok(Some(s)) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
+    let mut config = match stored {
+        Some(s) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
             .unwrap_or_else(|_| ServiceIdentityConfig::new_default()),
-        _ => ServiceIdentityConfig::new_default(),
+        None => ServiceIdentityConfig::new_default(),
     };
 
     // If tracked_alias_ids is empty (old stored config or default), populate from env default
@@ -629,6 +715,15 @@ pub async fn get_service_identity_config(
     config
 }
 
+/// Save an org's identity config in this region only, where its service-stream cleanup runs.
+pub async fn set_service_identity_config(setting: &SystemSetting) -> Result<SystemSetting> {
+    let stored = db::set(setting)
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+    cache_and_announce(&stored).await;
+    Ok(stored)
+}
+
 /// Get the updated_at timestamp for semantic_field_groups setting
 ///
 /// Returns the timestamp (in microseconds since epoch) when the semantic field groups
@@ -646,6 +741,55 @@ pub async fn get_semantic_field_groups_updated_at(org_id: &str) -> i64 {
         // No org-level setting found - using defaults (return 0 = epoch)
         0
     }
+}
+
+/// Caches what an org's semantic-groups miss means and returns it; `None` when left uncached.
+async fn cache_semantic_field_groups_miss(org_id: &str) -> Option<SystemSetting> {
+    use config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS;
+
+    let cfg = config::get_config();
+    // A replica can lag a save past its watch event, and a cached miss would outlive that lag.
+    if has_separate_read_replica(
+        &cfg.common.meta_store,
+        &cfg.common.meta_postgres_dsn,
+        &cfg.common.meta_postgres_ro_dsn,
+    ) {
+        return None;
+    }
+    let mut absent = SystemSetting::new_org(org_id, SEMANTIC_FIELD_GROUPS, serde_json::json!([]));
+    // Zero timestamps mark the stand-in, and keep `get_semantic_field_groups_updated_at` at 0.
+    absent.created_at = 0;
+    absent.updated_at = 0;
+    // A row cached since the database miss is newer than the miss, so it must win.
+    let cached = SYSTEM_SETTINGS
+        .write()
+        .await
+        .entry(cache_key(
+            &SettingScope::Org,
+            Some(org_id),
+            None,
+            SEMANTIC_FIELD_GROUPS,
+        ))
+        .or_insert(absent)
+        .clone();
+    Some(cached)
+}
+
+async fn evict_settings(keys: &[String]) -> Result<()> {
+    let local = async {
+        let mut cache = SYSTEM_SETTINGS.write().await;
+        for key in keys {
+            cache.remove(key);
+        }
+    };
+    let broadcast = async {
+        for key in keys {
+            let event_key = format!("{SYSTEM_SETTINGS_WATCHER_PREFIX}{key}");
+            infra::coordinator::emit_delete(&event_key).await?;
+        }
+        Ok(())
+    };
+    crate::teardown::evict(local, broadcast).await
 }
 
 async fn watch_events(mut events: Arc<tokio::sync::mpsc::Receiver<super::Event>>) -> Result<()> {
@@ -727,9 +871,260 @@ async fn watch_events(mut events: Arc<tokio::sync::mpsc::Receiver<super::Event>>
     Ok(())
 }
 
+/// The message for the other regions, or `None` for a scope that does not replicate.
+#[cfg(feature = "enterprise")]
+fn put_message(stored: &SystemSetting) -> Option<SystemSettingMessage> {
+    (stored.scope == SettingScope::Org).then(|| SystemSettingMessage::Put {
+        setting: Box::new(SystemSetting {
+            id: None,
+            ..stored.clone()
+        }),
+    })
+}
+
+/// The message for the other regions, or `None` for a scope that does not replicate.
+#[cfg(feature = "enterprise")]
+fn delete_message(
+    scope: &SettingScope,
+    org_id: Option<&str>,
+    key: &str,
+) -> Option<SystemSettingMessage> {
+    match (scope, org_id) {
+        (SettingScope::Org, Some(org_id)) => Some(SystemSettingMessage::Delete {
+            org_id: org_id.to_string(),
+            setting_key: key.to_string(),
+        }),
+        _ => None,
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn publish(msg: Option<SystemSettingMessage>) {
+    let Some(msg) = msg else {
+        return;
+    };
+    if !get_o2_config().super_cluster.enabled {
+        return;
+    }
+    if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::system_settings(&msg).await {
+        log::error!(
+            "[SUPER_CLUSTER:sync] Failed to publish the settings write {}: {e}",
+            msg.key()
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
+
+    async fn announced(event_key: &str) -> bool {
+        let keys = super::super::get_coordinator()
+            .await
+            .list_keys(event_key)
+            .await
+            .unwrap();
+        !keys.is_empty()
+    }
+
+    #[tokio::test]
+    async fn a_missing_semantic_field_groups_row_is_cached_until_a_real_one_is_saved() {
+        use config::meta::{correlation::FieldAlias, system_settings::keys::SEMANTIC_FIELD_GROUPS};
+
+        infra::db::create_table().await.unwrap();
+        db::create_table().await.unwrap();
+        let org = "b16560-no-semantic-groups";
+        let _ = db::delete(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS).await;
+        SYSTEM_SETTINGS.write().await.remove(&cache_key(
+            &SettingScope::Org,
+            Some(org),
+            None,
+            SEMANTIC_FIELD_GROUPS,
+        ));
+
+        let defaults = get_default_semantic_field_groups();
+        assert_eq!(get_semantic_field_groups(org).await, defaults);
+        let cached = get_cached(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS)
+            .await
+            .expect("the miss is cached");
+        assert_eq!(cached.setting_value, json!([]));
+        assert!(is_absent_semantic_field_groups(&cached));
+        assert_eq!(get_semantic_field_groups_updated_at(org).await, 0);
+
+        // Written behind the cache's back: still seeing the defaults proves no database read.
+        let groups = vec![FieldAlias::new("b16560-host", "Host", &["host"])];
+        let row = SystemSetting::new_org(org, SEMANTIC_FIELD_GROUPS, json!(groups));
+        db::set(&row).await.unwrap();
+        assert_eq!(get_semantic_field_groups(org).await, defaults);
+
+        set(&row).await.unwrap();
+        assert_eq!(get_semantic_field_groups(org).await, groups);
+        assert!(get_semantic_field_groups_updated_at(org).await > 0);
+
+        // A miss that lost the race to a save must not replace the saved row.
+        cache_semantic_field_groups_miss(org).await;
+        assert_eq!(get_semantic_field_groups(org).await, groups);
+        let saved = get_cached(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS)
+            .await
+            .unwrap();
+        assert!(!is_absent_semantic_field_groups(&saved));
+
+        let _ = delete(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS).await;
+    }
+
+    #[tokio::test]
+    async fn a_replicated_org_write_lands_in_the_table_and_the_cache_and_is_announced() {
+        infra::db::create_table().await.unwrap();
+        db::create_table().await.unwrap();
+        let (org, key) = ("b6r-replicated-org", "auto_investigate_gate");
+        let cache_k = cache_key(&SettingScope::Org, Some(org), None, key);
+        let event_key = format!("{SYSTEM_SETTINGS_WATCHER_PREFIX}{cache_k}");
+        let _ = db::delete(&SettingScope::Org, Some(org), None, key).await;
+        let _ = infra::coordinator::emit_delete(&event_key).await;
+        SYSTEM_SETTINGS.write().await.remove(&cache_k);
+        assert!(!announced(&event_key).await);
+
+        let mut incoming = SystemSetting::new_org(org, key, json!({"mode": "p1"}));
+        incoming.created_at = 1_000;
+        incoming.updated_at = 2_000;
+        assert!(apply_replicated_put(&incoming).await.unwrap());
+        let row = db::get(&SettingScope::Org, Some(org), None, key)
+            .await
+            .unwrap()
+            .expect("the row is written");
+        assert_eq!(row.setting_value, incoming.setting_value);
+        assert_eq!(row.updated_at, 2_000);
+        let cached = get_cached(&SettingScope::Org, Some(org), None, key).await;
+        assert_eq!(
+            cached.map(|s| s.setting_value),
+            Some(incoming.setting_value.clone())
+        );
+        assert!(
+            announced(&event_key).await,
+            "this region's nodes reload the row"
+        );
+        let resolved = get_resolved(Some(org), None, key).await.unwrap();
+        assert_eq!(
+            resolved.map(|s| s.setting_value),
+            Some(incoming.setting_value.clone())
+        );
+
+        let mut stale = incoming.clone();
+        stale.updated_at = 1_500;
+        stale.setting_value = json!({"mode": "off"});
+        assert!(!apply_replicated_put(&stale).await.unwrap());
+        let row = db::get(&SettingScope::Org, Some(org), None, key)
+            .await
+            .unwrap();
+        assert_eq!(
+            row.map(|s| s.setting_value),
+            Some(incoming.setting_value.clone())
+        );
+
+        assert!(apply_replicated_delete(org, key).await.unwrap());
+        assert!(
+            db::get(&SettingScope::Org, Some(org), None, key)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            get_cached(&SettingScope::Org, Some(org), None, key)
+                .await
+                .is_none()
+        );
+        assert!(
+            !announced(&event_key).await,
+            "this region's nodes drop the row"
+        );
+
+        let user = SystemSetting::new_user(org, "dana@acme.com", key, json!({"mode": "p1"}));
+        assert!(apply_replicated_put(&user).await.is_err());
+    }
+
+    #[test]
+    fn only_a_distinct_postgres_read_dsn_is_a_separate_replica() {
+        let (dsn, ro) = ("postgres://primary/o2", "postgres://replica/o2");
+        assert!(!has_separate_read_replica("sqlite", dsn, ro));
+        assert!(!has_separate_read_replica("postgres", dsn, ""));
+        assert!(!has_separate_read_replica("postgres", dsn, dsn));
+        assert!(has_separate_read_replica("postgres", dsn, ro));
+        assert!(has_separate_read_replica("postgresql", dsn, ro));
+    }
+
+    #[tokio::test]
+    async fn the_identity_config_is_read_from_the_cache_its_save_keeps_current() {
+        use config::meta::correlation::{IdentitySet, ServiceIdentityConfig};
+
+        infra::db::create_table().await.unwrap();
+        db::create_table().await.unwrap();
+        let org = "b16575-identity-config";
+        let _ = delete(&SettingScope::Org, Some(org), None, "service_identity").await;
+
+        let saved = ServiceIdentityConfig {
+            sets: vec![IdentitySet {
+                id: "b16575".to_string(),
+                label: "B16575".to_string(),
+                distinguish_by: vec!["k8s-namespace".to_string()],
+            }],
+            tracked_alias_ids: vec!["k8s-namespace".to_string()],
+            service_optional: false,
+        };
+        let row = SystemSetting::new_org(org, "service_identity", json!(saved));
+
+        // Written behind the cache's back: still seeing the defaults proves no database read.
+        db::set(&row).await.unwrap();
+        assert_ne!(get_service_identity_config(org).await.sets, saved.sets);
+
+        set_service_identity_config(&row).await.unwrap();
+        assert_eq!(get_service_identity_config(org).await.sets, saved.sets);
+        let cache_k = cache_key(&SettingScope::Org, Some(org), None, "service_identity");
+        assert!(
+            announced(&format!("{SYSTEM_SETTINGS_WATCHER_PREFIX}{cache_k}")).await,
+            "the other nodes reload the saved config"
+        );
+
+        delete(&SettingScope::Org, Some(org), None, "service_identity")
+            .await
+            .unwrap();
+        assert_ne!(get_service_identity_config(org).await.sets, saved.sets);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn only_org_scope_writes_produce_a_replication_message() {
+        let mut org =
+            SystemSetting::new_org("acme", "auto_investigate_gate", json!({"mode": "p1"}));
+        org.id = Some(7);
+        let Some(SystemSettingMessage::Put { setting }) = put_message(&org) else {
+            panic!("an org put replicates");
+        };
+        assert_eq!(
+            setting.id, None,
+            "the row id is local to the region that wrote it"
+        );
+        assert_eq!(setting.org_id.as_deref(), Some("acme"));
+        assert_eq!(setting.setting_value, org.setting_value);
+        assert_eq!(setting.updated_at, org.updated_at);
+        let Some(SystemSettingMessage::Delete {
+            org_id,
+            setting_key,
+        }) = delete_message(&SettingScope::Org, Some("acme"), "auto_investigate_gate")
+        else {
+            panic!("an org delete replicates");
+        };
+        assert_eq!(
+            (org_id.as_str(), setting_key.as_str()),
+            ("acme", "auto_investigate_gate")
+        );
+
+        assert!(put_message(&SystemSetting::new_system("k", json!(1))).is_none());
+        assert!(put_message(&SystemSetting::new_user("acme", "dana", "k", json!(1))).is_none());
+        assert!(delete_message(&SettingScope::System, None, "k").is_none());
+        assert!(delete_message(&SettingScope::User, Some("acme"), "k").is_none());
+    }
 
     #[tokio::test]
     async fn gen_ai_mapping_uses_cached_org_override_or_defaults() {

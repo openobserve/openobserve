@@ -27,6 +27,15 @@ const mockAddToQueue = vi.fn();
 const mockListQueues = vi.fn();
 const mockToast = vi.fn();
 const mockPush = vi.fn();
+const mockDateChange = vi.fn();
+const mockTimeRange = { value: { startTime: 100, endTime: 200 } };
+const mockDateState = {
+  value: { valueType: "relative", relativeTimePeriod: "15m" as string | null },
+};
+// Re-anchoring a relative window moves it to "now".
+const mockApplyRelative = vi.fn((_period: string) => {
+  mockTimeRange.value = { startTime: 300, endTime: 400 };
+});
 
 vi.mock("@/services/llm-discovery.service", () => ({
   default: {
@@ -59,10 +68,11 @@ vi.mock("@/types/i18n", async (importOriginal) => {
 
 vi.mock("@/enterprise/composables/useAiDateController", () => ({
   useAiDateController: () => ({
-    dateState: { value: {} },
-    timeRange: { value: { startTime: 100, endTime: 200 } },
-    onDateChange: vi.fn(),
-    mountResolve: vi.fn(),
+    dateState: mockDateState,
+    timeRange: mockTimeRange,
+    applyRelative: (period: string) => mockApplyRelative(period),
+    DEFAULT_RELATIVE: "15m",
+    onDateChange: (...args: unknown[]) => mockDateChange(...args),
   }),
 }));
 
@@ -91,7 +101,9 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
     template: `<div class="o-table" :data-table-id="tableId" :data-total="totalCount"
       :data-page="currentPage" :data-pagination="pagination"
       :data-columns="(columns || []).map(c => c.id).join(',')">
-      <slot name="toolbar" /><slot name="selection-actions" /><slot name="footer-note" /></div>`,
+      <slot name="toolbar" /><slot name="selection-actions" /><slot name="footer-note" />
+      <div v-for="row in data || []" class="o-row" @click="$emit('rowClick', row)">
+        <slot name="cell-trace" :row="row" /></div></div>`,
   },
 }));
 
@@ -115,6 +127,8 @@ vi.mock("@/enterprise/components/AIObservability/AddToQueueMenu.vue", () => ({
 }));
 
 import { mount, flushPromises } from "@vue/test-utils";
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
 import DiscoveryPage from "./DiscoveryPage.vue";
 
 function searchResult(overrides: Record<string, unknown> = {}) {
@@ -151,9 +165,13 @@ function searchResult(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function mountPage() {
+// The lock composable loads before this file's vuex mock, so it reads the real injected store.
+async function mountPage(features: Record<string, string> = {}) {
   const wrapper = mount(DiscoveryPage, {
-    global: { stubs: { OTabs: true, OTab: true, OEmptyState: true, OTag: true, OTimeCell: true } },
+    global: {
+      stubs: { OTabs: true, OTab: true, OEmptyState: true, OTag: true, OTimeCell: true },
+      provide: { store: { state: { zoConfig: { features } } } },
+    },
   });
   await flushPromises();
   return wrapper;
@@ -166,6 +184,11 @@ beforeEach(() => {
   mockListQueues.mockReset().mockResolvedValue([]);
   mockToast.mockReset();
   mockPush.mockReset();
+  vi.mocked(analytics.track).mockClear();
+  mockDateChange.mockReset();
+  mockApplyRelative.mockClear();
+  mockTimeRange.value = { startTime: 100, endTime: 200 };
+  mockDateState.value = { valueType: "relative", relativeTimePeriod: "15m" };
 });
 
 describe("DiscoveryPage fetching", () => {
@@ -197,6 +220,10 @@ describe("DiscoveryPage fetching", () => {
       "test-org",
       expect.objectContaining({ queueStatus: "reviewed", from: 0 }),
     );
+    expect(analytics.track).toHaveBeenCalledWith("llm_discovery_filter_applied", {
+      filter: "queue_status",
+      value: "reviewed",
+    });
   });
 
   it("switches columns and table id per scope, and clears paging", async () => {
@@ -257,6 +284,80 @@ describe("DiscoveryPage fetching", () => {
       expect.objectContaining({ from: 40, size: 20 }),
     );
     expect(wrapper.find(".o-table").attributes("data-total")).toBe("42");
+  });
+
+  // The controller reports whether the emitted range differs from the one in force.
+  it("refetches when a date-change moves the range, even a programmatic one", async () => {
+    const wrapper = await mountPage();
+    mockDateChange.mockReturnValue(true);
+
+    wrapper.findComponent({ name: "AiPageShell" }).vm.$emit("date-change", {
+      valueType: "relative",
+      relativeTimePeriod: "30d",
+      userChangedValue: false,
+    });
+    await flushPromises();
+
+    expect(mockSearch).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not refetch on the picker's mount replay of the range already loaded", async () => {
+    const wrapper = await mountPage();
+    mockDateChange.mockReturnValue(false);
+
+    wrapper.findComponent({ name: "AiPageShell" }).vm.$emit("date-change", {
+      valueType: "relative",
+      relativeTimePeriod: "15m",
+      userChangedValue: false,
+    });
+    await flushPromises();
+
+    expect(mockSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the latest range's rows when an earlier range's response lands last", async () => {
+    const wrapper = await mountPage();
+    mockDateChange.mockReturnValue(true);
+    const wide = Promise.withResolvers<unknown>();
+    mockSearch
+      .mockReturnValueOnce(wide.promise)
+      .mockResolvedValueOnce(searchResult({ items: [], total: 0 }));
+    const shell = wrapper.findComponent({ name: "AiPageShell" });
+
+    shell.vm.$emit("date-change", { valueType: "relative", relativeTimePeriod: "6M" });
+    shell.vm.$emit("date-change", { valueType: "relative", relativeTimePeriod: "15m" });
+    await flushPromises();
+    wide.resolve(searchResult({ total: 1 }));
+    await flushPromises();
+
+    expect(wrapper.find(".o-table").attributes("data-total")).toBe("0");
+  });
+
+  it("re-anchors a relative range to now on refresh, keeping the page", async () => {
+    const wrapper = await mountPage();
+
+    wrapper.findComponent({ name: "AiPageShell" }).vm.$emit("refresh");
+    await flushPromises();
+
+    expect(mockApplyRelative).toHaveBeenCalledWith("15m");
+    expect(mockSearch).toHaveBeenLastCalledWith(
+      "test-org",
+      expect.objectContaining({ startTime: 300, endTime: 400 }),
+    );
+  });
+
+  it("refreshes an absolute range as it is", async () => {
+    mockDateState.value = { valueType: "absolute", relativeTimePeriod: null };
+    const wrapper = await mountPage();
+
+    wrapper.findComponent({ name: "AiPageShell" }).vm.$emit("refresh");
+    await flushPromises();
+
+    expect(mockApplyRelative).not.toHaveBeenCalled();
+    expect(mockSearch).toHaveBeenLastCalledWith(
+      "test-org",
+      expect.objectContaining({ startTime: 100, endTime: 200 }),
+    );
   });
 
   it("narrows the loaded page across service, input and quality without refetching", async () => {
@@ -357,6 +458,10 @@ describe("DiscoveryPage fetching", () => {
     await flushPromises();
 
     expect(localStorage.getItem("o2_ai_discovery_scope")).toBe("session");
+    expect(analytics.track).toHaveBeenCalledWith("llm_discovery_filter_applied", {
+      filter: "scope",
+      value: "session",
+    });
   });
 
   it("surfaces a load failure as an error toast", async () => {
@@ -417,23 +522,24 @@ describe("DiscoveryPage add to queue", () => {
 });
 
 describe("DiscoveryPage row drill-down", () => {
-  it("routes a trace row to the trace detail view", async () => {
+  // Trace rows open in a drawer on this page, so the scope stays put.
+  it("opens a trace row in the trace drawer, around the row's time", async () => {
     const wrapper = await mountPage();
     const state = (wrapper.vm as any).$.setupState;
 
     state.openTarget(state.items[0]);
 
-    // stream + from/to are REQUIRED: the trace view reads them off the URL and
-    // renders "trace not found" without them.
-    expect(mockPush).toHaveBeenCalledWith({
-      name: "traceDetails",
-      query: {
-        org_identifier: "test-org",
-        stream: "default",
-        from: 1_700_000_000_000_000 - 3_600_000_000,
-        to: 1_700_000_000_000_000 + 3_600_000_000,
-        trace_id: "trace-1",
-      },
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(state.traceDrawerOpen).toBe(true);
+    expect(state.drawerTrace).toEqual({
+      traceId: "trace-1",
+      stream: "default",
+      startTime: 1_700_000_000_000_000 - 3_600_000_000,
+      endTime: 1_700_000_000_000_000 + 3_600_000_000,
+      spanId: undefined,
+    });
+    expect(analytics.track).toHaveBeenCalledWith("llm_discovery_target_opened", {
+      scope: "trace",
     });
   });
 
@@ -478,7 +584,7 @@ describe("DiscoveryPage row drill-down", () => {
     expect(mockPush.mock.calls[0][0].query).not.toHaveProperty("stream");
   });
 
-  it("routes a span row to its parent trace", async () => {
+  it("opens a span row on its parent trace", async () => {
     const wrapper = await mountPage();
     const state = (wrapper.vm as any).$.setupState;
 
@@ -491,17 +597,32 @@ describe("DiscoveryPage row drill-down", () => {
       sourceStream: "default",
     });
 
-    // A span lands on its parent trace with itself selected.
-    expect(mockPush).toHaveBeenCalledWith({
-      name: "traceDetails",
-      query: {
-        org_identifier: "test-org",
-        stream: "default",
-        from: 5_000_000_000 - 3_600_000_000,
-        to: 5_000_000_000 + 3_600_000_000,
-        trace_id: "trace-9",
-        span_id: "span-1",
-      },
-    });
+    // A span opens its parent trace in the drawer with itself selected.
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(state.drawerTrace).toMatchObject({ traceId: "trace-9", spanId: "span-1" });
+  });
+
+  // OTable keys the row pointer cursor on whether a row-click listener is bound.
+  const rowListener = (wrapper: Awaited<ReturnType<typeof mountPage>>) =>
+    wrapper.findComponent({ name: "OTable" }).vm.$.vnode.props?.onRowClick;
+
+  it("drops the row affordance, shows the lock and opens nothing while traces are locked", async () => {
+    const wrapper = await mountPage({ traces: "locked" });
+
+    expect(rowListener(wrapper)).toBeUndefined();
+    expect(wrapper.find('[data-test="ai-discovery-row-lock"]').exists()).toBe(true);
+    await wrapper.find(".o-row").trigger("click");
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(wrapper.findComponent({ name: "AiTraceDrawer" }).props("open")).toBe(false);
+  });
+
+  it("keeps rows clickable with no lock when the license enables traces", async () => {
+    const wrapper = await mountPage({ traces: "enabled" });
+
+    expect(rowListener(wrapper)).toBeTypeOf("function");
+    expect(wrapper.find('[data-test="ai-discovery-row-lock"]').exists()).toBe(false);
+    await wrapper.find(".o-row").trigger("click");
+    // The row has a stream, so its trace opens in the in-page drawer.
+    expect(wrapper.findComponent({ name: "AiTraceDrawer" }).props("open")).toBe(true);
   });
 });

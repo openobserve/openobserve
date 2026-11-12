@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { shallowMount } from "@vue/test-utils";
+import { flushPromises, shallowMount } from "@vue/test-utils";
 import { ref, reactive, nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 import PanelEditor from "./PanelEditor.vue";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
+import { resolveConfig } from "./types/panelEditor";
 
 // Mock vuex store
 const mockStore = {
@@ -30,7 +31,8 @@ const mockStore = {
   getters: {},
 };
 
-vi.mock("vuex", () => ({
+vi.mock("vuex", async (importOriginal) => ({
+  ...((await importOriginal()) as object),
   useStore: () => mockStore,
 }));
 
@@ -79,9 +81,14 @@ const mockDashboardPanelData = reactive({
   },
 });
 
+const mockMakeAutoSQLQuery = vi.fn(async () => undefined);
+const mockRegenerateOtherBuilderQueries = vi.fn();
+
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
     dashboardPanelData: mockDashboardPanelData,
+    makeAutoSQLQuery: mockMakeAutoSQLQuery,
+    regenerateOtherBuilderQueries: mockRegenerateOtherBuilderQueries,
     resetAggregationFunction: vi.fn(),
     resetDashboardPanelData: vi.fn(),
     updateGroupedFields: vi.fn(),
@@ -93,6 +100,7 @@ const mockChartData = ref(undefined as any);
 const mockShowLegendsDialog = ref(false);
 const mockNoticeProps = ref<Record<string, unknown>>({});
 const mockRunQuery = vi.fn();
+const mockHandleChartApiError = vi.fn();
 
 // Mock usePanelEditor composable
 vi.mock("./composables/usePanelEditor", () => ({
@@ -123,7 +131,7 @@ vi.mock("./composables/usePanelEditor", () => ({
     currentPanelData: ref({}),
     initChartData: vi.fn(),
     runQuery: mockRunQuery,
-    handleChartApiError: vi.fn(),
+    handleChartApiError: mockHandleChartApiError,
     handleLastTriggeredAtUpdate: vi.fn(),
     handleLimitNumberOfSeriesWarningMessage: vi.fn(),
     handleIsPartialDataUpdate: vi.fn(),
@@ -202,6 +210,14 @@ vi.mock("@/components/dashboards/PanelSchemaRenderer.vue", () => ({
     name: "PanelSchemaRenderer",
     props: ["searchType"],
     template: '<div class="panel-renderer-mock">PanelSchemaRenderer</div>',
+  },
+}));
+
+vi.mock("@/components/dashboards/VariablesValueSelector.vue", () => ({
+  default: {
+    name: "VariablesValueSelector",
+    emits: ["variablesData", "openAddVariable"],
+    template: '<div class="variables-selector-mock"></div>',
   },
 }));
 
@@ -403,6 +419,37 @@ describe("PanelEditor.vue", () => {
     vi.clearAllMocks();
   });
 
+  describe("chart toolbar", () => {
+    const mountWithRenderer = (noData: boolean) =>
+      shallowMount(PanelEditor, {
+        props: { pageType: "build" },
+        global: {
+          ...mountGlobal,
+          stubs: {
+            ...mountGlobal.stubs,
+            OButton: false,
+            PanelSchemaRenderer: {
+              name: "PanelSchemaRenderer",
+              props: ["searchType", "panelSchema", "selectedTimeObj", "width", "height"],
+              setup(_: unknown, { expose }: { expose: (exposed: object) => void }) {
+                expose({ noData });
+              },
+              template: "<div />",
+            },
+          },
+        },
+      });
+
+    it("keeps the legends button in place while the chart has no data, so the chart never jumps", async () => {
+      mockChartData.value = { type: "line", queries: [] };
+      wrapper = mountWithRenderer(true);
+      await flushPromises();
+      const btn = wrapper.find('[data-test="panel-editor-show-legends-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.classes()).toContain("invisible");
+    });
+  });
+
   describe("Component Initialization", () => {
     it("should mount successfully with dashboard pageType", () => {
       wrapper = shallowMount(PanelEditor, {
@@ -534,6 +581,28 @@ describe("PanelEditor.vue", () => {
 
       // The emit would normally be triggered by clicking "Add to Dashboard" button
       expect(wrapper.emitted()).toBeDefined();
+    });
+
+    const mountWithFeatures = (features: Record<string, string>) =>
+      shallowMount(PanelEditor, {
+        props: { pageType: "metrics", showAddToDashboardButton: true },
+        global: {
+          ...mountGlobal,
+          provide: {
+            store: { ...mockStore, state: { ...mockStore.state, zoConfig: { features } } },
+          },
+        },
+      });
+
+    it("blocks Add to dashboard with the license reason while dashboards is locked", () => {
+      wrapper = mountWithFeatures({ dashboards: "locked" });
+      expect(wrapper.vm.$.setupState.dashboardsLocked).toBe(true);
+      expect(wrapper.vm.$.setupState.dashboardsLockedReason).toContain("Locked");
+    });
+
+    it("leaves Add to dashboard unblocked while dashboards is enabled", () => {
+      wrapper = mountWithFeatures({ dashboards: "enabled" });
+      expect(wrapper.vm.$.setupState.dashboardsLocked).toBe(false);
     });
 
     it("should emit customQueryModeChanged on mount (immediate watcher)", () => {
@@ -759,6 +828,86 @@ describe("PanelEditor.vue", () => {
     });
   });
 
+  describe("Column / Series Formatting dialog", () => {
+    const OverrideConfigStub = {
+      name: "OverrideConfig",
+      props: ["mode", "panelData", "previewSource"],
+      template: '<div data-test="override-config-stub" :data-mode="mode"></div>',
+    };
+    const PanelSchemaRendererStub = {
+      name: "PanelSchemaRenderer",
+      props: ["searchType", "panelSchema"],
+      emits: ["result-metadata-update"],
+      template: '<div class="panel-renderer-mock"></div>',
+    };
+    const mountEditor = () =>
+      shallowMount(PanelEditor, {
+        props: { pageType: "dashboard" },
+        global: {
+          ...mountGlobal,
+          stubs: {
+            ...mountGlobal.stubs,
+            OverrideConfig: OverrideConfigStub,
+            PanelSchemaRenderer: PanelSchemaRendererStub,
+          },
+        },
+      });
+
+    it.each([
+      ["table", "table"],
+      ["line", "chart"],
+      ["h-stacked", "chart"],
+      ["pie", "chart"],
+      ["metric", "chart"],
+    ])("mounts the dialog for %s in %s mode", async (type, mode) => {
+      mockDashboardPanelData.data.type = type;
+      wrapper = mountEditor();
+      await nextTick();
+      expect(wrapper.findComponent({ name: "OverrideConfig" }).props("mode")).toBe(mode);
+    });
+
+    it.each(["heatmap", "geomap", "sankey"])("does not mount it for %s", async (type) => {
+      mockDashboardPanelData.data.type = type;
+      wrapper = mountEditor();
+      await nextTick();
+      expect(wrapper.findComponent({ name: "OverrideConfig" }).exists()).toBe(false);
+    });
+
+    it("hands chart mode the applied schema and the latest result metadata for the preview", async () => {
+      mockChartData.value = { type: "line", config: { unit: "bytes" } };
+      wrapper = mountEditor();
+      await nextTick();
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await renderer.vm.$emit("result-metadata-update", [[{ histogram_interval: 60 }]]);
+      await nextTick();
+      const source = wrapper.findComponent({ name: "OverrideConfig" }).props("previewSource");
+      expect(source.panelSchema).toEqual({ type: "line", config: { unit: "bytes" } });
+      expect(source.resultMetaData).toEqual([[{ histogram_interval: 60 }]]);
+      expect(source.hiddenQueries).toEqual([]);
+    });
+
+    it("passes the editor's hidden queries so the preview drops them like the panel", async () => {
+      mockChartData.value = { type: "line", config: {} };
+      (mockDashboardPanelData.layout as any).hiddenQueries = [1];
+      try {
+        wrapper = mountEditor();
+        await nextTick();
+        const source = wrapper.findComponent({ name: "OverrideConfig" }).props("previewSource");
+        expect(source.hiddenQueries).toEqual([1]);
+      } finally {
+        delete (mockDashboardPanelData.layout as any).hiddenQueries;
+      }
+    });
+
+    it("gives table mode no preview source", async () => {
+      mockDashboardPanelData.data.type = "table";
+      mockChartData.value = { type: "table", config: {} };
+      wrapper = mountEditor();
+      await nextTick();
+      expect(wrapper.findComponent({ name: "OverrideConfig" }).props("previewSource")).toBeNull();
+    });
+  });
+
   describe("ODialog migration (legends popup)", () => {
     // ShowLegendsPopup wraps ODialog internally. PanelEditor owns the v-model:open binding.
     // We test at the ShowLegendsPopup level (it is auto-stubbed in shallowMount).
@@ -832,6 +981,195 @@ describe("PanelEditor.vue", () => {
       expect(selectorDialog!.attributes("data-show-close")).toBe("false");
       // Closed by default
       expect(selectorDialog!.attributes("data-open")).toBe("false");
+    });
+  });
+
+  describe("builder SQL regeneration on heatmap y settings", () => {
+    it.each([
+      ["heatmap_y_bucket", { mode: "size", size: 10 }],
+      ["heatmap_y_min", 5],
+      ["heatmap_y_max", 50],
+    ])("rebuilds the query when %s changes", async (key, value) => {
+      const config = mockDashboardPanelData.data.config as Record<string, unknown>;
+      mockDashboardPanelData.data.type = "heatmap";
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "dashboard", editMode: false },
+        global: mountGlobal,
+      });
+      await nextTick();
+      mockMakeAutoSQLQuery.mockClear();
+      mockRegenerateOtherBuilderQueries.mockClear();
+
+      config[key] = value;
+      await nextTick();
+      expect(mockMakeAutoSQLQuery).toHaveBeenCalledTimes(1);
+      expect(mockRegenerateOtherBuilderQueries).toHaveBeenCalledTimes(1);
+      delete config[key];
+      wrapper.unmount();
+    });
+
+    it("rebuilds the other builder tabs when the chart type changes", async () => {
+      const previous = mockDashboardPanelData.data.type;
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "dashboard", editMode: false },
+        global: mountGlobal,
+      });
+      await nextTick();
+      mockRegenerateOtherBuilderQueries.mockClear();
+
+      mockDashboardPanelData.data.type = "boxplot";
+      await nextTick();
+      expect(mockRegenerateOtherBuilderQueries).toHaveBeenCalledTimes(1);
+      mockDashboardPanelData.data.type = previous;
+      wrapper.unmount();
+    });
+
+    it("rebuilds the query when the bucket size is edited in place", async () => {
+      const config = mockDashboardPanelData.data.config as Record<string, any>;
+      config.heatmap_y_bucket = { mode: "size", size: 10 };
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "dashboard", editMode: false },
+        global: mountGlobal,
+      });
+      await nextTick();
+      mockMakeAutoSQLQuery.mockClear();
+
+      config.heatmap_y_bucket.size = 20;
+      await nextTick();
+      expect(mockMakeAutoSQLQuery).toHaveBeenCalledTimes(1);
+      delete config.heatmap_y_bucket;
+      wrapper.unmount();
+    });
+  });
+
+  describe.each([
+    ["html", "CustomHTMLEditor"],
+    ["markdown", "CustomMarkdownEditor"],
+  ])("%s editor section", (type, editorName) => {
+    const configWithVariables = {
+      ...(resolveConfig as any)(),
+      showVariablesSelector: true,
+    };
+    let previousConfig: any;
+
+    beforeEach(() => {
+      previousConfig = (resolveConfig as any)();
+      (resolveConfig as any).mockReturnValue(configWithVariables);
+      mockDashboardPanelData.data.type = type;
+    });
+
+    afterEach(() => {
+      (resolveConfig as any).mockReturnValue(previousConfig);
+      mockDashboardPanelData.data.type = "line";
+    });
+
+    it("forwards the selector's add-variable request", async () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "dashboard", variablesData: { values: [] } },
+        global: mountGlobal,
+      });
+      await flushPromises();
+
+      wrapper.findComponent({ name: "VariablesValueSelector" }).vm.$emit("openAddVariable");
+
+      expect(wrapper.emitted("openAddVariable")).toHaveLength(1);
+    });
+
+    it("feeds start_time and end_time to the editor preview after the dashboard variables", async () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+          variablesData: { values: [{ name: "region", value: "us" }] },
+        },
+        global: {
+          ...mountGlobal,
+          stubs: {
+            ...mountGlobal.stubs,
+            [editorName]: {
+              name: editorName,
+              props: ["initialVariableValues"],
+              template: "<div />",
+            },
+          },
+        },
+      });
+      await flushPromises();
+
+      const values = wrapper
+        .findComponent({ name: editorName })
+        .props("initialVariableValues").values;
+
+      expect(values).toEqual([
+        { name: "region", value: "us" },
+        {
+          name: "start_time",
+          value: mockDashboardPanelData.meta.dateTime.start_time.getTime(),
+        },
+        { name: "end_time", value: mockDashboardPanelData.meta.dateTime.end_time.getTime() },
+      ]);
+    });
+  });
+
+  describe("Preview Chart | Data view", () => {
+    const TOGGLE = { name: "PanelViewToggle" };
+
+    beforeEach(() => {
+      mockChartData.value = {};
+      mockDashboardPanelData.data.type = "line";
+    });
+
+    afterEach(() => {
+      mockChartData.value = undefined;
+    });
+
+    const mountEditor = (pageType = "dashboard") =>
+      shallowMount(PanelEditor, { props: { pageType: pageType as any }, global: mountGlobal });
+
+    it("offers the switch on a dashboard chart and starts on Chart", () => {
+      wrapper = mountEditor();
+      expect(wrapper.findComponent(TOGGLE).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "PanelDataView" }).exists()).toBe(false);
+    });
+
+    it("hides the switch for table panels and outside dashboards", () => {
+      mockDashboardPanelData.data.type = "table";
+      wrapper = mountEditor();
+      expect(wrapper.findComponent(TOGGLE).exists()).toBe(false);
+      wrapper.unmount();
+
+      mockDashboardPanelData.data.type = "line";
+      wrapper = mountEditor("metrics");
+      expect(wrapper.findComponent(TOGGLE).exists()).toBe(false);
+    });
+
+    it("overlays the raw rows when Data is picked", async () => {
+      wrapper = mountEditor();
+      wrapper.findComponent({ name: "PanelViewToggle" }).vm.$emit("update:modelValue", "data");
+      await nextTick();
+      expect(wrapper.findComponent({ name: "PanelDataView" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "PanelSchemaRenderer" }).exists()).toBe(true);
+    });
+  });
+
+  describe("renderer errors", () => {
+    beforeEach(() => {
+      mockChartData.value = {};
+      mockHandleChartApiError.mockClear();
+    });
+
+    it("shows the renderer's error and hands it to the page as renderer-error", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "metrics" },
+        global: mountGlobal,
+      });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      const failure = { message: "parse error: unexpected <EOF>", code: 400 };
+      renderer.vm.$emit("error", failure);
+      expect(mockHandleChartApiError).toHaveBeenCalledWith(failure);
+      expect(wrapper.emitted("renderer-error")).toEqual([[failure]]);
+
+      renderer.vm.$emit("error", { message: "", code: "" });
+      expect(wrapper.emitted("renderer-error")?.[1]).toEqual([{ message: "", code: "" }]);
     });
   });
 });

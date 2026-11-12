@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { ref } from "vue";
 import { usePanelVariableSubstitution } from "./usePanelVariableSubstitution";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { computePercentileWindow } from "@/utils/metrics/metricDefaults";
 
 // Mock utilities that have heavy dependencies (vuex, services, async parser)
@@ -462,6 +463,73 @@ describe("replaceQueryValue", () => {
       const { query } = makeInst(values, q).replaceQueryValue(q, 0, 300_000_000, "sql");
       expect(query).toBe("WHERE a = '$traceid_sql' AND b = 'xyz789'");
     });
+  });
+});
+
+// ─── date variables ───────────────────────────────────────────────────────────
+
+describe("replaceQueryValue with date variables", () => {
+  const dateVar = (extra: Record<string, unknown> = {}) => ({
+    name: "d",
+    type: "date",
+    value: "2026-03-08",
+    isVariablePartialLoaded: true,
+    ...extra,
+  });
+  const run = (q: string, values: any[]) =>
+    usePanelVariableSubstitution({
+      panelSchema: makePanelSchema([{ query: q }]),
+      variablesData: makeVariablesData(values),
+      chartPanelRef: makeChartPanelRef(),
+      store: makeStore(),
+      log,
+    }).replaceQueryValue(q, 0, 300_000_000, "sql").query;
+
+  it("prints the epoch in microseconds for ${d:epochus}", () => {
+    expect(run("WHERE _timestamp >= ${d:epochus}", [dateVar()])).toBe(
+      "WHERE _timestamp >= 1772928000000000",
+    );
+  });
+
+  it("prints 00:00 UTC of the day for ${d:epoch} and ${d:epochms}", () => {
+    expect(run("WHERE a >= ${d:epoch} AND b >= ${d:epochms}", [dateVar()])).toBe(
+      "WHERE a >= 1772928000 AND b >= 1772928000000",
+    );
+  });
+
+  it("uses the variable's dateFormat for a bare $d", () => {
+    expect(run("WHERE day = '$d'", [dateVar({ dateFormat: "dmy" })])).toBe(
+      "WHERE day = '08/03/2026'",
+    );
+    expect(run("WHERE day = '$d'", [dateVar({ dateFormat: "epoch" })])).toBe(
+      "WHERE day = '1772928000'",
+    );
+  });
+
+  it("lets the placeholder override the variable's dateFormat", () => {
+    expect(run("{{d:mdy}} ${d}", [dateVar({ dateFormat: "dmy" })])).toBe("03/08/2026 08/03/2026");
+  });
+
+  it("formats with the default before a list format, which is a no-op on a scalar", () => {
+    expect(run("${d:csv} ${d:singlequote}", [dateVar({ dateFormat: "dmy" })])).toBe(
+      "08/03/2026 08/03/2026",
+    );
+  });
+
+  it("defaults to iso when the variable has no dateFormat", () => {
+    expect(run("$d", [dateVar()])).toBe("2026-03-08");
+  });
+
+  it("ignores a date format on a non-date variable", () => {
+    expect(run("${t:epochus} ${t:dmy}", [{ ...dateVar({ name: "t", type: "textbox" }) }])).toBe(
+      "2026-03-08 2026-03-08",
+    );
+  });
+
+  it("renders an empty or malformed date value as before", () => {
+    expect(run("[${d:epoch}]", [dateVar({ value: "" })])).toBe("[]");
+    expect(run("[${d:epoch}]", [dateVar({ value: "2026-02-30" })])).toBe("[2026-02-30]");
+    expect(run("[${d:epoch}]", [dateVar({ value: null })])).toBe(`[${SELECT_ALL_VALUE}]`);
   });
 });
 

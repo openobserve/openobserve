@@ -51,10 +51,22 @@ fn create_table_stmt() -> TableCreateStatement {
                 .auto_increment()
                 .primary_key(),
         )
-        .col(ColumnDef::new(SearchQueue::WorkGroup).string_len(16).not_null())
-        .col(ColumnDef::new(SearchQueue::UserId).string_len(256).not_null())
+        .col(
+            ColumnDef::new(SearchQueue::WorkGroup)
+                .string_len(16)
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(SearchQueue::UserId)
+                .string_len(256)
+                .not_null(),
+        )
         // Identifier of the user that owns the dashboard.
-        .col(ColumnDef::new(SearchQueue::TraceId).string_len(64).not_null())
+        .col(
+            ColumnDef::new(SearchQueue::TraceId)
+                .string_len(64)
+                .not_null(),
+        )
         .col(
             ColumnDef::new(SearchQueue::CreatedAt)
                 .big_integer()
@@ -84,6 +96,16 @@ fn create_index_created_at_stmt() -> IndexCreateStatement {
         .to_owned()
 }
 
+#[derive(DeriveIden)]
+enum SearchQueue {
+    Table,
+    Id,
+    WorkGroup,
+    UserId,
+    TraceId,
+    CreatedAt,
+}
+
 #[cfg(test)]
 mod tests {
     use sea_query::SqliteQueryBuilder;
@@ -107,14 +129,4 @@ mod tests {
         let sql = create_index_created_at_stmt().build(SqliteQueryBuilder);
         assert!(sql.contains(SEARCH_QUEUE_CREATED_AT_IDX));
     }
-}
-
-#[derive(DeriveIden)]
-enum SearchQueue {
-    Table,
-    Id,
-    WorkGroup,
-    UserId,
-    TraceId,
-    CreatedAt,
 }

@@ -264,6 +264,24 @@ describe("ImportDestination", () => {
       expect(result).toBe(true);
     });
 
+    it("accepts and offers a content template for an email destination", async () => {
+      await wrapper.setProps({
+        templates: [
+          ...defaultProps.templates,
+          { name: "content-template", type: "http", kind: "content" },
+        ],
+      });
+      const result = await wrapper.vm.validateDestinationInputs(
+        { name: "email-dest", type: "email", template: "content-template", emails: ["recipient"] },
+        1,
+      );
+      expect(result).toBe(true);
+
+      wrapper.vm.jsonArrayOfObj = [{ type: "email" }];
+      wrapper.vm.destinationErrorsToDisplay = [[]];
+      expect(wrapper.vm.getFormattedTemplates).toEqual(["email-template", "content-template"]);
+    });
+
     it("returns true for a valid email destination", async () => {
       const result = await wrapper.vm.validateDestinationInputs(
         { name: "email-dest", type: "email", template: "email-template", emails: ["a@b.com"] },

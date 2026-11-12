@@ -7,37 +7,10 @@ the Free Software Foundation, either version 3 of the License, or
 
 <template>
   <div class="flex h-full min-h-0 flex-col p-4" data-test="scorer-library">
-    <div
-      v-if="isLoadingCatalog"
-      class="flex flex-1 flex-col items-center justify-center p-8"
-      data-test="scorer-library-loading"
-    >
-      <OSpinner size="lg" />
-    </div>
-
-    <div
-      v-else-if="loadError"
-      class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
-      data-test="scorer-library-error"
-    >
-      <OIcon name="error-outline" class="mb-2 !h-[3em] !w-[3em]" />
-      <div class="text-status-error-text">{{ loadError }}</div>
-      <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
-        {{ t("common.retry") }}
-      </OButton>
-    </div>
-
-    <div
-      v-else-if="providers.length === 0"
-      class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
-      data-test="scorer-library-no-providers"
-    >
-      {{ t("onlineEvals.scorerLibrary.noProvidersMessage") }}
-    </div>
-
-    <div v-else class="flex min-h-0 flex-1 flex-col">
+    <!-- Code checks need no provider, so they list even while the judge catalog fails. -->
+    <div class="flex min-h-0 flex-1 flex-col">
       <div class="mb-4 flex items-end gap-3">
-        <div class="flex w-60 shrink-0 items-center gap-2">
+        <div v-if="providers.length > 0" class="flex w-60 shrink-0 items-center gap-2">
           <label class="text-text-secondary text-xs font-semibold whitespace-nowrap">{{
             t("onlineEvals.scorer.providerLabel")
           }}</label>
@@ -74,56 +47,103 @@ the Free Software Foundation, either version 3 of the License, or
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto">
-        <section
-          v-for="group in groupedEntries"
-          :key="group.category"
-          class="mt-4 first:mt-0"
-          :data-test="`scorer-library-section-${group.category}`"
-        >
-          <h4
-            class="text-text-heading m-0 mb-1.5 flex items-baseline gap-1.5 text-xs font-bold tracking-[0.04em] uppercase"
+        <template v-for="group in groupedEntries" :key="group.category">
+          <h3
+            v-if="group.category === firstCatalogCategory"
+            class="text-text-secondary m-0 mt-6 text-xs font-semibold"
+            data-test="scorer-library-judge-heading"
           >
-            <span>{{ group.category }}</span>
-            <span class="text-text-secondary font-medium">({{ group.entries.length }})</span>
-          </h4>
-          <ul class="rounded-default border-border-default flex flex-col border">
-            <li
-              v-for="entry in group.entries"
-              :key="entry.name"
-              class="flex cursor-pointer items-center gap-2 px-3 py-2 transition-colors duration-200"
-              :class="[isSelected(entry.name) ? 'bg-accent/6' : 'hover:bg-table-row-hover-bg']"
-              :data-test="`scorer-library-item-${entry.name}`"
-              @click="toggle(entry)"
+            {{ t("codeScorer.libraryJudgeGroup") }}
+          </h3>
+          <section
+            class="mt-4 first:mt-0"
+            :data-test="`scorer-library-section-${group.category === CODE_GROUP ? 'code' : group.category}`"
+          >
+            <h4
+              class="text-text-heading m-0 mb-1.5 flex items-baseline gap-1.5 text-xs font-bold tracking-[0.04em] uppercase"
             >
-              <div class="shrink-0 pe-2">
-                <OCheckbox
-                  :model-value="isSelected(entry.name)"
-                  @update:model-value="toggle(entry)"
-                  @click.stop
-                />
-              </div>
-              <div class="flex min-w-0 flex-1 flex-col">
-                <span
-                  class="text-sm"
-                  :class="
-                    isSelected(entry.name) ? 'text-text-heading font-semibold' : 'font-medium'
-                  "
-                  >{{ entry.displayName }}</span
-                >
-                <span v-if="entry.description" class="text-text-secondary block text-xs">
-                  {{ entry.description }}
-                </span>
-              </div>
-            </li>
-          </ul>
-        </section>
+              <span>{{
+                group.category === CODE_GROUP ? t("codeScorer.libraryGroup") : group.category
+              }}</span>
+              <span class="text-text-secondary font-medium">({{ group.entries.length }})</span>
+              <span
+                v-if="group.category === CODE_GROUP"
+                class="text-text-secondary ms-auto font-medium tracking-normal normal-case"
+                >{{ t("codeScorer.libraryGroupNote") }}</span
+              >
+            </h4>
+            <ul class="rounded-default border-border-default flex flex-col border">
+              <li
+                v-for="entry in group.entries"
+                :key="entry.name"
+                class="flex cursor-pointer items-center gap-2 px-3 py-2 transition-colors duration-200"
+                :class="[isSelected(entry.name) ? 'bg-accent/6' : 'hover:bg-table-row-hover-bg']"
+                :data-test="`scorer-library-item-${entry.name}`"
+                @click="toggle(entry)"
+              >
+                <div class="shrink-0 pe-2">
+                  <OCheckbox
+                    :model-value="isSelected(entry.name)"
+                    @update:model-value="toggle(entry)"
+                    @click.stop
+                  />
+                </div>
+                <div class="flex min-w-0 flex-1 flex-col">
+                  <span
+                    class="text-sm"
+                    :class="
+                      isSelected(entry.name) ? 'text-text-heading font-semibold' : 'font-medium'
+                    "
+                    >{{ entry.displayName }}</span
+                  >
+                  <span v-if="entry.description" class="text-text-secondary block text-xs">
+                    {{ entry.description }}
+                  </span>
+                </div>
+              </li>
+            </ul>
+          </section>
+        </template>
+
+        <div
+          v-if="isLoadingCatalog"
+          class="flex flex-col items-center justify-center p-8"
+          data-test="scorer-library-loading"
+        >
+          <OSpinner size="lg" />
+        </div>
+
+        <div
+          v-else-if="loadError"
+          class="text-text-secondary flex flex-col items-center justify-center p-8"
+          data-test="scorer-library-error"
+        >
+          <OIcon name="error-outline" class="mb-2 !h-[3em] !w-[3em]" />
+          <div class="text-status-error-text">{{ loadError }}</div>
+          <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
+            {{ t("common.retry") }}
+          </OButton>
+        </div>
+
+        <div
+          v-else-if="providers.length === 0"
+          class="text-text-secondary flex flex-col items-center justify-center p-8"
+          data-test="scorer-library-no-providers"
+        >
+          {{ t("onlineEvals.scorerLibrary.noProvidersMessage") }}
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { scoreConfigsQuery } from "@/services/online-evals.service.queries";
+import {
+  saveScoreConfigMutation,
+  saveScorerMutation,
+  scoreConfigsQuery,
+} from "@/services/online-evals.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
@@ -134,10 +154,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import onlineEvalsService, {
-  type Provider,
-  type ScoreConfig,
-} from "@/services/online-evals.service";
+import { type Provider, type ScoreConfig } from "@/services/online-evals.service";
 import {
   fetchOnlineEvalsCatalog,
   type CatalogScoreConfig,
@@ -145,6 +162,10 @@ import {
 } from "@/services/online-evals-catalog.service";
 import { entityId } from "./utils/evalEntity";
 import { showError } from "./utils/evalFormat";
+import { CODE_SCORER_STARTERS } from "./utils/codeScorerStarters";
+
+/** Group key for the starter checks; never a catalog category. */
+const CODE_GROUP = "__code__";
 
 const { t } = useI18nTyped();
 
@@ -159,6 +180,9 @@ const emit = defineEmits<{
   (e: "update:selected-count", value: number): void;
   (e: "imported"): void;
 }>();
+
+const saveScorer = useMutation(() => saveScorerMutation(props.orgId));
+const saveScoreConfig = useMutation(() => saveScoreConfigMutation(props.orgId));
 
 const isLoadingCatalog = ref(false);
 const loadError = ref("");
@@ -200,10 +224,28 @@ async function loadCatalog() {
   }
 }
 
+const codeEntries = computed<CatalogScorer[]>(() =>
+  CODE_SCORER_STARTERS.map((starter) => ({
+    name: starter.key,
+    displayName: t(`codeScorer.starters.${starter.key}.title`),
+    description: t(`codeScorer.starters.${starter.key}.description`),
+    category: CODE_GROUP,
+    level: "span",
+    requiredScoreConfigName: starter.key,
+    scorer: { type: "code", template: starter.source, params: {} },
+  })),
+);
+
+// Judges need a provider to run on, so without one only the code checks list.
+const allEntries = computed(() => [
+  ...codeEntries.value,
+  ...(props.providers.length > 0 ? scorerEntries.value : []),
+]);
+
 const filteredEntries = computed(() => {
   const q = searchQuery.value.trim().toLowerCase();
-  if (!q) return scorerEntries.value;
-  return scorerEntries.value.filter(
+  if (!q) return allEntries.value;
+  return allEntries.value.filter(
     (e) =>
       e.displayName.toLowerCase().includes(q) ||
       e.name.toLowerCase().includes(q) ||
@@ -220,6 +262,10 @@ const groupedEntries = computed(() => {
   }
   return Array.from(buckets.entries()).map(([category, entries]) => ({ category, entries }));
 });
+
+const firstCatalogCategory = computed(
+  () => groupedEntries.value.find((group) => group.category !== CODE_GROUP)?.category,
+);
 
 const allVisibleSelected = computed(() => {
   const visible = filteredEntries.value;
@@ -280,7 +326,8 @@ watch(selectedNames, (val) => emit("update:selected-count", val.size), {
 
 async function importSelected() {
   if (isImporting.value || selectedNames.value.size === 0) return;
-  if (!selectedProviderId.value) {
+  const selected = allEntries.value.filter((e) => selectedNames.value.has(e.name));
+  if (!selectedProviderId.value && selected.some((e) => e.scorer.type !== "code")) {
     toast({
       variant: "warning",
       message: t("toastMessages.onlineEvals.selectAProviderBeforeImportingScorers"),
@@ -289,18 +336,14 @@ async function importSelected() {
   }
   isImporting.value = true;
 
-  const selected = scorerEntries.value.filter((e) => selectedNames.value.has(e.name));
   let successCount = 0;
   let skipCount = 0;
   let failCount = 0;
 
   for (const entry of selected) {
     try {
-      const scoreConfig = await resolveRequiredScoreConfig(entry.requiredScoreConfigName);
-      await onlineEvalsService.scorers.create(
-        props.orgId,
-        scorerPayload(entry, entityId(scoreConfig)),
-      );
+      const scoreConfig = await resolveRequiredScoreConfig(entry);
+      await saveScorer.mutateAsync({ payload: scorerPayload(entry, entityId(scoreConfig)) });
       successCount++;
     } catch (err: any) {
       if (err?.response?.status === 409) {
@@ -332,18 +375,13 @@ async function importSelected() {
 
 // Match the existing OnlineEvalsCatalog logic: if the scorer references a
 // score config that doesn't exist locally, create it from the catalog first.
-async function resolveRequiredScoreConfig(name: string): Promise<ScoreConfig> {
+async function resolveRequiredScoreConfig(entry: CatalogScorer): Promise<ScoreConfig> {
+  const name = entry.requiredScoreConfigName;
   const existing = findScoreConfigByName(name);
   if (existing) return existing;
 
-  const catalogEntry = scoreConfigEntries.value.find((e) => e.name === name);
-  if (!catalogEntry) throw new Error(t("onlineEvals.catalogScoreConfigNotFound", { name }));
-
   try {
-    return await onlineEvalsService.scoreConfigs.create(
-      props.orgId,
-      scoreConfigPayload(catalogEntry),
-    );
+    return await saveScoreConfig.mutateAsync({ payload: requiredScoreConfigPayload(entry) });
   } catch (err: any) {
     if (err?.response?.status === 409) {
       const options = scoreConfigsQuery(props.orgId);
@@ -364,6 +402,22 @@ function findScoreConfigByName(name: string): ScoreConfig | null {
   return props.scoreConfigs.find((row) => row.name === name) ?? null;
 }
 
+function requiredScoreConfigPayload(entry: CatalogScorer) {
+  if (entry.scorer.type === "code") {
+    // A check passes or fails, so it gets a Boolean config, healthy when true.
+    return {
+      name: entry.requiredScoreConfigName,
+      description: entry.description,
+      dataType: "boolean",
+      healthyThreshold: { healthy_value: true },
+    };
+  }
+  const name = entry.requiredScoreConfigName;
+  const catalogEntry = scoreConfigEntries.value.find((e) => e.name === name);
+  if (!catalogEntry) throw new Error(t("onlineEvals.catalogScoreConfigNotFound", { name }));
+  return scoreConfigPayload(catalogEntry);
+}
+
 function scoreConfigPayload(entry: CatalogScoreConfig) {
   const payload: Record<string, any> = { name: entry.name, dataType: entry.dataType };
   if (entry.description) payload.description = entry.description;
@@ -373,18 +427,19 @@ function scoreConfigPayload(entry: CatalogScoreConfig) {
 }
 
 function scorerPayload(entry: CatalogScorer, scoreConfigId: string) {
+  const base = {
+    type: entry.scorer.type,
+    producesScoreConfigId: scoreConfigId,
+    template: entry.scorer.template,
+  };
   return {
     name: entry.name,
     description: entry.description,
-    scorer: {
-      type: entry.scorer.type,
-      producesScoreConfigId: scoreConfigId,
-      template: entry.scorer.template,
-      params: {
-        ...entry.scorer.params,
-        provider_id: selectedProviderId.value,
-      },
-    },
+    // A Code scorer takes no params, and the backend refuses unknown fields.
+    scorer:
+      entry.scorer.type === "code"
+        ? base
+        : { ...base, params: { ...entry.scorer.params, provider_id: selectedProviderId.value } },
   };
 }
 

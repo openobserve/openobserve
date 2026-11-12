@@ -1,7 +1,9 @@
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 import { withFeatureGate } from "@/utils/enterpriseFeatures";
+import { withLicenseFeature } from "@/utils/featureGate";
 import { oncallRouteGuard } from "./oncallRouteGuard";
+import { slackRouteGuard } from "./slackRouteGuard";
 
 const Settings = () => import("@/components/settings/index.vue");
 
@@ -66,6 +68,28 @@ const useManagementRoutes = () => {
           path: "alert_sources",
           redirect: (to: any) => ({ name: "alertSources", query: to.query }),
         },
+        // Redirects kept for bookmarks after these moved to /ai under the same route names.
+        {
+          path: "llm_providers",
+          redirect: (to: any) => ({ name: "llmProviders", query: to.query }),
+        },
+        {
+          path: "gen_ai_agent_mapping",
+          redirect: (to: any) => ({ name: "genAiAgentMapping", query: to.query }),
+        },
+        // LLM Model Pricing moved to the same Configure group (/ai/model-pricing).
+        {
+          path: "model_pricing",
+          redirect: (to: any) => ({ name: "modelPricing", query: to.query }),
+        },
+        {
+          path: "model_pricing/gaps",
+          redirect: (to: any) => ({ name: "modelPricingGaps", query: to.query }),
+        },
+        {
+          path: "model_pricing/edit",
+          redirect: (to: any) => ({ name: "modelPricingEditor", query: to.query }),
+        },
       ],
     },
   ];
@@ -107,54 +131,22 @@ const useManagementRoutes = () => {
       keepAlive: true,
       titleKey: "routeTitles.syntheticsLocations",
       allowOnEmptyData: true,
+      licenseFeature: "synthetics",
     },
     beforeEnter(to: any, from: any, next: any) {
       routeGuard(to, from, next);
     },
   });
 
-  // LLM Model Pricing, LLM Providers, GenAI Agent Mapping (used by the AI
-  // Observability / Online Evals flows), and the enterprise-only operations/
-  // security pages below are all always registered; a direct URL redirects
-  // to the shared locked page (see `withFeatureGate`) when the edition
-  // doesn't unlock them, instead of landing on the real page or a 404.
+  // Always registered so a direct URL hits the locked page; the guard and rail hide it unless Slack is on.
   routes[0].children.push({
-    path: "model_pricing",
-    name: "modelPricing",
+    path: "slack",
+    name: "slack",
+    component: () => import("@/components/settings/Slack.vue"),
     meta: {
-      keepAlive: true,
-      titleKey: "settings.llmModelPricing",
+      titleKey: "routeTitles.slackApp",
     },
-    component: () => import("@/components/settings/ModelPricingList.vue"),
-    beforeEnter: withFeatureGate("modelPricing", routeGuard),
-  });
-  routes[0].children.push({
-    path: "model_pricing/edit",
-    name: "modelPricingEditor",
-    meta: {
-      titleKey: "routeTitles.modelPricingEditor",
-    },
-    component: () => import("@/components/settings/ModelPricingEditor.vue"),
-    beforeEnter: withFeatureGate("modelPricing", routeGuard),
-  });
-  routes[0].children.push({
-    path: "llm_providers",
-    name: "llmProviders",
-    component: () => import("@/components/settings/LlmProvidersSettings.vue"),
-    meta: {
-      titleKey: "llmProviders.title",
-    },
-    beforeEnter: withFeatureGate("llmProviders", routeGuard),
-  });
-  routes[0].children.push({
-    path: "gen_ai_agent_mapping",
-    name: "genAiAgentMapping",
-    component: () => import("@/components/settings/GenAiAgentMappingSettings.vue"),
-    meta: {
-      keepAlive: true,
-      titleKey: "settings.genAiAgentMapping.title",
-    },
-    beforeEnter: withFeatureGate("genAiAgentMapping", routeGuard),
+    beforeEnter: slackRouteGuard,
   });
   // Alert Sources moved to a flat top-level route (router.ts, name
   // "alertSources") — no longer pushed here. It used to be conditional on
@@ -177,6 +169,7 @@ const useManagementRoutes = () => {
           meta: {
             keepAlive: true,
             titleKey: "settings.queryManagement",
+            licenseFeature: "query_management",
           },
           beforeEnter: withFeatureGate("queryManagement", routeGuard),
         },
@@ -190,7 +183,7 @@ const useManagementRoutes = () => {
           },
           beforeEnter: withFeatureGate("cipherKeys", routeGuard),
         },
-        {
+        withLicenseFeature("ai_toolsets", {
           path: "ai_toolsets",
           name: "aiToolsets",
           component: () => import("@/components/settings/AiToolsets.vue"),
@@ -199,7 +192,7 @@ const useManagementRoutes = () => {
             titleKey: "aiToolset.header",
           },
           beforeEnter: withFeatureGate("aiToolsets", routeGuard),
-        },
+        }),
         {
           path: "pipeline_destinations",
           name: "pipelineDestinations",
@@ -210,7 +203,7 @@ const useManagementRoutes = () => {
           beforeEnter: withFeatureGate("pipelineDestinations", routeGuard),
         },
         // Its API is mounted with on-call's, so the page exists only where on-call is on.
-        {
+        withLicenseFeature("oncall", {
           path: "telephony",
           name: "telephonySettings",
           meta: {
@@ -218,13 +211,14 @@ const useManagementRoutes = () => {
           },
           component: () => import("@/components/settings/TelephonySettings.vue"),
           beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
-        },
+        }),
         {
           path: "storage_settings",
           name: "storageSettings",
           component: () => import("@/components/settings/OrgStorageSettings.vue"),
           meta: {
             titleKey: "routeTitles.storageSettings",
+            licenseFeature: "byob",
           },
           beforeEnter: withFeatureGate("storageSettings", routeGuard),
         },
@@ -327,6 +321,17 @@ const useManagementRoutes = () => {
           meta: {
             keepAlive: true,
             titleKey: "settings.organizationManagement",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "org_domain_mapping",
+          name: "orgDomainMapping",
+          component: () => import("@/components/settings/OrgDomainManagement.vue"),
+          meta: {
+            titleKey: "routeTitles.orgDomainMapping",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);

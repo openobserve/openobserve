@@ -13,19 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createMemoryHistory, createRouter } from "vue-router";
 import Apache from "./Apache.vue";
 import FirstEventStatus from "@/components/ingestion/FirstEventStatus.vue";
 import { WEB_SERVER_GUIDES } from "@/composables/useIngestion";
+import { queryClient } from "@/composables/query/queryClient";
 
 const copyMock = vi.fn();
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: (...args: unknown[]) => copyMock(...args),
 }));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+const credentialApi = vi.hoisted(() => ({
+  get_organization_passcode: vi.fn(),
+  list_org_ingestion_tokens: vi.fn(),
+}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: credentialApi });
+});
 
 const SERVER = "apache";
 const PASSCODE = "o2tokenSECRETvalue0123456789";
@@ -62,16 +71,30 @@ const mountPage = async () => {
       stubs: { FirstEventStatus: true },
     },
   });
-  await flushPromises();
+  // the credential read settles through the query client before the block renders
+  for (let i = 0; i < 3; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushPromises();
+  }
   return wrapper;
 };
 
 describe("Apache.vue web server guide", () => {
   let wrapper: VueWrapper | undefined;
 
+  beforeEach(() => {
+    credentialApi.list_org_ingestion_tokens.mockResolvedValue({
+      data: { data: [{ name: "default", token: PASSCODE, enabled: true }] },
+    });
+    credentialApi.get_organization_passcode.mockResolvedValue({
+      data: { data: { passcode: PASSCODE, user: EMAIL } },
+    });
+  });
+
   afterEach(() => {
     wrapper?.unmount();
     wrapper = undefined;
+    queryClient.clear();
     copyMock.mockClear();
   });
 

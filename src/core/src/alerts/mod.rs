@@ -26,12 +26,13 @@ use config::{
         },
         cluster::RoleGroup,
         search::{SearchEventContext, SearchEventType, SqlQuery},
-        sql::resolve_stream_names,
+        sql::{TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
     utils::{
         base64,
         json::{Map, Value},
+        sql::quote_identifier,
     },
 };
 use search::utils::is_permissable_function_error;
@@ -40,29 +41,44 @@ use usage_reporting::http_report_metrics;
 
 use crate::{search as SearchService, service::setup_tracing_with_trace_id};
 
+pub mod ack;
 pub mod alert;
 #[cfg(feature = "enterprise")]
 pub mod alert_calibration;
+pub mod auto_investigate_decisions;
 pub mod backfill;
 pub mod composite;
 pub mod composite_graph_lock;
-#[cfg(feature = "enterprise")]
-pub mod deduplication;
 pub mod derived_streams;
 pub mod destination_usage;
 pub mod destinations;
 pub mod downtimes;
 pub mod external_alerts;
 #[cfg(feature = "enterprise")]
-pub mod grouping;
+pub mod incident_title;
 #[cfg(feature = "enterprise")]
 pub mod incidents;
-pub mod notifications;
+pub mod lifecycle;
 #[cfg(feature = "enterprise")]
-pub mod org_config;
+pub mod mute;
+pub mod notifications;
 mod prom_rule;
+#[cfg(feature = "enterprise")]
+pub mod rca_live;
+#[cfg(feature = "enterprise")]
+pub mod rca_resume;
+#[cfg(feature = "enterprise")]
+pub mod rca_runs;
+#[cfg(feature = "enterprise")]
+pub mod rca_steering;
+#[cfg(feature = "enterprise")]
+pub mod rca_turn;
 pub mod recovery;
 pub mod scheduler;
+pub mod slack_destination;
+pub mod slack_investigate;
+pub mod slack_publish;
+pub mod slack_view;
 pub mod templates;
 
 #[async_trait]
@@ -363,30 +379,7 @@ impl QueryConditionExt for QueryCondition {
             }
         };
 
-        let stream_names = resolve_stream_names(&sql)
-            .map_err(|e| anyhow::anyhow!("Error resolving stream names in SQL query: {e}"))?;
-
-        // SQL may contain multiple stream names, check for each stream
-        // if the query period is greater than the max query range
-        for stream in stream_names.iter() {
-            if infra::schema::get_stream_schema_from_cache(org_id, stream, stream_type)
-                .await
-                .is_none()
-            {
-                return Err(anyhow::anyhow!(
-                    "Stream \"{stream}\" not found in schema, skipping alert evaluation"
-                ));
-            };
-
-            if let Some(settings) = infra::schema::get_settings(org_id, stream, stream_type).await {
-                let max_query_range = settings.max_query_range;
-                if max_query_range > 0 && trigger_condition.period > max_query_range * 60 {
-                    return Err(anyhow::anyhow!(
-                        "Query period is greater than max query range of {max_query_range} hours for stream \"{stream}\""
-                    ));
-                }
-            }
-        }
+        check_query_streams(org_id, stream_type, &sql, trigger_condition.period).await?;
 
         let mut time_diff = Duration::try_minutes(trigger_condition.period)
             .unwrap()
@@ -553,10 +546,10 @@ impl QueryConditionExt for QueryCondition {
                 sort_by: None,
                 quick_mode: false,
                 track_total_hits: false,
-                query_type: "".to_string(),
                 uses_zo_fn: false,
                 query_fn: self.vrl_function.clone(),
                 skip_wal: false,
+                use_index: true,
                 index_type: "".to_string(),
                 per_query_response: false, // Will return results in single array
             };
@@ -591,22 +584,11 @@ impl QueryConditionExt for QueryCondition {
             let req = config::meta::search::Request {
                 query: config::meta::search::Query {
                     sql: sql.clone(),
-                    from: 0,
                     size,
                     start_time: start_time.unwrap(),
                     end_time,
-                    quick_mode: false,
-                    query_type: "".to_string(),
-                    track_total_hits: false,
-                    uses_zo_fn: false,
                     query_fn: encode_query_fn,
-                    skip_wal: false,
-                    sampling_config: None,
-                    sampling_ratio: None,
-                    streaming_output: false,
-                    streaming_id: None,
-                    histogram_interval: 0,
-                    timezone: None,
+                    ..Default::default()
                 },
                 encoding: config::meta::search::RequestEncoding::Empty,
                 regions: vec![],
@@ -615,6 +597,7 @@ impl QueryConditionExt for QueryCondition {
                 search_type,
                 search_event_context,
                 use_cache: false,
+                use_index: true,
                 clear_cache: false,
                 local_mode: None,
                 agent_options: None,
@@ -639,13 +622,7 @@ impl QueryConditionExt for QueryCondition {
         // 1. Vec<Map<String, Value>> - for normal alert
         // 2. Vec<Vec<Map<String, Value>>> - for multi_time_range alert
         let resp = match resp {
-            Ok(mut v) => {
-                // Check if function error is only query limit default error
-                if is_permissable_function_error(&v.function_error) {
-                    v.function_error.clear();
-                    v.is_partial = false;
-                }
-
+            Ok(v) => {
                 // the search request doesn't via cache layer, so need report usage separately
                 http_report_metrics(
                     req_start,
@@ -656,14 +633,7 @@ impl QueryConditionExt for QueryCondition {
                     &SearchEventType::Alerts.to_string(),
                     "",
                 );
-                if v.is_partial {
-                    return Err(anyhow::anyhow!(
-                        "Partial response: {}",
-                        v.function_error.join(", ")
-                    ));
-                } else {
-                    v
-                }
+                complete_response(v)?
             }
             Err(e) => {
                 if let infra::errors::Error::ErrorCode(e) = e {
@@ -878,6 +848,41 @@ impl QueryConditionExt for QueryCondition {
     }
 }
 
+/// Checks that every stream in the alert SQL exists and allows the alert period.
+async fn check_query_streams(
+    org_id: &str,
+    stream_type: StreamType,
+    sql: &str,
+    period: i64,
+) -> Result<(), anyhow::Error> {
+    let stream_refs = resolve_stream_names_with_type(sql)
+        .map_err(|e| anyhow::anyhow!("Error resolving stream names in SQL query: {e}"))?;
+
+    for stream_ref in stream_refs.iter() {
+        let stream = stream_ref.stream_name();
+        // A JOIN may name another type, e.g. "enrichment_tables".tbl in a logs alert.
+        let stream_type = stream_ref.get_stream_type(stream_type);
+        if infra::schema::get_stream_schema_from_cache(org_id, &stream, stream_type)
+            .await
+            .is_none()
+        {
+            return Err(anyhow::anyhow!(
+                "Stream \"{stream}\" not found in schema, skipping alert evaluation"
+            ));
+        };
+
+        if let Some(settings) = infra::schema::get_settings(org_id, &stream, stream_type).await {
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0 && period > max_query_range.saturating_mul(60) {
+                return Err(anyhow::anyhow!(
+                    "Query period is greater than max query range of {max_query_range} hours for stream \"{stream}\""
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Run the COUNT(*) decision query for a hybrid count-based alert.
 ///
 /// Returns `(exact_count, query_took_ms)`. The user's SQL runs verbatim inside
@@ -896,23 +901,12 @@ async fn run_alert_count_query(
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: config::meta::alerts::level::count_query_sql(sql),
-            from: 0,
             // COUNT(*) over a subquery yields exactly one row.
             size: 1,
             start_time,
             end_time,
-            quick_mode: false,
-            query_type: "".to_string(),
-            track_total_hits: false,
-            uses_zo_fn: false,
             query_fn: None, // guard upstream: hybrid excludes VRL alerts
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
+            ..Default::default()
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],
@@ -921,6 +915,7 @@ async fn run_alert_count_query(
         search_type,
         search_event_context,
         use_cache: false,
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,
@@ -934,6 +929,12 @@ async fn run_alert_count_query(
         Some(RoleGroup::Background),
     )
     .await?;
+    alert_count(resp)
+}
+
+/// The exact count and its query time from a COUNT(*) response. [pure]
+fn alert_count(resp: config::meta::search::Response) -> Result<(f64, i64), anyhow::Error> {
+    let resp = complete_response(resp)?;
     let count = resp
         .hits
         .first()
@@ -941,6 +942,23 @@ async fn run_alert_count_query(
         .and_then(|v| v.as_f64().or_else(|| v.as_i64().map(|i| i as f64)))
         .ok_or_else(|| anyhow::anyhow!("alert count query returned no zo_alert_count column"))?;
     Ok((count, resp.took as i64))
+}
+
+/// The response with its permissible function errors cleared, or Err if it is still partial. [pure]
+fn complete_response(
+    mut resp: config::meta::search::Response,
+) -> Result<config::meta::search::Response, anyhow::Error> {
+    if is_permissable_function_error(&resp.function_error) {
+        resp.function_error.clear();
+        resp.is_partial = false;
+    }
+    if resp.is_partial {
+        return Err(anyhow::anyhow!(
+            "Partial response: {}",
+            resp.function_error.join(", ")
+        ));
+    }
+    Ok(resp)
 }
 
 #[async_trait]
@@ -1101,10 +1119,29 @@ impl ConditionExt for Condition {
                 return false;
             }
         };
+        if let Some(result) = config::meta::alerts::condition_ops::evaluate_extended(
+            &self.operator,
+            val,
+            &self.value,
+            self.is_case_insensitive(),
+        ) {
+            return result;
+        }
         match val {
             Value::String(v) => {
-                let val = v.as_str();
                 let con_val = self.value.as_str().unwrap_or_default().trim_matches('"');
+                let (val, con_val) = if self.is_case_insensitive() {
+                    (
+                        std::borrow::Cow::Owned(v.to_lowercase()),
+                        std::borrow::Cow::Owned(con_val.to_lowercase()),
+                    )
+                } else {
+                    (
+                        std::borrow::Cow::Borrowed(v.as_str()),
+                        std::borrow::Cow::Borrowed(con_val),
+                    )
+                };
+                let (val, con_val) = (val.as_ref(), con_val.as_ref());
                 match self.operator {
                     Operator::EqualTo => val == con_val,
                     Operator::NotEqualTo => val != con_val,
@@ -1259,7 +1296,7 @@ impl ConditionGroupExt for config::meta::alerts::ConditionItem {
                     &v.column,
                     &v.operator,
                     &v.value,
-                    v.ignore_case.unwrap_or(false),
+                    v.in_memory_case_insensitive(),
                 )
                 .await
             }
@@ -1402,6 +1439,14 @@ async fn evaluate_condition(
             return false;
         }
     };
+    if let Some(result) = config::meta::alerts::condition_ops::evaluate_extended(
+        operator,
+        val,
+        condition_value,
+        ignore_case,
+    ) {
+        return result;
+    }
 
     match val {
         Value::String(v) => {
@@ -1492,6 +1537,7 @@ async fn condition_item_to_sql(
                 operator: v.operator,
                 value: v.value.clone(),
                 ignore_case: v.ignore_case.unwrap_or(false),
+                case_insensitive: v.case_insensitive,
             };
 
             let data_type = match schema.field_with_name(&condition.column) {
@@ -1539,13 +1585,19 @@ pub async fn build_sql(
                 ))?
         )
     };
-    if query_condition.aggregation.is_none() {
+    let Some(agg) = query_condition.aggregation.as_ref() else {
         return Ok(format!("SELECT * FROM \"{stream_name}\" {where_sql}"));
     };
+    build_aggregation_sql(stream_name, &schema, agg, &where_sql)
+}
 
-    // handle aggregation
-    let mut sql = String::new();
-    let agg = query_condition.aggregation.as_ref().unwrap();
+/// Only columns of `schema` reach the SQL; any other `group_by`/`having` entry is refused.
+fn build_aggregation_sql(
+    stream_name: &str,
+    schema: &Schema,
+    agg: &config::meta::alerts::Aggregation,
+    where_sql: &str,
+) -> Result<String, anyhow::Error> {
     let having_expr = {
         let data_type = match schema.field_with_name(&agg.having.column) {
             Ok(field) => field.data_type(),
@@ -1559,69 +1611,56 @@ pub async fn build_sql(
         build_having_expr(agg, data_type)?
     };
 
+    let col = quote_identifier(&agg.having.column);
     let func_expr = match agg.function {
-        AggFunction::Avg => format!("AVG(\"{}\")", agg.having.column),
-        AggFunction::Max => format!("MAX(\"{}\")", agg.having.column),
-        AggFunction::Min => format!("MIN(\"{}\")", agg.having.column),
-        AggFunction::Sum => format!("SUM(\"{}\")", agg.having.column),
-        AggFunction::Count => format!("COUNT(\"{}\")", agg.having.column),
-        AggFunction::Median => format!("MEDIAN(\"{}\")", agg.having.column),
-        AggFunction::P50 => format!(
-            "approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
-        AggFunction::P75 => format!(
-            "approx_percentile_cont(0.75) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
-        AggFunction::P90 => format!(
-            "approx_percentile_cont(0.9) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
-        AggFunction::P95 => format!(
-            "approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
-        AggFunction::P99 => format!(
-            "approx_percentile_cont(0.99) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
+        AggFunction::Avg => format!("AVG({col})"),
+        AggFunction::Max => format!("MAX({col})"),
+        AggFunction::Min => format!("MIN({col})"),
+        AggFunction::Sum => format!("SUM({col})"),
+        AggFunction::Count => format!("COUNT({col})"),
+        AggFunction::Median => format!("MEDIAN({col})"),
+        AggFunction::P50 => format!("approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P75 => format!("approx_percentile_cont(0.75) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P90 => format!("approx_percentile_cont(0.9) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P95 => format!("approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P99 => format!("approx_percentile_cont(0.99) WITHIN GROUP (ORDER BY {col})"),
     };
 
-    if let Some(group) = agg.group_by.as_ref()
-        && !group.is_empty()
-    {
-        let cols = group.join(", ");
-        if agg.multi_alert {
-            // Multi-alerts drop the HAVING filter. A group that falls back
-            // under the threshold must still be RETURNED: otherwise its
-            // recovery is indistinguishable from it vanishing, and it would
-            // only resolve later via the reaper timeout, with a NULL value
-            // where the real reading should be.
-            //
-            // The page stays bounded, so it is ordered worst-first. That
-            // ordering keeps the rollup level exact and lets the cap admit the
-            // true top of the distribution rather than an arbitrary slice. The
-            // group columns are the deterministic tiebreak within a severity
-            // band.
-            let severity_order =
-                config::meta::alerts::aggregation_level::severity_order_sql(agg, "alert_agg_value")
-                    .map_err(|e| anyhow::anyhow!("Invalid aggregation threshold: {e}"))?;
-            sql = format!(
-                "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} ORDER BY {severity_order}, {cols}"
-            );
-        } else {
-            sql = format!(
-                "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} HAVING {having_expr}"
-            );
-        }
-    }
-    if sql.is_empty() {
-        sql = format!(
+    let group = agg.group_by.as_deref().unwrap_or(&[]);
+    if group.is_empty() {
+        return Ok(format!(
             "SELECT {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} HAVING {having_expr}"
-        );
+        ));
     }
-    Ok(sql)
+    let cols = quoted_group_by(schema, group)
+        .map_err(|column| {
+            anyhow::anyhow!("Group by column {column} not found on stream {stream_name}")
+        })?
+        .join(", ");
+    if agg.multi_alert {
+        // No HAVING: a group back under the threshold must still be returned to show recovery.
+        // Worst-first order keeps the bounded page exact; group columns are the tiebreak.
+        let severity_order =
+            config::meta::alerts::aggregation_level::severity_order_sql(agg, "alert_agg_value")
+                .map_err(|e| anyhow::anyhow!("Invalid aggregation threshold: {e}"))?;
+        return Ok(format!(
+            "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} ORDER BY {severity_order}, {cols}"
+        ));
+    }
+    Ok(format!(
+        "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} HAVING {having_expr}"
+    ))
+}
+
+/// Quoted, escaped identifiers; `Err` carries the first entry that is not a column of `schema`.
+fn quoted_group_by(schema: &Schema, group_by: &[String]) -> Result<Vec<String>, String> {
+    group_by
+        .iter()
+        .map(|col| match schema.field_with_name(col) {
+            Ok(_) => Ok(quote_identifier(col)),
+            Err(_) => Err(col.clone()),
+        })
+        .collect()
 }
 
 /// `HAVING` clause filtering the `alert_agg_value` aggregate.
@@ -1685,11 +1724,11 @@ fn build_expr(
     field_alias: &str,
     field_type: &DataType,
 ) -> Result<String, anyhow::Error> {
-    let field_alias = if !field_alias.is_empty() {
-        field_alias
-    } else {
+    let field_alias = quote_identifier(if field_alias.is_empty() {
         cond.column.as_str()
-    };
+    } else {
+        field_alias
+    });
     // Null/empty checks take no value. On non-string columns "empty" can only
     // mean null, so the empty checks degrade to the null checks there.
     let is_string_type = matches!(
@@ -1697,23 +1736,29 @@ fn build_expr(
         DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View
     );
     match cond.operator {
-        Operator::IsNull => return Ok(format!("\"{field_alias}\" IS NULL")),
-        Operator::IsNotNull => return Ok(format!("\"{field_alias}\" IS NOT NULL")),
+        Operator::IsNull => return Ok(format!("{field_alias} IS NULL")),
+        Operator::IsNotNull => return Ok(format!("{field_alias} IS NOT NULL")),
         Operator::IsEmpty => {
             return Ok(if is_string_type {
-                format!("(\"{field_alias}\" IS NULL OR \"{field_alias}\" = '')")
+                format!("({field_alias} IS NULL OR {field_alias} = '')")
             } else {
-                format!("\"{field_alias}\" IS NULL")
+                format!("{field_alias} IS NULL")
             });
         }
         Operator::IsNotEmpty => {
             return Ok(if is_string_type {
-                format!("(\"{field_alias}\" IS NOT NULL AND \"{field_alias}\" != '')")
+                format!("({field_alias} IS NOT NULL AND {field_alias} != '')")
             } else {
-                format!("\"{field_alias}\" IS NOT NULL")
+                format!("{field_alias} IS NOT NULL")
             });
         }
         _ => {}
+    }
+    if cond.operator.is_extended() {
+        return build_extended_expr(cond, &field_alias, field_type, is_string_type);
+    }
+    if cond.is_case_insensitive() && is_string_type {
+        return build_case_insensitive_expr(cond, &field_alias, field_type);
     }
     let expr = match field_type {
         DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
@@ -1726,17 +1771,17 @@ fn build_expr(
             // terminate the SQL string literal early.
             let val = val.replace('\'', "''");
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = '{val}'"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != '{val}'"),
-                Operator::GreaterThan => format!("\"{field_alias}\" > '{val}'"),
+                Operator::EqualTo => format!("{field_alias} = '{val}'"),
+                Operator::NotEqualTo => format!("{field_alias} != '{val}'"),
+                Operator::GreaterThan => format!("{field_alias} > '{val}'"),
                 Operator::GreaterThanEquals => {
-                    format!("\"{field_alias}\" >= '{val}'")
+                    format!("{field_alias} >= '{val}'")
                 }
-                Operator::LessThan => format!("\"{field_alias}\" < '{val}'"),
-                Operator::LessThanEquals => format!("\"{field_alias}\" <= '{val}'"),
-                Operator::Contains => format!("str_match(\"{field_alias}\", '{val}')"),
+                Operator::LessThan => format!("{field_alias} < '{val}'"),
+                Operator::LessThanEquals => format!("{field_alias} <= '{val}'"),
+                Operator::Contains => format!("str_match({field_alias}, '{val}')"),
                 Operator::NotContains => {
-                    format!("\"{field_alias}\" NOT LIKE '%{val}%'")
+                    format!("{field_alias} NOT LIKE '%{val}%'")
                 }
                 // Null checks returned above; keep the dead arm panic-free.
                 _ => {
@@ -1785,15 +1830,15 @@ fn build_expr(
                     .to_string()
             };
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = {val}"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != {val}"),
-                Operator::GreaterThan => format!("\"{field_alias}\" > {val}"),
+                Operator::EqualTo => format!("{field_alias} = {val}"),
+                Operator::NotEqualTo => format!("{field_alias} != {val}"),
+                Operator::GreaterThan => format!("{field_alias} > {val}"),
                 Operator::GreaterThanEquals => {
-                    format!("\"{field_alias}\" >= {val}")
+                    format!("{field_alias} >= {val}")
                 }
-                Operator::LessThan => format!("\"{field_alias}\" < {val}"),
+                Operator::LessThan => format!("{field_alias} < {val}"),
                 Operator::LessThanEquals => {
-                    format!("\"{field_alias}\" <= {val}")
+                    format!("{field_alias} <= {val}")
                 }
                 _ => {
                     return Err(anyhow::anyhow!(
@@ -1821,15 +1866,15 @@ fn build_expr(
                     })?
             };
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = {val}"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != {val}"),
-                Operator::GreaterThan => format!("\"{field_alias}\" > {val}"),
+                Operator::EqualTo => format!("{field_alias} = {val}"),
+                Operator::NotEqualTo => format!("{field_alias} != {val}"),
+                Operator::GreaterThan => format!("{field_alias} > {val}"),
                 Operator::GreaterThanEquals => {
-                    format!("\"{field_alias}\" >= {val}")
+                    format!("{field_alias} >= {val}")
                 }
-                Operator::LessThan => format!("\"{field_alias}\" < {val}"),
+                Operator::LessThan => format!("{field_alias} < {val}"),
                 Operator::LessThanEquals => {
-                    format!("\"{field_alias}\" <= {val}")
+                    format!("{field_alias} <= {val}")
                 }
                 _ => {
                     return Err(anyhow::anyhow!(
@@ -1857,8 +1902,8 @@ fn build_expr(
                     })?
             };
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = {val}"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != {val}"),
+                Operator::EqualTo => format!("{field_alias} = {val}"),
+                Operator::NotEqualTo => format!("{field_alias} != {val}"),
                 _ => {
                     return Err(anyhow::anyhow!(
                         "Column {} has data_type [{field_type}] and it does not supported operator [{:?}]",
@@ -1878,6 +1923,200 @@ fn build_expr(
     Ok(expr)
 }
 
+/// Case-folded string comparison for `case_insensitive`; legacy `ignore_case` never reaches SQL.
+fn build_case_insensitive_expr(
+    cond: &Condition,
+    field_alias: &str,
+    field_type: &DataType,
+) -> Result<String, anyhow::Error> {
+    let raw = if cond.value.is_string() {
+        cond.value.as_str().unwrap_or_default().to_string()
+    } else {
+        cond.value.to_string()
+    };
+    let lowered = sql_string_literal(&raw.to_lowercase());
+    let op = match cond.operator {
+        Operator::EqualTo => "=",
+        Operator::NotEqualTo => "!=",
+        Operator::GreaterThan => ">",
+        Operator::GreaterThanEquals => ">=",
+        Operator::LessThan => "<",
+        Operator::LessThanEquals => "<=",
+        Operator::Contains => {
+            return Ok(format!(
+                "str_match_ignore_case({field_alias}, '{}')",
+                sql_string_literal(&raw)
+            ));
+        }
+        // NOT LIKE keeps the NULL-row semantics of the case-sensitive not_contains.
+        Operator::NotContains => {
+            return Ok(format!(
+                "lower({field_alias}) NOT LIKE '%{}%'",
+                sql_like_literal(&raw.to_lowercase())
+            ));
+        }
+        _ => return Err(unsupported_operator(cond, field_type)),
+    };
+    Ok(format!("lower({field_alias}) {op} '{lowered}'"))
+}
+
+/// SQL for `in`, `not_in`, `starts_with`, `ends_with`, `re_match` and `re_not_match`.
+fn build_extended_expr(
+    cond: &Condition,
+    field_alias: &str,
+    field_type: &DataType,
+    is_string_type: bool,
+) -> Result<String, anyhow::Error> {
+    let fold = cond.is_case_insensitive() && is_string_type;
+    let column = if fold {
+        format!("lower({field_alias})")
+    } else {
+        field_alias.to_string()
+    };
+    match cond.operator {
+        Operator::In | Operator::NotIn => {
+            let items = config::meta::alerts::condition_ops::list_values(&cond.value);
+            if items.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "Column {} needs at least one value for operator [{}]",
+                    cond.column,
+                    cond.operator
+                ));
+            }
+            let literals = items
+                .iter()
+                .map(|item| sql_list_literal(cond, item, field_type, fold))
+                .collect::<Result<Vec<_>, _>>()?
+                .join(", ");
+            let keyword = if matches!(cond.operator, Operator::In) {
+                "IN"
+            } else {
+                "NOT IN"
+            };
+            Ok(format!("{column} {keyword} ({literals})"))
+        }
+        Operator::StartsWith | Operator::EndsWith if is_string_type => {
+            let needle = scalar_sql_text(&cond.value);
+            let needle = sql_like_literal(&if fold { needle.to_lowercase() } else { needle });
+            Ok(if matches!(cond.operator, Operator::StartsWith) {
+                format!("{column} LIKE '{needle}%'")
+            } else {
+                format!("{column} LIKE '%{needle}'")
+            })
+        }
+        Operator::ReMatch | Operator::ReNotMatch if is_string_type => {
+            let pattern = cond.value.as_str().unwrap_or_default();
+            let pattern = if cond.is_case_insensitive() {
+                format!("(?i){pattern}")
+            } else {
+                pattern.to_string()
+            };
+            // Not the re_match UDF: it strips escapes like `\b`, unlike in-memory evaluation.
+            let negation = if matches!(cond.operator, Operator::ReMatch) {
+                ""
+            } else {
+                "NOT "
+            };
+            Ok(format!(
+                "{negation}regexp_like({field_alias}, '{}')",
+                sql_string_literal(&pattern)
+            ))
+        }
+        _ => Err(unsupported_operator(cond, field_type)),
+    }
+}
+
+/// One `IN (...)` item typed for the column, parsed the same way as the `=` operand.
+fn sql_list_literal(
+    cond: &Condition,
+    item: &Value,
+    field_type: &DataType,
+    fold: bool,
+) -> Result<String, anyhow::Error> {
+    let invalid = || {
+        anyhow::anyhow!(
+            "Column [{}] dataType is [{field_type}] but value is [{item}]",
+            cond.column
+        )
+    };
+    match field_type {
+        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
+            if !(item.is_string() || item.is_number() || item.is_boolean()) {
+                return Err(invalid());
+            }
+            let text = scalar_sql_text(item);
+            let text = if fold { text.to_lowercase() } else { text };
+            Ok(format!("'{}'", sql_string_literal(&text)))
+        }
+        DataType::Int16 | DataType::Int32 | DataType::Int64 => match item {
+            Value::Number(n) => match n.as_i64() {
+                Some(v) => Ok(v.to_string()),
+                None => n.as_f64().map(|v| v.to_string()).ok_or_else(invalid),
+            },
+            Value::String(s) => {
+                let s = s.trim();
+                match s.parse::<i64>() {
+                    Ok(v) => Ok(v.to_string()),
+                    Err(_) => s
+                        .parse::<f64>()
+                        .ok()
+                        .filter(|v| v.is_finite())
+                        .map(|v| v.to_string())
+                        .ok_or_else(invalid),
+                }
+            }
+            _ => Err(invalid()),
+        },
+        DataType::Float32 | DataType::Float64 => match item {
+            Value::Number(n) => n.as_f64().map(|v| v.to_string()).ok_or_else(invalid),
+            Value::String(s) => s
+                .trim()
+                .parse::<f64>()
+                .map(|v| v.to_string())
+                .map_err(|_| invalid()),
+            _ => Err(invalid()),
+        },
+        DataType::Boolean => match item {
+            Value::Bool(b) => Ok(b.to_string()),
+            Value::String(s) => s
+                .parse::<bool>()
+                .map(|b| b.to_string())
+                .map_err(|_| invalid()),
+            _ => Err(invalid()),
+        },
+        _ => Err(unsupported_operator(cond, field_type)),
+    }
+}
+
+fn scalar_sql_text(value: &Value) -> String {
+    match value {
+        Value::String(s) => s.clone(),
+        other => other.to_string(),
+    }
+}
+
+/// Doubles single quotes so the value cannot end the SQL string literal.
+fn sql_string_literal(value: &str) -> String {
+    value.replace('\'', "''")
+}
+
+/// Backslash-escapes LIKE wildcards (DataFusion's default escape) and then the quotes.
+fn sql_like_literal(value: &str) -> String {
+    let escaped = value
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
+    sql_string_literal(&escaped)
+}
+
+fn unsupported_operator(cond: &Condition, field_type: &DataType) -> anyhow::Error {
+    anyhow::anyhow!(
+        "Column {} has data_type [{field_type}] and it does not supported operator [{:?}]",
+        cond.column,
+        cond.operator
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use arrow_schema::{DataType, Field, Schema};
@@ -1890,6 +2129,37 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn a_count_from_a_partial_response_is_refused_unless_its_errors_are_permissible() {
+        let resp = |is_partial: bool, function_error: &[&str], hits: Vec<Value>| {
+            config::meta::search::Response {
+                took: 7,
+                hits,
+                is_partial,
+                function_error: function_error.iter().map(|e| e.to_string()).collect(),
+                ..Default::default()
+            }
+        };
+        let counted = || vec![serde_json::json!({ "zo_alert_count": 3 })];
+        let cases = [
+            ("complete", resp(false, &[], counted()), Some((3.0, 7))),
+            (
+                "permissible partial",
+                resp(true, &[search::CAPPED_RESULTS_MSG], counted()),
+                Some((3.0, 7)),
+            ),
+            (
+                "node failed",
+                resp(true, &["node ingester-2 returned 503"], counted()),
+                None,
+            ),
+            ("missing column", resp(false, &[], vec![]), None),
+        ];
+        for (name, resp, expected) in cases {
+            assert_eq!(alert_count(resp).ok(), expected, "{name}");
+        }
+    }
 
     #[tokio::test]
     async fn test_condition_group_to_sql_simple() {
@@ -1910,6 +2180,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // Not used (first item)
                 }),
                 ConditionItem::Condition(ConditionItemCondition {
@@ -1917,6 +2188,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("api".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // AND before this item
                 }),
             ],
@@ -1945,6 +2217,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // Not used (first item)
                 }),
                 ConditionItem::Condition(ConditionItemCondition {
@@ -1952,6 +2225,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("critical".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::Or, // OR before this item
                 }),
             ],
@@ -1975,6 +2249,7 @@ mod tests {
                 operator: Operator::EqualTo,
                 value: Value::String("it's production".to_string()),
                 ignore_case: None,
+                case_insensitive: None,
                 logical_operator: LogicalOperator::And,
             })],
         };
@@ -2005,6 +2280,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // Not used (first item)
                 }),
                 ConditionItem::Group {
@@ -2015,6 +2291,7 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("api".to_string()),
                             ignore_case: None,
+                            case_insensitive: None,
                             logical_operator: LogicalOperator::And, /* Not used (first item in
                                                                      * group) */
                         }),
@@ -2023,6 +2300,7 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("web".to_string()),
                             ignore_case: None,
+                            case_insensitive: None,
                             logical_operator: LogicalOperator::Or, // OR before this item
                         }),
                     ],
@@ -2057,6 +2335,7 @@ mod tests {
                     operator: Operator::GreaterThan,
                     value: Value::Number(serde_json::Number::from(100)),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // Not used (first item)
                 }),
                 ConditionItem::Condition(ConditionItemCondition {
@@ -2064,6 +2343,7 @@ mod tests {
                     operator: Operator::GreaterThanEquals,
                     value: Value::Number(serde_json::Number::from_f64(50.5).unwrap()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // AND before this item
                 }),
             ],
@@ -2088,6 +2368,7 @@ mod tests {
                 operator: Operator::Contains,
                 value: Value::String("error".to_string()),
                 ignore_case: None,
+                case_insensitive: None,
                 logical_operator: LogicalOperator::And,
             })],
         };
@@ -2134,6 +2415,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // Not used (first item)
                 }),
                 ConditionItem::Condition(ConditionItemCondition {
@@ -2141,6 +2423,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("active".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // AND before this item
                 }),
                 ConditionItem::Condition(ConditionItemCondition {
@@ -2148,6 +2431,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("api".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::Or, // OR before this item
                 }),
             ],
@@ -2178,6 +2462,7 @@ mod tests {
                 operator: Operator::EqualTo,
                 value: Value::String("error".to_string()),
                 ignore_case: None,
+                case_insensitive: None,
                 logical_operator: LogicalOperator::And,
             })],
         };
@@ -2210,6 +2495,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("test".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // Ignored because next is Group
                 }),
                 ConditionItem::Group {
@@ -2220,6 +2506,7 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("test".to_string()),
                             ignore_case: None,
+                            case_insensitive: None,
                             logical_operator: LogicalOperator::And,
                         }),
                         ConditionItem::Condition(ConditionItemCondition {
@@ -2227,6 +2514,7 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("test2".to_string()),
                             ignore_case: None,
+                            case_insensitive: None,
                             logical_operator: LogicalOperator::And,
                         }),
                     ],
@@ -2312,6 +2600,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("test".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::Or, // OR with next item
                 }),
                 ConditionItem::Group {
@@ -2322,6 +2611,7 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("test".to_string()),
                             ignore_case: None,
+                            case_insensitive: None,
                             logical_operator: LogicalOperator::And, // AND with next in group
                         }),
                         ConditionItem::Condition(ConditionItemCondition {
@@ -2329,6 +2619,7 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("test2".to_string()),
                             ignore_case: None,
+                            case_insensitive: None,
                             logical_operator: LogicalOperator::And,
                         }),
                     ],
@@ -2382,6 +2673,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("test".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
                 ConditionItem::Group {
@@ -2391,6 +2683,7 @@ mod tests {
                         operator: Operator::EqualTo,
                         value: Value::String("test".to_string()),
                         ignore_case: None,
+                        case_insensitive: None,
                         logical_operator: LogicalOperator::And,
                     })],
                 },
@@ -2399,6 +2692,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("test2".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
             ],
@@ -2429,6 +2723,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("test".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
                 ConditionItem::Group {
@@ -2438,6 +2733,7 @@ mod tests {
                         operator: Operator::EqualTo,
                         value: Value::String("test".to_string()),
                         ignore_case: None,
+                        case_insensitive: None,
                         logical_operator: LogicalOperator::And,
                     })],
                 },
@@ -2446,6 +2742,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("test2".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
             ],
@@ -2521,6 +2818,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("match".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // Not used (first)
                 }),
                 ConditionItem::Group {
@@ -2531,6 +2829,7 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("match".to_string()),
                             ignore_case: None,
+                            case_insensitive: None,
                             logical_operator: LogicalOperator::And, // Not used (first in group)
                         }),
                         ConditionItem::Condition(ConditionItemCondition {
@@ -2538,6 +2837,7 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("match".to_string()),
                             ignore_case: None,
+                            case_insensitive: None,
                             logical_operator: LogicalOperator::And, // AND before this
                         }),
                         ConditionItem::Group {
@@ -2548,6 +2848,7 @@ mod tests {
                                     operator: Operator::EqualTo,
                                     value: Value::String("match".to_string()),
                                     ignore_case: None,
+                                    case_insensitive: None,
                                     logical_operator: LogicalOperator::And,
                                 }),
                                 ConditionItem::Condition(ConditionItemCondition {
@@ -2555,6 +2856,7 @@ mod tests {
                                     operator: Operator::EqualTo,
                                     value: Value::String("match".to_string()),
                                     ignore_case: None,
+                                    case_insensitive: None,
                                     logical_operator: LogicalOperator::And, // AND before this
                                 }),
                             ],
@@ -2566,6 +2868,7 @@ mod tests {
                     operator: Operator::EqualTo,
                     value: Value::String("match".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And, // AND before this
                 }),
             ],
@@ -2687,6 +2990,7 @@ mod tests {
                 operator: Operator::IsEmpty,
                 value: Value::String(String::new()),
                 ignore_case: None,
+                case_insensitive: None,
                 logical_operator: LogicalOperator::And,
             })],
         };
@@ -2714,6 +3018,7 @@ mod tests {
                 operator: Operator::IsNull,
                 value: Value::String(String::new()),
                 ignore_case: None,
+                case_insensitive: None,
                 logical_operator: LogicalOperator::And,
             })],
         };
@@ -2733,6 +3038,7 @@ mod tests {
             operator,
             value,
             ignore_case: false,
+            case_insensitive: None,
         }
     }
 
@@ -2949,6 +3255,129 @@ mod tests {
         );
         let expr = build_expr(&cond, "", &DataType::Int64).unwrap();
         assert_eq!(expr, "\"code\" < 1.5");
+    }
+
+    // ── Aggregation SQL: group_by identifiers ───────────────────────────────
+
+    fn agg_schema() -> Schema {
+        Schema::new(vec![
+            Field::new("host", DataType::Utf8, false),
+            Field::new("region", DataType::Utf8, false),
+            Field::new("latency", DataType::Int64, false),
+        ])
+    }
+
+    fn group_agg(group_by: &[&str], multi_alert: bool) -> Aggregation {
+        Aggregation {
+            group_by: Some(group_by.iter().map(|s| s.to_string()).collect()),
+            function: AggFunction::Avg,
+            having: make_cond(
+                "latency",
+                Operator::GreaterThan,
+                Value::Number(serde_json::Number::from(100)),
+            ),
+            warning_value: None,
+            multi_alert,
+        }
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_quotes_group_by_columns() {
+        let agg = group_agg(&["host", "region"], false);
+        let sql = build_aggregation_sql("svc", &agg_schema(), &agg, "").unwrap();
+        assert_eq!(
+            sql,
+            "SELECT \"host\", \"region\", AVG(\"latency\") AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM \"svc\" GROUP BY \"host\", \"region\" HAVING \"alert_agg_value\" > 100"
+        );
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_multi_alert_quotes_group_by_in_order_by() {
+        let agg = group_agg(&["host"], true);
+        let sql = build_aggregation_sql("svc", &agg_schema(), &agg, " WHERE 1 = 1").unwrap();
+        assert_eq!(
+            sql,
+            "SELECT \"host\", AVG(\"latency\") AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM \"svc\" WHERE 1 = 1 GROUP BY \"host\" ORDER BY CASE WHEN \"alert_agg_value\" > 100 THEN 2 ELSE 0 END DESC, \"host\""
+        );
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_rejects_group_by_entry_not_in_schema() {
+        for entry in [
+            "nonexistent",
+            "host, (SELECT secret FROM \"other\" LIMIT 1)",
+            "host\" FROM \"other\" --",
+            "",
+        ] {
+            let agg = group_agg(&["host", entry], false);
+            let err = build_aggregation_sql("svc", &agg_schema(), &agg, "")
+                .unwrap_err()
+                .to_string();
+            assert_eq!(
+                err,
+                format!("Group by column {entry} not found on stream svc"),
+                "entry {entry:?} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_escapes_quotes_inside_schema_backed_identifiers() {
+        let tricky = "host\" FROM \"other\" --";
+        let schema = Schema::new(vec![
+            Field::new(tricky, DataType::Utf8, false),
+            Field::new("lat\"ency", DataType::Int64, false),
+        ]);
+        let mut agg = group_agg(&[tricky], false);
+        agg.having.column = "lat\"ency".to_string();
+        let sql = build_aggregation_sql("svc", &schema, &agg, "").unwrap();
+        assert_eq!(
+            sql,
+            "SELECT \"host\"\" FROM \"\"other\"\" --\", AVG(\"lat\"\"ency\") AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM \"svc\" GROUP BY \"host\"\" FROM \"\"other\"\" --\" HAVING \"alert_agg_value\" > 100"
+        );
+    }
+
+    #[test]
+    fn test_build_expr_escapes_quotes_inside_column_name() {
+        let cond = make_cond(
+            "lev\"el",
+            Operator::EqualTo,
+            Value::String("error".to_string()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"lev\"\"el\" = 'error'");
+        let expr = build_expr(&cond, "al\"ias", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"al\"\"ias\" = 'error'");
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_empty_group_by_collapses_to_single_row() {
+        let mut agg = group_agg(&[], false);
+        let sql = build_aggregation_sql("svc", &agg_schema(), &agg, "").unwrap();
+        assert!(!sql.contains("GROUP BY"), "{sql}");
+        agg.group_by = None;
+        assert_eq!(
+            build_aggregation_sql("svc", &agg_schema(), &agg, "").unwrap(),
+            sql
+        );
+    }
+
+    #[test]
+    fn test_quoted_group_by_reports_first_unknown_column() {
+        let schema = agg_schema();
+        assert_eq!(
+            quoted_group_by(&schema, &["host".into(), "region".into()]),
+            Ok(vec!["\"host\"".to_string(), "\"region\"".to_string()])
+        );
+        assert_eq!(
+            quoted_group_by(&schema, &["host".into(), "a".into(), "b".into()]),
+            Err("a".to_string())
+        );
+        let quoted = Schema::new(vec![Field::new("a\"b", DataType::Utf8, false)]);
+        assert_eq!(
+            quoted_group_by(&quoted, &["a\"b".into()]),
+            Ok(vec!["\"a\"\"b\"".to_string()])
+        );
     }
 
     // ── HAVING clause type resolution ───────────────────────────────────────
@@ -3227,5 +3656,653 @@ mod tests {
         assert!(
             evaluate_condition(&row, "meta_absent", &Operator::IsNull, &Value::Null, false).await
         );
+    }
+
+    #[tokio::test]
+    async fn test_check_query_streams_join_enrichment_table() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_alert_join_enrich";
+        let logs_key = format!("{org_id}/{}/app", StreamType::Logs);
+        let enrich_key = format!("{org_id}/{}/geo", StreamType::EnrichmentTables);
+        let schema = Schema::new(vec![Field::new("ip", DataType::Utf8, true)]);
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.insert(logs_key.clone(), SchemaCache::new(schema.clone()));
+            w.insert(enrich_key.clone(), SchemaCache::new(schema));
+        }
+
+        let sql =
+            r#"SELECT a.ip FROM "app" AS a JOIN "enrichment_tables"."geo" AS b ON a.ip = b.ip"#;
+        let missing_sql =
+            r#"SELECT a.ip FROM "app" AS a JOIN "enrichment_tables"."nope" AS b ON a.ip = b.ip"#;
+        let ok = check_query_streams(org_id, StreamType::Logs, sql, 10).await;
+        let missing = check_query_streams(org_id, StreamType::Logs, missing_sql, 10).await;
+
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.remove(&logs_key);
+            w.remove(&enrich_key);
+        }
+
+        assert!(ok.is_ok(), "join with enrichment table rejected: {ok:?}");
+        assert!(
+            missing
+                .unwrap_err()
+                .to_string()
+                .contains("\"nope\" not found")
+        );
+    }
+
+    fn make_ci_cond(column: &str, operator: Operator, value: Value) -> Condition {
+        Condition {
+            case_insensitive: Some(true),
+            ..make_cond(column, operator, value)
+        }
+    }
+
+    fn make_legacy_ic_cond(column: &str, operator: Operator, value: Value) -> Condition {
+        Condition {
+            ignore_case: true,
+            ..make_cond(column, operator, value)
+        }
+    }
+
+    #[test]
+    fn test_build_expr_legacy_ignore_case_keeps_main_sql() {
+        use config::utils::json::json;
+
+        for (op, value, ty) in [
+            (Operator::EqualTo, json!("Error"), DataType::Utf8),
+            (Operator::NotEqualTo, json!("o'k"), DataType::Utf8),
+            (Operator::GreaterThan, json!("b"), DataType::Utf8),
+            (Operator::Contains, json!("Err"), DataType::Utf8),
+            (Operator::NotContains, json!("5%_A"), DataType::Utf8),
+            (Operator::IsEmpty, json!(""), DataType::Utf8),
+            (Operator::EqualTo, json!(3), DataType::Int64),
+        ] {
+            let legacy = make_legacy_ic_cond("c", op, value.clone());
+            let plain = make_cond("c", op, value);
+            assert_eq!(
+                build_expr(&legacy, "", &ty).unwrap(),
+                build_expr(&plain, "", &ty).unwrap(),
+                "{op:?}"
+            );
+        }
+        let legacy = make_legacy_ic_cond("c", Operator::Contains, json!("Err"));
+        assert_eq!(
+            build_expr(&legacy, "", &DataType::Utf8).unwrap(),
+            r#"str_match("c", 'Err')"#
+        );
+    }
+
+    fn extended_operator_cases() -> Vec<(Operator, Value)> {
+        use config::utils::json::json;
+
+        vec![
+            (Operator::In, json!(["Error", "Warn"])),
+            (Operator::NotIn, json!(["Error"])),
+            (Operator::StartsWith, json!("Err")),
+            (Operator::EndsWith, json!("ROR")),
+            (Operator::ReMatch, json!("^err")),
+            (Operator::ReNotMatch, json!("^err")),
+        ]
+    }
+
+    #[test]
+    fn test_build_expr_extended_operators_ignore_legacy_ignore_case() {
+        for (op, value) in extended_operator_cases() {
+            let legacy = make_legacy_ic_cond("c", op, value.clone());
+            let plain = make_cond("c", op, value.clone());
+            let sql = build_expr(&legacy, "", &DataType::Utf8).unwrap();
+            assert_eq!(
+                sql,
+                build_expr(&plain, "", &DataType::Utf8).unwrap(),
+                "{op:?}"
+            );
+            assert!(
+                !sql.contains("lower(") && !sql.contains("(?i)"),
+                "{op:?}: {sql}"
+            );
+            let folded = build_expr(&make_ci_cond("c", op, value), "", &DataType::Utf8).unwrap();
+            assert!(
+                folded.contains("lower(\"c\")") || folded.contains("(?i)"),
+                "{op:?}: {folded}"
+            );
+        }
+        let cond = make_legacy_ic_cond("c", Operator::In, Value::from(vec!["A"]));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Utf8).unwrap(),
+            r#""c" IN ('A')"#
+        );
+    }
+
+    #[tokio::test]
+    async fn test_extended_operators_ignore_legacy_ignore_case_in_memory() {
+        use config::utils::json::json;
+
+        let row = json!({"level": "ERROR"});
+        let row = row.as_object().unwrap();
+        let lower_matches = [
+            (Operator::In, json!(["error", "warn"]), false),
+            (Operator::NotIn, json!(["error"]), true),
+            (Operator::StartsWith, json!("err"), false),
+            (Operator::EndsWith, json!("ror"), false),
+            (Operator::ReMatch, json!("^err"), false),
+            (Operator::ReNotMatch, json!("^err"), true),
+        ];
+        for (op, value, sensitive) in lower_matches {
+            let legacy = make_legacy_ic_cond("level", op, value.clone());
+            assert_eq!(legacy.evaluate(row).await, sensitive, "V1 legacy {op:?}");
+            assert_eq!(
+                make_ci_cond("level", op, value.clone()).evaluate(row).await,
+                !sensitive,
+                "V1 case_insensitive {op:?}"
+            );
+            for (flag, expected) in [("ignore_case", sensitive), ("case_insensitive", !sensitive)] {
+                let mut leaf = json!({"filterType": "condition", "column": "level",
+                    "operator": op, "value": value, "logicalOperator": "AND"});
+                leaf[flag] = json!(true);
+                let v2: AlertConditionParams = serde_json::from_value(json!({
+                    "version": 2,
+                    "conditions": {"filterType": "group", "logicalOperator": "AND", "conditions": [leaf]}
+                }))
+                .unwrap();
+                assert_eq!(v2.evaluate(row).await, expected, "V2 {flag} {op:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_build_having_expr_ignores_legacy_ignore_case() {
+        let mut agg = Aggregation {
+            group_by: None,
+            function: AggFunction::Max,
+            having: make_legacy_ic_cond("level", Operator::EqualTo, Value::from(5)),
+            warning_value: None,
+            multi_alert: false,
+        };
+        assert_eq!(
+            build_having_expr(&agg, &DataType::Utf8).unwrap(),
+            r#""alert_agg_value" = '5'"#
+        );
+        agg.having.case_insensitive = Some(true);
+        assert_eq!(
+            build_having_expr(&agg, &DataType::Utf8).unwrap(),
+            r#"lower("alert_agg_value") = '5'"#
+        );
+    }
+
+    #[tokio::test]
+    async fn test_legacy_ignore_case_entries_keep_main_sql_and_evaluation() {
+        use config::utils::json::json;
+
+        let schema = Schema::new(vec![Field::new("level", DataType::Utf8, true)]);
+        let v1: AlertConditionParams = serde_json::from_value(json!({
+            "and": [
+                {"column": "level", "operator": "=", "value": "ERROR", "ignore_case": true},
+                {"column": "level", "operator": "Contains", "value": "RR", "ignore_case": true}
+            ]
+        }))
+        .unwrap();
+        let v2: AlertConditionParams = serde_json::from_value(json!({
+            "version": 2,
+            "conditions": {
+                "filterType": "group",
+                "logicalOperator": "AND",
+                "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": "=",
+                     "value": "ERROR", "ignore_case": true, "logicalOperator": "AND"},
+                    {"filterType": "condition", "column": "level", "operator": "NotContains",
+                     "value": "DEBUG", "ignore_case": true, "logicalOperator": "AND"}
+                ]
+            }
+        }))
+        .unwrap();
+        assert_eq!(
+            v1.to_sql(&schema).await.unwrap(),
+            r#"("level" = 'ERROR' AND str_match("level", 'RR'))"#
+        );
+        assert_eq!(
+            v2.to_sql(&schema).await.unwrap(),
+            r#"("level" = 'ERROR' AND "level" NOT LIKE '%DEBUG%')"#
+        );
+        let row = json!({"level": "error"});
+        // Main: the V1 in-memory evaluator ignores ignore_case, the V2 one honours it.
+        assert!(!v1.evaluate(row.as_object().unwrap()).await);
+        assert!(v2.evaluate(row.as_object().unwrap()).await);
+        let row = json!({"level": "debug"});
+        assert!(!v2.evaluate(row.as_object().unwrap()).await);
+    }
+
+    #[tokio::test]
+    async fn test_case_insensitive_flag_on_v2_reaches_sql() {
+        use config::utils::json::json;
+
+        let schema = Schema::new(vec![Field::new("level", DataType::Utf8, true)]);
+        let v2: AlertConditionParams = serde_json::from_value(json!({
+            "version": 2,
+            "conditions": {
+                "filterType": "group",
+                "logicalOperator": "AND",
+                "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": "contains",
+                     "value": "Err", "case_insensitive": true, "logicalOperator": "AND"}
+                ]
+            }
+        }))
+        .unwrap();
+        assert_eq!(
+            v2.to_sql(&schema).await.unwrap(),
+            r#"(str_match_ignore_case("level", 'Err'))"#
+        );
+        assert!(
+            v2.evaluate(json!({"level": "ERROR"}).as_object().unwrap())
+                .await
+        );
+    }
+
+    #[test]
+    fn test_build_expr_old_operators_without_ignore_case_are_byte_identical() {
+        use config::utils::json::json;
+
+        let utf8 = DataType::Utf8;
+        let cases = [
+            (Operator::EqualTo, json!("it's"), &utf8, r#""c" = 'it''s'"#),
+            (Operator::NotEqualTo, json!("a"), &utf8, r#""c" != 'a'"#),
+            (Operator::GreaterThan, json!(5), &utf8, r#""c" > '5'"#),
+            (Operator::LessThanEquals, json!("b"), &utf8, r#""c" <= 'b'"#),
+            (
+                Operator::Contains,
+                json!("err"),
+                &utf8,
+                r#"str_match("c", 'err')"#,
+            ),
+            (
+                Operator::NotContains,
+                json!("50%_x"),
+                &utf8,
+                r#""c" NOT LIKE '%50%_x%'"#,
+            ),
+            (
+                Operator::IsEmpty,
+                json!(""),
+                &utf8,
+                r#"("c" IS NULL OR "c" = '')"#,
+            ),
+            (Operator::EqualTo, json!(3), &DataType::Int64, r#""c" = 3"#),
+            (
+                Operator::GreaterThan,
+                json!("2.5"),
+                &DataType::Float64,
+                r#""c" > 2.5"#,
+            ),
+            (
+                Operator::NotEqualTo,
+                json!(true),
+                &DataType::Boolean,
+                r#""c" != true"#,
+            ),
+        ];
+        for (op, value, ty, expected) in cases {
+            let cond = make_cond("c", op, value);
+            assert_eq!(build_expr(&cond, "", ty).unwrap(), expected, "{op:?}");
+        }
+    }
+
+    #[test]
+    fn test_build_expr_ignore_case_on_strings() {
+        use config::utils::json::json;
+
+        let utf8 = DataType::Utf8;
+        let cases = [
+            (Operator::EqualTo, json!("Error"), r#"lower("c") = 'error'"#),
+            (
+                Operator::NotEqualTo,
+                json!("O'K"),
+                r#"lower("c") != 'o''k'"#,
+            ),
+            (
+                Operator::GreaterThanEquals,
+                json!("B"),
+                r#"lower("c") >= 'b'"#,
+            ),
+            (
+                Operator::Contains,
+                json!("Err"),
+                r#"str_match_ignore_case("c", 'Err')"#,
+            ),
+            (
+                Operator::NotContains,
+                json!("5%_A"),
+                r#"lower("c") NOT LIKE '%5\%\_a%'"#,
+            ),
+        ];
+        for (op, value, expected) in cases {
+            let cond = make_ci_cond("c", op, value);
+            assert_eq!(build_expr(&cond, "", &utf8).unwrap(), expected, "{op:?}");
+        }
+        let cond = make_ci_cond("c", Operator::EqualTo, json!(3));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Int64).unwrap(),
+            r#""c" = 3"#
+        );
+    }
+
+    #[test]
+    fn test_build_expr_in_and_not_in_are_type_aware() {
+        use config::utils::json::json;
+
+        let cond = make_cond("c", Operator::In, json!(["a", "it's", 5]));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Utf8).unwrap(),
+            r#""c" IN ('a', 'it''s', '5')"#
+        );
+        let cond = make_ci_cond("c", Operator::NotIn, json!(["A", "b"]));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Utf8).unwrap(),
+            r#"lower("c") NOT IN ('a', 'b')"#
+        );
+        let cond = make_cond("c", Operator::In, json!([200, "404", 1.0]));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Int64).unwrap(),
+            r#""c" IN (200, 404, 1)"#
+        );
+        let cond = make_cond("c", Operator::NotIn, json!("1.5"));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Float64).unwrap(),
+            r#""c" NOT IN (1.5)"#
+        );
+        let cond = make_cond("c", Operator::In, json!([true, "false"]));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Boolean).unwrap(),
+            r#""c" IN (true, false)"#
+        );
+        let cond = make_cond("c", Operator::In, json!([]));
+        assert!(build_expr(&cond, "", &DataType::Utf8).is_err());
+        let cond = make_cond("c", Operator::In, json!(["x"]));
+        assert!(build_expr(&cond, "", &DataType::Int64).is_err());
+    }
+
+    #[test]
+    fn test_build_expr_starts_and_ends_with_escape_wildcards() {
+        use config::utils::json::json;
+
+        let cond = make_cond("c", Operator::StartsWith, json!("50%_o'k\\"));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Utf8).unwrap(),
+            r#""c" LIKE '50\%\_o''k\\%'"#
+        );
+        let cond = make_ci_cond("c", Operator::EndsWith, json!(".LOG"));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Utf8).unwrap(),
+            r#"lower("c") LIKE '%.log'"#
+        );
+        let cond = make_cond("c", Operator::StartsWith, json!("1"));
+        assert!(build_expr(&cond, "", &DataType::Int64).is_err());
+    }
+
+    #[test]
+    fn test_build_expr_regex_operators() {
+        use config::utils::json::json;
+
+        let cond = make_cond("c", Operator::ReMatch, json!("^GET '/api"));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Utf8).unwrap(),
+            r#"regexp_like("c", '^GET ''/api')"#
+        );
+        let cond = make_ci_cond("c", Operator::ReNotMatch, json!("timeout|refused"));
+        assert_eq!(
+            build_expr(&cond, "", &DataType::Utf8).unwrap(),
+            r#"NOT regexp_like("c", '(?i)timeout|refused')"#
+        );
+        let cond = make_cond("c", Operator::ReMatch, json!("5.."));
+        assert!(build_expr(&cond, "", &DataType::Int64).is_err());
+    }
+
+    #[tokio::test]
+    async fn test_like_escapes_are_honoured_by_datafusion() {
+        use std::sync::Arc;
+
+        use arrow::{array::StringArray, record_batch::RecordBatch};
+        use datafusion::{datasource::MemTable, prelude::SessionContext};
+
+        let schema = Arc::new(Schema::new(vec![Field::new("c", DataType::Utf8, true)]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(vec![
+                Some("50%_off"),
+                Some("50a_off"),
+                Some("500 off"),
+                Some("Path\\X"),
+                None,
+            ]))],
+        )
+        .unwrap();
+        let ctx = SessionContext::new();
+        let table = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(table)).unwrap();
+        let count = |cond: Condition| {
+            let ctx = ctx.clone();
+            async move {
+                let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+                let df = ctx
+                    .sql(&format!("SELECT c FROM t WHERE {expr}"))
+                    .await
+                    .unwrap();
+                df.collect()
+                    .await
+                    .unwrap()
+                    .iter()
+                    .map(|b| b.num_rows())
+                    .sum::<usize>()
+            }
+        };
+        use config::utils::json::json;
+        assert_eq!(
+            count(make_cond("c", Operator::StartsWith, json!("50%"))).await,
+            1
+        );
+        assert_eq!(
+            count(make_cond("c", Operator::EndsWith, json!("_off"))).await,
+            2
+        );
+        assert_eq!(
+            count(make_cond("c", Operator::EndsWith, json!("h\\X"))).await,
+            1
+        );
+        assert_eq!(
+            count(make_ci_cond("c", Operator::StartsWith, json!("PATH"))).await,
+            1
+        );
+        assert_eq!(
+            count(make_ci_cond("c", Operator::NotContains, json!("%_"))).await,
+            3
+        );
+        assert_eq!(
+            count(make_ci_cond("c", Operator::In, json!(["50%_OFF"]))).await,
+            1
+        );
+        assert_eq!(
+            count(make_cond("c", Operator::NotIn, json!(["50%_off"]))).await,
+            3
+        );
+    }
+
+    #[tokio::test]
+    async fn test_regex_sql_agrees_with_in_memory_evaluation() {
+        use std::sync::Arc;
+
+        use arrow::{array::StringArray, record_batch::RecordBatch};
+        use datafusion::{datasource::MemTable, prelude::SessionContext};
+
+        let texts = [Some("an error here"), Some("berrorb"), Some("a\tb"), None];
+        let schema = Arc::new(Schema::new(vec![Field::new("c", DataType::Utf8, true)]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(texts.to_vec()))],
+        )
+        .unwrap();
+        let ctx = SessionContext::new();
+        let table = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(table)).unwrap();
+        use config::utils::json::{Map, json};
+        for (pattern, ic) in [
+            (r"\berror\b", false),
+            (r"\b{start}ERROR", true),
+            (r"\Aberr", false),
+            (r"a\tb", false),
+        ] {
+            for op in [Operator::ReMatch, Operator::ReNotMatch] {
+                let cond = if ic {
+                    make_ci_cond("c", op, json!(pattern))
+                } else {
+                    make_cond("c", op, json!(pattern))
+                };
+                let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+                let batches = ctx
+                    .sql(&format!("SELECT c FROM t WHERE {expr}"))
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                let mut selected = Vec::new();
+                for batch in &batches {
+                    let col = batch
+                        .column(0)
+                        .as_any()
+                        .downcast_ref::<StringArray>()
+                        .unwrap();
+                    selected.extend(col.iter().map(|v| v.map(str::to_string)));
+                }
+                let mut expected = Vec::new();
+                for text in texts {
+                    let mut row = Map::new();
+                    if let Some(text) = text {
+                        row.insert("c".to_string(), json!(text));
+                    }
+                    if evaluate_condition(&row, "c", &op, &json!(pattern), ic).await {
+                        expected.push(text.map(str::to_string));
+                    }
+                }
+                assert_eq!(selected, expected, "{op:?} {pattern}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_evaluate_condition_extended_operators() {
+        use config::utils::json::json;
+
+        let row = json!({"level": "Error", "code": 503, "ok": false, "path": "/api/v1/users"});
+        let row = row.as_object().unwrap();
+        let eval = |column: &'static str, op: Operator, value: Value, ic: bool| async move {
+            evaluate_condition(row, column, &op, &value, ic).await
+        };
+        assert!(eval("level", Operator::In, json!(["Error", "warn"]), false).await);
+        assert!(!eval("level", Operator::In, json!(["error"]), false).await);
+        assert!(eval("level", Operator::In, json!(["error"]), true).await);
+        assert!(eval("code", Operator::In, json!(["503", 504]), false).await);
+        assert!(eval("code", Operator::NotIn, json!([200]), false).await);
+        assert!(eval("ok", Operator::In, json!([false]), false).await);
+        assert!(eval("path", Operator::StartsWith, json!("/API"), true).await);
+        assert!(!eval("path", Operator::StartsWith, json!("/API"), false).await);
+        assert!(eval("path", Operator::EndsWith, json!("users"), false).await);
+        assert!(eval("path", Operator::ReMatch, json!("^/api/v[0-9]+/"), false).await);
+        assert!(eval("path", Operator::ReNotMatch, json!("^/API"), false).await);
+        assert!(!eval("path", Operator::ReNotMatch, json!("^/API"), true).await);
+    }
+
+    #[tokio::test]
+    async fn test_negated_operators_on_a_missing_field_match_not_equal_to() {
+        use config::utils::json::json;
+
+        let row = json!({"other": "x"});
+        let row = row.as_object().unwrap();
+        // `!=` on a missing field is false today; every negated operator follows it.
+        for op in [
+            Operator::NotEqualTo,
+            Operator::NotContains,
+            Operator::NotIn,
+            Operator::ReNotMatch,
+        ] {
+            assert!(
+                !evaluate_condition(row, "absent", &op, &json!(["a"]), false).await,
+                "{op:?}"
+            );
+            assert!(
+                !evaluate_condition(row, "absent", &op, &json!("a"), false).await,
+                "{op:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_v1_condition_honours_case_insensitive_and_extended_operators() {
+        use config::utils::json::json;
+
+        let row = json!({"level": "ERROR"});
+        let row = row.as_object().unwrap();
+        let cond = make_cond("level", Operator::EqualTo, json!("error"));
+        assert!(!cond.evaluate(row).await);
+        let cond = make_legacy_ic_cond("level", Operator::EqualTo, json!("error"));
+        assert!(!cond.evaluate(row).await);
+        let cond = make_legacy_ic_cond("level", Operator::StartsWith, json!("err"));
+        assert!(!cond.evaluate(row).await);
+        let cond = make_ci_cond("level", Operator::EqualTo, json!("error"));
+        assert!(cond.evaluate(row).await);
+        let cond = make_ci_cond("level", Operator::Contains, json!("RR"));
+        assert!(cond.evaluate(row).await);
+        let cond = make_cond("level", Operator::In, json!(["WARN", "ERROR"]));
+        assert!(cond.evaluate(row).await);
+        let cond = make_ci_cond("level", Operator::ReMatch, json!("^err"));
+        assert!(cond.evaluate(row).await);
+    }
+
+    #[tokio::test]
+    async fn test_saved_v1_and_v2_alert_conditions_still_evaluate_and_build() {
+        use config::utils::json::json;
+
+        let schema = Schema::new(vec![
+            Field::new("level", DataType::Utf8, true),
+            Field::new("code", DataType::Int64, true),
+        ]);
+        let v1: AlertConditionParams = serde_json::from_value(json!({
+            "or": [
+                {"column": "level", "operator": "=", "value": "error", "ignore_case": false},
+                {"and": [
+                    {"column": "code", "operator": ">=", "value": "500", "ignore_case": false},
+                    {"column": "level", "operator": "Contains", "value": "warn", "ignore_case": false}
+                ]}
+            ]
+        }))
+        .unwrap();
+        let v2: AlertConditionParams = serde_json::from_value(json!({
+            "version": 2,
+            "conditions": {
+                "filterType": "group",
+                "logicalOperator": "AND",
+                "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": "NotContains",
+                     "value": "debug", "logicalOperator": "AND"},
+                    {"filterType": "condition", "column": "code", "operator": "!=",
+                     "value": 200, "logicalOperator": "OR"}
+                ]
+            }
+        }))
+        .unwrap();
+        assert!(v1.validate_operator_values().is_ok());
+        assert!(v2.validate_operator_values().is_ok());
+        assert_eq!(
+            v2.to_sql(&schema).await.unwrap(),
+            r#"("level" NOT LIKE '%debug%' OR "code" != 200)"#
+        );
+        let row = json!({"level": "warning", "code": 503});
+        assert!(v1.evaluate(row.as_object().unwrap()).await);
+        assert!(v2.evaluate(row.as_object().unwrap()).await);
+        let row = json!({"level": "debug", "code": 200});
+        assert!(!v1.evaluate(row.as_object().unwrap()).await);
+        assert!(!v2.evaluate(row.as_object().unwrap()).await);
     }
 }

@@ -52,7 +52,7 @@ pub struct Session {
     pub target_partitions: usize,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[schema(as = SearchRequest)]
 pub struct Request {
     pub query: Query,
@@ -70,6 +70,10 @@ pub struct Request {
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default = "default_use_cache")]
     pub use_cache: bool,
+    /// Set to false to skip the inverted index for this query.
+    #[serde(default = "default_use_index")]
+    #[schema(default = true)]
+    pub use_index: bool,
     #[serde(default)]
     pub clear_cache: bool,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -78,8 +82,31 @@ pub struct Request {
     pub agent_options: Option<AgentOptions>,
 }
 
+impl Default for Request {
+    fn default() -> Self {
+        Self {
+            query: Query::default(),
+            encoding: RequestEncoding::default(),
+            regions: Vec::new(),
+            clusters: Vec::new(),
+            timeout: 0,
+            search_type: None,
+            search_event_context: None,
+            use_cache: false,
+            use_index: default_use_index(),
+            clear_cache: false,
+            local_mode: None,
+            agent_options: None,
+        }
+    }
+}
+
 pub fn default_use_cache() -> bool {
     get_config().common.result_cache_enabled
+}
+
+pub fn default_use_index() -> bool {
+    true
 }
 
 /// Agent-oriented response options. When absent the response is unchanged, so
@@ -151,26 +178,32 @@ impl std::fmt::Display for RequestEncoding {
     }
 }
 
+// `Default` turns every option off; callers still set `sql`, the time range and `size`.
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[schema(as = SearchQuery)]
 pub struct Query {
     pub sql: String,
+    // Unix microseconds; `Default` leaves both ends at 0, so always set the range.
     pub start_time: i64,
     pub end_time: i64,
     #[serde(default)]
     pub from: i64,
+    // `QUERY_WITH_NO_LIMIT`: no cap; other `<= 0`: `query_default_limit`; `Default`: 10.
     #[serde(default = "default_size")]
     pub size: i64,
+    /// For `SELECT *` on streams wider than `quick_mode_num_fields`, reads only some columns.
     #[serde(default)]
     pub quick_mode: bool,
-    #[serde(default)]
-    pub query_type: String,
+    /// Turns the query into a `count(*)` of matching rows; also skips the cache and streaming.
     #[serde(default)]
     pub track_total_hits: bool,
+    /// Set when the SQL calls a saved VRL function, which makes the result hits get flattened.
     #[serde(default)]
     pub uses_zo_fn: bool,
+    /// Base64-encoded VRL program applied to the result hits.
     #[serde(default)]
     pub query_fn: Option<String>,
+    /// Not read by the search path; skipping the WAL is controlled by `feature_query_skip_wal`.
     #[serde(default)]
     pub skip_wal: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -180,17 +213,21 @@ pub struct Query {
     /// Takes precedence over sampling_config if both are provided
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sampling_ratio: Option<f64>,
-    // streaming output
+    /// Set with `streaming_id` by the streaming search endpoints; other callers leave both unset.
     #[serde(default)]
     pub streaming_output: bool,
     #[serde(default)]
     pub streaming_id: Option<String>,
+    /// Seconds; 0 uses the SQL `histogram()` interval, falling back to one from the time range.
     #[serde(default)]
     pub histogram_interval: i64,
     /// Default fixed-offset timezone (e.g. "+08:00") applied to histogram() buckets
     /// that don't carry their own 3rd timezone argument. None / "UTC" / "" => UTC.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
+    /// Adds the structured `profile` column to EXPLAIN ANALYZE output.
+    #[serde(default)]
+    pub analyze_profile: bool,
 }
 
 fn default_size() -> i64 {
@@ -206,7 +243,6 @@ impl Default for Query {
             start_time: 0,
             end_time: 0,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
@@ -217,6 +253,7 @@ impl Default for Query {
             streaming_id: None,
             histogram_interval: 0,
             timezone: None,
+            analyze_profile: false,
         }
     }
 }
@@ -264,8 +301,6 @@ pub struct Response {
     pub scan_size: usize,
     pub idx_scan_size: usize,
     pub scan_records: usize,
-    #[serde(skip_serializing_if = "String::is_empty", default)]
-    pub response_type: String,
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub trace_id: String,
@@ -359,7 +394,7 @@ impl ResponseChunkIterator {
                 * mb
         });
 
-        let hits = response.hits.drain(..).collect::<Vec<_>>();
+        let hits = std::mem::take(&mut response.hits);
 
         Self {
             response,
@@ -484,7 +519,6 @@ impl Response {
             scan_records: 0,
             columns: Vec::new(),
             hits: Vec::new(),
-            response_type: "".to_string(),
             trace_id: "".to_string(),
             function_error: Vec::new(),
             is_partial: false,
@@ -634,6 +668,8 @@ pub struct SearchPartitionRequest {
     pub sampling_ratio: Option<f64>,
     #[serde(default)]
     pub search_type: Option<SearchEventType>,
+    #[serde(default)]
+    pub timezone: Option<String>,
 }
 
 impl SearchPartitionRequest {
@@ -669,6 +705,7 @@ impl From<&Request> for SearchPartitionRequest {
             histogram_interval: req.query.histogram_interval,
             sampling_ratio: req.query.sampling_ratio,
             search_type: req.search_type,
+            timezone: req.query.timezone.clone(),
         }
     }
 }
@@ -751,22 +788,10 @@ impl SearchHistoryRequest {
         let search_req = Request {
             query: Query {
                 sql,
-                from: 0,
                 size: self.size,
                 start_time: self.start_time,
                 end_time: self.end_time,
-                quick_mode: false,
-                query_type: "".to_string(),
-                track_total_hits: false,
-                uses_zo_fn: false,
-                query_fn: None,
-                skip_wal: false,
-                sampling_config: None,
-                sampling_ratio: None,
-                streaming_output: false,
-                streaming_id: None,
-                histogram_interval: 0,
-                timezone: None,
+                ..Default::default()
             },
             encoding: RequestEncoding::Empty,
             regions: Vec::new(),
@@ -775,6 +800,7 @@ impl SearchHistoryRequest {
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
             use_cache: default_use_cache(),
+            use_index: default_use_index(),
             clear_cache: false,
             local_mode: None,
             agent_options: None,
@@ -974,7 +1000,6 @@ impl From<Query> for cluster_rpc::SearchQuery {
         cluster_rpc::SearchQuery {
             sql: query.sql,
             quick_mode: query.quick_mode,
-            query_type: query.query_type,
             from: query.from as i32,
             size: query.size as i32,
             start_time: query.start_time,
@@ -1044,6 +1069,8 @@ pub enum SearchEventType {
     SearchJob,
     Download,
     Insights,
+    #[serde(rename = "public_dashboard")]
+    PublicDashboard,
 }
 
 impl<'de> Deserialize<'de> for SearchEventType {
@@ -1064,7 +1091,9 @@ impl<'de> Deserialize<'de> for SearchEventType {
             where
                 E: serde::de::Error,
             {
-                SearchEventType::try_from(value).map_err(serde::de::Error::custom)
+                value
+                    .parse::<SearchEventType>()
+                    .map_err(serde::de::Error::custom)
             }
         }
 
@@ -1086,13 +1115,14 @@ impl std::fmt::Display for SearchEventType {
             Self::SearchJob => write!(f, "search_job"),
             Self::Download => write!(f, "download"),
             Self::Insights => write!(f, "insights"),
+            Self::PublicDashboard => write!(f, "public_dashboard"),
         }
     }
 }
 
-impl TryFrom<&str> for SearchEventType {
-    type Error = String;
-    fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
+impl std::str::FromStr for SearchEventType {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "ui" => Ok(Self::UI),
             "dashboards" => Ok(Self::Dashboards),
@@ -1105,8 +1135,9 @@ impl TryFrom<&str> for SearchEventType {
             "search_job" | "searchjob" => Ok(Self::SearchJob),
             "download" => Ok(Self::Download),
             "insights" => Ok(Self::Insights),
+            "public_dashboard" | "publicdashboard" => Ok(Self::PublicDashboard),
             _ => Err(format!(
-                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `search_job`, `insights`"
+                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `search_job`, `insights`, `public_dashboard`"
             )),
         }
     }
@@ -1153,6 +1184,12 @@ pub struct SearchEventContext {
         default
     )]
     pub dashboard_folder_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub public_dashboard_link_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub range_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub panel_id: Option<String>,
 }
 
 impl SearchEventContext {
@@ -1222,6 +1259,9 @@ impl From<proto::cluster_rpc::SearchEventContext> for SearchEventContext {
             dashboard_name: proto_sec.dashboard_name,
             dashboard_folder_id: proto_sec.dashboard_folder_id,
             dashboard_folder_name: proto_sec.dashboard_folder_name,
+            public_dashboard_link_id: proto_sec.public_dashboard_link_id,
+            range_key: proto_sec.range_key,
+            panel_id: proto_sec.panel_id,
         }
     }
 }
@@ -1237,6 +1277,9 @@ impl From<SearchEventContext> for proto::cluster_rpc::SearchEventContext {
             dashboard_name: sec.dashboard_name,
             dashboard_folder_id: sec.dashboard_folder_id,
             dashboard_folder_name: sec.dashboard_folder_name,
+            public_dashboard_link_id: sec.public_dashboard_link_id,
+            range_key: sec.range_key,
+            panel_id: sec.panel_id,
         }
     }
 }
@@ -1306,8 +1349,6 @@ pub struct MultiStreamRequest {
     #[serde(default)]
     pub quick_mode: bool,
     #[serde(default)]
-    pub query_type: String,
-    #[serde(default)]
     pub track_total_hits: bool,
     #[serde(default)]
     pub uses_zo_fn: bool,
@@ -1315,6 +1356,10 @@ pub struct MultiStreamRequest {
     pub query_fn: Option<String>,
     #[serde(default)]
     pub skip_wal: bool,
+    /// Set to false to skip the inverted index for every query.
+    #[serde(default = "default_use_index")]
+    #[schema(default = true)]
+    pub use_index: bool,
     #[serde(default)]
     pub regions: Vec<String>, // default query all regions, local: only query local region clusters
     #[serde(default)]
@@ -1391,17 +1436,11 @@ impl MultiStreamRequest {
                     start_time: query.start_time.unwrap_or(self.start_time),
                     end_time: query.end_time.unwrap_or(self.end_time),
                     quick_mode: self.quick_mode,
-                    query_type: self.query_type.clone(),
                     track_total_hits: self.track_total_hits,
                     uses_zo_fn: self.uses_zo_fn,
                     query_fn,
                     skip_wal: self.skip_wal,
-                    sampling_config: None,
-                    sampling_ratio: None,
-                    streaming_output: false,
-                    streaming_id: None,
-                    histogram_interval: 0,
-                    timezone: None,
+                    ..Default::default()
                 },
                 regions: self.regions.clone(),
                 clusters: self.clusters.clone(),
@@ -1410,6 +1449,7 @@ impl MultiStreamRequest {
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
                 use_cache: default_use_cache(),
+                use_index: self.use_index,
                 clear_cache: false,
                 local_mode: None,
                 agent_options: None,
@@ -1497,7 +1537,9 @@ pub enum HavingNode {
 pub struct ResultSchemaResponse {
     pub projections: Vec<String>,
     pub group_by: Vec<String>,
+    // HavingNode nests itself, and a self-referencing schema hangs the OpenAPI walk.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
     pub having: Option<HavingNode>,
     pub timeseries_field: Option<String>,
     #[serde(default)]
@@ -2144,7 +2186,6 @@ mod tests {
         assert_eq!(query.start_time, 0);
         assert_eq!(query.end_time, 0);
         assert!(!query.quick_mode);
-        assert_eq!(query.query_type, "");
         assert!(!query.track_total_hits);
         assert!(!query.uses_zo_fn);
         assert!(query.query_fn.is_none());
@@ -2297,6 +2338,7 @@ mod tests {
             histogram_interval: 0,
             sampling_ratio: None,
             search_type: None,
+            timezone: None,
         };
 
         req.decode().unwrap();
@@ -2484,19 +2526,19 @@ mod tests {
     #[test]
     fn test_search_event_type_try_from() {
         type Set = SearchEventType; // Saving line too long
-        assert_eq!(Set::try_from("ui").unwrap(), Set::UI);
-        assert_eq!(Set::try_from("dashboards").unwrap(), Set::Dashboards);
-        assert_eq!(Set::try_from("reports").unwrap(), Set::Reports);
-        assert_eq!(Set::try_from("alerts").unwrap(), Set::Alerts);
-        assert_eq!(Set::try_from("values").unwrap(), Set::Values);
-        assert_eq!(Set::try_from("_values").unwrap(), Set::Values);
-        assert_eq!(Set::try_from("other").unwrap(), Set::Other);
-        assert_eq!(Set::try_from("rum").unwrap(), Set::RUM);
-        assert_eq!(Set::try_from("derived_stream").unwrap(), Set::DerivedStream);
-        assert_eq!(Set::try_from("derivedstream").unwrap(), Set::DerivedStream);
-        assert_eq!(Set::try_from("search_job").unwrap(), Set::SearchJob);
-        assert_eq!(Set::try_from("searchjob").unwrap(), Set::SearchJob);
-        assert!(SearchEventType::try_from("invalid").is_err());
+        assert_eq!("ui".parse::<Set>().unwrap(), Set::UI);
+        assert_eq!("dashboards".parse::<Set>().unwrap(), Set::Dashboards);
+        assert_eq!("reports".parse::<Set>().unwrap(), Set::Reports);
+        assert_eq!("alerts".parse::<Set>().unwrap(), Set::Alerts);
+        assert_eq!("values".parse::<Set>().unwrap(), Set::Values);
+        assert_eq!("_values".parse::<Set>().unwrap(), Set::Values);
+        assert_eq!("other".parse::<Set>().unwrap(), Set::Other);
+        assert_eq!("rum".parse::<Set>().unwrap(), Set::RUM);
+        assert_eq!("derived_stream".parse::<Set>().unwrap(), Set::DerivedStream);
+        assert_eq!("derivedstream".parse::<Set>().unwrap(), Set::DerivedStream);
+        assert_eq!("search_job".parse::<Set>().unwrap(), Set::SearchJob);
+        assert_eq!("searchjob".parse::<Set>().unwrap(), Set::SearchJob);
+        assert!("invalid".parse::<SearchEventType>().is_err());
     }
 
     #[test]
@@ -2578,11 +2620,23 @@ mod tests {
     }
 
     #[test]
+    fn test_search_event_context_round_trips_through_cluster_rpc() {
+        let ctx = SearchEventContext {
+            dashboard_id: Some("d1".into()),
+            public_dashboard_link_id: Some("l1".into()),
+            range_key: Some("r3600".into()),
+            panel_id: Some("p1".into()),
+            ..Default::default()
+        };
+        let rpc: cluster_rpc::SearchEventContext = ctx.clone().into();
+        assert_eq!(SearchEventContext::from(rpc), ctx);
+    }
+
+    #[test]
     fn test_query_to_cluster_rpc() {
         let query = Query {
             sql: "SELECT * FROM test".to_string(),
             quick_mode: true,
-            query_type: "test".to_string(),
             from: 10,
             size: 20,
             start_time: 100,
@@ -2598,7 +2652,6 @@ mod tests {
         let cluster_query: cluster_rpc::SearchQuery = query.into();
         assert_eq!(cluster_query.sql, "SELECT * FROM test");
         assert!(cluster_query.quick_mode);
-        assert_eq!(cluster_query.query_type, "test");
         assert_eq!(cluster_query.from, 10);
         assert_eq!(cluster_query.size, 20);
         assert_eq!(cluster_query.start_time, 100);
@@ -2844,11 +2897,11 @@ mod tests {
             end_time: 250,
             sort_by: Some("timestamp".to_string()),
             quick_mode: true,
-            query_type: "test".to_string(),
             track_total_hits: true,
             uses_zo_fn: true,
             query_fn: Some("global_fn".to_string()),
             skip_wal: true,
+            use_index: false,
             regions: vec!["region1".to_string()],
             clusters: vec!["cluster1".to_string()],
             search_type: Some(SearchEventType::UI),
@@ -2859,6 +2912,7 @@ mod tests {
 
         let query_reqs = request.to_query_req();
         assert_eq!(query_reqs.len(), 2);
+        assert!(query_reqs.iter().all(|req| !req.use_index));
 
         // Check first query
         let first_req = &query_reqs[0];
@@ -2868,7 +2922,6 @@ mod tests {
         assert_eq!(first_req.query.from, 5);
         assert_eq!(first_req.query.size, 25);
         assert!(first_req.query.quick_mode);
-        assert_eq!(first_req.query.query_type, "test");
         assert!(first_req.query.track_total_hits);
         assert!(first_req.query.uses_zo_fn);
         assert!(first_req.query.skip_wal);
@@ -3443,12 +3496,45 @@ mod tests {
     #[test]
     fn test_search_event_type_try_from_download_and_insights() {
         assert_eq!(
-            SearchEventType::try_from("download").unwrap(),
+            "download".parse::<SearchEventType>().unwrap(),
             SearchEventType::Download
         );
         assert_eq!(
-            SearchEventType::try_from("insights").unwrap(),
+            "insights".parse::<SearchEventType>().unwrap(),
             SearchEventType::Insights
+        );
+    }
+
+    #[test]
+    fn public_dashboard_search_type_is_interactive_and_named_on_the_wire() {
+        let t = SearchEventType::PublicDashboard;
+        assert!(!t.is_background());
+        assert_eq!(t.to_string(), "public_dashboard");
+        assert_eq!(serde_json::to_string(&t).unwrap(), r#""public_dashboard""#);
+        assert_eq!(
+            serde_json::from_str::<SearchEventType>(r#""public_dashboard""#).unwrap(),
+            t
+        );
+        assert_eq!(
+            crate::meta::cluster::RoleGroup::from(t),
+            crate::meta::cluster::RoleGroup::Interactive
+        );
+        let ctx = SearchEventContext {
+            public_dashboard_link_id: Some("l1".into()),
+            dashboard_id: Some("d1".into()),
+            range_key: Some("r3600".into()),
+            panel_id: Some("p1".into()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&ctx).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "public_dashboard_link_id": "l1",
+                "dashboard_id": "d1",
+                "range_key": "r3600",
+                "panel_id": "p1"
+            })
         );
     }
 
@@ -3589,7 +3675,6 @@ mod tests {
         assert!(!obj.contains_key("function_error"));
         assert!(!obj.contains_key("order_by_metadata"));
         // String::is_empty fields
-        assert!(!obj.contains_key("response_type"));
         assert!(!obj.contains_key("trace_id"));
         // Option::is_none fields
         assert!(!obj.contains_key("histogram_interval"));
@@ -3609,7 +3694,6 @@ mod tests {
         let r = Response {
             columns: vec!["col1".to_string()],
             function_error: vec!["err".to_string()],
-            response_type: "json".to_string(),
             trace_id: "t1".to_string(),
             histogram_interval: Some(3600),
             new_start_time: Some(1000),
@@ -3627,7 +3711,6 @@ mod tests {
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("columns"));
         assert!(obj.contains_key("function_error"));
-        assert!(obj.contains_key("response_type"));
         assert!(obj.contains_key("trace_id"));
         assert!(obj.contains_key("histogram_interval"));
         assert!(obj.contains_key("new_start_time"));
@@ -3762,6 +3845,23 @@ mod tests {
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("sampling_ratio"));
         assert_eq!(obj["sampling_ratio"], serde_json::json!(0.5_f64));
+    }
+
+    #[test]
+    fn test_request_use_index_defaults_true() {
+        let body = r#"{"query":{"sql":"SELECT * FROM t","start_time":0,"end_time":1}}"#;
+        let req: Request = serde_json::from_str(body).unwrap();
+        assert!(req.use_index);
+        assert!(Request::default().use_index);
+
+        let body =
+            r#"{"query":{"sql":"SELECT * FROM t","start_time":0,"end_time":1},"use_index":false}"#;
+        let req: Request = serde_json::from_str(body).unwrap();
+        assert!(!req.use_index);
+
+        let body = r#"{"sql":["SELECT * FROM t"],"start_time":0,"end_time":1}"#;
+        let req: MultiStreamRequest = serde_json::from_str(body).unwrap();
+        assert!(req.use_index);
     }
 
     #[test]

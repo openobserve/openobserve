@@ -294,7 +294,6 @@ describe("EnrichmentTableList Component", () => {
       expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Delete Enrichment Table",
         user_org: "test-org",
-        user_id: "test@example.com",
         function_name: "test-table",
         is_ingest_func: undefined,
         page: "Functions",

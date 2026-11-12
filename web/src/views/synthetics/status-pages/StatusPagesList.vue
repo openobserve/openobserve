@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :columns="columns"
       :data="filteredPages"
       :loading="loading"
+      :forbidden="forbidden"
       pagination="client"
       :page-size="20"
       :page-size-options="[20, 50, 100]"
@@ -63,15 +64,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Name -->
-      <template #cell-name="{ row }">
-        <OTooltip
-          v-if="(row as any).name"
-          :content="raw((row as any).name)"
-          content-class="max-w-[25rem] whitespace-normal break-words text-xs"
-        >
-          <span class="cursor-pointer truncate">{{ (row as any).name }}</span>
-        </OTooltip>
-        <span v-else class="truncate">—</span>
+      <template #cell-name="{ row }: { row: StatusPageListItem }">
+        <div class="flex min-w-0 items-center gap-2">
+          <OTruncatedText v-if="row.name" as="span" class="cursor-pointer">{{
+            row.name
+          }}</OTruncatedText>
+          <span v-else class="truncate">—</span>
+          <EditorDraftDot
+            v-if="pageDrafts.ids.has(row.id)"
+            :saved-at="pageDrafts.savedAt(row.id)"
+            :data-test="`status-pages-${row.id}-draft-dot`"
+          />
+        </div>
       </template>
 
       <!-- Health -->
@@ -180,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="lock"
                   size="xs"
-                  class="ms-auto"
+                  class="lock-chip ms-auto"
                   aria-hidden="true"
                   :data-test="`status-pages-post-update-lock-${(row as any).id}`"
                 />
@@ -201,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="lock"
                   size="xs"
-                  class="ms-auto"
+                  class="lock-chip ms-auto"
                   aria-hidden="true"
                   :data-test="`status-pages-view-updates-lock-${(row as any).id}`"
                 />
@@ -232,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="lock"
                   size="xs"
-                  class="ms-auto"
+                  class="lock-chip ms-auto"
                   aria-hidden="true"
                   :data-test="`status-pages-domains-lock-${(row as any).id}`"
                 />
@@ -280,6 +284,7 @@ import { computed, ref } from "vue";
 import config from "@/aws-exports";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import type { ForbiddenState } from "@/utils/featureGate";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -287,6 +292,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -295,14 +301,17 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { StatusPageListItem } from "@/services/status_pages";
 import { healthBadge, visibilityBadge, publicStatusPageUrl } from "./statusPageBadges";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 
 const props = withDefaults(
   defineProps<{
     pages: StatusPageListItem[];
     loading?: boolean;
+    forbidden?: ForbiddenState;
     timezone?: string;
   }>(),
-  { loading: false, timezone: "UTC" },
+  { loading: false, forbidden: false, timezone: "UTC" },
 );
 
 const emit = defineEmits<{
@@ -317,6 +326,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const search = ref("");
+const pageDrafts = useEditorDraftIds("status_page");
 
 /**
  * Notices ("Post update" / "View updates") and Custom domains are locked in

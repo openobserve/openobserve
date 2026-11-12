@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";
@@ -22,6 +22,8 @@ import store from "@/test/unit/helpers/store";
 vi.mock("vue-router", () => ({
   useRouter: () => ({ currentRoute: { value: { query: {} } }, push: vi.fn() }),
   useRoute: () => ({ params: {}, query: {} }),
+  onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 vi.mock("@/services/alert_templates", async (importOriginal) => {
@@ -30,6 +32,15 @@ vi.mock("@/services/alert_templates", async (importOriginal) => {
     default: {
       create: vi.fn().mockResolvedValue({ data: { code: 200 } }),
       update: vi.fn().mockResolvedValue({ data: { code: 200 } }),
+      preview: vi.fn().mockResolvedValue({
+        data: {
+          variable_groups: [
+            { name: "common", variables: ["alert_name"] },
+            { name: "alert", variables: [] },
+            { name: "anomaly", variables: ["anomaly_count"] },
+          ],
+        },
+      }),
     },
   });
 });
@@ -42,6 +53,18 @@ vi.mock("@/utils/templates/validation", () => ({
   validateTemplateBody: vi.fn().mockReturnValue({ valid: true }),
   getTemplateValidationErrorMessage: vi.fn().mockReturnValue(""),
 }));
+
+const draftOptions = vi.hoisted(() => ({ last: null as any }));
+vi.mock("@/composables/useEditorDraft", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    useEditorDraft: (options: any) => {
+      draftOptions.last = options;
+      return actual.useEditorDraft(options);
+    },
+  };
+});
 
 // toast returns a `dismiss` function (used for the loading toast) — mock it so
 // no real toast renders and so we can assert the http JSON-validity toast.
@@ -190,6 +213,14 @@ describe("AddTemplate - rendering (create mode)", () => {
     const titleEl = w.find('[data-test="add-template-title"]');
     expect(titleEl.exists()).toBe(true);
     expect(titleEl.text()).toContain("New template");
+  });
+
+  it("limits the name input to the 256-character server limit", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+    const field = w.find('[data-test="add-template-name-input"]');
+    const input = field.element.tagName === "INPUT" ? field : field.find("input");
+    expect(input.attributes("maxlength")).toBe("256");
   });
 
   it("preserves the core data-tests", async () => {
@@ -366,6 +397,7 @@ describe("AddTemplate - save payload parity", () => {
         type: "http",
         title: "",
         kind: "custom",
+        applies_to: [],
       },
     });
     expect(templateService.update).not.toHaveBeenCalled();
@@ -391,6 +423,7 @@ describe("AddTemplate - save payload parity", () => {
         type: "email",
         title: "My subject",
         kind: "custom",
+        applies_to: [],
       },
     });
   });
@@ -418,6 +451,7 @@ describe("AddTemplate - save payload parity", () => {
         type: "http",
         title: "",
         kind: "custom",
+        applies_to: [],
       },
     });
     expect(templateService.create).not.toHaveBeenCalled();
@@ -457,6 +491,29 @@ describe("AddTemplate - http JSON-validity toast (Rule ④ side-effect)", () => 
 
     expect(validateTemplateBody).not.toHaveBeenCalled();
     expect(templateService.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("AddTemplate - refused save", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("closes its loading toast when the save is refused with a 403", async () => {
+    const dismissLoading = vi.fn();
+    vi.mocked(toast).mockReturnValueOnce(dismissLoading);
+    vi.mocked(templateService.create).mockRejectedValueOnce({ response: { status: 403 } });
+    const w = await mountComp();
+    await selectCustomMode(w);
+    const form = getForm(w);
+    form.setFieldValue("name", "email-template");
+    form.setFieldValue("type", "email");
+    form.setFieldValue("title", "Subject");
+    form.setFieldValue("body", "plain text");
+
+    await submit(w);
+
+    expect(templateService.create).toHaveBeenCalledTimes(1);
+    expect(dismissLoading).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -707,6 +764,7 @@ describe("AddTemplate - existing custom template survives a mode-tab round trip"
         type: "http",
         title: "",
         kind: "custom",
+        applies_to: [],
       },
     });
   }
@@ -904,5 +962,406 @@ describe("AddTemplate - scrolls the first error into view on failed save", () =>
     await nextTick();
 
     expect(scrollSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("AddTemplate - applies to", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const appliesTo = (w: any) =>
+    w.find('[data-test="add-template-applies-to-select"]').findComponent({ name: "OSelect" });
+
+  it("infers the kinds from the body until a chip is chosen, and Reset restores inference", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+    const editor = w.findComponent({ name: "QueryEditor" });
+
+    await editor.vm.$emit("update:query", '{"text":"{anomaly_count} anomalies"}');
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["anomaly"]);
+
+    await editor.vm.$emit("update:query", '{"text":"{check_name} {anomaly_count}"}');
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["anomaly", "synthetics"]);
+
+    // A chip click switches to manual: later body edits no longer change the list.
+    await appliesTo(w).vm.$emit("update:modelValue", ["incident"]);
+    await editor.vm.$emit("update:query", '{"text":"{downtime_name}"}');
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["incident"]);
+
+    await w.find('[data-test="add-template-applies-to-reset"]').trigger("click");
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["downtime"]);
+  });
+
+  it("sends the chosen list as an explicit array", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+    getForm(w).setFieldValue("name", "ops-card");
+    await w.findComponent({ name: "QueryEditor" }).vm.$emit("update:query", '{"text":"x"}');
+    await appliesTo(w).vm.$emit("update:modelValue", ["on_call", "anomaly"]);
+
+    await submit(w);
+
+    const sent = (templateService.create as any).mock.calls[0][0];
+    expect(sent.data.applies_to).toEqual(["anomaly", "on_call"]);
+  });
+
+  it("lists All kinds first and ticking it clears the chosen kinds in one click", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+    getForm(w).setFieldValue("name", "ops-card");
+    await w.findComponent({ name: "QueryEditor" }).vm.$emit("update:query", '{"text":"x"}');
+    expect((appliesTo(w).props("options") as any[])[0]).toEqual({
+      label: "All kinds",
+      value: "all_kinds",
+    });
+    expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
+
+    await appliesTo(w).vm.$emit("update:modelValue", ["anomaly", "incident"]);
+    await appliesTo(w).vm.$emit("update:modelValue", ["anomaly", "incident", "all_kinds"]);
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
+    expect(w.find('[data-test="add-template-applies-to-mode"]').text()).toBe(
+      String(i18n.global.t("alert_templates.appliesToManual")),
+    );
+    expect(w.find('[data-test="add-template-applies-to-reset"]').exists()).toBe(true);
+
+    await submit(w);
+    expect((templateService.create as any).mock.calls[0][0].data.applies_to).toEqual([]);
+  });
+
+  it("ticking a kind while All kinds is ticked selects that kind alone", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+    expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
+
+    await appliesTo(w).vm.$emit("update:modelValue", ["all_kinds", "synthetics"]);
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["synthetics"]);
+  });
+
+  it("an existing template starts in manual mode with its stored list", async () => {
+    const w = await mountComp({
+      template: {
+        name: "ops-card",
+        body: '{"text":"{anomaly_count}"}',
+        type: "http",
+        title: "",
+        applies_to: ["incident"],
+      },
+    });
+    expect(appliesTo(w).props("modelValue")).toEqual(["incident"]);
+    expect(w.find('[data-test="add-template-applies-to-reset"]').exists()).toBe(true);
+  });
+
+  it("an existing template stored as all kinds starts in manual mode", async () => {
+    const w = await mountComp({
+      template: { name: "ops-card", body: '{"text":"x"}', type: "http", title: "", applies_to: [] },
+    });
+    expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
+    expect(w.find('[data-test="add-template-applies-to-mode"]').text()).toBe(
+      String(i18n.global.t("alert_templates.appliesToManual")),
+    );
+    expect(w.find('[data-test="add-template-applies-to-reset"]').exists()).toBe(true);
+  });
+
+  it("an existing all-kinds template stays all kinds on save after the body gains {check_target}", async () => {
+    const w = await mountComp({
+      template: { name: "ops-card", body: '{"text":"x"}', type: "http", title: "", applies_to: [] },
+    });
+    await w
+      .findComponent({ name: "QueryEditor" })
+      .vm.$emit("update:query", '{"text":"{check_target} is down"}');
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
+
+    await submit(w);
+
+    expect((templateService.update as any).mock.calls[0][0].data.applies_to).toEqual([]);
+  });
+
+  it("an existing template with a stored list starts in manual mode", async () => {
+    const w = await mountComp({
+      template: {
+        name: "ops-card",
+        body: '{"text":"x"}',
+        type: "http",
+        title: "",
+        applies_to: ["incident"],
+      },
+    });
+    expect(appliesTo(w).props("modelValue")).toEqual(["incident"]);
+    expect(w.find('[data-test="add-template-applies-to-mode"]').text()).toBe(
+      String(i18n.global.t("alert_templates.appliesToManual")),
+    );
+  });
+
+  it("shows the narrowing 400 under the control and keeps the editor open", async () => {
+    const message =
+      "template is used for anomaly by: anomaly config 'error rate on web-logs'; remove the binding first";
+    vi.mocked(templateService.update).mockRejectedValueOnce({
+      response: { status: 400, data: { message } },
+    });
+    const w = await mountComp({
+      template: { name: "ops-card", body: '{"text":"x"}', type: "http", title: "", applies_to: [] },
+    });
+    await appliesTo(w).vm.$emit("update:modelValue", ["incident"]);
+
+    await submit(w);
+
+    expect(String(appliesTo(w).props("errorMessage"))).toContain("anomaly config");
+    expect(w.emitted("cancel:hideform")).toBeUndefined();
+  });
+
+  it("drafts, restores and compares the Applies to list and mode", async () => {
+    const w = await mountComp({
+      template: { name: "ops-card", body: '{"text":"x"}', type: "http", title: "", applies_to: [] },
+    });
+    const opts = draftOptions.last;
+    expect(opts.base()).toMatchObject({ appliesTo: [], appliesToMode: "manual" });
+
+    await appliesTo(w).vm.$emit("update:modelValue", ["incident", "anomaly"]);
+    const drafted = opts.snapshot();
+    expect(drafted).toMatchObject({ appliesTo: ["incident", "anomaly"], appliesToMode: "manual" });
+
+    await w.find('[data-test="add-template-applies-to-reset"]').trigger("click");
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
+    expect(w.find('[data-test="add-template-applies-to-mode"]').text()).toBe(
+      String(i18n.global.t("alert_templates.appliesToInferred")),
+    );
+
+    await opts.apply(drafted, { notKeptPaths: [] });
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["incident", "anomaly"]);
+    expect(w.find('[data-test="add-template-applies-to-mode"]').text()).toBe(
+      String(i18n.global.t("alert_templates.appliesToManual")),
+    );
+
+    await opts.apply(
+      { ...drafted, appliesTo: [], appliesToMode: "inferred" },
+      { notKeptPaths: [] },
+    );
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
+    expect(w.find('[data-test="add-template-applies-to-mode"]').text()).toBe(
+      String(i18n.global.t("alert_templates.appliesToInferred")),
+    );
+  });
+
+  it("fills the variable guide groups from the preview response", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+    expect(w.find('[data-test="add-template-variable-group-common"]').exists()).toBe(true);
+    expect(w.find('[data-test="add-template-variable-group-anomaly"]').exists()).toBe(true);
+    await appliesTo(w).vm.$emit("update:modelValue", ["incident"]);
+    await flushPromises();
+    expect(w.find('[data-test="add-template-variable-group-anomaly"]').exists()).toBe(false);
+  });
+});
+
+describe("AddTemplate - playground Kind drives the variables", () => {
+  const groups = [
+    { name: "common", variables: ["alert_name", "status_dot"] },
+    { name: "alert", variables: ["alert_level"] },
+    { name: "anomaly", variables: ["anomaly_score"] },
+    { name: "downtime", variables: ["downtime_window", "downtime_targets"] },
+  ];
+  const panel = (w: any) => w.findComponent({ name: "TemplatePreviewPanel" });
+  const kindSelect = (w: any) =>
+    w.find('[data-test="template-preview-panel-kind-select"]').findComponent({ name: "OSelect" });
+  const shownGroups = (w: any) =>
+    w
+      .findAll('[data-test^="add-template-variable-group-"]')
+      .map((g: any) => g.attributes("data-test").replace("add-template-variable-group-", ""));
+  const chips = (w: any) => w.findComponent({ name: "ContentTemplateForm" }).props("variables");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // The panel's 300ms debounced preview would otherwise overwrite the emitted groups on a slow run.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows common plus the previewed kind in the guide and the chips", async () => {
+    const w = await mountComp();
+    await panel(w).vm.$emit("variable-groups", groups);
+    (w.vm as any).variableGuideOpen = true;
+    await flushPromises();
+    expect(shownGroups(w)).toEqual(["common", "alert"]);
+    // The kind's own variables lead the chips so they are not behind "+N more".
+    expect(chips(w)).toEqual(["alert_level", "alert_name", "status_dot"]);
+
+    await kindSelect(w).vm.$emit("update:modelValue", "downtime");
+    await flushPromises();
+    expect(shownGroups(w)).toEqual(["common", "downtime"]);
+    expect(chips(w)).toEqual(["downtime_window", "downtime_targets", "alert_name", "status_dot"]);
+  });
+
+  it("a cloned custom template lists every kind's group and its Kind narrows the guide", async () => {
+    const templateService = (await import("@/services/alert_templates")).default as any;
+    templateService.preview.mockResolvedValueOnce({ data: { variable_groups: groups } });
+    const w = await mountComp({
+      template: {
+        name: "prebuilt_slack",
+        body: '{"text":"{alert_name}"}',
+        type: "http",
+        title: "",
+        kind: "custom",
+        applies_to: [],
+      },
+      isClone: true,
+    });
+    (w.vm as any).variableGuideOpen = true;
+    await flushPromises();
+    expect(shownGroups(w)).toEqual(["common", "alert", "anomaly", "downtime"]);
+
+    const guideKind = w
+      .find('[data-test="add-template-variable-guide-kind-select"]')
+      .findComponent({ name: "OSelect" });
+    expect((guideKind.props("options") as any[]).map((o) => o.value)).toEqual([
+      "all_kinds",
+      "alert",
+      "incident",
+      "anomaly",
+      "synthetics",
+      "downtime",
+      "on_call",
+    ]);
+    await guideKind.vm.$emit("update:modelValue", "downtime");
+    await flushPromises();
+    expect(shownGroups(w)).toEqual(["common", "downtime"]);
+  });
+
+  it("opens a template limited by Applies to on its first kind and offers only its kinds", async () => {
+    const spec = {
+      title: "Anomaly",
+      title_overrides: {},
+      body: "{anomaly_score}",
+      fields: [],
+      rows: { enabled: false, max: 5, columns: null, format: null },
+      links: [],
+      chart: { enabled: false },
+    };
+    const w = await mountComp({
+      template: {
+        name: "ops-card",
+        body: JSON.stringify(spec),
+        type: "http",
+        title: "",
+        kind: "content",
+        applies_to: ["downtime", "anomaly"],
+      },
+    });
+    await panel(w).vm.$emit("variable-groups", groups);
+    (w.vm as any).variableGuideOpen = true;
+    await flushPromises();
+    expect(kindSelect(w).props("modelValue")).toBe("anomaly");
+    expect((kindSelect(w).props("options") as any[]).map((o) => o.value)).toEqual([
+      "anomaly",
+      "downtime",
+    ]);
+    expect(shownGroups(w)).toEqual(["common", "anomaly"]);
+  });
+
+  it("follows Applies to in the custom editor, which has no playground", async () => {
+    const w = await mountComp();
+    await panel(w).vm.$emit("variable-groups", groups);
+    await selectCustomMode(w);
+    expect(shownGroups(w)).toEqual(["common", "alert", "anomaly", "downtime"]);
+  });
+});
+
+describe("AddTemplate - forms QA (B1, B25, B27, B31)", () => {
+  const appliesTo = (w: any) =>
+    w.find('[data-test="add-template-applies-to-select"]').findComponent({ name: "OSelect" });
+  const mode = (w: any) => w.find('[data-test="add-template-applies-to-mode"]').text();
+  const prebuilt = {
+    name: "prebuilt_slack",
+    body: '{"text":"{alert_name}"}',
+    type: "http",
+    title: "",
+    kind: "custom",
+    applies_to: [],
+    isPrebuilt: true,
+  };
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("B1: marks Applies to in error so the server reason shows", async () => {
+    vi.mocked(templateService.create).mockRejectedValueOnce({
+      response: {
+        status: 400,
+        data: { message: "template is used for anomaly by: anomaly config 'cpu'" },
+      },
+    });
+    const w = await mountComp();
+    await selectCustomMode(w);
+    getForm(w).setFieldValue("name", "ops-card");
+    await w.findComponent({ name: "QueryEditor" }).vm.$emit("update:query", '{"text":"x"}');
+    await submit(w);
+    expect(appliesTo(w).props("error")).toBe(true);
+    expect(String(appliesTo(w).props("errorMessage"))).toContain("anomaly config 'cpu'");
+  });
+
+  it("B25: clicking the ticked All kinds keeps inference on", async () => {
+    const w = await mountComp();
+    await appliesTo(w).vm.$emit("update:modelValue", []);
+    await flushPromises();
+    expect(mode(w)).toBe("Inferred from the variables in the body");
+    expect(w.find('[data-test="add-template-applies-to-all-hint"]').exists()).toBe(false);
+  });
+
+  it("B25: unticking the only kind says the template now applies to all kinds", async () => {
+    const w = await mountComp();
+    await appliesTo(w).vm.$emit("update:modelValue", ["anomaly"]);
+    await appliesTo(w).vm.$emit("update:modelValue", []);
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
+    expect(mode(w)).toBe("Chosen by you");
+    expect(w.find('[data-test="add-template-applies-to-all-hint"]').exists()).toBe(true);
+
+    // Ticking a kind from All kinds still narrows to that kind.
+    await appliesTo(w).vm.$emit("update:modelValue", ["all_kinds", "incident"]);
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["incident"]);
+  });
+
+  it("B27: disables Save on a prebuilt row and the leave-dialog Save does not save it", async () => {
+    const w = await mountComp({ template: prebuilt });
+    expect(w.find('[data-test="add-template-submit-btn"]').attributes("disabled")).toBeDefined();
+    const saved = await draftOptions.last.save();
+    await submit(w);
+    expect(saved).toBe(false);
+    expect(templateService.update).not.toHaveBeenCalled();
+    expect(templateService.create).not.toHaveBeenCalled();
+  });
+
+  it("B27: a clone of a prebuilt row still saves", async () => {
+    const w = await mountComp({ template: { ...prebuilt, name: "my_slack" }, isClone: true });
+    expect(w.find('[data-test="add-template-submit-btn"]').attributes("disabled")).toBeUndefined();
+    await submit(w);
+    expect(templateService.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("B31: drops group.<label> from the chips and keeps the episode_id and rows notes", async () => {
+    const w = await mountComp();
+    await w.findComponent({ name: "TemplatePreviewPanel" }).vm.$emit("variable-groups", [
+      { name: "common", variables: ["alert_name", "group.<label>"] },
+      { name: "alert", variables: ["alert_level"] },
+    ]);
+    (w.vm as any).variableGuideOpen = true;
+    await flushPromises();
+    const chips = w.findComponent({ name: "ContentTemplateForm" }).props("variables");
+    expect(chips).toEqual(["alert_level", "alert_name"]);
+    expect(w.find('[data-test="add-template-variable-episode-id"]').exists()).toBe(true);
+    expect(w.find('[data-test="add-template-variable-rows"]').exists()).toBe(true);
   });
 });

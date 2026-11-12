@@ -18,6 +18,9 @@ import { mount, flushPromises } from "@vue/test-utils";
 import PlayerEventsSidebar from "@/components/rum/PlayerEventsSidebar.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import i18n from "@/locales";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -221,6 +224,16 @@ describe("PlayerEventsSidebar", () => {
       expect(wrapper.find('[data-test="event-metadata"]').exists()).toBe(true);
     });
 
+    it("tracks a sidebar tab switch with the tab name", async () => {
+      vi.mocked(analytics.track).mockClear();
+      await wrapper.findComponent({ name: "AppTabs" }).vm.$emit("update:active-tab", "tags");
+      await flushPromises();
+
+      expect(analytics.track).toHaveBeenCalledWith("rum_session_sidebar_tab_switched", {
+        tab: "tags",
+      });
+    });
+
     it("should switch back to breadcrumbs content when AppTabs emits update:active-tab with breadcrumbs", async () => {
       const appTabs = wrapper.findComponent({ name: "AppTabs" });
       await appTabs.vm.$emit("update:active-tab", "tags");
@@ -394,6 +407,30 @@ describe("PlayerEventsSidebar", () => {
     it("should render event rows when breadcrumbs tab is active with 3 events", () => {
       expect(wrapper.findAll('[data-test^="player-event-row"]').length).toBe(3);
     });
+
+    it("shows loading rows, not the empty message, while the events load", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ events: [], loading: true });
+      await flushPromises();
+      expect(wrapper.find('[data-test="player-events-loading"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="player-events-empty"]').exists()).toBe(false);
+    });
+
+    it("shows the empty message once the events settle with none", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ events: [], loading: false });
+      await flushPromises();
+      expect(wrapper.find('[data-test="player-events-loading"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="player-events-empty"]').text()).toContain("No events found");
+    });
+
+    it("keeps showing loaded events while a later load is in flight", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ loading: true });
+      await flushPromises();
+      expect(wrapper.findAll('[data-test^="player-event-row"]').length).toBe(3);
+      expect(wrapper.find('[data-test="player-events-loading"]').exists()).toBe(false);
+    });
   });
 
   // ==========================================================================
@@ -454,8 +491,14 @@ describe("PlayerEventsSidebar", () => {
   // ==========================================================================
 
   describe("Event Filtering", () => {
-    it("should have all 4 event types selected by default", () => {
-      expect(wrapper.vm.selectedEventTypes).toEqual(["error", "action", "view", "frustration"]);
+    it("should have all 5 event types selected by default", () => {
+      expect(wrapper.vm.selectedEventTypes).toEqual([
+        "error",
+        "action",
+        "view",
+        "frustration",
+        "failed_request",
+      ]);
     });
 
     it("should have correct event type options list", () => {
@@ -464,7 +507,29 @@ describe("PlayerEventsSidebar", () => {
         { label: "Action", value: "action" },
         { label: "View", value: "view" },
         { label: "Frustration", value: "frustration" },
+        { label: "Failed requests", value: "failed_request" },
       ]);
+    });
+
+    it("should list failed requests by default and drop them when the type is deselected", async () => {
+      await wrapper.setProps({
+        events: [
+          ...mockEvents,
+          {
+            id: "event4",
+            type: "failed_request",
+            name: "403 GET /api/items",
+            displayTime: "10:36",
+            relativeTime: 6000,
+          },
+        ],
+      });
+      expect(wrapper.find('[data-test="player-event-row-failed_request"]').exists()).toBe(true);
+
+      wrapper.vm.selectedEventTypes = ["error"];
+      wrapper.vm.searchEvents("");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="player-event-row-failed_request"]').exists()).toBe(false);
     });
 
     it("should show only matching event when search term filters by name", async () => {

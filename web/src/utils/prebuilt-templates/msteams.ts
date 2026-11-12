@@ -117,7 +117,6 @@ export const msteamsConfig: PrebuiltConfig = {
     "Content-Type": "application/json",
   },
   method: "post",
-  urlValidator: (url: string) => isValidTeamsWebhookUrl(url),
   credentialFields: [
     {
       key: "webhookUrl",

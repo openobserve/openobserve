@@ -1,7 +1,12 @@
 // Dashboard actions page
 // Methods : AddPanelName, SavePanel, ApplyDashboardBtn, AddNextPanel, GetTableRowCount, VerifyChartRenders
 
+import { expect } from "@playwright/test";
 import { SELECTORS, visibleOnly } from "./dashboard-selectors.js";
+import { settlePanelLeave } from "./panel-leave-dialog.js";
+
+// Default unit formatting abbreviates large legend values ("2.40K"); the empty key is an unscaled value.
+const PIE_VALUE_SUFFIX_MULTIPLIER = { "": 1, K: 1e3, M: 1e6, B: 1e9, T: 1e12 };
 
 export default class DashboardactionPage {
   constructor(page) {
@@ -42,18 +47,21 @@ export default class DashboardactionPage {
     this.panelMenuDuplicate = page.locator('[data-test="dashboard-duplicate-panel"]');
     this.panelMenuDelete = page.locator('[data-test="dashboard-delete-panel"]');
     this.shareBtn = page.locator('[data-test="dashboard-share-btn"]');
-    this.settingsBtn = page.locator('[data-test="dashboard-setting-btn"]');
+    this.moreOptionsBtn = page.locator(SELECTORS.MORE_OPTIONS_BTN);
     this.addTabBtn = page.locator('[data-test="dashboard-tab-add-btn"]');
     this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
     this.chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
-    this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
+    this.chartRendererSelector = '[data-test="chart-renderer"]';
+    this.chartRendererCanvas = page.locator(this.chartRendererSelector);
     this.chartRendererCanvasEl = page.locator('[data-test="chart-renderer"] canvas');
     this.noDataElement = page.locator('[data-test="no-data"]');
     this.dashboardSearchInput = page.locator('[data-test="dashboard-search"]');
     this.discardPanelBtn = page.locator('[data-test="dashboard-panel-discard"]');
     // Error toast surfaced on validation/apply/save errors
     this.errorToast = page.locator('[data-test-variant="error"]');
+    // Panel validation messages listed under the chart (DashboardErrors.vue)
+    this.dashboardErrorItems = page.locator('[data-test="dashboard-errors-list-item"]');
     // Inline OForm field error under the panel name input (shown when the
     // panel name is empty on save — the form schema blocks submit before any
     // toast is produced).
@@ -149,6 +157,10 @@ export default class DashboardactionPage {
     return this.chartRendererCanvasEl;
   }
 
+  getErrorToastWithText(text) {
+    return this.errorToast.filter({ hasText: text });
+  }
+
   // Get dashboard-error locator
   // DashboardErrors.vue has two nested elements with the same data-test attribute;
   // use .first() to avoid Playwright strict-mode throws on multi-element locators.
@@ -212,8 +224,8 @@ export default class DashboardactionPage {
     return this.panelSaveBtn;
   }
 
-  // Raw discard-button locator for callers that must own the confirm dialog
-  // themselves (discardPanel() installs its own auto-accepting handler).
+  // Raw discard-button locator for callers that answer the in-app leave dialog
+  // themselves (discardPanel() answers it with Discard).
   getPanelDiscardBtn() {
     return this.discardPanelBtn;
   }
@@ -248,6 +260,22 @@ export default class DashboardactionPage {
     ]).catch(() => {});
   }
 
+  /**
+   * Save from the Save split button's menu and stay in the editor. A new panel's
+   * URL switches to its panelId; the "Panel saved" toast confirms the save.
+   */
+  async saveAndKeepEditing() {
+    await this.page.locator('[data-test="dashboard-panel-save-options-btn"]').click();
+    await this.page.locator('[data-test="dashboard-panel-save-and-stay"]').click();
+    await this.page.waitForURL((url) => url.searchParams.has("panelId"), { timeout: 20000 });
+  }
+
+  /** Ctrl/Cmd+S in the panel editor is Save and keep editing. */
+  async saveAndKeepEditingWithShortcut() {
+    await this.page.keyboard.press("ControlOrMeta+s");
+    await this.page.waitForURL((url) => url.searchParams.has("panelId"), { timeout: 20000 });
+  }
+
   async getErrorToastText() {
     await this.errorToast.first().waitFor({ state: "visible", timeout: 20000 });
     return (await this.errorToast.first().innerText()).replace(/\s+/g, " ").trim();
@@ -257,10 +285,9 @@ export default class DashboardactionPage {
    * Discard the current panel and return to the dashboard view page.
    * Use this for teardown when the panel intentionally holds an
    * incomplete/invalid config (which cannot pass save validation) or when the
-   * test does not need to persist the panel. Discarding an edited panel fires
-   * a native window.confirm — Playwright auto-dismisses dialogs by default,
-   * which would cancel the navigation and leave the page on add_panel — so
-   * accept it for the duration of the discard.
+   * test does not need to persist the panel. Discarding a panel with edits
+   * opens the in-app "Leave with unsaved changes?" dialog, answered with
+   * Discard so no browser draft lingers.
    * (Same handling as dashboard-multi-sql.js discardPanel; this is the
    * generic home for it since discard is not a multi-SQL-specific action.)
    */
@@ -271,10 +298,7 @@ export default class DashboardactionPage {
     try {
       await discardBtn.waitFor({ state: "visible", timeout: 15000 });
       await discardBtn.click();
-      // Discard navigates to the dashboard view page (/dashboards/view).
-      await this.page.waitForURL((url) => !url.pathname.includes("add_panel"), {
-        timeout: 30000,
-      });
+      return await settlePanelLeave(this.page);
     } finally {
       this.page.off("dialog", dialogHandler);
     }
@@ -328,18 +352,30 @@ export default class DashboardactionPage {
       const applyBtn = document.querySelector('[data-test="dashboard-apply"]');
       if (!applyBtn) return false;
       return !applyBtn.disabled;
-    }, { timeout: 30000 });
+    }, undefined, { timeout: 30000 });
   }
 
   // The apply button stays enabled for ~100ms after the click, so waitForChartToRender alone can pass before the query starts and the table later resets to empty.
-  async applyAndWaitForPromQLQuery() {
+  async applyAndWaitForPromQLQuery(isTarget = () => true) {
     const promqlResponse = this.page.waitForResponse(
-      (res) => res.url().includes("/prometheus/api/v1/query_range"),
+      (res) => res.url().includes("/prometheus/api/v1/query_range") && isTarget(new URL(res.url())),
       { timeout: 30000 }
     );
     await this.applyDashboardBtn();
-    await (await promqlResponse).finished();
+    const response = await promqlResponse;
+    // A streamed (text/event-stream) response may never report finished; waitForChartToRender covers completion.
+    if (!(await response.headerValue("content-type"))?.includes("text/event-stream")) {
+      await response.finished();
+    }
     await this.waitForChartToRender();
+    return response;
+  }
+
+  /** Resolves with the URL of the next PromQL query_range request; call before the action that fires it. */
+  nextPromQLQueryRangeRequest() {
+    return this.page
+      .waitForRequest((req) => req.url().includes("/prometheus/api/v1/query_range"), { timeout: 30000 })
+      .then((req) => new URL(req.url()));
   }
 
   //Dashboard panel actions(Edit, Layout, Duplicate, Inspector, Move, Delete)
@@ -349,6 +385,24 @@ export default class DashboardactionPage {
     return this.page.locator(
       `[data-test="dashboard-edit-panel-${panelName}-dropdown"]`
     );
+  }
+
+  /** Sorted sample values of every series in a PromQL query_range event-stream response. */
+  async promqlSampleValues(response) {
+    // The browser can abort the stream after the last event and keep no body, so fetch the same absolute range again.
+    return (await (await this.page.request.get(response.url())).text())
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => {
+        try {
+          return JSON.parse(line.slice("data: ".length));
+        } catch {
+          return null;
+        }
+      })
+      .flatMap((event) => event?.data?.result ?? [])
+      .map((series) => Number((series.value ?? series.values?.at(-1))?.[1]))
+      .sort((a, b) => a - b);
   }
 
   async selectPanelAction(panelName, action) {
@@ -571,6 +625,7 @@ export default class DashboardactionPage {
             cell.offsetParent !== null && cell.textContent.trim().length > 0,
         );
       },
+      undefined,
       { timeout },
     );
   }
@@ -637,12 +692,206 @@ export default class DashboardactionPage {
     await this.page.waitForTimeout(1000);
   }
 
-  // Legend is canvas-painted, so read series names via `_vnode` (`__vueParentComponent` is dev-only).
   async getChartSeriesNames(scopeSelector = '[data-test="chart-renderer"]') {
+    const names = (await this.getChartSeries(scopeSelector)).map((s) => s.name).filter(Boolean);
+    return [...new Set(names)];
+  }
+
+  async getChartSeries(scopeSelector = '[data-test="chart-renderer"]') {
+    const charts = await this.getChartOptionSnapshots(scopeSelector);
+    return charts.flatMap((chart) =>
+      chart.series.map((s) => ({
+        name: s.name,
+        values: s.points.map((point) =>
+          Array.isArray(point) ? point[point.length - 1] : point,
+        ),
+      })),
+    );
+  }
+
+  /**
+   * Legend entries of the first rendered pie/donut, as its live legend formatter prints them.
+   * @param {string} scopeSelector
+   * @returns {Promise<Array<{name: string, value: number, label: string, valuesText: string}>>}
+   */
+  async getPieLegendEntries(scopeSelector = '[data-test="chart-renderer"]') {
+    const [chart] = await this.getChartOptionSnapshots(scopeSelector);
+    return chart?.legendEntries ?? [];
+  }
+
+  /**
+   * Poll until the first pie/donut's legend entries satisfy `predicate`, then return them.
+   * The formatter is swapped on every render, so a single read right after Apply can see the old one.
+   * @param {(entries: Array<{name: string, value: number, label: string, valuesText: string}>) => boolean} predicate
+   * @param {number} timeout
+   */
+  async waitForPieLegendEntries(predicate, timeout = 20000) {
+    let entries = [];
+    await expect
+      .poll(
+        async () => {
+          entries = await this.getPieLegendEntries();
+          return entries.length > 0 && predicate(entries);
+        },
+        { timeout, intervals: [300, 500, 1000, 2000] }
+      )
+      .toBe(true);
+    return entries;
+  }
+
+  /**
+   * Splits a legend entry's values text ("2002.00  52.05%") into its tokens; no values means none.
+   * @param {{valuesText: string}} entry
+   * @returns {string[]}
+   */
+  getPieLegendTokens(entry) {
+    return entry.valuesText ? entry.valuesText.split(/\s{2,}/) : [];
+  }
+
+  /**
+   * Poll until every pie legend entry shows exactly `count` value tokens, then return the entries.
+   * @param {number} count - 1 for Value or Percent alone, 2 for both
+   */
+  async waitForPieLegendTokenCount(count) {
+    return this.waitForPieLegendEntries((entries) =>
+      entries.every((entry) => this.getPieLegendTokens(entry).length === count)
+    );
+  }
+
+  /**
+   * Assert every entry reads "<value>  <percent>%" with `decimals` digits, the value matching its slice
+   * (a K/M/B/T abbreviation is expanded) and the percent matching its share of the positive total.
+   * @param {Array<{name: string, value: number, valuesText: string}>} entries
+   * @param {number} decimals - panel Decimals setting
+   */
+  async expectPieLegendValueAndPercent(entries, decimals = 2) {
+    // Summed from the same snapshot: a second read can land on a later render with different data.
+    const total = entries
+      .map((entry) => entry.value)
+      .filter((v) => Number.isFinite(v) && v > 0)
+      .reduce((a, b) => a + b, 0);
+    expect(total, "pie slice total").toBeGreaterThan(0);
+    for (const entry of entries) {
+      const [valueText, percentText] = this.getPieLegendTokens(entry);
+      this._expectLegendValueMatches(entry, valueText, decimals);
+      this._expectLegendPercentMatches(entry, percentText, decimals, total);
+    }
+  }
+
+  /**
+   * Assert every entry shows its name alone, with no value or percent appended.
+   * @param {Array<{name: string, valuesText: string}>} entries
+   */
+  expectPieLegendNamesOnly(entries) {
+    for (const entry of entries) {
+      expect(entry.valuesText, `legend of ${entry.name} has no values`).toBe("");
+    }
+  }
+
+  /**
+   * Assert every entry shows only its value, with no percent.
+   * @param {Array<{name: string, value: number, valuesText: string}>} entries
+   * @param {number} decimals - panel Decimals setting
+   */
+  expectPieLegendValueOnly(entries, decimals = 2) {
+    for (const entry of entries) {
+      const tokens = this.getPieLegendTokens(entry);
+      expect(tokens, `legend tokens of ${entry.name}`).toHaveLength(1);
+      expect(tokens[0], `legend of ${entry.name}`).not.toContain("%");
+      this._expectLegendValueMatches(entry, tokens[0], decimals);
+    }
+  }
+
+  /**
+   * Assert every entry shows only a percent with `decimals` digits.
+   * @param {Array<{name: string, valuesText: string}>} entries
+   * @param {number} decimals - panel Decimals setting
+   */
+  expectPieLegendPercentOnly(entries, decimals = 2) {
+    const fraction = decimals > 0 ? `\\.\\d{${decimals}}` : "";
+    for (const entry of entries) {
+      expect(entry.valuesText, `legend of ${entry.name}`).toMatch(new RegExp(`^\\d+${fraction}%$`));
+    }
+  }
+
+  _expectLegendValueMatches(entry, valueText, decimals) {
+    const fraction = decimals > 0 ? `\\.\\d{${decimals}}` : "";
+    // A metric declared as percent seeds the panel unit, so the value can carry "%" as well as a K/M/B/T scale.
+    const match = String(valueText).match(new RegExp(`^(-?\\d+${fraction})(?:([KMBT])|%)?$`));
+    expect(match, `value of ${entry.name} ("${valueText}")`).not.toBeNull();
+    const multiplier = PIE_VALUE_SUFFIX_MULTIPLIER[match[2] ?? ""];
+    // Half a unit of the last printed digit, scaled by the abbreviation.
+    const tolerance = 0.5 * Math.pow(10, -decimals) * multiplier + 1e-9;
+    expect(
+      Math.abs(Number(match[1]) * multiplier - entry.value),
+      `value of ${entry.name} ("${valueText}" vs ${entry.value})`
+    ).toBeLessThanOrEqual(tolerance);
+  }
+
+  _expectLegendPercentMatches(entry, percentText, decimals, total) {
+    const fraction = decimals > 0 ? `\\.\\d{${decimals}}` : "";
+    expect(percentText, `percent of ${entry.name}`).toMatch(new RegExp(`^\\d+${fraction}%$`));
+    const exactShare = (Math.max(entry.value, 0) / total) * 100;
+    // Largest-remainder rounding puts a shown percent at most one last digit off its exact share.
+    const tolerance = 1.01 * Math.pow(10, -decimals);
+    expect(
+      Math.abs(parseFloat(percentText) - exactShare),
+      `percent of ${entry.name} ("${percentText}" vs ${exactShare.toFixed(4)})`
+    ).toBeLessThanOrEqual(tolerance);
+  }
+
+  /**
+   * Value-axis bounds and stacked series of the first rendered chart, read from the live ECharts option.
+   * @param {"yAxis"|"xAxis"} valueAxis - the axis that carries values (xAxis for h-stacked)
+   * @param {string} scopeSelector
+   * @returns {Promise<{min: number|null, max: number|null, series: Array<{name: string, stack: string|null, points: Array}>}|null>}
+   */
+  async getChartValueAxisFit(valueAxis = "yAxis", scopeSelector = '[data-test="chart-renderer"]') {
+    const [chart] = await this.getChartOptionSnapshots(scopeSelector);
+    if (!chart) return null;
+    const bounds = chart[valueAxis]?.[0] ?? {};
+    return { min: bounds.min ?? null, max: bounds.max ?? null, series: chart.series };
+  }
+
+  // Legend and axes are canvas-painted, so read the live option via `_vnode` (`__vueParentComponent` is dev-only).
+  async getChartOptionSnapshots(scopeSelector = '[data-test="chart-renderer"]') {
     return this.page.evaluate((scopeSel) => {
       const scopes = Array.from(document.querySelectorAll(scopeSel));
-      const names = new Set();
+      const charts = [];
       const visited = new Set();
+      const numberOrNull = (value) => (typeof value === "number" ? value : null);
+      const axesOf = (axis) =>
+        (Array.isArray(axis) ? axis : axis ? [axis] : []).map((a) => ({
+          type: a?.type ?? null,
+          min: numberOrNull(a?.min),
+          max: numberOrNull(a?.max),
+        }));
+      const pointOf = (point) => {
+        if (Array.isArray(point)) return point.map((v) => (v instanceof Date ? v.getTime() : v));
+        return point !== null && typeof point === "object" ? point.value : point;
+      };
+      // Runs the live legend formatter per pie slice; "{b|name}  v  p%" rich text is split into label and values.
+      const legendEntriesOf = (option) => {
+        const legend = Array.isArray(option.legend) ? option.legend[0] : option.legend;
+        const slices = (option.series?.[0]?.data ?? []).filter(
+          (d) => d !== null && typeof d === "object" && d.name,
+        );
+        return slices.map((d) => {
+          let raw = String(d.name);
+          try {
+            if (typeof legend?.formatter === "function") raw = String(legend.formatter(d.name));
+          } catch {
+            // Non-pie formatters may expect ECharts params; the snapshot must not drop the chart.
+          }
+          const match = raw.match(/^\{[a-z]+\|([^}]*)\}(?:\s+(.*))?$/);
+          return {
+            name: String(d.name),
+            value: typeof d.value === "number" ? d.value : Number(d.value),
+            label: match ? match[1] : raw,
+            valuesText: match ? (match[2] ?? "").trim() : "",
+          };
+        });
+      };
       const walk = (node, depth) => {
         if (!node || typeof node !== "object" || depth > 400 || visited.has(node)) return;
         visited.add(node);
@@ -663,7 +912,30 @@ export default class DashboardactionPage {
             scopes.some((scope) => scope.contains(host))
           ) {
             try {
-              for (const s of chart.getOption()?.series ?? []) if (s?.name) names.add(String(s.name));
+              const option = chart.getOption() ?? {};
+              charts.push({
+                width: chart.getWidth(),
+                height: chart.getHeight(),
+                hostWidth: host.clientWidth,
+                hostHeight: host.clientHeight,
+                xAxis: axesOf(option.xAxis),
+                yAxis: axesOf(option.yAxis),
+                series: (option.series ?? []).map((s) => ({
+                  name: s?.name ? String(s.name) : "",
+                  type: s?.type ?? null,
+                  silent: s?.silent === true,
+                  stack: s?.stack === undefined || s?.stack === null ? null : String(s.stack),
+                  radius: s?.radius ?? null,
+                  center: Array.isArray(s?.center) ? s.center.map(String) : null,
+                  min: numberOrNull(s?.min),
+                  max: numberOrNull(s?.max),
+                  points: (s?.data ?? []).map(pointOf),
+                  pointNames: (s?.data ?? []).map((point) =>
+                    point !== null && typeof point === "object" && !Array.isArray(point) ? String(point.name ?? "") : "",
+                  ),
+                })),
+                legendEntries: legendEntriesOf(option),
+              });
             } catch {
               // A disposed instance throws; it draws nothing anyway.
             }
@@ -674,8 +946,75 @@ export default class DashboardactionPage {
         if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
       };
       walk(document.querySelector("#app")?._vnode, 0);
-      return [...names];
+      return charts;
     }, scopeSelector);
+  }
+
+  async getGaugeLayoutProblems(expected = {}, scopeSelector = this.chartRendererSelector) {
+    const charts = await this.getChartOptionSnapshots(scopeSelector);
+    if (charts.length !== 1) return [`expected one rendered chart, found ${charts.length}`];
+    const [chart] = charts;
+    const problems = [];
+    const { width, height } = chart;
+    if (!(width > 0 && height > 0)) problems.push(`canvas has no size: ${width}x${height}`);
+    // A dial sized against a stale container overflows the canvas, which is the distortion itself.
+    if (Math.abs(width - chart.hostWidth) > 1 || Math.abs(height - chart.hostHeight) > 1) {
+      problems.push(`canvas ${width}x${height} does not match its container ${chart.hostWidth}x${chart.hostHeight}`);
+    }
+    // A display-name override adds a silent title-only gauge on top of its dial; it is not a dial.
+    const dials = chart.series.filter((s) => !s.silent);
+    if (expected.count !== undefined && dials.length !== expected.count) {
+      problems.push(`expected ${expected.count} dials, found ${dials.length}`);
+    }
+    if (dials.length === 0) problems.push("no gauge series");
+    const placed = [];
+    dials.forEach((dial, i) => {
+      const label = `dial ${i} (${dial.name || "unnamed"})`;
+      if (dial.type !== "gauge") problems.push(`${label}: type is ${dial.type}`);
+      const radius = parseFloat(dial.radius);
+      if (!/px$/.test(String(dial.radius)) || !Number.isFinite(radius) || radius <= 0) {
+        problems.push(`${label}: bad radius ${dial.radius}`);
+        return;
+      }
+      const [cxPct, cyPct] = (dial.center ?? []).map((c) => parseFloat(c));
+      if (!Number.isFinite(cxPct) || !Number.isFinite(cyPct) || cxPct < 0 || cxPct > 100 || cyPct < 0 || cyPct > 100) {
+        problems.push(`${label}: bad center ${JSON.stringify(dial.center)}`);
+        return;
+      }
+      const cx = (cxPct * width) / 100;
+      const cy = (cyPct * height) / 100;
+      if (cx - radius < -2 || cx + radius > width + 2 || cy - radius < -2 || cy + radius > height + 2) {
+        problems.push(`${label}: radius ${radius}px at (${cx.toFixed(0)},${cy.toFixed(0)}) overflows ${width}x${height}`);
+      }
+      for (const other of placed) {
+        if (Math.hypot(cx - other.cx, cy - other.cy) < radius + other.radius - 2) {
+          problems.push(`${label}: overlaps dial ${other.i}`);
+        }
+      }
+      placed.push({ i, cx, cy, radius });
+      if (dial.min === null || dial.max === null || !(dial.min < dial.max)) {
+        problems.push(`${label}: bad range ${dial.min}..${dial.max}`);
+      }
+      if (expected.min !== undefined && dial.min !== expected.min) problems.push(`${label}: min ${dial.min}, expected ${expected.min}`);
+      if (expected.max !== undefined && dial.max !== expected.max) problems.push(`${label}: max ${dial.max}, expected ${expected.max}`);
+      const value = dial.points[0];
+      if (typeof value !== "number" || !Number.isFinite(value)) problems.push(`${label}: value is ${value}`);
+    });
+    return problems;
+  }
+
+  async expectGaugeWellFormed(expect, expected = {}, scopeSelector = this.chartRendererSelector) {
+    await expect
+      .poll(() => this.getGaugeLayoutProblems(expected, scopeSelector), {
+        timeout: 20000,
+        intervals: [500, 1000, 1000, 2000],
+      })
+      .toEqual([]);
+  }
+
+  async getGaugeDialNames(scopeSelector = this.chartRendererSelector) {
+    const [chart] = await this.getChartOptionSnapshots(scopeSelector);
+    return chart ? chart.series.filter((s) => s.type === "gauge" && !s.silent).map((s) => s.pointNames[0] ?? "") : [];
   }
 
   /**

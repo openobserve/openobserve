@@ -29,9 +29,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         variant="primary"
         data-test="synthetic-monitoring-new-check-btn"
+        :aria-label="
+          hasNewCheckDraft
+            ? t('common.editorDraft.newDot', { label: t('synthetics.newCheck.button') })
+            : undefined
+        "
         @click="showTypePicker = true"
       >
         {{ t("synthetics.newCheck.button") }}
+        <EditorDraftDot
+          v-if="hasNewCheckDraft"
+          :saved-at="newCheckDraftSavedAt"
+          corner
+          data-test="synthetic-monitoring-new-check-draft-dot"
+        />
       </OButton>
       <OButton
         v-else-if="activeSection === 'status-pages'"
@@ -63,28 +74,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #header-tabs>
-      <OTabs
-        :model-value="activeSection"
-        align="left"
-        @change="activeSection = $event as SyntheticsSection"
-      >
-        <OTab name="checks">
-          <OIcon name="radar" size="sm" />
-          <span>{{ t("synthetics.tabs.checks") }}</span>
-        </OTab>
-        <OTab v-if="privateLocationsEnabled" name="private">
-          <OIcon name="location-on" size="sm" />
-          <span>{{ t("synthetics.tabs.private") }}</span>
-        </OTab>
-        <OTab name="status-pages">
-          <OIcon name="monitor-heart" size="sm" />
-          <span>{{ t("statusPages.tabTitle") }}</span>
-        </OTab>
-        <OTab name="variables">
-          <OIcon name="data-object" size="sm" />
-          <span>{{ t("synthetics.tabs.variables") }}</span>
-        </OTab>
-      </OTabs>
+      <!-- Section navigation stays live on a license-locked page; the actions inside each section stay locked. -->
+      <FeatureLockExempt class="contents">
+        <OTabs
+          :model-value="activeSection"
+          align="left"
+          @change="activeSection = $event as SyntheticsSection"
+        >
+          <OTab name="checks">
+            <OIcon name="radar" size="sm" />
+            <span>{{ t("synthetics.tabs.checks") }}</span>
+          </OTab>
+          <OTab v-if="privateLocationsEnabled" name="private">
+            <OIcon name="location-on" size="sm" />
+            <span>{{ t("synthetics.tabs.private") }}</span>
+          </OTab>
+          <OTab name="status-pages">
+            <OIcon name="monitor-heart" size="sm" />
+            <span>{{ t("statusPages.tabTitle") }}</span>
+          </OTab>
+          <OTab name="variables">
+            <OIcon name="data-object" size="sm" />
+            <span>{{ t("synthetics.tabs.variables") }}</span>
+          </OTab>
+        </OTabs>
+      </FeatureLockExempt>
     </template>
     <!-- CONTENT AREA: sidebar + main -->
     <div class="flex flex-1 overflow-hidden max-md:flex-col">
@@ -105,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="privateLocationsEnabled && activeSection === 'private'"
         :locations="privateLocations"
         :loading="locationsLoading"
+        :forbidden="locationsForbidden"
         @refresh="loadPrivateLocations"
         @copy-setup="openSetupDrawer"
         @delete="confirmDeleteLocation"
@@ -138,6 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selected-ids="selectedMonitorIds"
           :show-folder-column="searchAcrossFolders"
           :location-names="locationNames"
+          :draft-saved-at="checkDraftSavedAt"
           data-test="synthetic-monitoring-monitors-table"
           :toggle-loading-map="toggleLoadingMap"
           :trigger-loading-map="triggerLoadingMap"
@@ -168,10 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                → passing → unknown), with Total last. It replaces the status dropdown
                that used to hide these same counts inside its option labels. -->
           <template #subheader>
-            <div
-              class="px-page-edge border-table-row-divider border-b py-1.5"
-              data-test="synthetic-monitoring-summary"
-            >
+            <div data-test="synthetic-monitoring-summary">
               <OStatStrip
                 :items="summaryStats"
                 :loading="loading"
@@ -278,6 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="activeSection === 'status-pages'"
         :pages="statusPages"
         :loading="statusPagesLoading"
+        :forbidden="statusPagesForbidden"
         :timezone="store.state.timezone"
         @refresh="loadStatusPages"
         @new-page="showCreateStatusPage = true"
@@ -337,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="showBulkDeleteConfirm = false"
     >
       <p class="py-2">
-        {{ t("synthetics.dialog.bulkDeleteBody", { count: selectedMonitorIds.length }) }}
+        {{ t("synthetics.dialog.bulkDeleteBody", { count: bulkDeleteCount }) }}
       </p>
     </ODialog>
 
@@ -399,9 +413,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="deleteLocation"
       @click:secondary="showDeleteLocation = false"
     >
-      <p class="py-2">
-        {{ t("synthetics.privateLocations.deleteBody", { name: locationToDelete?.label ?? "" }) }}
-      </p>
+      <i18n-t keypath="synthetics.privateLocations.deleteBody" tag="p" class="py-2">
+        <template #name>
+          <span
+            data-test="synthetic-monitoring-delete-location-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ locationToDelete?.label }}</span
+          >
+        </template>
+      </i18n-t>
     </ODialog>
 
     <!-- Move checks dialog -->
@@ -431,6 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OText>
         </div>
         <CheckTypePicker
+          :draft-saved-at="newCheckDraftSavedAtByType"
           variant="modal"
           layout="row"
           data-test="synthetic-monitoring-check-type-picker-modal"
@@ -494,6 +515,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -542,10 +564,14 @@ import {
   statusPageEditRoute,
 } from "@/utils/synthetics/routes";
 import { getFoldersListByType } from "@/utils/commons";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useListViewState } from "@/composables/useListViewState";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -618,6 +644,25 @@ function formatTimeAgo(microseconds: number): string {
   return t("synthetics.daysAgo", { count: Math.floor(h / 24) });
 }
 
+/**
+ * Backend check status -> UI status key. The API sends strings, but the
+ * numeric enum (0 unknown, 1 passed, 2 warning, 3 failed, 4 error) may also
+ * reach us; anything unmapped becomes "unknown" so it never renders blank.
+ */
+const MONITOR_STATUS_BY_NUMBER: Record<number, string> = {
+  0: "unknown",
+  1: "passed",
+  2: "warning",
+  3: "failed",
+  4: "error",
+};
+const KNOWN_MONITOR_STATUSES = new Set(["passed", "warning", "failed", "error", "unknown"]);
+function normalizeMonitorStatus(status: unknown): string {
+  if (typeof status === "number") return MONITOR_STATUS_BY_NUMBER[status] ?? "unknown";
+  const s = String(status ?? "").toLowerCase();
+  return KNOWN_MONITOR_STATUSES.has(s) ? s : "unknown";
+}
+
 function mapMonitor(m: ApiMonitor) {
   return {
     id: m.id,
@@ -627,8 +672,8 @@ function mapMonitor(m: ApiMonitor) {
     url: m.target,
     type: m.type.toUpperCase(),
     interval: formatFrequency(m.frequency),
-    status: m.status,
-    responseTime: m.last_response_ms !== null ? `${m.last_response_ms}ms` : null,
+    status: normalizeMonitorStatus(m.status),
+    responseTime: m.last_response_ms,
     locations: m.locations,
     lastCheck: m.last_check_at !== null ? formatTimeAgo(m.last_check_at) : "—",
     // Raw microsecond epoch — drives the relative Last Check cell.
@@ -657,6 +702,49 @@ const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? "",
 );
 
+const protocolDrafts = useEditorDraftIds("synthetic_check");
+const browserDrafts = useEditorDraftIds("synthetic_browser");
+const hasNewCheckDraft = computed(
+  () =>
+    browserDrafts.hasNew ||
+    SYNTHETIC_CHECK_TYPES.some((type) => type !== "browser" && protocolDrafts.hasNewVariant(type)),
+);
+/** Each type's new-check draft time: the browser test has its own kind, a protocol check one slot per type. */
+const newCheckDraftSavedAtByType = computed(() =>
+  Object.fromEntries(
+    SYNTHETIC_CHECK_TYPES.map((type) => [
+      type,
+      type === "browser" ? browserDrafts.savedAt(null) : protocolDrafts.savedAtVariant(type),
+    ]),
+  ),
+);
+/** The newest of the new-check drafts, browser or any protocol type. */
+const newCheckDraftSavedAt = computed(() => {
+  const times = Object.values(newCheckDraftSavedAtByType.value).filter(
+    (at): at is number => at !== null,
+  );
+  return times.length ? Math.max(...times) : null;
+});
+/** Check id to its newest draft's time; one scan per kind, not per row. */
+const checkDraftSavedAt = computed(() => {
+  const map: Record<string, number> = {};
+  for (const drafts of [protocolDrafts, browserDrafts]) {
+    for (const id of drafts.ids) {
+      const at = drafts.savedAt(id) ?? 0;
+      map[id] = Math.max(map[id] ?? 0, at);
+    }
+  }
+  return map;
+});
+
+function dropCheckDrafts(ids: string[]) {
+  const org = orgIdentifier.value;
+  for (const entityId of ids) {
+    deleteEditorDraftsFor({ kind: "synthetic_check", org, entityId });
+    deleteEditorDraftsFor({ kind: "synthetic_browser", org, entityId });
+  }
+}
+
 const readFolder = ref<string | undefined>(undefined);
 // Distinct from readFolder being undefined, which is the "All folders" scope.
 const folderResolved = ref(false);
@@ -671,7 +759,7 @@ const loading = monitorsList.isPending;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = monitorsList.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+  return forbiddenState(e) || e?.status === 403;
 });
 // Request in flight, with rows still on screen — the refresh button's
 // spinner. `loading` stays for the skeleton, which only a cold read wants.
@@ -899,6 +987,8 @@ watch(searchAcrossFolders, async (newVal) => {
 const selectedMonitorIds = ref<string[]>([]);
 const showMoveDialog = ref(false);
 const showBulkDeleteConfirm = ref(false);
+// Set on open and never cleared: the selection empties before the dialog finishes closing.
+const bulkDeleteCount = ref(0);
 const monitorsToMove = ref<string[]>([]);
 
 // Both delete handlers' 409s render here, with distinct titles for a named parent vs outside ones.
@@ -931,6 +1021,7 @@ const duplicateSourceType = ref<string>("browser");
 const isDuplicating = ref(false);
 
 const openBulkDeleteConfirm = () => {
+  bulkDeleteCount.value = selectedMonitorIds.value.length;
   showBulkDeleteConfirm.value = true;
 };
 
@@ -950,6 +1041,7 @@ const bulkDeleteMonitors = async () => {
     );
     // The bulk endpoint deletes all ids or fails, so a resolved call removed every selected test.
     analytics.track("synthetic_test_deleted", { count: selectedMonitorIds.value.length });
+    dropCheckDrafts(selectedMonitorIds.value.map(String));
     selectedMonitorIds.value = [];
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.bulkDeleteSuccess") });
@@ -1034,13 +1126,17 @@ const setupData = ref<AgentSetup | null>(null);
 const showDeleteLocation = ref(false);
 const locationToDelete = ref<SyntheticLocation | null>(null);
 
+const locationsForbidden = ref<ForbiddenState>(false);
+
 async function loadPrivateLocations() {
   locationsLoading.value = true;
+  locationsForbidden.value = false;
   try {
     const res = await syntheticsService.getLocations(orgIdentifier.value);
     const all: SyntheticLocation[] = (res.data as any).locations ?? [];
     privateLocations.value = all.filter((l) => l.kind === "private");
   } catch (err) {
+    locationsForbidden.value = forbiddenState(err);
     console.error("[synthetics] failed to load private locations", err);
   } finally {
     locationsLoading.value = false;
@@ -1092,15 +1188,18 @@ async function deleteLocation() {
 // ── Status pages tab ───────────────────────────────────────────────────
 const statusPages = ref<StatusPageListItem[]>([]);
 const statusPagesLoading = ref(false);
+const statusPagesForbidden = ref<ForbiddenState>(false);
 const showCreateStatusPage = ref(false);
 
 async function loadStatusPages() {
   if (!orgIdentifier.value) return;
   statusPagesLoading.value = true;
+  statusPagesForbidden.value = false;
   try {
     const res = await statusPagesService.list(orgIdentifier.value);
     statusPages.value = (res.data as any).pages ?? [];
   } catch (err) {
+    statusPagesForbidden.value = forbiddenState(err);
     console.error("[status-pages] failed to load", err);
   } finally {
     statusPagesLoading.value = false;
@@ -1183,7 +1282,9 @@ const openDomains = (page: StatusPageListItem) => {
 const confirmDeleteStatusPage = async (page: StatusPageListItem) => {
   const ok = await confirm({
     title: t("statusPages.dialog.deleteTitle"),
-    message: t("statusPages.dialog.deleteBody", { name: page.name }),
+    messageKeypath: "statusPages.dialog.deleteBody",
+    messageName: page.name,
+    confirmVariant: "destructive",
   });
   if (!ok) return;
   const dismiss = toast({
@@ -1193,6 +1294,7 @@ const confirmDeleteStatusPage = async (page: StatusPageListItem) => {
   });
   try {
     await statusPagesService.delete(orgIdentifier.value, page.id);
+    deleteEditorDraftsFor({ kind: "status_page", org: orgIdentifier.value, entityId: page.id });
     statusPages.value = statusPages.value.filter((p) => p.id !== page.id);
     dismiss();
     toast({ variant: "success", message: t("statusPages.toast.deleted") });
@@ -1281,6 +1383,15 @@ const summaryStats = computed<StatItem[]>(() => {
       tone: "error",
       max: share,
       dataTest: "synthetics-summary-failed",
+    },
+    {
+      key: "error",
+      label: t("synthetics.filters.error"),
+      value: v(count("error")),
+      icon: "error-outline",
+      tone: "error",
+      max: share,
+      dataTest: "synthetics-summary-error",
     },
     {
       key: "warning",
@@ -1711,7 +1822,9 @@ async function runMonitor(m: any) {
 async function deleteMonitor(m: any) {
   const ok = await confirm({
     title: t("synthetics.dialog.deleteSingleTitle"),
-    message: t("synthetics.dialog.deleteSingleBody", { name: m.name }),
+    messageKeypath: "synthetics.dialog.deleteSingleBody",
+    messageName: m.name,
+    confirmVariant: "destructive",
   });
   if (!ok) return;
 
@@ -1724,6 +1837,7 @@ async function deleteMonitor(m: any) {
   try {
     await syntheticsService.delete(org, String(m.id), activeFolderId.value);
     analytics.track("synthetic_test_deleted", { count: 1 });
+    dropCheckDrafts([String(m.id)]);
     // Every cached folder, not just the one on screen: a cross-folder view deletes rows another folder's entry still holds.
     queryClient.setQueriesData({ queryKey: syntheticsKeys.monitorsAll(org) }, (old: any) => {
       if (!Array.isArray(old)) return undefined;

@@ -195,8 +195,8 @@ async function triggerSuggestionsWithRetry(page, pm, expectedValueOrNull, timeou
     const { monacoHelper } = getMonacoHelper(page, pm);
     let lastSuggestions = [];
     await expect.poll(async () => {
-        // Press Escape to close any prior popup, then re-trigger
-        await page.keyboard.press('Escape').catch(() => {});
+        // Escape with no menu open moves focus out of the editor, so only press it to close an open popup.
+        if ((await menuState(page)).visible) await page.keyboard.press('Escape');
         await page.keyboard.press('Control+Space');
         try {
             await monacoHelper.waitForSuggestions(1500);
@@ -1616,7 +1616,7 @@ test.describe("Autocomplete key contract — chained menus (Automatic)", () => {
         expect(await editorCaret(page)).toEqual(inQuotes);
         // Monaco picks its undo keys from the user agent, which the Desktop Chrome device sets to Windows.
         const mod = await page.evaluate(() => (/Macintosh/.test(navigator.userAgent) ? 'Meta' : 'Control'));
-        await page.keyboard.press('Escape');
+        if ((await menuState(page)).visible) await page.keyboard.press('Escape');
         await page.keyboard.press(`${mod}+z`);
         await expect.poll(() => editorText(page)).not.toBe(wrapped);
         await page.keyboard.press(`${mod}+Shift+z`);

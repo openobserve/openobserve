@@ -46,8 +46,19 @@ vi.mock("@/utils/zincutils", () => ({
 
 vi.mock("axios");
 
-const { addUnauthorizedError } = vi.hoisted(() => ({ addUnauthorizedError: vi.fn() }));
-vi.mock("@/composables/useUnauthorizedErrorGrouper", () => ({ addUnauthorizedError }));
+const { recordForbidden, noteAccessSuccess, currentAccessRouteKey } = vi.hoisted(() => ({
+  recordForbidden: vi.fn(),
+  noteAccessSuccess: vi.fn(),
+  currentAccessRouteKey: vi.fn(() => undefined),
+}));
+vi.mock("@/composables/useAccessStore", () => ({
+  recordForbidden,
+  noteAccessSuccess,
+  currentAccessRouteKey,
+  resetAccess: vi.fn(),
+}));
+const { addLicenseDeniedError } = vi.hoisted(() => ({ addLicenseDeniedError: vi.fn() }));
+vi.mock("@/composables/useLicenseDenials", () => ({ addLicenseDeniedError }));
 
 import config from "../aws-exports";
 import store from "../stores";
@@ -180,12 +191,59 @@ describe("attemptTokenRefresh", () => {
   });
 });
 
+describe("response interceptor — license 403 handling", () => {
+  // Builds a real instance and returns the rejection handler it registered.
+  function errorHandler() {
+    const use = vi.fn();
+    vi.mocked(axios.create).mockReturnValue({
+      interceptors: { request: { use: vi.fn() }, response: { use } },
+    } as any);
+    http();
+    return use.mock.calls[0][1] as (error: unknown) => Promise<unknown>;
+  }
+
+  const forbidden = (data: Record<string, unknown>) => ({
+    response: { status: 403, data },
+    request: { responseURL: "http://localhost:5080/api/org/workflows" },
+    config: { url: "/api/org/workflows" },
+  });
+
+  beforeEach(() => {
+    (config as any).isEnterprise = "true";
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    (config as any).isEnterprise = "false";
+  });
+
+  it("sends the missing features of a code 40001 denial to the top bar", async () => {
+    const error = forbidden({ code: 40001, error_detail: "oncall, workflows" });
+    (error.config as Record<string, unknown>).startedAt = 42;
+
+    await expect(errorHandler()(error)).rejects.toBe(error);
+
+    expect(addLicenseDeniedError).toHaveBeenCalledWith(["oncall", "workflows"], 42);
+    expect(recordForbidden).not.toHaveBeenCalled();
+  });
+
+  it("keeps a plain 403 on the RBAC access toast", async () => {
+    const error = forbidden({ code: 403, message: "Unauthorized Access" });
+
+    await expect(errorHandler()(error)).rejects.toBe(error);
+
+    expect(recordForbidden).toHaveBeenCalledTimes(1);
+    expect(addLicenseDeniedError).not.toHaveBeenCalled();
+  });
+});
+
 describe("http 403 interceptor", () => {
   /** Builds an instance and returns the rejection handler it registered. */
   const errorHandler = () => {
     let onError: (error: any) => Promise<unknown> = () => Promise.resolve();
     vi.mocked(axios.create).mockReturnValue({
       interceptors: {
+        request: { use: vi.fn() },
         response: {
           use: (_ok: unknown, err: (error: any) => Promise<unknown>) => {
             onError = err;
@@ -213,18 +271,35 @@ describe("http 403 interceptor", () => {
     (config as any).isEnterprise = "false";
   });
 
-  it("adds a 403 to the Access Required toast", async () => {
+  it("records a 403 with the access boundary", async () => {
     const error = forbidden();
     await expect(errorHandler()(error)).rejects.toBe(error);
-    expect(addUnauthorizedError).toHaveBeenCalledWith(
-      "http://localhost:5080/api/v2/org/folders/alerts",
-    );
+    expect(recordForbidden).toHaveBeenCalledWith({
+      url: "http://localhost:5080/api/v2/org/folders/alerts",
+      method: undefined,
+      routeKey: undefined,
+    });
   });
 
-  it("leaves a 403 out of the toast when the request opts out, and still rejects", async () => {
+  it("stamps a new request with the current page but keeps a retried request's stamp", () => {
+    let stamp: (config: any) => any = (c) => c;
+    vi.mocked(axios.create).mockReturnValue({
+      interceptors: {
+        request: { use: (fn: (config: any) => any) => (stamp = fn) },
+        response: { use: vi.fn() },
+      },
+    } as any);
+    http();
+    currentAccessRouteKey.mockReturnValue("acme|settings" as any);
+    expect(stamp({}).accessRouteKey).toBe("acme|settings");
+    expect(stamp({ accessRouteKey: "acme|users" }).accessRouteKey).toBe("acme|users");
+    currentAccessRouteKey.mockReturnValue(undefined);
+  });
+
+  it("leaves a 403 unrecorded when the request opts out, and still rejects", async () => {
     const error = forbidden({ skipAccessToast: true });
     await expect(errorHandler()(error)).rejects.toBe(error);
-    expect(addUnauthorizedError).not.toHaveBeenCalled();
+    expect(recordForbidden).not.toHaveBeenCalled();
   });
 });
 
@@ -237,9 +312,10 @@ describe("403 handling", () => {
   });
 
   beforeEach(() => {
-    addUnauthorizedError.mockClear();
+    recordForbidden.mockClear();
     vi.mocked(axios.create).mockReturnValue({
       interceptors: {
+        request: { use: vi.fn() },
         response: { use: (_ok: unknown, rejected: typeof onRejected) => (onRejected = rejected) },
       },
     } as any);
@@ -255,17 +331,126 @@ describe("403 handling", () => {
     ["enterprise", "isEnterprise"],
     ["cloud", "isCloud"],
   ])(
-    "on %s, toasts an unflagged 403 and stays silent on a silentForbidden one",
+    "on %s, records an unflagged 403 and stays silent on a silentForbidden one",
     async (_, flag) => {
       (config as any)[flag] = "true";
 
       await expect(onRejected(forbidden({}))).rejects.toBeDefined();
-      expect(addUnauthorizedError).toHaveBeenCalledWith("http://localhost:5080/api/acme/x");
+      expect(recordForbidden).toHaveBeenCalledWith({
+        url: "http://localhost:5080/api/acme/x",
+        method: undefined,
+        routeKey: undefined,
+      });
 
-      addUnauthorizedError.mockClear();
+      recordForbidden.mockClear();
       const silent = forbidden({ silentForbidden: true });
       await expect(onRejected(silent)).rejects.toBe(silent);
-      expect(addUnauthorizedError).not.toHaveBeenCalled();
+      expect(recordForbidden).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("401 handling", () => {
+  let onRejected: (error: any) => Promise<any>;
+  const probe = vi.fn();
+  const retry = vi.fn();
+  const unauthorized = (url: string, requestConfig: Record<string, unknown> = {}) => ({
+    response: { status: 401, data: "Unauthorized Access" },
+    request: { responseURL: `http://localhost:5080${url}` },
+    config: { url, method: "get", ...requestConfig },
+  });
+  const reloadMock = vi.fn();
+
+  beforeEach(() => {
+    (config as any).isEnterprise = "true";
+    (config as any).isCloud = "false";
+    (store.state as any).zoConfig.sso_enabled = false;
+    Object.defineProperty(window, "location", {
+      value: { ...window.location, reload: reloadMock },
+      writable: true,
+      configurable: true,
+    });
+    vi.mocked(axios.create).mockReturnValue({
+      interceptors: {
+        request: { use: vi.fn() },
+        response: { use: (_ok: unknown, rejected: typeof onRejected) => (onRejected = rejected) },
+      },
+      get: probe,
+      request: retry,
+    } as any);
+    http();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    probe.mockReset();
+    retry.mockReset();
+    (config as any).isEnterprise = "false";
+    (store.state as any).zoConfig.sso_enabled = false;
+  });
+
+  it("keeps a live session signed in when a Security route refuses with 401", async () => {
+    probe.mockResolvedValue({ status: 200, data: { read: false } });
+    const error = unauthorized("/api/acme/security/audit");
+    await expect(onRejected(error)).rejects.toBe(error);
+    expect(probe).toHaveBeenCalledWith("/api/acme/security/access");
+    expect(store.dispatch).not.toHaveBeenCalledWith("logout");
+    expect(recordForbidden).toHaveBeenCalledWith({
+      url: "http://localhost:5080/api/acme/security/audit",
+      method: "get",
+      routeKey: undefined,
+    });
+  });
+
+  it("asks once for a burst of Security 401s", async () => {
+    let answer!: (value: unknown) => void;
+    probe.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    const pending = ["audit", "cases", "sources"].map((path) =>
+      onRejected(unauthorized(`/api/acme/security/${path}`)).catch(() => undefined),
+    );
+    answer({ status: 200 });
+    await Promise.all(pending);
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect(store.dispatch).not.toHaveBeenCalledWith("logout");
+  });
+
+  it("logs out when the probe confirms the session expired", async () => {
+    probe.mockRejectedValue({ response: { status: 401 } });
+    await expect(onRejected(unauthorized("/api/acme/security/cases"))).rejects.toBeTruthy();
+    expect(store.dispatch).toHaveBeenCalledWith("logout");
+  });
+
+  it("stays signed in when the probe cannot reach the server", async () => {
+    probe.mockRejectedValue(new Error("Network Error"));
+    await expect(onRejected(unauthorized("/api/acme/security/cases"))).rejects.toBeTruthy();
+    expect(store.dispatch).not.toHaveBeenCalledWith("logout");
+  });
+
+  it("never probes for the access route itself, which a dead session fails", async () => {
+    await expect(onRejected(unauthorized("/api/acme/security/access"))).rejects.toBeTruthy();
+    expect(probe).not.toHaveBeenCalled();
+    expect(store.dispatch).toHaveBeenCalledWith("logout");
+  });
+
+  it("logs out on a 401 outside Security as before", async () => {
+    await expect(onRejected(unauthorized("/api/acme/streams"))).rejects.toBeTruthy();
+    expect(probe).not.toHaveBeenCalled();
+    expect(store.dispatch).toHaveBeenCalledWith("logout");
+  });
+
+  it("refreshes an SSO token once and treats a second 401 as a refusal", async () => {
+    (store.state as any).zoConfig.sso_enabled = true;
+    probe.mockResolvedValue({ status: 200 });
+    const second = unauthorized("/api/acme/security/audit", { _afterRefresh: true });
+    retry.mockImplementation((retried: any) => {
+      expect(retried._afterRefresh).toBe(true);
+      return onRejected(second);
+    });
+    await expect(onRejected(unauthorized("/api/acme/security/audit"))).rejects.toBe(second);
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(probe).toHaveBeenCalledWith("/config/dex_refresh");
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect(store.dispatch).not.toHaveBeenCalledWith("logout");
+    expect(recordForbidden).toHaveBeenCalledTimes(1);
+  });
 });

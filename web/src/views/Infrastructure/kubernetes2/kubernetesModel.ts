@@ -632,6 +632,23 @@ export function lensPodStatus(
   return "pending";
 }
 
+export type PodBucket = "ready" | "pending" | "failing" | "completed" | "unknown";
+
+// The one problem-pod rule: failed/evicted or an error-severity warning is failing; the tree badge counts every bucket but ready and completed.
+export function podBucket(row: PodRow): PodBucket {
+  const status = lensPodStatus(row);
+  if (status === "succeeded") return "completed";
+  if (status === "failed" || status === "evicted") return "failing";
+  if (podWarnings(row).some((w) => w.severity === "error")) return "failing";
+  if (status === "unknown") return "unknown";
+  return status === "running" ? "ready" : "pending";
+}
+
+export const isProblemPod = (row: PodRow) => {
+  const bucket = podBucket(row);
+  return bucket !== "ready" && bucket !== "completed";
+};
+
 export function podStatusKnown(row: PodRow) {
   return row.phase != null && (row.phase !== "Running" || row.ready != null);
 }

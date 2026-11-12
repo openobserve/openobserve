@@ -21,6 +21,7 @@
               {{ t("aiObservability.experiments.rowDetail.input") }}
             </h4>
             <OButton
+              :aria-label="t('aiObservability.experiments.rowDetail.copyInput')"
               variant="outline"
               size="sm"
               :disabled="!hasContent(detail.input)"
@@ -58,6 +59,7 @@
               {{ t("aiObservability.experiments.rowDetail.expectedOutput") }}
             </h4>
             <OButton
+              :aria-label="t('aiObservability.experiments.rowDetail.copyExpected')"
               variant="outline"
               size="sm"
               :disabled="!hasContent(detail.expectedOutput)"
@@ -121,8 +123,31 @@
                 {{ statusVariant(activeTrial.taskStatus, "eval").label }}
               </OTag>
               <div class="flex items-center gap-2">
+                <OTooltip
+                  v-if="activeTrial.execution?.traceId && tracesLock.locked.value"
+                  :content="tracesLock.lockedReason.value"
+                >
+                  <span class="inline-flex">
+                    <OButton
+                      size="sm"
+                      variant="outline"
+                      disabled
+                      data-test="ai-experiment-row-trace"
+                    >
+                      <template #icon-left>
+                        <OIcon
+                          name="lock"
+                          class="text-icon-locked"
+                          size="sm"
+                          data-test="ai-experiment-row-trace-lock"
+                        />
+                      </template>
+                      {{ t("aiObservability.experiments.rowDetail.viewTrace") }}
+                    </OButton>
+                  </span>
+                </OTooltip>
                 <OButton
-                  v-if="activeTrial.execution?.traceId"
+                  v-else-if="activeTrial.execution?.traceId"
                   size="sm"
                   variant="outline"
                   data-test="ai-experiment-row-trace"
@@ -149,6 +174,7 @@
                   {{ t("aiObservability.experiments.rowDetail.output") }}
                 </h4>
                 <OButton
+                  :aria-label="t('aiObservability.experiments.rowDetail.copyOutput')"
                   variant="outline"
                   size="sm"
                   :disabled="!hasContent(activeTrial.execution.output)"
@@ -248,8 +274,31 @@
                   >
                     {{ raw(score.value) }}
                   </span>
+                  <OTooltip
+                    v-if="score.trace && tracesLock.locked.value"
+                    :content="tracesLock.lockedReason.value"
+                  >
+                    <span class="inline-flex">
+                      <OButton
+                        size="sm"
+                        variant="outline"
+                        disabled
+                        :data-test="`ai-experiment-row-score-trace-${score.key}`"
+                      >
+                        <template #icon-left>
+                          <OIcon
+                            name="lock"
+                            class="text-icon-locked"
+                            size="sm"
+                            :data-test="`ai-experiment-row-score-trace-lock-${score.key}`"
+                          />
+                        </template>
+                        {{ t("aiObservability.experiments.rowDetail.viewTrace") }}
+                      </OButton>
+                    </span>
+                  </OTooltip>
                   <OButton
-                    v-if="score.trace"
+                    v-else-if="score.trace"
                     size="sm"
                     variant="outline"
                     :data-test="`ai-experiment-row-score-trace-${score.key}`"
@@ -316,11 +365,14 @@ import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import ExperimentRowNav from "./ExperimentRowNav.vue";
 import { durationLabel } from "./experimentRowContent";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import {
   experimentScoreSummaryValue,
   experimentScoreValue,
 } from "@/enterprise/views/AIObservability/experimentResults";
 import type {
+  ExperimentClientScoreSummary,
   ExperimentExecution,
   ExperimentResultSlot,
   ExperimentRowDetail,
@@ -342,6 +394,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const tracesLock = useLicenseLock("traces");
 
 const activeTrialIndex = ref(0);
 watch(
@@ -359,7 +412,7 @@ const activeTrial = computed(() =>
 const snapshotLabel = computed(() =>
   props.detail
     ? t("aiObservability.experiments.rowDetail.snapshot", {
-        version: props.detail.snapshot.datasetVersion,
+        version: props.detail.snapshot.datasetWriteVersion,
       })
     : raw(""),
 );
@@ -409,17 +462,52 @@ const scoreColumns = computed<OTableColumnDef[]>(() => [
     : []),
 ]);
 
+/** One score-matrix row: a pinned Scorer or a dimension the customer's own
+ *  code reported. Both render the same; only how a trial's Score is found and
+ *  whether it has an evaluator trace differ. */
+interface ScoreDimensionRow {
+  key: string;
+  dimension: string;
+  aggregate: unknown;
+  /** Client Scores carry a generated evaluator trace id, not a real trace. */
+  traceable: boolean;
+  /** The successful Score record for this dimension on `trial`, if any. */
+  successFor: (trial: ExperimentResultSlot) => Record<string, unknown> | null;
+}
+
+const scoreDimensions = computed<ScoreDimensionRow[]>(() => [
+  ...(props.detail?.scoreSummaries ?? []).map((summary) => ({
+    key: `${summary.scorerId}:${summary.scorerVersion}`,
+    dimension: scoreDimension(summary),
+    aggregate: summary.value,
+    traceable: true,
+    successFor: (trial: ExperimentResultSlot) => {
+      const result = scoreFor(trial, summary);
+      return result?.status === "success" ? result.score : null;
+    },
+  })),
+  ...(props.detail?.clientScoreSummaries ?? []).map((summary) => ({
+    key: `client:${summary.clientScorerKey}:${summary.scoreConfigId}`,
+    dimension:
+      summary.scoreConfigName ||
+      summary.clientScorerKey ||
+      t("aiObservability.experiments.rowDetail.unknownDimension"),
+    aggregate: summary.value,
+    traceable: false,
+    successFor: (trial: ExperimentResultSlot) => clientScoreFor(trial, summary),
+  })),
+]);
+
 const scoreRows = computed(() =>
-  (props.detail?.scoreSummaries ?? []).map((summary) => {
+  scoreDimensions.value.map((dimension) => {
     const row: Record<string, string> = {
-      key: `${summary.scorerId}:${summary.scorerVersion}`,
-      dimension: scoreDimension(summary),
-      aggregate: experimentScoreSummaryValue(summary.value),
+      key: dimension.key,
+      dimension: dimension.dimension,
+      aggregate: experimentScoreSummaryValue(dimension.aggregate),
     };
     for (const trial of props.detail?.trials ?? []) {
-      const result = scoreFor(trial, summary);
-      row[`trial-${trial.trialIndex}`] =
-        result?.status === "success" ? experimentScoreValue(result.score) : "—";
+      const record = dimension.successFor(trial);
+      row[`trial-${trial.trialIndex}`] = record ? experimentScoreValue(record) : "—";
     }
     return row;
   }),
@@ -428,18 +516,19 @@ const scoreRows = computed(() =>
 const activeScoreDetails = computed(() => {
   const trial = activeTrial.value;
   if (!trial) return [];
-  return (props.detail?.scoreSummaries ?? []).flatMap((summary) => {
-    const result = scoreFor(trial, summary);
-    if (result?.status !== "success" || !result.score) return [];
-    const record = result.score;
+  return scoreDimensions.value.flatMap((dimension) => {
+    const record = dimension.successFor(trial);
+    if (!record) return [];
     const reasoning = stringField(record, "reasoning");
-    const traceId = stringField(record, "evaluatorTraceId", "evaluator_trace_id");
+    const traceId = dimension.traceable
+      ? stringField(record, "evaluatorTraceId", "evaluator_trace_id")
+      : "";
     const timestamp = numberField(record, "timestamp", "_timestamp") ?? trial.execution?.timestamp;
     if (!reasoning && !traceId) return [];
     return [
       {
-        key: `${summary.scorerId}:${summary.scorerVersion}`,
-        dimension: scoreDimension(summary),
+        key: dimension.key,
+        dimension: dimension.dimension,
         value: experimentScoreValue(record),
         reasoning,
         trace: traceId && timestamp != null ? { traceId, timestamp } : null,
@@ -507,6 +596,20 @@ function navigate(rowId: string | null) {
 function scoreFor(trial: ExperimentResultSlot, summary: ExperimentScoreSummary) {
   return trial.scores.find(
     (score) => score.scorerId === summary.scorerId && score.scorerVersion === summary.scorerVersion,
+  );
+}
+
+function clientScoreFor(
+  trial: ExperimentResultSlot,
+  summary: ExperimentClientScoreSummary,
+): Record<string, unknown> | null {
+  return (
+    (trial.clientScores ?? []).find(
+      (record) =>
+        stringField(record, "clientScorerKey", "client_scorer_key") === summary.clientScorerKey &&
+        stringField(record, "scoreConfigId", "score_config_id") === summary.scoreConfigId &&
+        stringField(record, "status") === "success",
+    ) ?? null
   );
 }
 

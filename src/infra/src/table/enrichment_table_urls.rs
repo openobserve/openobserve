@@ -183,6 +183,20 @@ pub async fn list_by_org(org: &str) -> Result<Vec<EnrichmentTableUrlRecord>, err
     Ok(records.into_iter().map(|model| model.into()).collect())
 }
 
+/// Distinct table names with a URL job in the org.
+pub async fn list_names_by_org(org: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    let names = Entity::find()
+        .select_only()
+        .column(Column::Name)
+        .filter(Column::Org.eq(org))
+        .distinct()
+        .into_tuple::<String>()
+        .all(client)
+        .await?;
+    Ok(names)
+}
+
 /// Get all URL jobs for a specific table, ordered by created_at DESC
 ///
 /// # Arguments
@@ -393,14 +407,11 @@ pub async fn claim_stale_jobs(
     Ok(models.into_iter().map(|model| model.into()).collect())
 }
 
-/// Deletes all enrichment table URL entries belonging to the given org.
-pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
+/// Deletes all enrichment table URL entries belonging to the given org and returns their names.
+pub async fn delete_by_org(org: &str) -> Result<Vec<String>, errors::Error> {
     let client = get_orm_client_rw().await;
-    Entity::delete_many()
-        .filter(Column::Org.eq(org))
-        .exec(client)
-        .await?;
-    Ok(())
+    let delete = Entity::delete_many().filter(Column::Org.eq(org));
+    Ok(super::delete_returning(client, delete, &[Column::Name]).await?)
 }
 
 #[cfg(test)]

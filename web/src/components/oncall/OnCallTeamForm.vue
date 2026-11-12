@@ -20,40 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="md"
     :title="isEdit ? t('oncall.editTeam') : t('oncall.addTeam')"
     :form-id="FORM_ID"
-    :primary-button-label="t('oncall.save')"
+    :primary-button-label="primaryLabel"
     :secondary-button-label="t('oncall.cancel')"
     data-test="oncall-team-form-drawer"
     @update:open="(v: boolean) => emit('update:open', v)"
     @click:secondary="close"
   >
-    <!-- `formKey` remounts OForm on open so defaults re-read the edit target. -->
-    <OForm
-      :id="FORM_ID"
-      ref="formRef"
-      :key="formKey"
-      :schema="schema"
-      :default-values="defaultValues"
-      class="flex flex-col gap-5"
-      @submit="onSubmit"
-    >
+    <!-- Remounted on open so no field keeps state from the last visit; the values themselves come from `form.reset`. -->
+    <OForm :id="FORM_ID" :key="formKey" :form="form" class="flex flex-col gap-5">
       <OFormInput
         name="name"
         :label="t('oncall.teamName')"
-        :help-text="t('oncall.teamNameHint')"
         required
         data-test="oncall-team-form-name"
       />
-      <!-- In create mode this same field sits inline with First Handover
-           instead — a team's zone and its first handover are decided
-           together, so asking for the zone twice on one screen would be the
-           genuinely redundant thing. Edit mode has no handover row, so it
-           stays here. -->
       <OFormSelect
-        v-if="isEdit"
         name="timezone"
         :label="t('oncall.timezone')"
         :options="timezoneOptions"
-        :help-text="t('oncall.timezoneHint')"
         required
         data-test="oncall-team-form-timezone"
       />
@@ -62,6 +46,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('oncall.description')"
         data-test="oncall-team-form-description"
       />
+
+      <!-- Saved with the team, after it: the default is a routing setting, so the team's own write goes first. -->
+      <div v-if="isEdit && offerDefault" class="flex flex-col gap-1">
+        <OFormSwitch
+          name="make_default"
+          :label="t('oncall.defaultTeamTitle')"
+          :disabled="isDefault"
+          data-test="oncall-team-form-default"
+        />
+        <!-- The blocking reason, or the outcome once switched on; nothing while the switch is off. -->
+        <OText
+          v-if="isDefault || makingDefault"
+          variant="meta"
+          data-test="oncall-team-form-default-hint"
+        >
+          {{ isDefault ? t("oncall.deleteDefaultTeamBlocked") : t("oncall.defaultTeamBadgeTip") }}
+        </OText>
+      </div>
 
       <!-- The fields above are the whole of what this drawer can change. A
            reader who opened it to fix "nobody on call" needs a way out to the
@@ -73,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm-action"
         icon-right="arrow-right-alt"
         class="self-start"
+        icon-left="open-in-new"
         data-test="oncall-team-form-manage-link"
         @click="goToTeamDetail"
       >
@@ -98,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="sm-action"
+              icon-left="group-add"
               data-test="oncall-team-form-add-everyone"
               @click="addEveryone"
             >
@@ -106,53 +110,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <OFormSelect
-          name="shift_micros"
-          :label="t('oncall.shiftLength')"
-          :options="shiftOptions"
-          data-test="oncall-team-form-shift"
-        />
-
-        <!-- Without an explicit first handover the anchor is "now", so a team
-             created at 14:32 hands over at 14:32 for ever. The zone travels
-             with it on the same row — a date and time mean nothing on their
-             own, and this is the one place in create mode that asks for the
-             zone at all. -->
-        <div class="flex gap-2 max-md:flex-wrap" data-test="oncall-team-form-handover">
-          <OFormDate
-            class="min-w-0 flex-1"
-            name="first_handover_date"
-            :label="t('oncall.firstHandover')"
-            data-test="oncall-team-form-handover-date"
-          />
-          <!-- Blank label, not none: it reserves the same header row the date and timezone fields have, so all three boxes align. -->
-          <OFormTime
-            class="min-w-0 flex-1"
-            name="first_handover_time"
-            :label="raw('\u00A0')"
-            data-test="oncall-team-form-handover-time"
-          />
+        <template v-if="memberCount">
           <OFormSelect
-            class="min-w-0 flex-1 max-md:basis-full"
-            name="timezone"
-            :label="t('oncall.timezone')"
-            :options="timezoneOptions"
-            required
-            data-test="oncall-team-form-timezone"
+            name="shift_micros"
+            :label="t('oncall.shiftLength')"
+            :options="shiftOptions"
+            data-test="oncall-team-form-shift"
           />
-        </div>
 
-        <!-- The default that replaced the derived secondary. Ticked, because
+          <!-- Without an explicit first handover the anchor is "now", so a team created at 14:32 hands over at 14:32 for ever. -->
+          <div class="flex gap-2 max-md:flex-wrap" data-test="oncall-team-form-handover">
+            <OFormDate
+              class="min-w-0 flex-1"
+              name="first_handover_date"
+              :label="t('oncall.firstHandover')"
+              data-test="oncall-team-form-handover-date"
+            />
+            <!-- Blank label, not none: it reserves the header row the date field has, so the two boxes align. -->
+            <OFormTime
+              class="min-w-0 flex-1"
+              name="first_handover_time"
+              :label="raw('\u00A0')"
+              data-test="oncall-team-form-handover-time"
+            />
+          </div>
+
+          <!-- The default that replaced the derived secondary. Ticked, because
              a team with one position and no backup is the state almost nobody
              wants and nobody notices until a page goes unanswered. -->
-        <OFormCheckbox
-          name="create_secondary"
-          :label="t('oncall.teamCreateSecondary')"
-          :help-text="t('oncall.teamCreateSecondaryHint')"
-          data-test="oncall-team-form-secondary"
-        />
+          <OFormCheckbox
+            name="create_secondary"
+            :label="t('oncall.teamCreateSecondary')"
+            :help-text="t('oncall.teamCreateSecondaryHint')"
+            data-test="oncall-team-form-secondary"
+          />
 
-        <OnCallRotationPreview />
+          <OnCallRotationPreview />
+        </template>
       </template>
     </OForm>
   </ODrawer>
@@ -166,10 +160,13 @@ import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OFormTime from "@/lib/forms/Time/OFormTime.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
@@ -191,17 +188,30 @@ import {
   SECONDARY_ROTATION_NAME,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { fromZonedInputValue, resolvableTimezones, SHIFT_PRESETS } from "@/utils/oncall";
+import {
+  fromZonedInputValue,
+  offsetAnchor,
+  resolvableTimezones,
+  shiftsBackToNow,
+  SHIFT_PRESETS,
+} from "@/utils/oncall";
 import OnCallRotationPreview from "./OnCallRotationPreview.vue";
 
 import { makeOnCallTeamSchema, type OnCallTeamFormValues } from "./OnCallTeamForm.schema";
+import { serverMessageOf, statusOf } from "@/utils/slackLink";
 
 const FORM_ID = "oncall-team-form";
 
-const props = defineProps<{ open: boolean; team: OnCallTeam | null }>();
+const props = defineProps<{
+  open: boolean;
+  team: OnCallTeam | null;
+  /** Shows the Default team switch; the host sets the default when `saved` says so. */
+  offerDefault?: boolean;
+  isDefault?: boolean;
+}>();
 const emit = defineEmits<{
   "update:open": [value: boolean];
-  saved: [];
+  saved: [teamId: string, makeDefault: boolean];
 }>();
 
 const { t } = useI18nTyped();
@@ -210,7 +220,6 @@ const router = useRouter();
 const { noteConfigurationDenied } = useOnCallPermissions();
 
 const formKey = ref(0);
-const formRef = ref<{ form: any } | null>(null);
 const orgUsers = ref<{ email: string; first_name?: string; last_name?: string }[]>([]);
 const loadingUsers = ref(false);
 const isEdit = computed(() => !!props.team);
@@ -277,11 +286,28 @@ const defaultValues = computed<OnCallTeamFormValues>(() => {
     // Ticked. A team with one position and no backup is the state almost
     // nobody wants and nobody notices until a page goes unanswered.
     create_secondary: true,
+    make_default: !!props.isDefault,
   };
 });
 
+// Owned here rather than by OForm, so the rotation block and the primary button can follow the picked members.
+const form = useOForm<OnCallTeamFormValues>({
+  defaultValues: defaultValues.value,
+  schema: schema.value,
+  onSubmit,
+});
+const memberCount = form.useStore((s: any) => (s.values?.members ?? []).length as number);
+const makingDefault = form.useStore(
+  (s: { values: OnCallTeamFormValues }) => !!s.values?.make_default,
+);
+
+const primaryLabel = computed(() => {
+  if (isEdit.value) return t("oncall.save");
+  return memberCount.value ? t("oncall.createTeamAndRotation") : t("oncall.createTeam");
+});
+
 function addEveryone() {
-  formRef.value?.form?.setFieldValue(
+  form.setFieldValue(
     "members",
     userOptions.value.map((option) => option.value),
   );
@@ -307,6 +333,7 @@ watch(
   () => props.open,
   (isOpen) => {
     if (!isOpen) return;
+    form.reset(defaultValues.value);
     formKey.value += 1;
     if (!isEdit.value) void fetchOrgUsers();
   },
@@ -336,25 +363,27 @@ async function onSubmit(values: OnCallTeamFormValues) {
     description: values.description?.trim() ? values.description.trim() : null,
   };
   try {
+    let teamId = props.team?.id ?? "";
     if (props.team) {
       await updateTeamWrite.mutateAsync(data);
     } else {
       const created = await createTeamWrite.mutateAsync(data);
-      await staffNewTeam(created.data.id, values);
+      teamId = created.data.id;
+      await staffNewTeam(teamId, values);
     }
     toast({
       variant: "success",
       message: props.team ? t("oncall.teamUpdated") : t("oncall.teamCreated"),
     });
-    emit("saved");
-  } catch (err: any) {
+    emit("saved", teamId, !!props.offerDefault && !props.isDefault && !!values.make_default);
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     toast({
       variant: "error",
       message:
-        err?.response?.status === 403
+        statusOf(err) === 403
           ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.saveTeamFailed"),
+          : raw(serverMessageOf(err)) || t("oncall.saveTeamFailed"),
     });
   }
 }
@@ -369,10 +398,10 @@ async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
 
   try {
     await staffMembersWrite.mutateAsync({ teamId, userEmails: emails });
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "warning",
-      message: raw(err?.response?.data?.message) || t("oncall.teamCreatedWithoutMembers"),
+      message: raw(serverMessageOf(err)) || t("oncall.teamCreatedWithoutMembers"),
     });
     return;
   }
@@ -397,14 +426,15 @@ async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
           emails,
           shift,
           anchor,
+          values.timezone,
           values.create_secondary !== false,
         ),
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "warning",
-      message: raw(err?.response?.data?.message) || t("oncall.teamCreatedWithoutRotation"),
+      message: raw(serverMessageOf(err)) || t("oncall.teamCreatedWithoutRotation"),
     });
   }
 }
@@ -436,6 +466,7 @@ async function amendStaffedRotations(
   emails: string[],
   shift: number,
   anchorMicros: number,
+  timezone: string,
   wantSecondary: boolean,
 ): Promise<Rotation[]> {
   // The rule takes the BASE name, never the rotation's: a rotation is a
@@ -447,18 +478,21 @@ async function amendStaffedRotations(
     shift_micros: shift,
     anchor_micros: anchor,
   });
+  // Primary counts from the shift containing now, so the first member picked is on call from now; rotation `index` sits `index` shifts behind.
+  const back = shiftsBackToNow(rule(anchorMicros), Date.now() * 1000, timezone);
+  const anchorFor = (index: number) => offsetAnchor(rule(anchorMicros), back + index, timezone);
   const fallback: Rotation[] = [
     {
       id: mintRotationId(),
       name: DEFAULT_ROTATION_NAME,
-      shift_rules: [rule(anchorMicros)],
+      shift_rules: [rule(anchorFor(0))],
     },
     ...(wantSecondary
       ? [
           {
             id: mintRotationId(),
             name: SECONDARY_ROTATION_NAME,
-            shift_rules: [rule(anchorMicros - shift)],
+            shift_rules: [rule(anchorFor(1))],
           },
         ]
       : []),
@@ -479,7 +513,7 @@ async function amendStaffedRotations(
       shift_rules: (rotation.shift_rules ?? []).map((r) => ({
         ...r,
         shift_micros: shift,
-        anchor_micros: anchorMicros - index * shift,
+        anchor_micros: anchorFor(index),
       })),
       // A human has now chosen the timezone, the handover and the cadence, so
       // this is no longer the rotation nobody chose. The marker is the

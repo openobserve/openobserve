@@ -261,6 +261,41 @@ describe("dataProcessor", () => {
 
       expect(processed[0].series.map((s: any) => s.metric.job)).toEqual(["a", "b", "c", "d", "e"]);
       expect(processed[1].series.map((s: any) => s.metric.job)).toEqual(["e", "d", "c", "b"]);
+      expect(processed.map((q: any) => q.nameSuffix)).toEqual([undefined, "1 day ago"]);
+    });
+
+    it("keeps whole histograms under the series limit in histogram mode and reports the ones dropped", async () => {
+      const buckets = ["1", "2", "+Inf"];
+      // Interleaved, as Prometheus returns them, so a plain slice would cut every histogram short.
+      const result = buckets.flatMap((le) =>
+        ["a", "b", "c"].map((pod) => ({ metric: { le, pod }, values: [[1000, "1"]] })),
+      );
+      const processed = await processPromQLData(
+        [{ result }] as any,
+        {
+          ...mockPanelSchema,
+          type: "heatmap",
+          config: { promql_series_limit: 7, heatmap_mode: "prometheus_histogram" },
+        },
+        mockStore,
+      );
+
+      const kept = processed[0].series.map((s: any) => `${s.metric.pod}${s.metric.le}`);
+      expect(kept.sort()).toEqual(["a+Inf", "a1", "a2", "b+Inf", "b1", "b2"]);
+      expect(processed[0].histogramsLimited).toEqual({ shown: 2, total: 3 });
+    });
+
+    it("slices plain heatmaps by series, as before", async () => {
+      const result = ["1", "2"].flatMap((le) =>
+        ["a", "b"].map((pod) => ({ metric: { le, pod }, values: [[1000, "1"]] })),
+      );
+      const processed = await processPromQLData(
+        [{ result }] as any,
+        { ...mockPanelSchema, type: "heatmap", config: { promql_series_limit: 3 } },
+        mockStore,
+      );
+      expect(processed[0].series).toHaveLength(3);
+      expect(processed[0].histogramsLimited).toBeUndefined();
     });
 
     it("should use default series limit when not specified", async () => {
@@ -639,6 +674,34 @@ describe("dataProcessor", () => {
 
     it("should return last for unknown aggregation type", () => {
       expect(applyAggregation(values, "unknown" as any)).toBe(50);
+    });
+
+    it("skips NaN and infinite samples instead of returning NaN", () => {
+      const mixed: Array<[number, string]> = [
+        [1, "4"],
+        [2, "NaN"],
+        [3, "+Inf"],
+        [4, "-Inf"],
+        [5, "8"],
+      ];
+      expect(applyAggregation(mixed, "avg")).toBe(6);
+      expect(applyAggregation(mixed, "max")).toBe(8);
+      expect(applyAggregation(mixed, "min")).toBe(4);
+      expect(applyAggregation(mixed, "sum")).toBe(12);
+      expect(applyAggregation(mixed, "range")).toBe(4);
+      expect(applyAggregation(mixed, "diff")).toBe(4);
+      expect(applyAggregation(mixed, "first")).toBe(4);
+      expect(applyAggregation(mixed, "last")).toBe(8);
+      expect(applyAggregation(mixed, "count")).toBe(5);
+    });
+
+    it("returns NaN when no sample is finite", () => {
+      const none: Array<[number, string]> = [
+        [1, "NaN"],
+        [2, "+Inf"],
+      ];
+      expect(applyAggregation(none, "avg")).toBeNaN();
+      expect(applyAggregation(none, "max")).toBeNaN();
     });
   });
 });

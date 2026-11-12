@@ -157,7 +157,41 @@ export const BADGE_GROUPS = {
       training: { variant: "warning-soft", labelKey: "components.badge.alertStatus.training" },
       failed: { variant: "error-soft", labelKey: "components.badge.alertStatus.failed" },
       disabled: { variant: "default-soft", labelKey: "components.badge.alertStatus.disabled" },
+      // Expected data states of an anomaly config: enabled and re-evaluated, so never error colours.
+      waitingfordata: {
+        variant: "default-soft",
+        labelKey: "components.badge.alertStatus.waitingForData",
+      },
+      notapplicable: {
+        variant: "default-soft",
+        labelKey: "components.badge.alertStatus.notApplicable",
+      },
       paused: { variant: "warning-soft", labelKey: "components.badge.alertStatus.paused" },
+    },
+  },
+
+  // Public dashboard link state, derived server-side; only live is green so exceptions stand out.
+  publicLinkStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      live: { variant: "success-soft", labelKey: "components.badge.publicLinkStatus.live" },
+      paused: { variant: "default-soft", labelKey: "components.badge.publicLinkStatus.paused" },
+      notviewed: {
+        variant: "default-soft",
+        labelKey: "components.badge.publicLinkStatus.notViewed",
+      },
+      needsattention: {
+        variant: "warning-soft",
+        labelKey: "components.badge.publicLinkStatus.needsAttention",
+      },
+      expired: { variant: "default-soft", labelKey: "components.badge.publicLinkStatus.expired" },
+      dashboarddeleted: {
+        variant: "error-soft",
+        labelKey: "components.badge.publicLinkStatus.dashboardDeleted",
+      },
+      // The organization has public links turned off.
+      disabled: { variant: "default-soft", labelKey: "components.badge.publicLinkStatus.disabled" },
     },
   },
 
@@ -167,6 +201,7 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       condition: { variant: "primary-soft", icon: "tune" },
+      group: { variant: "primary-soft", icon: "bar-chart" },
       alerts: { variant: "default-soft", icon: "shield-alert-outline" },
       anomalydetections: { variant: "default-soft", icon: "query-stats" },
       synthetics: { variant: "default-soft", icon: "radar" },
@@ -190,6 +225,20 @@ export const BADGE_GROUPS = {
         variant: "default-soft",
         labelKey: "components.badge.downtimeStatus.endedEarly",
       },
+    },
+  },
+
+  licenseWaiverStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      scheduled: {
+        variant: "blue-soft",
+        labelKey: "components.badge.licenseWaiverStatus.scheduled",
+      },
+      active: { variant: "success-soft", labelKey: "components.badge.licenseWaiverStatus.active" },
+      past: { variant: "default-soft", labelKey: "components.badge.licenseWaiverStatus.past" },
+      ended: { variant: "default-soft", labelKey: "components.badge.licenseWaiverStatus.ended" },
     },
   },
 
@@ -230,6 +279,7 @@ export const BADGE_GROUPS = {
       triaged: { variant: "amber-soft", labelKey: "oncall.state_triaged" },
       acknowledged: { variant: "blue-soft", labelKey: "oncall.state_acknowledged" },
       resolved: { variant: "success-soft", labelKey: "oncall.state_resolved" },
+      exhausted: { variant: "error-soft", labelKey: "oncall.state_exhausted" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -246,8 +296,32 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       covered: { variant: "success-soft", labelKey: "oncall.coverage_covered" },
-      gap: { variant: "warning-soft", labelKey: "oncall.coverage_gap" },
-      unreachable: { variant: "error-soft", labelKey: "oncall.coverage_unreachable" },
+      gap: { variant: "error-soft", labelKey: "oncall.coverage_gap" },
+      unreachable: { variant: "warning-soft", labelKey: "oncall.coverage_cantReach" },
+      allunreachable: { variant: "error-soft", labelKey: "oncall.coverage_unreachable" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // A routing rule's traffic verdict, from `ownership/stats`; never recomputed on the client.
+  oncallRuleHealth: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      active: { variant: "success-soft", labelKey: "oncall.ruleActive" },
+      shadowed: { variant: "warning-soft", labelKey: "oncall.ruleShadowed" },
+      neverused: { variant: "default-soft", labelKey: "oncall.ruleNeverMatchedYet" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Where an unowned signal landed: the catch-all paged somebody, or nobody was paged at all.
+  oncallUnroutedOutcome: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      defaultteam: { variant: "warning-soft", labelKey: "oncall.unroutedFilterDefault" },
+      nobody: { variant: "error-soft", labelKey: "oncall.unroutedPagedNobody" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -400,8 +474,19 @@ export const BADGE_GROUPS = {
       active: { variant: "success-soft" },
       draft: { variant: "default-soft" },
       paused: { variant: "warning-soft" },
-      degraded: { variant: "orange-soft" },
       archived: { variant: "default-soft" },
+    },
+  },
+
+  // No labelKeys: EvalJobList always passes the translated `label`.
+  evalJobHealth: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      healthy: { variant: "success-soft" },
+      degraded: { variant: "orange-soft" },
+      waitingforcredentials: { variant: "error-soft" },
+      norecentruns: { variant: "default-soft" },
     },
   },
 
@@ -434,7 +519,11 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       // Current RunOutcome vocabulary.
-      firing: { variant: "success-soft", labelKey: "components.badge.pipelineRunOutcome.firing" },
+      // Derived-stream runs record a successful run as `firing`.
+      firing: {
+        variant: "success-soft",
+        labelKey: "components.badge.pipelineRunOutcome.succeeded",
+      },
       normal: { variant: "success-soft", labelKey: "components.badge.pipelineRunOutcome.normal" },
       succeeded: {
         variant: "success-soft",
@@ -479,6 +568,9 @@ export const BADGE_GROUPS = {
       offline: { variant: "error-soft", labelKey: "components.badge.serviceStatus.offline" },
       failed: { variant: "error-soft", labelKey: "components.badge.serviceStatus.failed" },
       down: { variant: "error-soft", labelKey: "components.badge.serviceStatus.down" },
+      // Synthetics infrastructure error (backend status 4): the probe could not
+      // run, which is not the same as the target failing.
+      error: { variant: "error-soft", labelKey: "components.badge.serviceStatus.error" },
       unknown: { variant: "default-soft", labelKey: "common.unknown" },
     },
   },
@@ -1393,6 +1485,14 @@ export const BADGE_GROUPS = {
       failed: { variant: "error-soft", labelKey: "components.badge.anomalyStatus.failed" },
       waiting: { variant: "default-soft", labelKey: "components.badge.anomalyStatus.waiting" },
       disabled: { variant: "default-soft", labelKey: "components.badge.anomalyStatus.disabled" },
+      waitingfordata: {
+        variant: "default-soft",
+        labelKey: "components.badge.anomalyStatus.waitingForData",
+      },
+      notapplicable: {
+        variant: "default-soft",
+        labelKey: "components.badge.anomalyStatus.notApplicable",
+      },
     },
   },
 
@@ -1556,6 +1656,19 @@ export const BADGE_GROUPS = {
         variant: "blue-soft",
         icon: "schedule",
         labelKey: "components.badge.alertState.pending",
+      },
+
+      // ── acknowledged: someone owns a firing; blue keeps it apart from firing red and muted amber ──
+      acknowledged: {
+        variant: "blue-soft",
+        icon: "person",
+        labelKey: "components.badge.alertState.acknowledged",
+      },
+      // An ack, unack or take-over recorded as its own history row, not a run.
+      ackevent: {
+        variant: "default-soft",
+        icon: "person",
+        labelKey: "components.badge.alertState.ackevent",
       },
     },
     fallback: { variant: "default-soft", icon: "help-outline" },
@@ -1767,14 +1880,11 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     class: "!bg-transparent !p-0 !ring-0",
+    // Keys are the Quality API `status` values (`no_data` normalises to `nodata`).
     values: {
+      attention: { variant: "error-soft", labelKey: "components.badge.qualityStatus.attention" },
       healthy: { variant: "success-soft", labelKey: "components.badge.qualityStatus.healthy" },
-      warn: { variant: "warning-soft", labelKey: "components.badge.qualityStatus.warn" },
-      unhealthy: { variant: "error-soft", labelKey: "components.badge.qualityStatus.unhealthy" },
-      nothreshold: {
-        variant: "default-soft",
-        labelKey: "components.badge.qualityStatus.nothreshold",
-      },
+      unset: { variant: "default-soft", labelKey: "components.badge.qualityStatus.unset" },
       nodata: { variant: "default-soft", labelKey: "components.badge.qualityStatus.nodata" },
     },
     fallback: { variant: "default-soft" },
@@ -1806,6 +1916,10 @@ export const BADGE_GROUPS = {
       action: { variant: "purple-soft", labelKey: "components.badge.rumEventType.action" },
       error: { variant: "error-soft", labelKey: "common.error" },
       resource: { variant: "teal-soft", labelKey: "components.badge.rumEventType.resource" },
+      failedrequest: {
+        variant: "error-soft",
+        labelKey: "components.badge.rumEventType.failedrequest",
+      },
       longtask: { variant: "warning-soft", labelKey: "components.badge.rumEventType.longtask" },
     },
     fallback: { variant: "default-soft" },
@@ -1925,6 +2039,78 @@ export const BADGE_GROUPS = {
       beta: { variant: "primary-soft", label: raw("BETA") },
       ha: { variant: "primary-soft", label: raw("HA") },
       comingsoon: { variant: "default-soft", labelKey: "components.badge.featureFlag.comingsoon" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Fleet Manager rollout lifecycle — dot + soft colour, attention states run hot.
+  fleetRolloutStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      scheduled: { variant: "default-soft", labelKey: "fleet.badge.scheduled" },
+      waiting: { variant: "warning-soft", labelKey: "fleet.badge.waiting" },
+      inprogress: { variant: "primary-soft", labelKey: "fleet.badge.inProgress" },
+      completed: { variant: "success-soft", labelKey: "fleet.badge.completed" },
+      halted: { variant: "error-soft", labelKey: "fleet.badge.halted" },
+      superseded: { variant: "default-soft", labelKey: "fleet.badge.superseded" },
+      rolledback: { variant: "warning-soft", labelKey: "fleet.badge.rolledBack" },
+      // A completed rollout of an empty fleet; not a status the server sends.
+      empty: { variant: "default-soft", labelKey: "fleet.rollouts.noneTargeted" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Fleet rollout batching — a category, so plain with one hue per kind.
+  fleetBatching: {
+    mode: "plain",
+    shape: "pill",
+    values: {
+      one: { variant: "default-soft", labelKey: "fleet.rollouts.oneBatch" },
+      canary: { variant: "amber-soft", labelKey: "fleet.badge.canary" },
+      progressive: { variant: "blue-soft", labelKey: "fleet.badge.progressive" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Fleet Manager config delivery — the one vocabulary for a collector's config lifecycle.
+  fleetDelivery: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      assigned: { variant: "default-soft", labelKey: "fleet.delivery.assigned" },
+      sent: { variant: "blue-soft", labelKey: "fleet.delivery.sent" },
+      accepted: { variant: "teal-soft", labelKey: "fleet.delivery.accepted" },
+      running: { variant: "success-soft", labelKey: "fleet.delivery.running" },
+      rejected: { variant: "error-soft", labelKey: "fleet.delivery.rejected" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  slackInstallStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      healthy: { variant: "success-soft", labelKey: "components.badge.slackInstallStatus.healthy" },
+      degraded: {
+        variant: "warning-soft",
+        labelKey: "components.badge.slackInstallStatus.degraded",
+      },
+      pending: { variant: "blue-soft", labelKey: "components.badge.slackInstallStatus.pending" },
+      revoked: { variant: "error-soft", labelKey: "components.badge.slackInstallStatus.revoked" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+  // Workflow run status as the history API stores it; rendered as given, never derived from `error`.
+  hookRunStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      queued: { variant: "warning-soft", labelKey: "workflow.history.statusQueued" },
+      running: { variant: "blue-soft", labelKey: "workflow.history.statusRunning" },
+      succeeded: { variant: "success-soft", labelKey: "workflow.history.success" },
+      failed: { variant: "error-soft", labelKey: "workflow.history.failed" },
+      expired: { variant: "default-soft", labelKey: "workflow.history.statusExpired" },
     },
     fallback: { variant: "default-soft" },
   },

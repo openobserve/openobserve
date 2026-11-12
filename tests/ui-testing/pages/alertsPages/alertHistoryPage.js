@@ -83,13 +83,13 @@ export class AlertHistoryPage {
 
   async expectTableHasRows() {
     // Exclude OTableLoading skeleton tbody to avoid false positives before real data loads
-    const rows = this.page.locator(`${this.table} tbody:not([data-test="o2-table-skeleton-body"]) tr`);
+    const rows = this.page.locator(`${this.table} tbody:not([data-test="o2-table-skeleton-body"]):not([data-test-stale]) tr`);
     await expect(rows.first()).toBeVisible({ timeout: 10000 });
   }
 
   async getTableRowCount() {
     // Exclude OTableLoading skeleton tbody rows
-    const rows = this.page.locator(`${this.table} tbody:not([data-test="o2-table-skeleton-body"]) tr`);
+    const rows = this.page.locator(`${this.table} tbody:not([data-test="o2-table-skeleton-body"]):not([data-test-stale]) tr`);
     return await rows.count();
   }
 

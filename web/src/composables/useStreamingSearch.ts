@@ -18,9 +18,11 @@ import { gt } from "@/types/i18n";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 import authService from "@/services/auth";
 import store from "@/stores";
-import { getUUID, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
+import { getUUID } from "@/utils/zincutils";
+import { expireSession } from "@/utils/sessionServices";
 import { attemptTokenRefresh } from "@/services/http";
 import { patchLargeNumbersInJson } from "@/utils/nsFieldsPatch";
+import { isNetworkFailure } from "@/utils/networkFailure";
 
 // Create and manage stream workers
 let streamWorker: Worker | null = null;
@@ -32,6 +34,14 @@ const createStreamWorker = () => {
   }
   return streamWorker;
 };
+
+// Status and message sit on prototypes of a Response or Error, which the error spread would drop.
+const withErrorFields = (error: unknown): unknown =>
+  error instanceof Response
+    ? { status: error.status, message: error.statusText || `HTTP ${error.status}` }
+    : error instanceof Error
+      ? { ...error, message: error.message }
+      : error;
 
 // Type definitions similar to WebSocket but for HTTP/2 streaming
 type StreamHandler = (data: any, traceId: string) => void;
@@ -422,8 +432,10 @@ const useHttpStreaming = () => {
                 // Refresh failed — logout/reload already handled inside attemptTokenRefresh
               }
             } else {
-              console.error("Error reading stream:", error);
-              onError(traceId, error);
+              // A dropped connection (offline, sleep, tab freeze) is not an app fault.
+              if (isNetworkFailure(error)) console.warn("Error reading stream:", error);
+              else console.error("Error reading stream:", error);
+              onError(traceId, withErrorFields(error));
             }
           } finally {
             // Always release the reader lock to prevent resource leaks
@@ -449,13 +461,9 @@ const useHttpStreaming = () => {
         // A refresh was already attempted in Path 1 (initial fetch 401 handler).
         // Reaching here means the refresh didn't help or json() parsing failed
         // on a 401 response — fall back to logout.
-        store.dispatch("logout");
-        useLocalCurrentUser("", true);
-        useLocalUserInfo("", true);
-        sessionStorage.clear();
-        window.location.reload();
+        expireSession(store);
       } else {
-        onError(traceId, error);
+        onError(traceId, withErrorFields(error));
       }
     }
   };

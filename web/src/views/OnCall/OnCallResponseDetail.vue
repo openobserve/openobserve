@@ -3,7 +3,9 @@
     bleed
     data-test="oncall-response-detail-page"
     :title="title"
+    title-min-width
     icon="notifications-active"
+    tabs-below
     :back="{
       label: t('oncall.backToResponses'),
       to: { name: 'onCallResponses', query: { org_identifier: orgId } },
@@ -16,69 +18,163 @@
          instead of a trailing clause, which is enough for "not the first
          time" without spelling out how many. -->
     <template v-if="response" #subtitle>
-      <i18n-t
-        keypath="oncall.responseSubtitle"
-        tag="span"
-        scope="global"
-        class="flex min-w-0 items-center gap-1 truncate"
-        data-test="oncall-response-subtitle"
-      >
-        <template #team>
-          <router-link
-            class="text-accent min-w-0 hover:underline"
-            :to="teamRoute"
-            data-test="oncall-response-team-link"
+      <span class="flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap">
+        <i18n-t
+          keypath="oncall.responseSubtitle"
+          tag="span"
+          scope="global"
+          class="flex min-w-0 items-center gap-1 truncate"
+          data-test="oncall-response-subtitle"
+        >
+          <template #team>
+            <span
+              v-if="!response.team_id"
+              class="text-status-error-text shrink-0"
+              data-test="oncall-response-team-none"
+              >{{ t("oncall.statUnrouted") }}</span
+            >
+            <OTag
+              v-else-if="teamDeleted"
+              variant="default-soft"
+              size="sm"
+              data-test="oncall-response-team-deleted"
+            >
+              {{ t("oncall.deletedTeam") }}
+            </OTag>
+            <OSkeleton
+              v-else-if="!teamName"
+              class="h-3.5 w-20"
+              data-test="oncall-response-team-pending"
+            />
+            <router-link
+              v-else
+              class="text-accent min-w-0 hover:underline"
+              :to="teamRoute"
+              data-test="oncall-response-team-link"
+            >
+              <OTruncatedText class="block">{{ raw(teamName) }}</OTruncatedText>
+            </router-link>
+          </template>
+          <template #opened>
+            <span class="shrink-0" data-test="oncall-response-opened">{{ openedAtClock }}</span>
+          </template>
+        </i18n-t>
+        <OTruncatedText
+          v-if="response.state === 'acknowledged' && response.acked_by"
+          class="shrink-[100]"
+          :tooltip="t('oncall.escalationAckedBy', { who: tooltipOf(response.acked_by) })"
+          data-test="oncall-response-acked-by"
+        >
+          {{ raw("·") }}
+          <i18n-t keypath="oncall.escalationAckedBy" tag="span" scope="global">
+            <template #who>
+              <OnCallPersonName
+                :email="response.acked_by"
+                data-test="oncall-response-acked-by-name"
+              />
+            </template>
+          </i18n-t>
+        </OTruncatedText>
+        <!-- A closed page's state tag already says it, and an acknowledged one names its holder just before. -->
+        <span
+          v-if="lgUp && isOpenState && response.state !== 'acknowledged'"
+          class="flex min-w-0 shrink-[100] items-center gap-1"
+          data-test="oncall-response-phrase"
+        >
+          <span v-if="headerPhraseKind !== 'unknown'" class="shrink-0">{{ raw("·") }}</span>
+          <!-- Words, not the list's chip: the title row keeps only state and priority. -->
+          <OTruncatedText
+            v-if="headerPhraseKind === 'nobodyAnswered'"
+            class="text-status-error-text min-w-0"
+            :tooltip="t('oncall.ladderExhausted')"
+            data-test="oncall-response-phrase-exhausted"
           >
-            <OTruncatedText class="block">{{ raw(teamName) }}</OTruncatedText>
-          </router-link>
-        </template>
-        <template #firing>
-          <span class="shrink-0" data-test="oncall-response-firing">
-            #{{ response.subject.firing }}
-            <OTooltip v-if="historyLabel">
-              <template #content>{{ historyLabel }}</template>
-            </OTooltip>
-          </span>
-        </template>
-        <template #opened>
-          <span class="shrink-0" data-test="oncall-response-opened">{{ openedAtClock }}</span>
-        </template>
-      </i18n-t>
-    </template>
-
-    <!-- The two facts a responder needs before anything else ride the title,
-         rather than sitting in a metadata grid below the fold. -->
-    <template #title-trail>
-      <!-- Below lg the title row has room for the alert's name or its tags, not both; there the tags lead the body instead. -->
-      <template v-if="response && lgUp">
-        <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-        <OTag type="oncallResponseState" :value="response.state" size="sm" />
-        <!-- How long it has been ringing, beside the word "ringing". The two
-             were a stat tile apart, and the one people read first is the
-             one that says how bad this already is. -->
-        <span class="text-text-secondary text-xs" data-test="oncall-response-elapsed">
-          {{ elapsedLabel }}
+            {{ t("oncall.state_exhausted") }}
+          </OTruncatedText>
+          <OnCallEscalationCell
+            v-else
+            class="min-w-0"
+            :response-id="response.id"
+            :record="response"
+            :progress="escalation"
+            :total-rungs="totalRungs"
+            :progress-loaded="escalationLoaded"
+            :reached-step="headerReachedStep"
+            :team-deleted="teamDeleted"
+          />
         </span>
-        <OTag v-if="snoozedUntilLabel" variant="warning-soft" size="sm">
-          {{ t("oncall.snoozed") }}
-        </OTag>
-        <!-- Why this team is looking at somebody else's outage, said where the
-             state is said rather than halfway down the page. -->
-        <OTag
-          v-if="isImpacted"
-          variant="info-outline"
-          size="sm"
+        <!-- Why this team is looking at somebody else's outage, said with the page's other facts. -->
+        <span
+          v-if="lgUp && isImpacted"
+          class="text-status-info-text inline-flex shrink-[100] items-center gap-1 truncate"
           data-test="oncall-response-liaison-tag"
         >
-          {{ t("oncall.liaisonTag") }}
-        </OTag>
-        <OTooltip v-if="isImpacted" side="bottom" :content="t('oncall.ladderLiaisonNote')" />
+          {{ raw("·") }} {{ t("oncall.liaisonTag") }}
+          <OTooltip side="bottom" :content="t('oncall.ladderLiaisonNote')" />
+        </span>
+      </span>
+    </template>
+
+    <template #title-trail>
+      <template v-if="response && lgUp">
+        <!-- The title ellipsises first; clipping here means the chips can never paint under the actions. -->
+        <span
+          class="flex min-w-0 shrink-[0.01] items-center gap-3.25 overflow-hidden"
+          data-test="oncall-response-title-trail"
+        >
+          <span class="inline-flex shrink-0" data-test="oncall-response-state-tag">
+            <OTag type="oncallResponseState" :value="response.state" size="sm" />
+            <OTooltip v-if="closedAfter" :content="closedAfter" />
+          </span>
+          <OTag class="shrink-0" type="alertPriority" :value="`p${response.priority}`" size="sm" />
+        </span>
       </template>
+    </template>
+
+    <template v-if="response" #header-tabs>
+      <OTabs
+        v-model="activeDetailTab"
+        align="left"
+        class="flex-1"
+        mobile-arrows
+        :breakpoint="0"
+        data-test="oncall-response-tabs-strip"
+      >
+        <OTab
+          name="activity"
+          icon="forum"
+          :label="t('oncall.tabActivity')"
+          data-test="oncall-response-tab-activity"
+        />
+        <OTab
+          name="deliveries"
+          icon="send"
+          :label="t('oncall.deliveriesTitle')"
+          data-test="oncall-response-tab-deliveries"
+        />
+        <OTab
+          name="causes"
+          icon="history"
+          :label="t('oncall.tabPriorCauses')"
+          data-test="oncall-response-tab-causes"
+        />
+        <!-- Absent on a deployment with no agent, rather than a tab that opens on nothing. -->
+        <OTab
+          v-if="report"
+          name="report"
+          icon="psychology"
+          :label="t('oncall.tabReport')"
+          data-test="oncall-response-tab-report"
+        />
+      </OTabs>
     </template>
 
     <template #actions>
       <ORefreshButton
         v-if="response"
+        layout="inline"
+        size="header"
+        variant="outline"
         :last-run-at="lastFetchedAt"
         :loading="refreshing"
         data-test="oncall-response-refresh"
@@ -90,29 +186,72 @@
         <OButton
           v-if="canAcknowledge"
           variant="primary"
-          size="sm-action"
+          size="sm"
           :loading="acking"
           data-test="oncall-response-ack-btn"
           @click="acknowledgeRecord"
         >
-          {{ t("oncall.acknowledge") }}
+          <OTooltip :content="ackWords.ackHint" />
+          <OIcon name="check-circle" size="sm" />{{ t("oncall.acknowledge") }}
         </OButton>
+        <template v-if="response.state === 'acknowledged'">
+          <OButton
+            v-if="response.acked_by !== me"
+            variant="outline"
+            size="sm"
+            :loading="acking"
+            data-test="oncall-response-take-over-btn"
+            @click="takeOverRecord"
+          >
+            <OTooltip :content="t('oncall.takeOverHint')" />
+            <OIcon name="how-to-reg" size="sm" />{{ t("oncall.takeOver") }}
+          </OButton>
+          <OButton
+            variant="outline"
+            size="sm"
+            :loading="acking"
+            :disabled="!!unackBlockedReason"
+            :focusable-unavailable="!!unackBlockedReason"
+            data-test="oncall-response-unack-btn"
+            @click="unacknowledgeRecord"
+          >
+            <!-- First child, so it anchors to the whole button: a disabled one must say why on hover. -->
+            <OTooltip :content="unackBlockedReason ?? ackWords.unackHint" />
+            <OIcon name="undo" size="sm" />{{ t("oncall.unacknowledge") }}
+            <template v-if="unackBlockedReason" #unavailable-reason>{{
+              unackBlockedReason
+            }}</template>
+          </OButton>
+        </template>
 
         <!-- A menu of durations, not a panel that pushes the page down. -->
-        <ODropdown v-if="canAcknowledge && lgUp">
+        <OButton
+          v-if="canUnsnooze && inlineVerbs"
+          variant="outline"
+          size="sm"
+          :loading="snoozing"
+          data-test="oncall-response-unsnooze-btn"
+          @click="unsnoozeRecord"
+        >
+          <OTooltip :content="t('oncall.unsnoozeHint')" />
+          <OIcon name="notifications-active" size="sm" />{{ t("oncall.unsnooze") }}
+        </OButton>
+        <ODropdown v-else-if="canSnooze && inlineVerbs">
           <template #trigger>
             <OButton
               variant="outline"
-              size="sm-action"
+              size="sm"
               :loading="snoozing"
+              icon-right="expand-more"
               data-test="oncall-response-snooze-btn"
             >
-              {{ t("oncall.snooze") }}
+              <OIcon name="alarm" size="sm" />{{ t("oncall.snooze") }}
             </OButton>
           </template>
           <ODropdownItem
             v-for="opt in snoozeOptions"
             :key="opt.minutes"
+            icon-left="alarm"
             :data-test="`oncall-response-snooze-${opt.minutes}`"
             @select="snoozeRecord(opt.minutes)"
           >
@@ -120,33 +259,33 @@
           </ODropdownItem>
         </ODropdown>
 
-        <!-- Escalate keeps this yours; hand off makes it theirs. Both verbs
-             have existed server-side since the ladder did, and only one of
-             them had a button. A disabled button that does not say why is a
-             dead end — the ladder's own explanation for why there is nobody
-             left to escalate to belongs right where the button went grey. -->
-        <span v-if="lgUp" class="inline-flex">
+        <!-- Not on an unrouted page: the server refuses it there, and Hand off is the next step. -->
+        <span v-if="inlineVerbs && canEscalate" class="inline-flex">
           <OButton
             variant="outline"
-            size="sm-action"
+            size="sm"
             :loading="escalatingNow"
             :disabled="escalation?.exhausted"
+            :focusable-unavailable="escalation?.exhausted"
             data-test="oncall-response-escalate-btn"
             @click="escalateNow"
           >
-            {{ t("oncall.escalate") }}
+            <OIcon name="trending-up" size="sm" />{{ t("oncall.escalate") }}
+            <template v-if="escalation?.exhausted" #unavailable-reason>{{
+              t("oncall.ladderExhausted")
+            }}</template>
           </OButton>
           <OTooltip v-if="escalation?.exhausted" :content="t('oncall.ladderExhausted')" />
         </span>
 
         <OButton
-          v-if="lgUp"
+          v-if="inlineVerbs"
           variant="outline"
-          size="sm-action"
+          size="sm"
           data-test="oncall-response-handoff-btn"
           @click="showHandoff = true"
         >
-          {{ t("oncall.handoff") }}
+          <OIcon name="swap-horiz" size="sm" />{{ t("oncall.handoff") }}
         </OButton>
       </template>
 
@@ -157,13 +296,13 @@
            something larger routinely arrives after it was closed. Hidden once
            an incident exists, because the rail links to it from then on. -->
       <OButton
-        v-if="response && !response.incident_id && lgUp"
+        v-if="response && !response.incident_id && inlineVerbs"
         variant="outline"
-        size="sm-action"
+        size="sm"
         data-test="oncall-response-promote-btn"
         @click="promoteOpen = true"
       >
-        {{ t("oncall.promote") }}
+        <OIcon name="local-fire-department" size="sm" />{{ t("oncall.promote") }}
       </OButton>
 
       <template v-if="response && isOpenState">
@@ -174,64 +313,69 @@
         <OButton
           v-if="isImpacted"
           :variant="canAcknowledge ? 'outline' : 'primary'"
-          size="sm-action"
+          size="sm"
           :loading="confirmingRecovery"
           data-test="oncall-response-confirm-recovery-btn"
           @click="confirmRecoveryOpen = true"
         >
-          {{ t("oncall.confirmRecovery") }}
+          <OIcon name="task-alt" size="sm" />{{ t("oncall.confirmRecovery") }}
         </OButton>
         <OButton
           v-else
           :variant="canAcknowledge ? 'outline' : 'primary'"
-          size="sm-action"
+          size="sm"
           :loading="resolving"
           data-test="oncall-response-resolve-btn"
           @click="confirmResolve = true"
         >
-          {{ t("oncall.resolve") }}
+          <OIcon name="task-alt" size="sm" />{{ t("oncall.resolve") }}
         </OButton>
       </template>
 
-      <!-- Below lg the row holds claiming and closing; the verbs used less often share one menu so the header stays two rows. -->
-      <ODropdown v-if="response && !lgUp && hasMoreActions" side="bottom" align="end">
+      <ODropdown v-if="response && !inlineVerbs && hasMoreActions" side="bottom" align="end">
         <template #trigger>
           <OButton
             variant="outline"
-            size="icon-toolbar"
+            size="icon-md"
             icon-left="more-vert"
             :loading="snoozing || escalatingNow"
             :aria-label="t('oncall.moreActions')"
             data-test="oncall-response-more-btn"
           />
         </template>
-        <ODropdownGroup v-if="canAcknowledge" :label="t('oncall.snoozeFor')">
+        <ODropdownItem
+          v-if="canUnsnooze"
+          icon-left="notifications-active"
+          data-test="oncall-response-unsnooze-btn-menu"
+          @select="unsnoozeRecord"
+        >
+          {{ t("oncall.unsnooze") }}
+        </ODropdownItem>
+        <ODropdownGroup v-else-if="canSnooze" :label="t('oncall.snoozeFor')">
           <ODropdownItem
             v-for="opt in snoozeOptions"
             :key="opt.minutes"
+            icon-left="alarm"
             :data-test="`oncall-response-snooze-${opt.minutes}-menu`"
             @select="snoozeRecord(opt.minutes)"
           >
             {{ raw(opt.label) }}
           </ODropdownItem>
         </ODropdownGroup>
-        <ODropdownSeparator v-if="canAcknowledge" />
+        <ODropdownSeparator v-if="canSnooze" />
         <ODropdownItem
-          v-if="isOpenState"
+          v-if="isOpenState && canEscalate"
+          icon-left="trending-up"
           :disabled="escalation?.exhausted"
           data-test="oncall-response-escalate-btn-menu"
           @select="escalateNow"
         >
-          <span class="flex max-w-56 flex-col">
-            <span>{{ t("oncall.escalate") }}</span>
-            <!-- Touch has no tooltip, so the reason the verb is greyed out rides on the item itself. -->
-            <span v-if="escalation?.exhausted" class="text-xs whitespace-normal">
-              {{ t("oncall.ladderExhausted") }}
-            </span>
-          </span>
+          <!-- Touch has no tooltip, so a greyed-out verb says why in its own one line. -->
+          {{ escalation?.exhausted ? t("oncall.escalateNobodyLeft") : t("oncall.escalate") }}
         </ODropdownItem>
         <ODropdownItem
           v-if="isOpenState"
+          icon-left="swap-horiz"
           data-test="oncall-response-handoff-btn-menu"
           @select="showHandoff = true"
         >
@@ -239,6 +383,7 @@
         </ODropdownItem>
         <ODropdownItem
           v-if="!response.incident_id"
+          icon-left="local-fire-department"
           data-test="oncall-response-promote-btn-menu"
           @select="promoteOpen = true"
         >
@@ -248,24 +393,33 @@
     </template>
 
     <template v-if="response">
-      <!-- OPageLayout keeps the body a fixed column (`scroll` off) so a table
-           can own its own scroller. This page is a document, so the body is
-           the scroller — without it the activity thread was clipped at the
-           fold with no way to reach the rest. -->
+      <!-- This page is a document, so the body is the scroller; the note box sticks to its foot. -->
       <OContent y class="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div
           v-if="!lgUp"
           class="mb-3 flex flex-wrap items-center gap-2"
           data-test="oncall-response-meta"
         >
-          <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-          <OTag type="oncallResponseState" :value="response.state" size="sm" />
-          <span class="text-text-secondary text-xs" data-test="oncall-response-elapsed">
-            {{ elapsedLabel }}
+          <span class="inline-flex" data-test="oncall-response-state-tag">
+            <OTag type="oncallResponseState" :value="response.state" size="sm" />
+            <OTooltip v-if="closedAfter" :content="closedAfter" />
           </span>
-          <OTag v-if="snoozedUntilLabel" variant="warning-soft" size="sm">
-            {{ t("oncall.snoozed") }}
-          </OTag>
+          <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
+          <span
+            v-if="isOpenState"
+            class="flex min-w-32 shrink-[1000] truncate"
+            data-test="oncall-response-phrase"
+          >
+            <OnCallEscalationCell
+              :response-id="response.id"
+              :record="response"
+              :progress="escalation"
+              :total-rungs="totalRungs"
+              :progress-loaded="escalationLoaded"
+              :reached-step="headerReachedStep"
+              :team-deleted="teamDeleted"
+            />
+          </span>
           <OTag
             v-if="isImpacted"
             variant="info-outline"
@@ -285,9 +439,20 @@
           :progress="escalation"
           :smtp-configured="smtpConfigured"
           :escalating="escalatingNow"
+          :no-team="!response.team_id || teamDeleted"
+          :escalatable="canEscalate"
           @escalate="escalateNow"
           @open-reachability="openReachability"
         />
+
+        <OBanner
+          v-if="exhaustedAtClock"
+          variant="error"
+          class="mb-3"
+          data-test="oncall-response-exhausted-banner"
+        >
+          {{ t("oncall.exhaustedBanner", { time: exhaustedAtClock }) }}
+        </OBanner>
 
         <!-- Snoozing does not assign the page, and the banner has to keep
              saying so — a quiet page that looks owned is how one gets dropped. -->
@@ -298,6 +463,17 @@
           data-test="oncall-response-snoozed-banner"
         >
           {{ t("oncall.snoozedUntil", { time: snoozedUntilLabel }) }}
+          <template v-if="canUnsnooze" #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              :loading="snoozing"
+              data-test="oncall-response-snoozed-banner-unsnooze"
+              @click="unsnoozeRecord"
+            >
+              <OIcon name="notifications-active" size="sm" />{{ t("oncall.unsnooze") }}
+            </OButton>
+          </template>
         </OBanner>
 
         <!-- D-21. This record exists because somebody else's failure reaches
@@ -325,16 +501,35 @@
           </router-link>
         </OBanner>
 
-        <!-- The four facts a responder reads first, read once rather than
-             assembled from the title tags and a description list further
-             down the page. -->
-        <OStatStrip :items="topStats" class="mb-4" data-test="oncall-response-stats" />
+        <!-- Acknowledge would take the page; Page now wakes rung 1 without waiting for triage. -->
+        <OBanner
+          v-if="holdSecondsLeft > 0"
+          variant="info"
+          class="mb-3"
+          data-test="oncall-response-hold-banner"
+        >
+          {{ t("oncall.holdBanner", { n: holdSecondsLeft }) }}
+          <template #actions>
+            <OButton
+              v-if="canEscalate"
+              variant="outline"
+              size="sm"
+              :loading="escalatingNow"
+              data-test="oncall-response-hold-page-now"
+              @click="escalateNow"
+            >
+              {{ t("oncall.pageNow") }}
+            </OButton>
+          </template>
+        </OBanner>
 
-        <!-- Two columns rather than three tabs. Everything a responder needs
-             to decide is on one screen: the tabs cost a click each for facts
-             that were never optional, and the rail's answers — who this is
-             reaching, what fires next, why this team — are the ones people
-             opened the tabs to find. -->
+        <OStatStrip
+          v-if="topStats.length"
+          :items="topStats"
+          class="mb-4"
+          data-test="oncall-response-stats"
+        />
+
         <div class="grid flex-1 grid-cols-1 gap-4 lg:grid-cols-3">
           <div class="flex flex-col gap-4 lg:col-span-2">
             <!-- Renders nothing until a verdict event exists (§G.7) — the
@@ -342,94 +537,91 @@
                  analysis panel that sits empty forever. -->
             <OnCallVerdictCard :events="events" />
 
-            <!-- Activity, deliveries and prior causes used to be a card and two
-                 collapsibles stacked on top of each other — only the first was
-                 visible without a click, and the other two hid behind their
-                 own expand toggle with no hint of what was inside. Tabs put
-                 all three labels on screen at once, so which one has the
-                 answer is a glance, not three clicks to find out. -->
-            <OCard variant="glass" class="flex-1" data-test="oncall-response-tabs">
-              <OCardSection role="header" dense class="flex-wrap items-center gap-2">
-                <OTabs v-model="activeDetailTab" dense data-test="oncall-response-tabs-strip">
-                  <OTab
-                    name="activity"
-                    :label="t('oncall.tabActivity')"
-                    data-test="oncall-response-tab-activity"
-                  />
-                  <OTab
-                    name="deliveries"
-                    :label="t('oncall.deliveriesTitle')"
-                    data-test="oncall-response-tab-deliveries"
-                  />
-                  <OTab
-                    name="causes"
-                    :label="t('oncall.tabPriorCauses')"
-                    data-test="oncall-response-tab-causes"
-                  />
-                  <!-- Absent on a deployment with no agent, rather than a tab
-                       that opens on nothing. -->
-                  <OTab
-                    v-if="report"
-                    name="report"
-                    :label="t('oncall.tabReport')"
-                    data-test="oncall-response-tab-report"
-                  />
-                </OTabs>
-                <OButton
-                  v-if="activeDetailTab === 'activity'"
-                  variant="ghost-primary"
-                  size="sm"
-                  class="ms-auto"
-                  data-test="oncall-response-activity-toggle-all"
-                  @click="showAllActivity = !showAllActivity"
+            <!-- Not clipped, or the note box could not stick to the scrolling body's foot. -->
+            <OCard
+              variant="glass"
+              class="overflow-visible lg:flex-1"
+              data-test="oncall-response-tabs"
+            >
+              <OCardSection role="body" dense class="lg:flex lg:flex-col">
+                <!-- Unclipped, or it becomes the note box's sticky container instead of the page. -->
+                <OTabPanels
+                  v-model="activeDetailTab"
+                  class="overflow-visible! lg:flex lg:flex-1 lg:flex-col"
                 >
-                  {{
-                    showAllActivity
-                      ? t("oncall.activityHideSystem")
-                      : t("oncall.activityShowSystemCount", { count: systemActivityCount })
-                  }}
-                </OButton>
-              </OCardSection>
-
-              <OCardSection role="body" dense>
-                <OTabPanels v-model="activeDetailTab">
-                  <OTabPanel name="activity" data-test="oncall-response-activity">
-                    <OnCallActivityTimeline
-                      :events="events"
-                      v-model:comment-text="noteBody"
-                      v-model:show-all="showAllActivity"
-                      :submitting="addingNote"
-                      @submit="addNote"
-                    />
+                  <OTabPanel name="activity" content-class="lg:flex lg:flex-1 lg:flex-col">
+                    <div data-test="oncall-response-activity" class="lg:flex lg:flex-1 lg:flex-col">
+                      <div v-if="systemActivityCount" class="flex justify-end pt-2">
+                        <OButton
+                          variant="ghost"
+                          size="sm"
+                          :icon-left="showAllActivity ? 'visibility-off' : 'visibility'"
+                          data-test="oncall-response-activity-toggle-all"
+                          @click="showAllActivity = !showAllActivity"
+                        >
+                          {{
+                            showAllActivity
+                              ? t("oncall.activityHideSystem")
+                              : t("oncall.activityShowSystemCount", { count: systemActivityCount })
+                          }}
+                        </OButton>
+                      </div>
+                      <!-- Held until the policy answers, so "(step 1)" is on each line from the first paint. -->
+                      <div
+                        v-if="!timelineReady"
+                        class="flex flex-col gap-4 py-3"
+                        data-test="oncall-response-activity-pending"
+                      >
+                        <OSkeleton v-for="n in 4" :key="n" class="h-4 w-3/4" />
+                      </div>
+                      <OnCallActivityTimeline
+                        v-else
+                        :events="events"
+                        v-model:comment-text="noteBody"
+                        v-model:show-all="showAllActivity"
+                        :submitting="addingNote"
+                        :opened-at="response.opened_at"
+                        :step-of="stepOfRung"
+                        :team-name-of="teamNameOf"
+                        pin-composer
+                        @submit="addNote"
+                      />
+                    </div>
                   </OTabPanel>
 
                   <!-- The receipt behind the ladder's claims. -->
-                  <OTabPanel name="deliveries" data-test="oncall-response-deliveries">
-                    <OnCallDeliveryLedger
-                      :records="deliveries"
-                      :total="deliveriesTotal"
-                      :loading="deliveriesLoading"
-                    />
+                  <OTabPanel name="deliveries">
+                    <div data-test="oncall-response-deliveries">
+                      <OnCallDeliveryLedger
+                        :records="deliveries"
+                        :total="deliveriesTotal"
+                        :loading="deliveriesLoading"
+                      />
+                    </div>
                   </OTabPanel>
 
                   <!-- The history behind the rail's one-line summary. -->
-                  <OTabPanel name="causes" data-test="oncall-response-causes">
-                    <OnCallPriorCauses
-                      :groups="priorCauses"
-                      :loading="priorCausesLoading"
-                      @open="openResponse"
-                    />
-                    <OnCallFiringHistory
-                      class="mt-4"
-                      :firings="firingHistory"
-                      :loading="priorCausesLoading"
-                      @open="openResponse"
-                    />
+                  <OTabPanel name="causes">
+                    <div class="flex flex-col gap-4 py-3" data-test="oncall-response-causes">
+                      <OnCallPriorCauses
+                        :groups="priorCauses"
+                        :loading="priorCausesLoading"
+                        @open="openResponse"
+                      />
+                      <OSeparator />
+                      <OnCallFiringHistory
+                        :firings="firingHistory"
+                        :loading="priorCausesLoading"
+                        @open="openResponse"
+                      />
+                    </div>
                   </OTabPanel>
 
                   <!-- The working behind the verdict card's one sentence. -->
-                  <OTabPanel name="report" data-test="oncall-response-report">
-                    <OnCallReportCard :report="report" :loading="reportLoading" />
+                  <OTabPanel name="report">
+                    <div class="py-3" data-test="oncall-response-report">
+                      <OnCallReportCard :report="report" :loading="reportLoading" />
+                    </div>
                   </OTabPanel>
                 </OTabPanels>
               </OCardSection>
@@ -437,7 +629,9 @@
           </div>
 
           <div class="flex flex-col gap-4">
+            <!-- An unrouted page has no rotation to read, so there is no one to list. -->
             <OnCallWhoIsOn
+              v-if="response.team_id"
               :positions="onCallPositions"
               :deliveries="deliveries"
               :handover-at="handoverAt"
@@ -445,6 +639,7 @@
               :closed-at="response.closed_at"
               :acked-by="response.acked_by"
               :loading="onCallPositionsLoading"
+              :team-deleted="teamDeleted"
             />
 
             <OnCallWhatFired
@@ -456,11 +651,14 @@
               :org-id="orgId"
               :team-id="response.team_id"
               :team-name="teamName"
+              :team-deleted="teamDeleted"
               :subject-type="response.subject.subject_type"
               :source-id="response.subject.source_id"
               :routing-reason="routingReason"
               :subject-stream="subjectStream"
               :incident-id="response.incident_id"
+              :incident-title="incidentTitle"
+              :incident-loading="incidentLoading"
               :cause="response.cause"
               :cause-note="response.cause_note"
             />
@@ -469,9 +667,38 @@
       </OContent>
     </template>
 
+    <!-- Ahead of the skeleton: the reads run together, so a slow one must not hold the lock back. -->
+    <LicenseDeniedState
+      v-else-if="licenseDenied"
+      :features="licenseDenied"
+      data-test="oncall-response-detail-license-denied"
+    />
+
     <OnCallResponseDetailSkeleton v-else-if="loading" />
 
-    <OEmptyState v-else size="hero" preset="no-data" data-test="oncall-response-detail-empty" />
+    <OContent v-else-if="loadError !== null" y>
+      <OEmptyState
+        size="hero"
+        variant="error"
+        illustration="broken-panel"
+        :title="t('oncall.loadResponseFailed')"
+        :description="raw(loadError)"
+        :action-label="t('oncall.retry')"
+        data-test="oncall-response-detail-error"
+        @action="refreshPage"
+      />
+    </OContent>
+
+    <!-- Reads return 404 for a deleted page, and "nothing here yet" would suggest it is still coming. -->
+    <OContent v-else y>
+      <OEmptyState
+        size="hero"
+        :title="t('oncall.responseNotFoundTitle')"
+        :action-label="t('oncall.openPagesList')"
+        data-test="oncall-response-detail-not-found"
+        @action="openPagesList"
+      />
+    </OContent>
 
     <!-- Handing a page to another team clears the ack and re-arms the ladder,
          so it gets room to say so rather than a menu. -->
@@ -627,11 +854,7 @@
       data-test="oncall-resolve-dialog"
     >
       <div class="flex flex-col gap-3">
-        <p class="text-text-secondary text-sm">{{ t("oncall.resolveMessage") }}</p>
-
-        <!-- Asked HERE and nowhere else. A cause collected later is a cause
-             never collected, and it is the only input the prior-causes panel
-             has. -->
+        <!-- Asked here and nowhere else: a cause collected later is never collected. -->
         <OnCallResolveCauseForm
           v-model:cause="resolveCause"
           v-model:note="resolveNote"
@@ -660,22 +883,28 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import OnCallAboutPage from "@/components/oncall/OnCallAboutPage.vue";
 import OnCallDeliveryLedger from "@/components/oncall/OnCallDeliveryLedger.vue";
+import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OnCallReachAlarm from "@/components/oncall/OnCallReachAlarm.vue";
 import OnCallWhatFired from "@/components/oncall/OnCallWhatFired.vue";
 import OnCallWhoIsOn from "@/components/oncall/OnCallWhoIsOn.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -691,6 +920,7 @@ import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { notAckedToast, pageAckWords, unchangedAckToast } from "@/utils/alerts/ackState";
 import OnCallFiringHistory from "@/components/oncall/OnCallFiringHistory.vue";
 import OnCallPriorCauses from "@/components/oncall/OnCallPriorCauses.vue";
 import OnCallReportCard from "@/components/oncall/OnCallReportCard.vue";
@@ -709,10 +939,14 @@ import analytics from "@/services/product_analytics";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import alertsService from "@/services/alerts";
+import { alertKeys } from "@/services/alerts.querykeys";
 import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
+import { readQuery } from "@/composables/query/readQuery";
 import {
   acknowledgeResponseMutation,
+  takeOverResponseMutation,
+  unacknowledgeResponseMutation,
   addResponseNoteMutation,
   confirmRecoveryMutation,
   escalateNowMutation,
@@ -729,14 +963,16 @@ import {
   responseQuery,
   responseReportQuery,
   snoozeResponseMutation,
+  unsnoozeResponseMutation,
   teamMembersQuery,
   teamPolicyQuery,
   teamReachabilityQuery,
   whoIsOnCallQuery,
 } from "@/services/oncall.queries";
 import { oncallKeys } from "@/services/oncall.querykeys";
+import { incidentQuery } from "@/services/incidents.queries";
+
 import type {
-  DeliveryLedger,
   DeliveryRecord,
   CauseGroup,
   EscalateResult,
@@ -746,30 +982,52 @@ import type {
   OnCallResponseEvent,
   OnCallResponseReport,
   OnCallPosition,
-  OnCallTeam,
-  OnCallTeamMember,
   PromoteSeverity,
   ResolutionCause,
-  ResolvedSegment,
-  TeamReachability,
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import { useOnCallClock } from "@/composables/useOnCallClock";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import {
+  apiErrorMessage,
+  apiErrorStatus,
+  apiErrorText,
   DEFAULT_ACTIVITY_KINDS,
+  formatOnCallInstant,
+  isDeletedTeam,
   isEscalating,
   isSnoozed,
   isUnresolved,
+  pagePhrase,
+  pageState,
   promoteSeverityFloor,
   promoteSeverityOptions,
+  reachedStepOf,
   routingReasonOf,
 } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 import { formatTimestampInTimezone } from "@/utils/date";
 
+const HOLD_RECHECK_MS = 10_000;
+/// Re-reads of a lapsed rung before giving up: a minute at HOLD_RECHECK_MS.
+const LAPSE_RECHECKS = 6;
+// Every verb inline takes about 56rem, which below this leaves the title a few letters wide.
+const INLINE_VERBS_QUERY = "(min-width: 96rem)";
+
 const { t } = useI18nTyped();
+const { tooltipOf } = useOrgUserNames();
 const { lgUp } = useBreakpoint();
+const inlineVerbsMql =
+  typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia(INLINE_VERBS_QUERY)
+    : null;
+const wideHeader = ref(inlineVerbsMql?.matches ?? true);
+const onWideHeader = (e: MediaQueryListEvent) => (wideHeader.value = e.matches);
+inlineVerbsMql?.addEventListener?.("change", onWideHeader);
+onBeforeUnmount(() => inlineVerbsMql?.removeEventListener?.("change", onWideHeader));
+const inlineVerbs = computed(() => lgUp.value && wideHeader.value);
 const nowMicros = useOnCallClock();
 const store = useStore();
 const route = useRoute();
@@ -781,7 +1039,13 @@ const systemActivityCount = computed(
   () => events.value.filter((e) => !DEFAULT_ACTIVITY_KINDS.includes(e.kind)).length,
 );
 const teamName = ref("");
+/// Ids of the teams that exist, `null` until the list has answered.
+const knownTeamIds = ref<string[] | null>(null);
+const teamDeleted = computed(() => isDeletedTeam(response.value?.team_id, knownTeamIds.value));
 const loading = ref(false);
+/// Set only when a load fails with nothing on screen; a 404 leaves it null and reads as not found.
+const loadError = ref<string | null>(null);
+const licenseDenied = ref<string[] | null>(null);
 const resolving = ref(false);
 const confirmRecoveryOpen = ref(false);
 const confirmingRecovery = ref(false);
@@ -808,10 +1072,10 @@ async function confirmRecovery() {
     recoveryNote.value = "";
     toast({ variant: "success", message: t("oncall.recoveryConfirmed") });
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.confirmRecoveryFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.confirmRecoveryFailed"),
     });
   } finally {
     confirmingRecovery.value = false;
@@ -834,15 +1098,11 @@ const severityOptions = computed(() =>
 /// The record's own severity is the default: the wire derives exactly this
 /// when no severity is sent, so the picker opens on the answer rather than on
 /// an empty box somebody has to fill in mid-incident.
-watch(
-  [response, promoteOpen],
-  () => {
-    if (!promoteOpen.value || !response.value) return;
-    promoteTitle.value = response.value.title || "";
-    promoteSeverity.value = promoteSeverityFloor(response.value.priority);
-  },
-  { immediate: true },
-);
+watch(promoteOpen, (open) => {
+  if (!open || !response.value) return;
+  promoteTitle.value = response.value.title || "";
+  promoteSeverity.value = promoteSeverityFloor(response.value.priority);
+});
 
 /// Makes an incident out of a page that turned out to be one. The refusal path
 /// matters as much as the success one: a 409 means somebody else promoted this
@@ -864,14 +1124,14 @@ async function promoteRecord() {
       message: t("oncall.promoted", { incident: res.data.incident_id }),
     });
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     promoteOpen.value = false;
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.promoteFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.promoteFailed"),
     });
     // A refused write expires nothing, so only a forced read shows whose incident won.
-    if (err?.response?.status === 409) await fetchResponse(true);
+    if (apiErrorStatus(err) === 409) await fetchResponse(true);
   } finally {
     promoting.value = false;
   }
@@ -885,11 +1145,9 @@ const confirmResolve = ref(false);
 const showHandoff = ref(false);
 const escalatingNow = ref(false);
 
-// Local rather than imported from the SLO composable that also defines it:
-// on-call has no business depending on that module for an em dash.
-const ABSENT = raw("—");
 const noteBody = ref("");
-const showAllActivity = ref(true);
+/// Engine bookkeeping stays folded until asked for; the default feed is what people and the ladder did.
+const showAllActivity = ref(false);
 /// Activity, deliveries and prior causes as tabs of one card rather than a
 /// card plus two collapsibles — the toggle-all button in the header only
 /// makes sense while activity is the one showing.
@@ -901,19 +1159,25 @@ const firingHistory = ref<OnCallResponse[]>([]);
 const priorCausesLoading = ref(false);
 const report = ref<OnCallResponseReport | null>(null);
 const reportLoading = ref(false);
-/// Only the fields the page shows — the stream, and the condition that
-/// tripped it; the rest of the payload belongs on the alert's own screen,
-/// which the subject row links to. `query_condition`/`condition` is `any`
-/// because `alertConditionText` (shared with the alert's own config summary)
-/// already treats it that way — the same rule read by two screens.
+/// Only the fields the page shows; the condition shapes stay opaque because only `alertConditionText` reads them.
 const subjectAlert = ref<{
   name?: string;
   stream_name?: string;
   stream_type?: string;
-  query_condition?: any;
-  condition?: any;
+  query_condition?: unknown;
+  condition?: unknown;
+  trigger_condition?: unknown;
 } | null>(null);
+/// True once the alert lookup answers 404: the page outlived its alert, and the server can no longer release it.
+const subjectAlertMissing = ref(false);
+/// Why the last Unacknowledge left the page held; cleared when another page loads.
+const unackRefusedReason = ref<I18nText | null>(null);
+const unackBlockedReason = computed<I18nText | null>(() =>
+  subjectAlertMissing.value ? t("oncall.unackAlertDeleted") : unackRefusedReason.value,
+);
 const escalation = ref<EscalationProgress | null>(null);
+/// False until the progress has answered, so the header makes no paging claim from a missing value.
+const escalationLoaded = ref(false);
 /// Who a page to this team reaches right now, and where the pager goes next.
 const onCallPositions = ref<OnCallPosition[]>([]);
 const onCallPositionsLoading = ref(false);
@@ -932,6 +1196,13 @@ const handoffTeam = ref("");
 const handoffNote = ref("");
 const memberOptions = ref<{ label: I18nText; value: string }[]>([]);
 const teamOptions = ref<{ label: I18nText; value: string }[]>([]);
+const teamNamesById = ref<Record<string, string>>({});
+/// The incident's own title for the rail link; the id until it answers, or when the read fails.
+const incidentTitle = ref<string | null>(null);
+/// True from the record's arrival until its incident's title answers, so the id never flashes first.
+const incidentLoading = ref(true);
+/// The timeline waits for the policy that numbers its steps, then never goes back to waiting.
+const timelineReady = ref(false);
 
 // Round numbers a half-awake person can pick without doing arithmetic.
 const snoozeOptions = [
@@ -947,7 +1218,18 @@ const responseId = computed(() => String(route.params.responseId ?? ""));
 // The id rides in the variables: the origin link swaps it under a reused instance.
 const resolveWrite = useMutation(() => resolveResponseMutation(orgId.value));
 const ackWrite = useMutation(() => acknowledgeResponseMutation(orgId.value));
+const takeOverWrite = useMutation(() => takeOverResponseMutation(orgId.value));
+const unackWrite = useMutation(() => unacknowledgeResponseMutation(orgId.value));
+const me = computed(() => store.state.userInfo?.email);
+const ackWords = computed(() =>
+  pageAckWords(
+    response.value?.team_id ? teamName.value : "",
+    response.value?.subject.subject_type ?? "alert",
+    t,
+  ),
+);
 const snoozeWrite = useMutation(() => snoozeResponseMutation(orgId.value));
+const unsnoozeWrite = useMutation(() => unsnoozeResponseMutation(orgId.value));
 const noteWrite = useMutation(() => addResponseNoteMutation(orgId.value));
 const handoffWrite = useMutation(() => handoffResponseMutation(orgId.value));
 const recoveryWrite = useMutation(() => confirmRecoveryMutation(orgId.value));
@@ -964,12 +1246,23 @@ const title = computed(() =>
 // not "is the ladder running" — an acknowledged page still needs resolving.
 const isOpenState = computed(() => !!response.value && isUnresolved(response.value.state));
 
+/// How long a closed page stayed open, said on hover of its state tag.
+const closedAfter = computed(() => {
+  const r = response.value;
+  if (!r?.closed_at || isOpenState.value) return null;
+  return t("oncall.resolvedAfter", { duration: formatMicrosDuration(r.closed_at - r.opened_at) });
+});
+
 /// Only an escalating page can be claimed. Once it is owned, Acknowledge and
 /// Snooze are gone and Resolve becomes the primary action.
 const canAcknowledge = computed(() => !!response.value && isEscalating(response.value.state));
 
 /// Whether the compact header's menu has anything in it: a closed page already tied to an incident has no verb left.
 const hasMoreActions = computed(() => isOpenState.value || !response.value?.incident_id);
+
+/// The server refuses Escalate and Snooze on a page with no team (AK-4); a deleted team's ladder reaches nobody, so Escalate goes there too.
+const canEscalate = computed(() => !!response.value?.team_id && !teamDeleted.value);
+const canSnooze = computed(() => canAcknowledge.value && !!response.value?.team_id);
 
 /// Where the team-name link in the subtitle goes — same target and tab
 /// OnCallAboutPage's own team row links to, so the two agree on what
@@ -980,17 +1273,6 @@ const teamRoute = computed(() => ({
   query: { org_identifier: orgId.value },
 }));
 
-/// The subtitle used to spell out "first page from this subject" / "N earlier
-/// firings" inline, which made a one-line tagline read as a paragraph. The
-/// firing count alone says "this isn't the first time" (or is); the rest is a
-/// tooltip on that count instead of a trailing clause, and the same prose the
-/// About card already carries.
-const historyLabel = computed(() =>
-  firingHistory.value.length
-    ? t("oncall.historyFirings", { count: firingHistory.value.length }, firingHistory.value.length)
-    : t("oncall.historyFirstPage"),
-);
-
 /// Clock time, not "N ago" — the elapsed duration is already said once, beside
 /// the title tags, and repeating it here as "opened 2 hours ago" would just be
 /// the same fact twice in two words.
@@ -1000,103 +1282,105 @@ const openedAtClock = computed(() => {
   return formatTimestampInTimezone(r.opened_at, "HH:mm", store.state.timezone);
 });
 
-/// How long this has been somebody's problem. An open page reads as elapsed;
-/// a closed one stops at the moment it closed, rather than counting forever.
-const elapsedLabel = computed(() => {
+/// Rungs the team's policy defines for this priority, `null` when the policy could not be read.
+const totalRungs = computed(
+  () =>
+    policy.value?.rungs.find((rung) => rung.priority === response.value?.priority)?.steps.length ??
+    null,
+);
+
+/// The record's own step, so the header says something true before the ladder's progress has answered.
+const headerReachedStep = computed(() =>
+  reachedStepOf(
+    policy.value?.rungs.find((rung) => rung.priority === response.value?.priority)?.steps,
+    response.value?.reached_rung_micros,
+  ),
+);
+
+/// The subtitle's separator waits for a phrase, so an unanswered ladder leaves no dangling dot.
+const headerPhraseKind = computed(() =>
+  response.value
+    ? pagePhrase({
+        record: response.value,
+        progress: escalation.value,
+        progressLoaded: escalationLoaded.value,
+        totalRungs: totalRungs.value,
+        reachedStep: headerReachedStep.value,
+        nowMicros: nowMicros.value,
+      }).kind
+    : "unknown",
+);
+
+// The same progress decides the header tag; the time is the last step's, which the record's flag lags.
+const exhaustedAtClock = computed(() => {
   const r = response.value;
-  if (!r) return "";
-  const end = r.closed_at ?? nowMicros.value;
-  return formatMicrosDuration(end - r.opened_at);
+  if (!r || pageState(r, escalation.value) !== "exhausted") return "";
+  const lastStepAt = escalation.value?.fired.at(-1)?.at ?? r.exhausted_at;
+  if (!lastStepAt) return "";
+  return formatOnCallInstant(lastStepAt, nowMicros.value, store.state.timezone);
 });
 
-/// Until somebody acks, "time to ack" is a clock still running, and freezing
-/// it at a dash hid the number the SLA is measured on.
-const ackLabel = computed(() => {
-  const r = response.value;
-  const openMicros = r ? nowMicros.value - r.opened_at : null;
-  return r?.acked_at || !openMicros ? t("oncall.timeToAck") : t("oncall.statUnackedFor");
+/// Whole seconds until the triage hold releases the first page; 0 once it has, or when there is none.
+const holdSecondsLeft = computed(() => {
+  const until = escalation.value?.held_until_micros;
+  if (!until) return 0;
+  return Math.max(0, Math.ceil((until - nowMicros.value) / 1_000_000));
 });
 
-const ackValue = computed(() => {
-  const r = response.value;
-  const openMicros = r ? nowMicros.value - r.opened_at : null;
-  if (r?.acked_at) return timeToAck.value;
-  return openMicros ? formatMicrosDuration(openMicros) : ABSENT;
-});
+/// The policy's steps for this page's priority, `null` when the policy could not be read.
+const prioritySteps = computed(
+  () =>
+    policy.value?.rungs.find((rung) => rung.priority === response.value?.priority)?.steps ?? null,
+);
 
-const resolveLabel = computed(() => {
-  const r = response.value;
-  const openMicros = r ? nowMicros.value - r.opened_at : null;
-  return r?.closed_at || !openMicros ? t("oncall.timeToResolve") : t("oncall.statOpenFor");
-});
+/// The 1-based step a rung delay belongs to, so the timeline says "step 2" rather than a delay.
+function stepOfRung(rungMicros: number): number | null {
+  return reachedStepOf(prioritySteps.value, rungMicros);
+}
 
-const resolveValue = computed(() => {
-  const r = response.value;
-  const openMicros = r ? nowMicros.value - r.opened_at : null;
-  if (r?.closed_at) return timeToResolve.value;
-  return openMicros ? formatMicrosDuration(openMicros) : ABSENT;
-});
+function teamNameOf(teamId: string): string | null {
+  return teamNamesById.value[teamId] ?? null;
+}
 
-/// How far up the ladder a page got, said as the rung rather than as a delay.
-///
-/// **`reached_rung_micros` is omitted when no page went out, and `0` is a real
-/// and common value** meaning it never left the first rung — so `if (micros)`
-/// is a bug here and the test is for `undefined`.
-///
-/// The number on the wire is the rung's `after_micros`, which is a delay, not
-/// an index. Matching it back against the policy's own steps is what turns it
-/// into "rung 2 of 5"; without a policy to match against, the delay is still
-/// more honest than nothing.
-const reachedRung = computed<I18nText | string>(() => {
-  const micros = response.value?.reached_rung_micros;
-  if (micros === undefined || micros === null) return ABSENT;
-  const steps = policy.value?.rungs.find(
-    (rung) => rung.priority === response.value?.priority,
-  )?.steps;
-  const index = steps?.findIndex((step) => step.after_micros === micros) ?? -1;
-  if (index < 0 || !steps) return raw(`+${formatMicrosDuration(micros)}`);
-  return t("oncall.statReachedRungOf", { n: index + 1, total: steps.length });
-});
-
-/// The four facts a responder reads first — read once at the top rather than
-/// pieced together from the title tags and the "who is on" card below.
+/// Only facts the header does not already say: the duration of a closed page rides the title, so it is not repeated here.
 const topStats = computed<StatItem[]>(() => {
   const r = response.value;
   if (!r) return [];
-  return [
-    {
+  const stats: StatItem[] = [];
+  if (r.acked_at) {
+    stats.push({
       key: "ack",
-      label: ackLabel.value,
-      value: ackValue.value,
+      label: t("oncall.statAckedIn"),
+      value: formatMicrosDuration(r.acked_at - r.opened_at),
       icon: "check-circle",
-      tone: r.acked_at ? "success" : "warning",
+      tone: "success",
       dataTest: "oncall-response-stat-ack",
-    },
-    {
-      key: "resolve",
-      label: resolveLabel.value,
-      value: resolveValue.value,
-      icon: "check-circle",
-      tone: r.closed_at ? "success" : "warning",
-      dataTest: "oncall-response-stat-resolve",
-    },
-    {
-      key: "rung",
-      label: t("oncall.statReachedRung"),
-      value: reachedRung.value,
-      icon: "trending-up",
+    });
+  } else if (!r.closed_at) {
+    stats.push({
+      key: "ack",
+      label: t("oncall.statUnackedFor"),
+      value: formatMicrosDuration(nowMicros.value - r.opened_at),
+      icon: "schedule",
       tone: "warning",
-      dataTest: "oncall-response-stat-rung",
-    },
-    {
+      dataTest: "oncall-response-stat-ack",
+    });
+  }
+  if (firingHistory.value.length) {
+    stats.push({
       key: "firing",
-      label: t("oncall.firing"),
-      value: `#${r.subject.firing}`,
-      icon: "format-list-numbered",
+      label: t("oncall.statFiredBefore"),
+      value: t(
+        "oncall.statTimes",
+        { count: firingHistory.value.length },
+        firingHistory.value.length,
+      ),
+      icon: "replay",
       tone: "neutral",
       dataTest: "oncall-response-stat-firing",
-    },
-  ];
+    });
+  }
+  return stats;
 });
 
 const routingReason = computed(() => routingReasonOf(events.value));
@@ -1118,49 +1402,48 @@ const handoffTarget = computed(() =>
 const snoozedUntilLabel = computed(() => {
   const r = response.value;
   if (!r || !isSnoozed(r)) return "";
-  return new Date((r.snoozed_until as number) / 1000).toLocaleString();
+  return formatOnCallInstant(r.snoozed_until as number, nowMicros.value, store.state.timezone);
 });
+const canUnsnooze = computed(() => canSnooze.value && !!snoozedUntilLabel.value);
 
-const timeToAck = computed(() => {
-  const r = response.value;
-  if (!r?.acked_at) return "—";
-  return formatMicrosDuration(r.acked_at - r.opened_at);
-});
-
-const timeToResolve = computed(() => {
-  const r = response.value;
-  if (!r?.closed_at) return "—";
-  return formatMicrosDuration(r.closed_at - r.opened_at);
-});
-
-/// Cache-first; a force expires the entry first, so it costs one request, not two.
-async function read<T>(
-  options: { queryKey: readonly unknown[]; [k: string]: any },
-  force: boolean,
-): Promise<T> {
-  if (force) {
-    await queryClient.invalidateQueries({
-      queryKey: options.queryKey,
-      exact: true,
-      refetchType: "none",
-    });
-  }
-  return queryClient.fetchQuery(options as any) as Promise<T>;
-}
+// Any on-call read can carry the denial, because the others may be answered from cache; the callers still see the error.
+const read: typeof readQuery = (options, force) =>
+  readQuery(options, force).catch((err: unknown) => {
+    const denied = licenseDeniedFeatures(err);
+    if (denied) {
+      licenseDenied.value = denied;
+      // Clearing these takes off the record's actions and the progress rechecks; the server would refuse each one.
+      response.value = null;
+      escalation.value = null;
+      // A lock drawn behind an open form would be out of sight, and saving there can only be refused.
+      showHandoff.value = false;
+      confirmRecoveryOpen.value = false;
+      promoteOpen.value = false;
+      confirmResolve.value = false;
+    }
+    throw err;
+  });
 
 // The newest read: a slower record for an id the route has already left must not overwrite the current one.
 let latestResponseRead = 0;
 
+type ReadGuard = () => boolean;
+
+/// True while no newer record read has started and no read was denied; every page read checks it before it writes.
+function readGuard(readId = latestResponseRead): ReadGuard {
+  return () => readId === latestResponseRead && !licenseDenied.value;
+}
+
 // `force` reaches the record alone — it is the only thing a promote conflict moved.
 async function fetchResponse(force = false) {
   loading.value = true;
+  loadError.value = null;
+  licenseDenied.value = null;
   const readId = ++latestResponseRead;
+  const isCurrent = readGuard(readId);
   try {
-    const data = await read<{
-      response: OnCallResponse;
-      events: OnCallResponseEvent[];
-    } | null>(responseQuery(orgId.value, responseId.value), force);
-    if (readId !== latestResponseRead) return;
+    const data = await read(responseQuery(orgId.value, responseId.value), force);
+    if (!isCurrent()) return;
     response.value = data?.response ?? null;
     events.value = data?.events ?? [];
     lastFetchedAt.value =
@@ -1168,24 +1451,29 @@ async function fetchResponse(force = false) {
         ?.dataUpdatedAt ?? null;
     // Flip before the awaits below so the card skeletons instead of reading an empty roster as "nobody on call".
     onCallPositionsLoading.value = true;
-    for (const step of [
-      fetchTeamName,
-      fetchSubjectAlert,
-      fetchHandoffTargets,
-      fetchPriorCauses,
-      fetchReport,
-      fetchEscalation,
-      fetchDeliveries,
-      fetchTeamContext,
-    ]) {
-      await step();
-      if (readId !== latestResponseRead) return;
+    // The team list first: it says whether the team still exists, and a deleted one has nothing else to read.
+    await fetchTeams(isCurrent);
+    if (!isCurrent()) return;
+    await Promise.all([
+      fetchTeamName(isCurrent),
+      fetchSubjectAlert(isCurrent),
+      fetchHandoffTargets(isCurrent),
+      fetchPriorCauses(isCurrent),
+      fetchReport(isCurrent),
+      fetchEscalation(false, isCurrent),
+      fetchDeliveries(isCurrent),
+      fetchTeamContext(isCurrent),
+      fetchIncidentTitle(isCurrent),
+    ]);
+  } catch (err: unknown) {
+    if (!isCurrent()) return;
+    if (!response.value) {
+      if (apiErrorStatus(err) !== 404) loadError.value = apiErrorText(err);
+      return;
     }
-  } catch (err: any) {
-    if (readId !== latestResponseRead) return;
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.loadResponseFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.loadResponseFailed"),
     });
   } finally {
     if (readId === latestResponseRead) loading.value = false;
@@ -1209,17 +1497,32 @@ async function refreshPage() {
   }
 }
 
-// The record stores a team id; a deleted team still has records pointing at
-// it, so the id is the fallback rather than an error.
-async function fetchTeamName() {
-  const r = response.value;
-  if (!r) return;
-  teamName.value = r.team_id;
+/// The org's teams: whether this page's team still exists, its name, and where it can be handed.
+async function fetchTeams(isCurrent: ReadGuard) {
   try {
-    const team = await read<OnCallTeam | null>(oncallTeamQuery(orgId.value, r.team_id), false);
-    if (team?.name) teamName.value = team.name;
+    const teams = await read(oncallTeamsQuery(orgId.value), false);
+    if (!isCurrent()) return;
+    knownTeamIds.value = teams.map((tm) => tm.id);
+    teamNamesById.value = Object.fromEntries(teams.map((tm) => [tm.id, tm.name]));
   } catch {
-    // Keep the id.
+    if (isCurrent()) knownTeamIds.value = null;
+  }
+}
+
+// Never the raw id: the name from the list, else the team's own read, else a dash.
+async function fetchTeamName(isCurrent: ReadGuard) {
+  const teamId = response.value?.team_id;
+  if (!teamId || teamDeleted.value) return;
+  const listed = teamNamesById.value[teamId];
+  if (listed) {
+    teamName.value = listed;
+    return;
+  }
+  try {
+    const team = await read(oncallTeamQuery(orgId.value, teamId), false);
+    if (isCurrent()) teamName.value = team?.name || "—";
+  } catch {
+    if (isCurrent()) teamName.value = "—";
   }
 }
 
@@ -1235,27 +1538,89 @@ async function resolveRecord() {
     analytics.track("oncall_page_resolved", { cause: resolveCause.value || "none", count: 1 });
     toast({ variant: "success", message: t("oncall.resolved") });
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.resolveFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.resolveFailed"),
     });
   } finally {
     resolving.value = false;
   }
 }
 
+/// A press that changed nothing on a closed page says so; nobody acknowledged it then (ack, take over).
+function resolvedToast(page: OnCallResponse, unheld: boolean) {
+  const closed = !!page.closed_at || !isUnresolved(page.state);
+  return closed && (!unheld || !page.acked_by)
+    ? { variant: "info" as const, message: t("oncall.alreadyResolved") }
+    : null;
+}
+
 async function acknowledgeRecord() {
   acking.value = true;
   try {
-    await ackWrite.mutateAsync(responseId.value);
+    const res = await ackWrite.mutateAsync(responseId.value);
     analytics.track("oncall_page_acknowledged", { count: 1 });
-    toast({ variant: "success", message: t("oncall.acknowledged") });
+    toast(
+      res.data.ack?.changed === false
+        ? (resolvedToast(res.data, true) ?? unchangedAckToast(res.data.acked_by, me.value, t))
+        : { variant: "success", message: ackWords.value.acked },
+    );
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.acknowledgeFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.acknowledgeFailed"),
+    });
+  } finally {
+    acking.value = false;
+  }
+}
+
+async function takeOverRecord() {
+  const from = response.value?.acked_by ?? "";
+  acking.value = true;
+  try {
+    const res = await takeOverWrite.mutateAsync(responseId.value);
+    toast(
+      res.data.ack?.changed === false
+        ? (resolvedToast(res.data, true) ?? unchangedAckToast(res.data.acked_by, me.value, t))
+        : { variant: "success", message: t("oncall.tookOver", { who: raw(from) }) },
+    );
+    await fetchResponse();
+  } catch (err: unknown) {
+    toast({
+      variant: "error",
+      message: raw(apiErrorMessage(err)) || t("oncall.acknowledgeFailed"),
+    });
+  } finally {
+    acking.value = false;
+  }
+}
+
+async function unacknowledgeRecord() {
+  acking.value = true;
+  try {
+    const res = await unackWrite.mutateAsync(responseId.value);
+    // The server answers 200 unchanged when it cannot find the alert to release, so the page stays held.
+    const stillHeld = res.data.ack?.changed === false && res.data.state === "acknowledged";
+    const refused = subjectAlertMissing.value
+      ? t("oncall.unackAlertDeleted")
+      : t("oncall.unackRefused");
+    if (stillHeld) unackRefusedReason.value = refused;
+    toast(
+      stillHeld
+        ? { variant: "warning", message: refused }
+        : res.data.ack?.changed === false
+          ? (resolvedToast(res.data, false) ??
+            notAckedToast(res.data.title || res.data.subject.source_id, t))
+          : { variant: "success", message: ackWords.value.unacked },
+    );
+    await fetchResponse();
+  } catch (err: unknown) {
+    toast({
+      variant: "error",
+      message: raw(apiErrorMessage(err)) || t("oncall.unacknowledgeFailed"),
     });
   } finally {
     acking.value = false;
@@ -1268,10 +1633,26 @@ async function snoozeRecord(minutes: number) {
     await snoozeWrite.mutateAsync({ responseId: responseId.value, minutes });
     toast({ variant: "success", message: t("oncall.snoozed") });
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.snoozeFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.snoozeFailed"),
+    });
+  } finally {
+    snoozing.value = false;
+  }
+}
+
+async function unsnoozeRecord() {
+  snoozing.value = true;
+  try {
+    await unsnoozeWrite.mutateAsync(responseId.value);
+    toast({ variant: "success", message: t("oncall.unsnoozed") });
+    await fetchResponse();
+  } catch (err: unknown) {
+    toast({
+      variant: "error",
+      message: raw(apiErrorMessage(err)) || t("oncall.unsnoozeFailed"),
     });
   } finally {
     snoozing.value = false;
@@ -1287,10 +1668,10 @@ async function addNote() {
     noteBody.value = "";
     toast({ variant: "success", message: t("oncall.noteAdded") });
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.addNoteFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.addNoteFailed"),
     });
   } finally {
     addingNote.value = false;
@@ -1316,10 +1697,10 @@ async function handoffRecord() {
     handoffNote.value = "";
     toast({ variant: "success", message: t("oncall.handoffDone") });
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.handoffFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.handoffFailed"),
     });
   } finally {
     handingOff.value = false;
@@ -1328,73 +1709,106 @@ async function handoffRecord() {
 
 // Handoff targets. Failing to load them leaves the selects empty rather than
 // breaking the page — every other action still works.
-async function fetchHandoffTargets() {
+async function fetchHandoffTargets(isCurrent: ReadGuard) {
   const r = response.value;
   if (!r) return;
+  // An unrouted page or a deleted team has no members to hand to, but the team list still offers a team.
+  const teamId = teamDeleted.value ? null : r.team_id;
   try {
-    const members = await read<OnCallTeamMember[]>(teamMembersQuery(orgId.value, r.team_id), false);
+    const members = teamId ? await read(teamMembersQuery(orgId.value, teamId), false) : [];
+    if (!isCurrent()) return;
+    // Names can repeat, so the email rides along in the option itself.
     memberOptions.value = members.map((m) => ({
-      label: raw(m.user_email),
+      label: tooltipOf(m.user_email),
       value: m.user_email,
     }));
   } catch {
+    if (!isCurrent()) return;
     memberOptions.value = [];
   }
-  try {
-    const teams = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), false);
-    teamOptions.value = teams
-      .filter((tm) => tm.id !== r.team_id)
-      .map((tm) => ({ label: raw(tm.name), value: tm.id }));
-  } catch {
-    teamOptions.value = [];
-  }
+  teamOptions.value = Object.entries(teamNamesById.value)
+    .filter(([id]) => id !== r.team_id)
+    .map(([id, name]) => ({ label: raw(name), value: id }));
 }
 
 /// Only alerts have a rule to fetch, and a page whose alert has since been
 /// deleted must still render — the record is the authority on what happened,
 /// the alert only decorates it.
 // Uncached: the page links to the alert editor, which seeds its form from the cached alert entry.
-async function fetchSubjectAlert() {
+async function fetchSubjectAlert(isCurrent: ReadGuard) {
   subjectAlert.value = null;
+  subjectAlertMissing.value = false;
   if (response.value?.subject.subject_type !== "alert") return;
+  const alertId = response.value.subject.source_id;
+  if (cachedAlertMissing(alertId, response.value.opened_at)) {
+    subjectAlertMissing.value = true;
+    return;
+  }
   try {
-    const res = await alertsService.get_by_alert_id(orgId.value, response.value.subject.source_id);
-    subjectAlert.value = res.data ?? null;
-  } catch {
+    const res = await alertsService.get_by_alert_id(orgId.value, alertId);
+    if (isCurrent()) subjectAlert.value = res.data ?? null;
+  } catch (err: unknown) {
+    if (!isCurrent()) return;
     subjectAlert.value = null;
+    subjectAlertMissing.value = apiErrorStatus(err) === 404;
+  }
+}
+
+/// Only an org-wide list already cached since the page opened can say the alert is gone; anything else asks the alert itself.
+function cachedAlertMissing(alertId: string, openedAt: number): boolean {
+  const key = alertKeys.dependencies(orgId.value);
+  const list = queryClient.getQueryData<{ alert_id?: string }[]>(key);
+  const fetchedAt = queryClient.getQueryState(key)?.dataUpdatedAt ?? 0;
+  if (!Array.isArray(list) || fetchedAt * 1000 < openedAt) return false;
+  return !list.some((alert) => alert.alert_id === alertId);
+}
+
+async function fetchIncidentTitle(isCurrent: ReadGuard) {
+  const incidentId = response.value?.incident_id;
+  if (!incidentId) {
+    incidentTitle.value = null;
+    incidentLoading.value = false;
+    return;
+  }
+  try {
+    const incident = await readQuery(incidentQuery(orgId.value, incidentId), false);
+    if (isCurrent()) incidentTitle.value = incident?.title ?? null;
+  } catch {
+    // The rail falls back to the id; Incidents has its own license feature, so a denial here does not lock this page.
+  } finally {
+    if (isCurrent()) incidentLoading.value = false;
   }
 }
 
 // History is context, not the page itself: failing to load it must not stop a
 // responder acting on what is in front of them. The two calls are independent,
 // so one server without the history route still leaves the causes readable.
-async function fetchPriorCauses() {
+async function fetchPriorCauses(isCurrent: ReadGuard) {
   priorCausesLoading.value = true;
   try {
     const [causeRes, historyRes] = await Promise.allSettled([
-      read<CauseGroup[]>(responsePriorCausesQuery(orgId.value, responseId.value), false),
-      read<OnCallResponse[]>(responseHistoryQuery(orgId.value, responseId.value), false),
+      read(responsePriorCausesQuery(orgId.value, responseId.value), false),
+      read(responseHistoryQuery(orgId.value, responseId.value), false),
     ]);
+    if (!isCurrent()) return;
     priorCauses.value = causeRes.status === "fulfilled" ? causeRes.value : [];
     firingHistory.value = historyRes.status === "fulfilled" ? historyRes.value : [];
   } finally {
-    priorCausesLoading.value = false;
+    if (isCurrent()) priorCausesLoading.value = false;
   }
 }
 
 // 404 is the ordinary answer — no agent ran, or it never answered — so a
 // failure here leaves the tab hidden rather than surfacing an error.
-async function fetchReport() {
+async function fetchReport(isCurrent: ReadGuard) {
   reportLoading.value = true;
   try {
-    report.value = await read<OnCallResponseReport | null>(
-      responseReportQuery(orgId.value, responseId.value),
-      false,
-    );
+    const next = await read(responseReportQuery(orgId.value, responseId.value), false);
+    if (isCurrent()) report.value = next;
   } catch {
-    report.value = null;
+    if (isCurrent()) report.value = null;
   } finally {
-    reportLoading.value = false;
+    if (isCurrent()) reportLoading.value = false;
   }
 }
 
@@ -1407,20 +1821,19 @@ const deliveriesLoading = ref(false);
 /// The receipt beside the claim: the timeline says "paged ana", the ledger
 /// says whether the transport took it. A failure leaves the panel empty with
 /// its own empty state — the rest of the page still answers its questions.
-async function fetchDeliveries() {
+async function fetchDeliveries(isCurrent: ReadGuard) {
   deliveriesLoading.value = true;
   try {
-    const ledger = await read<DeliveryLedger | null>(
-      responseDeliveriesQuery(orgId.value, responseId.value),
-      false,
-    );
+    const ledger = await read(responseDeliveriesQuery(orgId.value, responseId.value), false);
+    if (!isCurrent()) return;
     deliveries.value = ledger?.deliveries ?? [];
     deliveriesTotal.value = ledger?.total ?? 0;
   } catch {
+    if (!isCurrent()) return;
     deliveries.value = [];
     deliveriesTotal.value = 0;
   } finally {
-    deliveriesLoading.value = false;
+    if (isCurrent()) deliveriesLoading.value = false;
   }
 }
 
@@ -1432,38 +1845,53 @@ async function fetchDeliveries() {
  * four fail, so nothing here is allowed to throw and none of it gates the
  * record.
  */
-async function fetchTeamContext() {
+async function fetchTeamContext(isCurrent: ReadGuard) {
+  try {
+    await readTeamContext(isCurrent);
+  } finally {
+    if (isCurrent()) timelineReady.value = true;
+  }
+}
+
+async function readTeamContext(isCurrent: ReadGuard) {
   const r = response.value;
   if (!r) return;
+  const teamId = r.team_id;
+  // A deleted team has no rotation to read; asking only retries a 404 while the card waits.
+  if (!teamId || teamDeleted.value) {
+    onCallPositions.value = [];
+    policy.value = null;
+    smtpConfigured.value = null;
+    onCallPositionsLoading.value = false;
+    return;
+  }
   onCallPositionsLoading.value = true;
   try {
     const [slots, policyRes, reach] = await Promise.allSettled([
       // A closed record asks about its own last moment — the live rotation is not its history.
-      read<OnCallPosition[]>(
-        whoIsOnCallQuery(orgId.value, r.team_id, r.closed_at ?? undefined),
-        false,
-      ),
-      read<OnCallPolicy | null>(teamPolicyQuery(orgId.value, r.team_id), false),
-      read<TeamReachability | null>(teamReachabilityQuery(orgId.value, r.team_id), false),
+      read(whoIsOnCallQuery(orgId.value, teamId, r.closed_at ?? undefined), false),
+      read(teamPolicyQuery(orgId.value, teamId), false),
+      read(teamReachabilityQuery(orgId.value, teamId), false),
     ]);
+    if (!isCurrent()) return;
     onCallPositions.value = slots.status === "fulfilled" ? slots.value : [];
     policy.value = policyRes.status === "fulfilled" ? policyRes.value : null;
     smtpConfigured.value =
       reach.status === "fulfilled" ? (reach.value?.smtp_configured ?? null) : null;
-    await fetchHandover();
+    await fetchHandover(isCurrent);
   } finally {
-    onCallPositionsLoading.value = false;
+    if (isCurrent()) onCallPositionsLoading.value = false;
   }
 }
 
 /// When the default slot's current span ends, and who inherits it. The
 /// on-call payload names the next person but not the hour, and a page still
 /// open at handover is one somebody inherits without being told.
-async function fetchHandover() {
+async function fetchHandover(isCurrent: ReadGuard) {
   handoverAt.value = null;
   handoverTo.value = null;
   const r = response.value;
-  if (!r) return;
+  if (!r?.team_id) return;
   // Who inherits the pager next is advice for a page somebody still has to
   // carry. On a closed one it is a fact about next week's rota that nobody
   // opened this record to read.
@@ -1471,10 +1899,8 @@ async function fetchHandover() {
   const from = nowMicros.value;
   const to = from + 7 * 24 * 60 * 60 * 1_000_000;
   try {
-    const resolved = await read<ResolvedSegment[]>(
-      resolvedScheduleQuery(orgId.value, r.team_id, from, to),
-      false,
-    );
+    const resolved = await read(resolvedScheduleQuery(orgId.value, r.team_id, from, to), false);
+    if (!isCurrent()) return;
     const segments = [...resolved].sort((a, b) => a.from - b.from);
     const currentIndex = segments.findIndex((seg) => seg.from <= from && seg.to > from);
     if (currentIndex < 0) return;
@@ -1531,10 +1957,10 @@ async function escalateNow() {
     const res = await escalateWrite.mutateAsync({ responseId: responseId.value });
     toast(escalateOutcome(res.data));
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.escalateFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.escalateFailed"),
     });
   } finally {
     escalatingNow.value = false;
@@ -1544,7 +1970,7 @@ async function escalateNow() {
 /// The two rail links out. Both land on the tab that answers the question the
 /// reader had when they clicked, rather than on the team's front page.
 function openReachability() {
-  if (!response.value) return;
+  if (!response.value?.team_id) return;
   router.push({
     name: "onCallTeamDetail",
     params: { teamId: response.value.team_id, tab: "members" },
@@ -1552,15 +1978,50 @@ function openReachability() {
   });
 }
 
-async function fetchEscalation(force = false) {
+async function fetchEscalation(force = false, isCurrent: ReadGuard = readGuard()) {
   try {
-    escalation.value = await read<EscalationProgress | null>(
-      responseProgressQuery(orgId.value, responseId.value),
-      force,
-    );
+    const progress = await read(responseProgressQuery(orgId.value, responseId.value), force);
+    if (!isCurrent()) return;
+    escalation.value = progress;
+    // An empty body is no answer, so the header makes no paging claim from it.
+    escalationLoaded.value = progress !== null;
   } catch {
+    if (!isCurrent()) return;
     escalation.value = null;
+    escalationLoaded.value = false;
   }
+}
+
+/// Re-reads the record and its events, so the rung card and activity agree with a newer progress.
+async function refreshRecord() {
+  const id = responseId.value;
+  try {
+    const data = await read(responseQuery(orgId.value, id), true);
+    if (!data?.response || id !== responseId.value || licenseDenied.value) return;
+    response.value = data.response;
+    events.value = data.events ?? [];
+  } catch (err: unknown) {
+    if (id !== responseId.value || licenseDenied.value) return;
+    toast({
+      variant: "error",
+      message: raw(apiErrorMessage(err)) || t("oncall.loadResponseFailed"),
+    });
+  }
+}
+
+/// A failed re-read keeps the last good progress, so the hold banner and its polling survive until the next tick.
+async function recheckProgress() {
+  const isCurrent = readGuard();
+  try {
+    const progress = await read(responseProgressQuery(orgId.value, responseId.value), true);
+    if (isCurrent()) escalation.value = progress;
+  } catch {
+    // The next tick retries.
+  }
+}
+
+function openPagesList() {
+  router.push({ name: "onCallResponses", query: { org_identifier: orgId.value } });
 }
 
 function openResponse(id: string) {
@@ -1571,14 +2032,59 @@ function openResponse(id: string) {
   });
 }
 
-// The ladder's countdown lapses while the entry is still fresh, so this one forces.
+// A lapsed rung is sent a little later, so a few forced re-reads follow until next_at moves.
+let lapseRecheck: ReturnType<typeof setInterval> | null = null;
+function stopLapseRecheck() {
+  if (lapseRecheck !== null) clearInterval(lapseRecheck);
+  lapseRecheck = null;
+}
 watch(
   () => {
     const at = escalation.value?.next_at;
     return !!at && nowMicros.value >= at;
   },
   (lapsed) => {
-    if (lapsed) fetchEscalation(true);
+    stopLapseRecheck();
+    if (!lapsed) return;
+    fetchEscalation(true);
+    let triesLeft = LAPSE_RECHECKS;
+    lapseRecheck = setInterval(() => {
+      if (triesLeft-- <= 0) return stopLapseRecheck();
+      recheckProgress();
+    }, HOLD_RECHECK_MS);
+  },
+);
+onBeforeUnmount(stopLapseRecheck);
+
+// The newest rung sent in any ladder run; a run restart resets the count but never moves this back.
+const lastSentAt = computed(() =>
+  escalation.value ? Math.max(0, ...escalation.value.fired.map((rung) => rung.at)) : undefined,
+);
+// A rung the progress saw sent is on the record and its activity too, which this view read earlier.
+watch(lastSentAt, (sent, before) => {
+  if (sent !== undefined && before !== undefined && sent > before) refreshRecord();
+});
+
+// Triage may release the first page before the deadline, so the progress is re-read while held.
+let holdRecheck: ReturnType<typeof setInterval> | null = null;
+function stopHoldRecheck() {
+  if (holdRecheck !== null) clearInterval(holdRecheck);
+  holdRecheck = null;
+}
+watch(
+  () => holdSecondsLeft.value > 0,
+  (held) => {
+    stopHoldRecheck();
+    if (held) holdRecheck = setInterval(recheckProgress, HOLD_RECHECK_MS);
+  },
+);
+onBeforeUnmount(stopHoldRecheck);
+
+// The hold ends at its deadline, so the progress is re-read for the first page it released.
+watch(
+  () => !!escalation.value?.held_until_micros && holdSecondsLeft.value === 0,
+  (released) => {
+    if (released) fetchEscalation(true);
   },
 );
 
@@ -1586,5 +2092,30 @@ watch(
 // param, so Vue Router reuses this instance instead of remounting it — the
 // fetch has to key off responseId directly rather than firing once on mount.
 // Wrapped: a watcher hands the callback the new id, which `force` would read as a yes.
-watch(responseId, () => fetchResponse(), { immediate: true });
+// A linked page reuses this view, so the one left must not stay on screen if the new id fails.
+watch(
+  responseId,
+  () => {
+    response.value = null;
+    events.value = [];
+    escalation.value = null;
+    escalationLoaded.value = false;
+    policy.value = null;
+    onCallPositions.value = [];
+    deliveries.value = [];
+    teamName.value = "";
+    incidentTitle.value = null;
+    incidentLoading.value = true;
+    timelineReady.value = false;
+    subjectAlert.value = null;
+    subjectAlertMissing.value = false;
+    unackRefusedReason.value = null;
+    priorCauses.value = [];
+    firingHistory.value = [];
+    report.value = null;
+    promoteOpen.value = false;
+    fetchResponse();
+  },
+  { immediate: true },
+);
 </script>

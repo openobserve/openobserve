@@ -180,6 +180,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "SC 1.4.3 exempts text and boundaries that belong to a disabled, inactive control",
   },
   {
+    fg: "--color-table-row-text-secondary-tinted",
+    bg: "--color-table-row-selected-bg",
+    category: "text",
+    why: "secondary text inside a selected row sits on the selected fill, the lower-contrast of the two row fills in both themes",
+  },
+  {
     fg: "--color-table-row-divider",
     category: "exempt",
     why: "SC 1.4.11 decorative: a container hairline, not information required to identify a component or its state",
@@ -238,6 +244,30 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     fg: "--color-usage-banner-warning-border",
     category: "exempt",
     why: "SC 1.4.11 decorative: a container hairline, not information required to identify a component or its state",
+  },
+  {
+    fg: "--color-select-header-count-text",
+    bg: "--color-select-header-bg",
+    category: "text",
+    why: "an OSelect action header's count is painted on the header's accent tint",
+  },
+  {
+    fg: "--color-select-header-action-text",
+    bg: "--color-select-header-bg",
+    category: "text",
+    why: "an OSelect header action's label is painted on the header's accent tint",
+  },
+  {
+    fg: "--color-select-header-count-text",
+    bg: "--color-select-item-hover-bg",
+    category: "text",
+    why: "an OSelect action header's count stays on screen while the arrow keys highlight its row",
+  },
+  {
+    fg: "--color-select-header-action-text",
+    bg: "--color-select-header-action-hover-bg",
+    category: "text",
+    why: "an OSelect header action's label sits on its hover fill under the pointer or the arrow-key highlight",
   },
   {
     fg: "--color-slider-thumb-border",
@@ -703,20 +733,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     themes: ["dark"],
   },
   {
-    fg: "--color-input-border-focus",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["light"],
-  },
-  {
-    fg: "--color-input-border-hover",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["light"],
-  },
-  {
     fg: "--color-label-chip-email-text",
     bg: "--color-label-chip-email-bg",
     category: "pending",
@@ -847,20 +863,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     issue: "WCAG-AA colour remediation (follow-up PR)",
   },
   {
-    fg: "--color-select-border-focus",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["light"],
-  },
-  {
-    fg: "--color-select-border-hover",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["light"],
-  },
-  {
     fg: "--color-slider-error-text",
     category: "pending",
     why: "fails the threshold against the page surface it is painted on",
@@ -903,12 +905,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   },
   {
     fg: "--color-text-muted",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-  },
-  {
-    fg: "--color-text-placeholder",
     category: "pending",
     why: "fails the threshold against the page surface it is painted on",
     issue: "WCAG-AA colour remediation (follow-up PR)",
@@ -1075,10 +1071,22 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "a filled button's label sits on the button",
   },
   {
+    fg: "--color-button-pending-text",
+    bg: "--color-button-pending-bg",
+    category: "text",
+    why: "a filled button's label sits on the button",
+  },
+  {
     fg: "--color-checkbox-checked-fg",
     bg: "--color-checkbox-checked-bg",
     category: "text",
     why: "the tick is drawn inside the checked box",
+  },
+  {
+    fg: "--color-copy-confirm-text",
+    bg: "--color-copy-confirm-bg",
+    category: "text",
+    why: "the copy bubble's label is painted on the bubble's own inverse fill",
   },
   {
     fg: "--color-dag-node-agent-text",
@@ -1228,7 +1236,13 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     fg: "--color-flame-frame-text",
     bg: "--color-chart-series-1",
     category: "text",
-    why: "a flame graph frame label is painted on the frame fill (FlameGraphView.vue: chart series 1, 5, 7, 9), never on the page; series 1 is the darkest of the four, so it is the pair that must clear 4.5:1",
+    why: "a flame graph frame label is painted on the frame fill (FlameGraphView.vue: chart series 1, 5, 7, 9, or the grouped fill), never on the page; series 1 is the darkest of the four series, so it is the series pair that must clear 4.5:1",
+  },
+  {
+    fg: "--color-flame-frame-text",
+    bg: "--color-flame-grouped-fill",
+    category: "text",
+    why: "the root, grouped frames and unchanged Compare frames paint the frame label on the grouped fill (FlameGraphView.vue)",
   },
   {
     fg: "--color-icon-chip-error-text",
@@ -1424,5 +1438,11 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     bg: "--color-button-primary",
     category: "text",
     why: "the inverse foreground exists for filled controls, and the primary button is the fill it is sized against",
+  },
+  {
+    fg: "--color-onboarding-panel-text",
+    bg: "--color-onboarding-choice-active-bg",
+    category: "text",
+    why: "onboarding text sits on the brand panel top and the brand-filled option; the option fill is as light as or lighter than the panel top in both themes. Panel text stays in the top part; the lighter end stop carries only the example screen",
   },
 ];

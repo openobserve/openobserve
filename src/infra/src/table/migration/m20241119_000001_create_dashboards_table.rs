@@ -63,9 +63,17 @@ fn create_dashboards_table_statement() -> TableCreateStatement {
         )
         // A user-facing ID for the folder. This value can be a 64-bit signed
         // integer "snowflake".
-        .col(ColumnDef::new(Dashboards::DashboardId).string_len(256).not_null())
+        .col(
+            ColumnDef::new(Dashboards::DashboardId)
+                .string_len(256)
+                .not_null(),
+        )
         // Foreign key to the folders table.
-        .col(ColumnDef::new(Dashboards::FolderId).big_integer().not_null())
+        .col(
+            ColumnDef::new(Dashboards::FolderId)
+                .big_integer()
+                .not_null(),
+        )
         // Identifier of the user that owns the dashboard.
         .col(ColumnDef::new(Dashboards::Owner).string_len(256).not_null())
         .col(ColumnDef::new(Dashboards::Role).string_len(256).null())
@@ -80,9 +88,9 @@ fn create_dashboards_table_statement() -> TableCreateStatement {
         )
         .foreign_key(
             sea_query::ForeignKey::create()
-                    .name(DASHBOARDS_FOLDERS_FK)
-                    .from(Dashboards::Table, Dashboards::FolderId)
-                    .to(Folders::Table, Folders::Id)
+                .name(DASHBOARDS_FOLDERS_FK)
+                .from(Dashboards::Table, Dashboards::FolderId)
+                .to(Folders::Table, Folders::Id),
         )
         .to_owned()
 }

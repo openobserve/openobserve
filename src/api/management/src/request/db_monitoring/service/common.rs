@@ -362,7 +362,7 @@ impl ScopeFilters {
 ///
 /// The window is therefore carried solely by the request payload, which the
 /// planner pushes down as a physical `_timestamp >= start AND _timestamp < end`
-/// FilterExec per scan (`search/src/datafusion/table_provider/helpers.rs`).
+/// FilterExec per scan (`search/src/datafusion/datasource/helpers.rs`).
 /// [`stats_read_range`] converts the caller's range into that payload.
 pub(crate) fn build_stats_sql(org_id: &str, record_type: &str, preds: &str) -> String {
     build_stats_sql_projected(org_id, record_type, preds, "*")
@@ -923,7 +923,7 @@ async fn compute_tail(
 // ─── Search harnesses ────────────────────────────────────────────────────────
 
 /// Run one read over the `_o2_db_stats` summary stream (read as
-/// `StreamType::Logs`, exactly like `_o2_service_graph` — design §5.3).
+/// `StreamType::Logs`, exactly like `_agent_signals` — design §5.3).
 /// Returns empty when the stream does not exist yet.
 pub(super) async fn run_stats_search(
     org_id: &str,

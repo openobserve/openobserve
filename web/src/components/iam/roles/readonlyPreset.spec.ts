@@ -69,6 +69,15 @@ describe("buildReadonlyPermissions", () => {
     expect(perms).toEqual([]);
   });
 
+  it("AC-5.8 grants slack_integration LIST only, since its OpenFGA type has no GET", () => {
+    const perms = buildReadonlyPermissions(
+      [{ key: "slack_integration", visible: true }],
+      "default",
+      false,
+    );
+    expect(perms).toEqual([{ object: "slack_integration:_all_default", permission: "AllowList" }]);
+  });
+
   it("excludes the org resource outside the meta org (mirrors EditRole's setPermission guard)", () => {
     const resources = [
       { key: "org", visible: true },

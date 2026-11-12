@@ -57,7 +57,8 @@ export type FeatureKey =
   | "remoteTasks"
   | "evaluations"
   | "scheduledSearch"
-  | "customBranding";
+  | "customBranding"
+  | "slack";
 
 /**
  * The flags every predicate below reads — EDITION-only, plus RBAC's own
@@ -185,14 +186,10 @@ const FEATURE_GATES: Record<FeatureKey, FeatureGateDefinition> = {
     predicate: (c) => c.isEnterprise || c.isCloud,
     labelKey: "llmProviders.tabLabel",
   },
-  // Also gates the LLM Insights/Sessions Agent-mode toggle and the LLM
-  // Insights version-compare entry — both call the same agent-mapping API
-  // this Settings tab configures, so they share this one gate rather than
-  // each re-deriving their own edition check (see AiScopeBar.vue,
-  // LLMInsightsDashboard.vue, SessionsList.vue).
+  // Also gates Agent mode and version compare: they call the same agent-mapping API.
   genAiAgentMapping: {
     predicate: (c) => c.isEnterprise || c.isCloud,
-    labelKey: "settings.genAiAgentMapping.tabLabel",
+    labelKey: "genAiAgentMapping.tabLabel",
     pitchKey: "enterpriseFeature.pitch.genAiAgentMapping",
   },
   incidents: {
@@ -311,6 +308,11 @@ const FEATURE_GATES: Record<FeatureKey, FeatureGateDefinition> = {
     labelKey: "settings.customLogoText",
     pitchKey: "enterpriseFeature.pitch.customBranding",
     cloudOffers: false,
+  },
+  // The edition gate only: whether this org has Slack turned on is the org config's `slack_enabled`.
+  slack: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "settings.slackApp",
   },
 };
 

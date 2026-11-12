@@ -20,14 +20,21 @@
  * Prometheus-histogram mode, and the SQL converter — and share these defaults so
  * a heatmap looks like a heatmap wherever it appears.
  *
- * This is presentation only. It says nothing about how the data is prepared:
+ * It also holds the cell budget, colour range/scale and warning helpers, but never prepares data:
  * the classic-histogram `le`-sort and de-accumulation stay opt-in behind
  * `config.heatmap_mode === "prometheus_histogram"`, because applying them to an
  * arbitrary heatmap would corrupt it.
  */
 
-import { SPECTRAL_HEATMAP_STOPS } from "./promql/shared/spectral";
+import {
+  DEFAULT_HEATMAP_PALETTE,
+  HEATMAP_PALETTES,
+  HEATMAP_STOP_COUNT,
+  buildColorStops,
+} from "./heatmapPalettes";
 import { chartColor } from "@/utils/chartTheme";
+import { gt } from "@/types/i18n";
+import { addCommasToNumber } from "@/utils/formatters";
 
 /**
  * Stroke every cell in the panel background colour.
@@ -43,13 +50,10 @@ export function heatmapCellItemStyle(_store: any) {
   };
 }
 
-/**
- * The Spectral ramp, cool-to-warm, with the colour-scale exponent already baked
- * into the stop positions (see spectral.ts). ECharts spreads `inRange.color`
- * linearly over [min, max], so the non-linear scale has to live in where each
- * stop is sampled from the ramp rather than in ECharts' own config.
- */
-export const HEATMAP_VISUAL_MAP_COLORS = SPECTRAL_HEATMAP_STOPS;
+/** The colour scales `heatmap_color_scale` accepts; unset is square root. */
+export const HEATMAP_COLOR_SCALES = ["linear", "sqrt", "log"] as const;
+
+export const DEFAULT_HEATMAP_COLOR_SCALE = "sqrt";
 
 /**
  * The cell borders delineate the grid; a split-area backdrop underneath them
@@ -112,3 +116,219 @@ export function heatmapLargeGridDefaults(cellCount: number) {
  * on the panel or the query still wins — this is only the default.)
  */
 export const HEATMAP_MAX_COLUMNS = 120;
+
+/** The most cells a heatmap grid holds: 120 columns by ~400 rows, past which rows shrink below a pixel on a full-size panel. */
+export const HEATMAP_MAX_CELLS = 50_000;
+
+/** The most rows a full-width heatmap keeps within the cell budget. */
+export const HEATMAP_MAX_ROWS = Math.floor(HEATMAP_MAX_CELLS / HEATMAP_MAX_COLUMNS);
+
+export interface HeatmapConfig {
+  heatmap_color_min?: unknown;
+  heatmap_color_max?: unknown;
+  heatmap_palette?: string | null;
+  heatmap_palette_reverse?: boolean | null;
+  heatmap_color_scale?: string | null;
+  heatmap_y_sort?: string | null;
+  heatmap_y_bucket?: { mode?: unknown; size?: unknown; base?: unknown } | null;
+  heatmap_y_min?: unknown;
+  heatmap_y_max?: unknown;
+}
+
+export interface HeatmapGridCut {
+  firstColumn: number;
+  rows: number[];
+}
+
+export interface HistogramStackCut {
+  groups: number[];
+  firstColumn: number;
+}
+
+function pinnedColorBound(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const bound = Number(value);
+  return Number.isFinite(bound) ? bound : undefined;
+}
+
+/** Whether both colour pins are set with min >= max, which the renderer ignores. */
+export function isHeatmapColorRangeInverted(config: HeatmapConfig | null | undefined): boolean {
+  const min = pinnedColorBound(config?.heatmap_color_min);
+  const max = pinnedColorBound(config?.heatmap_color_max);
+  return min !== undefined && max !== undefined && min >= max;
+}
+
+/** The `visualMap` range with `heatmap_color_min` / `heatmap_color_max` applied over `baseRange`, ignoring pins that would leave min >= max. */
+export function heatmapColorRange(
+  config: HeatmapConfig | null | undefined,
+  baseRange: { min: number; max: number },
+): { min: number; max: number } {
+  const pinnedMin = pinnedColorBound(config?.heatmap_color_min);
+  const pinnedMax = pinnedColorBound(config?.heatmap_color_max);
+  if (pinnedMin === undefined && pinnedMax === undefined) return { ...baseRange };
+
+  const min = pinnedMin ?? baseRange.min;
+  const max = pinnedMax ?? baseRange.max;
+  if (min >= max) return { ...baseRange };
+  return { min, max };
+}
+
+/** The `visualMap` range and `inRange.color` stops for `config`'s palette, reverse flag and colour scale over `range`; `cellSets` holds the `[x, y, value]` cells it colours. */
+export function heatmapColorScale(
+  config: HeatmapConfig | null | undefined,
+  range: { min: number; max: number },
+  cellSets: any[][],
+): { min: number; max: number; color: string[] } {
+  const palette =
+    HEATMAP_PALETTES[config?.heatmap_palette ?? DEFAULT_HEATMAP_PALETTE] ??
+    HEATMAP_PALETTES[DEFAULT_HEATMAP_PALETTE];
+  const ramp = config?.heatmap_palette_reverse ? [...palette].reverse() : palette;
+  const scale = config?.heatmap_color_scale ?? DEFAULT_HEATMAP_COLOR_SCALE;
+
+  // Log runs over [max(min, smallest positive cell), max]; cells at or below that floor (so every value <= 0) fall under the bar and take its lowest colour, and with no positive span the scale is linear.
+  if (scale === "log") {
+    const floor = Math.max(range.min, smallestPositiveCell(cellSets));
+    if (floor > 0 && range.max > floor) {
+      const logSpan = Math.log(range.max / floor);
+      const warp = (t: number) => Math.log((floor + t * (range.max - floor)) / floor) / logSpan;
+      return { min: floor, max: range.max, color: buildColorStops(ramp, HEATMAP_STOP_COUNT, warp) };
+    }
+  }
+  // Square root is the variance-stabilising transform for Poisson counts, so a colour step means similar evidence along the ramp.
+  const warp = scale === "linear" || scale === "log" ? (t: number) => t : Math.sqrt;
+  return { ...range, color: buildColorStops(ramp, HEATMAP_STOP_COUNT, warp) };
+}
+
+/** The `visualMap` range for a set of cell values; the floor drops below 0 only for negative data, so all-negative grids are not one colour. */
+export function visualMapRangeOf(minValue: number, maxValue: number): { min: number; max: number } {
+  return {
+    min: Number.isFinite(minValue) ? Math.min(0, minValue) : 0,
+    max: Number.isFinite(maxValue) ? maxValue : 0,
+  };
+}
+
+/** The cut that fits a `columnCount` x `rowTotals.length` grid into `budget` cells, or null when it already fits; `contiguous` keeps one unbroken run of rows, for ordered axes such as y buckets. */
+export function cutHeatmapToBudget(
+  columnCount: number,
+  rowTotals: number[],
+  budget: number = HEATMAP_MAX_CELLS,
+  contiguous = false,
+): HeatmapGridCut | null {
+  if (columnCount * rowTotals.length <= budget) return null;
+  const keep = columnCount <= budget ? Math.floor(budget / columnCount) : 1;
+  const rows = contiguous ? largestRowRun(rowTotals, keep) : largestRows(rowTotals, keep);
+  return { firstColumn: Math.max(0, columnCount - budget), rows };
+}
+
+export function heatmapBudgetWarning(
+  cut: HeatmapGridCut,
+  columnCount: number,
+  rowCount: number,
+): string {
+  if (cut.firstColumn === 0) {
+    return gt("dashboard.utils.heatmapRowsCapped", {
+      shown: addCommasToNumber(cut.rows.length),
+      total: addCommasToNumber(rowCount),
+    });
+  }
+  return gt("dashboard.utils.heatmapColumnsCapped", {
+    shownColumns: addCommasToNumber(columnCount - cut.firstColumn),
+    totalColumns: addCommasToNumber(columnCount),
+    shownRows: addCommasToNumber(cut.rows.length),
+    totalRows: addCommasToNumber(rowCount),
+  });
+}
+
+/** The histogram grids (indices, in input order) and first column a stack keeps within `budget`: smallest-total grids go first, then the oldest columns, never a bucket; null when it fits. */
+export function cutHistogramsToBudget(
+  columnCount: number,
+  groupRows: number[],
+  groupTotals: number[],
+  budget: number = HEATMAP_MAX_CELLS,
+): HistogramStackCut | null {
+  const totalRows = groupRows.reduce((sum, rows) => sum + rows, 0);
+  if (columnCount * totalRows <= budget) return null;
+
+  const groups: number[] = [];
+  let keptRows = 0;
+  const byTotal = groupTotals
+    .map((_total, index) => index)
+    .sort((a, b) => groupTotals[b] - groupTotals[a] || a - b);
+  for (const group of byTotal) {
+    if (groups.length > 0 && (keptRows + groupRows[group]) * columnCount > budget) break;
+    groups.push(group);
+    keptRows += groupRows[group];
+  }
+  const keptColumns = Math.max(1, Math.floor(budget / Math.max(1, keptRows)));
+  return {
+    groups: groups.sort((a, b) => a - b),
+    firstColumn: Math.max(0, columnCount - keptColumns),
+  };
+}
+
+export function histogramBudgetWarnings(
+  cut: HistogramStackCut,
+  columnCount: number,
+  groupCount: number,
+): string[] {
+  const warnings: string[] = [];
+  if (cut.groups.length < groupCount) {
+    warnings.push(
+      gt("dashboard.utils.heatmapHistogramsCapped", {
+        shown: addCommasToNumber(cut.groups.length),
+        total: addCommasToNumber(groupCount),
+      }),
+    );
+  }
+  if (cut.firstColumn > 0) {
+    warnings.push(
+      gt("dashboard.utils.heatmapHistogramColumnsCapped", {
+        shown: addCommasToNumber(columnCount - cut.firstColumn),
+        total: addCommasToNumber(columnCount),
+      }),
+    );
+  }
+  return warnings;
+}
+
+/** Adds `message` to the panel's warning, which the header shows through the series-limit notice. */
+export function addHeatmapWarning(extras: any, message: string): void {
+  if (!extras) return;
+  const existing = extras.limitNumberOfSeriesWarningMessage;
+  extras.limitNumberOfSeriesWarningMessage = existing ? `${existing}. ${message}` : message;
+}
+
+function smallestPositiveCell(cellSets: any[][]): number {
+  let smallest = Infinity;
+  for (const cells of cellSets) {
+    for (const cell of cells) {
+      const value = Number(cell?.[2]);
+      if (value > 0 && value < smallest) smallest = value;
+    }
+  }
+  return smallest;
+}
+
+/** The `keep` adjacent rows with the largest summed total, earliest run on a tie. */
+function largestRowRun(rowTotals: number[], keep: number): number[] {
+  let sum = 0;
+  let bestSum = -Infinity;
+  let bestStart = 0;
+  for (let index = 0; index < rowTotals.length; index++) {
+    sum += rowTotals[index];
+    if (index >= keep) sum -= rowTotals[index - keep];
+    if (index >= keep - 1 && sum > bestSum) {
+      bestSum = sum;
+      bestStart = index - keep + 1;
+    }
+  }
+  return Array.from({ length: Math.min(keep, rowTotals.length) }, (_unused, i) => bestStart + i);
+}
+
+function largestRows(rowTotals: number[], keep: number): number[] {
+  return rowTotals
+    .map((_total, index) => index)
+    .sort((a, b) => rowTotals[b] - rowTotals[a] || a - b)
+    .slice(0, keep)
+    .sort((a, b) => a - b);
+}

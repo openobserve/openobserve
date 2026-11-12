@@ -6,6 +6,7 @@ import { createI18n } from "vue-i18n";
 import StreamExplorer from "./StreamExplorer.vue";
 import stream from "@/services/stream";
 import search from "@/services/search";
+import analytics from "@/services/product_analytics";
 
 const i18n = createI18n({
   legacy: false,
@@ -21,6 +22,8 @@ vi.mock("@/services/search", async (importOriginal) => {
   const { automockService } = await import("@/test/unit/helpers/mockService");
   return automockService(await importOriginal());
 });
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({
@@ -199,6 +202,25 @@ describe("StreamExplorer", () => {
     });
 
     expect(wrapper.vm.currentPage).toBe(1);
+    wrapper.unmount();
+  });
+
+  it("tracks a search the user runs, but not the initial load", async () => {
+    const wrapper = mount(StreamExplorer, {
+      global: {
+        plugins: [i18n],
+        stubs: { OTable: true },
+      },
+    });
+    await flushPromises();
+    expect(analytics.track).not.toHaveBeenCalled();
+
+    wrapper.findComponent({ name: "SearchBar" }).vm.$emit("searchdata");
+    await flushPromises();
+
+    expect(analytics.track).toHaveBeenCalledWith("stream_explorer_search_run", {
+      stream_type: "logs",
+    });
     wrapper.unmount();
   });
 });

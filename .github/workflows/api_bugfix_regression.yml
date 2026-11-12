@@ -1,12 +1,6 @@
 name: API Bug-Fix Regression Tests
 
-# The per-PR suite (api-testing.yml) only runs on a labelled, non-draft PR whose
-# diff touches backend or tests/api-testing. Nothing re-runs the API suite against
-# main afterwards, so a regression that lands via an unrelated path — a dependency
-# bump, a merge-queue interleaving, a change classified as UI-only — is invisible
-# until the next backend PR happens to run it. This is the API sibling of
-# playwright_bugfix_regression.yml: same tests, same flag matrix, run against main
-# on a schedule, with a tracking issue as the notification.
+# Bug-fix API tests (tests/regression/) run only here, never on a PR; shards come from tests/api-testing/ci-matrix/ci_matrix_api_regression.json.
 
 on:
   schedule:
@@ -116,10 +110,10 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
-          toolchain: nightly-2026-05-20
+          toolchain: nightly-2026-10-24
 
       - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           # Read the same dependency cache api-testing.yml reads; the DB workflow's
           # push:main build is the only writer, so this job never saves.
@@ -148,71 +142,39 @@ jobs:
           # The payload is already gzip-compressed; avoid a second compression pass.
           compression-level: 0
 
-  # One matrix instead of api-testing.yml's three near-identical jobs: the legs differ
-  # only in the server env, the pytest target and the pytest env, so they are matrix
-  # fields. `category` feeds the junit artifact name that parse-api-junit.py reads.
+  # Runs beside the build, so a bad manifest or an unwired regression test fails in seconds, not after a cold compile.
+  generate_matrix:
+    name: generate_matrix
+    timeout-minutes: 5
+    needs: [check_main_changed]
+    if: ${{ needs.check_main_changed.outputs.should_run == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: gen
+        run: |
+          MATRIX=$(python3 .github/scripts/build-api-regression-matrix.py \
+            tests/api-testing/ci-matrix/ci_matrix_api_regression.json \
+            tests/api-testing)
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "$MATRIX" | jq -r '"generated \(.include | length) shards: \([.include[].label] | join(", "))"'
+
   api_regression_tests:
     timeout-minutes: 60
-    name: "api_regression / ${{ matrix.config.label }}"
-    needs: [check_main_changed, build_api_binary]
+    name: "api_regression / ${{ matrix.label }}"
+    needs: [check_main_changed, build_api_binary, generate_matrix]
     if: ${{ needs.check_main_changed.outputs.should_run == 'true' }}
-    runs-on: ubicloud-standard-4
+    runs-on: eks-openobserve-standard-4
     permissions:
       actions: read
       contents: read
     strategy:
       fail-fast: false
-      matrix:
-        config:
-          # The default set — everything under tests/ except the three dirs that
-          # need their own server configuration. tests/ingest/ lives here, so the
-          # OTLP UTF-8 repair cases run on every scheduled pass.
-          - label: default_set
-            category: api_integration_tests
-            server_env: ""
-            test_env: ""
-            target: "--ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex"
-          # Flag-sensitive query-engine cases: each file is meaningless unless the
-          # server is restarted under the paired flag, which is why they sit outside
-          # the default set.
-          - label: utf8_view_false
-            category: api_integration_tests
-            server_env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false"
-            test_env: ""
-            target: "tests/regression/test_subquery_join_match.py"
-          - label: utf8_view_true
-            category: api_integration_tests
-            server_env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true"
-            test_env: ""
-            target: "tests/regression/test_subquery_join_match.py"
-          - label: join_match_one_true
-            category: api_integration_tests
-            server_env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true"
-            test_env: ""
-            target: "tests/regression/test_logs_to_logs_join.py"
-          - label: join_match_one_false
-            category: api_integration_tests
-            server_env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false"
-            test_env: ""
-            target: "tests/regression/test_logs_to_logs_join.py"
-          # SINGLE_NODE_OPT_MODE decides which queries load_all_queries() includes:
-          # the non-optimized RemoteScanRewriter path trips known upstream DataFusion
-          # bugs, and those queries carry skip_without_single_node_opt.
-          - label: single_node_opt_false
-            category: query_agent_tests
-            server_env: "ZO_MAX_FILE_RETENTION_TIME=1 ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED=false"
-            test_env: "SINGLE_NODE_OPT_MODE=false"
-            target: "tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py"
-          - label: single_node_opt_true
-            category: query_agent_tests
-            server_env: "ZO_MAX_FILE_RETENTION_TIME=1 ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED=true"
-            test_env: "SINGLE_NODE_OPT_MODE=true"
-            target: "tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py"
-          - label: remove_filter_with_index_false
-            category: query_agent_tests
-            server_env: "ZO_MAX_FILE_RETENTION_TIME=1 ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX=false"
-            test_env: "SINGLE_NODE_OPT_MODE=true"
-            target: "tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py"
+      matrix: ${{ fromJSON(needs.generate_matrix.outputs.matrix) }}
     steps:
       - name: Checkout git repo
         uses: actions/checkout@v5
@@ -253,17 +215,17 @@ jobs:
         run: rye sync
         working-directory: tests/api-testing/
 
-      - name: Regenerate query-agent expected values
-        if: ${{ matrix.config.category == 'query_agent_tests' }}
-        run: |
-          cd ${{ github.workspace }}/tests/test-data/query-agent
-          ${{ github.workspace }}/tests/api-testing/.venv/bin/python compute_counts.py
-
-      - name: "Run ${{ matrix.config.label }}"
+      - name: "Run ${{ matrix.label }}"
         # --force-sugar omitted on purpose: pytest-sugar auto-loads via its entry
         # point, and passing the flag registers it twice and inflates the counter.
+        env:
+          SERVER_ENV: ${{ matrix.server_env }}
+          TARGET: ${{ matrix.target }}
+          LABEL: ${{ matrix.label }}
         run: |
-          ${{ matrix.config.server_env }} ${{ github.workspace }}/target/debug/openobserve > "o2_${{ matrix.config.label }}.log" 2>&1 &
+          read -ra pairs <<< "$SERVER_ENV"
+          read -ra args <<< "$TARGET"
+          env "${pairs[@]}" "$GITHUB_WORKSPACE/target/debug/openobserve" > "o2_$LABEL.log" 2>&1 &
           SERVER_PID=$!
           for i in $(seq 1 60); do
             if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
@@ -271,7 +233,7 @@ jobs:
             fi
             sleep 1
           done
-          ${{ matrix.config.test_env }} rye run pytest ${{ matrix.config.target }} --junitxml=junit-${{ matrix.config.label }}.xml
+          rye run pytest "${args[@]}" -v --junitxml="junit-$LABEL.xml"
           kill $SERVER_PID || true
         working-directory: tests/api-testing/
 
@@ -281,8 +243,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: api-junit__${{ matrix.config.category }}__${{ matrix.config.label }}
-          path: tests/api-testing/junit-${{ matrix.config.label }}.xml
+          name: api-junit__${{ matrix.category }}__${{ matrix.label }}
+          path: tests/api-testing/junit-${{ matrix.label }}.xml
           if-no-files-found: warn
           retention-days: 7
 
@@ -290,14 +252,14 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: openobserve-${{ matrix.config.label }}-log
-          path: tests/api-testing/o2_${{ matrix.config.label }}.log
+          name: openobserve-${{ matrix.label }}-log
+          path: tests/api-testing/o2_${{ matrix.label }}.log
           if-no-files-found: warn
           retention-days: 14
 
   api_regression_summary:
     name: api_regression_summary
-    needs: [check_main_changed, build_api_binary, api_regression_tests]
+    needs: [check_main_changed, build_api_binary, generate_matrix, api_regression_tests]
     if: always()
     runs-on: ubuntu-latest
     permissions: {}
@@ -309,11 +271,12 @@ jobs:
             exit 0
           fi
           if [ "${{ needs.build_api_binary.result }}" == "success" ] && \
+             [ "${{ needs.generate_matrix.result }}" == "success" ] && \
              [ "${{ needs.api_regression_tests.result }}" == "success" ]; then
             echo "✅ All API regression legs passed"
             exit 0
           fi
-          echo "API regression failed: build=${{ needs.build_api_binary.result }}, tests=${{ needs.api_regression_tests.result }}"
+          echo "API regression failed: build=${{ needs.build_api_binary.result }}, matrix=${{ needs.generate_matrix.result }}, tests=${{ needs.api_regression_tests.result }}"
           exit 1
 
   # GitHub emails assignees and @-mentioned users, so a tracking issue is the
@@ -352,7 +315,7 @@ jobs:
             --jq '[.jobs[] | select(.name | startswith("api_regression /")) | select(.conclusion == "failure" or .conclusion == "timed_out") | .name] | join(", ")')
           MENTIONS=$(echo "$NOTIFY" | sed 's/[^,]*/@&/g; s/,/ /g')
           BODY="API regression failed on main at ${{ github.sha }}.
-          Failed legs: ${FAILED:-none listed (build or summary failed)}
+          Failed legs: ${FAILED:-none listed (build, matrix or summary failed)}
           Run: $RUN_URL
 
           $MENTIONS"
@@ -363,9 +326,7 @@ jobs:
             gh issue create --title "API regression failing on main" --label "$LABEL" --assignee "$NOTIFY" --body "$BODY"
           fi
 
-  # Non-fatal metrics sidecar: same streams and the same junit parser as
-  # api-testing.yml, tagged workflow=regression so the scheduled pass is
-  # distinguishable from the per-PR one. Never fails the run.
+  # Non-fatal metrics sidecar: ci_regression and ci_regression_shards, as the UI regression reports; never fails the run.
   report_to_openobserve:
     name: Report run metrics to OpenObserve
     needs: [check_main_changed, api_regression_tests, api_regression_summary]
@@ -395,34 +356,25 @@ jobs:
           O2_REPORTING_INGEST_BASE: ${{ secrets.O2_REPORTING_INGEST_BASE }}
           O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
           O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
-          # The SUMMARY, not the test job: this job now also runs when the build failed,
-          # and in that case the test job is `skipped` — which read as success and would
-          # post a broken run to ci_test_runs as green. Anything that is not an explicit
-          # success or cancellation counts as a failure, so the metric errs loud.
+          BUILD_JOB_NAME: build_api_binary
+          SHARD_PREFIX: "api_regression / "
+          # The summary, not the test job: a failed build skips the tests, and skipped must not read as green.
           RESULT: ${{ needs.api_regression_summary.result }}
         run: |
           set -uo pipefail
           if [ "$RESULT" = "success" ]; then CONCLUSION=success
           elif [ "$RESULT" = "cancelled" ]; then CONCLUSION=cancelled
           else CONCLUSION=failure; fi
-          export CONCLUSION STREAM=ci_test_runs SUITE=api
-          # o2-run-report.sh derives its workflow tag from the STREAM name alone
-          # (regression only for ci_regression), so a scheduled run posting to
-          # ci_test_runs would be indistinguishable from a per-PR api-testing run and
-          # would pollute the PR-CI duration and pass-rate panels. EXTRA_JSON keys win
-          # the merge, so override it here. The default stands unless the counts merge
-          # BOTH succeeds and produces output — an empty EXTRA_JSON is skipped by the
-          # reporter, which would silently drop the tag back to "test". It must agree
-          # with the resync entry, which registers this workflow as is_regression=True.
-          EXTRA_JSON='{"workflow":"regression"}'
+          # MIRROR_STREAM also lands the run in ci_test_runs, so the run-health dashboard can pick suite=api_regression like UI regression.
+          export CONCLUSION STREAM=ci_regression SUITE=api_regression MIRROR_STREAM=ci_test_runs
+          EXTRA_JSON=""
           if [ -d junit-xml ]; then
             COUNTS=$(python3 .github/scripts/parse-api-junit.py junit-xml 2>/dev/null || echo "")
             if [ -n "$COUNTS" ] && printf '%s' "$COUNTS" | jq -e . >/dev/null 2>&1; then
               echo "API counts: $COUNTS"
-              MERGED=$(printf '%s' "$COUNTS" | jq -c '.total + {workflow:"regression"}' 2>/dev/null || echo "")
-              [ -n "$MERGED" ] && EXTRA_JSON="$MERGED"
+              EXTRA_JSON=$(printf '%s' "$COUNTS" | jq -c .total 2>/dev/null || echo "")
               printf '%s' "$COUNTS" | jq -c --arg run_id "$GITHUB_RUN_ID" --arg repo "$GITHUB_REPOSITORY" \
-                '[.by_category[] | {run_id:$run_id, repo:$repo, suite:"api", workflow:"regression", ingest_source:"live",
+                '[.by_category[] | {run_id:$run_id, repo:$repo, suite:"api_regression", workflow:"regression", ingest_source:"live",
                   module:.module, tests_total, tests_passed, tests_failed, tests_flaky, tests_skipped}]' > api_counts_rows.json
               if [ "$(jq 'length' api_counts_rows.json 2>/dev/null || echo 0)" -gt 0 ]; then
                 bash .github/scripts/o2-report.sh ci_test_counts api_counts_rows.json

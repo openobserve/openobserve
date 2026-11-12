@@ -20,14 +20,14 @@ use db::workflows::WorkflowTriggerType;
 use infra::table::workflows::get_all_associations_for_trigger_type;
 use serde_json::Value;
 
-use crate::{alerts::incidents::get_incident_with_alerts, workflows::send_workflow_trigger};
+use crate::{alerts::incidents::get_incident_with_triggers, workflows::send_workflow_trigger};
 
 async fn get_event_metadata(
     org_id: &str,
     incident_id: &str,
     event: IncidentEvent,
 ) -> Result<HashMap<String, Value>, anyhow::Error> {
-    let incident = get_incident_with_alerts(org_id, incident_id)
+    let incident = get_incident_with_triggers(org_id, incident_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("incident with given id not found"))?;
 
@@ -109,6 +109,11 @@ async fn get_event_metadata(
             metadata.push(("reason", reason.into()));
         }
 
+        IncidentEventType::AckEndedByPageResolve { user_id } => {
+            metadata.push(("event_type", "ack_ended_by_page_resolve".into()));
+            metadata.push(("user_id", user_id.into()));
+        }
+
         IncidentEventType::DimensionsUpgraded { from_key, to_key } => {
             metadata.push(("event_type", "dimensions_upgraded".into()));
             metadata.push(("from_key", from_key.into()));
@@ -121,8 +126,11 @@ async fn get_event_metadata(
             metadata.push(("new_title", to.into()));
             metadata.push(("user_id", user_id.into()));
         }
-        IncidentEventType::AssignmentChanged { from, to } => {
+        IncidentEventType::AssignmentChanged { from, to, user_id } => {
             metadata.push(("event_type", "assignment_changed".into()));
+            if let Some(user_id) = user_id {
+                metadata.push(("user_id", user_id.into()));
+            }
             metadata.push((
                 "from_user",
                 from.unwrap_or_else(|| "unknown".to_string()).into(),
@@ -131,6 +139,38 @@ async fn get_event_metadata(
                 "to_user",
                 to.unwrap_or_else(|| "unknown".to_string()).into(),
             ));
+        }
+
+        IncidentEventType::Verdict {
+            user_id,
+            verdict,
+            reason,
+        } => {
+            metadata.push(("event_type", "verdict".into()));
+            metadata.push(("user_id", user_id.into()));
+            metadata.push(("verdict", verdict.as_str().into()));
+            metadata.push(("reason", reason.into()));
+        }
+
+        IncidentEventType::AlertsAttached {
+            user_id,
+            alert_names,
+            ..
+        } => {
+            metadata.push(("event_type", "alerts_attached".into()));
+            metadata.push(("user_id", user_id.into()));
+            metadata.push(("alert_names", alert_names.join(", ").into()));
+        }
+
+        IncidentEventType::EventAttached {
+            user_id,
+            stream,
+            event_at,
+        } => {
+            metadata.push(("event_type", "event_attached".into()));
+            metadata.push(("user_id", user_id.into()));
+            metadata.push(("stream", stream.into()));
+            metadata.push(("event_at", event_at.to_string().into()));
         }
 
         IncidentEventType::Comment { user_id, comment } => {
@@ -159,6 +199,32 @@ async fn get_event_metadata(
         IncidentEventType::AIAnalysisCancelled { user_id } => {
             metadata.push(("event_type", "ai_analysis_cancelled".into()));
             metadata.push(("user_id", user_id.into()));
+        }
+        IncidentEventType::AiAnalysisSteered {
+            run_id,
+            steer_id,
+            user_id,
+            kind,
+        } => {
+            metadata.push(("event_type", "ai_analysis_steered".into()));
+            metadata.push(("run_id", run_id.into()));
+            metadata.push(("steer_id", steer_id.into()));
+            metadata.push(("user_id", user_id.into()));
+            metadata.push(("kind", kind.into()));
+        }
+        IncidentEventType::AiAnalysisNeedsInput {
+            run_id,
+            question_id,
+            need,
+            question,
+            deadline_at,
+        } => {
+            metadata.push(("event_type", "ai_analysis_needs_input".into()));
+            metadata.push(("run_id", run_id.into()));
+            metadata.push(("question_id", question_id.into()));
+            metadata.push(("need", need.into()));
+            metadata.push(("question", question.into()));
+            metadata.push(("deadline_at", deadline_at.into()));
         }
         IncidentEventType::Unknown(value) => {
             metadata.push(("event_type", "unknown".into()));

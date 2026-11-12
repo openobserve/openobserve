@@ -89,6 +89,16 @@ limitations under the License.
           tabindex="0"
         />
       </div>
+      <div class="w-full py-1">
+        <OFormSwitch
+          name="credentials.euRegion"
+          data-test="pagerduty-eu-region-toggle"
+          :label="t('alerts.prebuiltDestinations.pagerdutyEuRegion')"
+        />
+        <span class="text-text-secondary text-xs">
+          {{ t("alerts.prebuiltDestinations.pagerdutyEuRegionHelp") }}
+        </span>
+      </div>
     </template>
 
     <!-- ServiceNow Fields -->
@@ -206,6 +216,10 @@ limitations under the License.
       </div>
     </template>
 
+    <template v-if="destinationType === 'jira'">
+      <JiraDestinationFields />
+    </template>
+
     <!-- Test and Preview Actions (plain event-emitting buttons, not form fields). -->
     <div v-if="!hideActions" class="w-full py-3">
       <div class="flex items-center gap-2">
@@ -241,6 +255,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import SlackWebhookFields from "./SlackWebhookFields.vue";
+import JiraDestinationFields from "./JiraDestinationFields.vue";
 import { useStore } from "vuex";
 import usersService from "@/services/users";
 import serviceAccountsService from "@/services/service_accounts";

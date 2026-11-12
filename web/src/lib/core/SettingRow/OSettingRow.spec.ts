@@ -42,6 +42,24 @@ describe("OSettingRow", () => {
     expect(wrapper.find(".min-w-0").classes()).toContain("w-[22.5%]");
   });
 
+  it("stacks the label above a full-width control below md, single or paired", () => {
+    for (const provide of [{}, { [SETTING_ROW_PAIR_KEY as symbol]: true }]) {
+      const wrapper = mount(OSettingRow, {
+        props: { label: raw("Require digit") },
+        slots: { default: '<button data-test="control">toggle</button>' },
+        global: { provide },
+      });
+
+      expect(wrapper.classes()).toEqual(
+        expect.arrayContaining(["max-md:flex-col", "max-md:items-stretch"]),
+      );
+      expect(wrapper.find(".min-w-0").classes()).toContain("max-md:w-full");
+      expect(wrapper.find('[data-test="control"]').element.parentElement?.classList).toContain(
+        "max-md:justify-start",
+      );
+    }
+  });
+
   it("forwards data-test for addressing the row in page tests", () => {
     const wrapper = mount(OSettingRow, {
       props: { label: raw("Require digit"), dataTest: "settings-password-policy-require-digit" },

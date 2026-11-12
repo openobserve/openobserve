@@ -187,7 +187,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('alert_destinations.deleteDestinationTitle')"
-      :message="t('alert_destinations.deleteDestinationMessage')"
+      message-keypath="alert_destinations.deleteDestinationMessage"
+      :message-name="confirmDelete.data?.name"
+      ok-variant="destructive"
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
       v-model="confirmDelete.visible"
@@ -196,6 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('alert_destinations.deleteDestinationsTitle')"
       :message="t('alerts.confirmDeleteDestinations', { count: selectedDestinations.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteDestinations"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -238,6 +241,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { COL } from "@/lib/core/Table/OTable.types";
 
 interface ConformDelete {
@@ -308,7 +312,7 @@ export default defineComponent({
       {
         id: "method",
         header: t("alert_destinations.method"),
-        accessorKey: "method",
+        accessorFn: (row: any) => (row.method ?? "").toUpperCase(),
         sortable: true,
         resizable: true,
         hideable: true,
@@ -411,7 +415,7 @@ export default defineComponent({
     // spinner. `loading` is the skeleton, for a cold read only.
     const fetching = ref(false);
     const lastUpdatedAt = ref<number | null>(null);
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
     // Bound to refresh / post-write reloads: always reaches the server.
     const refreshDestinations = () => getDestinations(true);
 
@@ -454,7 +458,7 @@ export default defineComponent({
             queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
         })
         .catch((err: any) => {
-          forbidden.value = err?.response?.status === 403;
+          forbidden.value = forbiddenState(err);
           if (!forbidden.value) {
             toast({
               variant: "error",
@@ -472,7 +476,9 @@ export default defineComponent({
     const getTemplates = () => {
       queryClient
         .fetchQuery(templatesQuery(store.state.selectedOrganization.identifier))
-        .then((list: any) => (templates.value = list));
+        .then((list: any) => (templates.value = list))
+        // Template read can be denied (403) to users who may still manage destinations.
+        .catch(() => (templates.value = []));
     };
     const updateRoute = () => {
       const action = router.currentRoute.value.query.action;
@@ -725,7 +731,7 @@ export default defineComponent({
           error.response?.data?.message ||
           error?.message ||
           t("alerts.messages.bulkDeleteDestinationsFailed");
-        if (error.response?.status != 403 || error?.status != 403) {
+        if (error.response?.status !== 403 && error?.status !== 403) {
           toast({
             variant: "error",
             message: errorMessage,

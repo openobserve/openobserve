@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OCollapsible
     :model-value="isExpanded"
     @update:model-value="handleToggle"
-    class="field-expansion-item rounded-default w-full overflow-hidden"
+    class="field-expansion-item rounded-default w-full overflow-clip [overflow-clip-margin:0.25rem]"
     trigger-class="px-0! py-0!"
   >
     <template #trigger>
@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #actions>
           <OButton
+            :aria-label="t('common.addFilter')"
             v-if="field.isSchemaField && showFilterIcon"
             :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
             variant="ghost-neutral"
@@ -66,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="add" size="sm" />
           </OButton>
           <OButton
+            :aria-label="t('common.addFieldToTable')"
             :data-test="`log-search-index-list-add-${field.name}-field-btn`"
             v-if="showVisibilityToggle && !isFieldSelected"
             variant="ghost-neutral"
@@ -76,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="visibility" size="sm" />
           </OButton>
           <OButton
+            :aria-label="t('common.removeFieldFromTable')"
             :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
             v-if="showVisibilityToggle && isFieldSelected"
             variant="ghost-neutral"
@@ -105,6 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="py-0 ps-4 pe-2">
+      <slot name="caption" />
       <slot name="body">
         <FieldValuesPanel
           ref="fieldValuesPanelRef"

@@ -67,6 +67,15 @@ vi.mock("@/utils/rum/overview.json", () => ({
 }));
 
 describe("AppPerformance.vue", () => {
+  const refreshButton = () =>
+    wrapper
+      .findAllComponents({ name: "OButton" })
+      .find((b) => b.attributes("data-test") === "rum-performance-refresh")!;
+  const refreshTooltip = () =>
+    wrapper
+      .findAllComponents({ name: "OTooltip" })
+      .find((tip) => tip.find('[data-test="rum-performance-refresh"]').exists())!;
+
   let wrapper: VueWrapper<any>;
   let store: any;
   let router: any;
@@ -157,6 +166,7 @@ describe("AppPerformance.vue", () => {
         plugins: [store, router, i18n],
         stubs: {
           OButton: {
+            name: "OButton",
             template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
             props: ["variant", "size", "disabled"],
           },
@@ -235,6 +245,13 @@ describe("AppPerformance.vue", () => {
     it("should render refresh button", () => {
       const refreshBtn = wrapper.find('[data-test="rum-performance-refresh"]');
       expect(refreshBtn.exists()).toBe(true);
+    });
+
+    it("shows Refresh as a labelled primary button while nothing waits", () => {
+      const refreshBtn = refreshButton();
+      expect(refreshBtn.props("variant")).toBe("primary");
+      expect(refreshBtn.text()).toContain("dashboard.refresh");
+      expect(refreshTooltip().props("disabled")).toBe(true);
     });
 
     it("shares a URL carrying the active tab and its time range", () => {
@@ -646,6 +663,8 @@ describe("AppPerformance.vue", () => {
 
       expect(wrapper.vm.isAutoRunOn).toBe(false);
       expect(wrapper.vm.isVariablesChanged).toBe(true);
+      expect(refreshButton().props("variant")).toBe("warning");
+      expect(refreshTooltip().props("disabled")).toBe(false);
     });
   });
 });

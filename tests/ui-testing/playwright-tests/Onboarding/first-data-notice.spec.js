@@ -2,6 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const { FirstEventPage } = require('../../pages/generalPages/firstEventPage.js');
 const { getAuthHeaders, authedRequest } = require('../utils/cloud-auth.js');
+const { ingestBase } = require('../utils/ingest-url.js');
 
 const base = () => process.env.ZO_BASE_URL.replace(/\/$/, '');
 const ingestionBase = () => (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, '');
@@ -25,7 +26,7 @@ test.describe('Next-visit first data banner', () => {
             ).not.toBeNull();
             await expect(fe.notice).toHaveCount(0);
 
-            const res = await request.post(`${ingestionBase()}/api/${orgId}/e2e_notice/_json`, {
+            const res = await request.post(`${ingestBase(ingestionBase())}/api/${orgId}/e2e_notice/_json`, {
                 headers: getAuthHeaders(),
                 data: [{ level: 'info', log: 'arrived while away' }],
             });

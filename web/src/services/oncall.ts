@@ -33,9 +33,9 @@ import type {
   PresetDescriptor,
   OnCallPosition,
   OnCallTeam,
+  OnCallTeamContext,
   OnCallTeamMember,
   L0Policy,
-  PolicyFinalAction,
   PriorityRung,
   Rotation,
   CauseAnalytics,
@@ -49,6 +49,7 @@ import type {
   DeliveryLedger,
   EscalateResult,
   EscalationProgress,
+  EscalationProgressEntry,
   MyDeliveries,
   MyDeliveriesRead,
   MyOnCall,
@@ -57,7 +58,10 @@ import type {
   PromoteSeverity,
   PutTelephonyBody,
   TelephonyView,
+  TelephonyStatus,
   OrgTelephonyView,
+  SetTeamChannelBody,
+  TeamSlackTestResult,
   TestPageResult,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
@@ -202,6 +206,20 @@ const oncall = {
       at === undefined ? undefined : { params: { at } },
     ),
 
+  /// Policy, rotation and schedule for many teams in one read; `include_mine` adds the caller's teams.
+  teamContext: ({
+    org_identifier,
+    team_ids,
+    include_mine,
+  }: {
+    org_identifier: string;
+    team_ids: string[];
+    include_mine: boolean;
+  }) =>
+    http().get<{ teams: OnCallTeamContext[] }>(`/api/${org_identifier}/oncall/teams/context`, {
+      params: { team_ids: team_ids.join(","), include_mine },
+    }),
+
   getPolicy: ({ org_identifier, team_id }: { org_identifier: string; team_id: string }) =>
     http().get<OnCallPolicy>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/policy`,
@@ -219,13 +237,11 @@ const oncall = {
       destinations?: string[];
       p1_parallel?: boolean;
       p4_pages?: boolean;
-      /** How many full passes the ladder runs before `final_action`. 1 = once;
-       *  there is no zero. */
-      repeat_count?: number;
-      final_action?: PolicyFinalAction;
       /** Absent = unchanged. Only send when the user touched the L0 panel —
        *  editing rungs must not silently un-configure the gate. */
       l0?: L0Policy;
+      /** Template override; null clears it. */
+      template?: string | null;
     };
   }) =>
     http()
@@ -378,11 +394,23 @@ const oncall = {
   }: {
     org_identifier: string;
     team_id: string;
-    data: { destinations: string[] | null };
+    data: SetTeamChannelBody;
   }) =>
     http().put<TeamChannel>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/channel`,
       data,
+    ),
+
+  /// RO-6: one plain message to the team's Slack channel; the answer says what to fix.
+  testTeamSlackChannel: ({
+    org_identifier,
+    team_id,
+  }: {
+    org_identifier: string;
+    team_id: string;
+  }) =>
+    http().post<TeamSlackTestResult>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/slack/test`,
     ),
 
   /// Org-scoped, deliberately not per team. All three params optional; both
@@ -453,16 +481,31 @@ const oncall = {
     data: { oncall_team?: string; dimensions: Record<string, string> };
   }) => http().post<RoutingPreview>(`/api/${org_identifier}/oncall/routing/preview`, data),
 
-  /// Claims the page and stops the ladder.
+  /// Acknowledges the page's problem, which stops every page of it; `take_over` moves someone else's.
   acknowledgeResponse: ({
+    org_identifier,
+    response_id,
+    take_over,
+  }: {
+    org_identifier: string;
+    response_id: string;
+    take_over?: boolean;
+  }) =>
+    http().post<OnCallResponse & { ack?: { changed: boolean } | null }>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/acknowledge`,
+      ...(take_over ? [{ take_over }] : []),
+    ),
+
+  /// Clears the acknowledgement of the page's problem; the pages it stopped restart at step 1.
+  unacknowledgeResponse: ({
     org_identifier,
     response_id,
   }: {
     org_identifier: string;
     response_id: string;
   }) =>
-    http().post<OnCallResponse>(
-      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/acknowledge`,
+    http().post<OnCallResponse & { ack?: { changed: boolean } | null }>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/unacknowledge`,
     ),
 
   /// Quiets the page for a while WITHOUT claiming it — the record stays open
@@ -479,6 +522,18 @@ const oncall = {
     http().post<OnCallResponse>(
       `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/snooze`,
       { minutes },
+    ),
+
+  /// Ends a snooze now; the ladder continues from the step it paused on.
+  unsnoozeResponse: ({
+    org_identifier,
+    response_id,
+  }: {
+    org_identifier: string;
+    response_id: string;
+  }) =>
+    http().post<OnCallResponse>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/unsnooze`,
     ),
 
   addNote: ({
@@ -556,6 +611,19 @@ const oncall = {
   }) =>
     http().get<EscalationProgress>(
       `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/escalation`,
+    ),
+
+  /// Where the ladder has got to for many records in one read; an unreadable id is left out.
+  escalationProgressBatch: ({
+    org_identifier,
+    response_ids,
+  }: {
+    org_identifier: string;
+    response_ids: string[];
+  }) =>
+    http().get<{ progress: EscalationProgressEntry[] }>(
+      `/api/${org_identifier}/oncall/responses/escalation`,
+      { params: { response_ids: response_ids.join(",") } },
     ),
 
   /// What previous firings of this subject turned out to be, grouped by cause.
@@ -844,6 +912,10 @@ const oncall = {
   getTelephony: ({ org_identifier }: { org_identifier: string }) =>
     http().get<TelephonyView>(`/api/${org_identifier}/telephony`),
 
+  /// Asks Twilio about the account the org would page with; read-only.
+  getTelephonyStatus: ({ org_identifier }: { org_identifier: string }) =>
+    http().get<TelephonyStatus>(`/api/${org_identifier}/telephony/status`),
+
   /// Twilio is asked first; nothing is stored unless it reports the account active.
   putTelephony: ({ org_identifier, data }: { org_identifier: string; data: PutTelephonyBody }) =>
     http().put<OrgTelephonyView>(`/api/${org_identifier}/telephony`, data),
@@ -1011,6 +1083,25 @@ const oncall = {
     http().get<ResolvedSegment[]>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/resolved-schedule`,
       { params: rotation_id ? { from, to, rotation_id } : { from, to } },
+    ),
+
+  /// What `resolvedSchedule` would answer for `rotation` once saved, from the same server resolver. Writes nothing.
+  previewResolvedSchedule: ({
+    org_identifier,
+    team_id,
+    rotation,
+    from,
+    to,
+  }: {
+    org_identifier: string;
+    team_id: string;
+    rotation: Rotation;
+    from: number;
+    to: number;
+  }) =>
+    http().post<ResolvedSegment[]>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/resolved-schedule/preview`,
+      { rotation, from, to },
     ),
 
   /// Everything the team header needs, in one call: membership, coverage, the

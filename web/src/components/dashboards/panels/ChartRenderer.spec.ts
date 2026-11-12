@@ -14,10 +14,28 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { KeepAlive, defineComponent, h, ref } from "vue";
 import ChartRenderer from "./ChartRenderer.vue";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
+import { use as echartsUse, init as echartsInit } from "echarts/core";
+import {
+  fakeCanvasPainter,
+  fakeDevicePixelRatio,
+  type DevicePixelRatioFake,
+} from "@/test/unit/helpers/devicePixelRatioFake";
+import {
+  BoxplotChart,
+  FunnelChart,
+  GraphChart,
+  LineChart,
+  PictorialBarChart,
+  TreemapChart,
+  SunburstChart,
+} from "echarts/charts";
+import { applyLegendConfiguration } from "@/utils/dashboard/legendConfiguration";
+import { applySeriesOverrides } from "@/utils/dashboard/seriesOverrides";
 
 // Mock ECharts with comprehensive functionality
 vi.mock("echarts/core", () => ({
@@ -45,6 +63,7 @@ vi.mock("echarts/core", () => ({
     dispatchAction: vi.fn(),
     convertFromPixel: vi.fn(),
     convertToPixel: vi.fn(),
+    getZr: vi.fn().mockReturnValue({ on: vi.fn(), off: vi.fn() }),
   }),
   dispose: vi.fn(),
 }));
@@ -60,6 +79,11 @@ vi.mock("echarts/charts", () => ({
   SankeyChart: vi.fn(),
   TreeChart: vi.fn(),
   GraphChart: vi.fn(),
+  PictorialBarChart: vi.fn(),
+  TreemapChart: vi.fn(),
+  SunburstChart: vi.fn(),
+  FunnelChart: vi.fn(),
+  BoxplotChart: vi.fn(),
 }));
 
 vi.mock("echarts/features", () => ({
@@ -108,6 +132,34 @@ vi.mock("lodash-es", () => ({
   cloneDeep: vi.fn((obj) => JSON.parse(JSON.stringify(obj))),
 }));
 
+// ChartRenderer registers its series at import, before any beforeEach clears the mock.
+const registeredAtImport = vi.mocked(echartsUse).mock.calls.flat(2);
+
+describe("ChartRenderer series registration", () => {
+  it("registers the line series", () => {
+    expect(registeredAtImport).toContain(LineChart);
+  });
+
+  it("registers the pictorial bar series the bar gauge draws in LCD mode", () => {
+    expect(registeredAtImport).toContain(PictorialBarChart);
+  });
+  it("registers the treemap series", () => {
+    expect(registeredAtImport).toContain(TreemapChart);
+  });
+  it("registers the sunburst series", () => {
+    expect(registeredAtImport).toContain(SunburstChart);
+  });
+  it("registers the funnel series", () => {
+    expect(registeredAtImport).toContain(FunnelChart);
+  });
+  it("registers the graph series the node graph draws", () => {
+    expect(registeredAtImport).toContain(GraphChart);
+  });
+  it("registers the box plot series", () => {
+    expect(registeredAtImport).toContain(BoxplotChart);
+  });
+});
+
 describe("ChartRenderer", () => {
   let wrapper: any;
   let mockHoveredSeriesState: any;
@@ -132,18 +184,16 @@ describe("ChartRenderer", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    // Mock hoveredSeriesState - needs to be a reactive ref-like object
-    mockHoveredSeriesState = {
-      value: {
-        panelId: null,
-        seriesIndex: -1,
-        dataIndex: -1,
-        hoveredTime: null,
-        hoveredSeriesName: "",
-      },
+    // The providers inject a ref whose value carries the setters.
+    mockHoveredSeriesState = ref({
+      panelId: null,
+      seriesIndex: -1,
+      dataIndex: -1,
+      hoveredTime: null,
+      hoveredSeriesName: "",
       setIndex: vi.fn(),
       setHoveredSeriesName: vi.fn(),
-    };
+    });
 
     // Mock intersection observer
     global.IntersectionObserver = vi.fn(function () {
@@ -220,6 +270,34 @@ describe("ChartRenderer", () => {
       expect(wrapper.props("data")).toEqual(mockChartData);
       expect(wrapper.props("renderType")).toBe("canvas");
       expect(wrapper.props("height")).toBe("100%");
+    });
+  });
+
+  describe("the painted event (first frame for the chart placeholder)", () => {
+    const renderedHandler = async () => {
+      const echarts = await import("echarts/core");
+      const chart = vi.mocked(echarts.init).mock.results.at(-1)?.value;
+      return vi
+        .mocked(chart.on)
+        .mock.calls.filter(([event]: any[]) => event === "rendered")
+        .at(-1)?.[1] as () => void;
+    };
+
+    it("reports painted once per drawn frame of its current data, never for a frame of older data", async () => {
+      await flushPromises();
+      const rendered = await renderedHandler();
+      expect(rendered).toBeTypeOf("function");
+
+      await wrapper.setProps({ data: { ...mockChartData, options: { ...mockChartData.options } } });
+      // A frame drawn before the new data's setOption is the old data's frame.
+      rendered();
+      expect(wrapper.emitted("painted")).toBeUndefined();
+
+      await flushPromises();
+      rendered();
+      expect(wrapper.emitted("painted")).toHaveLength(1);
+      rendered();
+      expect(wrapper.emitted("painted")).toHaveLength(1);
     });
   });
 
@@ -312,7 +390,69 @@ describe("ChartRenderer", () => {
       await container.trigger("mouseover");
       await container.trigger("mouseleave");
 
-      expect(mockHoveredSeriesState.setIndex).toHaveBeenCalledWith(-1, -1, -1, null);
+      expect(mockHoveredSeriesState.value.setIndex).toHaveBeenCalledWith(-1, -1, -1, null);
+    });
+
+    it("keeps the hover when the pointer moves into a tooltip or exemplar card", async () => {
+      const container = wrapper.find('[data-test="chart-renderer"]');
+      for (const className of ["o2-echarts-tooltip", "o2-exemplar-card"]) {
+        const overlay = document.createElement("div");
+        overlay.className = className;
+        const child = document.createElement("span");
+        overlay.appendChild(child);
+        document.body.appendChild(overlay);
+        mockHoveredSeriesState.value.setIndex.mockClear();
+
+        await container.trigger("mouseleave", { relatedTarget: child });
+
+        expect(mockHoveredSeriesState.value.setIndex).not.toHaveBeenCalled();
+        overlay.remove();
+      }
+    });
+
+    it.each(["o2-echarts-tooltip", "o2-exemplar-card"])(
+      "resets the hover once the pointer leaves a %s for outside the chart, not for the chart",
+      async (className) => {
+        const container = wrapper.find('[data-test="chart-renderer"]');
+        const overlay = document.createElement("div");
+        overlay.className = className;
+        document.body.appendChild(overlay);
+        const outside = document.createElement("div");
+        document.body.appendChild(outside);
+        const leaveOverlay = (relatedTarget: Node) =>
+          overlay.dispatchEvent(new MouseEvent("mouseleave", { relatedTarget }));
+        mockHoveredSeriesState.value.setIndex.mockClear();
+
+        await container.trigger("mouseleave", { relatedTarget: overlay });
+        leaveOverlay(container.element);
+        expect(mockHoveredSeriesState.value.setIndex).not.toHaveBeenCalled();
+
+        await container.trigger("mouseleave", { relatedTarget: overlay });
+        leaveOverlay(outside);
+        expect(mockHoveredSeriesState.value.setIndex).toHaveBeenCalledWith(-1, -1, -1, null);
+
+        overlay.remove();
+        outside.remove();
+      },
+    );
+
+    it("follows the pointer from the tooltip into the exemplar card before resetting", async () => {
+      const container = wrapper.find('[data-test="chart-renderer"]');
+      const tooltip = document.createElement("div");
+      tooltip.className = "o2-echarts-tooltip";
+      const card = document.createElement("div");
+      card.className = "o2-exemplar-card";
+      document.body.append(tooltip, card);
+      mockHoveredSeriesState.value.setIndex.mockClear();
+
+      await container.trigger("mouseleave", { relatedTarget: tooltip });
+      tooltip.dispatchEvent(new MouseEvent("mouseleave", { relatedTarget: card }));
+      expect(mockHoveredSeriesState.value.setIndex).not.toHaveBeenCalled();
+      card.dispatchEvent(new MouseEvent("mouseleave", { relatedTarget: document.body }));
+      expect(mockHoveredSeriesState.value.setIndex).toHaveBeenCalledWith(-1, -1, -1, null);
+
+      tooltip.remove();
+      card.remove();
     });
 
     it("should set panelId on mouseover", async () => {
@@ -320,7 +460,7 @@ describe("ChartRenderer", () => {
 
       await container.trigger("mouseover");
 
-      expect(mockHoveredSeriesState.panelId).toBe("panel-1");
+      expect(mockHoveredSeriesState.value.panelId).toBe("panel-1");
     });
 
     it("should emit error events when needed", async () => {
@@ -357,6 +497,282 @@ describe("ChartRenderer", () => {
       await wrapper.vm.$nextTick();
 
       expect(mockHoveredSeriesState.value.hoveredSeriesName).toBe("Test Series");
+    });
+
+    describe("state timeline row scroll", () => {
+      const zoomIds = ["state-timeline-row-scroll", "state-timeline-row-wheel"];
+      const names = Array.from({ length: 10 }, (_, i) => `r${i}`);
+      const optionsFor = (rows: string[]) => ({
+        yAxis: [{ type: "category", data: rows }, { type: "value" }],
+        dataZoom: zoomIds.map((id) => ({ id, yAxisIndex: 0, startValue: 0, endValue: 2 })),
+        series: [],
+      });
+      const dataFor = (rows: string[], setRowWindow = vi.fn()) => ({
+        options: optionsFor(rows),
+        extras: {
+          panelId: "timeline",
+          isTimeSeries: true,
+          crosshairSeriesIndex: 1,
+          rowScroll: true,
+          setRowWindow,
+        },
+      });
+
+      const mountTimeline = async () => {
+        const echarts = await import("echarts/core");
+        const setRowWindow = vi.fn();
+        const timeline = mount(ChartRenderer, {
+          props: { data: dataFor(names, setRowWindow), renderType: "canvas", height: "100%" },
+          global: {
+            plugins: [i18n],
+            provide: { store, hoveredSeriesState: mockHoveredSeriesState },
+          },
+        });
+        await flushPromises();
+        const mockChart = vi.mocked(echarts.init).mock.results.at(-1)?.value;
+        const onDataZoom = vi
+          .mocked(mockChart.on)
+          .mock.calls.filter(([event]: any[]) => event === "dataZoom")
+          .at(-1)?.[1];
+        // The event ECharts emits for a wheel scroll to r4 carries only a percentage range.
+        const scrollToR4 = () => {
+          vi.mocked(mockChart.getOption).mockClear();
+          onDataZoom({
+            batch: [{ dataZoomId: zoomIds[1], start: (4 / 9) * 100 - 3, end: (6 / 9) * 100 - 3 }],
+          });
+          expect(mockChart.getOption).not.toHaveBeenCalled();
+        };
+        return { timeline, mockChart, onDataZoom, scrollToR4, setRowWindow };
+      };
+
+      const lastRowZoom = (mockChart: any) =>
+        vi
+          .mocked(mockChart.setOption)
+          .mock.calls.map(([option]: any[]) => option)
+          .filter((option: any) => option?.dataZoom?.length)
+          .at(-1)?.dataZoom;
+
+      it("scrolls rows on a y zoom without touching the dashboard time range", async () => {
+        const { timeline, mockChart, onDataZoom, scrollToR4, setRowWindow } = await mountTimeline();
+        scrollToR4();
+        expect(timeline.emitted("updated:dataZoom")).toBeUndefined();
+        expect(setRowWindow).toHaveBeenLastCalledWith(4, 6);
+
+        vi.mocked(mockChart.dispatchAction).mockClear();
+        onDataZoom({
+          batch: [
+            { dataZoomId: "\u0000_ec_\u0000toolbox-dataZoom_xAxis0", startValue: 1, endValue: 2 },
+          ],
+        });
+        expect(timeline.emitted("updated:dataZoom")?.[0]?.[0]).toMatchObject({ start: 1, end: 2 });
+        const actions = vi
+          .mocked(mockChart.dispatchAction)
+          .mock.calls.map(([action]: any[]) => action);
+        const restore = actions.findIndex((action: any) => action.type === "restore");
+        expect(restore).toBeGreaterThanOrEqual(0);
+        expect(actions.slice(restore + 1)).toContainEqual({
+          type: "dataZoom",
+          batch: zoomIds.map((dataZoomId) => ({ dataZoomId, startValue: 4, endValue: 6 })),
+        });
+        timeline.unmount();
+      });
+
+      it("keeps the first visible row across a refresh, or its index when that row is gone", async () => {
+        const { timeline, mockChart, scrollToR4 } = await mountTimeline();
+        scrollToR4();
+
+        await timeline.setProps({ data: dataFor(["new", ...names]) });
+        await flushPromises();
+        expect(lastRowZoom(mockChart).map((zoom: any) => zoom.startValue)).toEqual([5, 5]);
+
+        await timeline.setProps({ data: dataFor(names.filter((name) => name !== "r4")) });
+        await flushPromises();
+        expect(lastRowZoom(mockChart).map((zoom: any) => [zoom.startValue, zoom.endValue])).toEqual(
+          [
+            [5, 7],
+            [5, 7],
+          ],
+        );
+        timeline.unmount();
+      });
+    });
+
+    describe.each(["UTC", "America/Los_Angeles"])("crosshair from another panel in %s", (tz) => {
+      const sampleMs = [0, 30, 60, 90].map((s) => 1_700_000_000_000 + s * 1000);
+
+      const receive = async (hoveredTime: unknown) => {
+        const echarts = await import("echarts/core");
+        const { convertStateTimelineData } =
+          await import("@/utils/dashboard/convertStateTimelineData");
+        const converted: any = convertStateTimelineData(
+          {
+            id: "timeline",
+            type: "state-timeline",
+            queryType: "promql",
+            config: {},
+            queries: [{}],
+          },
+          [
+            {
+              resultType: "matrix",
+              result: [{ metric: { gpu: "0" }, values: sampleMs.map((ms) => [ms / 1000, "1"]) }],
+            },
+          ],
+          { state: { timezone: tz, theme: "light", selectedOrganization: { identifier: "o" } } },
+          null,
+          [[{ step: 30_000_000 }]],
+          null,
+        );
+        let markVisible: (entries: any[]) => void = () => {};
+        global.IntersectionObserver = vi.fn(function (callback: any) {
+          markVisible = callback;
+          return { observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn() };
+        }) as any;
+        const hovered = ref<any>({
+          panelId: -1,
+          seriesIndex: -1,
+          dataIndex: -1,
+          hoveredTime: null,
+          hoveredSeriesName: "",
+        });
+        const timeline = mount(ChartRenderer, {
+          props: { data: converted, renderType: "canvas", height: "100%" },
+          global: { plugins: [i18n], provide: { store, hoveredSeriesState: hovered } },
+        });
+        await flushPromises();
+        markVisible([{ isIntersecting: true }]);
+        const mockChart = vi.mocked(echarts.init).mock.results.at(-1)?.value;
+        vi.mocked(mockChart.getOption).mockReturnValue(converted.options);
+        vi.mocked(mockChart.dispatchAction).mockClear();
+
+        hovered.value = {
+          panelId: "line-panel",
+          seriesIndex: 0,
+          dataIndex: 7,
+          hoveredTime,
+          hoveredSeriesName: "",
+        };
+        await flushPromises();
+        timeline.unmount();
+        return vi
+          .mocked(mockChart.dispatchAction)
+          .mock.calls.map(([action]: any[]) => action)
+          .find((action: any) => action.type === "showTip");
+      };
+
+      it("lands on the hovered sample for a line panel's Date", async () => {
+        const { toZonedTime } = await import("date-fns-tz");
+        expect(await receive(toZonedTime(sampleMs[2], tz))).toEqual({
+          type: "showTip",
+          seriesIndex: 1,
+          dataIndex: 2,
+        });
+      });
+
+      it.runIf(tz === "UTC")(
+        "matches a PromQL zone-less UTC time when the browser itself is not in UTC",
+        async () => {
+          const ambient = process.env.TZ;
+          process.env.TZ = "America/Los_Angeles";
+          try {
+            expect(new Date(Date.UTC(2026, 0, 1)).getTimezoneOffset()).toBe(480);
+            const published = new Date(sampleMs[1]).toISOString().slice(0, -1);
+            expect(await receive(published)).toEqual({
+              type: "showTip",
+              seriesIndex: 1,
+              dataIndex: 1,
+            });
+          } finally {
+            process.env.TZ = ambient;
+          }
+        },
+      );
+
+      it("lands on the hovered sample for a PromQL line panel's time", async () => {
+        const { toZonedTime } = await import("date-fns-tz");
+        const published =
+          tz !== "UTC"
+            ? toZonedTime(sampleMs[3], tz)
+            : new Date(sampleMs[3]).toISOString().slice(0, -1);
+        expect(await receive(published)).toEqual({
+          type: "showTip",
+          seriesIndex: 1,
+          dataIndex: 3,
+        });
+      });
+    });
+
+    it("reports the pointer's time before ECharts formats an all-rows tooltip", async () => {
+      const echarts = await import("echarts/core");
+      const setPointerTime = vi.fn();
+      const timeline = mount(ChartRenderer, {
+        props: {
+          data: {
+            options: { series: [] },
+            extras: { panelId: "timeline", isTimeSeries: true, setPointerTime },
+          },
+          renderType: "canvas",
+          height: "100%",
+        },
+        global: { plugins: [i18n], provide: { store, hoveredSeriesState: mockHoveredSeriesState } },
+      });
+      await flushPromises();
+      const mockChart = vi.mocked(echarts.init).mock.results.at(-1)?.value;
+      vi.mocked(mockChart.convertFromPixel).mockReturnValue(12345 as any);
+      const zr = mockChart.getZr();
+      // The zr listener must be in place before the first setOption so it precedes the tooltip's.
+      const registered = zr.on.mock.invocationCallOrder.at(-1);
+      expect(registered).toBeLessThan(mockChart.setOption.mock.invocationCallOrder.at(-1));
+      const [event, onMove] = zr.on.mock.calls.at(-1);
+      expect(event).toBe("mousemove");
+
+      onMove({ offsetX: 100 });
+
+      expect(mockChart.convertFromPixel).toHaveBeenCalledWith({ xAxisIndex: 0 }, 100);
+      expect(setPointerTime).toHaveBeenCalledWith(12345);
+      timeline.unmount();
+      expect(zr.off).toHaveBeenCalledWith("mousemove", onMove);
+    });
+
+    it("clears only the crosshair of a crosshair panel when the hover ends, keeping its scroll", async () => {
+      const echarts = await import("echarts/core");
+      const hovered = ref({
+        panelId: "other",
+        seriesIndex: 0,
+        dataIndex: 0,
+        hoveredTime: 1609459200000,
+        hoveredSeriesName: "",
+      });
+      const timeline = mount(ChartRenderer, {
+        props: {
+          data: {
+            options: { series: [] },
+            extras: { panelId: "timeline", isTimeSeries: true, crosshairSeriesIndex: 1 },
+          },
+          renderType: "canvas",
+          height: "100%",
+        },
+        global: { plugins: [i18n], provide: { store, hoveredSeriesState: hovered } },
+      });
+      await flushPromises();
+      const mockChart = vi.mocked(echarts.init).mock.results.at(-1)?.value;
+      vi.mocked(mockChart.dispatchAction).mockClear();
+
+      hovered.value = {
+        panelId: -1,
+        seriesIndex: -1,
+        dataIndex: -1,
+        hoveredTime: null,
+        hoveredSeriesName: "",
+      } as any;
+      await flushPromises();
+
+      expect(mockChart.dispatchAction).toHaveBeenCalledWith({
+        type: "updateAxisPointer",
+        currTrigger: "leave",
+      });
+      expect(mockChart.dispatchAction).not.toHaveBeenCalledWith({ type: "restore" });
+      timeline.unmount();
     });
   });
 
@@ -1138,5 +1554,508 @@ describe("ChartRenderer", () => {
         "api-1 (1 day ago)": false,
       });
     });
+
+    const isolateFirstSlice = async (options: any) => {
+      const echarts = await import("echarts/core");
+      wrapper.unmount();
+      vi.clearAllMocks();
+      wrapper = mount(ChartRenderer, {
+        props: { data: { ...mockChartData, options }, renderType: "canvas", height: "100%" },
+        global: {
+          plugins: [i18n],
+          provide: { store, hoveredSeriesState: mockHoveredSeriesState },
+        },
+      });
+      await flushPromises();
+      const chart = (echarts.init as any).mock.results.at(-1).value;
+      const onLegend = chart.on.mock.calls.find(
+        ([event]: any[]) => event === "legendselectchanged",
+      )[1];
+      chart.getOption.mockReturnValue({ legend: [{}] });
+      const selected = { a: true, b: false };
+      onLegend({ name: "a", selected });
+      return { chart, selected };
+    };
+
+    it("recomputes a pie legend's percents over the visible slices, and again on restore", async () => {
+      const options: any = {
+        ...mockChartData.options,
+        series: [
+          {
+            type: "pie",
+            data: [
+              { name: "a", value: 10 },
+              { name: "b", value: 10 },
+            ],
+          },
+        ],
+      };
+      applyLegendConfiguration(
+        {
+          type: "pie",
+          config: { show_legends: true, legend_values: ["percent"], decimals: 0 },
+        },
+        { value: { offsetWidth: 800, offsetHeight: 400 } },
+        mockHoveredSeriesState,
+        options,
+      );
+      expect(options.legend.formatter("a")).toBe("{b|a}  50%");
+
+      const { chart, selected } = await isolateFirstSlice(options);
+
+      expect(options.legend.selected).toEqual({ a: true, b: false });
+      expect(options.legend.selected).not.toBe(selected);
+      expect(options.legend.formatter("a")).toBe("{b|a}  100%");
+
+      chart.getOption.mockReturnValue({ legend: [{}] });
+      const onDataZoom = chart.on.mock.calls.find(([event]: any[]) => event === "dataZoom")[1];
+      onDataZoom({ batch: [{}, {}] });
+
+      expect(chart.dispatchAction).toHaveBeenCalledWith({ type: "restore" });
+      expect(options.legend.formatter("a")).toBe("{b|a}  50%");
+    });
+
+    it("keeps a pie legend's percents on the slices a restore leaves isolated", async () => {
+      const options: any = {
+        ...mockChartData.options,
+        series: [
+          {
+            type: "pie",
+            data: [
+              { name: "a", value: 10 },
+              { name: "b", value: 10 },
+            ],
+          },
+        ],
+      };
+      applyLegendConfiguration(
+        {
+          type: "pie",
+          config: { show_legends: true, legend_values: ["percent"], decimals: 0 },
+        },
+        { value: { offsetWidth: 800, offsetHeight: 400 } },
+        mockHoveredSeriesState,
+        options,
+      );
+      const { chart } = await isolateFirstSlice(options);
+      chart.getOption.mockReturnValue({ legend: [{ selected: { a: true, b: false } }] });
+
+      const onDataZoom = chart.on.mock.calls.find(([event]: any[]) => event === "dataZoom")[1];
+      onDataZoom({ batch: [{}, {}] });
+
+      expect(chart.dispatchAction).toHaveBeenCalledWith({ type: "restore" });
+      expect(options.legend.formatter("a")).toBe("{b|a}  100%");
+    });
+
+    it("recomputes a pie slice's override-decimals label over the visible slices", async () => {
+      const options: any = {
+        ...mockChartData.options,
+        legend: { show: true },
+        series: [
+          {
+            type: "pie",
+            label: {
+              show: true,
+              formatter: (params: { percent: number }) => `${params.percent.toFixed(1)}%`,
+            },
+            data: [
+              { name: "a", value: 10 },
+              { name: "b", value: 10 },
+            ],
+          },
+        ],
+      };
+      applySeriesOverrides(
+        options,
+        {
+          type: "pie",
+          config: {
+            override_config: [
+              {
+                field: { matchBy: "series", value: "a" },
+                config: [{ type: "decimals", value: 1 }],
+              },
+            ],
+          },
+        },
+        "light",
+      );
+      const label = options.series[0].data[0].label;
+      expect(label.formatter()).toBe("50.0%");
+
+      await isolateFirstSlice(options);
+
+      expect(label.formatter()).toBe("100.0%");
+    });
+
+    it.each(["pie", "line"])(
+      "leaves the source legend of a %s chart without legend values untouched",
+      async (type) => {
+        const options: any = {
+          ...mockChartData.options,
+          legend: { show: true },
+          series: [{ name: "a", type, data: [] }],
+        };
+        await isolateFirstSlice(options);
+        expect(options.legend.selected).toBeUndefined();
+      },
+    );
+  });
+
+  describe("heatmap time columns", () => {
+    const axis = {
+      endInclusive: false,
+      columns: [
+        { start: 0, end: 60_000, x: "c0" },
+        { start: 60_000, end: 120_000, x: "c1" },
+        { start: 120_000, end: 180_000, x: "c2" },
+      ],
+    };
+    const heatmapData = (heatmapTimeAxis: unknown) => ({
+      chartType: "heatmap",
+      options: { series: [{ type: "heatmap", data: [] }], xAxis: [{ type: "category" }] },
+      extras: { panelId: "heat-1", isTimeSeries: !!heatmapTimeAxis, heatmapTimeAxis },
+    });
+    const mountHeatmap = async (hovered: any, heatmapTimeAxis: unknown = axis) => {
+      const echarts = await import("echarts/core");
+      let observe: (entries: { isIntersecting: boolean }[]) => void = () => {};
+      global.IntersectionObserver = vi.fn(function (callback: typeof observe) {
+        observe = callback;
+        return { observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn() };
+      }) as any;
+      wrapper.unmount();
+      vi.clearAllMocks();
+      wrapper = mount(ChartRenderer, {
+        props: { data: heatmapData(heatmapTimeAxis), renderType: "canvas", height: "100%" },
+        global: { plugins: [i18n], provide: { store, hoveredSeriesState: hovered } },
+      });
+      await flushPromises();
+      observe([{ isIntersecting: true }]);
+      const chart = (echarts.init as any).mock.results.at(-1).value;
+      const handler = (name: string) =>
+        chart.on.mock.calls.find(([event]: any[]) => event === name)[1];
+      return { chart, handler };
+    };
+
+    it("turns a zoom box's column indices into the times of those columns", async () => {
+      const { handler } = await mountHeatmap(mockHoveredSeriesState);
+      handler("dataZoom")({ batch: [{ startValue: 1.2, endValue: 2 }] });
+      expect(wrapper.emitted("updated:dataZoom")[0][0]).toEqual({ start: 60_000, end: 180_000 });
+    });
+
+    it("passes a heatmap without time columns its raw zoom values, as before", async () => {
+      const { handler } = await mountHeatmap(mockHoveredSeriesState, null);
+      handler("dataZoom")({ batch: [{ startValue: 1, endValue: 2 }] });
+      expect(wrapper.emitted("updated:dataZoom")[0][0]).toEqual({
+        start: 1,
+        end: 2,
+        start1: 0,
+        end1: 0,
+      });
+    });
+
+    it("broadcasts the hovered cell's column and time while this panel is hovered", async () => {
+      const setIndex = vi.fn();
+      const hovered = ref({ panelId: "heat-1", seriesIndex: -1, dataIndex: -1, setIndex });
+      const { handler } = await mountHeatmap(hovered);
+      handler("mouseover")({
+        seriesType: "heatmap",
+        value: [2, 4, 9],
+        seriesIndex: 0,
+        dataIndex: 14,
+      });
+      expect(setIndex).toHaveBeenCalledWith(2, 0, "heat-1", "c2");
+      handler("mouseover")({ seriesType: "scatter", value: [1, 1], seriesIndex: 1, dataIndex: 0 });
+      expect(setIndex).toHaveBeenCalledTimes(1);
+    });
+
+    it("names no hovered series for a heatmap cell, so other panels' unnamed heatmaps are not highlighted", async () => {
+      const setHoveredSeriesName = vi.fn();
+      const hovered = ref({ panelId: "heat-1", setHoveredSeriesName, setIndex: vi.fn() });
+      const { handler } = await mountHeatmap(hovered);
+      handler("mousemove")({
+        componentSubType: "heatmap",
+        seriesName: "series\u00000",
+        seriesIndex: 0,
+      });
+      expect(setHoveredSeriesName).toHaveBeenLastCalledWith("");
+    });
+
+    it("marks the column holding the time another panel hovers, and hides off its columns", async () => {
+      const hovered = ref<any>({ panelId: -1, seriesIndex: -1, dataIndex: -1, hoveredTime: null });
+      const { chart } = await mountHeatmap(hovered);
+      chart.convertToPixel.mockImplementation((_finder: unknown, [column]: number[]) => [
+        column * 100,
+        40,
+      ]);
+      chart.dispatchAction.mockClear();
+      hovered.value = { panelId: "line-1", seriesIndex: 0, dataIndex: 3, hoveredTime: 90_000 };
+      await flushPromises();
+      expect(chart.convertToPixel).toHaveBeenCalledWith({ gridIndex: 0 }, [1, 0]);
+      expect(chart.dispatchAction).toHaveBeenCalledWith({
+        type: "updateAxisPointer",
+        currTrigger: "mousemove",
+        x: 100,
+        y: 40,
+      });
+      expect(chart.dispatchAction).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: "showTip" }),
+      );
+      hovered.value = { panelId: "line-1", seriesIndex: 0, dataIndex: 4, hoveredTime: 999_000 };
+      await flushPromises();
+      expect(chart.dispatchAction).toHaveBeenLastCalledWith({
+        type: "updateAxisPointer",
+        currTrigger: "leave",
+      });
+      hovered.value = { panelId: -1, seriesIndex: -1, dataIndex: -1, hoveredTime: null };
+      await flushPromises();
+      expect(chart.dispatchAction).toHaveBeenLastCalledWith({
+        type: "updateAxisPointer",
+        currTrigger: "leave",
+      });
+    });
+  });
+});
+
+describe("ChartRenderer device pixel ratio", () => {
+  let display: DevicePixelRatioFake;
+  let wrapper: any;
+  let zr: any;
+
+  const mountAt = async (renderType = "canvas") => {
+    wrapper = mount(ChartRenderer, {
+      props: {
+        data: { options: { series: [{ type: "line", data: [[1609459200000, 10]] }] } },
+        renderType,
+      },
+      global: { plugins: [i18n], provide: { store, hoveredSeriesState: ref(null) } },
+    });
+    await flushPromises();
+  };
+
+  const attachPainter = (type: "canvas" | "svg" = "canvas") => {
+    const chart = vi.mocked(echartsInit).mock.results[0].value;
+    const painter = fakeCanvasPainter(1, type);
+    zr = chart.getZr();
+    zr.painter = painter;
+    chart.setOption.mockClear();
+    chart.dispose.mockClear();
+    return { chart, painter };
+  };
+
+  const initRatios = () =>
+    vi.mocked(echartsInit).mock.calls.map(([, , opts]) => opts?.devicePixelRatio);
+
+  beforeEach(() => {
+    vi.mocked(echartsInit).mockClear();
+    global.IntersectionObserver = vi.fn(function () {
+      return { observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn() };
+    }) as any;
+    store.state.theme = "light";
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    display.restore();
+    // The mocked instance and its zr are shared by every test in this file.
+    if (zr) delete zr.painter;
+    zr = null;
+  });
+
+  it("inits the chart at the live ratio, not the one zrender cached at import", async () => {
+    display = fakeDevicePixelRatio(2);
+    await mountAt();
+    expect(initRatios()).toEqual([2]);
+    expect(wrapper.classes()).not.toContain("chart-canvas-pixelated");
+  });
+
+  it("pixel-snaps its canvases only while the ratio is fractional", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt();
+    attachPainter();
+    const pixelated = () => wrapper.classes().includes("chart-canvas-pixelated");
+    expect(pixelated()).toBe(false);
+
+    display.setRatio(1.25);
+    await flushPromises();
+    expect(pixelated()).toBe(true);
+    display.setRatio(2);
+    await flushPromises();
+    expect(pixelated()).toBe(false);
+    display.setRatio(1);
+    await flushPromises();
+    expect(pixelated()).toBe(false);
+    display.setRatio(1.5);
+    await flushPromises();
+    expect(pixelated()).toBe(true);
+  });
+
+  it("re-rasterizes the mounted chart in place when the window changes display", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt();
+    const { chart, painter } = attachPainter();
+
+    display.setRatio(2);
+    await flushPromises();
+
+    expect(initRatios()).toEqual([1]);
+    expect(chart.dispose).not.toHaveBeenCalled();
+    expect(chart.setOption).not.toHaveBeenCalled();
+    expect(painter.dpr).toBe(2);
+    expect(painter.layers["zr_0.0"].ctx.dpr).toBe(2);
+    expect(painter.refresh).toHaveBeenCalledWith({ paintAll: true });
+
+    display.setRatio(1.5);
+    await flushPromises();
+    expect(initRatios()).toEqual([1]);
+    expect(painter.dpr).toBe(1.5);
+  });
+
+  it("leaves an SVG chart alone, since it does not rasterize at a ratio", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt("svg");
+    const { chart, painter } = attachPainter("svg");
+
+    display.setRatio(2);
+    await flushPromises();
+
+    expect(initRatios()).toEqual([1]);
+    expect(chart.dispose).not.toHaveBeenCalled();
+    expect(painter.refresh).not.toHaveBeenCalled();
+  });
+
+  it("stays smooth at a fractional ratio an SVG chart was not re-rasterized at", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt("svg");
+    attachPainter("svg");
+
+    display.setRatio(1.5);
+    await flushPromises();
+
+    expect(wrapper.classes()).not.toContain("chart-canvas-pixelated");
+  });
+
+  it("pixel-snaps once a re-init rasterizes at the fractional ratio a skipped change left behind", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt();
+    const { painter } = attachPainter();
+    painter.getLayers.mockReturnValue({ ...painter.layers, gl: { dpr: 1, resize: vi.fn() } });
+
+    display.setRatio(1.5);
+    await flushPromises();
+    expect(painter.dpr).toBe(1);
+    expect(wrapper.classes()).not.toContain("chart-canvas-pixelated");
+
+    // A real init at the live ratio builds its painter at that ratio.
+    painter.dpr = 1.5;
+    store.state.theme = "dark";
+    await flushPromises();
+    expect(initRatios()).toEqual([1, 1.5]);
+    expect(wrapper.classes()).toContain("chart-canvas-pixelated");
+  });
+
+  it("stops listening for ratio changes on unmount", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt();
+    expect(display.listenerCount()).toBe(1);
+    wrapper.unmount();
+    wrapper = null;
+    expect(display.listenerCount()).toBe(0);
+  });
+});
+
+describe("ChartRenderer motion", () => {
+  const lineData = (value: number, options: Record<string, unknown> = {}) => ({
+    chartType: "line",
+    options: { series: [{ type: "line", data: [[1609459200000, value]] }], ...options },
+    extras: { panelId: "motion-1" },
+  });
+  const drawn = async () => {
+    const echarts = await import("echarts/core");
+    const chart = vi.mocked(echarts.init).mock.results.at(-1)?.value;
+    return vi
+      .mocked(chart.setOption)
+      .mock.calls.map((call) => call[0] as Record<string, unknown>)
+      .filter((option) => "series" in option);
+  };
+  const mountKept = (data: ReturnType<typeof ref>, shown: ReturnType<typeof ref>) =>
+    mount(
+      defineComponent({
+        setup: () => () =>
+          h(KeepAlive, null, [
+            shown.value
+              ? h(ChartRenderer, { data: data.value, renderType: "canvas", height: "100%" })
+              : h("div"),
+          ]),
+      }),
+      {
+        global: {
+          plugins: [i18n],
+          provide: { store, hoveredSeriesState: ref({ panelId: null }) },
+        },
+      },
+    );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("draws with no entrance or update animation on first draw, data update and keep-alive return", async () => {
+    const data = ref(lineData(1));
+    const shown = ref(true);
+    const wrapper = mountKept(data, shown);
+    await flushPromises();
+    const first = (await drawn()).length;
+    expect(first).toBeGreaterThan(0);
+
+    data.value = lineData(2);
+    await flushPromises();
+    const firstAndUpdate = await drawn();
+    expect(firstAndUpdate.length).toBeGreaterThan(first);
+    shown.value = false;
+    await flushPromises();
+    vi.clearAllMocks();
+    shown.value = true;
+    await flushPromises();
+    const onReturn = await drawn();
+    expect(onReturn.length).toBeGreaterThan(0);
+
+    for (const option of [...firstAndUpdate, ...onReturn]) {
+      expect(option).toMatchObject({ animationDuration: 0, animationDurationUpdate: 0 });
+    }
+    wrapper.unmount();
+  });
+
+  it("zeroes a series' own durations, as on the service graph tree", async () => {
+    const { convertServiceGraphToTree } = await import("@/utils/traces/convertTraceData");
+    const { options } = convertServiceGraphToTree(
+      {
+        nodes: [
+          { id: "a", label: "a", requests: 1, errors: 0, errorRate: 0 },
+          { id: "b", label: "b", requests: 1, errors: 0, errorRate: 0 },
+        ],
+        edges: [{ from: "a", to: "b", total_requests: 1, failed_requests: 0 }],
+      } as any,
+      "horizontal",
+    );
+    const wrapper = mountKept(ref({ chartType: "tree", options, extras: {} }), ref(true));
+    await flushPromises();
+    const drawnOptions = await drawn();
+    expect(drawnOptions.length).toBeGreaterThan(0);
+    for (const option of drawnOptions) {
+      for (const series of option.series as Record<string, unknown>[]) {
+        expect(series).toMatchObject({ animationDuration: 0, animationDurationUpdate: 0 });
+      }
+    }
+    wrapper.unmount();
+  });
+
+  it("keeps a panel's own animation switch", async () => {
+    const wrapper = mountKept(ref(lineData(1, { animation: false })), ref(true));
+    await flushPromises();
+    for (const option of await drawn()) {
+      expect(option).toMatchObject({ animation: false, animationDuration: 0 });
+    }
+    wrapper.unmount();
   });
 });

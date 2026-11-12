@@ -40,6 +40,7 @@ const rootEl = ref<HTMLElement | null>(null);
 const suggest = useTemplateSuggest<T>({
   suggestions: () => props.suggestions,
   values: () => props.values,
+  delimiter: () => props.delimiter,
   emit,
 });
 

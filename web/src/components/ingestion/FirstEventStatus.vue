@@ -19,14 +19,23 @@ import { computed, inject, onBeforeUnmount, onMounted, ref, toRef, watch } from 
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
+import { streamTypeFeature } from "@/utils/featureGate";
 import config from "@/aws-exports";
 import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { FIRST_EVENT_BUDGET, cadenceAt } from "@/composables/firstEvent/firstEventBudget";
 import { rangeRoute } from "@/composables/firstEvent/confirmQuery";
+import { FIRST_EVENT_BARS } from "@/composables/firstEvent/firstEventCopied";
+import {
+  FIRST_EVENT_REPORTER,
+  FIRST_EVENT_SUCCESS_BY_HOST,
+} from "@/composables/firstEvent/firstEventReporter";
 import {
   useFirstEventWatch,
   type FirstEventResult,
@@ -34,6 +43,8 @@ import {
   type StreamSignal,
 } from "@/composables/firstEvent/useFirstEventWatch";
 import FirstEventStillStuck from "./FirstEventStillStuck.vue";
+import HeardFromPrompt from "@/components/login/HeardFromPrompt.vue";
+import { HEARD_FROM_ASKED_BY_HOST } from "@/components/login/heardFrom";
 import { FIRST_EVENT_ASK_AI, REJECTION_REASON_KEYS, askAiQuery } from "./firstEventAskAi";
 
 const props = withDefaults(
@@ -49,13 +60,18 @@ const props = withDefaults(
     guideRoute?: string;
     guideName?: string;
     docUrl?: string;
-    snippetKind?: "command" | "config";
+    /** What the user copies to send data; names the copy button and the idle and fix text. */
+    snippetKind?: "command" | "config" | "prompt";
+    /** The tool whose config holds the password, named in the invalid-credentials fix. */
+    configTool?: string;
     /** The guide's host or cluster input, when the user typed one. */
     sourceLabel?: string;
     /** `pill` renders the state pill and its one line only, for empty pages that link to the guide for diagnosis. */
     display?: "bar" | "pill";
     /** Replaces the generic waiting pill text in `pill` display. */
     waitingLabel?: I18nText;
+    /** Elapsed time without data before the bar reads rejections and shows a diagnosis. */
+    diagnosisAfterMs?: number;
   }>(),
   {
     signal: undefined,
@@ -67,9 +83,11 @@ const props = withDefaults(
     guideName: "",
     docUrl: undefined,
     snippetKind: "command",
+    configTool: "Fluent Bit",
     sourceLabel: undefined,
     display: "bar",
     waitingLabel: undefined,
+    diagnosisAfterMs: FIRST_EVENT_BUDGET.diagnosisAtMs,
   },
 );
 
@@ -83,6 +101,11 @@ const { t, locale } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const askAiFn = inject(FIRST_EVENT_ASK_AI, null);
+const hostAsksHeardFrom = inject(HEARD_FROM_ASKED_BY_HOST, false);
+const hostShowsSuccess = inject(FIRST_EVENT_SUCCESS_BY_HOST, false);
+// Attached in setup, not on mount: a keyed swap then never leaves the host counting zero statuses.
+const reporter = inject(FIRST_EVENT_REPORTER, null);
+const detach = reporter?.attach();
 // getIngestionURL's rule, kept reactive because /config can land after the bar mounts
 const endpoint = computed<string>(
   () => store.state.zoConfig?.ingestion_url || store.state.API_ENDPOINT || "",
@@ -93,11 +116,15 @@ const watcher = useFirstEventWatch(toRef(props, "org"), toRef(props, "signal"), 
   filter: toRef(props, "filter"),
   match: toRef(props, "match"),
   autoDiagnosis: computed(() => props.display !== "pill"),
+  diagnosisAtMs: toRef(props, "diagnosisAfterMs"),
 });
-const { state, result, diagnosis, startedAtMs, scope, troubleshooting } = watcher;
+const { state, result, diagnosis, startedAtMs, scope, troubleshooting, targetExists, deciding } =
+  watcher;
+const leaveBars = inject(FIRST_EVENT_BARS, null)?.(watcher.start);
+// A status that replaces another starts over, so the host drops the old one's result.
+reporter?.state(state.value);
 
 const CLOCK_TICK_MS = 1000;
-const FLUENT_BIT = raw("Fluent Bit");
 
 // a reactive clock, so the elapsed time and the cadence shown move on their own
 const nowMs = ref(Date.now());
@@ -108,6 +135,8 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   if (clock) clearInterval(clock);
+  detach?.();
+  leaveBars?.();
 });
 
 const elapsedMs = computed(() => Math.max(0, nowMs.value - (startedAtMs.value ?? nowMs.value)));
@@ -246,11 +275,21 @@ const idleStream = computed(() =>
   props.targetStream && props.match !== "keyword" ? raw(props.targetStream) : undefined,
 );
 const idleKey = computed<I18nKey>(() => {
-  const config = props.snippetKind === "config";
-  if (!idleStream.value) {
-    return config ? "ingestion.firstEvent.idleMatchesConfig" : "ingestion.firstEvent.idleMatches";
+  const kind = props.snippetKind;
+  if (!targetExists.value) {
+    if (kind === "config") return "ingestion.firstEvent.idleNewConfig";
+    return kind === "prompt"
+      ? "ingestion.firstEvent.idleNewPrompt"
+      : "ingestion.firstEvent.idleNew";
   }
-  return config ? "ingestion.firstEvent.idleInConfig" : "ingestion.firstEvent.idleIn";
+  if (!idleStream.value) {
+    if (kind === "config") return "ingestion.firstEvent.idleMatchesConfig";
+    return kind === "prompt"
+      ? "ingestion.firstEvent.idleMatchesPrompt"
+      : "ingestion.firstEvent.idleMatches";
+  }
+  if (kind === "config") return "ingestion.firstEvent.idleInConfig";
+  return kind === "prompt" ? "ingestion.firstEvent.idleInPrompt" : "ingestion.firstEvent.idleIn";
 });
 
 const metaText = computed(() => {
@@ -285,6 +324,9 @@ const openLabel = computed(() => {
   if (type === "profiles") return t("ingestion.firstEvent.openInProfiles");
   return t("ingestion.firstEvent.openInLogs");
 });
+const { isLocked, lockedReason } = useLicenseLocks();
+const openFeature = computed(() => streamTypeFeature(result.value?.streamType));
+const openLocked = computed(() => isLocked(openFeature.value));
 
 const firstRecordJson = computed(() => {
   const record = result.value?.firstRecord;
@@ -310,8 +352,18 @@ const reasonText = (reason: keyof typeof REJECTION_REASON_KEYS) =>
 const invalidCredentialsFix = (token: I18nText | undefined): I18nText => {
   if (props.snippetKind === "config") {
     return token
-      ? t("ingestion.firstEvent.fixInvalidCredentialsConfig", { tool: FLUENT_BIT, token })
-      : t("ingestion.firstEvent.fixInvalidCredentialsConfigUnnamed", { tool: FLUENT_BIT });
+      ? t("ingestion.firstEvent.fixInvalidCredentialsConfig", {
+          tool: raw(props.configTool),
+          token,
+        })
+      : t("ingestion.firstEvent.fixInvalidCredentialsConfigUnnamed", {
+          tool: raw(props.configTool),
+        });
+  }
+  if (props.snippetKind === "prompt") {
+    return token
+      ? t("ingestion.firstEvent.fixInvalidCredentialsPrompt", { token })
+      : t("ingestion.firstEvent.fixInvalidCredentialsPromptUnnamed");
   }
   return token
     ? t("ingestion.firstEvent.fixInvalidCredentials", { token })
@@ -339,11 +391,12 @@ const noRequestsWindow = computed(() =>
     : t("ingestion.firstEvent.windowLast2"),
 );
 
-const copyLabel = computed(() =>
-  props.snippetKind === "config"
-    ? t("ingestion.firstEvent.copyConfig")
-    : t("ingestion.firstEvent.copyCommand"),
-);
+const copyLabel = computed(() => {
+  if (props.snippetKind === "config") return t("ingestion.firstEvent.copyConfig");
+  return props.snippetKind === "prompt"
+    ? t("ingestion.firstEvent.copyPrompt")
+    : t("ingestion.firstEvent.copyCommand");
+});
 
 const aiEnabled = computed(
   () => config.isEnterprise === "true" && !!store.state.zoConfig?.ai_enabled,
@@ -372,9 +425,14 @@ const hint = computed((): I18nText | undefined => {
   if (state.value === "rejected" || state.value === "no-requests") {
     return t("ingestion.firstEvent.hintStillChecking", { seconds: cadenceSeconds.value });
   }
-  return elapsedMs.value < FIRST_EVENT_BUDGET.diagnosisAtMs && !diagnosis.value
+  if (elapsedMs.value >= props.diagnosisAfterMs || diagnosis.value) {
+    return t("ingestion.firstEvent.hintWaitingLate");
+  }
+  return props.diagnosisAfterMs === FIRST_EVENT_BUDGET.diagnosisAtMs
     ? t("ingestion.firstEvent.hintWaiting")
-    : t("ingestion.firstEvent.hintWaitingLate");
+    : t("ingestion.firstEvent.hintWaitingAfter", {
+        elapsed: formatElapsed(props.diagnosisAfterMs),
+      });
 });
 
 const secondsSinceSignup = (): number => {
@@ -394,6 +452,7 @@ const secondsSinceSignup = (): number => {
 let diagnosisReported = false;
 watch(state, (next, prev) => {
   emit("state", next);
+  reporter?.state(next);
   // Check again (or a copy) after the stop starts a new watch, which reports its own diagnosis
   if (prev === "stopped" && next === "waiting") diagnosisReported = false;
   if (next === "received" && prev !== "received" && result.value) {
@@ -402,6 +461,7 @@ watch(state, (next, prev) => {
       seconds_since_signup: secondsSinceSignup(),
     });
     emit("detected", result.value);
+    reporter?.detected(result.value);
   }
 });
 
@@ -433,12 +493,39 @@ const goTo = (name: string) => {
   router.push({ name, query: { org_identifier: props.org } }).catch(() => {});
 };
 
-defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
+defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
 </script>
 
 <template>
   <div
-    v-if="display === 'pill'"
+    v-if="deciding && display === 'pill'"
+    class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+    data-test="first-event-status"
+    data-state="deciding"
+    data-display="pill"
+  >
+    <OSkeleton class="h-5 w-28" />
+    <OSkeleton class="h-3.5 w-48" />
+  </div>
+  <div v-else-if="deciding" class="flex flex-col gap-2 text-sm">
+    <OBanner
+      variant="default"
+      inline-actions
+      dense
+      data-test="first-event-status"
+      data-state="deciding"
+    >
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <OSkeleton class="h-5 w-28" />
+        <OSkeleton class="h-3.5 w-56" />
+      </div>
+      <template #actions>
+        <OSkeleton class="h-8.5 w-24" />
+      </template>
+    </OBanner>
+  </div>
+  <div
+    v-else-if="display === 'pill'"
     class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
     data-test="first-event-status"
     :data-state="state"
@@ -581,7 +668,10 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
       </div>
       <template
         v-if="
-          state === 'waiting' || state === 'stopped' || state === 'idle' || state === 'received'
+          state === 'waiting' ||
+          state === 'stopped' ||
+          state === 'idle' ||
+          (state === 'received' && !hostShowsSuccess)
         "
         #actions
       >
@@ -615,15 +705,20 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
             {{ t("ingestion.firstEvent.checkNow") }}
           </OButton>
           <template v-if="state === 'received' && kind === 'test'">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              icon-left="open-in-new"
-              data-test="first-event-status-open-btn"
-              @click="openData"
-            >
-              {{ openLabel }}
-            </OButton>
+            <OTooltip :content="lockedReason(openFeature ?? '')" :disabled="!openLocked">
+              <span class="inline-flex">
+                <OButton
+                  variant="outline"
+                  size="sm-action"
+                  :icon-left="openLocked ? 'lock' : 'open-in-new'"
+                  :disabled="openLocked"
+                  data-test="first-event-status-open-btn"
+                  @click="openData"
+                >
+                  {{ openLabel }}
+                </OButton>
+              </span>
+            </OTooltip>
             <OButton
               variant="primary"
               size="sm-action"
@@ -642,15 +737,20 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
             >
               {{ t("ingestion.firstEvent.setupAnother") }}
             </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              icon-left="open-in-new"
-              data-test="first-event-status-open-btn"
-              @click="openData"
-            >
-              {{ openLabel }}
-            </OButton>
+            <OTooltip :content="lockedReason(openFeature ?? '')" :disabled="!openLocked">
+              <span class="inline-flex">
+                <OButton
+                  variant="primary"
+                  size="sm-action"
+                  :icon-left="openLocked ? 'lock' : 'open-in-new'"
+                  :disabled="openLocked"
+                  data-test="first-event-status-open-btn"
+                  @click="openData"
+                >
+                  {{ openLabel }}
+                </OButton>
+              </span>
+            </OTooltip>
           </template>
         </div>
       </template>
@@ -667,6 +767,11 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
       <strong class="shrink-0">{{ streamText }}</strong>
       <span class="min-w-0 truncate">{{ firstRecordJson }}</span>
     </div>
+
+    <HeardFromPrompt
+      v-if="state === 'received' && kind === 'standard' && !hostAsksHeardFrom"
+      :org="org"
+    />
 
     <div
       v-if="showDiagnosis && diagnosis"

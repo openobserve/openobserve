@@ -1628,6 +1628,8 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.triggerEditorSuggestions();
     await pm.logsPage.waitForSuggestionWidgetVisible(5000);
     testLogger.info('✅ Suggestion widget appeared');
+    // Checking for functions before the values load would pass on an empty list.
+    await pm.logsPage.waitForSuggestionRows();
 
     // Verify the suggestion widget does NOT contain function names
     const result = await pm.logsPage.checkSuggestionForFunctions();
@@ -1714,6 +1716,7 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.triggerEditorSuggestions();
     await pm.logsPage.waitForSuggestionWidgetVisible(5000);
     testLogger.info('✅ Suggestion widget appeared in mixed quote context');
+    await pm.logsPage.waitForSuggestionRows();
 
     // Verify functions are NOT in suggestions (value context filtering).
     // The suggestion engine SHOULD filter functions when cursor is in a value
@@ -1728,6 +1731,9 @@ test.describe("Logs Regression Bugs", () => {
     expect(result.rowCount).toBeGreaterThan(0);
     // Must be values of kubernetes_container_name, not a cached list from another field.
     expect(result.firstFew.some((row) => row.includes('ziox'))).toBe(true);
+    // A row count alone passed on keyword/function rows before #15344, so the
+    // value context must also be proven to exclude functions.
+    expect(result.hasFunctions, 'Functions must not be suggested inside an open quote').toBe(false);
     testLogger.info(`✅ ${result.rowCount} value suggestions in mixed quote context`);
 
     testLogger.info("Test passed: Mixed quote handling verified");

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <IngestionContent>
+  <IngestionContent snippet-kind="config" config-tool="Telegraf">
     <CredentialCodeBlock slug="telegraf" :content="content" />
   </IngestionContent>
 </template>

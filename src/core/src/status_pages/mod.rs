@@ -70,6 +70,7 @@ pub async fn create_page(
         brand_name: None,
         accent_color: None,
         logo_img: None,
+        favicon_img: None,
         tracking_since: None,
         owner: Some(owner.to_string()),
         created_at: now,
@@ -668,14 +669,17 @@ fn apply_display_fields(model: &mut page_entity::Model, req: &UpdatePageRequest)
     }
 }
 
-/// Sets/clears the page logo. Licensed — unlike `apply_display_fields`, the
+/// Sets/clears the page logo and favicon. Licensed — unlike `apply_display_fields`, the
 /// write is gated (an empty string clears it, matching the org-level logo's
-/// delete semantics); an already-set logo keeps rendering regardless of
+/// delete semantics); an already-set image keeps rendering regardless of
 /// license, since only the write path is gated.
 #[cfg(feature = "enterprise")]
 fn apply_logo_field(model: &mut page_entity::Model, req: &UpdatePageRequest) {
     if let Some(v) = &req.logo_img {
         model.logo_img = if v.is_empty() { None } else { Some(v.clone()) };
+    }
+    if let Some(v) = &req.favicon_img {
+        model.favicon_img = if v.is_empty() { None } else { Some(v.clone()) };
     }
 }
 
@@ -730,6 +734,7 @@ fn to_admin_view(
         brand_name: m.brand_name,
         accent_color: m.accent_color,
         logo_img: m.logo_img,
+        favicon_img: m.favicon_img,
         tracking_since: m.tracking_since,
         owner: m.owner,
         created_at: m.created_at,

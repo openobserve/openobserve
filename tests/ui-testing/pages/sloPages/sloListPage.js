@@ -9,6 +9,7 @@
  */
 
 import { expect } from '@playwright/test';
+import fs from 'fs';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class SloListPage {
@@ -21,6 +22,9 @@ export class SloListPage {
     return {
       title: '[data-test="slos-slolist-title"]',
       newButton: '[data-test="slos-slolist-new"]',
+      importButton: '[data-test="slos-slolist-import"]',
+      exportDialog: '[data-test="slos-slolist-export-dialog"]',
+      exportDownload: '[data-test="slos-slolist-export-dialog"] [data-test="o-dialog-primary-btn"]',
       search: '[data-test="slos-slolist-search"]',
       refresh: '[data-test="slos-slolist-refresh"]',
       table: '[data-test="slos-slolist-table"]',
@@ -38,6 +42,7 @@ export class SloListPage {
   deleteButton(name) { return `[data-test="slos-slolist-delete-${name}"]`; }
   moveButton(name) { return `[data-test="slos-slolist-move-${name}"]`; }
   toggleButton(name) { return `[data-test="slos-slolist-toggle-${name}"]`; }
+  exportButton(name) { return `[data-test="slos-slolist-export-${name}"]`; }
   typeFilterOption(value) { return `[data-test="slos-slolist-type-filter-${value}"]`; }
 
   // ------------------------------------------------------------- element getters
@@ -51,6 +56,16 @@ export class SloListPage {
     await this.page.goto(`/web/slos?org_identifier=${orgId}`);
     await expect(this.page.locator(this.locators.title)).toBeVisible({ timeout: 30000 });
     testLogger.navigation('SLO list');
+  }
+
+  async gotoFolder(orgId, folderId) {
+    await this.page.goto(`/web/slos?org_identifier=${orgId}&folder=${encodeURIComponent(folderId)}`);
+    await expect(this.page.locator(this.locators.title)).toBeVisible({ timeout: 30000 });
+    testLogger.navigation('SLO list folder', { folderId });
+  }
+
+  async clickImport() {
+    await this.page.locator(this.locators.importButton).click();
   }
 
   async refresh() {
@@ -80,6 +95,26 @@ export class SloListPage {
     await item.click();
     await expect(item).toHaveAttribute('data-state', 'on', { timeout: 10000 });
     await this.page.waitForTimeout(400);
+  }
+
+  /** Narrow the list to one SLO; the row appearing is the settle signal, not a timer. */
+  async filterTo(name) {
+    const field = this.page.locator(`${this.locators.search} [data-test$="-field"]`).first();
+    await field.waitFor({ state: 'visible', timeout: 15000 });
+    await field.fill(name);
+    await this.expectRowVisible(name);
+  }
+
+  /** Export one SLO as JSON through its row action and return the parsed file. */
+  async exportRowAsJson(name) {
+    await this.page.locator(this.exportButton(name)).click();
+    await expect(this.page.locator(this.locators.exportDialog)).toBeVisible({ timeout: 15000 });
+    const download = this.page.waitForEvent('download', { timeout: 30000 });
+    await this.page.locator(this.locators.exportDownload).click();
+    const file = await download;
+    const text = fs.readFileSync(await file.path(), 'utf-8');
+    testLogger.info('SLO exported', { name, file: file.suggestedFilename() });
+    return { fileName: file.suggestedFilename(), text, json: JSON.parse(text) };
   }
 
   async openRow(name) {
@@ -210,6 +245,20 @@ export class SloListPage {
       await this.page.keyboard.press('Escape');
       await expect(dialog).toHaveCount(0, { timeout: 10000 });
     }
+  }
+
+  async expectCorrectedChip(name, visible = true) {
+    const chip = this.page.locator(`[data-test="slos-slolist-corrected-${name}"]`);
+    if (visible) await expect(chip).toBeVisible({ timeout: 20000 });
+    else {
+      // Absence only means something once the row itself has rendered.
+      await this.expectRowVisible(name);
+      await expect(chip).toHaveCount(0, { timeout: 20000 });
+    }
+  }
+
+  async clickExcludeWindow(name) {
+    await this.page.locator(`[data-test="slos-slolist-exclude-${name}"]`).click();
   }
 }
 

@@ -117,11 +117,21 @@
                           }}</span>
                         </template>
                       </OSelect>
+
+                      <OSwitch
+                        v-else-if="param.type === 'boolean'"
+                        v-model="element.params[paramIndex] as boolean"
+                        :label="param.name"
+                        size="sm"
+                        class="mb-1.5"
+                        :data-test="`promql-operation-param-${paramIndex}`"
+                      />
                     </template>
                   </div>
                 </div>
               </ODropdown>
               <OButton
+                :aria-label="t('common.remove')"
                 variant="ghost"
                 size="icon-chip"
                 class="!w-4"
@@ -222,6 +232,7 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
@@ -231,9 +242,11 @@ import {
   PromqlStep,
   PromqlStepArgSpec,
   PromqlStepGroup,
+  PromqlStepId,
   PromqlStepSpec,
 } from "@/components/promql/types";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
+import analytics from "@/services/product_analytics";
 
 const props = defineProps<{
   operations: PromqlStep[];
@@ -262,7 +275,12 @@ const computedLabel = (operation: PromqlStep): string => {
   // Show operation name with parameters if any
   if (operation.params && operation.params.length > 0) {
     const displayParams = operation.params
-      .map((p) => {
+      .map((p, i) => {
+        if (typeof p === "boolean") return "";
+        // A trailing `true` after the label list is the aggregation's `without` flag.
+        if (Array.isArray(p) && operation.params[i + 1] === true) {
+          return ["without", ...p].join(" ");
+        }
         // Handle array parameters (e.g., selected labels)
         if (Array.isArray(p)) {
           return p.length > 0 ? p.join(", ") : "";
@@ -311,13 +329,19 @@ const getFilteredOperationsForCategory = (category: string): PromqlStepSpec[] =>
 // A range function needs a range vector, which in a chain only the bare selector gives.
 const isRangeStep = (id: string) => getStepSpec(id)?.group === PromqlStepGroup.RateAndRange;
 
-const isBlocked = (op: PromqlStepSpec) => isRangeStep(op.id) && props.operations.length > 0;
+// Offset modifies the selector wherever it sits in the list, so it never counts as wrapping it.
+const isOffsetStep = (id: string) => getStepSpec(id)?.id === PromqlStepId.Offset;
+
+const chainLength = computed(() => props.operations.filter((op) => !isOffsetStep(op.id)).length);
+
+const isBlocked = (op: PromqlStepSpec) => isRangeStep(op.id) && chainLength.value > 0;
 
 const isRangeGroupBlocked = (category: string) =>
-  category === PromqlStepGroup.RateAndRange && props.operations.length > 0;
+  category === PromqlStepGroup.RateAndRange && chainLength.value > 0;
 
 const handleDragUpdate = (newVal: PromqlStep[]) => {
-  if (newVal.some((step, index) => index > 0 && isRangeStep(step.id))) return;
+  const chain = newVal.filter((step) => !isOffsetStep(step.id));
+  if (chain.some((step, index) => index > 0 && isRangeStep(step.id))) return;
   // Create new array instead of mutating props
   const newOperations = [...newVal];
   emit("update:operations", newOperations);
@@ -330,6 +354,7 @@ const addOperation = (opDef: PromqlStepSpec) => {
   };
   const newOperations = [...props.operations, newOp];
   emit("update:operations", newOperations);
+  analytics.track("promql_builder_operation_added", { operation: opDef.id, group: opDef.group });
   showOperationSelector.value = false;
   searchQuery.value = "";
 };

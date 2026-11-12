@@ -41,6 +41,43 @@ use crate::{
     },
 };
 
+// Only documents async-stripe's CheckoutSession as it serializes; unmodelled fields stay open.
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+struct StripeCheckoutSession {
+    id: String,
+    url: Option<String>,
+    mode: String,
+    status: Option<String>,
+    payment_status: String,
+    customer_email: Option<String>,
+    client_reference_id: Option<String>,
+    success_url: Option<String>,
+    cancel_url: Option<String>,
+    currency: Option<String>,
+    amount_subtotal: Option<i64>,
+    amount_total: Option<i64>,
+    metadata: Option<HashMap<String, String>>,
+    payment_method_types: Vec<String>,
+    created: i64,
+    expires_at: i64,
+    livemode: bool,
+}
+
+// Only documents async-stripe's BillingPortalSession as it serializes; unmodelled fields stay open.
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+struct StripeBillingPortalSession {
+    id: String,
+    url: String,
+    customer: String,
+    return_url: Option<String>,
+    locale: Option<String>,
+    on_behalf_of: Option<String>,
+    created: i64,
+    livemode: bool,
+}
+
 /// GetSubscriptionUrl
 #[utoipa::path(
     get,
@@ -55,13 +92,15 @@ use crate::{
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("plan" = String, Query, description = "Subscription plan"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = StripeCheckoutSession),
+        (status = 302, description = "Redirects to the checkout URL: under 1024 bytes it is in Location and the body is empty; at 1024 bytes or more there is no Location and the body is a text/html refresh page to it", content_type = "text/html", body = String, headers(("Location" = String, description = "Checkout URL, absent on the HTML fallback"))),
         (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Billings", "operation": "list"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
@@ -153,12 +192,19 @@ pub async fn create_checkout_session(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("session_id" = String, Query, description = "Checkout session id"),
+        ("status" = String, Query, description = "Checkout status; anything but success is rejected"),
+        ("plan" = String, Query, description = "Subscribed plan"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 302, description = "Redirects to the billing plans page: under 1024 bytes it is in Location and the body is empty; at 1024 bytes or more there is no Location and the body is a text/html refresh page to it", content_type = "text/html", body = String, headers(("Location" = String, description = "Billing plans page, absent on the HTML fallback"))),
         (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Billings", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn process_session_detail(
     Path(org_id): Path<String>,
@@ -250,11 +296,11 @@ pub async fn process_session_detail(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "text/plain", body = String),
         (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Billings", "operation": "list"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
@@ -309,11 +355,11 @@ pub async fn unsubscribe(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = ListInvoicesResponseBody),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Billings", "operation": "list"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
@@ -348,11 +394,11 @@ pub async fn list_invoices(Path(org_id): Path<String>) -> Response {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = ListSubscriptionResponseBody),
         (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Billings", "operation": "list"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
@@ -386,11 +432,11 @@ pub async fn list_subscription(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = StripeBillingPortalSession),
         (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Billings", "operation": "list"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
@@ -499,6 +545,10 @@ pub async fn handle_stripe_event(headers: HeaderMap, payload: axum::body::Bytes)
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = openobserve_core::trial_quota::AiUsageResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Billings", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn get_ai_usage(Path(org_id): Path<String>) -> Response {
@@ -518,7 +568,7 @@ pub async fn get_ai_usage(Path(org_id): Path<String>) -> Response {
 /// StripeWebhookEvent
 #[utoipa::path(
     post,
-    path="/webhook/azure",
+    path = "/azure",
     context_path = "/webhook",
     tag = "Billings",
     summary = "Handle Azure webhook events",

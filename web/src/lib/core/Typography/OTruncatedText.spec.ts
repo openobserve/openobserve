@@ -99,6 +99,24 @@ describe("OTruncatedText", () => {
     expect(tooltipBubble()?.textContent).toContain("Payment service (production)");
   });
 
+  it("should give the tooltip bubble the requested classes, keeping the text's line breaks", async () => {
+    vi.useFakeTimers();
+    const text = "SELECT *\n  FROM k8s\n WHERE a = 1";
+    wrapper = mount(OTruncatedText, {
+      props: { lines: 2, tooltipClass: "whitespace-pre-wrap font-mono" },
+      slots: { default: () => text },
+      attachTo: document.body,
+    });
+    const root = wrapper.find('[data-test="o-truncated-text"]').element;
+    setWidths(root, 310, 200);
+
+    await hoverPastDelay(root);
+
+    expect(tooltipBubble()?.className).toContain("whitespace-pre-wrap");
+    expect(tooltipBubble()?.className).toContain("font-mono");
+    expect(tooltipBubble()?.textContent).toContain(text);
+  });
+
   it("should render no tooltip at all when tooltip is false", () => {
     wrapper = mount(OTruncatedText, { props: { tooltip: false }, slots: { default: "x" } });
     expect(wrapper.findComponent(OTooltip).exists()).toBe(false);

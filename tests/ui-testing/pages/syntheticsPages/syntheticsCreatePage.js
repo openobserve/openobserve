@@ -18,6 +18,10 @@
 import { expect } from '@playwright/test';
 import { selectOSelectOption } from '../alertsPages/oselectHelpers.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
+
+// The prober's assertion operators to the filter builder's ids.
+const SYNTHETICS_OPERATOR_IDS = { eq: 'eq', ne: 'neq', lt: 'lt', gt: 'gt', contains: 'contains', not_contains: 'not_contains' };
 
 export class SyntheticsCreatePage {
   constructor(page) {
@@ -33,7 +37,6 @@ export class SyntheticsCreatePage {
       descriptionField: '[data-test="synthetics-check-details-description-textarea-field"]',
       tagField: '[data-test="synthetics-check-details-tag-input-field"]',
       addTagButton: '[data-test="synthetics-check-details-add-tag-btn"]',
-      addAssertionButton: '[data-test="synthetics-check-http-add-assertion-btn"]',
       tcpPortField: '[data-test="synthetics-check-tcp-port-input-field"]',
       tlsPortField: '[data-test="synthetics-check-tls-port-input-field"]',
       tlsMinDaysField: '[data-test="synthetics-check-tls-min-days-input-field"]',
@@ -66,7 +69,8 @@ export class SyntheticsCreatePage {
       privateLocationsEmpty: '[data-test="synthetics-check-locations-private-empty"]',
       saveButton: '[data-test="synthetics-create-save-btn"]',
       cancelButton: '[data-test="synthetics-create-cancel-btn"]',
-      unsavedDialog: '[data-test="synthetics-create-unsaved-dialog"]',
+      unsavedDialog: '[data-test="editor-draft-leave-dialog"]',
+      leaveDiscardButton: '[data-test="o-dialog-neutral-btn"]',
       dialogPrimary: '[data-test="o-dialog-primary-btn"]',
       gateUrlField: '[data-test="synthetics-create-url-input-field"]',
       gateUrlError: '[data-test="synthetics-create-url-input-error"]',
@@ -87,9 +91,7 @@ export class SyntheticsCreatePage {
   }
 
   locationOption(id) { return `[data-test="synthetics-check-locations-option-${id}"]`; }
-  assertionField(i) { return `[data-test="synthetics-check-http-assertion-field-${i}"]`; }
-  assertionOperator(i) { return `[data-test="synthetics-check-http-assertion-operator-${i}"]`; }
-  assertionValueField(i) { return `[data-test="synthetics-check-http-assertion-value-${i}-field"]`; }
+  assertions() { return new FilterBuilderDriver(this.page, 'synthetics-check-http-assertions'); }
   removeTagButton(i) { return `[data-test="synthetics-check-details-remove-tag-${i}-btn"]`; }
   deviceCell(browser, device) { return `[data-test="synthetics-check-browser-devices-cell-${browser}-${device}"]`; }
   variableRemoveButton(i) { return `[data-test="synthetics-check-variables-panel-remove-${i}-btn"]`; }
@@ -116,12 +118,17 @@ export class SyntheticsCreatePage {
 
   async removeTag(index) { await this.page.locator(this.removeTagButton(index)).click(); }
 
-  // Appends an assertion row and fills it; `index` is the new row's position.
-  async addAssertion(index, field, operator, value) {
-    await this.page.locator(this.locators.addAssertionButton).click();
-    await selectOSelectOption(this.page, this.assertionField(index), field);
-    await selectOSelectOption(this.page, this.assertionOperator(index), operator);
-    await this.page.locator(this.assertionValueField(index)).fill(String(value));
+  // Appends an assertion through the shared filter builder; `operator` is the prober's (eq, ne, lt, gt, contains, not_contains).
+  async addAssertion(field, operator, value) {
+    const before = await this.assertions().chips.count();
+    await this.assertions().addCondition({
+      field,
+      operator: SYNTHETICS_OPERATOR_IDS[operator] ?? operator,
+      values: [String(value)],
+    });
+    // The picker stays open for the next condition and would swallow the next click on the form.
+    await this.assertions().close();
+    await expect(this.assertions().chips).toHaveCount(before + 1, { timeout: 10000 });
   }
 
   async fillTcp(port) { await this.page.locator(this.locators.tcpPortField).fill(String(port)); }
@@ -253,10 +260,11 @@ export class SyntheticsCreatePage {
 
   async cancel() { await this.page.locator(this.locators.cancelButton).click(); }
 
+  // Leaves through the shared leave dialog's Discard, so no draft is left behind.
   async confirmLeave() {
     const dialog = this.page.locator(this.locators.unsavedDialog);
     await expect(dialog).toBeVisible({ timeout: 15000 });
-    await dialog.locator(this.locators.dialogPrimary).click();
+    await dialog.locator(this.locators.leaveDiscardButton).click();
   }
 
   async fillGate(url, name) {

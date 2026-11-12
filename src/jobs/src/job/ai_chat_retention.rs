@@ -17,12 +17,12 @@
 
 use config::{
     cluster::LOCAL_NODE,
-    get_config,
     meta::{self_reporting::ai_chat::AI_CHAT_EVENTS_STREAM, stream::StreamType},
     spawn_pausable_job,
     utils::time::now_micros,
 };
 use infra::table::{ai_chat_sessions, ai_chat_turns};
+use openobserve_core::ai_chat;
 
 const SWEEP_INTERVAL_SECS: u64 = 60 * 60;
 /// Chats refreshed per org per pass; the rest wait for the next pass.
@@ -32,8 +32,6 @@ const MARGIN_MICROS: i64 = MICROS_PER_DAY;
 const MICROS_PER_DAY: i64 = 24 * 60 * 60 * 1_000_000;
 /// Deleted chats whose replica copies are re-purged per org per pass.
 const REPLICA_PURGE_PER_PASS: u64 = 100;
-/// Deleted chats keep being purged this long, for replicas that were down at delete time.
-const REPLICA_REPURGE_WINDOW_MICROS: i64 = 7 * MICROS_PER_DAY;
 
 pub fn run() {
     if !LOCAL_NODE.is_scheduler() {
@@ -55,11 +53,20 @@ async fn sweep() -> Result<(), infra::errors::Error> {
             infra::schema::get_settings(&org_id, AI_CHAT_EVENTS_STREAM, StreamType::Logs)
                 .await
                 .unwrap_or_default();
-        let Some(days) = effective_retention_days(
+        let days = match db::organization::stream_retention_days(
+            &org_id,
+            StreamType::Logs,
+            AI_CHAT_EVENTS_STREAM,
             settings.data_retention,
-            get_config().compact.data_retention_days,
-        ) else {
-            continue;
+        )
+        .await
+        {
+            Ok(0) => continue,
+            Ok(days) => days,
+            Err(e) => {
+                log::error!("[AI_CHAT_RETENTION] {org_id}: can't read retention: {e}");
+                continue;
+            }
         };
         refresh_in_use(&org_id, days, now).await;
         let cutoff = now - purge_age(days);
@@ -128,7 +135,7 @@ async fn refresh_in_use(org_id: &str, days: i64, now: i64) {
 
 /// A deleted chat is done once one pass reaches every live replica; until then it is retried.
 async fn purge_deleted_replicas(org_id: &str) {
-    let repurge_since = now_micros() - REPLICA_REPURGE_WINDOW_MICROS;
+    let repurge_since = now_micros() - ai_chat_sessions::REPLICA_REPURGE_WINDOW_MICROS;
     let due = match ai_chat_sessions::due_for_replica_purge(
         org_id,
         REPLICA_PURGE_PER_PASS,
@@ -146,20 +153,9 @@ async fn purge_deleted_replicas(org_id: &str) {
     let Some(client) = o2_enterprise::enterprise::ai::client::get_agent_client() else {
         return;
     };
-    let auth = match openobserve_core::organization::get_sre_agent_credentials(org_id).await {
-        Ok((email, token)) => openobserve_core::auth::build_basic_auth_header(&email, &token),
-        // o2-ai still accepts the internal secret the client attaches.
-        Err(_) => String::new(),
-    };
+    let auth = ai_chat::sweep_purge_auth(org_id).await;
     for row in due {
-        let result = client
-            .delete_session_everywhere(&row.session_id, org_id, &auth)
-            .await;
-        let label = if result.is_ok() { "ok" } else { "failed" };
-        config::metrics::AI_CHAT_REPLICA_PURGES_TOTAL
-            .with_label_values(&[label])
-            .inc();
-        match result {
+        match ai_chat::purge_replica_copy(&client, org_id, &auth, &row.session_id).await {
             Ok(()) => {
                 if let Err(e) =
                     ai_chat_sessions::mark_replica_purged(org_id, &row.session_id, now_micros())
@@ -190,16 +186,6 @@ async fn purge_deleted_replicas(org_id: &str) {
     }
 }
 
-/// The stream's retention in days as the compactor resolves it; `None` keeps data forever.
-fn effective_retention_days(stream_days: i64, global_days: i64) -> Option<i64> {
-    let days = if stream_days > 0 {
-        stream_days
-    } else {
-        global_days
-    };
-    (days > 0).then_some(days)
-}
-
 /// Age (micros) past which a row goes: before its events may, but beyond the refresh horizon (R/2).
 fn purge_age(days: i64) -> i64 {
     let retention = days * MICROS_PER_DAY;
@@ -209,13 +195,6 @@ fn purge_age(days: i64) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn stream_retention_wins_and_zero_keeps_forever() {
-        assert_eq!(effective_retention_days(30, 7), Some(30));
-        assert_eq!(effective_retention_days(0, 7), Some(7));
-        assert_eq!(effective_retention_days(0, 0), None);
-    }
 
     #[test]
     fn rows_go_before_their_events_and_never_inside_the_refresh_horizon() {

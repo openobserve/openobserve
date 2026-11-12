@@ -40,7 +40,10 @@ import { defineComponent, computed, onMounted, ref, shallowRef, watch } from "vu
 import { useTheme } from "@/composables/useTheme";
 import { useI18nTyped } from "@/types/i18n";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import { processVariableContent } from "@/utils/dashboard/variables/variablesUtils";
+import {
+  escapeHtmlValue,
+  processVariableContent,
+} from "@/utils/dashboard/variables/variablesUtils";
 import { sanitizeHtmlPanel } from "@/utils/dashboard/htmlPanelSanitizer";
 
 // fallback scope suffix for panels rendered without a panelId
@@ -85,7 +88,10 @@ export default defineComponent({
         tabId: props.tabId,
         panelId: props.panelId,
       };
-      return processVariableContent(props.htmlContent, props.variablesData, context);
+      // No allLabel: html panels keep the raw sentinel so hand-built var-x=_o2_all_ links round-trip.
+      return processVariableContent(props.htmlContent, props.variablesData, context, {
+        escapeValue: escapeHtmlValue,
+      });
     });
 
     // re-serializing through v-html would let CSSOM-decoded text re-parse as markup

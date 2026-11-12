@@ -14,9 +14,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="pinned-dashboard-tab flex h-full min-h-0 flex-col">
+    <LicenseDeniedState
+      v-if="dashboardsLocked || licenseDenied"
+      :features="licenseDenied ?? ['dashboards']"
+      data-test="pinned-dashboard-license-denied"
+    />
     <!-- Skeleton mirrors the loaded layout (toolbar + panels grid) so the
          transition to real content is stable, instead of flat full-width bars. -->
-    <div v-if="isLoading" class="flex h-full min-h-0 flex-col">
+    <div v-else-if="isLoading" class="flex h-full min-h-0 flex-col">
       <div
         class="border-border-default flex shrink-0 items-center justify-end gap-2 border-b px-4 py-2"
       >
@@ -49,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="dateTimePicker"
           size="sm"
           v-model="selectedDate"
+          calendar-presets
           @hide="setTime"
           data-test="pinned-dashboard-date-time-picker"
         />
@@ -59,15 +65,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @trigger="refreshData"
           size="sm"
         />
-        <OButton
-          variant="outline"
-          size="icon-toolbar"
-          icon-left="refresh"
-          data-test="pinned-dashboard-refresh-btn"
-          @click="refreshData"
-        >
-          <OTooltip :content="t('common.refresh')" />
-        </OButton>
+        <!-- The tooltip would only repeat the visible label, so it shows on phones alone. -->
+        <OTooltip :content="t('common.refresh')" :disabled="!isMobile">
+          <OButton
+            variant="primary"
+            :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+            icon-left="refresh"
+            :aria-label="t('common.refresh')"
+            data-test="pinned-dashboard-refresh-btn"
+            @click="refreshData"
+          >
+            <template v-if="!isMobile">{{ t("common.refresh") }}</template>
+          </OButton>
+        </OTooltip>
       </div>
       <div class="min-h-0 flex-1 overflow-auto">
         <RenderDashboardCharts
@@ -96,13 +106,20 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 
 const { t } = useI18nTyped();
+const { locked: dashboardsLocked } = useLicenseLock("dashboards");
+const licenseDenied = ref<string[] | null>(null);
+const { isMobile } = useBreakpoint();
 
 const props = defineProps<{ dashboardId: string; folderId: string }>();
 const emit = defineEmits<{
   (e: "update-label", label: string): void;
-  (e: "unavailable", dashboardId: string): void;
+  (e: "unavailable", dashboardId: string, folderId: string): void;
 }>();
 
 const store = useStore();
@@ -111,7 +128,9 @@ const dashboardData = ref<any>(null);
 // RenderDashboardCharts expects currentTimeObj keyed per-panel, falling back
 // to the "__global" key when no panel-specific override exists. We only
 // ever set the global time here (read-only embedded view, no per-panel UI).
-const currentTimeObj = ref<Record<string, { start_time?: Date; end_time?: Date }>>({});
+const currentTimeObj = ref<
+  Record<string, { start_time?: Date; end_time?: Date; relativeTimePeriod?: string | null }>
+>({});
 const refreshInterval = ref(0);
 const dateTimePicker = ref<any>(null);
 const renderRef = ref<any>(null);
@@ -156,7 +175,7 @@ const resolveWindow = (): { startTime: number; endTime: number } | null => {
   if (!d) return null;
   const type = d.valueType ?? d.type;
   if (type === "relative" && d.relativeTimePeriod) {
-    const rel = getConsumableRelativeTime(d.relativeTimePeriod);
+    const rel = getConsumableRelativeTime(d.relativeTimePeriod, store.state.timezone);
     if (rel?.startTime && rel?.endTime) {
       return { startTime: rel.startTime, endTime: rel.endTime };
     }
@@ -181,6 +200,7 @@ const setTime = () => {
       __global: {
         start_time: new Date(win.startTime),
         end_time: new Date(win.endTime),
+        relativeTimePeriod: selectedDate.value?.relativeTimePeriod,
       },
     };
   }
@@ -195,7 +215,10 @@ const refreshData = () => {
   setTime();
 };
 
+// A license denial is never "unavailable": that emit deletes the org-wide pin for everyone.
 const load = async () => {
+  if (dashboardsLocked.value) return;
+  licenseDenied.value = null;
   isLoading.value = true;
   try {
     // Use the shared getDashboard util (same as ViewDashboard) — NOT the raw
@@ -204,10 +227,11 @@ const load = async () => {
     // The raw service returns {version, v5:{...}} whose top level has no `tabs`,
     // which made RenderDashboardCharts render "No panels here yet".
     const dashboard = await getDashboard(store, props.dashboardId, props.folderId);
+    if (dashboardsLocked.value) return;
 
     // getDashboard returns {} (not a throw) for a missing/deleted dashboard.
     if (!dashboard || typeof dashboard !== "object" || !dashboard.title) {
-      emit("unavailable", props.dashboardId);
+      emit("unavailable", props.dashboardId, props.folderId);
       return;
     }
 
@@ -219,8 +243,10 @@ const load = async () => {
     selectedTabId.value = dashboard.tabs?.[0]?.tabId ?? "default";
     await nextTick();
     setTime();
-  } catch {
-    emit("unavailable", props.dashboardId);
+  } catch (err) {
+    const denied = licenseDeniedFeatures(err);
+    if (denied) licenseDenied.value = denied.length ? denied : ["dashboards"];
+    else if (!dashboardsLocked.value) emit("unavailable", props.dashboardId, props.folderId);
   } finally {
     isLoading.value = false;
   }
@@ -228,6 +254,11 @@ const load = async () => {
 
 onMounted(load);
 watch(() => props.dashboardId, load);
+// The org config, with its license states, can land after the first load started.
+watch(dashboardsLocked, (locked) => {
+  if (locked) dashboardData.value = null;
+  else void load();
+});
 
 // Recompute the window whenever the selected range changes. The
 // DateTimePickerDashboard updates its v-model (selectedDate) on Apply /

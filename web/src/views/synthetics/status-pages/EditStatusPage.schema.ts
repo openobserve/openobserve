@@ -26,6 +26,7 @@ export const makeEditStatusPageSchema = (t: (k: string) => string) =>
       description: z.string().optional().default(""),
       brand_name: z.string().optional().default(""),
       logo_img: z.string().optional().default(""),
+      favicon_img: z.string().optional().default(""),
       accent_color: z
         .string()
         .optional()

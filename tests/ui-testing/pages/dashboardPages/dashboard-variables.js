@@ -2,8 +2,10 @@
 //methods: addDashboardVariable, selectValueFromVariableDropDown
 //addDashboardVariable params: name, streamtype, streamName, field, customValueSearch, filterConfig, showMultipleValues
 import { expect } from "@playwright/test";
+import { SELECTORS, clickDashboardMenuItem } from "./dashboard-selectors.js";
 import { selectStreamFromDropdown, selectFieldFromDropdown } from "./dashboard-stream-field-utils.js";
 import { waitForValuesStreamComplete } from "../../playwright-tests/utils/streaming-helpers.js";
+import { FilterBuilderDriver } from "../generalPages/filterBuilderPage.js";
 
 export default class DashboardVariables {
   constructor(page) {
@@ -22,12 +24,31 @@ export default class DashboardVariables {
     this.variableLoadingSpinner = (name) => page.locator(`[data-test="variable-selector-${name}"] [role="status"]`);
     // HTML panel editor (Monaco) locators
     this.htmlEditor = page.locator('[data-test="dashboard-html-editor"]');
+    // "Add Variable" button in the panel editor's variable bar, and the drawer's name input it opens
+    this.addVariableBtn = page.locator('[data-test="dashboard-add-variable-btn"]');
+    this.variableNameField = page.locator('[data-test="dashboard-variable-name-field"]');
     // Ad-hoc (dynamic) filter variable selector controls
     this.adhocAddSelector = page.locator('[data-test="dashboard-variable-adhoc-add-selector"]');
     this.adhocNameSelectorField = page.locator('[data-test="dashboard-variable-adhoc-name-selector-field"]');
     this.adhocValueSelectorField = page.locator('[data-test="dashboard-variable-adhoc-value-selector-field"]');
     this.adhocNameSelectorInput = page.locator('[data-test="dashboard-variable-adhoc-name-selector"] input');
     this.adhocValueSelectorInput = page.locator('[data-test="dashboard-variable-adhoc-value-selector"] input');
+    // A variable's query filters are the shared FilterBuilder.
+    this.variableFilterBuilder = new FilterBuilderDriver(page, "dashboard-variable-filter-builder");
+  }
+
+  /**
+   * Add a filter row to the open variable's query filters
+   * @param {{filterName: string, operator: string, value: string}} filterConfig
+   */
+  async addVariableQueryFilter(filterConfig) {
+    await this.variableFilterBuilder.root.waitFor({ state: "visible", timeout: 10000 });
+    await this.variableFilterBuilder.addCondition({
+      field: filterConfig.filterName,
+      operator: filterConfig.operator,
+      value: filterConfig.value,
+    });
+    await this.variableFilterBuilder.close();
   }
 
   /**
@@ -43,12 +64,16 @@ export default class DashboardVariables {
     await this.adhocValueSelectorInput.fill(value);
   }
 
+  async clickAddVariableBtn() {
+    await this.addVariableBtn.click();
+  }
+
   /**
-   * Get the dashboard settings button locator
+   * Get the toolbar More button locator (it holds Settings and shows once the dashboard is ready)
    * @returns {import('@playwright/test').Locator}
    */
-  getSettingBtnLocator() {
-    return this.page.locator('[data-test="dashboard-setting-btn"]');
+  getMoreOptionsBtnLocator() {
+    return this.page.locator(SELECTORS.MORE_OPTIONS_BTN);
   }
 
   /**
@@ -123,53 +148,7 @@ export default class DashboardVariables {
 
     // Add Filter Configuration if provided
     if (filterConfig) {
-
-      const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
-      await addFilterBtn.waitFor({ state: "visible", timeout: 5000 });
-      await addFilterBtn.click();
-      // The add button opens a condition/group menu; the new condition opens from its chip.
-      await this.page.locator('[data-test="dashboard-variable-filter-add-condition"]').click();
-      await this.page.locator('[data-test^="dashboard-variable-filter-condition-"]').last().click();
-      
-      // Wait for and interact with Filter Name selector
-      const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]');
-      await filterNameSelector.waitFor({ state: "visible", timeout: 10000 });
-      await filterNameSelector.click();
-      const filterNameSearch = this.page.locator('[data-test="dashboard-query-values-filter-name-selector-search"]');
-      await filterNameSearch.waitFor({ state: "visible", timeout: 5000 });
-      await filterNameSearch.fill(filterConfig.filterName);
-
-      // Wait for and select the filter name option
-      const filterNameOption = this.page.locator(`[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="${filterConfig.filterName}"]`);
-      await filterNameOption.waitFor({ state: "visible", timeout: 10000 });
-      await filterNameOption.click();
-
-      // Wait for and interact with Operator selector
-      const operatorSelector = this.page.locator('[data-test="dashboard-query-values-filter-operator-selector"]');
-      await operatorSelector.waitFor({ state: "visible", timeout: 10000 });
-      await operatorSelector.click();
-
-      // Wait for and select the operator option
-      const operatorOption = this.page.locator(`[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="${filterConfig.operator}"]`);
-      await operatorOption.waitFor({ state: "visible", timeout: 10000 });
-      await operatorOption.click();
-
-      // Wait for and interact with value input (OCombobox).
-      // OCombobox debounces update:modelValue by 1000ms — typing via fill() and
-      // saving immediately leaves the model empty. Instead, type to filter the
-      // dropdown and click the matching option, which uses onSelect() and emits
-      // immediately (no debounce).
-      const filterValueInput = this.page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
-      await filterValueInput.waitFor({ state: "visible", timeout: 10000 });
-      await filterValueInput.fill(filterConfig.value);
-
-      // Wait for the dropdown option and click it so the value is committed instantly.
-      // Options have data-test-value="${value}" (e.g. "$variablename").
-      const filterValueOption = this.page.locator(
-        `[data-test*="filter-value-selector"][data-test$="-option"][data-test-value="${filterConfig.value}"]`
-      );
-      await filterValueOption.waitFor({ state: "visible", timeout: 5000 });
-      await filterValueOption.click();
+      await this.addVariableQueryFilter(filterConfig);
     }
 
     // Toggle show multiple values based on parameter
@@ -477,7 +456,7 @@ export default class DashboardVariables {
     field = "kubernetes_namespace_name"
   ) {
     // Open dashboard settings
-    await this.page.locator('[data-test="dashboard-setting-btn"]').click();
+    await clickDashboardMenuItem(this.page, SELECTORS.SETTING_BTN);
 
     // Wait for the settings panel to be fully opened and variable tab to be available
     const variableTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');
@@ -553,6 +532,7 @@ export default class DashboardVariables {
         const options = document.querySelectorAll('[data-test="dashboard-variable-field-select-option"]');
         return options.length > 0;
       },
+      undefined,
       { timeout: 10000, polling: 100 }
     );
 
@@ -566,19 +546,14 @@ export default class DashboardVariables {
     const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
     await saveBtn.waitFor({ state: "visible", timeout: 10000 });
 
-    // Wait for save to complete by monitoring the close button becomes clickable
     await saveBtn.click();
 
-    // Wait for the variable to be saved (settings drawer close button should be ready)
-    const closeBtn = this.page.locator('[data-test="dashboard-settings-drawer"] [data-test="o-drawer-close-btn"]');
-    await closeBtn.waitFor({ state: "visible", timeout: 10000 });
+    // Closing before the save lands opens the "Leave with unsaved changes?" dialog, so wait for the row.
+    await this.editVariableBtn(variableName).waitFor({ state: "visible", timeout: 15000 });
 
-    // Close the settings drawer
-    await closeBtn.click();
-
-    // Wait for settings drawer to close
-    const settingsDrawer = this.page.locator('[data-test="dashboard-settings-drawer"]');
-    await settingsDrawer.waitFor({ state: "hidden", timeout: 15000 });
+    await this.settingsDrawerCloseBtn.waitFor({ state: "visible", timeout: 10000 });
+    await this.settingsDrawerCloseBtn.click();
+    await this.settingsDrawer.waitFor({ state: "hidden", timeout: 15000 });
 
     // Wait for dashboard to stabilize after variable addition (longer for parallel execution)
     await this.page.waitForLoadState('domcontentloaded');

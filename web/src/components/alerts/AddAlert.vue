@@ -77,7 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OTooltip
                 :content="raw(anomalyConfig.last_error)"
-                :disabled="anomalyConfig.status !== 'failed' || !anomalyConfig.last_error"
+                :disabled="
+                  (anomalyConfig.status !== 'failed' &&
+                    !isAnomalyDataReadinessStatus(anomalyConfig.status)) ||
+                  !anomalyConfig.last_error
+                "
               >
                 <OTag
                   v-if="anomalyConfig.status"
@@ -113,6 +117,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="replay"
                 >
                   {{ t("alerts.retry") }}
+                </OButton>
+              </OTooltip>
+              <OTooltip
+                v-else-if="anomalyCanCheckDataNow(anomalyConfig)"
+                :content="t('alerts.anomaly.checkDataNowTooltip')"
+              >
+                <OButton
+                  variant="ghost"
+                  size="xs"
+                  :loading="anomalyRetraining"
+                  data-test="anomaly-check-data-now"
+                  @click="anomalyTriggerRetrain"
+                  icon-left="replay"
+                >
+                  {{ t("alerts.anomaly.checkDataNow") }}
                 </OButton>
               </OTooltip>
             </div>
@@ -167,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div class="flex min-h-0 flex-1 max-lg:flex-col max-lg:overflow-y-auto">
+      <div :key="draftFormKey" class="flex min-h-0 flex-1 max-lg:flex-col max-lg:overflow-y-auto">
         <!-- LEFT column wrapper (flex: 6.5) -->
         <div
           :class="[
@@ -198,10 +217,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="option.value"
                   :value="option.value"
                   size="sm"
+                  :disabled="option.locked"
+                  :focusable-unavailable="option.locked"
+                  :tooltip="option.locked ? anomalyLockedReason : undefined"
                   :data-test="`add-alert-type-tab-${option.value}`"
                 >
                   <template #icon-left>
-                    <OIcon :name="option.icon" size="sm" />
+                    <OIcon
+                      :class="option.locked ? 'lock-chip' : undefined"
+                      :name="option.locked ? 'lock' : option.icon"
+                      size="sm"
+                    />
                   </template>
                   {{ option.label }}
                 </OToggleGroupItem>
@@ -333,8 +359,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :promqlCondition="formData.query_condition.promql_condition"
                     :triggerCondition="formData.trigger_condition"
                     @update:tab="updateTab"
-                    @update-group="updateGroup"
-                    @remove-group="removeConditionGroup"
                     @input:update="onInputUpdate"
                     @update:sqlQuery="updateSqlQuery"
                     @update:promqlQuery="updatePromqlQuery"
@@ -417,15 +441,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:multiTimeRange="updateMultiTimeRange"
                   />
                 </div>
-
-                <!-- Deduplication (scheduled only) -->
-                <div v-if="formData.is_real_time === 'false'">
-                  <Deduplication
-                    :deduplication="formData.deduplication"
-                    :columns="filteredColumns"
-                    @update:deduplication="updateDeduplication"
-                  />
-                </div>
               </div>
 
               <div v-show="activeTab === 'anomaly-config'" data-tab-pane="anomaly-config">
@@ -457,7 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm-action"
               :disabled="isSubmitting"
-              @click="$emit('cancel:hideform')"
+              @click="cancelEditor"
               >{{ t("alerts.cancel") }}</OButton
             >
             <OButton
@@ -631,11 +646,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
     </div>
   </ODialog>
+
+  <EditorDraftDialogs :draft="alertDraft" />
 </template>
 
 <script lang="ts">
 import { raw } from "@/types/i18n";
-import { defineComponent, computed, watch, provide, ref } from "vue";
+import { defineComponent, computed, watch, provide, ref, onMounted } from "vue";
 import { useStore } from "vuex";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
@@ -648,7 +665,6 @@ import JsonEditor from "../common/JsonEditor.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
 import AlertSettings from "./steps/AlertSettings.vue";
 import CompareWithPast from "./steps/CompareWithPast.vue";
-import Deduplication from "./steps/Deduplication.vue";
 import Advanced from "./steps/Advanced.vue";
 import InlineSelectFolderDropdown from "../common/sidebar/InlineSelectFolderDropdown.vue";
 import PreviewAlert from "./PreviewAlert.vue";
@@ -657,8 +673,14 @@ import AnomalyDetectionConfig from "@/components/anomaly_detection/steps/Anomaly
 import AnomalyDataPreview from "@/components/anomaly_detection/AnomalyDataPreview.vue";
 import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
-import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
-import { anomalyNoticeBadgeKeys } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
+import { useAlertForm, defaultAlertValue, type AlertFormEmit } from "@/composables/useAlertForm";
+import { useAlertEditorDraft } from "@/composables/alerts/useAlertEditorDraft";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import {
+  anomalyNoticeBadgeKeys,
+  anomalyCanCheckDataNow,
+  isAnomalyDataReadinessStatus,
+} from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -674,6 +696,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import CompositeAlertForm from "./composite/CompositeAlertForm.vue";
 import alertsService from "@/services/alerts";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -708,7 +731,6 @@ export default defineComponent({
     QueryConfig,
     AlertSettings,
     CompareWithPast,
-    Deduplication,
     Advanced,
     PreviewAlert,
     AlertSummary,
@@ -730,10 +752,31 @@ export default defineComponent({
     OPageHeader,
     OTruncatedText,
     CompositeAlertForm,
+    EditorDraftDialogs,
   },
   setup(props, { emit }) {
     const store = useStore();
-    const alertForm = useAlertForm(props, emit);
+    // Bound once the draft exists; a save reports to the draft first, which decides whether the host navigates.
+    let onFormSaved: ((folderId?: string) => void) | null = null;
+    const formEmit = ((event: string, ...args: unknown[]) => {
+      if (event === "update:list" && onFormSaved) {
+        onFormSaved(args[0] as string | undefined);
+        return;
+      }
+      emit(event as Parameters<typeof emit>[0], ...args);
+    }) as AlertFormEmit;
+    const alertForm = useAlertForm(props, formEmit);
+    const alertEditorDraft = useAlertEditorDraft({
+      form: alertForm,
+      modelValue: () => props.modelValue,
+      onSaved: (folderId, options) => emit("update:list", folderId, options),
+    });
+    onFormSaved = alertEditorDraft.handleSaved;
+    onMounted(() => alertEditorDraft.start());
+
+    const cancelEditor = async () => {
+      if (await alertEditorDraft.draft.confirmLeave()) emit("cancel:hideform");
+    };
 
     // Share server SQL-validation squiggle ranges with the descendant query
     // editors (QueryEditorDialog / QueryConfig) via inject.
@@ -753,6 +796,8 @@ export default defineComponent({
     const isAnomalyDetectionEnabled = computed(
       () => alertForm.store.state.zoConfig.anomaly_detection_enabled === true,
     );
+    const { locked: anomalyLicenseLocked, lockedReason: anomalyLockedReason } =
+      useLicenseLock("anomaly_detection");
 
     // §4.8: keyed off the config API's notice_class field alone.
     const anomalyNoticeBadge = computed(() => {
@@ -858,12 +903,13 @@ export default defineComponent({
     const alertTypeOptions = computed(() => [
       { label: alertForm.t("alerts.scheduled"), value: "false", icon: "schedule" },
       { label: alertForm.t("alerts.realTime"), value: "true", icon: "bolt" },
-      ...(isAnomalyDetectionEnabled.value
+      ...(isAnomalyDetectionEnabled.value || anomalyLicenseLocked.value
         ? [
             {
               label: alertForm.t("alerts.anomalyDetection"),
               value: "anomaly",
               icon: "query-stats",
+              locked: anomalyLicenseLocked.value,
             },
           ]
         : []),
@@ -944,6 +990,7 @@ export default defineComponent({
     // the ONE form directly. The existing watch on is_real_time still drives the
     // anomaly/composite tab switch.
     const onAlertTypeChange = (value: unknown) => {
+      if (value === "anomaly" && anomalyLicenseLocked.value) return;
       alertForm.setF("is_real_time", value);
       // Realtime runs Builder only. The query text and Compare-with-Past windows
       // stay in the form for a switch back; the payload never sends windows here.
@@ -1024,12 +1071,18 @@ export default defineComponent({
     return {
       raw,
       ...alertForm,
+      alertDraft: alertEditorDraft.draft,
+      draftFormKey: alertEditorDraft.formKey,
+      cancelEditor,
       alertAutoName,
       headerModeLabel,
       isAnomalyDetectionEnabled,
       anomalyNoticeBadge,
       anomalyNoticeTooltip,
+      isAnomalyDataReadinessStatus,
+      anomalyCanCheckDataNow,
       alertTypeOptions,
+      anomalyLockedReason,
       alertTabs,
       activeFolderName,
       goBackToAlertsList,

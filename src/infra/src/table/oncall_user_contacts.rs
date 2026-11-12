@@ -95,6 +95,14 @@ pub fn same_person(user_email: &str) -> SimpleExpr {
     .eq(user_email.to_lowercase())
 }
 
+pub async fn delete_by_org<C: ConnectionTrait>(db: &C, org_id: &str) -> Result<u64, errors::Error> {
+    Ok(oncall_user_contacts::Entity::delete_many()
+        .filter(oncall_user_contacts::Column::OrgId.eq(org_id))
+        .exec(db)
+        .await?
+        .rows_affected)
+}
+
 async fn get_in<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -240,8 +248,10 @@ async fn list_for_in<C: ConnectionTrait>(
         .filter(oncall_user_contacts::Column::OrgId.eq(org_id))
         // Profiles keep the case the request path carried, while rosters may not.
         .filter(
-            Expr::expr(Func::lower(Expr::col(oncall_user_contacts::Column::UserEmail)))
-                .is_in(emails.iter().map(|e| e.to_lowercase())),
+            Expr::expr(Func::lower(Expr::col(
+                oncall_user_contacts::Column::UserEmail,
+            )))
+            .is_in(emails.iter().map(|e| e.to_lowercase())),
         )
         .all(conn)
         .await?
@@ -249,7 +259,10 @@ async fn list_for_in<C: ConnectionTrait>(
         .map(|m| (m.id.clone(), to_contact(m)))
         .fold(HashMap::new(), |mut picked, row| {
             let key = row.1.user_email.to_lowercase();
-            if picked.get(&key).is_none_or(|held| pick_rank(held) < pick_rank(&row)) {
+            if picked
+                .get(&key)
+                .is_none_or(|held| pick_rank(held) < pick_rank(&row))
+            {
                 picked.insert(key, row);
             }
             picked

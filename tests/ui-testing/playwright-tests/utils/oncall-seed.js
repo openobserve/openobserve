@@ -5,11 +5,7 @@
  *
  * Plan: docs/test_generator/features/oncall-test-plan.md
  *
- * On-Call is ENTERPRISE-GATED. Every route answers 404 (feature off) or 403
- * "Not Supported" (OSS build) when it is unavailable, and the product treats
- * both as the same calm fact rather than an error — so must we.
- * `isOnCallAvailable()` turns that into one boolean a spec can skip on, instead
- * of each spec failing thirty seconds into a timeout on an OSS runner.
+ * On-Call is ENTERPRISE-GATED: `isOnCallAvailable()` skips on an OSS build and throws when an enterprise build has it off.
  *
  * Three environment facts this module encodes, each of which fails QUIETLY if
  * you get it wrong:
@@ -34,9 +30,13 @@
  * This module contains NO expect() calls: assertions belong in spec files.
  */
 
+const { AsyncLocalStorage } = require('node:async_hooks');
 const { randomBytes } = require('node:crypto');
 const testLogger = require('./test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
+const { ingestBase } = require('./ingest-url.js');
+
+const orgScope = new AsyncLocalStorage();
 
 /** Every on-call timestamp is microseconds. Named so the call sites read. */
 const MICROS = 1_000_000;
@@ -52,8 +52,8 @@ const SEED_SERVICES = ['checkout', 'search', 'payments'];
 const FIRST_RUNG_MICROS = 0;
 const SECOND_RUNG_MICROS = 60 * MICROS;
 
-/** How long a fired alert may take to become a page. Generous: the scheduler owns the cadence. */
-const PAGE_WAIT_MS = 180_000;
+/** A new alert is due at once and the scheduler ticks every 10s, so its page opens in about 10-20s. */
+const PAGE_WAIT_MS = 90_000;
 
 function baseUrl() {
   const url = process.env.ZO_BASE_URL || 'http://localhost:5080';
@@ -72,7 +72,11 @@ function ingestUrl() {
 
 /** The org KSUID. Never the display name — see the module note. */
 function orgId() {
-  return getOrgIdentifier();
+  return orgScope.getStore() ?? getOrgIdentifier();
+}
+
+function withOrg(org, fn) {
+  return orgScope.run(org, fn);
 }
 
 /**
@@ -151,30 +155,52 @@ async function must(res, what, payload) {
   );
 }
 
+/** GET one resource: null only when it does not exist (404), a throw on any other failure. */
+async function getOrNull(page, url, what) {
+  const res = await page.request.get(url, { headers: getAuthHeaders() });
+  if (res.status() === 404) return null;
+  const text = await res.text().catch(() => '');
+  if (!res.ok()) throw new Error(`${what} failed: HTTP ${res.status()} — ${text.slice(0, 200)}`);
+  return text.trim() ? JSON.parse(text) : null;
+}
+
+/** A new org owned by the signed-in root user; the API has no working delete, so it stays. */
+async function createOrg(page, prefix = 'e2e_oncall_org') {
+  const name = uniqueName(prefix);
+  const res = await api(page, 'post', `${baseUrl()}/api/organizations`, { name });
+  const body = await must(res, `Create org "${name}"`, { name });
+  if (!body?.identifier) throw new Error(`Org "${name}" created but no identifier returned: ${JSON.stringify(body)}`);
+  testLogger.info('Org created', { name, id: body.identifier });
+  return { id: body.identifier, name };
+}
+
 // ------------------------------------------------------------- capability probe
 
+/** The server's `build_type` from the unauthenticated `/config`, or a throw when it cannot be read. */
+async function readBuildType(page) {
+  const res = await page.request.get(`${baseUrl()}/config`);
+  const text = await res.text().catch(() => '');
+  if (!res.ok()) {
+    throw new Error(`on-call probe: could not read GET /config (HTTP ${res.status()}) — ${text.slice(0, 200)}`);
+  }
+  let buildType;
+  try {
+    buildType = JSON.parse(text)?.build_type;
+  } catch {
+    buildType = undefined;
+  }
+  if (!buildType) throw new Error(`on-call probe: GET /config carries no build_type — ${text.slice(0, 200)}`);
+  return buildType;
+}
+
 /**
- * Is on-call reachable in this deployment?
- *
- * Asks the teams list rather than `/config`: the list IS the capability probe
- * the UI itself uses (§G.8.1), so a spec that skips on this skips on exactly
- * what the screens react to. `/config`'s `oncall_enabled` is checked as well
- * because it distinguishes "off" from "OSS build" in the reason string, which
- * is the difference between a misconfigured runner and a correct skip.
+ * Is on-call reachable here? Skips only on an OSS build; anything else that is not a working on-call throws.
  *
  * @returns {Promise<{available: boolean, reason: string}>}
  */
 async function isOnCallAvailable(page) {
   const org = orgId();
-  if (!org) return { available: false, reason: 'no org identifier — ORGNAME / cloud-config is unset' };
-
-  let flag = null;
-  try {
-    const cfg = await page.request.get(`${baseUrl()}/config`, { headers: getAuthHeaders() });
-    if (cfg.ok()) flag = (await cfg.json().catch(() => ({})))?.oncall_enabled ?? null;
-  } catch {
-    // A failed /config read is not itself a verdict; the teams probe below decides.
-  }
+  if (!org) throw new Error('on-call probe: no org identifier — ORGNAME / cloud-config is unset');
 
   const res = await page.request.get(`${baseUrl()}/api/${org}/oncall/teams`, {
     headers: getAuthHeaders(),
@@ -182,22 +208,24 @@ async function isOnCallAvailable(page) {
   if (res.ok()) return { available: true, reason: '' };
 
   const body = await res.text().catch(() => '');
-  if (isUnavailableStatus(res.status(), body)) {
+  // Every spec skips on `available: false`, so only a genuinely absent feature may return it.
+  if (!isUnavailableStatus(res.status(), body)) {
+    throw new Error(
+      `on-call probe failed: HTTP ${res.status()} on /oncall/teams — ${body.slice(0, 200)}`,
+    );
+  }
+
+  const buildType = await readBuildType(page);
+  if (buildType === 'opensource') {
     return {
       available: false,
-      reason: flag === false
-        ? 'on-call is disabled on this deployment (config.oncall_enabled=false)'
-        : `on-call is not available here (HTTP ${res.status()}) — OSS build or O2_ONCALL_ENABLED unset`,
+      reason: `on-call is enterprise-only and this is an OSS build (HTTP ${res.status()} on /oncall/teams)`,
     };
   }
-  // A THROW, not another `available: false`. Every spec calls this in
-  // `beforeEach` and skips on a false, so returning one here turns any backend
-  // fault into a silent pass: a 500 on this one route would skip all 106 tests
-  // and report both shards green. Only 404 and 403 "Not Supported" say the
-  // feature is absent; a 500, 502 or 401 says the deployment is broken, and a
-  // broken deployment must fail the suite rather than excuse it.
   throw new Error(
-    `on-call probe failed: HTTP ${res.status()} on /oncall/teams — ${body.slice(0, 200)}`,
+    `on-call is switched off on this ${buildType} build: /oncall/teams answered HTTP ${res.status()}. ` +
+    'Start the server with O2_ONCALL_ENABLED=true; skipping here would report the on-call suite green ' +
+    'without running it.',
   );
 }
 
@@ -238,12 +266,10 @@ async function listTeams(page) {
 }
 
 async function getTeam(page, teamId) {
-  const res = await page.request.get(
-    `${baseUrl()}/api/${orgId()}/oncall/teams/${encodeURIComponent(teamId)}`,
-    { headers: getAuthHeaders() },
+  return await getOrNull(
+    page, `${baseUrl()}/api/${orgId()}/oncall/teams/${encodeURIComponent(teamId)}`,
+    `Reading team ${teamId}`,
   );
-  if (!res.ok()) return null;
-  return await res.json().catch(() => null);
 }
 
 /**
@@ -262,6 +288,15 @@ async function addTeamMembers(page, teamId, userEmails) {
   const body = await must(res, `Add members to team ${teamId}`, payload);
   testLogger.info('On-call members added', { teamId, count: userEmails.length });
   return body;
+}
+
+/** Take one person off the team; the server also drops them from every rotation, so a sole member leaves it staffing nobody. */
+async function removeTeamMember(page, teamId, userEmail) {
+  const res = await api(
+    page, 'delete',
+    `${baseUrl()}/api/${orgId()}/oncall/teams/${encodeURIComponent(teamId)}/members?user_email=${encodeURIComponent(userEmail)}`,
+  );
+  return must(res, `Remove ${userEmail} from team ${teamId}`);
 }
 
 async function listTeamMembers(page, teamId) {
@@ -334,17 +369,9 @@ function allDayRestriction(days = [0, 1, 2, 3, 4, 5, 6]) {
  * BEFORE the policy that points at it, and when changing rotation ids, clear
  * the policy first.
  *
- * AND `addTeamMembers` IS ONE OF THE WRITERS THAT NAMES A ROTATION. Putting the
- * first member on a team that has no rotation auto-provisions a `source:
- * "default"` rotation AND rewrites rungs P1..P3 to page it by id — so a seed
- * that creates a team, adds members and only then writes its schedule hits the
- * §8.5 refusal every time, on a policy nothing in the spec ever wrote. Two ways
- * out, both verified against the live API:
- *   - write the schedule FIRST, then add members; the auto-write then binds to
- *     the rotation already there rather than inventing one, or
- *   - `detachPolicyFromRotations()` first — the server's own instruction —
- *     which is the only option when the schedule being written is EMPTY, since
- *     an existing-but-rotationless schedule auto-provisions just the same.
+ * Add the people BEFORE writing a schedule that names them: a rotation naming
+ * somebody not on the team is refused with a 400. The default rotation and
+ * ladder the first member provisions are regenerated by the schedule write.
  */
 async function setTeamSchedule(page, teamId, { timezone = 'UTC', rotations }) {
   const payload = { timezone, rotations };
@@ -359,12 +386,10 @@ async function setTeamSchedule(page, teamId, { timezone = 'UTC', rotations }) {
 }
 
 async function getTeamSchedule(page, teamId) {
-  const res = await page.request.get(
-    `${baseUrl()}/api/${orgId()}/oncall/teams/${encodeURIComponent(teamId)}/schedule`,
-    { headers: getAuthHeaders() },
+  return await getOrNull(
+    page, `${baseUrl()}/api/${orgId()}/oncall/teams/${encodeURIComponent(teamId)}/schedule`,
+    `Reading the schedule of team ${teamId}`,
   );
-  if (!res.ok()) return null;
-  return await res.json().catch(() => null);
 }
 
 /** Who the engine says is on call, optionally at a future instant (micros). */
@@ -459,14 +484,10 @@ function rungEscalatingToTeam(priority, rotationId, { channels = ['email'] } = {
 async function setTeamPolicy(page, teamId, {
   rungs,
   destinations = undefined,
-  repeatCount = undefined,
-  finalAction = undefined,
   l0 = undefined,
 } = {}) {
   const payload = { rungs };
   if (destinations !== undefined) payload.destinations = destinations;
-  if (repeatCount !== undefined) payload.repeat_count = repeatCount;
-  if (finalAction !== undefined) payload.final_action = finalAction;
   if (l0 !== undefined) payload.l0 = l0;
 
   const res = await api(
@@ -502,12 +523,10 @@ async function detachPolicyFromRotations(page, teamId) {
 }
 
 async function getTeamPolicy(page, teamId) {
-  const res = await page.request.get(
-    `${baseUrl()}/api/${orgId()}/oncall/teams/${encodeURIComponent(teamId)}/policy`,
-    { headers: getAuthHeaders() },
+  return await getOrNull(
+    page, `${baseUrl()}/api/${orgId()}/oncall/teams/${encodeURIComponent(teamId)}/policy`,
+    `Reading the policy of team ${teamId}`,
   );
-  if (!res.ok()) return null;
-  return await res.json().catch(() => null);
 }
 
 // ---------------------------------------------------------------- ownership
@@ -561,11 +580,10 @@ async function ownershipStats(page, { teamId = undefined, days = undefined } = {
   if (teamId) params.set('team_id', teamId);
   if (days !== undefined) params.set('days', String(days));
   const query = params.toString() ? `?${params}` : '';
-  const res = await page.request.get(
-    `${baseUrl()}/api/${orgId()}/oncall/ownership/stats${query}`, { headers: getAuthHeaders() },
+  return await getOrNull(
+    page, `${baseUrl()}/api/${orgId()}/oncall/ownership/stats${query}`,
+    'Reading ownership-rule stats',
   );
-  if (!res.ok()) return null;
-  return await res.json().catch(() => null);
 }
 
 /** Nominate the org's catch-all team, or clear it with null. */
@@ -576,11 +594,10 @@ async function setDefaultTeam(page, teamId) {
 }
 
 async function getRoutingConfig(page) {
-  const res = await page.request.get(`${baseUrl()}/api/${orgId()}/oncall/routing/config`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok()) return null;
-  return await res.json().catch(() => null);
+  return await getOrNull(
+    page, `${baseUrl()}/api/${orgId()}/oncall/routing/config`,
+    'Reading the routing config',
+  );
 }
 
 // ------------------------------------------------------------------ log data
@@ -614,7 +631,7 @@ async function seedOnCallStream(page, streamName, {
     });
   }
 
-  const res = await api(page, 'post', `${ingestUrl()}/api/${orgId()}/${streamName}/_json`, rows);
+  const res = await api(page, 'post', `${ingestBase(ingestUrl())}/api/${orgId()}/${streamName}/_json`, rows);
   await must(res, `On-call stream ingest "${streamName}"`);
   await waitForStreamSearchable(page, streamName, rows.length);
   testLogger.info('On-call stream seeded', { streamName, records: rows.length });
@@ -775,58 +792,6 @@ async function createPagingAlert(page, {
   return { id, name };
 }
 
-/**
- * Fire an alert now instead of waiting for its schedule.
- *
- * PATCH, not POST — the route is `PATCH /api/v2/{org}/alerts/{id}/trigger`.
- * Without this a spec waits a whole frequency window for the scheduler.
- */
-async function triggerAlert(page, alertId, { folder = 'default' } = {}) {
-  const res = await api(
-    page, 'patch',
-    `${baseUrl()}/api/v2/${orgId()}/alerts/${encodeURIComponent(alertId)}/trigger?folder=${encodeURIComponent(folder)}`,
-  );
-  return await must(res, `Trigger alert ${alertId}`);
-}
-
-/**
- * Fire now if the route will, otherwise let the scheduler do it.
- *
- * THE MANUAL TRIGGER IS BROKEN FOR EXACTLY THE ALERT SHAPE ON-CALL USES, and
- * the failure is a bare `500 {"code":500,"message":""}` with nothing to read.
- * Reproduced against this build, smallest case: an alert carrying
- * `oncall_team` and `destinations: []` — which `POST /api/v2/{org}/alerts`
- * ACCEPTS with 200, and which the scheduler then fires correctly, opening its
- * page within ~15s — 500s on `PATCH .../trigger`. Add any destination to that
- * same alert and the same PATCH answers 200. So the create route, the
- * scheduler and the trigger route disagree about whether the shape is legal,
- * and only the trigger route is wrong.
- *
- * Firing is SCAFFOLDING for the UI cases here — none of them assert on the
- * trigger route — so a spec must not die on it. This swallows the 500 and
- * falls through to `waitForPages`, which still proves the page opened; a
- * scheduler that then never fires fails the spec with its own message rather
- * than this one. The swallow is deliberately narrow: any other failure is
- * re-thrown, so a trigger route that breaks generally still fails loudly.
- *
- * @returns {Promise<boolean>} whether the manual trigger actually took
- */
-async function triggerAlertOrLetSchedulerFire(page, alertId, { folder = 'default' } = {}) {
-  try {
-    await triggerAlert(page, alertId, { folder });
-    return true;
-  } catch (e) {
-    if (!/failed: HTTP 500/.test(String(e?.message))) throw e;
-    testLogger.warn(
-      'Manual alert trigger 500ed; waiting for the scheduler instead. This is the known ' +
-      'trigger-route defect for an on-call alert with no notification destinations — the ' +
-      'alert itself saved fine and the scheduler fires it.',
-      { alertId },
-    );
-    return false;
-  }
-}
-
 // -------------------------------------------------------------------- pages
 
 /**
@@ -873,20 +838,39 @@ async function listResponses(page, {
 }
 
 async function getResponse(page, responseId) {
-  const res = await page.request.get(
-    `${baseUrl()}/api/${orgId()}/oncall/responses/${encodeURIComponent(responseId)}`,
-    { headers: getAuthHeaders() },
+  return await getOrNull(
+    page, `${baseUrl()}/api/${orgId()}/oncall/responses/${encodeURIComponent(responseId)}`,
+    `Reading page ${responseId}`,
   );
-  if (!res.ok()) return null;
-  return await res.json().catch(() => null);
+}
+
+/** The routing evidence on a page that landed on the wrong team, for the failure message. */
+async function describeMisroutedPage(page, record, expectTeamId) {
+  const lines = [
+    `Page ${record.id} opened on team ${record.team_id ?? 'NONE (unrouted)'}; ` +
+    `expected ${expectTeamId ?? 'NONE (unrouted)'}.`,
+  ];
+  try {
+    const detail = await getResponse(page, record.id);
+    for (const e of detail?.events ?? []) {
+      lines.push(`  event ${e.kind} by ${e.actor}: ${String(e.body ?? '').slice(0, 300)}`);
+    }
+    const progress = await getEscalationProgress(page, record.id);
+    if (progress?.stopped_because) lines.push(`  escalation stopped because: ${progress.stopped_because}`);
+  } catch (e) {
+    lines.push(`  (could not read the record's events: ${e.message})`);
+  }
+  lines.push(
+    'Check the ownership rule claims the dimension the alert\'s rows carry, and that nothing ' +
+    'fired the alert by hand: a manual trigger opens a teamless page that swallows every scheduled firing.',
+  );
+  return lines.join('\n');
 }
 
 /**
- * Wait for a page to exist, matching on the alert that opened it.
+ * Wait for the pages an alert opens, matched on `source_id` because each firing is its own record.
  *
- * Matching on `source_id` rather than a title: a record is keyed
- * `(subject_type, source_id, firing)` and each firing is its own record, so the
- * alert id is the only handle that survives a re-fire.
+ * `expectTeamId` (a team id, or null for an unrouted page) fails at once when any page lands elsewhere.
  *
  * @returns {Promise<object[]>} every page opened by this alert, newest first
  */
@@ -894,8 +878,9 @@ async function waitForPages(page, {
   alertId,
   expected = 1,
   teamId = undefined,
+  expectTeamId = undefined,
   timeout = PAGE_WAIT_MS,
-  pollMs = 3000,
+  pollMs = 2000,
 } = {}) {
   const deadline = Date.now() + timeout;
   let seen = [];
@@ -904,6 +889,10 @@ async function waitForPages(page, {
     seen = await listResponses(page, {
       subjectType: 'alert', sourceId: alertId, teamId, includeResolved: true,
     });
+    if (expectTeamId !== undefined) {
+      const stray = seen.find((r) => (r.team_id ?? null) !== expectTeamId);
+      if (stray) throw new Error(await describeMisroutedPage(page, stray, expectTeamId));
+    }
     if (seen.length >= expected) {
       testLogger.info('On-call page(s) observed', { alertId, count: seen.length });
       return seen;
@@ -912,26 +901,27 @@ async function waitForPages(page, {
   }
 
   throw new Error(
-    `Alert ${alertId} never opened ${expected} on-call page(s) within ${timeout}ms (saw ${seen.length}).\n` +
-    `Causes, in the order worth checking: the alert has no oncall_team AND no ownership rule matches\n` +
-    `its identity (a teamless page is still opened, so zero pages means the alert never FIRED);\n` +
-    `the alert's window holds no rows (seed the stream first); or the scheduler is not running.`,
+    `Alert ${alertId} opened ${seen.length} of ${expected} on-call page(s) within ${timeout}ms.\n` +
+    'A firing opens a page even when nothing routes it, so a shortfall means the alert never FIRED: ' +
+    'check the stream has rows inside the alert\'s window and that the alert scheduler is running.',
   );
 }
 
 /**
- * Create the alert, fire it, and wait for the page it opens.
+ * Create the alert and wait for the scheduler to fire it into a page; never fire it by hand.
  *
- * The one helper a UI spec that just needs "a page on screen" should call.
+ * `expectTeamId` defaults to the alert's own `teamId`; pass the team an ownership rule should pick otherwise.
  *
  * @returns {Promise<{alert: {id: string, name: string}, pages: object[]}>}
  */
-async function firePageAndWait(page, { alertOptions, expected = 1, timeout = PAGE_WAIT_MS } = {}) {
+async function firePageAndWait(page, {
+  alertOptions,
+  expected = 1,
+  expectTeamId = alertOptions?.teamId,
+  timeout = PAGE_WAIT_MS,
+} = {}) {
   const alert = await createPagingAlert(page, alertOptions);
-  await triggerAlertOrLetSchedulerFire(page, alert.id);
-  const pages = await waitForPages(page, {
-    alertId: alert.id, expected, teamId: alertOptions.teamId, timeout,
-  });
+  const pages = await waitForPages(page, { alertId: alert.id, expected, expectTeamId, timeout });
   return { alert, pages };
 }
 
@@ -960,22 +950,18 @@ async function sendTestPage(page, teamId, { priority = undefined } = {}) {
  * `EscalationProgress`, which is the trap.
  */
 async function getEscalationProgress(page, responseId) {
-  const res = await page.request.get(
-    `${baseUrl()}/api/${orgId()}/oncall/responses/${encodeURIComponent(responseId)}/escalation`,
-    { headers: getAuthHeaders() },
+  return await getOrNull(
+    page, `${baseUrl()}/api/${orgId()}/oncall/responses/${encodeURIComponent(responseId)}/escalation`,
+    `Reading the escalation progress of page ${responseId}`,
   );
-  if (!res.ok()) return null;
-  return await res.json().catch(() => null);
 }
 
 /** The delivery ledger — the ground truth `progress.reached` must agree with (§2.1). */
 async function getDeliveries(page, responseId) {
-  const res = await page.request.get(
-    `${baseUrl()}/api/${orgId()}/oncall/responses/${encodeURIComponent(responseId)}/deliveries`,
-    { headers: getAuthHeaders() },
+  return await getOrNull(
+    page, `${baseUrl()}/api/${orgId()}/oncall/responses/${encodeURIComponent(responseId)}/deliveries`,
+    `Reading the delivery ledger of page ${responseId}`,
   );
-  if (!res.ok()) return null;
-  return await res.json().catch(() => null);
 }
 
 // ------------------------------------------------------------------ teardown
@@ -1109,18 +1095,22 @@ module.exports = {
   MICROS,
   HOUR_MICROS,
   DAY_MICROS,
+  api,
   FIRST_RUNG_MICROS,
   SECOND_RUNG_MICROS,
   SEED_SERVICES,
   baseUrl,
   ingestUrl,
   orgId,
+  withOrg,
+  createOrg,
   uniqueName,
   isOnCallAvailable,
   createTeam,
   listTeams,
   getTeam,
   addTeamMembers,
+  removeTeamMember,
   listTeamMembers,
   rotation,
   allDayRestriction,
@@ -1142,8 +1132,6 @@ module.exports = {
   waitForStreamSearchable,
   seedNotificationDestination,
   createPagingAlert,
-  triggerAlert,
-  triggerAlertOrLetSchedulerFire,
   listResponses,
   getResponse,
   waitForPages,

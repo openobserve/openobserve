@@ -20,4 +20,6 @@ export interface FormDateTimeRangeProps {
   required?: boolean;
   /** Optional helper line rendered under the label. */
   description?: I18nText;
+  /** Render the field's validation error under the picker, for a form with no other place that says it. */
+  showError?: boolean;
 }

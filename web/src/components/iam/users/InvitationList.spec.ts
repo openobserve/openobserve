@@ -4,6 +4,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 const dismissToastMock = vi.fn();
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => dismissToastMock),
 }));
@@ -60,6 +61,7 @@ vi.mock("@/services/organizations", async (importOriginal) => {
 import InvitationList from "@/components/iam/users/InvitationList.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
+import analytics from "@/services/product_analytics";
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport).
 // Exposes the props the component forwards and emits the click events
@@ -297,6 +299,17 @@ describe("InvitationList - rejectInvitation", () => {
     // The second dialog is the reject dialog
     expect(dialogs[1].props("open")).toBe(true);
   });
+
+  it("names the org in bold and uses a destructive Reject button", async () => {
+    const wrapper = await mountInvitationList();
+    (wrapper.vm as any).rejectInvitation({ token: "tok-2", org_name: "Org Two", org_id: "org-2" });
+    await flushPromises();
+    const dialog = wrapper.findAllComponents(ODialogStub)[1];
+    expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+    const message = dialog.find('[data-test="invitation-list-reject-message"]');
+    expect(message.find("span.font-semibold").text()).toBe("Org Two");
+    expect(message.text()).toContain("reject the invitation to join Org Two?");
+  });
 });
 
 // 6. confirmAcceptInvitation
@@ -318,6 +331,9 @@ describe("InvitationList - confirmAcceptInvitation", () => {
       "confirm",
       "org-1",
     );
+    expect(analytics.track).toHaveBeenCalledWith("invitation_accepted", {
+      source: "invitation_list",
+    });
   });
 
   it("closes the confirmAccept dialog after invoking confirm", async () => {

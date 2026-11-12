@@ -183,11 +183,7 @@ fn create_incidents_table_statement() -> TableCreateStatement {
                 .not_null()
                 .default(1),
         )
-        .col(
-            ColumnDef::new(AlertIncidents::Title)
-                .string_len(500)
-                .null(),
-        )
+        .col(ColumnDef::new(AlertIncidents::Title).string_len(500).null())
         .col(
             ColumnDef::new(AlertIncidents::AssignedTo)
                 .string_len(256)

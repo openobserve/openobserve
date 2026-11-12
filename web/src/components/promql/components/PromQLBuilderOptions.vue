@@ -22,6 +22,7 @@
         >
           <!-- Legend -->
           <div
+            v-if="!queryTypeOnly"
             data-test="promql-builder-options-field-wrapper"
             class="ms-2.5 flex flex-row items-center gap-2 max-md:ms-0 max-md:w-full"
           >
@@ -68,6 +69,7 @@
 
           <!-- Step Value -->
           <div
+            v-if="!queryTypeOnly"
             data-test="promql-builder-options-field-wrapper"
             class="ms-2.5 flex flex-row items-center gap-2 max-md:ms-0"
           >
@@ -111,6 +113,7 @@
 
           <!-- Query Type Select (Range/Instant) -->
           <div
+            v-if="shouldShowPromQLQueryType(dashboardPanelData)"
             data-test="promql-builder-options-field-wrapper"
             class="ms-2.5 flex flex-row items-center gap-2 max-md:ms-0"
           >
@@ -120,11 +123,7 @@
               >{{ t("common.type") }}</span
             >
             <OSelect
-              v-model="
-                dashboardPanelDataModel.data.queries[
-                  dashboardPanelDataModel.layout.currentQueryIndex
-                ].config.query_type
-              "
+              v-model="queryType"
               :options="queryTypeOptions"
               labelKey="label"
               valueKey="value"
@@ -162,6 +161,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { shouldShowPromQLQueryType } from "@/utils/dashboard/configUtils";
 
 export default defineComponent({
   name: "PromQLBuilderOptions",
@@ -178,6 +178,11 @@ export default defineComponent({
       type: Object,
       required: true,
     },
+    // Custom queries keep their legend and step in the config panel.
+    queryTypeOnly: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup(props) {
     const { t } = useI18nTyped();
@@ -188,9 +193,21 @@ export default defineComponent({
     // Initialize query_type if not set (default to "range")
     const currentQuery =
       props.dashboardPanelData.data.queries[props.dashboardPanelData.layout.currentQueryIndex];
-    if (!currentQuery.config.query_type) {
+    if (!props.queryTypeOnly && !currentQuery.config.query_type) {
       currentQuery.config.query_type = "range";
     }
+
+    // Unset reads as range, matching the executor, so opening a saved custom panel does not dirty it.
+    const queryType = computed({
+      get: () =>
+        props.dashboardPanelData.data.queries[props.dashboardPanelData.layout.currentQueryIndex]
+          ?.config?.query_type || "range",
+      set: (value: string) => {
+        const query =
+          props.dashboardPanelData.data.queries[props.dashboardPanelData.layout.currentQueryIndex];
+        if (query) query.config.query_type = value;
+      },
+    });
 
     // Query type options for the select
     const queryTypeOptions = [
@@ -253,9 +270,11 @@ export default defineComponent({
       raw,
       t,
       dashboardPanelDataModel,
+      queryType,
       queryTypeOptions,
       dashboardSelectfieldPromQlList,
       selectPromQlNameOption,
+      shouldShowPromQLQueryType,
     };
   },
 });

@@ -3,6 +3,7 @@ import { beforeEach, describe, it, expect, vi } from "vitest";
 
 const getMock = vi.fn();
 const putMock = vi.fn();
+const postMock = vi.fn();
 
 vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -10,10 +11,11 @@ vi.mock("./http", () => ({
   default: () => ({
     get: getMock,
     put: putMock,
+    post: postMock,
   }),
 }));
 
-import genAiAgentMappingService from "./gen-ai-agent-mapping.service";
+import genAiAgentMappingService, { HARNESS_STRIP_BATCH } from "./gen-ai-agent-mapping.service";
 import analytics from "./product_analytics";
 
 describe("listAgents", () => {
@@ -83,6 +85,40 @@ describe("listVersionsForCompare", () => {
         start_time: nowMicros - 2_592_000_000_000,
         end_time: nowMicros,
       },
+    });
+  });
+
+  it("widens the window to the page start when the page window is longer than retention", async () => {
+    const pageStart = nowMicros - 90 * 24 * 3600 * 1000 * 1000;
+    getMock.mockResolvedValueOnce({ data: { agents: [] } });
+
+    await genAiAgentMappingService.listVersionsForCompare(
+      "org",
+      "checkout-agent",
+      null,
+      nowMicros,
+      pageStart,
+    );
+
+    expect(getMock).toHaveBeenLastCalledWith("/api/org/gen_ai/agents", {
+      params: { start_time: pageStart, end_time: nowMicros },
+    });
+  });
+
+  it("keeps the retention window when the page window is shorter", async () => {
+    const pageStart = nowMicros - 7 * 24 * 3600 * 1000 * 1000;
+    getMock.mockResolvedValueOnce({ data: { agents: [] } });
+
+    await genAiAgentMappingService.listVersionsForCompare(
+      "org",
+      "checkout-agent",
+      null,
+      nowMicros,
+      pageStart,
+    );
+
+    expect(getMock).toHaveBeenLastCalledWith("/api/org/gen_ai/agents", {
+      params: { start_time: nowMicros - 2_592_000_000_000, end_time: nowMicros },
     });
   });
 
@@ -238,5 +274,37 @@ describe("save analytics", () => {
     putMock.mockRejectedValueOnce(new Error("boom"));
     await expect(genAiAgentMappingService.save("org", {} as any)).rejects.toThrow("boom");
     expect(analytics.track).not.toHaveBeenCalled();
+  });
+});
+
+describe("stripHarness", () => {
+  beforeEach(() => {
+    postMock.mockReset();
+  });
+
+  const echo = async (_url: string, body: { texts: string[] }) => ({
+    data: {
+      results: body.texts.map((text) => ({ text: text.toUpperCase(), hidden: 1, only: null })),
+    },
+  });
+
+  it("posts the patterns and texts to the server and returns its results", async () => {
+    postMock.mockImplementation(echo);
+    const patterns = ["regex (?s)<env>.*?</env>"];
+    const out = await genAiAgentMappingService.stripHarness("org", patterns, ["a", "b"]);
+    expect(postMock).toHaveBeenCalledWith("/api/org/settings/gen_ai/harness_strip", {
+      patterns,
+      texts: ["a", "b"],
+    });
+    expect(out.map((r) => r.text)).toEqual(["A", "B"]);
+  });
+
+  it("splits texts into batches the server accepts and keeps their order", async () => {
+    postMock.mockImplementation(echo);
+    const texts = Array.from({ length: HARNESS_STRIP_BATCH + 2 }, (_, i) => `t${i}`);
+    const out = await genAiAgentMappingService.stripHarness("org", ["tag job"], texts);
+    expect(postMock).toHaveBeenCalledTimes(2);
+    expect(postMock.mock.calls[1][1].texts).toEqual(texts.slice(HARNESS_STRIP_BATCH));
+    expect(out.map((r) => r.text)).toEqual(texts.map((t) => t.toUpperCase()));
   });
 });

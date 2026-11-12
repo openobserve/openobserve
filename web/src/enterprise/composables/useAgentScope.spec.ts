@@ -16,6 +16,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ref } from "vue";
 import type { Ref } from "vue";
+import type { LocationQuery } from "vue-router";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { ALL_AGENTS_VALUE } from "@/enterprise/components/onlineEvals/utils/agentFilterSql";
 import { agentOptionKey } from "@/plugins/traces/llmAgentFilter";
@@ -30,7 +31,15 @@ vi.mock("@/services/gen-ai-agent-mapping.service", async (importOriginal) => {
   };
 });
 
-import { useAgentScope, UNSET } from "./useAgentScope";
+import {
+  useAgentScope,
+  resolveScopeMode,
+  UNSET,
+  scopeUrlQuery,
+  readUrlScope,
+  explicitScopeMode,
+  agentIdentityKey,
+} from "./useAgentScope";
 
 const t = (k: string) => k;
 
@@ -187,6 +196,196 @@ describe("useAgentScope — Shape 1 (allAgents:true, Sessions/LLM)", () => {
     expect(agents.value).toEqual([]);
     expect(scope.activeAgent.value).toBe(ALL_AGENTS_VALUE);
     expect(scope.agentsLoaded.value).toBe(true);
+  });
+
+  it("a failed load is an error, not 'no agents': no empty state, no identity banner", async () => {
+    const filterMode = ref<"stream" | "agent">("stream");
+    const scope = useAgentScope({
+      filterMode,
+      activeStream: ref("stream_a"),
+      availableStreams: ref(["stream_a"]),
+      orgId: () => "org1",
+      getWindow: () => ({ start: 100, end: 200 }),
+      allAgents: true,
+      t,
+    });
+    listAgents.mockRejectedValue(
+      Object.assign(new Error("boom"), { isAxiosError: true, response: { status: 500 } }),
+    );
+    await scope.loadAgents();
+    expect(scope.agentsError.value).toBe("failed");
+    expect(scope.noAgentIdentity.value).toBe(false);
+    filterMode.value = "agent";
+    expect(scope.agentEmpty.value).toBe(false);
+    expect(scope.agentsLoadFailed.value).toBe(true);
+
+    // A load that succeeds clears the error; an empty list is then "no agents".
+    listAgents.mockResolvedValue({ agents: [] });
+    await scope.loadAgents(undefined, undefined, true);
+    expect(scope.agentsError.value).toBeNull();
+    expect(scope.agentsLoadFailed.value).toBe(false);
+    expect(scope.agentEmpty.value).toBe(true);
+    filterMode.value = "stream";
+    expect(scope.noAgentIdentity.value).toBe(true);
+  });
+
+  it("a 403 is reported as forbidden", async () => {
+    const { scope } = makeScope(ref("agent"), ref(""));
+    listAgents.mockRejectedValue(
+      Object.assign(new Error("Forbidden"), { isAxiosError: true, response: { status: 403 } }),
+    );
+    await scope.loadAgents();
+    expect(scope.agentsError.value).toBe("forbidden");
+  });
+
+  it("drops an agents response or failure that lands after the org changed", async () => {
+    const org = ref("org-switch-old");
+    const agents = ref<GenAiAgentListItem[]>([]);
+    const agentsLoaded = ref(false);
+    const scope = useAgentScope({
+      filterMode: ref("agent"),
+      activeStream: ref(""),
+      orgId: () => org.value,
+      getWindow: () => ({ start: 100, end: 200 }),
+      allAgents: true,
+      agents,
+      agentsLoaded,
+      t,
+    });
+    const ok = Promise.withResolvers<unknown>();
+    listAgents.mockReturnValue(ok.promise);
+    const pending = scope.loadAgents();
+    org.value = "org-switch-new";
+    ok.resolve({ agents: [agentA] });
+    await pending;
+    expect(agents.value).toEqual([]);
+    expect(agentsLoaded.value).toBe(false);
+
+    // The error path is dropped the same way.
+    org.value = "org-switch-old-2";
+    const fail = Promise.withResolvers<unknown>();
+    listAgents.mockReturnValue(fail.promise);
+    agents.value = [agentB];
+    const failing = scope.loadAgents();
+    org.value = "org-switch-new";
+    fail.reject(
+      Object.assign(new Error("Forbidden"), { isAxiosError: true, response: { status: 403 } }),
+    );
+    await failing;
+    expect(agents.value).toEqual([agentB]);
+    expect(scope.agentsError.value).toBeNull();
+    expect(agentsLoaded.value).toBe(false);
+  });
+
+  it.each(["success", "failure"])(
+    "keeps the newer window after an older request finishes with %s",
+    async (outcome) => {
+      const scope = useAgentScope({
+        filterMode: ref("agent"),
+        activeStream: ref(""),
+        orgId: () => `window-race-${outcome}`,
+        getWindow: () => ({ start: 60_000_000, end: 120_000_000 }),
+        allAgents: true,
+        t,
+      });
+      const old = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+      const latest = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+      listAgents.mockReturnValueOnce(old.promise).mockReturnValueOnce(latest.promise);
+      const oldLoad = scope.loadAgents();
+      const latestLoad = scope.loadAgents(180_000_000, 240_000_000);
+      await vi.waitFor(() => expect(listAgents).toHaveBeenCalledTimes(2));
+      latest.resolve({ agents: [agentB] });
+      await latestLoad;
+      if (outcome === "success") old.resolve({ agents: [agentA] });
+      else old.reject(new Error("old window failed"));
+      await oldLoad;
+      expect(scope.agents.value).toEqual([agentB]);
+      expect(scope.agentsError.value).toBeNull();
+      expect(scope.agentsLoaded.value).toBe(true);
+    },
+  );
+
+  it("refreshes after an in-flight cached load rather than reusing its response", async () => {
+    const scope = useAgentScope({
+      filterMode: ref("agent"),
+      activeStream: ref(""),
+      orgId: () => "forced-load-after-entry",
+      getWindow: () => ({ start: 60_000_000, end: 120_000_000 }),
+      allAgents: true,
+      t,
+    });
+    const entry = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+    listAgents.mockReturnValueOnce(entry.promise).mockResolvedValueOnce({ agents: [agentB] });
+    const initialLoad = scope.loadAgents();
+    await vi.waitFor(() => expect(listAgents).toHaveBeenCalledTimes(1));
+    const refresh = scope.loadAgents(undefined, undefined, true);
+    entry.resolve({ agents: [agentA] });
+    await Promise.all([initialLoad, refresh]);
+    expect(listAgents).toHaveBeenCalledTimes(2);
+    expect(scope.agents.value).toEqual([agentB]);
+  });
+
+  it("the starter and joiners of a load wait for a forced refresh started after them", async () => {
+    const scope = useAgentScope({
+      filterMode: ref("agent"),
+      activeStream: ref(""),
+      orgId: () => "joiner-waits-for-forced",
+      getWindow: () => ({ start: 60_000_000, end: 120_000_000 }),
+      allAgents: true,
+      t,
+    });
+    const entry = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+    const forced = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+    listAgents.mockReturnValueOnce(entry.promise).mockReturnValueOnce(forced.promise);
+    const seen: Record<string, GenAiAgentListItem[]> = {};
+    const starter = scope.loadAgents().then(() => {
+      seen.starter = scope.agents.value;
+    });
+    await vi.waitFor(() => expect(listAgents).toHaveBeenCalledTimes(1));
+    const joiner = scope.loadAgents().then(() => {
+      seen.joiner = scope.agents.value;
+    });
+    const refresh = scope.loadAgents(undefined, undefined, true);
+    entry.resolve({ agents: [agentA] });
+    await vi.waitFor(() => expect(listAgents).toHaveBeenCalledTimes(2));
+    expect(seen).toEqual({});
+    forced.resolve({ agents: [agentB] });
+    await Promise.all([starter, joiner, refresh]);
+    expect(seen).toEqual({ starter: [agentB], joiner: [agentB] });
+  });
+});
+
+describe("resolveScopeMode", () => {
+  it("an explicit choice wins; else agents decide; a failed load never picks Stream", () => {
+    expect(resolveScopeMode("stream", 3)).toBe("stream");
+    expect(resolveScopeMode(null, 3)).toBe("agent");
+    expect(resolveScopeMode(null, 0)).toBe("stream");
+    expect(resolveScopeMode(null, 0, "failed")).toBe("agent");
+    expect(resolveScopeMode(null, 0, "forbidden")).toBe("agent");
+    expect(resolveScopeMode("stream", 0, "failed")).toBe("stream");
+  });
+});
+
+describe("scopeUrlQuery", () => {
+  const agent = { name: "support-bot", env: "prod", version: "v2" };
+
+  beforeEach(() => localStorage.clear());
+
+  it("leaves an auto-picked agent out of the URL, so a reload with no agents ends in Stream", () => {
+    const query = scopeUrlQuery(
+      { from: "1" },
+      { mode: "agent", explicit: false, stream: "", agent },
+    );
+    expect(query).toEqual({ from: "1" });
+    const reloaded = readUrlScope(query as LocationQuery);
+    expect(resolveScopeMode(explicitScopeMode(reloaded), 0)).toBe("stream");
+  });
+
+  it("writes an explicit agent scope, which a reload keeps", () => {
+    const query = scopeUrlQuery({}, { mode: "agent", explicit: true, stream: "", agent });
+    expect(query).toEqual({ type: "agent", agent: "support-bot", env: "prod", version: "v2" });
+    const reloaded = readUrlScope(query as LocationQuery);
+    expect(resolveScopeMode(explicitScopeMode(reloaded), 0)).toBe("agent");
   });
 });
 
@@ -456,8 +655,92 @@ describe("useAgentScope — Env→Agent→Version cascade (Plan 2)", () => {
   });
 });
 
+describe("useAgentScope — cascade with the All option (Quality)", () => {
+  const AGENTS: GenAiAgentListItem[] = [
+    {
+      name: "a",
+      id: "a",
+      source_stream: "s",
+      source_stream_type: "traces",
+      env: "prod",
+      version: "v1",
+    },
+    {
+      name: "a",
+      id: "a",
+      source_stream: "s",
+      source_stream_type: "traces",
+      env: "prod",
+      version: "v2",
+    },
+    {
+      name: "b",
+      id: "b",
+      source_stream: "s",
+      source_stream_type: "traces",
+      env: "dev",
+      version: "v1",
+    },
+    {
+      name: "x",
+      id: "x",
+      source_stream: "s",
+      source_stream_type: "traces",
+      env: null,
+      version: null,
+    },
+  ];
+
+  function makeScope(allOption?: boolean) {
+    return useAgentScope({
+      filterMode: ref<"stream" | "agent">("agent"),
+      activeStream: ref(""),
+      orgId: () => "org1",
+      getWindow: () => ({ start: 100, end: 200 }),
+      cascade: true,
+      allOption,
+      agents: ref<GenAiAgentListItem[]>(AGENTS),
+      agentsLoaded: ref(true),
+      t,
+    });
+  }
+
+  it("starts every level on All and lists it first", () => {
+    const scope = makeScope(true);
+    expect(scope.selectedEnv.value).toBe(ALL_AGENTS_VALUE);
+    expect(scope.selectedAgentName.value).toBe(ALL_AGENTS_VALUE);
+    expect(scope.selectedVersion.value).toBe(ALL_AGENTS_VALUE);
+    expect(scope.envs.value.map((o) => o.value)).toEqual([ALL_AGENTS_VALUE, "prod", "dev"]);
+    expect(scope.agentNames.value.map((o) => o.value)).toEqual([ALL_AGENTS_VALUE, "a", "b", "x"]);
+    expect(scope.versions.value.map((o) => o.value)).toEqual([ALL_AGENTS_VALUE, "v1", "v2"]);
+    expect(scope.envs.value[0].label).toBe("common.all");
+    expect(scope.agentNames.value[0].label).toBe("traces.allAgents");
+    expect(scope.selectedAgent.value).toBeNull();
+  });
+
+  it("narrows the lower levels without picking a value, and resets them to All", () => {
+    const scope = makeScope(true);
+    scope.selectedEnv.value = "prod";
+    expect(scope.agentNames.value.map((o) => o.value)).toEqual([ALL_AGENTS_VALUE, "a"]);
+    expect(scope.selectedAgentName.value).toBe(ALL_AGENTS_VALUE);
+    scope.selectedAgentName.value = "a";
+    scope.selectedVersion.value = "v2";
+    scope.selectedEnv.value = "dev";
+    expect(scope.selectedAgentName.value).toBe(ALL_AGENTS_VALUE);
+    expect(scope.selectedVersion.value).toBe(ALL_AGENTS_VALUE);
+  });
+
+  it("without the option keeps the first-value default and no All entry", () => {
+    const scope = makeScope();
+    expect(scope.selectedEnv.value).toBe("prod");
+    expect(scope.selectedAgentName.value).toBe("a");
+    expect(scope.selectedVersion.value).toBe("v1");
+    expect(scope.envs.value.map((o) => o.value)).toEqual(["prod", "dev", UNSET]);
+  });
+});
+
 describe("useAgentScope — stream options", () => {
-  it("streamSelectOptions + selectedStreamCount reflect availableStreams and agent counts", async () => {
+  it("counts each stream's distinct agent names, as the Agent picker lists them", async () => {
     const activeStream = ref("stream_a");
     const availableStreams = ref<string[]>(["stream_a", "stream_b"]);
     const scope = useAgentScope({
@@ -469,10 +752,141 @@ describe("useAgentScope — stream options", () => {
       allAgents: true,
       t,
     });
-    listAgents.mockResolvedValue({ agents: [agentA, agentA] });
+    // The same agent seen with and without an id, plus a second agent.
+    listAgents.mockResolvedValue({
+      agents: [agentA, { ...agentA, id: null }, { ...agentA, name: "gamma", id: "g1" }],
+    });
     await scope.loadAgents();
     const streamA = scope.streamSelectOptions.value.find((o: any) => o.value === "stream_a");
     expect(streamA?.agentCount).toBe(2);
     expect(scope.selectedStreamCount.value).toBe(2);
+  });
+});
+
+describe("useAgentScope — agent stream (one variant in several streams)", () => {
+  // The registry returns rows newest `last_seen` first, so `stray` precedes `main`.
+  const row = (
+    stream: string,
+    firstSeen: number | null,
+    over: Partial<GenAiAgentListItem> = {},
+  ): GenAiAgentListItem => ({
+    name: "support",
+    id: "support",
+    source_stream: stream,
+    source_stream_type: "traces",
+    env: "prod",
+    version: "v1",
+    first_seen: firstSeen,
+    last_seen: 1_000,
+    ...over,
+  });
+  const MULTI = [row("stray", 900), row("main", 100), row("side", 500)];
+
+  function makeScope(list: GenAiAgentListItem[]) {
+    const agents = ref<GenAiAgentListItem[]>(list);
+    const scope = useAgentScope({
+      filterMode: ref<"stream" | "agent">("agent"),
+      activeStream: ref("main"),
+      orgId: () => "org1",
+      getWindow: () => ({ start: 100, end: 200 }),
+      cascade: true,
+      agents,
+      agentsLoaded: ref(true),
+      t,
+    });
+    return { scope, agents };
+  }
+
+  it("defaults to the stream the agent has lived in longest, not the newest registry row", () => {
+    const { scope } = makeScope(MULTI);
+    expect(scope.agentStreams.value.map((o) => o.value)).toEqual(["main", "side", "stray"]);
+    expect(scope.selectedAgentStream.value).toBe("");
+    expect(scope.effectiveStream.value).toBe("main");
+  });
+
+  it("a row without first_seen is never the default over one with it", () => {
+    const { scope } = makeScope([row("unknown", null), row("main", 100)]);
+    expect(scope.effectiveStream.value).toBe("main");
+  });
+
+  it("reads the picked stream, and its agent identity changes so pages reload", () => {
+    const { scope } = makeScope(MULTI);
+    const before = agentIdentityKey(scope.selectedAgent.value);
+    scope.selectedAgentStream.value = "stray";
+    expect(scope.effectiveStream.value).toBe("stray");
+    expect(scope.selectedAgent.value?.source_stream).toBe("stray");
+    expect(agentIdentityKey(scope.selectedAgent.value)).not.toBe(before);
+  });
+
+  it("offers one stream (no picker) when the variant sends to one stream", () => {
+    const { scope } = makeScope([row("main", 100), row("other", 50, { version: "v2" })]);
+    expect(scope.agentStreams.value.map((o) => o.value)).toEqual(["main"]);
+    expect(scope.effectiveStream.value).toBe("main");
+  });
+
+  it("honours a deep link's stream, and ignores one the agent does not send to", () => {
+    const { scope } = makeScope(MULTI);
+    expect(scope.selectAgentByScope("prod", "support", "v1", "side")).toBe(true);
+    expect(scope.effectiveStream.value).toBe("side");
+    expect(scope.selectAgentByScope("prod", "support", "v1", "gone")).toBe(true);
+    expect(scope.selectedAgentStream.value).toBe("");
+    expect(scope.effectiveStream.value).toBe("main");
+  });
+
+  it("re-resolves the stream on an agent change: a pick the new agent lacks falls back", () => {
+    const { scope } = makeScope([
+      ...MULTI,
+      row("billing_main", 300, { name: "billing", id: "billing" }),
+      row("stray", 400, { name: "billing", id: "billing" }),
+    ]);
+    scope.selectedAgentStream.value = "side";
+    scope.selectedAgentName.value = "billing";
+    expect(scope.selectedAgentStream.value).toBe("");
+    expect(scope.effectiveStream.value).toBe("billing_main");
+    // A pick the new agent also sends to is kept.
+    scope.selectedAgentStream.value = "stray";
+    scope.selectedAgentName.value = "support";
+    expect(scope.selectedAgentStream.value).toBe("stray");
+    expect(scope.effectiveStream.value).toBe("stray");
+  });
+
+  it("drops a pick the reloaded agents list no longer carries", () => {
+    const { scope, agents } = makeScope(MULTI);
+    scope.selectedAgentStream.value = "stray";
+    agents.value = [row("main", 100), row("side", 500)];
+    expect(scope.selectedAgentStream.value).toBe("");
+    expect(scope.effectiveStream.value).toBe("main");
+  });
+});
+
+describe("scopeUrlQuery / readUrlScope — agent stream", () => {
+  const agent = { name: "support", env: "prod", version: "v1" };
+
+  it("writes the agent's picked stream as `stream`, and a reload reads it back for the agent", () => {
+    const query = scopeUrlQuery(
+      {},
+      { mode: "agent", explicit: true, stream: "picker", agent: { ...agent, stream: "side" } },
+    );
+    expect(query).toEqual({
+      type: "agent",
+      agent: "support",
+      env: "prod",
+      version: "v1",
+      stream: "side",
+    });
+    const reloaded = readUrlScope(query as LocationQuery);
+    expect(reloaded.agentStream).toBe("side");
+    // Agent mode's `stream` is not the Stream-mode picker's stream.
+    expect(reloaded.stream).toBe("");
+  });
+
+  it("leaves `stream` out of an agent URL when the default stream was kept", () => {
+    const query = scopeUrlQuery({}, { mode: "agent", explicit: true, stream: "picker", agent });
+    expect(query.stream).toBeUndefined();
+  });
+
+  it("keeps a Stream-mode `stream` for the picker", () => {
+    const reloaded = readUrlScope({ type: "stream", stream: "s1" });
+    expect(reloaded).toMatchObject({ stream: "s1", agentStream: "" });
   });
 });

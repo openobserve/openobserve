@@ -13,17 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    sync::LazyLock,
-    time::{Duration, Instant},
-};
+use std::time::Duration;
 
-use config::{
-    RwHashMap,
-    meta::synthetics::{
-        BrowserConfig, ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticCookie,
-        SyntheticFrequency, SyntheticSettings, SyntheticStatus, SyntheticType, SyntheticVariable,
-    },
+use config::meta::synthetics::{
+    BrowserConfig, ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticCookie,
+    SyntheticFrequency, SyntheticSettings, SyntheticStatus, SyntheticType, SyntheticVariable,
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
@@ -31,7 +25,10 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::entity::synthetics_checks::{self, ActiveModel, Column, Entity};
+use super::{
+    entity::synthetics_checks::{self, ActiveModel, Column, Entity},
+    ttl_cache::TtlCache,
+};
 use crate::errors;
 
 /// `org_id/synthetics_id` → the synthetic check **definition**, with load time.
@@ -48,8 +45,7 @@ use crate::errors;
 /// make the cache useless (they fire at the same rate as the reads it serves),
 /// so instead they deliberately do **not** invalidate — and callers that need
 /// scheduling or status state must use [`get`], `fetch_due` or `get_alert_state`.
-static SYNTHETIC_CACHE: LazyLock<RwHashMap<String, (Synthetic, Instant)>> =
-    LazyLock::new(Default::default);
+static SYNTHETIC_CACHE: TtlCache<Synthetic> = TtlCache::new(SYNTHETIC_CACHE_TTL);
 
 const SYNTHETIC_CACHE_TTL: Duration = Duration::from_secs(15);
 
@@ -147,6 +143,7 @@ impl TryFrom<synthetics_checks::Model> for Synthetic {
             locations,
             enabled: m.enabled,
             destinations,
+            template: m.template,
             retries: settings.retries,
             cooldown_mins: settings.cooldown_mins,
             wait_before_retry_secs: settings.wait_before_retry_secs,
@@ -207,15 +204,13 @@ pub async fn get_cached<C: ConnectionTrait>(
     id: &str,
 ) -> Result<Option<Synthetic>, errors::Error> {
     let key = synthetic_cache_key(org_id, id);
-    if let Some(entry) = SYNTHETIC_CACHE.get(&key)
-        && entry.1.elapsed() < SYNTHETIC_CACHE_TTL
-    {
-        return Ok(Some(entry.0.clone()));
+    if let Some(cached) = SYNTHETIC_CACHE.get(&key) {
+        return Ok(Some(cached));
     }
 
     let found = get(conn, org_id, id).await?;
     if let Some(synthetic) = &found {
-        SYNTHETIC_CACHE.insert(key, (synthetic.clone(), Instant::now()));
+        SYNTHETIC_CACHE.insert(key, synthetic.clone());
     }
     Ok(found)
 }
@@ -275,6 +270,17 @@ pub async fn count<C: ConnectionTrait>(
     org_id: &str,
     params: &ListSyntheticsParams,
 ) -> Result<u64, errors::Error> {
+    if has_json_filters(params) {
+        // location/tag live in JSON text columns: filter in Rust so count and
+        // page agree.
+        let models = Entity::find()
+            .filter(Column::OrgId.eq(org_id))
+            .apply_filters(params)
+            .order_by_asc(Column::Name)
+            .all(conn)
+            .await?;
+        return Ok(filter_and_paginate(models, params).1);
+    }
     let q = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .apply_filters(params);
@@ -526,6 +532,17 @@ pub async fn delete<C: ConnectionTrait>(
     Ok(res.rows_affected > 0)
 }
 
+/// Deletes every check of an org and drops each from the definition cache on every node.
+pub async fn delete_by_org(org_id: &str) -> Result<u64, errors::Error> {
+    let conn = crate::db::get_orm_client_rw().await;
+    let delete = Entity::delete_many().filter(Column::OrgId.eq(org_id));
+    let ids: Vec<String> = super::delete_returning(conn, delete, &[Column::Id]).await?;
+    for id in &ids {
+        invalidate_and_publish_delete(org_id, id).await;
+    }
+    Ok(ids.len() as u64)
+}
+
 /// Moves a batch of checks to a different folder.
 pub async fn move_to_folder<C: ConnectionTrait>(
     conn: &C,
@@ -598,6 +615,8 @@ pub struct DueCheck {
     /// Child ids the journey references, with multiplicity; empty for every non-composed check.
     pub subtest_refs: Vec<String>,
     pub tags: Vec<String>,
+    /// The row's `last_triggered_at` before this claim, so a released claim can put it back.
+    pub last_triggered_at: i64,
 }
 
 /// Returns up to `limit` enabled checks whose `next_run_at` is at or before `now_us`.
@@ -659,6 +678,7 @@ impl TryFrom<synthetics_checks::Model> for DueCheck {
             steps_configured,
             subtest_refs,
             tags,
+            last_triggered_at: m.last_triggered_at,
         })
     }
 }
@@ -852,6 +872,23 @@ where
     Ok(due)
 }
 
+/// Undoes a claim made at `claimed_at` unless a later claim or edit moved the check.
+pub async fn release_claim<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    claimed_at: i64,
+    (slot, triggered_at): (i64, i64),
+) -> Result<bool, errors::Error> {
+    let result = Entity::update_many()
+        .col_expr(Column::NextRunAt, Expr::value(slot))
+        .col_expr(Column::LastTriggeredAt, Expr::value(triggered_at))
+        .filter(Column::Id.eq(id))
+        .filter(Column::LastTriggeredAt.eq(claimed_at))
+        .exec(conn)
+        .await?;
+    Ok(result.rows_affected > 0)
+}
+
 /// Unconditionally sets a check's schedule. For user-initiated changes (edit,
 /// disable, run-now), where the user's action must always win.
 ///
@@ -902,6 +939,166 @@ pub async fn update_last_check_status<C: ConnectionTrait>(
         )
         .filter(Column::Id.eq(id))
         .filter(Column::LastCheckStatus.ne(status))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
+/// `(org, name)` of each check whose template override is `template`; `None` is every org.
+pub async fn names_using_template<C: ConnectionTrait>(
+    conn: &C,
+    org_id: Option<&str>,
+    template: &str,
+) -> Result<Vec<(String, String)>, errors::Error> {
+    let mut query = Entity::find()
+        .select_only()
+        .column(Column::OrgId)
+        .column(Column::Name)
+        .filter(Column::Template.eq(template));
+    if let Some(org) = org_id {
+        query = query.filter(Column::OrgId.eq(org));
+    }
+    Ok(query
+        .order_by_asc(Column::Name)
+        .into_tuple::<(String, String)>()
+        .all(conn)
+        .await?)
+}
+
+/// The template each check in scope names, one entry per check, for the template list's usage
+/// counts.
+pub async fn templates_in_use<C: ConnectionTrait>(
+    conn: &C,
+    org_id: Option<&str>,
+) -> Result<Vec<String>, errors::Error> {
+    let mut query = Entity::find()
+        .select_only()
+        .column(Column::Template)
+        .filter(Column::Template.is_not_null());
+    if let Some(org) = org_id {
+        query = query.filter(Column::OrgId.eq(org));
+    }
+    Ok(query
+        .into_tuple::<Option<String>>()
+        .all(conn)
+        .await?
+        .into_iter()
+        .flatten()
+        .collect())
+}
+
+/// The status badge and the status page run streaks, as one completed run leaves them.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct StatusStreaks {
+    pub last_check_status: i32,
+    pub down_runs: i32,
+    pub up_runs: i32,
+    /// `scheduled_ts` of the run that wrote these values, in microseconds.
+    pub run_ts: i64,
+}
+
+/// Reads the badge and run streaks of one check. `None` when the check is not in this region.
+pub async fn get_status_streaks<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+) -> Result<Option<StatusStreaks>, errors::Error> {
+    let row = Entity::find_by_id(id)
+        .select_only()
+        .column(Column::LastCheckStatus)
+        .column(Column::StatusDownRuns)
+        .column(Column::StatusUpRuns)
+        .column(Column::StatusRunTs)
+        .into_tuple::<(i32, i32, i32, i64)>()
+        .one(conn)
+        .await?;
+    Ok(row.map(
+        |(last_check_status, down_runs, up_runs, run_ts)| StatusStreaks {
+            last_check_status,
+            down_runs,
+            up_runs,
+            run_ts,
+        },
+    ))
+}
+
+/// [`get_status_streaks`] as a locking current read, so a retry inside a repeatable-read
+/// transaction sees the latest row.
+pub async fn lock_status_streaks<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+) -> Result<Option<StatusStreaks>, errors::Error> {
+    let row = Entity::find_by_id(id)
+        .select_only()
+        .column(Column::LastCheckStatus)
+        .column(Column::StatusDownRuns)
+        .column(Column::StatusUpRuns)
+        .column(Column::StatusRunTs)
+        .lock_exclusive()
+        .into_tuple::<(i32, i32, i32, i64)>()
+        .one(conn)
+        .await?;
+    Ok(row.map(
+        |(last_check_status, down_runs, up_runs, run_ts)| StatusStreaks {
+            last_check_status,
+            down_runs,
+            up_runs,
+            run_ts,
+        },
+    ))
+}
+
+/// Writes `next` only if the row still holds `expected`; `updated_at` moves only when a status page
+/// value changed.
+pub async fn swap_status_streaks<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    expected: &StatusStreaks,
+    next: &StatusStreaks,
+) -> Result<bool, errors::Error> {
+    let mut q = Entity::update_many()
+        .col_expr(Column::LastCheckStatus, Expr::value(next.last_check_status))
+        .col_expr(Column::StatusDownRuns, Expr::value(next.down_runs))
+        .col_expr(Column::StatusUpRuns, Expr::value(next.up_runs))
+        .col_expr(Column::StatusRunTs, Expr::value(next.run_ts));
+    if streaks_differ(expected, next) {
+        q = q.col_expr(
+            Column::UpdatedAt,
+            Expr::value(config::utils::time::now_micros()),
+        );
+    }
+    let res = q
+        .filter(Column::Id.eq(id))
+        .filter(Column::LastCheckStatus.eq(expected.last_check_status))
+        .filter(Column::StatusDownRuns.eq(expected.down_runs))
+        .filter(Column::StatusUpRuns.eq(expected.up_runs))
+        .filter(Column::StatusRunTs.eq(expected.run_ts))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
+/// Applies replicated streaks unless the local row holds a newer run; `run_ts = 0` is a badge-only
+/// message.
+pub async fn apply_replicated_streaks<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    next: &StatusStreaks,
+) -> Result<bool, errors::Error> {
+    if next.run_ts == 0 {
+        return update_last_check_status(conn, id, next.last_check_status).await;
+    }
+    let res = Entity::update_many()
+        .col_expr(Column::LastCheckStatus, Expr::value(next.last_check_status))
+        .col_expr(Column::StatusDownRuns, Expr::value(next.down_runs))
+        .col_expr(Column::StatusUpRuns, Expr::value(next.up_runs))
+        .col_expr(Column::StatusRunTs, Expr::value(next.run_ts))
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(config::utils::time::now_micros()),
+        )
+        .filter(Column::Id.eq(id))
+        // `<=` so a late run's rebuilt streaks, which keep the newest `run_ts`, still replicate.
+        .filter(Column::StatusRunTs.lte(next.run_ts))
         .exec(conn)
         .await?;
     Ok(res.rows_affected > 0)
@@ -965,7 +1162,7 @@ pub async fn get_alert_state<C: ConnectionTrait>(
 /// The three columns are guarded, not just the counter: a lost `alerting`
 /// transition is what produces a recovery for an incident nobody was told about.
 ///
-/// Compare `synthetics_runs::increment_jobs_done`, which is a single atomic
+/// Compare `synthetics_runs::finalize_run`, which is a single atomic
 /// `jobs_done = jobs_done + 1`. That shape is not available here because the new
 /// value depends on a policy decision, not on arithmetic over the old one.
 pub async fn update_alert_state_if<C: ConnectionTrait>(
@@ -1015,6 +1212,50 @@ async fn get_model<C: ConnectionTrait>(
         .await
 }
 
+fn has_json_filters(params: &ListSyntheticsParams) -> bool {
+    params.location.is_some() || params.tag.is_some()
+}
+
+fn json_array_contains(v: &serde_json::Value, needle: &str) -> bool {
+    v.as_array()
+        .is_some_and(|a| a.iter().any(|x| x.as_str() == Some(needle)))
+}
+
+/// Applies the `location` / `tag` exact-match filters (JSON text columns, so
+/// no DB operators) and then page/page_size over the filtered set. Returns the
+/// requested page and the filtered total; `models` must already be ordered.
+fn filter_and_paginate(
+    models: Vec<synthetics_checks::Model>,
+    params: &ListSyntheticsParams,
+) -> (Vec<synthetics_checks::Model>, u64) {
+    let filtered: Vec<_> = models
+        .into_iter()
+        .filter(|m| {
+            params
+                .location
+                .as_deref()
+                .is_none_or(|l| json_array_contains(&m.locations, l))
+                && params
+                    .tag
+                    .as_deref()
+                    .is_none_or(|t| json_array_contains(&m.tags, t))
+        })
+        .collect();
+    let total = filtered.len() as u64;
+    if let (Some(page_size), Some(page)) = (params.page_size, params.page)
+        && page_size > 0
+    {
+        let start = page.saturating_mul(page_size) as usize;
+        let page_rows = filtered
+            .into_iter()
+            .skip(start)
+            .take(page_size as usize)
+            .collect();
+        return (page_rows, total);
+    }
+    (filtered, total)
+}
+
 async fn list_models<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -1024,6 +1265,11 @@ async fn list_models<C: ConnectionTrait>(
         .filter(Column::OrgId.eq(org_id))
         .apply_filters(params)
         .order_by_asc(Column::Name);
+
+    if has_json_filters(params) {
+        let models = q.all(conn).await?;
+        return Ok(filter_and_paginate(models, params).0);
+    }
 
     if let (Some(page_size), Some(page)) = (params.page_size, params.page)
         && page_size > 0
@@ -1102,6 +1348,7 @@ fn update_mutable_fields(am: &mut ActiveModel, check: &Synthetic) -> Result<(), 
     am.locations = Set(locations);
     am.enabled = Set(check.enabled);
     am.destinations = Set(destinations);
+    am.template = Set(check.template.clone());
     am.settings = Set(settings);
     am.secrets = Set(pack_secrets(check)?);
     Ok(())
@@ -1123,10 +1370,17 @@ fn build_active_model(check: &Synthetic) -> Result<ActiveModel, errors::Error> {
         locations: Set(locations),
         enabled: Set(check.enabled),
         destinations: Set(destinations),
+        template: Set(check.template.clone()),
         settings: Set(settings),
         secrets: Set(pack_secrets(check)?),
         ..Default::default()
     })
+}
+
+fn streaks_differ(a: &StatusStreaks, b: &StatusStreaks) -> bool {
+    a.last_check_status != b.last_check_status
+        || a.down_runs != b.down_runs
+        || a.up_runs != b.up_runs
 }
 
 fn check_type_to_str(t: &SyntheticType) -> &'static str {
@@ -1196,10 +1450,71 @@ pub(crate) mod tests {
             last_alert_at: 0,
             alerting: false,
             degraded_notified_at: 0,
+            template: None,
+            status_down_runs: 0,
+            status_up_runs: 0,
+            status_run_ts: 0,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
         }
+    }
+
+    #[test]
+    fn filter_and_paginate_combined_filters_and_pages() {
+        let mk = |id: &str, locs: &[&str], tags: &[&str]| {
+            let mut m = make_model();
+            m.id = id.to_string();
+            m.locations = serde_json::json!(locs);
+            m.tags = serde_json::json!(tags);
+            m
+        };
+        let models = vec![
+            mk("a", &["l1"], &["prod"]),
+            mk("b", &["l1", "l2"], &["prod", "x"]),
+            mk("c", &["l2"], &["prod"]),
+            mk("d", &["l1"], &["dev"]),
+            mk("e", &["l1"], &["prod"]),
+        ];
+        let params = |loc: Option<&str>, tag: Option<&str>, page, size| ListSyntheticsParams {
+            location: loc.map(String::from),
+            tag: tag.map(String::from),
+            page,
+            page_size: size,
+            ..Default::default()
+        };
+        // location only
+        let (rows, total) =
+            filter_and_paginate(models.clone(), &params(Some("l2"), None, None, None));
+        assert_eq!((rows.len(), total), (2, 2));
+        // exact match, not substring
+        let (_, total) = filter_and_paginate(models.clone(), &params(Some("l"), None, None, None));
+        assert_eq!(total, 0);
+        // combined
+        let (rows, total) = filter_and_paginate(
+            models.clone(),
+            &params(Some("l1"), Some("prod"), None, None),
+        );
+        assert_eq!(total, 3);
+        assert_eq!(
+            rows.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
+            ["a", "b", "e"]
+        );
+        // page boundaries: total stays 3, pages 2 + 1 + empty
+        let (rows, total) = filter_and_paginate(
+            models.clone(),
+            &params(Some("l1"), Some("prod"), Some(0), Some(2)),
+        );
+        assert_eq!((rows.len(), total), (2, 3));
+        let (rows, total) = filter_and_paginate(
+            models.clone(),
+            &params(Some("l1"), Some("prod"), Some(1), Some(2)),
+        );
+        assert_eq!((rows.len(), total), (1, 3));
+        assert_eq!(rows[0].id, "e");
+        let (rows, total) =
+            filter_and_paginate(models, &params(Some("l1"), Some("prod"), Some(2), Some(2)));
+        assert_eq!((rows.len(), total), (0, 3));
     }
 
     #[test]
@@ -1410,6 +1725,27 @@ pub(crate) mod tests {
             ids,
             vec!["mon-1", "mon-2"],
             "the readable checks must still be claimed"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_release_claim_puts_back_only_its_own_claim() {
+        use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult, Transaction};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_exec_results(vec![MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+        assert!(release_claim(&db, "mon-1", 500, (100, 40)).await.unwrap());
+        assert_eq!(
+            db.into_transaction_log(),
+            vec![Transaction::from_sql_and_values(
+                DatabaseBackend::Postgres,
+                r#"UPDATE "synthetics" SET "next_run_at" = $1, "last_triggered_at" = $2 WHERE "synthetics"."id" = $3 AND "synthetics"."last_triggered_at" = $4"#,
+                [100i64.into(), 40i64.into(), "mon-1".into(), 500i64.into()],
+            )]
         );
     }
 
@@ -1777,6 +2113,54 @@ pub(crate) mod tests {
         let am: ActiveModel = model.into();
         am.reset_all().insert(&db).await.unwrap();
         db
+    }
+
+    #[tokio::test]
+    async fn names_using_template_finds_the_checks_that_name_it() {
+        use sea_orm::{ActiveModelTrait, IntoActiveModel};
+
+        let db = db_with_one_check(0).await;
+        let mut am = make_model().into_active_model();
+        am.template = Set(Some("ops-card".to_string()));
+        am.update(&db).await.unwrap();
+        assert_eq!(
+            names_using_template(&db, Some("org1"), "ops-card")
+                .await
+                .unwrap(),
+            vec![("org1".to_string(), "Login Flow".to_string())]
+        );
+        assert!(
+            names_using_template(&db, Some("other"), "ops-card")
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn templates_in_use_lists_one_entry_per_check_in_scope() {
+        use sea_orm::{ActiveModelTrait, IntoActiveModel};
+
+        let db = db_with_one_check(0).await;
+        assert!(templates_in_use(&db, None).await.unwrap().is_empty());
+        let mut am = make_model().into_active_model();
+        am.template = Set(Some("ops-card".to_string()));
+        am.update(&db).await.unwrap();
+        assert_eq!(
+            templates_in_use(&db, Some("org1")).await.unwrap(),
+            vec!["ops-card".to_string()]
+        );
+        // No scope is the default org's view: every org's checks count.
+        assert_eq!(
+            templates_in_use(&db, None).await.unwrap(),
+            vec!["ops-card".to_string()]
+        );
+        assert!(
+            templates_in_use(&db, Some("other"))
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 
     async fn stored_status(db: &sea_orm::DatabaseConnection, id: &str) -> i32 {

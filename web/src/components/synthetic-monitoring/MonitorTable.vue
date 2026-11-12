@@ -72,25 +72,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Monitor name -->
     <template #cell-name="{ row }">
-      <OTooltip
-        v-if="(row as any).name"
-        :content="(row as any).name"
-        content-class="max-w-[25rem] whitespace-normal break-words text-xs"
-      >
-        <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
-          <span
-            class="cursor-pointer truncate"
+      <div class="flex min-w-0 items-center gap-1.5">
+        <template v-if="(row as any).name">
+          <OTruncatedText
+            as="span"
+            class="cursor-pointer"
             :data-test="`${dataTest}-name-${(row as any).id}`"
-            >{{ (row as any).name || "—" }}</span
+            >{{ (row as any).name }}</OTruncatedText
           >
           <MutedChip
             v-if="(row as any).active_downtime"
             :downtime="(row as any).active_downtime"
             :data-test="`${dataTest}-${(row as any).id}-muted`"
           />
-        </div>
-      </OTooltip>
-      <span v-else class="truncate">—</span>
+        </template>
+        <span v-else class="truncate">—</span>
+        <EditorDraftDot
+          v-if="draftSavedAt[String((row as any).id)]"
+          :saved-at="draftSavedAt[String((row as any).id)]"
+          :data-test="`${dataTest}-${(row as any).id}-draft-dot`"
+        />
+      </div>
     </template>
 
     <!-- URL / Endpoint -->
@@ -190,16 +192,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Response time -->
     <template #cell-responseTime="{ row }">
       <span
-        v-if="(row as any).responseTime"
+        v-if="(row as any).responseTime != null"
         class="font-mono text-sm font-semibold"
-        :class="
-          parseFloat((row as any).responseTime) < 300
-            ? 'text-status-success-text'
-            : parseFloat((row as any).responseTime) < 1000
-              ? 'text-status-warning-text'
-              : 'text-status-error-text'
-        "
-        >{{ (row as any).responseTime }}</span
+        :class="responseTimeClass(row)"
+        >{{ formatMs((row as any).responseTime) }}</span
       >
       <span v-else class="text-sm">—</span>
     </template>
@@ -244,16 +240,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         content-class="max-w-[20rem] whitespace-pre-wrap text-xs"
         :delay="0"
       >
-        <div class="flex cursor-pointer items-center gap-1">
-          <span class="max-w-[4.375rem] truncate text-xs">{{
-            locationLabel((row as any).locations[0])
-          }}</span>
-          <span
-            v-if="(row as any).locations.length > 1"
-            class="rounded-default bg-surface-subtle shrink-0 px-1 py-0.5 text-xs font-bold whitespace-nowrap"
-            >+{{ (row as any).locations.length - 1 }}</span
-          >
-        </div>
+        <FitItems :items="(row as any).locations" class="cursor-pointer">
+          <template #default="{ item }">
+            <span class="block truncate text-xs">{{ locationLabel(item as string) }}</span>
+          </template>
+          <template #more="{ count }">
+            <span
+              class="rounded-default bg-surface-subtle px-1 py-0.5 text-xs font-bold whitespace-nowrap"
+              >+{{ count }}</span
+            >
+          </template>
+        </FitItems>
       </OTooltip>
       <span v-else class="text-xs">—</span>
     </template>
@@ -609,10 +606,15 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { resolveBadge, resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import type { ForbiddenState } from "@/utils/featureGate";
 import MutedChip from "@/components/alerts/downtimes/MutedChip.vue";
 import MuteMenuItems from "@/components/alerts/downtimes/MuteMenuItems.vue";
 import QuickMuteDialog from "@/components/alerts/downtimes/QuickMuteDialog.vue";
 import { useRowMute } from "@/composables/downtimes/useRowMute";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import FitItems from "@/components/common/FitItems.vue";
+import { formatMs } from "@/utils/formatters";
 
 type Mode = "all" | "browser";
 
@@ -628,14 +630,15 @@ type Mode = "all" | "browser";
 // noticing, not worth acting on this second, and washing it too would put most of
 // a wobbly estate in colour.
 const monitorRowClass = (row: any): string => {
-  if (String(row?.status ?? "").toLowerCase() === "failed") return "!bg-status-error-bg";
+  const st = String(row?.status ?? "").toLowerCase();
+  if (st === "failed" || st === "error") return "!bg-status-error-bg";
   return row?.enabled === false ? "!bg-surface-panel" : "";
 };
 
 const monitorRowStyle = (row: any): Record<string, string> => {
   const status = String(row?.status ?? "").toLowerCase();
   const color =
-    status === "failed"
+    status === "failed" || status === "error"
       ? "var(--color-error-500)"
       : status === "warning"
         ? "var(--color-warning-500)"
@@ -650,7 +653,7 @@ const props = withDefaults(
     mode: Mode;
     data: any[];
     loading?: boolean;
-    forbidden?: boolean;
+    forbidden?: ForbiddenState;
     /** IANA zone for the Last Check tooltip. Passed in: this table is a leaf
      *  component and must not reach into the store for it. */
     timezone?: string;
@@ -666,6 +669,8 @@ const props = withDefaults(
      *  human label. Falls back to the raw id when a location isn't in the map
      *  (e.g. deleted since the check last ran). */
     locationNames?: Record<string, string>;
+    /** Check id to when its unsaved editor draft was written. */
+    draftSavedAt?: Record<string, number>;
     pageSize?: number;
     currentPage?: number;
     sortBy?: string;
@@ -682,11 +687,24 @@ const props = withDefaults(
     bulkActionLoading: false,
     hasFilters: false,
     locationNames: () => ({}),
+    draftSavedAt: () => ({}),
   },
 );
 
 function locationLabel(id: string): string {
   return props.locationNames[id] ?? id;
+}
+
+// TanStack's sortUndefined only applies to undefined, so a never-run check has to read as that.
+function responseTimeSortValue(row: any): number | undefined {
+  return row.responseTime ?? undefined;
+}
+
+function responseTimeClass(row: any): string {
+  // A browser value is whole-journey wall-clock time, so latency limits say nothing about it.
+  if (row.type === "BROWSER") return "";
+  if (row.responseTime < 300) return "text-status-success-text";
+  return row.responseTime < 1000 ? "text-status-warning-text" : "text-status-error-text";
 }
 
 const emit = defineEmits<{
@@ -796,7 +814,8 @@ const HISTORY_COL: OTableColumnDef = {
 const RESPONSE_TIME_COL: OTableColumnDef = {
   id: "responseTime",
   header: t("synthetics.table.response"),
-  accessorKey: "responseTime",
+  accessorFn: responseTimeSortValue,
+  sortUndefined: "last",
   size: COL.responseTime,
   minSize: 72,
   sortable: true,
@@ -806,7 +825,8 @@ const RESPONSE_TIME_COL: OTableColumnDef = {
 const PAGE_LOAD_COL: OTableColumnDef = {
   id: "responseTime",
   header: t("synthetics.table.pageLoad"),
-  accessorKey: "responseTime",
+  accessorFn: responseTimeSortValue,
+  sortUndefined: "last",
   size: COL.responseTime,
   minSize: 80,
   sortable: true,

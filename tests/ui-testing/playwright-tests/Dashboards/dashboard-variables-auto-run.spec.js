@@ -59,7 +59,7 @@ test.describe('Dashboard variables Auto Run', { tag: ['@dashboards', '@dashboard
     await autoRun.closeMenu();
 
     await autoRun.selectVariableValue('ns', first);
-    await autoRun.expectRefreshVariant('warning');
+    await autoRun.expectRefreshVariant('pending');
     await autoRun.expectNoNewRun('var', base);
     await autoRun.expectPanelRows('p_var', { shows: [initial], hides: [first] });
 
@@ -119,7 +119,7 @@ test.describe('Dashboard variables Auto Run', { tag: ['@dashboards', '@dashboard
     await autoRun.closeMenu();
 
     await autoRun.selectVariableValue('ns', first);
-    await autoRun.expectRefreshVariant('warning');
+    await autoRun.expectRefreshVariant('pending');
     await autoRun.expectNoNewRun('var', base);
     await autoRun.clickRefresh();
     await autoRun.waitForRuns('var', base + 1);
@@ -213,7 +213,7 @@ test.describe('Dashboard variables Auto Run', { tag: ['@dashboards', '@dashboard
 
     const before = await autoRun.settledRunCount('var');
     await autoRun.selectVariableValue('ns', first, { inView: true });
-    await autoRun.expectViewRefreshVariant('warning');
+    await autoRun.expectViewRefreshVariant('pending');
     await autoRun.expectNoNewRun('var', before);
     await autoRun.expectViewPanelRows({ shows: [initial], hides: [first] });
 

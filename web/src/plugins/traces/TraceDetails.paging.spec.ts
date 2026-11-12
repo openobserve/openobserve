@@ -470,3 +470,50 @@ describe("TraceDetails - large and deep traces", () => {
     });
   }, 60_000);
 });
+
+describe("TraceDetails - first page load failure", () => {
+  let wrapper: any;
+
+  beforeEach(() => {
+    mocks.getTraceDetails.mockReset();
+    mocks.notifyError.mockReset();
+    mocks.fetchRum.mockResolvedValue({
+      tracedResources: [],
+      viewEvents: [],
+      actionEvents: [],
+      allViewEvents: [],
+    });
+    mocks.formatRum.mockReturnValue([]);
+    setRoute("trace-a");
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  const failFirstPage = async (status: number) => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.getTraceDetails.mockRejectedValueOnce({ response: { status } });
+    wrapper = mount(TraceDetails, {
+      attachTo: "#app",
+      props: { traceId: "trace-a" },
+      global: { plugins: [i18n, router], provide: { store }, stubs: STUBS },
+    });
+    await vi.waitFor(() => expect(mocks.notifyError).toHaveBeenCalled(), { timeout: 10_000 });
+    return consoleError;
+  };
+
+  it("does not log a 401, which the global handler turns into a logout", async () => {
+    const consoleError = await failFirstPage(401);
+    expect(consoleError).not.toHaveBeenCalledWith(
+      "Error fetching trace details:",
+      expect.anything(),
+    );
+  }, 30_000);
+
+  it("still logs any other failure", async () => {
+    const consoleError = await failFirstPage(500);
+    expect(consoleError).toHaveBeenCalledWith("Error fetching trace details:", expect.anything());
+  }, 30_000);
+});

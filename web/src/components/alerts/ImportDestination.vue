@@ -348,7 +348,10 @@ export default defineComponent({
           const currentDestinationType =
             jsonArrayOfObj.value[destinationErrorsToDisplay.value.length - 1]?.type;
 
-          if (currentDestinationType === "email" && template.type === "email") {
+          if (
+            currentDestinationType === "email" &&
+            (template.type === "email" || template.kind === "content")
+          ) {
             return true;
           } else if (currentDestinationType !== "email") {
             return true;
@@ -640,7 +643,11 @@ export default defineComponent({
       if (input.template) {
         const availableTemplates = props.templates
           .filter((template: any) => {
-            if (input.type === "email" && template.type === "email") return true;
+            if (
+              input.type === "email" &&
+              (template.type === "email" || template.kind === "content")
+            )
+              return true;
             else if (input.type !== "email") return true;
             return false;
           })

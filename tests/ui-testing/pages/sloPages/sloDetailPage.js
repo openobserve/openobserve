@@ -240,6 +240,20 @@ export class SloDetailPage {
       `the ${panel} panel must render a chart, not an empty state`,
     ).toBeVisible({ timeout });
   }
+
+  async expectCorrectedTag() {
+    await expect(this.page.locator('[data-test="slos-slodetail-corrected"]')).toBeVisible({ timeout: 20000 });
+  }
+
+  async expectCorrectionItem(downtimeId, text) {
+    await expect(
+      this.page.locator('[data-test="slos-slodetail-corrections-banner"]').locator(`[data-test="slos-slodetail-correction-${downtimeId}"]`),
+    ).toHaveText(text, { timeout: 20000 });
+  }
+
+  async clickCorrectionItem(downtimeId) {
+    await this.page.locator(`[data-test="slos-slodetail-correction-${downtimeId}"]`).click();
+  }
 }
 
 export default SloDetailPage;

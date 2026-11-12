@@ -11,11 +11,13 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import {
   renderTemplate,
+  segmentClass,
   buildPreviewContext,
   type PreviewSegment,
   type AlertFormFacts,
   type ExtraLiveValues,
 } from "@/composables/alerts/useTemplatePreview";
+import { parseContentSpec } from "@/components/alerts/template-content/contentSpec";
 
 const props = withDefaults(
   defineProps<{
@@ -30,6 +32,12 @@ const props = withDefaults(
     rowTemplateType?: string;
     facts?: AlertFormFacts;
     extra?: ExtraLiveValues;
+    /** `object` is the override picker of a non-alert kind: kind-neutral copy, resolved rows. */
+    subject?: "alert" | "object";
+    /** Destinations the override does not fit; they keep their own template. */
+    unfitDestinations?: string[];
+    /** The picker's per-destination answer to "which template will be sent". */
+    resolvedDestinations?: { destination: string; label: string }[];
   }>(),
   {
     templates: () => [],
@@ -41,6 +49,9 @@ const props = withDefaults(
     rowTemplateType: "String",
     facts: () => ({}),
     extra: () => ({}),
+    subject: "alert",
+    unfitDestinations: () => [],
+    resolvedDestinations: () => [],
   },
 );
 
@@ -80,25 +91,23 @@ const title = computed(() => {
 
 const ctx = computed(() => buildPreviewContext(props.facts, props.extra));
 
+/** The text to preview: a Content template's stored JSON spec becomes its title and body. */
+function displayBody(tpl: any): string {
+  const text = typeof tpl.body === "string" ? tpl.body : JSON.stringify(tpl.body, null, 2);
+  if (tpl.kind !== "content") return text;
+  const spec = parseContentSpec(text);
+  if (!spec) return text;
+  return [spec.title, spec.body].filter((part) => part?.trim()).join("\n\n");
+}
+
 function bodyOf(name: string): string {
   const tpl = props.templates.find((x: any) => x.name === name);
   if (!tpl) return "";
-  return typeof tpl.body === "string" ? tpl.body : JSON.stringify(tpl.body, null, 2);
+  return displayBody(tpl);
 }
 
 function segmentsFor(name: string): PreviewSegment[] {
   return renderTemplate(bodyOf(name), ctx.value);
-}
-
-// segClass maps a segment kind to its visual style class.
-function segClass(kind: string) {
-  return kind === "live"
-    ? "text-text-heading font-semibold"
-    : kind === "sample"
-      ? "text-text-secondary italic underline decoration-dashed"
-      : kind === "opaque"
-        ? "rounded-default bg-surface-subtle-hover text-text-body px-1"
-        : "text-text-body";
 }
 
 // ── CURRENT snapshot, frozen when the drawer opens ──────────────────
@@ -123,12 +132,7 @@ function destTemplateInfo(destName: string): { name: string; body: string } {
   }
   // full Template object on the destination
   const name = tpl.name ?? "";
-  const body =
-    tpl.body != null
-      ? typeof tpl.body === "string"
-        ? tpl.body
-        : JSON.stringify(tpl.body, null, 2)
-      : bodyOf(name);
+  const body = tpl.body != null ? displayBody(tpl) : bodyOf(name);
   return { name, body };
 }
 
@@ -336,13 +340,21 @@ defineExpose({ applyTemplate, previewTemplate });
             {{ t("alerts.alertSettings.helpWhatThisDoes") }}
           </h3>
           <p class="text-text-secondary m-0 mb-3 leading-[1.5]">
-            {{ t("alerts.alertSettings.helpTemplateExplain") }}
+            {{
+              subject === "object"
+                ? t("alerts.alertSettings.helpTemplateExplainObject")
+                : t("alerts.alertSettings.helpTemplateExplain")
+            }}
           </p>
           <p class="text-text-secondary m-0 leading-[1.5]" data-test="help-template-when">
             <span class="text-text-heading font-semibold">{{
               t("alerts.alertSettings.helpTemplateWhenHeading")
             }}</span>
-            {{ t("alerts.alertSettings.helpTemplateWhenDesc") }}
+            {{
+              subject === "object"
+                ? t("alerts.alertSettings.helpTemplateWhenDescObject")
+                : t("alerts.alertSettings.helpTemplateWhenDesc")
+            }}
           </p>
         </section>
 
@@ -350,24 +362,62 @@ defineExpose({ applyTemplate, previewTemplate });
 
         <section class="flex flex-col" data-test="help-current-section">
           <h3 class="text-text-heading m-0 mb-2 text-sm font-semibold">
-            {{ t("alerts.alertSettings.helpCurrentHeading") }}
+            {{
+              subject === "object"
+                ? t("alerts.alertSettings.helpCurrentHeadingObject")
+                : t("alerts.alertSettings.helpCurrentHeading")
+            }}
           </h3>
 
           <!-- Override set: one rendered body -->
           <template v-if="snapshotTemplate">
             <p class="text-text-secondary m-0 mb-3 leading-[1.5]">
-              {{ t("alerts.alertSettings.helpCurrentOverrideHeading") }}
+              {{
+                unfitDestinations.length
+                  ? t("alerts.alertSettings.helpCurrentOverrideSome")
+                  : t("alerts.alertSettings.helpCurrentOverrideHeading")
+              }}
             </p>
             <pre
               v-if="currentSegments.length"
               data-test="help-preview-box"
               class="rounded-surface border-border-default bg-surface-subtle text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
             ><template v-for="(s, i) in currentSegments" :key="i"
-                ><span :class="segClass(s.kind)">{{ s.text }}</span></template
+                ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
               ></pre>
             <p v-else class="text-text-secondary m-0 italic">
               {{ t("alerts.alertSettings.helpCurrentBodyEmpty") }}
             </p>
+            <p
+              v-if="unfitDestinations.length"
+              class="text-status-warning-text m-0 mt-2 text-xs"
+              data-test="help-current-unfit"
+            >
+              {{
+                t("alerts.templateOverride.mismatch", {
+                  count: unfitDestinations.length,
+                  names: unfitDestinations.join(", "),
+                })
+              }}
+            </p>
+          </template>
+
+          <!-- No override on a non-alert kind: the template each destination resolves to -->
+          <template v-else-if="subject === 'object' && resolvedDestinations.length">
+            <p class="text-text-secondary m-0 mb-3 leading-[1.5]">
+              {{ t("alerts.alertSettings.helpCurrentResolved") }}
+            </p>
+            <ul class="m-0 flex list-none flex-col gap-1 p-0">
+              <li
+                v-for="d in resolvedDestinations"
+                :key="d.destination"
+                data-test="help-resolved-row"
+                class="flex items-baseline justify-between gap-3"
+              >
+                <span class="text-text-heading font-semibold">{{ d.destination }}</span>
+                <span class="text-text-muted text-xs">{{ d.label }}</span>
+              </li>
+            </ul>
           </template>
 
           <!-- No override: each destination's current message, side by side -->
@@ -394,7 +444,7 @@ defineExpose({ applyTemplate, previewTemplate });
                   data-test="help-destination-preview"
                   class="rounded-surface border-border-subtle bg-surface-panel text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
                 ><template v-for="(s, i) in d.segments" :key="i"
-                    ><span :class="segClass(s.kind)">{{ s.text }}</span></template
+                    ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
                   ></pre>
                 <p v-else class="text-text-secondary m-0 text-xs italic">
                   {{ t("alerts.alertSettings.helpDestinationNoTemplate") }}
@@ -424,7 +474,7 @@ defineExpose({ applyTemplate, previewTemplate });
               data-test="help-preview-box"
               class="rounded-surface border-border-default bg-surface-subtle text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
             ><template v-for="(s, i) in previewSegments" :key="i"
-                ><span :class="segClass(s.kind)">{{ s.text }}</span></template
+                ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
               ></pre>
             <p v-else class="text-text-secondary m-0 italic">
               {{ t("alerts.alertSettings.helpCurrentBodyEmpty") }}
@@ -435,7 +485,11 @@ defineExpose({ applyTemplate, previewTemplate });
               class="mt-3"
               @click="applyTemplate"
             >
-              {{ t("alerts.alertSettings.helpApplyToAlert") }}
+              {{
+                subject === "object"
+                  ? t("alerts.alertSettings.helpApplyToObject")
+                  : t("alerts.alertSettings.helpApplyToAlert")
+              }}
             </OButton>
           </template>
           <p v-else class="text-text-secondary m-0 italic" data-test="help-preview-select-empty">
@@ -670,7 +724,7 @@ defineExpose({ applyTemplate, previewTemplate });
             data-test="help-preview-box"
             class="rounded-surface border-border-default bg-surface-subtle text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
           ><template v-for="(s, i) in rowSegments" :key="i"
-              ><span :class="segClass(s.kind)">{{ s.text }}</span></template
+              ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
             ></pre>
           <p v-else class="text-text-secondary m-0 italic" data-test="help-row-preview-empty">
             {{ t("alerts.alertSettings.helpRowTemplatePreviewEmpty") }}

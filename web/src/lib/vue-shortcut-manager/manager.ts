@@ -1,5 +1,5 @@
 import type { RegisteredShortcut, Shortcut, ShortcutManagerOptions } from "./types";
-import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { isInputFocused, isInsideDialog } from "@/utils/keyboardShortcuts";
 
 // ---------------------------------------------------------------------------
 // Lazy singleton — no plugin or main.ts setup needed.
@@ -279,6 +279,16 @@ export class ShortcutManager {
       !shortcut.allowInInput &&
       !ShortcutManager.hasModifier(shortcut.key) &&
       isInputFocused(target)
+    ) {
+      return;
+    }
+
+    // A plain key pressed inside a dialog belongs to it, not the page behind; Escape still closes things.
+    if (
+      !shortcut.allowInDialog &&
+      shortcut.key !== "escape" &&
+      !ShortcutManager.hasModifier(shortcut.key) &&
+      isInsideDialog(target)
     ) {
       return;
     }

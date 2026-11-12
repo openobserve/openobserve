@@ -36,6 +36,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          `sessions-*` for the count/badges — so those two are passed explicitly to
          stay byte-identical. solidAgentTrigger keeps the "All Agents" empty state
          in solid text (Sessions never dimmed it). -->
+    <!-- Debounced 300 ms like the Streams search; the term lives in useSessions so Back restores the filtered page. -->
+    <div
+      v-if="!(streamsLoaded && availableStreams.length === 0)"
+      class="px-page-edge shrink-0 pt-2"
+    >
+      <label :for="SEARCH_INPUT_ID" class="sr-only">
+        {{ t("traces.sessionsList.search.placeholder") }}
+      </label>
+      <OSearchInput
+        :id="SEARCH_INPUT_ID"
+        v-model="searchKeyword"
+        :placeholder="t('traces.sessionsList.search.placeholder')"
+        :title="t('traces.sessionsList.search.title')"
+        clearable
+        :debounce="300"
+        class="w-full"
+        data-test="sessions-list-search"
+      />
+      <!-- Exact user from a `?user=` link (Users page "Sessions"). -->
+      <OTag
+        v-if="searchUser"
+        variant="primary-soft"
+        :label="t('traces.sessionsList.search.user', { user: searchUser })"
+        removable
+        :remove-label="t('traces.sessionsList.search.clearUser')"
+        class="mt-2"
+        data-test="sessions-list-user-filter"
+        @remove="clearUserFilter"
+      />
+    </div>
     <AiScopeBar
       v-if="!(streamsLoaded && availableStreams.length === 0)"
       :filter-mode="filterMode"
@@ -61,38 +91,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :envs="envs"
       :agent-names="agentNames"
       :versions="versions"
+      :agent-streams="agentStreams"
+      :selected-agent-stream="effectiveStream"
       :selected-stream-count="selectedStreamCount"
       :streams-loaded="streamsLoaded"
       :agents-loaded="agentsLoaded"
       @filter-mode-change="onFilterModeChange"
+      @update:selected-agent-stream="selectedAgentStream = $event"
+      @agent-pick="modeExplicit = true"
       @stream-change="onStreamChange"
     >
-      <!-- List search — one box, matched against the user id OR the
-           conversation text server-side (whichever the stream has). Live,
-           debounced (300ms — same as the Streams list's search), same
-           pattern as LogStream.vue: no Enter/run-query affordance, a settled
-           value just re-fetches. The applied term lives in useSessions'
-           singleton next to the page/size so back-navigation restores the
-           filtered page. -->
-      <template #trailing>
-        <div class="flex min-w-0 flex-1 items-center gap-2">
-          <label :for="SEARCH_INPUT_ID" class="sr-only">
-            {{ t("traces.sessionsList.search.placeholder") }}
-          </label>
-          <OSearchInput
-            :id="SEARCH_INPUT_ID"
-            v-model="searchKeyword"
-            :placeholder="t('traces.sessionsList.search.placeholder')"
-            :title="t('traces.sessionsList.search.title')"
-            size="sm"
-            clearable
-            :debounce="300"
-            class="w-full"
-            data-test="sessions-list-search"
-          />
-        </div>
-      </template>
     </AiScopeBar>
+
+    <!-- Stream mode because these LLM spans carry no agent identity. -->
+    <AiNoAgentIdentityBanner v-if="noAgentIdentity" data-test="sessions-list" class="pb-2" />
 
     <!-- Streams exist: OTable owns the data surface (column chooser, server-side
          pagination footer, column resize, empty/error body). The scope control
@@ -142,8 +154,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('traces.sessionsList.failedToLoad')"
           :description="raw(error || '')"
           :action-label="t('traces.sessionsList.retry')"
+          action-id="retry"
           action-icon="refresh"
           @action="loadSessions()"
+        />
+        <!-- Agent mode whose agents list failed to load: not "no agents". -->
+        <AiAgentsLoadError
+          v-else-if="agentsLoadFailed"
+          :error="agentsError ?? 'failed'"
+          data-test="sessions-empty"
+          @retry="refresh()"
         />
         <OEmptyState
           v-else-if="agentEmpty"
@@ -153,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('traces.sessionsList.noAgentsTitle')"
           :description="t('traces.sessionsList.noAgentsDescription')"
           :action-label="t('traces.sessionsList.viewByStream')"
+          action-id="view-by-stream"
           @action="onFilterModeChange('stream')"
         />
         <!-- A search that matched nothing is NOT a first-run situation — the
@@ -166,6 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('traces.sessionsList.search.noResultsTitle')"
           :description="t('traces.sessionsList.search.noResultsDescription')"
           :action-label="t('traces.sessionsList.search.clear')"
+          action-id="clear-search"
           @action="clearSearch"
         />
         <div v-else class="flex items-center justify-center py-12" data-test="sessions-empty">
@@ -194,7 +216,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="row.firstUserMessage" class="text-text-secondary text-xs">
           {{ row.firstUserMessage }}
         </span>
+        <!-- A message that was only harness text says so and names the tag. -->
+        <span v-else-if="row.harnessOnly" class="text-text-muted text-xs">
+          {{ t("readableSessions.onlyHarness", { tag: `<${row.harnessOnly}>` }) }}
+        </span>
         <span v-else class="text-text-muted text-xs">—</span>
+        <span
+          v-if="row.harnessHidden && row.firstUserMessage"
+          class="text-2xs text-text-muted block"
+          :data-test="`sessions-list-harness-hidden-${row.sessionId}`"
+        >
+          {{ t("readableSessions.hidden", { n: row.harnessHidden }, row.harnessHidden) }}
+        </span>
+      </template>
+
+      <template #cell-title="{ row }">
+        <span class="text-text-body text-xs font-medium">{{ row.title }}</span>
       </template>
 
       <!-- Turns -->
@@ -233,9 +270,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Cost -->
       <template #cell-cost="{ row }">
-        <span class="text-xs"
-          >{{ t("traces.sessionDetail.currencySymbol") }}{{ row.cost.toFixed(4) }}</span
-        >
+        <LLMCostCell
+          class="text-xs"
+          scope="session"
+          :cost="row.cost"
+          :tokens="row.tokens"
+          :unpriced-tokens="row.unpricedTokens"
+          :unpriced-models="row.unpricedModels"
+          :stream="effectiveStream"
+          :time-window="{ start: startTime, end: endTime }"
+          :format="(c: number) => `${t('traces.sessionDetail.currencySymbol')}${c.toFixed(4)}`"
+        />
       </template>
 
       <!-- Status (derived from error_count) -->
@@ -261,7 +306,19 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { useLlmTraceStreams } from "@/enterprise/composables/useLlmTraceStreams";
-import { useAgentScope } from "@/enterprise/composables/useAgentScope";
+import {
+  useAgentScope,
+  readUrlScope,
+  explicitScopeMode,
+  resolveScopeMode,
+  rememberModeChoice,
+  scopeUrlQuery,
+  agentIdentityKey,
+  type ScopeMode,
+} from "@/enterprise/composables/useAgentScope";
+import { replaceRouteQuery } from "@/utils/url/replaceRouteQuery";
+import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";
+import AiAgentsLoadError from "@/enterprise/components/AIObservability/AiAgentsLoadError.vue";
 import {
   useSessions,
   normalizeSearchTerm,
@@ -274,11 +331,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { AcceptableValue } from "reka-ui";
-import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
-import { queryClient } from "@/composables/query/queryClient";
 import type { SessionSortField, SessionSortOrder } from "@/services/sessions";
 import { buildAgentSessionFilter } from "./llmAgentFilter";
 import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
+import LLMCostCell from "./LLMCostCell.vue";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 
@@ -314,19 +370,18 @@ const {
   currentPage,
   rowsPerPage,
   searchKeyword,
+  searchUser,
   sortBy,
   sortOrder,
   agents,
   agentsLoaded,
+  agentsError,
+  agentsOrg,
   fetchPage,
   cancelAll,
 } = useSessions();
 
-const urlType = typeof route.query.type === "string" ? route.query.type : "";
-const urlStream = typeof route.query.stream === "string" ? route.query.stream : "";
-const urlAgentName = typeof route.query.agent === "string" ? route.query.agent : "";
-const urlEnv = typeof route.query.env === "string" ? route.query.env : "";
-const urlVersion = typeof route.query.version === "string" ? route.query.version : "";
+const urlScope = readUrlScope(route.query);
 // Search deep-link: `?keyword=<term>`. Read once at setup, like the scope.
 const urlKeyword = normalizeSearchTerm(
   typeof route.query.keyword === "string" ? route.query.keyword : "",
@@ -341,22 +396,27 @@ const urlKeyword = normalizeSearchTerm(
 // Matched server-side against the user id OR the conversation text,
 // whichever the stream has.
 const SEARCH_INPUT_ID = "sessions-list-search";
-// A term in the URL overrides whatever the singleton holds: a pasted link
-// must reproduce its filtered view. When it differs from what the cached rows
-// were fetched with, the cache guard in `loadSessions` is bypassed once so the
-// mount fetch runs with the URL's term instead of restoring the stale page.
+// A URL term overrides the singleton and bypasses the cache guard once, so a pasted link reproduces its view.
 let searchChangedByUrl = false;
-if (urlKeyword && urlKeyword !== searchKeyword.value) {
+if (urlKeyword && (urlKeyword !== searchKeyword.value || !window.history.state?.forward)) {
   searchKeyword.value = urlKeyword;
+  searchChangedByUrl = true;
+}
+// The URL alone owns `?user=`: a link without it shows every user.
+const urlUser = normalizeSearchTerm(typeof route.query.user === "string" ? route.query.user : "");
+if (urlUser !== searchUser.value) {
+  searchUser.value = urlUser;
   searchChangedByUrl = true;
 }
 const searchActive = computed(() => searchKeyword.value.length > 0);
 const activeSearch = computed<SessionSearch | undefined>(() =>
-  searchActive.value ? { keyword: searchKeyword.value || undefined } : undefined,
+  searchActive.value || searchUser.value
+    ? { keyword: searchKeyword.value || undefined, user: searchUser.value || undefined }
+    : undefined,
 );
 
 const activeStream = ref<string>(
-  urlStream || localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
+  urlScope.stream || localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
 );
 // Trace-stream loading is shared with the other AI pages via
 // useLlmTraceStreams. availableStreams/streamsLoaded/ensureStreamsLoaded are
@@ -365,12 +425,9 @@ const { availableStreams, streamsLoaded, ensureStreamsLoaded } = useLlmTraceStre
   activeStream,
   t,
 );
-const MODE_LS_KEY = "sessionsList_filterMode";
-// Persists the RESOLVED agent NAME/env/version of the cascade selection (was
-// the old single `activeAgent` key). On reload we re-seed the cascade from
-// them (see `pendingAgentName`/`pendingEnv`/`pendingVersion` +
-// `selectAgentByScope`), so the last-picked agent is remembered exactly as
-// before — just via the cascade, not the retired `activeAgent` ref.
+// Persists the RESOLVED agent NAME/env/version of the cascade selection. On
+// reload we re-seed the cascade from them (see `pendingScope` +
+// `selectAgentByScope`), so the last-picked agent is remembered exactly.
 const AGENT_LS_KEY = "sessionsList_agentFilter";
 const ENV_LS_KEY = "sessionsList_envFilter";
 const VERSION_LS_KEY = "sessionsList_versionFilter";
@@ -384,30 +441,53 @@ const genAiAgentMappingAccess = checkFeatureAccess(
   "genAiAgentMapping",
   buildFeatureGateContext(store.state.zoConfig),
 );
-// Default scope is ALWAYS "agent" — every AI page lands on Agent for consistency.
-// Only an explicit `?type=stream` URL param overrides it (a stale saved
-// preference must not silently land on Stream). Agent mode calls the
-// enterprise-only agent-mapping API, so OSS is pinned to Stream regardless of
-// the URL/localStorage — the toggle to reach Agent is locked, not gone, but
-// clicking it is a no-op.
-const filterMode = ref<"stream" | "agent">(
-  !genAiAgentMappingAccess.allowed ? "stream" : urlType === "stream" ? "stream" : "agent",
+// The mode the user asked for (URL `type`/`agent`, else the remembered toggle),
+// or null when the agents list decides: Agent when the window has agents,
+// Stream when it has none (see loadSessions). OSS has no agent-mapping API, so
+// it is pinned to Stream. `agents` / `agentsLoaded` are module-scoped (see
+// useSessions), so a back-navigation remount decides from the list it already
+// has — but only if that list belongs to this org.
+function currentOrg(): string {
+  return store.state.selectedOrganization?.identifier || "default";
+}
+// Drops a module-scoped agents list that belongs to another org: it must not
+// decide this org's mode or fill its picker.
+function claimAgentsForOrg(org: string) {
+  if (agentsOrg.value === org) return;
+  agents.value = [];
+  agentsLoaded.value = false;
+  agentsError.value = null;
+  agentsOrg.value = org;
+}
+claimAgentsForOrg(currentOrg());
+const explicitMode = genAiAgentMappingAccess.allowed ? explicitScopeMode(urlScope) : "stream";
+const agentsDecided = agentsLoaded.value && !agentsError.value;
+const filterMode = ref<ScopeMode>(
+  explicitMode ?? (agentsDecided ? resolveScopeMode(null, agents.value.length) : "stream"),
 );
-// `agents` / `agentsLoaded` are module-scoped (see useSessions) so the agent
-// picker keeps its options — and stays off its skeleton — across a remount.
-// Env/name/version to seed the cascade with once the list is available: the
-// URL deep-link first, else the persisted last selection. Resolved into
-// selectedEnv/AgentName/Version via `selectAgentByScope` (falls back to
-// `selectAgentByName` when the exact env+version no longer exists), then
-// cleared.
-const pendingAgentName = ref<string | null>(
-  filterMode.value === "agent" ? urlAgentName || localStorage.getItem(AGENT_LS_KEY) || null : null,
-);
-const pendingEnv = ref<string | null>(
-  filterMode.value === "agent" ? urlEnv || localStorage.getItem(ENV_LS_KEY) || null : null,
-);
-const pendingVersion = ref<string | null>(
-  filterMode.value === "agent" ? urlVersion || localStorage.getItem(VERSION_LS_KEY) || null : null,
+const modeExplicit = ref(explicitMode !== null);
+// The org whose agents list decided the mode. A load for another org, after a
+// failed agents load, or for a window the user picked decides again (unless the
+// user chose a mode). The module-scoped list above may belong to another window,
+// so it only seeds the mode a back-navigation's cached rows show; the next load
+// that runs decides from its own window's list.
+let modeSettledOrg: string | null = null;
+// Seeded from the URL deep-link or else the persisted selection, never a mix of the two.
+const pendingScope = ref<{ env: string; name: string; version: string; stream?: string } | null>(
+  urlScope.agent || urlScope.env || urlScope.version
+    ? {
+        env: urlScope.env,
+        name: urlScope.agent,
+        version: urlScope.version,
+        stream: urlScope.agentStream,
+      }
+    : localStorage.getItem(AGENT_LS_KEY)
+      ? {
+          env: localStorage.getItem(ENV_LS_KEY) || "",
+          name: localStorage.getItem(AGENT_LS_KEY) || "",
+          version: localStorage.getItem(VERSION_LS_KEY) || "",
+        }
+      : null,
 );
 
 // Server-side pagination (1-indexed). OTable owns the footer controls in
@@ -438,6 +518,9 @@ const sessionSortFieldMap: Record<string, SessionSortField> = {
 // filter builder). Injected refs are the SAME instances the page owns, so
 // module scoping is unchanged.
 const {
+  loadAgents,
+  agentsLoadFailed,
+  noAgentIdentity,
   streamSelectOptions,
   selectedStreamCount,
   selectedAgent,
@@ -450,6 +533,8 @@ const {
   selectedEnv,
   selectedAgentName,
   selectedVersion,
+  agentStreams,
+  selectedAgentStream,
   selectAgentByName,
   selectAgentByScope,
 } = useAgentScope({
@@ -457,6 +542,7 @@ const {
   activeStream,
   agents,
   agentsLoaded,
+  agentsError,
   availableStreams,
   orgId: () => store.state.selectedOrganization?.identifier,
   getWindow: () => ({ start: props.startTime, end: props.endTime }),
@@ -466,19 +552,13 @@ const {
 });
 
 // Pins the cascade from the carried-over env/name/version (URL deep-link,
-// else the persisted last selection) when a match is possible: the exact
-// triple when both env and version are known, else by name alone. One-shot —
-// clears the pending state whether or not `agents` was ready to resolve it.
+// else the persisted last selection) when a match is possible. One-shot —
+// cleared once `agents` was ready to resolve it.
 function seedPendingCascade() {
-  if (!pendingAgentName.value || agents.value.length === 0) return;
-  if (pendingEnv.value && pendingVersion.value) {
-    selectAgentByScope(pendingEnv.value, pendingAgentName.value, pendingVersion.value);
-  } else {
-    selectAgentByName(pendingAgentName.value);
-  }
-  pendingAgentName.value = null;
-  pendingEnv.value = null;
-  pendingVersion.value = null;
+  if (!pendingScope.value || agents.value.length === 0) return;
+  const { env, name, version, stream } = pendingScope.value;
+  selectAgentByScope(env, name, version, stream);
+  pendingScope.value = null;
 }
 
 // `agents` can already be populated here on a back-navigation remount (it's
@@ -489,6 +569,13 @@ function seedPendingCascade() {
 // yet, so this is a no-op here; `loadSessions()` calls it again once
 // `loadAgents()` populates the list for the first time.
 seedPendingCascade();
+
+// Identity of the agent loadSessions last resolved, and whether a loadSessions
+// is between loading the agents and settling the selection. The selected-agent
+// watcher skips both, so the selection loadSessions itself seeds (the cascade's
+// first-agent default, then the URL / remembered agent) is not fetched twice.
+let loadedAgentKey = agentIdentityKey(selectedAgent.value);
+let resolvingScope = 0;
 
 const agentFilterClause = computed(() =>
   buildAgentSessionFilter(effectiveAgent.value, effectiveStream.value),
@@ -524,12 +611,25 @@ const tableColumns = computed(() =>
       id: "userId",
       header: t("traces.sessionsList.columns.user"),
       accessorKey: "userId",
-      // Email-identity width preset; OUserCell truncates + tooltips beyond it.
-      size: COL.email,
+      // OUserCell truncates + tooltips beyond this width.
+      size: 180,
       sortable: true,
       hideable: true,
       meta: { align: "left" },
     },
+    ...(sessions.value.some((s) => s.title)
+      ? [
+          {
+            id: "title",
+            header: t("readableSessions.title"),
+            accessorKey: "title",
+            size: COL.name,
+            sortable: false,
+            hideable: true,
+            meta: { align: "left" as const },
+          },
+        ]
+      : []),
     {
       id: "firstUserMessage",
       header: t("traces.sessionsList.columns.firstMessage"),
@@ -538,7 +638,7 @@ const tableColumns = computed(() =>
       // Flex columns collapse to `minSize` when the table overflows horizontally;
       // pin a floor so the message stays readable instead of clipping to "Han…".
       // The user drives how much they want to see via resize, capped by maxSize.
-      minSize: 200,
+      minSize: 160,
       maxSize: 600,
       sortable: false,
       hideable: true,
@@ -552,6 +652,25 @@ const tableColumns = computed(() =>
       sortable: true,
       hideable: true,
       meta: { align: "right" },
+    },
+    {
+      id: "cost",
+      header: t("traces.sessionsList.columns.cost"),
+      accessorKey: "cost",
+      // Fits "≥ $0.0000 partial" and "cost unknown" (unpriced tokens).
+      size: 150,
+      sortable: true,
+      hideable: true,
+      meta: { align: "right" },
+    },
+    {
+      id: "status",
+      header: t("traces.sessionsList.columns.status"),
+      accessorKey: "status",
+      size: 100,
+      sortable: true,
+      hideable: true,
+      meta: { align: "left", disableCellAction: true },
     },
     {
       id: "durationNanos",
@@ -571,24 +690,6 @@ const tableColumns = computed(() =>
       sortable: true,
       hideable: true,
       meta: { align: "right" },
-    },
-    {
-      id: "cost",
-      header: t("traces.sessionsList.columns.cost"),
-      accessorKey: "cost",
-      size: 100,
-      sortable: true,
-      hideable: true,
-      meta: { align: "right" },
-    },
-    {
-      id: "status",
-      header: t("traces.sessionsList.columns.status"),
-      accessorKey: "status",
-      size: 100,
-      sortable: true,
-      hideable: true,
-      meta: { align: "left", disableCellAction: true },
     },
     {
       id: "lastSeenNanos",
@@ -634,60 +735,27 @@ function formatTokens(n: number): string {
   return `${t.value}${t.unit}`;
 }
 
-async function loadAgents(startTime?: number, endTime?: number, force = false) {
-  const orgId = store.state.selectedOrganization?.identifier;
-  const start = startTime ?? props.startTime;
-  const end = endTime ?? props.endTime;
-  if (!orgId || !start || !end) return;
-  agentsLoaded.value = false;
-  try {
-    const options = genAiAgentsQuery(orgId, start, end);
-    // Agents appear as they emit spans and no write expires the list, so a user refresh forces.
-    if (force) {
-      await queryClient.invalidateQueries({
-        queryKey: options.queryKey,
-        exact: true,
-        refetchType: "none",
-      });
-    }
-    const agentList = await queryClient.fetchQuery(options);
-    agents.value = agentList.agents;
-    // The cascade selection is reconciled against the fresh list by
-    // useAgentScope's watcher (invalid env/name/version fall back / clear), so
-    // there is no page-local selection to clamp here anymore.
-  } catch (e) {
-    console.warn("Failed to load GenAI agents", e);
-    agents.value = [];
-  } finally {
-    agentsLoaded.value = true;
-  }
-}
-
 function syncFilterUrl() {
-  const query: Record<string, any> = { ...route.query, type: filterMode.value };
-  if (filterMode.value === "agent") {
-    delete query.stream;
-    if (selectedAgent.value?.name) {
-      query.agent = selectedAgent.value.name;
-      query.env = selectedEnv.value;
-      query.version = selectedVersion.value;
-    } else {
-      delete query.agent;
-      delete query.env;
-      delete query.version;
-    }
-  } else {
-    delete query.agent;
-    delete query.env;
-    delete query.version;
-    if (activeStream.value) query.stream = activeStream.value;
-    else delete query.stream;
-  }
-  // Only the applied term — so the filtered view has a link and survives a
-  // reload, and a cleared box leaves no stale param behind.
-  if (searchKeyword.value) query.keyword = searchKeyword.value;
-  else delete query.keyword;
-  router.replace({ query }).catch(() => {});
+  void replaceRouteQuery(router, route, (current) => {
+    const query = scopeUrlQuery(current, {
+      mode: filterMode.value,
+      explicit: modeExplicit.value,
+      stream: activeStream.value,
+      agent: selectedAgent.value
+        ? {
+            name: selectedAgent.value.name,
+            env: selectedEnv.value,
+            version: selectedVersion.value,
+            stream: selectedAgentStream.value,
+          }
+        : null,
+    });
+    if (searchKeyword.value) query.keyword = searchKeyword.value;
+    else delete query.keyword;
+    if (searchUser.value) query.user = searchUser.value;
+    else delete query.user;
+    return query;
+  });
 }
 
 function clearSessionRows() {
@@ -702,6 +770,7 @@ async function loadSessions(
   endTime?: number,
   force = false,
   forceAgents = false,
+  windowPicked = false,
 ) {
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
@@ -712,7 +781,7 @@ async function loadSessions(
   // programmatically) — we keep the previous page instead of re-fetching. Only
   // an explicit refresh or a real date change passes `force`. A prior error or
   // an org switch invalidates the cache so those still re-fetch.
-  const orgId = store.state.selectedOrganization?.identifier || "default";
+  const orgId = currentOrg();
   if (
     !force &&
     !searchChangedByUrl &&
@@ -725,16 +794,15 @@ async function loadSessions(
   searchChangedByUrl = false;
   // An org switch invalidates the list (see the guard above); the search
   // belonged to the previous org's data, so it goes with it.
-  if (loadedOrg.value && loadedOrg.value !== orgId && searchActive.value) {
-    searchKeyword.value = "";
+  if (loadedOrg.value && loadedOrg.value !== orgId) {
+    if (searchActive.value) searchKeyword.value = "";
+    searchUser.value = "";
   }
 
-  localStorage.setItem(MODE_LS_KEY, filterMode.value);
-
   // Hold the table skeleton across the whole load. We await the stream list and
-  // (in Agent mode) the agents API before `fetchPage`, which is the only thing
-  // that flips `loading`. Setting it true up front means the table shows one
-  // continuous skeleton instead of flashing its empty body between phases.
+  // the agents API before `fetchPage`, which is the only thing that flips
+  // `loading`. Setting it true up front means the table shows one continuous
+  // skeleton instead of flashing its empty body between phases.
   loading.value = true;
 
   // Stream-mode reads `effectiveStream` from `activeStream`, which is only set
@@ -742,9 +810,28 @@ async function loadSessions(
   // regardless of whether this call raced ahead of the mount's stream load.
   await ensureStreamsLoaded();
 
-  // Agents API is only relevant in Agent mode — don't touch it in Stream mode.
+  // The agents list decides the mode (when the user didn't choose one), fills
+  // the Agent cascade and the stream agent counts, and drives the "No agent
+  // identity found" banner. Served from the query cache within a window.
+  claimAgentsForOrg(orgId);
+  resolvingScope++;
+  try {
+    if (genAiAgentMappingAccess.allowed && availableStreams.value.length > 0) {
+      const agentsLoad = loadAgents(start, end, forceAgents);
+      // Explicit Stream queries need no agent identity. Counts and the
+      // instrumentation banner can settle after the sessions start loading.
+      if (!modeExplicit.value || filterMode.value === "agent") await agentsLoad;
+    }
+  } finally {
+    resolvingScope--;
+  }
+  if ((modeSettledOrg !== orgId || windowPicked) && !modeExplicit.value) {
+    filterMode.value = resolveScopeMode(null, agents.value.length, agentsError.value);
+  }
+  // A failed load decided nothing about agent identity: the next load decides.
+  if (!agentsError.value) modeSettledOrg = orgId;
+
   if (filterMode.value === "agent") {
-    await loadAgents(start, end, forceAgents);
     // Seeds the cascade now that the list exists (a no-op if the setup-time
     // call above already resolved it — see seedPendingCascade's own comment).
     seedPendingCascade();
@@ -765,12 +852,15 @@ async function loadSessions(
   } else {
     localStorage.setItem(STREAM_LS_KEY, activeStream.value);
   }
+  loadedAgentKey = agentIdentityKey(selectedAgent.value);
 
   syncFilterUrl();
 
   const stream = effectiveStream.value;
   if (!stream) {
     clearSessionRows();
+    // Stamp the org so the cache guard does not serve this empty list to the previous org.
+    loadedOrg.value = orgId;
     loading.value = false; // nothing to fetch — release the held skeleton
     return;
   }
@@ -801,6 +891,12 @@ function clearSearch() {
   searchKeyword.value = "";
 }
 
+function clearUserFilter() {
+  searchUser.value = "";
+  currentPage.value = 1;
+  loadSessions(undefined, undefined, true);
+}
+
 // Filter / pagination changes are deliberate user actions — force a re-fetch
 // so they bypass the "already loaded" cache guard.
 function onStreamChange() {
@@ -808,10 +904,14 @@ function onStreamChange() {
   loadSessions(undefined, undefined, true);
 }
 
+// A toggle click is an explicit choice: kept in the URL and remembered for the
+// other Monitor pages, so the agents list no longer picks the mode.
 function onFilterModeChange(mode?: AcceptableValue | AcceptableValue[] | boolean) {
   const next = mode === "agent" ? "agent" : "stream";
   if (next === filterMode.value) return;
   filterMode.value = next;
+  modeExplicit.value = true;
+  rememberModeChoice(next);
   currentPage.value = 1;
   clearSessionRows();
   loadSessions(undefined, undefined, true);
@@ -823,12 +923,9 @@ function onFilterModeChange(mode?: AcceptableValue | AcceptableValue[] | boolean
 // @agent-change handler. Keyed on the agent's stream-scoped identity + version so
 // a same-named agent in a different stream/version still triggers a reload.
 watch(
-  () => {
-    const a = selectedAgent.value;
-    return a ? `${a.source_stream}::${a.name}::${a.env ?? ""}::${a.version ?? ""}` : "";
-  },
-  () => {
-    if (filterMode.value !== "agent") return;
+  () => agentIdentityKey(selectedAgent.value),
+  (key) => {
+    if (filterMode.value !== "agent" || resolvingScope > 0 || key === loadedAgentKey) return;
     currentPage.value = 1;
     loadSessions(undefined, undefined, true);
   },
@@ -875,11 +972,13 @@ function handleRowClick(row: SessionRow) {
 // Explicit refresh (header button) / real date change — always re-fetches,
 // bypassing the cache guard. `lastRunAt` is stamped inside `fetchPage`, so it
 // only advances on an actual load, never on a cache hit.
-async function refresh(startTime?: number, endTime?: number, force = true) {
+// `windowPicked` is true only for a user's own date pick: an auto-decided mode
+// is decided again for that window (Agent with no agents → Stream).
+async function refresh(startTime?: number, endTime?: number, force = true, windowPicked = false) {
   // Only snap back to page 1 when we're actually going to fetch. On the
   // non-forced mount replay we skip the fetch and keep the restored page.
   if (force) currentPage.value = 1;
-  await loadSessions(startTime, endTime, force, force);
+  await loadSessions(startTime, endTime, force, force, windowPicked);
 }
 
 defineExpose({ refresh, lastRunAt, loading });

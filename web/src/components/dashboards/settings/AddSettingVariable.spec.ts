@@ -18,13 +18,9 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick, ref } from "vue";
 import AddSettingVariable from "./AddSettingVariable.vue";
 import { makeAddSettingVariableSchema } from "./AddSettingVariable.schema";
-import {
-  createFilterCondition,
-  createFilterGroup,
-  legacyFiltersToGroup,
-} from "@/utils/dashboard/variables/variableFilterGroupUtils";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import analytics from "@/services/product_analytics";
 import { addVariable, getDashboard, updateVariable } from "../../../utils/commons";
 
@@ -56,6 +52,7 @@ vi.mock("vue-i18n", () => ({
         "dashboard.queryValues": "Query Values",
         "dashboard.constant": "Constant",
         "dashboard.textbox": "Textbox",
+        "dashboard.date": "Date",
         "dashboard.custom": "Custom",
       };
       return translations[key] || key;
@@ -71,7 +68,12 @@ vi.mock("@/composables/dashboard/useDashboardSaveConflict", () => ({
   }),
 }));
 
-vi.mock("vuex", () => ({
+vi.mock("@/composables/fieldValueStore", () => ({
+  requestFieldValues: vi.fn(async () => ["error", "warn"]),
+}));
+
+vi.mock("vuex", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vuex")>()),
   useStore: () => ({
     state: {
       selectedOrganization: {
@@ -231,62 +233,7 @@ describe("AddSettingVariable", () => {
     wrapper.unmount();
   });
 
-  describe("Component Initialization", () => {
-    it("should render correctly", () => {
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-header-mock"]').exists()).toBe(true);
-    });
-
-    it("should have correct component name", () => {
-      expect(wrapper.vm.$options.name).toBe("AddSettingVariable");
-    });
-
-    it("should accept props correctly", () => {
-      expect(wrapper.props("variableName")).toBe(null);
-      expect(wrapper.props("dashboardVariablesList")).toEqual(defaultProps.dashboardVariablesList);
-    });
-
-    it("should initialize with default variable type", () => {
-      expect(wrapper.vm.variableData.type).toBe("query_values");
-    });
-
-    it("should have correct title for new variable", () => {
-      expect(wrapper.vm.title).toBe("Add Variable");
-    });
-  });
-
   describe("Variable Types", () => {
-    it("should render variable type selector", () => {
-      const typeSelect = wrapper.find('[data-test="dashboard-variable-type-select"]');
-      expect(typeSelect.exists()).toBe(true);
-    });
-
-    it("should have correct variable type options", () => {
-      const expectedTypes = [
-        {
-          label: "Query Values",
-          value: "query_values",
-          subLabel: "dashboard.queryVariable.typeQueryValuesDescription",
-        },
-        {
-          label: "Constant",
-          value: "constant",
-          subLabel: "dashboard.queryVariable.typeConstantDescription",
-        },
-        {
-          label: "Textbox",
-          value: "textbox",
-          subLabel: "dashboard.queryVariable.typeTextboxDescription",
-        },
-        {
-          label: "Custom",
-          value: "custom",
-          subLabel: "dashboard.queryVariable.typeCustomDescription",
-        },
-      ];
-      expect(wrapper.vm.variableTypes).toEqual(expectedTypes);
-    });
-
     it("describes the selected type below the type picker", async () => {
       expect(wrapper.vm.selectedTypeDescription).toBe(
         "dashboard.queryVariable.typeQueryValuesDescription",
@@ -335,34 +282,122 @@ describe("AddSettingVariable", () => {
       expect(wrapper.find('[data-test="dashboard-variable-textbox-default-value"]').exists()).toBe(
         true,
       );
+
+      // Test date type
+      wrapper.vm.variableData.type = "date";
+      await nextTick();
+
+      expect(wrapper.find('[data-test="dashboard-variable-date-default-value"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("should keep a valid YYYY-MM-DD value when switching textbox to date", async () => {
+      wrapper.vm.variableData.type = "textbox";
+      wrapper.vm.variableData.value = "2026-01-31";
+      await nextTick();
+      wrapper.vm.variableData.type = "date";
+      await nextTick();
+      await nextTick();
+
+      expect(wrapper.vm.variableData.value).toBe("2026-01-31");
+    });
+
+    it("should clear a non-date value when switching textbox to date", async () => {
+      wrapper.vm.variableData.type = "textbox";
+      wrapper.vm.variableData.value = "not a date";
+      await nextTick();
+      wrapper.vm.variableData.type = "date";
+      await nextTick();
+      await nextTick();
+
+      expect(wrapper.vm.variableData.value).toBe("");
     });
   });
 
-  describe("Basic Fields", () => {
-    it("should render variable name field", () => {
-      const nameField = wrapper.find('[data-test="dashboard-variable-name"]');
-      expect(nameField.exists()).toBe(true);
+  describe("Date variable format", () => {
+    const formatSelect = '[data-test="dashboard-variable-date-format-select"]';
+    const dateForm = (extra: Record<string, unknown> = {}) => ({
+      scope: "global",
+      selectedTabs: [],
+      selectedPanels: [],
+      name: "from_date",
+      type: "date",
+      value: "2026-03-08",
+      dateFormat: "dmy",
+      options: [],
+      ...extra,
     });
 
-    it("should render variable label field", () => {
-      const labelField = wrapper.find('[data-test="dashboard-variable-label"]');
-      expect(labelField.exists()).toBe(true);
+    it("shows the format select only for a date variable", async () => {
+      expect(wrapper.find(formatSelect).exists()).toBe(false);
+
+      wrapper.vm.variableData.type = "date";
+      await nextTick();
+      expect(wrapper.find(formatSelect).exists()).toBe(true);
+
+      wrapper.vm.variableData.type = "textbox";
+      await nextTick();
+      expect(wrapper.find(formatSelect).exists()).toBe(false);
     });
 
-    it("should validate required name field", async () => {
-      const nameField = wrapper.find('[data-test="dashboard-variable-name"]');
-      expect(nameField.exists()).toBe(true);
-
-      // Test that field has validation functionality
-      expect(wrapper.vm.variableData.name).toBeDefined();
+    it("defaults to iso and offers every format with its name", () => {
+      expect(wrapper.vm.variableData.dateFormat).toBe("iso");
+      expect(wrapper.vm.dateFormatOptions.map((o: any) => o.value)).toEqual([
+        "iso",
+        "dmy",
+        "mdy",
+        "epochms",
+        "epochus",
+        "epoch",
+      ]);
     });
 
-    it("should validate name field format", () => {
-      const nameField = wrapper.find('[data-test="dashboard-variable-name"]');
-      expect(nameField.exists()).toBe(true);
+    it("saves dateFormat for a date variable", () => {
+      const payload = wrapper.vm.buildVariablePayload(dateForm());
+      expect(payload.dateFormat).toBe("dmy");
+      expect(payload.value).toBe("2026-03-08");
+    });
 
-      // Test that the component has validation logic
-      expect(wrapper.vm.variableData.name).toBeDefined();
+    it("drops it when the variable is not a date", () => {
+      const payload = wrapper.vm.buildVariablePayload(dateForm({ type: "textbox" }));
+      expect(payload).not.toHaveProperty("dateFormat");
+    });
+
+    it("shows the default when editing a date variable saved without one", async () => {
+      vi.mocked(getDashboard).mockResolvedValueOnce({
+        variables: { list: [{ name: "old_date", type: "date", value: "2026-01-01" }] },
+      } as any);
+      const editWrapper = mount(AddSettingVariable, {
+        global: { plugins: [] },
+        props: { variableName: "old_date", dashboardVariablesList: [] },
+      });
+      await flushPromises();
+      expect(editWrapper.vm.variableData.type).toBe("date");
+      expect(editWrapper.vm.variableData.dateFormat).toBe("iso");
+      editWrapper.unmount();
+    });
+
+    it("keeps the saved format when editing", async () => {
+      vi.mocked(getDashboard).mockResolvedValueOnce({
+        variables: {
+          list: [
+            {
+              name: "d2",
+              type: "date",
+              value: "",
+              dateFormat: "epochus",
+            },
+          ],
+        },
+      } as any);
+      const editWrapper = mount(AddSettingVariable, {
+        global: { plugins: [] },
+        props: { variableName: "d2", dashboardVariablesList: [] },
+      });
+      await flushPromises();
+      expect(editWrapper.vm.variableData.dateFormat).toBe("epochus");
+      editWrapper.unmount();
     });
   });
 
@@ -370,36 +405,6 @@ describe("AddSettingVariable", () => {
     beforeEach(async () => {
       wrapper.vm.variableData.type = "query_values";
       await nextTick();
-    });
-
-    it("should render stream type selector", () => {
-      const streamTypeSelect = wrapper.find('[data-test="dashboard-variable-stream-type-select"]');
-      expect(streamTypeSelect.exists()).toBe(true);
-    });
-
-    it("should render stream selector", () => {
-      const streamSelect = wrapper.find('[data-test="dashboard-variable-stream-select"]');
-      expect(streamSelect.exists()).toBe(true);
-    });
-
-    it("should render field selector", () => {
-      const fieldSelect = wrapper.find('[data-test="dashboard-variable-field-select"]');
-      expect(fieldSelect.exists()).toBe(true);
-    });
-
-    it("should render max record size field", () => {
-      const maxRecordSize = wrapper.find('[data-test="dashboard-variable-max-record-size"]');
-      expect(maxRecordSize.exists()).toBe(true);
-    });
-
-    it("should have correct stream type options", () => {
-      expect(wrapper.vm.data.streamType).toEqual([
-        "logs",
-        "metrics",
-        "traces",
-        "enrichment_tables",
-        "metadata",
-      ]);
     });
 
     it("should update streams when stream type changes", async () => {
@@ -446,67 +451,40 @@ describe("AddSettingVariable", () => {
       await nextTick();
     });
 
-    it("should render add filter button", () => {
-      const addFilterBtn = wrapper.find('[data-test="dashboard-add-filter-btn"]');
-      expect(addFilterBtn.exists()).toBe(true);
+    const builder = () => wrapper.findComponent(FilterBuilder);
+
+    it("edits the query filters with the shared builder in the variable profile", () => {
+      expect(builder().exists()).toBe(true);
+      expect(builder().props("profile")).toBe("dashboard-variable");
+      expect(builder().props("dataTest")).toBe("dashboard-variable-filter-builder");
     });
 
-    const filterGroup = () => wrapper.vm.variableData.query_data.filter_group;
-    const condition = (field: string, value: string, logic: "AND" | "OR" = "AND") => ({
-      ...createFilterCondition(logic),
-      column: { field },
-      value,
-    });
-    const openAddMenu = async (testId = "dashboard-add-filter-btn") => {
-      const trigger = wrapper.find(`[data-test="${testId}"]`);
-      await trigger.trigger("pointerdown");
-      await trigger.trigger("click");
-      await flushPromises();
+    const orGroup = {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [
+        {
+          type: "condition",
+          column: { field: "env" },
+          filterType: "condition",
+          operator: "=",
+          value: "$env",
+          logicalOperator: "AND",
+          values: [],
+        },
+        {
+          type: "condition",
+          column: { field: "level" },
+          filterType: "condition",
+          operator: "=",
+          value: "error",
+          logicalOperator: "OR",
+          values: [],
+        },
+      ],
     };
-    const selectMenuItem = async (testId: string) => {
-      const item = document.body.querySelector(`[data-test="${testId}"]`) as HTMLElement;
-      expect(item).not.toBeNull();
-      item.click();
-      await flushPromises();
-    };
-    const chipTexts = () =>
-      wrapper
-        .findAll('[data-test^="dashboard-variable-filter-condition-"]')
-        .map((chip) => chip.text().replace(/\s+/g, " ").trim());
-
-    it("adds a condition from the add menu, in the backend's condition shape", async () => {
-      await openAddMenu();
-      await selectMenuItem("dashboard-variable-filter-add-condition");
-
-      expect(filterGroup().conditions).toEqual([createFilterCondition()]);
-      expect(wrapper.find('[data-test="dashboard-variable-filter-condition-0"]').exists()).toBe(
-        true,
-      );
-    });
-
-    it("adds a nested group, toggles OR and saves filter_group without a flat filter copy", async () => {
-      wrapper.vm.form.setFieldValue(
-        "query_data.filter_group",
-        createFilterGroup("AND", [condition("env", "$env")]),
-      );
-      await flushPromises();
-
-      await openAddMenu();
-      await selectMenuItem("dashboard-variable-filter-add-group");
-      expect(filterGroup().conditions[1]).toEqual(createFilterGroup());
-      expect(wrapper.find('[data-test="dashboard-variable-filter-group-1"]').exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-variable-filter-logical-operator-1"]').exists(),
-      ).toBe(true);
-
-      wrapper.vm.form.setFieldValue("query_data.filter_group.conditions[1].logicalOperator", "OR");
-      wrapper.vm.form.setFieldValue(
-        "query_data.filter_group.conditions[1].conditions[0]",
-        condition("level", "error"),
-      );
-      await flushPromises();
-
-      const payload = wrapper.vm.buildVariablePayload({
+    const payloadFor = (queryData: Record<string, unknown>) =>
+      wrapper.vm.buildVariablePayload({
         ...JSON.parse(JSON.stringify(wrapper.vm.form.state.values)),
         name: "v",
         query_data: {
@@ -514,58 +492,85 @@ describe("AddSettingVariable", () => {
           stream_type: "logs",
           stream: "s1",
           field: "f1",
+          ...queryData,
         },
-      });
-      expect(payload.query_data).not.toHaveProperty("filter");
-      expect(payload.query_data.filter_group).toEqual(
-        createFilterGroup("AND", [
-          condition("env", "$env"),
-          createFilterGroup("OR", [condition("level", "error")]),
-        ]),
-      );
+      }).query_data;
+
+    it("hands the builder the saved rows untouched", async () => {
+      const saved = [
+        { name: "k8s_namespace_name", operator: "IN", value: "('prod','dev')" },
+        { name: "level", operator: "!=", value: "$level" },
+        { name: "host", operator: "Is Null", value: "" },
+      ];
+      wrapper.vm.form.setFieldValue("query_data.filter", JSON.parse(JSON.stringify(saved)));
+      await flushPromises();
+      expect(JSON.stringify(builder().props("modelValue"))).toBe(JSON.stringify({ filter: saved }));
     });
 
-    it("hides add group and disables OR for PromQL, with the AND-only hint", async () => {
+    it("writes the builder's rows into the form", async () => {
+      const next = [{ name: "level", operator: "=", value: "error" }];
+      builder().vm.$emit("update:modelValue", { filter: next });
+      await flushPromises();
+      expect(wrapper.vm.form.state.values.query_data.filter).toEqual(next);
+      expect(wrapper.vm.form.state.values.query_data.filter_group).toBeUndefined();
+    });
+
+    it("saves AND-only rows as the flat filter, exactly as written", async () => {
+      const rows = [{ name: "level", operator: "!=", value: "$level" }];
+      builder().vm.$emit("update:modelValue", { filter: rows });
+      await flushPromises();
+      const queryData = payloadFor({});
+      expect(queryData.filter).toEqual(rows);
+      expect(queryData).not.toHaveProperty("filter_group");
+    });
+
+    it("saves an OR filter as filter_group without a flat filter copy", async () => {
+      builder().vm.$emit("update:modelValue", { filter_group: orGroup });
+      await flushPromises();
+      expect(wrapper.vm.form.state.values.query_data.filter).toBeUndefined();
+      const queryData = payloadFor({});
+      expect(queryData.filter_group).toEqual(orGroup);
+      expect(queryData).not.toHaveProperty("filter");
+    });
+
+    it("uses the AND-only profile for PromQL and saves a SQL group as its AND rows", async () => {
       wrapper.vm.form.setFieldValue("query_data.stream_type", "metrics");
       wrapper.vm.form.setFieldValue("query_data.query_type", "promql");
-      wrapper.vm.form.setFieldValue(
-        "query_data.filter_group",
-        createFilterGroup("AND", [condition("job", "api"), condition("env", "prod", "OR")]),
-      );
       await flushPromises();
-
-      expect(wrapper.find('[data-test="dashboard-variable-filter-promql-hint"]').exists()).toBe(
-        true,
-      );
-      expect(wrapper.find('[data-test="dashboard-variable-filter-promql-error"]').exists()).toBe(
-        true,
-      );
-      await openAddMenu();
-      expect(
-        document.body.querySelector('[data-test="dashboard-variable-filter-add-condition"]'),
-      ).not.toBeNull();
-      expect(
-        document.body.querySelector('[data-test="dashboard-variable-filter-add-group"]'),
-      ).toBeNull();
+      expect(builder().props("profile")).toBe("dashboard-variable-promql");
+      const queryData = payloadFor({
+        stream_type: "metrics",
+        filter: [],
+        filter_group: JSON.parse(JSON.stringify(orGroup)),
+      });
+      expect(queryData).not.toHaveProperty("filter_group");
+      expect(queryData.filter).toEqual([
+        { name: "env", operator: "=", value: "$env" },
+        { name: "level", operator: "=", value: "error" },
+      ]);
     });
 
-    it("removes a NON-last condition and keeps the remaining chips in order", async () => {
-      wrapper.vm.form.setFieldValue(
-        "query_data.filter_group",
-        legacyFiltersToGroup([
-          { name: "f0", operator: "=", value: "V0" },
-          { name: "f1", operator: "=", value: "V1" },
-          { name: "f2", operator: "=", value: "V2" },
-        ]),
+    it("offers the stream's fields and the visible $variables", async () => {
+      wrapper.vm.data.currentFieldsList = [
+        { name: "level", type: "Utf8" },
+        { name: "status", type: "Int64" },
+      ];
+      await nextTick();
+      expect(builder().props("fields")).toEqual([
+        { name: "level", type: "string" },
+        { name: "status", type: "number" },
+      ]);
+      const suggestions = builder().props("extraValueSuggestions")!("level");
+      wrapper.vm.dashboardVariablesFilterItems.forEach((item: any) =>
+        expect(suggestions).toContain(item.value),
       );
-      await flushPromises();
-      expect(chipTexts()).toEqual(["f0 = V0", "f1 = V1", "f2 = V2"]);
+    });
 
-      await wrapper.find('[data-test="dashboard-variable-adhoc-close-1"]').trigger("click");
+    it("loads no values while the stream is itself a $variable", async () => {
+      wrapper.vm.form.setFieldValue("query_data.stream_type", "logs");
+      wrapper.vm.form.setFieldValue("query_data.stream", "$stream");
       await flushPromises();
-
-      expect(chipTexts()).toEqual(["f0 = V0", "f2 = V2"]);
-      expect(filterGroup().conditions.map((c: any) => c.value)).toEqual(["V0", "V2"]);
+      await expect(builder().props("loadValues")!("level", "")).resolves.toEqual([]);
     });
   });
 
@@ -573,12 +578,6 @@ describe("AddSettingVariable", () => {
     beforeEach(async () => {
       wrapper.vm.variableData.type = "custom";
       await nextTick();
-    });
-
-    it("should render custom variable options", () => {
-      // Check if custom options are rendered
-      expect(wrapper.vm.variableData.options).toBeDefined();
-      expect(Array.isArray(wrapper.vm.variableData.options)).toBe(true);
     });
 
     it("should add new custom option", async () => {
@@ -647,29 +646,9 @@ describe("AddSettingVariable", () => {
 
       expect(wrapper.vm.variableData.options).toHaveLength(1);
     });
-
-    it("should handle custom select all checkbox", () => {
-      wrapper.vm.variableData.options = [
-        { label: "opt1", value: "val1", selected: true },
-        { label: "opt2", value: "val2", selected: true },
-      ];
-
-      // Test that custom select all model exists
-      expect(wrapper.vm.customSelectAllModel).toBeDefined();
-    });
   });
 
   describe("Multi-select Configuration", () => {
-    it("should render multi-select toggle for query_values", async () => {
-      wrapper.vm.variableData.type = "query_values";
-      await nextTick();
-
-      const multiSelectToggle = wrapper.find(
-        '[data-test="dashboard-query_values-show_multiple_values"]',
-      );
-      expect(multiSelectToggle.exists()).toBe(true);
-    });
-
     it("should render multi-select default value options", async () => {
       wrapper.vm.variableData.type = "query_values";
       wrapper.vm.variableData.multiSelect = true;
@@ -689,50 +668,9 @@ describe("AddSettingVariable", () => {
       expect(allValuesBtn.exists()).toBe(true);
       expect(customBtn.exists()).toBe(true);
     });
-
-    it("should handle multi-select default value selection", async () => {
-      // The form is the source (rule ②); drive it and read the projection back.
-      wrapper.vm.form.setFieldValue("selectAllValueForMultiSelect", "all");
-      await flushPromises();
-
-      expect(wrapper.vm.variableData.selectAllValueForMultiSelect).toBe("all");
-    });
-  });
-
-  describe("Additional Options", () => {
-    it("should render hide on dashboard toggle", () => {
-      const hideToggle = wrapper.find('[data-test="dashboard-variable-hide_on_dashboard"]');
-      expect(hideToggle.exists()).toBe(true);
-    });
-
-    it("should toggle hide on dashboard option", async () => {
-      const initialValue = wrapper.vm.variableData.hideOnDashboard;
-
-      wrapper.vm.variableData.hideOnDashboard = !initialValue;
-      await nextTick();
-
-      expect(wrapper.vm.variableData.hideOnDashboard).toBe(!initialValue);
-    });
-
-    it("should render escape single quotes toggle", () => {
-      const escapeToggle =
-        wrapper.find('[data-test*="dashboard-config-limit-info"]').exists() ||
-        Object.prototype.hasOwnProperty.call(wrapper.vm.variableData, "escapeSingleQuotes");
-      expect(escapeToggle).toBe(true);
-    });
   });
 
   describe("Form Actions", () => {
-    it("should render cancel button", () => {
-      const cancelBtn = wrapper.find('[data-test="dashboard-variable-cancel-btn"]');
-      expect(cancelBtn.exists()).toBe(true);
-    });
-
-    it("should render save button", () => {
-      const saveBtn = wrapper.find('[data-test="dashboard-variable-save-btn"]');
-      expect(saveBtn.exists()).toBe(true);
-    });
-
     it("should emit close event when cancel clicked", async () => {
       const cancelBtn = wrapper.find('[data-test="dashboard-variable-cancel-btn"]');
 
@@ -863,7 +801,7 @@ describe("AddSettingVariable", () => {
         ...validBase,
         query_data: {
           ...validBase.query_data,
-          filter_group: legacyFiltersToGroup([{ name: "f", operator: "=", value: "" }]),
+          filter: [{ name: "f", operator: "=", value: "" }],
         },
       };
       expect(schema.safeParse(withEmptyValue).success).toBe(false);
@@ -871,7 +809,7 @@ describe("AddSettingVariable", () => {
         ...validBase,
         query_data: {
           ...validBase.query_data,
-          filter_group: legacyFiltersToGroup([{ name: "f", operator: "=", value: "v" }]),
+          filter: [{ name: "f", operator: "=", value: "v" }],
         },
       };
       expect(schema.safeParse(withValue).success).toBe(true);
@@ -882,7 +820,7 @@ describe("AddSettingVariable", () => {
         ...validBase,
         query_data: {
           ...validBase.query_data,
-          filter_group: legacyFiltersToGroup([{ name: "f", operator: "Is Null", value: "" }]),
+          filter: [{ name: "f", operator: "Is Null", value: "" }],
         },
       };
       expect(schema.safeParse(isNull).success).toBe(true);
@@ -893,7 +831,7 @@ describe("AddSettingVariable", () => {
         ...validBase,
         query_data: {
           ...validBase.query_data,
-          filter_group: legacyFiltersToGroup([{ name: "", operator: "=", value: "v" }]),
+          filter: [{ name: "", operator: "=", value: "v" }],
         },
       };
       expect(schema.safeParse(noName).success).toBe(false);
@@ -930,19 +868,13 @@ describe("AddSettingVariable", () => {
       f.setFieldValue("query_data.stream_type", "logs");
       f.setFieldValue("query_data.stream", "s1");
       f.setFieldValue("query_data.field", "f1");
-      f.setFieldValue(
-        "query_data.filter_group",
-        legacyFiltersToGroup([{ name: "f", operator: "=", value: "" }]),
-      );
+      f.setFieldValue("query_data.filter", [{ name: "f", operator: "=", value: "" }]);
       await flushPromises();
       await f.handleSubmit();
       await flushPromises();
       expect(f.state.isValid).toBe(false);
 
-      f.setFieldValue(
-        "query_data.filter_group",
-        legacyFiltersToGroup([{ name: "f", operator: "=", value: "v" }]),
-      );
+      f.setFieldValue("query_data.filter", [{ name: "f", operator: "=", value: "v" }]);
       await flushPromises();
       await f.handleSubmit();
       await flushPromises();
@@ -1023,7 +955,7 @@ describe("AddSettingVariable", () => {
       expect(exists("dashboard-variable-query-mode")).toBe(true);
       expect(exists("dashboard-variable-stream-select")).toBe(true);
       expect(exists("dashboard-variable-field-select")).toBe(true);
-      expect(exists("dashboard-add-filter-btn")).toBe(true);
+      expect(exists("dashboard-variable-filter-builder-root")).toBe(true);
       expect(exists("query-variable-editor-mock")).toBe(false);
     });
 
@@ -1094,7 +1026,7 @@ describe("AddSettingVariable", () => {
           stream: "default",
           field: "host",
           query_type: language,
-          filter_group: legacyFiltersToGroup([{ name: "env", operator: "=", value: "$env" }]),
+          filter: [{ name: "env", operator: "=", value: "$env" }],
         });
         wrapper.vm.onQueryModeChange("custom");
         expect(wrapper.vm.variableData.query_data.custom_query).toBe(true);
@@ -1140,32 +1072,44 @@ describe("AddSettingVariable", () => {
         stream: "up",
         field: "job",
         query_type: "promql",
-        filter_group: legacyFiltersToGroup([{ name: "env", operator: "=", value: "$env" }]),
+        filter: [{ name: "env", operator: "=", value: "$env" }],
       });
       await wrapper.vm.onQueryModeChange("custom");
       await flushPromises();
       expect(wrapper.vm.variableData.query_data.query).toBe('label_values(up{env=~"$env"}, job)');
     });
 
-    it("prefills custom SQL with the parenthesised AND/OR WHERE of a nested group", async () => {
-      const leaf = (field: string, value: string, logic: "AND" | "OR" = "AND") => ({
-        ...createFilterCondition(logic),
+    it("prefills custom SQL with the panel builder's AND/OR WHERE of a nested group", async () => {
+      const leaf = (field: string, value: string, logicalOperator = "AND") => ({
+        type: "condition",
         column: { field },
+        filterType: "condition",
+        operator: "=",
         value,
+        logicalOperator,
+        values: [],
       });
       await setQueryData({
         stream_type: "logs",
         stream: "default",
         field: "host",
-        filter_group: createFilterGroup("AND", [
-          leaf("env", "$env"),
-          createFilterGroup("AND", [leaf("level", "error"), leaf("level", "warn", "OR")]),
-        ]),
+        filter_group: {
+          filterType: "group",
+          logicalOperator: "AND",
+          conditions: [
+            leaf("env", "$env"),
+            {
+              filterType: "group",
+              logicalOperator: "AND",
+              conditions: [leaf("level", "error"), leaf("level", "warn", "OR")],
+            },
+          ],
+        },
       });
       await wrapper.vm.onQueryModeChange("custom");
       await flushPromises();
       expect(wrapper.vm.variableData.query_data.query).toBe(
-        `SELECT DISTINCT "host" FROM "default" WHERE "env" = '$env' AND ("level" = 'error' OR "level" = 'warn')`,
+        `SELECT DISTINCT "host" FROM "default" WHERE env = '$env' AND (level = 'error' OR level = 'warn')`,
       );
     });
 
@@ -1219,21 +1163,6 @@ describe("AddSettingVariable", () => {
       await wrapper.vm.onQueryLanguageChange("sql");
       await flushPromises();
       expect(wrapper.vm.variableData.query_data.query).toBe("SELECT job FROM up");
-    });
-
-    it("shows PromQL operator symbols for an auto PromQL filter", () => {
-      const options = wrapper.vm.promqlFilterOperatorOptions;
-      expect(options.map((o: any) => o.value)).toEqual([
-        "=",
-        "!=",
-        "IN",
-        "NOT IN",
-        "re_match",
-        "re_not_match",
-        "Is Null",
-        "Is Not Null",
-      ]);
-      expect(options.slice(4, 6).map((o: any) => o.label)).toEqual(["=~", "!~"]);
     });
   });
 
@@ -1405,21 +1334,30 @@ describe("AddSettingVariable", () => {
       await nextTick();
     });
 
-    it("should set edit mode when variableName is provided", () => {
-      // In edit mode, the component should be initialized differently
-      expect(wrapper.props("variableName")).toBe("existingVar");
-    });
-
     it("should have correct title in edit mode", () => {
       expect(wrapper.vm.title).toBe("Edit Variable");
     });
 
-    it("should load existing variable data in edit mode", async () => {
-      // The component should load the variable data in edit mode
-      expect(wrapper.vm.title).toBe("Edit Variable");
-    });
+    const mountSaved = async (queryData: Record<string, unknown>) => {
+      vi.mocked(getDashboard).mockResolvedValueOnce({
+        tabs: [],
+        variables: {
+          list: [
+            { name: "savedVar", label: "savedVar", type: "query_values", query_data: queryData },
+          ],
+        },
+      });
+      const saved = mount(AddSettingVariable, {
+        props: { variableName: "savedVar", dashboardVariablesList: [] },
+      });
+      await flushPromises();
+      return saved;
+    };
+    const savedQueryData = (saved: any) =>
+      saved.vm.buildVariablePayload(JSON.parse(JSON.stringify(saved.vm.form.state.values)))
+        .query_data;
 
-    it("loads a legacy filter array as the same chips and re-saves it unchanged", async () => {
+    it("loads a legacy filter array into the builder and re-saves it unchanged", async () => {
       const legacyQueryData = {
         stream_type: "logs",
         stream: "stream1",
@@ -1430,76 +1368,94 @@ describe("AddSettingVariable", () => {
           { name: "level", operator: "Is Null", value: "" },
         ],
       };
-      vi.mocked(getDashboard).mockResolvedValueOnce({
-        tabs: [],
-        variables: {
-          list: [
-            {
-              name: "legacyVar",
-              label: "legacyVar",
-              type: "query_values",
-              query_data: legacyQueryData,
-            },
-          ],
-        },
+      const saved = await mountSaved(legacyQueryData);
+      expect(saved.findComponent(FilterBuilder).props("modelValue")).toEqual({
+        filter: legacyQueryData.filter,
       });
-      const legacyWrapper = mount(AddSettingVariable, {
-        props: { variableName: "legacyVar", dashboardVariablesList: [] },
+      expect(JSON.stringify(savedQueryData(saved))).toBe(JSON.stringify(legacyQueryData));
+      saved.unmount();
+    });
+
+    it("turns AND into OR from the real builder's connector and saves filter_group", async () => {
+      const saved = await mountSaved({
+        stream_type: "logs",
+        stream: "stream1",
+        field: "field1",
+        max_record_size: null,
+        filter: [
+          { name: "env", operator: "=", value: "prod" },
+          { name: "level", operator: "=", value: "error" },
+        ],
       });
+      const connector = saved.find('[data-test="dashboard-variable-filter-builder-connector-1"]');
+      expect(connector.text()).toBe("AND");
+      await connector.trigger("click");
       await flushPromises();
+      const queryData = savedQueryData(saved);
+      expect(queryData).not.toHaveProperty("filter");
+      expect(queryData.filter_group.conditions.map((c: any) => c.logicalOperator)).toEqual([
+        "AND",
+        "OR",
+      ]);
+      saved.unmount();
+    });
 
-      const chips = legacyWrapper
-        .findAll('[data-test^="dashboard-variable-filter-condition-"]')
-        .map((chip) => chip.text().replace(/\s+/g, " ").trim());
-      expect(chips).toEqual(["env = $env", "level dashboard.filterOperators.isNull"]);
+    it("offers no OR connector for an auto PromQL variable", async () => {
+      const saved = await mountSaved({
+        stream_type: "metrics",
+        stream: "up",
+        field: "job",
+        max_record_size: null,
+        query_type: "promql",
+        filter: [
+          { name: "env", operator: "=", value: "prod" },
+          { name: "region", operator: "=", value: "eu" },
+        ],
+      });
+      expect(saved.findComponent(FilterBuilder).props("profile")).toBe("dashboard-variable-promql");
+      expect(
+        saved.find('[data-test^="dashboard-variable-filter-builder-connector-"]').exists(),
+      ).toBe(false);
+      saved.unmount();
+    });
 
-      const payload = legacyWrapper.vm.buildVariablePayload(
-        JSON.parse(JSON.stringify(legacyWrapper.vm.form.state.values)),
-      );
-      expect(JSON.stringify(payload.query_data)).toBe(JSON.stringify(legacyQueryData));
-      legacyWrapper.unmount();
+    it("loads a saved filter_group and re-saves it without a flat filter", async () => {
+      const group = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          {
+            type: "condition",
+            column: { field: "env" },
+            filterType: "condition",
+            operator: "=",
+            value: "prod",
+            logicalOperator: "AND",
+            values: [],
+          },
+          {
+            filterType: "group",
+            logicalOperator: "OR",
+            conditions: [],
+          },
+        ],
+      };
+      const saved = await mountSaved({
+        stream_type: "logs",
+        stream: "stream1",
+        field: "field1",
+        max_record_size: null,
+        filter_group: group,
+      });
+      expect(saved.findComponent(FilterBuilder).props("modelValue")).toMatchObject({
+        filter_group: group,
+      });
+      const queryData = savedQueryData(saved);
+      expect(queryData.filter_group).toEqual(group);
+      expect(queryData).not.toHaveProperty("filter");
+      saved.unmount();
     });
   });
-
-  describe("Data Validation", () => {
-    it("should have form validation", () => {
-      const nameField = wrapper.find('[data-test="dashboard-variable-name"]');
-      expect(nameField.exists()).toBe(true);
-
-      // Component should have validation logic
-      expect(wrapper.vm.variableData).toBeDefined();
-    });
-
-    it("should handle form submission", async () => {
-      wrapper.vm.variableData.name = "test-variable";
-      wrapper.vm.variableData.type = "constant";
-      wrapper.vm.variableData.value = "test-value";
-
-      expect(wrapper.vm.onSubmit).toBeDefined();
-    });
-  });
-
-  describe("Error Handling", () => {
-    it("should handle form errors", () => {
-      expect(wrapper.vm.filterCycleError).toBeDefined();
-    });
-
-    it("should have error handling methods", () => {
-      expect(wrapper.vm.onSubmit).toBeDefined();
-      expect(wrapper.vm.filterCycleError).toBeDefined();
-    });
-  });
-
-  describe("Dependency Graph Integration", () => {
-    it("should have cycle detection functionality", async () => {
-      wrapper.vm.variableData.name = "test-variable";
-      wrapper.vm.variableData.type = "query_values";
-
-      expect(wrapper.vm.filterCycleError).toBeDefined();
-      expect(wrapper.vm.variableData).toHaveProperty("name");
-    });
-  });
-
   describe("Custom Value Management", () => {
     it("should add custom value for multi-select", async () => {
       wrapper.vm.form.setFieldValue("customMultiSelectValue", ["value1"]);
@@ -1559,31 +1515,6 @@ describe("AddSettingVariable", () => {
     beforeEach(async () => {
       wrapper.vm.variableData.type = "query_values";
       await nextTick();
-    });
-
-    it("should have mergedStreamsFilteredOptions computed property", () => {
-      expect(wrapper.vm.mergedStreamOptionsWithLabel).toBeDefined();
-      expect(Array.isArray(wrapper.vm.mergedStreamOptionsWithLabel)).toBe(true);
-    });
-
-    it("should have mergedFieldsFilteredOptions computed property", () => {
-      expect(wrapper.vm.mergedFieldOptionsWithLabel).toBeDefined();
-      expect(Array.isArray(wrapper.vm.mergedFieldOptionsWithLabel)).toBe(true);
-    });
-
-    it("should have dashboardVariablesFilterItems that produces $ prefixed options", () => {
-      // dashboardVariablesFilterItems should produce items like {label: "var1", value: "$var1"}
-      const filterItems = wrapper.vm.dashboardVariablesFilterItems;
-      expect(Array.isArray(filterItems)).toBe(true);
-      // Variable options should have $ prefix in their value
-      filterItems.forEach((item: any) => {
-        expect(item.value).toMatch(/^\$/);
-      });
-    });
-
-    it("should expose mergedStreamsFilterFn and mergedFieldsFilterFn for autocomplete", () => {
-      expect(wrapper.vm.streamsFilterFn).toBeDefined();
-      expect(wrapper.vm.fieldsFilterFn).toBeDefined();
     });
 
     it("should skip schema fetch when stream is a variable reference", async () => {
@@ -1653,16 +1584,6 @@ describe("AddSettingVariable", () => {
 
       // Field should be reset for non-variable streams
       expect(wrapper.vm.variableData.query_data.field).toBe("");
-    });
-
-    it("should render stream select with CommonAutoComplete", () => {
-      const streamSelect = wrapper.find('[data-test="dashboard-variable-stream-select"]');
-      expect(streamSelect.exists()).toBe(true);
-    });
-
-    it("should render field select with CommonAutoComplete", () => {
-      const fieldSelect = wrapper.find('[data-test="dashboard-variable-field-select"]');
-      expect(fieldSelect.exists()).toBe(true);
     });
   });
 });

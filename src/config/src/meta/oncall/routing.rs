@@ -310,7 +310,7 @@ impl OwnershipRule {
                 return Err(OwnershipError::WildcardMatchesEverything(k.clone()));
             }
             // Only the final character may be a `*`; more would be a pattern language this is not.
-            if v.trim_end_matches('*').contains('*') {
+            if v.strip_suffix('*').unwrap_or(v).contains('*') {
                 return Err(OwnershipError::WildcardNotTrailing(k.clone()));
             }
         }
@@ -363,15 +363,20 @@ impl RoutingDecision {
     /// One line for the timeline. Every case names the team and the mechanism
     /// in the same shape, so "why did this page me" reads as a sentence rather
     /// than a rule id somebody then has to look up.
-    pub fn reason(&self) -> String {
+    pub fn reason(&self, team_name: Option<&str>) -> String {
+        // The id stands in only when the caller could not read the team's name.
+        let team = |team_id: &str| team_name.unwrap_or(team_id).to_string();
         match self {
-            Self::Explicit { team_id } => format!("routed to {team_id} by the alert's own setting"),
+            Self::Explicit { team_id } => {
+                format!("routed to {} by the alert's own setting", team(team_id))
+            }
             Self::Ownership { team_id, path, .. } => {
-                format!("routed to {team_id} by ownership rule {path}")
+                format!("routed to {} by ownership rule {path}", team(team_id))
             }
-            Self::Default { team_id } => {
-                format!("no ownership rule matched, so it went to the default team {team_id}")
-            }
+            Self::Default { team_id } => format!(
+                "no ownership rule matched, so it went to the default team {}",
+                team(team_id)
+            ),
             Self::Unrouted => "no ownership rule matches this signal and no default team is set, \
                                so no team was paged"
                 .to_string(),
@@ -429,11 +434,15 @@ impl Routed {
     }
 
     /// The whole story in one timeline line: what was ignored, then what won.
-    pub fn reason(&self) -> String {
+    pub fn reason(&self, team_name: Option<&str>) -> String {
         if self.notes.is_empty() {
-            return self.decision.reason();
+            return self.decision.reason(team_name);
         }
-        format!("{}; {}", self.notes.join("; "), self.decision.reason())
+        format!(
+            "{}; {}",
+            self.notes.join("; "),
+            self.decision.reason(team_name)
+        )
     }
 }
 
@@ -581,17 +590,24 @@ pub fn resolve_owner_ranked<'a>(
     rules
         .iter()
         .filter(|rule| rule.validate().is_ok() && rule.matches(dims))
-        .max_by(|a, b| {
-            a.specificity()
-                .cmp(&b.specificity())
-                // Then how fine the claim is: a service beats a cluster, not merely a longer name.
-                .then_with(|| a.finest_depth(depths).cmp(&b.finest_depth(depths)))
-                // Then exactness (§7): a wildcard outranks a shallower rule, never an exact one.
-                .then_with(|| a.exact_dimensions().cmp(&b.exact_dimensions()))
-                .then_with(|| a.literal_chars().cmp(&b.literal_chars()))
-                .then_with(|| b.path().cmp(&a.path()))
-                .then_with(|| b.id.cmp(&a.id))
-        })
+        .max_by(|a, b| compare_precedence(a, b, depths))
+}
+
+/// `Greater` when `a` outranks `b`; routing and every rule list share this one ordering.
+pub fn compare_precedence(
+    a: &OwnershipRule,
+    b: &OwnershipRule,
+    depths: &DimensionDepth,
+) -> std::cmp::Ordering {
+    a.specificity()
+        .cmp(&b.specificity())
+        // Then how fine the claim is: a service beats a cluster, not merely a longer name.
+        .then_with(|| a.finest_depth(depths).cmp(&b.finest_depth(depths)))
+        // Then exactness (§7): a wildcard outranks a shallower rule, never an exact one.
+        .then_with(|| a.exact_dimensions().cmp(&b.exact_dimensions()))
+        .then_with(|| a.literal_chars().cmp(&b.literal_chars()))
+        .then_with(|| b.path().cmp(&a.path()))
+        .then_with(|| b.id.cmp(&a.id))
 }
 
 /// The full routing decision, in the order §5 specifies.
@@ -877,6 +893,31 @@ mod tests {
                 resolve_owner(&rules, &record).unwrap().team_id,
                 "payments",
                 "the unranked entry point has to agree, or the two disagree by default",
+            );
+        }
+
+        /// The rules table numbers rules by this ordering, so it has to put service above cluster.
+        #[test]
+        fn test_the_shared_ordering_ranks_service_over_cluster_as_routing_does() {
+            let cluster = rule(
+                "r_cluster",
+                "platform",
+                &[("k8s-cluster", "production-us-east")],
+            );
+            let service = rule("r_svc", "payments", &[("service", "pay")]);
+            let record = dims(&[("k8s-cluster", "production-us-east"), ("service", "pay")]);
+            let depths = DimensionDepth::shipped_default();
+            assert_eq!(
+                compare_precedence(&service, &cluster, &depths),
+                std::cmp::Ordering::Greater
+            );
+            let mut listed = vec![cluster.clone(), service.clone()];
+            listed.sort_by(|a, b| compare_precedence(b, a, &depths));
+            let winner = resolve_owner_ranked(&listed, &record, &depths).unwrap();
+            assert_eq!(winner.id, "r_svc");
+            assert_eq!(
+                listed[0].id, winner.id,
+                "the first listed rule is the one that pages"
             );
         }
 
@@ -1206,9 +1247,9 @@ mod tests {
             let label = format!("explicit={explicit} owned={owned} default={defaulted}");
             assert_eq!(routed.decision, want, "{label}");
             assert!(
-                routed.reason().contains(sentence),
+                routed.reason(None).contains(sentence),
                 "{label}: reason `{}` does not say `{sentence}`",
-                routed.reason()
+                routed.reason(None)
             );
         }
     }
@@ -1319,8 +1360,8 @@ mod tests {
         let routed = route(&RoutingInputs::default());
         assert!(!routed.is_routed());
         assert_eq!(routed.team_id(), None);
-        assert!(routed.reason().contains("no team was paged"));
-        assert!(routed.reason().contains("no default team is set"));
+        assert!(routed.reason(None).contains("no team was paged"));
+        assert!(routed.reason(None).contains("no default team is set"));
     }
 
     /// "Nothing owns this" is actionable only if the note says what nothing
@@ -1346,7 +1387,7 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(defaulted.notes, queued.notes);
-        assert!(defaulted.reason().contains("service=zxporter"));
+        assert!(defaulted.reason(None).contains("service=zxporter"));
 
         assert_eq!(
             route(&RoutingInputs::default()).notes,
@@ -1375,20 +1416,20 @@ mod tests {
             dimensions: Some(&dims(&[("k8s-cluster", "prod")])),
             ..Default::default()
         });
-        assert!(ownership.reason().contains("k8s-cluster=prod"));
-        assert!(ownership.reason().contains("platform"));
+        assert!(ownership.reason(None).contains("k8s-cluster=prod"));
+        assert!(ownership.reason(None).contains("platform"));
 
         assert!(
             route(&RoutingInputs {
                 explicit_team_id: Some("t"),
                 ..Default::default()
             })
-            .reason()
+            .reason(None)
             .contains("alert's own setting")
         );
         assert!(
             route(&RoutingInputs::default())
-                .reason()
+                .reason(None)
                 .contains("no ownership rule matches")
         );
 
@@ -1398,10 +1439,41 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(
-            defaulted.decision.reason(),
+            defaulted.decision.reason(None),
             "no ownership rule matched, so it went to the default team Platform"
         );
-        assert!(!defaulted.reason().contains("rule_id"));
+        assert!(!defaulted.reason(None).contains("rule_id"));
+    }
+
+    /// A person reads the team's name; `insight` still finds the path after the marker.
+    #[test]
+    fn test_the_sentence_names_the_team_and_keeps_the_ownership_marker() {
+        let named = Some("Platform SRE");
+        let cases = [
+            (
+                RoutingDecision::Ownership {
+                    team_id: "team_1".into(),
+                    rule_id: "r_1".into(),
+                    path: "k8s-cluster=prod".into(),
+                },
+                "routed to Platform SRE by ownership rule k8s-cluster=prod",
+            ),
+            (
+                RoutingDecision::Explicit {
+                    team_id: "team_1".into(),
+                },
+                "routed to Platform SRE by the alert's own setting",
+            ),
+            (
+                RoutingDecision::Default {
+                    team_id: "team_1".into(),
+                },
+                "no ownership rule matched, so it went to the default team Platform SRE",
+            ),
+        ];
+        for (decision, sentence) in cases {
+            assert_eq!(decision.reason(named), sentence);
+        }
     }
 
     // ── Trailing wildcards (§7) ─────────────────────────────────────────────
@@ -1541,6 +1613,30 @@ mod tests {
             Err(OwnershipError::WildcardNotTrailing("host".into()))
         );
         assert!(resolve_owner(&[interior], &dims(&[("host", "db-x-01")])).is_none());
+    }
+
+    /// `pair_matches` strips one trailing `*`, so a value with two could be stored and never match.
+    #[test]
+    fn test_a_value_holds_at_most_one_star_and_only_last() {
+        let not_trailing = || Err(OwnershipError::WildcardNotTrailing("host".into()));
+        let cases = [
+            ("db-*", Ok(())),
+            ("db", Ok(())),
+            ("db-**", not_trailing()),
+            ("**", not_trailing()),
+            ("a*b", not_trailing()),
+            (
+                "*",
+                Err(OwnershipError::WildcardMatchesEverything("host".into())),
+            ),
+        ];
+        for (value, want) in cases {
+            assert_eq!(
+                rule("r", "t", &[("host", value)]).validate(),
+                want,
+                "{value}"
+            );
+        }
     }
 
     /// The queue is worked by writing the rule that was missing, so a wildcard

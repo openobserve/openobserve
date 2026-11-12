@@ -8,9 +8,9 @@ export async function waitForDateTimeButtonToBeEnabled(page) {
 }
 
 const WAITING_REFRESH_BUTTONS = [
-  '[data-test="dashboard-viewpanel-refresh-data-btn"][data-o2-variant="warning"]',
+  '[data-test="dashboard-viewpanel-refresh-data-btn"][data-o2-variant="pending"]',
   '[data-test="dashboard-panel-refresh-panel-btn"][data-o2-variant="ghost-warning"]',
-  '[data-test="dashboard-refresh-btn"][data-o2-variant="warning"]',
+  '[data-test="dashboard-refresh-btn"][data-o2-variant="pending"]',
 ];
 
 /**
@@ -24,7 +24,10 @@ export async function applyPickedDateTime(page) {
     await pickerApply.first().evaluate((el) => el.click());
     return;
   }
-  await page.keyboard.press("Escape");
+  const menu = page.locator("#date-time-menu").first();
+  // An Auto Run picker closes itself on the pick; Escape then would reach the dialog underneath.
+  const closedItself = await menu.waitFor({ state: "hidden", timeout: 1500 }).then(() => true, () => false);
+  if (!closedItself) await page.keyboard.press("Escape");
   await page.locator("#date-time-menu").first().waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
 
   const panelApply = page.locator('[data-test="dashboard-apply"]').first();

@@ -345,6 +345,15 @@ describe("streams store", () => {
         expect(store.state.streams.metadata).toEqual(streams);
       });
 
+      it("should dispatch updateProfiles when streamType is 'profiles'", async () => {
+        const streams = [{ name: "prof" }];
+        await store.dispatch("streams/setStreams", {
+          streamType: "profiles",
+          streams,
+        });
+        expect(store.state.streams.profiles).toEqual(streams);
+      });
+
       it("should not mutate any state for an unknown streamType", async () => {
         await store.dispatch("streams/setStreams", {
           streamType: "unknown_type",

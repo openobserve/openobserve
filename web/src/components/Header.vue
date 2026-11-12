@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- LEFT SIDE: Logo -->
     <div class="flex shrink-0 items-center justify-start gap-1 ps-3 max-md:ps-1.5">
       <OButton
+        v-if="!focusMode"
         variant="ghost"
         size="icon-toolbar"
         class="md:hidden"
@@ -143,11 +144,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- end left side -->
 
+    <div v-if="securityAccess.canOpen.value" class="ms-3 flex shrink-0 items-center">
+      <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
+    </div>
+
     <!-- CENTER: elastic spacer so the right-side controls stay right-aligned. -->
     <div class="min-w-0 flex-1" />
 
     <!-- RIGHT SIDE: Controls -->
     <div class="flex shrink-0 items-center justify-end gap-1 pe-3">
+      <!-- SAMPLE DATA: stays visible while the org holds sample data -->
+      <SampleDataHeaderChip class="me-2" />
+
       <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
       <div
         class="me-4 flex items-center gap-1 max-md:hidden"
@@ -190,6 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
 
+        <OPageHeaderStatus fallback />
         <!-- EDITION BADGE / UPGRADE BUTTON -->
         <!-- Enterprise/Cloud: ghost-muted badge (informational, opens about dialog) -->
         <!-- Open Source: primary CTA to drive upgrades -->
@@ -229,15 +238,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            Leads the utility-icon cluster, set off by a separator from the
            org selector so it reads as the primary action in this group.
            Shown locked (not hidden) in builds that don't unlock it. -->
-          <template v-if="aiButtonVisible">
+          <template v-if="aiButtonVisible || aiLicenseLocked">
             <OButton
               variant="ghost"
               size="icon-toolbar"
-              @click="toggleAIChat"
-              data-test="menu-link-ai-item"
-              :aria-label="t('menu.aiAssistant')"
+              @click="aiLicenseLocked ? openLockedAiAssistant() : toggleAIChat()"
+              :data-test="aiLicenseLocked ? 'menu-link-ai-locked' : 'menu-link-ai-item'"
+              :aria-label="
+                aiLicenseLocked
+                  ? t('featureLock.headerLocked', {
+                      feature: featureName('ai_assistant') ?? t('featureLock.thisFeature'),
+                    })
+                  : t('menu.aiAssistant')
+              "
               class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
-              :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+              :class="store.state.isAiChatEnabled && !aiLicenseLocked ? 'ai-btn-active' : ''"
               @mouseenter="handleMouseEnter"
               @mouseleave="handleMouseLeave"
             >
@@ -246,22 +261,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :src="getBtnLogo"
                 class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
               />
-              <span
-                v-if="!aiAccess.allowed"
-                aria-hidden="true"
-                class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
-              >
-                <OIcon name="lock" size="xs" class="text-warning-600 size-2.5!" />
-              </span>
+              <OLockBadge v-if="!aiAccess.allowed || aiLicenseLocked" class="-end-2! -top-1!" />
               <OTooltip
                 v-if="aiAccess.allowed"
                 side="bottom"
                 align="center"
-                :content="t('menu.aiAssistant')"
-                shortcut-id="aiChatToggle"
+                :content="
+                  aiLicenseLocked
+                    ? t('featureLock.headerLocked', {
+                        feature: featureName('ai_assistant') ?? t('featureLock.thisFeature'),
+                      })
+                    : t('menu.aiAssistant')
+                "
+                :shortcut-id="aiLicenseLocked ? undefined : 'aiChatToggle'"
               />
             </OButton>
           </template>
+          <span
+            v-else-if="aiSlotPending"
+            aria-hidden="true"
+            class="size-[1.875rem] shrink-0"
+            data-test="header-ai-slot-placeholder"
+          />
 
           <!-- THEME SWITCHER: Toggle between light and dark mode -->
           <ThemeSwitcher class="max-md:hidden"></ThemeSwitcher>
@@ -370,16 +391,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <ODropdownSeparator />
 
-              <template v-if="showMyOncall">
-                <ODropdownItem data-test="header-my-oncall" @select="goToMyOncall">
-                  <template #icon-left>
-                    <OIcon size="xs" name="person" class="padding-none" />
-                  </template>
-                  {{ t("oncall.mineTitle") }}
-                </ODropdownItem>
-                <ODropdownSeparator />
-              </template>
-
               <!-- A menuitem cannot hold menuitems, so the list is the row's sibling inside one positioned wrapper. -->
               <div class="relative" role="none">
                 <ODropdownItem
@@ -417,7 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ref="languageListRef"
                   role="group"
                   :aria-label="t('menu.language')"
-                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute end-full top-0 z-9999 me-1 min-w-50 border py-1 shadow-lg max-lg:static max-lg:me-0 max-lg:mt-1 max-lg:w-full max-lg:min-w-0 max-lg:shadow-none dark:shadow-lg"
+                  class="rounded-default bg-dropdown-bg shadow-overlay max-lg:border-dropdown-border absolute end-full top-0 z-9999 me-1 min-w-50 border border-transparent py-1 max-lg:static max-lg:me-0 max-lg:mt-1 max-lg:w-full max-lg:min-w-0 max-lg:shadow-none"
                   data-test="language-dropdown-item"
                   @keydown="onLanguageListKeydown"
                 >
@@ -457,6 +468,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdownItem>
               <ODropdownSeparator />
 
+              <template v-if="linkedAccountsVisible">
+                <ODropdownItem
+                  data-test="menu-link-linked-accounts-item"
+                  @select="showLinkedAccounts = true"
+                >
+                  <template #icon-left>
+                    <OIcon size="xs" name="link" class="padding-none" />
+                  </template>
+                  {{ t("menu.linkedAccounts") }}
+                </ODropdownItem>
+                <ODropdownSeparator />
+              </template>
+
               <!-- Logout -->
               <ODropdownItem
                 data-test="menu-link-logout-item"
@@ -477,6 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Enterprise Upgrade Dialog -->
     <EnterpriseUpgradeDialog v-model="showEnterpriseDialog" />
+    <LinkedAccountsDialog v-if="linkedAccountsVisible" v-model:open="showLinkedAccounts" />
   </div>
 </template>
 
@@ -490,27 +515,40 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OrganizationSelector from "./OrganizationSelector.vue";
+import SolutionSwitcher from "./SolutionSwitcher.vue";
+import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
+import LinkedAccountsDialog from "./settings/LinkedAccountsDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
+import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
+import { readSlackOrgConfig } from "@/utils/slackSettings";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import SampleDataHeaderChip from "@/components/sampleData/SampleDataHeaderChip.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
-import { isGateOpen, useNavGateContext } from "@/lib/core/Navbar/useNavGateContext";
 
 import { getImageURL } from "@/utils/zincutils";
+import { featureLockedPath, menuState } from "@/utils/featureGate";
+import { useFeatureNames } from "@/composables/useFeatureLock";
 import { chartColor } from "@/utils/chartTheme";
 
 export default defineComponent({
   name: "HeaderComponent",
   components: {
+    OPageHeaderStatus,
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     OrganizationSelector,
+    SolutionSwitcher,
+    SampleDataHeaderChip,
+    LinkedAccountsDialog,
     OButton,
     OIcon,
+    OLockBadge,
     OTooltip,
     ODropdown,
     ODropdownItem,
@@ -601,7 +639,9 @@ export default defineComponent({
     "signout",
   ],
   setup(props, { emit }) {
+    const securityAccess = useSecurityAccess();
     const { t } = useI18nTyped();
+    const { featureName } = useFeatureNames();
     const router = useRouter();
     const { isDark } = useTheme();
 
@@ -705,9 +745,36 @@ export default defineComponent({
         rbac: props.store.state.zoConfig?.rbac_enabled !== false,
       }),
     );
-    const aiButtonVisible = computed(
-      () => !aiAccess.value.allowed || Boolean(props.store.state.zoConfig.ai_enabled),
+    // A focus-mode route has no side menu and no AI panel, so their buttons go too.
+    const focusMode = computed(() => props.router?.currentRoute?.value?.meta?.focusMode === true);
+    // The license map applies once the edition allows the assistant.
+    const aiAssistantState = computed(() =>
+      menuState(
+        props.store.state.zoConfig?.features,
+        "ai_assistant",
+        Boolean(props.store.state.zoConfig.ai_enabled),
+      ),
     );
+    const aiButtonVisible = computed(
+      () => !focusMode.value && (!aiAccess.value.allowed || aiAssistantState.value === "enabled"),
+    );
+    const aiSlotPending = computed(
+      () => aiAccess.value.allowed && !props.store.state.zoConfig?.version,
+    );
+    const aiLicenseLocked = computed(
+      () => !focusMode.value && aiAccess.value.allowed && aiAssistantState.value === "locked",
+    );
+
+    // The edition gate and the org's runtime switch both have to pass, as for Settings › Slack.
+    const linkedAccountsVisible = computed(
+      () =>
+        checkFeatureAccess("slack", {
+          isEnterprise: props.config.isEnterprise === "true",
+          isCloud: props.config.isCloud === "true",
+          rbac: props.store.state.zoConfig?.rbac_enabled !== false,
+        }).allowed && readSlackOrgConfig(props.store.state.zoConfig).enabled,
+    );
+    const showLinkedAccounts = ref(false);
 
     // Computed property for enterprise button text based on deployment type
     const enterpriseButtonText = computed(() => {
@@ -756,6 +823,13 @@ export default defineComponent({
       emit("toggleAIChat");
     };
 
+    const openLockedAiAssistant = () => {
+      router.push({
+        path: featureLockedPath("ai_assistant"),
+        query: { org_identifier: props.store.state.selectedOrganization?.identifier },
+      });
+    };
+
     const openSlack = () => {
       emit("openSlack");
     };
@@ -799,26 +873,15 @@ export default defineComponent({
       emit("updateOrganization");
     };
 
-    const navGateContext = useNavGateContext();
-    // Same gate and route check the nav flyout applies to the On-Call entries.
-    const showMyOncall = computed(
-      () => isGateOpen(navGateContext.value, "oncall") && props.router.hasRoute("onCallMine"),
-    );
-
-    const goToMyOncall = () => {
-      // eslint-disable-next-line vue/no-mutating-props -- vue-router's push navigates; the rule mistakes it for Array#push.
-      props.router.push({
-        name: "onCallMine",
-        query: { org_identifier: props.store.state.selectedOrganization.identifier },
-      });
-    };
-
     return {
+      securityAccess,
       isDark,
       t,
       raw,
+      featureName,
       getImageURL,
       enterpriseButtonText,
+      aiSlotPending,
       ingestionQuotaPercentage,
       ingestionQuotaColor,
       showEnterpriseDialog,
@@ -832,8 +895,14 @@ export default defineComponent({
       homeUrl,
       goToAbout,
       toggleAIChat,
+      aiAssistantState,
+      openLockedAiAssistant,
       aiAccess,
       aiButtonVisible,
+      focusMode,
+      aiLicenseLocked,
+      linkedAccountsVisible,
+      showLinkedAccounts,
       openSlack,
       navigateToOpenAPI,
       navigateToDocs,
@@ -845,8 +914,6 @@ export default defineComponent({
       handleMouseLeave,
       handleOrgSelection,
       openEnterpriseDialog,
-      showMyOncall,
-      goToMyOncall,
     };
   },
 });

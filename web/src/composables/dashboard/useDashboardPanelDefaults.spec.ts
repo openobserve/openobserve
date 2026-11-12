@@ -76,6 +76,11 @@ describe("getDefaultDashboardPanelData", () => {
       expect(data.config.table_pagination).toBe(false);
     });
 
+    it("sets table_expandable_rows to false", () => {
+      const { data } = getDefaultDashboardPanelData(makeStore());
+      expect(data.config.table_expandable_rows).toBe(false);
+    });
+
     it("sets table_pagination_rows_per_page to null", () => {
       const { data } = getDefaultDashboardPanelData(makeStore());
       expect(data.config.table_pagination_rows_per_page).toBeNull();

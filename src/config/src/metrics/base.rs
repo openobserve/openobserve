@@ -220,6 +220,19 @@ pub static SYNTHETICS_ORPHANED_CHECKS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static ORG_CLEANUP_FAILED_STEPS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "org_cleanup_failed_steps",
+            "Org deletion steps that exhausted their attempts, per org.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org"],
+    )
+    .expect("Metric created")
+});
+
 /// Completed orphan-detection passes. A dead-man's switch, not a workload count.
 ///
 /// The detector runs only on scheduler nodes and reads only its own region's
@@ -1336,7 +1349,6 @@ pub static META_NUM_ALERTS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-// Alert deduplication metrics
 // Alert notification chart events. Single low-cardinality `event` label —
 // deliberately NO organization/alert labels: signature failures carry
 // attacker-controlled request data, which must never become label values.
@@ -1355,45 +1367,6 @@ pub static ALERT_CHART_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-pub static ALERT_DEDUP_SUPPRESSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "alert_dedup_suppressed_total",
-            "Total number of alerts suppressed by deduplication",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "alert_name", "dedup_type"],
-    )
-    .expect("Metric created")
-});
-
-pub static ALERT_DEDUP_PASSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "alert_dedup_passed_total",
-            "Total number of alerts that passed deduplication",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "alert_name"],
-    )
-    .expect("Metric created")
-});
-
-pub static ALERT_DEDUP_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "alert_dedup_errors_total",
-            "Total deduplication processing errors",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "error_type"],
-    )
-    .expect("Metric created")
-});
-
 pub static ALERT_RUNS_SUPPRESSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -1407,73 +1380,6 @@ pub static ALERT_RUNS_SUPPRESSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-// Alert grouping/batching metrics
-pub static ALERT_GROUPING_BATCHES_PENDING: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new(
-            "alert_grouping_batches_pending",
-            "Current number of pending alert batches",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization"],
-    )
-    .expect("Metric created")
-});
-
-pub static ALERT_GROUPING_NOTIFICATIONS_SENT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "alert_grouping_notifications_sent_total",
-            "Total number of grouped notifications sent",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "send_strategy", "reason"],
-    )
-    .expect("Metric created")
-});
-
-pub static ALERT_GROUPING_BATCH_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
-    HistogramVec::new(
-        HistogramOpts::new(
-            "alert_grouping_batch_size",
-            "Number of alerts per grouped notification",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels())
-        .buckets(vec![1.0, 2.0, 3.0, 5.0, 10.0, 25.0, 50.0, 100.0]),
-        &["organization", "send_strategy"],
-    )
-    .expect("Metric created")
-});
-
-pub static ALERT_GROUPING_WAIT_TIME: Lazy<HistogramVec> = Lazy::new(|| {
-    HistogramVec::new(
-        HistogramOpts::new(
-            "alert_grouping_wait_time_seconds",
-            "Time batches waited before sending (seconds)",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels())
-        .buckets(vec![5.0, 10.0, 15.0, 20.0, 30.0, 45.0, 60.0, 90.0, 120.0]),
-        &["organization"],
-    )
-    .expect("Metric created")
-});
-
-pub static ALERT_GROUPING_SEND_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "alert_grouping_send_errors_total",
-            "Total grouped notification send failures",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "error_type"],
-    )
-    .expect("Metric created")
-});
 pub static META_NUM_DASHBOARDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new("meta_num_dashboards", "Metadata dashboard nums")
@@ -2751,6 +2657,290 @@ pub static AI_CHAT_SHARE_READS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+// RCA runs (incident analysis; see core::alerts::rca_turn)
+pub static RCA_RUNS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_runs_total",
+            "Ended RCA runs by trigger, end state and error code (empty when none)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "trigger", "state", "error_code"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUN_DURATION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "rca_run_duration_seconds",
+            "Wall time of an ended RCA run by end state",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![
+            10.0, 30.0, 60.0, 120.0, 300.0, 600.0, 1200.0, 1800.0, 3600.0,
+        ]),
+        &["organization", "state"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUN_STEPS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "rca_run_steps",
+            "Narrated steps recorded by an ended RCA run",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUN_TOOL_CALLS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new("rca_run_tool_calls", "Tool calls made by an ended RCA run")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels())
+            .buckets(vec![1.0, 5.0, 10.0, 20.0, 40.0, 80.0, 150.0, 300.0]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUN_CONTINUATIONS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_run_continuations_total",
+            "Continuation turns started for RCA runs that ended without a report",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUNS_WITHOUT_REPORT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_runs_without_report_total",
+            "RCA runs whose turns ended without a submitted report",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+// RCA verdicts; counted by the finalizer's winning end write.
+pub static RCA_OUTCOME_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_outcome_total",
+            "Outcomes that code derived for completed RCA runs",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "outcome", "trigger"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_OUTCOME_CLAIM_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_outcome_claim_total",
+            "Outcomes the agent claimed against the outcomes code derived for completed RCA runs",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "claimed", "derived"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_HYPOTHESIS_LEFT_TESTING_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_hypothesis_left_testing_total",
+            "Hypotheses still testing when their RCA run ended, rewritten to untested",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_LEDGER_TRUNCATED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_ledger_truncated_total",
+            "Evidence ledger items and strings cut at their limits, by field",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "field"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_LEDGER_INVALID_CALL_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_ledger_invalid_call_total",
+            "Evidence ledger calls dropped as invalid, by tool",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "tool"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_TIMELINE_UNVERIFIED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_timeline_unverified_total",
+            "Submitted timeline entries shown as unverified",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_VERDICT_REVISED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_verdict_revised_total",
+            "RCA runs whose leading hypothesis changed during the run",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_CONFIDENCE_GRADE_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_confidence_grade_total",
+            "Confidence bands the agent claimed against the bands code graded",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "claimed", "graded"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_UNVERIFIED_CITATIONS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_unverified_citations_total",
+            "Evidence citations that matched no successful tool call, by reason",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "reason"],
+    )
+    .expect("Metric created")
+});
+// RCA steering and questions (see core::alerts::rca_steering)
+pub static RCA_STEERING_MESSAGES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_steering_messages_total",
+            "Steering rows of ended RCA runs, by kind and final status",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "kind", "final_status"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_STEERING_READ_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "rca_steering_read_latency_seconds",
+            "Time from a steering message's delivery to the agent reading it",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_STEERING_NOT_READ_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_steering_not_read_total",
+            "Steering messages the agent never read, by reason",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "status_reason"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_STEERING_ACKS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_steering_acks_total",
+            "Read steering messages by the agent's action: applied, declined or unacknowledged",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "action"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_QUESTIONS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_questions_total",
+            "Questions RCA runs asked responders, by result: answered or deadline",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "result"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_ANSWER_WAIT_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "rca_answer_wait_seconds",
+            "Time an RCA run waited for an answer to its question",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![
+            30.0, 60.0, 120.0, 300.0, 600.0, 900.0, 1800.0, 3600.0, 7200.0,
+        ]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+// RCA resume
+pub static RCA_RESUME_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_resume_total",
+            "Requests to resume an RCA run, by result: started or refused",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "result"],
+    )
+    .expect("Metric created")
+});
+// RCA live stream (see core::alerts::rca_live)
+pub static RCA_LIVE_STREAMS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("rca_live_streams", "Open RCA live streams on this node")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
 // Deliberate: spec §14.1 says `org_id` and four `result` values; `organization` is the house label.
 pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -2780,6 +2970,20 @@ pub static HEC_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static DATADOG_DROPPED_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "datadog_dropped_requests_total",
+            "Datadog Agent requests to an unsupported route, answered 202 and dropped".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
 /// Count of records dropped by an ingestion policy on the write path, which still answers success.
 ///
 /// Not labelled by stream: streams are auto-created from client-supplied names, and this fires on
@@ -2794,6 +2998,130 @@ pub static INGEST_RECORDS_DROPPED: Lazy<IntCounterVec> = Lazy::new(|| {
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
         &["organization", "stream_type", "reason"],
+    )
+    .expect("Metric created")
+});
+
+// public dashboards (design 8.5)
+pub static PUBLIC_DASHBOARD_READS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "public_dashboard_reads_total",
+            "Public dashboard data reads by outcome.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "outcome"],
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_BUILDS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "public_dashboard_builds_total",
+            "Public dashboard builds by outcome.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "outcome"],
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_BUILD_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "public_dashboard_build_seconds",
+            "Public dashboard build time.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0])
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_RESULT_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "public_dashboard_result_bytes",
+            "Size of public dashboard result files.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .buckets(prometheus::exponential_buckets(1024.0, 4.0, 10).expect("buckets"))
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_MEM_CACHE_HITS_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "public_dashboard_mem_cache_hits_total",
+            "Public dashboard bodies served from the memory cache.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_MEM_CACHE_MISSES_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "public_dashboard_mem_cache_misses_total",
+            "Public dashboard bodies decompressed from disk.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_FILE_CACHE_BYTES: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "public_dashboard_file_cache_bytes",
+            "Bytes of public dashboard result files in the disk result cache.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_INFLIGHT_BUILDS: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "public_dashboard_inflight_builds",
+            "Public dashboard builds running on this querier.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_LINKS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "public_dashboard_links",
+            "Public dashboard links by status.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "status"],
+    )
+    .expect("Metric created")
+});
+
+/// HTTP trigger snapshots this region failed to apply; each failure is left for redelivery.
+pub static WORKFLOW_HOOK_SNAPSHOT_APPLY_FAILURES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "workflow_hook_snapshot_apply_failures_total",
+            "Workflow HTTP trigger snapshots that failed to apply and will be redelivered"
+                .to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["origin_cluster"],
     )
     .expect("Metric created")
 });
@@ -2823,7 +3151,13 @@ pub(crate) fn register(registry: &Registry) {
         .register(Box::new(HEC_REQUESTS_TOTAL.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(DATADOG_DROPPED_REQUESTS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(INGEST_RECORDS_DROPPED.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(WORKFLOW_HOOK_SNAPSHOT_APPLY_FAILURES.clone()))
         .expect("Metric registered");
 
     // ingester stats
@@ -2850,6 +3184,9 @@ pub(crate) fn register(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(SYNTHETICS_ORPHANED_CHECKS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ORG_CLEANUP_FAILED_STEPS.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(SYNTHETICS_ORPHAN_SCANS_TOTAL.clone()))
@@ -3133,35 +3470,8 @@ pub(crate) fn register(registry: &Registry) {
         .register(Box::new(ALERT_CHART_EVENTS_TOTAL.clone()))
         .expect("Metric registered");
 
-    // alert deduplication metrics
-    registry
-        .register(Box::new(ALERT_DEDUP_SUPPRESSED_TOTAL.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(ALERT_DEDUP_PASSED_TOTAL.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(ALERT_DEDUP_ERRORS_TOTAL.clone()))
-        .expect("Metric registered");
     registry
         .register(Box::new(ALERT_RUNS_SUPPRESSED_TOTAL.clone()))
-        .expect("Metric registered");
-
-    // alert grouping metrics
-    registry
-        .register(Box::new(ALERT_GROUPING_BATCHES_PENDING.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(ALERT_GROUPING_NOTIFICATIONS_SENT_TOTAL.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(ALERT_GROUPING_BATCH_SIZE.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(ALERT_GROUPING_WAIT_TIME.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(ALERT_GROUPING_SEND_ERRORS_TOTAL.clone()))
         .expect("Metric registered");
 
     // db stats
@@ -3435,6 +3745,38 @@ pub(crate) fn register(registry: &Registry) {
         Box::new(AI_CHAT_RESTORE_EVENTS.clone()),
         Box::new(AI_CHAT_RESTORE_BYTES.clone()),
         Box::new(AI_CHAT_REPLICA_PURGES_TOTAL.clone()),
+        Box::new(RCA_RUNS_TOTAL.clone()),
+        Box::new(RCA_RUN_DURATION_SECONDS.clone()),
+        Box::new(RCA_RUN_STEPS.clone()),
+        Box::new(RCA_RUN_TOOL_CALLS.clone()),
+        Box::new(RCA_RUN_CONTINUATIONS_TOTAL.clone()),
+        Box::new(RCA_RUNS_WITHOUT_REPORT_TOTAL.clone()),
+        Box::new(RCA_OUTCOME_TOTAL.clone()),
+        Box::new(RCA_OUTCOME_CLAIM_TOTAL.clone()),
+        Box::new(RCA_HYPOTHESIS_LEFT_TESTING_TOTAL.clone()),
+        Box::new(RCA_LEDGER_TRUNCATED_TOTAL.clone()),
+        Box::new(RCA_LEDGER_INVALID_CALL_TOTAL.clone()),
+        Box::new(RCA_TIMELINE_UNVERIFIED_TOTAL.clone()),
+        Box::new(RCA_VERDICT_REVISED_TOTAL.clone()),
+        Box::new(RCA_CONFIDENCE_GRADE_TOTAL.clone()),
+        Box::new(RCA_UNVERIFIED_CITATIONS_TOTAL.clone()),
+        Box::new(RCA_STEERING_MESSAGES_TOTAL.clone()),
+        Box::new(RCA_STEERING_READ_LATENCY_SECONDS.clone()),
+        Box::new(RCA_STEERING_NOT_READ_TOTAL.clone()),
+        Box::new(RCA_STEERING_ACKS_TOTAL.clone()),
+        Box::new(RCA_QUESTIONS_TOTAL.clone()),
+        Box::new(RCA_ANSWER_WAIT_SECONDS.clone()),
+        Box::new(RCA_RESUME_TOTAL.clone()),
+        Box::new(RCA_LIVE_STREAMS.clone()),
+        Box::new(PUBLIC_DASHBOARD_READS_TOTAL.clone()),
+        Box::new(PUBLIC_DASHBOARD_BUILDS_TOTAL.clone()),
+        Box::new(PUBLIC_DASHBOARD_BUILD_SECONDS.clone()),
+        Box::new(PUBLIC_DASHBOARD_RESULT_BYTES.clone()),
+        Box::new(PUBLIC_DASHBOARD_MEM_CACHE_HITS_TOTAL.clone()),
+        Box::new(PUBLIC_DASHBOARD_MEM_CACHE_MISSES_TOTAL.clone()),
+        Box::new(PUBLIC_DASHBOARD_FILE_CACHE_BYTES.clone()),
+        Box::new(PUBLIC_DASHBOARD_INFLIGHT_BUILDS.clone()),
+        Box::new(PUBLIC_DASHBOARD_LINKS.clone()),
     ] {
         registry.register(metric).expect("Metric registered");
     }
@@ -3468,9 +3810,30 @@ mod tests {
     }
 
     #[test]
+    fn workflow_hook_snapshot_apply_failures_is_registered_under_its_name() {
+        let registry = Registry::new();
+        register(&registry);
+        WORKFLOW_HOOK_SNAPSHOT_APPLY_FAILURES
+            .with_label_values(&["r1"])
+            .inc();
+        let names: Vec<String> = registry
+            .gather()
+            .iter()
+            .map(|family| family.name().to_string())
+            .collect();
+        assert!(
+            names.contains(&format!(
+                "{NAMESPACE}_workflow_hook_snapshot_apply_failures_total"
+            )),
+            "{names:?}"
+        );
+    }
+
+    #[test]
     fn test_statics_hec() {
         let _ = HEC_AUTH_TOTAL.clone();
         let _ = HEC_REQUESTS_TOTAL.clone();
+        let _ = DATADOG_DROPPED_REQUESTS_TOTAL.clone();
     }
 
     #[test]
@@ -3483,6 +3846,7 @@ mod tests {
         let _ = SYNTHETICS_PENDING_JOBS.clone();
         let _ = SYNTHETICS_OLDEST_PENDING_AGE_SECONDS.clone();
         let _ = SYNTHETICS_ORPHANED_CHECKS.clone();
+        let _ = ORG_CLEANUP_FAILED_STEPS.clone();
         let _ = SYNTHETICS_ORPHAN_SCANS_TOTAL.clone();
         let _ = SYNTHETICS_UNREADABLE_CHECKS_TOTAL.clone();
         let _ = O2_SERVICE_GRAPH_RESOLVED_TOTAL.clone();
@@ -3591,17 +3955,9 @@ mod tests {
     }
 
     #[test]
-    fn test_statics_alert_dedup_and_grouping() {
+    fn test_statics_alert_chart_and_suppression() {
         let _ = ALERT_CHART_EVENTS_TOTAL.clone();
-        let _ = ALERT_DEDUP_SUPPRESSED_TOTAL.clone();
-        let _ = ALERT_DEDUP_PASSED_TOTAL.clone();
-        let _ = ALERT_DEDUP_ERRORS_TOTAL.clone();
         let _ = ALERT_RUNS_SUPPRESSED_TOTAL.clone();
-        let _ = ALERT_GROUPING_BATCHES_PENDING.clone();
-        let _ = ALERT_GROUPING_NOTIFICATIONS_SENT_TOTAL.clone();
-        let _ = ALERT_GROUPING_BATCH_SIZE.clone();
-        let _ = ALERT_GROUPING_WAIT_TIME.clone();
-        let _ = ALERT_GROUPING_SEND_ERRORS_TOTAL.clone();
     }
 
     #[test]
@@ -3698,6 +4054,61 @@ mod tests {
                     .collect()
             };
             assert_eq!(labels, expected, "{}", family.name());
+        }
+    }
+
+    #[test]
+    fn public_dashboard_metrics_are_the_nine_of_the_design() {
+        let registry = Registry::new();
+        register(&registry);
+        PUBLIC_DASHBOARD_READS_TOTAL
+            .with_label_values(&["o", "fresh"])
+            .inc();
+        PUBLIC_DASHBOARD_BUILDS_TOTAL
+            .with_label_values(&["o", "complete"])
+            .inc();
+        PUBLIC_DASHBOARD_BUILD_SECONDS
+            .with_label_values(&["o"])
+            .observe(1.0);
+        PUBLIC_DASHBOARD_RESULT_BYTES
+            .with_label_values(&["o"])
+            .observe(10.0);
+        PUBLIC_DASHBOARD_LINKS
+            .with_label_values(&["o", "live"])
+            .set(1);
+        let names: std::collections::BTreeSet<String> = registry
+            .gather()
+            .into_iter()
+            .map(|m| m.name().to_string())
+            .filter(|n| n.starts_with("zo_public_dashboard_"))
+            .collect();
+        assert_eq!(
+            names.into_iter().collect::<Vec<_>>(),
+            [
+                "zo_public_dashboard_build_seconds",
+                "zo_public_dashboard_builds_total",
+                "zo_public_dashboard_file_cache_bytes",
+                "zo_public_dashboard_inflight_builds",
+                "zo_public_dashboard_links",
+                "zo_public_dashboard_mem_cache_hits_total",
+                "zo_public_dashboard_mem_cache_misses_total",
+                "zo_public_dashboard_reads_total",
+                "zo_public_dashboard_result_bytes",
+            ]
+        );
+    }
+
+    #[test]
+    fn test_org_cleanup_failed_steps_help_names_only_its_org_label() {
+        use prometheus::core::Collector;
+        let desc = ORG_CLEANUP_FAILED_STEPS.desc();
+        assert_eq!(desc[0].variable_labels, ["org"]);
+        let help = &desc[0].help;
+        for absent in ["'organization", "'stream type'", "'stream'"] {
+            assert!(
+                !help.contains(absent),
+                "help names a label it lacks: {help}"
+            );
         }
     }
 }

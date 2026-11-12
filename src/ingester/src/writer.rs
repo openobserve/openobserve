@@ -24,16 +24,13 @@ use std::{
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{
-    MEM_TABLE_INDIVIDUAL_STREAMS, get_config,
-    meta::stream::StreamType,
-    metrics,
-    stats::MemorySize,
-    utils::hash::{Sum64, gxhash},
+    MEM_TABLE_INDIVIDUAL_STREAMS, get_config, meta::stream::StreamType, metrics, stats::MemorySize,
+    utils::hash::key_sum64,
 };
 use hashbrown::HashSet;
 use infra::runtime::WAL_RUNTIME;
 use snafu::ResultExt;
-use tokio::sync::{RwLock, mpsc};
+use tokio::sync::{RwLock, RwLockWriteGuard, mpsc};
 use wal::{Writer as WalWriter, build_file_path};
 
 use crate::{
@@ -135,12 +132,12 @@ fn get_table_idx(thread_id: usize, org_id: &str, stream_name: &str) -> usize {
     } else if get_config().common.feature_shared_memtable_enabled {
         // When shared memtable is enabled, hash by org_id and stream_name
         let hash_key = format!("{org_id}_{stream_name}");
-        let hash_id = gxhash::new().sum64(&hash_key);
+        let hash_id = key_sum64(&hash_key);
         hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
     } else {
         // Original behavior: hash by thread_id and stream_name
         let hash_key = format!("{thread_id}_{stream_name}");
-        let hash_id = gxhash::new().sum64(&hash_key);
+        let hash_id = key_sum64(&hash_key);
         hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
     }
 }
@@ -253,6 +250,17 @@ pub async fn check_ttl() -> Result<()> {
     Ok(())
 }
 
+/// Rotates every registered writer without closing its queue or removing it.
+pub async fn rotate_all() -> Result<()> {
+    for w in WRITERS.iter() {
+        let w = w.read().await;
+        for r in w.values() {
+            r.rotate_locked(r.wal.write().await).await?;
+        }
+    }
+    Ok(())
+}
+
 pub async fn flush_all() -> Result<()> {
     log::info!("[INGESTER:MEM] start flush all writers");
     for w in WRITERS.iter() {
@@ -271,17 +279,16 @@ pub async fn flush_all() -> Result<()> {
     Ok(())
 }
 
-// get the max seq id of all writers
-pub async fn get_max_writer_seq_id() -> u64 {
-    let mut max_seq_id = 0;
+/// Max id of the writers' active memtables, comparable with `check_persist_done`.
+pub async fn get_max_memtable_id() -> u64 {
+    let mut max_id = 0;
     for w in WRITERS.iter() {
         let w = w.read().await;
         for r in w.values() {
-            // next_seq is the next seq id to be used, so we need to subtract 1
-            max_seq_id = max_seq_id.max(r.next_seq.load(Ordering::Relaxed) - 1);
+            max_id = max_id.max(r.memtable.read().await.id());
         }
     }
-    max_seq_id
+    max_id
 }
 
 impl Writer {
@@ -430,6 +437,17 @@ impl Writer {
         Ok(())
     }
 
+    /// [Self::write_batch] that skips the write queue and flushes the WAL to the OS before it
+    /// returns (and fsyncs it when fsync is on), so the caller may treat the ack as durable
+    /// against a process kill.
+    pub async fn write_batch_synced(&self, entries: Vec<Entry>) -> Result<()> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+        let processed_batch = self.preprocess_batch(entries)?;
+        self.consume_processed(processed_batch, true).await
+    }
+
     fn preprocess_batch(&self, mut entries: Vec<Entry>) -> Result<crate::ProcessedBatch> {
         // data_size == 0 is treated as an empty entry downstream
         for entry in entries.iter_mut() {
@@ -539,7 +557,7 @@ impl Writer {
 
         // rotation wal
         let start = std::time::Instant::now();
-        let mut wal = self.wal.write().await;
+        let wal = self.wal.write().await;
         let wal_lock_time = start.elapsed().as_millis() as f64;
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
@@ -551,6 +569,10 @@ impl Writer {
         {
             return Ok(());
         }
+        self.rotate_locked(wal).await
+    }
+
+    async fn rotate_locked(&self, mut wal: RwLockWriteGuard<'_, WalWriter>) -> Result<()> {
         let cfg = get_config();
         let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
         let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)
@@ -579,29 +601,30 @@ impl Writer {
         let old_wal = std::mem::replace(&mut *wal, new_wal);
         drop(wal);
 
-        // rotation memtable
-        let new_mem = MemTable::new();
+        self.freeze_memtable(old_wal.path().clone()).await;
+
+        // update created_at
+        self.created_at
+            .store(Utc::now().timestamp_micros(), Ordering::Release);
+
+        Ok(())
+    }
+
+    async fn freeze_memtable(&self, wal_path: PathBuf) {
+        let path_str = wal_path.display().to_string();
         let start = std::time::Instant::now();
         let mut mem = self.memtable.write().await;
         let mem_lock_time = start.elapsed().as_millis() as f64;
         metrics::INGEST_MEMTABLE_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(mem_lock_time);
-        let old_mem = std::mem::replace(&mut *mem, new_mem);
-        drop(mem);
-
-        // update created_at
-        self.created_at
-            .store(Utc::now().timestamp_micros(), Ordering::Release);
-
-        let path = old_wal.path().clone();
-        let path_str = path.display().to_string();
+        let old_mem = std::mem::replace(&mut *mem, MemTable::new());
         let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
         log::info!("[INGESTER:MEM] start add to IMMUTABLES, file: {path_str}");
-        IMMUTABLES.write().await.insert(path, table);
+        // the memtable lock is held across the insert so no reader sees the rows in neither place
+        IMMUTABLES.write().await.insert(wal_path, table);
+        drop(mem);
         log::info!("[INGESTER:MEM] dones add to IMMUTABLES, file: {path_str}");
-
-        Ok(())
     }
 
     pub async fn flush(&self) -> Result<()> {
@@ -622,14 +645,7 @@ impl Writer {
         let path = wal.path().clone();
         drop(wal);
 
-        // rotation memtable
-        let mut mem = self.memtable.write().await;
-        let new_mem = MemTable::new();
-        let old_mem = std::mem::replace(&mut *mem, new_mem);
-        drop(mem);
-
-        let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
-        IMMUTABLES.write().await.insert(path, table);
+        self.freeze_memtable(path).await;
         Ok(())
     }
 
@@ -742,5 +758,34 @@ mod tests {
         let key = WriterKey::new_replay("abc", "xyz");
         let min_expected = std::mem::size_of::<WriterKey>() + "abc".len() + "xyz".len();
         assert_eq!(key.mem_size(), min_expected);
+    }
+
+    #[tokio::test]
+    async fn test_rotate_publishes_immutable_before_new_memtable() {
+        let writer = Writer::new(0, WriterKey::new_replay("rotate_gap_org", "logs"));
+        let old_id = writer.memtable.read().await.id();
+        let old_wal = writer.wal.read().await.path().clone();
+
+        let immutables = IMMUTABLES.read().await;
+        let w = writer.clone();
+        let rotation = tokio::spawn(async move { w.rotate_locked(w.wal.write().await).await });
+        loop {
+            tokio::task::yield_now().await;
+            assert!(!rotation.is_finished(), "rotation ended before the insert");
+            match writer.memtable.try_read() {
+                Ok(mem) if mem.id() == old_id => continue,
+                Ok(_) => panic!("new memtable is readable while the old one is in neither place"),
+                Err(_) => break,
+            }
+        }
+        assert!(!immutables.contains_key(&old_wal));
+        drop(immutables);
+        rotation.await.unwrap().unwrap();
+
+        assert_ne!(writer.memtable.read().await.id(), old_id);
+        assert!(IMMUTABLES.write().await.swap_remove(&old_wal).is_some());
+        let new_wal = writer.wal.read().await.path().clone();
+        let _ = std::fs::remove_file(old_wal);
+        let _ = std::fs::remove_file(new_wal);
     }
 }

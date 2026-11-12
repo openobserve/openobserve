@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
 import type { TemplateSuggestSlots, TemplateSuggestion } from "./OTemplateInput.types";
 
 export interface TemplateSuggestListProps<T extends TemplateSuggestion> {
@@ -24,6 +25,8 @@ export interface TemplateSuggestListProps<T extends TemplateSuggestion> {
   boundary: HTMLElement | null;
   matches: T[];
   highlightedIndex: number;
+  /** The token text a row renders; defaults to `{{name}}`. */
+  format?: (_name: string) => I18nText;
   /** The consumer's `data-test`; the list appends `-suggest` and `-suggest-item-{name}`. */
   dataTest?: string;
 }

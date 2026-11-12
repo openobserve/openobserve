@@ -20,6 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="step-content rounded-default bg-surface-overlay border-border-default h-full overflow-x-hidden overflow-y-auto border px-3 py-4"
     >
       <OForm :form="form">
+        <p
+          v-if="storedIntervals"
+          class="text-text-secondary mb-3 text-xs"
+          data-test="anomaly-retrain-note"
+        >
+          {{ t("alerts.anomaly.retrainOnEditNote") }}
+        </p>
         <!-- Query Mode Tabs -->
         <div class="mb-4">
           <OFormToggleGroup name="query_mode" data-test="anomaly-query-tabs">
@@ -41,63 +48,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alerts.anomaly.filters") }}
           </div>
           <div class="min-w-0 flex-1 basis-60">
-            <!-- :key must be the array INDEX — the fields bind by index-based
-                 name and do not re-bind, so a stable-id key would leave inputs
-                 shifted on a mid-list delete. -->
-            <div
-              v-for="(filter, idx) in filterRows"
-              :key="idx"
-              class="mb-2 flex flex-wrap items-center gap-2"
-              data-test="anomaly-filter-row"
-            >
-              <OFormSelect
-                :name="`filters[${idx}].field`"
-                :data-test="`anomaly-filter-field-${idx}`"
-                :options="filteredStreamFields"
-                :placeholder="filter.field ? raw('') : t('alerts.anomaly.fieldPlaceholder')"
-                class="alert-v3-select filter-field-select max-w-50 min-w-50"
-                :loading="loadingFields"
-              >
-                <template #empty>
-                  <div class="text-muted-foreground px-3 py-2">
-                    {{
-                      config.stream_name
-                        ? t("alerts.anomaly.noFieldsFound")
-                        : t("alerts.anomaly.selectStreamFirst")
-                    }}
-                  </div>
-                </template>
-              </OFormSelect>
-              <OFormSelect
-                :name="`filters[${idx}].operator`"
-                :data-test="`anomaly-filter-operator-${idx}`"
-                :options="filterOperators"
-                class="alert-v3-select max-w-27.5 min-w-27.5"
-              />
-              <OFormInput
-                v-if="operatorNeedsValue(filter.operator)"
-                :name="`filters[${idx}].value`"
-                :data-test="`anomaly-filter-value-${idx}`"
-                :placeholder="t('alerts.placeholders.value')"
-                class="alert-v3-input max-w-40"
-              />
-              <OButton
-                variant="ghost"
-                size="icon-sm"
-                data-test="anomaly-filter-row-remove"
-                @click="removeFilter(idx)"
-                icon-left="close"
-              />
-            </div>
-            <OButton
-              variant="outline"
-              size="sm-action"
-              class="mt-2"
-              data-test="anomaly-filter-add"
-              @click="addFilter"
-            >
-              {{ t("alerts.anomaly.addFilter") }}
-            </OButton>
+            <FilterBuilder
+              profile="anomaly"
+              :model-value="filterRows"
+              :fields="filterFields"
+              :fields-loading="loadingFields"
+              :load-values="loadFilterValues"
+              :placeholder="config.stream_name ? undefined : t('alerts.anomaly.selectStreamFirst')"
+              data-test="anomaly-filter-builder"
+              @update:model-value="onFiltersChange"
+            />
           </div>
         </div>
 
@@ -200,6 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormSelect
                 name="detection_function"
                 :options="detectionFunctions"
+                :aria-label="t('alerts.detectionFunction')"
                 data-test="anomaly-detection-function"
                 class="alert-v3-select max-w-27.5 min-w-27.5"
                 @update:model-value="onDetectionFunctionChange"
@@ -212,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   detectionFunctionField ? raw('') : t('alerts.anomaly.fieldPlaceholder')
                 "
                 :loading="loadingFields"
+                :aria-label="t('alerts.anomaly.detectionFunctionField')"
                 data-test="anomaly-detection-function-field"
                 class="alert-v3-select max-w-35 min-w-24 flex-1"
               >
@@ -250,6 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="number"
                   min="1"
                   class="alert-v3-input max-w-21.75 min-w-21.75"
+                  :aria-label="t('alerts.anomaly.detectionResolution')"
                   data-test="anomaly-histogram-interval-value"
                 >
                   <!-- Message rendered below at pair width — see histogramIntervalError. -->
@@ -261,6 +224,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   label-key="label"
                   value-key="value"
                   class="alert-v3-select max-w-25 min-w-25"
+                  :aria-label="
+                    t('common.unitFor', { label: t('alerts.anomaly.detectionResolution') })
+                  "
                   data-test="anomaly-histogram-interval-unit"
                 />
               </div>
@@ -297,6 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="number"
                 min="1"
                 class="alert-v3-input max-w-21.75 min-w-21.75"
+                :aria-label="t('alerts.anomaly.detectionResolution')"
                 data-test="anomaly-histogram-interval-value"
               >
                 <!-- Message rendered below at pair width — see histogramIntervalError. -->
@@ -308,6 +275,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 label-key="label"
                 value-key="value"
                 class="alert-v3-select max-w-25 min-w-25"
+                :aria-label="
+                  t('common.unitFor', { label: t('alerts.anomaly.detectionResolution') })
+                "
                 data-test="anomaly-histogram-interval-unit"
               />
             </div>
@@ -347,6 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="number"
                   min="1"
                   class="alert-v3-input max-w-21.75 min-w-21.75"
+                  :aria-label="t('alerts.anomaly.checkEvery')"
                   data-test="anomaly-schedule-interval-value"
                 >
                   <!-- Message rendered below at pair width — see scheduleIntervalError. -->
@@ -358,6 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   label-key="label"
                   value-key="value"
                   class="alert-v3-select max-w-25 min-w-25"
+                  :aria-label="t('common.unitFor', { label: t('alerts.anomaly.checkEvery') })"
                   data-test="anomaly-schedule-interval-unit"
                 />
               </div>
@@ -394,6 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="number"
                   min="1"
                   class="alert-v3-input max-w-21.75 min-w-21.75"
+                  :aria-label="t('alerts.anomaly.lookBackWindow')"
                   data-test="anomaly-detection-window-value"
                 >
                   <!-- Message rendered below at pair width — see detectionWindowError. -->
@@ -405,6 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   label-key="label"
                   value-key="value"
                   class="alert-v3-select max-w-25 min-w-25"
+                  :aria-label="t('common.unitFor', { label: t('alerts.anomaly.lookBackWindow') })"
                   data-test="anomaly-detection-window-unit"
                 />
               </div>
@@ -462,6 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="number"
                 :min="1"
                 :suffix="t('alerts.anomaly.daysUnit')"
+                :aria-label="t('alerts.trainingWindow')"
                 data-test="anomaly-training-window"
                 class="alert-v3-input max-w-30 min-w-30"
               />
@@ -494,6 +469,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="retrainIntervalOptions"
                 label-key="label"
                 value-key="value"
+                :aria-label="t('alerts.anomaly.retrainEvery')"
                 data-test="anomaly-retrain-interval"
                 class="alert-v3-select max-w-50"
               />
@@ -503,7 +479,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Sensitivity -->
         <div class="mb-4! flex flex-row flex-wrap items-start gap-2 pb-0!">
-          <div class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold">
+          <div
+            class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
+            :class="{ 'flex items-center': !budgetMode }"
+          >
             {{ t("alerts.sensitivity") }}
             <span class="text-status-error-text ms-1">*</span>
             <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
@@ -515,7 +494,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OIcon>
           </div>
-          <div class="flex min-w-0 flex-1 basis-60 flex-col gap-1">
+          <div
+            class="flex min-w-0 flex-1 basis-60 flex-col"
+            :class="budgetMode ? 'gap-1' : 'gap-2'"
+          >
             <!-- In budget mode the budget IS the contract, so the control is the delivered-alert cap. -->
             <div v-if="budgetMode" class="flex flex-wrap items-start gap-3">
               <OToggleGroup
@@ -553,11 +535,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   label-key="label"
                   value-key="value"
                   class="alert-v3-select min-w-25"
+                  :aria-label="t('alerts.anomaly.budgetPeriod')"
                   data-test="anomaly-budget-period"
                 />
               </div>
             </div>
-            <div v-else class="flex flex-wrap items-center gap-3">
+            <div v-else class="flex flex-col items-start gap-2">
               <OToggleGroup
                 :model-value="bandTier"
                 :aria-label="t('alerts.sensitivity')"
@@ -575,29 +558,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ tier.label }}
                 </OToggleGroupItem>
               </OToggleGroup>
-              <!-- Inline, not OFormInput's `label` prop: a stacked label would push the
-                   whole control row a label-height below the Sensitivity heading. -->
-              <div class="flex items-center gap-2">
-                <span
-                  class="o-input-label text-compact text-input-label-text flex items-center gap-1 leading-tight font-medium whitespace-nowrap"
+              <div
+                v-if="autoSensitivity"
+                class="flex min-h-8.5 flex-wrap items-center gap-x-2 gap-y-1"
+                role="status"
+                aria-live="polite"
+                data-test="anomaly-sensitivity-auto-level"
+              >
+                <span class="text-input-label-text text-xs font-medium">{{ autoLevelLabel }}</span>
+                <output class="text-sm font-medium tabular-nums">{{ autoLevelValue }}</output>
+              </div>
+              <div
+                v-else
+                class="grid w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1"
+              >
+                <label
+                  for="anomaly-manual-level"
+                  class="text-input-label-text flex min-h-8.5 items-center text-xs font-medium"
                 >
                   {{ t("alerts.anomaly.level") }}
-                </span>
-                <OFormInput
-                  name="band_width"
-                  type="number"
-                  suffix="σ"
-                  :model-modifiers="{ number: true }"
-                  :aria-label="t('alerts.anomaly.level')"
-                  class="max-w-21.75 min-w-21.75"
-                  data-test="anomaly-sensitivity-level"
+                </label>
+                <div class="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
+                  <OFormInput
+                    id="anomaly-manual-level"
+                    name="band_width"
+                    type="number"
+                    suffix="σ"
+                    :model-modifiers="{ number: true }"
+                    :aria-label="t('alerts.anomaly.level')"
+                    :aria-describedby="sensitivityError ? 'anomaly-manual-level-error' : undefined"
+                    class="max-w-21.75 min-w-21.75"
+                    data-test="anomaly-sensitivity-level"
+                  >
+                    <template #error />
+                  </OFormInput>
+                  <span
+                    v-if="customSensitivity"
+                    class="text-text-secondary flex min-h-8.5 items-center text-xs"
+                    data-test="anomaly-sensitivity-custom"
+                    >{{ t("alerts.anomaly.customSensitivity") }}</span
+                  >
+                </div>
+                <div
+                  v-if="sensitivityError"
+                  id="anomaly-manual-level-error"
+                  class="text-input-error-text col-start-2 text-xs"
+                  data-test="anomaly-sensitivity-error"
+                  role="alert"
                 >
-                  <template #error />
-                </OFormInput>
+                  {{ sensitivityError }}
+                </div>
               </div>
             </div>
             <div
-              v-if="sensitivityError"
+              v-if="budgetMode && sensitivityError"
               class="text-input-error-text pt-1 text-xs"
               data-test="anomaly-sensitivity-error"
               role="alert"
@@ -608,6 +622,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="sensitivityHint"
               class="text-text-secondary text-xs"
               data-test="anomaly-sensitivity-hint"
+              role="status"
+              aria-live="polite"
             >
               {{ sensitivityHint }}
             </span>
@@ -648,12 +664,9 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import {
-  ANOMALY_FILTER_OPERATORS,
-  operatorNeedsValue,
-} from "@/utils/alerts/anomalyFilterOperators";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import { toFilterFields, type FilterField } from "@/utils/query/filterBar";
 import QueryEditor from "@/components/QueryEditor.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -670,11 +683,11 @@ import {
   createAnomalyDetectionConfigSchema,
   anomalyDetectionConfigDefaults,
   anomalyIntervalSeconds,
-  anomalyTrainedK,
+  anomalySensitivityModel,
+  anomalyModelQuery,
   formatAnomalySeconds,
   hasTimestampAliasInSql,
   lookBackWindowFloorSeconds,
-  makeAnomalyFilterRow,
   type AnomalyDetectionConfigForm,
   type AnomalyFilterRow,
   type AnomalyStoredIntervals,
@@ -684,8 +697,8 @@ export default defineComponent({
   name: "AnomalyDetectionConfig",
 
   components: {
+    FilterBuilder,
     QueryEditor,
-    OButton,
     OToggleGroup,
     OToggleGroupItem,
     OFormToggleGroup,
@@ -724,25 +737,6 @@ export default defineComponent({
       { label: raw("SQL"), value: "custom_sql" },
     ]);
 
-    // The array itself stays English: each entry IS the persisted operator and
-    // is matched by identity (operatorNeedsValue, the SQL builders).
-    // Split label from value so the dropdown reads in the user's language, the
-    // same way AddCondition.vue does — the keys are already shared.
-    const OPERATOR_LABEL_KEYS: Record<string, string> = {
-      Contains: "dashboard.filterOperators.contains",
-      "Starts With": "dashboard.filterOperators.startsWith",
-      "Ends With": "dashboard.filterOperators.endsWith",
-      "Not Contains": "dashboard.filterOperators.notContains",
-      "Is Null": "dashboard.filterOperators.isNull",
-      "Is Not Null": "dashboard.filterOperators.isNotNull",
-    };
-    const filterOperators = computed(() =>
-      ANOMALY_FILTER_OPERATORS.map((op) => {
-        const key = OPERATOR_LABEL_KEYS[op as string];
-        // SQL/PromQL tokens (=, IN, str_match, …) are syntax, not copy.
-        return { label: key ? t(key as any) : raw(op as string), value: op as string };
-      }),
-    );
     const detectionFunctions = ["count", "avg", "sum", "min", "max", "p50", "p95", "p99"];
     // One s/m/h/d grammar shared with the server's parse_interval (§4.5) — "90s" and "1d" must render.
     const intervalUnits = computed(() => [
@@ -758,16 +752,10 @@ export default defineComponent({
       { label: t("alerts.anomaly.retrainSevenDays"), value: 7 },
       { label: t("alerts.anomaly.retrainFourteenDays"), value: 14 },
     ]);
-    const trainedK = computed(() => anomalyTrainedK(props.config));
-    // Preset values stay numbers — reka-ui matches the active item with ohash.isEqual.
+    const modelQuery = ref(anomalyModelQuery(props.config));
+    const modelState = computed(() => anomalySensitivityModel(props.config));
     const sensitivityTiers = computed(() => [
-      {
-        value: "auto" as const,
-        label:
-          trainedK.value === null
-            ? t("alerts.anomaly.sensitivityAuto")
-            : t("alerts.anomaly.sensitivityAutoTrained", { k: trainedK.value }),
-      },
+      { value: "auto" as const, label: t("alerts.anomaly.sensitivityAuto") },
       { value: 4, label: t("alerts.anomaly.sensitivityConservative") },
       { value: ANOMALY_BALANCED_BAND_WIDTH, label: t("alerts.anomaly.sensitivityBalanced") },
       { value: 2.5, label: t("alerts.anomaly.sensitivityAggressive") },
@@ -869,7 +857,7 @@ export default defineComponent({
 
     const bandTier = computed(() => {
       const value = bandWidth.value;
-      if (value === "" || value === null || value === undefined) return "auto";
+      if (value === null || value === undefined) return "auto";
       return sensitivityTiers.value.find((tier) => tier.value === Number(value))?.value ?? "";
     });
 
@@ -878,6 +866,46 @@ export default defineComponent({
       if (!tier) return;
       form.setFieldValue("band_width", tier.value === "auto" ? null : tier.value);
     };
+
+    const autoSensitivity = computed(() => bandWidth.value == null);
+    const customSensitivity = computed(
+      () =>
+        !autoSensitivity.value &&
+        bandTier.value === "" &&
+        String(bandWidth.value).trim() !== "" &&
+        Number.isFinite(Number(bandWidth.value)) &&
+        Number(bandWidth.value) >= 1 &&
+        Number(bandWidth.value) <= 10,
+    );
+    const autoLevelLabel = computed(() =>
+      modelState.value.level === null
+        ? t("alerts.anomaly.autoLevel")
+        : modelState.value.current
+          ? t("alerts.anomaly.currentLevel")
+          : t("alerts.anomaly.lastTrainedLevel"),
+    );
+    const autoLevelValue = computed(() =>
+      modelState.value.level === null
+        ? t(
+            modelState.value.state === "training"
+              ? "alerts.anomaly.autoLearning"
+              : modelState.value.state === "failed"
+                ? "alerts.anomaly.autoUnavailable"
+                : "alerts.anomaly.autoAfterTraining",
+          )
+        : raw(`${modelState.value.level}σ`),
+    );
+    const modelHelpKeys = {
+      trained: "alerts.anomaly.autoLearnedHelp",
+      untrained: "alerts.anomaly.autoUntrainedHelp",
+      training: "alerts.anomaly.autoTrainingHelp",
+      failed: "alerts.anomaly.autoFailedHelp",
+      waitingForData: "alerts.anomaly.autoWaitingForDataHelp",
+      notApplicable: "alerts.anomaly.autoNotApplicableHelp",
+      retraining: "alerts.anomaly.autoRetrainingHelp",
+      retrainFailed: "alerts.anomaly.autoRetrainFailedHelp",
+      unconfirmed: "alerts.anomaly.autoUnconfirmedHelp",
+    } as const;
 
     // Suppressed on bad input: the error is the feedback.
     const sensitivityHint = computed(() => {
@@ -888,9 +916,13 @@ export default defineComponent({
           ? t("alerts.anomaly.budgetHintPerWeek", { count })
           : t("alerts.anomaly.budgetHintPerDay", { count });
       }
+      if (autoSensitivity.value) return t(modelHelpKeys[modelState.value.state]);
+      if (sensitivityError.value) return raw("");
+      // The range error only renders after save, so an invalid draft must not show the model note.
       const k = Number(bandWidth.value);
       if (bandWidth.value === "" || !Number.isFinite(k) || k < 1 || k > 10) return raw("");
-      return t("alerts.anomaly.bandWidthHint", { k });
+      if (!modelState.value.current) return t("alerts.anomaly.manualModelRequired");
+      return t("alerts.anomaly.manualSensitivityHelp");
     });
 
     // §4.6: the floor is computed locally from the form's own values — no server dependency.
@@ -987,8 +1019,7 @@ export default defineComponent({
           // Switching to band mode must clear a previously stored budget, or the
           // save payload keeps sending the stale value.
           cfg.alert_budget_per_day = undefined;
-          cfg.band_width =
-            v.band_width === "" || v.band_width == null ? null : toModelNumber(v.band_width);
+          cfg.band_width = v.band_width == null ? null : toModelNumber(v.band_width);
         }
       },
       { deep: true },
@@ -999,7 +1030,16 @@ export default defineComponent({
     watch(
       () => props.config,
       (cfg) => {
+        modelQuery.value = anomalyModelQuery(cfg);
         form.reset(anomalyDetectionConfigDefaults(cfg));
+      },
+    );
+
+    watch(
+      () => anomalyModelQuery(props.config),
+      (query) => {
+        const cfg = props.config;
+        cfg.sensitivity_model_stale = query !== modelQuery.value;
       },
     );
 
@@ -1046,6 +1086,7 @@ export default defineComponent({
     } = useSqlSuggestions();
     const numericStreamFields = ref<string[]>([]); // only numeric types for avg/sum/min/max/pXX
     const filteredStreamFields = ref<string[]>([]);
+    const filterFields = ref<FilterField[]>([]);
     const filteredDetectionFields = ref<string[]>([]);
     const loadingFields = ref(false);
 
@@ -1081,6 +1122,7 @@ export default defineComponent({
         updateFieldKeywords([]);
         numericStreamFields.value = [];
         filteredStreamFields.value = [];
+        filterFields.value = [];
         filteredDetectionFields.value = [];
         return;
       }
@@ -1106,6 +1148,12 @@ export default defineComponent({
           .map((f: any) => f.name)
           .sort();
         filteredStreamFields.value = allStreamFields.value;
+        filterFields.value = toFilterFields(
+          fieldsArray.map((f: any) => ({
+            name: f.name,
+            type: f.field_type || f.data_type || f.type,
+          })),
+        ).sort((a, b) => a.name.localeCompare(b.name));
         filteredDetectionFields.value = requiresNumericField(detectionFunction.value as string)
           ? numericStreamFields.value
           : allStreamFields.value;
@@ -1114,6 +1162,7 @@ export default defineComponent({
         updateFieldKeywords([]);
         numericStreamFields.value = [];
         filteredStreamFields.value = [];
+        filterFields.value = [];
         filteredDetectionFields.value = [];
       } finally {
         loadingFields.value = false;
@@ -1186,14 +1235,13 @@ export default defineComponent({
       );
     });
 
-    // Structural mutations go through the form.
-    const addFilter = () => {
-      form.pushFieldValue("filters", makeAnomalyFilterRow());
+    const onFiltersChange = (next: unknown) => {
+      form.setFieldValue("filters", next as AnomalyFilterRow[]);
     };
 
-    const removeFilter = (idx: number) => {
-      form.removeFieldValue("filters", idx);
-    };
+    // No stream context means no value lookup; the picker then takes typed values only.
+    const loadFilterValues = (field: string, search: string) =>
+      resolveFieldValues(field, { prefix: search }).catch(() => [] as string[]);
 
     // The parent (AddAlert wizard via useAlertForm) still calls
     // anomalyStep2Ref.validate() to gate Next/Save — drive it through
@@ -1210,8 +1258,6 @@ export default defineComponent({
       store,
       form,
       queryTabOptions,
-      filterOperators,
-      operatorNeedsValue,
       detectionFunctions,
       intervalUnits,
       retrainIntervalOptions,
@@ -1223,8 +1269,9 @@ export default defineComponent({
       filteredDetectionFields,
       loadingFields,
       onDetectionFunctionChange,
-      addFilter,
-      removeFilter,
+      filterFields,
+      onFiltersChange,
+      loadFilterValues,
       validate,
       hasTimestampAlias,
       hasSqlError,
@@ -1242,6 +1289,10 @@ export default defineComponent({
       lookBackWindowHint,
       legacyWindowWarning,
       sensitivityTiers,
+      autoSensitivity,
+      customSensitivity,
+      autoLevelLabel,
+      autoLevelValue,
       bandTier,
       onBandTier,
       sensitivityHint,

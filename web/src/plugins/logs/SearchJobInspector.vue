@@ -407,7 +407,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ traceId }}
         </div>
-        <OButton variant="primary" size="sm-action" @click="copyTraceId"
+        <OButton
+          :aria-label="t('common.copyToClipboard')"
+          variant="primary"
+          size="sm-action"
+          @click="copyTraceId"
           ><OIcon name="content-copy" size="sm" class="me-1"
         /></OButton>
       </div>

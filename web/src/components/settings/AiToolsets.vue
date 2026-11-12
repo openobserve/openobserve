@@ -30,9 +30,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="ai-toolsets-add-btn"
           variant="primary"
           size="sm-action"
+          :aria-label="
+            toolsetDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('aiToolset.add') })
+              : undefined
+          "
           @click="addToolset"
-          >{{ t("aiToolset.add") }}</OButton
-        >
+          >{{ t("aiToolset.add") }}
+          <EditorDraftDot
+            v-if="toolsetDrafts.hasNew"
+            :saved-at="toolsetDrafts.savedAt(null)"
+            corner
+            data-test="ai-toolsets-add-draft-dot"
+        /></OButton>
       </template>
 
       <!-- Table -->
@@ -89,6 +99,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
+          <template #cell-name="{ row }">
+            <div class="flex min-w-0 items-center gap-2">
+              <OTruncatedText>{{ row.name }}</OTruncatedText>
+              <EditorDraftDot
+                v-if="toolsetDrafts.ids.has(row.id)"
+                :saved-at="toolsetDrafts.savedAt(row.id)"
+                :data-test="`ai-toolsets-${row.name}-draft-dot`"
+              />
+            </div>
+          </template>
+
           <template #cell-kind="{ row }">
             <OTag type="aiToolsetKind" :value="row.kind" />
           </template>
@@ -117,6 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
+                  :aria-label="t('common.moreActions')"
                   icon-left="more-vert"
                   variant="ghost"
                   size="icon-xs-sq"
@@ -150,14 +172,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Add / Edit form -->
     <div v-else>
-      <AddAiToolset @cancel:hideform="hideAddDialog" />
+      <AddAiToolset @cancel:hideform="hideAddDialog" @update:list="refreshData" />
     </div>
   </div>
 
   <!-- Delete confirmation -->
   <ConfirmDialog
     :title="t('aiToolset.deleteTitle')"
-    :message="t('aiToolset.deleteMessage', { name: confirmDelete.data?.name ?? '' })"
+    message-keypath="aiToolset.deleteMessage"
+    :message-name="confirmDelete.data?.name"
+    ok-variant="destructive"
     @update:ok="deleteToolset"
     @update:cancel="cancelDelete"
     v-model="confirmDelete.visible"
@@ -189,8 +213,14 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { forbiddenState } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
 import aiToolsetsService from "@/services/ai_toolsets";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 export default defineComponent({
   name: "PageAiToolsets",
@@ -206,15 +236,24 @@ export default defineComponent({
     OTag,
     OSearchInput,
     OTable,
+    OTruncatedText,
+    EditorDraftDot,
   },
   setup() {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18nTyped();
+    const toolsetDrafts = useEditorDraftIds("ai_toolset");
 
     const orgIdForList = useOrgId();
+    const { locked: toolsetsFeatureLocked } = useLicenseLock("ai_toolsets");
+    const { locked: assistantLocked } = useLicenseLock("ai_assistant");
+    // The list endpoint is licensed under ai_assistant, so either lock would 403 it.
+    const toolsetsLocked = computed(() => toolsetsFeatureLocked.value || assistantLocked.value);
     const toolsetsList = useQuery(() =>
-      Object.assign(aiToolsetsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+      Object.assign(aiToolsetsQuery(orgIdForList.value), {
+        enabled: !!orgIdForList.value && !toolsetsLocked.value,
+      }),
     );
 
     // The list is the query, not a copy: only an observer applies `staleTime` and revalidates on mount.
@@ -227,7 +266,8 @@ export default defineComponent({
       })),
     );
     const showAddDialog = ref(false);
-    const loading = toolsetsList.isPending;
+    // a disabled query stays pending forever
+    const loading = computed(() => !toolsetsLocked.value && toolsetsList.isPending.value);
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = toolsetsList.isFetching;
@@ -236,7 +276,7 @@ export default defineComponent({
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = toolsetsList.error.value;
-      return e?.status === 403 || e?.response?.status === 403;
+      return forbiddenState(e) || e?.status === 403;
     });
     const viewState = useListViewState("ai-toolsets", {
       filterQuery: "",
@@ -346,7 +386,7 @@ export default defineComponent({
     const refreshData = () => getData(true);
 
     const getData = async (force = false) => {
-      if (force) await toolsetsList.refetch();
+      if (force && !toolsetsLocked.value) await toolsetsList.refetch();
     };
 
     let dismissLoading: (() => void) | null = null;
@@ -431,13 +471,14 @@ export default defineComponent({
       });
     };
 
+    // The route goes first: while it still says add/edit, onUpdated would remount the editor and re-offer its draft.
     const hideAddDialog = async () => {
-      showAddDialog.value = false;
-      await getData(true);
-      router.push({
+      await router.push({
         name: "aiToolsets",
         query: { org_identifier: store.state.selectedOrganization.identifier },
       });
+      showAddDialog.value = false;
+      await getData(true);
     };
 
     // -----------------------------------------------------------------------
@@ -464,6 +505,11 @@ export default defineComponent({
       aiToolsetsService
         .delete(store.state.selectedOrganization.identifier, row.id)
         .then(() => {
+          deleteEditorDraftsFor({
+            kind: "ai_toolset",
+            org: store.state.selectedOrganization.identifier,
+            entityId: row.id,
+          });
           toast({ variant: "success", message: t("aiToolset.deletedSuccessfully") });
           // Drop the row from the cache first so it disappears now, not when
           // the refetch lands; the forced reload re-persists the list.
@@ -492,12 +538,14 @@ export default defineComponent({
 
     return {
       refreshData,
+      toolsetDrafts,
       t,
       store,
       loading,
       fetching,
       lastUpdatedAt,
       forbidden,
+      toolsetsLocked,
       tabledata,
       columns,
       showAddDialog,

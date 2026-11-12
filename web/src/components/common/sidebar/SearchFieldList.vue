@@ -29,10 +29,12 @@
               {{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})
             </OTruncatedText>
             <OButton
+              :aria-label="groupName"
+              :aria-expanded="expandGroupRows[row.group] !== false"
               v-if="(groupFieldCount[row.group] ?? 0) > 0"
               variant="ghost"
               size="icon"
-              class="flex-shrink-0"
+              class="size-5! flex-shrink-0"
             >
               <OIcon
                 :name="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'"
@@ -57,6 +59,7 @@
             <OFieldLabel :field="row" />
             <template #actions>
               <OButton
+                :aria-label="t('common.addFilter')"
                 v-if="!hideAddSearchTerm"
                 variant="ghost-neutral"
                 size="icon"
@@ -165,6 +168,7 @@
               :content="t('common.totalFields', { count: bottomProps.totalRows })"
             />
             <OButton
+              :aria-label="t('search.firstPage')"
               variant="ghost-primary"
               size="icon-panel"
               :disabled="bottomProps.isFirstPage"
@@ -183,6 +187,7 @@
               >
             </template>
             <OButton
+              :aria-label="t('search.lastPage')"
               variant="ghost-primary"
               size="icon-panel"
               :disabled="bottomProps.isLastPage"
@@ -199,6 +204,7 @@
 </template>
 
 <script setup lang="ts">
+import { unescapeSqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { computed, ref, watch, onMounted, type Ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -339,14 +345,14 @@ function walkFilters(
         if (node.left?.type === "column_ref") {
           const col = extractColName(node.left.column);
           if (col && node.right?.value != null) {
-            push(include, col, String(node.right.value));
+            push(include, col, unescapeSqlLiteral(node.right.value));
           }
         }
       } else if (op === "!=" || op === "<>") {
         if (node.left?.type === "column_ref") {
           const col = extractColName(node.left.column);
           if (col && node.right?.value != null) {
-            push(exclude, col, String(node.right.value));
+            push(exclude, col, unescapeSqlLiteral(node.right.value));
           }
         }
       } else if (op === "IS") {

@@ -3,6 +3,7 @@ import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import enLocale from "@/locales/languages/en-US.json";
 import ORefreshButton from "./ORefreshButton.vue";
+import { raw } from "@/types/i18n";
 
 // The component calls useI18n() in setup, so an i18n instance must be installed
 // or vue-i18n throws "Need to install with app.use function". Source the real
@@ -123,7 +124,46 @@ describe("ORefreshButton", () => {
     expect(wrapper.emitted("click")).toBeUndefined();
   });
 
+  // --- accessible name ---
+
+  it("names the button Refresh, with the age once it has run", () => {
+    const never = mount(ORefreshButton, { global: globalConfig });
+    expect(never.find("button").attributes("aria-label")).toBe("Refresh");
+
+    const ran = mount(ORefreshButton, {
+      props: { layout: "inline", lastRunAt: Date.now() - 57_000 },
+      global: globalConfig,
+    });
+    expect(ran.find("button").attributes("aria-label")).toBe("Refresh, last refreshed 57s ago");
+  });
+
+  it("shows a passed tooltip instead of the last-refreshed time", () => {
+    const wrapper = mount(ORefreshButton, {
+      props: { lastRunAt: Date.now() - 3_000, tooltip: raw("Data as of 16:19") },
+      global: globalConfig,
+    });
+    const tips = wrapper.findAll("[data-stub-tooltip]").map((tip) => tip.text());
+    expect(tips).toContain("Data as of 16:19");
+    expect(tips.some((tip) => tip.startsWith("Last refreshed"))).toBe(false);
+  });
+
   // --- layout="inline" ---
+
+  describe("size", () => {
+    const button = (props = {}) =>
+      mount(ORefreshButton, { props, global: globalConfig }).find('[data-test="refresh-button"]');
+
+    it("uses the toolbar icon size by default", () => {
+      expect(button().attributes("size")).toBe("icon-toolbar");
+      expect(button().classes()).not.toContain("size-5.5!");
+    });
+
+    it("inset renders the icon size with size-5.5", () => {
+      const inset = button({ size: "inset" });
+      expect(inset.attributes("size")).toBe("icon");
+      expect(inset.classes()).toContain("size-5.5!");
+    });
+  });
 
   describe("layout=inline", () => {
     const inline = (props: Record<string, unknown> = {}) =>
@@ -158,6 +198,13 @@ describe("ORefreshButton", () => {
       const wrapper = inline({ lastRunAt: 0 });
       expect(wrapper.find("span.tabular-nums").exists()).toBe(false);
       expect(wrapper.find("[data-stub-tooltip]").text()).toBe("Not yet refreshed");
+    });
+
+    it("is 32px by default and 34px at the header size", () => {
+      expect(inline().find("button").classes()).toContain("h-8!");
+      const header = inline({ size: "header" }).find("button");
+      expect(header.classes()).toContain("h-8.5!");
+      expect(header.classes()).not.toContain("h-8!");
     });
 
     it("forwards dataTest onto the button", () => {

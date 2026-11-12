@@ -2,11 +2,16 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
+const metricsIngestion = require('../utils/metrics-ingestion.js');
 const { verifyDataOnUIWithValues: verifyDataOnUI } = require('../utils/metrics-assertions.js');
 
 test.describe("Metrics Aggregation and Grouping Tests", () => {
   test.beforeAll(async () => {
     await ensureMetricsIngested();
+    // The random seed puts ~1 point per series, and rate() needs 2+ points in one series.
+    const seeded = await metricsIngestion.ingestFixedRequestCountSeries();
+    expect(seeded.success, `fixed request_count seed failed: ${seeded.error}`).toBe(true);
+    expect(await metricsIngestion.waitForMetricQueryable('sum by (service) (rate(request_count[5m]))'), 'rate(request_count[5m]) never became queryable').toBe(true);
   });
 
   /** Create fresh PageManager per test — avoids data races in parallel workers. */
@@ -117,23 +122,27 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
   }, async ({ page }, testInfo) => {
     const pm = await setupTest(page, testInfo);
     const queries = [
-      'topk(5, request_count)',
-      'bottomk(3, cpu_usage)',
-      'topk(10, sum by (service) (rate(request_count[5m])))'
+      ['topk(5, request_count)', 5],
+      ['bottomk(3, cpu_usage)', 3],
+      ['topk(10, sum by (service) (rate(request_count[5m])))', 10],
     ];
     testLogger.info('Testing TopK and BottomK queries');
-    for (const query of queries) {
+    for (const [query, k] of queries) {
       testLogger.info(`Executing: ${query}`);
-      await pm.metricsPage.executeQuery(query);
+      const { series, maxPerStep } = await pm.metricsPage.executeQueryAndCountSeries(query);
+      testLogger.info(`Query returned ${series} series, at most ${maxPerStep} at one step`);
+      // topk/bottomk choose per step, so the k bound holds at each step, not over the range.
+      expect(series).toBeGreaterThan(0);
+      expect(maxPerStep).toBeGreaterThan(0);
+      expect(maxPerStep).toBeLessThanOrEqual(k);
       const inlineError = pm.metricsPage.getInlineError();
       const hasInlineError = await inlineError.isVisible({ timeout: 1000 }).catch(() => false);
       if (hasInlineError) {
         testLogger.warn(`Query may have produced an error: ${await inlineError.textContent().catch(() => '')}`);
       }
       expect(hasInlineError).toBe(false);
-      const legendCount = await pm.metricsPage.getLegendItemCount();
-      testLogger.info(`Query returned ${legendCount} series`);
-      expect(legendCount).toBeGreaterThan(0);
+      await pm.metricsPage.expectChartRendered();
+      await pm.metricsPage.expectNoDataHidden();
     }
     testLogger.info('TopK and BottomK queries tested successfully');
   });

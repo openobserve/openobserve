@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex flex-wrap items-center gap-2"
         :data-test="`oncall-rotation-preview-${shift.startMicros}`"
       >
-        <OTag variant="default-soft" size="sm">{{ raw(shift.when) }}</OTag>
+        <OTag variant="default-soft" size="sm">{{ shift.when }}</OTag>
         <OUserCell :value="shift.member" />
         <!-- The second rotation's holder for the same week. Side by side is the
              point: it is how "these two can never be the same person" stops
@@ -78,7 +78,14 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatInZone, fromZonedInputValue, memberAt } from "@/utils/oncall";
+import {
+  formatInZone,
+  fromZonedInputValue,
+  memberAt,
+  offsetAnchor,
+  shiftBoundary,
+  shiftsBackToNow,
+} from "@/utils/oncall";
 
 const { t } = useI18nTyped();
 
@@ -122,22 +129,31 @@ const shifts = computed(() => {
     shift_micros: shift,
     anchor_micros: anchorFor,
   });
-  const primary = rule(anchorMicros);
+  // Counted from the shift containing now, as the team form writes it.
+  const back = shiftsBackToNow(rule(anchorMicros), Date.now() * 1000, timezone.value);
+  const primary = rule(offsetAnchor(rule(anchorMicros), back, timezone.value));
   // One shift BEHIND, which is the whole mechanism: the second rotation is
   // holding the week the first one has not reached yet, so the two are never
   // the same person while the roster has two or more.
-  const secondary = rule(anchorMicros - shift);
+  const secondary = rule(offsetAnchor(primary, 1, timezone.value));
+  const format = (micros: number) =>
+    formatInZone(micros, timezone.value, { dateStyle: "medium", timeStyle: "short" });
 
-  return [0, 1, 2].map((index) => {
-    const startMicros = anchorMicros + index * shift;
+  return [0, 1, 2].flatMap((index) => {
+    // A handover is a wall-clock time, so a DST change between turns moves the instant.
+    const startMicros = shiftBoundary(primary, index, timezone.value);
+    const next = shiftBoundary(primary, index + 1, timezone.value);
+    if (startMicros === null || next === null) return [];
     return {
       startMicros,
-      member: memberAt(primary, startMicros) ?? "",
-      secondary: showSecondary.value ? (memberAt(secondary, startMicros) ?? "") : "",
-      when: formatInZone(startMicros, timezone.value, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }),
+      member: memberAt(primary, startMicros, timezone.value) ?? "",
+      secondary: showSecondary.value
+        ? (memberAt(secondary, startMicros, timezone.value) ?? "")
+        : "",
+      when:
+        index === 0
+          ? t("oncall.rotationPreviewNow", { until: raw(format(next)) })
+          : raw(format(startMicros)),
     };
   });
 });

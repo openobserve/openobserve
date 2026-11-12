@@ -497,15 +497,19 @@ mod tests {
                 ),
                 (
                     Matcher::new(MatchOp::Equal, "path", ""),
-                    vec![Range { start: 5, end: 6 }],
+                    vec![Range { start: 3, end: 6 }],
                 ),
                 (
                     Matcher::new(MatchOp::NotEqual, "path", "a"),
-                    vec![Range { start: 5, end: 6 }],
+                    vec![Range { start: 3, end: 6 }],
+                ),
+                (
+                    Matcher::new(MatchOp::NotEqual, "path", ""),
+                    vec![Range { start: 0, end: 3 }],
                 ),
                 (
                     parsed_matchers(r#"m{path=~".*"}"#).matchers.remove(0),
-                    vec![0..3, 5..6],
+                    vec![Range { start: 0, end: 6 }],
                 ),
                 (Matcher::new(MatchOp::Equal, "path", "unmatched"), vec![]),
             ] {

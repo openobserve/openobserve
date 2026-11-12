@@ -13,12 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+};
 
 use axum::{http::StatusCode, response::Response};
 use chrono::{Duration, Utc};
 use config::{
-    ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
         db_monitoring::is_dbm_server_stream,
         otlp::OtlpRequestType,
@@ -32,8 +35,7 @@ use infra::{
     errors::{Error, Result},
     schema::get_flatten_level,
 };
-use ingestion_common::{IngestionStatus, StreamStatus};
-use itertools::Itertools;
+use ingestion_common::{IngestionStatus, RecordStatus, StreamStatus};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::logs::v1::{
@@ -45,7 +47,7 @@ use opentelemetry_proto::tonic::{
 use schema::{get_future_discard_error, get_upto_discard_error};
 use transform::TRANSFORM_FAILED;
 
-use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
+use super::{DestinationSettings, bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
     common::meta::otlp::{otlp_export_response, otlp_rejection_response},
     db_monitoring::server_vantage::O2_EVENT_NAME,
@@ -372,73 +374,28 @@ pub async fn handle_request(
                     rec = flatten::flatten_with_level(rec, flatten_level)?;
 
                     // get json object
-                    let mut local_val = match rec.take() {
+                    let local_val = match rec.take() {
                         json::Value::Object(v) => v,
                         _ => unreachable!(),
                     };
 
-                    // DBM server-vantage canonicalization — the shipped collector recipes all
-                    // export over OTLP, so this path is the one that matters for them.
-                    if dbm_gate {
-                        crate::db_monitoring::server_vantage::canonicalize_dbm_record(
-                            &mut local_val,
-                        );
-                    }
-
-                    // Re-insert the trusted event name AFTER canonicalization.
-                    //
-                    // `o2_event_name` is a reserved field, so `apply_to_record`'s strip loop
-                    // removes it along with every other caller-settable `o2_dbm_*` key. That
-                    // strip has to be unconditional: it receives only a flattened map, in
-                    // which a receiver-derived value and a forged one are byte-identical, so
-                    // any attempt to keep "the trusted one" could only guess from the record
-                    // shape — which is precisely what a spoofer controls. Restoring it here,
-                    // where `log_record` is still in scope, is what makes the value trusted.
-                    if !log_record.event_name.is_empty() && event_name_gate {
-                        local_val.insert(
-                            O2_EVENT_NAME.to_string(),
-                            log_record.event_name.as_str().into(),
-                        );
-                    }
-
-                    if let Some(fields) = uds_fields {
-                        local_val = crate::ingestion::refactor_map(local_val, fields);
-                    }
-
-                    // add `_original` and '_record_id` if required by StreamSettings
-                    if need_original && let Some(original_data) = original_data {
-                        local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
-
-                        let record_id = crate::ingestion::generate_record_id(
-                            org_id,
-                            &stream_name,
-                            &StreamType::Logs,
-                        );
-
-                        local_val.insert(ID_COL_NAME.to_string(), record_id.to_string().into());
-                    }
-
-                    // add `_all_values` if required by StreamSettings
-                    if need_all_values {
-                        let values = local_val
-                            .iter()
-                            .filter(|(k, v)| {
-                                ![
-                                    TIMESTAMP_COL_NAME,
-                                    ID_COL_NAME,
-                                    ORIGINAL_DATA_COL_NAME,
-                                    ALL_VALUES_COL_NAME,
-                                ]
-                                .contains(&k.as_str())
-                                    && (index_all_max_value_length == 0
-                                        || v.as_str()
-                                            .is_none_or(|s| s.len() <= index_all_max_value_length))
-                            })
-                            .map(|(_, v)| v)
-                            .join(" ");
-                        local_val
-                            .insert(ALL_VALUES_COL_NAME.to_string(), json::Value::String(values));
-                    }
+                    let settings = DestinationSettings {
+                        org_id,
+                        stream_name: &stream_name,
+                        dbm: dbm_gate,
+                        uds_fields,
+                        need_original,
+                        need_all_values,
+                        all_values_max_len: index_all_max_value_length,
+                    };
+                    // from `log_record`, not the record, where a forged attribute looks the same
+                    let trusted_event_name = (!log_record.event_name.is_empty() && event_name_gate)
+                        .then(|| log_record.event_name.as_str().into());
+                    let local_val = settings.apply(
+                        local_val,
+                        original_data.map(Cow::Owned),
+                        trusted_event_name,
+                    );
 
                     stream_records.push((timestamp, local_val));
                 }
@@ -454,7 +411,17 @@ pub async fn handle_request(
     // batch process records through pipeline
     if !executable_pipelines.is_empty() {
         let records_count = pipeline_inputs.len();
-        for exec_pl in &executable_pipelines {
+        let evaluation_tasks = crate::ingestion::spawn_llm_evaluations(
+            org_id,
+            &stream_name,
+            &executable_pipelines,
+            &pipeline_inputs,
+            Some(&stream_name),
+        );
+        for exec_pl in executable_pipelines
+            .iter()
+            .filter(|p| !crate::ingestion::is_llm_evaluation(p))
+        {
             match exec_pl
                 .process_batch(org_id, pipeline_inputs.clone(), Some(stream_name.clone()))
                 .await
@@ -498,6 +465,21 @@ pub async fn handle_request(
                             )
                             .await;
                         }
+                        let settings = DestinationSettings {
+                            org_id,
+                            stream_name: &destination_stream,
+                            dbm: dest_dbm_gate,
+                            uds_fields: user_defined_schema_map
+                                .get(&destination_stream)
+                                .and_then(Option::as_ref),
+                            need_original: streams_need_original_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v),
+                            need_all_values: streams_need_all_values_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v),
+                            all_values_max_len: index_all_max_value_length,
+                        };
 
                         for (idx, mut res) in stream_pl_results {
                             let timestamp =
@@ -519,95 +501,24 @@ pub async fn handle_request(
                                 };
 
                             let original_size = json::estimate_json_bytes(&res);
-                            // get json object
-                            let mut local_val = match res.take() {
+                            let local_val = match res.take() {
                                 json::Value::Object(v) => v,
                                 _ => unreachable!(),
                             };
-
-                            // Carry the trusted event name across the reservation strip.
-                            //
-                            // `local_val` here is VRL *output*, so the producer-loop value may
-                            // or may not have survived the transform — but the INPUT record is
-                            // still addressable: `idx` indexes `pipeline_inputs`, exactly as it
-                            // indexes `original_options` a few lines below (`usize::MAX` is the
-                            // "no source record" sentinel). Recovering it from there means a
-                            // user pipeline on a DBM stream no longer silently reintroduces the
-                            // very ambiguity W1 exists to remove.
-                            let trusted_event_name = (idx != usize::MAX)
-                                .then(|| {
-                                    pipeline_inputs
-                                        .get(idx)
-                                        .and_then(|src| src.get(O2_EVENT_NAME))
-                                        .cloned()
-                                })
-                                .flatten();
-
-                            // Pipeline-routed records are canonicalized too: a VRL transform may
-                            // have produced the receiver fields we dispatch on.
-                            if dest_dbm_gate {
-                                crate::db_monitoring::server_vantage::canonicalize_dbm_record(
-                                    &mut local_val,
-                                );
-                            }
-
-                            if let Some(event_name) = trusted_event_name {
-                                local_val.insert(O2_EVENT_NAME.to_string(), event_name);
-                            }
-
-                            if let Some(Some(fields)) =
-                                user_defined_schema_map.get(&destination_stream)
-                            {
-                                local_val = crate::ingestion::refactor_map(local_val, fields);
-                            }
-
-                            // add `_original` and '_record_id` if required by StreamSettings
-                            if idx != usize::MAX
-                                && streams_need_original_map
-                                    .get(&destination_stream)
-                                    .is_some_and(|v| *v)
-                                && original_options[idx].is_some()
-                            {
-                                local_val.insert(
-                                    ORIGINAL_DATA_COL_NAME.to_string(),
-                                    original_options[idx].clone().unwrap().into(),
-                                );
-
-                                let record_id = crate::ingestion::generate_record_id(
-                                    org_id,
-                                    &destination_stream,
-                                    &StreamType::Logs,
-                                );
-                                local_val
-                                    .insert(ID_COL_NAME.to_string(), record_id.to_string().into());
-                            }
-
-                            // add `_all_values` if required by StreamSettings
-                            if streams_need_all_values_map
-                                .get(&destination_stream)
-                                .copied()
-                                .unwrap_or_default()
-                            {
-                                let values = local_val
-                                    .iter()
-                                    .filter(|(k, v)| {
-                                        ![
-                                            TIMESTAMP_COL_NAME,
-                                            ID_COL_NAME,
-                                            ORIGINAL_DATA_COL_NAME,
-                                            ALL_VALUES_COL_NAME,
-                                        ]
-                                        .contains(&k.as_str())
-                                            && (index_all_max_value_length == 0
-                                                || v.as_str().is_none_or(|s| {
-                                                    s.len() <= index_all_max_value_length
-                                                }))
-                                    })
-                                    .map(|(_, v)| v)
-                                    .join(" ");
-
-                                local_val.insert(ALL_VALUES_COL_NAME.to_string(), values.into());
-                            }
+                            // VRL may have dropped the name; the input record at idx still has it
+                            let trusted_event_name = pipeline_inputs
+                                .get(idx)
+                                .and_then(|src| src.get(O2_EVENT_NAME))
+                                .cloned();
+                            // a ResultArray record carries idx usize::MAX and has no source record
+                            let local_val = settings.apply(
+                                local_val,
+                                original_options
+                                    .get(idx)
+                                    .and_then(|o| o.as_deref())
+                                    .map(Cow::Borrowed),
+                                trusted_event_name,
+                            );
 
                             let size: &mut usize = size_by_stream
                                 .entry(destination_stream.clone())
@@ -625,12 +536,29 @@ pub async fn handle_request(
             }
         } // for each pipeline
 
-        // Evaluation-only pipelines emit no downstream records. Preserve the
-        // original log stream while evaluator work runs asynchronously.
-        let has_user_pipeline = executable_pipelines
-            .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
-        if !has_user_pipeline && !json_data_by_stream.contains_key(&stream_name) {
+        crate::ingestion::join_llm_evaluations(evaluation_tasks, org_id, &stream_name).await;
+
+        if crate::ingestion::should_preserve_source(
+            org_id,
+            &stream_name,
+            &executable_pipelines,
+            json_data_by_stream.contains_key(&stream_name),
+        ) {
+            let settings = DestinationSettings {
+                org_id,
+                stream_name: &stream_name,
+                dbm: dbm_gate,
+                uds_fields: user_defined_schema_map
+                    .get(&stream_name)
+                    .and_then(Option::as_ref),
+                need_original: streams_need_original_map
+                    .get(&stream_name)
+                    .is_some_and(|v| *v),
+                need_all_values: streams_need_all_values_map
+                    .get(&stream_name)
+                    .is_some_and(|v| *v),
+                all_values_max_len: index_all_max_value_length,
+            };
             for (idx, mut res) in pipeline_inputs.iter().cloned().enumerate() {
                 let timestamp = match super::handle_timestamp_for_value(&mut res, min_ts, max_ts) {
                     Ok(ts) => ts,
@@ -654,73 +582,17 @@ pub async fn handle_request(
 
                 res = flatten::flatten_with_level(res, flatten_level)?;
 
-                let mut local_val = match res.take() {
+                let local_val = match res.take() {
                     json::Value::Object(v) => v,
                     _ => unreachable!(),
                 };
-
-                // Carry the trusted event name across the reservation strip.
-                //
-                // These records are replayed `pipeline_inputs`, so they already hold the
-                // value the producer loop wrote — `log_record` is out of scope here, but
-                // it is not needed: the value travels on the record itself. Take it
-                // before `apply_to_record` strips it and put it back after, exactly as
-                // the non-pipeline branch does.
+                // replayed inputs still hold the name the producer loop wrote
                 let trusted_event_name = local_val.get(O2_EVENT_NAME).cloned();
-
-                // DBM server-vantage canonicalization (see the note at the first call site).
-                if dbm_gate {
-                    crate::db_monitoring::server_vantage::canonicalize_dbm_record(&mut local_val);
-                }
-
-                if let Some(event_name) = trusted_event_name {
-                    local_val.insert(O2_EVENT_NAME.to_string(), event_name);
-                }
-
-                if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
-                    local_val = crate::ingestion::refactor_map(local_val, fields);
-                }
-
-                if streams_need_original_map
-                    .get(&stream_name)
-                    .is_some_and(|v| *v)
-                    && let Some(original_data) = original_options[idx].clone()
-                {
-                    local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
-
-                    let record_id = crate::ingestion::generate_record_id(
-                        org_id,
-                        &stream_name,
-                        &StreamType::Logs,
-                    );
-
-                    local_val.insert(ID_COL_NAME.to_string(), record_id.to_string().into());
-                }
-
-                if streams_need_all_values_map
-                    .get(&stream_name)
-                    .copied()
-                    .unwrap_or_default()
-                {
-                    let values = local_val
-                        .iter()
-                        .filter(|(k, v)| {
-                            ![
-                                TIMESTAMP_COL_NAME,
-                                ID_COL_NAME,
-                                ORIGINAL_DATA_COL_NAME,
-                                ALL_VALUES_COL_NAME,
-                            ]
-                            .contains(&k.as_str())
-                                && (index_all_max_value_length == 0
-                                    || v.as_str()
-                                        .is_none_or(|s| s.len() <= index_all_max_value_length))
-                        })
-                        .map(|(_, v)| v)
-                        .join(" ");
-
-                    local_val.insert(ALL_VALUES_COL_NAME.to_string(), values.into());
-                }
+                let local_val = settings.apply(
+                    local_val,
+                    original_options[idx].as_deref().map(Cow::Borrowed),
+                    trusted_event_name,
+                );
 
                 let (ts_data, fn_num) = json_data_by_stream
                     .entry(stream_name.clone())
@@ -737,14 +609,6 @@ pub async fn handle_request(
     drop(user_defined_schema_map);
     drop(streams_need_original_map);
 
-    // Update partial success
-    if stream_status.status.failed > 0 {
-        res.partial_success = Some(ExportLogsPartialSuccess {
-            rejected_log_records: stream_status.status.failed as i64,
-            error_message: stream_status.status.error.clone(),
-        });
-    }
-
     let endpoint = match req_type {
         OtlpRequestType::Grpc => "/grpc/otlp/logs",
         _ => "/api/otlp/v1/logs",
@@ -752,6 +616,7 @@ pub async fn handle_request(
 
     // if no data, fast return
     if json_data_by_stream.is_empty() {
+        res.partial_success = partial_success(&stream_status.status);
         return Ok(otlp_export_response(&res, req_type)); // just return
     }
 
@@ -818,16 +683,18 @@ pub async fn handle_request(
     }
 
     // OTLP has no field for a deleting-stream skip, so a skipped stream still answers 200
+    let mut ingestion_status = IngestionStatus::Record(stream_status.status);
     let write_result = super::write_logs_by_stream(
         thread_id,
         org_id,
         user_email,
         (started_at, &start),
         UsageType::Logs,
-        &mut IngestionStatus::Record(stream_status.status),
+        &mut ingestion_status,
         json_data_by_stream,
         size_by_stream,
         derived_streams,
+        None,
         None,
     )
     .await;
@@ -863,7 +730,18 @@ pub async fn handle_request(
         ));
     }
 
+    // the write rejects rows too, e.g. ones that do not fit the stream schema
+    if let IngestionStatus::Record(status) = &ingestion_status {
+        res.partial_success = partial_success(status);
+    }
     Ok(otlp_export_response(&res, req_type))
+}
+
+fn partial_success(status: &RecordStatus) -> Option<ExportLogsPartialSuccess> {
+    (status.failed > 0).then(|| ExportLogsPartialSuccess {
+        rejected_log_records: status.failed as i64,
+        error_message: status.error.clone(),
+    })
 }
 
 #[cfg(test)]
@@ -1872,7 +1750,7 @@ mod tests {
         // arbitrary_precision is enabled workspace-wide, so the plain decode must fail here
         assert!(json::from_slice::<ExportLogsServiceRequest>(body).is_err());
 
-        let request: ExportLogsServiceRequest = json::from_slice_lenient_floats(body).unwrap();
+        let request: ExportLogsServiceRequest = json::from_slice_lenient_otlp(body).unwrap();
         let value = |kv: &KeyValue| kv.value.as_ref().and_then(|v| v.value.clone());
         let resource_logs = &request.resource_logs[0];
         let resource = resource_logs.resource.as_ref().unwrap();
@@ -1898,15 +1776,50 @@ mod tests {
     }
 
     #[test]
+    fn test_otlp_json_decodes_empty_any_values() {
+        use crate::ingestion::grpc::get_val_with_type_retained;
+
+        let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"geo.locality.region","value":{}}]},"scopeLogs":[{"logRecords":[{"timeUnixNano":"1789000000000000001","body":{},"attributes":[{"key":"region","value":{}},{"key":"tags","value":{"arrayValue":{}}},{"key":"map","value":{"kvlistValue":{"values":[{"key":"k","value":{}},{"key":"list","value":{"arrayValue":{"values":[{"stringValue":"a"},{"kvlistValue":{}}]}}}]}}},{"key":"empty.map","value":{"kvlistValue":{}}},{"key":"r","value":{"doubleValue":1.50}}]},{"timeUnixNano":"1789000000000000002","body":{"stringValue":"valid record in the same batch"}}]}]}]}"#;
+        assert!(json::from_slice::<ExportLogsServiceRequest>(body).is_err());
+
+        let request: ExportLogsServiceRequest = json::from_slice_lenient_otlp(body).unwrap();
+        let resource_logs = &request.resource_logs[0];
+        assert_eq!(
+            resource_logs.resource.as_ref().unwrap().attributes[0].value,
+            None
+        );
+        let records = &resource_logs.scope_logs[0].log_records;
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[0].body, None);
+        let attr = |i: usize| get_val_with_type_retained(&records[0].attributes[i].value.as_ref());
+        assert_eq!(attr(0), json::Value::Null);
+        assert_eq!(attr(1), json::json!([]));
+        assert_eq!(attr(2), json::json!({"k": null, "list": ["a", {}]}));
+        assert_eq!(attr(3), json::json!({}));
+        assert_eq!(
+            records[0].attributes[4]
+                .value
+                .as_ref()
+                .and_then(|v| v.value.clone()),
+            Some(DoubleValue(1.5))
+        );
+        assert_eq!(
+            records[1].body.as_ref().and_then(|v| v.value.clone()),
+            Some(StringValue("valid record in the same batch".into()))
+        );
+    }
+
+    #[test]
     fn test_otlp_json_keeps_strict_errors() {
         for body in [
             &br#"{"resourceLogs":[{"scopeLogs":[{"scope":{"name":"a","name":"b"},"logRecords":[]}]}]}"#[..],
             br#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"stringValue":1}}]}]}]}"#,
             br#"{"resourceLogs":["#,
+            br#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"arrayValue":{"values":[{"intValue":"1"},{},{"intValue":"3"}]}}}]}]}]}"#,
         ] {
             let strict = json::from_slice::<ExportLogsServiceRequest>(body).map(|_| ());
             let lenient =
-                json::from_slice_lenient_floats::<ExportLogsServiceRequest>(body).map(|_| ());
+                json::from_slice_lenient_otlp::<ExportLogsServiceRequest>(body).map(|_| ());
             assert!(strict.is_err());
             assert_eq!(
                 strict.map_err(|e| e.to_string()),
@@ -1916,7 +1829,7 @@ mod tests {
 
         let float_with_bad_bytes = br#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"doubleValue":1.5},"attributes":[{"key":"b","value":{"bytesValue":"!"}}]}]}]}]}"#;
         assert!(
-            json::from_slice_lenient_floats::<ExportLogsServiceRequest>(float_with_bad_bytes)
+            json::from_slice_lenient_otlp::<ExportLogsServiceRequest>(float_with_bad_bytes)
                 .is_err()
         );
     }
@@ -1925,7 +1838,7 @@ mod tests {
     fn test_otlp_json_without_floats_decodes_exactly_as_before() {
         let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"s","value":{"stringValue":"x"}}]},"scopeLogs":[{"logRecords":[{"timeUnixNano":"1789000000000000001","body":{"stringValue":"x"},"attributes":[{"key":"i","value":{"intValue":"42"}},{"key":"b","value":{"boolValue":true}}]}]}]}]}"#;
         assert_eq!(
-            json::from_slice_lenient_floats::<ExportLogsServiceRequest>(body).unwrap(),
+            json::from_slice_lenient_otlp::<ExportLogsServiceRequest>(body).unwrap(),
             json::from_slice::<ExportLogsServiceRequest>(body).unwrap()
         );
     }
@@ -1934,12 +1847,30 @@ mod tests {
     fn test_otlp_json_float_rescues_a_body_that_repeats_a_field() {
         // the retry decodes through a Value, which keeps the last of two repeated fields
         let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"r","value":{"doubleValue":1.5}}]},"scopeLogs":[{"scope":{"name":"a","name":"b"},"logRecords":[]}]}]}"#;
-        let request: ExportLogsServiceRequest = json::from_slice_lenient_floats(body).unwrap();
+        let request: ExportLogsServiceRequest = json::from_slice_lenient_otlp(body).unwrap();
         let scope = request.resource_logs[0].scope_logs[0]
             .scope
             .as_ref()
             .unwrap();
         assert_eq!(scope.name, "b");
+    }
+
+    #[test]
+    fn test_partial_success_reports_rows_failed_at_write() {
+        let accepted = ingestion_common::RecordStatus {
+            successful: 3,
+            ..Default::default()
+        };
+        assert_eq!(super::partial_success(&accepted), None);
+        let rejected = ingestion_common::RecordStatus {
+            successful: 3,
+            failed: 2,
+            error: "boom".to_string(),
+            ..Default::default()
+        };
+        let partial = super::partial_success(&rejected).unwrap();
+        assert_eq!(partial.rejected_log_records, 2);
+        assert_eq!(partial.error_message, "boom");
     }
 
     // cloud builds reject the unknown test org at the trial check before the columns check

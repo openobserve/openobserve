@@ -14,9 +14,11 @@ import {
   ComboboxRoot,
   ComboboxViewport,
 } from "reka-ui";
-import { computed, nextTick, ref, useAttrs, useId, useSlots, watch } from "vue";
+import { computed, nextTick, onMounted, ref, useAttrs, useId, useSlots, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import { useI18nTyped } from "@/types/i18n";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 const { t } = useI18nTyped();
 
@@ -26,10 +28,9 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
-const wrapperAttrs = computed(() => {
-  const { tabindex: _tabindex, ...rest } = $attrs;
-  return rest;
-});
+const split = computed(() => splitControlAttrs($attrs));
+const wrapperAttrs = computed(() => split.value.wrapperAttrs);
+const controlAttrs = computed(() => split.value.controlAttrs);
 
 const props = withDefaults(defineProps<ComboboxProps>(), {
   items: () => [],
@@ -43,6 +44,7 @@ const props = withDefaults(defineProps<ComboboxProps>(), {
 
 const emit = defineEmits<ComboboxEmits>();
 defineSlots<ComboboxSlots>();
+const isDisabled = useLockedDisabled(() => props.disabled);
 
 const slots = useSlots();
 const _fallbackId = useId();
@@ -172,6 +174,15 @@ const effectiveError = computed(() => props.errorMessage || (props.error ? " " :
 const hasError = computed(() => !!effectiveError.value);
 
 const hasLabel = computed(() => Boolean(slots.label) || props.label !== undefined);
+onMounted(() =>
+  warnIfUnlabelled(
+    "OCombobox",
+    Boolean(
+      hasLabel.value || props.placeholder || $attrs["aria-label"] || $attrs["aria-labelledby"],
+    ),
+    inputId.value,
+  ),
+);
 const hasInsideLabel = computed(
   () => props.labelPosition === "inside" && (Boolean(slots.label) || Boolean(props.label)),
 );
@@ -190,7 +201,7 @@ const hasInsideLabel = computed(
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
-        disabled
+        isDisabled
           ? 'text-input-label-text-disabled font-normal'
           : 'text-input-label-text font-medium',
       ]"
@@ -212,7 +223,7 @@ const hasInsideLabel = computed(
       :ignore-filter="true"
       :open-on-click="true"
       :open-on-focus="true"
-      :disabled="disabled"
+      :disabled="isDisabled"
       @update:model-value="onSelect"
     >
       <ComboboxAnchor class="relative flex w-full items-center">
@@ -225,10 +236,11 @@ const hasInsideLabel = computed(
           ><span v-if="required" aria-hidden="true">&nbsp;*</span>
         </span>
         <ComboboxInput
+          v-bind="controlAttrs"
           :id="inputId"
           :name="name"
           :placeholder="placeholder"
-          :disabled="disabled"
+          :disabled="isDisabled"
           :tabindex="inputTabindex"
           auto-complete="off"
           :class="[
@@ -257,8 +269,8 @@ const hasInsideLabel = computed(
             'z-10001 w-(--reka-combobox-trigger-width) max-w-(--reka-combobox-trigger-width) min-w-(--reka-combobox-trigger-width)',
             'max-h-60 overflow-hidden',
             'max-lg:max-h-[var(--reka-popper-available-height,15rem)]',
-            'rounded-default border shadow-lg',
-            'bg-select-content-bg border-select-content-border',
+            'rounded-default shadow-overlay border border-transparent',
+            'bg-select-content-bg',
             'p-1',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
             // scale/squish). Wipes down by default; top-placed wipes up. Soft

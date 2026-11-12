@@ -15,6 +15,8 @@
 
 import type { AxiosRequestConfig } from "axios";
 import http from "./http";
+import analytics from "./product_analytics";
+import type { SentTemplate } from "@/utils/alerts/notificationKinds";
 
 export type TargetModule = "alerts" | "anomaly_detections" | "synthetics" | "slos";
 export type DowntimeStatus = "scheduled" | "active" | "ended" | "cancelled" | "ended_early";
@@ -29,6 +31,20 @@ export type TargetFolders = { kind: "all" } | { kind: "some"; folder_ids: string
 export type DimensionCondition =
   | { type: "group"; op: LogicalOp; items: DimensionCondition[] }
   | { type: "pair"; key: string; operator: PairOperator; value: string };
+
+/** One group of one alert; `group_key` is the hashed label-set identity. */
+export interface AlertGroupRef {
+  alert_id: string;
+  group_key: string;
+  /** Captured at mute time; older nodes send none. */
+  group_labels?: Record<string, string> | null;
+}
+
+/** Set only by "Until it clears"; a null `group_key` ends when no group of the alert is firing. */
+export interface EndOnClear {
+  alert_id: string;
+  group_key?: string | null;
+}
 
 export interface DowntimeTarget {
   module: TargetModule;
@@ -71,6 +87,8 @@ export interface DowntimeNotificationLogEntry {
   sent_at: number;
   destinations: string[];
   result?: string;
+  /** The template each destination that sent used; absent on rows sent before it was recorded. */
+  templates?: SentTemplate[];
 }
 
 export interface Downtime {
@@ -93,6 +111,9 @@ export interface Downtime {
   updated_at: number;
   /** Bumped by every write; an edit that sends the version it loaded is refused once it moved. */
   version?: number;
+  /** When set, the downtime mutes only these groups of its alert targets. */
+  alert_groups?: AlertGroupRef[] | null;
+  end_on_clear?: EndOnClear | null;
 }
 
 export interface DowntimeWindow {
@@ -158,6 +179,8 @@ export interface DowntimeRequest {
   notifications?: DowntimeNotifications;
   /** The loaded row's version; a newer stored row answers 409. */
   version?: number;
+  alert_groups?: AlertGroupRef[];
+  end_on_clear?: EndOnClear;
 }
 
 /** Exactly one of the two, with the loaded row's version when known. */
@@ -232,6 +255,8 @@ export interface ActiveDowntime {
   id: string;
   name: string;
   ends_at: number;
+  end_on_clear?: EndOnClear | null;
+  alert_groups?: AlertGroupRef[] | null;
 }
 
 export interface CorrectionRef {
@@ -264,21 +289,67 @@ const downtimes = {
   get: (org: string, id: string, folder?: string) =>
     http().get<DowntimeDetail>(one(org, id), inFolder(folder)),
   create: (org: string, body: DowntimeRequest) =>
-    http().post<{ id: string }>(base(org), body, inFolder(body.folder_id)),
+    http()
+      .post<{ id: string }>(base(org), body, inFolder(body.folder_id))
+      .then((res) => {
+        analytics.track("downtime_created", {
+          repeat: body.schedule.repeat,
+          targets: body.targets.length,
+          group_scoped: !!body.alert_groups?.length,
+          end_on_clear: !!body.end_on_clear,
+        });
+        return res;
+      }),
   update: (org: string, id: string, body: DowntimeRequest) =>
-    http().put(one(org, id), body, inFolder(body.folder_id)),
+    http()
+      .put(one(org, id), body, inFolder(body.folder_id))
+      .then((res) => {
+        analytics.track("downtime_updated", { repeat: body.schedule.repeat });
+        return res;
+      }),
   cancel: (org: string, id: string, folder?: string) =>
-    http().post(`${one(org, id)}/cancel`, undefined, inFolder(folder)),
+    http()
+      .post(`${one(org, id)}/cancel`, undefined, inFolder(folder))
+      .then((res) => {
+        analytics.track("downtime_cancelled");
+        return res;
+      }),
   extend: (org: string, id: string, body: ExtendDowntimeRequest, folder?: string) =>
-    http().post<ExtendDowntimeResponse>(`${one(org, id)}/extend`, body, inFolder(folder)),
+    http()
+      .post<ExtendDowntimeResponse>(`${one(org, id)}/extend`, body, inFolder(folder))
+      .then((res) => {
+        analytics.track("downtime_extended", { mode: "by_secs" in body ? "by" : "until" });
+        return res;
+      }),
+  test: (org: string, id: string, destinations: string[], folder?: string) =>
+    http()
+      .post<{ destination: string; ok: boolean; unsupported?: boolean; error?: string }[]>(
+        `${one(org, id)}/test`,
+        { destinations },
+        inFolder(folder),
+      )
+      .then((res) => {
+        analytics.track("downtime_notification_test_sent", { count: destinations.length });
+        return res;
+      }),
   remove: (org: string, id: string, folder?: string) =>
-    http().delete(one(org, id), inFolder(folder)),
+    http()
+      .delete(one(org, id), inFolder(folder))
+      .then((res) => {
+        analytics.track("downtime_deleted", { count: 1 });
+        return res;
+      }),
   move: (org: string, downtimeIds: string[], dstFolderId: string, folder?: string) =>
-    http().patch(
-      `${base(org)}/move`,
-      { downtime_ids: downtimeIds, dst_folder_id: dstFolderId },
-      inFolder(folder),
-    ),
+    http()
+      .patch(
+        `${base(org)}/move`,
+        { downtime_ids: downtimeIds, dst_folder_id: dstFolderId },
+        inFolder(folder),
+      )
+      .then((res) => {
+        analytics.track("downtime_moved", { count: downtimeIds.length });
+        return res;
+      }),
   preview: (org: string, body: PreviewRequest, folder?: string) =>
     http().post<PreviewResponse>(`${base(org)}/preview`, body, inFolder(folder)),
   resources: (org: string, body: ResourcesRequest, folder?: string) =>

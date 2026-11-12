@@ -35,6 +35,7 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { createMemoryHistory, createRouter, type Router } from "vue-router";
 
 vi.mock("@/aws-exports", () => ({
   default: { isCloud: "false", isEnterprise: "false" },
@@ -77,7 +78,6 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 import AlertList from "@/components/alerts/AlertList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import router from "@/test/unit/helpers/router";
 import AlertService from "@/services/alerts";
 import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
@@ -94,6 +94,8 @@ if (!URL.revokeObjectURL) URL.revokeObjectURL = vi.fn();
 
 const alertsSvc = AlertService as any;
 const sloSvc = SloService as any;
+
+let router: Router;
 
 /** A plain (non-SLO) scheduled alert, in the shape the LIST API returns. */
 const plainAlert = (overrides: Record<string, any> = {}) => ({
@@ -210,8 +212,6 @@ async function mountBare(rows: any[]) {
       },
     },
   });
-  (wrapper.vm as any).router.currentRoute.value.name = "alertList";
-  (wrapper.vm as any).router.currentRoute.value.query = {} as any;
   await flushPromises();
   return wrapper;
 }
@@ -259,8 +259,19 @@ const nameCell = (wrapper: any, alertName: string) =>
 describe("AlertList — SLO alert rows", () => {
   let wrapper: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    // A fresh router stops a pending navigation or lazy route import of the app router leaking into a later test.
+    router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { name: "alertList", path: "/alerts", component: { template: "<div />" } },
+        { name: "alertDetail", path: "/alerts/:alert_id", component: { template: "<div />" } },
+        { name: "sloDetail", path: "/slos/:slo_id", component: { template: "<div />" } },
+      ],
+    });
+    await router.push({ name: "alertList" });
+    await router.isReady();
     // Keyed by type, the way production stores it — the component's watcher
     // reads `foldersByType["alerts"]`.
     (store.state as any).organizationData.foldersByType = {
@@ -541,11 +552,7 @@ describe("AlertList — SLO alert rows", () => {
         query_condition: queryCondition,
       });
 
-      // `router` is a module singleton shared by every test in this file, and
-      // these cases are the only ones that put a real query on it. Both
-      // navigations are stubbed and the query is wiped afterwards — letting a
-      // real `push`/`replace` through leaves the shared router on another route
-      // and every later test in the file fails for an unrelated reason.
+      // Stubbed so the route stays where the test put it and the diversion's target can be asserted.
       let push: any;
       let replace: any;
       beforeEach(() => {
@@ -555,7 +562,6 @@ describe("AlertList — SLO alert rows", () => {
       afterEach(() => {
         push.mockRestore();
         replace.mockRestore();
-        router.currentRoute.value.query = {} as any;
       });
 
       const deepLink = async (fetched: any) => {

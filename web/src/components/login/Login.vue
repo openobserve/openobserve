@@ -330,12 +330,18 @@ export default defineComponent({
     };
 
     const loginWithSSo = async () => {
+      // index.html already asked for dex_login; a second request would overwrite the login-state cookie it set.
+      const fastPath = (window as any).__o2SsoFastPath;
+      delete (window as any).__o2SsoFastPath;
+      if (await fastPath) return;
       try {
         const res = await authService.get_dex_login();
         if (res) window.location.href = withSignupHint(res);
       } catch (error: any) {
         // The browser aborts this request when the user leaves the page before it returns.
         if (error?.code === "ECONNABORTED") return;
+        // Offline or blocked before any response; nothing for us to fix.
+        if (error?.code === "ERR_NETWORK") return;
         console.error("Error during redirection:", error);
       }
     };

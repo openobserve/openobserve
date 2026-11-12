@@ -14,48 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use bytes::Bytes;
-use infra::{
-    dist_lock,
-    errors::{DbError, Error},
-};
+use infra::errors::{DbError, Error};
 
 use crate as db;
 
-pub(crate) fn mk_key() -> String {
-    "/service_graph/node/offsets".to_string()
-}
-
 pub fn v4_offset_key(org_id: &str, stream_name: &str) -> String {
     format!("/service_graph/v4/offsets/{org_id}/{stream_name}")
-}
-
-pub async fn get_offset() -> (i64, String) {
-    let key = mk_key();
-    let mut value = match db::get(&key).await {
-        Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
-        Err(_) => String::from("0"),
-    };
-    if value.is_empty() {
-        value = String::from("0");
-    }
-    if value.contains(';') {
-        let mut parts = value.split(';');
-        let offset: i64 = parts.next().unwrap().parse().unwrap();
-        let node = parts.next().unwrap().to_string();
-        (offset, node)
-    } else {
-        (value.parse().unwrap(), String::from(""))
-    }
-}
-
-pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::Error> {
-    let key = mk_key();
-    let val = if let Some(node) = node {
-        format!("{offset};{node}")
-    } else {
-        offset.to_string()
-    };
-    Ok(db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?)
 }
 
 /// Malformed meta-db content is `(0, "")`, never a panic.
@@ -94,23 +58,6 @@ pub async fn set_v4_offset(
     Ok(db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?)
 }
 
-/// Write-once: re-read under the lock because two schedulers may seed the same key together.
-pub(crate) async fn put_once(key: &str, value: String) -> Result<(), anyhow::Error> {
-    if missing_as_none(db::get(key).await)?.is_some() {
-        return Ok(());
-    }
-    let locker = dist_lock::lock(key, 0).await?;
-    let ret = match missing_as_none(db::get(key).await) {
-        Ok(Some(_)) => Ok(()),
-        Ok(None) => db::put(key, value.into(), db::NO_NEED_WATCH, None)
-            .await
-            .map_err(anyhow::Error::from),
-        Err(e) => Err(e.into()),
-    };
-    dist_lock::unlock(&locker).await?;
-    ret
-}
-
 /// Only a missing key is absent; any other meta-db error must not be mistaken for one.
 pub(crate) fn missing_as_none(
     ret: infra::errors::Result<Bytes>,
@@ -125,11 +72,6 @@ pub(crate) fn missing_as_none(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_mk_key_returns_expected_path() {
-        assert_eq!(mk_key(), "/service_graph/node/offsets");
-    }
 
     #[test]
     fn test_key_formats() {

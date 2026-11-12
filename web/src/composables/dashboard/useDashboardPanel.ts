@@ -35,6 +35,7 @@ import {
   mapChart,
   sankeyChartQuery,
 } from "@/utils/dashboard/dashboardAutoQueryBuilder";
+import { isFlowChart } from "@/utils/dashboard/chartTypeGroups";
 import { usePanelFields } from "@/composables/dashboard/usePanelFields";
 import { usePanelAggregation } from "@/composables/dashboard/usePanelAggregation";
 import {
@@ -134,6 +135,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     dashboardPanelData,
     getDefaultQueries,
     getDefaultCustomChartText,
+    getTimestampColumn: () => store?.state?.zoConfig?.timestamp_column || "_timestamp",
   });
 
   const addQuery = () => {
@@ -286,17 +288,26 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
   // Track if updateGroupedFields is currently running to prevent race conditions
   let isUpdatingGroupedFields = false;
   let pendingUpdateGroupedFields = false;
+  // Settles once the run in flight has written groupedFields.
+  let inFlightGroupedFields: Promise<void> | null = null;
+  let settleInFlightGroupedFields: (() => void) | null = null;
 
   // Helper function to update grouped fields
   const updateGroupedFields = async () => {
-    // If already updating, mark that we need to run again after completion
+    // Resolving before groupedFields lands makes the caller's next makeAutoSQLQuery() a silent no-op.
     if (isUpdatingGroupedFields) {
       pendingUpdateGroupedFields = true;
+      // The run this call joined predates its change; the queued run the join starts is the one that carries it.
+      while (isUpdatingGroupedFields) await inFlightGroupedFields;
       return;
     }
 
     isUpdatingGroupedFields = true;
     pendingUpdateGroupedFields = false;
+    // Only ever resolved, so a coalesced caller never inherits this run's rejection.
+    inFlightGroupedFields = new Promise<void>((resolve) => {
+      settleInFlightGroupedFields = resolve;
+    });
 
     try {
       // For PromQL queries, collect streams from ALL queries
@@ -356,6 +367,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
       }
     } finally {
       isUpdatingGroupedFields = false;
+      settleInFlightGroupedFields?.();
       // If there was a pending update request, run it now
       if (pendingUpdateGroupedFields) {
         updateGroupedFields();
@@ -994,9 +1006,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
       }
 
       let query = "";
-      if (dashboardPanelData.data.type == "geomap") {
+      if (dashboardPanelData.data.type == "alert-list") {
+        query = "";
+      } else if (dashboardPanelData.data.type == "geomap") {
         query = geoMapChart(dashboardPanelData);
-      } else if (dashboardPanelData.data.type == "sankey") {
+      } else if (isFlowChart(dashboardPanelData.data.type)) {
         query = sankeyChartQuery(dashboardPanelData);
       } else if (dashboardPanelData.data.type == "maps") {
         query = mapChart(dashboardPanelData);
@@ -1011,6 +1025,24 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
       return query;
     }
     return;
+  };
+  // Heatmap y bucketing and box plot raw values shape the SQL, so every builder tab must carry them, not only the active tab.
+  const regenerateOtherBuilderQueries = () => {
+    if (
+      !["heatmap", "boxplot"].includes(dashboardPanelData.data.type) ||
+      dashboardPanelData.data.queryType === "promql"
+    ) {
+      return;
+    }
+    if (!dashboardPanelData?.meta?.streamFields?.groupedFields?.length) return;
+    dashboardPanelData.data.queries.forEach((queryData: any, index: number) => {
+      if (index === dashboardPanelData.layout.currentQueryIndex || queryData?.customQuery) return;
+      queryData.query = buildSQLChartQuery({
+        queryData,
+        chartType: dashboardPanelData.data.type,
+        dashboardPanelData,
+      });
+    });
   };
   const { checkTimestampAlias } = logsUtils();
   // Replace the existing validatePanel function with a wrapper that calls the generic function
@@ -1610,6 +1642,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     getDefaultQueries,
     validatePanel: validatePanelWrapper,
     makeAutoSQLQuery,
+    regenerateOtherBuilderQueries,
     currentXLabel,
     currentYLabel,
     generateLabelFromName,

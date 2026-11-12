@@ -48,7 +48,48 @@ pub(crate) fn extract_token(auth_header: Option<&str>, path_token: Option<&str>)
         .map(|t| t.to_string())
 }
 
+/// 403 when the org is blocked or gone (a leaked token dies with it), 500 when unreadable.
+pub async fn inactive_org_response(org_id: &str) -> Option<Response> {
+    org_status_refusal(org_id, db::org_status::read_active(org_id).await)
+}
+
+/// 403 for an inactive org, 500 when its status could not be read; None lets the request on.
+pub fn org_status_refusal(
+    org_id: &str,
+    active: Result<bool, impl std::fmt::Display>,
+) -> Option<Response> {
+    match active {
+        Ok(true) => None,
+        Ok(false) => Some(MetaHttpResponse::forbidden("organization is not active")),
+        Err(e) => {
+            log::error!("cannot read the status of org {org_id}: {e}");
+            Some(MetaHttpResponse::internal_error(
+                "cannot read the organization status",
+            ))
+        }
+    }
+}
+
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/incidents/events",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "IngestExternalIncidentEvents",
+    summary = "Ingest events from an external alert source",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = serde_json::Value, description = "Alert payload: one object, or an array of objects for the generic format", content_type = "application/json"),
+    responses(
+        (status = 202, description = "Accepted; carries the accepted and rejected counts and the per-alert errors", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn ingest_events(
     Path(org_id): Path<String>,
     headers: HeaderMap,
@@ -59,6 +100,26 @@ pub async fn ingest_events(
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/incidents/events/{token}",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "IngestExternalIncidentEventsWithToken",
+    summary = "Ingest events using a token in the URL",
+    security(),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("token" = String, Path, description = "Integration token"),
+    ),
+    request_body(content = serde_json::Value, description = "Alert payload: one object, or an array of objects for the generic format", content_type = "application/json"),
+    responses(
+        (status = 202, description = "Accepted; carries the accepted and rejected counts and the per-alert errors", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn ingest_events_url_token(
     Path((org_id, token)): Path<(String, String)>,
     headers: HeaderMap,
@@ -86,6 +147,9 @@ async fn handle_events(
         Ok(_) => return MetaHttpResponse::not_found("not found"),
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
+    if let Some(resp) = inactive_org_response(&integration.org_id).await {
+        return resp;
+    }
 
     let now = chrono::Utc::now().timestamp_micros();
     let ua = headers.get("user-agent").and_then(|v| v.to_str().ok());
@@ -203,6 +267,25 @@ async fn handle_events(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/incidents/events",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "IngestExternalIncidentEvents",
+    summary = "Ingest events from an external alert source",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = serde_json::Value, description = "Alert payload: one object, or an array of objects for the generic format", content_type = "application/json"),
+    responses(
+        (status = 202, description = "Accepted; carries the accepted and rejected counts and the per-alert errors", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn ingest_events(
     _path: Path<String>,
     _headers: HeaderMap,
@@ -212,6 +295,26 @@ pub async fn ingest_events(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/incidents/events/{token}",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "IngestExternalIncidentEventsWithToken",
+    summary = "Ingest events using a token in the URL",
+    security(),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("token" = String, Path, description = "Integration token"),
+    ),
+    request_body(content = serde_json::Value, description = "Alert payload: one object, or an array of objects for the generic format", content_type = "application/json"),
+    responses(
+        (status = 202, description = "Accepted; carries the accepted and rejected counts and the per-alert errors", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn ingest_events_url_token(
     _path: Path<(String, String)>,
     _headers: HeaderMap,
@@ -241,5 +344,38 @@ mod tests {
         assert_eq!(extract_token(Some("Basic xyz"), None), None); // wrong scheme
         assert_eq!(extract_token(Some("Bearer nope_prefix"), None), None); // wrong prefix
         assert_eq!(extract_token(None, None), None);
+    }
+
+    #[tokio::test]
+    async fn test_inactive_org_response_refuses_blocked_and_missing_orgs() {
+        let blocked = "ext-events-blocked-org";
+        common::infra::config::ORG_STATUS_CACHE.insert(
+            blocked.into(),
+            common::meta::organization::OrgStatus::Deleting,
+        );
+        let resp = inactive_org_response(blocked).await;
+        common::infra::config::ORG_STATUS_CACHE.remove(blocked);
+        assert_eq!(
+            resp.map(|r| r.status()),
+            Some(axum::http::StatusCode::FORBIDDEN)
+        );
+        let resp = inactive_org_response("ext-events-never-created").await;
+        assert_eq!(
+            resp.map(|r| r.status()),
+            Some(axum::http::StatusCode::FORBIDDEN)
+        );
+    }
+
+    #[test]
+    fn test_an_unreadable_org_status_is_a_server_error_not_a_refusal() {
+        let status = |active: Result<bool, &str>| {
+            org_status_refusal("ext-events-org", active).map(|r| r.status())
+        };
+        assert_eq!(status(Ok(true)), None);
+        assert_eq!(status(Ok(false)), Some(axum::http::StatusCode::FORBIDDEN));
+        assert_eq!(
+            status(Err("db down")),
+            Some(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
+        );
     }
 }

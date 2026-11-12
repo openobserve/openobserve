@@ -21,8 +21,18 @@ use common::{
     infra::config::{ORGANIZATION_SETTING, ORGANIZATIONS},
     meta::organization::{Organization, OrganizationSetting},
 };
-use config::utils::json;
+use config::{
+    get_config,
+    meta::stream::{
+        DataRetentionDefaults, MAX_DATA_RETENTION_DAYS, RETENTION_STREAM_TYPES, StreamType,
+    },
+    utils::{
+        json,
+        util::{DISTINCT_STREAM_PREFIX, TRACE_TIME_INDEX_STREAM_PREFIX},
+    },
+};
 use infra::{
+    coordinator::org_status::{STATUS_DELETED, STATUS_DELETING, STATUS_PENDING_DELETION},
     db::{delete_from_db_coordinator, put_into_db_coordinator},
     errors::{self, Error},
     table::organizations,
@@ -86,29 +96,94 @@ pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error>
         }
     };
 
+    let mut settings = read_org_setting(org_id, OrganizationSetting::clone).await?;
+    settings.free_trial_expiry = trial_period_expiry;
+    Ok(settings)
+}
+
+/// Picks from the org's cached settings, caching the stored or default settings on a miss.
+pub async fn read_org_setting<T>(
+    org_id: &str,
+    pick: impl FnOnce(&OrganizationSetting) -> T,
+) -> Result<T, Error> {
     let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
     if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
-        let mut ret = v.clone();
-        ret.free_trial_expiry = trial_period_expiry;
-        return Ok(ret);
+        return Ok(pick(v));
     }
 
-    // Try to get settings from DB, but use default if not found
-    let mut settings: OrganizationSetting = match db::get(&key).await {
+    let settings: OrganizationSetting = match db::get(&key).await {
         Ok(settings) => json::from_slice(&settings)?,
         Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
             OrganizationSetting::default()
         }
         Err(e) => return Err(e),
     };
+    let picked = pick(&settings);
+    ORGANIZATION_SETTING.write().await.insert(key, settings);
+    Ok(picked)
+}
 
-    // Cache the org setting (even if it's default)
-    ORGANIZATION_SETTING
-        .write()
-        .await
-        .insert(key.to_string(), settings.clone());
-    settings.free_trial_expiry = trial_period_expiry;
-    Ok(settings)
+/// Days a stream keeps data, resolved on read; 0 keeps it forever.
+pub async fn stream_retention_days(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    stream_days: i64,
+) -> Result<i64, Error> {
+    match stream_type {
+        StreamType::Index => index_stream_retention_days(org_id, stream_name).await,
+        StreamType::Metadata => {
+            metadata_stream_retention_days(org_id, stream_name, stream_days).await
+        }
+        _ => data_stream_retention_days(org_id, stream_type, stream_days).await,
+    }
+}
+
+/// The global levels alone, for a caller that only estimates and can live with a failed org read.
+pub fn global_retention_days(stream_type: StreamType) -> i64 {
+    default_retention_days(
+        stream_type,
+        &DataRetentionDefaults::default(),
+        &global_retention_defaults(),
+    )
+}
+
+/// The org's stored defaults; a failed read is an error, never the possibly shorter global value.
+#[cfg(feature = "enterprise")]
+pub async fn org_retention_defaults(org_id: &str) -> Result<DataRetentionDefaults, Error> {
+    read_org_setting(org_id, org_setting_retention_defaults).await
+}
+
+/// The org layer is not compiled in, so it has nothing to say.
+#[cfg(not(feature = "enterprise"))]
+pub async fn org_retention_defaults(_org_id: &str) -> Result<DataRetentionDefaults, Error> {
+    Ok(DataRetentionDefaults::default())
+}
+
+/// What a stream of each type with no value of its own resolves to under these org values.
+pub fn resolved_retention_defaults(org: &DataRetentionDefaults) -> DataRetentionDefaults {
+    let global = global_retention_defaults();
+    let days = |stream_type| default_retention_days(stream_type, org, &global);
+    DataRetentionDefaults {
+        default: first_positive(&[org.default, global.default]),
+        logs: days(StreamType::Logs),
+        metrics: days(StreamType::Metrics),
+        traces: days(StreamType::Traces),
+        profiles: days(StreamType::Profiles),
+    }
+}
+
+/// The org's stored defaults; every level is 0 where the org layer is not compiled in.
+pub fn org_setting_retention_defaults(setting: &OrganizationSetting) -> DataRetentionDefaults {
+    #[cfg(feature = "enterprise")]
+    {
+        setting.data_retention
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = setting;
+        DataRetentionDefaults::default()
+    }
 }
 
 /// Applies `apply` to the settings in the store's `get_for_update`; true if it wrote them.
@@ -116,83 +191,13 @@ pub async fn update_org_setting<F>(org_id: &str, apply: F) -> Result<bool, anyho
 where
     F: FnOnce(&mut OrganizationSetting) -> bool + Send + 'static,
 {
-    update_org_setting_in(infra::db::get_db().await.as_ref(), org_id, apply).await
-}
-
-/// Get the toggle ingestion logs setting for an org
-/// If the setting is not found, return false
-/// we add a separate function for avoid clone the setting
-pub async fn get_org_setting_toggle_ingestion_logs(org_id: &str) -> Result<bool, Error> {
-    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
-    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
-        return Ok(v.toggle_ingestion_logs);
+    let written = update_org_setting_in(infra::db::get_db().await.as_ref(), org_id, apply).await?;
+    // The store write skips `db::put`, so the other regions only see what is queued here.
+    #[cfg(feature = "enterprise")]
+    if let Some(value) = &written {
+        super_cluster::organization_setting_put(org_id, value.clone()).await?;
     }
-
-    // Try to get settings from DB, but use default if not found
-    let settings: OrganizationSetting = match db::get(&key).await {
-        Ok(settings) => json::from_slice(&settings)?,
-        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
-            OrganizationSetting::default()
-        }
-        Err(e) => return Err(e),
-    };
-    let toggle_ingestion_logs = settings.toggle_ingestion_logs;
-
-    // Cache the org setting (even if it's default)
-    ORGANIZATION_SETTING
-        .write()
-        .await
-        .insert(key.to_string(), settings);
-    Ok(toggle_ingestion_logs)
-}
-
-/// Get the usage stream enabled setting for an org.
-/// Without a stored setting this falls back to `default_usage_stream_enabled`, which is off.
-pub async fn get_org_setting_usage_stream_enabled(org_id: &str) -> Result<bool, Error> {
-    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
-    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
-        return Ok(v.usage_stream_enabled);
-    }
-
-    // Try to get settings from DB, but use default if not found
-    let settings: OrganizationSetting = match db::get(&key).await {
-        Ok(settings) => json::from_slice(&settings)?,
-        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
-            OrganizationSetting::default()
-        }
-        Err(e) => return Err(e),
-    };
-    let usage_stream_enabled = settings.usage_stream_enabled;
-
-    // Cache the org setting (even if it's default)
-    ORGANIZATION_SETTING
-        .write()
-        .await
-        .insert(key.to_string(), settings);
-    Ok(usage_stream_enabled)
-}
-
-/// Whether automatic RED anomaly insights are on for an org; absent settings mean off.
-pub async fn get_org_setting_red_insights_enabled(org_id: &str) -> Result<bool, Error> {
-    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
-    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
-        return Ok(v.red_insights_enabled);
-    }
-
-    let settings: OrganizationSetting = match db::get(&key).await {
-        Ok(settings) => json::from_slice(&settings)?,
-        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
-            OrganizationSetting::default()
-        }
-        Err(e) => return Err(e),
-    };
-    let red_insights_enabled = settings.red_insights_enabled;
-
-    ORGANIZATION_SETTING
-        .write()
-        .await
-        .insert(key.to_string(), settings);
-    Ok(red_insights_enabled)
+    Ok(written.is_some())
 }
 
 /// The coordinator delete evicts `ORGANIZATION_SETTING` on every node.
@@ -319,6 +324,9 @@ pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "enterprise")]
     super_cluster::organization_add(&key, entry).await?;
+    #[cfg(feature = "cloud")]
+    o2_enterprise::enterprise::cloud::billings::sync_public_dashboard_links(&entry.identifier)
+        .await;
     Ok(())
 }
 
@@ -381,8 +389,51 @@ pub async fn delete_org(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Turns a `deleting` org row into a `deleted` tombstone; true only for the call that flipped it.
+pub async fn tombstone_org(org_id: &str) -> Result<bool, anyhow::Error> {
+    let won = organizations::set_status_if(org_id, STATUS_DELETING, STATUS_DELETED)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error tombstoning org: {e}"))?;
+    if !won {
+        // A retry after a later failure finds the tombstone already written.
+        organizations::invalidate_cache(Some(org_id)).await;
+        let status = organizations::get(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("Error tombstoning org: {e}"))?
+            .status;
+        if status != STATUS_DELETED {
+            return Err(anyhow::anyhow!(
+                "Cannot tombstone org {org_id} in status {status}"
+            ));
+        }
+    }
+    Ok(won)
+}
+
+/// Drops a tombstoned org from every node's org caches; safe to repeat on a step retry.
+pub async fn evict_org(org_id: &str) -> Result<(), anyhow::Error> {
+    organizations::invalidate_cache(Some(org_id)).await;
+    ORGANIZATIONS.clone().write().await.remove(org_id);
+    let key = format!("{ORG_KEY_PREFIX}{org_id}");
+    delete_from_db_coordinator(&key, false, true, None).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::organization_delete(&key).await?;
+    Ok(())
+}
+
 /// Lists live orgs; tombstones stay out so caches, jobs and the org list never see them.
 pub async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error> {
+    Ok(list_with_created_at(limit)
+        .await?
+        .into_iter()
+        .map(|(org, _)| org)
+        .collect())
+}
+
+/// Same as [`list`], paired with each org's creation time in microseconds.
+pub async fn list_with_created_at(
+    limit: Option<i64>,
+) -> Result<Vec<(Organization, i64)>, anyhow::Error> {
     let filter = organizations::ListFilter {
         exclude_deleted: true,
         ..organizations::ListFilter::with_limit(limit)
@@ -392,12 +443,30 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error
         .map_err(|e| anyhow::anyhow!("Error listing orgs: {}", e))?;
     Ok(orgs
         .into_iter()
-        .map(|org| Organization {
-            identifier: org.identifier,
-            name: org.org_name,
-            org_type: org.org_type.to_string(),
-            service_account: None,
+        .map(|org| {
+            let created_at = org.created_at;
+            (to_organization(org), created_at)
         })
+        .collect())
+}
+
+/// Orgs whose row and this node's status cache are both clear of pending, deleting and deleted.
+pub async fn list_unblocked() -> Result<Vec<Organization>, anyhow::Error> {
+    let filter = organizations::ListFilter {
+        exclude_deleted: true,
+        ..organizations::ListFilter::default()
+    };
+    let orgs = organizations::list(filter)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error listing orgs: {}", e))?;
+    Ok(orgs
+        .into_iter()
+        .filter(|org| {
+            ![STATUS_PENDING_DELETION, STATUS_DELETING, STATUS_DELETED]
+                .contains(&org.status.as_str())
+                && !crate::org_status::is_blocked(&org.identifier)
+        })
+        .map(to_organization)
         .collect())
 }
 
@@ -454,13 +523,40 @@ mod super_cluster {
         }
         Ok(())
     }
+
+    pub async fn organization_setting_put(
+        org_id: &str,
+        value: bytes::Bytes,
+    ) -> Result<(), anyhow::Error> {
+        if get_o2_config().super_cluster.enabled {
+            let key = format!("{}/{org_id}", super::ORG_SETTINGS_KEY_PREFIX);
+            o2_enterprise::enterprise::super_cluster::queue::put(
+                &key,
+                value,
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await?;
+        }
+        Ok(())
+    }
 }
 
+fn to_organization(org: organizations::OrganizationRecord) -> Organization {
+    Organization {
+        identifier: org.identifier,
+        name: org.org_name,
+        org_type: org.org_type.to_string(),
+        service_account: None,
+    }
+}
+
+/// Returns the stored bytes when it wrote, the full value the other regions must receive.
 async fn update_org_setting_in<F>(
     store: &dyn infra::db::Db,
     org_id: &str,
     apply: F,
-) -> Result<bool, anyhow::Error>
+) -> Result<Option<bytes::Bytes>, anyhow::Error>
 where
     F: FnOnce(&mut OrganizationSetting) -> bool + Send + 'static,
 {
@@ -482,8 +578,8 @@ where
                 if !apply(&mut settings) {
                     return Ok(None);
                 }
-                let value = json::to_vec(&settings)?.into();
-                *slot.lock().unwrap() = Some(settings);
+                let value: bytes::Bytes = json::to_vec(&settings)?.into();
+                *slot.lock().unwrap() = Some((settings, value.clone()));
                 // NATS can only create a missing key through the insert slot.
                 Ok(Some(if existed {
                     (Some(value), None)
@@ -493,11 +589,11 @@ where
             }),
         )
         .await?;
-    let Some(settings) = written.lock().unwrap().take() else {
-        return Ok(false);
+    let Some((settings, value)) = written.lock().unwrap().take() else {
+        return Ok(None);
     };
     ORGANIZATION_SETTING.write().await.insert(key, settings);
-    Ok(true)
+    Ok(Some(value))
 }
 
 async fn apply_event(ev: db::Event) {
@@ -517,7 +613,17 @@ async fn apply_event(ev: db::Event) {
                     }
                 }
             } else {
-                json::from_slice(&ev.value.unwrap()).unwrap()
+                match ev.value.as_deref().map(json::from_slice::<Organization>) {
+                    Some(Ok(val)) => val,
+                    Some(Err(e)) => {
+                        log::error!("[ORGANIZATION] bad value for {item_key}: {e}");
+                        return;
+                    }
+                    None => {
+                        log::error!("[ORGANIZATION] put event for {item_key} has no value");
+                        return;
+                    }
+                }
             };
             ORGANIZATIONS
                 .clone()
@@ -534,6 +640,118 @@ async fn apply_event(ev: db::Event) {
         }
         db::Event::Empty => {}
     }
+}
+
+async fn data_stream_retention_days(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_days: i64,
+) -> Result<i64, Error> {
+    if stream_days > 0 {
+        return Ok(stream_days.min(MAX_DATA_RETENTION_DAYS));
+    }
+    let org = org_retention_defaults(org_id).await?;
+    Ok(default_retention_days(
+        stream_type,
+        &org,
+        &global_retention_defaults(),
+    ))
+}
+
+/// An index stream has no value of its own: it expires with the stream it was derived from.
+async fn index_stream_retention_days(org_id: &str, index_stream: &str) -> Result<i64, Error> {
+    let Some((source, source_type)) = index_stream_source(index_stream) else {
+        log::warn!(
+            "[RETENTION] index stream {org_id}/{index_stream} has no recognizable source, keeping it"
+        );
+        return Ok(0);
+    };
+    let source_days = stored_retention_days(org_id, source, source_type).await?;
+    if source_type == StreamType::Metadata {
+        return metadata_stream_retention_days(org_id, source, source_days).await;
+    }
+    data_stream_retention_days(org_id, source_type, source_days).await
+}
+
+/// A derived metadata stream has no default of its own: it expires with the stream it describes.
+async fn metadata_stream_retention_days(
+    org_id: &str,
+    metadata_stream: &str,
+    stream_days: i64,
+) -> Result<i64, Error> {
+    if stream_days > 0 {
+        return data_stream_retention_days(org_id, StreamType::Metadata, stream_days).await;
+    }
+    let Some((source, source_type)) = metadata_stream_source(metadata_stream) else {
+        return data_stream_retention_days(org_id, StreamType::Metadata, 0).await;
+    };
+    let source_days = stored_retention_days(org_id, source, source_type).await?;
+    data_stream_retention_days(org_id, source_type, source_days).await
+}
+
+/// A stream with no stored schema has no value; a failed read is an error, never a default.
+async fn stored_retention_days(
+    org_id: &str,
+    stream: &str,
+    stream_type: StreamType,
+) -> Result<i64, Error> {
+    let key = format!("{org_id}/{stream_type}/{stream}");
+    if let Some(settings) = infra::schema::get_stream_settings_atomic(&key) {
+        return Ok(settings.data_retention);
+    }
+    let schema = infra::schema::get(org_id, stream, stream_type).await?;
+    Ok(infra::schema::unwrap_stream_settings(&schema).map_or(0, |s| s.data_retention))
+}
+
+/// Index streams are named `<source stream>_<source type>`.
+fn index_stream_source(index_stream: &str) -> Option<(&str, StreamType)> {
+    RETENTION_STREAM_TYPES
+        .into_iter()
+        .chain([StreamType::Metadata])
+        .find_map(|source_type| {
+            let source = index_stream.strip_suffix(source_type.as_str())?;
+            let source = source.strip_suffix('_')?;
+            (!source.is_empty()).then_some((source, source_type))
+        })
+}
+
+/// Metadata streams are named `distinct_values_<source type>_<source>` or
+/// `trace_time_index_<source>`.
+fn metadata_stream_source(metadata_stream: &str) -> Option<(&str, StreamType)> {
+    if let Some(source) = metadata_stream.strip_prefix(TRACE_TIME_INDEX_STREAM_PREFIX) {
+        return (!source.is_empty()).then_some((source, StreamType::Traces));
+    }
+    let typed_source = metadata_stream.strip_prefix(DISTINCT_STREAM_PREFIX)?;
+    RETENTION_STREAM_TYPES.into_iter().find_map(|source_type| {
+        let source = typed_source.strip_prefix(source_type.as_str())?;
+        let source = source.strip_prefix('_')?;
+        (!source.is_empty()).then_some((source, source_type))
+    })
+}
+
+fn global_retention_defaults() -> DataRetentionDefaults {
+    get_config().compact.data_retention
+}
+
+/// Scope wins first (org over global), then type over generic inside a scope.
+fn default_retention_days(
+    stream_type: StreamType,
+    org: &DataRetentionDefaults,
+    global: &DataRetentionDefaults,
+) -> i64 {
+    first_positive(&[
+        org.for_type(stream_type),
+        org.default,
+        global.for_type(stream_type),
+        global.default,
+    ])
+}
+
+fn first_positive(levels: &[i64]) -> i64 {
+    levels
+        .iter()
+        .find(|days| **days > 0)
+        .map_or(0, |days| (*days).min(MAX_DATA_RETENTION_DAYS))
 }
 
 #[cfg(test)]
@@ -719,16 +937,17 @@ mod tests {
         })
         .await
         .unwrap();
-        assert!(created);
+        assert_eq!(created, store.stored.lock().unwrap().clone());
+        assert!(created.is_some());
         let updated = update_org_setting_in(&store, org_id, |s| {
             s.scrape_interval += 1;
             true
         })
         .await
         .unwrap();
-        assert!(updated);
-        let stored: OrganizationSetting =
-            json::from_slice(&store.stored.lock().unwrap().clone().unwrap()).unwrap();
+        let stored_bytes = store.stored.lock().unwrap().clone();
+        assert_eq!(updated, stored_bytes, "regions would get another value");
+        let stored: OrganizationSetting = json::from_slice(&stored_bytes.unwrap()).unwrap();
         assert_eq!(stored.scrape_interval, 8);
         assert_eq!(
             ORGANIZATION_SETTING
@@ -744,7 +963,7 @@ mod tests {
         let unchanged = update_org_setting_in(&store, org_id, |_| false)
             .await
             .unwrap();
-        assert!(!unchanged);
+        assert!(unchanged.is_none(), "a no-op apply has nothing to sync");
         assert!(!store.wrote.load(Ordering::SeqCst), "a no-op apply wrote");
     }
 
@@ -804,10 +1023,363 @@ mod tests {
         assert!(!ORGANIZATIONS.read().await.contains_key(org_id));
     }
 
+    #[tokio::test]
+    async fn test_org_watch_put_without_a_readable_value_is_skipped() {
+        if !config::get_config().common.local_mode {
+            return;
+        }
+        let org_id = "watchbadputorg";
+        for value in [None, Some(Bytes::from_static(b"not json"))] {
+            apply_event(db::Event::Put(infra::db::EventData {
+                key: format!("{ORG_KEY_PREFIX}{org_id}"),
+                value,
+                start_dt: None,
+            }))
+            .await;
+        }
+        assert!(!ORGANIZATIONS.read().await.contains_key(org_id));
+    }
+
     #[test]
     fn test_org_key_format() {
         let org_id = "myorg";
         let key = format!("{ORG_KEY_PREFIX}{org_id}");
         assert_eq!(key, "/organization/org/myorg");
+    }
+
+    #[tokio::test]
+    async fn test_backfills_list_only_orgs_neither_their_row_nor_the_cache_blocks() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        ONCE.get_or_init(|| async {
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+        let base = format!("t_unblocked_{}", config::utils::time::now_micros());
+        let orgs = [
+            ("active", "active"),
+            ("pending", "pending_deletion"),
+            ("deleting", "deleting"),
+            ("deleted", "deleted"),
+            ("cached", "active"),
+        ]
+        .map(|(suffix, status)| (format!("{base}_{suffix}"), status));
+        for (org, status) in &orgs {
+            organizations::add(
+                org,
+                org,
+                config::meta::organization::OrganizationType::Custom,
+            )
+            .await
+            .unwrap();
+            organizations::set_status(org, status).await.unwrap();
+        }
+        // Another node's broadcast reached this node before its row read caught up.
+        ORG_STATUS_CACHE.insert(orgs[4].0.clone(), OrgStatus::PendingDeletion);
+
+        let listed: Vec<String> = list_unblocked()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|org| org.identifier)
+            .filter(|id| id.starts_with(&base))
+            .collect();
+        ORG_STATUS_CACHE.remove(&orgs[4].0);
+        for (org, _) in &orgs {
+            organizations::remove(org).await.unwrap();
+        }
+
+        assert_eq!(listed, [orgs[0].0.clone()]);
+    }
+
+    fn levels(default: i64, logs: i64, metrics: i64, traces: i64) -> DataRetentionDefaults {
+        DataRetentionDefaults {
+            default,
+            logs,
+            metrics,
+            traces,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn retention_defaults_resolve_scope_first_then_type() {
+        let none = levels(0, 0, 0, 0);
+        let global = levels(100, 10, 20, 30);
+        let org_generic = levels(40, 0, 0, 0);
+        let org_typed = levels(40, 4, 5, 6);
+        let global_generic = levels(100, 0, 0, 0);
+        let org_metrics = levels(0, 0, 7, 0);
+        let global_profiles = DataRetentionDefaults {
+            profiles: 15,
+            ..global
+        };
+        let org_profiles = DataRetentionDefaults {
+            profiles: 8,
+            ..none
+        };
+
+        // (stream type, org, global, expected)
+        let cases = [
+            (StreamType::Logs, none, none, 0),
+            (StreamType::Metrics, none, none, 0),
+            (StreamType::Traces, none, none, 0),
+            (StreamType::Profiles, none, none, 0),
+            // global default only
+            (StreamType::Logs, none, global_generic, 100),
+            (StreamType::Metrics, none, global_generic, 100),
+            (StreamType::Traces, none, global_generic, 100),
+            (StreamType::Profiles, none, global_generic, 100),
+            (StreamType::ServiceGraph, none, global_generic, 100),
+            // a global per-type value beats the global default
+            (StreamType::Logs, none, global, 10),
+            (StreamType::Metrics, none, global, 20),
+            (StreamType::Traces, none, global, 30),
+            (StreamType::Profiles, none, global, 100),
+            (StreamType::Profiles, none, global_profiles, 15),
+            // the org default beats a global per-type value
+            (StreamType::Metrics, org_generic, global, 40),
+            (StreamType::Profiles, org_generic, global_profiles, 40),
+            // the org value for the type beats the org default
+            (StreamType::Logs, org_typed, global, 4),
+            (StreamType::Metrics, org_typed, global, 5),
+            (StreamType::Traces, org_typed, global, 6),
+            (StreamType::Profiles, org_typed, global, 40),
+            (StreamType::Profiles, org_profiles, global_profiles, 8),
+            // only one type set in the org: the others fall through to the global layer
+            (StreamType::Metrics, org_metrics, global, 7),
+            (StreamType::Logs, org_metrics, global, 10),
+            // global default off, a per-type value still applies
+            (StreamType::Metrics, none, levels(0, 0, 20, 0), 20),
+            (StreamType::Logs, none, levels(0, 0, 20, 0), 0),
+            // org default with the global default off
+            (StreamType::Logs, org_generic, none, 40),
+        ];
+        for (stream_type, org, global, expected) in cases {
+            assert_eq!(
+                default_retention_days(stream_type, &org, &global),
+                expected,
+                "{stream_type} org={org:?} global={global:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn retention_defaults_clamp_huge_levels() {
+        let none = levels(0, 0, 0, 0);
+        assert_eq!(
+            default_retention_days(StreamType::Logs, &levels(i64::MAX, 0, 0, 0), &none),
+            MAX_DATA_RETENTION_DAYS
+        );
+    }
+
+    #[test]
+    fn index_stream_source_comes_from_its_name() {
+        assert_eq!(
+            index_stream_source("app_logs"),
+            Some(("app", StreamType::Logs))
+        );
+        assert_eq!(
+            index_stream_source("app_logs_metrics"),
+            Some(("app_logs", StreamType::Metrics))
+        );
+        assert_eq!(
+            index_stream_source("a_b_metadata"),
+            Some(("a_b", StreamType::Metadata))
+        );
+        assert_eq!(index_stream_source("app"), None);
+        assert_eq!(index_stream_source("logs"), None);
+        assert_eq!(index_stream_source("_logs"), None);
+        assert_eq!(index_stream_source("app_file_list"), None);
+    }
+
+    #[test]
+    fn metadata_stream_source_comes_from_its_name() {
+        assert_eq!(
+            metadata_stream_source(&config::utils::util::get_trace_time_index_stream_name(
+                "a_b"
+            )),
+            Some(("a_b", StreamType::Traces))
+        );
+        for stream_type in RETENTION_STREAM_TYPES {
+            assert_eq!(
+                metadata_stream_source(&config::utils::util::get_distinct_stream_name(
+                    stream_type,
+                    "a_logs"
+                )),
+                Some(("a_logs", stream_type))
+            );
+        }
+        assert_eq!(metadata_stream_source("trace_time_index_"), None);
+        assert_eq!(metadata_stream_source("distinct_values_logs_"), None);
+        assert_eq!(metadata_stream_source("distinct_values_unknown_a"), None);
+        assert_eq!(metadata_stream_source("app"), None);
+    }
+
+    #[test]
+    fn resolved_defaults_answer_each_stream_type() {
+        // these org values leave no level to the global layer, whatever the environment sets
+        let org = DataRetentionDefaults {
+            profiles: 8,
+            ..levels(40, 0, 7, 0)
+        };
+        assert_eq!(
+            resolved_retention_defaults(&org),
+            DataRetentionDefaults {
+                default: 40,
+                logs: 40,
+                metrics: 7,
+                traces: 40,
+                profiles: 8,
+            }
+        );
+
+        let global = get_config().compact.data_retention;
+        let resolved = resolved_retention_defaults(&levels(0, 0, 0, 0));
+        assert_eq!(resolved.default, first_positive(&[global.default]));
+        assert_eq!(
+            resolved.metrics,
+            first_positive(&[global.metrics, global.default])
+        );
+    }
+
+    #[test]
+    fn the_global_levels_ignore_the_org() {
+        let global = get_config().compact.data_retention;
+        assert_eq!(
+            global_retention_days(StreamType::Traces),
+            first_positive(&[global.traces, global.default])
+        );
+    }
+
+    #[tokio::test]
+    async fn the_stream_value_wins_without_reading_org_settings() {
+        // no org settings or store exist for this org, so a lookup would fail
+        assert_eq!(
+            stream_retention_days("no-such-org", StreamType::Metrics, "s", 5)
+                .await
+                .unwrap(),
+            5
+        );
+    }
+
+    #[tokio::test]
+    async fn a_metadata_stream_follows_the_stream_it_was_derived_from() {
+        let org = "metadata_follows_source";
+        let days = |data_retention| {
+            std::sync::Arc::new(config::meta::stream::StreamSettings {
+                data_retention,
+                ..Default::default()
+            })
+        };
+        let resolve = |stream_type, stream| stream_retention_days(org, stream_type, stream, 0);
+        infra::schema::put_stream_settings(format!("{org}/traces/own"), days(77)).await;
+        infra::schema::put_stream_settings(format!("{org}/metadata/trace_time_index_own"), days(0))
+            .await;
+
+        for stream in ["trace_time_index_own", "distinct_values_traces_own"] {
+            assert_eq!(resolve(StreamType::Metadata, stream).await.unwrap(), 77);
+        }
+        assert_eq!(
+            resolve(StreamType::Index, "trace_time_index_own_metadata")
+                .await
+                .unwrap(),
+            77
+        );
+        // a value synced from the source wins without reading the source
+        assert_eq!(
+            stream_retention_days(org, StreamType::Metadata, "trace_time_index_own", 5)
+                .await
+                .unwrap(),
+            5
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unreadable_source_fails_instead_of_falling_back_to_a_default() {
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org = "unreadable_source_org";
+        let key = infra::schema::mk_key(org, StreamType::Traces, "app");
+        infra::db::get_db()
+            .await
+            .put(&key, "not json".into(), infra::db::NO_NEED_WATCH, None)
+            .await
+            .unwrap();
+
+        for (stream_type, stream) in [
+            (StreamType::Metadata, "trace_time_index_app"),
+            (StreamType::Metadata, "distinct_values_traces_app"),
+            (StreamType::Index, "app_traces"),
+        ] {
+            assert!(
+                stream_retention_days(org, stream_type, stream, 0)
+                    .await
+                    .is_err(),
+                "{stream}"
+            );
+        }
+        // a source that was never written has nothing to read, so it is no failure
+        assert!(
+            stream_retention_days(org, StreamType::Metadata, "trace_time_index_absent", 0)
+                .await
+                .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn an_index_stream_with_no_known_source_is_kept() {
+        assert_eq!(
+            stream_retention_days("no-such-org", StreamType::Index, "app", 5)
+                .await
+                .unwrap(),
+            0
+        );
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn only_the_global_levels_apply_outside_enterprise() {
+        let global = get_config().compact.data_retention;
+        assert_eq!(
+            stream_retention_days("no-such-org", StreamType::Metrics, "s", 0)
+                .await
+                .unwrap(),
+            first_positive(&[global.metrics, global.default])
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn org_settings_apply_in_enterprise() {
+        let org_id = "retention_defaults_test_org";
+        let setting = OrganizationSetting {
+            data_retention: levels(40, 0, 7, 0),
+            ..Default::default()
+        };
+        ORGANIZATION_SETTING
+            .write()
+            .await
+            .insert(format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}"), setting);
+        let days = |t, d| stream_retention_days(org_id, t, "s", d);
+        assert_eq!(days(StreamType::Metrics, 0).await.unwrap(), 7);
+        assert_eq!(days(StreamType::Logs, 0).await.unwrap(), 40);
+        assert_eq!(days(StreamType::Metrics, 90).await.unwrap(), 90);
+        // an index stream of a metrics source follows that type's value
+        assert_eq!(
+            stream_retention_days(org_id, StreamType::Index, "s_metrics", 0)
+                .await
+                .unwrap(),
+            7
+        );
     }
 }

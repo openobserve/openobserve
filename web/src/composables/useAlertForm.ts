@@ -27,15 +27,21 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep, debounce, set } from "lodash-es";
+import {
+  alertConditionsPayload,
+  loadAlertConditions,
+  type LegacyAlertConditions,
+} from "@/utils/alerts/alertConditionsLoad";
 
 import alertsService from "@/services/alerts";
 import searchService from "@/services/search";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import {
+  anomalyConfigQuery,
   saveAnomalyConfigMutation,
   triggerAnomalyTrainingMutation,
 } from "@/services/anomaly_detection.queries";
-import { useMutation } from "@tanstack/vue-query";
+import { useMutation, useQuery as useServerQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import analytics from "@/services/product_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -86,15 +92,11 @@ import {
   removeConditionGroup as removeConditionGroupUtil,
   transformFEToBE as transformFEToBEUtil,
   retransformBEToFE as retransformBEToFEUtil,
-  detectConditionsVersion,
-  convertV0ToV2,
-  convertV1ToV2,
-  convertV1BEToV2,
-  ensureIds,
   type TransformContext,
 } from "@/utils/alerts/alertDataTransforms";
 import { AlertFocusManager } from "@/utils/alerts/focusManager";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
+import { isNotFoundError } from "@/utils/alerts/alertEditorDraft";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import type { AlertPrefill, AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
@@ -105,11 +107,8 @@ import {
 } from "@/utils/alerts/forecastAlert";
 import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import {
-  buildAnomalyFilterExpression,
-  operatorNeedsValue,
-} from "@/utils/alerts/anomalyFilterOperators";
-import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
+import { anomalyWhereClause, toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
+import { invalidateSiemDetections } from "@/composables/security/useSiemDetections";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 import {
@@ -198,11 +197,14 @@ export const defaultAlertValue: any = () => {
     lastEditedBy: "",
     folder_id: "",
     creates_incident: false,
+    incident_title_template: "",
     // Off by default: a recovery is a new outbound message class, so it is opted into.
     notify_on_recovery: false,
     recovery_destinations: [],
     // Seconds the condition must stay clear before recovering. 0 = immediately.
     keep_firing_for: 0,
+    // Off by default: on, a still-firing alert sends nothing until its state changes.
+    suppress_repeats: false,
     // Feature 2 (PT-1/PT-6). `null` (not 0) is unset — 0 is not a valid
     // priority id, and the payload layer drops null so pre-Feature-2 alerts
     // serialize unchanged.
@@ -341,6 +343,10 @@ export const defaultAnomalyConfig = () => ({
   alert_window_recover_pct: null as number | string | null,
   alert_enabled: true,
   alert_destination_ids: [] as string[],
+  // Template override for anomaly messages; null uses each destination's template.
+  template: null as string | null,
+  // The server's 400 for the template override, shown under the picker until it changes.
+  template_error: null as string | null,
   folder_id: "default",
   status: undefined as string | undefined,
   is_trained: false,
@@ -488,17 +494,20 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // QueryConfig then keeps `_meta` fresh via its own syncMeta watcher, and
   // re-seeds `_ui.checkEvery` from the stored frequency at setup.
   const withFormExtras = (obj: any): any => {
+    // A response-only key: moved into `_ui`, which every save path strips.
+    const { locked_target_names: lockedTargetNames, ...alert } = obj ?? {};
     const groupBy: string[] = Array.isArray(obj?.query_condition?.aggregation?.group_by)
       ? obj.query_condition.aggregation.group_by.filter((g: string) => g)
       : [];
     const freq = frequencyDisplay(obj);
     return {
-      ...obj,
+      ...alert,
       logGroupBy: groupBy,
       _ui: obj?._ui ?? {
         checkEvery: freq.checkEvery,
         pendingPeriod: pendingPeriodDisplay(obj).value,
         forecast: formForecastOf(obj),
+        lockedTargetNames,
       },
       _meta:
         obj?._meta ??
@@ -578,6 +587,34 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     triggerAnomalyTrainingMutation(anomalyOrgId.value),
   );
 
+  const anomalyModelQuery = useServerQuery(() => ({
+    ...anomalyConfigQuery(
+      anomalyOrgId.value,
+      String(router.currentRoute.value.params.anomaly_id ?? ""),
+    ),
+    enabled: anomalyEditMode.value,
+    refetchInterval: (query) => (query.state.data?.status === "training" ? 5000 : false),
+  }));
+  watch(
+    () => anomalyModelQuery.data.value,
+    (data) => {
+      if (!data) return;
+      // Refresh only model metadata so training cannot erase unsaved form fields.
+      for (const key of [
+        "status",
+        "is_trained",
+        "current_model_version",
+        "band_k",
+        "last_error",
+        "training_started_at",
+        "training_completed_at",
+        "notice_class",
+      ] as const) {
+        (anomalyConfig.value as Record<string, unknown>)[key] = data[key];
+      }
+    },
+  );
+
   const anomalyStatusVariant = computed<BadgeVariant>(() => {
     switch (anomalyConfig.value.status) {
       case "active":
@@ -634,15 +671,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       c.detection_function,
       c.detection_function_field || "<field>",
     );
-    const filterLines = (c.filters || [])
-      .filter((f: any) => f.field && (operatorNeedsValue(f.operator) ? f.value : true))
-      .map((f: any) => `  AND ${buildAnomalyFilterExpression(f.field, f.operator, f.value)}`);
-    const where = filterLines.length
-      ? [
-          "WHERE",
-          ...filterLines.map((l: string, i: number) => (i === 0 ? l.replace(/^\s+AND /, "  ") : l)),
-        ].join("\n")
-      : "";
+    const where = anomalyWhereClause(c.filters);
     return [
       `SELECT histogram(_timestamp, '${interval}') AS time_bucket,`,
       `       ${fn} AS value`,
@@ -716,6 +745,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const isLoadingPrefill = ref(false);
   /** Lossy transforms the source adapter performed, surfaced in the form. */
   const prefillWarnings = ref<AlertPrefillWarning[]>([]);
+  /** Outcome of the anomaly edit fetch: "missing" when the server has no such config. */
+  const anomalyLoadStatus = ref<"idle" | "loaded" | "missing" | "failed">("idle");
+  // Late async seeding (timezone from the stored offset) that must land before the form counts as loaded.
+  let pendingSeeding: Promise<unknown> = Promise.resolve();
+  let resolveFormReady: () => void = () => {};
+  /** Resolves once the mounted form holds the item it opened with (edit, prefill or anomaly load). */
+  const formReady = new Promise<void>((resolve) => {
+    resolveFormReady = resolve;
+  });
 
   const folderQuery = router.currentRoute.value.query.folder;
   // Prefer the folder the caller (AlertList) hands us over the URL query: the
@@ -748,7 +786,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     condition: false,
     rules: false,
     compare: false,
-    dedup: false,
     advanced: false,
   });
   const chartCollapsed = ref(false);
@@ -818,8 +855,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       2: t("alerts.stepCaptions.conditions"),
       3: t("alerts.stepCaptions.compareWithPast"),
       4: t("alerts.stepCaptions.alertSettings"),
-      5: t("alerts.stepCaptions.deduplication"),
-      6: t("alerts.stepCaptions.advanced"),
+      5: t("alerts.stepCaptions.advanced"),
     };
     return captions[wizardStep.value] || "";
   });
@@ -828,7 +864,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (formData.value.is_real_time === "anomaly") {
       return wizardStep.value === 3;
     }
-    return wizardStep.value === 6;
+    return wizardStep.value === 5;
   });
 
   const getFormattedDestinations = computed(() => {
@@ -1051,7 +1087,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       return !!(
         conditions.column &&
         (isUnaryOperator(conditions.operator) ||
-          (conditions.value !== undefined && conditions.value !== ""))
+          (conditions.value !== undefined &&
+            conditions.value !== "" &&
+            !(Array.isArray(conditions.value) && conditions.value.length === 0)))
       );
     }
     if (conditions.filterType === "group" && Array.isArray(conditions.conditions)) {
@@ -1228,6 +1266,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         pending_period_sec: Math.round((Number(source.pending_period_sec) || 0) * 60),
         owner: source.owner || undefined,
         creates_incident: source.creates_incident ?? false,
+        incident_title_template: source.creates_incident
+          ? String(source.incident_title_template ?? "").trim() || undefined
+          : undefined,
         workflows: source.workflows ?? [],
         priority: source.priority ?? null,
         tags: source.tags ?? [],
@@ -1514,7 +1555,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       condition: false,
       rules: false,
       compare: false,
-      dedup: false,
       advanced: false,
     };
 
@@ -1646,7 +1686,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // scalars directly by nested `name=`, so their update:* emits no-op in
   // descendant mode; these handlers still route the out-of-form widget values
   // (SQL/PromQL/VRL editors) and the bare wizard steps B (Advanced /
-  // CompareWithPast / Deduplication) into the form via setFieldValue.
+  // CompareWithPast) into the form via setFieldValue.
   const updateSqlQuery = (value: any) => setF("query_condition.sql", value);
   const updatePromqlQuery = (value: any) => setF("query_condition.promql", value);
   const updateVrlFunction = (value: any) => setF("query_condition.vrl_function", value);
@@ -1659,7 +1699,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const updateDescription = (value: any) => setF("description", value);
   const updateRowTemplate = (value: any) => setF("row_template", value);
   const updateRowTemplateType = (value: any) => setF("row_template_type", value);
-  const updateDeduplication = (value: any) => setF("deduplication", value);
 
   const handleGoToSqlEditor = () => {
     setF("query_condition.type", "sql");
@@ -1792,7 +1831,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         // schema (it reads them off the form); resetForm below re-seeds anyway.
         setF("stream_type", data.stream_type);
         setF("stream_name", data.stream_name);
-        await updateStreams(false);
+        // A stream this org has not ingested yet has no schema; the rest of the prefill still applies.
+        await Promise.resolve(updateStreams(false)).catch(() => undefined);
       }
 
       if (prefill.queryType === "promql") {
@@ -1923,8 +1963,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (formData.value.is_real_time === "true") {
       if (wizardStep.value === 2) {
         wizardStep.value = 4;
-      } else if (wizardStep.value === 4) {
-        wizardStep.value = 6;
       } else {
         wizardStep.value = wizardStep.value + 1;
       }
@@ -1943,9 +1981,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       return;
     }
     if (formData.value.is_real_time === "true") {
-      if (wizardStep.value === 6) {
-        wizardStep.value = 4;
-      } else if (wizardStep.value === 4) {
+      if (wizardStep.value === 4) {
         wizardStep.value = 2;
       } else {
         wizardStep.value = wizardStep.value - 1;
@@ -2068,6 +2104,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           ...anomalySensitivityPayload(budgetPerDay, c.threshold),
           ...anomalyBandPayload(c, budgetPerDay !== null),
           alert_enabled: c.alert_enabled,
+          // Always sent so a clear sticks; with notifications off the hidden picker clears it.
+          template: c.alert_enabled ? c.template || null : null,
         },
       };
 
@@ -2085,9 +2123,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       emit("update:list", (activeFolderId.value as string) || "default");
     } catch (err: any) {
+      const message: string = err?.response?.data?.message ?? "";
+      // The template binding rule names the template; the picker shows it inline too.
+      if (err?.response?.status === 400 && /template '[^']*'/.test(message)) {
+        c.template_error = message.replace(/^validation error: /, "");
+      }
       toast({
         variant: "error",
-        message: err?.response?.data?.message || t("alerts.messages.anomalyConfigSaveFailed"),
+        message: message ? raw(message) : t("alerts.messages.anomalyConfigSaveFailed"),
       });
     } finally {
       anomalySaving.value = false;
@@ -2409,10 +2452,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
     if (formData.value.is_real_time !== "composite") {
       // VERSION HANDLING - wrap conditions with version field for backend
-      payload.query_condition.conditions = {
-        version: 2,
-        conditions: form.state.values.query_condition.conditions,
-      };
+      payload.query_condition.conditions = alertConditionsPayload(
+        form.state.values.query_condition.conditions,
+        loadedLegacyConditions,
+      );
     }
 
     if (beingUpdated.value) {
@@ -2427,6 +2470,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // re-enables in the same tick and repeat clicks fire duplicate saves.
       const request = callAlert
         .then((res: { data: any }) => {
+          invalidateSiemDetections();
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
@@ -2450,7 +2494,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       analytics.track("Button Click", {
         button: "Update Alert",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         stream_name: formData.value.stream_name,
         alert_name: formData.value.name,
         page: "Add/Update Alert",
@@ -2467,6 +2510,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // Same as the update branch: returned below so isSubmitting spans the request.
       const request = callAlert
         .then((res: { data: any }) => {
+          invalidateSiemDetections();
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
@@ -2490,7 +2534,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       analytics.track("Button Click", {
         button: "Save Alert",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         stream_name: formData.value.stream_name,
         alert_name: formData.value.name,
         page: "Add/Update Alert",
@@ -2514,7 +2557,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   // ── Data Initialization (replaces created() hook) ───────────────────────
 
+  // A V0/V1 rule is shown as V2; while it stays unedited, Save writes back the stored shape.
+  let loadedLegacyConditions: LegacyAlertConditions | null = null;
+
   const initializeFormData = async () => {
+    loadedLegacyConditions = null;
     // Build the full alert object in a LOCAL var, apply every transform, then
     // seed the ONE form with a single form.reset (Rule ③ — NOT a per-field
     // setFieldValue loop, NOT a mirror). The form-only extras (logGroupBy /
@@ -2588,7 +2635,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         }
       }
 
-      lastValidStep.value = 6;
+      lastValidStep.value = 5;
 
       if (data.is_real_time !== "composite" && !data.trigger_condition?.timezone) {
         if (data.tz_offset === 0) {
@@ -2638,6 +2685,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // form inputs expect strings/arrays, so normalize them here.
       data.description ??= "";
       data.template ??= "";
+      data.incident_title_template ??= "";
       data.tags ??= [];
       data.composite_condition ??= {
         expression: "",
@@ -2645,50 +2693,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         stale_child_policy: "use_last_state",
       };
       data.children ??= [];
-    } else if (
-      data.query_condition.conditions?.version === "2" ||
-      data.query_condition.conditions?.version === 2
-    ) {
-      data.query_condition.conditions = ensureIds(data.query_condition.conditions.conditions);
-    } else if (
-      data.query_condition.conditions &&
-      !Array.isArray(data.query_condition.conditions) &&
-      Object.keys(data.query_condition.conditions).length != 0
-    ) {
-      const version = detectConditionsVersion(data.query_condition.conditions);
-
-      if (version === 0) {
-        data.query_condition.conditions = ensureIds(convertV0ToV2(data.query_condition.conditions));
-      } else if (version === 1) {
-        if (data.query_condition.conditions.and || data.query_condition.conditions.or) {
-          data.query_condition.conditions = ensureIds(
-            convertV1BEToV2(data.query_condition.conditions),
-          );
-        } else if (data.query_condition.conditions.label && data.query_condition.conditions.items) {
-          data.query_condition.conditions = ensureIds(
-            convertV1ToV2(data.query_condition.conditions),
-          );
-        }
-      } else {
-        data.query_condition.conditions = ensureIds(data.query_condition.conditions);
-      }
-    } else if (
-      Array.isArray(data.query_condition.conditions) &&
-      data.query_condition.conditions.length > 0
-    ) {
-      data.query_condition.conditions = ensureIds(convertV0ToV2(data.query_condition.conditions));
-    } else if (
-      data.query_condition.conditions == null ||
-      data.query_condition.conditions == undefined ||
-      data.query_condition.conditions.length == 0 ||
-      Object.keys(data.query_condition.conditions).length == 0
-    ) {
-      data.query_condition.conditions = {
-        filterType: "group",
-        logicalOperator: "AND",
-        conditions: [],
-        groupId: getUUID(),
-      };
+    } else {
+      const loaded = loadAlertConditions(data.query_condition.conditions);
+      data.query_condition.conditions = loaded.tree;
+      loadedLegacyConditions = loaded.legacy;
     }
 
     // Seed the ONE form (single source of truth) with the fully-transformed obj.
@@ -2696,7 +2704,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
     // Resolve the timezone from the stored offset (edit prefill) after the reset.
     if (pendingTimezoneOffset != null) {
-      getTimezonesByOffset(pendingTimezoneOffset).then((res: any) => {
+      pendingSeeding = getTimezonesByOffset(pendingTimezoneOffset).then((res: any) => {
         if (res.length > 1) showTimezoneWarning.value = true;
         setF("trigger_condition.timezone", res[0]);
       });
@@ -3016,16 +3024,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     await getAllFunctions();
   });
 
-  onMounted(async () => {
-    // Initialize form data (replaces created() hook)
-    await initializeFormData();
-
-    // Pre-set anomaly mode
-    if (router.currentRoute.value.name === "addAnomalyDetection") {
-      setF("is_real_time", "anomaly");
-    }
-
-    // Load anomaly detection config when editing
+  // Load anomaly detection config when editing
+  const loadAnomalyForEdit = async () => {
     const routeAnomalyId = router.currentRoute.value.params.anomaly_id as string | undefined;
     if (routeAnomalyId) {
       try {
@@ -3088,20 +3088,41 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         setF("stream_type", data.stream_type);
         if (data.folder_id) activeFolderId.value = data.folder_id;
         anomalyEditMode.value = true;
-        lastValidStep.value = 6;
+        lastValidStep.value = 5;
 
         // The stream is only known NOW. initializeFormData already ran its
         // updateStreams, but at that point stream_type was empty, so it
         // returned early — leaving the stream select with no options and the
         // stream's columns unloaded. The form value was set, yet nothing was
         // selectable and every field picker downstream was empty.
+        anomalyLoadStatus.value = "loaded";
         if (data.stream_type) await updateStreams(false);
-      } catch {
+      } catch (error: unknown) {
+        if (anomalyLoadStatus.value === "idle") {
+          anomalyLoadStatus.value = isNotFoundError(error) ? "missing" : "failed";
+        }
         toast({
           variant: "error",
           message: t("alerts.messages.anomalyConfigLoadFailed"),
         });
       }
+    }
+  };
+
+  onMounted(async () => {
+    try {
+      // Initialize form data (replaces created() hook)
+      await initializeFormData();
+
+      // Pre-set anomaly mode
+      if (router.currentRoute.value.name === "addAnomalyDetection") {
+        setF("is_real_time", "anomaly");
+      }
+
+      await loadAnomalyForEdit();
+      await pendingSeeding.catch(() => undefined);
+    } finally {
+      resolveFormReady();
     }
 
     // Set up alerts context provider
@@ -3223,6 +3244,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     validationErrors,
     isLoadingPrefill,
     prefillWarnings,
+    anomalyLoadStatus,
+    formReady,
     activeFolderId,
     alertType,
 
@@ -3288,7 +3311,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     updateDescription,
     updateRowTemplate,
     updateRowTemplateType,
-    updateDeduplication,
     validateInputs,
     validateSqlQuery,
     validateConditionsAgainstUDS,

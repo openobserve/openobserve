@@ -128,6 +128,7 @@ function handleRangeChange(value: DateRange | undefined) {
     emit("update:startDate", fromIso(start.toString()));
     emit("update:endDate", fromIso(end.toString()));
   }
+  emit("update:pendingDate", start && !end ? fromIso(start.toString()) : null);
 }
 </script>
 

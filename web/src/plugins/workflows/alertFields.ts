@@ -21,7 +21,7 @@ import { raw, type I18nKey, I18nText } from "@/types/i18n";
 // The backend flattens the `{ meta: {...} }` envelope, so the alert fields are
 // exposed to conditions as `meta_<field>` (e.g. `meta.alert_name` → the column
 // `meta_alert_name`) — confirmed with the backend. The Condition form passes
-// these to FilterGroup as suggestions with `allow-custom-columns`, so users can
+// these to the condition builder as fields, and custom fields are allowed, so users can
 // still type any other flattened field the payload carries (e.g. a `data[]` row
 // column).
 
@@ -29,6 +29,8 @@ export interface WorkflowFieldOption {
   label: I18nText;
   value: string;
   type: string;
+  /** A non-selectable group heading in the field picker (OSelect `header`). */
+  header?: boolean;
 }
 
 // Schema of the fixed `meta` block the Alert Trigger emits per firing, shown

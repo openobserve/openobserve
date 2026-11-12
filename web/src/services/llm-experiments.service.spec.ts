@@ -95,6 +95,59 @@ describe("list()", () => {
       executionStatus: "running",
     });
   });
+
+  // The list summary carries the dimensions the customer's code reported.
+  it("normalizes client-reported score summaries, and leaves them absent without a summary", async () => {
+    const clientSummary = {
+      score_config_id: "cfg-quality",
+      score_config_name: "quality",
+      client_scorer_key: "ci_judge",
+      sample_count: 10,
+      value: { kind: "numeric", mean: 0.42 },
+    };
+    mockClient.get.mockResolvedValue({
+      data: {
+        list: [
+          { id: "summarized", clientScoreSummaries: [clientSummary] },
+          { id: "failed-summary", clientScoreSummaries: null },
+          { id: "bare" },
+        ],
+      },
+    });
+
+    const [summarized, failed, bare] = await llmExperimentsService.list("acme", {
+      includeSummary: true,
+    });
+
+    expect(summarized.clientScoreSummaries).toEqual([
+      {
+        scoreConfigId: "cfg-quality",
+        scoreConfigName: "quality",
+        clientScorerKey: "ci_judge",
+        sampleCount: 10,
+        value: { kind: "numeric", mean: 0.42 },
+      },
+    ]);
+    expect(failed.clientScoreSummaries).toEqual([]);
+    expect(bare.clientScoreSummaries).toBeUndefined();
+  });
+
+  it("reads the run's client-reported score summaries on the detail results", async () => {
+    const summary = {
+      scoreConfigId: "cfg-quality",
+      scoreConfigName: "quality",
+      clientScorerKey: "ci_judge",
+      sampleCount: 10,
+      value: { kind: "numeric", mean: 0.42 },
+    };
+    mockClient.get.mockResolvedValue({
+      data: { experiment: { id: "exp-1" }, results: { clientScoreSummaries: [summary] } },
+    });
+
+    expect((await llmExperimentsService.get("acme", "exp-1")).results.clientScoreSummaries).toEqual(
+      [summary],
+    );
+  });
 });
 describe("llm-experiments compare()", () => {
   it.each([{ ids: ["cost", "latency"] }, { ids: [] }])(
@@ -472,6 +525,49 @@ describe("normalizeExperimentRowDetail()", () => {
       scoreConfigVersion: 3,
       pendingCount: 1,
     });
+  });
+
+  it("keeps the structured output and the client-reported scores", () => {
+    const clientScore = {
+      client_scorer_key: "six-axis/service",
+      score_config_id: "config-1",
+      status: "success",
+      value_numeric: 1,
+    };
+    const normalized = normalizeExperimentRowDetail({
+      trials: [
+        {
+          rowId: "row-1",
+          trialIndex: 0,
+          taskStatus: "ok",
+          execution: { row_id: "row-1", status: "ok", output: { run_id: "run-1" } },
+          scores: [],
+          clientScores: [clientScore],
+        },
+      ],
+      scoreSummaries: [],
+      clientScoreSummaries: [
+        {
+          scoreConfigId: "config-1",
+          scoreConfigName: "orca_service",
+          clientScorerKey: "six-axis/service",
+          sampleCount: 1,
+          value: { kind: "numeric", mean: 1 },
+        },
+      ],
+    });
+
+    expect(normalized.trials[0].execution?.output).toEqual({ run_id: "run-1" });
+    expect(normalized.trials[0].clientScores).toEqual([clientScore]);
+    expect(normalized.clientScoreSummaries).toEqual([
+      {
+        scoreConfigId: "config-1",
+        scoreConfigName: "orca_service",
+        clientScorerKey: "six-axis/service",
+        sampleCount: 1,
+        value: { kind: "numeric", mean: 1 },
+      },
+    ]);
   });
 });
 

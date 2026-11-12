@@ -15,82 +15,139 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="card-container rounded-surface bg-surface-base border-border-default flex flex-col gap-2 border px-4 py-3"
-    data-test="oncall-phone-card"
-  >
-    <span class="flex flex-wrap items-center gap-2">
-      <OIcon name="smartphone" size="sm" class="text-text-secondary" />
-      <OText variant="panel-title">{{ t("oncall.phoneTitle") }}</OText>
-      <OTag
-        v-if="state === 'verified'"
-        variant="success-soft"
-        size="sm"
-        data-test="oncall-phone-state"
-      >
-        {{ t("oncall.phoneVerified") }}
-      </OTag>
-      <OTag
-        v-else-if="state === 'codeSent'"
-        variant="default-soft"
-        size="sm"
-        data-test="oncall-phone-state"
-      >
-        {{ t("oncall.phoneNotVerified") }}
-      </OTag>
-      <!-- Amber, not red: email still reaches the person. -->
-      <OTag
-        v-else-if="state === 'changed'"
-        variant="amber-soft"
-        size="sm"
-        data-test="oncall-phone-state"
-      >
-        {{ t("oncall.phoneNotVerified") }}
-      </OTag>
-      <OText v-if="state === 'empty'" variant="meta">{{ t("oncall.phoneIntro") }}</OText>
-    </span>
-
-    <OText v-if="loadFailed" variant="meta" data-test="oncall-phone-load-failed">
-      {{ t("oncall.phoneLoadFailed") }}
-    </OText>
-
-    <template v-else-if="contact && state">
-      <span
-        v-if="state === 'verified' || state === 'codeSent'"
-        class="flex flex-wrap items-center gap-2"
-      >
-        <OText variant="body-strong" as="span" data-test="oncall-phone-number">
+  <div class="flex flex-col gap-2" data-test="oncall-phone-card">
+    <OnCallReachRow :label="t('oncall.phoneTitle')" icon="smartphone">
+      <template #value>
+        <OText v-if="loadFailed" variant="meta" data-test="oncall-phone-load-failed">
+          {{ t("oncall.phoneLoadFailed") }}
+        </OText>
+        <!-- No provider is an org fact the reader may not be able to change, so it is said once with who can fix it. -->
+        <OText
+          v-else-if="state === 'noProvider'"
+          variant="meta"
+          data-test="oncall-phone-no-provider"
+        >
+          {{ t("oncall.phoneNotAvailable") }}
+        </OText>
+        <OText
+          v-else-if="contact?.phone && state !== 'empty'"
+          variant="body-strong"
+          as="span"
+          data-test="oncall-phone-number"
+        >
           {{ raw(contact.phone) }}
         </OText>
+        <OText v-else-if="state === 'empty'" variant="meta">
+          {{ t("oncall.phoneAddHint") }}
+        </OText>
+      </template>
+
+      <template v-if="contact && state && !loadFailed" #status>
+        <OTag
+          v-if="state === 'verified'"
+          variant="success-soft"
+          size="sm"
+          data-test="oncall-phone-state"
+        >
+          {{ t("oncall.phoneVerified") }}
+          <OTooltip
+            :content="
+              contact.press4_available
+                ? t('oncall.phoneVerifiedPress4')
+                : t('oncall.phoneVerifiedAckLink')
+            "
+          />
+        </OTag>
+        <OnCallHint v-else-if="state === 'changed'" :hint="t('oncall.phoneChangedHint')">
+          <OTag variant="amber-soft" size="sm" data-test="oncall-phone-state">
+            {{ t("oncall.phoneNotVerified") }}
+          </OTag>
+        </OnCallHint>
+        <OTag
+          v-else-if="state === 'codeSent'"
+          variant="default-soft"
+          size="sm"
+          data-test="oncall-phone-state"
+        >
+          {{ t("oncall.phoneNotVerified") }}
+        </OTag>
+        <OTag v-else variant="default-soft" size="sm" data-test="oncall-phone-state">
+          {{ t("oncall.reachNotSetUp") }}
+        </OTag>
+      </template>
+
+      <template v-if="contact && state && !loadFailed" #action>
         <OButton
-          variant="ghost-primary"
+          v-if="state === 'noProvider' && admin"
+          variant="outline"
           size="xs"
+          data-test="oncall-phone-telephony-link"
+          @click="openTelephony"
+        >
+          <OIcon name="settings" size="sm" />{{ t("oncall.reachSetUp") }}
+          <OTooltip :content="t('oncall.phoneSetUpHint')" />
+        </OButton>
+        <OnCallHint
+          v-else-if="state === 'noProvider'"
+          :hint="t('oncall.phoneAskAdmin')"
+          data-test="oncall-phone-ask-admin"
+        />
+        <OButton
+          v-if="state === 'verified' || state === 'codeSent'"
+          variant="ghost"
+          size="icon-sm"
+          icon-left="edit"
+          :aria-label="t('oncall.phoneChangeAction')"
           data-test="oncall-phone-change"
           @click="startChange"
         >
-          {{ t("oncall.phoneChange") }}
+          <OTooltip :content="t('oncall.phoneChangeAction')" />
         </OButton>
-      </span>
+        <!-- A saved number can always be taken off, verified or not, provider or not; while editing, Cancel is the way back. -->
+        <OButton
+          v-if="contact.phone && !editing"
+          variant="ghost-destructive"
+          size="icon-sm"
+          icon-left="delete"
+          :loading="removing"
+          :aria-label="t('oncall.phoneRemoveAction')"
+          data-test="oncall-phone-remove"
+          @click="removeOpen = true"
+        >
+          <OTooltip :content="t('oncall.phoneRemoveAction')" />
+        </OButton>
+      </template>
+    </OnCallReachRow>
 
-      <span v-else class="flex flex-wrap items-center gap-2">
+    <template v-if="contact && state && !loadFailed">
+      <span
+        v-if="state === 'empty' || state === 'changed'"
+        class="flex flex-wrap items-center gap-2 md:ps-31"
+      >
         <OInput
           v-model="draftPhone"
           type="tel"
           width="md"
           autocomplete="tel"
           :placeholder="PHONE_EXAMPLE"
-          :disabled="state === 'noProvider'"
+          :error="!!formatError"
+          :error-message="formatError ?? undefined"
           data-test="oncall-phone-input"
+          @blur="checkFormat"
         />
         <OButton
           variant="primary"
           size="sm-action"
-          :disabled="state === 'noProvider' || !draftPhone.trim()"
+          :disabled="!draftPhone.trim() || sendWaiting"
           :loading="sending"
           data-test="oncall-phone-send"
           @click="sendCode"
         >
-          {{ t("oncall.phoneSendCode") }}
+          {{
+            sendWaiting
+              ? t("oncall.phoneResendIn", { time: raw(formatCountdown(resendLeft)) })
+              : t("oncall.phoneSendCode")
+          }}
         </OButton>
         <OButton
           v-if="editing && contact.phone"
@@ -101,10 +158,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("common.cancel") }}
         </OButton>
-        <OText v-if="state === 'empty'" variant="meta">{{ t("oncall.phoneSendHint") }}</OText>
       </span>
 
-      <span v-if="state === 'codeSent'" class="flex flex-wrap items-center gap-2">
+      <span v-if="state === 'codeSent'" class="flex flex-wrap items-center gap-2 md:ps-31">
         <OInput
           v-model="code"
           width="xs"
@@ -139,42 +195,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <p
         v-if="error"
-        class="text-status-error-text text-sm"
+        class="text-status-error-text text-sm md:ps-31"
         role="alert"
         data-test="oncall-phone-error"
       >
         {{ error }}
       </p>
 
-      <OText v-if="state === 'codeSent'" variant="meta">
+      <OText
+        v-if="state === 'codeSent'"
+        variant="meta"
+        class="md:ps-31"
+        data-test="oncall-phone-code-sent-text"
+      >
         {{ t("oncall.phoneCodeSentTo", { phone: raw(contact.phone) }) }}
       </OText>
-      <OText v-else-if="state === 'verified'" variant="meta">
-        {{
-          contact.press4_available
-            ? t("oncall.phoneVerifiedPress4")
-            : t("oncall.phoneVerifiedAckLink")
-        }}
-      </OText>
-      <OText v-else-if="state === 'changed'" variant="meta">
-        {{ t("oncall.phoneChangedHint") }}
-      </OText>
-      <OBanner
-        v-else-if="state === 'noProvider'"
-        variant="info"
-        data-test="oncall-phone-no-provider"
-      >
-        {{ t("oncall.phoneNoProvider") }}
-        <OButton
-          variant="ghost-primary"
-          size="xs"
-          data-test="oncall-phone-telephony-link"
-          @click="openTelephony"
-        >
-          {{ t("oncall.phoneNoProviderLink") }}
-        </OButton>
-      </OBanner>
     </template>
+
+    <ConfirmDialog
+      :model-value="removeOpen"
+      :title="t('oncall.phoneRemoveTitle')"
+      :message="t('oncall.phoneRemoveMessage')"
+      :ok-label="t('oncall.phoneRemove')"
+      ok-variant="destructive"
+      focus-cancel
+      @update:ok="removePhone"
+      @update:cancel="removeOpen = false"
+    />
   </div>
 </template>
 
@@ -184,27 +231,54 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OnCallHint from "@/components/oncall/OnCallHint.vue";
+import OnCallReachRow from "@/components/oncall/OnCallReachRow.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   confirmCodeMutation,
   contactQuery,
   sendCodeMutation,
   setContactMutation,
 } from "@/services/oncall.queries";
-import type { Contact } from "@/ts/interfaces/oncall";
+import type { Contact, RefusalReason } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatCountdown, phoneCardState, phoneRefusalText, refusalOf } from "@/utils/oncall";
+import {
+  formatCountdown,
+  isInternationalPhone,
+  phoneCardState,
+  phoneRefusalText,
+  refusalOf,
+  samePhone,
+} from "@/utils/oncall";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 
 // The server's minimum gap between two codes for one number (R17).
 const RESEND_SECS = 60;
+// Refusals the server returns after storing the new code, so the old one no longer works.
+const UNDELIVERED: ReadonlySet<RefusalReason> = new Set([
+  "number_rejected",
+  "number_not_allowed",
+  "provider_unavailable",
+]);
 const PHONE_EXAMPLE = raw("+1 415 555 0134");
 const CODE_EXAMPLE = raw("000000");
+
+withDefaults(
+  defineProps<{
+    /** Whether to offer the Telephony setup button rather than "ask an admin"; the server is still the gate. */
+    admin?: boolean;
+  }>(),
+  { admin: false },
+);
+
+const emit = defineEmits<{ licenseDenied: [features: string[]] }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -218,7 +292,14 @@ const contactRead = useQuery(() =>
   }),
 );
 const contact = computed(() => contactRead.data.value ?? null);
-const loadFailed = computed(() => contactRead.isError.value);
+// A license denial is not a failed read: the license bar already says why.
+const loadFailed = computed(
+  () => contactRead.isError.value && !licenseDeniedFeatures(contactRead.error.value),
+);
+watch(contactRead.error, (err) => {
+  const denied = licenseDeniedFeatures(err);
+  if (denied) emit("licenseDenied", denied);
+});
 
 const saveContact = useMutation(() => setContactMutation(orgId.value, email.value));
 const sendCodeWrite = useMutation(() => sendCodeMutation(orgId.value, email.value));
@@ -232,12 +313,20 @@ const error = ref<I18nText | null>(null);
 const sending = ref(false);
 const confirming = ref(false);
 const resendAt = ref(0);
+const countdownPhone = ref("");
 const now = ref(Date.now());
+const formatError = ref<I18nText | null>(null);
+const removeOpen = ref(false);
+const removing = ref(false);
 
 const state = computed(() =>
   contact.value ? phoneCardState(contact.value, codeSent.value, editing.value) : null,
 );
 const resendLeft = computed(() => Math.max(0, Math.ceil((resendAt.value - now.value) / 1000)));
+// The server's gap is per number, so a different number may be sent at once.
+const sendWaiting = computed(
+  () => resendLeft.value > 0 && samePhone(draftPhone.value, countdownPhone.value),
+);
 
 watch(
   () => contact.value?.phone,
@@ -247,9 +336,22 @@ watch(
   { immediate: true },
 );
 
+// Cleared as soon as the number reads right, so the hint never outlives the mistake.
+watch(draftPhone, (typed) => {
+  if (formatError.value && isInternationalPhone(typed)) formatError.value = null;
+});
+
+/// The server's own format rule, said before the round trip; an empty box is not a mistake yet.
+function checkFormat(): boolean {
+  const typed = draftPhone.value.trim();
+  formatError.value = typed && !isInternationalPhone(typed) ? t("oncall.phoneFormatHint") : null;
+  return !formatError.value;
+}
+
 let timer: ReturnType<typeof setInterval> | undefined;
 
-function startCountdown(secs: number) {
+function startCountdown(phone: string, secs: number) {
+  countdownPhone.value = phone;
   now.value = Date.now();
   resendAt.value = now.value + secs * 1000;
   clearInterval(timer);
@@ -278,19 +380,24 @@ function cancelChange() {
   editing.value = false;
 }
 
-async function requestCode() {
+async function requestCode(phone: string) {
   try {
     await sendCodeWrite.mutateAsync();
     code.value = "";
     codeSent.value = true;
-    startCountdown(RESEND_SECS);
+    startCountdown(phone, RESEND_SECS);
   } catch (err) {
     const refusal = refusalOf(err);
-    if (refusal?.retry_after_secs !== undefined) startCountdown(refusal.retry_after_secs);
+    if (refusal?.retry_after_secs !== undefined) startCountdown(phone, refusal.retry_after_secs);
     // A code sent under a minute ago is still valid, so its box opens instead of an error.
     if (refusal?.reason === "too_soon" && refusal.retry_after_secs !== undefined) {
       codeSent.value = true;
       return;
+    }
+    // The server stored the undelivered code, so no code works yet the 60 s gap still runs.
+    if (refusal && UNDELIVERED.has(refusal.reason)) {
+      codeSent.value = false;
+      startCountdown(phone, RESEND_SECS);
     }
     error.value = errorText(err, t("oncall.phoneSendFailed"));
   }
@@ -307,6 +414,7 @@ async function saveNumber(): Promise<Contact | null> {
 
 /// PUT then POST: there is no combined endpoint (§10).
 async function sendCode() {
+  if (!checkFormat()) return;
   error.value = null;
   codeSent.value = false;
   sending.value = true;
@@ -316,7 +424,7 @@ async function sendCode() {
     editing.value = false;
     // An unchanged number, or one proved in another org, keeps its proof (V5).
     if (saved.phone_is_pageable) return;
-    await requestCode();
+    await requestCode(saved.phone ?? "");
   } finally {
     sending.value = false;
   }
@@ -326,7 +434,7 @@ async function resend() {
   error.value = null;
   sending.value = true;
   try {
-    await requestCode();
+    await requestCode(contact.value?.phone ?? "");
   } finally {
     sending.value = false;
   }
@@ -342,6 +450,23 @@ async function confirmCode() {
     error.value = errorText(err, t("oncall.phoneCodeFailed"));
   } finally {
     confirming.value = false;
+  }
+}
+
+/// An empty number clears it (`set_contact`); only this org's copy goes, other orgs keep theirs.
+async function removePhone() {
+  removeOpen.value = false;
+  error.value = null;
+  removing.value = true;
+  try {
+    await saveContact.mutateAsync("");
+    codeSent.value = false;
+    editing.value = false;
+    draftPhone.value = "";
+  } catch (err) {
+    error.value = errorText(err, t("oncall.phoneSaveFailed"));
+  } finally {
+    removing.value = false;
   }
 }
 

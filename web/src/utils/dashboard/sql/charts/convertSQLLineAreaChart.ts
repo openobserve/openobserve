@@ -15,8 +15,11 @@
 
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { type SQLContext } from "../shared/types";
-import { chartColor } from "../../../chartTheme";
+import { chartAxisTextColor, chartColor } from "../../../chartTheme";
 import { escapeHtml } from "@/utils/html";
+import { createSeriesOverrideLookup } from "../../seriesOverrides";
+import { sortTooltipParams } from "../../tooltipSort";
+import { tooltipPointValue } from "../../cartesianOptions";
 
 /**
  * Applies chart-specific options for:
@@ -74,6 +77,7 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
     };
     const xAxisLabelRotation = hasTimestampField ? 0 : panelSchema.config?.axis_label_rotate || 0;
     options.xAxis[0].axisLabel = {
+      color: chartAxisTextColor(),
       rotate: xAxisLabelRotation,
     };
     options.xAxis[0].axisTick = {};
@@ -86,6 +90,7 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
     panelSchema.type !== "area" &&
     panelSchema.type !== "bar"
   ) {
+    const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
     options.tooltip.formatter = function (name: any) {
       try {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
@@ -97,10 +102,7 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
           return "";
         if (name?.length == 0) return "";
 
-        // sort tooltip array based on value
-        name?.sort((a: any, b: any) => {
-          return (b.value ?? 0) - (a.value ?? 0);
-        });
+        sortTooltipParams(name, panelSchema?.config, (it: any) => tooltipPointValue(it.value));
 
         // if hovered series name is not null then move it to first position
         if (ctx.hoveredSeriesState?.value?.hoveredSeriesName) {
@@ -127,29 +129,15 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
             // if have than bold it
             if (it?.seriesName == ctx.hoveredSeriesState?.value?.hoveredSeriesName)
               hoverText.push(
-                `<strong>${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
-                  formatUnitValue(
-                    getUnitValue(
-                      it.data,
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals,
-                    ),
-                  ),
+                `<strong>${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
+                  seriesOverrides.formatValue(tooltipPointValue(it.data), it.seriesName),
                 )} </strong>`,
               );
             // else normal text
             else
               hoverText.push(
-                `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
-                  formatUnitValue(
-                    getUnitValue(
-                      it.data,
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals,
-                    ),
-                  ),
+                `${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
+                  seriesOverrides.formatValue(tooltipPointValue(it.data), it.seriesName),
                 )}`,
               );
           }

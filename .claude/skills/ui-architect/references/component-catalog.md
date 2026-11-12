@@ -79,6 +79,7 @@ markup — don't guess a prop name.
 | Transient notification (replaces `q-notify`)         | `useToast()` (+ `OToastProvider` at root)                                                                            | feedback-data           |
 | Loading state                                        | `OSkeleton` (placeholder) / `OSpinner` (bare) / `OInnerLoading` (over a container)                                   | feedback-data           |
 | Progress indicator                                   | `OProgressBar`                                                                                                       | feedback-data           |
+| Segmented proportion / capacity bar with ticks       | `OSegmentedBar`                                                                                                      | feedback-data           |
 | Event timeline                                       | `OTimeline` (+ `OTimelineItem`)                                                                                      | feedback-data           |
 | Hierarchical / tree data                             | `OTree` (+ `OTreeNode`)                                                                                              | feedback-data           |
 | Label–value detail rows                              | `OFieldList` (+ `OFieldRow`, `OFieldLabel`)                                                                          | feedback-data           |

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { configQuery } from "@/services/config.queries";
+import { configQuery, isFullConfigLoaded } from "@/services/config.queries";
 import { createApp } from "vue";
 import { VueQueryPlugin } from "@tanstack/vue-query";
 import store from "./stores";
@@ -28,19 +28,17 @@ import "./styles/rtl.css";
 import "./assets/styles/log-highlighting.css";
 import config from "./aws-exports";
 
-import { openobserveRum } from "@openobserve/browser-rum";
-import { openobserveLogs } from "@openobserve/browser-logs";
 import { useReo } from "./services/reodotdev_analytics";
 import { contextRegistry, createDefaultContextProvider } from "./composables/contextProviders";
-import { buildVersionChecker } from "./utils/buildVersionChecker";
+import { buildVersionChecker, isChunkLoadError } from "./utils/buildVersionChecker";
 import { queryClient, setMutationNotifier } from "./composables/query/queryClient";
-import { shouldPropagateTracing } from "./utils/rum/tracingOrigin";
-import { isIgnoredNoise } from "./utils/rum/ignoredNoisePatterns";
-import { scrubAuthParams } from "./utils/rum/scrubAuthParams";
-import { isExtensionOnlyError } from "./utils/rum/extensionFrames";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 import { raw } from "@/types/i18n";
+import { bindAccess } from "@/composables/useAccessStore";
+import { installFetchLicenseReceiver } from "@/services/licenseDenialReceiver";
+
+installFetchLicenseReceiver();
 
 // Apply the resolved theme synchronously before the app mounts so the first
 // paint already uses the correct colors (no flash of the base stylesheet theme).
@@ -56,6 +54,8 @@ app.use(i18n);
 
 // const router = createRouter(store);
 app.use(store).use(router);
+// Bound before mount: a 403 while the layout still shows its skeleton has no boundary to bind it yet.
+bindAccess(router, store);
 
 app.use(VueQueryPlugin, { queryClient });
 
@@ -69,8 +69,6 @@ contextRegistry.register("default", defaultProvider);
 
 const { reoInit } = useReo();
 
-reoInit();
-
 // app.use(SearchPlugin);
 
 // Unauthenticated bootstrap payload: only what the login page needs. The full
@@ -80,23 +78,8 @@ interface ConfigResponse {
     telemetry_enabled?: boolean;
     build_type?: string;
     commit_hash?: string;
-    rum?: {
-      enabled: boolean;
-      client_token: string;
-      application_id: string;
-      site: string;
-      service: string;
-      env: string;
-      version?: string;
-      organization_identifier: string;
-      insecure_http?: boolean;
-      api_version?: string;
-    };
   };
 }
-
-// Only the three dot-separated parts make a token, so a bare eyJ inside a word (surveyJsonBtn) is kept.
-const JWT_PATTERN = /eyJ[\w-]*\.[\w-]+\.[\w-]*/g;
 
 const getConfig = async () => {
   // Seeds the shared bootstrap `/config` query — Login and the version checker
@@ -109,7 +92,7 @@ const getConfig = async () => {
 
     // Never clobber the authenticated full config with the bootstrap subset if
     // the full fetch (MainLayout) happens to resolve first.
-    if (!store.state.zoConfig?.version) {
+    if (!isFullConfigLoaded(store.state.zoConfig)) {
       store.dispatch("setConfig", res.data);
     }
     config.enableAnalytics = res.data.telemetry_enabled?.toString() ?? "false";
@@ -117,116 +100,6 @@ const getConfig = async () => {
     // Store initial commit hash for version checking
     if (res.data.commit_hash) {
       buildVersionChecker.setInitialVersion(res.data.commit_hash);
-    }
-    if (res.data.rum?.enabled) {
-      const options = {
-        clientToken: res.data.rum.client_token,
-        applicationId: res.data.rum.application_id,
-        site: res.data.rum.site,
-        service: res.data.rum.service,
-        env: res.data.rum.env,
-        version: res.data.rum.version || "0.0.1",
-        organizationIdentifier: res.data.rum.organization_identifier,
-        insecureHTTP: res.data.rum.insecure_http || false,
-        apiVersion: res.data.rum.api_version || "v1",
-      };
-
-      openobserveRum.init({
-        applicationId: options.applicationId, // required, any string identifying your application
-        clientToken: options.clientToken,
-        site: options.site,
-        organizationIdentifier: options.organizationIdentifier,
-        service: options.service,
-        env: options.env,
-        version: options.version,
-        trackResources: true,
-        trackLongTasks: true,
-        trackUserInteractions: true,
-        actionNameAttribute: "data-test",
-        apiVersion: options.apiVersion,
-        insecureHTTP: options.insecureHTTP,
-        defaultPrivacyLevel: "allow",
-        // Session renewal drops the forced replay start, so sampling must keep every renewed session recording.
-        sessionReplaySampleRate: 100,
-        startSessionReplayRecordingManually: true,
-        // Same-origin only: cross-origin (dev against a remote cluster) the
-        // injected headers fail the CORS preflight and kill every API call.
-        // See shouldPropagateTracing.
-        allowedTracingUrls: shouldPropagateTracing(store.state.API_ENDPOINT, window.location.origin)
-          ? [
-              {
-                match: store.state.API_ENDPOINT + "/api",
-                propagatorTypes: ["openobserve", "tracecontext"],
-              },
-            ]
-          : [],
-        beforeSend: (event) => {
-          event.view.url = scrubAuthParams(event.view.url) ?? event.view.url;
-          event.view.referrer = scrubAuthParams(event.view.referrer);
-          if (event.type === "error" && isExtensionOnlyError(event.error?.stack)) return false;
-          if (event.type === "action" && event.action.target?.name) {
-            event.action.target.name = event.action.target.name.replace(JWT_PATTERN, "");
-          }
-          // Filter out specific errors before sending to RUM
-          if (event.type === "error") {
-            const errorMessage = event.error?.message || "";
-            const errorStack = event.error?.stack || "";
-
-            // List of error patterns to ignore
-            const ignoredErrorPatterns = [
-              /ResizeObserver loop/i,
-              /reo.dev/i,
-              /Cannot set properties of null \(setting 'innerHTML'\)/,
-            ];
-
-            // Check if error matches any ignored pattern
-            const shouldIgnore = ignoredErrorPatterns.some(
-              (pattern) => pattern.test(errorMessage) || pattern.test(errorStack),
-            );
-
-            if (shouldIgnore || isIgnoredNoise(errorMessage, errorStack)) {
-              return false; // Don't send this error
-            }
-          }
-
-          // Allow all other events to be sent
-          return true;
-        },
-      });
-
-      openobserveLogs.init({
-        clientToken: options.clientToken,
-        site: options.site,
-        organizationIdentifier: options.organizationIdentifier,
-        service: options.service,
-        env: options.env,
-        version: options.version,
-        forwardErrorsToLogs: true,
-        insecureHTTP: options.insecureHTTP,
-        apiVersion: options.apiVersion,
-        beforeSend: (log) => {
-          if (log.view?.url) log.view.url = scrubAuthParams(log.view.url) ?? log.view.url;
-          // Filter out specific logs before sending
-          const logMessage = log.message || "";
-
-          // List of log patterns to ignore
-          const ignoredLogPatterns = [/ResizeObserver loop/i];
-
-          // Check if log matches any ignored pattern
-          const shouldIgnore = ignoredLogPatterns.some((pattern) => pattern.test(logMessage));
-
-          if (shouldIgnore || isIgnoredNoise(logMessage)) {
-            return false; // Don't send this log
-          }
-
-          // Allow all other logs to be sent
-          return true;
-        },
-      });
-
-      // Don't start session replay automatically - it will be started after login
-      // to avoid capturing login page with "Unknown" user
-      // Session replay will be started in Login.vue and MainLayout.vue after user is authenticated
     }
   });
 };
@@ -304,10 +177,7 @@ window.addEventListener(
 
 // Handle dynamic import errors (for code splitting)
 router.onError(async (error) => {
-  const chunkFailedPattern =
-    /Loading chunk [\d]+ failed|Failed to fetch dynamically imported module/i;
-
-  if (chunkFailedPattern.test(error.message)) {
+  if (isChunkLoadError(error)) {
     // Smart detection: Check if it's stale build or network error
     const isStale = await buildVersionChecker.isStaleChunkError(error);
 
@@ -319,7 +189,10 @@ router.onError(async (error) => {
 
 // router.onError only sees route chunks; lazy components (e.g. the alert dialog) fail through Vite's preload hook.
 window.addEventListener("vite:preloadError", async (event) => {
-  if (await buildVersionChecker.isStaleChunkError(event.payload)) {
+  if (
+    isChunkLoadError(event.payload) &&
+    (await buildVersionChecker.isStaleChunkError(event.payload))
+  ) {
     showNewVersionNotification();
   }
 });
@@ -332,4 +205,10 @@ loadLocaleMessages(activeLocale)
   .catch(() => {})
   .finally(() => {
     app.mount("#app");
+    // reo.js is not needed to render, but the login callback identifies the user and then leaves the page.
+    const startReo = () => void reoInit();
+    if (/\/cb\/?$/.test(window.location.pathname)) startReo();
+    else if (typeof requestIdleCallback !== "undefined")
+      requestIdleCallback(startReo, { timeout: 5000 });
+    else setTimeout(startReo, 0);
   });

@@ -27,7 +27,9 @@ use infra::errors::Error;
 use proto::cluster_rpc;
 
 use crate::{
-    cache::cacher::get_ts_col_order_by, partition::aggregate::is_streaming_aggregate, sql::Sql,
+    cache::{cacher::get_ts_col_order_by, result_utils::is_ts_order_field},
+    partition::aggregate::is_streaming_aggregate,
+    sql::Sql,
 };
 
 /// SQL-derived context for a search partition request.
@@ -55,6 +57,7 @@ impl PartitionSqlContext {
             end_time: req.end_time,
             sql: req.sql.to_string(),
             histogram_interval: req.histogram_interval,
+            timezone: req.timezone.clone(),
             ..Default::default()
         };
         let sql = Sql::new(&query, org_id, stream_type, None).await?;
@@ -68,7 +71,9 @@ impl PartitionSqlContext {
                 && RESULT_ARRAY.is_match(&base64::decode_url(v).unwrap_or_else(|_| v.to_string()))
         });
 
+        // Non-UTC aggregates cannot share the persistent state that merges partition results.
         let use_single_partition = is_explain
+            || (is_streaming_agg && sql.histogram_offset != Some(0))
             || ((ts_column.is_none() || apply_over_hits)
                 && !(req.streaming_output && is_streaming_agg));
 
@@ -79,7 +84,11 @@ impl PartitionSqlContext {
             .order_by
             .first()
             .map(|(field, order_by)| {
-                if field == &ts_column.clone().unwrap_or_default() && order_by == &OrderBy::Asc {
+                if ts_column
+                    .as_deref()
+                    .is_some_and(|ts| is_ts_order_field(field, ts, &sql.aliases))
+                    && order_by == &OrderBy::Asc
+                {
                     OrderBy::Asc
                 } else {
                     OrderBy::Desc
@@ -156,6 +165,7 @@ mod tests {
                 order_by,
                 histogram_interval,
                 timezone: None,
+                histogram_offset: Some(0),
                 sorted_by_time: false,
                 sampling_config: None,
             },

@@ -16,6 +16,7 @@
 import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
 import { addLabelsToSQlQuery, getStreamFromQuery } from "@/utils/query/sqlUtils";
 import {
+  formatDateVariable,
   formatInterval,
   formatRateInterval,
   getTimeInSecondsBasedOnUnit,
@@ -41,8 +42,9 @@ const formatPanelVariableValue = (
   const resolved = resolveQueryVariableValue(variable);
 
   if (!Array.isArray(resolved)) {
-    // If no data found (null value), use SELECT_ALL_VALUE
-    return `${escape(resolved === null ? SELECT_ALL_VALUE : resolved)}`;
+    // a date variable prints in its effective format; a null value is the All sentinel
+    const dateText = formatDateVariable(variable, format);
+    return `${escape(dateText ?? (resolved === null ? SELECT_ALL_VALUE : resolved))}`;
   }
 
   // If no data found (empty array), use SELECT_ALL_VALUE

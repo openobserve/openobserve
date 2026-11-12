@@ -51,11 +51,7 @@ fn create_statement() -> TableCreateStatement {
                 .string_len(27)
                 .not_null(),
         )
-        .col(
-            ColumnDef::new(LlmSecrets::OrgId)
-                .string_len(256)
-                .not_null(),
-        )
+        .col(ColumnDef::new(LlmSecrets::OrgId).string_len(256).not_null())
         .col(
             ColumnDef::new(LlmSecrets::OwnerKind)
                 .string_len(32)
@@ -72,11 +68,7 @@ fn create_statement() -> TableCreateStatement {
                 .not_null(),
         )
         .col(ColumnDef::new(LlmSecrets::KeyId).string_len(64).null())
-        .col(
-            ColumnDef::new(LlmSecrets::State)
-                .string_len(16)
-                .not_null(),
-        )
+        .col(ColumnDef::new(LlmSecrets::State).string_len(16).not_null())
         .col(ColumnDef::new(LlmSecrets::Ciphertext).text().not_null())
         .col(
             ColumnDef::new(LlmSecrets::LastVerifiedAt)

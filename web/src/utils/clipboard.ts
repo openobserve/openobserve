@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { confirmCopy, confirmationAnchor } from "@/lib/feedback/Toast/copyConfirm";
 import { raw, type TranslateFn, type I18nText } from "@/types/i18n";
 
 export interface CopyToClipboardOptions {
@@ -8,6 +9,12 @@ export interface CopyToClipboardOptions {
   errorMessage?: I18nText;
   timeout?: number;
   silent?: boolean;
+  /** Control the "Copied" confirmation sits on; defaults to the control the user just activated. */
+  anchor?: HTMLElement | null;
+}
+
+function isShown(anchor: HTMLElement | null): anchor is HTMLElement {
+  return !!anchor?.isConnected && anchor.getClientRects().length > 0;
 }
 
 async function writeClipboard(text: string): Promise<void> {
@@ -35,6 +42,8 @@ async function writeClipboard(text: string): Promise<void> {
   textarea.value = text;
   textarea.style.cssText = "position:fixed;top:0;left:0;opacity:0;pointer-events:none;";
   textarea.setAttribute("readonly", "");
+  // Callers copy tokens and secrets; session replay records any unmasked DOM insert.
+  textarea.setAttribute("data-o2-privacy", "mask");
   container.appendChild(textarea);
   textarea.focus();
   textarea.select();
@@ -44,9 +53,33 @@ async function writeClipboard(text: string): Promise<void> {
   const focused = document.activeElement === textarea;
   const copied = focused && document.execCommand("copy");
   container.removeChild(textarea);
+  // Removing the focused textarea drops focus to <body>, which an open popover reads as focus-outside and closes.
+  activeEl?.focus({ preventScroll: true });
 
   if (!copied) {
     throw new Error("execCommand copy failed");
+  }
+}
+
+/** Copies text that is still loading: the ClipboardItem write starts inside the click, before any await; false when no copy path works, a rejection of `text` rethrows. */
+export async function copyPendingText(text: Promise<string>): Promise<boolean> {
+  if (typeof ClipboardItem !== "undefined" && typeof navigator.clipboard?.write === "function") {
+    try {
+      const blob = text.then((value) => new Blob([value], { type: "text/plain" }));
+      // The fallback below rethrows the same failure from `text`, so this copy of it is dropped.
+      blob.catch(() => undefined);
+      await navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]);
+      return true;
+    } catch {
+      // Refused or unsupported item: fall back to writing the resolved text.
+    }
+  }
+  const value = await text;
+  try {
+    await writeClipboard(value);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -56,24 +89,37 @@ export async function copyToClipboard(
   options: CopyToClipboardOptions = {},
 ): Promise<boolean> {
   const { successMessage, errorMessage, timeout = 2000, silent = false } = options;
+  // Resolved before the write, because a click made while it is pending would otherwise take the confirmation.
+  const anchor = silent ? null : confirmationAnchor(options.anchor);
 
   try {
     await writeClipboard(text);
-    if (!silent) {
+    if (silent) return true;
+    const toastSuccess = () =>
       toast({
         variant: "success",
         message: raw(successMessage || t("common.copySuccess")),
         timeout,
       });
+    if (isShown(anchor)) {
+      // A page that scrolls right after the copy closes the bubble before anyone sees it.
+      confirmCopy(anchor, raw(successMessage || t("common.copied")), toastSuccess);
+    } else {
+      toastSuccess();
     }
     return true;
   } catch {
-    if (!silent) {
+    if (silent) return false;
+    const toastError = () =>
       toast({
         variant: "error",
         message: raw(errorMessage || t("common.copyError")),
         timeout,
       });
+    if (isShown(anchor)) {
+      confirmCopy(anchor, raw(errorMessage || t("common.couldntCopy")), toastError, "error");
+    } else {
+      toastError();
     }
     return false;
   }

@@ -19,6 +19,16 @@ describe("isUnnamedIconOnly", () => {
     expect(isUnnamedIconOnly(el('<button aria-label="Save"></button>'))).toBe(false);
     expect(isUnnamedIconOnly(el('<button aria-labelledby="x"></button>'))).toBe(false);
     expect(isUnnamedIconOnly(el('<button><span class="sr-only">Save</span></button>'))).toBe(false);
+    expect(
+      isUnnamedIconOnly(el('<button title="Delete"><svg aria-hidden="true"></svg></button>')),
+    ).toBe(false);
+    expect(isUnnamedIconOnly(el('<button title=" "><svg aria-hidden="true"></svg></button>'))).toBe(
+      true,
+    );
+  });
+
+  it("leaves a button hidden from assistive tech alone", () => {
+    expect(isUnnamedIconOnly(el('<button aria-hidden="true"><svg></svg></button>'))).toBe(false);
   });
 
   it("accepts a named image or a named child, but not an empty alt", () => {

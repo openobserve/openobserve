@@ -15,11 +15,11 @@
 
 use std::collections::HashMap;
 
-use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::{
+    alerts::{fixed_offset, next_cron_after},
     downtimes::ActiveDowntime,
     synthetics_variables::{placeholder_names, substitute_placeholders},
 };
@@ -85,14 +85,10 @@ impl SyntheticFrequency {
                 }
                 let schedule = cron::Schedule::from_str(&self.cron)
                     .map_err(|e| anyhow::anyhow!("invalid cron '{}': {e}", self.cron))?;
-                let tz = FixedOffset::east_opt(tz_offset_mins * 60)
-                    .unwrap_or_else(|| FixedOffset::east_opt(0).unwrap());
+                let offset = fixed_offset(tz_offset_mins).map_or(0, |_| tz_offset_mins);
                 let from = chrono::DateTime::from_timestamp_micros(from_us)
-                    .ok_or_else(|| anyhow::anyhow!("invalid from timestamp {from_us}"))?
-                    .with_timezone(&tz);
-                schedule
-                    .after(&from)
-                    .next()
+                    .ok_or_else(|| anyhow::anyhow!("invalid from timestamp {from_us}"))?;
+                next_cron_after(&schedule, self.timezone.as_deref(), offset, from)
                     .map(|t| t.timestamp_micros())
                     .ok_or_else(|| anyhow::anyhow!("cron '{}' has no future dates", self.cron))
             }
@@ -122,7 +118,7 @@ pub struct Synthetic {
     /// accepts and returns; it is resolved to the `folders.id` KSUID on write.
     #[serde(default)]
     pub folder_id: String,
-    /// Timezone offset in minutes from UTC (e.g. -300 = EST). Used for cron scheduling.
+    /// UTC offset in minutes, used only when `frequency.timezone` is absent or unparseable.
     #[serde(default)]
     pub tz_offset: i32,
     pub name: String,
@@ -144,6 +140,9 @@ pub struct Synthetic {
     /// Alert destination names to notify on check failure.
     #[serde(default)]
     pub destinations: Vec<String>,
+    /// Template override for this check's messages; null or "" uses the destination's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
     /// Number of retries before marking a check failed (0 = no retry).
     #[serde(default)]
     pub retries: i32,
@@ -1062,7 +1061,7 @@ pub fn api_endpoint() -> String {
 
 /// A device class with its viewport dimensions — returned by the capabilities
 /// endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SyntheticsDevice {
     pub id: String,
     pub label: String,
@@ -1301,9 +1300,10 @@ fn validate_net_retry_budget(
         } else {
             String::new()
         };
+        let or = if retries_fix.is_empty() { "" } else { "or " };
         return Err(format!(
             "config: this check needs up to {} per run, which is over the {} check budget. To fix \
-             it, {retries_fix}or lower config.timeout_ms (currently {}). Detail: {} attempt(s) x \
+             it, {retries_fix}{or}lower config.timeout_ms (currently {}). Detail: {} attempt(s) x \
              {} each, plus {}s between retries. A check that outlives the budget is killed mid-run \
              by the probe's function timeout and reports a failure the target never had.",
             human_ms(worst_case_ms),
@@ -1473,8 +1473,18 @@ fn check_http_url(field: &str, value: &str, echo: bool) -> Result<(), String> {
         };
         return Err(format!("{field}: URL scheme must be http or https{got}"));
     }
-    if parsed.host_str().is_none_or(str::is_empty) {
+    let Some(host) = parsed.host_str().filter(|h| !h.is_empty()) else {
         return Err(format!("{field}: URL has no host"));
+    };
+    // Every probe refuses these under every policy, so reject them at save time rather
+    // than schedule a check that can only fail. Private ranges pass: a private location
+    // exists to reach them, and the probe's dialer decides per location.
+    if crate::utils::ssrf_guard::is_always_blocked_host(host) {
+        return Err(format!(
+            "{field}: URL host is a loopback, link-local or cloud metadata address, which no \
+             probe location can reach{}",
+            quoted(": ")
+        ));
     }
     Ok(())
 }
@@ -2285,9 +2295,14 @@ fn validate_browser_config(
         } else {
             String::new()
         };
+        let or = if combos_fix.is_empty() && retries_fix.is_empty() {
+            ""
+        } else {
+            "or "
+        };
         return Err(format!(
             "config: this check needs up to {} per run, which is over the {} check budget. To fix \
-             it, {combos_fix}{retries_fix}or shorten the run with config.journey_budget_ms \
+             it, {combos_fix}{retries_fix}{or}shorten the run with config.journey_budget_ms \
              (currently {}). Detail: {devices} browser/device combo(s) x {attempts} attempt(s) x \
              {} each, plus {}s between retries. A run that outlives the budget is killed \
              mid-journey by the probe's function timeout.",
@@ -2955,6 +2970,7 @@ mod tests {
             "https://",
             "{{A}} hunter2",
             "{{A/hunter2",
+            "http://127.0.0.1/hunter2",
         ] {
             let quiet = validate_http_url_quietly("target", bad).unwrap_err();
             assert!(quiet.starts_with("target: "), "{quiet}");
@@ -2962,6 +2978,39 @@ mod tests {
             assert!(validate_http_url("target", bad).is_err(), "{bad}");
         }
         assert!(validate_http_url_quietly("target", "https://shop.test/login").is_ok());
+    }
+
+    #[test]
+    fn a_target_no_probe_can_reach_is_rejected_at_save_time() {
+        for bad in [
+            "http://127.0.0.1/",
+            "http://localhost:8080/",
+            "https://LocalHost/",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://[fd00:ec2::254]/",
+            "http://[::1]/",
+            "http://[fe80::1]/",
+            "http://metadata.google.internal/computeMetadata/v1/",
+            "http://metadata/",
+            "http://0.0.0.0/",
+        ] {
+            let err = validate_http_url("target", bad).unwrap_err();
+            assert!(err.contains("no probe location can reach"), "{bad}: {err}");
+        }
+        // A templated host resolves in the probe, whose dialer is the authoritative control.
+        assert!(validate_http_url("target", "{{HOST}}:8080/health").is_ok());
+        // Private ranges stay valid: private locations exist to reach them.
+        for ok in [
+            "http://10.0.0.5/health",
+            "http://192.168.1.1/",
+            "http://172.16.4.2:9090/metrics",
+            "http://[fd12::1]/",
+            "http://api.internal/",
+            "http://service.local/",
+            "https://shop.test/login",
+        ] {
+            assert!(validate_http_url("target", ok).is_ok(), "{ok}");
+        }
     }
 
     #[test]
@@ -4264,6 +4313,30 @@ mod tests {
         assert!(retries_at < budget_at, "reachable lever first: {err}");
     }
 
+    #[test]
+    fn over_budget_message_with_only_the_budget_lever_has_no_dangling_or() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.retries = 0;
+        s.config["journey_budget_ms"] = serde_json::json!(MAX_JOURNEY_BUDGET_MS);
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(
+            err.contains(
+                "To fix it, shorten the run with config.journey_budget_ms (currently 15m)"
+            ),
+            "{err}"
+        );
+        assert!(!err.contains("To fix it, or"), "{err}");
+
+        s.retries = 1;
+        s.config["journey_budget_ms"] = serde_json::json!(450_000);
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(
+            err.contains("To fix it, lower retries below 1, or shorten the run"),
+            "{err}"
+        );
+    }
+
     /// Two browser/device combos with the web form's own default `retries: 1`
     /// and the server default budget land at 2 x (2 x 300s + 5s) = 1210s, past
     /// the 840s check budget — so "Chromium desktop + Chromium mobile" cannot be
@@ -4664,5 +4737,61 @@ mod tests {
         })
         .unwrap();
         assert_eq!(json["reference_state"], "missing");
+    }
+
+    fn cron_frequency(timezone: Option<&str>) -> SyntheticFrequency {
+        SyntheticFrequency {
+            frequency_type: SyntheticFrequencyType::Cron,
+            interval: 0,
+            cron: "0 0 9 * * *".to_string(),
+            timezone: timezone.map(str::to_string),
+        }
+    }
+
+    fn utc_micros(y: i32, m: u32, d: u32, h: u32, mi: u32) -> i64 {
+        use chrono::TimeZone;
+        chrono::Utc
+            .with_ymd_and_hms(y, m, d, h, mi, 0)
+            .unwrap()
+            .timestamp_micros()
+    }
+
+    #[test]
+    fn cron_next_run_follows_the_zone_name_across_dst() {
+        let ny = cron_frequency(Some("America/New_York"));
+        // The stored offset is the one in force when the check was saved, stale after the change.
+        assert_eq!(
+            ny.next_run_at(utc_micros(2026, 11, 1, 12, 0), -240)
+                .unwrap(),
+            utc_micros(2026, 11, 1, 14, 0)
+        );
+        assert_eq!(
+            ny.next_run_at(utc_micros(2026, 3, 8, 12, 0), -300).unwrap(),
+            utc_micros(2026, 3, 8, 13, 0)
+        );
+    }
+
+    #[test]
+    fn cron_next_run_uses_the_offset_without_a_zone_name() {
+        let legacy = cron_frequency(None);
+        assert_eq!(
+            legacy
+                .next_run_at(utc_micros(2026, 6, 15, 0, 0), 330)
+                .unwrap(),
+            utc_micros(2026, 6, 15, 3, 30)
+        );
+        assert_eq!(
+            legacy
+                .next_run_at(utc_micros(2026, 6, 15, 0, 0), 1440)
+                .unwrap(),
+            utc_micros(2026, 6, 15, 9, 0)
+        );
+        let unknown_zone = cron_frequency(Some("Not/AZone"));
+        assert_eq!(
+            unknown_zone
+                .next_run_at(utc_micros(2026, 6, 15, 0, 0), 330)
+                .unwrap(),
+            utc_micros(2026, 6, 15, 3, 30)
+        );
     }
 }

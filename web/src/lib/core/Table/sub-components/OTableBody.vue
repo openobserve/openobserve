@@ -2,9 +2,15 @@
 
 <script setup lang="ts">
 import type { Row, Table } from "@tanstack/vue-table";
-import { computed, ref, watch, useSlots } from "vue";
+import { computed, inject, onActivated, ref, watch, useSlots } from "vue";
 import OTableBodyRow from "./OTableBodyRow.vue";
+// Rows fade only when the body mounts, i.e. when they replace the skeleton or empty state, never on sort or paging.
+import { ENTER_FADE } from "@/lib/styles/motion";
+import { PAGE_ENTRANCE_KEY } from "@/lib/core/PageLayout/pageEntrance";
 import { VueDraggableNext } from "vue-draggable-next";
+
+// The parent's attrs belong on the data tbody, not the body-start one.
+defineOptions({ inheritAttrs: false });
 
 const props = defineProps<{
   rows: Row<any>[];
@@ -84,6 +90,7 @@ const emit = defineEmits<{
   "toggle-expansion": [row: any];
   "row-click": [row: any, event: MouseEvent];
   "row-dblclick": [row: any, event: MouseEvent];
+  "row-auxclick": [row: any, event: MouseEvent];
   "row-mouseenter": [row: any, event: MouseEvent];
   "row-mouseleave": [row: any];
   "cell-click": [params: { columnId: string; row: any; value: any }];
@@ -92,6 +99,12 @@ const emit = defineEmits<{
 }>();
 
 const slots = useSlots();
+
+const pageEntering = inject(PAGE_ENTRANCE_KEY, () => true);
+const rowsEnterClass = () => (pageEntering() ? ENTER_FADE : "");
+const rowsEnter = ref(rowsEnterClass());
+// A kept-alive return re-inserts the body, which would replay the fade unless the class is dropped first.
+onActivated(() => (rowsEnter.value = rowsEnterClass()));
 
 // When every row's disableRowReorder returns true, fall back to non-draggable body
 const allRowsDisabled = computed(() => {
@@ -222,9 +235,11 @@ const headingColspan = computed(
   <!-- Normal draggable body -->
   <VueDraggableNext
     v-if="!isVirtual() && rowReorderEnabled"
+    v-bind="$attrs"
     v-model="draggableModel"
     :item-key="rowKey || 'id'"
     tag="tbody"
+    :class="rowsEnter"
     handle="[data-test='o2-table-row-drag-handle']"
     :animation="200"
     ghost-class="table-drag-ghost"
@@ -267,6 +282,7 @@ const headingColspan = computed(
       @toggle-expansion="emit('toggle-expansion', $event)"
       @row-click="(row: any, evt: MouseEvent) => emit('row-click', row, evt)"
       @row-dblclick="(row: any, evt: MouseEvent) => emit('row-dblclick', row, evt)"
+      @row-auxclick="(row: any, evt: MouseEvent) => emit('row-auxclick', row, evt)"
       @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
       @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
       @cell-click="emit('cell-click', $event)"
@@ -284,7 +300,7 @@ const headingColspan = computed(
 
   <!-- Normal (non-virtual, non-draggable) body. One loop over heading-or-row
        items, so sectioned and unsectioned bodies share the row markup. -->
-  <tbody v-else-if="!isVirtual()" data-test="o2-table-body">
+  <tbody v-else-if="!isVirtual()" v-bind="$attrs" :class="rowsEnter" data-test="o2-table-body">
     <slot name="body-start" />
     <template v-for="item in plainBodyItems" :key="item.itemKey">
       <!-- Spans every visible column: a heading is about the run below it, not
@@ -332,6 +348,7 @@ const headingColspan = computed(
         @toggle-expansion="emit('toggle-expansion', $event)"
         @row-click="(row: any, evt: MouseEvent) => emit('row-click', row, evt)"
         @row-dblclick="(row: any, evt: MouseEvent) => emit('row-dblclick', row, evt)"
+        @row-auxclick="(row: any, evt: MouseEvent) => emit('row-auxclick', row, evt)"
         @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
         @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
         @cell-click="emit('cell-click', $event)"
@@ -346,12 +363,13 @@ const headingColspan = computed(
         </template>
       </OTableBodyRow>
     </template>
+    <slot name="body-end" />
   </tbody>
 
   <!-- Virtual scroll body: rows stay in flow; top/bottom spacer rows
        reserve the offset above first and below last visible row so cells
        inherit the parent table's column layout (same as non-virtual). -->
-  <tbody v-else data-test="o2-table-body">
+  <tbody v-else v-bind="$attrs" :class="rowsEnter" data-test="o2-table-body">
     <slot name="body-start" />
     <tr v-if="virtualRows && virtualRows.length && virtualRows[0].start > 0" aria-hidden="true">
       <td
@@ -399,6 +417,7 @@ const headingColspan = computed(
       @toggle-expansion="emit('toggle-expansion', $event)"
       @row-click="(row: any, evt: MouseEvent) => emit('row-click', row, evt)"
       @row-dblclick="(row: any, evt: MouseEvent) => emit('row-dblclick', row, evt)"
+      @row-auxclick="(row: any, evt: MouseEvent) => emit('row-auxclick', row, evt)"
       @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
       @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
       @cell-click="emit('cell-click', $event)"
@@ -421,5 +440,13 @@ const headingColspan = computed(
         }"
       />
     </tr>
+    <slot name="body-end" />
+  </tbody>
+  <!-- Own tbody, after the v-if chain: inside the draggable body it would count as a model row. -->
+  <tbody
+    v-if="!isVirtual() && rowReorderEnabled && slots['body-end']"
+    data-test="o2-table-body-end"
+  >
+    <slot name="body-end" />
   </tbody>
 </template>

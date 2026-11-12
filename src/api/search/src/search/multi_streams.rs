@@ -50,6 +50,10 @@ use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 use transform as functions;
 use usage_reporting::report_request_usage_stats;
+use utoipa::openapi::{
+    RefOr,
+    schema::{AnyOfBuilder, ArrayBuilder, ObjectBuilder, Schema, SchemaType, Type},
+};
 #[cfg(feature = "cloud")]
 use {
     axum::http::StatusCode as AxumStatusCode,
@@ -71,6 +75,34 @@ use crate::{
     search::{error_utils::map_error_to_http_response, utils::SearchStreamGuard},
 };
 
+/// Only documents `_search_multi`: with `per_query_response` each hit is one query's rows.
+struct MultiSearchResponse;
+
+impl utoipa::PartialSchema for MultiSearchResponse {
+    fn schema() -> RefOr<Schema> {
+        let mut schema = <search::Response as utoipa::PartialSchema>::schema();
+        if let RefOr::T(Schema::Object(response)) = &mut schema {
+            let row = || ObjectBuilder::new().schema_type(Type::Object);
+            // A ResultArray VRL may put non-object values inside a per-query group.
+            let any_value = ObjectBuilder::new().schema_type(SchemaType::AnyValue);
+            let hit = AnyOfBuilder::new()
+                .item(row())
+                .item(ArrayBuilder::new().items(any_value));
+            let hits = ArrayBuilder::new().items(hit).description(Some(
+                "Rows, or with `per_query_response` one array of values per query",
+            ));
+            response.properties.insert("hits".to_string(), hits.into());
+        }
+        schema
+    }
+}
+
+impl utoipa::ToSchema for MultiSearchResponse {
+    fn schemas(schemas: &mut Vec<(String, RefOr<Schema>)>) {
+        <search::Response as utoipa::ToSchema>::schemas(schemas);
+    }
+}
+
 /// SearchStreamData
 #[utoipa::path(
     post,
@@ -82,7 +114,7 @@ use crate::{
     description = "Executes SQL queries that can span across multiple data streams within the organization. This enables cross-stream analytics, joins, and aggregations to analyze data relationships and patterns across different log streams, metrics, or traces. The query engine automatically handles data from different streams and returns unified results.",
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("validate" = bool, Query, description = "Validate query fields against stream schema and User-Defined Schema (UDS). When enabled, returns error if queried fields are not in schema or not allowed by UDS"),
+        ("validate" = Option<bool>, Query, description = "Validate query fields against stream schema and User-Defined Schema (UDS). When enabled, returns error if queried fields are not in schema or not allowed by UDS"),
     ),
     request_body(
         content = inline(search::MultiStreamRequest),
@@ -98,12 +130,13 @@ use crate::{
         }
     })
     ),
+    security(("Authorization" = [])),
     responses(
         (
             status = 200,
             description = "Success",
             content_type = "application/json",
-            body = Object,
+            body = MultiSearchResponse,
             example = json!({
             "took": 155,
             "hits": [
@@ -142,6 +175,10 @@ use crate::{
             content_type = "application/json",
             body = (),
         )
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn search_multi(
@@ -256,10 +293,13 @@ pub async fn search_multi(
                     .await;
             // Enrichment tables have no retention and must be searched in full; skip the clamp.
             if stream_type != StreamType::EnrichmentTables
-                && max_query_range > 0
-                && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
+                && let Some(clamped) = config::utils::query_range::clamp_start_time(
+                    req.query.start_time,
+                    req.query.end_time,
+                    max_query_range,
+                )
             {
-                req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
+                req.query.start_time = clamped;
                 range_error = format!(
                     "{} Query duration for stream {} is modified due to query range restriction of {} hours",
                     range_error, stream_name, max_query_range
@@ -285,44 +325,19 @@ pub async fn search_multi(
             return map_error_to_http_response(&e, Some(trace_id));
         }
 
-        // Check permissions on stream
         #[cfg(feature = "enterprise")]
         {
-            use o2_openfga::meta::mapping::OFGA_MODELS;
-
-            use crate::service::{auth::AuthExtractor, users::get_user};
-
-            if !db::user::is_root_user(user_id) {
-                let user: config::meta::user::User =
-                    get_user(Some(&org_id), user_id).await.unwrap();
-                let stream_type_str = stream_type.as_str();
-
-                if !openobserve_core::authz::check_permissions(
-                    user_id,
-                    AuthExtractor {
-                        auth: "".to_string(),
-                        method: "GET".to_string(),
-                        o2_type: format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(stream_type_str)
-                                .map_or(stream_type_str, |model| model.key),
-                            openobserve_core::auth::into_ofga_supported_format(&stream_name)
-                        ),
-                        org_id: org_id.clone(),
-                        bypass_check: false,
-                        parent_id: "".to_string(),
-                        use_all_org: false,
-                        use_self_context: false,
-                        use_self_parent: true,
-                    },
-                    user.role,
-                    user.is_external,
-                )
-                .await
-                {
-                    return MetaHttpResponse::forbidden("Unauthorized Access");
-                }
+            if let Some(res) = super::check_sql_stream_permissions(
+                &req.query.sql,
+                &org_id,
+                user_id,
+                stream_type,
+                crate::search::utils::StreamPermissionResourceType::Search,
+                &trace_id,
+            )
+            .await
+            {
+                return res;
             }
 
             if let Some(res) = check_cipher_key_permissions(&org_id, user_id, &req.query.sql).await
@@ -428,7 +443,6 @@ pub async fn search_multi(
                 multi_res.scan_size += res.scan_size;
                 multi_res.scan_records += res.scan_records;
                 multi_res.columns.extend(res.columns);
-                multi_res.response_type = res.response_type;
                 multi_res.trace_id = res.trace_id;
                 multi_res.cached_ratio = res.cached_ratio;
 
@@ -684,12 +698,13 @@ pub async fn search_multi(
         "end_time": 1675185660872049i64
     })
     ),
+    security(("Authorization" = [])),
     responses(
         (
             status = 200,
             description = "Success",
             content_type = "application/json",
-            body = Object,
+            body = config::meta::search::SearchPartitionResponse,
             example = json!({
             "took": 155,
             "file_num": 10,
@@ -713,6 +728,10 @@ pub async fn search_multi(
             content_type = "application/json",
             body = (),
         )
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn _search_partition_multi(
@@ -770,8 +789,15 @@ pub async fn _search_partition_multi(
 
     #[cfg(feature = "enterprise")]
     for sql in &req.sql {
-        if let Some(res) =
-            super::check_sql_stream_permissions(sql, &org_id, user_id, stream_type, &trace_id).await
+        if let Some(res) = super::check_sql_stream_permissions(
+            sql,
+            &org_id,
+            user_id,
+            stream_type,
+            crate::search::utils::StreamPermissionResourceType::Search,
+            &trace_id,
+        )
+        .await
         {
             return res;
         }
@@ -840,7 +866,7 @@ pub async fn _search_partition_multi(
 
 /// SearchAround
 #[utoipa::path(
-    post,
+    get,
     path = "/{org_id}/{stream_names}/_around_multi",
     context_path = "/api",
     tag = "Search",
@@ -853,12 +879,13 @@ pub async fn _search_partition_multi(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_names" = String, Path, description = "base64 encoded comma separated stream names"),
-        ("key" = i64, Query, description = "around key"),
-        ("size" = i64, Query, description = "around size"),
+        ("key" = Option<i64>, Query, description = "around key; defaults to 0"),
+        ("size" = Option<i64>, Query, description = "around size; defaults to 10"),
+        ("sql" = Option<String>, Query, description = "comma separated base64 url encoded SQL, one per stream"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -885,6 +912,10 @@ pub async fn _search_partition_multi(
         })),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn around_multi(
@@ -1013,6 +1044,8 @@ fn parse_simple_multi_stream_request(
     #[derive(serde::Deserialize)]
     struct SimpleMultiStreamWrapper {
         query: SimpleMultiStreamQuery,
+        #[serde(default = "search::default_use_index")]
+        use_index: bool,
     }
     #[derive(serde::Deserialize)]
     struct SimpleMultiStreamQuery {
@@ -1058,11 +1091,11 @@ fn parse_simple_multi_stream_request(
         end_time: simple_req.query.end_time,
         sort_by: None,
         quick_mode: simple_req.query.quick_mode,
-        query_type: "".to_string(),
         track_total_hits: simple_req.query.track_total_hits,
         uses_zo_fn: simple_req.query.query_fn.is_some(),
         query_fn: simple_req.query.query_fn,
         skip_wal: false,
+        use_index: simple_req.use_index,
         regions: vec![],
         clusters: vec![],
         search_type: None,
@@ -1273,111 +1306,6 @@ pub async fn search_multi_stream(
         }
     };
 
-    // Check permissions for all streams upfront before processing queries
-    // Extract stream names from SQL queries and check permissions
-    #[cfg(feature = "enterprise")]
-    {
-        use o2_openfga::meta::mapping::OFGA_MODELS;
-
-        use crate::service::{auth::AuthExtractor, users::get_user};
-
-        if !db::user::is_root_user(&user_id) {
-            let user: config::meta::user::User = get_user(Some(&org_id), &user_id).await.unwrap();
-            let stream_type_str = stream_type.as_str();
-            let user_role = user.role.clone();
-            let user_is_external = user.is_external;
-
-            // Extract all stream names from SQL queries
-            let mut stream_names = hashbrown::HashSet::new();
-            for sql_query in &multi_req.sql {
-                match resolve_stream_names(&sql_query.sql) {
-                    Ok(streams) => {
-                        for stream in streams {
-                            stream_names.insert(stream);
-                        }
-                    }
-                    Err(e) => {
-                        #[cfg(feature = "enterprise")]
-                        let error_message = format!("Failed to parse SQL: {e}");
-
-                        let http_response =
-                            map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
-
-                        #[cfg(feature = "enterprise")]
-                        {
-                            report_to_audit(
-                                user_id.clone(),
-                                org_id.clone(),
-                                trace_id.clone(),
-                                http_response.status().into(),
-                                Some(error_message),
-                                "POST".to_string(),
-                                format!("/api/{}/_search_multi_stream", org_id),
-                                query
-                                    .iter()
-                                    .map(|(k, v)| format!("{}={}", k, v))
-                                    .collect::<Vec<_>>()
-                                    .join("&"),
-                                body_bytes.clone(),
-                            )
-                            .await;
-                        }
-                        return http_response;
-                    }
-                }
-            }
-
-            // Check permissions for each unique stream
-            for stream_name in stream_names {
-                if !openobserve_core::authz::check_permissions(
-                    &user_id,
-                    AuthExtractor {
-                        auth: "".to_string(),
-                        method: "GET".to_string(),
-                        o2_type: format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(stream_type_str)
-                                .map_or(stream_type_str, |model| model.key),
-                            openobserve_core::auth::into_ofga_supported_format(&stream_name)
-                        ),
-                        org_id: org_id.clone(),
-                        bypass_check: false,
-                        parent_id: "".to_string(),
-                        use_all_org: false,
-                        use_self_context: false,
-                        use_self_parent: true,
-                    },
-                    user_role.clone(),
-                    user_is_external,
-                )
-                .await
-                {
-                    #[cfg(feature = "enterprise")]
-                    {
-                        report_to_audit(
-                            user_id.clone(),
-                            org_id.clone(),
-                            trace_id.clone(),
-                            403,
-                            Some(format!("Unauthorized Access to stream: {stream_name}")),
-                            "POST".to_string(),
-                            format!("/api/{}/_search_multi_stream", org_id),
-                            query
-                                .iter()
-                                .map(|(k, v)| format!("{}={}", k, v))
-                                .collect::<Vec<_>>()
-                                .join("&"),
-                            body_bytes.clone(),
-                        )
-                        .await;
-                    }
-                    return MetaHttpResponse::forbidden("Unauthorized Access");
-                }
-            }
-        }
-    }
-
     // Extract top-level query_fn (VRL function) and per_query_response, mirroring
     // search_multi(). Decode the base64-encoded VRL and ensure it ends with '.' for
     // correct VRL evaluation.
@@ -1473,6 +1401,41 @@ pub async fn search_multi_stream(
                 .await;
             }
             return http_response;
+        }
+
+        #[cfg(feature = "enterprise")]
+        if let Some(res) = super::check_sql_stream_permissions(
+            &req.query.sql,
+            &org_id,
+            &user_id,
+            stream_type,
+            crate::search::utils::StreamPermissionResourceType::Search,
+            &trace_id,
+        )
+        .await
+        {
+            let reason = if res.status() == StatusCode::FORBIDDEN {
+                "Unauthorized Access"
+            } else {
+                "Failed to parse SQL"
+            };
+            report_to_audit(
+                user_id.clone(),
+                org_id.clone(),
+                trace_id.clone(),
+                res.status().into(),
+                Some(reason.to_string()),
+                "POST".to_string(),
+                format!("/api/{}/_search_multi_stream", org_id),
+                query
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>()
+                    .join("&"),
+                body_bytes.clone(),
+            )
+            .await;
+            return res;
         }
     }
 
@@ -1622,6 +1585,8 @@ pub async fn report_to_audit(
     let is_audit_enabled = get_o2_config().common.audit_enabled;
     if is_audit_enabled {
         audit(AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: user_id,
             org_id,
             _timestamp: config::utils::time::now_micros(),
@@ -1635,6 +1600,9 @@ pub async fn report_to_audit(
                 error_msg: error_message,
                 trace_id: Some(trace_id.to_string()),
             },
+            delegated: None,
+            fleet_id: None,
+            target: None,
         })
         .await;
     }
@@ -1656,7 +1624,42 @@ mod tests {
     use openobserve_api_common::extractors::Headers;
     use openobserve_core::auth::UserEmail;
 
-    use super::around_multi;
+    use super::{around_multi, parse_simple_multi_stream_request};
+
+    #[test]
+    fn test_parse_simple_multi_stream_request_use_index() {
+        let body = |extra: &str| {
+            format!(
+                r#"{{"query":{{"sql":["SELECT * FROM t"],"start_time":0,"end_time":1}}{extra}}}"#
+            )
+        };
+        assert!(
+            parse_simple_multi_stream_request(body("").as_bytes())
+                .unwrap()
+                .use_index
+        );
+        let req = parse_simple_multi_stream_request(body(r#","use_index":false"#).as_bytes());
+        assert!(!req.unwrap().use_index);
+    }
+
+    #[test]
+    fn multi_stream_checks_each_query_after_decoding_it() {
+        let text = include_str!("multi_streams.rs");
+        let start = text
+            .find("pub async fn search_multi_stream(")
+            .expect("handler");
+        let body = &text[start..];
+        let body = &body[..body.find("\n}\n").expect("handler end")];
+        let decode = body.find("req.decode()").expect("decode");
+        let check = body
+            .find("check_sql_stream_permissions(")
+            .expect("permission check");
+        assert!(
+            decode < check,
+            "base64 SQL must be decoded before it is parsed for permissions"
+        );
+        assert!(body[check..].contains("&req.query.sql"));
+    }
 
     #[test]
     fn test_multi_stream_request_structure() {
@@ -1676,11 +1679,11 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1730,11 +1733,11 @@ mod tests {
             end_time: Utc::now().timestamp_micros() - 3_600_000_000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1759,11 +1762,11 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1793,11 +1796,11 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some("base64_encoded_vrl_function".to_string()),
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1828,11 +1831,11 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1871,11 +1874,11 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1907,11 +1910,11 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1974,11 +1977,11 @@ mod tests {
             end_time: 4000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some("dG9wX2xldmVsX3ZybA==".to_string()), // "top_level_vrl" base64
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -2016,11 +2019,11 @@ mod tests {
             end_time: 2000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some("dG9wX2xldmVsX3ZybA==".to_string()), // "top_level_vrl"
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -2080,11 +2083,11 @@ mod tests {
             end_time: 2000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some(encoded),
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -2146,11 +2149,11 @@ mod tests {
             end_time: 2000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some(encoded),
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -2220,11 +2223,11 @@ mod tests {
             end_time: 2000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some(encoded),
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,

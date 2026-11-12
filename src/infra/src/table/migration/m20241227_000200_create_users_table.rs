@@ -62,11 +62,7 @@ fn create_users_table_statement() -> TableCreateStatement {
         // - 0 is a internal user
         // - 1 is a external user
         .col(ColumnDef::new(Users::UserType).small_integer().not_null())
-        .col(
-            ColumnDef::new(Users::CreatedAt)
-            .big_integer()
-                .not_null(),
-        )
+        .col(ColumnDef::new(Users::CreatedAt).big_integer().not_null())
         .col(ColumnDef::new(Users::UpdatedAt).big_integer().not_null())
         .to_owned()
 }

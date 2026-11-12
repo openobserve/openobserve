@@ -193,7 +193,7 @@ function stepDetail(row: TData): string {
 // ── Status dot rendering ───────────────────────────────────────────
 function dotClass(state: StepDotState | undefined): string {
   if (!state) {
-    return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-text-muted text-text-muted text-xs font-semibold";
+    return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-text-secondary text-text-secondary text-xs font-semibold";
   }
   switch (state) {
     case "active":
@@ -565,7 +565,7 @@ const startRowColspan = computed(
           >{{ stepProgress(row)!.done }}/{{ stepProgress(row)!.total }}</span
         >
         <OBadge
-          v-else-if="mode === 'editor' && stepBadge(row)"
+          v-else-if="mode !== 'preview' && stepBadge(row)"
           :variant="stepBadge(row)!.variant"
           size="sm"
           :data-test="`synthetics-journey-step-badge-${rowIndex(row)}`"
@@ -725,6 +725,7 @@ const startRowColspan = computed(
         <ODropdown v-if="!readonly" side="bottom" align="end">
           <template #trigger>
             <OButton
+              :aria-label="t('common.moreActions')"
               icon-left="more-vert"
               variant="ghost"
               size="icon-xs-sq"

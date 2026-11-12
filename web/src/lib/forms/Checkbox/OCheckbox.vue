@@ -10,6 +10,7 @@ import type {
 } from "./OCheckbox.types";
 import { CHECKBOX_GROUP_KEY } from "./OCheckbox.types";
 import { computed, inject } from "vue";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 const props = withDefaults(defineProps<CheckboxProps>(), {
   size: "md",
@@ -60,7 +61,7 @@ const checked = computed((): boolean | "indeterminate" => {
   return Boolean(props.modelValue);
 });
 
-const isDisabled = computed(() => props.disabled || (groupContext?.disabled ?? false));
+const isDisabled = useLockedDisabled(() => props.disabled || (groupContext?.disabled ?? false));
 
 const dataState = computed<"checked" | "unchecked" | "indeterminate">(() => {
   if (checked.value === "indeterminate") return "indeterminate";
@@ -159,9 +160,10 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       ]"
       @click="toggle"
     >
+      <!-- Clicks pass through the tick: unchecking removes it mid-click, and the label then re-clicks the box. -->
       <span
         v-if="checked === true"
-        class="text-checkbox-checked-fg flex size-full items-center justify-center"
+        class="text-checkbox-checked-fg pointer-events-none flex size-full items-center justify-center"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -179,7 +181,7 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       </span>
       <span
         v-else-if="checked === 'indeterminate'"
-        class="text-checkbox-checked-fg flex size-full items-center justify-center"
+        class="text-checkbox-checked-fg pointer-events-none flex size-full items-center justify-center"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"

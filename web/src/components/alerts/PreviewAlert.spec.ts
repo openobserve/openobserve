@@ -2669,3 +2669,141 @@ describe("PromQL rule preview", () => {
     w.unmount();
   });
 });
+
+describe("PreviewAlert - debounced props refresh", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  const mountSqlSettled = async () => {
+    const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: "sql" });
+    await vi.advanceTimersByTimeAsync(2000);
+    vi.mocked(searchService.result_schema).mockClear();
+    return w;
+  };
+
+  it("fetches the schema once after typing pauses, not on every keystroke", async () => {
+    const w = await mountSqlSettled();
+
+    for (const query of ["SELECT a", "SELECT ab", "SELECT abc"]) {
+      await w.setProps({ query });
+      await vi.advanceTimersByTimeAsync(300);
+    }
+    expect(searchService.result_schema).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(800);
+    expect(searchService.result_schema).toHaveBeenCalledTimes(1);
+    w.unmount();
+  });
+
+  it("still refreshes when only the threshold changes", async () => {
+    const w = await mountSqlSettled();
+
+    await w.setProps({
+      formData: {
+        ...baseFormData(),
+        trigger_condition: { period: 10, threshold: 9, operator: ">=" },
+      },
+    });
+    await vi.advanceTimersByTimeAsync(800);
+
+    expect(searchService.result_schema).toHaveBeenCalledTimes(1);
+    w.unmount();
+  });
+
+  it("refreshes once for two setting changes inside the 200 ms guard", async () => {
+    const w = await mountSqlSettled();
+
+    await w.setProps({
+      formData: {
+        ...baseFormData(),
+        trigger_condition: { period: 10, threshold: 9, operator: ">=" },
+      },
+    });
+    await vi.advanceTimersByTimeAsync(50);
+    await w.setProps({
+      formData: {
+        ...baseFormData(),
+        trigger_condition: { period: 15, threshold: 9, operator: ">=" },
+      },
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(searchService.result_schema).toHaveBeenCalledTimes(1);
+    w.unmount();
+  });
+
+  it("refreshes a stream switch at once instead of waiting for the debounce", async () => {
+    const w = await mountSqlSettled();
+
+    await w.setProps({ formData: { ...baseFormData(), stream_name: "other-stream" } });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(searchService.result_schema).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(800);
+    expect(searchService.result_schema).toHaveBeenCalledTimes(1);
+    w.unmount();
+  });
+
+  it("drops the pending debounced refresh when the parent refreshes explicitly", async () => {
+    const w = await mountSqlSettled();
+
+    await w.setProps({ query: "SELECT a" });
+    (w.vm as any).refreshData();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(searchService.result_schema).toHaveBeenCalledTimes(1);
+    w.unmount();
+  });
+
+  it("skips the pending refresh when the editor opened meanwhile", async () => {
+    const w = await mountSqlSettled();
+
+    await w.setProps({ query: "SELECT a" });
+    await w.setProps({ isEditorOpen: true });
+    await vi.advanceTimersByTimeAsync(800);
+
+    expect(searchService.result_schema).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("drops a pending refresh on unmount", async () => {
+    const w = await mountSqlSettled();
+
+    await w.setProps({ query: "SELECT a" });
+    w.unmount();
+    await vi.advanceTimersByTimeAsync(800);
+
+    expect(searchService.result_schema).not.toHaveBeenCalled();
+  });
+});
+
+describe("PreviewAlert - schema fetch failure logging", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const failSchema = async (error: unknown) => {
+    vi.mocked(searchService.result_schema).mockRejectedValueOnce(error);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: "sql" });
+    await flushPromises();
+    w.unmount();
+    return { warn, err };
+  };
+
+  it("warns on a 4xx because the user's query is still being edited", async () => {
+    const { warn, err } = await failSchema({ response: { status: 400 } });
+    expect(warn).toHaveBeenCalledWith("Failed to fetch query schema:", expect.anything());
+    expect(err).not.toHaveBeenCalledWith("Failed to fetch query schema:", expect.anything());
+  });
+
+  it("keeps logging a 5xx as an error", async () => {
+    const { warn, err } = await failSchema({ response: { status: 500 } });
+    expect(err).toHaveBeenCalledWith("Failed to fetch query schema:", expect.anything());
+    expect(warn).not.toHaveBeenCalledWith("Failed to fetch query schema:", expect.anything());
+  });
+});

@@ -71,22 +71,15 @@ pub fn parse_key(key: &str) -> Option<Invalidation> {
 }
 
 pub async fn emit_label(org_id: &str, entity_id: &str, label: &str) -> Result<(), Error> {
-    emit(&label_key(org_id, entity_id, label)).await
+    super::emit_put(&label_key(org_id, entity_id, label)).await
 }
 
 pub async fn emit_version(org_id: &str, entity_id: &str, version: i32) -> Result<(), Error> {
-    emit(&version_key(org_id, entity_id, version)).await
+    super::emit_put(&version_key(org_id, entity_id, version)).await
 }
 
 pub async fn emit_head(org_id: &str, entity_id: &str) -> Result<(), Error> {
-    emit(&head_key(org_id, entity_id)).await
-}
-
-async fn emit(key: &str) -> Result<(), Error> {
-    super::get_coordinator()
-        .await
-        .put(key, bytes::Bytes::new(), true, None)
-        .await
+    super::emit_put(&head_key(org_id, entity_id)).await
 }
 
 fn encode(value: &str) -> String {

@@ -92,7 +92,8 @@ pub async fn backfill_org_configs() -> Result<(), anyhow::Error> {
             return Ok(());
         }
     };
-    let orgs = crate::organization::list_all_orgs(None)
+    // A blocked org's rows are deleted by its cleanup, which a restart must not undo.
+    let orgs = crate::db::organization::list_unblocked()
         .await
         .unwrap_or_default();
     for org in &orgs {

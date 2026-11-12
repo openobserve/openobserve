@@ -7,7 +7,7 @@
     <OPageLayout
       :back="{
         label: t('onlineEvals.job.backTo'),
-        onClick: () => $emit('cancel'),
+        onClick: cancel,
         dataTest: 'job-form-back-btn',
       }"
       bleed
@@ -119,6 +119,7 @@
                 name-prefix="filterGroup"
                 :target-scope="formValues.targetScope"
                 :stream-fields="streamFields"
+                :stream="formValues.stream"
                 data-test="job-form-filter-builder"
               />
             </div>
@@ -200,6 +201,17 @@
             </div>
           </section>
 
+          <JobCostSection
+            ref="costSection"
+            :estimate="spend.estimate.value"
+            :loading="spend.loading.value"
+            :rate="samplingRate"
+            :scope="formValues.targetScope"
+            :budget-enabled="formValues.budgetEnabled"
+            :has-judges="judgeIds.length > 0"
+            :org-id="orgId"
+          />
+
           <!-- Trace/session completion -->
           <section
             v-if="formValues.targetScope !== 'span'"
@@ -247,6 +259,7 @@
                 :group="endSignalGroup"
                 purpose="endSignal"
                 :stream-fields="streamFields"
+                :stream="formValues.stream"
                 data-test="job-form-end-signal-builder"
                 @update:group="endSignalGroup = $event"
               />
@@ -262,6 +275,9 @@
           :stream="formValues.stream"
           :filter-where="filterWhere"
           :filter-ready="filterReady"
+          :stream-fields="streamFieldNames"
+          :daily-cost="spend.estimate.value.perDayUsd"
+          :cost-loading="spend.loading.value"
         />
       </div>
 
@@ -274,7 +290,7 @@
           variant="outline"
           size="sm-action"
           :disabled="isSubmitting"
-          @click="$emit('cancel')"
+          @click="cancel"
         >
           {{ t("onlineEvals.buttons.cancel") }}
         </OButton>
@@ -318,11 +334,12 @@
         </OButton>
       </footer>
     </OPageLayout>
+    <EditorDraftDialogs :draft="jobDraft" />
   </OForm>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -333,11 +350,14 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import useStreams from "@/composables/useStreams";
-import onlineEvalsService, {
-  type EvalJob,
-  type Scorer,
-  type SpanSelector,
+import type {
+  EvalJob,
+  EvalTargetScope,
+  Scorer,
+  SpanSelector,
 } from "@/services/online-evals.service";
+import { saveEvalJobMutation, setJobActiveMutation } from "@/services/online-evals.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import {
   entityId,
   samplingModeOf,
@@ -348,6 +368,7 @@ import {
   valueOf,
 } from "../utils/evalEntity";
 import { showError } from "../utils/evalFormat";
+import { leavesEvalForm } from "../utils/routeSync";
 import { parseSamplingRate, samplingRateForForm, samplingRatePercent } from "../utils/jobSampling";
 import {
   buildJobFilterConditionPayload,
@@ -379,21 +400,33 @@ import JobScorerPicker from "./job/JobScorerPicker.vue";
 import JobFilterBuilder from "./job/JobFilterBuilder.vue";
 import JobInputMapping from "./job/JobInputMapping.vue";
 import JobPreviewPanel from "./job/JobPreviewPanel.vue";
+import JobCostSection from "./job/JobCostSection.vue";
+import { useJobSpendEstimate } from "../composables/useJobSpendEstimate";
+import { DEFAULT_BUDGET_ACTION, DEFAULT_DAILY_BUDGET_USD } from "../utils/evalSpend";
 import { makeJobFormSchema, type JobForm } from "./JobFormPage.schema";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import type { V2Group } from "@/utils/alerts/alertDataTransforms";
 
 const props = defineProps<{
   orgId: string;
   mode: "create" | "edit";
   row: EvalJob | null;
   scorers: Scorer[];
+  /** Opened from a budget-paused job's Edit budget: the form starts at the cost section. */
+  focusBudget?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "saved"): void;
   (e: "cancel"): void;
+  /** Saved from the leave dialog: the list reloads while the pending navigation closes the form. */
+  (e: "persisted"): void;
 }>();
 
 const { t } = useI18nTyped();
+const saveJob = useMutation(() => saveEvalJobMutation(props.orgId));
+const setJobActive = useMutation(() => setJobActiveMutation(props.orgId));
 
 // Co-located Zod schema (factory keeps messages i18n-driven). The form is
 // mounted fresh per create/edit action, so building it once is safe.
@@ -414,10 +447,6 @@ const form = useOForm<JobForm>({
 });
 const formValues = form.useStore((s: any) => s.values as JobForm);
 
-// The filter-builder tree is FORM-OWNED now: a reactive READ-VIEW of the
-// form's `filterGroup` field (JobFilterBuilder renders FilterGroup in form mode
-// and writes structural changes straight to the form). Single source of truth,
-// no mirror ref. Drives the preview computeds below and the save payload.
 const filterGroup = form.useStore((s: any) => s.values.filterGroup ?? createEmptyJobFilterGroup());
 // The completion end-signal and mapping/selectors are composite working state
 // built into the payload at submit.
@@ -432,7 +461,7 @@ const activateOnSave = ref(false);
 
 // A draft has never run, so both create and draft-edit offer the same explicit
 // choice: keep it a draft, or promote it to active. Editing a job that already
-// has a run state (active/paused/degraded) shows a single Save that preserves
+// has a run state (active/paused) shows a single Save that preserves
 // that state — a config edit must never silently flip enablement.
 const isDraft = computed(() => (props.row?.status ?? "draft") === "draft");
 const showActivateChoice = computed(
@@ -530,6 +559,35 @@ const selectedScorers = computed(() =>
     .filter((scorer): scorer is Scorer => Boolean(scorer)),
 );
 
+// Only LLM judges cost money.
+const judgeIds = computed(() =>
+  selectedScorers.value
+    .filter(
+      (scorer) => (valueOf(scorer, "scorerType", "scorer_type") ?? "llm_judge") === "llm_judge",
+    )
+    .map(entityId),
+);
+const samplingRate = computed(() =>
+  formValues.value.samplingMode === "all"
+    ? 1
+    : (samplingRatePercent(formValues.value.samplingValue) ?? 0) / 100,
+);
+const streamFields = ref<Array<{ label: I18nText; value: string; type: string }>>([]);
+const streamFieldsLoaded = ref(false);
+// Null while the selected stream's schema is still loading.
+const streamFieldNames = computed(() =>
+  streamFieldsLoaded.value ? streamFields.value.map((field) => field.value) : null,
+);
+const spend = useJobSpendEstimate({
+  stream: computed(() => formValues.value.stream),
+  where: filterWhere,
+  ready: filterReady,
+  scope: computed(() => formValues.value.targetScope as EvalTargetScope),
+  fields: streamFieldNames,
+  judgeIds,
+  rate: samplingRate,
+});
+
 const { getStreams, getStream } = useStreams(t);
 const traceStreams = ref<string[]>([]);
 const RESERVED_EVAL_SOURCE_STREAMS = new Set([
@@ -541,7 +599,6 @@ const RESERVED_EVAL_SOURCE_STREAMS = new Set([
   "errors",
   "data_retention_usage",
 ]);
-const streamFields = ref<Array<{ label: I18nText; value: string; type: string }>>([]);
 
 const streamOptions = computed(() => {
   const opts = traceStreams.value.map((name) => ({ label: raw(name), value: name }));
@@ -577,16 +634,16 @@ async function loadTraceStreams() {
 }
 
 async function loadStreamFields() {
-  if (!formValues.value.stream) {
+  const name = formValues.value.stream;
+  streamFieldsLoaded.value = false;
+  if (!name || typeof getStream !== "function") {
     streamFields.value = [];
-    return;
-  }
-  if (typeof getStream !== "function") {
-    streamFields.value = [];
+    streamFieldsLoaded.value = true;
     return;
   }
   try {
-    const stream: any = await getStream(formValues.value.stream, "traces", true);
+    const stream: any = await getStream(name, "traces", true);
+    if (name !== formValues.value.stream) return;
     streamFields.value = (stream?.schema || [])
       .map((field: any) => {
         const name = typeof field === "string" ? field : field?.name;
@@ -603,13 +660,22 @@ async function loadStreamFields() {
         ): field is { label: I18nText; value: string; type: string } => field !== null,
       );
   } catch {
+    if (name !== formValues.value.stream) return;
     streamFields.value = [];
   }
+  streamFieldsLoaded.value = true;
 }
 
-onMounted(() => {
+const costSection = ref<{ $el?: HTMLElement } | null>(null);
+
+onMounted(async () => {
   void loadTraceStreams();
   void loadStreamFields();
+  await jobDraft.start();
+  if (props.focusBudget) {
+    await nextTick();
+    costSection.value?.$el?.scrollIntoView?.({ block: "start" });
+  }
 });
 
 const samplingModeOptions = computed(() => [
@@ -626,7 +692,7 @@ const targetScopeOptions = computed(() => [
 watch(
   () => formValues.value.targetScope,
   (targetScope, previousScope) => {
-    if (targetScope === previousScope) return;
+    if (targetScope === previousScope || applyingDraft) return;
     if (targetScope !== "trace") {
       spanSelectors.value = [];
       spanSelectorBindings.value = {};
@@ -666,6 +732,9 @@ function initForm(row: EvalJob | null): JobForm {
       samplingMode: "rate",
       samplingValue: "0.1",
       filterGroup: initFilterGroup(row),
+      budgetEnabled: true,
+      dailyBudgetUsd: DEFAULT_DAILY_BUDGET_USD,
+      budgetAction: DEFAULT_BUDGET_ACTION,
     };
   }
   const targetScope = targetScopeOf(row);
@@ -684,6 +753,9 @@ function initForm(row: EvalJob | null): JobForm {
     samplingMode: samplingModeOf(row),
     samplingValue: samplingRateForForm(valueOf(row, "samplingValue", "sampling_value")),
     filterGroup: initFilterGroup(row),
+    budgetEnabled: row.budget != null,
+    dailyBudgetUsd: row.budget?.dailyUsd ?? DEFAULT_DAILY_BUDGET_USD,
+    budgetAction: row.budget?.onReach ?? DEFAULT_BUDGET_ACTION,
   };
 }
 
@@ -733,6 +805,92 @@ function initScorerVersions(row: EvalJob | null) {
   return Object.fromEntries(
     (row.scorers || []).map((scorer) => [scorerRefId(scorer), scorerRefVersion(scorer)]),
   );
+}
+
+interface JobDraft {
+  values: JobForm;
+  endSignalGroup: V2Group;
+  inputMappings: Record<string, Record<string, string>>;
+  spanSelectors: SpanSelector[];
+  spanSelectorBindings: Record<string, string>;
+  scorerVersions: Record<string, number | null>;
+}
+
+// Set while a continued draft lands, so the scope watcher does not reset its completion window and selectors.
+let applyingDraft = false;
+// Set while the leave dialog's Save runs, so a successful save neither closes the form nor reloads the page.
+let leaveSave: { saved: boolean } | null = null;
+
+// Run state, health and timestamps change on their own; only what the form edits is hashed.
+const RUN_STATE_KEYS = new Set([
+  "status",
+  "version",
+  "health",
+  "pipelineId",
+  "pipeline_id",
+  "createdAt",
+  "created_at",
+  "updatedAt",
+  "updated_at",
+]);
+
+function jobDefinition(row: EvalJob | null) {
+  if (!row) return null;
+  const definition: Record<string, unknown> = Object.fromEntries(
+    Object.entries(row).filter(([key]) => !RUN_STATE_KEYS.has(key)),
+  );
+  // The server writes the budget's pause state (pausedAt, pausedSpendUsd, liftedUntil) itself.
+  if (row.budget) {
+    definition.budget = { dailyUsd: row.budget.dailyUsd, onReach: row.budget.onReach };
+  }
+  return definition;
+}
+
+const jobDraft = useEditorDraft<JobDraft>({
+  kind: "eval_job",
+  entityLabel: () => t("common.editorDraft.entities.eval_job"),
+  // "Draft" already names a job that has never been activated.
+  serverDraftItem: true,
+  entityId: () => (props.mode === "edit" ? (props.row?.id ?? null) : null),
+  snapshot: () => ({
+    values: { ...formValues.value, scorerIds: [...formValues.value.scorerIds] },
+    endSignalGroup: endSignalGroup.value,
+    inputMappings: inputMappings.value,
+    spanSelectors: spanSelectors.value,
+    spanSelectorBindings: spanSelectorBindings.value,
+    scorerVersions: scorerVersions.value,
+  }),
+  apply: async (data) => {
+    applyingDraft = true;
+    try {
+      form.reset({ ...initForm(null), ...data.values });
+      endSignalGroup.value = data.endSignalGroup;
+      inputMappings.value = data.inputMappings;
+      spanSelectors.value = data.spanSelectors;
+      spanSelectorBindings.value = data.spanSelectorBindings;
+      scorerVersions.value = data.scorerVersions;
+      await nextTick();
+    } finally {
+      applyingDraft = false;
+    }
+  },
+  base: () => (props.mode === "edit" ? jobDefinition(props.row) : undefined),
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    activateOnSave.value = false;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  leaveOnRouteUpdate: leavesEvalForm,
+});
+
+async function cancel() {
+  if (await jobDraft.confirmLeave()) emit("cancel");
 }
 
 function syncMappings() {
@@ -810,17 +968,21 @@ async function onSubmit(value: JobForm) {
         value.samplingMode === "all"
           ? null
           : parseSamplingRate(value.samplingValue ?? "", t("onlineEvals.job.samplingValueLabel")),
+      // Inputs hand numbers over as text; the schema checked they parse. `null` removes it.
+      budget: value.budgetEnabled
+        ? { dailyUsd: Number(value.dailyBudgetUsd), onReach: value.budgetAction }
+        : null,
     };
 
     if (props.mode === "edit" && props.row) {
-      await onlineEvalsService.jobs.update(props.orgId, props.row.id, payload);
+      await saveJob.mutateAsync({ id: props.row.id, payload });
       // Promote a draft to active when the user chose Save & Activate. Only
       // drafts surface that button (showActivateChoice), so activateAfter can
       // only be true for a draft here; the isDraft guard is defensive and
       // matches the template (a missing status is treated as draft).
       if (activateAfter && isDraft.value) {
         try {
-          await onlineEvalsService.jobs.activate(props.orgId, props.row.id);
+          await setJobActive.mutateAsync({ id: props.row.id, active: true });
           toast({
             variant: "success",
             message: t("onlineEvals.job.savedAndActivated"),
@@ -839,10 +1001,10 @@ async function onSubmit(value: JobForm) {
         });
       }
     } else {
-      const created = await onlineEvalsService.jobs.create(props.orgId, payload);
+      const created = await saveJob.mutateAsync({ payload });
       if (activateAfter && created?.id) {
         try {
-          await onlineEvalsService.jobs.activate(props.orgId, created.id);
+          await setJobActive.mutateAsync({ id: created.id, active: true });
           toast({
             variant: "success",
             message: t("onlineEvals.job.createdAndActivated"),
@@ -861,6 +1023,12 @@ async function onSubmit(value: JobForm) {
         });
       }
     }
+    if (leaveSave) {
+      leaveSave.saved = true;
+      emit("persisted");
+      return;
+    }
+    jobDraft.markSaved();
     emit("saved");
   } catch (err: any) {
     showError(err, t("onlineEvals.job.saveError"));

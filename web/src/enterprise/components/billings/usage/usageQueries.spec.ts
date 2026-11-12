@@ -84,8 +84,22 @@ describe("usageQueries", () => {
     const sections = DRILLDOWNS.query!;
     const present = new Set(["user_email", "stream_name"]);
     const kept = availableSections(sections, present);
-    expect(kept.map((section) => section.id)).toEqual(["stream"]);
+    expect(kept.map((section) => section.id)).toEqual(["stream", "user"]);
     expect(availableSections(sections, new Set()).length).toBe(sections.length);
+  });
+
+  it("offers by user once user_email exists, leaving out exclusions for fields never recorded", () => {
+    // No dashboard or scheduled pipeline search yet: those fields are null on every row.
+    const present = new Set(["user_email", "alert_name", "stream_name"]);
+    const byUser = availableSections(DRILLDOWNS.query!, present).find((s) => s.id === "user")!;
+    for (const sql of [byUser.sql("default"), dailyEntitySql("default", byUser, 1)]) {
+      expect(sql).toContain("alert_name is null");
+      expect(sql).not.toContain("dashboard_name");
+      expect(sql).not.toContain("derived_stream_key");
+    }
+    // A schema that could not be read keeps every exclusion, as before.
+    const unread = availableSections(DRILLDOWNS.query!, new Set()).find((s) => s.id === "user")!;
+    expect(unread.sql("default")).toContain("derived_stream_key is null");
   });
 
   it("keeps every section when all fields exist", () => {

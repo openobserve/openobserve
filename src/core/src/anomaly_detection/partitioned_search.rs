@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
+    ops::ControlFlow,
     sync::{LazyLock, Mutex},
     time::{Duration, Instant},
 };
@@ -29,16 +30,17 @@ use o2_enterprise::enterprise::anomaly_detection::types::QueryDataPoint;
 use search::sql::visitor::histogram_interval::validate_and_adjust_histogram_interval;
 use sqlparser::{
     ast::{
-        BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, ObjectNamePart,
-        Select, SelectItem, SetExpr, Statement, TableFactor, Value,
+        BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, GroupByExpr,
+        ObjectNamePart, Query, Select, SelectFlavor, SelectItem, SetExpr, Statement, TableFactor,
+        Value, visit_expressions,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
 
-use crate::traces::red_insights::{MANAGED_TAG, parse_managed};
+use super::{LEGACY_VALUE_COLUMNS, TIMESTAMP_COLUMNS};
 
-/// The generated queries' bucket and metric aliases; supported rows are read from these only.
+/// The filter builder's bucket and metric aliases; custom SQL names its own.
 const BUCKET_COLUMN: &str = "time_bucket";
 const VALUE_COLUMN: &str = "value";
 
@@ -55,6 +57,24 @@ const FILTER_PREDICATE_FUNCTIONS: [&str; 4] = [
     "re_not_match",
 ];
 
+/// Functions bound at query execution time, so each partition search would see its own value.
+const VOLATILE_FUNCTIONS: [&str; 11] = [
+    "now",
+    "current_timestamp",
+    "current_date",
+    "current_time",
+    "localtime",
+    "localtimestamp",
+    "today",
+    "random",
+    "rand",
+    "uuid",
+    "gen_random_uuid",
+];
+
+/// Functions that turn one bucket into several rows, which the slice reader rejects as duplicates.
+const ROW_EXPANDING_FUNCTIONS: [&str; 1] = ["unnest"];
+
 /// An unchanged fallback reason is logged once per config per interval, not on every tick.
 const FALLBACK_LOG_INTERVAL: Duration = Duration::from_secs(3600);
 
@@ -62,14 +82,13 @@ static FALLBACK_LOGGED: LazyLock<Mutex<FallbackLog>> = LazyLock::new(|| Mutex::n
 
 type FallbackLog = HashMap<(String, String), (String, Instant)>;
 
-/// The config facts eligibility reads, cached alongside the value column under one TTL.
+/// The config facts eligibility reads, cached under one TTL.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct QueryMetadata {
     pub(super) query_mode: String,
     pub(super) stream_name: String,
     pub(super) stream_type: String,
     pub(super) histogram_interval: String,
-    pub(super) tags: Vec<String>,
     pub(super) value_column: Option<String>,
 }
 
@@ -82,11 +101,6 @@ impl QueryMetadata {
             stream_name: model.stream_name.clone(),
             stream_type: model.stream_type.clone(),
             histogram_interval: model.histogram_interval.clone(),
-            tags: model
-                .tags
-                .clone()
-                .and_then(|tags| serde_json::from_value(tags).ok())
-                .unwrap_or_default(),
             value_column: super::declared_value_column(
                 &model.query_mode,
                 &model.detection_function,
@@ -102,12 +116,44 @@ pub(super) struct BucketGrid {
     interval_us: i64,
 }
 
+/// The two result columns a supported query's rows are read from, by name.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct ResultColumns {
+    bucket: String,
+    value: String,
+}
+
+impl ResultColumns {
+    fn generated() -> Self {
+        Self {
+            bucket: BUCKET_COLUMN.to_string(),
+            value: VALUE_COLUMN.to_string(),
+        }
+    }
+}
+
+/// A query proven safe to search one bucket-aligned partition at a time, and how to read it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct SupportedQuery {
+    pub(super) grid: BucketGrid,
+    pub(super) columns: ResultColumns,
+}
+
+/// The histogram item of a custom projection: its position, alias, call and interval literal.
+struct CustomBucket<'a> {
+    position: usize,
+    alias: String,
+    expr: &'a Expr,
+    literal: &'a str,
+}
+
 /// One supported invocation: its identity, window, proven grid and per-search row budget.
 struct SupportedRun<'a> {
     anomaly_id: &'a str,
     trace_id: &'a str,
     window: (i64, i64),
     grid: BucketGrid,
+    columns: ResultColumns,
     budget: usize,
     size: i32,
 }
@@ -117,8 +163,9 @@ impl<'a> SupportedRun<'a> {
         anomaly_id: &'a str,
         trace_id: &'a str,
         window: (i64, i64),
-        grid: BucketGrid,
+        query: SupportedQuery,
     ) -> Result<Self> {
+        let SupportedQuery { grid, columns } = query;
         let context = || format!("[anomaly_detection {anomaly_id}] trace_id {trace_id}");
         let budget = bucket_budget(window.0, window.1, grid.interval_us).with_context(context)?;
         // The cluster request carries `size` as i32, so a larger budget would wrap on the wire.
@@ -130,6 +177,7 @@ impl<'a> SupportedRun<'a> {
             trace_id,
             window,
             grid,
+            columns,
             budget,
             size,
         })
@@ -143,7 +191,6 @@ impl<'a> SupportedRun<'a> {
             i64::from(self.size),
         );
         req.query.histogram_interval = self.grid.interval_secs;
-        req.query.query_type = "table".to_string();
         req
     }
 
@@ -215,12 +262,18 @@ impl<'a> SupportedRun<'a> {
                 .await
                 .map_err(|e| self.slice_error(&child_trace_id, slice, "search failed", e))?;
             series
-                .add_slice(&response, slice, self.grid.interval_us, self.budget)
+                .add_slice(
+                    &response,
+                    slice,
+                    self.grid.interval_us,
+                    self.budget,
+                    &self.columns,
+                )
                 .map_err(|e| self.slice_error(&child_trace_id, slice, "result rejected", e))?;
         }
         let (raw_hits, omitted_nulls) = (series.raw_hits, series.omitted_nulls);
         let points = series
-            .finish(self.budget)
+            .finish(self.budget, &self.columns.value)
             .map_err(|e| anyhow::anyhow!("[anomaly_detection {}] {e}", self.anomaly_id))?;
         log::info!(
             "[anomaly_detection {}] supported search done: trace_id {}, executed {} searches, raw \
@@ -257,6 +310,7 @@ struct SeriesAccumulator {
     raw_buckets: HashSet<i64>,
     raw_hits: usize,
     omitted_nulls: usize,
+    keys_seen: BTreeSet<String>,
 }
 
 impl SeriesAccumulator {
@@ -266,6 +320,7 @@ impl SeriesAccumulator {
         slice: [i64; 2],
         interval_us: i64,
         budget: usize,
+        columns: &ResultColumns,
     ) -> Result<()> {
         if response.is_partial {
             if response.function_error.is_empty() {
@@ -289,46 +344,27 @@ impl SeriesAccumulator {
         if raw == 0 {
             return Ok(());
         }
-        // Table rows carry an explicit null per declared column, so a NULL is never an absent key.
-        let [first, second] = response.columns.as_slice() else {
-            anyhow::bail!(
-                "response declares columns {:?}, not the generated '{BUCKET_COLUMN}' and \
-                 '{VALUE_COLUMN}'",
-                response.columns
-            );
-        };
-        let value_first = match (first.as_str(), second.as_str()) {
-            (BUCKET_COLUMN, VALUE_COLUMN) => false,
-            (VALUE_COLUMN, BUCKET_COLUMN) => true,
-            _ => anyhow::bail!(
-                "response declares columns {:?}, not the generated '{BUCKET_COLUMN}' and \
-                 '{VALUE_COLUMN}'",
-                response.columns
-            ),
-        };
-        response
-            .hits
-            .iter()
-            .try_for_each(|hit| self.add_row(hit, value_first, slice, interval_us))
+        response.hits.iter().try_for_each(|hit| {
+            let Some(row) = hit.as_object() else {
+                anyhow::bail!("row is not an object: {hit}");
+            };
+            self.note_keys(row);
+            self.add_row(hit, row, columns, slice, interval_us)
+        })
     }
 
     fn add_row(
         &mut self,
         hit: &serde_json::Value,
-        value_first: bool,
+        row: &serde_json::Map<String, serde_json::Value>,
+        columns: &ResultColumns,
         slice: [i64; 2],
         interval_us: i64,
     ) -> Result<()> {
-        let Some([first, second]) = hit.as_array().map(Vec::as_slice) else {
-            anyhow::bail!("row is not a two-cell table row: {hit}");
-        };
-        let (bucket_cell, value_cell) = if value_first {
-            (second, first)
-        } else {
-            (first, second)
-        };
-        let bucket = super::timestamp_from_value(bucket_cell)
-            .with_context(|| format!("row has no usable '{BUCKET_COLUMN}': {hit}"))?;
+        let bucket = row
+            .get(&columns.bucket)
+            .and_then(super::timestamp_from_value)
+            .with_context(|| format!("row has no usable '{}': {hit}", columns.bucket))?;
         if bucket.rem_euclid(interval_us) != 0 {
             anyhow::bail!("bucket {bucket} is off the {interval_us}us grid");
         }
@@ -338,13 +374,14 @@ impl SeriesAccumulator {
         if !self.raw_buckets.insert(bucket) {
             anyhow::bail!("bucket {bucket} was returned more than once");
         }
-        if value_cell.is_null() {
+        // Object rows omit SQL NULL fields; a column absent from every row fails in finish.
+        let Some(value_cell) = row.get(&columns.value).filter(|v| !v.is_null()) else {
             self.omitted_nulls += 1;
             return Ok(());
-        }
+        };
         let value = super::json_value_as_f64(value_cell)
             .filter(|v| v.is_finite())
-            .with_context(|| format!("'{VALUE_COLUMN}' is not a finite number: {hit}"))?;
+            .with_context(|| format!("'{}' is not a finite number: {hit}", columns.value))?;
         self.points.push(QueryDataPoint {
             timestamp_us: bucket,
             value,
@@ -352,7 +389,20 @@ impl SeriesAccumulator {
         Ok(())
     }
 
-    fn finish(mut self, budget: usize) -> Result<Vec<QueryDataPoint>> {
+    /// Object rows drop NULL keys, so the diagnostic needs keys from every row, not one.
+    fn note_keys(&mut self, row: &serde_json::Map<String, serde_json::Value>) {
+        // Only an all-NULL run reports the keys, so collecting stops at the first usable point.
+        if !self.points.is_empty() {
+            return;
+        }
+        for key in row.keys() {
+            if !self.keys_seen.contains(key) {
+                self.keys_seen.insert(key.clone());
+            }
+        }
+    }
+
+    fn finish(mut self, budget: usize, value_column: &str) -> Result<Vec<QueryDataPoint>> {
         if self.raw_hits >= budget {
             anyhow::bail!(
                 "{} rows across the run reached the {budget}-row budget, so the result may be \
@@ -362,8 +412,10 @@ impl SeriesAccumulator {
         }
         if self.raw_hits > 0 && self.points.is_empty() {
             anyhow::bail!(
-                "query returned {} rows but none were usable: every '{VALUE_COLUMN}' was SQL NULL",
-                self.raw_hits
+                "query returned {} rows but none were usable: every '{value_column}' was SQL \
+                 NULL, or the column is missing from the result (columns present: {:?})",
+                self.raw_hits,
+                self.keys_seen.iter().collect::<Vec<_>>()
             );
         }
         self.points.sort_by_key(|p| p.timestamp_us);
@@ -414,13 +466,14 @@ impl SliceSearch for EngineSearch<'_> {
     }
 }
 
-/// The proven grid of a supported generated query, or why it keeps the single-call path.
-pub(super) fn supported_grid(
+/// The proven grid and columns of a supported query, or why it keeps the single-call path.
+pub(super) fn supported_query(
     metadata: Option<&QueryMetadata>,
     query_sql: &str,
     stream_type: &str,
     window: (i64, i64),
-) -> Result<BucketGrid, String> {
+    stream_fields: Option<&HashSet<String>>,
+) -> Result<SupportedQuery, String> {
     let metadata = metadata.ok_or("eligibility metadata could not be loaded")?;
     if !metadata.stream_type.eq_ignore_ascii_case(stream_type) {
         return Err(format!(
@@ -428,32 +481,32 @@ pub(super) fn supported_grid(
             metadata.stream_type
         ));
     }
-    if let Some(column) = metadata
-        .value_column
-        .as_deref()
-        .filter(|c| *c != VALUE_COLUMN)
-    {
-        return Err(format!(
-            "declared value column '{column}' is not the generated '{VALUE_COLUMN}'"
-        ));
-    }
-    let statement = if metadata.query_mode.eq_ignore_ascii_case("filters") {
-        let statement = single_statement(query_sql)?;
+    let statement = single_statement(query_sql)?;
+    let (literal, columns) = if metadata.query_mode.eq_ignore_ascii_case("filters") {
+        if let Some(column) = metadata
+            .value_column
+            .as_deref()
+            .filter(|c| *c != VALUE_COLUMN)
+        {
+            return Err(format!(
+                "declared value column '{column}' is not the generated '{VALUE_COLUMN}'"
+            ));
+        }
         check_filter_shape(&statement, &metadata.stream_name)?;
-        statement
+        let literal = statement_select(&statement)
+            .and_then(histogram_literal)
+            .ok_or("no histogram(_timestamp, '<interval>') AS time_bucket column")?;
+        (literal, ResultColumns::generated())
     } else if metadata.query_mode.eq_ignore_ascii_case("custom_sql") {
-        check_current_red(metadata, query_sql)?;
-        single_statement(query_sql)?
+        check_custom_shape(&statement, metadata, stream_fields)?
     } else {
         return Err(format!(
-            "query mode '{}' is not generated",
+            "query mode '{}' is neither filters nor custom_sql",
             metadata.query_mode
         ));
     };
-    let literal = statement_select(&statement)
-        .and_then(histogram_literal)
-        .ok_or("no histogram(_timestamp, '<interval>') AS time_bucket column")?;
-    proven_grid(literal, &metadata.histogram_interval, window)
+    let grid = proven_grid(literal, &metadata.histogram_interval, window)?;
+    Ok(SupportedQuery { grid, columns })
 }
 
 /// Searches a supported query completely, one validated partition at a time.
@@ -464,9 +517,9 @@ pub(super) async fn execute_supported(
     anomaly_id: &str,
     stream_type: &str,
     trace_id: &str,
-    grid: BucketGrid,
+    query: SupportedQuery,
 ) -> Result<Vec<QueryDataPoint>> {
-    let run = SupportedRun::new(anomaly_id, trace_id, window, grid)?;
+    let run = SupportedRun::new(anomaly_id, trace_id, window, query)?;
     let engine = EngineSearch {
         org_id,
         stream_type: StreamType::from(stream_type),
@@ -569,14 +622,299 @@ fn check_filter_shape(statement: &Statement, stream_name: &str) -> Result<(), St
     Ok(())
 }
 
-fn check_current_red(metadata: &QueryMetadata, query_sql: &str) -> Result<(), String> {
-    if !metadata.tags.iter().any(|t| t == MANAGED_TAG) {
-        return Err("custom SQL without the managed RED tag".to_string());
+/// Holds custom SQL to one SELECT whose every row is one bucket computed from that bucket's
+/// rows alone, so bucket-aligned partitions return exactly the single-call rows.
+fn check_custom_shape<'a>(
+    statement: &'a Statement,
+    metadata: &QueryMetadata,
+    stream_fields: Option<&HashSet<String>>,
+) -> Result<(&'a str, ResultColumns), String> {
+    let Statement::Query(query) = statement else {
+        return Err("SQL is not a SELECT query".to_string());
+    };
+    check_query_clauses(query)?;
+    let SetExpr::Select(select) = query.body.as_ref() else {
+        return Err("SQL is a set operation or VALUES, not one SELECT".to_string());
+    };
+    check_select_clauses(select)?;
+    check_custom_source(select, &metadata.stream_name)?;
+    check_row_local(statement)?;
+    let bucket = custom_bucket(select)?;
+    let names = projection_names(select);
+    // The single-call reader takes the first timestamp-named column, so no other may exist.
+    if let Some(name) = names
+        .iter()
+        .enumerate()
+        .filter(|(position, _)| *position != bucket.position)
+        .find_map(|(_, name)| name.filter(|n| TIMESTAMP_COLUMNS.contains(n)))
+    {
+        return Err(format!(
+            "column '{name}' would be read as the timestamp instead of '{}'",
+            bucket.alias
+        ));
     }
-    match parse_managed(&metadata.tags, query_sql, &metadata.stream_name) {
-        Some((_, _, true)) => Ok(()),
-        Some(_) => Err("managed RED SQL is edited or not the current template".to_string()),
-        None => Err("custom SQL is not a managed RED template on the config's stream".to_string()),
+    let value = custom_value_column(&names, metadata.value_column.as_deref())?;
+    if value == bucket.alias {
+        return Err(format!("value column '{value}' is the bucket column"));
+    }
+    check_custom_group_by(select, &bucket, stream_fields)?;
+    Ok((
+        bucket.literal,
+        ResultColumns {
+            bucket: bucket.alias,
+            value,
+        },
+    ))
+}
+
+fn check_query_clauses(query: &Query) -> Result<(), String> {
+    let clauses = [
+        (query.with.is_some(), "WITH"),
+        (query.limit_clause.is_some(), "LIMIT or OFFSET"),
+        (query.fetch.is_some(), "FETCH"),
+        (!query.locks.is_empty(), "FOR UPDATE or FOR SHARE"),
+        (query.for_clause.is_some(), "FOR XML or FOR JSON"),
+        (query.settings.is_some(), "SETTINGS"),
+        (query.format_clause.is_some(), "FORMAT"),
+        (!query.pipe_operators.is_empty(), "a pipe operator"),
+    ];
+    match clauses.iter().find(|(present, _)| *present) {
+        Some((_, clause)) => Err(format!("SQL uses {clause}, which is not per bucket")),
+        None => Ok(()),
+    }
+}
+
+fn check_select_clauses(select: &Select) -> Result<(), String> {
+    let clauses = [
+        (select.distinct.is_some(), "DISTINCT"),
+        (select.top.is_some(), "TOP"),
+        (select.into.is_some(), "INTO"),
+        (select.exclude.is_some(), "EXCLUDE"),
+        (!select.lateral_views.is_empty(), "LATERAL VIEW"),
+        (select.prewhere.is_some(), "PREWHERE"),
+        (!select.connect_by.is_empty(), "CONNECT BY"),
+        (!select.cluster_by.is_empty(), "CLUSTER BY"),
+        (!select.distribute_by.is_empty(), "DISTRIBUTE BY"),
+        (!select.sort_by.is_empty(), "SORT BY"),
+        (!select.named_window.is_empty(), "WINDOW"),
+        (select.qualify.is_some(), "QUALIFY"),
+        (select.value_table_mode.is_some(), "AS STRUCT or AS VALUE"),
+        (select.select_modifiers.is_some(), "a select modifier"),
+        (!select.optimizer_hints.is_empty(), "an optimizer hint"),
+        (select.flavor != SelectFlavor::Standard, "FROM-first syntax"),
+    ];
+    match clauses.iter().find(|(present, _)| *present) {
+        Some((_, clause)) => Err(format!("SQL uses {clause}, which is not per bucket")),
+        None => Ok(()),
+    }
+}
+
+fn check_custom_source(select: &Select, stream_name: &str) -> Result<(), String> {
+    let [from] = select.from.as_slice() else {
+        return Err("SQL does not read exactly one stream".to_string());
+    };
+    if !from.joins.is_empty() {
+        return Err("SQL joins another relation".to_string());
+    }
+    let TableFactor::Table {
+        name,
+        args,
+        with_hints,
+        version,
+        with_ordinality,
+        partitions,
+        json_path,
+        sample,
+        index_hints,
+        ..
+    } = &from.relation
+    else {
+        return Err("SQL does not read an ordinary stream".to_string());
+    };
+    let modified = args.is_some()
+        || !with_hints.is_empty()
+        || version.is_some()
+        || *with_ordinality
+        || !partitions.is_empty()
+        || json_path.is_some()
+        || sample.is_some()
+        || !index_hints.is_empty();
+    if modified {
+        return Err("stream reference carries arguments, hints, a version or a sample".to_string());
+    }
+    match name.0.as_slice() {
+        [ObjectNamePart::Identifier(ident)] if ident.value == stream_name => Ok(()),
+        _ => Err(format!(
+            "SQL does not read the config's stream '{stream_name}'"
+        )),
+    }
+}
+
+/// Rejects expressions whose value depends on more than the bucket's own rows and the SQL text.
+fn check_row_local(statement: &Statement) -> Result<(), String> {
+    let walk = visit_expressions(statement, |expr| match expr {
+        Expr::Subquery(_) | Expr::InSubquery { .. } | Expr::Exists { .. } => {
+            ControlFlow::Break("SQL contains a subquery".to_string())
+        }
+        Expr::Function(function) if function.over.is_some() => {
+            ControlFlow::Break("SQL contains a window function".to_string())
+        }
+        Expr::Function(function) => match function_name(&function.name) {
+            Some(name) if VOLATILE_FUNCTIONS.contains(&name.as_str()) => {
+                ControlFlow::Break(format!("SQL calls {name}(), bound at query time"))
+            }
+            Some(name) if ROW_EXPANDING_FUNCTIONS.contains(&name.as_str()) => ControlFlow::Break(
+                format!("SQL calls {name}(), which expands a bucket into rows"),
+            ),
+            _ => ControlFlow::Continue(()),
+        },
+        _ => ControlFlow::Continue(()),
+    });
+    match walk {
+        ControlFlow::Continue(()) => Ok(()),
+        ControlFlow::Break(reason) => Err(reason),
+    }
+}
+
+/// The lowercased last part of a function name, so `pg_catalog.now` and `NOW` read the same.
+fn function_name(name: &sqlparser::ast::ObjectName) -> Option<String> {
+    match name.0.last()? {
+        ObjectNamePart::Identifier(ident) => Some(ident.value.to_ascii_lowercase()),
+        _ => None,
+    }
+}
+
+/// The one `histogram(_timestamp, '<lit>') AS <timestamp name>` item of a custom projection.
+fn custom_bucket(select: &Select) -> Result<CustomBucket<'_>, String> {
+    let mut found = None;
+    for (position, item) in select.projection.iter().enumerate() {
+        let (expr, alias) = match item {
+            SelectItem::ExprWithAlias { expr, alias } => (expr, Some(alias)),
+            SelectItem::UnnamedExpr(expr) => (expr, None),
+            _ => return Err("SELECT uses a wildcard".to_string()),
+        };
+        let Some((name, args)) = plain_call(expr).filter(|(name, _)| name == "histogram") else {
+            continue;
+        };
+        if found.is_some() {
+            return Err("SELECT has more than one histogram column".to_string());
+        }
+        let literal = histogram_args(args).ok_or_else(|| {
+            format!("{name}() is not histogram(_timestamp, '<interval>') with two arguments")
+        })?;
+        let alias = alias.ok_or("histogram column has no alias")?;
+        if !TIMESTAMP_COLUMNS.contains(&alias.value.as_str()) {
+            return Err(format!(
+                "histogram alias '{}' is none of the timestamp names {}",
+                alias.value,
+                TIMESTAMP_COLUMNS.join(", ")
+            ));
+        }
+        found = Some(CustomBucket {
+            position,
+            alias: alias.value.clone(),
+            expr,
+            literal,
+        });
+    }
+    found.ok_or_else(|| "no histogram(_timestamp, '<interval>') column".to_string())
+}
+
+/// Each projection item's result column name, where a plain alias or identifier gives it.
+fn projection_names(select: &Select) -> Vec<Option<&str>> {
+    select
+        .projection
+        .iter()
+        .map(|item| match item {
+            SelectItem::ExprWithAlias { alias, .. } => Some(alias.value.as_str()),
+            SelectItem::UnnamedExpr(Expr::Identifier(ident)) => Some(ident.value.as_str()),
+            SelectItem::UnnamedExpr(Expr::CompoundIdentifier(parts)) => {
+                parts.last().map(|part| part.value.as_str())
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// The declared value column, else the one legacy name present; two legacy names stay single-call.
+fn custom_value_column(names: &[Option<&str>], declared: Option<&str>) -> Result<String, String> {
+    let present = |column: &str| names.contains(&Some(column));
+    if let Some(column) = declared.map(str::trim).filter(|c| !c.is_empty()) {
+        return if present(column) {
+            Ok(column.to_string())
+        } else {
+            Err(format!(
+                "declared value column '{column}' is not a SELECT column"
+            ))
+        };
+    }
+    // The single-call reader falls through legacy names per row, so one candidate keeps them equal.
+    let candidates: Vec<&str> = LEGACY_VALUE_COLUMNS
+        .iter()
+        .copied()
+        .filter(|column| present(column))
+        .collect();
+    match candidates.as_slice() {
+        [column] => Ok(column.to_string()),
+        [] => Err(format!(
+            "no value column: none of {} is a SELECT column",
+            LEGACY_VALUE_COLUMNS.join(", ")
+        )),
+        several => Err(format!(
+            "legacy value names {} are all SELECT columns; declare one",
+            several.join(", ")
+        )),
+    }
+}
+
+/// GROUP BY must be the bucket alone: by alias, by ordinal, or by the histogram call itself.
+fn check_custom_group_by(
+    select: &Select,
+    bucket: &CustomBucket<'_>,
+    stream_fields: Option<&HashSet<String>>,
+) -> Result<(), String> {
+    let GroupByExpr::Expressions(exprs, modifiers) = &select.group_by else {
+        return Err("GROUP BY ALL does not name the bucket".to_string());
+    };
+    let ([expr], []) = (exprs.as_slice(), modifiers.as_slice()) else {
+        return Err("GROUP BY is not exactly the histogram bucket".to_string());
+    };
+    let ordinal = (bucket.position + 1).to_string();
+    let is_bucket = match expr {
+        Expr::Identifier(ident) if ident.value == bucket.alias => {
+            alias_free_of_stream_fields(&bucket.alias, stream_fields)?;
+            true
+        }
+        Expr::Identifier(_) => false,
+        Expr::Value(v) => matches!(&v.value, Value::Number(n, false) if *n == ordinal),
+        other => other.to_string() == bucket.expr.to_string(),
+    };
+    if is_bucket {
+        Ok(())
+    } else {
+        Err("GROUP BY is not exactly the histogram bucket".to_string())
+    }
+}
+
+/// The engine binds a GROUP BY name to a stream field before a projection alias of that name.
+fn alias_free_of_stream_fields(
+    alias: &str,
+    stream_fields: Option<&HashSet<String>>,
+) -> Result<(), String> {
+    let hint = "use GROUP BY <ordinal> or the histogram call";
+    if alias == "_timestamp" {
+        return Err(format!(
+            "GROUP BY _timestamp groups by the stream column, not the bucket: {hint}"
+        ));
+    }
+    match stream_fields {
+        None => Err(format!(
+            "stream schema unavailable to prove that GROUP BY {alias} is the bucket: {hint}"
+        )),
+        Some(fields) if fields.contains(alias) => Err(format!(
+            "GROUP BY {alias} groups by the stream field of that name, not the bucket: {hint}"
+        )),
+        Some(_) => Ok(()),
     }
 }
 
@@ -588,14 +926,23 @@ fn histogram_literal(select: &Select) -> Option<&str> {
     if alias.value != BUCKET_COLUMN || alias.quote_style.is_some() {
         return None;
     }
-    let (name, [column, interval]) = plain_call(expr)? else {
+    let (name, args) = plain_call(expr)?;
+    if name != "histogram" {
+        return None;
+    }
+    histogram_args(args)
+}
+
+/// The interval literal of histogram's exact generated arguments: bare `_timestamp` and a string.
+fn histogram_args(args: &[FunctionArg]) -> Option<&str> {
+    let [column, interval] = args else {
         return None;
     };
     let is_timestamp = matches!(
         unnamed_expr(column)?,
         Expr::Identifier(ident) if ident.value == "_timestamp" && ident.quote_style.is_none()
     );
-    if name != "histogram" || !is_timestamp {
+    if !is_timestamp {
         return None;
     }
     unnamed_expr(interval).and_then(string_literal)
@@ -867,6 +1214,13 @@ mod tests {
         interval_us: FIVE_MIN_US,
     };
 
+    fn generated_query() -> SupportedQuery {
+        SupportedQuery {
+            grid: GRID_5M,
+            columns: ResultColumns::generated(),
+        }
+    }
+
     const WINDOW: (i64, i64) = (T0, T0 + 3 * FIVE_MIN_US);
     const SQL: &str = "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \
                        default GROUP BY time_bucket ORDER BY time_bucket";
@@ -914,7 +1268,6 @@ mod tests {
         }
 
         async fn search(&self, trace_id: &str, req: &Request) -> Result<Response> {
-            assert_eq!(req.query.query_type, "table");
             let call = (
                 trace_id.to_string(),
                 req.query.start_time,
@@ -935,7 +1288,7 @@ mod tests {
         }
     }
 
-    /// Uses the leader JSON and table conversion so null handling matches production.
+    /// Uses the leader JSON row conversion so null handling matches production.
     struct ArrowSearch {
         plan: Option<SearchPartitionResponse>,
         batches: Mutex<VecDeque<RecordBatch>>,
@@ -954,8 +1307,7 @@ mod tests {
                 .expect("planner response was not configured"))
         }
 
-        async fn search(&self, _trace_id: &str, req: &Request) -> Result<Response> {
-            assert_eq!(req.query.query_type, "table");
+        async fn search(&self, _trace_id: &str, _req: &Request) -> Result<Response> {
             self.searched.fetch_add(1, Ordering::SeqCst);
             let batch = self
                 .batches
@@ -963,7 +1315,7 @@ mod tests {
                 .unwrap()
                 .pop_front()
                 .expect("unscripted search");
-            Ok(table_response(&batch))
+            Ok(object_response(&batch))
         }
     }
 
@@ -1007,6 +1359,7 @@ mod tests {
             last_updated: 0,
             created_at: 0,
             updated_at: 0,
+            template: None,
         }
     }
 
@@ -1024,7 +1377,6 @@ mod tests {
             stream_name: "default".to_string(),
             stream_type: "logs".to_string(),
             histogram_interval: interval.to_string(),
-            tags: vec![],
             value_column: None,
         }
     }
@@ -1035,8 +1387,16 @@ mod tests {
             stream_name: stream.to_string(),
             stream_type: "traces".to_string(),
             histogram_interval: "5m".to_string(),
-            tags: vec![MANAGED_TAG.to_string(), signal.tag().to_string()],
             value_column: (signal == RedSignal::P95Latency).then(|| "value".to_string()),
+        }
+    }
+
+    /// Custom SQL on the logs stream `default`, with the declared value column if any.
+    fn custom_metadata(value_column: Option<&str>) -> QueryMetadata {
+        QueryMetadata {
+            query_mode: "custom_sql".to_string(),
+            value_column: value_column.map(str::to_string),
+            ..filter_metadata("5m")
         }
     }
 
@@ -1056,12 +1416,47 @@ mod tests {
     }
 
     fn eligible(metadata: &QueryMetadata, sql: &str) -> Result<BucketGrid, String> {
-        supported_grid(
+        supported(metadata, sql).map(|query| query.grid)
+    }
+
+    fn supported(metadata: &QueryMetadata, sql: &str) -> Result<SupportedQuery, String> {
+        supported_with(metadata, sql, Some(&stream_fields()))
+    }
+
+    fn supported_with(
+        metadata: &QueryMetadata,
+        sql: &str,
+        fields: Option<&HashSet<String>>,
+    ) -> Result<SupportedQuery, String> {
+        supported_query(
             Some(metadata),
             sql,
             &metadata.stream_type,
             training_window(),
+            fields,
         )
+    }
+
+    /// The seed stream's fields: `time` is deliberately absent, `_timestamp` always present.
+    fn stream_fields() -> HashSet<String> {
+        [
+            "_timestamp",
+            "level",
+            "latency",
+            "service",
+            "bytes",
+            "duration",
+            "id",
+        ]
+        .map(str::to_string)
+        .into()
+    }
+
+    fn columns(bucket: &str, value: &str) -> ResultColumns {
+        ResultColumns {
+            bucket: bucket.to_string(),
+            value: value.to_string(),
+        }
     }
 
     fn filter_sql(where_clause: &str) -> String {
@@ -1181,63 +1576,317 @@ mod tests {
     }
 
     #[test]
-    fn red_without_tag_edited_or_on_another_stream_falls_back() {
+    fn edited_or_untagged_red_sql_still_qualifies_on_its_own_shape() {
         let sql = red_sql(RedSignal::ErrorRatio, true);
-        let mut untagged = red_metadata(RedSignal::ErrorRatio, "default");
-        untagged.tags = vec![RedSignal::ErrorRatio.tag().to_string()];
-        let reason = |meta: &QueryMetadata, sql: &str| eligible(meta, sql).unwrap_err();
-        assert!(reason(&untagged, &sql).contains("managed RED tag"));
-        let mut no_signal = red_metadata(RedSignal::ErrorRatio, "default");
-        no_signal.tags = vec![MANAGED_TAG.to_string()];
-        assert!(reason(&no_signal, &sql).contains("not a managed RED template"));
         let ratio = red_metadata(RedSignal::ErrorRatio, "default");
         let edited = sql.replace(">= 20", ">= 10");
-        assert!(reason(&ratio, &edited).contains("edited"));
+        assert_eq!(eligible(&ratio, &edited), Ok(GRID_5M));
         let reformatted = sql.replace(" FROM ", "  FROM ");
-        assert!(reason(&ratio, &reformatted).contains("edited"));
-        let other_stream = red_metadata(RedSignal::ErrorRatio, "other");
-        assert!(reason(&other_stream, &sql).contains("not a managed RED template"));
+        assert_eq!(eligible(&ratio, &reformatted), Ok(GRID_5M));
         let rate = red_metadata(RedSignal::Rate, "default");
-        assert!(reason(&rate, &sql).contains("edited"));
-        assert!(reason(&rate, &filter_sql("")).contains("not a managed RED template"));
+        assert_eq!(eligible(&rate, &sql), Ok(GRID_5M));
+        assert_eq!(eligible(&rate, &filter_sql("")), Ok(GRID_5M));
+        let other_stream = red_metadata(RedSignal::ErrorRatio, "other");
+        let reason = eligible(&other_stream, &sql).unwrap_err();
+        assert!(reason.contains("config's stream"), "{reason}");
+    }
+
+    #[test]
+    fn plain_custom_sql_with_a_bucket_grid_qualifies() {
+        let logs_page = "SELECT histogram(_timestamp, '5m') AS zo_sql_timestamp, count(*) AS \
+                         zo_sql_num FROM \"default\" GROUP BY zo_sql_timestamp ORDER BY \
+                         zo_sql_timestamp DESC";
+        assert_eq!(
+            supported(&custom_metadata(Some("zo_sql_num")), logs_page),
+            Ok(SupportedQuery {
+                grid: GRID_5M,
+                columns: columns("zo_sql_timestamp", "zo_sql_num"),
+            })
+        );
+        let value_first_by_ordinal = "SELECT avg(latency) AS value, histogram(_timestamp, \
+                                      '5m') AS time_bucket FROM default GROUP BY 2";
+        let by_expression = "SELECT histogram(_timestamp, '5m') AS _timestamp, max(bytes) AS \
+                             metric FROM default d WHERE d.level = 'error' AND _timestamp > 0 \
+                             GROUP BY histogram(_timestamp, '5m') HAVING count(*) >= 20";
+        let per_bucket_arithmetic = "SELECT histogram(_timestamp, '5m') AS time, count(*) AS \
+                                     n, count(*) FILTER (WHERE level = 'error') * 1.0 / \
+                                     count(*) AS value FROM default GROUP BY time";
+        let legacy_count = "SELECT histogram(_timestamp, '300s') AS time_bucket, count(*) AS \
+                            count, approx_percentile_cont(duration, 0.5) WITHIN GROUP (ORDER \
+                            BY duration) AS p50 FROM default GROUP BY time_bucket";
+        for (sql, bucket, value) in [
+            (value_first_by_ordinal, "time_bucket", "value"),
+            (by_expression, "_timestamp", "metric"),
+            (per_bucket_arithmetic, "time", "value"),
+            (legacy_count, "time_bucket", "count"),
+        ] {
+            assert_eq!(
+                supported(&custom_metadata(None), sql),
+                Ok(SupportedQuery {
+                    grid: GRID_5M,
+                    columns: columns(bucket, value),
+                }),
+                "{sql}"
+            );
+        }
+        let declared_over_legacy = supported(&custom_metadata(Some("p50")), legacy_count);
+        assert_eq!(
+            declared_over_legacy.unwrap().columns,
+            columns("time_bucket", "p50")
+        );
+        let two_legacy = "SELECT histogram(_timestamp, '5m') AS time_bucket, avg(latency) AS \
+                          value, count(*) AS count FROM default GROUP BY time_bucket";
+        let declared = supported(&custom_metadata(Some("count")), two_legacy);
+        assert_eq!(declared.unwrap().columns, columns("time_bucket", "count"));
+        let deterministic_time = "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) \
+                                  AS value FROM default WHERE _timestamp > \
+                                  to_timestamp('2026-01-01') GROUP BY time_bucket";
+        assert_eq!(
+            eligible(&custom_metadata(None), deterministic_time),
+            Ok(GRID_5M)
+        );
+    }
+
+    #[test]
+    fn a_group_by_alias_that_names_a_stream_field_falls_back() {
+        let meta = custom_metadata(None);
+        let by_timestamp = "SELECT histogram(_timestamp, '5m') AS _timestamp, count(*) AS value \
+                            FROM default GROUP BY _timestamp";
+        let reason = supported(&meta, by_timestamp).unwrap_err();
+        assert!(
+            reason.contains("GROUP BY _timestamp groups by the stream column"),
+            "{reason}"
+        );
+        let by_ordinal = by_timestamp.replace("GROUP BY _timestamp", "GROUP BY 1");
+        assert_eq!(
+            supported(&meta, &by_ordinal).unwrap().columns,
+            columns("_timestamp", "value")
+        );
+        let by_time = "SELECT histogram(_timestamp, '5m') AS time, count(*) AS value FROM \
+                       default GROUP BY time";
+        assert_eq!(
+            supported(&meta, by_time).unwrap().columns,
+            columns("time", "value")
+        );
+        let mut with_time_field = stream_fields();
+        with_time_field.insert("time".to_string());
+        let reason = supported_with(&meta, by_time, Some(&with_time_field)).unwrap_err();
+        assert!(reason.contains("stream field of that name"), "{reason}");
+        let no_schema = supported_with(&meta, &filter_sql(""), None).unwrap_err();
+        assert!(no_schema.contains("schema unavailable"), "{no_schema}");
+        let ordinal_without_schema = filter_sql("").replace("GROUP BY time_bucket", "GROUP BY 1");
+        assert!(supported_with(&meta, &ordinal_without_schema, None).is_ok());
+    }
+
+    #[test]
+    fn custom_sql_that_reads_across_buckets_or_rows_falls_back() {
+        let base = "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \
+                    default";
+        let cases = [
+            (format!("{base} GROUP BY time_bucket LIMIT 10"), "LIMIT"),
+            (
+                format!("{base} GROUP BY time_bucket OFFSET 10"),
+                "LIMIT or OFFSET",
+            ),
+            (
+                format!("WITH t AS (SELECT * FROM default) {base} GROUP BY time_bucket"),
+                "WITH",
+            ),
+            (
+                format!("{base} GROUP BY time_bucket UNION ALL {base} GROUP BY time_bucket"),
+                "set operation",
+            ),
+            (
+                format!("{base} WHERE id IN (SELECT id FROM other) GROUP BY time_bucket"),
+                "subquery",
+            ),
+            (
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) / (SELECT \
+                 count(*) FROM default) AS value FROM default GROUP BY time_bucket"
+                    .to_string(),
+                "subquery",
+            ),
+            (
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) - lag(count(*)) \
+                 OVER (ORDER BY 1) AS value FROM default GROUP BY time_bucket"
+                    .to_string(),
+                "window function",
+            ),
+            (
+                format!("{base} JOIN other ON default.id = other.id GROUP BY time_bucket"),
+                "joins",
+            ),
+            (
+                "SELECT DISTINCT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value \
+                 FROM default GROUP BY time_bucket"
+                    .to_string(),
+                "DISTINCT",
+            ),
+            (format!("{base} GROUP BY time_bucket, level"), "GROUP BY"),
+            (format!("{base} GROUP BY level"), "GROUP BY"),
+            (format!("{base} GROUP BY 2"), "GROUP BY"),
+            (format!("{base} GROUP BY ROLLUP (time_bucket)"), "GROUP BY"),
+            (base.to_string(), "GROUP BY"),
+            (
+                "SELECT histogram(_timestamp, '5m'), count(*) AS value FROM default GROUP BY 1"
+                    .to_string(),
+                "no alias",
+            ),
+            (
+                "SELECT histogram(_timestamp, '5m') AS bucket, count(*) AS value FROM default \
+                 GROUP BY bucket"
+                    .to_string(),
+                "timestamp names",
+            ),
+            (
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, max(_timestamp) AS \
+                 _timestamp, count(*) AS value FROM default GROUP BY time_bucket"
+                    .to_string(),
+                "read as the timestamp",
+            ),
+            (
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS requests FROM \
+                 default GROUP BY time_bucket"
+                    .to_string(),
+                "no value column",
+            ),
+            (
+                "SELECT histogram(created, '5m') AS time_bucket, count(*) AS value FROM \
+                 default GROUP BY time_bucket"
+                    .to_string(),
+                "two arguments",
+            ),
+            (
+                "SELECT histogram(_timestamp, '5m', 'UTC') AS time_bucket, count(*) AS value \
+                 FROM default GROUP BY time_bucket"
+                    .to_string(),
+                "two arguments",
+            ),
+            (
+                "SELECT histogram(_timestamp) AS time_bucket, count(*) AS value FROM default \
+                 GROUP BY time_bucket"
+                    .to_string(),
+                "two arguments",
+            ),
+            (
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, histogram(_timestamp, \
+                 '1h') AS time, count(*) AS value FROM default GROUP BY time_bucket"
+                    .to_string(),
+                "more than one histogram",
+            ),
+            (
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, * FROM default GROUP BY \
+                 time_bucket"
+                    .to_string(),
+                "wildcard",
+            ),
+            (
+                format!(
+                    "{} GROUP BY time_bucket",
+                    base.replace("FROM default", "FROM other")
+                ),
+                "config's stream",
+            ),
+            (
+                format!(
+                    "{} GROUP BY time_bucket",
+                    base.replace("FROM default", "FROM (SELECT * FROM default) d")
+                ),
+                "ordinary stream",
+            ),
+            (
+                format!("{} GROUP BY time_bucket", base.replace("'5m'", "'10m'")),
+                "differs from the configured",
+            ),
+            (
+                format!("{base} GROUP BY time_bucket; SELECT 1"),
+                "one statement",
+            ),
+            ("VALUES (1, 2)".to_string(), "set operation"),
+            (
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) / extract(epoch \
+                 FROM now()) AS value FROM default GROUP BY time_bucket"
+                    .to_string(),
+                "now(), bound at query time",
+            ),
+            (
+                format!(
+                    "{base} WHERE _timestamp > CURRENT_TIMESTAMP - INTERVAL '1 day' GROUP BY \
+                     time_bucket"
+                ),
+                "current_timestamp(), bound at query time",
+            ),
+            (
+                format!("{base} GROUP BY time_bucket HAVING count(*) > random() * 10"),
+                "random(), bound at query time",
+            ),
+            (
+                format!("{base} GROUP BY time_bucket ORDER BY pg_catalog.NOW()"),
+                "now(), bound at query time",
+            ),
+            (
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, unnest(array_agg(latency)) \
+                 AS value FROM default GROUP BY time_bucket"
+                    .to_string(),
+                "unnest(), which expands a bucket into rows",
+            ),
+            (
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, avg(latency) AS value, \
+                 count(*) AS count FROM default GROUP BY time_bucket"
+                    .to_string(),
+                "legacy value names value, count are all SELECT columns",
+            ),
+        ];
+        for (sql, expected) in cases {
+            let reason = supported(&custom_metadata(None), &sql).unwrap_err();
+            assert!(reason.contains(expected), "{sql}\n  got: {reason}");
+        }
+        let sql = format!("{base} GROUP BY time_bucket");
+        let absent = supported(&custom_metadata(Some("requests")), &sql).unwrap_err();
+        assert!(absent.contains("not a SELECT column"), "{absent}");
+        let bucket = supported(&custom_metadata(Some("time_bucket")), &sql).unwrap_err();
+        assert!(bucket.contains("is the bucket column"), "{bucket}");
     }
 
     #[test]
     fn metadata_mismatches_fall_back() {
         let sql = filter_sql("");
-        assert!(supported_grid(None, &sql, "logs", training_window()).is_err());
+        let fields = stream_fields();
+        assert!(supported_query(None, &sql, "logs", training_window(), Some(&fields)).is_err());
         let meta = filter_metadata("5m");
-        assert!(supported_grid(Some(&meta), &sql, "traces", training_window()).is_err());
+        assert!(
+            supported_query(
+                Some(&meta),
+                &sql,
+                "traces",
+                training_window(),
+                Some(&fields)
+            )
+            .is_err()
+        );
         let mut conflicting = filter_metadata("5m");
         conflicting.value_column = Some("requests".to_string());
         assert!(eligible(&conflicting, &sql).is_err());
         let mut declared_value = filter_metadata("5m");
         declared_value.value_column = Some("value".to_string());
         assert!(eligible(&declared_value, &sql).is_ok());
-        let mut custom = filter_metadata("5m");
-        custom.query_mode = "custom_sql".to_string();
-        assert!(eligible(&custom, &sql).is_err());
+        assert_eq!(eligible(&custom_metadata(None), &sql), Ok(GRID_5M));
         let mut unknown = filter_metadata("5m");
         unknown.query_mode = "promql".to_string();
         assert!(eligible(&unknown, &sql).is_err());
     }
 
     #[test]
-    fn metadata_snapshot_reads_tags_and_the_declared_column() {
+    fn metadata_snapshot_reads_the_declared_column() {
         let model = infra::table::entity::anomaly_detection_config::Model {
             query_mode: "custom_sql".to_string(),
             stream_name: "default".to_string(),
             stream_type: "traces".to_string(),
             histogram_interval: "5m".to_string(),
             detection_function: "p95(value)".to_string(),
-            tags: Some(json!([MANAGED_TAG, "red:p95"])),
             ..sample_model()
         };
         let meta = QueryMetadata::from_model(&model);
-        assert_eq!(
-            meta.tags,
-            vec![MANAGED_TAG.to_string(), "red:p95".to_string()]
-        );
         assert_eq!(meta.value_column.as_deref(), Some("value"));
         assert_eq!(meta.histogram_interval, "5m");
     }
@@ -1291,6 +1940,7 @@ mod tests {
             last_failed_at: None,
             last_alert_fired_at: None,
             last_recovery_notified_at: None,
+            template: None,
             detection_lease_us: None,
             last_updated: 0,
             created_at: 0,
@@ -1389,28 +2039,31 @@ mod tests {
         assert!(bucket_budget(0, 10, -1).is_err());
         assert!(bucket_budget(i64::MIN, i64::MAX, FIVE_MIN_US).is_err());
         assert!(bucket_budget(0, i64::MAX, 1).is_err());
-        let run = SupportedRun::new("a1", "t", (T0, T0), GRID_5M);
+        let run = SupportedRun::new("a1", "t", (T0, T0), generated_query());
         assert!(run.is_err());
     }
 
     #[test]
     fn the_budget_must_survive_the_i32_wire_size() {
-        let one_second = BucketGrid {
-            interval_secs: 1,
-            interval_us: 1_000_000,
+        let one_second = || SupportedQuery {
+            grid: BucketGrid {
+                interval_secs: 1,
+                interval_us: 1_000_000,
+            },
+            columns: ResultColumns::generated(),
         };
         let widest = (i64::from(i32::MAX) - 2) * 1_000_000;
-        let run = SupportedRun::new("a1", "t", (0, widest), one_second).unwrap();
+        let run = SupportedRun::new("a1", "t", (0, widest), one_second()).unwrap();
         assert_eq!(run.budget, i32::MAX as usize);
         let wire = proto::cluster_rpc::SearchQuery::from(run.search_request(SQL).query);
         assert_eq!(wire.size, i32::MAX);
 
-        let err = SupportedRun::new("a1", "t", (0, widest + 1), one_second)
+        let err = SupportedRun::new("a1", "t", (0, widest + 1), one_second())
             .err()
             .unwrap();
         assert!(format!("{err:#}").contains("search size limit"), "{err:#}");
         let reported = (0, 4_294_967_300 * 1_000_000);
-        assert!(SupportedRun::new("a1", "t", reported, one_second).is_err());
+        assert!(SupportedRun::new("a1", "t", reported, one_second()).is_err());
     }
 
     fn plan(partitions: Vec<[i64; 2]>) -> SearchPartitionResponse {
@@ -1485,39 +2138,51 @@ mod tests {
 
     fn response(hits: Vec<serde_json::Value>) -> Response {
         Response {
-            columns: vec![BUCKET_COLUMN.to_string(), VALUE_COLUMN.to_string()],
             hits,
             ..Default::default()
         }
     }
 
     fn row(bucket: i64, value: serde_json::Value) -> serde_json::Value {
-        json!([bucket, value])
+        json!({BUCKET_COLUMN: bucket, VALUE_COLUMN: value})
+    }
+
+    /// An object row whose SQL NULL value was omitted, as the leader JSON writer does.
+    fn null_row(bucket: i64) -> serde_json::Value {
+        json!({ BUCKET_COLUMN: bucket })
     }
 
     fn parse_one(resp: &Response, slice: [i64; 2]) -> Result<Vec<QueryDataPoint>> {
         let mut series = SeriesAccumulator::default();
-        series.add_slice(resp, slice, FIVE_MIN_US, 100)?;
-        series.finish(100)
+        series.add_slice(resp, slice, FIVE_MIN_US, 100, &ResultColumns::generated())?;
+        series.finish(100, VALUE_COLUMN)
     }
 
     #[test]
     fn malformed_rows_fail_even_beside_valid_rows() {
         let slice = [T0, T0 + 4 * FIVE_MIN_US];
+        let next = T0 + FIVE_MIN_US;
         let good = row(T0, json!(1.0));
         let bad = [
-            json!(["yesterday", 1.0]),
-            json!({"time_bucket": T0 + FIVE_MIN_US, "value": 1.0}),
-            json!([T0 + FIVE_MIN_US]),
-            json!([T0 + FIVE_MIN_US, 1.0, 2.0]),
-            row(T0 + FIVE_MIN_US, json!("1.0")),
-            row(T0 + FIVE_MIN_US, json!(true)),
+            json!([next, 1.0]),
+            json!(T0),
+            json!(null),
+            json!({ VALUE_COLUMN: 1.0 }),
+            json!({BUCKET_COLUMN: null, VALUE_COLUMN: 1.0}),
+            json!({BUCKET_COLUMN: "yesterday", VALUE_COLUMN: 1.0}),
+            json!({BUCKET_COLUMN: true, VALUE_COLUMN: 1.0}),
+            row(next, json!("1.0")),
+            row(next, json!("NaN")),
+            row(next, json!("inf")),
+            row(next, json!(true)),
+            row(next, json!({"v": 1})),
+            row(next, json!([1.0])),
             row(T0 + 1, json!(1.0)),
             row(T0 - FIVE_MIN_US, json!(1.0)),
             row(T0 + 4 * FIVE_MIN_US, json!(1.0)),
             row(T0, json!(2.0)),
             row(T0, serde_json::Value::Null),
-            json!(T0),
+            null_row(T0),
         ];
         for b in bad {
             let resp = response(vec![good.clone(), b.clone()]);
@@ -1528,86 +2193,208 @@ mod tests {
     #[test]
     fn string_buckets_parse_and_an_unaligned_start_keeps_its_first_bucket() {
         let slice = [T0 + MINUTE_US, T0 + 2 * FIVE_MIN_US];
-        let resp = response(vec![json!(["2026-01-01T00:05:00", 2]), row(T0, json!(1.5))]);
+        let resp = response(vec![
+            json!({BUCKET_COLUMN: "2026-01-01T00:05:00", VALUE_COLUMN: 2}),
+            row(T0, json!(1.5)),
+        ]);
         let points = parse_one(&resp, slice).unwrap();
         let got: Vec<_> = points.iter().map(|p| (p.timestamp_us, p.value)).collect();
         assert_eq!(got, vec![(T0, 1.5), (T0 + FIVE_MIN_US, 2.0)]);
     }
 
     #[test]
-    fn null_values_are_omitted_counted_and_never_zero() {
+    fn omitted_and_explicit_null_values_are_counted_and_never_zero() {
         let slice = [T0, T0 + 4 * FIVE_MIN_US];
         let resp = response(vec![
             row(T0, json!(1.0)),
-            row(T0 + FIVE_MIN_US, serde_json::Value::Null),
+            null_row(T0 + FIVE_MIN_US),
+            row(T0 + 2 * FIVE_MIN_US, serde_json::Value::Null),
             row(T0 + 3 * FIVE_MIN_US, json!(3.0)),
         ]);
         let mut series = SeriesAccumulator::default();
-        series.add_slice(&resp, slice, FIVE_MIN_US, 100).unwrap();
-        assert_eq!((series.raw_hits, series.omitted_nulls), (3, 1));
-        let points = series.finish(100).unwrap();
-        let got: Vec<_> = points.iter().map(|p| p.timestamp_us).collect();
-        assert_eq!(got, vec![T0, T0 + 3 * FIVE_MIN_US]);
+        series
+            .add_slice(&resp, slice, FIVE_MIN_US, 100, &ResultColumns::generated())
+            .unwrap();
+        assert_eq!((series.raw_hits, series.omitted_nulls), (4, 2));
+        let points = series.finish(100, VALUE_COLUMN).unwrap();
+        let got: Vec<_> = points.iter().map(|p| (p.timestamp_us, p.value)).collect();
+        assert_eq!(got, vec![(T0, 1.0), (T0 + 3 * FIVE_MIN_US, 3.0)]);
     }
 
     #[test]
-    fn a_missing_value_column_is_an_error_not_a_null() {
-        let slice = [T0, T0 + 2 * FIVE_MIN_US];
-        let mut undeclared = response(vec![json!([T0])]);
-        undeclared.columns = vec![BUCKET_COLUMN.to_string()];
-        let err = parse_one(&undeclared, slice).unwrap_err().to_string();
-        assert!(err.contains("declares columns"), "{err}");
-        let mut no_columns = response(vec![row(T0, json!(1))]);
-        no_columns.columns.clear();
-        assert!(parse_one(&no_columns, slice).is_err());
-        let mut extra = response(vec![json!([T0, 1.0, 2.0])]);
-        extra.columns.push("other".to_string());
-        assert!(parse_one(&extra, slice).is_err());
-        let object_without_value = response(vec![json!({"time_bucket": T0})]);
-        assert!(parse_one(&object_without_value, slice).is_err());
-
-        let mut swapped = response(vec![json!([2.5, T0 + FIVE_MIN_US])]);
-        swapped.columns.reverse();
-        let points = parse_one(&swapped, slice).unwrap();
-        assert_eq!(
-            (points[0].timestamp_us, points[0].value),
-            (T0 + FIVE_MIN_US, 2.5)
+    fn a_column_missing_from_every_row_fails_the_run_naming_the_keys_seen() {
+        let first = [T0, T0 + FIVE_MIN_US];
+        let second = [T0 + FIVE_MIN_US, T0 + 2 * FIVE_MIN_US];
+        let mut series = SeriesAccumulator::default();
+        for (slice, bucket) in [(first, T0), (second, T0 + FIVE_MIN_US)] {
+            let rows = response(vec![json!({BUCKET_COLUMN: bucket, "count": 3})]);
+            series
+                .add_slice(&rows, slice, FIVE_MIN_US, 100, &ResultColumns::generated())
+                .unwrap();
+        }
+        assert_eq!(series.omitted_nulls, 2);
+        let err = series.finish(100, VALUE_COLUMN).unwrap_err().to_string();
+        assert!(err.contains("2 rows"), "{err}");
+        assert!(err.contains("every 'value' was SQL NULL"), "{err}");
+        assert!(err.contains("missing from the result"), "{err}");
+        assert!(
+            err.contains(r#"columns present: ["count", "time_bucket"]"#),
+            "{err}"
         );
 
-        let mut empty = response(vec![]);
-        empty.columns.clear();
-        assert!(parse_one(&empty, slice).unwrap().is_empty());
+        let custom = columns("zo_sql_timestamp", "Cnt");
+        let mut series = SeriesAccumulator::default();
+        for (slice, hit) in [
+            (first, json!({ "zo_sql_timestamp": T0 })),
+            (
+                second,
+                json!({"zo_sql_timestamp": T0 + FIVE_MIN_US, "cnt": 4}),
+            ),
+        ] {
+            series
+                .add_slice(&response(vec![hit]), slice, FIVE_MIN_US, 100, &custom)
+                .unwrap();
+        }
+        let err = series.finish(100, "Cnt").unwrap_err().to_string();
+        assert!(
+            err.contains(r#"columns present: ["cnt", "zo_sql_timestamp"]"#),
+            "{err}"
+        );
+
+        let wide: serde_json::Map<_, _> = (0..128)
+            .map(|i| (format!("k{i:03}"), json!(1)))
+            .chain([(BUCKET_COLUMN.to_string(), json!(T0))])
+            .collect();
+        let mut series = SeriesAccumulator::default();
+        series
+            .add_slice(
+                &response(vec![serde_json::Value::Object(wide)]),
+                first,
+                FIVE_MIN_US,
+                100,
+                &ResultColumns::generated(),
+            )
+            .unwrap();
+        assert_eq!(series.keys_seen.len(), 129);
+        assert!(series.keys_seen.contains(BUCKET_COLUMN));
+
+        let slice = [T0, T0 + 2 * FIVE_MIN_US];
+        let no_bucket = response(vec![json!({ VALUE_COLUMN: 1 })]);
+        let err = parse_one(&no_bucket, slice).unwrap_err().to_string();
+        assert!(err.contains("no usable 'time_bucket'"), "{err}");
+
+        let extra = response(vec![
+            json!({BUCKET_COLUMN: T0, VALUE_COLUMN: 1.0, "other": 2.0}),
+        ]);
+        assert_eq!(parse_one(&extra, slice).unwrap()[0].value, 1.0);
+
+        assert!(parse_one(&response(vec![]), slice).unwrap().is_empty());
+    }
+
+    #[test]
+    fn custom_columns_are_read_by_name_from_object_rows() {
+        let slice = [T0, T0 + 3 * FIVE_MIN_US];
+        let custom = columns("zo_sql_timestamp", "zo_sql_num");
+        let resp = response(vec![
+            json!({"zo_sql_num": 7, "n": 99, "zo_sql_timestamp": T0}),
+            json!({"n": 99, "zo_sql_timestamp": T0 + FIVE_MIN_US}),
+            json!({"zo_sql_timestamp": T0 + 2 * FIVE_MIN_US, VALUE_COLUMN: 5}),
+        ]);
+        let mut series = SeriesAccumulator::default();
+        series
+            .add_slice(&resp, slice, FIVE_MIN_US, 100, &custom)
+            .unwrap();
+        assert_eq!(series.omitted_nulls, 2);
+        let points = series.finish(100, VALUE_COLUMN).unwrap();
+        let got: Vec<_> = points.iter().map(|p| (p.timestamp_us, p.value)).collect();
+        assert_eq!(got, vec![(T0, 7.0)]);
+
+        let mut series = SeriesAccumulator::default();
+        let err = series
+            .add_slice(
+                &resp,
+                slice,
+                FIVE_MIN_US,
+                100,
+                &columns("time_bucket", "zo_sql_num"),
+            )
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("'time_bucket'"), "{err}");
     }
 
     #[test]
     fn a_null_only_slice_is_fine_but_an_all_null_run_is_an_error() {
         let first = [T0, T0 + FIVE_MIN_US];
         let second = [T0 + FIVE_MIN_US, T0 + 2 * FIVE_MIN_US];
-        let mut series = SeriesAccumulator::default();
-        let nulls = response(vec![row(T0, serde_json::Value::Null)]);
-        series.add_slice(&nulls, first, FIVE_MIN_US, 100).unwrap();
-        let numbers = response(vec![row(T0 + FIVE_MIN_US, json!(4))]);
-        series
-            .add_slice(&numbers, second, FIVE_MIN_US, 100)
-            .unwrap();
-        assert_eq!(series.finish(100).unwrap().len(), 1);
+        for nulls in [
+            response(vec![null_row(T0)]),
+            response(vec![row(T0, serde_json::Value::Null)]),
+        ] {
+            let mut series = SeriesAccumulator::default();
+            series
+                .add_slice(&nulls, first, FIVE_MIN_US, 100, &ResultColumns::generated())
+                .unwrap();
+            let numbers = response(vec![row(T0 + FIVE_MIN_US, json!(4))]);
+            series
+                .add_slice(
+                    &numbers,
+                    second,
+                    FIVE_MIN_US,
+                    100,
+                    &ResultColumns::generated(),
+                )
+                .unwrap();
+            let points = series.finish(100, VALUE_COLUMN).unwrap();
+            assert_eq!(
+                points
+                    .iter()
+                    .map(|p| (p.timestamp_us, p.value))
+                    .collect::<Vec<_>>(),
+                vec![(T0 + FIVE_MIN_US, 4.0)]
+            );
 
-        let mut all_null = SeriesAccumulator::default();
-        all_null.add_slice(&nulls, first, FIVE_MIN_US, 100).unwrap();
-        let err = all_null.finish(100).unwrap_err().to_string();
-        assert!(err.contains("NULL"), "{err}");
+            let mut all_null = SeriesAccumulator::default();
+            all_null
+                .add_slice(&nulls, first, FIVE_MIN_US, 100, &ResultColumns::generated())
+                .unwrap();
+            let err = all_null.finish(100, VALUE_COLUMN).unwrap_err().to_string();
+            assert!(err.contains("NULL"), "{err}");
+        }
 
-        assert!(parse_one(&response(vec![]), first).unwrap().is_empty());
+        let mut empty_run = SeriesAccumulator::default();
+        for slice in [first, second] {
+            empty_run
+                .add_slice(
+                    &response(vec![]),
+                    slice,
+                    FIVE_MIN_US,
+                    100,
+                    &ResultColumns::generated(),
+                )
+                .unwrap();
+        }
+        assert!(empty_run.finish(100, VALUE_COLUMN).unwrap().is_empty());
     }
 
     #[test]
     fn a_null_row_still_counts_toward_duplicates_across_slices() {
-        let mut series = SeriesAccumulator::default();
         let slice = [T0, T0 + FIVE_MIN_US];
-        let nulls = response(vec![row(T0, serde_json::Value::Null)]);
-        series.add_slice(&nulls, slice, FIVE_MIN_US, 100).unwrap();
-        let again = response(vec![row(T0, json!(1))]);
-        assert!(series.add_slice(&again, slice, FIVE_MIN_US, 100).is_err());
+        for nulls in [
+            response(vec![null_row(T0)]),
+            response(vec![row(T0, serde_json::Value::Null)]),
+        ] {
+            let mut series = SeriesAccumulator::default();
+            series
+                .add_slice(&nulls, slice, FIVE_MIN_US, 100, &ResultColumns::generated())
+                .unwrap();
+            let again = response(vec![row(T0, json!(1))]);
+            assert!(
+                series
+                    .add_slice(&again, slice, FIVE_MIN_US, 100, &ResultColumns::generated())
+                    .is_err()
+            );
+        }
     }
 
     #[test]
@@ -1621,17 +2408,25 @@ mod tests {
         let err = parse_one(&partial, slice).unwrap_err().to_string();
         assert!(err.contains("querier timeout"), "{err}");
 
-        let full = response(vec![row(T0, json!(1)), row(T0 + FIVE_MIN_US, json!(1))]);
-        let mut series = SeriesAccumulator::default();
         let wide = [T0, T0 + 2 * FIVE_MIN_US];
-        assert!(series.add_slice(&full, wide, FIVE_MIN_US, 2).is_err());
+        let full = response(vec![null_row(T0), null_row(T0 + FIVE_MIN_US)]);
+        let mut series = SeriesAccumulator::default();
+        let err = series
+            .add_slice(&full, wide, FIVE_MIN_US, 2, &ResultColumns::generated())
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("budget"), "{err}");
 
         let mut series = SeriesAccumulator::default();
         let one = response(vec![row(T0, json!(1))]);
-        series.add_slice(&one, wide, FIVE_MIN_US, 2).unwrap();
-        let two = response(vec![row(T0 + FIVE_MIN_US, json!(1))]);
-        series.add_slice(&two, wide, FIVE_MIN_US, 2).unwrap();
-        assert!(series.finish(2).is_err());
+        series
+            .add_slice(&one, wide, FIVE_MIN_US, 2, &ResultColumns::generated())
+            .unwrap();
+        let two = response(vec![null_row(T0 + FIVE_MIN_US)]);
+        series
+            .add_slice(&two, wide, FIVE_MIN_US, 2, &ResultColumns::generated())
+            .unwrap();
+        assert!(series.finish(2, VALUE_COLUMN).is_err());
     }
 
     fn three_slices() -> SearchPartitionResponse {
@@ -1647,7 +2442,7 @@ mod tests {
     }
 
     async fn run(engine: &ScriptedSearch) -> Result<Vec<QueryDataPoint>> {
-        let run = SupportedRun::new("a1", "trace", WINDOW, GRID_5M)?;
+        let run = SupportedRun::new("a1", "trace", WINDOW, generated_query())?;
         run.execute(engine, SQL).await
     }
 
@@ -1819,17 +2614,15 @@ mod tests {
         );
     }
 
-    fn table_response(batch: &RecordBatch) -> Response {
+    /// Mirrors the leader: real JSON rows with empty objects dropped.
+    fn object_response(batch: &RecordBatch) -> Response {
         let rows = config::utils::arrow::record_batches_to_json_rows(&[batch]).unwrap();
-        let (columns, hits) = search_service::cluster::handle_table_response(
-            batch.schema(),
-            rows.into_iter().map(serde_json::Value::Object).collect(),
-        );
-        Response {
-            columns,
-            hits,
-            ..Default::default()
-        }
+        response(
+            rows.into_iter()
+                .filter(|v| !v.is_empty())
+                .map(serde_json::Value::Object)
+                .collect(),
+        )
     }
 
     fn arrow_rows(rows: &[(i64, Option<f64>)]) -> RecordBatch {
@@ -1860,17 +2653,55 @@ mod tests {
             (T0 + FIVE_MIN_US, None),
             (T0 + 2 * FIVE_MIN_US, Some(f64::INFINITY)),
         ]);
-        let resp = table_response(&batch);
+        let resp = object_response(&batch);
+        let hits = &resp.hits;
         assert!(
-            resp.hits[1][1].is_null() && resp.hits[2][1].is_null(),
-            "{:?}",
-            resp.hits
+            hits[1].get(VALUE_COLUMN).is_none()
+                && hits[2]
+                    .get(VALUE_COLUMN)
+                    .is_none_or(serde_json::Value::is_null),
+            "{hits:?}"
         );
         let mut series = SeriesAccumulator::default();
         series
-            .add_slice(&resp, [WINDOW.0, WINDOW.1], FIVE_MIN_US, 5)
+            .add_slice(
+                &resp,
+                [WINDOW.0, WINDOW.1],
+                FIVE_MIN_US,
+                5,
+                &ResultColumns::generated(),
+            )
             .unwrap();
         assert_eq!(series.omitted_nulls, 2);
+    }
+
+    #[tokio::test]
+    async fn an_entirely_null_value_partition_is_skipped_never_zeroed() {
+        let all_null = arrow_rows(&[(T0 + FIVE_MIN_US, None)]);
+        let resp = object_response(&all_null);
+        assert!(
+            !resp.hits.is_empty() && resp.hits.iter().all(|hit| hit.get(VALUE_COLUMN).is_none()),
+            "{:?}",
+            resp.hits
+        );
+
+        let engine = arrow_engine(
+            Some(three_slices()),
+            vec![
+                arrow_rows(&[(T0, Some(2.0))]),
+                all_null,
+                arrow_rows(&[(T0 + 2 * FIVE_MIN_US, Some(0.5))]),
+            ],
+        );
+        let points = run_arrow(&engine).await.unwrap();
+        let got: Vec<_> = points.iter().map(|p| (p.timestamp_us, p.value)).collect();
+        assert_eq!(got, vec![(T0, 2.0), (T0 + 2 * FIVE_MIN_US, 0.5)]);
+
+        let only_nulls = arrow_rows(&[(T0, None), (T0 + FIVE_MIN_US, None)]);
+        let engine = arrow_engine(Some(plan(vec![[WINDOW.0, WINDOW.1]])), vec![only_nulls]);
+        let err = run_arrow(&engine).await.unwrap_err().to_string();
+        assert!(err.contains("SQL NULL"), "{err}");
+        assert!(err.contains(r#"columns present: ["time_bucket"]"#), "{err}");
     }
 
     #[tokio::test]
@@ -1918,7 +2749,7 @@ mod tests {
     }
 
     async fn run_arrow(engine: &ArrowSearch) -> Result<Vec<QueryDataPoint>> {
-        let run = SupportedRun::new("a1", "trace", WINDOW, GRID_5M)?;
+        let run = SupportedRun::new("a1", "trace", WINDOW, generated_query())?;
         run.execute(engine, SQL).await
     }
 }

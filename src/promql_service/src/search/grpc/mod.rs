@@ -15,7 +15,7 @@
 
 use std::{
     sync::Arc,
-    time::{Duration, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use async_trait::async_trait;
@@ -39,6 +39,7 @@ use promql::{
     },
     exec::PromqlContext,
     micros,
+    utils::absent_label_rejects_all,
 };
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
@@ -76,14 +77,32 @@ impl TableProvider for StorageProvider {
         filters: &mut [(String, Vec<String>)],
         streaming: bool,
     ) -> datafusion::error::Result<Vec<ScanContext>> {
-        let mut ctxs = Vec::new();
+        if matches_nothing(org_id, stream_name, &matchers).await? {
+            return Ok(vec![]);
+        }
+        // WAL before storage: a sample moved in between is then read twice, never missed.
+        let wal_ctxs = if self.need_wal {
+            let trace_id = self.trace_id.to_owned() + "-wal-" + stream_name;
+            wal::create_context(
+                &trace_id,
+                org_id,
+                stream_name,
+                time_range,
+                matchers.clone(),
+                label_selector.clone(),
+            )
+            .await?
+        } else {
+            Vec::new()
+        };
+        let mut ctxs = Vec::with_capacity(wal_ctxs.len() + 1);
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
         let ctx = storage::create_context(
             &trace_id,
             org_id,
             stream_name,
             time_range,
-            matchers.clone(),
+            matchers,
             filters,
             storage::SourcePreference {
                 streaming,
@@ -94,21 +113,7 @@ impl TableProvider for StorageProvider {
         if let Some(ctx) = ctx {
             ctxs.push(ctx);
         }
-        if self.need_wal {
-            let trace_id = self.trace_id.to_owned() + "-wal-" + stream_name;
-            let wal_ctx_list = wal::create_context(
-                &trace_id,
-                org_id,
-                stream_name,
-                time_range,
-                matchers,
-                label_selector,
-            )
-            .await?;
-            for ctx in wal_ctx_list {
-                ctxs.push(ctx);
-            }
-        }
+        ctxs.extend(wal_ctxs);
         Ok(ctxs)
     }
 
@@ -396,16 +401,13 @@ pub async fn search_inner(
     let org_id = &req.org_id;
     let query = req.query.as_ref().unwrap();
     let prom_expr = promql::parse(&query.query).map_err(DataFusionError::Execution)?;
+    let (eval_start, eval_end, interval) = eval_window(query)?;
 
     let eval_stmt = parser::EvalStmt {
         expr: prom_expr,
-        start: UNIX_EPOCH
-            .checked_add(Duration::from_micros(query.start as _))
-            .unwrap(),
-        end: UNIX_EPOCH
-            .checked_add(Duration::from_micros(query.end as _))
-            .unwrap(),
-        interval: Duration::from_micros(query.step as _),
+        start: eval_start,
+        end: eval_end,
+        interval,
         lookback_delta: DEFAULT_LOOKBACK,
     };
 
@@ -423,7 +425,7 @@ pub async fn search_inner(
         need_wal: req.need_wal,
         use_cache: req.use_cache,
         timeout,
-        search_event_type: SearchEventType::try_from(req.search_event_type.as_str()).ok(),
+        search_event_type: req.search_event_type.parse::<SearchEventType>().ok(),
         regions: req.regions.clone(),
         clusters: req.clusters.clone(),
         is_super_cluster: req.is_super_cluster,
@@ -455,6 +457,33 @@ pub async fn search_inner(
     scan_stats.format_to_mb();
     let took = start.elapsed().as_millis() as i64;
     Ok((value, result_type, scan_stats, took, warnings))
+}
+
+/// The request's microsecond window as evaluator times, rejecting values they cannot hold.
+fn eval_window(
+    query: &cluster_rpc::MetricsQueryStmt,
+) -> Result<(SystemTime, SystemTime, Duration)> {
+    let to_duration = |name: &str, v: i64| {
+        u64::try_from(v).map(Duration::from_micros).map_err(|_| {
+            DataFusionError::Execution(format!("promql {name} must not be negative, got {v}"))
+        })
+    };
+    let start = to_duration("start", query.start)?;
+    let end = to_duration("end", query.end)?;
+    let step = to_duration("step", query.step)?;
+    if end < start {
+        return Err(DataFusionError::Execution(format!(
+            "promql end {} must not be before start {}",
+            query.end, query.start
+        ))
+        .into());
+    }
+    let to_time = |name: &str, d: Duration| {
+        UNIX_EPOCH.checked_add(d).ok_or_else(|| {
+            DataFusionError::Execution(format!("promql {name} is out of range, got {d:?}"))
+        })
+    };
+    Ok((to_time("start", start)?, to_time("end", end)?, step))
 }
 
 async fn get_max_file_list(
@@ -504,6 +533,21 @@ async fn get_max_file_list(
         files: file_list,
         window,
     })
+}
+
+/// A label the stream lacks reads as "", so a matcher rejecting "" leaves nothing to scan.
+async fn matches_nothing(
+    org_id: &str,
+    stream_name: &str,
+    matchers: &Matchers,
+) -> datafusion::error::Result<bool> {
+    let schema = infra::schema::get_cache(org_id, stream_name, StreamType::Metrics)
+        .await
+        .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+    Ok(matchers
+        .matchers
+        .iter()
+        .any(|mat| absent_label_rejects_all(schema.schema(), mat)))
 }
 
 /// The time from which a group must also read the WAL.
@@ -885,5 +929,83 @@ mod tests {
                 .unwrap(),
             vec![(0, 410), (420, 430)]
         );
+    }
+
+    #[tokio::test]
+    async fn test_matches_nothing_on_a_label_the_stream_lacks() {
+        use datafusion::arrow::datatypes::{DataType, Field, Schema};
+
+        let (org_id, stream_name) = ("test_org_absent_label", "absent_label_metric");
+        {
+            let mut w = infra::schema::STREAM_SCHEMAS_LATEST.write().await;
+            infra::schema::insert_latest(
+                &mut w,
+                format!("{org_id}/{}/{stream_name}", StreamType::Metrics),
+                infra::schema::SchemaCache::new(Schema::new(vec![Field::new(
+                    "job",
+                    DataType::Utf8,
+                    true,
+                )])),
+            );
+        }
+        for (query, nothing) in [
+            (r#"absent_label_metric{uuid="x"}"#, true),
+            (r#"absent_label_metric{uuid=~"x.+"}"#, true),
+            (r#"absent_label_metric{uuid!="x"}"#, false),
+            (r#"absent_label_metric{uuid=""}"#, false),
+            (r#"absent_label_metric{job="x"}"#, false),
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(query).unwrap() else {
+                panic!("expected a vector selector");
+            };
+            assert_eq!(
+                matches_nothing(org_id, stream_name, &selector.matchers)
+                    .await
+                    .unwrap(),
+                nothing,
+                "{query}"
+            );
+        }
+    }
+
+    fn stmt(start: i64, end: i64, step: i64) -> cluster_rpc::MetricsQueryStmt {
+        cluster_rpc::MetricsQueryStmt {
+            start,
+            end,
+            step,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn eval_window_converts_a_valid_window() {
+        let (start, end, step) = eval_window(&stmt(1_000_000, 61_000_000, 15_000_000)).unwrap();
+        assert_eq!(start, UNIX_EPOCH + Duration::from_secs(1));
+        assert_eq!(end, UNIX_EPOCH + Duration::from_secs(61));
+        assert_eq!(step, Duration::from_secs(15));
+        let (start, end, step) = eval_window(&stmt(5, 5, 0)).unwrap();
+        assert_eq!(start, end);
+        assert_eq!(step, Duration::ZERO);
+        // Whether a max end fits SystemTime is platform dependent; it must error, never panic.
+        let max_end_fits = UNIX_EPOCH
+            .checked_add(Duration::from_micros(i64::MAX as u64))
+            .is_some();
+        assert_eq!(eval_window(&stmt(0, i64::MAX, 1)).is_ok(), max_end_fits);
+    }
+
+    #[test]
+    fn eval_window_rejects_negative_times_and_inverted_ranges() {
+        for (start, end, step, needle) in [
+            (-1, 10, 1, "start must not be negative"),
+            (i64::MIN, 10, 1, "start must not be negative"),
+            (0, -1, 1, "end must not be negative"),
+            (0, 10, -1, "step must not be negative"),
+            (10, 5, 1, "end 5 must not be before start 10"),
+        ] {
+            let err = eval_window(&stmt(start, end, step))
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains(needle), "{start},{end},{step}: {err}");
+        }
     }
 }

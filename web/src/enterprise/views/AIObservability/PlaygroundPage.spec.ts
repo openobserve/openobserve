@@ -9,6 +9,7 @@ const scorersList = vi.fn();
 const providersList = vi.fn();
 const datasetsList = vi.fn();
 const push = vi.fn();
+const routeQuery: Record<string, string> = {};
 const toast = vi.fn();
 
 vi.mock("@/services/llm-playground.service", async () => {
@@ -29,12 +30,15 @@ vi.mock("@/services/online-evals.service", () => ({
   },
 }));
 
-vi.mock("@/services/llm-datasets.service", () => ({
+vi.mock("@/services/llm-datasets.service", async () => ({
+  ...(await vi.importActual<typeof import("@/services/llm-datasets.service")>(
+    "@/services/llm-datasets.service",
+  )),
   default: { list: (...args: unknown[]) => datasetsList(...args) },
 }));
 
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ query: {} }),
+  useRoute: () => ({ query: routeQuery }),
   useRouter: () => ({ push }),
 }));
 
@@ -63,7 +67,10 @@ vi.mock("@/types/i18n", async () => {
 });
 
 import PlaygroundPage from "./PlaygroundPage.vue";
-import { SINGLE_ROW_KEY } from "./playgroundDraft";
+import { SINGLE_ROW_KEY, type PlaygroundSample } from "./playgroundDraft";
+import type { LlmDatasetItem } from "@/services/llm-datasets.service";
+import type { PromptConfig } from "@/services/llm-prompts.service";
+import { storePromptPlaygroundHandoff } from "@/views/AIObservability/promptPlaygroundHandoff";
 
 // Structural stubs: this spec is about the run engine and draft mutations, not
 // about how the shared components paint.
@@ -93,6 +100,7 @@ const stubs = {
   PlaygroundRowDrawer: true,
   PlaygroundSampleDialog: true,
   PlaygroundAddRowDialog: true,
+  SaveAsPromptDialog: true,
 };
 
 const PROVIDER = {
@@ -130,6 +138,11 @@ function vm(wrapper: Awaited<ReturnType<typeof mountPage>>) {
     scoreAll: () => Promise<void>;
     addOutputToMessages: (variantId: string) => void;
     totalCells: number;
+    applySample: (sample: PlaygroundSample, item: LlmDatasetItem, notify?: boolean) => void;
+    clearSample: () => void;
+    openSaveAsPrompt: (variantId: string) => void;
+    savePromptConfig: PromptConfig;
+    restoreDraft: (entry: unknown) => void;
   };
 }
 
@@ -362,6 +375,40 @@ describe("PlaygroundPage", () => {
     expect(request.messages[0].content).toBe("Summarise the refund policy");
   });
 
+  describe("sampling an object-input row", () => {
+    const sample = { datasetId: "d1", datasetName: "goldens", itemId: "i1", index: 0, total: 2 };
+    const row = (rawInput: Record<string, unknown>) =>
+      ({
+        rawInput,
+        input: JSON.stringify(rawInput),
+        inputPreview: JSON.stringify(rawInput),
+        expectedOutput: null,
+      }) as LlmDatasetItem;
+
+    it("binds each field by name and drops a field the next row lacks", async () => {
+      const page = vm(await mountPage());
+      page.draft.variants[0].messages[1].content = "Q: {{question}} C: {{context}}";
+
+      page.applySample(sample, row({ question: "What is 2+2?", context: "math" }), false);
+      page.applySample({ ...sample, index: 1 }, row({ question: "Capital of France?" }), false);
+      page.onRunAll();
+      await flushPromises();
+
+      const request = runPlayground.mock.calls[0][1] as { messages: { content: string }[] };
+      expect(request.messages[0].content).toBe("Q: Capital of France? C: ");
+    });
+
+    it("unbinds the row's fields when the sample is cleared", async () => {
+      const page = vm(await mountPage());
+      page.draft.vars = { tone: "curt" };
+
+      page.applySample(sample, row({ context: "math" }), false);
+      page.clearSample();
+
+      expect(page.draft.vars).toEqual({ tone: "curt", input: '{"context":"math"}' });
+    });
+  });
+
   it("runs every variant on the bench", async () => {
     const page = vm(await mountPage());
     page.draft.variants[0].messages[1].content = "Hello";
@@ -405,6 +452,18 @@ describe("PlaygroundPage", () => {
     await page.onRunVariant(page.draft.variants[0].id);
 
     expect(analytics.track).toHaveBeenCalledWith("llm_playground_run_completed", { count: 1 });
+  });
+
+  it("tracks copying a finished output", async () => {
+    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+    const page = vm(await mountPage());
+    const variantId = page.draft.variants[0].id;
+    await page.onRunVariant(variantId);
+
+    await page.copyOutput(variantId, SINGLE_ROW_KEY);
+
+    expect(writeText).toHaveBeenCalledWith("an answer");
+    expect(analytics.track).toHaveBeenCalledWith("llm_playground_output_copied");
   });
 
   it("hands the variant's config to the experiment form", async () => {
@@ -472,6 +531,133 @@ describe("PlaygroundPage", () => {
     await page.scoreAll();
     expect(scorePlayground).toHaveBeenCalledTimes(2);
     expect(scorePlayground.mock.calls[1][1].expectedOutput).toBe("the golden answer");
+  });
+
+  it("tracks a user-triggered score, never an auto-score after a run", async () => {
+    scorePlayground.mockResolvedValue([]);
+    const page = vm(await mountPage());
+    page.draft.scorerIds = ["scorer-1"];
+    page.draft.autoScore = true;
+    page.duplicate(page.draft.variants[0].id);
+
+    page.onRunAll();
+    await flushPromises();
+    expect(scorePlayground).toHaveBeenCalled();
+    expect(analytics.track).not.toHaveBeenCalledWith("llm_playground_scored", expect.anything());
+
+    page.draft.expectedSingle = "golden";
+    await page.scoreAll();
+    expect(analytics.track).toHaveBeenCalledTimes(2);
+    expect(analytics.track).toHaveBeenCalledWith("llm_playground_scored", { variant_count: 2 });
+  });
+
+  it("counts only the variants that scored, and tracks nothing when none did", async () => {
+    scorePlayground.mockResolvedValue([]);
+    const page = vm(await mountPage());
+    page.draft.scorerIds = ["scorer-1"];
+    page.duplicate(page.draft.variants[0].id);
+    page.onRunAll();
+    await flushPromises();
+
+    scorePlayground.mockReset();
+    scorePlayground.mockRejectedValue(new Error("judge down"));
+    vi.mocked(analytics.track).mockClear();
+    await page.scoreAll();
+    expect(analytics.track).not.toHaveBeenCalledWith("llm_playground_scored", expect.anything());
+
+    scorePlayground.mockReset();
+    scorePlayground.mockResolvedValueOnce([]).mockRejectedValueOnce(new Error("judge down"));
+    await page.scoreAll();
+    expect(analytics.track).toHaveBeenCalledWith("llm_playground_scored", { variant_count: 1 });
+
+    vi.mocked(analytics.track).mockClear();
+    scorePlayground.mockReset();
+    scorePlayground.mockResolvedValue([]);
+    await page.scoreAll();
+    expect(analytics.track).toHaveBeenCalledWith("llm_playground_scored", { variant_count: 1 });
+
+    vi.mocked(analytics.track).mockClear();
+    await page.scoreAll();
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
+  describe("opened from a managed prompt", () => {
+    function openPrompt(config: PromptConfig) {
+      routeQuery.from = "prompt";
+      storePromptPlaygroundHandoff({
+        entityId: "prompt-1",
+        id: "version-row-1",
+        name: "triage",
+        version: 3,
+        payload: [{ role: "user", content: "Triage {{input}}" }],
+        config,
+        provenance: { type: "prompt", label: "triage@v3" },
+      });
+    }
+
+    const tuned: PromptConfig = {
+      model: "gpt-4o",
+      params: { temperature: 0.3, max_tokens: 256, top_p: 0.9, stop: ["###"] },
+      tools: null,
+      responseFormat: null,
+    };
+
+    afterEach(() => {
+      delete routeQuery.from;
+      sessionStorage.clear();
+    });
+
+    it("saves the version's settings back exactly as stored", async () => {
+      openPrompt(tuned);
+      const page = vm(await mountPage());
+
+      page.openSaveAsPrompt(page.draft.variants[0].id);
+
+      expect(page.savePromptConfig).toEqual(tuned);
+    });
+
+    // The bench seeds the provider default to run, but the saved prompt must not gain it.
+    it("saves a version with no settings without a temperature or the seeded model", async () => {
+      const bare: PromptConfig = { model: null, params: null, tools: null, responseFormat: null };
+      openPrompt(bare);
+      const page = vm(await mountPage());
+      expect(page.draft.variants[0].model).toBe("gpt-4o-mini");
+
+      page.openSaveAsPrompt(page.draft.variants[0].id);
+
+      expect(page.savePromptConfig).toEqual(bare);
+    });
+
+    it("keeps the seeded model out of a restored draft after the provider default changed", async () => {
+      const bare: PromptConfig = { model: null, params: null, tools: null, responseFormat: null };
+      openPrompt(bare);
+      const first = await mountPage();
+      const stored = JSON.parse(JSON.stringify(vm(first).draft));
+      first.unmount();
+      delete routeQuery.from;
+      providersList.mockResolvedValue([
+        { ...PROVIDER, availableModels: ["gpt-4o-mini", "gpt-4.1"], defaultModel: "gpt-4.1" },
+      ]);
+      const page = vm(await mountPage());
+
+      page.restoreDraft({ id: "d1", summary: "triage", models: [], savedAt: 0, draft: stored });
+      expect(page.draft.variants[0].model).toBe("gpt-4o-mini");
+      page.openSaveAsPrompt(page.draft.variants[0].id);
+
+      expect(page.savePromptConfig).toEqual(bare);
+    });
+
+    it("runs with every stored param, not just temperature", async () => {
+      openPrompt(tuned);
+      const page = vm(await mountPage());
+
+      page.onRunAll();
+      await flushPromises();
+
+      const request = runPlayground.mock.calls[0][1] as { model: string; params: unknown };
+      expect(request.model).toBe("gpt-4o");
+      expect(request.params).toEqual(tuned.params);
+    });
   });
 });
 

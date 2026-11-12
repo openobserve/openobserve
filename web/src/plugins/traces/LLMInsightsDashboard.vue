@@ -20,6 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        another bg-card-glass-bg would render same-bg-on-same-bg and the
        inner cards would visually disappear (no border contrast). -->
   <div class="flex h-full flex-col bg-transparent">
+    <!-- Page filter: a WHERE clause over the spans, kept in the URL. -->
+    <LLMInsightsSearchBar
+      v-if="availableStreams.length > 0 && scopeReady && !compareMode && !emptyOrg"
+      :stream="effectiveStream"
+      :applied="searchQuery"
+      :start-time="startTime"
+      :end-time="endTime"
+      :error="hasActiveFilters && error ? error : undefined"
+      @apply="applySearch"
+    />
     <!-- Toolbar: Stream/Agent mode tab (left) + the matching picker (right) —
          hidden when no streams are available. Padding lives on the toolbar +
          scroll area (not the root) so the scrollbar hugs the content-area edge
@@ -31,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          holds a picker-shaped skeleton until the agents list first lands;
          solidAgentTrigger keeps the "All Agents" empty state in solid text. -->
     <AiScopeBar
-      v-if="availableStreams.length > 0"
+      v-if="availableStreams.length > 0 && scopeReady"
       :filter-mode="filterMode"
       v-model:active-stream="activeStream"
       v-model:selected-env="selectedEnv"
@@ -55,10 +65,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :envs="envs"
       :agent-names="agentNames"
       :versions="versions"
+      :agent-streams="agentStreams"
+      :selected-agent-stream="effectiveStream"
       :selected-stream-count="selectedStreamCount"
       :streams-loaded="true"
       :agents-loaded="agentsLoaded"
       @filter-mode-change="onFilterModeChange"
+      @update:selected-agent-stream="selectedAgentStream = $event"
+      @agent-pick="modeExplicit = true"
       @stream-change="onStreamChange"
     >
       <template #trailing>
@@ -67,7 +81,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              affordance when it can't apply is cleaner (ui-architect empty-affordance
              rule). The tooltip explains the concept when the entry IS available. -->
         <OTooltip
-          v-if="genAiAgentMappingAccess.allowed && canCompare && !compareMode"
+          v-if="aiObsLock.locked.value && !compareMode"
+          :content="aiObsLock.lockedReason.value"
+        >
+          <span class="inline-flex">
+            <OButton
+              variant="outline"
+              size="sm"
+              disabled
+              icon-left="lock"
+              data-test="llm-insights-compare-license-locked"
+            >
+              {{ t("traces.lLMInsightsDashboard.compareEntry") }}
+            </OButton>
+          </span>
+        </OTooltip>
+        <OTooltip
+          v-else-if="genAiAgentMappingAccess.allowed && canCompare && !compareMode"
           :content="t('traces.lLMInsightsDashboard.compareEntryHint')"
         >
           <OButton
@@ -75,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             icon-left="compare-arrows"
             data-test="llm-insights-compare-entry"
-            @click="enterCompareMode"
+            @click="enterCompareMode()"
           >
             {{ t("traces.lLMInsightsDashboard.compareEntry") }}
           </OButton>
@@ -92,9 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="llm-insights-compare-locked"
             @click="openUpgradeDialog"
           >
-            <template #icon-right
-              ><OIcon name="lock" size="sm" class="text-warning-600"
-            /></template>
+            <template #icon-right><OIcon name="lock" size="sm" class="lock-chip" /></template>
             {{ t("traces.lLMInsightsDashboard.compareEntry") }}
           </OButton>
         </template>
@@ -110,12 +138,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("aiObservability.versionCompare.bar.exit") }}
         </OButton>
+        <!-- A setup action, not a scope control, so it sits at the bar's far end. -->
+        <OButton
+          v-if="!compareMode"
+          variant="outline"
+          size="icon-md"
+          class="ms-auto"
+          :aria-label="t('aiAlertPack.open')"
+          data-test="llm-insights-install-ai-alerts"
+          @click="alertPackOpen = true"
+        >
+          <OIcon name="notifications-active" size="sm" />
+          <OTooltip :content="t('aiAlertPack.open')" />
+        </OButton>
       </template>
     </AiScopeBar>
+
+    <!-- Stream mode because these LLM spans carry no agent identity: say so and
+         link to GenAI Agent Mapping. Not over the first-run empty state, which
+         already says what is missing. -->
+    <AiNoAgentIdentityBanner
+      v-if="noAgentIdentity && scopeReady && !isEmpty"
+      data-test="llm-insights"
+    />
 
     <VersionCompareView
       v-if="genAiAgentMappingAccess.allowed && compareMode"
       :version-list="compareVersionList"
+      :initial-pair="compareInitialPair"
       :stream="effectiveStream"
       :windows="versionCompare.windows.value"
       :result="versionCompare.result.value"
@@ -136,21 +186,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          empty states / dashboard content stays intact without adding a DOM
          wrapper node. -->
     <template v-if="!compareMode">
-      <!-- Full-page skeleton only until the stream list is known. Once we have a
-         stream, we fall through to the content so the trend/table panels mount
-         and fire their queries immediately — in parallel with the KPI fetch,
-         rather than waiting for it (the KPI strip keeps its own skeleton). -->
+      <!-- Full-page skeleton until the stream list is known and the first load
+         has settled the mode and the selection (agents list included). The
+         panels then mount once, with the final scope, and fire their queries
+         in parallel with the KPI fetch (the KPI strip keeps its own skeleton).
+         Mounting them earlier meant a mode or agent flip remounted them and
+         cancelled their in-flight queries. -->
       <LLMInsightsSkeleton
-        v-if="!streamsLoaded || switching"
-        :hide-toolbar="streamsLoaded"
+        v-if="!streamsLoaded || !scopeReady || switching"
+        :hide-toolbar="streamsLoaded && scopeReady"
         class="px-page-edge flex-1"
       />
 
-      <!-- Generic error state — kept separate because a failed request is a
-         different signal from "no data yet". Once we have a result we fall
-         through to the consolidated empty / dashboard branches below. -->
+      <!-- A failed request, even a filter on first load, is a different signal from "no data yet". -->
       <OEmptyState
-        v-else-if="error && hasLoadedOnce"
+        v-else-if="error && (hasLoadedOnce || hasActiveFilters)"
         size="hero"
         illustration="broken-panel"
         variant="error"
@@ -158,22 +208,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('traces.lLMInsightsDashboard.failedToLoad')"
         :description="raw(error || '')"
         :action-label="t('traces.lLMInsightsDashboard.retry')"
+        action-id="retry"
         action-icon="refresh"
         @action="loadInsights()"
       />
 
+      <!-- Agent tab whose agents list failed to load: not "no agents". -->
+      <div
+        v-else-if="agentsLoadFailed"
+        class="px-page-edge flex min-h-0 flex-1 items-center justify-center"
+      >
+        <AiAgentsLoadError
+          :error="agentsError ?? 'failed'"
+          data-test="llm-insights"
+          @retry="loadInsights(undefined, undefined, { force: true })"
+        />
+      </div>
+
       <!-- Consolidated empty state — single OEmptyState covers all three
          "no data" shapes (no LLM streams in the org, the active stream has
          no gen_ai_* fields, or the time window returned nothing). The page
-         doesn't expose a search/filter widget, so we never set `:filtered`
-         — both the first-run and the "no data right now" cases land on
-         the preset's "Instrument with OpenTelemetry" call to action. -->
+         doesn't expose a search/filter widget, so we never set `:filtered`.
+         Its actions open a specific integration guide: the one whose docs
+         page the user came from (first), the coding-agent setup, then all
+         integrations, with the most-read guides as chips underneath. -->
       <div
         v-else-if="isEmpty"
         class="px-page-edge flex min-h-0 flex-1 items-center justify-center"
         data-test="llm-insights-empty"
       >
-        <OEmptyState size="hero" preset="no-llm-insights" @action="onEmptyAction" />
+        <OEmptyState
+          size="hero"
+          preset="no-llm-insights"
+          :actions="emptyStateActions"
+          @action="onEmptyAction"
+        >
+          <template #extra>
+            <div
+              class="flex flex-wrap items-center justify-center gap-2"
+              data-test="llm-insights-empty-integrations"
+            >
+              <span class="text-text-secondary text-compact">
+                {{ t("emptyState.noLLMInsights.startFrom") }}
+              </span>
+              <EmptyStateIngestionChip
+                v-for="integration in popularIntegrations"
+                :key="integration.routeName"
+                :data-test="`o2-empty-state-action-integration-${integration.slug}`"
+                :data-empty-state-action="`integration-${integration.slug}`"
+                @click="onEmptyAction(`integration-${integration.slug}`)"
+              >
+                <img
+                  v-if="integration.logo"
+                  :src="integration.logo"
+                  alt=""
+                  class="size-3.5 shrink-0 object-contain"
+                />
+                {{ integration.name }}
+              </EmptyStateIngestionChip>
+            </div>
+          </template>
+        </OEmptyState>
       </div>
 
       <!-- Agent tab with no agents in the window — its own empty state (reuses
@@ -190,6 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('traces.lLMInsightsDashboard.noAgentsInRange')"
           :description="t('traces.lLMInsightsDashboard.noAgentsDescription')"
           :action-label="t('traces.lLMInsightsDashboard.viewByStream')"
+          action-id="view-by-stream"
           @action="onFilterModeChange('stream')"
         />
       </div>
@@ -198,6 +294,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          here (inside the scroll container) so the scrollbar sits at the
          content-area edge with content padded away from it. -->
       <div v-else class="px-page-edge flex-1 overflow-y-auto pb-3">
+        <!-- AI data health: hidden when every check passes. -->
+        <LLMDataHealthStrip
+          :health="dataHealth"
+          :loading="dataHealthLoading"
+          :error="dataHealthError"
+          :stream="effectiveStream"
+          :checked-window="dataHealthWindow"
+          :samples="dataHealthSamples"
+          :samples-loading="dataHealthSamplesLoading"
+          @rerun="loadDataHealth(true)"
+          @load-samples="fetchSamples"
+          @view-trace="onViewTrace"
+        />
+        <!-- A new agent version against the previous one. Enterprise only. -->
+        <ReleaseWatchCard
+          v-if="
+            genAiAgentMappingAccess.allowed && filterMode === 'agent' && releaseVariants.length > 1
+          "
+          :variants="releaseVariants"
+          :stream="effectiveStream"
+          class="mt-2.5"
+          @open-compare="(p) => enterCompareMode({ a: p.prev.version!, b: p.next.version! })"
+        />
         <!-- KPI strip: keep a skeleton until the first KPI result lands so the
            cards never flash zeros. The panels below render regardless, so
            their queries fire in parallel with the KPI fetch. -->
@@ -206,9 +325,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <KpiCardRow v-else :columns="5" class="mt-2.5 mb-2.5">
           <div
             v-for="card in kpiCards"
-            :key="card.label"
-            class="bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 py-2.5 max-lg:shrink-0 max-lg:basis-auto max-lg:px-1.5 max-lg:py-1"
-            :title="lgUp ? undefined : card.label"
+            :key="card.id"
+            :data-test="`llm-insights-kpi-${card.id}`"
+            class="bg-card-glass-bg rounded-default border-border-default flex min-w-0 flex-col gap-1 border px-3.5 py-2.5 max-lg:shrink-0 max-lg:basis-auto max-lg:gap-0.5 max-lg:px-2 max-lg:py-1.5"
           >
             <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
@@ -222,23 +341,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSkeleton type="text" class="h-6 w-[55%]" />
             </template>
             <template v-else>
-              <div
-                class="flex flex-col gap-1 max-lg:flex-row-reverse max-lg:items-center max-lg:gap-1.5"
-              >
+              <!-- The label stays visible at every width; a compact tile
+                 without it is a bare number. -->
+              <div class="flex flex-col gap-1 max-lg:gap-0.5">
                 <div class="mb-1 flex items-center justify-between gap-2 max-lg:mb-0">
-                  <OTruncatedText
-                    as="div"
-                    class="text-2xs text-text-secondary leading-normal font-semibold max-lg:hidden"
-                  >
-                    {{ card.label }}
-                  </OTruncatedText>
+                  <OTooltip :content="card.tooltip" :disabled="!card.tooltip">
+                    <OTruncatedText
+                      as="div"
+                      class="text-2xs text-text-secondary leading-normal font-semibold"
+                    >
+                      {{ card.label }}
+                    </OTruncatedText>
+                  </OTooltip>
                   <span
                     class="rounded-default bg-surface-subtle text-text-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center"
                   >
                     <OIcon :name="card.icon" size="sm" />
                   </span>
                 </div>
-                <div class="flex items-baseline gap-[0.2rem]">
+                <div class="flex items-baseline gap-[0.2rem]" data-test="llm-insights-kpi-value">
+                  <span
+                    v-if="card.prefix"
+                    class="text-text-secondary text-lg leading-none font-bold max-lg:text-base"
+                    >{{ card.prefix }}</span
+                  >
                   <span class="text-text-secondary text-2xl leading-none font-bold max-lg:text-lg">
                     {{ card.value }}
                   </span>
@@ -246,6 +372,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ card.unit }}
                   </span>
                 </div>
+                <button
+                  v-if="card.note && card.onNote"
+                  type="button"
+                  class="text-2xs self-start text-left underline-offset-2 hover:underline"
+                  :class="
+                    card.noteTone === 'warning' ? 'text-status-warning-text' : 'text-text-secondary'
+                  "
+                  :title="card.noteTooltip"
+                  :data-test="card.noteTestId"
+                  @click="card.onNote"
+                >
+                  {{ card.note }}
+                </button>
+                <span
+                  v-else-if="card.note"
+                  class="text-2xs text-text-secondary"
+                  :data-test="card.noteTestId"
+                  >{{ card.note }}</span
+                >
               </div>
               <KpiSparkline
                 v-if="card.sparkData && card.sparkData.length > 1"
@@ -265,24 +410,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            remount is what lets it restore an already-fetched result instead of
            re-querying. Same selection + window → instant cache hit; a new one →
            a clean miss that fetches. -->
-        <div class="grid grid-cols-2 gap-2.5">
+        <!-- One column below xl: at 1024 px a half-width panel leaves its table too narrow. -->
+        <div class="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
           <div
             v-for="panel in LLM_INSIGHTS_PANELS"
             :key="`${panel.id}::${panelCacheDashboardId}`"
-            :class="panel.layout.colSpan === 2 ? 'col-span-2' : ''"
+            :class="panel.layout.colSpan === 2 ? 'xl:col-span-2' : ''"
           >
             <!-- Table panels use OTable (interactive, app-navigation) — matches
                the other AI Observability tables; every chart panel renders
                through the shared dashboards engine (PanelSchemaRenderer). -->
-            <LLMErrorTable
-              v-if="panel.type === 'table'"
+            <!-- Errors by message: a row click lists the traces with that error. -->
+            <LLMTopErrorsTable
+              v-if="panel.type === 'error-table'"
               :panel="panel"
-              :streamName="effectiveStream"
-              :startTime="startTime"
-              :endTime="endTime"
-              :agent-filter="agentFilterClause"
-              :cache-key="panelCacheDashboardId"
-              @view-trace="onViewTrace"
+              :stream-name="effectiveStream"
+              :start-time="startTime"
+              :end-time="endTime"
+              :agent-filter="scopeClause"
+              @drill="onDrill"
+            />
+            <!-- The failing-tools ranking: a table, a row click lists the failed traces. -->
+            <LLMFailingToolsTable
+              v-else-if="panel.type === 'tool-table'"
+              :panel="panel"
+              :stream-name="effectiveStream"
+              :start-time="startTime"
+              :end-time="endTime"
+              :agent-filter="scopeClause"
+              @drill="onDrill"
             />
             <LLMSchemaPanel
               v-else
@@ -290,18 +446,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :streamName="effectiveStream"
               :startTime="startTime"
               :endTime="endTime"
-              :agent-filter="agentFilterClause"
+              :agent-filter="scopeClause"
               :dashboard-id="panelCacheDashboardId"
               :folder-id="PANEL_CACHE_FOLDER"
+              :alert-agent="effectiveAgent?.name ?? null"
+              @drill="onDrill"
             />
           </div>
         </div>
+
+        <!-- Below the trends: it breaks the cost trend down. -->
+        <LLMCostAttribution
+          :stream="effectiveStream"
+          :scope="scopeClause"
+          :start-time="startTime"
+          :end-time="endTime"
+          class="mt-2.5"
+          @filter="(dim, value) => setFilter(dim, value)"
+        />
 
         <!-- Agent behavior signals (loops / failure taxonomy) moved to their own
            dedicated "Agent Behavior" page under Monitor. LLM Insights keeps the
            cost/latency/error story; behavior lives beside Agent Graph. -->
       </div>
     </template>
+
+    <AiAlertPackDialog v-model:open="alertPackOpen" :default-stream="effectiveStream" />
+
+    <!-- The traces behind a clicked chart point or tile. -->
+    <LLMTraceListDrawer
+      v-model:open="traceListOpen"
+      :stream="effectiveStream"
+      :scope="scopeClause"
+      :selection="traceListSelection"
+      :title="traceListTitle"
+      :subtitle="traceListSubtitle"
+      @view-trace="onViewTrace"
+      @filter="onFilterToModel"
+      @open-in-traces="openTraceListInTraces"
+    />
+
+    <!-- Last, so the trace drawer stacks over the trace list. -->
+    <AiTraceDrawer v-model:open="traceDrawerOpen" :trace="drawerTrace" />
   </div>
 </template>
 
@@ -311,28 +497,68 @@ import type { AcceptableValue } from "reka-ui";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import useBreakpoint from "@/composables/useBreakpoint";
 import { useLLMInsights } from "./composables/useLLMInsights";
 import { splitNumberWithUnit, splitDuration, splitCost } from "./llmInsightsDashboard.utils";
 import KpiSparkline from "./KpiSparkline.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import LLMSchemaPanel from "./LLMSchemaPanel.vue";
-import LLMErrorTable from "./LLMErrorTable.vue";
+import LLMTopErrorsTable from "./LLMTopErrorsTable.vue";
+import LLMDataHealthStrip from "./LLMDataHealthStrip.vue";
+import AiTraceDrawer from "./AiTraceDrawer.vue";
+import LLMTraceListDrawer from "./LLMTraceListDrawer.vue";
+import LLMCostAttribution from "./LLMCostAttribution.vue";
+import LLMFailingToolsTable from "./LLMFailingToolsTable.vue";
+import AiAlertPackDialog from "@/components/alerts/AiAlertPackDialog.vue";
+import ReleaseWatchCard from "@/enterprise/components/AIObservability/ReleaseWatchCard.vue";
+import LLMInsightsSearchBar from "./LLMInsightsSearchBar.vue";
+import {
+  addSearchClause,
+  equalsClause,
+  searchFilterSql,
+  type FilterDim,
+  type LLMPanelDrill,
+  type TraceListSelection,
+} from "./llmInsightsDrill";
+import { b64EncodeUnicode } from "@/utils/zincutils";
+import { timestampToTimezoneDate } from "@/utils/timezone";
+import type { AiDrawerTrace } from "./AiTraceDrawer.types";
+import { useLLMDataHealth } from "./composables/useLLMDataHealth";
+import { costKind, unpricedSummary, pricingGapsRoute } from "./llmDataTrust.utils";
+import { formatTokens } from "@/utils/llmUtils";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { LLM_INSIGHTS_PANELS } from "./config/llmInsightsPanels";
+import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
+import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
+import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";
+import AiAgentsLoadError from "@/enterprise/components/AIObservability/AiAgentsLoadError.vue";
+import { readPrefill } from "@/components/login/firstSourceOptions";
+import {
+  POPULAR_AI_INTEGRATION_ROUTES,
+  aiIntegrationByRoute,
+  referredAiIntegration,
+} from "./llmInsightsEmptyState";
+import { LLM_INSIGHTS_PANELS, autoHistogramBucketMicros } from "./config/llmInsightsPanels";
 import { kpiCache, selectionKey } from "./llmInsightsCache";
 import useStreams from "@/composables/useStreams";
 import genAiAgentMappingService, {
   type GenAiAgentListItem,
 } from "@/services/gen-ai-agent-mapping.service";
-import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
-import { queryClient } from "@/composables/query/queryClient";
+import {
+  useAgentScope,
+  readUrlScope,
+  explicitScopeMode,
+  resolveScopeMode,
+  rememberModeChoice,
+  scopeUrlQuery,
+  agentIdentityKey,
+  type ScopeMode,
+} from "@/enterprise/composables/useAgentScope";
+import { replaceRouteQuery } from "@/utils/url/replaceRouteQuery";
 import { buildAgentTraceFilter } from "./llmAgentFilter";
-import { useAgentScope } from "@/enterprise/composables/useAgentScope";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -340,10 +566,10 @@ import VersionCompareView from "@/enterprise/components/AIObservability/VersionC
 import { useVersionCompare } from "./composables/useVersionCompare";
 import analytics from "@/services/product_analytics";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 
 const { t } = useI18nTyped();
-const { lgUp } = useBreakpoint();
 const { getStreams } = useStreams(t);
 const router = useRouter();
 const route = useRoute();
@@ -352,11 +578,7 @@ const store = useStore();
 // Initial filter selection precedence: URL query (deep link / shareable) >
 // localStorage (last used) > default. Read once at setup; we write the URL
 // back on every change via syncFilterUrl().
-const urlType = typeof route.query.type === "string" ? route.query.type : "";
-const urlStream = typeof route.query.stream === "string" ? route.query.stream : "";
-const urlAgentName = typeof route.query.agent === "string" ? route.query.agent : "";
-const urlEnv = typeof route.query.env === "string" ? route.query.env : "";
-const urlVersion = typeof route.query.version === "string" ? route.query.version : "";
+const urlScope = readUrlScope(route.query);
 
 interface Props {
   streamName: string;
@@ -376,20 +598,71 @@ const {
   p95Loading,
   error,
   fetchAll,
+  restore,
   cancelAll,
   hasLoadedOnce,
   availableStreams,
   streamsLoaded,
 } = useLLMInsights();
 
+// AI data health also feeds the Total Cost tile's unpriced note.
+const {
+  health: dataHealth,
+  checkedWindow: dataHealthWindow,
+  loading: dataHealthLoading,
+  error: dataHealthError,
+  samples: dataHealthSamples,
+  samplesLoading: dataHealthSamplesLoading,
+  fetchHealth,
+  fetchSamples,
+  reset: resetDataHealth,
+} = useLLMDataHealth();
+const unpriced = computed(() => unpricedSummary(dataHealth.value));
+// The server lists the top 20 unpriced models; the tile and chart notes say so when there are more.
+const unpricedModelNames = computed(() => {
+  const u = unpriced.value;
+  if (!u) return "";
+  const names = u.models.map((m) => m.model ?? t("llmDataTrust.noModelName")).join(", ");
+  return u.truncated
+    ? t("llmDataTrust.topModels", {
+        models: names,
+        shown: u.models.length,
+        total: u.modelCount.toLocaleString(),
+      })
+    : names;
+});
+function loadDataHealth(refresh = false, start = props.startTime, end = props.endTime) {
+  const agent = effectiveAgent.value;
+  fetchHealth(store.state.selectedOrganization?.identifier ?? "", {
+    stream_name: effectiveStream.value,
+    start_time: start,
+    end_time: end,
+    agent: agent?.name,
+    agent_id: agent?.id,
+    env: agent?.env,
+    version: agent?.version,
+    refresh,
+  });
+}
+// The tile's unpriced note comes from the health check, so open the window it counted.
+function openUnpricedTab() {
+  router.push(
+    pricingGapsRoute(
+      effectiveStream.value,
+      store.state.selectedOrganization?.identifier ?? "",
+      dataHealthWindow.value,
+    ),
+  );
+}
+
 // activeStream is component-local (drives the select v-model), but its
 // initial value falls back to localStorage / parent prop. Once the streams
 // list is reconciled, it's clamped to a valid option.
 const activeStream = ref<string>(
-  urlStream || localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
+  urlScope.stream || localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
 );
 // Persists the RESOLVED agent name/env/version of the cascade selection. On
-// reload we re-seed the cascade from them (see `pendingAgentName` +
+// reload we re-seed the cascade from them (see `pendingScope` +
 // `selectAgentByScope`), so the last-picked variant is remembered exactly.
 const AGENT_LS_KEY = "llmInsights_agentFilter";
 const ENV_LS_KEY = "llmInsights_envFilter";
@@ -407,7 +680,6 @@ const switching = ref(false);
 
 // Filter mode: "stream" = view a whole stream; "agent" = view a single agent,
 // whose source stream + trace filter both come from the agents API.
-const MODE_LS_KEY = "llmInsights_filterMode";
 // Cloud registers the SAME enterprise route tree and backend as an enterprise
 // build (see router/index.ts's userCloudRoutes() picked for isCloud too) — only
 // a true OSS build lacks the agent-mapping API this gates. Goes through the
@@ -419,37 +691,43 @@ const genAiAgentMappingAccess = checkFeatureAccess(
   buildFeatureGateContext(store.state.zoConfig),
 );
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
-// Default scope is ALWAYS "agent" — the AI module is agent-centric and every AI
-// page lands on Agent for consistency. Only an explicit `?type=stream` URL param
-// overrides it (a stale saved preference must not silently land on Stream).
-// Agent mode calls the enterprise-only agent-mapping API (and gates version
-// compare), so OSS is pinned to Stream regardless of the URL/localStorage — the
-// toggle to reach Agent is locked, not gone, but clicking it is a no-op.
-const filterMode = ref<"stream" | "agent">(
-  !genAiAgentMappingAccess.allowed ? "stream" : urlType === "stream" ? "stream" : "agent",
-);
-// Env/name/version to seed the cascade with once the list loads: the URL
-// deep-link first, else the persisted last selection. Resolved into
-// selectedEnv/AgentName/Version via `selectAgentByScope` (falls back to
-// `selectAgentByName` when the exact env+version no longer exists), then
-// cleared. (The URL carries readable values, not the internal agent key.)
-const pendingAgentName = ref<string | null>(
-  filterMode.value === "agent" ? urlAgentName || localStorage.getItem(AGENT_LS_KEY) || null : null,
-);
-// Env/version come from the same source as the name, so a name-only link never pairs with a stored variant of another agent.
-const pendingEnv = ref<string | null>(
-  filterMode.value !== "agent"
-    ? null
-    : urlAgentName
-      ? urlEnv || null
-      : localStorage.getItem(ENV_LS_KEY) || null,
-);
-const pendingVersion = ref<string | null>(
-  filterMode.value !== "agent"
-    ? null
-    : urlAgentName
-      ? urlVersion || null
-      : localStorage.getItem(VERSION_LS_KEY) || null,
+const aiObsLock = useLicenseLock("ai_observability");
+// The mode the user asked for (URL `type`/`agent`, else the remembered toggle),
+// or null when the agents list decides: Agent when the window has agents,
+// Stream when it has none (see loadInsights). OSS has no agent-mapping API and a
+// locked AI license cannot use it, so both are pinned to Stream. Until the mode
+// is resolved the panels stay unmounted, so they mount once, with the final
+// mode, and no query is started and then cancelled by a mode flip.
+const explicitMode =
+  genAiAgentMappingAccess.allowed && !aiObsLock.locked.value
+    ? explicitScopeMode(urlScope)
+    : "stream";
+const filterMode = ref<ScopeMode>(explicitMode ?? "stream");
+const modeExplicit = ref(explicitMode !== null);
+// False until the first loadInsights has settled the mode and the selection;
+// the panels and the scope bar wait for it.
+const scopeReady = ref(false);
+// Whether an agents list has decided the mode. A failed agents load decides
+// nothing, so the next load after it decides again; so does a window the user
+// picks, whose agents may differ (unless the user chose the mode).
+let modeSettled = false;
+// URL deep-link scope first, else persisted; env/version share its source so a name-only link never pairs with another agent's variant.
+const urlHasAgentScope = !!(urlScope.agent || urlScope.env || urlScope.version);
+const pendingScope = ref<{ env: string; name: string; version: string; stream?: string } | null>(
+  urlHasAgentScope
+    ? {
+        env: urlScope.env,
+        name: urlScope.agent,
+        version: urlScope.version,
+        stream: urlScope.agentStream,
+      }
+    : localStorage.getItem(AGENT_LS_KEY)
+      ? {
+          env: localStorage.getItem(ENV_LS_KEY) || "",
+          name: localStorage.getItem(AGENT_LS_KEY) || "",
+          version: localStorage.getItem(VERSION_LS_KEY) || "",
+        }
+      : null,
 );
 
 // Shared derived scope computeds come from useAgentScope. LLM Insights injects
@@ -462,6 +740,11 @@ const pendingVersion = ref<string | null>(
 // (see loadInsights). `agentFilterClause` stays page-local (LLM's trace-filter
 // builder). Injected refs are the SAME instances the page owns.
 const {
+  loadAgents: loadAgentList,
+  agentsError,
+  agentsLoadFailed,
+  agentEmpty,
+  noAgentIdentity,
   streamSelectOptions,
   selectedStreamCount,
   selectedAgent,
@@ -473,6 +756,8 @@ const {
   selectedEnv,
   selectedAgentName,
   selectedVersion,
+  agentStreams,
+  selectedAgentStream,
   selectAgentByName,
   selectAgentByScope,
 } = useAgentScope({
@@ -488,9 +773,90 @@ const {
   t,
 });
 
+// Read over the wide window: the previous version usually has no spans in a short window right after a rollout.
+const releaseVersionList = ref<GenAiAgentListItem[]>([]);
+let releaseVersionSeq = 0;
+
+async function loadReleaseVersions() {
+  const mine = ++releaseVersionSeq;
+  const orgId = store.state.selectedOrganization?.identifier;
+  if (
+    !genAiAgentMappingAccess.allowed ||
+    filterMode.value !== "agent" ||
+    !orgId ||
+    !selectedAgentName.value
+  ) {
+    releaseVersionList.value = [];
+    return;
+  }
+  const list = await genAiAgentMappingService
+    .listVersionsForCompare(
+      orgId,
+      selectedAgentName.value,
+      selectedEnv.value === "__unset__" ? null : selectedEnv.value || null,
+      Date.now() * 1000,
+      props.startTime,
+    )
+    .catch(() => []);
+  if (mine === releaseVersionSeq) releaseVersionList.value = list;
+}
+
+watch(
+  [
+    filterMode,
+    selectedAgentName,
+    selectedEnv,
+    effectiveStream,
+    () => store.state.selectedOrganization?.identifier,
+    // A refresh or a new window may follow a rollout.
+    () => props.endTime,
+  ],
+  loadReleaseVersions,
+  { immediate: true },
+);
+
+// The agents list has one row per version per time bucket; the earliest first_seen is the rollout.
+const releaseVariants = computed(() => {
+  const byVersion = new Map<string, GenAiAgentListItem>();
+  for (const a of releaseVersionList.value) {
+    if (!a.version || a.name !== selectedAgentName.value) continue;
+    if (a.source_stream !== effectiveStream.value) continue;
+    if (
+      selectedEnv.value === "__unset__" ? a.env : selectedEnv.value && a.env !== selectedEnv.value
+    ) {
+      continue;
+    }
+    const seen = byVersion.get(a.version);
+    if (!seen || (a.first_seen ?? Infinity) < (seen.first_seen ?? Infinity)) {
+      byVersion.set(a.version, a);
+    }
+  }
+  return [...byVersion.values()];
+});
+
 const agentFilterClause = computed(() =>
   buildAgentTraceFilter(effectiveAgent.value, effectiveStream.value),
 );
+
+// The search bar's WHERE clause over the spans, kept in the URL as `q`.
+const searchQuery = ref(typeof route.query.q === "string" ? route.query.q.trim() : "");
+const hasActiveFilters = computed(() => !!searchQuery.value);
+const filterClause = computed(() => searchFilterSql(effectiveStream.value, searchQuery.value));
+// What every panel and the trace list filter on: the agent, then the page filter.
+const scopeClause = computed(() =>
+  [agentFilterClause.value, filterClause.value].filter(Boolean).join(" AND "),
+);
+
+function applySearch(query: string) {
+  if (query === searchQuery.value) return;
+  searchQuery.value = query;
+  loadInsights();
+}
+
+// A clicked model series or Cost by row narrows the search to that value.
+function setFilter(dim: FilterDim, value: string) {
+  applySearch(addSearchClause(searchQuery.value, equalsClause(dim, value)));
+}
 
 // --- Version compare mode ----------------------------------------------------
 // "Compare versions…" swaps the single-select dashboard body for
@@ -498,19 +864,30 @@ const agentFilterClause = computed(() =>
 // the currently-selected agent has fewer than 2 versions across the wide
 // (retention-scoped) enumeration — checked via `versions` (page-window-scoped,
 // cheap) first; the wide-window `listVersionsForCompare` call is what actually
-// feeds the compare bar once entered (enumeration must ignore the page
-// date-picker window per the plan's baseline-enumeration requirement).
+// feeds the compare bar once entered (enumeration covers the retention window
+// and the page date-picker window, whichever reaches further back).
 const compareMode = ref(false);
 const compareVersionList = ref<GenAiAgentListItem[]>([]);
+// The pair to open on (Release watch's card); null lets the view pick latest vs previous.
+const compareInitialPair = ref<{ a: string; b: string } | null>(null);
 const versionCompare = useVersionCompare();
 
-// Cheap pre-check from the already-loaded cascade `versions` list (scoped to
-// the page window) — good enough to gate the entry button without an extra
-// network call on every render. The wide-window list (loaded on entry) is the
-// source of truth for the compare bar's own options.
+// Counts only the effective stream's versions: one seen only in another stream would leave Version B empty.
 const canCompare = computed(() => {
-  const real = versions.value.filter((v) => v.value !== "__unset__");
-  return real.length >= 2 && !!selectedAgentName.value;
+  if (!selectedAgentName.value) return false;
+  const unsetEnv = selectedEnv.value === "__unset__";
+  const inStream = new Set(
+    agents.value
+      .filter(
+        (a) =>
+          a.version &&
+          a.name === selectedAgentName.value &&
+          a.source_stream === effectiveStream.value &&
+          (unsetEnv ? !a.env : !selectedEnv.value || a.env === selectedEnv.value),
+      )
+      .map((a) => a.version),
+  );
+  return inStream.size >= 2;
 });
 
 // Exposed to the parent (LLMInsightsPage) so the page-level date-picker can be
@@ -525,23 +902,31 @@ const compareDateDisabled = computed(
   () => compareMode.value && compareAlign.value !== "sameWallClock",
 );
 
-async function enterCompareMode() {
-  if (!canCompare.value) return;
+async function enterCompareMode(pair?: { a: string; b: string }) {
+  if (!pair && !canCompare.value) return;
+  compareInitialPair.value = pair ?? null;
   compareMode.value = true;
   const orgId = store.state.selectedOrganization?.identifier;
   if (!orgId || !selectedAgentName.value) return;
   const nowMicros = Date.now() * 1000;
-  compareVersionList.value = await genAiAgentMappingService.listVersionsForCompare(
-    orgId,
-    selectedAgentName.value,
-    selectedEnv.value === "__unset__" ? null : selectedEnv.value,
-    nowMicros,
-  );
+  const stream = effectiveStream.value;
+  // "(No env)" is its own variant: the service reads a null env as any env.
+  const unsetEnv = selectedEnv.value === "__unset__";
+  compareVersionList.value = (
+    await genAiAgentMappingService.listVersionsForCompare(
+      orgId,
+      selectedAgentName.value,
+      unsetEnv ? null : selectedEnv.value,
+      nowMicros,
+      props.startTime,
+    )
+  ).filter((v) => v.source_stream === stream && (!unsetEnv || !v.env));
 }
 
 function exitCompareMode() {
   compareMode.value = false;
   compareVersionList.value = [];
+  compareInitialPair.value = null;
   versionCompare.windows.value = null;
   versionCompare.result.value = null;
   // Force a fresh setPair() (and its intentional blank) on the next compare entry.
@@ -641,9 +1026,11 @@ watch(
 const PANEL_CACHE_FOLDER = "ai-llm-insights";
 // Env/version are part of the key: each variant filters to different data, so sharing a name must not share a cache slot.
 function selectionAgentKey(): string {
-  if (filterMode.value !== "agent") return "_stream";
+  // The page filter narrows the data, so it is part of the identity too.
+  const f = hasActiveFilters.value ? `::${searchQuery.value}` : "";
+  if (filterMode.value !== "agent") return `_stream${f}`;
   const a = effectiveAgent.value;
-  return a ? `${a.name}::${a.env ?? ""}::${a.version ?? ""}` : "_none";
+  return a ? `${a.name}::${a.env ?? ""}::${a.version ?? ""}${f}` : `_none${f}`;
 }
 const panelCacheDashboardId = computed(() => {
   const agentKey = selectionAgentKey();
@@ -685,53 +1072,134 @@ watch(panelCacheDashboardId, (id) => ensurePanelCacheStub(id), {
   flush: "sync",
 });
 
-// Agent tab is open but the agents API returned none for this window — drives a
-// dedicated empty state (vs. the generic "no LLM data" one). Only true once the
-// list has actually loaded, so we don't flash it before the first fetch.
-const agentEmpty = computed(
-  () => filterMode.value === "agent" && agentsLoaded.value && agents.value.length === 0,
-);
-
 // Reflect the current filter in the URL so the view is shareable / survives a
-// reload: `?type=stream&stream=<name>` or `?type=agent&agent=<name>&env=<env>&version=<version>`.
-// We keep readable values (not the internal agent key) and preserve other params
+// reload: `?stream=<name>` or `?agent=<name>&env=<env>&version=<version>`, plus
+// `type` when the mode was chosen rather than picked from the agents list. We
+// keep readable values (not the internal agent key) and preserve other params
 // (e.g. the time range owned by the parent).
 function syncFilterUrl() {
-  const query: Record<string, any> = { ...route.query, type: filterMode.value };
-  if (filterMode.value === "agent") {
-    delete query.stream;
-    if (selectedAgent.value?.name) {
-      query.agent = selectedAgent.value.name;
-      query.env = selectedEnv.value;
-      query.version = selectedVersion.value;
-    } else {
-      delete query.agent;
-      delete query.env;
-      delete query.version;
-    }
-  } else {
-    delete query.agent;
-    delete query.env;
-    delete query.version;
-    if (activeStream.value) query.stream = activeStream.value;
-    else delete query.stream;
-  }
+  const agent = selectedAgent.value
+    ? {
+        name: selectedAgent.value.name,
+        env: selectedEnv.value,
+        version: selectedVersion.value,
+        stream: selectedAgentStream.value,
+      }
+    : null;
   // replace (not push) — filter tweaks shouldn't pile up in browser history.
-  router.replace({ query }).catch(() => {});
+  void replaceRouteQuery(router, route, (current) => {
+    const query = scopeUrlQuery(current, {
+      mode: filterMode.value,
+      explicit: modeExplicit.value,
+      stream: activeStream.value,
+      agent,
+    });
+    if (searchQuery.value) query.q = searchQuery.value;
+    else delete query.q;
+    return query;
+  });
+}
+
+const traceDrawerOpen = ref(false);
+const drawerTrace = ref<AiDrawerTrace | null>(null);
+const alertPackOpen = ref(false);
+
+// --- Click-through -----------------------------------------------------------
+const traceListOpen = ref(false);
+const traceListSelection = ref<TraceListSelection | null>(null);
+const traceListTitle = ref<I18nText>(raw(""));
+const traceListSubtitle = ref<I18nText | undefined>(undefined);
+
+function openTraceList(sel: Partial<TraceListSelection>, title: I18nText) {
+  const selection: TraceListSelection = {
+    startTime: props.startTime,
+    endTime: props.endTime,
+    ...sel,
+  };
+  traceListSelection.value = selection;
+  traceListTitle.value = title;
+  const tz = store.state.timezone || "UTC";
+  traceListSubtitle.value = t("llmInsightsDrill.window", {
+    from: timestampToTimezoneDate(selection.startTime, tz, "MMM d HH:mm"),
+    to: timestampToTimezoneDate(selection.endTime, tz, "MMM d HH:mm"),
+  });
+  traceListOpen.value = true;
+}
+
+// A clicked bar or point: its series, inside its time bucket on a time axis.
+function onDrill(d: LLMPanelDrill) {
+  const drill = d.panel.drill;
+  if (!drill) return;
+  const start = d.atMicros ?? props.startTime;
+  const end =
+    d.atMicros !== null
+      ? d.atMicros + autoHistogramBucketMicros(props.startTime, props.endTime)
+      : props.endTime;
+  // The series past the top N fold into "others": no one value selects them.
+  if (d.panel.query.topSeries?.others && d.series === "others") return;
+  // Usage with no model (agent span only) lists those traces, not a model.
+  const agentOnly = d.panel.id === "cost-trend" && d.series === t("llmAttribution.unattributed");
+  // A measure says what its series lists: the OK or the errored part of a bar.
+  const measure = d.panel.query.measures?.find((m) => t(m.labelKey) === d.series);
+  // The title names the series; the only empty one is the Top errors row with no message.
+  const series = d.series || t("aiObservability.panels.topErrors.noMessage");
+  const bySeries = !!drill.seriesSql && !agentOnly;
+  openTraceList(
+    {
+      startTime: Math.max(start, props.startTime),
+      endTime: Math.min(end, props.endTime),
+      seriesSql: bySeries ? drill.seriesSql : undefined,
+      seriesValue: bySeries ? (d.series ?? undefined) : undefined,
+      errored: measure?.errored ?? drill.errored,
+      ...(agentOnly ? { agentOnly: true } : {}),
+    },
+    t("llmInsightsDrill.title", { panel: t(d.panel.titleKey), series }),
+  );
+}
+
+function onFilterToModel(model: string) {
+  traceListOpen.value = false;
+  setFilter("model", model);
+}
+
+function openTraceListInTraces() {
+  const sel = traceListSelection.value;
+  if (!sel) return;
+  const where = [
+    scopeClause.value,
+    sel.seriesSql && sel.seriesValue !== undefined
+      ? `${sel.seriesSql} = ${sqlLiteral(sel.seriesValue)}`
+      : "",
+    // A span filter cannot say "no errored span in the trace", so OK traces open unfiltered.
+    sel.errored ? "span_status = 'ERROR'" : "",
+    // Nor "usage only on the agent span": the agent spans are where that usage is.
+    sel.agentOnly ? "gen_ai_operation_name = 'invoke_agent'" : "",
+  ]
+    .filter(Boolean)
+    .join(" AND ");
+  const href = router.resolve({
+    name: "traces",
+    query: {
+      stream: effectiveStream.value,
+      from: String(sel.startTime),
+      to: String(sel.endTime),
+      query: b64EncodeUnicode(where),
+      org_identifier: store.state.selectedOrganization?.identifier,
+      tab: "traces",
+    },
+  }).href;
+  window.open(href, "_blank");
 }
 
 function onViewTrace(traceId: string) {
   if (!traceId) return;
-  router.push({
-    name: "traceDetails",
-    query: {
-      stream: effectiveStream.value,
-      trace_id: traceId,
-      from: props.startTime,
-      to: props.endTime,
-      org_identifier: store.state.selectedOrganization?.identifier,
-    },
-  });
+  drawerTrace.value = {
+    traceId,
+    stream: effectiveStream.value,
+    startTime: props.startTime,
+    endTime: props.endTime,
+  };
+  traceDrawerOpen.value = true;
 }
 
 // Load the trace-stream list at most once per mount. Both the initial mount
@@ -762,55 +1230,25 @@ async function loadTraceStreams() {
   }
 }
 
-// The window the agent list was last loaded for. The agents API is scoped to a
-// time range, so the list only needs refreshing when that window changes — not
-// on every tab toggle. Guarding on this kills a redundant /gen_ai/agents call
-// per toggle.
-let agentsLoadedWindow = "";
-async function loadAgents(startTime?: number, endTime?: number, force = false) {
-  const orgId = store.state.selectedOrganization?.identifier;
-  const start = startTime ?? props.startTime;
-  const end = endTime ?? props.endTime;
-  // No org/window yet (pre-resolve mount): mark loaded with an empty list rather
-  // than returning early — otherwise `agentsLoaded` never flips and the cascade
-  // is stuck behind its loading skeleton forever.
-  if (!orgId || !start || !end) {
-    agents.value = [];
-    agentsLoaded.value = true;
-    return;
-  }
-  const windowKey = `${start}-${end}`;
-  if (agentsLoaded.value && agentsLoadedWindow === windowKey) return;
-  try {
-    const options = genAiAgentsQuery(orgId, start, end);
-    // Past the window guard a user refresh must reach the server: the key buckets the window by the minute.
-    if (force) {
-      await queryClient.invalidateQueries({
-        queryKey: options.queryKey,
-        exact: true,
-        refetchType: "none",
-      });
-    }
-    const agentList = await queryClient.fetchQuery(options);
-    agents.value = agentList.agents;
-    agentsLoadedWindow = windowKey;
-    // Proactively seed the panel-cache stub for every selection at this window —
-    // the Stream tab plus each agent. A cold tab/agent switch can mount the
-    // panels before the per-id sync watcher fires, so pre-seeding here (right
-    // after the list resolves, before any switch) closes that race and keeps
-    // getDashboard a store lookup in every case.
-    ensurePanelCacheStub(selectionKey(orgId, activeStream.value, "_stream", start, end));
-    for (const agent of agents.value) {
-      ensurePanelCacheStub(selectionKey(orgId, agent.source_stream, agent.name, start, end));
-    }
-    // The cascade selection is reconciled against the fresh list by
-    // useAgentScope's watcher (invalid env/name/version fall back / clear), so
-    // there is no page-local selection to clamp here anymore.
-  } catch (e) {
-    console.warn("Failed to load GenAI agents", e);
-    agents.value = [];
-  } finally {
-    agentsLoaded.value = true;
+// Agents for the window, through useAgentScope's single loader (one request
+// per window bucket; `force` only on a user refresh). Then seed the panel-cache
+// stub for every selection at this window — the Stream tab plus each agent — so
+// a cold tab/agent switch that mounts the panels before the per-id sync watcher
+// fires still finds getDashboard a store lookup.
+async function loadAgents(start: number, end: number, force: boolean) {
+  await loadAgentList(start, end, force);
+  const orgId = store.state.selectedOrganization?.identifier ?? "";
+  ensurePanelCacheStub(selectionKey(orgId, activeStream.value, "_stream", start, end));
+  for (const a of agents.value) {
+    ensurePanelCacheStub(
+      selectionKey(
+        orgId,
+        a.source_stream,
+        `${a.name}::${a.env ?? ""}::${a.version ?? ""}`,
+        start,
+        end,
+      ),
+    );
   }
 }
 
@@ -839,29 +1277,86 @@ const isEmpty = computed<boolean>(
     streamsLoaded.value &&
     (availableStreams.value.length === 0 ||
       streamHasNoLLMFields.value ||
-      (hasLoadedOnce.value && !hasData.value && !loading.value)),
+      (hasLoadedOnce.value && !hasData.value && !loading.value && !hasActiveFilters.value)),
+);
+// No LLM data at all here: the filter bar has nothing to narrow.
+const emptyOrg = computed(
+  () => streamsLoaded.value && (availableStreams.value.length === 0 || streamHasNoLLMFields.value),
 );
 
-// The empty-state action card emits its `id` here. `instrument` routes to
-// the in-app AI integrations page (OpenTelemetry / Gen-AI guides) — the
-// closest thing we have to a "set this up" landing surface and keeps the
-// user inside the product instead of bouncing to docs.
+// The integration guide the user most likely needs: the one whose docs page
+// they came from — the signup docs referrer (kept for onboarding until the
+// first login ends), else this page load's own referrer.
+const suggestedIntegration = referredAiIntegration([readPrefill()?.referrer, document.referrer]);
+// The guides AI-docs visitors read most, as one-click chips (minus the suggested one).
+const popularIntegrations = POPULAR_AI_INTEGRATION_ROUTES.map(aiIntegrationByRoute).filter(
+  (i): i is NonNullable<typeof i> => !!i && i.routeName !== suggestedIntegration?.routeName,
+);
+const emptyStateActions: EmptyStateAction[] = [
+  ...(suggestedIntegration
+    ? [
+        {
+          id: `suggested-${suggestedIntegration.slug}`,
+          icon: "auto-awesome",
+          titleKey: "emptyState.noLLMInsights.suggested",
+          titleParams: { name: suggestedIntegration.name },
+          descriptionKey: "emptyState.noLLMInsights.suggestedDesc",
+          descriptionParams: { name: suggestedIntegration.name },
+        } satisfies EmptyStateAction,
+      ]
+    : []),
+  {
+    id: "instrument-with-coding-agent",
+    icon: "smart-toy",
+    titleKey: "emptyState.noLLMInsights.codingAgent",
+    descriptionKey: "emptyState.noLLMInsights.codingAgentDesc",
+  },
+  {
+    id: "all-integrations",
+    icon: "widgets",
+    titleKey: "emptyState.noLLMInsights.action",
+    descriptionKey: "emptyState.noLLMInsights.actionDesc",
+  },
+];
+
+// Every empty-state action opens an in-app integration page. A guide's own
+// route (not `ai-integrations`, whose default child redirect lands on the
+// first integration and drops the query) is what makes the click land on it.
 function onEmptyAction(id?: string) {
-  if (id !== "instrument") return;
-  router.push({
-    name: "ai-integrations",
-    query: {
-      org_identifier: store.state.selectedOrganization?.identifier,
-    },
-  });
+  const org_identifier = store.state.selectedOrganization?.identifier;
+  if (id === "all-integrations") {
+    router.push({ name: "ai-integrations", query: { org_identifier } });
+    return;
+  }
+  if (id === "instrument-with-coding-agent") {
+    router.push({ name: "ai-openai-python", query: { org_identifier, tab: "agent" } });
+    return;
+  }
+  const slug = id?.replace(/^(suggested|integration)-/, "");
+  const integration =
+    suggestedIntegration?.slug === slug
+      ? suggestedIntegration
+      : popularIntegrations.find((i) => i.slug === slug);
+  if (integration) router.push({ name: integration.routeName, query: { org_identifier } });
 }
 
 interface KpiCard {
+  id: "traces" | "errors" | "p95" | "cost" | "tokens";
   label: I18nText;
   /** Material-symbol icon name (OIcon) shown in the card's corner tile. */
   icon: string;
   value: string;
   unit?: string;
+  /** Shown before the value, e.g. "≥" when the cost is a lower bound. */
+  prefix?: string;
+  /** Line under the value; a button when `onNote` is set (unpriced tokens → Model Pricing). */
+  note?: string;
+  noteTooltip?: string;
+  noteTone?: "warning";
+  noteTestId?: string;
+  onNote?: () => void;
+  /** Shown on hover of the label: what the number measures. */
+  tooltip?: I18nText;
   sparkData?: number[];
   sparkColor?: string;
   // True while this card's own value is still loading (P95 only — it rides a
@@ -873,31 +1368,54 @@ const kpiCards = computed<KpiCard[]>(() => {
   const tokens = splitNumberWithUnit(kpi.value.totalTokens);
   const traces = splitNumberWithUnit(kpi.value.traceCount);
   const p95 = splitDuration(kpi.value.p95DurationMicros);
+  // Traces with at least one span whose status is ERROR, over all traces.
   const errorRate =
     kpi.value.traceCount > 0 ? (kpi.value.errorCount / kpi.value.traceCount) * 100 : 0;
 
-  // Cost comes straight from SUM(gen_ai_usage_cost) on the KPI summary.
-  // If it's 0, either there are no LLM spans in the window or the SDK
-  // isn't emitting cost; either way we render "$0".
+  // Unpriced spans carry no cost, so the tile is a lower bound ("≥ $X") when the whole-window health check finds unpriced tokens.
+  const u = unpriced.value;
+  const windowOnly = hasActiveFilters.value;
+  const filteredPriced = kpi.value.totalCost > 0 || kpi.value.totalTokens === 0;
+  const kind = costKind(
+    kpi.value.totalCost,
+    kpi.value.totalTokens,
+    windowOnly && filteredPriced ? 0 : (u?.tokens ?? 0),
+  );
   const costCard: KpiCard = {
+    id: "cost",
     label: t("traces.lLMInsightsDashboard.totalCost"),
     icon: "payments",
-    ...splitCost(kpi.value.totalCost),
+    ...(kind === "unknown"
+      ? { value: t("llmDataTrust.cost.unknown") }
+      : splitCost(kpi.value.totalCost)),
+    ...(kind === "partial" ? { prefix: "≥" } : {}),
+    ...(u
+      ? {
+          note: t(
+            windowOnly ? "llmDataTrust.tile.unpricedWindow" : "llmDataTrust.tile.unpricedTokens",
+            { tokens: formatTokens(u.tokens) },
+          ),
+          noteTooltip: t(
+            windowOnly
+              ? "llmDataTrust.tile.unpricedWindowTooltip"
+              : u.pricedSince
+                ? "llmDataTrust.tile.pricedSinceTooltip"
+                : "llmDataTrust.tile.unpricedTooltip",
+            { tokens: formatTokens(u.tokens), models: unpricedModelNames.value },
+          ),
+          noteTone: "warning" as const,
+          noteTestId: "llm-insights-cost-unpriced",
+          onNote: openUnpricedTab,
+        }
+      : {}),
     sparkData: sparklines.value.cost,
     sparkColor: "#0ea5e9",
   };
 
+  // Traffic, then health, then spend: the order of the panel rows below.
   return [
-    costCard,
     {
-      label: t("traces.lLMInsightsDashboard.totalTokens"),
-      icon: "tag",
-      value: tokens.value,
-      unit: tokens.unit,
-      sparkData: sparklines.value.tokens,
-      sparkColor: "#a855f7",
-    },
-    {
+      id: "traces",
       label: t("traces.lLMInsightsDashboard.totalTraces"),
       icon: "account-tree",
       value: traces.value,
@@ -906,6 +1424,16 @@ const kpiCards = computed<KpiCard[]>(() => {
       sparkColor: "#3b82f6",
     },
     {
+      id: "errors",
+      label: t("traces.lLMInsightsDashboard.errorRate"),
+      icon: "error",
+      value: errorRate.toFixed(1),
+      unit: "%",
+      sparkData: sparklines.value.errorRate,
+      sparkColor: "#ef4444",
+    },
+    {
+      id: "p95",
       label: t("traces.lLMInsightsDashboard.p95Latency"),
       icon: "schedule",
       value: p95.value,
@@ -914,13 +1442,15 @@ const kpiCards = computed<KpiCard[]>(() => {
       sparkColor: "#f97316",
       loading: p95Loading.value,
     },
+    costCard,
     {
-      label: t("traces.lLMInsightsDashboard.errorRate"),
-      icon: "error",
-      value: errorRate.toFixed(1),
-      unit: "%",
-      sparkData: sparklines.value.errorRate,
-      sparkColor: "#ef4444",
+      id: "tokens",
+      label: t("traces.lLMInsightsDashboard.totalTokens"),
+      icon: "tag",
+      value: tokens.value,
+      unit: tokens.unit,
+      sparkData: sparklines.value.tokens,
+      sparkColor: "#a855f7",
     },
   ];
 });
@@ -940,40 +1470,67 @@ function kpiCacheKey(start: number, end: number): string {
   );
 }
 
+// Identity of the agent loadInsights last resolved and loaded for, and whether
+// a loadInsights is between loading the agents and settling the selection. The
+// selected-agent watcher below skips both, so the selection loadInsights itself
+// seeds (the cascade's first-agent default, then the URL / remembered agent)
+// doesn't start a second load that remounts the panels and cancels their
+// queries.
+let loadedAgentKey = "";
+let resolvingScope = 0;
+// A load whose awaits resolve after a newer load began must not fetch, or its stale numbers win the tiles.
+let loadSeq = 0;
+
 // Single fetch entry point. Always pulls from the current props (which the
 // parent keeps in sync via `recomputeInsightsTimeRange`). Stream selector
 // changes, refresh button, and onMounted all funnel through here. `force`
-// (manual refresh) bypasses the KPI cache and pulls fresh numbers.
-async function loadInsights(startTime?: number, endTime?: number, opts?: { force?: boolean }) {
+// (manual refresh) bypasses the KPI and agents caches and pulls fresh numbers.
+// `windowPicked` (a user's date pick) lets the new window's agents decide an
+// auto mode again.
+async function loadInsights(
+  startTime?: number,
+  endTime?: number,
+  opts?: { force?: boolean; windowPicked?: boolean },
+) {
+  const mine = ++loadSeq;
   try {
     const force = opts?.force ?? false;
     const start = startTime ?? props.startTime;
     const end = endTime ?? props.endTime;
     if (!start || !end) return;
-    localStorage.setItem(MODE_LS_KEY, filterMode.value);
-
     // Stream-mode reads `effectiveStream` from `activeStream`, which is only set
     // once the stream list loads — so make sure that's done before we fetch,
     // regardless of whether this call raced ahead of the mount's stream load.
     await ensureStreamsLoaded();
+    if (mine !== loadSeq) return;
+
+    // The agents list decides the mode (when the user didn't choose one), fills
+    // the Agent cascade and the stream picker's agent counts, and drives the
+    // "No agent identity found" banner — one request per window.
+    resolvingScope++;
+    try {
+      if (genAiAgentMappingAccess.allowed && availableStreams.value.length > 0) {
+        const agentsLoad = loadAgents(start, end, force);
+        // Explicit Stream queries need no agent identity. Counts and the
+        // instrumentation banner can settle after the panels start loading.
+        if (!modeExplicit.value || filterMode.value === "agent") await agentsLoad;
+      }
+    } finally {
+      resolvingScope--;
+    }
+    if (mine !== loadSeq) return;
+    if ((!modeSettled || opts?.windowPicked) && !modeExplicit.value) {
+      filterMode.value = resolveScopeMode(null, agents.value.length, agentsError.value);
+    }
+    if (!agentsError.value) modeSettled = true;
 
     if (filterMode.value === "agent") {
-      // Agent tab can't fetch until it knows the agent's source stream, so the
-      // agents list must be loaded first — await it here. (Agents API is only
-      // ever hit on the Agent tab.)
-      await loadAgents(start, end, force);
       // Seed the cascade from the carried-over env/name/version (URL deep-link,
-      // else the persisted last selection) now that the list exists: the exact
-      // triple when env and version are known, else by name; then clear it.
-      if (pendingAgentName.value) {
-        if (pendingEnv.value && pendingVersion.value) {
-          selectAgentByScope(pendingEnv.value, pendingAgentName.value, pendingVersion.value);
-        } else {
-          selectAgentByName(pendingAgentName.value);
-        }
-        pendingAgentName.value = null;
-        pendingEnv.value = null;
-        pendingVersion.value = null;
+      // else the persisted last selection) now that the list exists; then clear it.
+      if (pendingScope.value && agents.value.length > 0) {
+        const { env, name, version, stream } = pendingScope.value;
+        selectAgentByScope(env, name, version, stream);
+        pendingScope.value = null;
       }
       // Default to the first agent when nothing valid is selected (fresh entry
       // to the tab, or the previously-picked agent is gone for this window).
@@ -988,10 +1545,11 @@ async function loadInsights(startTime?: number, endTime?: number, opts?: { force
         localStorage.setItem(VERSION_LS_KEY, selectedVersion.value);
       }
     } else {
-      // Agents API is only relevant on the Agent tab — don't touch it in Stream
-      // mode. The list loads lazily when the user switches to the Agent tab.
       localStorage.setItem(STREAM_LS_KEY, activeStream.value);
     }
+    loadedAgentKey = agentIdentityKey(selectedAgent.value);
+    // Mode and selection are final: the panels may mount now, exactly once.
+    scopeReady.value = true;
 
     // Keep the URL in step with the resolved selection (runs even when there's
     // nothing to query, e.g. the Agent tab with no agents).
@@ -999,7 +1557,12 @@ async function loadInsights(startTime?: number, endTime?: number, opts?: { force
 
     // Stream comes from the agent (Agent tab) or the picker (Stream tab).
     const stream = effectiveStream.value;
-    if (!stream) return;
+    if (!stream) {
+      resetDataHealth();
+      return;
+    }
+    // Data health runs alongside (server-cached ~1 min; a manual refresh re-runs it).
+    loadDataHealth(force, start, end);
 
     // Per-selection KPI retention: restore the summary numbers for this exact
     // stream+agent+window instead of refetching on a tab toggle. `force`
@@ -1007,37 +1570,34 @@ async function loadInsights(startTime?: number, endTime?: number, opts?: { force
     const ck = kpiCacheKey(start, end);
     if (!force && kpiCache.has(ck)) {
       const snap = kpiCache.get(ck)!;
-      kpi.value = snap.kpi;
-      sparklines.value = snap.sparklines;
+      // Also supersedes an in-flight load for the previous selection, which would otherwise land on these tiles.
+      restore(snap);
       lastRunAt.value = snap.lastRunAt;
-      error.value = null; // restoring a prior success — drop any stale error
-      hasLoadedOnce.value = true; // we have data → no first-load skeleton
       return;
     }
 
-    await fetchAll(stream, start, end, effectiveAgent.value);
-    // `loading` true→false already stamped lastRunAt via the watcher; snapshot
-    // the fresh result so returning to this selection skips the network.
-    if (!error.value) {
-      kpiCache.set(ck, {
-        kpi: kpi.value,
-        sparklines: sparklines.value,
-        lastRunAt: lastRunAt.value,
-      });
+    const result = await fetchAll(stream, start, end, effectiveAgent.value, filterClause.value);
+    // Snapshot this call's result so returning to this selection skips the network.
+    if (result) {
+      kpiCache.set(ck, { ...result, lastRunAt: lastRunAt.value });
     }
   } finally {
     // The switch is resolved (data ready, or we bailed early) — drop the switch
     // skeleton. Any in-flight KPI/panel fetch keeps its own skeleton from here.
-    switching.value = false;
+    if (mine === loadSeq) switching.value = false;
   }
 }
 
+// A toggle click is an explicit choice: it is kept in the URL and remembered for
+// the other Monitor pages, so the agents list no longer picks the mode.
 function onFilterModeChange(mode: boolean | AcceptableValue | AcceptableValue[]) {
   const next = mode === "agent" ? "agent" : "stream";
   if (next === filterMode.value) return;
   filterMode.value = next;
-  // Entering the Agent tab fetches the agents list before any KPI fetch — show
-  // the skeleton for that whole stretch so the switch is immediate, not stale.
+  modeExplicit.value = true;
+  rememberModeChoice(next);
+  // Entering the Agent tab can wait on the agents list before any KPI fetch —
+  // show the skeleton for that stretch so the switch is immediate, not stale.
   if (next === "agent") switching.value = true;
   loadInsights();
 }
@@ -1052,12 +1612,16 @@ function onStreamChange() {
 // the former @agent-change handler. Keyed on the agent's stream-scoped identity +
 // version so a same-named agent in a different stream/version still reloads.
 watch(
-  () => {
-    const a = selectedAgent.value;
-    return a ? `${a.source_stream}::${a.name}::${a.env ?? ""}::${a.version ?? ""}` : "";
-  },
-  () => {
-    if (filterMode.value !== "agent") return;
+  () => agentIdentityKey(selectedAgent.value),
+  (key) => {
+    if (
+      filterMode.value !== "agent" ||
+      !scopeReady.value ||
+      resolvingScope > 0 ||
+      key === loadedAgentKey
+    ) {
+      return;
+    }
     switching.value = true;
     loadInsights();
   },
@@ -1065,9 +1629,12 @@ watch(
 
 // Parent calls this on Run Query / Refresh / date-range change, passing
 // the freshly computed start/end so we don't have to wait for Vue's
-// next-tick prop propagation.
-async function refresh(startTime?: number, endTime?: number) {
-  await loadInsights(startTime, endTime, { force: true });
+// next-tick prop propagation. `force` is false for the window DateTime replays
+// on mount, so entering the page does not bypass the caches. `windowPicked` is
+// true only for a user's own date pick: an auto-decided mode is decided again
+// for that window (Agent with no agents → Stream), as Agent Behavior does.
+async function refresh(startTime?: number, endTime?: number, force = true, windowPicked = false) {
+  await loadInsights(startTime, endTime, { force, windowPicked });
 }
 
 // "Last refreshed" timestamp for the whole-page refresh indicator. Stamped when
@@ -1075,9 +1642,14 @@ async function refresh(startTime?: number, endTime?: number) {
 // its single last-refresh off `searchObj.loading`. Exposed to the page header,
 // which renders it via ORefreshButton.
 const lastRunAt = ref<number | null>(null);
-watch(loading, (isLoading, wasLoading) => {
-  if (wasLoading && !isLoading) lastRunAt.value = Date.now();
-});
+// Sync: a cache restore ends a load and then sets the snapshot's time, which a deferred stamp would overwrite.
+watch(
+  loading,
+  (isLoading, wasLoading) => {
+    if (wasLoading && !isLoading) lastRunAt.value = Date.now();
+  },
+  { flush: "sync" },
+);
 
 defineExpose({
   refresh,

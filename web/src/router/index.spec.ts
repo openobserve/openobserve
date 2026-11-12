@@ -41,6 +41,19 @@ vi.mock("@/composables/shared/router", () => ({
         component: { template: "<div>Public chat</div>" },
         meta: { public: true },
       },
+      {
+        // Mirrors the Slack link page: it needs a session, so it is not public.
+        path: "/slack/link",
+        name: "slackLink",
+        component: { template: "<div>Slack link</div>" },
+        meta: { titleKey: "routeTitles.slackLink" },
+      },
+      {
+        path: "/slack/oauth/callback",
+        name: "slackOAuthCallback",
+        component: { template: "<div>Slack OAuth callback</div>" },
+        meta: { titleKey: "routeTitles.slackOAuthCallback" },
+      },
     ],
     homeChildRoutes: [
       {
@@ -214,6 +227,27 @@ describe("router/index (factory)", () => {
       expect(router.currentRoute.value.params.token).toBe("tok123");
     });
 
+    it("AC-9.6 sends a signed-out /slack/link to /login and keeps the URL to return to", async () => {
+      window.sessionStorage.clear();
+      const before = window.location.href;
+      // A Slack link opens a fresh tab, so the address bar already holds the link when the guard runs.
+      window.history.replaceState({}, "", "/web/slack/link?r=req-1.sig");
+      try {
+        await router.push("/slack/link?r=req-1.sig").catch(() => {});
+        expect(router.currentRoute.value.path).toBe("/login");
+        expect(window.sessionStorage.getItem("redirectURI")).toBe(
+          `${window.location.origin}/web/slack/link?r=req-1.sig`,
+        );
+      } finally {
+        window.history.replaceState({}, "", before);
+      }
+    });
+
+    it("lets the Slack OAuth popup callback through without a session", async () => {
+      await router.push("/slack/oauth/callback?code=c&state=s").catch(() => {});
+      expect(router.currentRoute.value.name).toBe("slackOAuthCallback");
+    });
+
     it("should redirect to /login when navigating to a protected route without a session", async () => {
       // Simulate unauthenticated access to /logs; the guard should redirect to /login
       await router.push("/logs").catch(() => {});
@@ -273,6 +307,45 @@ describe("router/index (factory)", () => {
       expect(openobserveRum.setViewName).toHaveBeenCalledWith("logs");
     });
 
+    it("sends a signed-in user from /signup into the app instead of the login page", async () => {
+      await router.push("/signup?utm_source=blog").catch(() => {});
+      expect(router.currentRoute.value.path).toBe("/");
+    });
+
+    it("sends a signed-in user from /login into the app", async () => {
+      await router.push("/login").catch(() => {});
+      expect(router.currentRoute.value.path).toBe("/");
+    });
+
+    it("sends a user with a saved session but a fresh store from /signup into the app", async () => {
+      store = buildStore(false);
+      router = createAppRouter(store);
+      await router.push("/signup").catch(() => {});
+      expect(router.currentRoute.value.path).toBe("/");
+      expect(store.state.loggedIn).toBe(true);
+    });
+
+    it("keeps an expired saved session on the signup flow instead of sending it into the app", async () => {
+      vi.mocked(getDecodedUserInfo).mockReturnValue(
+        JSON.stringify({ email: "user@example.com", exp: Math.floor(Date.now() / 1000) - 60 }),
+      );
+      store = buildStore(false);
+      router = createAppRouter(store);
+      await router.push("/signup").catch(() => {});
+      expect(router.currentRoute.value.path).toBe("/login");
+      expect(router.currentRoute.value.query.mode).toBe("signup");
+    });
+
+    it("sends a saved session that has not expired from /signup into the app", async () => {
+      vi.mocked(getDecodedUserInfo).mockReturnValue(
+        JSON.stringify({ email: "user@example.com", exp: Math.floor(Date.now() / 1000) + 3600 }),
+      );
+      store = buildStore(false);
+      router = createAppRouter(store);
+      await router.push("/signup").catch(() => {});
+      expect(router.currentRoute.value.path).toBe("/");
+    });
+
     it("does not set the RUM view name when the navigation is aborted", async () => {
       router.beforeEach(() => false);
       vi.mocked(openobserveRum.setViewName).mockClear();
@@ -302,6 +375,8 @@ describe("router/index (factory)", () => {
       // Asserting the resolved text (not the key) is the point: the guard, not the
       // route table, is what translates — that is what keeps the tab title in the
       // current locale.
+      vi.mocked(getDecodedUserInfo).mockReturnValue(null);
+      router = createAppRouter(buildStore(false));
       await router.push("/login").catch(() => {});
       expect(document.title).toBe("OpenObserve - Login");
     });

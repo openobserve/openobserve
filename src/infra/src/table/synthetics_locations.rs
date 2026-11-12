@@ -125,7 +125,7 @@ async fn with_cached<T>(
     Ok(f(rows))
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 pub struct SyntheticsLocationRecord {
     pub id: String,
     pub org_id: Option<String>,
@@ -255,6 +255,17 @@ pub async fn remove(id: &str) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
     Entity::delete_by_id(id)
         .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    invalidate_and_publish().await;
+    Ok(())
+}
+
+/// Deletes an org's private locations; public locations carry no org and stay.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(get_orm_client_rw().await)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     invalidate_and_publish().await;

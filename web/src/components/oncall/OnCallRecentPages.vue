@@ -21,13 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container rounded-surface bg-surface-base border-border-default overflow-hidden border"
+    class="card-container rounded-surface bg-surface-base border-border-default table-last-row-flush overflow-hidden border"
     data-test="oncall-recent-pages"
   >
     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-4 py-3">
       <OText variant="panel-title">{{ t("oncall.teamRecentPages") }}</OText>
-      <!-- Suppressed mid-fetch: "0 in the last 7 days" under a skeleton is an
-           answer, and it is the wrong one. -->
+      <!-- Not while loading: a count under a skeleton reads as an answer. -->
       <OText v-if="!loading" variant="meta" data-test="oncall-recent-pages-window">
         {{ windowLabel }}
       </OText>
@@ -35,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost-primary"
         size="xs"
         class="ms-auto"
+        icon-left="open-in-new"
         data-test="oncall-recent-pages-view-all"
         @click="emit('view-all')"
       >
@@ -72,15 +72,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-responder="{ row }">
-        <span v-if="row.acked_by && row.acked_at" class="text-text-secondary text-sm">
-          {{
-            t("oncall.teamAckedByIn", {
-              who: raw(row.acked_by),
-              took: raw(formatMicrosDuration(row.acked_at - row.opened_at)),
-            })
-          }}
-        </span>
+        <i18n-t
+          v-if="row.acked_by && row.acked_at"
+          keypath="oncall.teamAckedByIn"
+          tag="span"
+          scope="global"
+          class="text-text-secondary text-sm"
+          :data-test="`oncall-recent-pages-responder-${row.id}`"
+        >
+          <template #who><OnCallPersonName :email="row.acked_by" /></template>
+          <template #took>{{ raw(formatMicrosDuration(row.acked_at - row.opened_at)) }}</template>
+        </i18n-t>
         <span v-else class="text-text-secondary text-sm">{{ t("oncall.neverAcknowledged") }}</span>
+      </template>
+
+      <!-- The same one phrase the Pages list's Escalation column says; no progress is fetched here, so only the record's step is claimed. -->
+      <template #cell-state="{ row }">
+        <span :data-test="`oncall-recent-pages-state-${row.id}`">
+          <OnCallEscalationCell
+            :response-id="row.id"
+            :record="row"
+            :total-rungs="stepsFor(row)?.length ?? null"
+            :reached-step="reachedStep(row)"
+            :progress-loaded="false"
+          />
+        </span>
       </template>
 
       <template #cell-opened_at="{ value }">
@@ -98,9 +114,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import useBreakpoint from "@/composables/useBreakpoint";
+import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
@@ -109,6 +127,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import type { OnCallPolicy, OnCallResponse } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
+import { reachedStepOf } from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
@@ -119,19 +138,28 @@ const props = withDefaults(
      * Read from the policy rather than per-record, which needs no extra request.
      */
     policy?: OnCallPolicy | null;
-    /** How many days the window covers — the header states it. */
-    windowDays?: number;
     /** How many rows to show before deferring to the full list. */
     limit?: number;
     loading?: boolean;
+    /** How many days `pages` spans, for the header's count. */
+    windowDays?: number;
   }>(),
-  { pages: () => [], policy: null, windowDays: 7, limit: 3, loading: false },
+  { pages: () => [], policy: null, limit: 3, loading: false, windowDays: 7 },
 );
 
 const emit = defineEmits<{ open: [page: OnCallResponse]; "view-all": [] }>();
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
+
+/// The ladder's steps for this record's priority, earliest first.
+function stepsFor(page: OnCallResponse) {
+  const steps = props.policy?.rungs.find((rung) => rung.priority === page.priority)?.steps;
+  return steps ? [...steps].sort((a, b) => a.after_micros - b.after_micros) : null;
+}
+
+const reachedStep = (page: OnCallResponse) =>
+  reachedStepOf(stepsFor(page), page.reached_rung_micros);
 
 /// The delay before this record's ladder would have woken a SECOND person.
 function secondRungDelay(page: OnCallResponse): number | null {
@@ -160,6 +188,12 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
     meta: { isName: true, flex: true },
   },
   {
+    id: "state",
+    header: t("oncall.state"),
+    accessorFn: (page: OnCallResponse) => page.state,
+    size: 180,
+  },
+  {
     id: "responder",
     header: t("oncall.responder"),
     accessorFn: (page: OnCallResponse) => page.acked_by ?? "",
@@ -173,8 +207,7 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
   },
 ]);
 
-/// "3 of 6 in the last 7 days" — a truncated list that does not say it is
-/// truncated reads as the whole history of the team.
+/// A capped list that does not say it is capped reads as the team's whole history.
 const windowLabel = computed<I18nText>(() =>
   props.pages.length > rows.value.length
     ? t("oncall.teamRecentPagesWindowOf", {

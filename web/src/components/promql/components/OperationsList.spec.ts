@@ -19,6 +19,9 @@ import OperationsList from "./OperationsList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { PromqlStepId } from "@/components/promql/types";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // ── Stubs ────────────────────────────────────────────────────────────────────
 
@@ -222,6 +225,10 @@ describe("OperationsList", () => {
       expect(emitted![0][0]).toHaveLength(1);
       expect(emitted![0][0][0].id).toBe(PromqlStepId.Rate);
       expect(emitted![0][0][0].params).toEqual(["5m"]);
+      expect(analytics.track).toHaveBeenCalledWith("promql_builder_operation_added", {
+        operation: PromqlStepId.Rate,
+        group: "Rate & range",
+      });
     });
   });
 
@@ -581,6 +588,49 @@ describe("OperationsList", () => {
       wrapper = createWrapper();
       wrapper.vm.handleDragUpdate([mockOperations[1], mockOperations[0]]);
       expect(wrapper.emitted("update:operations")).toBeUndefined();
+    });
+  });
+
+  describe("without and offset", () => {
+    const mountOpen = (operations: any[]) =>
+      mount(OperationsList, {
+        props: { operations, dashboardData: mockDashboardData },
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            ODialog: oDialogStub,
+            ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+          },
+        },
+      });
+
+    it("renders the without flag as a switch that writes the step's trailing param", async () => {
+      const operations = [{ id: PromqlStepId.Sum, params: [["method"]] as any[] }];
+      wrapper = mountOpen(operations);
+      const toggle = wrapper.find('[data-test="promql-operation-param-1"]');
+      expect(toggle.exists()).toBe(true);
+      await toggle.find("button").trigger("click");
+      expect(operations[0].params[1]).toBe(true);
+    });
+
+    it("labels a without aggregation as such and hides the bare flag", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.computedLabel({ id: PromqlStepId.Sum, params: [["pod"], true] })).toBe(
+        "Sum(without pod)",
+      );
+      expect(wrapper.vm.computedLabel({ id: PromqlStepId.Sum, params: [["pod"], false] })).toBe(
+        "Sum(pod)",
+      );
+    });
+
+    it("does not count an offset step as wrapping the selector", () => {
+      const offset = { id: PromqlStepId.Offset, params: ["1h"] };
+      wrapper = createWrapper({ operations: [offset] });
+      expect(wrapper.vm.isBlocked(wrapper.vm.getStepSpec(PromqlStepId.Rate))).toBe(false);
+
+      const rate = { id: PromqlStepId.Rate, params: ["5m"] };
+      wrapper.vm.handleDragUpdate([offset, rate]);
+      expect(wrapper.emitted("update:operations")![0][0]).toEqual([offset, rate]);
     });
   });
 });

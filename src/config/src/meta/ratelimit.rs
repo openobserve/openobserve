@@ -193,10 +193,10 @@ impl std::fmt::Display for InvalidIntervalError {
 
 impl std::error::Error for InvalidIntervalError {}
 
-impl TryFrom<&str> for Interval {
-    type Error = InvalidIntervalError;
+impl std::str::FromStr for Interval {
+    type Err = InvalidIntervalError;
 
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "second" => Ok(Interval::Second),
             "minute" => Ok(Interval::Minute),
@@ -656,14 +656,14 @@ mod tests {
 
     #[test]
     fn test_interval_try_from_valid() {
-        assert!(matches!(Interval::try_from("second"), Ok(Interval::Second)));
-        assert!(matches!(Interval::try_from("minute"), Ok(Interval::Minute)));
-        assert!(matches!(Interval::try_from("hour"), Ok(Interval::Hour)));
+        assert!(matches!("second".parse::<Interval>(), Ok(Interval::Second)));
+        assert!(matches!("minute".parse::<Interval>(), Ok(Interval::Minute)));
+        assert!(matches!("hour".parse::<Interval>(), Ok(Interval::Hour)));
     }
 
     #[test]
     fn test_interval_try_from_invalid() {
-        let err = Interval::try_from("millisecond").unwrap_err();
+        let err = "millisecond".parse::<Interval>().unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("Invalid interval"));
         assert!(msg.contains("millisecond"));

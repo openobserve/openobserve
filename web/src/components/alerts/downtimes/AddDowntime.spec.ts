@@ -107,6 +107,8 @@ const seeSchedule = async (wrapper: ReturnType<typeof mount>) => {
 
 describe("AddDowntime", () => {
   beforeEach(() => {
+    // An earlier test's unsaved form leaves a draft, whose restore dialog would cover the next page.
+    localStorage.clear();
     queryClient.clear();
     vi.mocked(common.list_Folders).mockImplementation(
       (_org: string, type: string) =>
@@ -130,6 +132,58 @@ describe("AddDowntime", () => {
     dialog()!.querySelector<HTMLButtonElement>(`[data-test="o-dialog-${which}-btn"]`)!.click();
     await flushPromises();
   };
+
+  it("locks the license-locked target modules and reads no synthetics folders", async () => {
+    vi.mocked(common.list_Folders).mockClear();
+    store.state.zoConfig.features = { synthetics: "locked", anomaly_detection: "locked" };
+    try {
+      const { wrapper } = await mountPage();
+      for (const module of ["synthetics", "anomaly_detections", "slos"]) {
+        const item = wrapper.get(`[data-test="add-downtime-module-${module}"]`);
+        expect(item.attributes("disabled")).toBeDefined();
+      }
+      expect(
+        wrapper.get('[data-test="add-downtime-module-alerts"]').attributes("disabled"),
+      ).toBeUndefined();
+      const types = vi.mocked(common.list_Folders).mock.calls.map((call) => call[1]);
+      expect(types).not.toContain("synthetics");
+      wrapper.unmount();
+    } finally {
+      delete store.state.zoConfig.features;
+    }
+  });
+
+  it("drops a prefilled module when a late config locks it", async () => {
+    const router = makeRouter();
+    await router.push({
+      name: "addDowntime",
+      query: { org_identifier: "default", module: "synthetics" },
+    });
+    await router.isReady();
+    const wrapper = mount(AddDowntime, {
+      global: { plugins: [store, router] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="downtime-target-synthetics"]').exists()).toBe(true);
+    try {
+      store.state.zoConfig.features = { synthetics: "locked" };
+      await flushPromises();
+      expect(wrapper.find('[data-test="downtime-target-synthetics"]').exists()).toBe(false);
+    } finally {
+      delete store.state.zoConfig.features;
+      wrapper.unmount();
+    }
+  });
+
+  it("leaves every target module open while the features are enabled", async () => {
+    const { wrapper } = await mountPage();
+    for (const module of ["alerts", "synthetics", "anomaly_detections", "slos"]) {
+      const item = wrapper.get(`[data-test="add-downtime-module-${module}"]`);
+      expect(item.attributes("disabled")).toBeUndefined();
+    }
+    wrapper.unmount();
+  });
 
   it("counts the reason against the server's 1,000-character cap", async () => {
     const { wrapper } = await mountPage();
@@ -280,13 +334,65 @@ describe("AddDowntime", () => {
     wrapper.unmount();
   });
 
-  it("shows the condition rule under the builder when a row is empty", async () => {
+  it("shows the condition rule under the builder when the block is empty", async () => {
     const { wrapper } = await mountPage();
     await wrapper.get('[data-test="downtime-condition-add"]').trigger("click");
     await flushPromises();
     await save(wrapper);
     expect(downtimes.create).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain("Choose a dimension for every row.");
+    expect(wrapper.get('[data-test="downtime-condition-builder-issues"]').text()).toContain(
+      "Add a condition, or remove the condition block.",
+    );
+    wrapper.unmount();
+  });
+
+  it("states a star rule once after a refused save", async () => {
+    vi.mocked(downtimes.get).mockResolvedValue({
+      data: {
+        id: "d1",
+        org: "default",
+        folder_id: "default",
+        name: "Stars",
+        targets: [{ module: "alerts", folders: { kind: "all" }, ids: ["a1"] }],
+        condition: {
+          type: "group",
+          op: "and",
+          items: [{ type: "pair", key: "host", operator: "=", value: "*" }],
+        },
+        schedule: {
+          repeat: "none",
+          starts_at: (Date.now() + 3_600_000) * 1000,
+          ends_at: (Date.now() + 7_200_000) * 1000,
+          timezone: "UTC",
+          duration_secs: 3600,
+          weekdays: [],
+        },
+        show_banner: true,
+        version: 1,
+        status: "scheduled",
+        affected: { alerts: [], anomalies: [], synthetics: [], slos: [] },
+      },
+    } as any);
+    vi.mocked(downtimes.update).mockReset();
+    const router = makeRouter();
+    await router.push({
+      name: "editDowntime",
+      params: { id: "d1" },
+      query: { org_identifier: "default", folder: "default" },
+    });
+    await router.isReady();
+    const wrapper = mount(AddDowntime, {
+      global: { plugins: [store, router] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    await save(wrapper);
+    expect(downtimes.update).not.toHaveBeenCalled();
+    // The chip's own copy is for screen readers; the visible alerts are what a user reads.
+    const shown = wrapper
+      .findAll('[data-test="downtime-condition"] [role="alert"]')
+      .filter((alert) => alert.text().includes("A value cannot be a lone *."));
+    expect(shown).toHaveLength(1);
     wrapper.unmount();
   });
 

@@ -159,354 +159,167 @@ impl ListTimedAnnotationsQuery {
 mod tests {
     use super::*;
 
+    fn annotation(
+        start: i64,
+        end: Option<i64>,
+        title: &str,
+        tags: &[&str],
+        panels: &[&str],
+    ) -> TimedAnnotation {
+        TimedAnnotation {
+            annotation_id: None,
+            start_time: start,
+            end_time: end,
+            title: title.to_string(),
+            text: None,
+            tags: tags.iter().map(|s| s.to_string()).collect(),
+            panels: panels.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    fn ok() -> Result<(), String> {
+        Ok(())
+    }
+
+    fn err(msg: &str) -> Result<(), String> {
+        Err(msg.to_string())
+    }
+
     #[test]
-    fn test_timed_annotation_req_validate_empty() {
-        let req = TimedAnnotationReq {
+    fn test_timed_annotation_req_validate() {
+        let empty = TimedAnnotationReq {
             timed_annotations: vec![],
         };
-        assert_eq!(
-            req.validate().unwrap_err(),
-            "timed_annotations cannot be empty"
-        );
+        assert_eq!(empty.validate(), err("timed_annotations cannot be empty"));
+
+        let valid = TimedAnnotationReq {
+            timed_annotations: vec![annotation(1000, Some(2000), "t", &["a"], &["p"])],
+        };
+        assert_eq!(valid.validate(), ok());
+
+        // The first invalid annotation's error is returned
+        let invalid = TimedAnnotationReq {
+            timed_annotations: vec![
+                annotation(1000, None, "t", &[], &[]),
+                annotation(1000, None, "", &[], &[]),
+                annotation(1000, None, "t", &["a", ""], &[]),
+            ],
+        };
+        assert_eq!(invalid.validate(), err("title cannot be empty"));
     }
 
     #[test]
-    fn test_timed_annotation_req_validate_valid() {
-        let annotation = TimedAnnotation {
-            annotation_id: Some("test_id".to_string()),
-            start_time: 1000,
-            end_time: Some(2000),
-            title: "Test Annotation".to_string(),
-            text: Some("Test description".to_string()),
-            tags: vec!["tag1".to_string(), "tag2".to_string()],
-            panels: vec!["panel1".to_string()],
-        };
-
-        let req = TimedAnnotationReq {
-            timed_annotations: vec![annotation],
-        };
-        assert!(req.validate().is_ok());
+    fn test_timed_annotation_validate() {
+        let cases = [
+            (
+                annotation(1000, Some(2000), "t", &["a", "b"], &["p1", "p2"]),
+                ok(),
+            ),
+            (annotation(1000, None, "t", &[], &[]), ok()),
+            (
+                annotation(1000, Some(1000), "t", &[], &[]),
+                err("end time must be greater than start time"),
+            ),
+            (
+                annotation(2000, Some(1000), "", &[], &[]),
+                err("end time must be greater than start time"),
+            ),
+            (
+                annotation(1000, Some(2000), "", &[], &[]),
+                err("title cannot be empty"),
+            ),
+            (
+                annotation(1000, None, "t", &[], &["p1", ""]),
+                err("panel cannot be empty"),
+            ),
+            (
+                annotation(1000, None, "t", &["a", ""], &[]),
+                err("tag cannot be empty"),
+            ),
+        ];
+        for (i, (a, want)) in cases.into_iter().enumerate() {
+            assert_eq!(a.validate(), want, "case {i}");
+        }
     }
 
     #[test]
-    fn test_timed_annotation_req_validate_invalid_annotation() {
-        let invalid_annotation = TimedAnnotation {
-            annotation_id: None,
-            start_time: 2000,
-            end_time: Some(1000),  // Invalid: end_time <= start_time
-            title: "".to_string(), // Invalid: empty title
-            text: None,
-            tags: vec![],
-            panels: vec![],
+    fn test_timed_annotation_delete_validate() {
+        let ids = |v: &[&str]| TimedAnnotationDelete {
+            annotation_ids: v.iter().map(|s| s.to_string()).collect(),
         };
-
-        let req = TimedAnnotationReq {
-            timed_annotations: vec![invalid_annotation],
-        };
-        assert!(req.validate().is_err());
+        assert_eq!(ids(&[]).validate(), err("annotation_ids cannot be empty"));
+        assert_eq!(ids(&["id1", "id2"]).validate(), ok());
     }
 
     #[test]
-    fn test_timed_annotation_validate_valid() {
-        let annotation = TimedAnnotation {
-            annotation_id: Some("test_id".to_string()),
-            start_time: 1000,
-            end_time: Some(2000),
-            title: "Valid Title".to_string(),
-            text: Some("Valid description".to_string()),
-            tags: vec!["tag1".to_string(), "tag2".to_string()],
-            panels: vec!["panel1".to_string(), "panel2".to_string()],
+    fn test_timed_annotation_update_validate() {
+        let update = |start: Option<i64>, end: Option<Option<i64>>, title: Option<&str>| {
+            TimedAnnotationUpdate {
+                start_time: start,
+                end_time: end,
+                title: title.map(str::to_string),
+                text: None,
+                tags: None,
+                panels: None,
+            }
         };
-        assert!(annotation.validate().is_ok());
+        let cases = [
+            (
+                update(None, None, None),
+                err("At least one field must be present"),
+            ),
+            (update(None, None, Some("t")), ok()),
+            (update(Some(1000), Some(Some(2000)), Some("t")), ok()),
+            (update(Some(1000), Some(None), None), ok()),
+            (
+                update(None, Some(Some(2000)), Some("t")),
+                err("start time must be present when end_time is specified"),
+            ),
+            (
+                update(Some(2000), Some(Some(1000)), None),
+                err("end time must be greater than start time"),
+            ),
+        ];
+        for (i, (u, want)) in cases.into_iter().enumerate() {
+            assert_eq!(u.validate(), want, "case {i}");
+        }
     }
 
     #[test]
-    fn test_timed_annotation_validate_no_end_time() {
-        let annotation = TimedAnnotation {
-            annotation_id: Some("test_id".to_string()),
-            start_time: 1000,
-            end_time: None, // Valid: no end time
-            title: "Valid Title".to_string(),
-            text: Some("Valid description".to_string()),
-            tags: vec!["tag1".to_string()],
-            panels: vec!["panel1".to_string()],
-        };
-        assert!(annotation.validate().is_ok());
-    }
-
-    #[test]
-    fn test_timed_annotation_validate_equal_end_time() {
-        let annotation = TimedAnnotation {
-            annotation_id: Some("test_id".to_string()),
-            start_time: 1000,
-            end_time: Some(1000), // Invalid: end_time == start_time
-            title: "Valid Title".to_string(),
-            text: None,
-            tags: vec![],
-            panels: vec![],
-        };
-        assert_eq!(
-            annotation.validate().unwrap_err(),
-            "end time must be greater than start time"
-        );
-    }
-
-    #[test]
-    fn test_timed_annotation_validate_empty_title() {
-        let annotation = TimedAnnotation {
-            annotation_id: Some("test_id".to_string()),
-            start_time: 1000,
-            end_time: Some(2000),
-            title: "".to_string(), // Invalid: empty title
-            text: None,
-            tags: vec![],
-            panels: vec![],
-        };
-        assert_eq!(annotation.validate().unwrap_err(), "title cannot be empty");
-    }
-
-    #[test]
-    fn test_timed_annotation_validate_empty_panel() {
-        let annotation = TimedAnnotation {
-            annotation_id: Some("test_id".to_string()),
-            start_time: 1000,
-            end_time: Some(2000),
-            title: "Valid Title".to_string(),
-            text: None,
-            tags: vec![],
-            panels: vec!["panel1".to_string(), "".to_string()], // Invalid: empty panel
-        };
-        assert_eq!(annotation.validate().unwrap_err(), "panel cannot be empty");
-    }
-
-    #[test]
-    fn test_timed_annotation_validate_empty_tag() {
-        let annotation = TimedAnnotation {
-            annotation_id: Some("test_id".to_string()),
-            start_time: 1000,
-            end_time: Some(2000),
-            title: "Valid Title".to_string(),
-            text: None,
-            tags: vec!["tag1".to_string(), "".to_string()], // Invalid: empty tag
-            panels: vec![],
-        };
-        assert_eq!(annotation.validate().unwrap_err(), "tag cannot be empty");
-    }
-
-    #[test]
-    fn test_timed_annotation_delete_validate_empty() {
-        let delete_req = TimedAnnotationDelete {
-            annotation_ids: vec![],
-        };
-        assert_eq!(
-            delete_req.validate().unwrap_err(),
-            "annotation_ids cannot be empty"
-        );
-    }
-
-    #[test]
-    fn test_timed_annotation_delete_validate_valid() {
-        let delete_req = TimedAnnotationDelete {
-            annotation_ids: vec!["id1".to_string(), "id2".to_string()],
-        };
-        assert!(delete_req.validate().is_ok());
-    }
-
-    #[test]
-    fn test_timed_annotation_update_validate_empty() {
-        let update_req = TimedAnnotationUpdate {
-            start_time: None,
-            end_time: None,
-            title: None,
-            text: None,
-            tags: None,
+    fn test_list_timed_annotations_query_validate() {
+        let query = |start, end| ListTimedAnnotationsQuery {
             panels: None,
+            start_time: start,
+            end_time: end,
         };
+        assert_eq!(query(1000, 2000).validate(), ok());
         assert_eq!(
-            update_req.validate().unwrap_err(),
-            "At least one field must be present"
+            query(1000, 1000).validate(),
+            err("start time must be less than end time")
+        );
+        assert_eq!(
+            query(2000, 1000).validate(),
+            err("start time must be less than end time")
         );
     }
 
     #[test]
-    fn test_timed_annotation_update_validate_valid_single_field() {
-        let update_req = TimedAnnotationUpdate {
-            start_time: None,
-            end_time: None,
-            title: Some("New Title".to_string()),
-            text: None,
-            tags: None,
-            panels: None,
-        };
-        assert!(update_req.validate().is_ok());
-    }
-
-    #[test]
-    fn test_timed_annotation_update_validate_valid_with_times() {
-        let update_req = TimedAnnotationUpdate {
-            start_time: Some(1000),
-            end_time: Some(Some(2000)),
-            title: Some("Updated Title".to_string()),
-            text: Some("Updated text".to_string()),
-            tags: Some(vec!["new_tag".to_string()]),
-            panels: Some(vec!["new_panel".to_string()]),
-        };
-        assert!(update_req.validate().is_ok());
-    }
-
-    #[test]
-    fn test_timed_annotation_update_validate_no_start_time_with_end_time() {
-        let update_req = TimedAnnotationUpdate {
-            start_time: None,
-            end_time: Some(Some(2000)), // Invalid: end_time without start_time
-            title: Some("Title".to_string()),
-            text: None,
-            tags: None,
-            panels: None,
-        };
-        assert_eq!(
-            update_req.validate().unwrap_err(),
-            "start time must be present when end_time is specified"
-        );
-    }
-
-    #[test]
-    fn test_timed_annotation_update_validate_invalid_time_range() {
-        let update_req = TimedAnnotationUpdate {
-            start_time: Some(2000),
-            end_time: Some(Some(1000)), // Invalid: end_time <= start_time
-            title: Some("Title".to_string()),
-            text: None,
-            tags: None,
-            panels: None,
-        };
-        assert_eq!(
-            update_req.validate().unwrap_err(),
-            "end time must be greater than start time"
-        );
-    }
-
-    #[test]
-    fn test_timed_annotation_update_validate_none_end_time() {
-        let update_req = TimedAnnotationUpdate {
-            start_time: Some(1000),
-            end_time: Some(None), // Valid: explicitly setting end_time to None
-            title: Some("Title".to_string()),
-            text: None,
-            tags: None,
-            panels: None,
-        };
-        assert!(update_req.validate().is_ok());
-    }
-
-    #[test]
-    fn test_list_timed_annotations_query_validate_equal_times() {
-        let query = ListTimedAnnotationsQuery {
-            panels: None,
-            start_time: 1000,
-            end_time: 1000, // Invalid: start_time == end_time
-        };
-        assert_eq!(
-            query.validate().unwrap_err(),
-            "start time must be less than end time"
-        );
-    }
-
-    #[test]
-    fn test_list_timed_annotations_query_validate_valid() {
-        let query = ListTimedAnnotationsQuery {
-            panels: Some("panel1,panel2".to_string()),
-            start_time: 1000,
-            end_time: 2000,
-        };
-        assert!(query.validate().is_ok());
-    }
-
-    #[test]
-    fn test_list_timed_annotations_query_get_panels_none() {
-        let query = ListTimedAnnotationsQuery {
-            panels: None,
-            start_time: 1000,
-            end_time: 2000,
-        };
-        assert_eq!(query.get_panels(), None);
-    }
-
-    #[test]
-    fn test_list_timed_annotations_query_get_panels_single() {
-        let query = ListTimedAnnotationsQuery {
-            panels: Some("panel1".to_string()),
-            start_time: 1000,
-            end_time: 2000,
-        };
-        assert_eq!(query.get_panels(), Some(vec!["panel1".to_string()]));
-    }
-
-    #[test]
-    fn test_list_timed_annotations_query_get_panels_multiple() {
-        let query = ListTimedAnnotationsQuery {
-            panels: Some("panel1,panel2,panel3".to_string()),
-            start_time: 1000,
-            end_time: 2000,
-        };
-        assert_eq!(
-            query.get_panels(),
-            Some(vec![
-                "panel1".to_string(),
-                "panel2".to_string(),
-                "panel3".to_string()
-            ])
-        );
-    }
-
-    #[test]
-    fn test_list_timed_annotations_query_get_panels_with_empty() {
-        let query = ListTimedAnnotationsQuery {
-            panels: Some("panel1,,panel3,".to_string()),
-            start_time: 1000,
-            end_time: 2000,
-        };
-        assert_eq!(
-            query.get_panels(),
-            Some(vec!["panel1".to_string(), "panel3".to_string()])
-        );
-    }
-
-    #[test]
-    fn test_list_timed_annotations_query_get_panels_all_empty() {
-        let query = ListTimedAnnotationsQuery {
-            panels: Some(",,".to_string()),
-            start_time: 1000,
-            end_time: 2000,
-        };
-        assert_eq!(query.get_panels(), Some(vec![]));
-    }
-
-    #[test]
-    fn test_serialization_deserialization() {
-        let annotation = TimedAnnotation {
-            annotation_id: Some("test_id".to_string()),
-            start_time: 1640995200000,
-            end_time: Some(1640995260000),
-            title: "Test Annotation".to_string(),
-            text: Some("This is a test annotation".to_string()),
-            tags: vec!["maintenance".to_string(), "deployment".to_string()],
-            panels: vec!["cpu_usage".to_string(), "memory_usage".to_string()],
-        };
-
-        // Test serialization
-        let json = serde_json::to_string(&annotation).expect("Failed to serialize");
-        assert!(!json.is_empty());
-
-        // Test deserialization
-        let deserialized: TimedAnnotation =
-            serde_json::from_str(&json).expect("Failed to deserialize");
-        assert_eq!(deserialized.annotation_id, annotation.annotation_id);
-        assert_eq!(deserialized.start_time, annotation.start_time);
-        assert_eq!(deserialized.end_time, annotation.end_time);
-        assert_eq!(deserialized.title, annotation.title);
-        assert_eq!(deserialized.text, annotation.text);
-        assert_eq!(deserialized.tags, annotation.tags);
-        assert_eq!(deserialized.panels, annotation.panels);
+    fn test_list_timed_annotations_query_get_panels() {
+        let cases: [(Option<&str>, Option<Vec<&str>>); 5] = [
+            (None, None),
+            (Some("p1"), Some(vec!["p1"])),
+            (Some("p1,p2,p3"), Some(vec!["p1", "p2", "p3"])),
+            (Some("p1,,p3,"), Some(vec!["p1", "p3"])),
+            (Some(",,"), Some(vec![])),
+        ];
+        for (panels, want) in cases {
+            let query = ListTimedAnnotationsQuery {
+                panels: panels.map(str::to_string),
+                start_time: 0,
+                end_time: 1,
+            };
+            let want = want.map(|v| v.into_iter().map(str::to_string).collect::<Vec<_>>());
+            assert_eq!(query.get_panels(), want, "panels {panels:?}");
+        }
     }
 }

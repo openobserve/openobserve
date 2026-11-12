@@ -17,11 +17,18 @@ import { markRaw } from "vue";
 import { generateTraceContext } from "@/utils/zincutils";
 import { createPromQLChunkProcessor } from "./promqlChunkProcessor";
 import { computeStepSeconds } from "@/utils/metrics/metricDefaults";
+import { promqlSeriesCap } from "@/utils/dashboard/convertStateTimelineData";
+import { isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import { HEATMAP_MAX_COLUMNS } from "@/utils/dashboard/heatmapDefaults";
 import { parseSearchError } from "@/utils/query/searchError";
 import { gt } from "@/types/i18n";
 import { convertOffsetToSeconds } from "@/utils/dashboard/dateTimeUtils";
-import { formulaInputs, isFormulaQuery, substituteFormula } from "@/utils/dashboard/promql/formula";
+import {
+  formulaInputs,
+  isFormulaQuery,
+  queryRefs,
+  substituteFormula,
+} from "@/utils/dashboard/promql/formula";
 
 // Fixed-length units only (ms): a time shift moves both ends of the window by one delta.
 const FIXED_OFFSET_MS: Record<string, number> = {
@@ -44,10 +51,11 @@ type QueryPlan = { query: string; skip: boolean; error?: string };
 // A hidden query is never sent: a formula embeds its inputs' text instead.
 const planQueries = (queries: any[], texts: string[]): QueryPlan[] => {
   const inputs = formulaInputs(queries, texts);
+  const refs = queryRefs(queries);
   return queries.map((it, i) => {
     if (it.config?.hide) return { query: texts[i], skip: true };
     if (!isFormulaQuery(it)) return { query: texts[i], skip: false };
-    const out = substituteFormula(texts[i], inputs);
+    const out = substituteFormula(texts[i], inputs, refs[i]);
     return "error" in out
       ? { query: texts[i], skip: true, error: out.error }
       : { query: out.expr, skip: false };
@@ -145,6 +153,7 @@ export const usePanelPromQLExecutor = (ctx: {
       const queryResults: any[] = [];
       const queryMetadata: any[] = [];
       const completedQueries = new Set<number>(); // Track completed streams
+      const streamProgress: number[] = [];
       // Merged across streams so a later stream cannot hide an earlier one's truncation.
       const streamStats: {
         totalMetricsReceived: number;
@@ -177,6 +186,12 @@ export const usePanelPromQLExecutor = (ctx: {
       );
       const totalStreams = nextShiftedIndex - plans.filter((plan) => plan.skip).length;
       const chunkProcessors: ReturnType<typeof createPromQLChunkProcessor>[] = [];
+      // Each stream reports its own percent; one shared bar must show their mean or it jumps between streams.
+      const setStreamProgress = (queryIndex: number, percent: number) => {
+        streamProgress[queryIndex] = percent;
+        const sum = streamProgress.reduce((total, p) => total + (p ?? 0), 0);
+        state.loadingProgressPercentage = Math.round(sum / Math.max(totalStreams, 1));
+      };
 
       // An empty slot keeps data[i] and metadata.queries[i] on panel query i.
       plans.forEach((plan, i) => {
@@ -294,7 +309,10 @@ export const usePanelPromQLExecutor = (ctx: {
                     : panelStepValue
                       ? panelStepValue
                       : (heatmapStepValue ?? "0"),
-                  query_type: it.config.query_type || "range", // Add query_type from config (default: range)
+                  // A state timeline needs samples over time, so it ignores a stored instant setting.
+                  query_type: isRowTimeline(panelSchema.value?.type)
+                    ? "range"
+                    : it.config.query_type || "range",
                 },
                 type: "promql" as const,
                 traceId: traceId,
@@ -313,7 +331,7 @@ export const usePanelPromQLExecutor = (ctx: {
               };
 
               // Get series limit from config
-              const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
+              const maxSeries = promqlSeriesCap(panelSchema.value?.type, store.state?.zoConfig);
 
               const isShifted = queryIndex !== panelQueryIndex;
               // Create chunk processor for efficient metric merging
@@ -332,7 +350,7 @@ export const usePanelPromQLExecutor = (ctx: {
               const handlePromQLResponse = (data: any, res: any) => {
                 if (isSuperseded()) return;
                 if (res.type === "event_progress") {
-                  state.loadingProgressPercentage = res?.content?.percent ?? 0;
+                  setStreamProgress(queryIndex, res?.content?.percent ?? 0);
                   state.isPartialData = true;
                 }
                 if (res?.type === "promql_metadata") {
@@ -371,6 +389,7 @@ export const usePanelPromQLExecutor = (ctx: {
                 }
                 // Mark this query as completed (even with error)
                 completedQueries.add(queryIndex);
+                setStreamProgress(queryIndex, 100);
 
                 // parseSearchError unwraps the backend's internal error envelope
                 // ("Error during planning: ErrorCode# {...}") into a readable
@@ -399,6 +418,7 @@ export const usePanelPromQLExecutor = (ctx: {
                 }
                 // Mark this query as completed
                 completedQueries.add(queryIndex);
+                setStreamProgress(queryIndex, 100);
 
                 // A shifted stream that finished first chose its cap before this primary's series were known.
                 if (!isShifted) {

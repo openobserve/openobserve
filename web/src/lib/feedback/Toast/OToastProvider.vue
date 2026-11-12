@@ -15,8 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from "vue";
 import { ToastProvider, ToastViewport } from "reka-ui";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useToast, toastRecords } from "./useToast";
+import { copyConfirm, dismissCopyConfirm, trackActivations } from "./copyConfirm";
 import { viewportPositionClasses } from "./OToastProvider.types";
 import type { ToastPosition } from "./OToast.types";
 import OToast from "./OToast.vue";
@@ -32,6 +36,42 @@ const positions: ToastPosition[] = ["bottom-center"];
 function toastsForPosition(pos: ToastPosition) {
   return toasts.filter((t) => t.position === pos);
 }
+
+// The tooltip adopts a new anchor only after rendering, so opening in that render places the bubble top-left.
+const placedAnchor = shallowRef<HTMLElement | null>(null);
+let placeFrame = 0;
+watch(
+  () => copyConfirm.anchor,
+  (anchor) => {
+    placedAnchor.value = null;
+    placeFrame = requestAnimationFrame(() => {
+      if (copyConfirm.anchor === anchor) placedAnchor.value = anchor;
+    });
+  },
+  { flush: "post", immediate: true },
+);
+const failed = computed(() => copyConfirm.tone === "error");
+// `!` because OTooltip's own surface classes would otherwise win or lose by stylesheet order.
+const bubbleClass = computed(() =>
+  failed.value
+    ? "bg-copy-confirm-error-bg! border border-status-error-text/40"
+    : "bg-copy-confirm-bg! text-copy-confirm-text!",
+);
+const bubbleArrowClass = computed(() =>
+  failed.value ? "fill-copy-confirm-error-bg" : "fill-copy-confirm-bg",
+);
+const bubbleOpen = computed(
+  () => copyConfirm.open && !!copyConfirm.anchor && placedAnchor.value === copyConfirm.anchor,
+);
+
+let stopTracking: (() => void) | null = null;
+onMounted(() => (stopTracking = trackActivations()));
+// The bubble lives here, so its timers and scroll fallback must not outlive the provider.
+onBeforeUnmount(() => {
+  stopTracking?.();
+  dismissCopyConfirm();
+  cancelAnimationFrame(placeFrame);
+});
 
 function handleOpenChange(id: string, open: boolean): void {
   if (!open) {
@@ -55,4 +95,36 @@ function handleOpenChange(id: string, open: boolean): void {
     />
     <ToastViewport :class="viewportPositionClasses[pos]" />
   </ToastProvider>
+  <OTooltip
+    :anchor="copyConfirm.anchor"
+    :open="bubbleOpen"
+    :side="copyConfirm.side"
+    :content-class="bubbleClass"
+    :arrow-class="bubbleArrowClass"
+    @update:open="(open) => open || dismissCopyConfirm()"
+  >
+    <template #content>
+      <span
+        :class="['inline-flex items-center gap-1', failed && 'text-status-error-text']"
+        data-test="copy-confirm"
+        :data-test-side="copyConfirm.side"
+        :data-test-variant="copyConfirm.tone"
+        :data-test-message="copyConfirm.message"
+      >
+        <OIcon :name="failed ? 'error-outline' : 'check'" size="sm" />{{ copyConfirm.message }}
+      </span>
+    </template>
+  </OTooltip>
+  <div aria-live="polite" aria-atomic="true" class="sr-only" data-test="copy-confirm-announcer">
+    {{ copyConfirm.open && !failed ? copyConfirm.message : "" }}
+  </div>
+  <!-- An alert is announced when it is inserted, so it exists only while the failure shows. -->
+  <div
+    v-if="copyConfirm.open && failed"
+    role="alert"
+    class="sr-only"
+    data-test="copy-confirm-alert"
+  >
+    {{ copyConfirm.message }}
+  </div>
 </template>

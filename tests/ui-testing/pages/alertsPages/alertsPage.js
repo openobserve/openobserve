@@ -19,6 +19,7 @@ import fs from 'fs';
 import { CommonActions } from '../commonActions';
 import { AlertCreationWizard } from './alertCreationWizard.js';
 import { openOSelectDropdown } from './oselectHelpers.js';
+import { discardEditorDraftIfAsked } from './editorDraftHelpers.js';
 import { AlertManagement } from './alertManagement.js';
 import { AlertBulkOperations } from './alertBulkOperations.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -89,15 +90,17 @@ export class AlertsPage {
             queryTabsContainer: '[data-test="step2-query-tabs"]',
             viewEditorButton: '[data-test="step2-view-editor-btn"]',
             conditionsTabsContainer: '[data-test="scheduled-alert-tabs"]',
-            conditionColumnSelect: '[data-test="alert-conditions-select-column"]',
-            operatorSelect: '[data-test="alert-conditions-operator-select"]',
-            conditionValueInput: '[data-test="alert-conditions-value-input"]',
-            addConditionButton: '[data-test="alert-conditions-add-condition-btn"]',
-            addFirstConditionButton: '[data-test="alert-conditions-add-btn"]',
-            addConditionGroupButton: '[data-test="alert-conditions-add-condition-group-btn"]',
-            deleteConditionButton: '[data-test="alert-conditions-delete-condition-btn"]',
-            columnInput: '[data-test="alert-conditions-select-column"]',
-            valueInput: '[data-test="alert-conditions-value-input"]',
+            // The shared condition builder (FilterBuilder, prefix "alert-conditions"): one chip per
+            // condition with -field / -operator / -value / -remove parts; the picker adds new ones.
+            conditionColumnSelect: '[data-test^="alert-conditions-chip-"][data-test$="-field"]',
+            operatorSelect: '[data-test^="alert-conditions-chip-"][data-test$="-operator"]',
+            conditionValueInput: '[data-test^="alert-conditions-chip-"][data-test$="-value"]',
+            addConditionButton: '[data-test="alert-conditions-add-condition"]',
+            addFirstConditionButton: '[data-test="alert-conditions-empty-row"]',
+            addConditionGroupButton: '[data-test="alert-conditions-add-group"]',
+            deleteConditionButton: '[data-test^="alert-conditions-chip-"][data-test$="-remove"]',
+            columnInput: '[data-test^="alert-conditions-chip-"][data-test$="-field"]',
+            valueInput: '[data-test^="alert-conditions-chip-"][data-test$="-value"]',
             stepQueryConfig: '.step-query-config',
 
             // Step 3: Compare with Past (Scheduled only)
@@ -105,14 +108,7 @@ export class AlertsPage {
             multiTimeRangeDeleteButton: '[data-test="multi-time-range-alerts-delete-btn"]',
             goToViewEditorButton: '[data-test="go-to-view-editor-btn"]',
 
-            // Step 5: Deduplication (Scheduled only — in Advanced tab). Use data-test
-            // hooks from Deduplication.vue; the old `.step-deduplication .alert-v3-select`
-            // class chain no longer exists on newer builds (e.g. alpha pre-cloud).
-            stepDeduplication: '[data-test="alert-dedup-fingerprint-fields"]',
-            stepDeduplicationFingerprintSelect: '[data-test="alert-dedup-fingerprint-fields"]',
-            stepDeduplicationTimeWindowInput: '[data-test="alert-dedup-time-window-field"]',
-
-            // Step 6: Advanced settings
+            // Step 5: Advanced settings
             contextAttributesAddButton: '[data-test="alert-variables-add-btn"]',
             contextAttributeKeyInput: '[data-test="alert-variables-key-input"]',
             contextAttributeValueInput: '[data-test="alert-variables-value-input"]',
@@ -179,7 +175,7 @@ export class AlertsPage {
             alertUpdatedMessage: 'Alert updated successfully.',
             alertClonedMessage: 'Alert Cloned Successfully',
             alertDeletedMessage: 'Alert deleted',
-            deleteConfirmText: 'Are you sure you want to delete this alert?',
+            deleteConfirmText: /Are you sure you want to delete the .+ alert\?/,
             deleteButtonText: 'Delete',
             containsOperatorText: 'Contains',
             arrowDropDownText: 'arrow_drop_down',
@@ -207,6 +203,7 @@ export class AlertsPage {
             alertCloneButton: '[data-test="alert-list-{alertName}-clone-alert"]',
             alertMoreOptions: '[data-test="alert-list-{alertName}-more-options"]',
             confirmButton: '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]',
+            confirmDialogProviderPrimary: '[data-test="confirm-dialog-provider"] [data-test="o-dialog-primary-btn"]',
 
             // Alert movement locators
             selectAllCheckboxRowName: '# Name Owner Period Frequency',
@@ -275,15 +272,6 @@ export class AlertsPage {
             // Telemetry tab state selectors
             loadingSpinner: '[data-test="incident-telemetry-loading-indicator"]',
 
-            // RCA Analysis locators (inside incident detail)
-            rcaAnalysisContainer: '[data-test="rca-analysis-container"]',
-            triggerRcaButton: '[data-test="trigger-rca-btn"]',
-            rcaStreamContent: '[data-test="rca-stream-content"]',
-            rcaExistingContent: '[data-test="rca-existing-content"]',
-            rcaEmptyState: '[data-test="rca-empty-state"]',
-
-            // Table of contents locators (inside incident detail)
-            tocContainer: '[data-test="toc-container"]',
 
             // Import/Export locators
             alertImportButton: '[data-test="alert-import"]',
@@ -340,16 +328,6 @@ export class AlertsPage {
             // v3 AddAlert wizard tabs (OToggleGroupItem with data-test="add-alert-tab-{key}")
             addAlertTabCondition: '[data-test="add-alert-tab-condition"]',
             addAlertTabAdvanced: '[data-test="add-alert-tab-advanced"]',
-
-            // v3 Deduplication step (Advanced tab)
-            // OSelect wrapper has data-test, popover auto-derived suffix `-popover`,
-            // options auto-derived suffix `-option` with `data-test-value="<value>"` per item.
-            dedupFingerprintFieldsSelect: '[data-test="alert-dedup-fingerprint-fields"]',
-            dedupFingerprintFieldsTrigger: '[data-test="alert-dedup-fingerprint-fields-trigger"]',
-            dedupFingerprintFieldsPopover: '[data-test="alert-dedup-fingerprint-fields-popover"]',
-            dedupFingerprintFieldsOption: '[data-test="alert-dedup-fingerprint-fields-option"]',
-            dedupTimeWindowInput: '[data-test="alert-dedup-time-window"]',
-            dedupTimeWindowInputField: '[data-test="alert-dedup-time-window-field"]',
 
             // OToast (alerts module - success / error variants)
             oToastSuccess: '[data-test-variant="success"]',
@@ -753,26 +731,14 @@ export class AlertsPage {
         return result;
     }
 
-    async createScheduledAlertWithSQL(streamName, destinationName, randomValue) {
-        const result = await this.creationWizard.createScheduledAlertWithSQL(streamName, destinationName, randomValue);
+    async createScheduledAlertWithSQL(streamName, destinationName, randomValue, sqlQuery = null) {
+        const result = await this.creationWizard.createScheduledAlertWithSQL(streamName, destinationName, randomValue, sqlQuery);
         this.currentAlertName = result;
         return result;
     }
 
     async createAlertWithMultipleConditions(streamName, destinationName, randomValue) {
         const result = await this.creationWizard.createAlertWithMultipleConditions(streamName, destinationName, randomValue);
-        this.currentAlertName = result;
-        return result;
-    }
-
-    async createScheduledAlertWithDeduplication(streamName, destinationName, randomValue, dedupConfig = {}) {
-        const result = await this.creationWizard.createScheduledAlertWithDeduplication(streamName, destinationName, randomValue, dedupConfig);
-        this.currentAlertName = result;
-        return result;
-    }
-
-    async createScheduledAlertWithDedupForValidation(streamName, column, value, destinationName, randomValue, dedupConfig = {}) {
-        const result = await this.creationWizard.createScheduledAlertWithDedupForValidation(streamName, column, value, destinationName, randomValue, dedupConfig);
         this.currentAlertName = result;
         return result;
     }
@@ -811,14 +777,6 @@ export class AlertsPage {
 
     async deleteCondition(index = 0) {
         return this.creationWizard.deleteCondition(index);
-    }
-
-    async verifyDeduplicationStepVisible() {
-        return this.creationWizard.verifyDeduplicationStepVisible();
-    }
-
-    async getDeduplicationConfig() {
-        return this.creationWizard.getDeduplicationConfig();
     }
 
     // ==================== DELEGATE TO MANAGEMENT ====================
@@ -915,30 +873,10 @@ export class AlertsPage {
         return this.management.verifyAlertTriggerInValidationStream(alertName, validationStreamName, logsPage, waitTimeMs);
     }
 
-    // ==================== ALERT EDIT — DEDUP REGRESSION ====================
-
-    async waitForAlertListReady(timeout) {
-        return this.management.waitForAlertListReady(timeout);
-    }
-
-    async openAlertEditByName(alertName) {
-        return this.management.openAlertEditByName(alertName);
-    }
+    // ==================== ALERT EDIT ====================
 
     async openAdvancedTab() {
         return this.management.openAdvancedTab();
-    }
-
-    async getSelectedFingerprintFields() {
-        return this.management.getSelectedFingerprintFields();
-    }
-
-    async removeAllFingerprintFields() {
-        return this.management.removeAllFingerprintFields();
-    }
-
-    async submitAlertEdit() {
-        return this.management.submitAlertEdit();
     }
 
     // ==================== ALERT DETAIL PAGE ====================
@@ -1474,8 +1412,10 @@ export class AlertsPage {
     async waitForEvaluationHistoryRow({ attempts = 8 } = {}) {
         const row = this.getAlertHistoryDataRowLocator().first();
         const refresh = this.page.locator(this.locators.alertDetailsRefreshButton).first();
+        // isVisible() ignores its timeout and returns at once, so waitFor is what gives each attempt its 5s.
+        const rowShows = () => row.waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false);
         for (let i = 0; i < attempts; i++) {
-            if (await row.isVisible({ timeout: 5000 }).catch(() => false)) return true;
+            if (await rowShows()) return true;
             // The history fetch is single-shot on load, so re-issue it; a reload is the fallback when the toolbar is absent.
             if (await refresh.isVisible().catch(() => false)) {
                 await refresh.click().catch(() => {});
@@ -1483,7 +1423,7 @@ export class AlertsPage {
                 await this.page.reload({ waitUntil: 'networkidle' }).catch(() => {});
             }
         }
-        return await row.isVisible({ timeout: 5000 }).catch(() => false);
+        return await rowShows();
     }
 
     /**
@@ -1784,7 +1724,7 @@ export class AlertsPage {
             // until the row renders. Deterministic (each probe waits for the actual cell); no
             // reliance on one slow fetch landing inside a fixed window.
             const inputField = this.page.locator(this.locators.alertSearchInputField);
-            const listSkeleton = this.page.locator('[data-test="o2-table-skeleton-body"]');
+            const listSkeleton = this.page.locator('[data-test="o2-table"][data-test-loading="true"]');
             let found = false;
             for (let attempt = 1; attempt <= 4 && !found; attempt++) {
                 if (attempt === 3) {
@@ -1806,7 +1746,7 @@ export class AlertsPage {
         }
 
         // Final deterministic assertions (the row is present by now under normal + slow paths).
-        await this.page.locator('[data-test="o2-table-skeleton-body"]').first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
+        await this.page.locator('[data-test="o2-table"][data-test-loading="true"]').first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
         await expect(this.page.getByRole('cell', { name: nameToVerify }).first()).toBeVisible({ timeout: 15000 });
         await expect(this.page.locator(this.locators.pauseStartAlert.replace('{alertName}', nameToVerify)).first()).toBeVisible({ timeout: 10000 });
     }
@@ -1969,6 +1909,7 @@ export class AlertsPage {
 
             // Try clicking with force to bypass potential overlays
             await backButton.click({ force: true, timeout: 10000 });
+            await discardEditorDraftIfAsked(this.page);
             testLogger.info('Closed alert wizard via back button');
         } catch (error) {
             testLogger.warn('Back button click failed, trying close button', { error: error.message });
@@ -2395,6 +2336,7 @@ export class AlertsPage {
         testLogger.info(`Target lifecycle row index: ${targetIndex}`);
 
         await allRows.nth(targetIndex).locator(this.locators.incidentAckButton).click();
+        await this.page.locator(this.locators.confirmDialogProviderPrimary).click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Clicked acknowledge button');
     }
@@ -2416,6 +2358,7 @@ export class AlertsPage {
         const resolveButton = row.locator(this.locators.incidentResolveButton);
         await resolveButton.waitFor({ state: 'visible', timeout: 10000 });
         await resolveButton.click();
+        await this.page.locator(this.locators.confirmDialogProviderPrimary).click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Clicked resolve button');
     }
@@ -2429,6 +2372,7 @@ export class AlertsPage {
         const reopenButton = row.locator(this.locators.incidentReopenButton);
         await reopenButton.waitFor({ state: 'visible', timeout: 10000 });
         await reopenButton.click();
+        await this.page.locator(this.locators.confirmDialogProviderPrimary).click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Clicked reopen button');
     }
@@ -2921,41 +2865,6 @@ export class AlertsPage {
         testLogger.info('No triggers message visible');
     }
 
-    /**
-     * Verify RCA analysis container is visible in detail view
-     */
-    async expectRcaContainerVisible() {
-        await expect(this.page.locator(this.locators.rcaAnalysisContainer)).toBeVisible({ timeout: 10000 });
-        testLogger.info('RCA analysis container visible');
-    }
-
-    /**
-     * Check if RCA has existing content or is in empty state
-     * @returns {Promise<'content'|'empty'|'hidden'>}
-     */
-    async getRcaState() {
-        const existing = this.page.locator(this.locators.rcaExistingContent);
-        const empty = this.page.locator(this.locators.rcaEmptyState);
-
-        if (await existing.isVisible({ timeout: 3000 }).catch(() => false)) {
-            testLogger.info('RCA state: content');
-            return 'content';
-        }
-        if (await empty.isVisible({ timeout: 3000 }).catch(() => false)) {
-            testLogger.info('RCA state: empty');
-            return 'empty';
-        }
-        testLogger.info('RCA state: hidden');
-        return 'hidden';
-    }
-
-    /**
-     * Verify TOC container is visible in incident detail
-     */
-    async expectTocContainerVisible() {
-        await expect(this.page.locator(this.locators.tocContainer)).toBeVisible({ timeout: 10000 });
-        testLogger.info('TOC container visible');
-    }
 
     /**
      * Click refresh button on incidents list
@@ -3299,6 +3208,11 @@ export class AlertsPage {
         return ((await valueEl.textContent()) ?? '').trim();
     }
 
+    /** Display-mode alert name value element (OFormInlineEdit span, not an <input>). */
+    getAlertNameValueLocator() {
+        return this.page.locator('[data-test="add-alert-name-input-value"]').first();
+    }
+
     /**
      * Select stream type from dropdown
      * OSelect popover pattern: open trigger, wait for popover, click option keyed by data-test-value (§4)
@@ -3627,7 +3541,7 @@ export class AlertsPage {
             if (!monaco?.editor?.getEditors) return false;
             const editors = monaco.editor.getEditors();
             return editors && editors.length > 0;
-        }, { timeout: 15000 });
+        }, undefined, { timeout: 15000 });
 
         await this.page.evaluate((sql) => {
             const monaco = window.monaco;
@@ -3755,6 +3669,7 @@ export class AlertsPage {
      */
     async clickBackButton() {
         await this.page.locator(this.locators.alertBackButton).first().click({ timeout: 15000 });
+        await discardEditorDraftIfAsked(this.page);
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
@@ -4281,6 +4196,40 @@ export class AlertsPage {
     }
 
     /**
+     * Click Run Query and return the status of the validating search it issues.
+     *
+     * Run Query sends `validate=true`, so a field-validation failure is a server
+     * 400 the dialog surfaces only as a transient toast. The response is awaited
+     * from BEFORE the click: clickRunQueryAndWait() syncs on the rendered preview,
+     * and a refused query renders nothing, so reading afterwards races the reply.
+     */
+    async runQueryAndGetValidationStatus() {
+        const response = this.page.waitForResponse(
+            (res) => res.request().method() === 'POST'
+                && res.url().includes('/_search')
+                && /[?&]validate=true/.test(res.url()),
+            { timeout: 45000 },
+        );
+        await this.page.locator(this.locators.runQueryButton).click();
+        const status = (await response).status();
+        testLogger.info('Validating search responded', { status });
+        return status;
+    }
+
+    /**
+     * The query editor's result pane rendered rows.
+     *
+     * `sql-output-editor` mounts only once `outputEvents` is non-empty, so its
+     * presence separates a query that returned data from one the server refused:
+     * a refusal leaves the pane on its empty-state icon.
+     */
+    async expectSqlOutputRendered() {
+        const output = this.page.locator('[data-test="sql-output-editor"]').first();
+        await expect(output).toBeVisible({ timeout: 30000 });
+        testLogger.info('Query editor rendered SQL results');
+    }
+
+    /**
      * The Query Result pane shows no all-windows chip.
      *
      * Asserted on the rendered copy, not on a styling class — the chip carries
@@ -4317,7 +4266,7 @@ export class AlertsPage {
      * Navigate through wizard steps by clicking Continue button multiple times
      * @param {number} times - Number of times to click Continue
      */
-    async navigateThroughWizardSteps(times = 5) {
+    async navigateThroughWizardSteps(times = 4) {
         for (let i = 0; i < times; i++) {
             const clicked = await this.clickContinueButton();
             if (!clicked) break;
@@ -4902,5 +4851,62 @@ export class AlertsPage {
     /** "Alert deleted" toast text */
     getAlertDeletedText() {
         return this.page.getByText(this.locators.alertDeletedMessage);
+    }
+
+    // ===== DOWNTIMES: row mute, Muted chip and last outcome =====
+
+    /** A fresh load, which the Muted chip needs after a mute. */
+    async gotoAlertListFolder(folderId, { tab = null } = {}) {
+        const org = process.env.ORGNAME || 'default';
+        const tabQuery = tab ? `&tab=${tab}` : '';
+        await this.page.goto(`/web/alerts?org_identifier=${org}&folder=${folderId}${tabQuery}`);
+        await expect(this.page.locator('[data-test="alert-list-table"]')).toBeVisible({ timeout: 30000 });
+    }
+
+    _alertRowByName(name) {
+        return this.page.locator('[data-test^="o2-table-row-"]').filter({ has: this.page.locator(`[data-test="alert-list-${name}-name-cell"]`) });
+    }
+
+    async muteAlertPreset(name, preset) {
+        await this.page.locator(`[data-test="alert-list-${name}-more-options"]`).click();
+        await this.page.locator(`[data-test="alert-list-${name}-mute-${preset}"]`).click();
+    }
+
+    async openMuteUntil(name) {
+        await this.page.locator(`[data-test="alert-list-${name}-more-options"]`).click();
+        await this.page.locator(`[data-test="alert-list-${name}-mute-until"]`).click();
+    }
+
+    async bulkMute(names, preset) {
+        for (const name of names) {
+            const box = this._alertRowByName(name).locator(this.locators.tableCheckbox);
+            await box.click();
+            await expect(box).toHaveAttribute('data-state', 'checked');
+        }
+        await this.page.locator('[data-test="alert-list-mute-alerts-btn"]').click();
+        await this.page.locator(`[data-test="alert-list-bulk-mute-${preset}"]`).click();
+    }
+
+    async expectMutedChip(name, visible = true, pattern = /^Muted · ends in /) {
+        const chip = this.page.locator(`[data-test="alert-list-${name}-muted"]`);
+        if (visible) await expect(chip).toHaveText(pattern, { timeout: 20000 });
+        else {
+            // Absence only means something once the row itself has rendered.
+            await expect(this.page.locator(`[data-test="alert-list-${name}-name-cell"]`)).toBeVisible({ timeout: 20000 });
+            await expect(chip).toHaveCount(0, { timeout: 20000 });
+        }
+    }
+
+    async expectLastOutcome(name, text) {
+        await expect(this.page.locator(`[data-test="alert-list-${name}-last-outcome"]`)).toHaveText(text, { timeout: 20000 });
+    }
+
+    /** Throws when no element renders exactly the full name, since measuring the whole cell could report "not clipped" by accident. */
+    async isAlertNameClipped(name) {
+        return this.page.locator(`[data-test="alert-list-${name}-name-cell"]`).evaluate((cell, n) => {
+            const el = [...cell.querySelectorAll('*')].find((e) => e.textContent.trim() === n && [...e.children].every((c) => c.textContent.trim() !== n));
+            if (!el) throw new Error(`no element in the name cell of "${n}" renders its full name`);
+            return el.scrollWidth > el.clientWidth;
+        }, name);
     }
 }

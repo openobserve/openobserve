@@ -83,6 +83,16 @@ fn create_service_streams_dimensions_org_dimension_value_hash_idx_stmnt() -> Ind
         .to_owned()
 }
 
+#[derive(DeriveIden)]
+enum ServiceStreamsDimensions {
+    Table,
+    Id,
+    OrgId,
+    DimensionName,
+    ValueHash,
+    DimensionValue,
+}
+
 #[cfg(test)]
 mod tests {
     use sea_query::SqliteQueryBuilder;
@@ -101,14 +111,4 @@ mod tests {
             .build(SqliteQueryBuilder);
         assert!(sql.contains(SERVICE_STREAMS_DIMENSIONS_ORG_DIMENSION_VALUE_HASH_IDX));
     }
-}
-
-#[derive(DeriveIden)]
-enum ServiceStreamsDimensions {
-    Table,
-    Id,
-    OrgId,
-    DimensionName,
-    ValueHash,
-    DimensionValue,
 }

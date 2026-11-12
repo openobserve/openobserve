@@ -16,9 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, inject, toRef } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { CodeBlockChrome, CodeBlockCopyPayload } from "@/lib/core/Code/OCodeBlock.types";
 import { useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
@@ -40,32 +41,48 @@ const props = withDefaults(
 );
 
 const { t } = useI18nTyped();
-const router = useRouter();
+const route = useRoute();
 const openTokenPicker = inject(OPEN_TOKEN_PICKER, null);
 const snippetCopied = inject(FIRST_EVENT_SNIPPET_COPIED, null);
 
-const { code, codeMasked, needsPasscode, forbidden, tokenName } = useCredentialSnippet(
-  toRef(props, "content"),
-);
+const { code, codeMasked, needsPasscode, forbidden, tokenName, ready, hasCredential } =
+  useCredentialSnippet(toRef(props, "content"));
 
 const dataTest = computed(() => `ingestion-${props.slug}-code-block`);
+// an empty passcode substitutes into a valid-looking snippet that answers 401
+const awaitingCredential = computed(() => needsPasscode.value && !ready.value);
+// a settled read can still carry no token, so readiness alone does not make the snippet usable
+const credentialUnavailable = computed(
+  () => needsPasscode.value && ready.value && !forbidden.value && !hasCredential.value,
+);
 const masked = computed(() =>
   needsPasscode.value && codeMasked.value !== code.value ? codeMasked.value : undefined,
 );
 
 const onCopy = ({ partial }: CodeBlockCopyPayload) => {
-  analytics.track("snippet_copied", { route: router?.currentRoute.value.name, partial });
+  analytics.track("snippet_copied", { route: route?.name, partial });
   snippetCopied?.();
 };
 </script>
 
 <template>
-  <!-- an empty passcode would substitute into a valid-looking but non-functional snippet -->
+  <OSkeleton
+    v-if="awaitingCredential"
+    type="rect"
+    class="my-3 h-20"
+    :data-test="`${dataTest}-loading`"
+  />
   <OBanner
-    v-if="forbidden && needsPasscode"
+    v-else-if="forbidden && needsPasscode"
     variant="warning"
     :data-test="`${dataTest}-passcode-forbidden`"
     :content="t('ingestion.passcodeForbiddenMessage')"
+  />
+  <OBanner
+    v-else-if="credentialUnavailable"
+    variant="warning"
+    :data-test="`${dataTest}-passcode-unavailable`"
+    :content="t('ingestion.passcodeUnavailableMessage')"
   />
   <div v-else :data-test="`${dataTest}-container`">
     <OCodeBlock

@@ -209,6 +209,7 @@ mod m20260928_000001_add_alert_recovery_destinations;
 mod m20261001_000001_add_anomaly_band_settings;
 mod m20261003_000001_create_rum_pa_tables;
 mod m20261004_000001_create_query_history;
+mod m20261005_000001_create_fleet;
 mod m20261006_000001_create_ai_chat_shares;
 mod m20261007_000001_create_ai_chat_turns;
 mod m20261007_000001_scope_alert_dedup_state_by_org;
@@ -224,9 +225,99 @@ mod m20261012_000001_create_alert_calibration_configs;
 mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
 mod m20261015_000001_reports_add_last_run_columns;
+mod m20261016_000001_create_rca_runs;
 mod m20261016_000001_create_rum_pa_app_settings;
+mod m20261017_000001_add_rca_run_progress_columns;
+mod m20261018_000001_create_rca_steering;
+mod m20261018_000001_create_slack_tables;
+mod m20261020_000001_create_eval_job_states_tables;
+mod m20261021_000001_create_public_dashboards;
+mod m20261021_000001_status_pages_add_favicon_img;
+mod m20261021_000002_add_search_type_to_search_queue;
+mod m20261024_000001_add_lease_to_org_cleanup_tasks;
+mod m20261025_000001_add_firing_started_at_to_alert_states;
+mod m20261025_000002_create_alert_acks;
+mod m20261025_000003_add_mute_targets_to_downtimes;
+mod m20261025_000004_create_slack_alert_messages;
+mod m20261025_000005_add_held_action_to_slack_link_requests;
+mod m20261026_000001_backfill_v1_rca_pointer;
+mod m20261026_000001_create_workflow_http_triggers;
+mod m20261026_000002_create_workflow_http_trigger_credentials;
+mod m20261026_000003_create_workflow_http_trigger_requests;
+mod m20261027_000001_alter_query_history;
+mod m20261028_000001_add_group_label_set_to_alert_states;
+mod m20261028_000001_add_llm_dataset_item_write_version;
+mod m20261029_000001_add_budget_to_online_eval_jobs;
+mod m20261029_000001_widen_alert_dedup_fingerprint;
+mod m20261030_000001_add_suppress_repeats_to_alerts;
+mod m20261030_000001_create_org_domain_ownership_table;
+mod m20261030_000002_create_org_domain_ownership_req_table;
+mod m20261101_000001_create_oncall_slack;
+mod m20261102_000001_add_workflow_run_data_run_id_index;
+mod m20261103_000001_add_status_streaks_to_synthetics;
+mod m20261120_000001_add_template_applies_to;
+mod m20261120_000002_rename_reserved_template_collisions;
+mod m20261120_000003_add_anomaly_template;
+mod m20261201_000001_add_synthetics_template;
+mod m20261210_000001_add_oncall_policy_template;
+mod m20261211_000001_add_templates_to_downtime_notifications;
+mod m20261212_000001_add_templates_to_oncall_response_events;
+mod m20261213_000001_retire_compiled_default_templates;
+mod m20261214_000001_templates_columns_to_text;
+mod m20261215_000001_add_alert_incident_title_template;
+mod m20261216_000001_rename_user_default_folders;
+mod m20261217_000001_add_alert_incidents_unresolved_index;
+mod m20261218_000001_add_security_case_to_alert_incidents;
+mod m20261219_000001_add_historical_to_alert_incidents;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
+
+pub(crate) use m20261021_000001_create_public_dashboards::forget_draft_migrations;
+pub(crate) use m20261218_000001_add_security_case_to_alert_incidents::forget_renamed_migrations;
+
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_public_dashboards_schema_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20261021_000001_create_public_dashboards::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+/// The search queue as migrations 109 and earlier leave it.
+#[cfg(test)]
+pub(crate) async fn create_search_queue_schema_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    let manager = SchemaManager::new(db);
+    m20241204_143100_create_table_search_queue::Migration
+        .up(&manager)
+        .await?;
+    m20251219_000001_add_org_id_to_search_queue::Migration
+        .up(&manager)
+        .await?;
+    m20261021_000002_add_search_type_to_search_queue::Migration
+        .up(&manager)
+        .await
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn create_fleet_collectors_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm::ConnectionTrait;
+
+    let manager = SchemaManager::new(db);
+    m20261005_000001_create_fleet::Migration
+        .up(&manager)
+        .await?;
+    // Folder rows are what fleet writes lock, so the fleet tests need the shared table too.
+    let backend = db.get_database_backend();
+    let mut folders =
+        sea_orm::Schema::new(backend).create_table_from_entity(super::entity::folders::Entity);
+    db.execute(backend.build(folders.if_not_exists())).await?;
+    Ok(())
+}
 
 #[cfg(test)]
 pub(crate) async fn create_llm_prompt_schema_for_test(
@@ -283,6 +374,11 @@ pub(crate) async fn create_composite_alert_tables_for_test(
     manager
         .alter_table(update::get_update_stmt_composites())
         .await?;
+    manager
+        .alter_table(
+            m20261215_000001_add_alert_incident_title_template::get_update_stmt_composites(),
+        )
+        .await?;
     Ok(())
 }
 
@@ -303,6 +399,11 @@ pub(crate) fn composite_alert_migration_sql_for_test(
             .to_string(),
         backend
             .build(&update::get_update_stmt_composites())
+            .to_string(),
+        backend
+            .build(
+                &m20261215_000001_add_alert_incident_title_template::get_update_stmt_composites(),
+            )
             .to_string(),
     ];
     sql.extend(
@@ -339,7 +440,20 @@ pub(crate) async fn create_downtime_notifications_for_test(
     db: &sea_orm::DatabaseConnection,
 ) -> Result<(), DbErr> {
     use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
     m20261009_000005_create_downtime_notifications::Migration
+        .up(&manager)
+        .await?;
+    m20261211_000001_add_templates_to_downtime_notifications::Migration
+        .up(&manager)
+        .await
+}
+
+#[cfg(test)]
+pub(crate) async fn create_alert_incidents_unresolved_index_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20261217_000001_add_alert_incidents_unresolved_index::Migration
         .up(&SchemaManager::new(db))
         .await
 }
@@ -365,6 +479,126 @@ pub(crate) async fn create_rum_pa_tables(db: &sea_orm::DatabaseConnection) -> Re
         .up(&manager)
         .await?;
     m20261016_000001_create_rum_pa_app_settings::Migration
+        .up(&manager)
+        .await
+}
+
+/// Apply only the Slack app tables, idempotently, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_slack_tables(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    m20261018_000001_create_slack_tables::create_all(db).await?;
+    m20261025_000004_create_slack_alert_messages::create_all(db).await?;
+    m20261025_000005_add_held_action_to_slack_link_requests::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+/// Builds `oncall_chat_messages` with its keys, which `create_table_from_entity` omits.
+#[cfg(test)]
+pub(crate) async fn create_oncall_chat_messages_for_test<C: sea_orm::ConnectionTrait>(
+    db: &C,
+) -> Result<(), DbErr> {
+    m20261101_000001_create_oncall_slack::create_messages(db).await
+}
+
+/// Apply only `alert_acks`, idempotently, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_alert_acks_table<C: sea_orm::ConnectionTrait>(
+    db: &C,
+) -> Result<(), DbErr> {
+    m20261025_000002_create_alert_acks::create_all(db).await
+}
+
+#[cfg(test)]
+pub(crate) async fn create_alert_states_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
+    m20260725_000001_create_alert_states_tables::Migration
+        .up(&manager)
+        .await?;
+    m20261025_000001_add_firing_started_at_to_alert_states::Migration
+        .up(&manager)
+        .await?;
+    m20261028_000001_add_group_label_set_to_alert_states::Migration
+        .up(&manager)
+        .await
+}
+
+/// Tables the Phase 2 migrations alter; `downtimes` is bare to skip its folder key.
+#[cfg(test)]
+pub(crate) async fn create_alert_slack_prerequisites_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm::ConnectionTrait;
+    use sea_orm_migration::MigrationTrait;
+    m20260725_000001_create_alert_states_tables::Migration
+        .up(&SchemaManager::new(db))
+        .await?;
+    m20261018_000001_create_slack_tables::create_all(db).await?;
+    db.execute_unprepared("CREATE TABLE IF NOT EXISTS downtimes (id varchar(27) PRIMARY KEY)")
+        .await?;
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn alert_slack_migrations_for_test() -> Vec<Box<dyn MigrationTrait>> {
+    vec![
+        Box::new(m20261025_000001_add_firing_started_at_to_alert_states::Migration),
+        Box::new(m20261025_000002_create_alert_acks::Migration),
+        Box::new(m20261025_000003_add_mute_targets_to_downtimes::Migration),
+        Box::new(m20261025_000004_create_slack_alert_messages::Migration),
+        Box::new(m20261025_000005_add_held_action_to_slack_link_requests::Migration),
+    ]
+}
+
+/// Run the v1 run-pointer backfill over the current rows, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn backfill_v1_rca_pointer(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
+    m20261026_000001_backfill_v1_rca_pointer::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+/// Apply the query_history table and its columns, idempotently, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_query_history_table(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    let manager = SchemaManager::new(db);
+    m20261004_000001_create_query_history::Migration
+        .up(&manager)
+        .await?;
+    m20261027_000001_alter_query_history::Migration
+        .up(&manager)
+        .await
+}
+
+/// Apply only the HTTP trigger tables and the tables they write, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_workflow_http_trigger_tables(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
+    m20260720_000001_create_workflow_run_data_table::Migration
+        .up(&manager)
+        .await?;
+    m20260820_000003_create_llm_secrets::Migration
+        .up(&manager)
+        .await?;
+    m20261026_000001_create_workflow_http_triggers::Migration
+        .up(&manager)
+        .await?;
+    m20261026_000002_create_workflow_http_trigger_credentials::Migration
+        .up(&manager)
+        .await?;
+    m20261026_000003_create_workflow_http_trigger_requests::Migration
+        .up(&manager)
+        .await?;
+    m20261102_000001_add_workflow_run_data_run_id_index::Migration
         .up(&manager)
         .await
 }
@@ -582,6 +816,50 @@ impl MigratorTrait for Migrator {
             Box::new(m20261013_000002_create_org_telephony::Migration),
             Box::new(m20261015_000001_reports_add_last_run_columns::Migration),
             Box::new(m20261016_000001_create_rum_pa_app_settings::Migration),
+            Box::new(m20261020_000001_create_eval_job_states_tables::Migration),
+            Box::new(m20261018_000001_create_slack_tables::Migration),
+            Box::new(m20261016_000001_create_rca_runs::Migration),
+            Box::new(m20261017_000001_add_rca_run_progress_columns::Migration),
+            Box::new(m20261018_000001_create_rca_steering::Migration),
+            Box::new(m20261021_000001_status_pages_add_favicon_img::Migration),
+            Box::new(m20261005_000001_create_fleet::Migration),
+            Box::new(m20261024_000001_add_lease_to_org_cleanup_tasks::Migration),
+            Box::new(m20261021_000001_create_public_dashboards::Migration),
+            Box::new(m20261021_000002_add_search_type_to_search_queue::Migration),
+            Box::new(m20261026_000001_backfill_v1_rca_pointer::Migration),
+            Box::new(m20261025_000001_add_firing_started_at_to_alert_states::Migration),
+            Box::new(m20261025_000002_create_alert_acks::Migration),
+            Box::new(m20261025_000003_add_mute_targets_to_downtimes::Migration),
+            Box::new(m20261025_000004_create_slack_alert_messages::Migration),
+            Box::new(m20261025_000005_add_held_action_to_slack_link_requests::Migration),
+            Box::new(m20261028_000001_add_group_label_set_to_alert_states::Migration),
+            Box::new(m20261029_000001_widen_alert_dedup_fingerprint::Migration),
+            Box::new(m20261027_000001_alter_query_history::Migration),
+            Box::new(m20261030_000001_add_suppress_repeats_to_alerts::Migration),
+            Box::new(m20261030_000001_create_org_domain_ownership_table::Migration),
+            Box::new(m20261030_000002_create_org_domain_ownership_req_table::Migration),
+            Box::new(m20261101_000001_create_oncall_slack::Migration),
+            Box::new(m20261103_000001_add_status_streaks_to_synthetics::Migration),
+            Box::new(m20261028_000001_add_llm_dataset_item_write_version::Migration),
+            Box::new(m20261026_000001_create_workflow_http_triggers::Migration),
+            Box::new(m20261026_000002_create_workflow_http_trigger_credentials::Migration),
+            Box::new(m20261026_000003_create_workflow_http_trigger_requests::Migration),
+            Box::new(m20261102_000001_add_workflow_run_data_run_id_index::Migration),
+            Box::new(m20261120_000001_add_template_applies_to::Migration),
+            Box::new(m20261120_000002_rename_reserved_template_collisions::Migration),
+            Box::new(m20261120_000003_add_anomaly_template::Migration),
+            Box::new(m20261201_000001_add_synthetics_template::Migration),
+            Box::new(m20261210_000001_add_oncall_policy_template::Migration),
+            Box::new(m20261211_000001_add_templates_to_downtime_notifications::Migration),
+            Box::new(m20261212_000001_add_templates_to_oncall_response_events::Migration),
+            Box::new(m20261213_000001_retire_compiled_default_templates::Migration),
+            Box::new(m20261214_000001_templates_columns_to_text::Migration),
+            Box::new(m20261215_000001_add_alert_incident_title_template::Migration),
+            Box::new(m20261216_000001_rename_user_default_folders::Migration),
+            Box::new(m20261217_000001_add_alert_incidents_unresolved_index::Migration),
+            Box::new(m20261218_000001_add_security_case_to_alert_incidents::Migration),
+            Box::new(m20261219_000001_add_historical_to_alert_incidents::Migration),
+            Box::new(m20261029_000001_add_budget_to_online_eval_jobs::Migration),
         ]
     }
 }
@@ -651,6 +929,61 @@ mod tests {
         (108, "m20261013_000002_create_org_telephony"),
         (109, "m20261015_000001_reports_add_last_run_columns"),
         (110, "m20261016_000001_create_rum_pa_app_settings"),
+        (111, "m20261020_000001_create_eval_job_states_tables"),
+        (112, "m20261018_000001_create_slack_tables"),
+        (113, "m20261016_000001_create_rca_runs"),
+        (114, "m20261017_000001_add_rca_run_progress_columns"),
+        (115, "m20261018_000001_create_rca_steering"),
+        (116, "m20261021_000001_status_pages_add_favicon_img"),
+        (117, "m20261005_000001_create_fleet"),
+        (118, "m20261024_000001_add_lease_to_org_cleanup_tasks"),
+        (119, "m20261021_000001_create_public_dashboards"),
+        (120, "m20261021_000002_add_search_type_to_search_queue"),
+        (121, "m20261026_000001_backfill_v1_rca_pointer"),
+        (
+            122,
+            "m20261025_000001_add_firing_started_at_to_alert_states",
+        ),
+        (123, "m20261025_000002_create_alert_acks"),
+        (124, "m20261025_000003_add_mute_targets_to_downtimes"),
+        (125, "m20261025_000004_create_slack_alert_messages"),
+        (
+            126,
+            "m20261025_000005_add_held_action_to_slack_link_requests",
+        ),
+        (127, "m20261028_000001_add_group_label_set_to_alert_states"),
+        (128, "m20261029_000001_widen_alert_dedup_fingerprint"),
+        (129, "m20261027_000001_alter_query_history"),
+        (130, "m20261030_000001_add_suppress_repeats_to_alerts"),
+        (
+            131,
+            "m20261030_000002_create_org_domain_ownership_req_table",
+        ),
+        (132, "m20261101_000001_create_oncall_slack"),
+        (133, "m20261103_000001_add_status_streaks_to_synthetics"),
+        (134, "m20261028_000001_add_llm_dataset_item_write_version"),
+        (135, "m20261102_000001_add_workflow_run_data_run_id_index"),
+        (136, "m20261120_000001_add_template_applies_to"),
+        (137, "m20261120_000002_rename_reserved_template_collisions"),
+        (138, "m20261120_000003_add_anomaly_template"),
+        (139, "m20261201_000001_add_synthetics_template"),
+        (140, "m20261210_000001_add_oncall_policy_template"),
+        (
+            141,
+            "m20261211_000001_add_templates_to_downtime_notifications",
+        ),
+        (
+            142,
+            "m20261212_000001_add_templates_to_oncall_response_events",
+        ),
+        (143, "m20261213_000001_retire_compiled_default_templates"),
+        (144, "m20261214_000001_templates_columns_to_text"),
+        (145, "m20261215_000001_add_alert_incident_title_template"),
+        (146, "m20261216_000001_rename_user_default_folders"),
+        (147, "m20261217_000001_add_alert_incidents_unresolved_index"),
+        (148, "m20261218_000001_add_security_case_to_alert_incidents"),
+        (149, "m20261219_000001_add_historical_to_alert_incidents"),
+        (150, "m20261029_000001_add_budget_to_online_eval_jobs"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -750,12 +1083,24 @@ mod tests {
                 "m20260924_000001_add_recovery_episode_columns",
             ),
             (
+                "m20260725_000001_create_alert_states_tables",
+                "m20261028_000001_add_group_label_set_to_alert_states",
+            ),
+            (
                 "m20250109_092400_recreate_tables_with_ksuids",
                 "m20261009_000001_create_downtimes",
             ),
             (
                 "m20251204_000001_create_alert_incidents_table",
                 "m20261009_000002_add_muted_by_downtime_id_to_alert_incidents",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261218_000001_add_security_case_to_alert_incidents",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261219_000001_add_historical_to_alert_incidents",
             ),
             (
                 "m20260725_000001_create_alert_states_tables",
@@ -770,8 +1115,28 @@ mod tests {
                 "m20261009_000001_create_downtimes",
             ),
             (
+                "m20261007_000001_scope_alert_dedup_state_by_org",
+                "m20261029_000001_widen_alert_dedup_fingerprint",
+            ),
+            (
                 "m20261009_000001_create_downtimes",
                 "m20261009_000005_create_downtime_notifications",
+            ),
+            (
+                "m20261009_000005_create_downtime_notifications",
+                "m20261211_000001_add_templates_to_downtime_notifications",
+            ),
+            (
+                "m20260806_000001_create_oncall_tables",
+                "m20261212_000001_add_templates_to_oncall_response_events",
+            ),
+            (
+                "m20261210_000001_add_oncall_policy_template",
+                "m20261213_000001_retire_compiled_default_templates",
+            ),
+            (
+                "m20261212_000001_add_templates_to_oncall_response_events",
+                "m20261214_000001_templates_columns_to_text",
             ),
             (
                 "m20260923_000001_create_ai_chat_sessions",
@@ -784,6 +1149,42 @@ mod tests {
             (
                 "m20260923_000001_create_ai_chat_sessions",
                 "m20261007_000001_create_ai_chat_turns",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261016_000001_create_rca_runs",
+            ),
+            (
+                "m20261016_000001_create_rca_runs",
+                "m20261017_000001_add_rca_run_progress_columns",
+            ),
+            (
+                "m20261016_000001_create_rca_runs",
+                "m20261018_000001_create_rca_steering",
+            ),
+            (
+                "m20260725_000001_create_alert_states_tables",
+                "m20261025_000001_add_firing_started_at_to_alert_states",
+            ),
+            (
+                "m20261009_000001_create_downtimes",
+                "m20261025_000003_add_mute_targets_to_downtimes",
+            ),
+            (
+                "m20261018_000001_create_slack_tables",
+                "m20261025_000004_create_slack_alert_messages",
+            ),
+            (
+                "m20261018_000001_create_slack_tables",
+                "m20261025_000005_add_held_action_to_slack_link_requests",
+            ),
+            (
+                "m20260806_000001_create_oncall_tables",
+                "m20261101_000001_create_oncall_slack",
+            ),
+            (
+                "m20260720_000001_create_workflow_run_data_table",
+                "m20261102_000001_add_workflow_run_data_run_id_index",
             ),
         ] {
             assert!(

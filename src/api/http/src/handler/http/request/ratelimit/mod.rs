@@ -85,7 +85,10 @@ async fn validate_ratelimit_updater(
         .into_iter()
         .filter_map(|rule| {
             let group_name = rule.api_group_name?;
-            let operation = ApiGroupOperation::try_from(rule.api_group_operation?.as_str()).ok()?;
+            let operation = rule
+                .api_group_operation?
+                .parse::<ApiGroupOperation>()
+                .ok()?;
             Some(((group_name, operation), rule.threshold))
         })
         .collect();
@@ -93,7 +96,7 @@ async fn validate_ratelimit_updater(
     for (api_group_name, operations) in rules.0.iter() {
         for (operation, threshold) in operations.iter() {
             // Validate operation format
-            let operation = ApiGroupOperation::try_from(operation.as_str());
+            let operation = operation.parse::<ApiGroupOperation>();
             if operation.is_err() {
                 return Err(anyhow::anyhow!(
                     "rule operation_name is err, {:?}",
@@ -161,7 +164,7 @@ async fn validate_ratelimit_updater(
         ("org_id" = String, Path, description = "Organization Name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -264,7 +267,7 @@ pub async fn list_module_ratelimit(
 
         let info = get_ratelimit_global_default_api_info().await;
         let interval = if let Some(interval_str) = query.interval.as_deref() {
-            match Interval::try_from(interval_str) {
+            match interval_str.parse::<Interval>() {
                 Ok(interval) => Some(interval.get_interval_ms()),
                 Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
             }
@@ -373,7 +376,7 @@ pub async fn list_role_ratelimit(
 
         let info = get_ratelimit_global_default_api_info().await;
         let interval = if let Some(interval_str) = query.interval.as_deref() {
-            match Interval::try_from(interval_str) {
+            match interval_str.parse::<Interval>() {
                 Ok(interval) => Some(interval.get_interval_ms()),
                 Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
             }
@@ -424,7 +427,7 @@ pub async fn list_role_ratelimit(
     ),
     request_body(content = String, description = "json array", content_type = "application/json", example = json!({"Key Values": {"list": 0,"create": 0,"delete": 0,"get": 0},"Service Accounts": {"update": 0,"list": 0,"create": 0,"delete": 0,"get": 0}})),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = crate::common::meta::http::HttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -485,7 +488,7 @@ pub async fn update_ratelimit(
 
         // Determine stat_interval_ms based on interval query param
         let stat_interval_ms = if let Some(interval_str) = query.interval.as_deref() {
-            match Interval::try_from(interval_str) {
+            match interval_str.parse::<Interval>() {
                 Ok(interval) => Some(interval.get_interval_ms()),
                 Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
             }

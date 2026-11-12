@@ -5,6 +5,7 @@ import OText from "../../core/Typography/OText.vue";
 import { DropdownMenuItem } from "reka-ui";
 import OIcon from "../../core/Icon/OIcon.vue";
 import OShortcut from "../../core/Shortcut/OShortcut.vue";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 const props = withDefaults(defineProps<DropdownItemProps>(), {
   as: "div",
@@ -19,7 +20,8 @@ defineSlots<DropdownItemSlots>();
 
 const attrs = useAttrs();
 const id = useId();
-const unavailable = computed(() => props.disabled && props.focusableUnavailable);
+const isDisabled = useLockedDisabled(() => props.disabled);
+const unavailable = computed(() => isDisabled.value && props.focusableUnavailable);
 const reasonId = computed(() => props.descriptionId ?? `${attrs["data-test"] ?? id}-reason`);
 
 function blockActivation(event: Event) {
@@ -33,7 +35,7 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 function onSelect(event: Event) {
-  if (props.disabled) {
+  if (isDisabled.value) {
     event.preventDefault();
     return;
   }
@@ -49,7 +51,7 @@ const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> 
 
 <template>
   <DropdownMenuItem
-    :disabled="disabled && !focusableUnavailable"
+    :disabled="isDisabled && !focusableUnavailable"
     as-child
     :aria-describedby="description ? reasonId : undefined"
     :text-value="textValue"
@@ -57,7 +59,7 @@ const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> 
       'group/item relative flex items-center gap-2',
       'rounded-default w-full px-3 py-1.5',
       'cursor-pointer outline-none select-none',
-      'transition-colors duration-150',
+      'transition-colors duration-(--duration-hover-out) data-[highlighted]:duration-(--duration-hover-in)',
       variantClasses[variant],
       'data-[disabled]:text-dropdown-item-disabled data-[disabled]:cursor-not-allowed',
       unavailable &&
@@ -70,12 +72,17 @@ const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> 
     <component
       :is="as"
       :type="as === 'button' ? 'button' : undefined"
-      :aria-disabled="disabled || undefined"
+      :aria-disabled="isDisabled || undefined"
     >
       <slot name="icon-left">
-        <OIcon v-if="props.iconLeft" :name="props.iconLeft" size="sm" />
+        <OIcon
+          v-if="props.iconLeft"
+          :name="props.iconLeft"
+          size="sm"
+          :class="props.iconLeft === 'lock' ? 'lock-chip' : undefined"
+        />
       </slot>
-      <span v-if="description" class="flex min-w-0 flex-1 flex-col gap-1">
+      <span v-if="description" class="flex min-w-0 flex-1 flex-col gap-0.5">
         <span><slot /></span>
         <OText
           :id="reasonId"

@@ -19,9 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- select new folder -->
     <OSelect
       v-model="selectedFolder"
-      :label="t('dashboard.selectFolderLabel')"
+      :label="t(folderKey(type, 'dashboard.selectFolderLabel'))"
       :options="folderOptions"
-      :placeholder="excludeFolderId ? t('dashboard.selectFolderPlaceholder') : undefined"
+      :placeholder="
+        excludeFolderId ? t(folderKey(type, 'dashboard.selectFolderPlaceholder')) : undefined
+      "
       :data-test="`${type}-index-dropdown-stream_type`"
       labelKey="label"
       valueKey="value"
@@ -43,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-xs-sq"
         class="h-8! w-8!"
         :data-test="`${type}-folder-move-new-add`"
-        :title="t('common.addFolder')"
+        :title="t(folderKey(type, 'common.addFolder'))"
         :disabled="disableDropdown"
         @mousedown.prevent
         @click="
@@ -69,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, onActivated, ref, watch, computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
+import { folderKey } from "./folderTerms";
 import { useStore } from "vuex";
 import AddFolder from "./AddFolder.vue";
 import { useRoute } from "vue-router";
@@ -212,6 +215,7 @@ export default defineComponent({
 
     return {
       t,
+      folderKey,
       store,
       selectedFolder,
       selectedFolderIcon,

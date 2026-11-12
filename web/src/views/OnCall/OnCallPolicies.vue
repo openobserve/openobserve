@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     data-test="oncall-policies-page"
     :title="t('oncall.policiesTitle')"
-    :subtitle="t('oncall.policiesSubtitle')"
     icon="arrow-upward"
     :back="{
       label: t('oncall.backToTeams'),
@@ -41,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTable
       ref="oTableRef"
       :frame="false"
+      :forbidden="forbidden"
       :data="rows"
       :columns="columns"
       row-key="teamId"
@@ -89,6 +89,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="oncall-policies-refresh"
           @click="refreshAll"
         />
+      </template>
+
+      <template #cell-teamName="{ row, value }">
+        <span class="inline-flex items-center gap-2">
+          <span class="text-text-body">{{ value }}</span>
+          <EditorDraftDot
+            v-if="policyDrafts.ids.has(row.teamId)"
+            :saved-at="policyDrafts.savedAt(row.teamId)"
+            :data-test="`oncall-policies-${row.teamId}-draft-dot`"
+          />
+        </span>
       </template>
 
       <template #cell-on_call="{ row }">
@@ -159,11 +170,14 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { queryClient } from "@/composables/query/queryClient";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { useListViewState } from "@/composables/useListViewState";
 import { oncallTeamsQuery, teamPolicyQuery, whoIsOnCallQuery } from "@/services/oncall.queries";
 import type { OnCallPolicy, OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { priorityLabel, priorityTagVariant, resolveLadder } from "@/utils/oncall";
+import { licenseDeniedFeatures, type ForbiddenState } from "@/utils/featureGate";
 
 /// One team's ladder, reduced to the two questions this page exists to answer.
 interface PolicyRow {
@@ -182,7 +196,10 @@ const router = useRouter();
 
 const ABSENT = raw("—");
 
+const policyDrafts = useEditorDraftIds("oncall_policy");
+
 const allRows = ref<PolicyRow[]>([]);
+const forbidden = ref<ForbiddenState>(false);
 const loading = ref(false);
 const lastUpdatedAt = ref<number | null>(null);
 const savedView = useListViewState("oncall-policies", {
@@ -343,6 +360,7 @@ async function fetchAll(force = false) {
     const teams = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), force);
     const settled = await Promise.all(teams.map((team) => fetchTeamRow(team, force)));
     allRows.value = settled.filter((row): row is PolicyRow => row !== null);
+    forbidden.value = false;
     // The oldest of the reads the rows are built from, so the age never claims the table is fresher than it is.
     lastUpdatedAt.value = Math.min(
       ...[
@@ -351,6 +369,12 @@ async function fetchAll(force = false) {
       ].map((options) => queryClient.getQueryState(options.queryKey)?.dataUpdatedAt || Date.now()),
     );
   } catch (err: any) {
+    // A license denial is not a failed read: the table shows the license copy instead.
+    const denied = licenseDeniedFeatures(err);
+    if (denied) {
+      forbidden.value = denied;
+      return;
+    }
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.loadTeamsFailed"),

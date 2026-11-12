@@ -48,8 +48,7 @@ const RUN_COLUMNS: &str = "window_start, window_end, finding_count, skip_count, 
      coverage_gap, coverage_unreadable_definitions, coverage_facts_without_definition, \
      coverage_definitions_without_facts, coverage_transitions_truncated, \
      coverage_counters_truncated, coverage_error_clusters_truncated, \
-     coverage_error_clusters_unattributed, coverage_stream_substrate_empty, \
-     coverage_meta_fallback_used";
+     coverage_error_clusters_unattributed, coverage_stream_substrate_empty";
 const DEFAULT_SIZE: i64 = 100;
 const MAX_SIZE: i64 = 1000;
 
@@ -84,6 +83,25 @@ pub struct CalibrationStatus {
     last_run: Option<LastRun>,
 }
 
+/// Which digest columns a read names, which decides what a search error can mean.
+#[derive(Clone, Copy)]
+enum Columns {
+    /// Stamped on every record, so a missing one is a bug once the stream exists.
+    Run,
+    /// Written only by findings, so they stay absent until some run flags something.
+    Finding,
+}
+
+impl Columns {
+    fn not_written_yet(self, code: &ErrorCodes) -> bool {
+        match code {
+            ErrorCodes::SearchStreamNotFound(_) => true,
+            ErrorCodes::SearchFieldNotFound(_) => matches!(self, Self::Finding),
+            _ => false,
+        }
+    }
+}
+
 #[utoipa::path(
     get,
     path = "/v2/{org_id}/alert_calibration/digests",
@@ -100,6 +118,10 @@ pub struct CalibrationStatus {
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "list"}))
     )
 )]
 pub async fn list_runs(Path(org_id): Path<String>, Query(range): Query<DigestRange>) -> Response {
@@ -107,7 +129,15 @@ pub async fn list_runs(Path(org_id): Path<String>, Query(range): Query<DigestRan
         "SELECT DISTINCT {RUN_COLUMNS}, _timestamp AS emitted_at FROM \"{DIGEST_STREAM}\" \
          ORDER BY emitted_at DESC"
     );
-    read(&org_id, sql, range.start_time, range.end_time, range.size).await
+    read(
+        &org_id,
+        sql,
+        range.start_time,
+        range.end_time,
+        range.size,
+        Columns::Run,
+    )
+    .await
 }
 
 #[utoipa::path(
@@ -126,6 +156,10 @@ pub async fn list_runs(Path(org_id): Path<String>, Query(range): Query<DigestRan
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "list"}))
     )
 )]
 pub async fn list_runs_for_alert(
@@ -137,7 +171,15 @@ pub async fn list_runs_for_alert(
          WHERE rule_id IS NOT NULL AND str_match_ignore_case(alert_name, {})",
         quote_sql_string(&query.alert_name)
     );
-    read(&org_id, sql, query.start_time, query.end_time, query.size).await
+    read(
+        &org_id,
+        sql,
+        query.start_time,
+        query.end_time,
+        query.size,
+        Columns::Finding,
+    )
+    .await
 }
 
 #[utoipa::path(
@@ -156,6 +198,10 @@ pub async fn list_runs_for_alert(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "list"}))
     )
 )]
 pub async fn get_run_records(Path(org_id): Path<String>, Query(run): Query<RunWindow>) -> Response {
@@ -165,7 +211,15 @@ pub async fn get_run_records(Path(org_id): Path<String>, Query(run): Query<RunWi
         run.window_start, run.window_end
     );
     // A run's records are stamped when it finishes, at or after the end of its window.
-    read(&org_id, sql, run.window_end, now_micros(), run.size).await
+    read(
+        &org_id,
+        sql,
+        run.window_end,
+        now_micros(),
+        run.size,
+        Columns::Run,
+    )
+    .await
 }
 
 #[utoipa::path(
@@ -184,6 +238,10 @@ pub async fn get_run_records(Path(org_id): Path<String>, Query(run): Query<RunWi
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "list"}))
     )
 )]
 pub async fn count_findings_by_rule(
@@ -195,7 +253,15 @@ pub async fn count_findings_by_rule(
          COUNT(DISTINCT window_end) AS runs_flagging FROM \"{DIGEST_STREAM}\" \
          WHERE rule_id IS NOT NULL GROUP BY rule_id"
     );
-    read(&org_id, sql, range.start_time, range.end_time, range.size).await
+    read(
+        &org_id,
+        sql,
+        range.start_time,
+        range.end_time,
+        range.size,
+        Columns::Finding,
+    )
+    .await
 }
 
 #[utoipa::path(
@@ -213,6 +279,10 @@ pub async fn count_findings_by_rule(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment, or the org has no config", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "list"}))
     )
 )]
 pub async fn get_status(Path(org_id): Path<String>) -> Response {
@@ -251,6 +321,10 @@ pub async fn get_status(Path(org_id): Path<String>) -> Response {
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment, or the org has no config", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "create"}))
     )
 )]
 pub async fn run_alert_calibration(Path(org_id): Path<String>) -> Response {
@@ -270,6 +344,7 @@ async fn read(
     start_time: i64,
     end_time: i64,
     size: Option<i64>,
+    columns: Columns,
 ) -> Response {
     if let Some(disabled) = deployment_disabled() {
         return disabled;
@@ -292,13 +367,35 @@ async fn read(
     let trace_id = ider::generate();
     match search_service::search(&trace_id, org_id, StreamType::Logs, None, &request).await {
         Ok(response) => MetaHttpResponse::json(response.hits),
-        // Before the first run the stream, or a column only findings write, does not exist yet.
-        Err(InfraError::ErrorCode(
-            ErrorCodes::SearchStreamNotFound(_) | ErrorCodes::SearchFieldNotFound(_),
-        )) => MetaHttpResponse::json(Vec::<Value>::new()),
+        Err(InfraError::ErrorCode(code)) if columns.not_written_yet(&code) => {
+            MetaHttpResponse::json(Vec::<Value>::new())
+        }
         Err(e) => {
             log::error!("[alert_calibration] digest read failed for org={org_id}: {e}");
             MetaHttpResponse::internal_error(e)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_a_finding_read_treats_a_missing_column_as_nothing_written() {
+        let stream = ErrorCodes::SearchStreamNotFound(DIGEST_STREAM.to_string());
+        let field = ErrorCodes::SearchFieldNotFound("coverage_gap".to_string());
+        let timeout = ErrorCodes::SearchTimeout("slow".to_string());
+        assert!(Columns::Run.not_written_yet(&stream));
+        assert!(!Columns::Run.not_written_yet(&field));
+        assert!(Columns::Finding.not_written_yet(&stream));
+        assert!(Columns::Finding.not_written_yet(&field));
+        assert!(!Columns::Finding.not_written_yet(&timeout));
+    }
+
+    #[test]
+    fn digests_stay_gated_while_search_is_blocked() {
+        // OTLP ingest accepts customer writes here, so it must never join the allowlist
+        assert!(!search_service::is_operational_stream(DIGEST_STREAM));
     }
 }

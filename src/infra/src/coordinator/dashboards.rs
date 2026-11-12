@@ -28,19 +28,14 @@ pub fn key(org_id: &str, dashboard_id: &str) -> String {
 /// into the database.
 pub async fn emit_put_event(org_id: &str, dashboard_id: &str) -> Result<(), Error> {
     let key = key(org_id, dashboard_id);
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator
-        .put(&key, bytes::Bytes::from(""), true, None)
-        .await?;
-    Ok(())
+    super::emit_put(&key).await
 }
 
 /// Sends event to the cluster coordinator indicating that a dashboard has been
 /// deleted from the database.
 pub async fn emit_delete_event(org_id: &str, dashboard_id: &str) -> Result<(), Error> {
     let key = key(org_id, dashboard_id);
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator.delete(&key, false, true, None).await
+    super::emit_delete(&key).await
 }
 
 #[cfg(test)]

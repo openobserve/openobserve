@@ -19,18 +19,23 @@
 // data source's copy.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { defineComponent, h } from "vue";
+import { defineComponent, h, ref } from "vue";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
-import type { RichCardContent } from "./types";
+import { SETUP_STEPS_HOST } from "./stepsHost";
+import { SETUP_CARD_ONBOARDING, type RichCardContent, type SetupCardPresets } from "./types";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import linuxCard from "./content/linux";
+import postgresCard from "./content/postgres";
 import kubernetesCard from "./content/kubernetes";
+import otlpTracesCard from "./content/otlpTraces";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { gt } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 
@@ -146,6 +151,64 @@ describe("SetupCardRenderer — advanced section", () => {
   it("omits the accordion entirely when no advanced content is given", () => {
     wrapper = mountCard({ ...CONTENT, extras: { troubleshooting: [] } });
     expect(wrapper.find('[data-test="ai-advanced-accordion"]').exists()).toBe(false);
+  });
+});
+
+describe("SetupCardRenderer — ingest token gating", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const tokenContent: RichCardContent = {
+    ...CONTENT,
+    steps: [
+      {
+        ...CONTENT.steps[0],
+        code: {
+          lang: "bash",
+          raw: "curl -H 'Authorization: Basic tok'",
+          masked: "curl -H 'Authorization: Basic ••••'",
+          dataTest: "token-block",
+        },
+      },
+      {
+        id: "plain",
+        title: "Plain",
+        completeOn: "copy",
+        code: { lang: "bash", raw: "helm repo update", dataTest: "plain-block" },
+      },
+      CONTENT.steps[1],
+    ],
+  };
+
+  const mountWithToken = (tokenState?: "ready" | "loading" | "unavailable") =>
+    mount(SetupCardRenderer, {
+      props: { content: tokenContent, subs: SUBS, tokenState },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+  const has = (testId: string) => wrapper.find(`[data-test="${testId}"]`).exists();
+
+  it("shows a skeleton for the token block while the token loads, and keeps tokenless blocks", () => {
+    wrapper = mountWithToken("loading");
+    expect(has("token-block-loading")).toBe(true);
+    expect(has("token-block-copy-btn")).toBe(false);
+    expect(has("plain-block-copy-btn")).toBe(true);
+  });
+
+  it("drops the token block when no token can be had, and keeps tokenless blocks", () => {
+    wrapper = mountWithToken("unavailable");
+    expect(has("token-block-loading")).toBe(false);
+    expect(has("token-block-copy-btn")).toBe(false);
+    expect(has("plain-block-copy-btn")).toBe(true);
+  });
+
+  it("renders the token block by default", () => {
+    wrapper = mountWithToken();
+    expect(has("token-block-loading")).toBe(false);
+    expect(has("token-block-copy-btn")).toBe(true);
   });
 });
 
@@ -369,6 +432,25 @@ describe("SetupCardRenderer — first-event bar, detected emit & showOnDetect ac
     });
   });
 
+  it("emits the bar's first-event result as `received`", async () => {
+    wrapper = mountCard(hostContent());
+    const result = { streamName: "system_cpu_time", streamType: "metrics", count: 3 };
+    bar(wrapper).vm.$emit("detected", result);
+    await flushPromises();
+    expect(wrapper.emitted("received")).toEqual([[result]]);
+  });
+
+  it("emits the bar's state as `state` on every change", async () => {
+    wrapper = mountCard();
+    bar(wrapper).vm.$emit("state", "idle");
+    await flushPromises();
+    bar(wrapper).vm.$emit("state", "rejected");
+    await flushPromises();
+    bar(wrapper).vm.$emit("state", "rejected");
+    await flushPromises();
+    expect(wrapper.emitted("state")).toEqual([["idle"], ["rejected"]]);
+  });
+
   it("does not emit `detected` on a fresh mount (no transition happened)", async () => {
     wrapper = mountCard(hostContent());
     await flushPromises();
@@ -397,6 +479,32 @@ describe("SetupCardRenderer — first-event bar, detected emit & showOnDetect ac
     };
     wrapper = mountCard(content);
     expect(wrapper.find('[data-test="ai-step-action-launch-console"]').exists()).toBe(true);
+  });
+
+  it("renders an action with a disabledReason disabled and emits nothing on click", async () => {
+    const content: RichCardContent = {
+      ...CONTENT,
+      steps: [
+        {
+          ...CONTENT.steps[0],
+          action: {
+            id: "launch-console",
+            label: "Launch",
+            icon: "lock",
+            disabled: true,
+            disabledReason: "Locked" as never,
+          },
+        },
+        CONTENT.steps[1],
+      ],
+    };
+    wrapper = mountCard(content);
+    const btn = wrapper
+      .findAllComponents({ name: "OButton" })
+      .find((b) => b.attributes("data-test") === "ai-step-action-launch-console")!;
+    expect(btn.props("disabled")).toBe(true);
+    await btn.trigger("click");
+    expect(wrapper.emitted("step-action")).toBeUndefined();
   });
 
   it("shows the most-likely-fix box only once the bar has a diagnosis, and rechecks through the bar", async () => {
@@ -515,6 +623,89 @@ describe("SetupCardRenderer — step-note jump links", () => {
   });
 });
 
+describe("SetupCardRenderer — folded optional step", () => {
+  let wrapper: VueWrapper<any>;
+  const original = (Element.prototype as any).scrollIntoView;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+    (Element.prototype as any).scrollIntoView = original;
+  });
+
+  // install → folded optional step → verify, so the fold sits between two main-path steps.
+  const folded = (): RichCardContent => ({
+    ...CONTENT,
+    steps: [
+      CONTENT.steps[0],
+      {
+        id: "extra",
+        title: "Optional: extra",
+        description: "Only if you want it.",
+        chip: { kind: "editor", label: "Optional" },
+        completeOn: "copy",
+        collapsed: true,
+        code: { lang: "bash", raw: "echo extra" },
+      },
+      CONTENT.steps[1],
+    ],
+  });
+  const fold = () => wrapper.find('[data-test="ai-step-fold-extra"]');
+  const codes = () => wrapper.findAllComponents(OCodeBlock).map((b) => b.props("code"));
+  const activeStep = () => wrapper.findComponent(OStepper).props("modelValue");
+  // OStep's wrapper element is the whole stepper, so name a step by its body.
+  const body = (i: number) => wrapper.findAll(".step-content-pad")[i];
+  const scrolledTo = (spy: ReturnType<typeof vi.fn>) => spy.mock.contexts[0] as Element;
+
+  it("starts folded under its heading and opens from it", async () => {
+    wrapper = mountCard(folded());
+    expect(wrapper.findAllComponents(OStep)[1].props("title")).toBe("Optional: extra");
+    // The description stays visible; everything below it sits in the fold.
+    expect(body(1).find(".step-desc").text()).toBe("Only if you want it.");
+    expect(body(1).find('[data-test="ai-step-fold-extra"]').exists()).toBe(true);
+    expect(codes()).not.toContain("echo extra");
+
+    await fold().find("button").trigger("click");
+    await flushPromises();
+    expect(codes()).toContain("echo extra");
+  });
+
+  it("does not hold up the auto-advance, the active step or the done state", async () => {
+    wrapper = mountCard(folded());
+    const scrollSpy = vi.fn();
+    (Element.prototype as any).scrollIntoView = scrollSpy;
+    expect(activeStep()).toBe(1);
+
+    wrapper.findAllComponents(OCodeBlock)[0].vm.$emit("copy", { partial: false });
+    await flushPromises();
+    // Copying install skips the fold: the verify step is next, and it scrolls there.
+    expect(activeStep()).toBe(3);
+    expect(scrollSpy).toHaveBeenCalledTimes(1);
+    expect(scrolledTo(scrollSpy)).toBe(body(2).element);
+
+    // Data arriving finishes the card although the optional step was never opened.
+    bar(wrapper).vm.$emit("detected", { count: 1 });
+    await flushPromises();
+    expect(activeStep()).toBe(0);
+    expect(wrapper.findAllComponents(OStep)[1].props("done")).toBe(false);
+  });
+
+  it("leaves a card with no collapsed step unchanged", async () => {
+    wrapper = mountCard();
+    const scrollSpy = vi.fn();
+    (Element.prototype as any).scrollIntoView = scrollSpy;
+    expect(wrapper.find('[data-test^="ai-step-fold-"]').exists()).toBe(false);
+    // The code block is still a direct child of the step body, with no wrapper.
+    expect(
+      wrapper.find('.step-content-pad > [data-test="ingestion-setup-code-block"]').exists(),
+    ).toBe(true);
+
+    wrapper.findAllComponents(OCodeBlock)[0].vm.$emit("copy", { partial: false });
+    await flushPromises();
+    expect(activeStep()).toBe(2);
+    expect(scrolledTo(scrollSpy)).toBe(body(1).element);
+  });
+});
+
 describe("SetupCardRenderer — product analytics", () => {
   let wrapper: VueWrapper<any>;
 
@@ -548,7 +739,10 @@ describe("SetupCardRenderer — product analytics", () => {
         userInfo: { email: "t@e.com" },
         organizationData: {
           organizationPasscode: "pc",
-          orgTokens: [{ name: "default", token: "pc" }],
+          orgTokens: [
+            { name: "default", token: "pc" },
+            { name: "ci", token: "other" },
+          ],
         },
         theme: "light",
       },
@@ -687,6 +881,25 @@ describe("SetupCardRenderer — Linux install step tracing toggle", () => {
     expect(step().props("done")).toBe(true);
   });
 
+  it("shows the network flows command only once a CIDR is given, with no toggle", async () => {
+    wrapper = mountLinux();
+    const step = () => wrapper.find('[data-test="ai-step-network"]');
+    expect(step().find('[data-test="ai-variant-tabs"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-variant-require-network"]').exists()).toBe(true);
+    expect(step().findComponent(OCodeBlock).exists()).toBe(false);
+
+    await type("networkFlows", "10.0.1.5/32=web1,0.0.0.0/0=other");
+    expect(wrapper.find('[data-test="ai-variant-require-network"]').exists()).toBe(false);
+    expect(
+      step()
+        .findComponent(OCodeBlock)
+        .props("code")
+        .endsWith(`${BASE_TAIL} --network-flows '10.0.1.5/32=web1,0.0.0.0/0=other'`),
+    ).toBe(true);
+    // The install step is untouched by the network field.
+    expect(installBlock().props("code").endsWith(BASE_TAIL)).toBe(true);
+  });
+
   it("leaves step-level inputs where they were (Kubernetes cluster name)", async () => {
     wrapper = mount(SetupCardRenderer, {
       props: { content: kubernetesCard(LINUX_SUBS, gt), subs: LINUX_SUBS },
@@ -715,7 +928,12 @@ describe("SetupCardRenderer — Kubernetes instrument step (nested toggle)", () 
 helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-collector \\
   --version '>=0.6.0' --reset-then-reuse-values \\
   --set ebpf.enabled=true`;
-  const codes = () => wrapper.findAllComponents(OCodeBlock).map((b) => b.props("code") as string);
+  // Scoped to the instrument step: the network flows step below also runs `upgrade o2c`.
+  const codes = () =>
+    wrapper
+      .find('[data-test="ai-step-instrument"]')
+      .findAllComponents(OCodeBlock)
+      .map((b) => b.props("code") as string);
   const instrumentCode = () =>
     codes().find((c) => c.includes("kubectl annotate") || c.includes("upgrade o2c"));
   const field = (id: string) => wrapper.find(`[data-test="ai-input-${id}"]`);
@@ -828,5 +1046,448 @@ helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-colle
     await type("ebpfExe", ",");
     expect(warning().exists()).toBe(true);
     expect(codes().some((c) => c.includes("upgrade o2c"))).toBe(false);
+  });
+});
+
+describe("SetupCardRenderer — setup modes", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const MODES: RichCardContent = {
+    provider: { id: "demo-db", name: "Demo DB", tagline: "A demo.", logo: "", tone: "#000" },
+    setupModes: [
+      { id: "auto", label: "Automatic" },
+      { id: "manual", label: "Manual" },
+    ],
+    steps: [
+      {
+        id: "prepare",
+        title: "Prepare",
+        completeOn: "copy",
+        code: { lang: "sql", raw: "SELECT 1" },
+      },
+      {
+        id: "auto",
+        mode: "auto",
+        title: "Quick install",
+        completeOn: "copy",
+        required: true,
+        inputs: [{ id: "host", label: "Host", default: "localhost" }],
+        code: { lang: "bash", raw: "install --host={host}" },
+        note: "Prefer the long way? Use [Manual](#manual).",
+      },
+      {
+        id: "m-config",
+        mode: "manual",
+        title: "Configure",
+        completeOn: "copy",
+        required: true,
+        inputs: [{ id: "host", label: "Host", default: "localhost" }],
+        code: { lang: "bash", raw: "endpoint: {host}" },
+      },
+      {
+        id: "m-run",
+        mode: "manual",
+        title: "Run",
+        completeOn: "copy",
+        code: { lang: "bash", raw: "run" },
+      },
+      { id: "verify", title: "Verify", completeOn: "detect", detectionAnchor: true },
+    ],
+    detect: { streamType: "metrics", match: "keyword", streamName: "demo", filter: "" },
+    extras: {
+      uninstall: { label: "Uninstall", code: { lang: "bash", raw: "uninstall --host={host}" } },
+    },
+  };
+
+  const stepIds = () =>
+    wrapper
+      .findAllComponents(OStep)
+      .map((s) => String(s.vm.$attrs["data-test"]).replace("ai-step-", ""));
+  const pickMode = async (id: string) => {
+    wrapper
+      .find('[data-test="ai-setup-mode-tabs"]')
+      .findComponent(OToggleGroup)
+      .vm.$emit("update:modelValue", id);
+    await flushPromises();
+  };
+  const copyStep = async (id: string) => {
+    wrapper.find(`[data-test="ai-step-${id}"]`).findComponent(OCodeBlock).vm.$emit("copy", {});
+    await flushPromises();
+  };
+  const activeStep = () => wrapper.findComponent(OStepper).props("modelValue");
+
+  it("renders no mode toggle and every step for a card without setupModes", () => {
+    wrapper = mountCard();
+    expect(wrapper.find('[data-test="ai-setup-mode-tabs"]').exists()).toBe(false);
+    expect(stepIds()).toEqual(["install", "verify"]);
+  });
+
+  it("opens on the first mode and shows untagged steps in both modes", async () => {
+    wrapper = mountCard(MODES);
+    expect(wrapper.find('[data-test="ai-setup-mode-auto"]').text()).toBe("Automatic");
+    expect(stepIds()).toEqual(["prepare", "auto", "verify"]);
+    await pickMode("manual");
+    expect(stepIds()).toEqual(["prepare", "m-config", "m-run", "verify"]);
+  });
+
+  it("counts only the visible steps toward completion and the active step", async () => {
+    wrapper = mountCard(MODES);
+    await copyStep("prepare");
+    await copyStep("auto");
+    // Hidden manual steps never block: the verify step (3rd visible) is next.
+    expect(activeStep()).toBe(3);
+    await pickMode("manual");
+    expect(activeStep()).toBe(2);
+    await copyStep("m-config");
+    await copyStep("m-run");
+    expect(activeStep()).toBe(4);
+  });
+
+  it("keeps a typed input value across modes, since both paths share its id", async () => {
+    wrapper = mountCard(MODES);
+    await wrapper.find('[data-test="ai-input-host"] input').setValue("db.internal");
+    expect(wrapper.find('[data-test="ai-step-auto"]').text()).toContain(
+      "install --host=db.internal",
+    );
+    await pickMode("manual");
+    expect(wrapper.find('[data-test="ai-step-m-config"]').text()).toContain(
+      "endpoint: db.internal",
+    );
+  });
+
+  it("switches to the manual mode from a [label](#manual) note link", async () => {
+    wrapper = mountCard(MODES);
+    (Element.prototype as any).scrollIntoView = vi.fn();
+    const link = wrapper.find('a.note-jump[data-jump="manual"]');
+    expect(link.text()).toBe("Manual");
+    await link.trigger("click");
+    await flushPromises();
+    expect(stepIds()).toContain("m-config");
+    expect(stepIds()).not.toContain("auto");
+  });
+
+  it("ignores a #manual link on a card that has no manual mode", async () => {
+    wrapper = mountCard({
+      ...MODES,
+      setupModes: [{ id: "auto", label: "Automatic" }],
+    });
+    await wrapper.find('a.note-jump[data-jump="manual"]').trigger("click");
+    await flushPromises();
+    expect(stepIds()).toEqual(["prepare", "auto", "verify"]);
+  });
+
+  it("auto-advances to the next visible step after switching modes", async () => {
+    wrapper = mountCard(MODES);
+    await pickMode("manual");
+    await pickMode("auto");
+    await pickMode("manual");
+    const targets: Element[] = [];
+    const original = (Element.prototype as any).scrollIntoView;
+    (Element.prototype as any).scrollIntoView = function (this: Element) {
+      targets.push(this);
+    };
+    try {
+      await copyStep("prepare");
+      // A step unmounted by the switch must not clear the ref of the step now in its slot.
+      expect(targets).toHaveLength(1);
+      expect(targets[0].closest('[data-test="ai-step-m-config"]')).not.toBeNull();
+      await copyStep("m-config");
+      expect(targets[1].closest('[data-test="ai-step-m-run"]')).not.toBeNull();
+    } finally {
+      (Element.prototype as any).scrollIntoView = original;
+    }
+  });
+
+  it("shows a mode-scoped uninstall section only in its mode", async () => {
+    wrapper = mountCard({
+      ...MODES,
+      extras: { uninstall: { ...MODES.extras!.uninstall!, mode: "auto" } },
+    });
+    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(true);
+    await pickMode("manual");
+    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(false);
+  });
+
+  it("fills step inputs into the uninstall command", async () => {
+    wrapper = mountCard(MODES);
+    await wrapper.find('[data-test="ai-input-host"] input').setValue("db.internal");
+    await wrapper.find('[data-test="ai-uninstall-accordion"] button').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-uninstall-code"]').text()).toContain(
+      "uninstall --host=db.internal",
+    );
+  });
+
+  it("drives the Postgres card: installer by default, DBM variant adds --dbm and the log path", async () => {
+    const PG_SUBS = { ...SUBS, token: "dGVzdEB0b2tlbg==" };
+    wrapper = mount(SetupCardRenderer, {
+      props: { content: postgresCard(PG_SUBS, gt), subs: PG_SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+    expect(stepIds()).not.toContain("install");
+    expect(stepIds()).not.toContain("dbm-configure");
+    expect(stepIds().slice(0, 3)).toEqual(["prepare", "quick-install", "verify"]);
+    const quick = () => wrapper.find('[data-test="ai-step-quick-install"]');
+    const code = () => quick().findComponent(OCodeBlock);
+    expect(code().props("code")).toContain("--db=postgres");
+    expect(code().props("code")).not.toContain("--dbm");
+    // Shown masked; the raw token is only in the copied text.
+    expect(code().props("codeMasked")).not.toContain(PG_SUBS.token);
+    expect(quick().find('[data-test="ai-input-logpath"]').exists()).toBe(false);
+
+    quick().findComponent(OToggleGroup).vm.$emit("update:modelValue", "metrics-dbm");
+    await flushPromises();
+    expect(code().props("code")).toContain("--dbm");
+    expect(code().props("code")).toContain("--log-path='/var/log/postgresql/postgresql*.log'");
+    expect(quick().find('[data-test="ai-input-logpath"]').exists()).toBe(true);
+
+    // Typed values are quoted and sanitised as the script will; a cleared field drops its flag.
+    await quick().find('[data-test="ai-input-serviceName"] input').setValue("Prod DB");
+    await quick().find('[data-test="ai-input-host"] input').setValue("db 1");
+    await quick().find('[data-test="ai-input-user"] input').setValue("");
+    expect(code().props("code")).toContain("--name='prod-db'");
+    expect(code().props("code")).toContain("--host='db 1'");
+    expect(code().props("code")).not.toContain("--db-user");
+    await wrapper.find('[data-test="ai-uninstall-accordion"] button').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-uninstall-code"]').text()).toContain("--name='prod-db'");
+
+    await pickMode("manual");
+    // The script's uninstall does not apply to a manual install.
+    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(false);
+    expect(stepIds()).toEqual([
+      "prepare",
+      "install",
+      "configure",
+      "run",
+      "verify",
+      "dbm-grant",
+      "dbm-logging",
+      "dbm-logging-verify",
+      "dbm-auto-explain",
+      "dbm-configure",
+      "dbm-run",
+      "verify-dbm",
+    ]);
+  });
+});
+
+describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  // Onboarding provides the tracing answer from its URL; the card is built from it, as
+  // DataSourceSetupCard does.
+  const mountOnboarding = (presets: SetupCardPresets) => {
+    wrapper = mount(SetupCardRenderer, {
+      props: { content: kubernetesCard(SUBS, gt, presets), subs: SUBS },
+      global: {
+        plugins: [store, router],
+        stubs: { FirstEventStatus: FirstEventStatusStub },
+        provide: { [SETUP_CARD_ONBOARDING as symbol]: ref(presets) },
+      },
+      attachTo: document.body,
+    });
+  };
+  const find = (id: string) => wrapper.find(`[data-test="${id}"]`);
+  const titles = () => wrapper.findAllComponents(OStep).map((st) => st.props("title"));
+  const instrumentCode = () =>
+    find("ai-step-instrument").findComponent(OCodeBlock).exists()
+      ? (find("ai-step-instrument").findComponent(OCodeBlock).props("code") as string)
+      : undefined;
+
+  it("keeps the verify step, with its data check, as Check Your Data", () => {
+    mountOnboarding({ traces: "off", languages: [] });
+    expect(titles()).toContain("Check Your Data");
+    expect(wrapper.text()).not.toContain("Verify data in OpenObserve");
+    expect(find("ai-step-verify").text()).toContain("Give the collector a few seconds to start");
+    expect(find("ai-step-verify").findComponent(FirstEventStatusStub).exists()).toBe(true);
+  });
+
+  it("has no tracing step when traces were skipped", () => {
+    mountOnboarding({ traces: "off", languages: [] });
+    expect(titles()).toEqual([
+      "Quick install (recommended)",
+      "See which workloads talk to each other: eBPF network flows",
+      "Check Your Data",
+    ]);
+    expect(find("ai-step-instrument").exists()).toBe(false);
+  });
+
+  it("shows a numbered eBPF step, open and with no toggle", async () => {
+    mountOnboarding({ traces: "ebpf", languages: [] });
+    expect(titles()).toEqual([
+      "Quick install (recommended)",
+      "Trace your apps",
+      "See which workloads talk to each other: eBPF network flows",
+      "Check Your Data",
+    ]);
+    expect(find("ai-step-fold-instrument").exists()).toBe(false);
+    expect(find("ai-step-instrument").find('[data-test="ai-variant-tabs"]').exists()).toBe(false);
+    for (const id of ["ebpfPorts", "ebpfExe", "ebpfCmd"]) {
+      expect(find(`ai-input-${id}`).exists()).toBe(true);
+    }
+    expect(find("ai-variant-require-instrument").exists()).toBe(true);
+    await find("ai-input-ebpfPorts").find("input").setValue("8080");
+    expect(instrumentCode()).toContain("upgrade o2c");
+    expect(instrumentCode()).toContain("--set-string 'ebpf.trace.ports={8080}'");
+  });
+
+  it("gives each language its own namespace placeholder and restart, with no input", () => {
+    mountOnboarding({ traces: "library", languages: ["java", "nodejs"] });
+    expect(titles()).toEqual([
+      "Quick install (recommended)",
+      "Trace your apps",
+      "See which workloads talk to each other: eBPF network flows",
+      "Check Your Data",
+    ]);
+    expect(find("ai-step-instrument").find('[data-test="ai-variant-tabs"]').exists()).toBe(false);
+    expect(find("ai-step-instrument").find('[data-test^="ai-input-"]').exists()).toBe(false);
+    expect(instrumentCode()).toBe(
+      [
+        "# Every pod in the namespace is instrumented — no code or image change.",
+        "kubectl annotate namespace my-java-namespace \\",
+        '  instrumentation.opentelemetry.io/inject-java="openobserve-collector/openobserve-java"',
+        "kubectl annotate namespace my-nodejs-namespace \\",
+        '  instrumentation.opentelemetry.io/inject-nodejs="openobserve-collector/openobserve-nodejs"',
+        "",
+        "# Restart so running pods pick up the injection",
+        "kubectl rollout restart deployment -n my-java-namespace",
+        "kubectl rollout restart deployment -n my-nodejs-namespace",
+      ].join("\n"),
+    );
+  });
+
+  it.each([
+    ["no answer", { languages: [] }],
+    ["a library with no known language", { traces: "library", languages: ["go"] }],
+  ] as [string, SetupCardPresets][])("folds the optional steps for %s", (_, presets) => {
+    mountOnboarding(presets);
+    expect(titles()).toEqual([
+      "Quick install (recommended)",
+      "Trace your applications: language libraries or eBPF",
+      "See which workloads talk to each other: eBPF network flows",
+      "Check Your Data",
+    ]);
+    expect(find("ai-step-fold-instrument").exists()).toBe(true);
+    expect(find("ai-step-fold-network").exists()).toBe(true);
+  });
+
+  it("keeps the verify step and folds nothing on the Data sources page", () => {
+    wrapper = mount(SetupCardRenderer, {
+      props: { content: kubernetesCard(SUBS, gt), subs: SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+    expect(titles()).toEqual([
+      "Quick install (recommended)",
+      "Trace your applications: language libraries or eBPF",
+      "See which workloads talk to each other: eBPF network flows",
+      "Verify data in OpenObserve",
+    ]);
+    expect(wrapper.find('[data-test^="ai-step-fold-"]').exists()).toBe(false);
+    expect(find("ai-step-verify").findComponent(FirstEventStatusStub).exists()).toBe(true);
+  });
+});
+
+describe("SetupCardRenderer — steps host", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const setStream = vi.fn();
+  const mountWithHost = (content: RichCardContent, onboarding?: SetupCardPresets) => {
+    const setSteps = vi.fn();
+    wrapper = mount(SetupCardRenderer, {
+      props: { content, subs: SUBS },
+      global: {
+        plugins: [store, router],
+        stubs: { FirstEventStatus: FirstEventStatusStub },
+        provide: {
+          [SETUP_STEPS_HOST as symbol]: { setSteps, setStream },
+          ...(onboarding ? { [SETUP_CARD_ONBOARDING as symbol]: ref(onboarding) } : {}),
+        },
+      },
+      attachTo: document.body,
+    });
+    return setSteps;
+  };
+
+  it("reports the steps in order, then their done and active changes", async () => {
+    const setSteps = mountWithHost(CONTENT);
+    // The verify step is the one that holds the data check.
+    expect(setSteps).toHaveBeenLastCalledWith([
+      { id: "install", title: "Install", done: false, active: true },
+      { id: "verify", title: "Verify", done: false, active: false, detectionAnchor: true },
+    ]);
+    wrapper.findComponent(OCodeBlock).vm.$emit("copy", {});
+    await flushPromises();
+    expect(setSteps).toHaveBeenLastCalledWith([
+      { id: "install", title: "Install", done: true, active: false },
+      { id: "verify", title: "Verify", done: false, active: true, detectionAnchor: true },
+    ]);
+    bar(wrapper).vm.$emit("detected", { count: 3 });
+    await flushPromises();
+    expect(setSteps).toHaveBeenLastCalledWith([
+      { id: "install", title: "Install", done: true, active: false },
+      { id: "verify", title: "Verify", done: true, active: false, detectionAnchor: true },
+    ]);
+  });
+
+  it("gives each step's root an id the page can scroll to", () => {
+    mountWithHost(CONTENT);
+    expect(wrapper.find("#setup-step-install").attributes("data-test")).toBe("ai-step-install");
+    expect(wrapper.find("#setup-step-verify").attributes("data-test")).toBe("ai-step-verify");
+  });
+
+  it("marks the tracing step as one the cluster's logs do not prove, so it waits for its copy", async () => {
+    const presets: SetupCardPresets = { traces: "ebpf", languages: [] };
+    const setSteps = mountWithHost(kubernetesCard(SUBS, gt, presets), presets);
+    bar(wrapper).vm.$emit("detected", { count: 3 });
+    await flushPromises();
+    const steps = setSteps.mock.lastCall![0];
+    expect(steps.map((s: { id: string }) => s.id)).toEqual([
+      "install",
+      "instrument",
+      "network",
+      "verify",
+    ]);
+    expect(steps[0].notProvenByDetect).toBeUndefined();
+    expect(steps[1]).toMatchObject({ done: false, notProvenByDetect: true });
+    expect(steps[2]).toMatchObject({ done: false, notProvenByDetect: true });
+    expect(steps[3]).toMatchObject({ done: true });
+  });
+
+  it("reports the stream the user picks, and no stream for a card without the input", async () => {
+    mountWithHost(otlpTracesCard(SUBS, gt));
+    expect(setStream).toHaveBeenLastCalledWith("default");
+    wrapper.findComponent(OInput).vm.$emit("update:modelValue", "checkout");
+    await flushPromises();
+    expect(setStream).toHaveBeenLastCalledWith("checkout");
+    wrapper.unmount();
+    mountWithHost(CONTENT);
+    expect(setStream).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("reports the onboarding titles, folded optional step included", () => {
+    const setSteps = mountWithHost(kubernetesCard(SUBS, gt, { languages: [] }), {
+      languages: [],
+    });
+    expect(setSteps.mock.lastCall![0].map((s: { title: string }) => s.title)).toEqual([
+      "Quick install (recommended)",
+      "Trace your applications: language libraries or eBPF",
+      "See which workloads talk to each other: eBPF network flows",
+      "Check Your Data",
+    ]);
   });
 });

@@ -53,20 +53,11 @@ pub async fn set(account: &str, key: &str, meta: Option<FileMeta>, deleted: bool
         deleted,
     );
 
-    // write into file_list storage
-    // retry 5 times
-    for _ in 0..5 {
-        match progress(account, key, meta.as_ref(), deleted).await {
-            Ok(id) => {
-                file_data.id = id;
-                break;
-            }
-            Err(e) => {
-                log::error!("[FILE_LIST] Error saving file to storage, retrying: {e}");
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            }
-        }
-    }
+    file_data.id = retry_op(
+        || progress(account, key, meta.as_ref(), deleted),
+        tokio::time::Duration::from_secs(1),
+    )
+    .await?;
 
     let cfg = config::get_config();
 
@@ -79,11 +70,43 @@ pub async fn set(account: &str, key: &str, meta: Option<FileMeta>, deleted: bool
     Ok(())
 }
 
+async fn retry_op<F, Fut>(mut op: F, delay: tokio::time::Duration) -> Result<i64>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<i64>>,
+{
+    let mut id = 0;
+    let mut last_err = None;
+    for attempt in 0..5u32 {
+        match op().await {
+            Ok(v) => {
+                id = v;
+                last_err = None;
+                break;
+            }
+            Err(e) => {
+                log::error!("[FILE_LIST] Error saving file to storage, retrying: {e}");
+                last_err = Some(e);
+                if attempt < 4 && !delay.is_zero() {
+                    tokio::time::sleep(delay).await;
+                }
+            }
+        }
+    }
+
+    if let Some(err) = last_err {
+        return Err(err);
+    }
+
+    Ok(id)
+}
+
 async fn progress(account: &str, key: &str, data: Option<&FileMeta>, delete: bool) -> Result<i64> {
     let mut id = 0;
     if delete {
         if let Err(e) = infra::file_list::remove(key).await {
             log::error!("service:db:file_list: delete {key}, remove error: {e}");
+            return Err(e);
         }
     } else if let Some(data) = data {
         match infra::file_list::add(account, key, data).await {
@@ -92,6 +115,7 @@ async fn progress(account: &str, key: &str, data: Option<&FileMeta>, delete: boo
             }
             Err(e) => {
                 log::error!("service:db:file_list: add {key}, add error: {e}");
+                return Err(e);
             }
         }
         // update stream stats realtime
@@ -179,6 +203,59 @@ mod tests {
         let result = progress("test_org", "test_file.parquet", None, false).await;
         assert!(result.is_ok()); // Should return 0 when no operation is performed
         assert_eq!(result.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_progress_add_error() {
+        // invalid_key fails parse_file_key_columns before any DB call
+        let meta = create_test_file_meta();
+        let result = progress("test_org", "invalid_key", Some(&meta), false).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_progress_delete_error() {
+        // invalid_key fails parse_file_key_columns before any DB call
+        let result = progress("test_org", "invalid_key", None, true).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_retry_op_succeeds_after_transient_failure() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let attempts = AtomicUsize::new(0);
+        let result = retry_op(
+            || async {
+                if attempts.fetch_add(1, Ordering::SeqCst) == 0 {
+                    Err(infra::errors::Error::Message("transient error".to_string()))
+                } else {
+                    Ok(42)
+                }
+            },
+            tokio::time::Duration::ZERO,
+        )
+        .await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 42);
+        assert_eq!(attempts.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn test_retry_op_fails_all_attempts() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let attempts = AtomicUsize::new(0);
+        let result = retry_op(
+            || async {
+                attempts.fetch_add(1, Ordering::SeqCst);
+                Err(infra::errors::Error::Message(
+                    "persistent error".to_string(),
+                ))
+            },
+            tokio::time::Duration::ZERO,
+        )
+        .await;
+        assert!(result.is_err());
+        assert_eq!(attempts.load(Ordering::SeqCst), 5);
     }
 
     #[test]

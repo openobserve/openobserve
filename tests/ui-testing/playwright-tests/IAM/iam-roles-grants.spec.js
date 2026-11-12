@@ -1,4 +1,4 @@
-// IAM → Edit Role · grant semantics (G-01 .. G-18)
+// IAM → Edit Role · grant semantics (G-01 .. G-19)
 //
 // Plan: .claude/commands/nvpworkflow/iam-roles-redesign-tests.md
 //
@@ -11,6 +11,7 @@
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
+const { openNavFlyoutChild } = require('../../pages/commonActions.js');
 const testLogger = require('../utils/test-logger.js');
 const {
     ns, req, listRoles, createRole, setRolePerms, getPerms, makeTracker, uniq, org, rbacEnabled,
@@ -115,7 +116,7 @@ test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () 
         pm = new PageManager(page);
         // Capability is decided by the API, not by how fast a tab paints.
         test.skip(!(await rbacEnabled(page)), 'RBAC is off (OSS build)');
-        await page.locator('[data-test="menu-link-\\/iam-item"]').click();
+        await openNavFlyoutChild(page, 'iam');
         await pm.rolesPage.rolesTab.waitFor({ state: 'visible', timeout: 30000 });
     });
 
@@ -335,8 +336,8 @@ test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () 
         tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
     }, async ({ page }) => {
         const name = await openFresh(page, 'preset');
-        await expect(pm.rolesPage.summaryEmpty).toBeVisible({ timeout: 15000 });
-        await pm.rolesPage.presetCard('Read-Only').click();
+        await expect(pm.rolesPage.presetsPanel).toBeVisible({ timeout: 15000 });
+        await pm.rolesPage.applyPreset('readonly');
         await pm.rolesPage.save();
 
         const stored = await getPerms(page, name);
@@ -382,6 +383,42 @@ test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () 
         await expect
             .poll(async () => (await getPerms(page, name)).length, { timeout: 20000 })
             .toBeGreaterThan(0);
+    });
+
+    test('G-19 · the Alert Manager preset adds module-wide grants plus Streams List and Get, leaving nothing missing', {
+        tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
+    }, async ({ page }) => {
+        const name = await openFresh(page, 'alertmgr');
+        const want = [
+            { object: obj('afolder'), permission: 'AllowAll' },
+            { object: obj('destination'), permission: 'AllowAll' },
+            { object: obj('template'), permission: 'AllowAll' },
+            { object: obj('stream'), permission: 'AllowList' },
+            { object: obj('stream'), permission: 'AllowGet' },
+        ];
+
+        await expect(pm.rolesPage.presetStatus('alert_manager')).toContainText('+5', { timeout: 15000 });
+        await pm.rolesPage.openPreset('alert_manager');
+        await expect(pm.rolesPage.presetDetail).toContainText('Nothing will be missing after you add it.');
+        await expect(pm.rolesPage.presetApply).toBeEnabled({ timeout: 15000 });
+        await pm.rolesPage.presetApply.click();
+        await pm.rolesPage.waitForPresetStaged();
+
+        await pm.rolesPage.openDrawer();
+        // One row per object, so Streams List and Get share the stream row.
+        for (const resource of ['afolder', 'destination', 'template', 'stream']) {
+            await expect(pm.rolesPage.drawerChange(`${resource}-_all_${org()}-added`)).toBeVisible();
+        }
+        await expect(pm.rolesPage.drawerCompanions).toHaveCount(0);
+
+        const payload = await pm.rolesPage.saveAndCapture({ via: pm.rolesPage.drawerSave });
+        expect(payload, 'save fired no PUT').toBeTruthy();
+        expect(payload.remove).toEqual([]);
+        expect(tuples(payload.add)).toEqual(tuples(want));
+
+        await expect
+            .poll(async () => tuples(await getPerms(page, name)), { timeout: 15000 })
+            .toEqual(tuples(want));
     });
 
     // ---------------- column select-all ----------------

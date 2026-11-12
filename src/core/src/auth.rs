@@ -26,7 +26,7 @@ use base64::Engine;
 use common::meta::user::AuthTokensExt;
 use common::meta::user::{AuthTokens, UserOrgRole};
 use config::{
-    meta::user::UserRole,
+    meta::{feature::Feature, user::UserRole},
     utils::{hash::try_get_passcode_hash, json},
 };
 use lru::LruCache;
@@ -41,7 +41,7 @@ use {
 
 pub const V2_API_PREFIX: &str = "v2";
 /// Modules routed as `/v2/{org_id}/{module}`; any other path names its org in the first segment.
-pub const V2_ORG_MODULES: [&str; 8] = [
+pub const V2_ORG_MODULES: [&str; 9] = [
     "alerts",
     "folders",
     "reports",
@@ -50,6 +50,7 @@ pub const V2_ORG_MODULES: [&str; 8] = [
     "downtimes",
     "workflows",
     "alert_calibration",
+    "fleets",
 ];
 pub const SESSION_AUTH_MARKER: &str = "Session::";
 const PASSWORD_HASH_CACHE_CAPACITY: NonZeroUsize = NonZeroUsize::new(10_000).unwrap();
@@ -94,6 +95,11 @@ pub fn org_from_path<'a>(path_columns: &[&'a str]) -> &'a str {
         [org, ..] => org,
         [] => "",
     }
+}
+
+/// The license routes name no org, so a user lookup cannot take one from their path.
+pub fn is_license_path_without_org(path_columns: &[&str]) -> bool {
+    matches!(path_columns, ["license"] | ["license", "refresh"])
 }
 
 /// The path as the router matched it, below the mount prefixes axum has already stripped.
@@ -175,18 +181,21 @@ pub async fn save_org_tuples(org_id: &str) {
 pub async fn save_org_tuples(_org_id: &str) {}
 
 #[cfg(feature = "enterprise")]
-pub async fn delete_org_tuples(org_id: &str) {
+pub async fn delete_org_tuples(org_id: &str) -> Result<(), anyhow::Error> {
     use o2_openfga::config::get_config as get_openfga_config;
 
-    if get_openfga_config().enabled
-        && let Err(e) = o2_openfga::authorizer::authz::delete_org_tuples(org_id).await
-    {
-        log::error!("[auth] failed to delete org tuples for {org_id}: {e}");
+    if get_openfga_config().enabled {
+        o2_openfga::authorizer::authz::delete_org_tuples(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to delete org tuples for {org_id}: {e}"))?;
     }
+    Ok(())
 }
 
 #[cfg(not(feature = "enterprise"))]
-pub async fn delete_org_tuples(_org_id: &str) {}
+pub async fn delete_org_tuples(_org_id: &str) -> Result<(), anyhow::Error> {
+    Ok(())
+}
 
 #[cfg(feature = "enterprise")]
 pub fn get_role(role: &UserOrgRole) -> UserRole {
@@ -215,6 +224,37 @@ pub struct UserEmail {
     pub user_id: String,
 }
 
+/// A per-object GET check, taken as a trait so tests can stand in for OpenFGA.
+#[cfg(feature = "enterprise")]
+pub trait ReadCheck {
+    fn can_read(&self, resource: &str, object_id: &str) -> impl Future<Output = bool> + Send;
+}
+
+/// One user's reads in one org, checked as the `GET /{org}/{resource}/{id}` routes check them.
+#[cfg(feature = "enterprise")]
+pub struct UserReads<'a> {
+    pub org_id: &'a str,
+    pub user_id: &'a str,
+}
+
+#[cfg(feature = "enterprise")]
+impl ReadCheck for UserReads<'_> {
+    async fn can_read(&self, resource: &str, object_id: &str) -> bool {
+        check_permissions(
+            object_id,
+            self.org_id,
+            self.user_id,
+            resource,
+            "GET",
+            None,
+            false,
+            false,
+            true,
+        )
+        .await
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AuthExtractor {
     pub auth: String,
@@ -226,6 +266,8 @@ pub struct AuthExtractor {
     pub use_all_org: bool,
     pub use_self_context: bool,
     pub use_self_parent: bool,
+    /// License features the route requires; checked even when `bypass_check` is set.
+    pub feature: Option<&'static [Feature]>,
 }
 
 impl AuthExtractor {
@@ -242,6 +284,7 @@ impl AuthExtractor {
             use_all_org: false,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         }
     }
 }
@@ -326,6 +369,9 @@ where
             if let Some(auth_header) = parts.headers.get("Authorization")
                 && let Ok(auth_str) = auth_header.to_str()
             {
+                let feature =
+                    rp::resolve_permission(&path_columns, &method, &org_id, &folder, None)
+                        .and_then(|r| r.feature);
                 return Ok(AuthExtractor {
                     auth: reject_forged_session_marker(auth_str.to_owned()),
                     method,
@@ -336,20 +382,29 @@ where
                     use_all_org: false,
                     use_self_context: false,
                     use_self_parent: false,
+                    feature,
                 });
             }
             return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
         }
 
-        // This is case for ingestion endpoints where we need to check
-        // permissions on the stream. Classified against the authoritative
-        // ingestion-route table (method + exact path shape) rather than
-        // substring-matching an ingestion word, so only real writes take the
-        // stream-level bypass.
-        if common::meta::ingestion_routes::is_ingestion_write(&parts.method, path) {
+        if common::meta::ingestion_routes::is_opamp(path) {
+            return opamp_extractor(&parts.headers, &method, &org_id, &folder);
+        }
+
+        // Only a matched ingestion route takes the stream-level bypass, never a look-alike path.
+        let route = parts
+            .extensions
+            .get::<axum::extract::MatchedPath>()
+            .map(|route| route.as_str());
+        if common::meta::ingestion_routes::is_ingestion_write(&parts.method, path, route) {
             if let Some(auth_header) = parts.headers.get("Authorization")
                 && let Ok(auth_str) = auth_header.to_str()
             {
+                // the stream-level bypass skips RBAC, not the license gate
+                let feature =
+                    rp::resolve_permission(&path_columns, &method, &org_id, &folder, None)
+                        .and_then(|r| r.feature);
                 return Ok(AuthExtractor {
                     auth: reject_forged_session_marker(auth_str.to_owned()),
                     method,
@@ -360,6 +415,7 @@ where
                     use_all_org: false,
                     use_self_context: false,
                     use_self_parent: false,
+                    feature,
                 });
             }
             return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
@@ -367,7 +423,12 @@ where
 
         // Resolve permission via the declarative route table.
         // Falls back to the legacy if-else for routes not yet in the table.
-        let resolved = match rp::resolve_permission(
+        let resolve = if query.contains_key("folder") {
+            rp::resolve_permission
+        } else {
+            rp::resolve_permission_without_folder
+        };
+        let resolved = match resolve(
             &path_columns,
             &method,
             &org_id,
@@ -376,6 +437,7 @@ where
                 StreamType::Logs => RpStreamType::Logs,
                 StreamType::Metrics => RpStreamType::Metrics,
                 StreamType::Traces => RpStreamType::Traces,
+                StreamType::Profiles => RpStreamType::Profiles,
                 StreamType::EnrichmentTables => RpStreamType::EnrichmentTables,
                 _ => RpStreamType::Logs,
             }),
@@ -402,6 +464,7 @@ where
                     use_all_org: false,
                     use_self_context: false,
                     use_self_parent: false,
+                    feature: None,
                 });
             }
         };
@@ -422,6 +485,7 @@ where
                 use_all_org: false,
                 use_self_context: false,
                 use_self_parent: false,
+                feature: resolved.feature,
             });
         }
 
@@ -440,6 +504,7 @@ where
             use_all_org: resolved.use_all_org,
             use_self_context: resolved.use_self_context,
             use_self_parent: resolved.use_self_parent,
+            feature: resolved.feature,
         })
     }
 
@@ -478,6 +543,7 @@ where
                 use_all_org: false,
                 use_self_context: false,
                 use_self_parent: false,
+                feature: None,
             });
         }
 
@@ -503,6 +569,40 @@ fn reject_forged_session_marker(auth: String) -> String {
     } else {
         auth
     }
+}
+
+/// §4.2: a fleet token in the header only; a cookie would let any page the user visits drive OpAMP.
+#[cfg(feature = "enterprise")]
+fn opamp_extractor(
+    headers: &HeaderMap,
+    method: &str,
+    org_id: &str,
+    folder: &str,
+) -> Result<AuthExtractor, AuthExtractorRejection> {
+    let Some(auth) = headers
+        .get("Authorization")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| reject_forged_session_marker(v.to_owned()))
+        .filter(|v| {
+            config::utils::base64::basic_password(v)
+                .is_some_and(|p| p.starts_with(config::meta::fleet::FLEET_TOKEN_PREFIX))
+        })
+    else {
+        return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
+    };
+    // The token's fixed scope is its authorization; the validator confines it to its org's writes.
+    Ok(AuthExtractor {
+        auth,
+        method: method.to_string(),
+        o2_type: String::new(),
+        org_id: org_id.to_string(),
+        bypass_check: true,
+        parent_id: folder.to_string(),
+        use_all_org: false,
+        use_self_context: false,
+        use_self_parent: false,
+        feature: None,
+    })
 }
 
 fn extract_cookies_from_headers(headers: &HeaderMap) -> HashMap<&str, &str> {
@@ -715,6 +815,7 @@ pub async fn check_permissions(
                 use_all_org,
                 use_self_context,
                 use_self_parent,
+                feature: None,
             },
             user.role,
             user.is_external,
@@ -722,6 +823,22 @@ pub async fn check_permissions(
         .await;
     }
     true
+}
+
+/// The first object `reads` refuses, asking once per distinct trimmed id.
+#[cfg(feature = "enterprise")]
+pub async fn first_unreadable<'a>(
+    objects: &[(&'static str, &'a str)],
+    reads: &impl ReadCheck,
+) -> Option<(&'static str, &'a str)> {
+    let mut asked = std::collections::HashSet::new();
+    for &(resource, id) in objects {
+        let id = id.trim();
+        if asked.insert((resource, id)) && !reads.can_read(resource, id).await {
+            return Some((resource, id));
+        }
+    }
+    None
 }
 
 // OSS has no folder boundary to cross, so this allows where the `check_permissions`
@@ -907,6 +1024,39 @@ mod tests {
         assert_eq!(generated_url, expected_url);
     }
 
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn ingestion_write_carries_its_route_feature() {
+        use axum::{Router, body::Body, routing::post};
+        use config::meta::feature::Feature;
+        use tower::ServiceExt;
+
+        // `MatchedPath` only exists on a routed request, so the extractor runs behind a router.
+        let app = Router::new()
+            .route(
+                "/{org_id}/v1/logs",
+                post(|auth: AuthExtractor| async move {
+                    (auth.bypass_check && auth.feature == Some(&[Feature::Logs][..])).to_string()
+                }),
+            )
+            .route(
+                "/{org_id}/kv/{key}",
+                post(|auth: AuthExtractor| async move { auth.bypass_check.to_string() }),
+            );
+        for (uri, expected) in [("/myorg/v1/logs", "true"), ("/myorg/kv/_json", "false")] {
+            let request = axum::http::Request::post(uri)
+                .header("Authorization", "Basic cm9vdEBleGFtcGxlLmNvbTpwYXNz")
+                .body(Body::empty())
+                .unwrap();
+            let response = app.clone().oneshot(request).await.unwrap();
+            assert_eq!(response.status(), axum::http::StatusCode::OK, "{uri}");
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert_eq!(body, expected, "{uri}");
+        }
+    }
+
     #[tokio::test]
     async fn test_is_root_user() {
         assert!(!is_root_user("dummy"));
@@ -1084,7 +1234,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete_org_tuples_non_enterprise() {
         // In non-enterprise mode, this should not panic and return immediately
-        delete_org_tuples("test_org").await;
+        assert!(delete_org_tuples("test_org").await.is_ok());
         // If we reach here, the function completed successfully
     }
 
@@ -1226,7 +1376,7 @@ mod tests {
             ("POST", "/kv/kv/_search", "kv"),
             ("POST", "/api/kv/_search", "api"),
             ("POST", "/v2/kv/_search", "v2"),
-            ("GET", "/v2/acme/alerts", "acme"),
+            ("GET", "/v2/acme/alerts?folder=default", "acme"),
         ] {
             let (mut parts, ()) = http::Request::builder()
                 .method(method)
@@ -1261,5 +1411,57 @@ mod tests {
                 format!("Bearer {access_token}")
             );
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn basic(credentials: &str) -> String {
+        format!("Basic {}", config::utils::base64::encode(credentials))
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn opamp_extractor_takes_fleet_tokens_only() {
+        let headers = |name: http::header::HeaderName, value: &str| {
+            let mut headers = HeaderMap::new();
+            headers.insert(name, value.parse().unwrap());
+            headers
+        };
+
+        // The validator trims the password, so a padded token is still a fleet token.
+        for credentials in [
+            "agent:o2ft_x",
+            "admin@example.com: o2ft_x",
+            "agent:o2ft_x\n",
+        ] {
+            let fleet_token = headers(http::header::AUTHORIZATION, &basic(credentials));
+            for method in ["GET", "POST"] {
+                let ext = opamp_extractor(&fleet_token, method, "default", "")
+                    .unwrap_or_else(|_| panic!("{method} rejected"));
+                assert!(ext.bypass_check, "{method} {credentials:?}");
+            }
+        }
+
+        for login in [
+            basic("user@example.com:pw"),
+            "Bearer o2ft_x".to_string(),
+            basic("o2ft_x:pw"),
+        ] {
+            let login = headers(http::header::AUTHORIZATION, &login);
+            for method in ["GET", "POST"] {
+                let Err(rejection) = opamp_extractor(&login, method, "default", "") else {
+                    panic!("only a fleet token may connect, {method}");
+                };
+                assert_eq!(rejection.status_code, StatusCode::UNAUTHORIZED);
+            }
+        }
+
+        let cookie = headers(
+            http::header::COOKIE,
+            "auth_tokens=eyJhY2Nlc3NfdG9rZW4iOiJ4In0=",
+        );
+        let Err(rejection) = opamp_extractor(&cookie, "GET", "default", "") else {
+            panic!("a cookie must never authenticate OpAMP");
+        };
+        assert_eq!(rejection.status_code, StatusCode::UNAUTHORIZED);
     }
 }

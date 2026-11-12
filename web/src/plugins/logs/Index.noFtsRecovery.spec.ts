@@ -110,6 +110,33 @@ afterEach(() => {
   resetFreeTextSchemasForTests();
 });
 
+describe("Index SQL toggle before the stream fields load (#15549)", { timeout: 30000 }, () => {
+  it("refuses a bare word on a no-FTS stream instead of running it as raw SQL", async () => {
+    streams.push({
+      name: "plain",
+      schema: [
+        { name: "_timestamp", type: "Int64" },
+        { name: "msg_text", type: "Utf8" },
+      ],
+      settings: {},
+    });
+    const state = wrapper.vm.searchObj;
+    state.data.stream.selectedStream = ["plain"];
+    state.data.streamResults = { list: [{ name: "plain" }] };
+    state.data.stream.selectedStreamFields = [];
+    state.data.freeTextBlocked = null;
+    resetFreeTextSchemasForTests();
+
+    state.meta.sqlMode = true;
+    await flushPromises();
+
+    await vi.waitFor(() => expect(state.data.freeTextBlocked?.streams).toEqual(["plain"]));
+    expect(state.meta.sqlMode).toBe(false);
+    expect(state.data.query).toBe("timeout");
+    expect(results()).toHaveLength(0);
+  });
+});
+
 describe("Index no-FTS recovery requests", { timeout: 30000 }, () => {
   it.each([
     ["-refused", ""],
@@ -205,7 +232,8 @@ describe("Index no-FTS recovery requests", { timeout: 30000 }, () => {
     expect(wrapper.findComponent(OForm).vm.form.state.values.field).toBe("level");
     const preview = wrapper.get('[data-test="logs-no-fts-preview"]').text();
     await wrapper.get('[data-test="logs-no-fts-field-form"]').trigger("submit");
-    await vi.waitFor(() => expect(results()).toHaveLength(1));
+    // Switching to the UDS stream runs extractFields before the search, which outlasts the 1s default on loaded CI.
+    await vi.waitFor(() => expect(results()).toHaveLength(1), { timeout: 5000 });
     expect(results()[0].queryReq.query.sql.replace(/"level"/g, "level")).toContain(preview);
   });
 

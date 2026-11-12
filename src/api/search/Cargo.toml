@@ -32,11 +32,12 @@ vectorscan = [
 
 [dependencies]
 common.workspace = true
-audit.workspace = true
+audit = { workspace = true, optional = true }
 db.workspace = true
 openobserve-api-common.workspace = true
 openobserve-core.workspace = true
 ingestion-common.workspace = true
+schema.workspace = true
 search.workspace = true
 search_service.workspace = true
 usage_reporting.workspace = true

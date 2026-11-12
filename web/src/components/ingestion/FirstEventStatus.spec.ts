@@ -18,13 +18,20 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createMemoryHistory, createRouter } from "vue-router";
 import i18n from "@/locales";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type {
   FirstEventDiagnosis,
   FirstEventResult,
   FirstEventState,
 } from "@/composables/firstEvent/useFirstEventWatch";
 import FirstEventStatus from "./FirstEventStatus.vue";
+import { markHeardFromPending } from "@/components/login/heardFrom";
 import { FIRST_EVENT_ASK_AI } from "./firstEventAskAi";
+import {
+  FIRST_EVENT_REPORTER,
+  FIRST_EVENT_SUCCESS_BY_HOST,
+  type FirstEventReporter,
+} from "@/composables/firstEvent/firstEventReporter";
 import analytics from "@/services/product_analytics";
 
 const fake = {
@@ -35,6 +42,8 @@ const fake = {
   scope: ref<"new-data" | "since-watch-start">("new-data"),
   troubleshooting: ref(false),
   sinceUs: ref<number>(),
+  targetExists: ref(true),
+  deciding: ref(false),
   start: vi.fn(),
   stop: vi.fn(),
   probeNow: vi.fn(),
@@ -48,6 +57,8 @@ vi.mock("@/composables/firstEvent/useFirstEventWatch", () => ({
       ...fake,
       scope: computed(() => fake.scope.value),
       sinceUs: computed(() => fake.sinceUs.value),
+      targetExists: computed(() => fake.targetExists.value),
+      deciding: computed(() => fake.deciding.value),
     };
   },
 }));
@@ -62,13 +73,17 @@ const routes = ["logs", "metrics", "traces", "profiles", "recommended", "curl"].
   component: { template: "<div />" },
 }));
 
-const makeStore = (zoConfig: Record<string, unknown> = {}) =>
+const makeStore = (
+  zoConfig: Record<string, unknown> = {},
+  org: Record<string, unknown> = {},
+  organizations: unknown[] = [],
+) =>
   createStore({
     state: {
       API_ENDPOINT: "https://api.openobserve.ai",
       zoConfig: { cluster_name: "US1", ...zoConfig },
-      selectedOrganization: { identifier: "acme-prod" },
-      organizations: [],
+      selectedOrganization: { identifier: "acme-prod", ...org },
+      organizations,
       organizationData: {
         organizationPasscode: "secret-token-value",
         orgTokens: [{ name: "default", token: "secret-token-value" }],
@@ -80,14 +95,25 @@ let wrapper: VueWrapper;
 let router: ReturnType<typeof createRouter>;
 const mountBar = (
   props: Record<string, unknown> = {},
-  opts: { askAi?: (q: string) => void; zoConfig?: Record<string, unknown> } = {},
+  opts: {
+    askAi?: (q: string) => void;
+    zoConfig?: Record<string, unknown>;
+    reporter?: FirstEventReporter;
+    successByHost?: boolean;
+    org?: Record<string, unknown>;
+    organizations?: unknown[];
+  } = {},
 ) => {
   router = createRouter({ history: createMemoryHistory(), routes });
   wrapper = mount(FirstEventStatus, {
     props: { org: "acme-prod", guideName: "Kubernetes", ...props },
     global: {
-      plugins: [i18n, makeStore(opts.zoConfig), router],
-      provide: opts.askAi ? { [FIRST_EVENT_ASK_AI as symbol]: opts.askAi } : {},
+      plugins: [i18n, makeStore(opts.zoConfig, opts.org, opts.organizations), router],
+      provide: {
+        ...(opts.askAi ? { [FIRST_EVENT_ASK_AI as symbol]: opts.askAi } : {}),
+        ...(opts.reporter ? { [FIRST_EVENT_REPORTER as symbol]: opts.reporter } : {}),
+        ...(opts.successByHost ? { [FIRST_EVENT_SUCCESS_BY_HOST as symbol]: true } : {}),
+      },
     },
   });
   return wrapper;
@@ -112,6 +138,8 @@ beforeEach(() => {
   fake.scope.value = "new-data";
   fake.troubleshooting.value = false;
   fake.sinceUs.value = undefined;
+  fake.targetExists.value = true;
+  fake.deciding.value = false;
   awsConfig.isEnterprise = "false";
 });
 
@@ -185,6 +213,49 @@ describe("FirstEventStatus — waiting", () => {
     expect(q("first-event-status-troubleshoot-btn").attributes("aria-busy")).toBe("true");
     expect(fake.state.value).toBe("waiting");
   });
+
+  it("reads rejections at 2 minutes by default, as the stepped cards say", async () => {
+    mountBar();
+    const opts = watchArgs.mock.calls[0][2] as { diagnosisAtMs: { value: number } };
+    expect(opts.diagnosisAtMs.value).toBe(120_000);
+    expect(wrapper.text()).toContain("If nothing arrives in 2 minutes it shows what went wrong");
+    await vi.advanceTimersByTimeAsync(130_000);
+    expect(wrapper.text()).toContain("Checks stop after 60 minutes");
+  });
+
+  it("waits the page's longer delay before a diagnosis and says so", async () => {
+    mountBar({ diagnosisAfterMs: 900_000 });
+    const opts = watchArgs.mock.calls[0][2] as { diagnosisAtMs: { value: number } };
+    expect(opts.diagnosisAtMs.value).toBe(900_000);
+    expect(wrapper.text()).toContain("If nothing arrives in 15 min it shows what went wrong");
+    await vi.advanceTimersByTimeAsync(130_000);
+    expect(wrapper.text()).toContain("If nothing arrives in 15 min");
+    await vi.advanceTimersByTimeAsync(800_000);
+    expect(wrapper.text()).toContain("Checks stop after 60 minutes");
+  });
+});
+
+describe("FirstEventStatus — before the first decision", () => {
+  it.each([{}, { display: "pill" }])(
+    "renders a neutral placeholder and no claim until the watch decides (%o)",
+    async (props) => {
+      fake.deciding.value = true;
+      mountBar({ targetStream: "syslog_ng", signal: "logs", ...props });
+      const root = q("first-event-status");
+      expect(root.attributes("data-state")).toBe("deciding");
+      expect(root.text()).toBe("");
+      expect(root.find('[role="status"]').exists()).toBe(true);
+      expect(q("first-event-status-meta").exists()).toBe(false);
+      expect(q("first-event-status-troubleshoot-btn").exists()).toBe(false);
+      expect(q("first-event-status-check-now-btn").exists()).toBe(false);
+      await vi.advanceTimersByTimeAsync(130_000);
+      expect(q("first-event-status").text()).not.toContain("Waiting");
+      fake.deciding.value = false;
+      await nextTick();
+      expect(q("first-event-status").attributes("data-state")).toBe("waiting");
+      expect(q("first-event-status").text()).toContain("Waiting for logs in syslog_ng");
+    },
+  );
 });
 
 describe("FirstEventStatus — received", () => {
@@ -197,6 +268,17 @@ describe("FirstEventStatus — received", () => {
     rangeStart: NOW * 1000 - 900_000_000,
     rangeEnd: NOW * 1000 + 900_000_000,
   };
+
+  it("leaves the open and add-another buttons to an onboarding page's own success panel", async () => {
+    mountBar({}, { successByHost: true });
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(q("first-event-status-summary").exists()).toBe(true);
+    expect(q("first-event-status-open-btn").exists()).toBe(false);
+    expect(q("first-event-status-setup-another-btn").exists()).toBe(false);
+    expect(q("first-event-status-connect-source-btn").exists()).toBe(false);
+  });
 
   it("shows the count, stream, source and first record, and fires first_event_detected once", async () => {
     mountBar({ sourceLabel: "acme-prod-eks" });
@@ -226,6 +308,31 @@ describe("FirstEventStatus — received", () => {
     expect(
       vi.mocked(analytics.track).mock.calls.filter((c) => c[0] === "first_event_detected"),
     ).toHaveLength(2);
+  });
+
+  it("reports seconds_since_signup from the org's creation time in microseconds", async () => {
+    mountBar({}, { org: { created_at: (NOW - 3_600_000) * 1000 } });
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(analytics.track).toHaveBeenCalledWith("first_event_detected", {
+      stream_type: "logs",
+      seconds_since_signup: 3600,
+    });
+  });
+
+  it("falls back to the org list for the creation time", async () => {
+    mountBar(
+      {},
+      { organizations: [{ identifier: "acme-prod", created_at: (NOW - 90_000) * 1000 }] },
+    );
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(analytics.track).toHaveBeenCalledWith("first_event_detected", {
+      stream_type: "logs",
+      seconds_since_signup: 90,
+    });
   });
 
   it("opens Logs on the stream with the thirty minutes around the first record", async () => {
@@ -273,6 +380,40 @@ describe("FirstEventStatus — received", () => {
       from: String(result.rangeStart),
       to: String(result.rangeEnd),
     });
+  });
+
+  it("asks how the user heard of us on a Data sources page once data arrives", async () => {
+    markHeardFromPending(undefined);
+    mountBar();
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(q("heard-from-prompt").exists()).toBe(true);
+    localStorage.clear();
+  });
+
+  it("disables Open in Traces with a lock while the traces license is locked", async () => {
+    mountBar({}, { zoConfig: { features: { traces: "locked" } } });
+    fake.result.value = { ...result, streamType: "traces" };
+    fake.state.value = "received";
+    await nextTick();
+    const btn = q("first-event-status-open-btn");
+    expect(btn.attributes("disabled")).toBeDefined();
+    expect(btn.findAllComponents(OIcon).map((i) => i.props("name"))).toContain("lock");
+    await btn.trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.name).not.toBe("traces");
+  });
+
+  it("keeps Open in Logs live when only traces is locked", async () => {
+    mountBar({}, { zoConfig: { features: { traces: "locked" } } });
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(q("first-event-status-open-btn").attributes("disabled")).toBeUndefined();
+    await q("first-event-status-open-btn").trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("logs");
   });
 
   it("reads Test event received with Connect your real source primary on a test guide", async () => {
@@ -417,6 +558,37 @@ describe("FirstEventStatus — diagnosis", () => {
     expect(q("first-event-diagnosis-fix").text()).toContain("Fluent Bit");
     await q("first-event-diagnosis-copy-btn").trigger("click");
     expect(wrapper.emitted("copy-command")).toHaveLength(1);
+  });
+
+  it("reads Copy prompt on the coding-agent tab and points the token fix at the .env", async () => {
+    mountBar({ snippetKind: "prompt" });
+    fake.diagnosis.value = {
+      form: "rejected",
+      trigger: "troubleshoot",
+      rejections: [rejection("invalid_credentials", 401)],
+    };
+    fake.state.value = "rejected";
+    await nextTick();
+    expect(q("first-event-diagnosis-copy-btn").text()).toBe("Copy prompt");
+    expect(q("first-event-diagnosis-fix").text()).toBe(
+      "The token in your .env doesn't match org token default. Download the .env again and ask your coding agent to re-run the request.",
+    );
+  });
+
+  it("names the guide's own tool in the config fix", async () => {
+    mountBar({ snippetKind: "config", configTool: "syslog-ng" });
+    fake.diagnosis.value = {
+      form: "rejected",
+      trigger: "troubleshoot",
+      rejections: [rejection("invalid_credentials", 401)],
+    };
+    fake.state.value = "rejected";
+    await nextTick();
+    expect(q("first-event-diagnosis-fix").text()).toContain(
+      "The password in your syslog-ng config",
+    );
+    expect(q("first-event-diagnosis-fix").text()).toContain("restart syslog-ng");
+    expect(q("first-event-diagnosis-fix").text()).not.toContain("Fluent Bit");
   });
 
   it("shows the org id, endpoint and compare sentence when no request reached the org", async () => {
@@ -680,12 +852,43 @@ describe("FirstEventStatus — pill display for empty pages", () => {
   it.each([
     [{ targetStream: "system_", match: "keyword" }, "Matching streams already receive data."],
     [{ targetStream: "default", snippetKind: "config" }, "Checks start when you copy the config."],
+    [{ targetStream: "default", snippetKind: "prompt" }, "Checks start when you copy the prompt."],
+    [
+      { targetStream: "system_", match: "keyword", snippetKind: "prompt" },
+      "Matching streams already receive data. Checks start when you copy the prompt.",
+    ],
   ])("names what the idle bar waits on (%o)", async (props, text) => {
     mountBar(props);
     fake.state.value = "idle";
     await nextTick();
     expect(q("first-event-status-meta").text()).toContain(text);
   });
+
+  it.each([
+    [{ targetStream: "syslog_ng" }, "Checks start when you copy the command."],
+    [
+      { targetStream: "syslog_ng", snippetKind: "config" },
+      "Checks start when you copy the config.",
+    ],
+    [
+      { targetStream: "syslog_ng", snippetKind: "prompt" },
+      "Checks start when you copy the prompt.",
+    ],
+    [{ targetStream: "system_", match: "keyword" }, "Checks start when you copy the command."],
+    [{ targetStream: "syslog_ng", display: "pill" }, "Checks start when you copy the command."],
+  ])(
+    "claims no existing data when the idle bar waits on a target that does not exist (%o)",
+    async (props, text) => {
+      mountBar(props);
+      fake.state.value = "idle";
+      fake.targetExists.value = false;
+      await nextTick();
+      expect(q("first-event-status-meta").text()).toBe(text);
+      expect(q("first-event-status").text()).toContain("Not checking yet");
+      await q("first-event-status-check-now-btn").trigger("click");
+      expect(fake.start).toHaveBeenCalledWith("check");
+    },
+  );
 
   it("offers no Check now outside the idle state", () => {
     mountBar({ targetStream: "default" });
@@ -723,5 +926,32 @@ describe("FirstEventStatus — pill display for empty pages", () => {
     expect(q("first-event-status").attributes("data-display")).toBeUndefined();
     expect(q("first-event-status-troubleshoot-btn").exists()).toBe(true);
     expect(q("first-event-status").text()).not.toContain("Waiting for your first logs");
+  });
+});
+
+describe("FirstEventStatus — host page reporter", () => {
+  it("attaches on mount, reports its states and first record, and detaches on unmount", async () => {
+    const detach = vi.fn();
+    const reporter = { attach: vi.fn(() => detach), state: vi.fn(), detected: vi.fn() };
+    mountBar({}, { reporter });
+    expect(reporter.attach).toHaveBeenCalledTimes(1);
+    fake.state.value = "rejected";
+    await nextTick();
+    expect(reporter.state).toHaveBeenLastCalledWith("rejected");
+    const result: FirstEventResult = {
+      streamName: "default",
+      streamType: "logs",
+      count: 3,
+      rangeStart: 1,
+      rangeEnd: 2,
+    };
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(reporter.state).toHaveBeenLastCalledWith("received");
+    expect(reporter.detected).toHaveBeenCalledWith(result);
+    expect(detach).not.toHaveBeenCalled();
+    wrapper.unmount();
+    expect(detach).toHaveBeenCalledTimes(1);
   });
 });

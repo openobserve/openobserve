@@ -40,7 +40,8 @@ import { makeEdge } from "@/composables/flow/makeEdge";
 import { getTruncatedConditions } from "@/utils/conditionPreview";
 import { convertV0ToV2, convertV1BEToV2, convertV1ToV2 } from "@/utils/alerts/alertDataTransforms";
 import { DEFAULT_TRIGGER_KIND, triggerTypeForKind } from "./triggers";
-import workflowService from "@/services/workflows";
+import { hasStoredRunData, runReasonOf, type RunOutcomeFields } from "./runStatus";
+import workflowService, { type WorkflowHistoryRow } from "@/services/workflows";
 import { workflowRunsQuery } from "@/services/workflows.queries";
 import { workflowKeys } from "@/services/workflows.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
@@ -725,6 +726,12 @@ export const currentTriggerKind = (): string | undefined => {
   return trigger?.data?.trigger_kind || trigger?.meta?.trigger_kind;
 };
 
+export const currentTriggerNodeId = (): string | undefined => {
+  const nodes: { id: string; data?: { node_type?: string } }[] =
+    workflowObj.currentSelectedWorkflow?.nodes || [];
+  return nodes.find((n) => n.data?.node_type === "workflow_trigger")?.id;
+};
+
 // ── Shared graph helpers ─────────────────────────────────────────────────────
 // Workflows enforce one incoming edge per node (see onConnect), so the graph is
 // a TREE rooted at the trigger (or from_node) — a plain BFS from the root visits
@@ -1045,6 +1052,91 @@ export const serializeWorkflow = (opts?: { onlyNodeId?: string }) => {
   };
 };
 
+const BRANCH_PROBE_SEP = "::path::";
+
+// Wired in the current graph, not the run's graph.
+const wiredBranchHandles = (nodeId: string): string[] => {
+  const node = (workflowObj.currentSelectedWorkflow?.nodes || []).find((n: any) => n.id === nodeId);
+  const wired = new Set(
+    (workflowObj.currentSelectedWorkflow?.edges || [])
+      .filter((e: any) => e.source === nodeId)
+      .map((e: any) => e.source_handle ?? e.sourceHandle),
+  );
+  return branchHandles(node).filter((h) => wired.has(h));
+};
+
+// The server records a Branch's output only for a handle with an edge, so a lone Run Step would drop every record; each wired handle gets a pass-through condition probe instead.
+const withBranchProbes = (workflow: any, nodeId: string) => {
+  const handles = wiredBranchHandles(nodeId);
+  const probeId = (handle: string) => `${nodeId}${BRANCH_PROBE_SEP}${handle}`;
+  const probes = handles.map((handle) =>
+    serializeNode({
+      id: probeId(handle),
+      io_type: "default",
+      position: { x: 0, y: 0 },
+      is_disabled: false,
+      data: { node_type: "condition", conditions: null },
+    }),
+  );
+  const edges = handles.map((handle) => ({
+    id: `${probeId(handle)}-edge`,
+    source: nodeId,
+    target: probeId(handle),
+    source_handle: handle,
+  }));
+  return {
+    workflow: { ...workflow, nodes: [...workflow.nodes, ...probes], edges },
+    handles,
+    probeId,
+  };
+};
+
+// A saved workflow's probe run is persisted with the probe ids, so a reopened run must fold them the way the live response is folded.
+const foldStoredBranchProbes = (maps: {
+  inputs: Record<string, any>;
+  outputs: Record<string, any>;
+  errors: Record<string, any>;
+}) => {
+  const handlesOf = new Map<string, Set<string>>();
+  for (const key of [
+    ...Object.keys(maps.inputs),
+    ...Object.keys(maps.outputs),
+    ...Object.keys(maps.errors),
+  ]) {
+    const at = key.lastIndexOf(BRANCH_PROBE_SEP);
+    if (at <= 0) continue;
+    const branchId = key.slice(0, at);
+    if (!handlesOf.has(branchId)) handlesOf.set(branchId, new Set());
+    handlesOf.get(branchId)!.add(key.slice(at + BRANCH_PROBE_SEP.length));
+  }
+  let folded = maps;
+  // A probe that routed nothing may have no key, so the wired handles are added as the live fold does.
+  for (const [branchId, seen] of handlesOf) {
+    const handles = new Set([...wiredBranchHandles(branchId), ...seen]);
+    folded = foldBranchProbes(branchId, [...handles], folded);
+  }
+  return folded;
+};
+
+/** Folds the probes' inputs into the Branch's per-handle output map and drops the probes from the result. */
+export const foldBranchProbes = (
+  nodeId: string,
+  handles: string[],
+  maps: { inputs: Record<string, any>; outputs: Record<string, any>; errors: Record<string, any> },
+) => {
+  const isProbe = (key: string) => key.startsWith(`${nodeId}${BRANCH_PROBE_SEP}`);
+  const perHandle = Object.fromEntries(
+    handles.map((h) => [h, maps.inputs[`${nodeId}${BRANCH_PROBE_SEP}${h}`] ?? []]),
+  );
+  const strip = (m: Record<string, any>) =>
+    Object.fromEntries(Object.entries(m).filter(([key]) => !isProbe(key)));
+  return {
+    inputs: strip(maps.inputs),
+    outputs: { ...strip(maps.outputs), [nodeId]: perHandle },
+    errors: strip(maps.errors),
+  };
+};
+
 // Stamp the current graph as the stored version. Called on load and after every
 // successful write, so the no-op comparison always names the newest saved state.
 export const captureStoredSnapshot = () => {
@@ -1083,9 +1175,15 @@ export const executeTestRun = async (opts: {
     // single-node run is inherently a partial graph (one node, no trigger/edges),
     // so it's ALWAYS a draft, even when the parent workflow is published.
     const draft = !!(single || wf.isDraft || workflowObj.dirtyFlag || !wf.id);
+    const sent = serializeWorkflow(single ? { onlyNodeId: single } : undefined);
+    const singleNodeData = single
+      ? (wf.nodes || []).find((n: any) => n.id === single)?.data
+      : undefined;
+    const probed =
+      singleNodeData?.node_type === "branch" ? withBranchProbes(sent, single) : undefined;
     const res = await workflowService.testWorkflow({
       org_identifier: opts.orgId,
-      workflow: serializeWorkflow(single ? { onlyNodeId: single } : undefined),
+      workflow: probed?.workflow ?? sent,
       inputs: opts.inputs,
       from_node: opts.fromNode || undefined,
       draft,
@@ -1095,14 +1193,21 @@ export const executeTestRun = async (opts: {
     if (wf.id) {
       void queryClient.invalidateQueries({ queryKey: workflowKeys.runsOf(opts.orgId, wf.id) });
     }
-    const errors = res.data?.errors || {};
+    let errors = res.data?.errors || {};
     // Per-node INPUT map: node_id -> the records that node received.
-    const inputs = res.data?.inputs || {};
+    let inputs = res.data?.inputs || {};
     // Per-node OUTPUT map: node_id -> the records that node emitted. The backend
     // now sends this directly (alongside `inputs`), so a node's Output is read
     // straight from here (see nodeTestOutput) rather than derived from downstream
     // inputs. Errors are still delivered the old way, via `errors`.
-    const outputs = res.data?.outputs || {};
+    let outputs = res.data?.outputs || {};
+    if (probed) {
+      ({ inputs, outputs, errors } = foldBranchProbes(single, probed.handles, {
+        inputs,
+        outputs,
+        errors,
+      }));
+    }
 
     if (single) {
       // Single-node Run Step: REPLACE just this node's input/output/error in the
@@ -1533,18 +1638,20 @@ export const restoreTestData = (workflowId: string, opts?: { keepDocumentState?:
 // test_workflow and retry_run just record the run — so a Test and a failed Retry
 // both LOOK retryable in history but answer 400 "Errored run info not found".
 // Why a run cannot be retried, "" when it can — lets a disabled control say which.
+// A run that never executed or never finished stored no input, so its retry would be refused too.
 export const retryBlockedReason = (
-  run: { event_type?: string; error?: string } | null | undefined,
-): "" | "test" | "retry" | "succeeded" => {
+  run: ({ event_type?: string } & RunOutcomeFields) | null | undefined,
+): "" | "test" | "retry" | "succeeded" | "no_input" => {
   if (!run) return "succeeded";
   if (run.event_type === "Test") return "test";
   if (run.event_type === "Retry") return "retry";
-  if (!run.error) return "succeeded";
+  if (runReasonOf(run) || !hasStoredRunData(run)) return "no_input";
+  if (run.status !== "failed") return "succeeded";
   return "";
 };
 
 export const isRetryableRun = (
-  run: { event_type?: string; error?: string } | null | undefined,
+  run: ({ event_type?: string } & RunOutcomeFields) | null | undefined,
 ): boolean => retryBlockedReason(run) === "";
 
 // Replay a failed run server-side. The backend re-runs from the stored input map,
@@ -1556,7 +1663,7 @@ export const retryWorkflowRun = async (opts: {
   workflowId: string;
   runId: string;
   fromNode?: string;
-  run?: { event_type?: string; error?: string } | null;
+  run?: ({ event_type?: string } & RunOutcomeFields) | null;
 }): Promise<{ ok: boolean; error?: string }> => {
   if (opts.run !== undefined && !isRetryableRun(opts.run)) {
     return { ok: false, error: "" };
@@ -1629,6 +1736,23 @@ export const loadWorkflowRun = async (opts: {
   runId: string;
 }): Promise<{ ok: boolean; error?: string }> => {
   const wf = workflowObj.currentSelectedWorkflow;
+  const row = (workflowObj.runsHistory.list as WorkflowHistoryRow[]).find(
+    (r) => r.run_id === opts.runId,
+  );
+  if (row && !hasStoredRunData(row)) {
+    workflowObj.testRun.result = {
+      errors: {},
+      inputs: {},
+      outputs: {},
+      ranNodeIds: [],
+      blockedNodeIds: [],
+      mode: "history",
+      runId: opts.runId,
+      ghostNodeIds: [],
+      source: "run",
+    };
+    return { ok: true };
+  }
   try {
     const res = await workflowService.getWorkflowRun({
       org_identifier: opts.orgId,
@@ -1640,12 +1764,12 @@ export const loadWorkflowRun = async (opts: {
     // errors.data (array) -> map keyed by node_id, in the same
     // { error_count, errors: [[message], …] } shape the badges + drawer read.
     const errList = Array.isArray(payload.errors?.data) ? payload.errors.data : [];
-    const errors: Record<string, any> = {};
+    const rawErrors: Record<string, any> = {};
     for (const e of errList) {
       // Drop null/empty messages so a message-less error entry doesn't render
       // the literal string "undefined"/"null" as an error line.
       const msgs = (Array.isArray(e.error) ? e.error : [e.error]).filter(Boolean);
-      errors[e.node_id] = {
+      rawErrors[e.node_id] = {
         error_count: msgs.length,
         errors: msgs.map((m: string) => [m]),
       };
@@ -1654,11 +1778,16 @@ export const loadWorkflowRun = async (opts: {
     // Per-node INPUT for the whole run (all nodes) — the same shape/semantics as a
     // Test run's `inputs`. Older runs only carried error_node_map (errored node's
     // input) — fall back to that.
-    const inputs = payload.data?.input_map || payload.data?.error_node_map || {};
+    const rawInputs = payload.data?.input_map || payload.data?.error_node_map || {};
     // Per-node OUTPUT for the whole run — the stored counterpart of a Test run's
     // `outputs`, so the drawer reads a node's Output directly. Older runs predate
     // the output map → empty, and Output shows "run to view".
-    const outputs = payload.data?.output_map || {};
+    const rawOutputs = payload.data?.output_map || {};
+    const { inputs, outputs, errors } = foldStoredBranchProbes({
+      inputs: rawInputs,
+      outputs: rawOutputs,
+      errors: rawErrors,
+    });
 
     // GHOST NODES — the run references a node the workflow no longer has (it was
     // edited/deleted after the run). Its badge has nowhere to render, so an error

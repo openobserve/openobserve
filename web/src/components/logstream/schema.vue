@@ -310,6 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                             <div>
                               <OButton
+                                :aria-label="t('common.close')"
                                 data-test="add-stream-cancel-btn"
                                 variant="ghost"
                                 size="icon-sm"
@@ -443,15 +444,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                               {{
                                 patternAssociations[row.name]?.length
-                                  ? t("logStream.viewPatternsCount", {
-                                      count: patternAssociations[row.name]?.length,
-                                    })
+                                  ? t(
+                                      "logStream.viewPatternsCount",
+                                      { count: patternAssociations[row.name]?.length },
+                                      patternAssociations[row.name]?.length,
+                                    )
                                   : t("logStream.addPattern")
                               }}
                               <OIcon
                                 :name="sdrAccess.allowed ? 'arrow-forward' : 'lock'"
                                 size="xs"
-                                :class="sdrAccess.allowed ? '' : 'text-warning-600'"
+                                :class="sdrAccess.allowed ? '' : 'lock-chip'"
                               />
                             </span>
                           </template>
@@ -480,19 +483,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="max-w-55"
                             @update:model-value="markFormDirty"
                           />
-                          <!-- casts: number input can hold "" at runtime while cleared -->
-                          <small v-if="dataRetentionDays > 0 && (dataRetentionDays as any) != ''">
+                          <small data-test="stream-details-inherited-retention">
                             {{
-                              t("logStream.globalRetentionDays", {
-                                days: store.state.zoConfig.data_retention_days,
-                              })
+                              inheritedRetention > 0
+                                ? t("logStream.retentionDefaultDays", { days: inheritedRetention })
+                                : t("logStream.retentionDefaultForever")
                             }}
-                          </small>
-                          <small
-                            v-if="dataRetentionDays <= 0 || (dataRetentionDays as any) == ''"
-                            class="text-status-error-text"
-                          >
-                            {{ t("logStream.retentionMinOneDay") }}
                           </small>
                         </div>
 
@@ -552,6 +548,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             v-model="storeOriginalData"
                             @update:model-value="formDirtyFlag = true"
                           />
+                        </div>
+
+                        <div
+                          v-if="showDynamicPartitionSettings"
+                          class="text-compact flex items-center justify-between px-3 py-2.5"
+                        >
+                          <span class="flex items-center gap-2">
+                            {{ t("logStream.dynamicPartition") }}
+                            <span class="flex items-center">
+                              <OIcon
+                                name="info"
+                                size="sm"
+                                class="text-text-secondary cursor-pointer"
+                              />
+                              <OTooltip
+                                side="right"
+                                :content="t('logStream.dynamicPartitionTooltip')"
+                              />
+                            </span>
+                          </span>
+                          <OSwitch
+                            data-test="log-stream-dynamic-partition-toggle-btn"
+                            v-model="dynamicPartition"
+                            @update:model-value="formDirtyFlag = true"
+                          />
+                        </div>
+
+                        <div
+                          v-if="showDynamicPartitionSettings && !dynamicPartition"
+                          class="text-compact flex items-center justify-between px-3 py-2.5"
+                        >
+                          <span class="flex items-center gap-2">
+                            {{ t("logStream.partitionTimeLevel") }}
+                            <span class="flex items-center">
+                              <OIcon
+                                name="info"
+                                size="sm"
+                                class="text-text-secondary cursor-pointer"
+                              />
+                              <OTooltip
+                                side="right"
+                                :content="t('logStream.partitionTimeLevelTooltip')"
+                              />
+                            </span>
+                          </span>
+                          <OToggleGroup
+                            data-test="log-stream-partition-time-level-toggle"
+                            v-model="partitionTimeLevel"
+                            @update:model-value="formDirtyFlag = true"
+                          >
+                            <OToggleGroupItem value="hourly" size="sm">
+                              {{ t("logStream.partitionTimeLevelHourly") }}
+                            </OToggleGroupItem>
+                            <OToggleGroupItem value="daily" size="sm">
+                              {{ t("logStream.partitionTimeLevelDaily") }}
+                            </OToggleGroupItem>
+                          </OToggleGroup>
                         </div>
 
                         <div class="text-compact flex items-center justify-between px-3 py-2.5">
@@ -657,10 +710,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex items-center justify-between max-md:flex-wrap max-md:gap-y-1"
                   >
                     <div class="flex items-center gap-2 max-md:flex-wrap">
-                      <span v-if="activeMainTab == 'schemaSettings'" class="px-2 py-2"
-                        ><strong> {{ selectedFields.length }}</strong>
-                        {{ t("logStream.fieldsSelected") }}</span
+                      <i18n-t
+                        v-if="activeMainTab == 'schemaSettings'"
+                        keypath="logStream.fieldsSelected"
+                        :plural="selectedFields.length"
+                        tag="span"
+                        class="px-2 py-2"
+                        data-test="schema-fields-selected-count"
                       >
+                        <template #count
+                          ><strong>{{ selectedFields.length }}</strong></template
+                        >
+                      </i18n-t>
                       <OButton
                         v-if="isSchemaUDSEnabled && activeMainTab == 'schemaSettings'"
                         data-test="schema-add-field-button"
@@ -690,11 +751,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="schema-delete-button"
                         variant="outline"
                         size="sm-action"
-                        @click="
-                          activeMainTab == 'schemaSettings'
-                            ? (confirmQueryModeChangeDialog = true)
-                            : (confirmDeleteDatesDialog = true)
-                        "
+                        @click="openDeleteConfirm"
                         icon-left="delete"
                       >
                         {{ t("logStream.delete") }}
@@ -771,15 +828,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODrawer>
 
   <ConfirmDialog
-    :title="t('logStream.deleteActionTitle')"
-    :message="t('logStream.deleteActionMessage')"
+    :title="t('logStream.deleteActionTitle', deleteConfirmCount)"
+    :message="t('logStream.deleteActionMessage', { count: deleteConfirmCount })"
+    ok-variant="destructive"
     @update:ok="deleteFields()"
     @update:cancel="confirmQueryModeChangeDialog = false"
     v-model="confirmQueryModeChangeDialog"
   />
   <ConfirmDialog
     :title="t('logStream.deleteDatesTitle')"
-    :message="t('logStream.deleteDatesMessage')"
+    :message="t('logStream.deleteDatesMessage', { count: deleteConfirmCount })"
+    ok-variant="destructive"
     @update:ok="deleteDates()"
     @update:cancel="confirmDeleteDatesDialog = false"
     v-model="confirmDeleteDatesDialog"
@@ -851,6 +910,7 @@ import { makeSchemaFieldsSchema } from "./Schema.schema";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
+import { inheritedRetentionDays } from "@/utils/dataRetention";
 import type { AcceptableValue } from "reka-ui";
 
 const defaultValue: any = () => {
@@ -950,13 +1010,16 @@ export default defineComponent({
     const indexData: any = ref(defaultValue());
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
-    const dataRetentionDays = ref(0);
+    // Empty means the stream inherits; a default must never be saved as the stream's own value.
+    const dataRetentionDays = ref<number | "">("");
     const storeOriginalData = ref(false);
     const enableDistinctFields = ref(false);
     const maxQueryRange = ref(0);
     const flattenLevel = ref<number | undefined>(undefined);
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDeleteDatesDialog = ref(false);
+    // Snapshot at open: the selection is cleared while the dialog is still closing.
+    const deleteConfirmCount = ref(0);
     const confirmAddPerformanceFieldsDialog = ref(false);
     const missingPerformanceFields = ref<MissingPerformanceField[]>([]);
     const pendingSelectedFields = ref<string[]>([]);
@@ -996,6 +1059,14 @@ export default defineComponent({
     const activeMainTab = ref("schemaSettings");
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
+    const dynamicPartition = ref(false);
+    const partitionTimeLevel = ref("hourly");
+    // only a change is written: the server records a new level from the next day on
+    const savedPartitionTimeLevel = ref("hourly");
+    const showDynamicPartitionSettings = computed(() => {
+      const type = modelValue.stream_type;
+      return type === "logs" || type === "metrics" || type === "traces";
+    });
 
     const streamCrossLinks = ref<any[]>([]);
     const orgCrossLinks = computed(
@@ -1201,15 +1272,16 @@ export default defineComponent({
     const { getStream, getUpdatedSettings } = useStreams(t);
 
     onBeforeMount(() => {
-      dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
+      dataRetentionDays.value = "";
       maxQueryRange.value = 0;
       storeOriginalData.value = false;
       enableDistinctFields.value = false;
       approxPartition.value = false;
     });
 
+    // only the logs ingest path writes the original record
     const showStoreOriginalDataToggle = computed(() => {
-      return modelValue.stream_type !== "traces";
+      return modelValue.stream_type === "logs";
     });
     //here we added a watcher to
     //1. if user defined schema is enabled then we need to show the schema fields tab and also need to make sure that it would be the active tab
@@ -1408,9 +1480,9 @@ export default defineComponent({
       // Populate stream-level cross-links
       streamCrossLinks.value = streamResponse.settings?.cross_links || [];
 
+      serverInheritedRetention.value = streamResponse.inherited_retention_days;
       if (showDataRetention.value)
-        dataRetentionDays.value =
-          streamResponse.settings.data_retention || store.state.zoConfig.data_retention_days;
+        dataRetentionDays.value = streamResponse.settings.data_retention || "";
       calculateDateRange();
 
       maxQueryRange.value = streamResponse.settings.max_query_range || 0;
@@ -1418,6 +1490,10 @@ export default defineComponent({
       storeOriginalData.value = streamResponse.settings.store_original_data || false;
       enableDistinctFields.value = streamResponse.settings.enable_distinct_fields || false;
       approxPartition.value = streamResponse.settings.approx_partition || false;
+      const partitionLevelSettings = streamResponse.settings.partition_time_level;
+      dynamicPartition.value = partitionLevelSettings?.dynamic ?? false;
+      savedPartitionTimeLevel.value = partitionLevelSettings?.changes?.at(-1)?.level ?? "hourly";
+      partitionTimeLevel.value = savedPartitionTimeLevel.value;
 
       if (!streamResponse.schema) {
         loadingState.value = false;
@@ -1508,6 +1584,8 @@ export default defineComponent({
         store_original_data?: boolean;
         enable_distinct_fields?: boolean;
         approx_partition?: boolean;
+        dynamic_partition?: boolean;
+        partition_time_level?: string;
         flatten_level?: number;
       }
       let settings: StreamSettingsPayload = {
@@ -1521,7 +1599,7 @@ export default defineComponent({
         pattern_associations: [...patternAssociations.value],
       };
 
-      if (showDataRetention.value && dataRetentionDays.value < 1) {
+      if (showDataRetention.value && Number(dataRetentionDays.value) < 0) {
         toast({
           message: t("toastMessages.logstream.invalidDataRetentionPeriodRetentionPeriod"),
           variant: "error",
@@ -1542,6 +1620,12 @@ export default defineComponent({
       settings["store_original_data"] = storeOriginalData.value;
       settings["enable_distinct_fields"] = enableDistinctFields.value;
       settings["approx_partition"] = approxPartition.value;
+      if (showDynamicPartitionSettings.value) {
+        settings["dynamic_partition"] = dynamicPartition.value;
+        if (!dynamicPartition.value && partitionTimeLevel.value !== savedPartitionTimeLevel.value) {
+          settings["partition_time_level"] = partitionTimeLevel.value;
+        }
+      }
 
       if (flattenLevel.value !== undefined) {
         settings["flatten_level"] = Number(flattenLevel.value);
@@ -1710,7 +1794,6 @@ export default defineComponent({
           analytics.track("Button Click", {
             button: "Update Settings",
             user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
             stream_name: indexData.value.name,
             page: "Schema Details",
           });
@@ -1747,10 +1830,15 @@ export default defineComponent({
 
     const showFullTextSearchColumn = computed(() => modelValue.stream_type !== "enrichment_tables");
 
-    const showDataRetention = computed(
+    const showDataRetention = computed(() => modelValue.stream_type !== "enrichment_tables");
+
+    const serverInheritedRetention = ref<number | undefined>();
+
+    // A metadata stream follows its source stream's own value, which only the backend can see.
+    const inheritedRetention = computed(
       () =>
-        !!(store.state.zoConfig.data_retention_days || false) &&
-        modelValue.stream_type !== "enrichment_tables",
+        serverInheritedRetention.value ??
+        inheritedRetentionDays(store.state, String(modelValue.stream_type)),
     );
 
     const disableOptions = (schema: any, option: any) => {
@@ -2265,14 +2353,15 @@ export default defineComponent({
       }
     };
     const calculateDateRange = () => {
-      if (dataRetentionDays.value <= 0) {
+      const retentionDays = Number(dataRetentionDays.value) || inheritedRetention.value;
+      if (retentionDays <= 0) {
         minDate.value = null;
         return;
       }
 
       const today = new Date();
       const currentDate = new Date(today);
-      currentDate.setDate(today.getDate() - (dataRetentionDays.value - 1)); // Adjust to the desired number of days (dataRetentionDays of  days in this case)
+      currentDate.setDate(today.getDate() - (retentionDays - 1)); // Adjust to the desired number of days (retentionDays of days in this case)
 
       // Format minDate using timestampToTimezoneDate for a custom format
       minDate.value = timestampToTimezoneDate(
@@ -2292,6 +2381,16 @@ export default defineComponent({
       });
       formDirtyFlag.value = true;
       onSubmit();
+    };
+
+    const openDeleteConfirm = () => {
+      if (activeMainTab.value == "schemaSettings") {
+        deleteConfirmCount.value = selectedFields.value.length;
+        confirmQueryModeChangeDialog.value = true;
+      } else {
+        deleteConfirmCount.value = selectedDateFields.value.length;
+        confirmDeleteDatesDialog.value = true;
+      }
     };
 
     const groupPatternAssociationsByField = (
@@ -2496,15 +2595,22 @@ export default defineComponent({
       showFullTextSearchColumn,
       getImageURL,
       dataRetentionDays,
+      inheritedRetention,
+      serverInheritedRetention,
       storeOriginalData,
       enableDistinctFields,
       approxPartition,
+      dynamicPartition,
+      partitionTimeLevel,
+      showDynamicPartitionSettings,
       maxQueryRange,
       flattenLevel,
       showDataRetention,
       formatSizeFromMB,
       confirmQueryModeChangeDialog,
       confirmDeleteDatesDialog,
+      deleteConfirmCount,
+      openDeleteConfirm,
       confirmAddPerformanceFieldsDialog,
       missingPerformanceFields,
       pendingSelectedFields,

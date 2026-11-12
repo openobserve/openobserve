@@ -83,6 +83,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>
                 <span class="inline-block">
                   <OButton
+                    aria-hidden="true"
+                    tabindex="-1"
                     class="pointer-events-none min-w-auto opacity-30"
                     variant="ghost"
                     size="icon-circle-sm"
@@ -190,6 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div>
                 <OButton
+                  :aria-label="t('common.delete')"
                   data-test="multi-time-range-alerts-delete-btn"
                   variant="ghost"
                   size="icon-circle-sm"

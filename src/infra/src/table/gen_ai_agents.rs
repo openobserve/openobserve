@@ -189,6 +189,10 @@ pub async fn delete_for_stream(
     delete(org_id, Some(source_stream), Some(source_stream_type)).await
 }
 
+pub async fn delete_by_org(org_id: &str) -> Result<u64, errors::Error> {
+    delete(org_id, None, None).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

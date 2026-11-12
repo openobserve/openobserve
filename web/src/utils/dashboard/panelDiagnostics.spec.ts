@@ -226,3 +226,15 @@ describe("omitFunctionErrorMessages", () => {
     expect(omitFunctionErrorMessages(metadata, [])).toBe(metadata);
   });
 });
+
+describe("summarizePanelDiagnostics with sparse PromQL metadata", () => {
+  it("summarises holes as empty queries instead of crashing", () => {
+    const resultMetaData: unknown[] = [];
+    resultMetaData[1] = [{ took: 20, is_partial: true }];
+    const result = summarizePanelDiagnostics({ resultMetaData, queryType: "promql" });
+    expect(result.queries).toHaveLength(2);
+    expect(result.queries[0].partialReasons).toEqual([]);
+    expect(result.queries[0].functionErrors).toEqual([]);
+    expect(result.serverPartial).toBe(true);
+  });
+});

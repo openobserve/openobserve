@@ -82,6 +82,22 @@
         </OFormSwitch>
       </div>
 
+      <div v-if="showRedInsights" data-test="settings-ai-rca-thread-tool-output" class="o2-input">
+        <div data-test="settings-incidents-heading" class="pt-4 pb-1 text-base font-bold">
+          {{ t("settings.incidentsHeading") }}
+        </div>
+        <OFormSwitch
+          data-test="settings-ai-rca-thread-tool-output-btn"
+          name="aiRcaThreadToolOutput"
+          :label="t('settings.aiRcaThreadToolOutputLabel')"
+          class="mt-2"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('settings.aiRcaThreadToolOutputHelp')" />
+          </template>
+        </OFormSwitch>
+      </div>
+
       <!-- Cross-Linking Configuration -->
       <template v-if="store.state.zoConfig?.enable_cross_linking">
         <OSeparator class="mt-6 mb-4" />
@@ -91,12 +107,6 @@
           :subtitle="t('crossLinks.orgConfigSubtitle')"
           @change="formDirty = true"
         />
-      </template>
-
-      <!-- Domain -> organization mappings: cloud-only, and stored on the meta org. -->
-      <template v-if="showDomainOrgMappings">
-        <OSeparator class="mt-6 mb-4" />
-        <DomainOrgMappings v-model="domainOrgMappings" @change="formDirty = true" />
       </template>
 
       <div class="mt-3 flex gap-2">
@@ -116,6 +126,11 @@
         >
       </div>
     </OForm>
+
+    <template v-if="showDataRetentionDefaults">
+      <OSeparator class="mt-6 mb-4" />
+      <DataRetentionDefaults />
+    </template>
   </div>
 </template>
 
@@ -127,9 +142,7 @@ import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import { useStore } from "vuex";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
-import DomainOrgMappings from "./DomainOrgMappings.vue";
-import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import type { DomainOrgMapping } from "./DomainOrgMappings.schema";
+import DataRetentionDefaults from "@/components/settings/DataRetentionDefaults.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -158,14 +171,8 @@ const organizationSettingsSchema = makeOrganizationSettingsSchema(t);
 const crossLinks = ref(store.state?.organizationData?.organizationSettings?.cross_links || []);
 const formDirty = ref(false);
 
-// Domain mappings are read and written on the meta org only, and the backend
-// ignores the field outside cloud — so the section renders under both conditions.
-const { isMetaOrg } = useIsMetaOrg();
-const showDomainOrgMappings = computed(() => config.isCloud === "true" && isMetaOrg.value);
 const showRedInsights = config.isEnterprise == "true";
-const domainOrgMappings = ref<DomainOrgMapping[]>(
-  store.state?.organizationData?.organizationSettings?.domain_org_mappings || [],
-);
+const showDataRetentionDefaults = config.isEnterprise == "true";
 
 // Dynamic defaults (edit-prefill from the store) → a typed computed. The trace/
 // span/toggle values are form-owned (OFormInput / OFormSwitch).
@@ -177,6 +184,7 @@ const organizationSettingsDefaults = computed((): OrganizationSettingsForm => {
     toggleIngestionLogs: s?.toggle_ingestion_logs ?? false,
     usageStreamEnabled: s?.usage_stream_enabled ?? false,
     redInsightsEnabled: s?.red_insights_enabled ?? false,
+    aiRcaThreadToolOutput: s?.ai_rca_thread_tool_output ?? false,
   };
 });
 
@@ -185,15 +193,6 @@ watch(
   (newVal) => {
     if (!formDirty.value) {
       crossLinks.value = newVal || [];
-    }
-  },
-);
-
-watch(
-  () => store.state?.organizationData?.organizationSettings?.domain_org_mappings,
-  (newVal) => {
-    if (!formDirty.value) {
-      domainOrgMappings.value = newVal || [];
     }
   },
 );
@@ -211,14 +210,10 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       usage_stream_enabled: value.usageStreamEnabled,
     };
 
-    // Only sent when the section rendered: an org that never showed it must not
-    // post an empty list and wipe mappings another admin saved.
-    if (showDomainOrgMappings.value) {
-      payload.domain_org_mappings = domainOrgMappings.value;
-    }
-    // Same rule for the enterprise-only switch: a hidden field must not overwrite the stored one.
+    // A hidden enterprise-only field must not overwrite the stored one.
     if (showRedInsights) {
       payload.red_insights_enabled = value.redInsightsEnabled;
+      payload.ai_rca_thread_tool_output = value.aiRcaThreadToolOutput;
     }
 
     const crossLinksChanged =
@@ -235,8 +230,12 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       toggle_ingestion_logs: value.toggleIngestionLogs,
       cross_links: crossLinks.value,
       usage_stream_enabled: value.usageStreamEnabled,
-      ...(showDomainOrgMappings.value ? { domain_org_mappings: domainOrgMappings.value } : {}),
-      ...(showRedInsights ? { red_insights_enabled: value.redInsightsEnabled } : {}),
+      ...(showRedInsights
+        ? {
+            red_insights_enabled: value.redInsightsEnabled,
+            ai_rca_thread_tool_output: value.aiRcaThreadToolOutput,
+          }
+        : {}),
     };
 
     store.dispatch("setOrganizationSettings", updatedSettings);
@@ -261,8 +260,6 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
 // Exposed for unit tests that exercise the submit handler directly.
 defineExpose({
   crossLinks,
-  domainOrgMappings,
-  showDomainOrgMappings,
   formDirty,
   saveOrgSettings,
   organizationSettingsSchema,

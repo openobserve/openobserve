@@ -184,6 +184,11 @@ async fn run() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("db init failed: {e}");
             }
+            // Logged, not fatal: the plan sync and the next start repair any row it misses.
+            #[cfg(feature = "cloud")]
+            if let Err(e) = o2_enterprise::enterprise::cloud::reconcile_plan_rows().await {
+                log::error!("public dashboard plan rows reconcile failed: {e}");
+            }
 
             // init infra
             if let Err(e) = infra::init().await {
@@ -204,6 +209,16 @@ async fn run() -> Result<(), anyhow::Error> {
             if let Err(e) = infra::table::cipher::boot(master_key.as_deref()).await {
                 job_init_tx.send(false).ok();
                 panic!("cipher master key boot failed: {e}");
+            }
+            #[cfg(feature = "enterprise")]
+            if let Err(e) = infra::table::cipher::install_oncall_key(
+                !o2_enterprise::enterprise::common::config::get_config()
+                    .encryption
+                    .oncall_master_key
+                    .is_empty(),
+            ) {
+                job_init_tx.send(false).ok();
+                panic!("on-call key install failed: {e}");
             }
 
             if let Err(e) = bootstrap::init().await {
@@ -455,6 +470,10 @@ async fn run() -> Result<(), anyhow::Error> {
 /// Initializes enterprise features.
 #[cfg(feature = "enterprise")]
 async fn init_enterprise() -> Result<(), anyhow::Error> {
+    let node = &config::cluster::LOCAL_NODE;
+    // before routes and jobs start, so their first license check sees the loaded license
+    o2_enterprise::enterprise::license::load_license(node.is_router() || node.is_single_role())
+        .await;
     o2_enterprise::enterprise::search::init().await?;
 
     if o2_enterprise::enterprise::common::config::get_config()

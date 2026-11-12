@@ -10,6 +10,7 @@ const getStreamsMock = vi.hoisted(() =>
       logs: { list: [{ name: "app" }, { name: "sys" }] },
       metrics: { list: [{ name: "cpu" }] },
       traces: { list: [{ name: "svc-a" }] },
+      profiles: { list: [{ name: "cpu-prof" }] },
       index: { list: [{ name: "users" }] },
       enrichment_tables: { list: [{ name: "geo" }] },
       metadata: { list: [{ name: "meta" }] },
@@ -127,6 +128,11 @@ vi.mock("@/services/common", async (importOriginal) => {
     },
   });
 });
+vi.mock("@/services/fleet", () => ({
+  default: {
+    listFleets: vi.fn(async () => ({ data: { items: [{ id: "f9", name: "F9" }] } })),
+  },
+}));
 vi.mock("@/services/synthetics", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock((await importOriginal()) as any, {
@@ -179,6 +185,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import alertService from "@/services/alerts";
 import cipherKeysService from "@/services/cipher_keys";
 import commonService from "@/services/common";
+import fleetService from "@/services/fleet";
 import dashboardService from "@/services/dashboards";
 import destinationService from "@/services/alert_destination";
 import jsTransformService from "@/services/jstransform";
@@ -201,7 +208,7 @@ const ORG = "default";
 
 // The row builders live in EditRole.vue; here they are stubs that record what
 // each loader hands them and keep the entity count observable.
-function setup() {
+function setup(features?: Record<string, string>) {
   const updateResourceEntities = vi.fn();
   const updateEntityEntities = vi.fn((entity: any, _keys: string[], entities: any[]) => {
     entity?.entities?.push(...entities);
@@ -209,7 +216,7 @@ function setup() {
   const updateResourceResource = vi.fn();
 
   const loaders = useRoleEntityLoaders({
-    store: { state: { selectedOrganization: { identifier: ORG } } },
+    store: { state: { selectedOrganization: { identifier: ORG }, zoConfig: { features } } },
     getStreams: getStreamsMock,
     t: (key: string) => key,
     updateResourceEntities,
@@ -233,6 +240,58 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+});
+
+describe("useRoleEntityLoaders - license-locked features", () => {
+  const LOCKED = {
+    dashboards: "locked",
+    pipelines: "locked",
+    alerts: "locked",
+    reports: "locked",
+    synthetics: "locked",
+  };
+
+  it("lists nothing for the rows of locked features", async () => {
+    const { getResourceEntities } = setup(LOCKED);
+    const rows = [
+      row({ resourceName: "dfolder" }),
+      row({ name: "f1", resourceName: "dfolder", childName: "dashboard" }),
+      row({ resourceName: "pipeline" }),
+      row({ name: "f1", resourceName: "afolder", childName: "alert" }),
+      row({ name: "f1", resourceName: "report", childName: "report" }),
+      row({ resourceName: "synthetic_folder" }),
+      row({ name: "f1", resourceName: "synthetic_folder", childName: "synthetics" }),
+      row({ resourceName: "synthetic_environment" }),
+      row({ resourceName: "downtime_folder" }),
+      row({ name: "f1", resourceName: "downtime_folder", childName: "downtime" }),
+    ];
+
+    for (const r of rows) await expect(getResourceEntities(r as any)).resolves.toBe(true);
+
+    expect(downtimesService.list).not.toHaveBeenCalled();
+    expect(commonService.list_Folders).not.toHaveBeenCalled();
+    expect(dashboardService.list).not.toHaveBeenCalled();
+    expect(dashboardService.list_Folders).not.toHaveBeenCalled();
+    expect(pipelineService.getPipelines).not.toHaveBeenCalled();
+    expect(alertService.listByFolderId).not.toHaveBeenCalled();
+    expect(reportService.listByFolderId).not.toHaveBeenCalled();
+    expect(syntheticsService.listByFolderId).not.toHaveBeenCalled();
+    expect(rows.every((r) => !r.is_loading)).toBe(true);
+  });
+
+  it("still lists the same rows when the features are enabled", async () => {
+    const { getResourceEntities } = setup({ dashboards: "enabled", reports: "enabled" });
+
+    await getResourceEntities(
+      row({ name: "f1", resourceName: "dfolder", childName: "dashboard" }) as any,
+    );
+    await getResourceEntities(
+      row({ name: "f9", resourceName: "report", childName: "report" }) as any,
+    );
+
+    expect(dashboardService.list).toHaveBeenCalledTimes(1);
+    expect(reportService.listByFolderId).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("useRoleEntityLoaders - getResourceEntities dispatch", () => {
@@ -328,7 +387,7 @@ describe("useRoleEntityLoaders - getResourceEntities dispatch", () => {
 });
 
 describe("useRoleEntityLoaders - stream loaders", () => {
-  it("getStreamsTypes builds four type rows without a service call", async () => {
+  it("getStreamsTypes builds five type rows without a service call", async () => {
     const { getStreamsTypes, updateResourceResource } = setup();
     getStreamsMock.mockClear();
 
@@ -339,6 +398,7 @@ describe("useRoleEntityLoaders - stream loaders", () => {
       "logs",
       "traces",
       "metrics",
+      "profiles",
       "index",
     ]);
     expect(updateResourceResource.mock.calls[0]).toEqual([
@@ -350,6 +410,9 @@ describe("useRoleEntityLoaders - stream loaders", () => {
       "name",
     ]);
     expect(updateResourceResource.mock.calls[3][3]).toEqual([
+      { stream_type: "profiles", name: "menu.profiles" },
+    ]);
+    expect(updateResourceResource.mock.calls[4][3]).toEqual([
       { stream_type: "index", name: "iam.indices" },
     ]);
   });
@@ -368,26 +431,30 @@ describe("useRoleEntityLoaders - stream loaders", () => {
     );
   });
 
-  it("getMetrics, getTraces and getIndexStreams each ask for their own stream type", async () => {
-    const { getMetrics, getTraces, getIndexStreams, updateEntityEntities } = setup();
+  it("getMetrics, getTraces, getProfiles and getIndexStreams each ask for their own stream type", async () => {
+    const { getMetrics, getTraces, getProfiles, getIndexStreams, updateEntityEntities } = setup();
     getStreamsMock.mockClear();
 
     const metrics = row({ name: "metrics", childName: "metrics" });
     const traces = row({ name: "traces", childName: "traces" });
+    const profiles = row({ name: "profiles", childName: "profiles" });
     const index = row({ name: "index", childName: "index" });
 
     await getMetrics(metrics as any);
     await getTraces(traces as any);
+    await getProfiles(profiles as any);
     await getIndexStreams(index as any);
 
     expect(getStreamsMock.mock.calls).toEqual([
       ["metrics", false],
       ["traces", false],
+      ["profiles", false],
       ["index", false],
     ]);
     expect(updateEntityEntities.mock.calls.map((call) => call[2])).toEqual([
       [{ name: "cpu" }],
       [{ name: "svc-a" }],
+      [{ name: "cpu-prof" }],
       [{ name: "users" }],
     ]);
   });
@@ -492,6 +559,28 @@ describe("useRoleEntityLoaders - folder loaders", () => {
       { folderId: "default", name: "default" },
       { folderId: "f9", name: "F9" },
     ]);
+  });
+});
+
+describe("useRoleEntityLoaders - fleets", () => {
+  it("loads fleets entities from the fleet list, with default added and no children", async () => {
+    const { getResourceEntities, updateResourceEntities } = setup();
+    const resource = row({ resourceName: "fleets" });
+
+    await getResourceEntities(resource as any);
+
+    expect(fleetService.listFleets).toHaveBeenCalledWith(ORG);
+    expect(commonService.list_Folders).not.toHaveBeenCalledWith(ORG, "fleets");
+    expect(updateResourceEntities).toHaveBeenCalledWith(
+      "fleets",
+      ["id"],
+      [
+        { id: "default", name: "default" },
+        { id: "f9", name: "F9" },
+      ],
+      false,
+      "name",
+    );
   });
 });
 

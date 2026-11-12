@@ -19,6 +19,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+#[cfg(feature = "cloud")]
+use config::utils::str::is_valid_domain;
 use db::organization::{get_org_setting, set_org_setting};
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
@@ -28,7 +30,6 @@ use {
 };
 #[cfg(feature = "cloud")]
 use {
-    config::META_ORG_ID,
     o2_enterprise::enterprise::cloud::{
         billing_group::list_billing_group_members_of, billings::MeteringProvider, customer_billings,
     },
@@ -39,6 +40,15 @@ use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
     organization::{OrganizationSetting, OrganizationSettingPayload, OrganizationSettingResponse},
 };
+
+// Only documents the multipart body: the handler concatenates every part it receives.
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+struct LogoUploadForm {
+    /// Image file.
+    #[schema(value_type = String, format = Binary)]
+    file: Vec<u8>,
+}
 
 /// Organization specific settings
 
@@ -78,12 +88,18 @@ pub async fn create(
     #[cfg(feature = "cloud")]
     let settings = match check_domain_org_mappings(&org_id, settings).await {
         Ok(settings) => settings,
-        Err(msg) => return MetaHttpResponse::bad_request(msg),
+        Err(refusal) => return MetaHttpResponse::bad_request(refusal),
     };
     #[cfg(feature = "cloud")]
     if let Err(response) = check_budget_config(&org_id, &settings).await {
         return response;
     }
+
+    #[cfg(feature = "cloud")]
+    let settings = match check_domain_management_config(settings).await {
+        Ok(settings) => settings,
+        Err(msg) => return MetaHttpResponse::bad_request(msg),
+    };
 
     match db::organization::update_org_setting(&org_id, |data| {
         apply_settings_payload(data, settings)
@@ -119,7 +135,7 @@ pub async fn create(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = OrganizationSettingResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -129,16 +145,12 @@ pub async fn create(
 )]
 pub async fn get(Path(org_id): Path<String>) -> Response {
     match get_org_setting(&org_id).await {
-        Ok(data) => (StatusCode::OK, Json(OrganizationSettingResponse { data })).into_response(),
+        Ok(data) => settings_response(data),
         Err(err) => {
             if let Error::DbError(DbError::KeyNotExists(_e)) = &err {
                 let setting = OrganizationSetting::default();
                 if let Ok(()) = set_org_setting(&org_id, &setting).await {
-                    return (
-                        StatusCode::OK,
-                        Json(OrganizationSettingResponse { data: setting }),
-                    )
-                        .into_response();
+                    return settings_response(setting);
                 }
             };
             MetaHttpResponse::bad_request(&err)
@@ -147,6 +159,27 @@ pub async fn get(Path(org_id): Path<String>) -> Response {
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/settings/logo",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "UploadOrgLogo",
+    summary = "Upload the organization logo",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("theme" = Option<String>, Query, description = "Logo theme"),
+    ),
+    request_body(content = inline(LogoUploadForm), description = "Image file", content_type = "multipart/form-data"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn upload_logo(
     Query(query): Query<std::collections::HashMap<String, String>>,
     mut payload: Multipart,
@@ -175,11 +208,50 @@ pub async fn upload_logo(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/settings/logo",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "UploadOrgLogo",
+    summary = "Upload the organization logo",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 403, description = "Not supported outside enterprise", content_type = "application/json", body = String),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn upload_logo() -> Response {
     (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/settings/logo",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "DeleteOrgLogo",
+    summary = "Delete the organization logo",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("theme" = Option<String>, Query, description = "Logo theme"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn delete_logo(
     Query(query): Query<std::collections::HashMap<String, String>>,
 ) -> Response {
@@ -196,11 +268,50 @@ pub async fn delete_logo(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/settings/logo",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "DeleteOrgLogo",
+    summary = "Delete the organization logo",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 403, description = "Not supported outside enterprise", content_type = "application/json", body = String),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn delete_logo() -> Response {
     (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/settings/logo/text",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "SetOrgLogoText",
+    summary = "Set the organization logo text",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = String, description = "Logo text", content_type = "text/plain"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn set_logo_text(body: axum::body::Bytes) -> Response {
     match settings::set_logo_text(body).await {
         Ok(_) => (
@@ -213,11 +324,49 @@ pub async fn set_logo_text(body: axum::body::Bytes) -> Response {
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/settings/logo/text",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "SetOrgLogoText",
+    summary = "Set the organization logo text",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 403, description = "Not supported outside enterprise", content_type = "application/json", body = String),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn set_logo_text() -> Response {
     (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/settings/logo/text",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "DeleteOrgLogoText",
+    summary = "Delete the organization logo text",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn delete_logo_text() -> Response {
     match settings::delete_logo_text().await {
         Ok(_) => (
@@ -230,8 +379,41 @@ pub async fn delete_logo_text() -> Response {
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/settings/logo/text",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "DeleteOrgLogoText",
+    summary = "Delete the organization logo text",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 403, description = "Not supported outside enterprise", content_type = "application/json", body = String),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn delete_logo_text() -> Response {
     (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
+}
+
+fn settings_response(data: OrganizationSetting) -> Response {
+    let resolved_data_retention = db::organization::resolved_retention_defaults(
+        &db::organization::org_setting_retention_defaults(&data),
+    );
+    (
+        StatusCode::OK,
+        Json(OrganizationSettingResponse {
+            data,
+            resolved_data_retention,
+        }),
+    )
+        .into_response()
 }
 
 fn validate_settings_payload(settings: &OrganizationSettingPayload) -> Result<(), &'static str> {
@@ -242,6 +424,12 @@ fn validate_settings_payload(settings: &OrganizationSettingPayload) -> Result<()
         && !(1_000..=1_000_000).contains(&max_series_per_query)
     {
         return Err("max_series_per_query must be between 1,000 and 1,000,000");
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(data_retention) = &settings.data_retention
+        && data_retention.validate().is_err()
+    {
+        return Err("data_retention values must be 0 or at least 3 days");
     }
     for link in settings.cross_links.iter().flatten() {
         if link.name.is_empty() {
@@ -263,13 +451,43 @@ async fn check_domain_org_mappings(
     org_id: &str,
     mut settings: OrganizationSettingPayload,
 ) -> Result<OrganizationSettingPayload, String> {
+    use hashbrown::HashSet;
     let Some(mut mappings) = settings.domain_org_mappings.take() else {
         return Ok(settings);
     };
-    if org_id != META_ORG_ID {
-        return Ok(settings);
-    }
+    let child_orgs =
+        o2_enterprise::enterprise::cloud::billing_group::list_billing_group_members_of(&org_id)
+            .await
+            .unwrap_or_default();
+
+    let mut allowed_orgs: HashSet<_> = child_orgs.into_iter().map(|v| v.member_org_id).collect();
+    allowed_orgs.insert(org_id.to_string());
+
+    let mut seen_domains = HashSet::new();
     for mapping in &mut mappings {
+        use openobserve_core::org_domain_ownership;
+
+        let domain = mapping.domain.trim().to_lowercase();
+
+        if !is_valid_domain(&domain) {
+            return Err(format!("domain {domain} is not a valid domain",));
+        }
+
+        if seen_domains.contains(&(domain.clone(), mapping.org_id.clone())) {
+            return Err(format!(
+                "domain {domain} is linked to {} multiple times",
+                mapping.org_id
+            ));
+        }
+        seen_domains.insert((domain.clone(), mapping.org_id.clone()));
+
+        if !allowed_orgs.contains(&mapping.org_id) {
+            return Err(format!(
+                "Not allowed to setup a mapping for org {}",
+                mapping.org_id
+            ));
+        }
+
         if openobserve_core::organization::get_org(&mapping.org_id)
             .await
             .is_none()
@@ -277,7 +495,19 @@ async fn check_domain_org_mappings(
             return Err(format!("No org with org id {} found", mapping.org_id));
         }
 
-        if mapping.domain.is_empty() || mapping.domain.contains(' ') {
+        // A deleted org keeps its row as a tombstone, so the row alone does not make it a target.
+        match db::org_status::read_active(&mapping.org_id).await {
+            Ok(true) => {}
+            Ok(false) => return Err(inactive_mapping_target(&mapping.org_id).await),
+            Err(e) => {
+                return Err(format!(
+                    "cannot read the status of org {}: {e}",
+                    mapping.org_id
+                ));
+            }
+        }
+
+        if domain.is_empty() || domain.contains(' ') {
             return Err(format!(
                 "domain cannot have space or be empty, bad domain '{}'",
                 mapping.domain
@@ -295,15 +525,56 @@ async fn check_domain_org_mappings(
         }
         if let Some(claim) = mapping.role_claim_name.as_mut() {
             if claim.trim().is_empty() {
-                return Err("role claim name must not be empty".to_string());
+                return Err("role claim name must not be empty".into());
             }
             *claim = claim.trim().to_string();
         }
 
-        mapping.domain = mapping.domain.to_lowercase();
+        match org_domain_ownership::get_domain_org_record(&org_id, &domain).await {
+            Ok(None) => {
+                return Err("This domain is not linked yet".to_string());
+            }
+            Err(e) => {
+                return Err(format!("error getting domain mappings : {e}"));
+            }
+            Ok(Some(v)) => {
+                use infra::table::org_domain_ownership::OwnershipState;
+
+                if v.verification_state != OwnershipState::Verified as i32 {
+                    return Err("This domain is not verified yet".to_string());
+                }
+            }
+        }
+
+        mapping.domain = domain;
     }
     settings.domain_org_mappings = Some(mappings);
     Ok(settings)
+}
+
+#[cfg(feature = "cloud")]
+async fn check_domain_management_config(
+    mut settings: OrganizationSettingPayload,
+) -> Result<OrganizationSettingPayload, String> {
+    if let Some(mut config) = settings.domain_management_config {
+        config.blocked_emails = config
+            .blocked_emails
+            .into_iter()
+            .map(|v| v.trim().to_lowercase())
+            .collect();
+
+        settings.domain_management_config = Some(config);
+    }
+    Ok(settings)
+}
+/// The refusal for a mapping whose target org is not active: missing, blocked, or unreadable.
+#[cfg(feature = "cloud")]
+async fn inactive_mapping_target(org_id: &str) -> String {
+    match infra::table::organizations::find(org_id).await {
+        Ok(None) => format!("No org with org id {org_id} found"),
+        Ok(Some(_)) => format!("org {org_id} is not active"),
+        Err(e) => format!("cannot read org {org_id}: {e}"),
+    }
 }
 
 // Budgets are for Stripe-billed orgs only, and only for this org, its group members and the
@@ -407,12 +678,21 @@ fn apply_settings_payload(
         field_found = true;
         data.claim_parser_function = claim_parser_function;
     }
+    #[cfg(feature = "enterprise")]
+    if let Some(data_retention) = settings.data_retention {
+        field_found = true;
+        data.data_retention = data_retention;
+    }
     if let Some(usage_stream_enabled) = settings.usage_stream_enabled {
         field_found = true;
         data.usage_stream_enabled = usage_stream_enabled;
     }
     if merge_red_insights_enabled(data, settings.red_insights_enabled) {
         field_found = true;
+    }
+    if let Some(ai_rca_thread_tool_output) = settings.ai_rca_thread_tool_output {
+        field_found = true;
+        data.ai_rca_thread_tool_output = ai_rca_thread_tool_output;
     }
     if let Some(cross_links) = settings.cross_links {
         field_found = true;
@@ -427,6 +707,16 @@ fn apply_settings_payload(
     if let Some(configs) = settings.budget_config {
         field_found = true;
         data.budget_config = configs;
+    }
+    #[cfg(feature = "cloud")]
+    if let Some(enforce) = settings.enforce_allowed_orgs_only {
+        field_found = true;
+        data.enforce_allowed_orgs_only = enforce;
+    }
+    #[cfg(feature = "cloud")]
+    if let Some(config) = settings.domain_management_config {
+        field_found = true;
+        data.domain_management_config = config;
     }
     // this will always be taken from orgs table, never from settings
     data.free_trial_expiry = None;
@@ -444,6 +734,35 @@ fn merge_red_insights_enabled(data: &mut OrganizationSetting, value: Option<bool
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_data_retention_payload_is_validated_and_replaces_as_a_whole() {
+        let payload = |json: serde_json::Value| -> OrganizationSettingPayload {
+            serde_json::from_value(json).unwrap()
+        };
+        let metrics = |days: i64| payload(serde_json::json!({"data_retention": {"metrics": days}}));
+        assert!(validate_settings_payload(&metrics(2)).is_err());
+        assert!(validate_settings_payload(&metrics(0)).is_ok());
+        assert!(validate_settings_payload(&metrics(3)).is_ok());
+
+        let mut data = OrganizationSetting::default();
+        let both = payload(serde_json::json!({"data_retention": {"default": 40, "logs": 21}}));
+        assert!(apply_settings_payload(&mut data, both));
+        assert_eq!(data.data_retention.default, 40);
+        assert_eq!(data.data_retention.logs, 21);
+
+        // a request carrying the field replaces the object: what it leaves out is removed
+        assert!(apply_settings_payload(&mut data, metrics(180)));
+        assert_eq!(data.data_retention.metrics, 180);
+        assert_eq!(data.data_retention.default, 0);
+        assert_eq!(data.data_retention.logs, 0);
+
+        // a request without it leaves the stored values alone
+        let other = payload(serde_json::json!({"scrape_interval": 30}));
+        assert!(apply_settings_payload(&mut data, other));
+        assert_eq!(data.data_retention.metrics, 180);
+    }
 
     #[test]
     fn test_merge_red_insights_enabled_sets_and_leaves() {

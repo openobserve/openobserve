@@ -175,6 +175,9 @@ pub async fn check_backfill_job(
     if !pipeline.source.is_scheduled() {
         return Err(anyhow::anyhow!("Pipeline is not a scheduled pipeline"));
     }
+    if let Some(refusal) = pipeline.cross_org_refusal() {
+        return Err(anyhow::anyhow!(refusal));
+    }
 
     // 1a. Validate deletion is not enabled for pipelines with remote destinations
     if delete_before_backfill {
@@ -961,5 +964,59 @@ mod tests {
         };
 
         assert!(get_destination_streams(&pipeline).is_err());
+    }
+
+    #[tokio::test]
+    async fn a_backfill_of_a_stored_cross_org_pipeline_is_refused() {
+        use config::meta::{
+            pipeline::{
+                Pipeline,
+                components::{DerivedStream, Edge, Node, NodeData, PipelineSource},
+            },
+            stream::{StreamParams, StreamType},
+        };
+
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs ZO_META_STORE");
+            return;
+        }
+        infra::db_init().await.unwrap();
+        infra::table::migrate().await.unwrap();
+        let foreign = DerivedStream {
+            org_id: "backfill_org_b".to_string(),
+            ..Default::default()
+        };
+        let node = |id: &str, data| Node::new(id.to_string(), data, 0.0, 0.0, "input".to_string());
+        let pipeline = Pipeline {
+            id: "backfill_cross_org_pl".to_string(),
+            version: 1,
+            enabled: true,
+            org: "backfill_org_a".to_string(),
+            name: "backfill_cross_org_pl".to_string(),
+            description: String::new(),
+            source: PipelineSource::Scheduled(DerivedStream::default()),
+            kind: Default::default(),
+            nodes: vec![
+                node("src", NodeData::Query(foreign)),
+                node(
+                    "dst",
+                    NodeData::Stream(StreamParams::new("", "out", StreamType::Logs)),
+                ),
+            ],
+            edges: vec![Edge::new("src".to_string(), "dst".to_string())],
+        };
+        crate::pipeline::db::set(&pipeline).await.unwrap();
+
+        let checked =
+            check_backfill_job(&pipeline.id, HOUR_ALIGNED_START, HOUR_ALIGNED_END, false).await;
+        crate::pipeline::delete_pipeline(&pipeline.id)
+            .await
+            .unwrap();
+        assert!(
+            checked.as_ref().is_err_and(|e| e
+                .to_string()
+                .contains("points at organization backfill_org_b")),
+            "{checked:?}"
+        );
     }
 }

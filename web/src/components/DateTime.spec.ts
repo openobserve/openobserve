@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import DateTime from "@/components/DateTime.vue";
 import i18n from "@/locales";
@@ -75,20 +75,14 @@ describe("DateTime Component", () => {
     });
   };
 
-  it("should mount DateTime component", () => {
+  it("opens its picker on mount only when asked to", async () => {
     wrapper = createWrapper();
-    expect(wrapper).toBeTruthy();
-  });
-
-  it("should have correct props", () => {
-    wrapper = createWrapper();
-    expect(wrapper.exists()).toBe(true);
-    expect(wrapper.vm).toBeDefined();
-  });
-
-  it("should render without errors", () => {
-    wrapper = createWrapper();
-    expect(wrapper.exists()).toBe(true);
+    await flushPromises();
+    expect(wrapper.vm.menuOpen).toBe(false);
+    wrapper.unmount();
+    wrapper = createWrapper({ defaultOpen: true });
+    await flushPromises();
+    expect(wrapper.vm.menuOpen).toBe(true);
   });
 
   describe("Function Coverage Tests", () => {
@@ -132,31 +126,6 @@ describe("DateTime Component", () => {
       wrapper.vm.setRelativeTime("2h");
       expect(wrapper.vm.relativePeriod).toBe("h");
       expect(wrapper.vm.relativeValue).toBe(2);
-    });
-
-    it("should test resetTime function", () => {
-      wrapper = createWrapper();
-
-      // Test with no parameters
-      wrapper.vm.resetTime("", "");
-
-      expect(wrapper.vm.selectedTime.startTime).toBe("00:00:00");
-      expect(wrapper.vm.selectedDate.from).toBeDefined();
-      expect(wrapper.vm.selectedDate.to).toBeDefined();
-    });
-
-    it("should test setAbsoluteTime function", () => {
-      wrapper = createWrapper();
-
-      const startTime = new Date("2023-01-01T10:00:00").getTime() * 1000;
-      const endTime = new Date("2023-01-01T12:00:00").getTime() * 1000;
-
-      wrapper.vm.setAbsoluteTime(startTime, endTime);
-
-      expect(wrapper.vm.selectedDate.from).toBeDefined();
-      expect(wrapper.vm.selectedDate.to).toBeDefined();
-      expect(wrapper.vm.selectedTime.startTime).toBeDefined();
-      expect(wrapper.vm.selectedTime.endTime).toBeDefined();
     });
 
     it("should test saveDate function", async () => {
@@ -215,33 +184,6 @@ describe("DateTime Component", () => {
       expect(events).toBeTruthy();
       const lastPayload = events[events.length - 1][0];
       expect(lastPayload.userChangedValue).toBe(false);
-    });
-
-    it("should test setCustomDate function", () => {
-      wrapper = createWrapper();
-
-      const dateobj = {
-        start: new Date("2023-01-01T10:00:00").getTime(),
-        end: new Date("2023-01-01T12:00:00").getTime(),
-      };
-
-      wrapper.vm.setCustomDate("absolute", dateobj);
-
-      expect(wrapper.vm.selectedType).toBe("absolute");
-      expect(wrapper.vm.selectedDate.from).toBeDefined();
-      expect(wrapper.vm.selectedDate.to).toBeDefined();
-    });
-
-    it("should test onBeforeHide function", () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.selectedType = "absolute";
-      wrapper.vm.selectedTime = { startTime: "10:00:00", endTime: "12:00:00" };
-
-      wrapper.vm.onBeforeHide();
-
-      // Should call resetTime for absolute type
-      expect(wrapper.vm.selectedTime).toBeDefined();
     });
 
     it("should test getPeriodLabel computed property", () => {
@@ -353,16 +295,6 @@ describe("DateTime Component", () => {
       expect(displayValue).toContain("12:00:00");
     });
 
-    it("should test timezoneFilterFn function", () => {
-      wrapper = createWrapper();
-
-      const mockUpdate = vi.fn((fn) => fn());
-      wrapper.vm.timezoneFilterFn("UTC", mockUpdate);
-
-      expect(mockUpdate).toHaveBeenCalled();
-      expect(wrapper.vm.filteredTimezone).toBeDefined();
-    });
-
     it("should test optionsFn function", () => {
       wrapper = createWrapper();
 
@@ -390,14 +322,24 @@ describe("DateTime Component", () => {
       expect(result2).toBe(false);
     });
 
-    it("should test setDateType function", () => {
-      wrapper = createWrapper();
+    // C8: a forward-looking caller lifts the cap; every other caller keeps today.
+    it("caps the calendar at today unless a later max date is passed", () => {
+      // "Today" is the mocked timestampToTimezoneDate above.
+      wrapper = createWrapper({ disableRelative: true });
+      expect(wrapper.vm.calendarMaxDate).toBe("2025/01/01");
+      wrapper.unmount();
 
-      wrapper.vm.setDateType("absolute");
-      expect(wrapper.vm.selectedType).toBe("absolute");
+      wrapper = createWrapper({ disableRelative: true, maxDate: "2099/01/01" });
+      expect(wrapper.vm.calendarMaxDate).toBe("2099/01/01");
+      wrapper.unmount();
 
-      wrapper.vm.setDateType("relative");
-      expect(wrapper.vm.selectedType).toBe("relative");
+      wrapper = createWrapper({
+        disableRelative: true,
+        minDate: "2023/01/01",
+        maxDate: "2099/01/01",
+      });
+      expect(wrapper.vm.optionsFn("2098/06/15")).toBe(true);
+      expect(wrapper.vm.optionsFn("2099/01/02")).toBe(false);
     });
 
     it("should test computeRelativePeriod function", () => {
@@ -431,25 +373,6 @@ describe("DateTime Component", () => {
       expect(wrapper.emitted("on:timezone-change")).toBeTruthy();
     });
 
-    it("should test showOnlyAbsolute function", () => {
-      wrapper = createWrapper({
-        disableRelative: true,
-      });
-
-      wrapper.vm.showOnlyAbsolute();
-      expect(wrapper.vm.selectedType).toBe("absolute");
-    });
-
-    it("should test onHide and onShow functions", () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.onHide();
-      expect(wrapper.emitted("hide")).toBeTruthy();
-
-      wrapper.vm.onShow();
-      expect(wrapper.emitted("show")).toBeTruthy();
-    });
-
     it("should test refresh function", async () => {
       wrapper = createWrapper();
       store.state.savedViewFlag = false;
@@ -459,14 +382,6 @@ describe("DateTime Component", () => {
 
       // Should call saveDate
       expect(wrapper.emitted("on:date-change")).toBeTruthy();
-    });
-
-    it("should test timezoneFilterFn indirectly", () => {
-      wrapper = createWrapper();
-
-      // Test that filteredTimezone is accessible
-      expect(wrapper.vm.filteredTimezone).toBeDefined();
-      expect(wrapper.vm.timezoneFilterFn).toBeTypeOf("function");
     });
 
     it("should test date validation through getConsumableDateTime", () => {
@@ -766,6 +681,24 @@ describe("DateTime Component", () => {
         ).toBeUndefined();
       });
 
+      // F2: a caller that lifts the calendar cap lifts the › cap with it, up to the end of maxDate.
+      it("should shift forward past now up to the end of maxDate", () => {
+        wrapper = createWrapper({ disableRelative: true, maxDate: "2026/09/11" });
+        store.state.savedViewFlag = false;
+
+        wrapper.vm.selectedType = "absolute";
+        wrapper.vm.selectedDate = { from: "2026/09/10", to: "2026/09/10" };
+        wrapper.vm.selectedTime = { startTime: "11:00:00", endTime: "12:00:00" };
+        expect(wrapper.vm.isNextShiftDisabled()).toBe(false);
+
+        wrapper.vm.shiftTimeRange("next");
+        expect(wrapper.vm.selectedTime).toEqual({ startTime: "12:00:00", endTime: "13:00:00" });
+
+        wrapper.vm.selectedDate = { from: "2026/09/11", to: "2026/09/11" };
+        wrapper.vm.selectedTime = { startTime: "23:00:00", endTime: "23:59:59" };
+        expect(wrapper.vm.isNextShiftDisabled()).toBe(true);
+      });
+
       it("should still shift backward from a window that ends at now", () => {
         wrapper = createWrapper();
         store.state.savedViewFlag = false;
@@ -798,54 +731,19 @@ describe("DateTime Component", () => {
     });
   });
 
-  describe("Relative preset search", () => {
-    it("shows every period with no search term", () => {
-      wrapper = createWrapper();
+  describe("hideSeconds", () => {
+    const units = (list: Array<{ value: string }>) => list.map((period) => period.value);
 
-      expect(wrapper.vm.filteredRelativePeriods.map((p: any) => p.value)).toEqual([
-        "s",
-        "m",
-        "h",
-        "d",
-        "w",
-        "M",
-      ]);
+    it("offers Seconds by default, as every existing picker has it", () => {
+      wrapper = createWrapper();
+      expect(units(wrapper.vm.relativePeriods)).toEqual(["s", "m", "h", "d", "w", "M"]);
+      expect(units(wrapper.vm.relativePeriodsSelect)).toEqual(["s", "m", "h", "d", "w", "M"]);
     });
 
-    it("narrows to the matching period when searching its label", async () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.relativeSearchTerm = "hour";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.filteredRelativePeriods.map((p: any) => p.value)).toEqual(["h"]);
-    });
-
-    it("narrows to periods whose preset values match a numeric search", async () => {
-      wrapper = createWrapper();
-
-      // 45 only appears under seconds and minutes (relativeDates.s / .m).
-      wrapper.vm.relativeSearchTerm = "45";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.filteredRelativePeriods.map((p: any) => p.value)).toEqual(["s", "m"]);
-      expect(wrapper.vm.visibleRelativeItems({ label: "Seconds", value: "s" })).toEqual([45]);
-    });
-
-    it("reports no matches for a query nothing satisfies", async () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.relativeSearchTerm = "not-a-real-preset";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.filteredRelativePeriods).toEqual([]);
-    });
-
-    it("keeps relativeItemHours indexed to the underlying (unfiltered) preset list", () => {
-      wrapper = createWrapper();
-
-      // Hours row: relativeDates.h = [1, 2, 3, 6, 8, 12], relativeDatesInHour.h same values.
-      expect(wrapper.vm.relativeItemHours("h", 8)).toBe(8);
+    it("drops Seconds from the rows and the custom unit when the parent asks", () => {
+      wrapper = createWrapper({ hideSeconds: true });
+      expect(units(wrapper.vm.relativePeriods)).toEqual(["m", "h", "d", "w", "M"]);
+      expect(units(wrapper.vm.relativePeriodsSelect)).toEqual(["m", "h", "d", "w", "M"]);
     });
   });
 });

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <IngestionContent>
+  <IngestionContent snippet-kind="config" config-tool="Prometheus">
     <CredentialCodeBlock slug="prometheus" :content="content" />
     <IngestionDocLink
       href="https://openobserve.ai/blog/send-metrics-using-kube-prometheus-stack-to-openobserve"

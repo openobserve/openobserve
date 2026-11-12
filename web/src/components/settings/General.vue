@@ -62,8 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               :min="1000"
               :max="1000000"
-              class="ms-2 w-45!"
+              class="ms-2 w-52!"
               :placeholder="raw('40000 (' + t('settings.systemDefault') + ')')"
+              :aria-label="t('settings.maxSeriesPerQueryLabel')"
               data-test="general-settings-max-series-per-query"
             >
               <template v-slot:icon-right>
@@ -196,10 +197,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="w-62.5"
                 model-value=""
                 :placeholder="t('settings.noTextAvailable')"
+                :aria-label="t('settings.customLogoText')"
                 data-test="settings_ent_logo_custom_text_locked"
               >
                 <template v-slot:icon-right>
-                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                  <OIcon name="lock" size="sm" class="lock-chip" />
                 </template>
               </OInput>
             </div>
@@ -211,11 +213,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OInput
                 class="w-62.5"
+                :aria-label="t('settings.customLogoText')"
                 data-test="settings_ent_logo_custom_text"
                 v-model="customText"
               />
               <div class="flex gap-x-2">
                 <OButton
+                  :aria-label="t('common.cancel')"
                   type="button"
                   variant="outline-destructive"
                   size="icon-xs-sq"
@@ -223,6 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="close"
                 />
                 <OButton
+                  :aria-label="t('common.save')"
                   data-test="settings_ent_logo_custom_text_save_btn"
                   :loading="loadingState"
                   variant="outline"
@@ -238,6 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ store.state.zoConfig.custom_logo_text || t("settings.noTextAvailable") }}
               </OTruncatedText>
               <OButton
+                :aria-label="t('common.edit')"
                 data-test="settings_ent_logo_custom_text_edit_btn"
                 :loading="loadingState"
                 variant="outline"
@@ -270,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="o2-file-input mx-0"
               >
                 <template v-slot:prepend>
-                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                  <OIcon name="lock" size="sm" class="lock-chip" />
                 </template>
               </OFile>
             </div>
@@ -290,6 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mx-3 max-h-7.75 max-w-37.5"
               />
               <OButton
+                :aria-label="t('common.delete')"
                 data-test="setting_ent_custom_logo_img_delete_btn"
                 variant="ghost-destructive"
                 size="icon-xs-sq"
@@ -316,6 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OFile>
               <div class="flex gap-x-2 pt-5.75">
                 <OButton
+                  :aria-label="t('common.cancel')"
                   type="button"
                   variant="outline-destructive"
                   size="icon-xs-sq"
@@ -323,6 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="close"
                 />
                 <OButton
+                  :aria-label="t('common.save')"
                   data-test="settings_ent_logo_custom_light_save_btn"
                   :loading="loadingState"
                   variant="outline"
@@ -356,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="o2-file-input mx-0"
               >
                 <template v-slot:prepend>
-                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                  <OIcon name="lock" size="sm" class="lock-chip" />
                 </template>
               </OFile>
             </div>
@@ -376,6 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mx-3 max-h-7.75 max-w-37.5"
               />
               <OButton
+                :aria-label="t('common.delete')"
                 data-test="setting_ent_custom_logo_dark_img_delete_btn"
                 variant="ghost-destructive"
                 size="icon-xs-sq"
@@ -402,6 +412,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OFile>
               <div class="flex gap-x-2 pt-5.75">
                 <OButton
+                  :aria-label="t('common.cancel')"
                   type="button"
                   variant="outline-destructive"
                   size="icon-xs-sq"
@@ -409,6 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="close"
                 />
                 <OButton
+                  :aria-label="t('common.save')"
                   data-test="settings_ent_logo_custom_dark_save_btn"
                   :loading="loadingState"
                   variant="outline"
@@ -510,10 +522,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('settings.deleteLogoTitle')"
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('confirmDialog.ok')"
+    primary-button-variant="destructive"
     @click:secondary="cancelConfirmDialog"
     @click:primary="confirmDialogOK"
   >
-    <p>{{ t("settings.deleteLogoMessage") }}</p>
+    <i18n-t keypath="settings.deleteLogoMessage" tag="p" data-test="general-delete-image-message">
+      <template #name
+        ><span class="text-text-heading font-semibold break-all">{{
+          logoThemeToDelete === "dark" ? t("settings.darkMode") : t("settings.lightMode")
+        }}</span></template
+      >
+    </i18n-t>
   </ODialog>
 
   <ODialog
@@ -590,6 +609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </i18n-t>
         </label>
         <OInput
+          :aria-label="t('settings.deleteOrganizationTypeToConfirm', { name: deleteOrgName })"
           data-test="general-delete-org-confirm-input"
           v-model="deleteConfirmInput"
           :placeholder="deleteOrgName"

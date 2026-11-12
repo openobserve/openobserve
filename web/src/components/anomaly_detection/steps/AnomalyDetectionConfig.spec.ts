@@ -32,8 +32,6 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import streamService from "@/services/stream";
@@ -75,6 +73,9 @@ import {
   anomalyBandWidthPrefill,
   anomalyExpectedGroupingKey,
   anomalyNoticeBadgeKeys,
+  isAnomalyDataReadinessStatus,
+  anomalyCanCheckDataNow,
+  anomalySensitivityModel,
   anomalyWindowShareErrors,
   lookBackWindowFloorSeconds,
 } from "./AnomalyDetectionConfig.schema";
@@ -141,12 +142,12 @@ const getForm = (w: VueWrapper): any => (w.vm as any).form;
 const fieldError = (w: VueWrapper, name: string): string | undefined =>
   firstFieldError(getForm(w).getFieldMeta(name)?.errors);
 
-// Rendered values of the filters[i].field selects, in render order.
-const renderedFilterFields = (w: VueWrapper): unknown[] =>
+// Field names on the filter chips, in render order.
+const renderedFilterFields = (w: VueWrapper): string[] =>
   w
-    .findAllComponents(OFormSelect)
-    .filter((c: any) => /^filters\[\d+\]\.field$/.test(c.props("name") || ""))
-    .map((c: any) => c.findComponent(OSelect).props("modelValue"));
+    .findAll('[data-test^="anomaly-filter-builder-chip-"]')
+    .map((c) => c.attributes("data-test")!.replace("anomaly-filter-builder-chip-", ""))
+    .filter((key) => !/-(field|operator|value|remove)$/.test(key));
 
 // The sensitivity tiers, in render order: Auto, then Conservative, Balanced, Aggressive (band width in σ).
 const SENSITIVITY_TIERS = ["auto", 4, 3, 2.5];
@@ -532,17 +533,90 @@ describe("AnomalyDetectionConfig", () => {
 
       expect(getForm(wrapper).state.values.band_width).toBeNull();
       expect(tierStates(wrapper)).toEqual(["on", "off", "off", "off"]);
-      expect(sensitivityHintText(wrapper)).toBeUndefined();
+      expect(sensitivityHintText(wrapper)).toBe(i18n.global.t("alerts.anomaly.autoUntrainedHelp"));
     });
 
-    it("names the trained k beside Auto once the config carries one", async () => {
-      wrapper = mountConfig({ band_width: null, band_k: 3.4567 });
+    it.each([
+      [{}, "Available after training", "Auto level"],
+      [
+        { status: "training", current_model_version: 0 },
+        "Learning from your history…",
+        "Auto level",
+      ],
+      [{ status: "failed", current_model_version: 0 }, "Unavailable", "Auto level"],
+      [
+        { status: "ready", is_trained: true, current_model_version: 1, band_k: 4.2345 },
+        "4.23σ",
+        "Current level",
+      ],
+      [
+        { status: "training", is_trained: true, current_model_version: 1, band_k: 4.2345 },
+        "4.23σ",
+        "Last trained level",
+      ],
+      [
+        { status: "failed", is_trained: true, current_model_version: 1, band_k: 4.2345 },
+        "4.23σ",
+        "Last trained level",
+      ],
+      [{ band_k: 4.2345 }, "4.23σ", "Last trained level"],
+      [{ status: "waiting", band_k: 4.2345 }, "Available after training", "Auto level"],
+      [
+        { status: "ready", is_trained: false, current_model_version: 0, band_k: 4.2345 },
+        "Available after training",
+        "Auto level",
+      ],
+    ])("renders an honest Auto lifecycle readout for %j", async (model, value, label) => {
+      wrapper = mountConfig({ band_width: null, ...model });
       await flushPromises();
-
-      expect(wrapper.find('[data-test="anomaly-sensitivity-tier-auto"]').text()).toBe(
-        i18n.global.t("alerts.anomaly.sensitivityAutoTrained", { k: 3.46 }),
+      expect(wrapper.find('[data-test="anomaly-sensitivity-tier-auto"]').text()).toBe("Auto");
+      expect(wrapper.find('[data-test="anomaly-sensitivity-auto-level"]').text()).toBe(
+        `${label}${value}`,
       );
+      expect(levelInput(wrapper).exists()).toBe(false);
       expect(getForm(wrapper).state.values.band_width).toBeNull();
+    });
+
+    it("suppresses an active learned value after a query edit and restores it on reverting", async () => {
+      wrapper = mountConfig({
+        status: "ready",
+        is_trained: true,
+        current_model_version: 1,
+        band_k: 4.23,
+      });
+      await flushPromises();
+      getForm(wrapper).setFieldValue("detection_function", "sum");
+      await flushPromises();
+      expect(wrapper.find('[data-test="anomaly-sensitivity-auto-level"]').text()).not.toContain(
+        "4.23",
+      );
+      getForm(wrapper).setFieldValue("detection_function", "count");
+      await flushPromises();
+      expect(wrapper.find('[data-test="anomaly-sensitivity-auto-level"]').text()).toContain(
+        "Current level4.23σ",
+      );
+    });
+
+    it("preserves an unsaved manual draft when model metadata refreshes", async () => {
+      const { wrapper: w, config } = mountReturning({ band_width: 4 });
+      wrapper = w;
+      await flushPromises();
+      await levelInput(wrapper).setValue("3.5");
+      await flushPromises();
+      await wrapper.setProps({
+        config: Object.assign(config, {
+          status: "ready",
+          is_trained: true,
+          current_model_version: 2,
+          band_k: 4.23,
+        }),
+      });
+      await flushPromises();
+      expect((levelInput(wrapper).element as HTMLInputElement).value).toBe("3.5");
+      expect(wrapper.find('[data-test="anomaly-sensitivity-custom"]').text()).toBe(
+        "Custom sensitivity",
+      );
+      expect(anomalyBandPayload(config, false).band_width).toBe(3.5);
     });
 
     it("clicking Auto clears an override and writes null back", async () => {
@@ -573,14 +647,32 @@ describe("AnomalyDetectionConfig", () => {
     });
 
     it("a non-tier level lights no tier and still states the band", async () => {
-      wrapper = mountConfig({ band_width: 3.5 });
+      wrapper = mountConfig({
+        band_width: 3.5,
+        status: "ready",
+        is_trained: true,
+        current_model_version: 1,
+      });
       await flushPromises();
 
       expect(tierStates(wrapper)).toEqual(["off", "off", "off", "off"]);
       expect((levelInput(wrapper).element as HTMLInputElement).value).toBe("3.5");
       expect(sensitivityHintText(wrapper)).toBe(
-        i18n.global.t("alerts.anomaly.bandWidthHint", { k: 3.5 }),
+        i18n.global.t("alerts.anomaly.manualSensitivityHelp"),
       );
+    });
+
+    it("an untrained config hides the model note while the typed level is out of range", async () => {
+      wrapper = mountConfig({ band_width: 3 });
+      await flushPromises();
+      expect(sensitivityHintText(wrapper)).toBe(
+        i18n.global.t("alerts.anomaly.manualModelRequired"),
+      );
+
+      await levelInput(wrapper).setValue("0.5");
+      await flushPromises();
+
+      expect(sensitivityHintText(wrapper)).toBeUndefined();
     });
 
     it("typing a tier value lights that tier up, as a number", async () => {
@@ -595,37 +687,59 @@ describe("AnomalyDetectionConfig", () => {
       expect(tierStates(wrapper)).toEqual(["off", "on", "off", "off"]);
     });
 
-    it.each([0.5, 10.5, 0])("rejects %s with the band-width range message", async (bad) => {
-      wrapper = mountConfig({ band_width: 3 });
-      await flushPromises();
-      const form = getForm(wrapper);
-      form.setFieldValue("band_width", bad);
-      await flushPromises();
+    it.each([0.5, 10.5, 0, " ", "invalid", Infinity])(
+      "rejects %s with the band-width range message",
+      async (bad) => {
+        wrapper = mountConfig({ band_width: 3 });
+        await flushPromises();
+        const form = getForm(wrapper);
+        form.setFieldValue("band_width", bad);
+        await flushPromises();
 
-      await form.handleSubmit();
-      await flushPromises();
-      await nextTick();
+        await form.handleSubmit();
+        await flushPromises();
+        await nextTick();
 
-      expect(form.state.isValid).toBe(false);
-      expect(fieldError(wrapper, "band_width")).toBe(RANGE_MESSAGE);
-      // Two OForm* wrappers on one field, but only the step's own message renders.
-      expect(wrapper.text().split(RANGE_MESSAGE).length - 1).toBe(1);
-      expect(wrapper.find('[data-test="anomaly-sensitivity-error"]').attributes("role")).toBe(
-        "alert",
-      );
-      expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(false);
-    });
+        expect(form.state.isValid).toBe(false);
+        expect(fieldError(wrapper, "band_width")).toBe(RANGE_MESSAGE);
+        // Two OForm* wrappers on one field, but only the step's own message renders.
+        expect(wrapper.text().split(RANGE_MESSAGE).length - 1).toBe(1);
+        expect(wrapper.find('[data-test="anomaly-sensitivity-error"]').attributes("role")).toBe(
+          "alert",
+        );
+        expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(false);
+      },
+    );
 
-    it.each([1, 10, 3.25])("accepts %s", async (ok) => {
-      wrapper = mountConfig({ band_width: ok });
-      await flushPromises();
-      const form = getForm(wrapper);
+    it.each([1, 10, 3.25, 4.234])(
+      "validates typed %s and preserves its numeric payload",
+      async (ok) => {
+        const { wrapper: w, config } = mountReturning({ band_width: 4 });
+        wrapper = w;
+        await flushPromises();
+        await levelInput(wrapper).setValue(String(ok));
+        await flushPromises();
 
-      await form.handleSubmit();
-      await flushPromises();
+        await expect((wrapper.vm as any).validate()).resolves.toBe(true);
+        expect(anomalyBandPayload(config, false).band_width).toBe(ok);
+        expect(typeof anomalyBandPayload(config, false).band_width).toBe("number");
+      },
+    );
 
-      expect(form.state.isValid).toBe(true);
-    });
+    it.each(["0.5", "10.5", ""])(
+      "blocks a typed %j draft through app validation and keeps manual mode",
+      async (draft) => {
+        wrapper = mountConfig({ band_width: 4 });
+        await flushPromises();
+        await levelInput(wrapper).setValue(draft);
+        await flushPromises();
+
+        await expect((wrapper.vm as any).validate()).resolves.toBe(false);
+        expect(tierStates(wrapper)).toEqual(["off", "off", "off", "off"]);
+        expect(wrapper.find('[data-test="anomaly-sensitivity-auto-level"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="anomaly-sensitivity-error"]').text()).toBe(RANGE_MESSAGE);
+      },
+    );
 
     // Saving must never pin k: both an Auto create and an untouched Auto edit send null.
     it.each([
@@ -644,7 +758,7 @@ describe("AnomalyDetectionConfig", () => {
       expect(anomalyBandPayload(config, false).band_width).toBeNull();
     });
 
-    it("clearing the level is Auto: null goes back and validation passes", async () => {
+    it("clearing the level preserves the manual draft and blocks saving", async () => {
       const { wrapper: w, config } = mountReturning({ band_width: 4 });
       wrapper = w;
       await flushPromises();
@@ -653,9 +767,12 @@ describe("AnomalyDetectionConfig", () => {
       await flushPromises();
       await nextTick();
 
-      expect((config as any).band_width).toBeNull();
-      expect(tierStates(wrapper)).toEqual(["on", "off", "off", "off"]);
-      await expect((wrapper.vm as any).validate()).resolves.toBe(true);
+      expect((config as any).band_width).toBe("");
+      expect(tierStates(wrapper)).toEqual(["off", "off", "off", "off"]);
+      await expect((wrapper.vm as any).validate()).resolves.toBe(false);
+      const input = levelInput(wrapper);
+      expect(input.attributes("aria-invalid")).toBe("true");
+      expect(wrapper.find(`#${input.attributes("aria-describedby")}`).text()).toBe(RANGE_MESSAGE);
     });
 
     it("never writes the percentile threshold, which the server still keeps", async () => {
@@ -690,25 +807,12 @@ describe("AnomalyDetectionConfig", () => {
 
       expect(wrapper.find('[data-test="anomaly-sensitivity-tier-4"]').text()).toBe(before);
     });
-
-    it("keeps the toggle bar and the level box on one centred row", async () => {
-      wrapper = mountConfig();
-      await flushPromises();
-
-      let row: HTMLElement | null = wrapper.find('[data-test="anomaly-sensitivity-level"]')
-        .element as HTMLElement;
-      while (row && !row.querySelector('[data-test="anomaly-sensitivity-tier"]')) {
-        row = row.parentElement;
-      }
-      expect(row).not.toBeNull();
-      expect(row?.className).toContain("items-center");
-    });
   });
 
   // Wire contract: `alert_budget_per_day` set = budget mode, which the server rejects band_width beside.
   describe("sensitivity — budget mode", () => {
     it("a config with no budget renders the band controls only", async () => {
-      wrapper = mountConfig();
+      wrapper = mountConfig({ band_width: 3 });
       await flushPromises();
 
       expect(wrapper.find('[data-test="anomaly-sensitivity-level"]').exists()).toBe(true);
@@ -939,6 +1043,42 @@ describe("AnomalyDetectionConfig", () => {
       expect(group.attributes("aria-label")).toBe("Sensitivity");
     });
 
+    it("names the time-unit selects after their row so they are distinguishable", async () => {
+      wrapper = mountConfig({ filters: [{ field: "level", operator: "=", value: "error" }] });
+      await flushPromises();
+      const label = (testId: string) =>
+        wrapper.find(`[data-test="${testId}"]`).find("[aria-label]").attributes("aria-label");
+
+      const units = [
+        label("anomaly-histogram-interval-unit"),
+        label("anomaly-schedule-interval-unit"),
+        label("anomaly-detection-window-unit"),
+      ];
+      expect(units).toEqual([
+        "Detection Resolution unit",
+        "Check Every unit",
+        "Look Back Window unit",
+      ]);
+      expect(new Set(units).size).toBe(units.length);
+
+      expect(label("anomaly-detection-function")).toBe("Detection Function");
+      expect(label("anomaly-histogram-interval-value")).toBe("Detection Resolution");
+      expect(label("anomaly-schedule-interval-value")).toBe("Check Every");
+      expect(label("anomaly-detection-window-value")).toBe("Look Back Window");
+      expect(label("anomaly-training-window")).toBe("Training Window");
+    });
+
+    it("names the custom-SQL detection resolution unit after its row", async () => {
+      wrapper = mountConfig({ query_mode: "custom_sql" });
+      await flushPromises();
+      expect(
+        wrapper
+          .find('[data-test="anomaly-histogram-interval-unit"]')
+          .find("[aria-label]")
+          .attributes("aria-label"),
+      ).toBe("Detection Resolution unit");
+    });
+
     it("exposes no mark-line or series-max machinery", async () => {
       wrapper = mountConfig();
       await flushPromises();
@@ -950,53 +1090,46 @@ describe("AnomalyDetectionConfig", () => {
     });
   });
 
-  // =========================================================================
-  // filters[] field-array (Rule ① — indexed names + :key=index). The
-  // non-negotiable gate: delete a NON-last row and assert the RENDERED inputs
-  // (each OFormSelect→OSelect model-value), not just form.state.values.
-  // =========================================================================
-  describe("filters[] field-array — rendered inputs stay in sync on non-last delete", () => {
-    it("removing the MIDDLE of three filter rows leaves the rendered field selects correct", async () => {
-      wrapper = mountConfig({
-        filters: [
-          { field: "alpha", operator: "=", value: "1" },
-          { field: "beta", operator: "=", value: "2" },
-          { field: "gamma", operator: "=", value: "3" },
-        ],
-      });
-      await flushPromises();
-      await nextTick();
+  // Rows the user does not touch must be written back exactly as loaded.
+  describe("filters[] — shared filter builder", () => {
+    const saved = [
+      { field: "alpha", operator: "=", value: "1" },
+      { field: "beta", operator: "IN", value: "'a', 'b'" },
+      { field: "gamma", operator: "Is Not Null", value: "" },
+    ];
 
-      // sanity — all three rendered in order
+    it("draws one chip per saved row, in order", async () => {
+      wrapper = mountConfig({ filters: saved.map((f) => ({ ...f })) });
+      await flushPromises();
+      const builder = wrapper.findComponent({ name: "FilterBuilder" });
+      expect(builder.props("profile")).toBe("anomaly");
       expect(renderedFilterFields(wrapper)).toEqual(["alpha", "beta", "gamma"]);
+    });
 
-      (wrapper.vm as any).removeFilter(1); // delete "beta" (non-last)
-      await nextTick();
+    it("removing the middle chip keeps the other rows byte-identical in the form and the config", async () => {
+      const { wrapper: w, config } = mountReturning({ filters: saved.map((f) => ({ ...f })) });
+      wrapper = w;
       await flushPromises();
 
-      // form DATA is correct
-      expect(getForm(wrapper).state.values.filters.map((f: any) => f.field)).toEqual([
-        "alpha",
-        "gamma",
-      ]);
+      await wrapper.find('[data-test="anomaly-filter-builder-chip-beta-remove"]').trigger("click");
+      await flushPromises();
+      await nextTick();
 
-      // the RENDERED inputs must match — not shifted, not blank (:key=index)
+      expect(getForm(wrapper).state.values.filters).toEqual([saved[0], saved[2]]);
+      expect(config.filters).toEqual([saved[0], saved[2]]);
       expect(renderedFilterFields(wrapper)).toEqual(["alpha", "gamma"]);
     });
 
-    it("addFilter / removeFilter mutate the form array (single source of truth)", async () => {
+    it("writes a builder edit back in the flat row format", async () => {
       wrapper = mountConfig({ filters: [] });
       await flushPromises();
-      const form = getForm(wrapper);
-
-      (wrapper.vm as any).addFilter();
-      (wrapper.vm as any).addFilter();
+      wrapper
+        .findComponent({ name: "FilterBuilder" })
+        .vm.$emit("update:modelValue", [{ field: "level", operator: "<>", value: "debug" }]);
       await nextTick();
-      expect(form.state.values.filters.length).toBe(2);
-
-      (wrapper.vm as any).removeFilter(0);
-      await nextTick();
-      expect(form.state.values.filters.length).toBe(1);
+      expect(getForm(wrapper).state.values.filters).toEqual([
+        { field: "level", operator: "<>", value: "debug" },
+      ]);
     });
   });
 
@@ -1110,6 +1243,50 @@ describe("AnomalyDetectionConfig", () => {
       expect(getForm(wrapper).state.isValid).toBe(false);
     });
 
+    it("refuses a schedule under one minute and accepts one minute", async () => {
+      const shape = {
+        schedule_interval_unit: "s",
+        histogram_interval_value: 1,
+        histogram_interval_unit: "s",
+        detection_window_value: 1,
+        detection_window_unit: "h",
+      };
+      wrapper = await submitted({ ...shape, schedule_interval_value: 59 });
+      expect(fieldError(wrapper, "schedule_interval_value")).toContain("1m");
+      expect(getForm(wrapper).state.isValid).toBe(false);
+      wrapper.unmount();
+
+      wrapper = await submitted({ ...shape, schedule_interval_value: 60 });
+      expect(fieldError(wrapper, "schedule_interval_value")).toBeUndefined();
+    });
+
+    it("refuses a window over the server's 100,000 bucket limit and names the longest one", async () => {
+      wrapper = await submitted({
+        schedule_interval_value: 1,
+        schedule_interval_unit: "m",
+        histogram_interval_value: 1,
+        histogram_interval_unit: "s",
+        detection_window_value: 365,
+        detection_window_unit: "d",
+      });
+
+      expect(fieldError(wrapper, "detection_window_value")).toContain("1d 3h 46m 40s");
+      expect(getForm(wrapper).state.isValid).toBe(false);
+    });
+
+    it("accepts a window at exactly the bucket limit", async () => {
+      wrapper = await submitted({
+        schedule_interval_value: 1,
+        schedule_interval_unit: "m",
+        histogram_interval_value: 1,
+        histogram_interval_unit: "s",
+        detection_window_value: 100000,
+        detection_window_unit: "s",
+      });
+
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+    });
+
     it("accepts exactly the floor and refuses one bucket under it", async () => {
       const shape = {
         schedule_interval_value: 5,
@@ -1159,6 +1336,43 @@ describe("AnomalyDetectionConfig", () => {
       await flushPromises();
       return w;
     };
+
+    it("tells the editor which changes retrain, only on the edit screen", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+      expect(wrapper.find('[data-test="anomaly-retrain-note"]').text()).toContain(
+        "retrains this detector",
+      );
+      wrapper.unmount();
+      wrapper = mountConfig(matchingConfig);
+      await flushPromises();
+      expect(wrapper.find('[data-test="anomaly-retrain-note"]').exists()).toBe(false);
+    });
+
+    it("a schedule-only edit leaves an over-limit row editable", async () => {
+      wrapper = mountConfig(
+        {
+          schedule_interval_value: 1,
+          schedule_interval_unit: "m",
+          histogram_interval_value: 1,
+          histogram_interval_unit: "s",
+          detection_window_value: 365,
+          detection_window_unit: "d",
+        },
+        {
+          storedIntervals: {
+            histogram: { raw: "1s", value: 1, unit: "s", parsed: true },
+            schedule: { raw: "1m", value: 1, unit: "m", parsed: true },
+            window: { raw: 31536000, value: 365, unit: "d", parsed: true },
+          },
+        },
+      );
+      await flushPromises();
+      getForm(wrapper).setFieldValue("schedule_interval_value", 2);
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+    });
 
     it("an untouched below-floor triple passes: a description-only edit saves", async () => {
       wrapper = await mountStored(storedBelowFloor());
@@ -1232,6 +1446,52 @@ describe("AnomalyDetectionConfig", () => {
         false,
       );
     });
+  });
+});
+
+describe("data readiness statuses", () => {
+  it.each([
+    ["waiting_for_data", "waitingForData"],
+    ["not_applicable", "notApplicable"],
+  ])("reads %s as a data state, not a failure or a usable model", (status, state) => {
+    expect(isAnomalyDataReadinessStatus(status)).toBe(true);
+    const model = anomalySensitivityModel({
+      status,
+      is_trained: false,
+      current_model_version: 7,
+      band_k: 4.2,
+    });
+    expect(model.state).toBe(state);
+    expect(model.current).toBe(false);
+    expect(model.level).toBeNull();
+  });
+
+  it("offers Check now only on an enabled data state", () => {
+    expect(anomalyCanCheckDataNow({ status: "not_applicable", enabled: true })).toBe(true);
+    expect(anomalyCanCheckDataNow({ status: "waiting_for_data", enabled: false })).toBe(false);
+    expect(anomalyCanCheckDataNow({ status: "failed", enabled: true })).toBe(false);
+  });
+
+  it.each(["failed", "waiting", "ready", "training", undefined])(
+    "does not treat %s as a data state",
+    (status) => {
+      expect(isAnomalyDataReadinessStatus(status)).toBe(false);
+    },
+  );
+
+  it.each([
+    "alerts.anomaly.autoWaitingForDataHelp",
+    "alerts.anomaly.autoNotApplicableHelp",
+    "alerts.anomaly.checkDataNow",
+    "alerts.anomaly.checkDataNowTooltip",
+    "alerts.anomaly.dataReadinessReason",
+    "components.badge.anomalyStatus.waitingForData",
+    "components.badge.anomalyStatus.notApplicable",
+    "components.badge.alertStatus.waitingForData",
+    "components.badge.alertStatus.notApplicable",
+  ])("has the en-US copy %s", (key) => {
+    const text = key.split(".").reduce<any>((node, part) => node?.[part], enLocale);
+    expect(typeof text).toBe("string");
   });
 });
 

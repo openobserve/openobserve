@@ -155,6 +155,12 @@ describe("PodDetails containers", () => {
     expect(wrapper.find('[data-test="k8s2-pod-init-containers"]').exists()).toBe(false);
   });
 
+  it("shows each container's restart count, and a dash when the count is unknown", () => {
+    expect(field(mountPod(podRow()), "app", "restarts").text()).toContain("2");
+    const wrapper = mountPod(observedRow());
+    expect(field(wrapper, "init-db", "restarts").text()).toContain("—");
+  });
+
   it("adds ports, unresolved env, mounts, Lens probes and command from the object", () => {
     const wrapper = mountPod(observedRow());
     expect(field(wrapper, "app", "ports").text()).toContain("http: 8080/TCP");

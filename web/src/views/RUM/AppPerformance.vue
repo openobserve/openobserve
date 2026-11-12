@@ -26,23 +26,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="px-page-edge border-border-default flex shrink-0 items-center gap-2 border-b py-2 max-md:flex-wrap"
       data-test="rum-performance-toolbar"
     >
-      <OToggleGroup
-        v-model="activePerformanceTab"
-        mobile-dropdown
-        class="shrink-0"
-        data-test="rum-performance-tabs"
-      >
-        <OToggleGroupItem
-          v-for="tab in tabs"
-          :key="tab.value"
-          :value="tab.value"
-          :icon-left="tab.icon"
-          size="sm"
-          :data-test="`rum-performance-tab-${tab.value}`"
+      <FeatureLockExempt class="contents">
+        <OToggleGroup
+          v-model="activePerformanceTab"
+          mobile-dropdown
+          class="shrink-0"
+          data-test="rum-performance-tabs"
         >
-          {{ tab.label }}
-        </OToggleGroupItem>
-      </OToggleGroup>
+          <OToggleGroupItem
+            v-for="tab in tabs"
+            :key="tab.value"
+            :value="tab.value"
+            :icon-left="tab.icon"
+            size="sm"
+            :data-test="`rum-performance-tab-${tab.value}`"
+          >
+            {{ tab.label }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+      </FeatureLockExempt>
       <div
         class="ms-auto flex shrink-0 items-center gap-2 max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end max-md:[&_.date-time-label]:hidden"
       >
@@ -61,27 +63,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @trigger="refreshData"
         />
         <OButtonGroup>
-          <OButton
-            :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
-            :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
-            size="icon-toolbar"
-            data-test="rum-performance-refresh"
-            @click="refreshData"
+          <OTooltip
+            :content="
+              isAutoRunOn
+                ? t('search.autoRunEnabled')
+                : isVariablesChanged
+                  ? t('dashboard.refreshToApplyVariableChanges')
+                  : t('dashboard.refresh')
+            "
+            :disabled="!isMobile && !isAutoRunOn && !isVariablesChanged"
           >
-            <OTooltip
-              :content="
-                isAutoRunOn
-                  ? t('search.autoRunEnabled')
-                  : isVariablesChanged
-                    ? t('dashboard.refreshToApplyVariableChanges')
-                    : t('dashboard.refresh')
-              "
-            />
-          </OButton>
+            <OButton
+              :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
+              :variant="isVariablesChanged ? 'warning' : 'primary'"
+              :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+              :aria-label="t('dashboard.refresh')"
+              data-test="rum-performance-refresh"
+              @click="refreshData"
+            >
+              <template v-if="!isMobile">{{ t("dashboard.refresh") }}</template>
+            </OButton>
+          </OTooltip>
           <ODropdown v-if="isAutoRunAvailable" align="end" side="bottom">
             <template #trigger>
               <OButton
-                :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
+                :variant="isVariablesChanged ? 'warning' : 'primary'"
                 size="icon-toolbar"
                 class="w-5"
                 :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
@@ -161,11 +167,13 @@ import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { getDashboard } from "@/utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "@/utils/date";
+import { overviewStateOnly } from "@/utils/rum/performanceOverview";
 import { reactive } from "vue";
 import { useRoute } from "vue-router";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import overviewDashboard from "@/utils/rum/overview.json";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import usePerformance from "@/composables/rum/usePerformance";
@@ -190,6 +198,7 @@ export default defineComponent({
   name: "AppPerformance",
   components: {
     AutoRefreshInterval,
+    FeatureLockExempt,
     OToggleGroup,
     OToggleGroupItem,
     DateTimePickerDashboard,
@@ -322,6 +331,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
+          ...(activePerformanceTab.value === "overview" ? overviewStateOnly(route.query) : {}),
         },
       });
     };
@@ -474,6 +484,7 @@ export default defineComponent({
           folder: route.query.folder,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
+          ...overviewStateOnly(route.query),
         },
       });
     });

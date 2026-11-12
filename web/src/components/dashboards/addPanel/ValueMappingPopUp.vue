@@ -32,166 +32,26 @@
     data-test="dashboard-value-mapping-popup"
   >
     <div class="mb-4">
-      <OEmptyState
-        v-if="editedValueMapping.length === 0"
-        size="inline"
-        icon="swap-horiz"
-        :title="t('dashboard.valueMappingEmptyTitle')"
-        :description="t('dashboard.valueMappingEmptyDescription')"
-        data-test="dashboard-addpanel-config-value-mapping-empty"
-      />
-      <draggable
-        v-else
+      <ValueMappingList
         v-model="editedValueMapping"
-        :options="dragOptions"
-        @mousedown.stop="() => {}"
-        data-test="dashboard-addpanel-config-value-mapping-drag"
-      >
-        <div
-          v-for="(mapping, index) in editedValueMapping"
-          :key="index"
-          class="mb-2 flex items-start gap-2"
-        >
-          <div class="cursor-move p-2">
-            <OIcon
-              name="drag-indicator"
-              size="sm"
-              :data-test="`dashboard-addpanel-config-value-mapping-drag-handle-${index}`"
-            />
-          </div>
-          <div
-            class="rounded-default border-border-default flex flex-1 flex-col gap-2 border px-2.5 py-2"
-          >
-            <!-- Condition — "If value [is / between / matches] …" -->
-            <div class="flex flex-wrap items-center gap-2">
-              <span
-                class="o-input-label text-compact text-input-label-text w-24 shrink-0 leading-tight font-medium"
-                >{{ t("dashboard.valueMappingIfValue") }}</span
-              >
-              <div class="w-44 shrink-0">
-                <OSelect
-                  v-model="mapping.type"
-                  :options="mappingTypes"
-                  class="w-full"
-                  :data-test="`dashboard-addpanel-config-value-mapping-type-select-${index}`"
-                />
-              </div>
-              <div v-if="mapping.type === 'range'" class="flex w-52 shrink-0 gap-2">
-                <div class="min-w-0 flex-1">
-                  <OInput
-                    v-model="mapping.from"
-                    :placeholder="t('dashboard.valueMappingFrom')"
-                    class="w-full"
-                    :data-test="`dashboard-addpanel-config-value-mapping-from-input-${index}`"
-                  />
-                </div>
-                <div class="min-w-0 flex-1">
-                  <OInput
-                    v-model="mapping.to"
-                    :placeholder="t('dashboard.valueMappingTo')"
-                    class="w-full"
-                    :data-test="`dashboard-addpanel-config-value-mapping-to-input-${index}`"
-                  />
-                </div>
-              </div>
-              <div v-else-if="mapping.type === 'regex'" class="w-52 shrink-0">
-                <OInput
-                  v-model="mapping.pattern"
-                  :placeholder="t('dashboard.valueMappingRegex')"
-                  :error="!!patternErrors[index]"
-                  :error-message="patternErrors[index]"
-                  class="w-full"
-                  :data-test="`dashboard-addpanel-config-value-mapping-pattern-input-${index}`"
-                />
-              </div>
-              <div v-else class="w-52 shrink-0">
-                <OInput
-                  v-model="mapping.value"
-                  :placeholder="t('dashboard.valueMappingValue')"
-                  class="w-full"
-                  :data-test="`dashboard-addpanel-config-value-mapping-value-input-${index}`"
-                />
-              </div>
-            </div>
-            <!-- Display text -->
-            <div class="flex flex-wrap items-center gap-2">
-              <span
-                class="o-input-label text-compact text-input-label-text w-24 shrink-0 leading-tight font-medium"
-                >{{ t("dashboard.valueMappingDisplayValue") }}</span
-              >
-              <div class="w-98 shrink-0">
-                <OInput
-                  v-model="mapping.text"
-                  :placeholder="t('dashboard.valueMappingDisplayPlaceholder')"
-                  class="w-full"
-                  :data-test="`dashboard-addpanel-config-value-mapping-text-input-${index}`"
-                />
-              </div>
-            </div>
-            <!-- Text color -->
-            <div class="flex flex-wrap items-center gap-2">
-              <span
-                class="o-input-label text-compact text-input-label-text w-24 shrink-0 leading-tight font-medium"
-                >{{ t("dashboard.textColor") }}</span
-              >
-              <ColorSwatchPicker
-                v-model="mapping.textColor"
-                :swatches="TEXT_SWATCHES"
-                :data-test="`dashboard-addpanel-config-value-mapping-text-color-${index}`"
-              />
-            </div>
-            <!-- Background color -->
-            <div class="flex flex-wrap items-center gap-2">
-              <span
-                class="o-input-label text-compact text-input-label-text w-24 shrink-0 leading-tight font-medium"
-                >{{ t("dashboard.bgColor") }}</span
-              >
-              <ColorSwatchPicker
-                v-model="mapping.color"
-                :swatches="BG_SWATCHES"
-                :data-test="`dashboard-addpanel-config-value-mapping-bg-color-${index}`"
-              />
-            </div>
-          </div>
-          <OButton
-            variant="ghost"
-            size="icon-xs"
-            icon-left="close"
-            :title="t('common.remove')"
-            class="shrink-0"
-            :data-test="`dashboard-addpanel-config-value-mapping-delete-btn-${index}`"
-            @click="removeValueMappingByIndex(index)"
-          />
-        </div>
-      </draggable>
+        :pattern-errors="patternErrors"
+        @remove="removeValueMappingByIndex"
+      />
     </div>
   </ODialog>
 </template>
 <script lang="ts">
-import { ref, computed, watch, defineComponent, onMounted } from "vue";
+import { ref, watch, defineComponent, onMounted } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import { VueDraggableNext } from "vue-draggable-next";
-import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import ColorSwatchPicker from "../ColorSwatchPicker.vue";
-import { TEXT_SWATCHES, BG_SWATCHES } from "@/composables/dashboard/useColumnFormatting";
-import { valueMappingPatternError } from "@/utils/dashboard/tableConfigUtils";
+import ValueMappingList from "./ValueMappingList.vue";
+import { valueMappingPatternErrors } from "./valueMappingErrors";
 
 export default defineComponent({
   name: "ValueMappingPopUp",
   components: {
-    draggable: VueDraggableNext as any,
-    OButton,
-    OEmptyState,
-    OInput,
-    OSelect,
-    ColorSwatchPicker,
     ODialog,
-    OIcon,
+    ValueMappingList,
   },
   props: {
     open: {
@@ -225,20 +85,6 @@ export default defineComponent({
       { immediate: true },
     );
 
-    const dragOptions = ref({
-      animation: 200,
-    });
-
-    const mappingTypes = computed(() => [
-      { label: t("dashboard.valueMappingTypeValue"), value: "value" },
-      { label: t("dashboard.valueMappingTypeRange"), value: "range" },
-      { label: t("dashboard.valueMappingTypeRegex"), value: "regex" },
-      { label: t("dashboard.valueMappingTypeGt"), value: "gt" },
-      { label: t("dashboard.valueMappingTypeLt"), value: "lt" },
-      { label: t("dashboard.valueMappingTypeGte"), value: "gte" },
-      { label: t("dashboard.valueMappingTypeLte"), value: "lte" },
-    ]);
-
     const addValueMapping = () => {
       editedValueMapping.value.push({
         type: "value",
@@ -264,13 +110,7 @@ export default defineComponent({
     });
 
     const applyValueMapping = () => {
-      const errors: Record<number, I18nText> = {};
-      editedValueMapping.value.forEach((mapping, index) => {
-        if (mapping?.type !== "regex") return;
-        const error = valueMappingPatternError(String(mapping.pattern ?? ""));
-        if (error === "tooLong") errors[index] = t("dashboard.valueMappingRegexTooLong");
-        if (error === "unsupported") errors[index] = t("dashboard.valueMappingRegexUnsupported");
-      });
+      const errors = valueMappingPatternErrors(editedValueMapping.value, t);
       patternErrors.value = errors;
       if (Object.keys(errors).length > 0) return;
       emit("save", editedValueMapping.value);
@@ -289,14 +129,10 @@ export default defineComponent({
       t,
       addValueMapping,
       removeValueMappingByIndex,
-      mappingTypes,
-      dragOptions,
       applyValueMapping,
       cancelEdit,
       editedValueMapping,
       patternErrors,
-      TEXT_SWATCHES,
-      BG_SWATCHES,
       cancel: "cancel",
     };
   },

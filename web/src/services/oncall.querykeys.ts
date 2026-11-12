@@ -31,6 +31,8 @@ export const oncallKeys = {
   /** Every team's list and per-team entry — the scope a team write drops. */
   teamsAll: (org: string) => orgKey(org, "oncall", "teams"),
   teams: (org: string) => orgKey(org, "oncall", "teams", "list"),
+  /** Every team's room destinations, read together for the Slack app's on-call room check. */
+  teamRooms: (org: string) => orgKey(org, "oncall", "teams", "rooms"),
   /** One team's whole prefix: detail, roster, schedule, policy and everything derived from them. */
   team: (org: string, teamId: string) => orgKey(org, "oncall", "teams", teamId),
   teamOverview: (org: string, teamId: string) => orgKey(org, "oncall", "teams", teamId, "overview"),
@@ -41,6 +43,10 @@ export const oncallKeys = {
   members: (org: string, teamId: string) => orgKey(org, "oncall", "teams", teamId, "members"),
   schedule: (org: string, teamId: string) => orgKey(org, "oncall", "teams", teamId, "schedule"),
   policy: (org: string, teamId: string) => orgKey(org, "oncall", "teams", teamId, "policy"),
+  /** Many teams in one entry, outside every per-team prefix, so each team write names this scope too. */
+  teamContextAll: (org: string) => orgKey(org, "oncall", "teams", "context"),
+  teamContext: (org: string, teamIds: string[], includeMine: boolean) =>
+    orgKey(org, "oncall", "teams", "context", [...teamIds].sort().join(","), includeMine),
   /**
    * `at` omitted asks for "now", which every caller derives from the clock, so
    * it buckets to the minute; a pinned instant (a closed record's `closed_at`)
@@ -68,6 +74,14 @@ export const oncallKeys = {
       quantizeRange(from, to),
       rotationId ?? "primary",
     ),
+  /** Keyed by the draft itself, so an unchanged draft is a cache hit rather than a request. */
+  resolvedSchedulePreview: (
+    org: string,
+    teamId: string,
+    from: number,
+    to: number,
+    rotation: unknown,
+  ) => orgKey(org, "oncall", "teams", teamId, "resolvedSchedulePreview", from, to, rotation),
   overrides: (org: string, teamId: string, from?: number, to?: number) =>
     orgKey(
       org,
@@ -98,6 +112,9 @@ export const oncallKeys = {
   response: (org: string, responseId: string) => orgKey(org, "oncall", "responses", responseId),
   responseProgress: (org: string, responseId: string) =>
     orgKey(org, "oncall", "responses", responseId, "progress"),
+  /** Under `responsesAll`, so a response write drops it like the per-record entry. */
+  responsesProgress: (org: string, responseIds: string[]) =>
+    orgKey(org, "oncall", "responses", "escalation", [...responseIds].sort().join(",")),
   responsePriorCauses: (org: string, responseId: string) =>
     orgKey(org, "oncall", "responses", responseId, "priorCauses"),
   responseReport: (org: string, responseId: string) =>
@@ -145,6 +162,8 @@ export const oncallKeys = {
   contactsAll: (org: string) => orgKey(org, "oncall", "contacts"),
   contact: (org: string, userEmail: string) => orgKey(org, "oncall", "contacts", userEmail),
   telephony: (org: string) => orgKey(org, "oncall", "telephony"),
+  /** Under `telephony`, so a telephony write drops the live check with the settings. */
+  telephonyStatus: (org: string) => orgKey(org, "oncall", "telephony", "status"),
 
   routingConfig: (org: string) => orgKey(org, "oncall", "routing", "config"),
 };

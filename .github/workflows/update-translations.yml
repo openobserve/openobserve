@@ -75,7 +75,7 @@ jobs:
         (github.event.action != 'synchronize' || github.event.pull_request.auto_merge != null)))
 
     permissions:
-      contents: write
+      contents: read
 
     env:
       # Deliberately no token here: a job-level `env:` is injected into *every*
@@ -91,11 +91,10 @@ jobs:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.TRANSLATIONS_APPROVE_TOKEN || secrets.GITHUB_TOKEN }}
           # This job runs PR-authored code (requirements.txt, main.py,
           # translator.py all come from the PR head). Without this, checkout
-          # would leave the push token in .git/config for that code to read.
-          # The push step re-attaches the credential after the Python is done.
+          # would leave its token in .git/config for that code to read.
+          # The push step attaches the push credential after the Python is done.
           persist-credentials: false
           # Check out the PR's head branch by name (not the merge commit that
           # `pull_request` checks out by default) so the generated files can be
@@ -209,6 +208,10 @@ jobs:
         if: steps.guard.outputs.skip == 'false'
         run: pip install -r scripts/translations/requirements.txt
 
+      - name: Set trace ID
+        if: steps.guard.outputs.skip == 'false'
+        run: echo "O2_TRACE_ID=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
+
       - name: Run translation script
         id: run_translation
         if: steps.guard.outputs.skip == 'false'
@@ -232,6 +235,14 @@ jobs:
         env:
           INPUT_LANGUAGES: ${{ inputs.languages }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          O2_TRACE_INGEST_URL: ${{ secrets.O2_TRACE_INGEST_URL }}
+          O2_TRACE_ORG: ${{ secrets.O2_TRACE_ORG }}
+          O2_TRACE_USERNAME: ${{ secrets.O2_TRACE_USERNAME }}
+          O2_TRACE_PASSWORD: ${{ secrets.O2_TRACE_PASSWORD }}
+          O2_TRACE_AUTH: ${{ secrets.O2_TRACE_AUTH }}
+          O2_TRACE_STREAM: ${{ secrets.O2_TRACE_STREAM }}
+          O2_TRACE_EXPORT_TIMEOUT_MS: ${{ vars.O2_TRACE_EXPORT_TIMEOUT_MS }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           cd scripts/translations
           ARGS=()
@@ -317,6 +328,16 @@ jobs:
           npm ci --ignore-scripts
           npx prettier --write "src/locales/languages/*.json"
 
+      - name: Mint the translations App token
+        id: app_token
+        if: "!cancelled() && steps.check_changes.outputs.changes == 'true' && vars.TRANSLATIONS_APP_ID != ''"
+        # Pinned to a full commit SHA because this action receives the app's signing private key.
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.TRANSLATIONS_APP_ID }}
+          private-key: ${{ secrets.TRANSLATIONS_APP_PRIVATE_KEY }}
+          permission-contents: write
+
       - name: Commit translations onto the PR branch
         id: commit
         if: '!cancelled() && steps.check_changes.outputs.changes == ''true'''
@@ -324,16 +345,14 @@ jobs:
           # Scoped to this step, not the job: every step above this one runs
           # PR-authored code, and none of them need a push credential.
           #
-          # Pushing with GITHUB_TOKEN would leave the PR wedged: GitHub
-          # deliberately does not re-trigger workflows for commits made with that
-          # token, so the new head SHA would have no status checks and required
-          # checks could never go green. TRANSLATIONS_APPROVE_TOKEN is a real
-          # user token, so its push re-runs CI on the translation commit. The
-          # fallback keeps the workflow functional if the secret is missing, at
-          # the cost of that re-trigger.
-          PUSH_TOKEN: ${{ secrets.TRANSLATIONS_APPROVE_TOKEN || secrets.GITHUB_TOKEN }}
+          # Not GITHUB_TOKEN: GitHub holds every run its push starts as action_required, so ci-gate never reports on the new head.
+          PUSH_TOKEN: ${{ steps.app_token.outputs.token }}
           RUN_RESULT: ${{ steps.run_translation.outputs.run }}
         run: |
+          if [ -z "$PUSH_TOKEN" ]; then
+            echo "::error::No push token: set the TRANSLATIONS_APP_ID variable and the TRANSLATIONS_APP_PRIVATE_KEY secret for a GitHub App with Contents: read and write on this repository (see scripts/translations/README.md)."
+            exit 1
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Checkout ran with persist-credentials: false, so re-attach the

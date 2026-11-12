@@ -7,7 +7,7 @@ const STORAGE_KEYS = {
   logsStreamType: (orgId: string) => `oo_logs_stream_type_${orgId}`,
 };
 
-const DASHBOARD_STREAM_TYPES = ["logs", "metrics", "traces"];
+const DASHBOARD_STREAM_TYPES = ["logs", "metrics", "traces", "enrichment_tables"];
 
 const DASHBOARD_KEYS = {
   streamType: (orgId: string) => `oo_dashboard_panel_stream_type_${orgId}`,

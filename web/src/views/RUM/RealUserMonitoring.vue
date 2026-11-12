@@ -36,15 +36,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="shrink-0"
       >
         <template #tabs>
-          <OTabs v-model="activeTab" align="left" @change="changeTab">
-            <OTab
-              v-for="tab in tabs"
-              :key="tab.value"
-              :name="tab.value"
-              :label="tab.label"
-              :data-test="`rum-tab-${tab.value.replace('_', '-')}`"
-            />
-          </OTabs>
+          <!-- Section navigation stays live on a license-locked page. -->
+          <FeatureLockExempt class="contents">
+            <OTabs v-model="activeTab" align="left" @change="changeTab">
+              <OTab
+                v-for="tab in tabs"
+                :key="tab.value"
+                :name="tab.value"
+                :label="tab.label"
+                :data-test="`rum-tab-${tab.value.replace('_', '-')}`"
+              />
+            </OTabs>
+          </FeatureLockExempt>
         </template>
       </OPageHeader>
       <router-view v-slot="{ Component }">
@@ -73,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { overviewStateOnly } from "@/utils/rum/performanceOverview";
 import { computed, nextTick, onActivated, onMounted, ref, watch, onUpdated } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -84,6 +88,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useI18nTyped } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -107,6 +112,31 @@ const CACHED_RUM_VIEWS = [
   "SourceMaps",
   "AppPerformance",
 ];
+
+const ROUTE_TABS: Readonly<Record<string, string>> = {
+  Sessions: "sessions",
+  SessionViewer: "sessions",
+  ErrorTracking: "error_tracking",
+  ErrorViewer: "error_tracking",
+  RumPerformance: "performance",
+  rumPerformanceSummary: "performance",
+  rumPerformanceWebVitals: "performance",
+  rumPerformanceErrors: "performance",
+  rumPerformanceApis: "performance",
+  SourceMaps: "source_maps",
+};
+
+// These views keep state in their URL (a record id or a Performance sub-tab) that re-pushing the tab's landing route would drop.
+const VIEW_OWNED_ROUTES = [
+  "SessionViewer",
+  "ErrorViewer",
+  "UploadSourceMaps",
+  "rumPerformanceWebVitals",
+  "rumPerformanceErrors",
+  "rumPerformanceApis",
+];
+
+const tabForRoute = (name: unknown): string | undefined => ROUTE_TABS[String(name ?? "")];
 
 const router = useRouter();
 const store = useStore();
@@ -170,55 +200,17 @@ onMounted(async () => {
   // The awaits above can outlast a click elsewhere; redirecting now would undo it.
   if (!router.currentRoute.value.matched.some((r: { name?: unknown }) => r.name === "RUM")) return;
 
-  const routeNameMapping: { [key: string]: string } = {
-    SessionViewer: "sessions",
-    ErrorTracking: "error_tracking",
-    RumPerformance: "performance",
-    ErrorViewer: "error_tracking",
-    Sessions: "sessions",
-    rumPerformanceSummary: "performance",
-    SourceMaps: "source_maps",
-  };
+  activeTab.value = tabForRoute(routeName.value) ?? "performance";
 
-  if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
-    activeTab.value = routeNameMapping[router.currentRoute.value.name?.toString() || "placeholder"];
-  } else {
-    activeTab.value = "performance";
-  }
-
-  // This is temporary fix, as we have kept sessionViewer keep-alive as false.
-  // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
-  const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
-
-  if (ignoreRoutes.includes(routeName.value as string)) return;
+  if (VIEW_OWNED_ROUTES.includes(String(routeName.value))) return;
   if (keepsOwnTimeRange()) return;
   changeTab(activeTab.value);
 });
 
 onUpdated(async () => {
   if (routeName.value === "RUM") {
-    const routeNameMapping: { [key: string]: string } = {
-      SessionViewer: "sessions",
-      ErrorTracking: "error_tracking",
-      RumPerformance: "performance",
-      ErrorViewer: "error_tracking",
-      Sessions: "sessions",
-      rumPerformanceSummary: "performance",
-      SourceMaps: "source_maps",
-    };
-
-    if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
-      activeTab.value =
-        routeNameMapping[router.currentRoute.value.name?.toString() || "placeholder"];
-    } else {
-      activeTab.value = "performance";
-    }
-
-    // This is temporary fix, as we have kept sessionViewer keep-alive as false.
-    // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
-    const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
-
-    if (!ignoreRoutes.includes(routeName.value as string)) changeTab(activeTab.value);
+    activeTab.value = tabForRoute(routeName.value) ?? "performance";
+    if (!VIEW_OWNED_ROUTES.includes(String(routeName.value))) changeTab(activeTab.value);
   }
 });
 
@@ -232,18 +224,7 @@ watch(
 );
 
 const updateTabOnRouteChange = () => {
-  const routeNameMapping: { [key: string]: string } = {
-    SessionViewer: "sessions",
-    ErrorTracking: "error_tracking",
-    RumPerformance: "performance",
-    Sessions: "sessions",
-    rumPerformanceSummary: "performance",
-    rumPerformanceWebVitals: "performance",
-    rumPerformanceErrors: "performance",
-    rumPerformanceApis: "performance",
-    SourceMaps: "source_maps",
-  };
-  const tab = routeNameMapping[router.currentRoute.value.name?.toString() || "placeholder"];
+  const tab = tabForRoute(routeName.value);
   if (tab !== activeTab.value && tab !== undefined) {
     activeTab.value = tab;
   }
@@ -306,6 +287,7 @@ const changeTab = (tab: string | number) => {
       name: "rumPerformanceSummary",
       query: {
         ...getQueryParams(performanceState.data.datetime, ""),
+        ...overviewStateOnly(router.currentRoute.value.query),
         org_identifier: store.state.selectedOrganization.identifier,
       },
     });
@@ -362,6 +344,8 @@ const getSessionReplayFields = () => {
           performanceState.data.streams["_sessionreplay"]["schema"][field.name] = field;
         });
       })
+      // An org without replay data has no _sessionreplay stream; it just stays absent.
+      .catch(() => {})
       .finally(() => {
         resolve(true);
         isLoading.value.pop();
@@ -382,6 +366,8 @@ const getRumDataFields = () => {
           performanceState.data.streams["_rumdata"]["schema"][field.name] = field;
         });
       })
+      // An org without RUM data has no _rumdata stream; it just stays absent.
+      .catch(() => {})
       .finally(() => {
         resolve(true);
         isLoading.value.pop();

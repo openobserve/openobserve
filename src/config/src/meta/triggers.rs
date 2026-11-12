@@ -56,13 +56,20 @@ pub enum TriggerModule {
     OncallEscalation,
     /// Periodic alert calibration pass, one job per org config.
     AlertCalibration,
+    /// Fleet rollout engine: one job per rollout with work left, region-local.
+    FleetRollout,
+    /// Slack sync of one on-call page, keyed by its response id; region-local (SY-8).
+    OncallSlackSync,
 }
 
 impl TriggerModule {
     /// Exhaustive, so a new module has to choose; keep-alive must renew the claim it completes by.
     pub fn completes_by_claim(&self) -> bool {
         match self {
-            Self::CompositeAlert | Self::AlertCalibration => true,
+            Self::CompositeAlert
+            | Self::AlertCalibration
+            | Self::FleetRollout
+            | Self::OncallSlackSync => true,
             Self::Report
             | Self::Alert
             | Self::DerivedStream
@@ -90,6 +97,8 @@ impl std::fmt::Display for TriggerModule {
             Self::CompositeAlert => write!(f, "composite_alert"),
             Self::OncallEscalation => write!(f, "oncall_escalation"),
             Self::AlertCalibration => write!(f, "alert_calibration"),
+            Self::FleetRollout => write!(f, "fleet_rollout"),
+            Self::OncallSlackSync => write!(f, "oncall_slack_sync"),
         }
     }
 }
@@ -122,6 +131,13 @@ pub struct Trigger {
     pub retries: i32,
     #[serde(default)]
     pub data: String,
+}
+
+impl Trigger {
+    /// The due time, or `None` once the trigger is Completed and will not run again.
+    pub fn pending_next_run_at(&self) -> Option<i64> {
+        (self.status != TriggerStatus::Completed).then_some(self.next_run_at)
+    }
 }
 
 impl MemorySize for Trigger {
@@ -183,6 +199,10 @@ pub struct ScheduledTriggerData {
     /// rendering) is its only consumer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chart_id: Option<String>,
+    /// SIEM detections only: enterprise evaluation memory (covered window, rows alerted on).
+    #[cfg(feature = "enterprise")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub siem: Option<json::Value>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -227,6 +247,13 @@ impl ScheduledTriggerData {
         self.notified_destinations.clear();
     }
 
+    /// Forgets the delivery cycle, so the next firing pages as the alert's first.
+    pub fn clear_delivery(&mut self) {
+        self.delivery_silenced_until = None;
+        self.last_notified_level = None;
+        self.notified_destinations.clear();
+    }
+
     pub fn to_json_string(&self) -> String {
         json::to_string(self).unwrap()
     }
@@ -236,9 +263,80 @@ impl ScheduledTriggerData {
     }
 }
 
+/// The `data` of an `OncallSlackSync` row: the retry state of its passes (SY-6).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OncallSlackSyncData {
+    /// Failed passes in a row.
+    #[serde(default)]
+    pub attempt: u32,
+    /// No pass before this time, in microseconds; 0 for none.
+    #[serde(default)]
+    pub not_before: i64,
+}
+
+/// How a sync pass ends its row when no arm came in during it (SY-2.3).
+#[derive(Debug, Clone, PartialEq)]
+pub struct SlackSyncFinish {
+    pub status: TriggerStatus,
+    pub next_run_at: i64,
+    /// Stored as the row's `data`; its `not_before` also bounds an arm made during the pass.
+    pub data: OncallSlackSyncData,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_re_enabled_alert_pages_inside_its_old_silence_window() {
+        use crate::meta::alerts::level::{AlertLevel, delivery_decision};
+
+        let now = 1_000_000_000;
+        let mut data = ScheduledTriggerData {
+            period_end_time: Some(7),
+            tolerance: 3,
+            last_satisfied_at: Some(5),
+            delivery_silenced_until: Some(now + 3_600_000_000),
+            last_notified_level: Some(AlertLevel::Critical.to_i32()),
+            notified_destinations: vec!["slack".to_string()],
+            ..Default::default()
+        };
+        let decide = |data: &ScheduledTriggerData| {
+            delivery_decision(
+                AlertLevel::Critical,
+                data.last_notified_level.and_then(AlertLevel::from_i32),
+                data.delivery_silenced_until,
+                now,
+                None,
+            )
+            .should_deliver()
+        };
+        assert!(!decide(&data), "the old window holds the Critical back");
+
+        data.clear_delivery();
+
+        assert!(decide(&data), "the first Critical after re-enable pages");
+        assert!(data.notified_destinations.is_empty());
+        assert_eq!(
+            (data.period_end_time, data.tolerance, data.last_satisfied_at),
+            (Some(7), 3, Some(5)),
+            "only the delivery cycle is forgotten"
+        );
+    }
+
+    #[test]
+    fn test_completed_trigger_has_no_pending_next_run() {
+        let waiting = Trigger {
+            next_run_at: 42,
+            ..Default::default()
+        };
+        assert_eq!(waiting.pending_next_run_at(), Some(42));
+        let completed = Trigger {
+            status: TriggerStatus::Completed,
+            ..waiting
+        };
+        assert_eq!(completed.pending_next_run_at(), None);
+    }
 
     #[test]
     fn test_trigger_module_display() {
@@ -275,6 +373,14 @@ mod tests {
         assert_eq!(TriggerModule::CompositeAlert as i32, 8);
         assert_eq!(TriggerModule::OncallEscalation as i32, 9);
         assert_eq!(TriggerModule::AlertCalibration as i32, 10);
+        assert_eq!(TriggerModule::FleetRollout as i32, 11);
+        assert_eq!(TriggerModule::FleetRollout.to_string(), "fleet_rollout");
+        // SY-8: appended after FleetRollout; the stored value is pinned.
+        assert_eq!(TriggerModule::OncallSlackSync as i32, 12);
+        assert_eq!(
+            TriggerModule::OncallSlackSync.to_string(),
+            "oncall_slack_sync"
+        );
     }
 
     #[test]
@@ -322,6 +428,8 @@ mod tests {
             last_notified_level: None,
             notified_destinations: vec![],
             chart_id: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
         };
         data.reset();
         assert!(data.period_end_time.is_none());
@@ -389,6 +497,8 @@ mod tests {
             last_notified_level: None,
             notified_destinations: vec![],
             chart_id: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
         };
         let json = data.to_json_string();
         let restored = ScheduledTriggerData::from_json_string(&json).unwrap();
@@ -585,6 +695,8 @@ mod tests {
             last_notified_level: None,
             notified_destinations: vec![],
             chart_id: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
             backfill_job: Some(BackfillJob {
                 current_position: 42,
                 deletion_status: DeletionStatus::Pending,

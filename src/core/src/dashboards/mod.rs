@@ -16,6 +16,10 @@
 use config::{
     TIMESTAMP_COL_NAME, ider,
     meta::{
+        alerts::{
+            Operator,
+            condition_ops::{MAX_REGEX_PATTERN_LEN, validate_condition_value},
+        },
         dashboards::{Dashboard, ListDashboardsParams, v8},
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         stream::{DistinctField, StreamType},
@@ -43,11 +47,6 @@ use crate::common::meta::authz::Authz;
 pub mod reports;
 pub mod timed_annotations;
 
-/// Org-setting key holding the "pin dashboard to Home" snapshot
-/// (`{ dashboardId, folderId, label }`). Kept in sync when the pinned
-/// dashboard is moved or deleted so the pin never goes stale.
-const HOME_DASHBOARD_SETTING_KEY: &str = "home_dashboard";
-
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 #[cfg(feature = "enterprise")]
@@ -58,6 +57,35 @@ use o2_openfga::{
 
 #[cfg(feature = "enterprise")]
 use crate::auth::{check_folder_write_permissions, check_permissions};
+
+/// Org-setting key holding the "pin dashboard to Home" snapshot
+/// (`{ dashboardId, folderId, label }`). Kept in sync when the pinned
+/// dashboard is moved or deleted so the pin never goes stale.
+const HOME_DASHBOARD_SETTING_KEY: &str = "home_dashboard";
+
+/// Mirrors `ANNOTATION_FILTER_OPERATORS` in `web/src/utils/dashboard/validateAnnotationSources.ts`.
+const ANNOTATION_FILTER_OPERATORS: &[&str] = &[
+    "=",
+    "!=",
+    ">=",
+    "<=",
+    ">",
+    "<",
+    "Contains",
+    "NotContains",
+    "contains",
+    "not_contains",
+    "is_null",
+    "is_not_null",
+    "is_empty",
+    "is_not_empty",
+    "in",
+    "not_in",
+    "starts_with",
+    "ends_with",
+    "re_match",
+    "re_not_match",
+];
 
 /// An error that occurs interacting with dashboards.
 #[derive(Debug, thiserror::Error)]
@@ -141,6 +169,14 @@ pub enum DashboardError {
 
     #[error("panel with id {0} already exists in tab {1}")]
     PanelAlreadyExists(String, String),
+
+    /// Error that occurs when a dashboard has more than `v8::MAX_ANNOTATION_SOURCES` sources.
+    #[error("a dashboard can have at most {0} annotation sources")]
+    TooManyAnnotationSources(usize),
+
+    /// Error that occurs when an `annotationSources` entry fails structural validation.
+    #[error("invalid annotation source: {0}")]
+    InvalidAnnotationSource(String),
 }
 
 async fn add_distinct_field_entry(
@@ -526,6 +562,22 @@ async fn reconcile_home_dashboard_on_move(org_id: &str, dashboard_id: &str, to_f
     }
 }
 
+/// Drops the dashboard's distinct-value rows and its ownership tuples.
+async fn forget_dashboard(
+    org_id: &str,
+    dashboard_id: &str,
+    folder_id: &str,
+) -> Result<(), DashboardError> {
+    distinct_values::batch_remove(OriginType::Dashboard, dashboard_id).await?;
+    let dashboard = Authz {
+        obj_id: dashboard_id.to_owned(),
+        parent_type: "folders".to_owned(),
+        parent: folder_id.to_owned(),
+    };
+    remove_ownership(org_id, "dashboards", dashboard).await;
+    Ok(())
+}
+
 /// Clear the org's pinned `home_dashboard` setting when the pinned dashboard is
 /// deleted. Best-effort — never fails the caller.
 async fn reconcile_home_dashboard_on_delete(org_id: &str, dashboard_id: &str) {
@@ -572,6 +624,10 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
     table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
     // Keep the org's "pin to Home" setting from dangling on a deleted dashboard.
     reconcile_home_dashboard_on_delete(org_id, dashboard_id).await;
+    // A public link must not outlive its dashboard; a failure shows it as "dashboard deleted".
+    if let Err(e) = crate::public_dashboards::revoke_all_for_dashboard(org_id, dashboard_id).await {
+        log::error!("[Dashboard] error revoking public links of {dashboard_id}: {e}");
+    }
     if let Err(e) = infra::coordinator::dashboards::emit_delete_event(org_id, dashboard_id).await {
         log::error!("[Dashboard] error emitting coordinator delete event for {dashboard_id}: {e}");
     }
@@ -601,6 +657,45 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
         .await;
     }
 
+    Ok(())
+}
+
+pub async fn delete_by_org(org_id: &str) -> Result<(), DashboardError> {
+    system_settings::delete(
+        &SettingScope::Org,
+        Some(org_id),
+        None,
+        HOME_DASHBOARD_SETTING_KEY,
+    )
+    .await?;
+    let dashboards = table::dashboards::list_ids_by_org(org_id).await?;
+    let local = |(dashboard_id, _): (String, String)| async move {
+        common::infra::config::DASHBOARD_ID_TO_ORG
+            .write()
+            .await
+            .remove(&dashboard_id);
+    };
+    let broadcast = |(dashboard_id, _): (String, String)| async move {
+        infra::coordinator::dashboards::emit_delete_event(org_id, &dashboard_id).await?;
+        Ok::<(), DashboardError>(())
+    };
+    db::teardown::evict_then_delete(
+        dashboards,
+        &local,
+        &broadcast,
+        |(dashboard_id, folder_id): (String, String)| async move {
+            forget_dashboard(org_id, &dashboard_id, &folder_id).await?;
+            table::dashboards::delete_from_folder(org_id, &folder_id, &dashboard_id).await?;
+            Ok(())
+        },
+    )
+    .await?;
+    // A retry must also evict rows that appeared after the initial listing.
+    for (dashboard_id, folder_id) in table::dashboards::delete_by_org(org_id).await? {
+        forget_dashboard(org_id, &dashboard_id, &folder_id).await?;
+        let item = (dashboard_id, folder_id);
+        db::teardown::evict(local(item.clone()), broadcast(item)).await?;
+    }
     Ok(())
 }
 
@@ -675,7 +770,8 @@ pub async fn move_dashboard(
             )
             .await;
         }
-        if get_openfga_config().enabled {
+        // A same-folder move would delete the only parent tuple, cutting off folder grants.
+        if get_openfga_config().enabled && curr_folder.folder_id != to_folder {
             set_parent_relation(
                 dashboard_id,
                 &get_ofga_type("dashboards"),
@@ -743,8 +839,13 @@ async fn put(
 
     let title = checked_title(&dashboard)?;
     dashboard.set_title(title);
+    checked_annotation_sources_count(&dashboard)?;
+    checked_annotation_sources(&mut dashboard)?;
+    prune_annotation_source_panels(&mut dashboard);
 
     dashboard.set_dashboard_id(dashboard_id.to_owned());
+    // Public links detect edits by this stamp, so every writer gets it, not only the UI.
+    dashboard.set_updated_at();
     let dash = table::dashboards::put(org_id, folder_id, new_folder_id, dashboard, false).await?;
     if let Some(id) = dash.dashboard_id() {
         if let Err(e) = infra::coordinator::dashboards::emit_put_event(org_id, id).await {
@@ -1043,6 +1144,211 @@ pub fn checked_title(dashboard: &Dashboard) -> Result<String, DashboardError> {
         .ok_or_else(|| DashboardError::PutMissingTitle)
 }
 
+/// Rejects a dashboard whose `annotationSources` exceeds [`v8::MAX_ANNOTATION_SOURCES`].
+pub fn checked_annotation_sources_count(dashboard: &Dashboard) -> Result<(), DashboardError> {
+    let count = dashboard
+        .v8
+        .as_ref()
+        .and_then(|d| d.annotation_sources.as_ref())
+        .map_or(0, Vec::len);
+    if count > v8::MAX_ANNOTATION_SOURCES {
+        return Err(DashboardError::TooManyAnnotationSources(
+            v8::MAX_ANNOTATION_SOURCES,
+        ));
+    }
+    Ok(())
+}
+
+/// Rejects an annotation source's structural problems and trims/writes back `id`/`name`/`title`.
+pub fn checked_annotation_sources(dashboard: &mut Dashboard) -> Result<(), DashboardError> {
+    let Some(sources) = dashboard
+        .v8
+        .as_mut()
+        .and_then(|d| d.annotation_sources.as_mut())
+    else {
+        return Ok(());
+    };
+    let mut seen_ids = std::collections::HashSet::new();
+    let mut seen_names = std::collections::HashSet::new();
+    for source in sources.iter_mut() {
+        source.id = source.id.trim().to_string();
+        source.name = source.name.trim().to_string();
+        source.title = source.title.trim().to_string();
+        if source.id.is_empty() {
+            return Err(DashboardError::InvalidAnnotationSource(
+                "annotation source id is required".to_string(),
+            ));
+        }
+        if !seen_ids.insert(source.id.clone()) {
+            return Err(DashboardError::InvalidAnnotationSource(format!(
+                "annotation source id {} is used more than once",
+                source.id
+            )));
+        }
+        if source.name.is_empty() {
+            return Err(DashboardError::InvalidAnnotationSource(format!(
+                "annotation source {}: name is required",
+                source.id
+            )));
+        }
+        if !seen_names.insert(source.name.to_lowercase()) {
+            return Err(DashboardError::InvalidAnnotationSource(format!(
+                "annotation source {}: name {} is used more than once",
+                source.id, source.name
+            )));
+        }
+        if source.title.is_empty() {
+            return Err(DashboardError::InvalidAnnotationSource(format!(
+                "annotation source {}: title is required",
+                source.id
+            )));
+        }
+        if source
+            .color
+            .as_deref()
+            .is_some_and(|color| !is_valid_hex_color(color))
+        {
+            return Err(DashboardError::InvalidAnnotationSource(format!(
+                "annotation source {}: color must be a 6-digit hex code",
+                source.id
+            )));
+        }
+        if source.mode == v8::AnnotationSourceMode::Sql
+            && source.query.as_deref().unwrap_or("").trim().is_empty()
+        {
+            return Err(DashboardError::InvalidAnnotationSource(format!(
+                "annotation source {}: query is required in sql mode",
+                source.id
+            )));
+        }
+        if source.mode == v8::AnnotationSourceMode::Builder && source.stream.trim().is_empty() {
+            return Err(DashboardError::InvalidAnnotationSource(format!(
+                "annotation source {}: stream is required in builder mode",
+                source.id
+            )));
+        }
+        if source.filters.filter_type != "group" {
+            return Err(DashboardError::InvalidAnnotationSource(format!(
+                "annotation source {}: filters must be a group",
+                source.id
+            )));
+        }
+        if let Some(operator) = first_invalid_operator(&source.filters.conditions) {
+            return Err(DashboardError::InvalidAnnotationSource(format!(
+                "annotation source {}: unsupported filter operator {operator}",
+                source.id
+            )));
+        }
+        if let Some(column) = first_invalid_column(&source.filters.conditions) {
+            return Err(DashboardError::InvalidAnnotationSource(format!(
+                "annotation source {}: invalid filter column {column}",
+                source.id
+            )));
+        }
+        if let Some(reason) = first_invalid_regex(&source.filters.conditions) {
+            return Err(DashboardError::InvalidAnnotationSource(format!(
+                "annotation source {}: {reason}",
+                source.id
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// A 6-digit hex color, `#` included, matching the only shape `ColorSwatchPicker`'s palette writes.
+fn is_valid_hex_color(color: &str) -> bool {
+    color.len() == 7 && color.starts_with('#') && color[1..].chars().all(|c| c.is_ascii_hexdigit())
+}
+
+/// The first unsupported filter operator in a condition subtree, if any.
+fn first_invalid_operator(conditions: &[v8::AnnotationConditionItem]) -> Option<&str> {
+    conditions.iter().find_map(|node| match node {
+        v8::AnnotationConditionItem::Condition(leaf) => (!ANNOTATION_FILTER_OPERATORS
+            .contains(&leaf.operator.as_str()))
+        .then_some(leaf.operator.as_str()),
+        v8::AnnotationConditionItem::Group { conditions, .. } => first_invalid_operator(conditions),
+    })
+}
+
+/// Field names allow dots/hyphens/spaces; only chars that could escape quoting are banned.
+fn is_valid_annotation_column(column: &str) -> bool {
+    let name = column.strip_prefix('$').unwrap_or(column);
+    !name.is_empty()
+        && !name.contains('"')
+        && !name.contains(';')
+        && !name.contains("--")
+        && !name.chars().any(|c| c.is_control())
+}
+
+/// The first leaf column that isn't a plain field identifier or a `$variable` reference, if any.
+fn first_invalid_column(conditions: &[v8::AnnotationConditionItem]) -> Option<&str> {
+    conditions.iter().find_map(|node| match node {
+        v8::AnnotationConditionItem::Condition(leaf) => {
+            (!is_valid_annotation_column(&leaf.column)).then_some(leaf.column.as_str())
+        }
+        v8::AnnotationConditionItem::Group { conditions, .. } => first_invalid_column(conditions),
+    })
+}
+
+/// The first regex leaf whose pattern fails the shared alert check, as its error message.
+fn first_invalid_regex(conditions: &[v8::AnnotationConditionItem]) -> Option<String> {
+    conditions.iter().find_map(|node| match node {
+        v8::AnnotationConditionItem::Condition(leaf) => {
+            let operator = match leaf.operator.as_str() {
+                "re_match" => Operator::ReMatch,
+                "re_not_match" => Operator::ReNotMatch,
+                _ => return None,
+            };
+            // A `$var` pattern is only known after substitution, so only its length is checked.
+            if has_variable_reference(&leaf.value) {
+                return (leaf.value.chars().count() > MAX_REGEX_PATTERN_LEN).then(|| {
+                    format!(
+                        "Condition on '{}': regex is longer than {MAX_REGEX_PATTERN_LEN} characters",
+                        leaf.column
+                    )
+                });
+            }
+            validate_condition_value(
+                &leaf.column,
+                &operator,
+                &serde_json::Value::String(leaf.value.clone()),
+                leaf.case_insensitive.unwrap_or(false),
+            )
+            .err()
+        }
+        v8::AnnotationConditionItem::Group { conditions, .. } => first_invalid_regex(conditions),
+    })
+}
+
+/// Whether `value` references a dashboard variable (`$name` or `${name}`).
+fn has_variable_reference(value: &str) -> bool {
+    value
+        .split('$')
+        .skip(1)
+        .any(|rest| rest.starts_with(|c: char| c == '{' || c == '_' || c.is_alphabetic()))
+}
+
+/// Drops `panels` ids with no live panel, so a deleted panel can't leave a source pointed at it.
+fn prune_annotation_source_panels(dashboard: &mut Dashboard) {
+    let Some(v8_dash) = dashboard.v8.as_mut() else {
+        return;
+    };
+    let live_panel_ids: std::collections::HashSet<&str> = v8_dash
+        .tabs
+        .iter()
+        .flat_map(|tab| tab.panels.iter())
+        .map(|panel| panel.id.as_str())
+        .collect();
+    let Some(sources) = v8_dash.annotation_sources.as_mut() else {
+        return;
+    };
+    for source in sources.iter_mut() {
+        if let Some(panels) = source.panels.as_mut() {
+            panels.retain(|id| live_panel_ids.contains(id.as_str()));
+        }
+    }
+}
+
 /// Rejects an update whose hash is missing or does not match `existing`.
 pub fn check_update_hash(existing: &Dashboard, hash: Option<&str>) -> Result<(), DashboardError> {
     let Some(Ok(hash_val)) = hash.map(|hash_str| hash_str.parse::<u64>()) else {
@@ -1165,6 +1471,7 @@ async fn filter_permitted_dashboards(
                 use_self_context: false,
                 use_self_parent: true,
                 auth: "".to_string(), // We don't need to pass the auth token here.
+                feature: None,
             },
             user_role,
             false,
@@ -1220,6 +1527,39 @@ mod tests {
     use config::meta::dashboards::v8;
 
     use super::*;
+
+    #[tokio::test]
+    async fn org_deletion_clears_an_orphan_home_pin_without_dashboard_rows() {
+        use config::meta::system_settings::SystemSetting;
+
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs ZO_META_STORE");
+            return;
+        }
+        infra::db_init().await.unwrap();
+        table::migrate().await.unwrap();
+        let org = format!("home_pin_teardown_{}", config::utils::time::now_micros());
+        system_settings::set(&SystemSetting::new_org(
+            &org,
+            HOME_DASHBOARD_SETTING_KEY,
+            serde_json::json!({"dashboardId": "missing", "folderId": "missing"}),
+        ))
+        .await
+        .unwrap();
+        delete_by_org(&org).await.unwrap();
+        assert!(
+            system_settings::get(
+                &SettingScope::Org,
+                Some(&org),
+                None,
+                HOME_DASHBOARD_SETTING_KEY
+            )
+            .await
+            .unwrap()
+            .is_none()
+        );
+        delete_by_org(&org).await.unwrap();
+    }
 
     fn make_panel(i: i64, x: i64, y: i64, w: i64, h: i64) -> v8::Panel {
         let mut p: v8::Panel = serde_json::from_str(
@@ -1338,5 +1678,466 @@ mod tests {
             map.get(&("up".to_string(), StreamType::Metrics)),
             Some(&vec!["job".to_string()])
         );
+    }
+
+    fn dashboard_with_sources(count: usize) -> Dashboard {
+        let sources = (0..count)
+            .map(|i| v8::AnnotationSource {
+                id: format!("s{i}"),
+                ..Default::default()
+            })
+            .collect();
+        let mut dashboard = v8::Dashboard::default();
+        dashboard.annotation_sources = Some(sources);
+        dashboard.into()
+    }
+
+    #[test]
+    fn checked_annotation_sources_count_allows_up_to_the_cap() {
+        assert!(
+            checked_annotation_sources_count(&dashboard_with_sources(v8::MAX_ANNOTATION_SOURCES))
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn checked_annotation_sources_count_rejects_one_over_the_cap() {
+        let result = checked_annotation_sources_count(&dashboard_with_sources(
+            v8::MAX_ANNOTATION_SOURCES + 1,
+        ));
+        assert!(matches!(
+            result,
+            Err(DashboardError::TooManyAnnotationSources(max)) if max == v8::MAX_ANNOTATION_SOURCES
+        ));
+    }
+
+    #[test]
+    fn checked_annotation_sources_count_allows_none() {
+        let dashboard: Dashboard = v8::Dashboard::default().into();
+        assert!(checked_annotation_sources_count(&dashboard).is_ok());
+    }
+
+    fn valid_source(id: &str) -> v8::AnnotationSource {
+        v8::AnnotationSource {
+            id: id.to_string(),
+            name: format!("{id} name"),
+            title: format!("{id} title"),
+            stream: "logs".to_string(),
+            ..Default::default()
+        }
+    }
+
+    fn dashboard_from_sources(sources: Vec<v8::AnnotationSource>) -> Dashboard {
+        let mut dashboard = v8::Dashboard::default();
+        dashboard.annotation_sources = Some(sources);
+        dashboard.into()
+    }
+
+    #[test]
+    fn checked_annotation_sources_allows_a_valid_source() {
+        let mut dashboard = dashboard_from_sources(vec![valid_source("s1")]);
+        assert!(checked_annotation_sources(&mut dashboard).is_ok());
+    }
+
+    #[test]
+    fn checked_annotation_sources_allows_none() {
+        let mut dashboard: Dashboard = v8::Dashboard::default().into();
+        assert!(checked_annotation_sources(&mut dashboard).is_ok());
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_blank_id() {
+        let mut source = valid_source("s1");
+        source.id = "  ".to_string();
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(matches!(
+            checked_annotation_sources(&mut dashboard),
+            Err(DashboardError::InvalidAnnotationSource(_))
+        ));
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_blank_name() {
+        let mut source = valid_source("s1");
+        source.name = String::new();
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(matches!(
+            checked_annotation_sources(&mut dashboard),
+            Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("name")
+        ));
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_blank_title() {
+        let mut source = valid_source("s1");
+        source.title = String::new();
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(matches!(
+            checked_annotation_sources(&mut dashboard),
+            Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("title")
+        ));
+    }
+
+    #[test]
+    fn checked_annotation_sources_allows_a_valid_hex_color() {
+        let mut source = valid_source("s1");
+        source.color = Some("#5b8ef0".to_string());
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(checked_annotation_sources(&mut dashboard).is_ok());
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_an_invalid_hex_color() {
+        let mut source = valid_source("s1");
+        source.color = Some("red".to_string());
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(matches!(
+            checked_annotation_sources(&mut dashboard),
+            Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("color")
+        ));
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_duplicate_ids() {
+        let mut dashboard = dashboard_from_sources(vec![valid_source("dup"), valid_source("dup")]);
+        assert!(matches!(
+            checked_annotation_sources(&mut dashboard),
+            Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("dup")
+        ));
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_duplicate_names_case_insensitively() {
+        let mut second = valid_source("s2");
+        second.name = "DEPLOYS".to_string();
+        let mut first = valid_source("s1");
+        first.name = "deploys".to_string();
+        let mut dashboard = dashboard_from_sources(vec![first, second]);
+        assert!(matches!(
+            checked_annotation_sources(&mut dashboard),
+            Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("is used more than once")
+        ));
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_sql_mode_without_query() {
+        let mut source = valid_source("s1");
+        source.mode = v8::AnnotationSourceMode::Sql;
+        source.query = None;
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(matches!(
+            checked_annotation_sources(&mut dashboard),
+            Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("sql mode")
+        ));
+    }
+
+    #[test]
+    fn checked_annotation_sources_allows_sql_mode_with_query() {
+        let mut source = valid_source("s1");
+        source.mode = v8::AnnotationSourceMode::Sql;
+        source.query = Some("SELECT * FROM t".to_string());
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(checked_annotation_sources(&mut dashboard).is_ok());
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_builder_mode_without_stream() {
+        let mut source = valid_source("s1");
+        source.mode = v8::AnnotationSourceMode::Builder;
+        source.stream = String::new();
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(matches!(
+            checked_annotation_sources(&mut dashboard),
+            Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("builder mode")
+        ));
+    }
+
+    #[test]
+    fn checked_annotation_sources_allows_builder_mode_with_stream() {
+        let mut source = valid_source("s1");
+        source.mode = v8::AnnotationSourceMode::Builder;
+        source.stream = "logs".to_string();
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(checked_annotation_sources(&mut dashboard).is_ok());
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_unsupported_operator_in_nested_group() {
+        let mut source = valid_source("s1");
+        source.filters = v8::AnnotationConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: v8::AnnotationLogicalOperator::And,
+            conditions: vec![v8::AnnotationConditionItem::Group {
+                logical_operator: v8::AnnotationLogicalOperator::Or,
+                conditions: vec![v8::AnnotationConditionItem::Condition(
+                    v8::AnnotationConditionLeaf {
+                        column: "col".to_string(),
+                        operator: "bogus".to_string(),
+                        value: "x".to_string(),
+                        case_insensitive: None,
+                        logical_operator: v8::AnnotationLogicalOperator::And,
+                    },
+                )],
+            }],
+        };
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(matches!(
+            checked_annotation_sources(&mut dashboard),
+            Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("bogus")
+        ));
+    }
+
+    fn single_condition_leaf(column: &str) -> v8::AnnotationConditionItem {
+        v8::AnnotationConditionItem::Condition(v8::AnnotationConditionLeaf {
+            column: column.to_string(),
+            operator: "=".to_string(),
+            value: "x".to_string(),
+            case_insensitive: None,
+            logical_operator: v8::AnnotationLogicalOperator::And,
+        })
+    }
+
+    #[test]
+    fn checked_annotation_sources_accepts_the_filter_builder_operators() {
+        for operator in [
+            "in",
+            "not_in",
+            "starts_with",
+            "ends_with",
+            "re_match",
+            "re_not_match",
+            "contains",
+            "not_contains",
+        ] {
+            let mut source = valid_source("s1");
+            let mut leaf = single_condition_leaf("col");
+            if let v8::AnnotationConditionItem::Condition(ref mut c) = leaf {
+                c.operator = operator.to_string();
+                c.case_insensitive = Some(true);
+            }
+            source.filters.conditions = vec![leaf];
+            let mut dashboard = dashboard_from_sources(vec![source]);
+            assert!(
+                checked_annotation_sources(&mut dashboard).is_ok(),
+                "{operator} must be accepted"
+            );
+        }
+    }
+
+    fn dashboard_with_regex_leaf(operator: &str, value: &str) -> Dashboard {
+        let mut source = valid_source("s1");
+        let mut leaf = single_condition_leaf("col");
+        if let v8::AnnotationConditionItem::Condition(ref mut c) = leaf {
+            c.operator = operator.to_string();
+            c.value = value.to_string();
+        }
+        source.filters.conditions = vec![v8::AnnotationConditionItem::Group {
+            logical_operator: v8::AnnotationLogicalOperator::And,
+            conditions: vec![leaf],
+        }];
+        dashboard_from_sources(vec![source])
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_an_invalid_regex() {
+        for operator in ["re_match", "re_not_match"] {
+            let mut dashboard = dashboard_with_regex_leaf(operator, "a(");
+            assert!(matches!(
+                checked_annotation_sources(&mut dashboard),
+                Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("invalid regex")
+            ));
+        }
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_a_regex_over_the_length_limit() {
+        let long = "é".repeat(MAX_REGEX_PATTERN_LEN + 1);
+        let mut dashboard = dashboard_with_regex_leaf("re_match", &long);
+        assert!(matches!(
+            checked_annotation_sources(&mut dashboard),
+            Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("characters")
+        ));
+        let at_limit = "é".repeat(MAX_REGEX_PATTERN_LEN);
+        let mut dashboard = dashboard_with_regex_leaf("re_match", &at_limit);
+        assert!(checked_annotation_sources(&mut dashboard).is_ok());
+    }
+
+    #[test]
+    fn checked_annotation_sources_allows_a_valid_or_variable_regex() {
+        for value in ["^api-[0-9]+$", "${service}", "^$service-.*", "err$"] {
+            let mut dashboard = dashboard_with_regex_leaf("re_match", value);
+            assert!(
+                checked_annotation_sources(&mut dashboard).is_ok(),
+                "{value} must be accepted"
+            );
+        }
+        let long_var = format!("$svc{}", "a".repeat(MAX_REGEX_PATTERN_LEN));
+        let mut dashboard = dashboard_with_regex_leaf("re_match", &long_var);
+        assert!(checked_annotation_sources(&mut dashboard).is_err());
+    }
+
+    #[test]
+    fn checked_annotation_sources_does_not_compile_non_regex_values() {
+        let mut dashboard = dashboard_with_regex_leaf("contains", "a(");
+        assert!(checked_annotation_sources(&mut dashboard).is_ok());
+    }
+
+    #[test]
+    fn annotation_leaf_without_case_insensitive_round_trips_unchanged() {
+        let json =
+            r#"{"column":"level","operator":"Contains","value":"err","logicalOperator":"AND"}"#;
+        let leaf: v8::AnnotationConditionLeaf = serde_json::from_str(json).unwrap();
+        assert_eq!(leaf.case_insensitive, None);
+        assert_eq!(serde_json::to_string(&leaf).unwrap(), json);
+
+        use std::hash::{Hash, Hasher};
+        let mut actual = std::hash::DefaultHasher::new();
+        leaf.hash(&mut actual);
+        let mut derived = std::hash::DefaultHasher::new();
+        "level".to_string().hash(&mut derived);
+        "Contains".to_string().hash(&mut derived);
+        "err".to_string().hash(&mut derived);
+        v8::AnnotationLogicalOperator::And.hash(&mut derived);
+        assert_eq!(actual.finish(), derived.finish());
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_a_column_that_is_not_a_plain_identifier() {
+        let mut source = valid_source("s1");
+        source.filters.conditions = vec![single_condition_leaf("x = 1 OR 1=1 --")];
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(matches!(
+            checked_annotation_sources(&mut dashboard),
+            Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("invalid filter column")
+        ));
+    }
+
+    #[test]
+    fn checked_annotation_sources_allows_a_dollar_variable_column() {
+        let mut source = valid_source("s1");
+        source.filters.conditions = vec![single_condition_leaf("$env")];
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(checked_annotation_sources(&mut dashboard).is_ok());
+    }
+
+    #[test]
+    fn checked_annotation_sources_allows_a_dotted_field_name() {
+        let mut source = valid_source("s1");
+        source.filters.conditions = vec![single_condition_leaf("k8s.namespace")];
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(checked_annotation_sources(&mut dashboard).is_ok());
+    }
+
+    #[test]
+    fn checked_annotation_sources_allows_a_hyphenated_field_name() {
+        let mut source = valid_source("s1");
+        source.filters.conditions = vec![single_condition_leaf("service-name")];
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(checked_annotation_sources(&mut dashboard).is_ok());
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_a_double_quote_in_the_column() {
+        let mut source = valid_source("s1");
+        source.filters.conditions = vec![single_condition_leaf("a\"b")];
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(matches!(
+            checked_annotation_sources(&mut dashboard),
+            Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("invalid filter column")
+        ));
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_a_semicolon_in_the_column() {
+        let mut source = valid_source("s1");
+        source.filters.conditions = vec![single_condition_leaf("a;b")];
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(matches!(
+            checked_annotation_sources(&mut dashboard),
+            Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("invalid filter column")
+        ));
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_a_newline_in_the_column() {
+        let mut source = valid_source("s1");
+        source.filters.conditions = vec![single_condition_leaf("a\nb")];
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(matches!(
+            checked_annotation_sources(&mut dashboard),
+            Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("invalid filter column")
+        ));
+    }
+
+    #[test]
+    fn checked_annotation_sources_rejects_a_non_group_filter_type() {
+        let mut source = valid_source("s1");
+        source.filters.filter_type = "condition".to_string();
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(matches!(
+            checked_annotation_sources(&mut dashboard),
+            Err(DashboardError::InvalidAnnotationSource(msg)) if msg.contains("filters must be a group")
+        ));
+    }
+
+    #[test]
+    fn checked_annotation_sources_trims_id_name_and_title_before_storing() {
+        let mut source = valid_source("s1");
+        source.id = "  s1  ".to_string();
+        source.name = "  Deploys  ".to_string();
+        source.title = "  {service}  ".to_string();
+        let mut dashboard = dashboard_from_sources(vec![source]);
+        assert!(checked_annotation_sources(&mut dashboard).is_ok());
+        let saved = &dashboard
+            .v8
+            .as_ref()
+            .unwrap()
+            .annotation_sources
+            .as_ref()
+            .unwrap()[0];
+        assert_eq!(saved.id, "s1");
+        assert_eq!(saved.name, "Deploys");
+        assert_eq!(saved.title, "{service}");
+    }
+
+    #[test]
+    fn prune_annotation_source_panels_drops_ids_with_no_live_panel() {
+        let mut v8_dashboard = v8::Dashboard::default();
+        v8_dashboard.tabs = vec![v8::Tab {
+            tab_id: "t1".to_string(),
+            name: "Tab 1".to_string(),
+            panels: vec![make_panel(1, 0, 0, 96, 18)],
+        }];
+        let mut source = valid_source("s1");
+        source.panels = Some(vec!["p1".to_string(), "stale".to_string()]);
+        v8_dashboard.annotation_sources = Some(vec![source]);
+        let mut dashboard: Dashboard = v8_dashboard.into();
+
+        prune_annotation_source_panels(&mut dashboard);
+
+        let sources = dashboard
+            .v8
+            .as_ref()
+            .unwrap()
+            .annotation_sources
+            .as_ref()
+            .unwrap();
+        assert_eq!(sources[0].panels, Some(vec!["p1".to_string()]));
+    }
+
+    #[test]
+    fn prune_annotation_source_panels_leaves_an_unset_panels_list_untouched() {
+        let mut dashboard = dashboard_from_sources(vec![valid_source("s1")]);
+
+        prune_annotation_source_panels(&mut dashboard);
+
+        let sources = dashboard
+            .v8
+            .as_ref()
+            .unwrap()
+            .annotation_sources
+            .as_ref()
+            .unwrap();
+        assert_eq!(sources[0].panels, None);
     }
 }

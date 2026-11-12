@@ -18,6 +18,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { ref, computed, reactive } from "vue";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import config from "@/aws-exports";
 
 // ---------------------------------------------------------------------------
 // Module-level mocks — vi.mock is hoisted by Vitest; never use vi.doMock here
@@ -33,6 +34,13 @@ vi.mock("@/services/product_analytics", () => ({
 
 vi.mock("@/aws-exports", () => ({
   default: { isCloud: "false", isEnterprise: "true" },
+}));
+
+const nlFilterMock = vi.hoisted(() =>
+  vi.fn((_sql: string, _parser: unknown): string | null => null),
+);
+vi.mock("@/plugins/traces/utils/nlSqlToTracesFilter", () => ({
+  nlSqlToTracesFilter: nlFilterMock,
 }));
 
 // getImageURL is called by the metricsIcon computed; stub to avoid asset loading.
@@ -190,6 +198,8 @@ const makeSearchObj = () =>
       searchApplied: false,
       serviceGraphVisualizationType: "tree" as "tree" | "graph",
       serviceGraphLayoutType: "horizontal" as string,
+      liveMode: false,
+      lastRunSignature: null as string | null,
     },
     data: {
       query: "",
@@ -279,11 +289,14 @@ const makeSearchObj = () =>
 // call-time so every mount gets the fresh instance.
 let searchObjInstance = makeSearchObj();
 
+const tracesParserRef = vi.hoisted(() => ({ value: { astify: (() => ({})) as any } }));
+
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
     get searchObj() {
       return searchObjInstance;
     },
+    tracesParser: tracesParserRef,
     tracesShareURL: computed(() => "http://localhost/traces?shared=1"),
     resetSearchObj: vi.fn(),
     updatedLocalLogFilterField: vi.fn(),
@@ -295,12 +308,34 @@ vi.mock("@/composables/useTraces", () => ({
   }),
 }));
 
+const alertAction = vi.hoisted(() => ({
+  createAlert: vi.fn(),
+  disabledReason: { value: null as string | null },
+  queryNotRun: { value: false },
+}));
+
+vi.mock("@/plugins/traces/composables/useTracesAlertAction", async () => {
+  const { computed } = await import("vue");
+  return {
+    useTracesAlertAction: () => ({
+      createAlert: alertAction.createAlert,
+      disabledReason: computed(() => alertAction.disabledReason.value),
+      queryNotRun: computed(() => alertAction.queryNotRun.value),
+    }),
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Import the component AFTER all vi.mock declarations.
+import queryHistory from "@/services/query_history";
+import { queryClient } from "@/composables/query/queryClient";
 // ---------------------------------------------------------------------------
 import SearchBar from "@/plugins/traces/SearchBar.vue";
-import SavedViewsListDialog from "@/components/savedViews/SavedViewsListDialog.vue";
+import analytics from "@/services/product_analytics";
+import SavedViewsSubmenu from "@/components/savedViews/SavedViewsSubmenu.vue";
 import { useToolbarPins } from "@/composables/useToolbarPins";
+import { placeCaret } from "@/test/unit/helpers/monacoCaret";
+import { tracesSearchRunSignature } from "@/plugins/traces/tracesSearchBar.utils";
 
 // ---------------------------------------------------------------------------
 // DOM anchor node required by attachTo
@@ -315,14 +350,15 @@ document.body.appendChild(appNode);
 const sharedStubs = {
   DateTime: {
     template: '<div data-test="logs-search-bar-date-time-dropdown" />',
-    props: [
-      "autoApply",
-      "defaultType",
-      "defaultAbsoluteTime",
-      "defaultRelativeTime",
-      "queryRangeRestrictionInHour",
-      "queryRangeRestrictionMsg",
-    ],
+    props: {
+      autoApply: null,
+      defaultType: null,
+      defaultAbsoluteTime: null,
+      defaultRelativeTime: null,
+      queryRangeRestrictionInHour: null,
+      queryRangeRestrictionMsg: null,
+      calendarPresets: Boolean,
+    },
     emits: ["on:date-change", "on:timezone-change"],
     setup() {
       return {
@@ -333,8 +369,13 @@ const sharedStubs = {
       };
     },
   },
-  CodeQueryEditor: {
-    template: '<div data-test="code-query-editor-stub" />',
+  UnifiedQueryEditor: {
+    // Monaco's caret element: the recent-searches dropdown opens at it.
+    template:
+      '<div data-test="code-query-editor-stub"><div class="monaco-editor"><div class="cursors-layer"><div class="cursor" /></div></div></div>',
+    mounted(this: { $el: Element }) {
+      placeCaret(this.$el.querySelector(".cursor"));
+    },
     props: [
       "editorId",
       "query",
@@ -345,13 +386,18 @@ const sharedStubs = {
       "filterMode",
       "debounceTime",
       "fieldValueResolver",
+      "hideNlToggle",
+      "nlpMode",
+      "transformGeneratedQuery",
     ],
-    emits: ["update:query", "run-query", "focus", "blur"],
-    setup() {
+    emits: ["update:query", "run-query", "focus", "blur", "user-edit", "update:nlpMode"],
+    setup(_: unknown, { emit }: { emit: (event: "focus") => void }) {
       return {
         setValue: vi.fn(),
         getCursorIndex: vi.fn().mockReturnValue(0),
         triggerAutoComplete: vi.fn(),
+        // Monaco fires its focus event inside focus(), in the same tick.
+        focus: () => emit("focus"),
       };
     },
   },
@@ -405,6 +451,17 @@ const sharedStubs = {
     template: '<div v-bind="$attrs"><slot name="label-action" /><slot /></div>',
   },
   ODropdownSeparator: { template: "<hr />" },
+  AddToDashboard: {
+    name: "AddToDashboard",
+    template: '<div data-test="traces-add-to-dashboard-stub" />',
+    props: ["open", "panels", "notice", "dashboardPanelData"],
+  },
+  ODropdownSub: {
+    name: "ODropdownSub",
+    template:
+      '<div class="o-dropdown-sub-stub" v-bind="$attrs"><slot name="icon-left" /><slot name="trigger" /><slot name="icon-right" /><slot /></div>',
+    props: ["open", "textValue", "description"],
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -476,10 +533,13 @@ function csvToRows(csv: string): string[][] {
 // ---------------------------------------------------------------------------
 describe("SearchBar", () => {
   let wrapper: VueWrapper;
+  let desktopWidthSpy: ReturnType<typeof mockToolbarWidth>;
 
   beforeEach(() => {
     // Fresh searchObj per test — mutations cannot bleed across tests.
     searchObjInstance = makeSearchObj();
+    // A desktop-wide bar by default; jsdom's zero width is the narrowest collapse stage.
+    desktopWidthSpy = mockToolbarWidth(1600);
 
     // Spy on router so updateDateTime's route guard does not early-return.
     vi.spyOn(router, "currentRoute", "get").mockReturnValue({
@@ -492,6 +552,7 @@ describe("SearchBar", () => {
 
   afterEach(() => {
     wrapper?.unmount();
+    desktopWidthSpy.mockRestore();
     vi.clearAllMocks();
   });
 
@@ -627,6 +688,18 @@ describe("SearchBar", () => {
       expect(wrapper.find('[data-test="service-graph-date-time-picker"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="service-graph-refresh-btn"]').exists()).toBe(false);
     });
+
+    it.each(["service-graph", "services-catalog"])(
+      "keeps a shared calendar range on the %s picker by offering calendar presets",
+      async (mode) => {
+        searchObjInstance.meta.searchMode = mode;
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        const picker = wrapper.findComponent(`[data-test="${mode}-date-time-picker"]`);
+        expect(picker.props("calendarPresets")).toBe(true);
+      },
+    );
 
     it("should emit service-graph-refresh when the graph refresh button is clicked", async () => {
       searchObjInstance.meta.searchMode = "service-graph";
@@ -926,15 +999,15 @@ describe("SearchBar", () => {
       await flushPromises();
       expect(pinnedBtn().exists()).toBe(true);
       expect(savedViewsGroup().exists()).toBe(false);
-      expect(wrapper.find('[data-test="traces-search-bar-menu-saved-views-group"]').exists()).toBe(
-        true,
-      );
+      expect(
+        wrapper.find('[data-test="traces-search-bar-menu-list-saved-views-btn"]').exists(),
+      ).toBe(true);
     });
 
     it("shrinks the toggle labels for the pinned RED Metrics width", async () => {
       togglePin("savedViews");
       togglePin("histogram");
-      useWidth(800);
+      useWidth(660);
       wrapper = mountSearchBar();
       await flushPromises();
 
@@ -970,7 +1043,7 @@ describe("SearchBar", () => {
         const btn = wrapper.find('[data-test="insights-button"]');
         expect(btn.exists()).toBe(true);
         expect(btn.text().includes("traces.drillDown")).toBe(
-          !(wrapper.vm as any).shouldHideToggleText,
+          !(wrapper.vm as any).shouldHideToolbarButtonText,
         );
         const toggleGroup = wrapper.find(".o-toggle-group-stub").element;
         expect(toggleGroup.nextElementSibling).toBe(btn.element);
@@ -1014,13 +1087,25 @@ describe("SearchBar", () => {
       expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
     });
 
-    it("should be hidden while a search is loading", async () => {
+    it("stays in place, aria-disabled and inert to clicks, while a search is loading", async () => {
       applySearch();
       searchObjInstance.loading = true;
       wrapper = mountSearchBar();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
+      const btn = wrapper.find('[data-test="insights-button"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.attributes("aria-disabled")).toBe("true");
+      expect(btn.attributes("disabled")).toBeUndefined();
+      await btn.trigger("click");
+      expect(wrapper.emitted("drill-down")).toBeUndefined();
+      expect(wrapper.find('[data-test="insights-button-placeholder"]').exists()).toBe(false);
+
+      searchObjInstance.loading = false;
+      await flushPromises();
+      expect(btn.attributes("aria-disabled")).toBeUndefined();
+      await btn.trigger("click");
+      expect(wrapper.emitted("drill-down")).toHaveLength(1);
     });
 
     it("should be hidden when the org has no trace streams", async () => {
@@ -1048,6 +1133,77 @@ describe("SearchBar", () => {
 
       await wrapper.find('[data-test="insights-button"]').trigger("click");
       expect(wrapper.emitted("drill-down")).toHaveLength(1);
+    });
+
+    describe("reserved slot while results load (200% zoom shift)", () => {
+      const placeholder = () => wrapper.find('[data-test="insights-button-placeholder"]');
+
+      it.each([
+        ["streams are loading", () => (searchObjInstance.loadingStream = true)],
+        ["the search errored", () => (searchObjInstance.data.errorMsg = "boom")],
+      ])("holds an invisible, inert placeholder in the button's place while %s", async (_, set) => {
+        applySearch();
+        set();
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
+        expect(placeholder().exists()).toBe(true);
+        expect(placeholder().classes()).toContain("invisible");
+        expect(placeholder().attributes("aria-hidden")).toBe("true");
+        expect(placeholder().attributes("inert")).toBeDefined();
+        const toggleGroup = wrapper.find(".o-toggle-group-stub").element;
+        expect(toggleGroup.nextElementSibling).toBe(placeholder().element);
+      });
+
+      it("reserves nothing when the button shows, or when the org has no trace streams", async () => {
+        applySearch();
+        wrapper = mountSearchBar();
+        await flushPromises();
+        expect(placeholder().exists()).toBe(false);
+        wrapper.unmount();
+
+        applySearch();
+        searchObjInstance.data.stream.streamLists = [];
+        wrapper = mountSearchBar();
+        await flushPromises();
+        expect(placeholder().exists()).toBe(false);
+        expect((wrapper.vm as any).drillDownSlot).toBe(false);
+      });
+
+      it.each(["service-graph", "services-catalog"] as const)(
+        "reserves nothing in %s mode",
+        async (mode) => {
+          searchObjInstance.meta.searchMode = mode;
+          applySearch();
+          searchObjInstance.loading = true;
+          wrapper = mountSearchBar();
+          await flushPromises();
+
+          expect(placeholder().exists()).toBe(false);
+        },
+      );
+
+      it("budgets the toolbar the same while loading as once the button shows", async () => {
+        const widthSpy = mockToolbarWidth(714);
+        try {
+          applySearch();
+          wrapper = mountSearchBar();
+          await flushPromises();
+          const shown = (wrapper.vm as any).shouldHideToolbarButtonText;
+          wrapper.unmount();
+
+          applySearch();
+          searchObjInstance.loadingStream = true;
+          wrapper = mountSearchBar();
+          await flushPromises();
+
+          expect((wrapper.vm as any).shouldHideToolbarButtonText).toBe(shown);
+          expect(placeholder().text().includes("traces.drillDown")).toBe(!shown);
+        } finally {
+          widthSpy.mockRestore();
+        }
+      });
     });
   });
 
@@ -1182,6 +1338,39 @@ describe("SearchBar", () => {
       expect(wrapper.emitted("searchdata")).toHaveLength(1);
     });
 
+    it("moves focus from Run to Cancel and back as the run starts and ends", async () => {
+      wrapper = mountSearchBar({ isLoading: false });
+      await flushPromises();
+      const run = () => wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
+      const cancel = () => wrapper.find('[data-test="traces-search-bar-cancel-btn"]');
+      (run().element as HTMLElement).focus();
+      expect(document.activeElement).toBe(run().element);
+
+      await wrapper.setProps({ isLoading: true });
+      await flushPromises();
+      expect(cancel().exists()).toBe(true);
+      expect(cancel().attributes("aria-busy")).toBe("true");
+      expect(document.activeElement).toBe(cancel().element);
+
+      await wrapper.setProps({ isLoading: false });
+      await flushPromises();
+      expect(document.activeElement).toBe(run().element);
+    });
+
+    it("leaves focus alone when it was outside the run control", async () => {
+      wrapper = mountSearchBar({ isLoading: false });
+      await flushPromises();
+      const outside = document.createElement("button");
+      document.body.appendChild(outside);
+      outside.focus();
+
+      await wrapper.setProps({ isLoading: true });
+      await flushPromises();
+
+      expect(document.activeElement).toBe(outside);
+      outside.remove();
+    });
+
     it("should show cancel button when isLoading prop is true on enterprise", async () => {
       wrapper = mountSearchBar({ isLoading: true });
       await flushPromises();
@@ -1213,14 +1402,210 @@ describe("SearchBar", () => {
     });
   });
 
+  describe("run query pending state", () => {
+    const runBtn = () => wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
+    const markRun = () => {
+      searchObjInstance.meta.lastRunSignature = tracesSearchRunSignature(searchObjInstance);
+    };
+    const setAutoRun = (on: boolean) => {
+      store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: true };
+      searchObjInstance.meta.liveMode = on;
+    };
+
+    afterEach(() => {
+      store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: false };
+    });
+
+    it("shows pending with auto-run off once a staged edit differs from the last run", async () => {
+      setAutoRun(false);
+      markRun();
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(runBtn().attributes("data-run-pending")).toBeUndefined();
+
+      searchObjInstance.data.editorValue = "service_name = 'checkout'";
+      await flushPromises();
+
+      expect(runBtn().attributes("data-run-pending")).toBe("true");
+      expect(runBtn().attributes("aria-label")).toBe("search.runQueryPendingLabel");
+      expect(runBtn().findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "search.autoRunPendingDot",
+      );
+    });
+
+    it.each([
+      ["time range", () => (searchObjInstance.data.datetime.relativeTimePeriod = "1h")],
+      ["stream", () => (searchObjInstance.data.stream.selectedStream.value = "other")],
+    ])("shows pending with auto-run off after a %s change", async (_label, edit) => {
+      setAutoRun(false);
+      markRun();
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      edit();
+      await flushPromises();
+
+      expect(runBtn().attributes("data-run-pending")).toBe("true");
+    });
+
+    it("stages a click-to-filter from the field panel as pending, without searching", async () => {
+      setAutoRun(false);
+      markRun();
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      searchObjInstance.data.stream.addToFilter = "service_name='checkout'";
+      await flushPromises();
+
+      expect(searchObjInstance.data.editorValue).toContain("service_name='checkout'");
+      expect(runBtn().attributes("data-run-pending")).toBe("true");
+      expect(wrapper.emitted("searchdata")).toBeUndefined();
+    });
+
+    it("clears pending once the staged state runs", async () => {
+      setAutoRun(false);
+      markRun();
+      searchObjInstance.data.editorValue = "service_name = 'checkout'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(runBtn().attributes("data-run-pending")).toBe("true");
+
+      markRun();
+      await flushPromises();
+
+      expect(runBtn().attributes("data-run-pending")).toBeUndefined();
+    });
+
+    it("never shows pending with auto-run on", async () => {
+      setAutoRun(true);
+      markRun();
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      searchObjInstance.data.editorValue = "service_name = 'checkout'";
+      await flushPromises();
+
+      expect(runBtn().attributes("data-run-pending")).toBeUndefined();
+    });
+
+    it.each([true, false])(
+      "shows pending for a staged edit when the server turns auto-run off (live mode %s)",
+      async (liveMode) => {
+        store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: false };
+        searchObjInstance.meta.liveMode = liveMode;
+        markRun();
+        wrapper = mountSearchBar();
+        await flushPromises();
+        expect(runBtn().attributes("data-run-pending")).toBeUndefined();
+
+        searchObjInstance.data.editorValue = "service_name = 'checkout'";
+        await flushPromises();
+
+        expect(runBtn().attributes("data-run-pending")).toBe("true");
+      },
+    );
+
+    it("clears pending with auto-run off on the server once the staged state runs", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: false };
+      markRun();
+      searchObjInstance.data.editorValue = "service_name = 'checkout'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(runBtn().attributes("data-run-pending")).toBe("true");
+
+      markRun();
+      await flushPromises();
+
+      expect(runBtn().attributes("data-run-pending")).toBeUndefined();
+    });
+
+    it("shows no pending before the first run", async () => {
+      setAutoRun(false);
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      searchObjInstance.data.editorValue = "service_name = 'checkout'";
+      await flushPromises();
+
+      expect(runBtn().attributes("data-run-pending")).toBeUndefined();
+    });
+  });
+
+  describe("toolbar collapse stages", () => {
+    let widthSpy: ReturnType<typeof mockToolbarWidth>;
+    const { isPinned, togglePin } = useToolbarPins("traces");
+    const spansBtn = () => wrapper.find('[data-test="traces-search-mode-spans-btn"]');
+    const resetBtn = () => wrapper.find('[data-test="traces-search-bar-reset-filters-btn"]');
+    const menuReset = () => wrapper.find('[data-test="traces-search-bar-menu-reset-filters-btn"]');
+    const drillDown = () => wrapper.find('[data-test="insights-button"]');
+    // The bar reports `width`; the left section gets width minus the 14px bar padding.
+    const mountAt = async (width: number) => {
+      widthSpy = mockToolbarWidth(width + 14);
+      wrapper = mountSearchBar();
+      await flushPromises();
+    };
+
+    beforeEach(() => {
+      mockSavedViewsGet.mockResolvedValue({ data: { views: [] } });
+      if (isPinned("histogram")) togglePin("histogram");
+      if (isPinned("savedViews")) togglePin("savedViews");
+      searchObjInstance.searchApplied = true;
+      searchObjInstance.data.stream.streamLists = [{ label: "default", value: "default" }] as any;
+    });
+
+    afterEach(() => {
+      widthSpy?.mockRestore();
+      if (!isPinned("savedViews")) togglePin("savedViews");
+      breakpointState.lgUp = true;
+    });
+
+    it("keeps every label at full width", async () => {
+      await mountAt(1200);
+      expect(spansBtn().text()).toContain("traces.spansTab");
+      expect(drillDown().text()).toContain("traces.drillDown");
+      expect(resetBtn().text()).toContain("common.reset");
+      expect(menuReset().exists()).toBe(false);
+    });
+
+    it("drops the button labels first and keeps the view toggle labels", async () => {
+      await mountAt(700);
+      expect(spansBtn().text()).toContain("traces.spansTab");
+      expect(drillDown().text()).not.toContain("traces.drillDown");
+      expect(resetBtn().text()).not.toContain("common.reset");
+    });
+
+    it("then shows the view toggle as icons", async () => {
+      await mountAt(500);
+      expect(spansBtn().text()).not.toContain("traces.spansTab");
+      expect(resetBtn().exists()).toBe(true);
+    });
+
+    it("finally moves Reset into More, where it still resets", async () => {
+      searchObjInstance.data.editorValue = "service_name = 'a'";
+      await mountAt(300);
+      expect(resetBtn().exists()).toBe(false);
+
+      await menuReset().trigger("click");
+
+      expect(searchObjInstance.data.editorValue).toBe("");
+      expect(wrapper.emitted("filters-reset")).toHaveLength(1);
+    });
+
+    it("keeps Reset on the bar below lg, where the bar wraps", async () => {
+      breakpointState.lgUp = false;
+      await mountAt(0);
+      expect(resetBtn().exists()).toBe(true);
+      expect(menuReset().exists()).toBe(false);
+    });
+  });
+
   // -------------------------------------------------------------------------
   describe("download button", () => {
     it("should render the download button", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      // OButton: the download button uses title="Export Traces" (no .download-logs-btn class)
-      expect(wrapper.find('[title="traces.exportTraces"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-search-bar-export-btn"]').exists()).toBe(true);
     });
 
     it("should be disabled when queryResults.hits is empty", async () => {
@@ -1228,10 +1613,9 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      // OButton uses native HTML disabled attribute (not a CSS "disabled" class)
-      const btn = wrapper.find('[title="traces.exportTraces"]');
+      const btn = wrapper.find('[data-test="traces-search-bar-export-btn"]');
       expect(btn.exists()).toBe(true);
-      expect(btn.attributes("disabled")).toBeDefined();
+      expect(btn.attributes("disabled")).toBe("true");
     });
 
     it("should be enabled when queryResults.hits has entries", async () => {
@@ -1246,10 +1630,9 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      // OButton: when enabled, native disabled attribute should be absent
-      const btn = wrapper.find('[title="traces.exportTraces"]');
+      const btn = wrapper.find('[data-test="traces-search-bar-export-btn"]');
       expect(btn.exists()).toBe(true);
-      expect(btn.attributes("disabled")).toBeUndefined();
+      expect(btn.attributes("disabled")).toBe("false");
     });
 
     it("should export a traces-mode hit with a services object as aligned CSV", async () => {
@@ -1309,6 +1692,88 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
+  describe("more actions menu", () => {
+    const moreBtn = () => wrapper.find('[data-test="traces-search-bar-more-actions-btn"]');
+    const alertItem = () => wrapper.find('[data-test="traces-create-alert-btn"]');
+    const redItem = () => wrapper.find('[data-test="traces-add-red-to-dashboard-btn"]');
+
+    beforeEach(() => {
+      alertAction.createAlert.mockReset();
+      alertAction.disabledReason.value = null;
+      alertAction.queryNotRun.value = false;
+    });
+
+    it("renders the more actions trigger with Export, Create alert and Add RED charts inside", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(moreBtn().exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-search-bar-export-btn"]').exists()).toBe(true);
+      expect(alertItem().exists()).toBe(true);
+      expect(redItem().exists()).toBe(true);
+      expect(wrapper.find('[title="traces.exportTraces"]').exists()).toBe(false);
+    });
+
+    it("exports from the menu item", async () => {
+      downloadFileMock.mockReturnValue(true);
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await wrapper.find('[data-test="traces-search-bar-export-btn"]').trigger("click");
+      expect(downloadFileMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("hides the menu outside the spans and traces views", async () => {
+      searchObjInstance.meta.searchMode = "service-graph";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(moreBtn().exists()).toBe(false);
+    });
+
+    it("creates a matches alert on select", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await alertItem().trigger("click");
+      expect(alertAction.createAlert).toHaveBeenCalledWith("matches");
+    });
+
+    it("disables Create alert with the reason when no stream is picked", async () => {
+      alertAction.disabledReason.value = "Pick a stream first";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(alertItem().attributes("disabled")).toBe("true");
+      expect(alertItem().attributes("description")).toBe("Pick a stream first");
+      await alertItem().trigger("click");
+      expect(alertAction.createAlert).not.toHaveBeenCalled();
+    });
+
+    it("notes when the query has not run yet", async () => {
+      alertAction.queryNotRun.value = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(alertItem().attributes("description")).toBe("search.queryActions.usesUnrunQuery");
+    });
+
+    it("opens Add to dashboard with Rate, Errors and Duration panels and the bucket notice", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await redItem().trigger("click");
+      await flushPromises();
+      const dialog = wrapper.findComponent({ name: "AddToDashboard" });
+      expect(dialog.exists()).toBe(true);
+      const panels = dialog.props("panels") as any[];
+      expect(panels.map((p) => p.title.split(" · ")[0])).toEqual(["Rate", "Errors", "Duration"]);
+      expect(panels.every((p) => p.queries[0].fields.stream_type === "traces")).toBe(true);
+      expect(dialog.props("notice")).toBe("traces.redActions.bucketNotice.seconds");
+    });
+
+    it("disables Add RED charts when no stream is picked", async () => {
+      searchObjInstance.data.stream.selectedStream = { label: "", value: "" };
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(redItem().attributes("disabled")).toBe("true");
+    });
+  });
+
+  // -------------------------------------------------------------------------
   describe("structural elements", () => {
     it("should render the date-time dropdown", async () => {
       wrapper = mountSearchBar();
@@ -1348,6 +1813,127 @@ describe("SearchBar", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="code-query-editor-stub"]').exists()).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("filter builder growth", () => {
+    let rectSpy: ReturnType<typeof vi.spyOn> | undefined;
+
+    afterEach(() => {
+      rectSpy?.mockRestore();
+      localStorage.removeItem("o2.traces.queryInput");
+    });
+
+    it("reports how far the builder grew past one line, and null once the editor is back", async () => {
+      localStorage.setItem("o2.traces.queryInput", "builder");
+      rectSpy = vi
+        .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+        .mockImplementation(function (this: HTMLElement) {
+          const builder = this.getAttribute("data-test") === "traces-search-bar-filter-builder";
+          return { height: builder ? 84 : 0, width: 0 } as DOMRect;
+        });
+      searchObjInstance.meta.showQuery = true;
+      searchObjInstance.meta.sqlMode = false;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      // Three 1.875rem lines measure 84px; one line is the pane's own height.
+      expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([54]);
+      await wrapper.find('[data-test="traces-search-bar-filter-builder-toggle"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([null]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("plain-English filter (Ask AI) on the query editor", () => {
+    const editor = () => wrapper.findComponent({ ref: "queryEditorRef" });
+
+    afterEach(() => {
+      config.isEnterprise = "true";
+      delete store.state.zoConfig.ai_enabled;
+      nlFilterMock.mockReset();
+    });
+
+    it("keeps the Monaco host id the e2e helpers look for", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(editor().props("editorId")).toBe("traces-query-editor");
+    });
+
+    it("shows the AI toggle on an enterprise build with AI enabled", async () => {
+      store.state.zoConfig.ai_enabled = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(editor().props("hideNlToggle")).toBe(false);
+    });
+
+    it("hides the AI toggle when AI is off", async () => {
+      store.state.zoConfig.ai_enabled = false;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(editor().props("hideNlToggle")).toBe(true);
+    });
+
+    it("hides the AI toggle on a non-enterprise build", async () => {
+      store.state.zoConfig.ai_enabled = true;
+      config.isEnterprise = "false";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(editor().props("hideNlToggle")).toBe(true);
+    });
+
+    it("writes only the WHERE part of the generated SQL into the editor", async () => {
+      nlFilterMock.mockReturnValue("service_name = 'querier'");
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const sql = "SELECT * FROM default WHERE service_name = 'querier' LIMIT 100";
+      expect(editor().props("transformGeneratedQuery")(sql)).toBe("service_name = 'querier'");
+      expect(nlFilterMock).toHaveBeenCalledWith(sql, tracesParserRef.value);
+      expect(toastMock).not.toHaveBeenCalled();
+    });
+
+    it("keeps the user's text and says the question needs SQL when no filter fits", async () => {
+      nlFilterMock.mockReturnValue(null);
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const sql = "SELECT service_name, count(*) FROM default GROUP BY service_name";
+      expect(editor().props("transformGeneratedQuery")(sql)).toBeNull();
+      expect(toastMock).toHaveBeenCalledWith({
+        message: "traces.nlNeedsSql",
+        variant: "warning",
+      });
+    });
+
+    it("keeps the builder toggle beside the AI button in both modes, and hides it in AI mode", async () => {
+      store.state.zoConfig.ai_enabled = true;
+      searchObjInstance.meta.showQuery = true;
+      searchObjInstance.meta.sqlMode = false;
+      localStorage.setItem("o2.traces.queryInput", "query");
+      try {
+        wrapper = mountSearchBar();
+        await flushPromises();
+        const toggle = () => wrapper.find('[data-test="traces-search-bar-filter-builder-toggle"]');
+        expect(toggle().attributes("style")).toContain("right: 2.375rem");
+
+        await toggle().trigger("click");
+        await flushPromises();
+        expect(toggle().attributes("style")).toContain("right: 2.375rem");
+        expect(wrapper.find('[data-test="traces-search-bar-filter-builder-ai-btn"]').exists()).toBe(
+          true,
+        );
+
+        await wrapper
+          .find('[data-test="traces-search-bar-filter-builder-ai-btn"]')
+          .trigger("click");
+        await flushPromises();
+        editor().vm.$emit("update:nlpMode", true);
+        await flushPromises();
+        expect(toggle().exists()).toBe(false);
+      } finally {
+        localStorage.removeItem("o2.traces.queryInput");
+      }
     });
   });
 
@@ -1498,6 +2084,55 @@ describe("SearchBar", () => {
       });
 
       expect(wrapper.emitted("searchdata")).toBeFalsy();
+    });
+
+    it("tracks a user relative change as traces_time_range_changed without the raw value", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+
+      await (wrapper.vm as any).updateDateTime({
+        startTime: 0,
+        endTime: 0,
+        relativeTimePeriod: "1h",
+        valueType: "relative",
+        userChangedValue: true,
+      });
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_time_range_changed", {
+        stream_name: "default",
+        value_type: "relative",
+        relative_period: "1h",
+      });
+      expect(analytics.track).not.toHaveBeenCalledWith("Button Click", expect.anything());
+    });
+
+    it("tracks a debounced user absolute change in live mode as traces_time_range_changed", async () => {
+      store.state.zoConfig = { auto_query_enabled: true };
+      searchObjInstance.meta.liveMode = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      vi.useFakeTimers();
+      try {
+        await (wrapper.vm as any).updateDateTime({
+          startTime: 1_000,
+          endTime: 2_000,
+          relativeTimePeriod: null,
+          valueType: "absolute",
+          userChangedValue: true,
+        });
+        await vi.advanceTimersByTimeAsync(2600);
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_time_range_changed", {
+        stream_name: "default",
+        value_type: "absolute",
+        relative_period: null,
+      });
+      expect(analytics.track).not.toHaveBeenCalledWith("Button Click", expect.anything());
     });
   });
 
@@ -1929,6 +2564,16 @@ describe("SearchBar", () => {
       });
     });
 
+    it("marks a just-created view as applied when the response has its id", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      (wrapper.vm as any).newViewName = "fresh";
+      await (wrapper.vm as any).saveAsNewView();
+
+      expect((wrapper.vm as any).appliedSavedViewId).toBe("n1");
+    });
+
     it("apply emits apply-saved-view with the stored data", async () => {
       mockGetViewDetail.mockResolvedValue({ data: { ...tracesView, data: expectedData() } });
       wrapper = mountSearchBar();
@@ -1975,12 +2620,12 @@ describe("SearchBar", () => {
       expect(wrapper.emitted("apply-saved-view")).toBeUndefined();
     });
 
-    it("pinned dropdown has no delete action", async () => {
+    it("pinned dropdown offers a delete action beside update", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
       expect(wrapper.find('[data-test="traces-saved-view-update-t1"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="traces-saved-view-delete-t1"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-saved-view-delete-t1"]').exists()).toBe(true);
     });
 
     it("pinned dropdown lists favourites first, then by name, with a star on favourites", async () => {
@@ -1993,13 +2638,10 @@ describe("SearchBar", () => {
         .findAll('[data-test^="traces-saved-view-apply-"]')
         .map((item) => item.attributes("data-test"));
       expect(items).toEqual(["traces-saved-view-apply-t1", "traces-saved-view-apply-t2"]);
-      const iconName = (id: string) =>
-        wrapper
-          .findAllComponents({ name: "OIcon" })
-          .find((c) => c.attributes("data-test") === `traces-saved-view-icon-${id}`)
-          ?.props("name");
-      expect(iconName("t1")).toBe("star");
-      expect(iconName("t2")).toBe("saved-search");
+      const pressed = (id: string) =>
+        wrapper.find(`[data-test="traces-saved-view-favorite-${id}"]`).attributes("aria-pressed");
+      expect(pressed("t1")).toBe("true");
+      expect(pressed("t2")).toBe("false");
     });
 
     it("pinned dropdown shows a loading row while the list loads", async () => {
@@ -2007,56 +2649,37 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="traces-saved-views-menu-loading"]').exists()).toBe(true);
-      expect(wrapper.findComponent(SavedViewsListDialog).props("loading")).toBe(true);
+      expect(wrapper.find('[data-test="traces-saved-view-loading"]').exists()).toBe(true);
     });
 
     describe("in the More menu", () => {
-      const moreGroup = () =>
-        wrapper.find('[data-test="traces-search-bar-menu-saved-views-group"]');
+      const moreGroup = () => wrapper.findComponent(SavedViewsSubmenu);
       const toolbarGroup = () => wrapper.find('[data-test="traces-search-bar-saved-views"]');
-      const dialog = () => wrapper.findComponent(SavedViewsListDialog);
+      const dialog = () => wrapper.findComponent(SavedViewsSubmenu);
 
-      it("shows the saved-views group with List, Create and the pin button", async () => {
+      it("shows the saved-views submenu with Create and the pin button", async () => {
         wrapper = mountSearchBar();
         await flushPromises();
 
         expect(moreGroup().exists()).toBe(true);
         expect(
-          moreGroup().find('[data-test="traces-search-bar-menu-list-saved-views-btn"]').exists(),
+          moreGroup().find('[data-test="traces-search-bar-menu-saved-views-delete-t1"]').exists(),
         ).toBe(true);
+        expect(
+          moreGroup().find('[data-test="traces-search-bar-menu-manage-saved-views-btn"]').exists(),
+        ).toBe(false);
         expect(
           moreGroup().find('[data-test="traces-search-bar-menu-create-saved-view-btn"]').exists(),
         ).toBe(true);
         expect(
           moreGroup().find('[data-test="traces-search-bar-menu-pin-saved-views-btn"]').exists(),
         ).toBe(true);
-        expect(moreGroup().find('[data-test="traces-saved-view-apply-t1"]').exists()).toBe(false);
+        expect(
+          moreGroup().find('[data-test="traces-search-bar-menu-saved-views-apply-t1"]').exists(),
+        ).toBe(true);
       });
 
-      it("opens the saved-views dialog from List saved views", async () => {
-        wrapper = mountSearchBar();
-        await flushPromises();
-        expect(dialog().props("open")).toBe(false);
-
-        await moreGroup()
-          .find('[data-test="traces-search-bar-menu-list-saved-views-btn"]')
-          .trigger("click");
-
-        expect(dialog().props("open")).toBe(true);
-        expect(dialog().props("views")).toEqual([tracesView]);
-      });
-
-      it("opens the saved-views dialog from the pinned dropdown's Manage item", async () => {
-        wrapper = mountSearchBar();
-        await flushPromises();
-
-        await toolbarGroup().find('[data-test="traces-saved-view-manage"]').trigger("click");
-
-        expect(dialog().props("open")).toBe(true);
-      });
-
-      it("deletes from the dialog through the confirmation flow while unpinned", async () => {
+      it("deletes from the submenu through the confirmation flow while unpinned", async () => {
         togglePin("savedViews");
         wrapper = mountSearchBar();
         await flushPromises();
@@ -2069,7 +2692,7 @@ describe("SearchBar", () => {
         expect(mockSavedViewsDelete).toHaveBeenCalledWith(expect.any(String), "t1");
       });
 
-      it("applies and updates views from the dialog", async () => {
+      it("applies and updates views from the submenu", async () => {
         mockGetViewDetail.mockResolvedValue({ data: { ...tracesView, data: expectedData() } });
         wrapper = mountSearchBar();
         await flushPromises();
@@ -2086,33 +2709,37 @@ describe("SearchBar", () => {
         });
       });
 
-      it("refetches the saved views each time the dialog opens", async () => {
+      it("marks a view applied after a successful quick update, not after a failed one", async () => {
+        mockSavedViewsPut.mockRejectedValueOnce(new Error("boom"));
         wrapper = mountSearchBar();
         await flushPromises();
-        const callsBefore = mockSavedViewsGet.mock.calls.length;
-        mockSavedViewsGet.mockResolvedValue({
-          data: { views: [tracesView, tracesView2, logsView] },
-        });
 
-        await wrapper
-          .find('[data-test="traces-search-bar-menu-list-saved-views-btn"]')
-          .trigger("click");
+        dialog().vm.$emit("update", tracesView);
         await flushPromises();
+        expect((wrapper.vm as any).appliedSavedViewId).toBeNull();
 
-        expect(mockSavedViewsGet.mock.calls.length).toBe(callsBefore + 1);
-        expect(dialog().props("open")).toBe(true);
-        expect(dialog().props("views")).toEqual([tracesView, tracesView2]);
-
-        dialog().vm.$emit("update:open", false);
+        dialog().vm.$emit("update", tracesView);
         await flushPromises();
-        expect(dialog().props("open")).toBe(false);
-        await wrapper
-          .find('[data-test="traces-search-bar-menu-list-saved-views-btn"]')
-          .trigger("click");
-        await flushPromises();
+        expect((wrapper.vm as any).appliedSavedViewId).toBe("t1");
+      });
 
-        expect(mockSavedViewsGet.mock.calls.length).toBe(callsBefore + 2);
-        expect(dialog().props("open")).toBe(true);
+      it("refetches the list when the More submenu or the pinned dropdown opens", async () => {
+        wrapper = mountSearchBar();
+        await flushPromises();
+        mockSavedViewsGet.mockClear();
+
+        dialog().vm.$emit("open");
+        await flushPromises();
+        expect(mockSavedViewsGet).toHaveBeenCalledTimes(1);
+
+        (wrapper.vm as any).onSavedViewsDropdownOpenChange(true);
+        await flushPromises();
+        expect(mockSavedViewsGet).toHaveBeenCalledTimes(2);
+        expect((wrapper.vm as any).savedViewsDropdownOpen).toBe(true);
+
+        (wrapper.vm as any).onSavedViewsDropdownOpenChange(false);
+        await flushPromises();
+        expect(mockSavedViewsGet).toHaveBeenCalledTimes(2);
       });
 
       it("prunes favourites deleted elsewhere once the list loads, freeing the cap", async () => {
@@ -2145,7 +2772,6 @@ describe("SearchBar", () => {
         wrapper = mountSearchBar();
         await flushPromises();
 
-        expect(dialog().props("loading")).toBe(false);
         expect(dialog().props("views")).toEqual([]);
         expect(dialog().props("favoriteIds")).toEqual(["t1", "gone"]);
         expect(JSON.parse(localStorage.getItem("savedViews") || "{}")).toEqual({
@@ -2174,7 +2800,7 @@ describe("SearchBar", () => {
         });
       });
 
-      it("passes the traces data-test prefix, views and favourites to the dialog", async () => {
+      it("passes the traces data-test prefix, views and favourites to the submenu", async () => {
         localStorage.setItem(
           "savedViews",
           JSON.stringify({ t1: tracesView, l1: { ...logsView, org_id: "default" } }),
@@ -2182,54 +2808,140 @@ describe("SearchBar", () => {
         wrapper = mountSearchBar();
         await flushPromises();
 
-        expect(dialog().props("dataTestPrefix")).toBe("traces-saved-views-dialog");
-        expect(dialog().props("loading")).toBe(false);
+        expect(dialog().props("dataTestPrefix")).toBe("traces-search-bar-menu-saved-views");
         expect(dialog().props("favoriteIds")).toEqual(["t1"]);
-        expect(dialog().props("favoriteViews")).toEqual([tracesView]);
       });
 
-      it("update from the dialog closes it and asks for confirmation first", async () => {
-        mockConfirm.mockResolvedValue(false);
-        wrapper = mountSearchBar();
-        await flushPromises();
-        await wrapper
-          .find('[data-test="traces-search-bar-menu-list-saved-views-btn"]')
-          .trigger("click");
-        expect(dialog().props("open")).toBe(true);
-
-        dialog().vm.$emit("update", tracesView);
-        await flushPromises();
-
-        expect(dialog().props("open")).toBe(false);
-        expect(mockConfirm).toHaveBeenCalledWith({
-          title: "search.updateSavedView",
-          message: "search.updateSavedViewConfirm",
-        });
-        expect(mockSavedViewsPut).not.toHaveBeenCalled();
-      });
-
-      it("delete from the dialog closes it, confirms, and drops the favourite", async () => {
+      it("delete from the submenu confirms, and drops the favourite", async () => {
         localStorage.setItem("savedViews", JSON.stringify({ t1: tracesView }));
         wrapper = mountSearchBar();
         await flushPromises();
-        await wrapper
-          .find('[data-test="traces-search-bar-menu-list-saved-views-btn"]')
-          .trigger("click");
 
         dialog().vm.$emit("delete", tracesView);
         await flushPromises();
 
-        expect(dialog().props("open")).toBe(false);
         expect(mockConfirm).toHaveBeenCalledWith({
           title: "search.deleteSavedView",
-          message: "search.deleteSavedViewConfirm",
+          messageKeypath: "search.deleteSavedViewConfirm",
+          messageName: tracesView.view_name,
+          confirmVariant: "destructive",
         });
         expect(mockSavedViewsDelete).toHaveBeenCalledWith(expect.any(String), "t1");
         expect(dialog().props("favoriteIds")).toEqual([]);
         expect(JSON.parse(localStorage.getItem("savedViews") || "{}")).toEqual({});
       });
 
-      it("delete from the dialog does nothing when not confirmed", async () => {
+      it("closes the More menu and the pinned dropdown before deleting", async () => {
+        let release!: (value: boolean) => void;
+        mockConfirm.mockReturnValueOnce(new Promise<boolean>((resolve) => (release = resolve)));
+        wrapper = mountSearchBar();
+        await flushPromises();
+        (wrapper.vm as any).moreMenuOpen = true;
+        (wrapper.vm as any).savedViewsDropdownOpen = true;
+
+        dialog().vm.$emit("delete", tracesView);
+        await flushPromises();
+
+        expect((wrapper.vm as any).moreMenuOpen).toBe(false);
+        expect((wrapper.vm as any).savedViewsDropdownOpen).toBe(false);
+        expect(mockSavedViewsDelete).not.toHaveBeenCalled();
+        release(false);
+      });
+
+      it("marks the applied view only after its detail loads", async () => {
+        mockGetViewDetail.mockRejectedValueOnce(new Error("boom"));
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        dialog().vm.$emit("apply", tracesView);
+        await flushPromises();
+        expect((wrapper.vm as any).appliedSavedViewId).toBeNull();
+
+        mockGetViewDetail.mockResolvedValueOnce({ data: { ...tracesView, data: expectedData() } });
+        dialog().vm.$emit("apply", tracesView);
+        await flushPromises();
+        expect((wrapper.vm as any).appliedSavedViewId).toBe("t1");
+      });
+
+      it("deleting the applied view clears the applied check", async () => {
+        mockGetViewDetail.mockResolvedValueOnce({ data: { ...tracesView, data: expectedData() } });
+        wrapper = mountSearchBar();
+        await flushPromises();
+        dialog().vm.$emit("apply", tracesView);
+        await flushPromises();
+        expect((wrapper.vm as any).appliedSavedViewId).toBe("t1");
+
+        dialog().vm.$emit("delete", tracesView);
+        await flushPromises();
+
+        expect((wrapper.vm as any).appliedSavedViewId).toBeNull();
+      });
+
+      describe("applied check follows the live search", () => {
+        const applyView = async () => {
+          mockGetViewDetail.mockResolvedValueOnce({
+            data: { ...tracesView, data: expectedData() },
+          });
+          wrapper = mountSearchBar();
+          await flushPromises();
+          dialog().vm.$emit("apply", tracesView);
+          await flushPromises();
+          expect((wrapper.vm as any).appliedSavedViewId).toBe("t1");
+        };
+
+        it("clears when the query text is edited", async () => {
+          await applyView();
+          searchObjInstance.data.editorValue = "span_status = 'OK'";
+          await flushPromises();
+          expect((wrapper.vm as any).appliedSavedViewId).toBeNull();
+        });
+
+        it("clears when the stream changes", async () => {
+          await applyView();
+          searchObjInstance.data.stream.selectedStream = { label: "other", value: "other" };
+          await flushPromises();
+          expect((wrapper.vm as any).appliedSavedViewId).toBeNull();
+          searchObjInstance.data.stream.selectedStream = { label: "default", value: "default" };
+        });
+
+        it("clears on Reset", async () => {
+          await applyView();
+          (wrapper.vm as any).resetFilters();
+          await flushPromises();
+          expect((wrapper.vm as any).appliedSavedViewId).toBeNull();
+        });
+      });
+
+      it("overwrite asks for confirmation naming the view and keeps focus on Cancel", async () => {
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        dialog().vm.$emit("update", tracesView);
+        await flushPromises();
+
+        expect(mockConfirm).toHaveBeenCalledWith(
+          expect.objectContaining({
+            messageKeypath: "search.overwriteSavedViewConfirm",
+            messageName: "checkout errors",
+            focusCancel: true,
+          }),
+        );
+        expect(mockSavedViewsPut).toHaveBeenCalledTimes(1);
+      });
+
+      it("a cancelled overwrite leaves the view untouched", async () => {
+        mockConfirm.mockResolvedValue(false);
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        dialog().vm.$emit("update", tracesView);
+        await flushPromises();
+
+        expect(mockSavedViewsPut).not.toHaveBeenCalled();
+        expect((wrapper.vm as any).appliedSavedViewId).toBeNull();
+      });
+
+      it("delete from the submenu does nothing when not confirmed", async () => {
         mockConfirm.mockResolvedValue(false);
         localStorage.setItem("savedViews", JSON.stringify({ t1: tracesView }));
         wrapper = mountSearchBar();
@@ -2242,7 +2954,7 @@ describe("SearchBar", () => {
         expect(dialog().props("favoriteIds")).toEqual(["t1"]);
       });
 
-      it("toggles a favourite from the dialog", async () => {
+      it("toggles a favourite from the submenu", async () => {
         wrapper = mountSearchBar();
         await flushPromises();
 
@@ -2319,7 +3031,7 @@ describe("SearchBar", () => {
 
       it("shrinks the toggle labels before the pinned group falls back", async () => {
         widthSpy.mockRestore();
-        widthSpy = mockToolbarWidth(800);
+        widthSpy = mockToolbarWidth(660);
         wrapper = mountSearchBar();
         await flushPromises();
 
@@ -2344,6 +3056,216 @@ describe("SearchBar", () => {
         expect(toolbarGroup().exists()).toBe(false);
         expect(moreGroup().exists()).toBe(true);
       });
+    });
+  });
+  describe("updateQueryValue with unparsable SQL", () => {
+    it("keeps the last parsed query when the parser throws mid-typing", async () => {
+      searchObjInstance.meta.sqlMode = true;
+      const previous = { from: [{ table: "default" }] };
+      searchObjInstance.data.parsedQuery = previous;
+      tracesParserRef.value.astify = vi.fn(() => {
+        throw new Error('Expected end of input but "(" found.');
+      });
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      await expect((wrapper.vm as any).updateQueryValue("SELECT * FROM (")).resolves.toBe(
+        undefined,
+      );
+      expect(searchObjInstance.data.parsedQuery).toEqual(previous);
+    });
+  });
+
+  describe("recent-searches dropdown and the editor placeholder", () => {
+    it("hides the typing placeholder while the dropdown is open, so only one list changes", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      searchObjInstance.data.editorValue = "";
+      searchObjInstance.meta.queryEditorPlaceholderFlag = true;
+      const vm = wrapper.vm as unknown as {
+        recentFocusOpen: boolean;
+        toggleFilterBuilder: () => void;
+      };
+      vm.toggleFilterBuilder();
+      vm.recentFocusOpen = false;
+      await flushPromises();
+      expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
+
+      vm.recentFocusOpen = true;
+      await flushPromises();
+      expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(false);
+
+      vm.recentFocusOpen = false;
+      await flushPromises();
+      expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
+    });
+
+    it("types no placeholder while the stream loads, so a restored query paints first", async () => {
+      searchObjInstance.loadingStream = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      searchObjInstance.data.editorValue = "";
+      searchObjInstance.meta.queryEditorPlaceholderFlag = true;
+      await flushPromises();
+      expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(false);
+
+      searchObjInstance.loadingStream = false;
+      await flushPromises();
+      expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
+    });
+
+    it("never starts typing Select a stream first while the stream list may still pick one", async () => {
+      vi.useFakeTimers();
+      try {
+        searchObjInstance.loadingStream = true;
+        searchObjInstance.data.stream.selectedStream = { label: "", value: "" };
+        wrapper = mountSearchBar();
+        await vi.advanceTimersByTimeAsync(5000);
+        const typed = () => wrapper.find(".query-editor-placeholder-typewriter").text?.() ?? "";
+        expect((wrapper.vm as any).traceEditorPlaceholder).not.toMatch(/^Sel/);
+
+        searchObjInstance.data.stream.selectedStream = { label: "default", value: "default" };
+        searchObjInstance.loadingStream = false;
+        for (let i = 0; i < 20; i++) {
+          await vi.advanceTimersByTimeAsync(100);
+          expect(typed()).not.toMatch(/^Sel/);
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("recent searches with the filter builder on", () => {
+    const entry = {
+      id: "a",
+      source: "traces",
+      query: "service_name = 'api'",
+      status: "ok",
+      starred: false,
+      context: {},
+      updated_at: Date.now() * 1000,
+      created_at: Date.now() * 1000,
+      run_count: 1,
+    };
+    const DT = "traces-search-bar-filter-builder-bar";
+    const row = (key: string) =>
+      document.body.querySelector<HTMLElement>(`[data-test="${DT}-suggest-item-${key}"]`);
+
+    it("lists them above the fields and hands the picked row to the page", async () => {
+      const list = vi
+        .spyOn(queryHistory, "list")
+        .mockResolvedValue({ data: [entry] } as Awaited<ReturnType<typeof queryHistory.list>>);
+      const count = vi
+        .spyOn(queryHistory, "count")
+        .mockResolvedValue({ data: { count: 0 } } as Awaited<
+          ReturnType<typeof queryHistory.count>
+        >);
+      store.state.zoConfig.query_history_enabled = true;
+      queryClient.clear();
+      localStorage.removeItem("o2.traces.queryInput");
+      searchObjInstance.data.editorValue = "";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      document.body.querySelector<HTMLInputElement>(`[data-test="${DT}-input"]`)!.click();
+      await vi.waitFor(() => expect(row("extra-recent-a")).not.toBeNull());
+      row("extra-recent-a")!.click();
+      await flushPromises();
+
+      expect(wrapper.emitted("recent-restore")![0].slice(0, 1)).toEqual([
+        expect.objectContaining({ id: "a" }),
+      ]);
+      expect(wrapper.emitted("recent-restore")![0][2]).toBe(true);
+      delete store.state.zoConfig.query_history_enabled;
+      list.mockRestore();
+      count.mockRestore();
+    });
+  });
+
+  describe("the Run button once the editor differs from the searched query", () => {
+    const runButton = () => wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
+
+    it("shows the pending state for a typed edit or a loaded recent search, and clears it when they match again", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      searchObjInstance.data.appliedEditorValue = "service_name='a'";
+      searchObjInstance.data.editorValue = "service_name='a'";
+      await flushPromises();
+      expect(runButton().attributes("data-run-pending")).toBeUndefined();
+
+      searchObjInstance.data.editorValue = "service_name='b'";
+      await flushPromises();
+      expect(runButton().attributes("data-run-pending")).toBe("true");
+      expect(runButton().attributes("aria-label")).toBe("search.runQueryPendingLabel");
+
+      searchObjInstance.data.editorValue = "service_name='a' ";
+      await flushPromises();
+      expect(runButton().attributes("data-run-pending")).toBeUndefined();
+    });
+
+    it("shows no pending state before the first search", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      searchObjInstance.data.appliedEditorValue = null;
+      searchObjInstance.data.editorValue = "service_name='b'";
+      await flushPromises();
+      expect(runButton().attributes("data-run-pending")).toBeUndefined();
+    });
+  });
+
+  describe("recent-searches dropdown on an edit that empties the editor", () => {
+    it("opens without a refocus when the text is cleared and closes on the next character", async () => {
+      store.state.zoConfig.query_history_enabled = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      searchObjInstance.data.editorValue = "service_name='api'";
+      const vm = wrapper.vm as unknown as { recentFocusOpen: boolean };
+      const editor = wrapper.findComponent('[data-test="code-query-editor-stub"]');
+      editor.vm.$emit("focus");
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(false);
+
+      editor.vm.$emit("user-edit", true, false);
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(true);
+
+      editor.vm.$emit("user-edit", false, true);
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(false);
+
+      searchObjInstance.data.editorValue = "";
+      editor.vm.$emit("focus");
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(true);
+      vm.recentFocusOpen = false;
+      editor.vm.$emit("user-edit", true, false);
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(true);
+      delete store.state.zoConfig.query_history_enabled;
+    });
+
+    it("stays closed when Escape in the list hands focus back to the editor, until the next real focus", async () => {
+      store.state.zoConfig.query_history_enabled = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      searchObjInstance.data.editorValue = "";
+      const vm = wrapper.vm as unknown as { recentFocusOpen: boolean };
+      const editor = wrapper.findComponent('[data-test="code-query-editor-stub"]');
+      editor.vm.$emit("focus");
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(true);
+
+      const dropdown = wrapper.findComponent({ name: "RecentSearchesFocusDropdown" });
+      dropdown.vm.$emit("update:open", false);
+      dropdown.vm.$emit("dismiss");
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(false);
+
+      editor.vm.$emit("focus");
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(true);
+      delete store.state.zoConfig.query_history_enabled;
     });
   });
 });

@@ -1,6 +1,7 @@
 const testLogger = require('./test-logger.js');
 const logsdata = require("../../../test-data/logs_data.json");
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
+const { ingestBase } = require('./ingest-url.js');
 
 // Rows are stamped at ingest, so a 5-min refresh keeps them inside every 15-min test window.
 const SHARED_STREAM = 'e2e_automate';
@@ -29,7 +30,7 @@ async function ingestTestData(page, streamName = "e2e_automate", { force = false
   }
 
   try {
-    const response = await page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
+    const response = await page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`, {
       headers: headers,
       data: logsdata
     });
@@ -65,7 +66,7 @@ function getHeaders() {
  * // Returns: "http://localhost:5080/api/default/my_stream/_json"
  */
 function getIngestionUrl(orgId, streamName) {
-  return `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+  return `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`;
 }
 
 /**
@@ -108,7 +109,7 @@ async function ingestCustomData(page, streamName, data) {
 
   try {
     // Use Playwright's request API to keep credentials in Node.js context
-    const response = await page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
+    const response = await page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`, {
       headers: headers,
       data: data
     });

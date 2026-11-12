@@ -1,5 +1,6 @@
 
 import logsdata from "../../../test-data/logs_data.json";
+import { ingestBase } from '../../playwright-tests/utils/ingest-url.js';
 const http = require('http');
 const https = require('https');
 const nodeFetch = require('node-fetch');
@@ -54,7 +55,7 @@ export class IngestionPage {
     const streamName = "e2e_automate";
     const headers = getAuthHeaders();
     const fetchResponse = await fetchWithRetry(
-      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+      `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
         headers: headers,
@@ -86,7 +87,7 @@ export class IngestionPage {
 
     for (const streamName of streams) {
       const fetchResponse = await fetch(
-        `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+        `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`,
         {
           method: "POST",
           headers: headers,
@@ -114,7 +115,7 @@ export class IngestionPage {
     const streamName = "e2e_automate";
     const headers = getAuthHeaders();
     const fetchResponse = await fetchWithRetry(
-      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+      `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
         headers: headers,
@@ -140,7 +141,7 @@ export class IngestionPage {
   async ingestionMultiOrgStream(orgId, streamName) {
     const headers = getAuthHeaders();
     const fetchResponse = await fetchWithRetry(
-      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+      `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
         headers: headers,
@@ -197,7 +198,7 @@ export class IngestionPage {
 
     // Ingest data to each stream
     for (const streamName of streams) {
-      const url = `${ingestionUrl}/api/${orgId}/${streamName}/_json`;
+      const url = `${ingestBase(ingestionUrl)}/api/${orgId}/${streamName}/_json`;
       testLogger.debug(`ingestionJoinUnion: Ingesting to stream '${streamName}' at ${url}`);
 
       try {

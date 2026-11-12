@@ -187,13 +187,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="delete-source-maps-dialog"
       :secondary-button-label="t('common.cancel')"
       :primary-button-label="t('common.ok')"
+      primary-button-variant="destructive"
       @click:secondary="deleteDialog.show = false"
       @click:primary="
         deleteSourceMap();
         deleteDialog.show = false;
       "
     >
-      <p class="para">{{ deleteDialog.message }}</p>
+      <i18n-t
+        v-if="deleteDialog.data"
+        keypath="rum.deleteSourceMapsConfirm"
+        :plural="deleteDialog.data.fileCount"
+        tag="p"
+        class="para"
+      >
+        <template #service>
+          <span
+            data-test="delete-source-maps-dialog-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ deleteDialog.data.service }}</span
+          >
+        </template>
+        <template #version>
+          <span class="text-text-heading font-semibold break-all">{{
+            deleteDialog.data.version
+          }}</span>
+        </template>
+        <template #env>
+          <span class="text-text-heading font-semibold break-all">{{ deleteDialog.data.env }}</span>
+        </template>
+        <template #count>{{ deleteDialog.data.fileCount }}</template>
+      </i18n-t>
     </ODialog>
   </div>
 </template>
@@ -224,6 +248,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -233,7 +258,6 @@ const router = useRouter();
 const deleteDialog = ref({
   show: false,
   title: "",
-  message: "",
   data: null as any,
 });
 
@@ -288,7 +312,7 @@ const fetchFilterValues = async () => {
 
 // State
 const isLoading = ref(false);
-const forbidden = ref(false);
+const forbidden = ref<ForbiddenState>(false);
 const sourceMaps = ref<any[]>([]);
 const groupedSourceMaps = ref<any[]>([]);
 const expandedIds = ref<string[]>([]);
@@ -393,7 +417,7 @@ const fetchSourceMaps = async () => {
     groupSourceMaps();
   } catch (error: any) {
     console.error("Error fetching source maps:", error);
-    forbidden.value = error?.response?.status === 403;
+    forbidden.value = forbiddenState(error);
     sourceMaps.value = [];
     groupedSourceMaps.value = [];
   } finally {
@@ -460,12 +484,6 @@ const confirmDeleteSourceMap = (sourceMap: any) => {
   deleteDialog.value = {
     show: true,
     title: t("rum.deleteSourceMapsTitle"),
-    message: t("rum.deleteSourceMapsConfirm", {
-      service: sourceMap.service,
-      version: sourceMap.version,
-      env: sourceMap.env,
-      count: sourceMap.fileCount,
-    }),
     data: sourceMap,
   };
 };
@@ -514,8 +532,8 @@ const navigateToUpload = () => {
 };
 
 // On mount
-onMounted(async () => {
-  await fetchFilterValues();
+onMounted(() => {
+  void fetchFilterValues();
   fetchSourceMaps();
 });
 

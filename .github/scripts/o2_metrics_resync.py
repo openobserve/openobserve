@@ -11,7 +11,7 @@ Env: GITHUB_REPOSITORY, GH_TOKEN, O2_REPORTING_INGEST_BASE, O2_REPORTING_AUTH,
      O2_REPORTING_INSECURE (opt), LOOKBACK_DAYS (default 2), GITHUB_API_URL (opt).
 Never raises fatally — best-effort.
 """
-import os, json, ssl, base64, urllib.request, urllib.error, time
+import os, json, ssl, urllib.request, urllib.error, time
 from datetime import datetime, timezone, timedelta
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "")
@@ -24,12 +24,12 @@ CTX = ssl.create_default_context()
 if os.environ.get("O2_REPORTING_INSECURE", "") == "true":
     CTX.check_hostname = False; CTX.verify_mode = ssl.CERT_NONE
 
-# (workflow file, stream, suite, is_regression)
+# (workflow file, stream, suite, is_regression, shard job-name prefix, build job name)
 TARGETS = [
-    ("playwright.yml", "ci_test_runs", "ui", False),
-    ("api-testing.yml", "ci_test_runs", "api", False),
-    ("playwright_bugfix_regression.yml", "ci_regression", "regression", True),
-    ("api_bugfix_regression.yml", "ci_test_runs", "api", True),
+    ("playwright.yml", "ci_test_runs", "ui", False, None, None),
+    ("api-testing.yml", "ci_test_runs", "api", False, None, None),
+    ("playwright_bugfix_regression.yml", "ci_regression", "regression", True, "e2e /", "build_binary"),
+    ("api_bugfix_regression.yml", "ci_regression", "api_regression", True, "api_regression /", "build_api_binary"),
 ]
 
 def gh(path):
@@ -57,7 +57,7 @@ def jdur(j):
     if a is None or b is None: return None
     d = round(b - a); return d if d >= 0 else None
 
-def reconstruct(run, suite, is_reg):
+def reconstruct(run, suite, is_reg, prefix, build_job):
     rid, att = run["id"], run.get("run_attempt", 1)
     jobs = gh(f"repos/{REPO}/actions/runs/{rid}/attempts/{att}/jobs?per_page=100").get("jobs", [])
     final = wall(jobs)
@@ -84,8 +84,8 @@ def reconstruct(run, suite, is_reg):
         "retry_wasted_sec": total - final,
     }
     if is_reg:
-        sh = [j for j in jobs if j.get("name", "").startswith("e2e /")]
-        bj = [j for j in jobs if j.get("name") == "build_binary"]
+        sh = [j for j in jobs if j.get("name", "").startswith(prefix)]
+        bj = [j for j in jobs if j.get("name") == build_job]
         doc.update({
             "build_duration_sec": (jdur(bj[0]) if bj else None),
             "shards_total": len(sh),
@@ -100,7 +100,7 @@ def reconstruct(run, suite, is_reg):
 def post(stream, docs):
     if not docs: return 0
     url = f"{BASE.rstrip('/')}/{stream}/_json"
-    hdr = {"Authorization": "Basic " + base64.b64encode(AUTH.encode()).decode(), "Content-Type": "application/json"}
+    hdr = {"Authorization": "Basic " + AUTH, "Content-Type": "application/json"}
     ok = 0
     for k in range(0, len(docs), 200):
         chunk = docs[k:k+200]
@@ -120,10 +120,10 @@ def main():
         print("::notice::missing env (repo/token/O2_REPORTING_*) — skipping re-sync"); return
     since = (datetime.now(timezone.utc) - timedelta(days=DAYS)).strftime("%Y-%m-%d")
     grand = 0
-    for wf, stream, suite, is_reg in TARGETS:
+    for wf, stream, suite, is_reg, prefix, build_job in TARGETS:
         runs = gh(f"repos/{REPO}/actions/workflows/{wf}/runs?created=%3E%3D{since}&per_page=100").get("workflow_runs", [])
         runs = [r for r in runs if r.get("status") == "completed"]
-        docs = [reconstruct(r, suite, is_reg) for r in runs]
+        docs = [reconstruct(r, suite, is_reg, prefix, build_job) for r in runs]
         n = post(stream, docs); grand += n
         print(f"{wf:<26} -> {stream} ({suite}): {len(docs)} runs, ingested {n}")
     print(f"TOTAL re-synced: {grand}")

@@ -31,6 +31,7 @@
           clearable
           autofocus
           data-test="test-match-model-input"
+          @keydown.enter="onModelNameEnter"
         >
           <template #icon-left>
             <OIcon name="smart-toy" size="sm" class="shrink-0 opacity-[0.35]" />
@@ -178,12 +179,27 @@
           <!-- Match Found -->
           <div v-else key="match" class="flex flex-col gap-3" data-test="test-match-result">
             <!-- Match status -->
-            <OBanner variant="success" icon="check-circle" inline-actions>
+            <OBanner
+              :variant="isApproximateMatch ? 'warning' : 'success'"
+              :icon="isApproximateMatch ? 'warning' : 'check-circle'"
+              inline-actions
+            >
               <div class="text-compact font-bold">
-                {{ t("modelPricing.matchFound") }}
+                {{
+                  isApproximateMatch
+                    ? t("modelPricing.approximateMatchFound")
+                    : t("modelPricing.matchFound")
+                }}
               </div>
               <div class="mt-0.5 text-xs opacity-70">
                 <OCode truncate>{{ testResult.matched.name }}</OCode>
+              </div>
+              <div
+                v-if="isApproximateMatch"
+                class="mt-0.5 text-xs opacity-70"
+                data-test="test-match-approximate"
+              >
+                {{ t("modelPricing.approximateMatchDesc", { modelName: testModelName }) }}
               </div>
               <template #actions>
                 <OTag
@@ -445,6 +461,12 @@ async function runTest() {
   testing.value = false;
 }
 
+// Mirrors the Test match button, which is disabled while a test is running; an IME Enter only commits text.
+function onModelNameEnter(event: KeyboardEvent) {
+  if (event.isComposing || testing.value) return;
+  runTest();
+}
+
 watch(testModelName, (val) => {
   if (!val) {
     testResult.value = null;
@@ -483,6 +505,9 @@ function sortedPriceEntries(prices: Record<string, number>): [string, number][] 
 }
 
 const winnerSource = computed(() => testResult.value?.matched?.source || null);
+
+// The pattern matched only part of the model name, so the price may belong to another model.
+const isApproximateMatch = computed(() => testResult.value?.match_kind === "approximate");
 
 const matchFlowSteps = computed(() => [
   { key: "org", label: t("settings.testModelMatchDialog.stepYourOrg"), icon: "person" },

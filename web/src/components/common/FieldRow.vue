@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-if="field.name !== timestampColumn" #actions>
       <OButton
+        :aria-label="t('common.addFilter')"
         v-if="field.isSchemaField && field.name != timestampColumn"
         variant="ghost-neutral"
         size="icon"

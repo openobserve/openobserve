@@ -225,12 +225,10 @@ export default defineComponent({
         toast({
           variant: "error",
           message: raw(
-            JSON.stringify(
-              err?.response?.data["message"] ||
-                (organizationId
-                  ? this.t("iam.addUpdateOrganization.updateFailed")
-                  : this.t("iam.addUpdateOrganization.createFailed")),
-            ),
+            err?.response?.data["message"] ||
+              (organizationId
+                ? this.t("iam.addUpdateOrganization.updateFailed")
+                : this.t("iam.addUpdateOrganization.createFailed")),
           ),
         });
       }

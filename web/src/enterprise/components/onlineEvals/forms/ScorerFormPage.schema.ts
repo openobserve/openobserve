@@ -1,13 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// Validation schema for ScorerFormPage.vue (online-evals scorer create/edit
-// page, llm_judge + remote variants).
-//
-// Validation timing is owned by OForm (submit-then-change); this file only
-// describes WHAT is valid. The @submit payload carries RAW values, so the
-// component trims/coerces at save.
+// Describes only what is valid; OForm owns timing and the component trims raw values at save.
 
 import { z } from "zod";
+import { scoreFunctionParams } from "../utils/codeScorerStarters";
 
 // Required free-text field: non-blank after trimming, without transforming the
 // stored value (keeps typing intact; the component trims at save).
@@ -37,7 +32,7 @@ export const makeScorerFormSchema = (t: (_key: string) => string) =>
       // ── Identity ────────────────────────────────────────────────────────
       name: requiredText(t("onlineEvals.scorer.validation.nameRequired")),
       // Discriminator — seeded once, drives the conditional requireds below.
-      scorerType: z.enum(["llm_judge", "remote"]).default("llm_judge"),
+      scorerType: z.enum(["llm_judge", "remote", "code"]).default("llm_judge"),
       description: z.string().optional().default(""),
       // Optional — a scorer with no score config is a valid server-side entity
       // (`produces_score_config_id: Option<String>` with #[serde(default)]). The
@@ -53,6 +48,21 @@ export const makeScorerFormSchema = (t: (_key: string) => string) =>
       // ── LLM judge ───────────────────────────────────────────────────────
       providerId: z.string().optional().default(""),
       model: z.string().optional().default(""),
+      // Blank = not sent (the judge runs at temperature 0). A number <input>
+      // emits strings, so validate the text and convert at save.
+      temperature: z
+        .union([z.string(), z.number()])
+        .optional()
+        .default("")
+        .refine(
+          (val) => {
+            const text = String(val ?? "").trim();
+            if (!text) return true;
+            const num = Number(text);
+            return Number.isFinite(num) && num >= 0 && num <= 2;
+          },
+          { message: t("onlineEvals.scorer.validation.temperatureInvalid") },
+        ),
       // Intentionally NOT required: legacy scorers may exist with an empty
       // template, and requiring it here would block re-saving those on edit
       // (create seeds a default template; edit preserves whatever was stored).
@@ -90,6 +100,15 @@ export const makeScorerFormSchema = (t: (_key: string) => string) =>
             code: z.ZodIssueCode.custom,
             path: ["providerId"],
             message: t("onlineEvals.scorer.validation.providerRequired"),
+          });
+        }
+      } else if (val.scorerType === "code") {
+        // The backend refuses a function whose parameters it cannot read.
+        if (scoreFunctionParams(val.template) === null) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["template"],
+            message: t("codeScorer.signatureRequired"),
           });
         }
       } else if (val.scorerType === "remote") {

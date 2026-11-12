@@ -22,6 +22,7 @@
           ref="dateTimePickerRef"
           v-model="selectedDate"
           :auto-apply-dashboard="true"
+          calendar-presets
           class="flex-none"
           data-test="eval-job-detail-window"
         />
@@ -229,10 +230,21 @@
                         item.scorerType === 'llm_judge',
                       'bg-badge-orange-soft-bg text-badge-orange-soft-text':
                         item.scorerType === 'remote',
+                      'bg-badge-purple-soft-bg text-badge-purple-soft-text':
+                        item.scorerType === 'code',
                       'text-text-secondary bg-text-secondary/14': item.scorerType === 'unknown',
                     }"
                   >
-                    <OIcon :name="item.scorerType === 'remote' ? 'cloud' : 'smart-toy'" size="sm" />
+                    <OIcon
+                      :name="
+                        item.scorerType === 'remote'
+                          ? 'cloud'
+                          : item.scorerType === 'code'
+                            ? 'code'
+                            : 'smart-toy'
+                      "
+                      size="sm"
+                    />
                   </span>
                   <div class="flex min-w-0 flex-1 flex-col gap-1.25">
                     <div class="flex flex-wrap items-center gap-2">
@@ -316,6 +328,20 @@
               >
                 {{ samplingValue }}
               </dd>
+
+              <dt class="text-text-secondary text-xs font-semibold">
+                {{ t("evalSpend.budget.label") }}
+              </dt>
+              <dd
+                class="text-compact text-text-body m-0 wrap-break-word"
+                data-test="eval-job-detail-budget"
+              >
+                {{
+                  row.budget
+                    ? `${formatUsd(row.budget.dailyUsd)} · ${t(`evalSpend.budget.actions.${row.budget.onReach}.label`)}`
+                    : "—"
+                }}
+              </dd>
             </dl>
           </section>
 
@@ -366,6 +392,7 @@
             :columns="runColumns"
             row-key="id"
             :loading="isLoadingRuns"
+            :loading-reset-key="jobIdRef"
             :show-global-filter="false"
             :show-footer="false"
             :page-size="20"
@@ -374,10 +401,22 @@
             show-index
             width="100%"
             class="w-full"
-            @row-click="openEvaluationRun"
+            v-on="rowClickListeners"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="text-text-secondary">{{ relativeTime(row.timestampMs) }}</span>
+              <span class="inline-flex items-center">
+                <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
+                  <span class="me-1.5 inline-flex">
+                    <OIcon
+                      name="lock"
+                      class="text-icon-locked"
+                      size="sm"
+                      data-test="eval-job-detail-run-lock"
+                    />
+                  </span>
+                </OTooltip>
+                <span class="text-text-secondary">{{ relativeTime(row.timestampMs, t) }}</span>
+              </span>
             </template>
             <template #cell-scorerId="{ row }">
               <span>{{ scorerNameFor(row.scorerId) }}</span>
@@ -402,6 +441,15 @@
           </OTable>
         </template>
 
+        <JobWorkloadTab
+          v-else-if="activeTab === 'workload'"
+          :row="row"
+          :date-window="dateWindow"
+          :org-id="orgId"
+          :refresh-token="refreshToken"
+          @view-failures="activeTab = 'failures'"
+        />
+
         <!-- Failures -->
         <template v-else-if="activeTab === 'failures'">
           <!-- Single failures table — filterable by agent. -->
@@ -414,6 +462,7 @@
             :columns="runColumns"
             row-key="id"
             :loading="isLoadingRuns"
+            :loading-reset-key="jobIdRef"
             :show-global-filter="false"
             :show-footer="false"
             :page-size="20"
@@ -422,10 +471,22 @@
             show-index
             width="100%"
             class="w-full"
-            @row-click="openEvaluationRun"
+            v-on="rowClickListeners"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="text-text-secondary">{{ relativeTime(row.timestampMs) }}</span>
+              <span class="inline-flex items-center">
+                <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
+                  <span class="me-1.5 inline-flex">
+                    <OIcon
+                      name="lock"
+                      class="text-icon-locked"
+                      size="sm"
+                      data-test="eval-job-detail-run-lock"
+                    />
+                  </span>
+                </OTooltip>
+                <span class="text-text-secondary">{{ relativeTime(row.timestampMs, t) }}</span>
+              </span>
             </template>
             <template #cell-scorerId="{ row }">
               <span>{{ scorerNameFor(row.scorerId) }}</span>
@@ -471,9 +532,11 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
+import JobWorkloadTab from "./job/JobWorkloadTab.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
 import { queryClient } from "@/composables/query/queryClient";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import type {
   EvalJob,
   EvalTargetScope,
@@ -481,6 +544,8 @@ import type {
   ScoreConfig,
 } from "@/services/online-evals.service";
 import { entityId, targetScopeOf } from "../utils/evalEntity";
+import { relativeTime } from "../utils/evalFormat";
+import { formatUsd } from "../utils/evalSpend";
 import { normalizeJobFilterCondition } from "../utils/jobFilter";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import { useEvalJobRuns, type JobRunRow, type JobRunsWindow } from "../composables/useEvalJobRuns";
@@ -515,10 +580,15 @@ function handleOpenChange(value: boolean) {
 
 const { t } = useI18nTyped();
 const router = useRouter();
+const tracesLock = useLicenseLock("traces");
+// Without a row-click listener OTable drops the pointer cursor, so locked rows stop looking clickable.
+const rowClickListeners = computed(() =>
+  tracesLock.locked.value ? {} : { rowClick: openEvaluationRun },
+);
 const store = useStore();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "default");
 
-type TabId = "configuration" | "runs" | "failures";
+type TabId = "configuration" | "runs" | "failures" | "workload";
 const activeTab = ref<TabId>("configuration");
 
 function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined {
@@ -592,7 +662,7 @@ interface ResolvedScorer {
   scoreConfigName: string;
   scoreConfigDataType: string;
   scoreConfigRangeText: string;
-  scorerType: "llm_judge" | "remote" | "unknown";
+  scorerType: "llm_judge" | "remote" | "code" | "unknown";
   scorerTypeLabel: string;
 }
 
@@ -647,7 +717,8 @@ const resolvedScorers = computed<ResolvedScorer[]>(() => {
     const cfg = cfgId ? (props.scoreConfigs.find((c) => entityId(c) === cfgId) ?? null) : null;
     const cfgMeta = describeScoreConfig(cfg);
     const rawType = valueOf<string>(found, "scorerType", "scorer_type") ?? "llm_judge";
-    const scorerType: ResolvedScorer["scorerType"] = rawType === "remote" ? "remote" : "llm_judge";
+    const scorerType: ResolvedScorer["scorerType"] =
+      rawType === "remote" || rawType === "code" ? rawType : "llm_judge";
     return {
       // Use the resolved scorer's stable entity_id so downstream lookups
       // (findScorerById, onScorerClick) consistently match against
@@ -663,7 +734,9 @@ const resolvedScorers = computed<ResolvedScorer[]>(() => {
       scorerTypeLabel:
         scorerType === "remote"
           ? t("onlineEvals.job.detail.scorerTypeRemote")
-          : t("onlineEvals.job.detail.scorerTypeLlmJudge"),
+          : scorerType === "code"
+            ? t("codeScorer.typeTitle")
+            : t("onlineEvals.job.detail.scorerTypeLlmJudge"),
     };
   });
 });
@@ -715,6 +788,7 @@ const tabs = computed(() => [
   },
   { id: "runs" as TabId, label: t("onlineEvals.job.detail.tabs.runs") },
   { id: "failures" as TabId, label: t("onlineEvals.job.detail.tabs.failures") },
+  { id: "workload" as TabId, label: t("evalWorkload.tab") },
 ]);
 
 // — Runs / Failures window — backed by DateTimePickerDashboard.
@@ -812,7 +886,7 @@ const {
 } = useEvalJobRuns(jobIdRef, dateWindow, tableEnabled, selectedAgent);
 
 function openEvaluationRun(run: JobRunRow) {
-  if (!run.evaluatorTraceId) return;
+  if (!run.evaluatorTraceId || tracesLock.locked.value) return;
   const timestampUs = run.timestampMs > 0 ? run.timestampMs * 1000 : 0;
   router
     .push({
@@ -829,10 +903,11 @@ function openEvaluationRun(run: JobRunRow) {
     .catch(() => {});
 }
 
-// Global refresh — re-syncs the shared window then re-queries everything
-// (KPI strip + Runs + Failures), since one picker drives the whole view.
+const refreshToken = ref(0);
+
 async function refreshAll() {
   syncDateWindow();
+  refreshToken.value++;
   // The window watcher's own read is not forced, and does not run at all when the window is unchanged.
   void loadAgents(true);
   await refreshRunsData();
@@ -961,18 +1036,5 @@ function splitLatency(ms: number | null): { value: string; unit: string } {
   if (ms == null) return { value: "—", unit: "" };
   if (ms >= 1000) return { value: (ms / 1000).toFixed(1), unit: "s" };
   return { value: String(Math.round(ms)), unit: "ms" };
-}
-
-function relativeTime(timestampMs: number): string {
-  const diff = Date.now() - timestampMs;
-  if (diff < 0 || !Number.isFinite(diff)) return "—";
-  const sec = Math.floor(diff / 1000);
-  if (sec < 60) return t("refreshButton.secondsAgo", { sec });
-  const min = Math.floor(sec / 60);
-  if (min < 60) return t("refreshButton.minutesAgo", { min });
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return t("refreshButton.hoursAgo", { h: hr });
-  const day = Math.floor(hr / 24);
-  return t("onlineEvals.quality.overview.relativeTime.daysAgo", { day });
 }
 </script>

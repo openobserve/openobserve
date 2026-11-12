@@ -98,7 +98,7 @@
           "queryType": "promql",
           "queries": [
             {
-              "query": "100 * (1 - avg(irate(system_cpu_time{state=\"idle\",host_name=~\"$host_name\"}[5m])))",
+              "query": "100 * (1 - sum(irate(system_cpu_time{state=\"idle\",host_name=~\"$host_name\"}[5m])) / sum(irate(system_cpu_time{host_name=~\"$host_name\"}[5m])))",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -379,7 +379,7 @@
           "queryType": "promql",
           "queries": [
             {
-              "query": "topk(10, 100 * (1 - avg by (host_name)(irate(system_cpu_time{state=\"idle\",host_name=~\"$host_name\"}[5m]))))",
+              "query": "topk(10, 100 * (1 - sum by (host_name)(irate(system_cpu_time{state=\"idle\",host_name=~\"$host_name\"}[5m])) / sum by (host_name)(irate(system_cpu_time{host_name=~\"$host_name\"}[5m]))))",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -629,7 +629,7 @@
           "queryType": "promql",
           "queries": [
             {
-              "query": "100 * (1 - avg by (host_name)(irate(system_cpu_time{state=\"idle\",host_name=~\"$host_name\"}[5m])))",
+              "query": "100 * (1 - sum by (host_name)(irate(system_cpu_time{state=\"idle\",host_name=~\"$host_name\"}[5m])) / sum by (host_name)(irate(system_cpu_time{host_name=~\"$host_name\"}[5m])))",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -690,7 +690,7 @@
           "queryType": "promql",
           "queries": [
             {
-              "query": "avg by (state)(irate(system_cpu_time{host_name=~\"$host_name\",state!=\"idle\"}[5m]))",
+              "query": "sum by (state)(irate(system_cpu_time{host_name=~\"$host_name\",state!=\"idle\"}[5m])) / ignoring(state) group_left sum(irate(system_cpu_time{host_name=~\"$host_name\"}[5m]))",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {

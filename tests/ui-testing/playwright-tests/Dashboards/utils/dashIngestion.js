@@ -3,6 +3,7 @@ import logsdata from "../../../../test-data/logs_data.json";
 import geoMapdata from "../../../../test-data/geo_map.json";
 import dashboardChartJsonData from "../../../../test-data/dashboard_chart_json.json";
 import sankeyData from "../../../../test-data/sankey_data.json";
+import { ingestBase } from '../../utils/ingest-url.js';
 // Fixed testLogger path - updated to use correct relative path
 const testLogger = require('../../utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier, refreshCloudConfig } = require('../../utils/cloud-auth.js');
@@ -24,6 +25,61 @@ const getAuthToken = async () => {
   return `Basic ${basicAuthCredentials}`;
 };
 
+// Shared by ingestion() and ingestionHighCardinality() so their retry, passcode-refresh and backoff rules cannot drift apart.
+const postWithRetry = async (page, streamName, records, label) => {
+  // Resolve headers/org per attempt so a refreshed passcode is picked up on retry.
+  const post = () =>
+    fetch(
+      `${ingestBase(process.env.INGESTION_URL)}/api/${getOrgIdentifier()}/${streamName}/_json`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(records),
+      }
+    );
+
+  const MAX_ATTEMPTS = 3;
+  let fetchResponse;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      fetchResponse = await post();
+    } catch (networkError) {
+      // A connect timeout / socket reset rejects before any status exists, so the
+      // status-based retries below never see it and beforeEach dies on a blip.
+      if (attempt === MAX_ATTEMPTS) throw networkError;
+      testLogger.warn(
+        `${label} request failed (${networkError.message}) — retrying (attempt ${attempt}/${MAX_ATTEMPTS})`
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+      continue;
+    }
+
+    // The per-org cloud passcode can be rotated mid-session (another shard, or expiry).
+    // The 401 leaves no data ingested and surfaces far away as "No dropdown options
+    // appeared for stream", so refresh it from the page's live session and retry.
+    if ((fetchResponse.status === 401 || fetchResponse.status === 403) && page) {
+      testLogger.warn(
+        `${label} returned ${fetchResponse.status} — refreshing cloud passcode and retrying`
+      );
+      if (await refreshCloudConfig(page)) continue;
+    }
+
+    // Transient upstream failure (e.g. "502 Proxy request failed") — payload and
+    // credentials are fine, so back off briefly and retry rather than fail beforeEach.
+    if (fetchResponse.status >= 500 && attempt < MAX_ATTEMPTS) {
+      testLogger.warn(
+        `${label} returned ${fetchResponse.status} — retrying (attempt ${attempt}/${MAX_ATTEMPTS})`
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+      continue;
+    }
+
+    break;
+  }
+  return fetchResponse;
+};
+
 // `page` is used to recover a rotated cloud passcode via its live session (see below)
 export const ingestion = async (page, streamName = "e2e_automate") => {
   if (!process.env["INGESTION_URL"]) {
@@ -38,58 +94,8 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
     return { skipped: true };
   }
 
-  // Resolve headers/org per attempt so a refreshed passcode is picked up on retry.
-  const post = () =>
-    fetch(
-      `${process.env.INGESTION_URL}/api/${getOrgIdentifier()}/${streamName}/_json`,
-      {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(logsdata),
-      }
-    );
-
-  const MAX_ATTEMPTS = 3;
-
   try {
-    let fetchResponse;
-
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      try {
-        fetchResponse = await post();
-      } catch (networkError) {
-        // A connect timeout / socket reset rejects before any status exists, so the
-        // status-based retries below never see it and beforeEach dies on a blip.
-        if (attempt === MAX_ATTEMPTS) throw networkError;
-        testLogger.warn(
-          `Ingestion request failed (${networkError.message}) — retrying (attempt ${attempt}/${MAX_ATTEMPTS})`
-        );
-        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
-        continue;
-      }
-
-      // The per-org cloud passcode can be rotated mid-session (another shard, or expiry).
-      // The 401 leaves no data ingested and surfaces far away as "No dropdown options
-      // appeared for stream", so refresh it from the page's live session and retry.
-      if ((fetchResponse.status === 401 || fetchResponse.status === 403) && page) {
-        testLogger.warn(
-          `Ingestion returned ${fetchResponse.status} — refreshing cloud passcode and retrying`
-        );
-        if (await refreshCloudConfig(page)) continue;
-      }
-
-      // Transient upstream failure (e.g. "502 Proxy request failed") — payload and
-      // credentials are fine, so back off briefly and retry rather than fail beforeEach.
-      if (fetchResponse.status >= 500 && attempt < MAX_ATTEMPTS) {
-        testLogger.warn(
-          `Ingestion returned ${fetchResponse.status} — retrying (attempt ${attempt}/${MAX_ATTEMPTS})`
-        );
-        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
-        continue;
-      }
-
-      break;
-    }
+    const fetchResponse = await postWithRetry(page, streamName, logsdata, "Ingestion");
 
     if (!fetchResponse.ok) {
       const body = await fetchResponse.text().catch(() => "");
@@ -106,6 +112,43 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
   }
 };
 
+// No fixture has >100 distinct values, so this writes `count` distinct breakdown values to trip the 100-series cap.
+export const ingestionHighCardinality = async (
+  page,
+  streamName,
+  { breakdownField = "breakdown", measureField = "metric_value", count = 150 } = {},
+) => {
+  if (!process.env["INGESTION_URL"]) {
+    throw new Error("Required environment variables are not set");
+  }
+
+  const nowUs = Date.now() * 1000;
+  const records = [];
+  for (let i = 0; i < count; i++) {
+    records.push({
+      [breakdownField]: `series-${i}`,
+      [measureField]: i + 1,
+      _timestamp: nowUs,
+    });
+  }
+
+  const fetchResponse = await postWithRetry(page, streamName, records, "High-cardinality ingestion");
+
+  if (!fetchResponse.ok) {
+    const body = await fetchResponse.text().catch(() => "");
+    throw new Error(
+      `HTTP error! status: ${fetchResponse.status}, response: ${body.slice(0, 200)}`
+    );
+  }
+
+  testLogger.info("High-cardinality stream ingested", {
+    streamName,
+    count,
+    breakdownField,
+  });
+  return await fetchResponse.json();
+};
+
 // Dashboard maps ingestion
 
 // Ingestion function for Geomap and Maps chart
@@ -120,7 +163,7 @@ const ingestionForMaps = async (page, streamName = "geojson") => {
     const headers = getAuthHeaders();
 
     const fetchResponse = await fetch(
-      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+      `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
         headers,
@@ -153,7 +196,7 @@ const ingestionForDashboardChartJson = async (page, streamName = "kubernetes") =
     const headers = getAuthHeaders();
 
     const fetchResponse = await fetch(
-      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+      `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
         headers,
@@ -186,7 +229,7 @@ const ingestionForSankey = async (streamName = "sankey_data") => {
     const headers = getAuthHeaders();
 
     const fetchResponse = await fetch(
-      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+      `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
         headers,

@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { watch } from "vue";
 import {
   CREDENTIAL_PARAMS,
   MAX_FILTER_VALUES,
+  MAX_STEP_PROP_CONDS,
   MAX_VIEW_CONDS,
   parseFunnelFilter,
   parseStepRef,
@@ -24,13 +26,16 @@ import {
   type SessionField,
 } from "@/utils/rum/productAnalyticsModel";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
-import type {
-  FunnelDef,
-  FunnelFilter,
-  StepFilters,
-  StepRef,
-  ViewCond,
+import {
+  isSessionFilter,
+  type FunnelDef,
+  type FunnelFilter,
+  type StepFilters,
+  type StepRef,
+  type ViewCond,
 } from "@/utils/rum/productAnalyticsQueries";
+
+const VALUES_WAIT_MS = 30000;
 
 export interface FilterValueRow {
   value: string;
@@ -76,12 +81,49 @@ export const FILTER_CONDITIONS: readonly FilterCondition[] = [
   { id: "notRegex", op: "regex", not: true },
 ];
 
+/** A row a field picker lists under a fixed band; a `reason` shows it disabled. */
+export interface PickerField {
+  id: string;
+  name: string;
+  hint?: I18nText;
+  reason?: I18nText;
+}
+
+/** A band of a field picker with its own label, in place of the Logs grouping. */
+export interface PickerGroup {
+  id: string;
+  label: I18nText;
+  fields: PickerField[];
+}
+
+/** A step's Property row as edited; it applies once it has a field and a value. */
+export interface PropDraft {
+  field: string;
+  cond: FilterConditionId;
+  values: string[];
+}
+
+/** An attribute filter that fewer than half of step 1's sessions ever carry, with the counts that show it. */
+export interface FilterNotice {
+  field: string;
+  kept: number;
+  opened: number;
+  carry: number;
+}
+
 /** One "Only when" row as typed; `values` is the comma-separated text. */
 export interface ViewCondDraft {
   t: ViewCond["t"];
   key: string;
   values: string;
 }
+
+/** The conditions a step's Property row offers: is, is not, contains, matches. */
+export const PROP_CONDITIONS: readonly FilterCondition[] = FILTER_CONDITIONS.filter((c) =>
+  ["in", "notIn", "contains", "regex"].includes(c.id),
+);
+
+const NOTICE_SHARE = 0.5;
 
 const splitValues = (text: string): string[] => [
   ...new Set(
@@ -157,4 +199,84 @@ export function withConds(step: StepRef, conds: ViewCond[]): StepRef {
   return Object.keys(f).length
     ? { kind: step.kind, key: step.key, f }
     : { kind: step.kind, key: step.key };
+}
+
+const valuesOf = (state: FilterValuesState, search: string): string[] => {
+  const needle = search.trim().toLowerCase();
+  const rows = state.status === "ok" ? state.rows.map((row) => row.value) : [];
+  return needle ? rows.filter((v) => v.toLowerCase().includes(needle)) : rows;
+};
+
+/** A filter builder value loader over an owner-run values query whose rows arrive through `state`. */
+export function valuesLoader(
+  state: () => FilterValuesState,
+  request: (field: string) => void,
+): (field: string, search: string) => Promise<string[]> {
+  return (field, search) => {
+    const now = state();
+    const done = now.field === field && (now.status === "ok" || now.status === "error");
+    if (done) {
+      request(field);
+      return Promise.resolve(valuesOf(now, search));
+    }
+    // The rows come a render later; idle for this field means the owner had nothing to run.
+    return new Promise((resolve) => {
+      const finish = (rows: string[]) => {
+        stop();
+        clearTimeout(timer);
+        resolve(rows);
+      };
+      const timer = setTimeout(() => finish([]), VALUES_WAIT_MS);
+      // Watched before the request, which may settle the state synchronously.
+      const stop = watch(state, (next) => {
+        if (next.field === field && next.status !== "loading") finish(valuesOf(next, search));
+      });
+      request(field);
+    });
+  };
+}
+
+export function propDraftOf(r: FunnelFilter): PropDraft {
+  return { field: r.field, cond: conditionOf(r).id, values: [...r.values] };
+}
+
+/** A Property row as the server would accept it, or null while it is incomplete or invalid. */
+export function propOf(d: PropDraft): FunnelFilter | null {
+  if (!d.field || !d.values.length) return null;
+  // A rule from a link may use any Filter all steps condition, and it must come back unchanged.
+  const c = FILTER_CONDITIONS.find((x) => x.id === d.cond) ?? PROP_CONDITIONS[0];
+  const r = parseFunnelFilter({
+    field: d.field,
+    op: c.op,
+    values: [...new Set(d.values)],
+    ...(c.not ? { not: true } : {}),
+  });
+  return r && isFilterColumn(r.field) ? r : null;
+}
+
+/** The step with `rules` as its property conditions, keeping its other filters. */
+export function withProps(step: StepRef, rules: FunnelFilter[]): StepRef {
+  const f: StepFilters = { ...step.f, pc: rules.slice(0, MAX_STEP_PROP_CONDS) };
+  if (!rules.length) delete f.pc;
+  return Object.keys(f).length
+    ? { kind: step.kind, key: step.key, f }
+    : { kind: step.kind, key: step.key };
+}
+
+/** The first attribute filter fewer than half of step 1's sessions ever carry, from a "Why N?" row. */
+export function filterNoticeOf(
+  def: FunnelDef,
+  row: Record<string, unknown> | null,
+): FilterNotice | null {
+  if (!row) return null;
+  const opened = Number(row.opened) || 0;
+  if (opened <= 0) return null;
+  const ids = (def.f ?? []).filter(isSessionFilter);
+  for (const [i, r] of ids.entries()) {
+    const carry = Number(row[`carry${i + 1}`]) || 0;
+    // A negated filter keeps the sessions that never set the field, so it drops nobody for lacking it.
+    if (!r.not && isFilterColumn(r.field) && carry / opened < NOTICE_SHARE)
+      return { field: r.field, kept: Number(row.kept) || 0, opened, carry };
+  }
+  return null;
 }

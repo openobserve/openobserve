@@ -60,6 +60,7 @@ pub(crate) static CONFIG_SWAP_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex:
 pub const BUILT_WITH_CLOUD: bool = cfg!(feature = "cloud");
 
 pub mod alerting;
+pub mod callback_endpoint;
 pub mod dispatcher;
 pub mod job_api;
 pub mod pool;
@@ -157,52 +158,200 @@ pub async fn init(step_pool: Option<pool::StepPoolHooks>) {
     // super-cluster KV client is built and no NATS read is issued on this path
     // (spec §14 — super cluster off must be byte-identical).
     #[cfg(not(feature = "enterprise"))]
-    spawn_workers();
+    drop(spawn_workers(StopToken::never()));
 
     #[cfg(feature = "enterprise")]
     if !o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
     {
-        spawn_workers();
+        drop(spawn_workers(StopToken::never()));
         return;
     }
 
     #[cfg(feature = "enterprise")]
-    tokio::spawn(async move {
-        let mut announced = false;
-        while !holds_job_cluster_claim().await {
-            if !announced {
-                // Once, not per poll: a region that legitimately does not hold
-                // the claim is the steady state for the whole life of the
-                // process, and an every-10s line would bury it.
-                tracing::info!(
-                    "[synthetics] another cluster holds the job-cluster claim (or none is \
-                     registered yet) — workers not started, re-checking every {}s",
-                    JOB_CLUSTER_POLL.as_secs()
-                );
-                announced = true;
-            }
-            tokio::time::sleep(JOB_CLUSTER_POLL).await;
-        }
-        tracing::info!("[synthetics] this cluster holds the job-cluster claim — starting workers");
-        spawn_workers();
-    });
+    tokio::spawn(ownership_supervisor());
 }
 
-fn spawn_workers() {
-    tokio::spawn(scheduler::run());
-    tokio::spawn(dispatcher::run());
-    tokio::spawn(reaper::run());
-    // POC scope: single cluster. Multi-region needs this split — the
-    // incident-engine half claim-gated, the snapshot half per region.
-    // Status pages ships with synthetics — no separate toggle.
-    tokio::spawn(status_pages::run());
-    tokio::spawn(status_pages::run_domain_verifier());
-    // Its own task, not a step on the reaper's tick: a pass is up to a thousand
-    // rows of outbound HTTP, and the reaper's lease bookkeeping cannot wait
-    // behind it. Its own kill switch too, checked per pass rather than here.
-    tokio::spawn(reaper::orphan::run());
+/// Cooperative stop signal handed to every claim-gated worker.
+///
+/// A minimal `CancellationToken` on `tokio::sync::watch` (the crate has no
+/// `tokio-util` dependency, and adding one is not worth a manifest change).
+/// A dropped sender reads as cancelled, so a supervisor that goes away fails
+/// closed rather than leaving workers running unsupervised.
+#[derive(Clone)]
+pub struct StopToken {
+    rx: tokio::sync::watch::Receiver<bool>,
+    // Only set by [`StopToken::never`]: keeps the channel open forever.
+    _keep: Option<std::sync::Arc<tokio::sync::watch::Sender<bool>>>,
+}
+
+impl StopToken {
+    /// A token plus the sender that cancels it.
+    pub fn new() -> (tokio::sync::watch::Sender<bool>, Self) {
+        let (tx, rx) = tokio::sync::watch::channel(false);
+        (tx, Self { rx, _keep: None })
+    }
+
+    /// A token that is never cancelled: the single-cluster path, where there
+    /// is no ownership to lose.
+    pub fn never() -> Self {
+        let (tx, rx) = tokio::sync::watch::channel(false);
+        Self {
+            rx,
+            _keep: Some(std::sync::Arc::new(tx)),
+        }
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        *self.rx.borrow() || (self._keep.is_none() && self.rx.has_changed().is_err())
+    }
+
+    pub async fn cancelled(&self) {
+        let mut rx = self.rx.clone();
+        // Err = sender dropped, which also means stop.
+        let _ = rx.wait_for(|v| *v).await;
+    }
+
+    /// Sleeps for `d`; returns `true` when cancelled first (the caller exits
+    /// its loop at this tick boundary, never mid-pass).
+    pub async fn sleep(&self, d: std::time::Duration) -> bool {
+        tokio::select! {
+            _ = self.cancelled() => true,
+            _ = tokio::time::sleep(d) => self.is_cancelled(),
+        }
+    }
+}
+
+/// Result of one read of the job-cluster claim. A failed read is `Unknown`,
+/// never "held": the supervisor fails closed.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClaimRead {
+    Held,
+    NotHeld,
+    Unknown,
+}
+
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SupervisorAction {
+    Start,
+    Stop,
+    Hold,
+}
+
+/// The supervisor's whole decision: a pure function of whether a worker
+/// generation is running and what the claim read returned. Workers run exactly
+/// while the claim is provably held here; `NotHeld` and `Unknown` both stop a
+/// running generation (same fail-closed rule as the anomaly supervisor in
+/// `jobs::job::mod.rs`).
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn supervisor_action(running: bool, claim: ClaimRead) -> SupervisorAction {
+    match (running, claim) {
+        (false, ClaimRead::Held) => SupervisorAction::Start,
+        (true, ClaimRead::NotHeld | ClaimRead::Unknown) => SupervisorAction::Stop,
+        _ => SupervisorAction::Hold,
+    }
+}
+
+/// Start/Stop supervisor for the claim-gated workers (o2-enterprise#3190).
+///
+/// Replaces the old start-only latch, which spawned the workers once on
+/// gaining the claim and never stopped them when the claim moved away, so two
+/// regions could schedule, dispatch and reap the same checks. Each generation
+/// gets its own [`StopToken`]; Stop cancels it and JOINS every worker before
+/// the next Start can happen, so there are never two generations at once.
+#[cfg(feature = "enterprise")]
+async fn ownership_supervisor() {
+    let mut generation: u64 = 0;
+    let mut running: Option<(
+        tokio::sync::watch::Sender<bool>,
+        Vec<tokio::task::JoinHandle<()>>,
+    )> = None;
+    let mut last_claim: Option<ClaimRead> = None;
+    loop {
+        let claim = read_job_cluster_claim().await;
+        if last_claim != Some(claim) && claim == ClaimRead::NotHeld && running.is_none() {
+            tracing::info!(
+                "[synthetics] another cluster holds the job-cluster claim (or none is registered \
+                 yet) — workers not running here, re-checking every {}s",
+                JOB_CLUSTER_POLL.as_secs()
+            );
+        }
+        last_claim = Some(claim);
+        match supervisor_action(running.is_some(), claim) {
+            SupervisorAction::Start => {
+                generation += 1;
+                tracing::info!(
+                    generation,
+                    "[synthetics] ownership acquired — starting workers"
+                );
+                let (tx, token) = StopToken::new();
+                running = Some((tx, spawn_workers(token)));
+            }
+            SupervisorAction::Stop => {
+                if claim == ClaimRead::Unknown {
+                    tracing::warn!(
+                        generation,
+                        "[synthetics] ownership unknown (claim read failed) — stopping workers"
+                    );
+                } else {
+                    tracing::info!(generation, "[synthetics] ownership lost — stopping workers");
+                }
+                if let Some((tx, handles)) = running.take() {
+                    let _ = tx.send(true);
+                    for h in handles {
+                        if let Err(e) = h.await {
+                            tracing::error!(generation, "[synthetics] worker join failed: {e}");
+                        }
+                    }
+                }
+                tracing::info!(generation, "[synthetics] workers stopped");
+            }
+            SupervisorAction::Hold => {}
+        }
+        tokio::time::sleep(JOB_CLUSTER_POLL).await;
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn read_job_cluster_claim() -> ClaimRead {
+    match holds_job_cluster_claim().await {
+        Some(true) => ClaimRead::Held,
+        Some(false) => ClaimRead::NotHeld,
+        None => ClaimRead::Unknown,
+    }
+}
+
+/// Spawns one generation of workers. Every worker takes `stop` and leaves its
+/// loop at the next tick boundary once it is cancelled.
+///
+/// All of them are claim-gated, as they were under the old latch: the status
+/// page task is still one loop (incident engine and snapshot together — the
+/// per-region snapshot split is future work), and the domain verifier writes
+/// shared verification state, so both stay owner-only.
+fn spawn_workers(stop: StopToken) -> Vec<tokio::task::JoinHandle<()>> {
+    let verifier_stop = stop.clone();
+    vec![
+        tokio::spawn(scheduler::run(stop.clone())),
+        tokio::spawn(dispatcher::run(stop.clone())),
+        tokio::spawn(reaper::run(stop.clone())),
+        // Status pages ships with synthetics — no separate toggle.
+        tokio::spawn(status_pages::run(stop.clone())),
+        // The verifier lives in the enterprise crate and takes no token, so it
+        // is dropped at its next await point on cancel.
+        tokio::spawn(async move {
+            tokio::select! {
+                _ = verifier_stop.cancelled() => {}
+                _ = status_pages::run_domain_verifier() => {}
+            }
+        }),
+        // Its own task, not a step on the reaper's tick: a pass is up to a
+        // thousand rows of outbound HTTP, and the reaper's lease bookkeeping
+        // cannot wait behind it. Its own kill switch too, checked per pass.
+        tokio::spawn(reaper::orphan::run(stop)),
+    ]
 }
 
 /// One evaluation of [`should_start`] against the super-cluster KV.
@@ -217,7 +366,7 @@ fn spawn_workers() {
 /// increments `SYNTHETICS_ORPHAN_SCANS_TOTAL` anywhere, which is exactly the
 /// dead-region signal `reaper::orphan` documents.
 #[cfg(feature = "enterprise")]
-async fn holds_job_cluster_claim() -> bool {
+async fn holds_job_cluster_claim() -> Option<bool> {
     use o2_enterprise::enterprise::super_cluster::kv;
 
     let local = config::get_cluster_name();
@@ -225,27 +374,27 @@ async fn holds_job_cluster_claim() -> bool {
         Ok(name) => name,
         Err(e) => {
             tracing::error!("[synthetics] could not read the job cluster, not starting yet: {e}");
-            return false;
+            return None;
         }
     };
 
     // Both settled without the cluster list, which is the more expensive read.
     // Must agree with `should_start`, which is where the rule is tested.
     if claim.is_empty() {
-        return false;
+        return Some(false);
     }
     if claim == local {
-        return true;
+        return Some(true);
     }
 
     let live = match kv::cluster::list_by_role_group(None).await {
         Ok(clusters) => clusters.into_iter().map(|c| c.name).collect::<Vec<_>>(),
         Err(e) => {
             tracing::error!("[synthetics] could not list clusters, not starting yet: {e}");
-            return false;
+            return None;
         }
     };
-    should_start(true, &claim, &local, &live)
+    Some(should_start(true, &claim, &local, &live))
 }
 
 /// Whether this cluster may start the synthetics workers.
@@ -344,4 +493,73 @@ mod job_cluster_gate_tests {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use config::meta::self_reporting::usage::is_system_stream;
+
+    use super::{
+        ClaimRead::*, RESULTS_STREAM, STEP_RESULTS_STREAM, StopToken, SupervisorAction::*,
+        supervisor_action,
+    };
+
+    #[test]
+    fn starts_only_on_a_held_claim() {
+        assert_eq!(supervisor_action(false, Held), Start);
+        assert_eq!(supervisor_action(false, NotHeld), Hold);
+        assert_eq!(supervisor_action(false, Unknown), Hold);
+    }
+
+    #[test]
+    fn a_running_generation_stops_on_loss_or_read_error() {
+        assert_eq!(supervisor_action(true, NotHeld), Stop);
+        assert_eq!(supervisor_action(true, Unknown), Stop);
+        assert_eq!(supervisor_action(true, Held), Hold);
+    }
+
+    /// Flapping claim: replay the reads through the decision function and
+    /// check the generation never overlaps and every flip is acted on.
+    #[test]
+    fn flapping_claim_alternates_start_and_stop_without_overlap() {
+        let reads = [Held, Held, NotHeld, Held, Unknown, Unknown, Held, NotHeld];
+        let mut running = false;
+        let mut starts = 0;
+        let mut stops = 0;
+        for r in reads {
+            match supervisor_action(running, r) {
+                Start => {
+                    assert!(!running, "never two generations");
+                    running = true;
+                    starts += 1;
+                }
+                Stop => {
+                    assert!(running);
+                    running = false;
+                    stops += 1;
+                }
+                Hold => {}
+            }
+        }
+        assert_eq!((starts, stops), (3, 3));
+        assert!(!running);
+    }
+
+    #[tokio::test]
+    async fn stop_token_cancels_sleep_and_dropped_sender_fails_closed() {
+        let (tx, token) = StopToken::new();
+        assert!(!token.is_cancelled());
+        tx.send(true).unwrap();
+        assert!(token.sleep(std::time::Duration::from_secs(60)).await);
+
+        let (tx, token) = StopToken::new();
+        drop(tx);
+        assert!(token.sleep(std::time::Duration::from_secs(60)).await);
+
+        let never = StopToken::never();
+        assert!(!never.sleep(std::time::Duration::from_millis(1)).await);
+    }
+
+    #[test]
+    fn test_result_streams_are_system_streams() {
+        assert!(is_system_stream("acme", RESULTS_STREAM));
+        assert!(is_system_stream("acme", STEP_RESULTS_STREAM));
+    }
+}

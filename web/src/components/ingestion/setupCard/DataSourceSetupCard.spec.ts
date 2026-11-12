@@ -20,8 +20,19 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
 import { ref } from "vue";
-import DataSourceSetupCard from "./DataSourceSetupCard.vue";
+import { SETUP_CARD_ONBOARDING, type SetupCardPresets } from "./types";
 import i18n from "@/locales";
+import { b64EncodeStandard } from "@/utils/formatters";
+import DataSourceSetupCard from "./DataSourceSetupCard.vue";
+
+const credentialMock = vi.hoisted(() => ({ ready: true }));
+
+vi.mock("@/composables/useOrgCredential", async () => {
+  const { computed } = await import("vue");
+  return {
+    useOrgCredential: () => ({ ready: computed(() => credentialMock.ready) }),
+  };
+});
 
 const { importHostMetricsDashboard, importSetupDashboard, toastMock } = vi.hoisted(() => ({
   importHostMetricsDashboard: vi.fn(),
@@ -57,8 +68,8 @@ vi.mock("@/composables/useIngestion", () => ({
 // The renderer is presentational — stub it and drive its emits directly.
 const rendererStub = {
   name: "SetupCardRenderer",
-  props: ["content", "subs"],
-  emits: ["detected", "step-action"],
+  props: ["content", "subs", "tokenState"],
+  emits: ["detected", "step-action", "state", "received"],
   template: '<div data-test="renderer-stub" />',
 };
 
@@ -70,12 +81,13 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
   let store: any;
   let router: any;
 
-  const mountCard = (slug: string) => {
+  const mountCard = (slug: string, passcode = "pc", features: Record<string, string> = {}) => {
     store = createStore({
       state: {
+        zoConfig: { features },
         selectedOrganization: { identifier: "test-org" },
         userInfo: { email: "t@e.com" },
-        organizationData: { organizationPasscode: "pc" },
+        organizationData: { organizationPasscode: passcode },
         theme: "light",
       },
     });
@@ -101,6 +113,7 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    credentialMock.ready = true;
     importHostMetricsDashboard.mockResolvedValue({
       status: "created",
       dashboardId: "dash-1",
@@ -110,6 +123,75 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
+  });
+
+  const unavailableBanner = () =>
+    wrapper.find('[data-test="data-source-setup-card-passcode-unavailable"]');
+
+  it("holds token blocks while the credential loads, with no blank token", () => {
+    credentialMock.ready = false;
+    wrapper = mountCard("macos", "");
+    expect(renderer().props("subs").token).toBe("");
+    expect(renderer().props("tokenState")).toBe("loading");
+    expect(unavailableBanner().exists()).toBe(false);
+  });
+
+  it("encodes the org passcode once the credential has loaded", () => {
+    wrapper = mountCard("macos");
+    expect(renderer().props("subs").token).toBe(b64EncodeStandard("t@e.com:pc"));
+    expect(renderer().props("tokenState")).toBe("ready");
+    expect(unavailableBanner().exists()).toBe(false);
+  });
+
+  it("says so in the card when the settled read carries no passcode", () => {
+    wrapper = mountCard("kubernetes", "");
+    expect(renderer().props("tokenState")).toBe("unavailable");
+    expect(unavailableBanner().exists()).toBe(true);
+  });
+
+  describe("license locks", () => {
+    const stepAction = (id: string) =>
+      renderer()
+        .props("content")
+        .steps.find((s: any) => s.action?.id === id)?.action;
+
+    it("skips the auto-import and locks the dashboard action when dashboards are locked", async () => {
+      wrapper = mountCard("linux", "pc", { dashboards: "locked" });
+      renderer().vm.$emit("detected", 4);
+      renderer().vm.$emit("step-action", "view-host-dashboard");
+      await flushPromises();
+
+      expect(importHostMetricsDashboard).not.toHaveBeenCalled();
+      expect(toastMock).not.toHaveBeenCalled();
+      expect(stepAction("view-host-dashboard")).toMatchObject({ disabled: true, icon: "lock" });
+      expect(stepAction("view-host-dashboard").disabledReason).toBeTruthy();
+    });
+
+    it("skips the companion dashboard import when dashboards are locked", async () => {
+      wrapper = mountCard("nvidiaDcgm", "pc", { dashboards: "locked" });
+      renderer().vm.$emit("detected", 1);
+      renderer().vm.$emit("step-action", "open-setup-dashboard");
+      await flushPromises();
+
+      expect(importSetupDashboard).not.toHaveBeenCalled();
+      expect(stepAction("open-setup-dashboard")).toMatchObject({ disabled: true, icon: "lock" });
+    });
+
+    it("drops the View hosts toast action when host monitoring is locked", async () => {
+      wrapper = mountCard("linux", "pc", { host_monitoring: "locked" });
+      renderer().vm.$emit("detected", 4);
+      await flushPromises();
+
+      expect(importHostMetricsDashboard).toHaveBeenCalledTimes(1);
+      expect(toastMock.mock.calls[0][0].action).toBeUndefined();
+    });
+
+    it("leaves the dashboard action untouched when dashboards are enabled", () => {
+      wrapper = mountCard("linux", "pc", { dashboards: "enabled" });
+
+      expect(stepAction("view-host-dashboard").disabled).toBeFalsy();
+      expect(stepAction("view-host-dashboard").disabledReason).toBeUndefined();
+    });
   });
 
   it.each(["linux", "windows", "macos"])(
@@ -141,6 +223,18 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
       expect(wrapper.emitted("detected")).toEqual([[4]]);
     },
   );
+
+  it("forwards the renderer's state and received emits (onboarding pins them in a bar)", async () => {
+    wrapper = mountCard("linux");
+    const result = { streamName: "system_cpu_time", streamType: "metrics", count: 4 };
+    renderer().vm.$emit("state", "no-requests");
+    renderer().vm.$emit("received", result);
+    await flushPromises();
+    expect(wrapper.emitted("state")).toEqual([["no-requests"]]);
+    expect(wrapper.emitted("received")).toEqual([[result]]);
+    // `detected` stays count-only for the pages that bind it.
+    expect(wrapper.emitted("detected")).toBeUndefined();
+  });
 
   it("toasts hostDashboardImported with the View Hosts action on created", async () => {
     wrapper = mountCard("linux");
@@ -343,6 +437,7 @@ describe("DataSourceSetupCard — companion dashboard (NVIDIA GPU) wiring", () =
 
   beforeEach(() => {
     vi.clearAllMocks();
+    credentialMock.ready = true;
     importSetupDashboard.mockResolvedValue({
       status: "created",
       dashboardId: "gpu-1",
@@ -435,5 +530,49 @@ describe("DataSourceSetupCard — companion dashboard (NVIDIA GPU) wiring", () =
     renderer().vm.$emit("step-action", "open-setup-dashboard");
     await flushPromises();
     expect(importSetupDashboard).not.toHaveBeenCalled();
+  });
+});
+
+describe("DataSourceSetupCard — onboarding's tracing answer", () => {
+  const mountK8s = (presets?: SetupCardPresets) => {
+    const store = createStore({
+      state: {
+        selectedOrganization: { identifier: "test-org" },
+        userInfo: { email: "t@e.com" },
+        organizationData: { organizationPasscode: "pc" },
+        theme: "light",
+      },
+    });
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/", component: { template: "<div />" } }],
+    });
+    return mount(DataSourceSetupCard, {
+      props: { slug: "kubernetes" },
+      global: {
+        plugins: [store, router, i18n],
+        stubs: { SetupCardRenderer: rendererStub },
+        provide: presets ? { [SETUP_CARD_ONBOARDING as symbol]: ref(presets) } : {},
+      },
+    });
+  };
+  const instrument = (w: VueWrapper<any>) =>
+    w
+      .findComponent({ name: "SetupCardRenderer" })
+      .props("content")
+      .steps.find((s: { id: string }) => s.id === "instrument");
+
+  it("builds the tracing step from onboarding's answer", () => {
+    const step = instrument(mountK8s({ traces: "library", languages: ["java"] }));
+    expect(step.collapsed).toBeUndefined();
+    expect(step.inputs).toBeUndefined();
+    expect(step.code.raw).toContain("kubectl annotate namespace my-namespace");
+  });
+
+  it("folds the optional step only inside onboarding", () => {
+    expect(instrument(mountK8s({ languages: [] })).collapsed).toBe(true);
+    const step = instrument(mountK8s());
+    expect(step.collapsed).toBe(false);
+    expect(step.inputs).toBeUndefined();
   });
 });

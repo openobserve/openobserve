@@ -31,11 +31,26 @@ use aws_sdk_lambda::{Client as LambdaClient, primitives::Blob};
 use dashmap::DashMap;
 use infra::{
     db::get_orm_client_rw,
-    table::{synthetics_checks, synthetics_jobs, synthetics_runs},
+    table::{synthetics_jobs, synthetics_runs},
 };
 
 const TICK: Duration = Duration::from_secs(2);
-const LEASE_BATCH_SIZE: i64 = 10;
+
+/// Jobs per pool per lease call (`ZO_SYNTHETICS_LEASE_BATCH_SIZE`), read per tick.
+fn lease_batch_size() -> i64 {
+    config::get_config().synthetics.lease_batch_size.max(1)
+}
+
+/// Most jobs leased across all pools in one tick (`ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK`).
+fn max_inflight_per_tick() -> i64 {
+    config::get_config().synthetics.max_inflight_per_tick.max(1)
+}
+
+/// Size of the next lease call: a full batch, trimmed so the tick never leases
+/// past its cap. Zero means the tick is out of budget.
+fn next_batch_limit(batch: i64, leased_this_tick: i64, cap: i64) -> i64 {
+    batch.min(cap - leased_this_tick).max(0)
+}
 /// How long a leased job may run before the reaper requeues it
 /// (`reaper::requeue_expired`).
 ///
@@ -95,39 +110,88 @@ static INSTANCE_ID: LazyLock<String> = LazyLock::new(|| {
     )
 });
 
-pub async fn run() {
+static POOL_ROTATION: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+pub async fn run(stop: crate::StopToken) {
     let instance_id = INSTANCE_ID.as_str();
     tracing::info!(instance_id = %instance_id, "[synthetics dispatcher] started");
 
+    // o2-enterprise#3165: a Lambda probe can only report to a callback endpoint
+    // its own network reaches. Log-only; never blocks the dispatcher.
+    {
+        let cfg = config::get_config();
+        if !cfg.synthetics.lambda_browser.is_empty() || !cfg.synthetics.lambda_net.is_empty() {
+            crate::callback_endpoint::warn_if_lambda_callback_may_be_unreachable().await;
+        }
+    }
+
     loop {
-        tokio::time::sleep(TICK).await;
+        if stop.sleep(TICK).await {
+            tracing::info!("[synthetics dispatcher] stopped");
+            return;
+        }
 
         let db = get_orm_client_rw().await;
 
         let now_us = config::utils::time::now_micros();
 
-        for pool in dispatcher_pools().await {
-            let rows = match synthetics_jobs::lease_batch(
-                db,
-                &pool,
-                instance_id,
-                LEASE_BATCH_SIZE,
-                now_us,
-                lease_secs(),
-                None, // public pools are already type-segmented (net-* vs aws-browser)
-            )
-            .await
-            {
-                Ok(r) => r,
-                Err(e) => {
-                    tracing::error!(pool = %pool, "[synthetics dispatcher] lease_batch: {e}");
-                    continue;
+        // Round-robin across pools, one batch each per round. A pool whose batch
+        // came back full may have more due, so it stays in for another round;
+        // the per-tick cap bounds the total, and no pool gets a second batch
+        // before every other active pool has had its turn.
+        let batch = lease_batch_size();
+        let cap = max_inflight_per_tick();
+        let mut leased_this_tick: i64 = 0;
+        let mut active = dispatcher_pools().await;
+        // Rotate the starting pool every tick: with the cap reached, a fixed
+        // order would let the first pools take the whole budget every tick.
+        if !active.is_empty() {
+            let start =
+                POOL_ROTATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % active.len();
+            active.rotate_left(start);
+        }
+        while !active.is_empty() {
+            let mut still_active = Vec::with_capacity(active.len());
+            for pool in active {
+                // Ownership lost mid-tick: lease nothing more.
+                if stop.is_cancelled() {
+                    return;
                 }
-            };
+                let limit = next_batch_limit(batch, leased_this_tick, cap);
+                if limit == 0 {
+                    break;
+                }
+                let rows = match synthetics_jobs::lease_batch(
+                    db,
+                    &pool,
+                    instance_id,
+                    limit,
+                    now_us,
+                    lease_secs(),
+                    None, // public pools are already type-segmented (net-* vs aws-browser)
+                )
+                .await
+                {
+                    Ok(r) => r,
+                    Err(e) => {
+                        tracing::error!(pool = %pool, "[synthetics dispatcher] lease_batch: {e}");
+                        continue;
+                    }
+                };
 
-            for row in rows {
-                tokio::spawn(invoke_probe(row));
+                let full = rows.len() as i64 >= limit;
+                leased_this_tick += rows.len() as i64;
+                for row in rows {
+                    tokio::spawn(invoke_probe(row, stop.clone()));
+                }
+                if full {
+                    still_active.push(pool);
+                }
             }
+            if leased_this_tick >= cap {
+                break;
+            }
+            active = still_active;
         }
     }
 }
@@ -166,18 +230,6 @@ fn lambda_fn_for_pool(pool: &str) -> Option<String> {
     if name.is_empty() { None } else { Some(name) }
 }
 
-/// Marks the job as Error and increments the run counter. Called when Lambda dispatch fails.
-///
-/// Returns `false` when the failure was NOT recorded because the ack did not apply
-/// — the job has already been completed, or it is held by someone else now. The
-/// caller must then not report it either.
-///
-/// Honouring that is the whole point: `increment_jobs_done` used to run whether or
-/// not the ack applied, which is the exact double-count the ack's status guard
-/// exists to prevent — `jobs_done` overshoots `job_count`, the run is declared
-/// complete on a partial set of results, and the alert streak advances twice for
-/// one failure. The ownership guard adds a second way for an ack not to apply, so
-/// ignoring the result is no longer survivable.
 /// Reasons a dispatch was abandoned before the probe was ever invoked. These
 /// land in the job's `result` so the run says why, instead of a bare "error"
 /// whose only explanation is a WARN on whichever scheduler node leased the row.
@@ -257,6 +309,8 @@ async fn mint_default_token(org_id: &str) -> Option<String> {
     }
 }
 
+/// Records a failed dispatch as Error; `false` when the ack did not apply, so the caller must not
+/// report it.
 async fn mark_failure(row: &synthetics_jobs::LeasedRow, reason: Option<&str>) -> bool {
     let db = get_orm_client_rw().await;
     let now_us = config::utils::time::now_micros();
@@ -295,39 +349,11 @@ async fn mark_failure(row: &synthetics_jobs::LeasedRow, reason: Option<&str>) ->
         );
         return false;
     }
-    if let Err(e) = synthetics_runs::increment_jobs_done(db, &row.run_id, 4, now_us).await {
-        tracing::error!(synthetics_id = %row.synthetics_id, run_id = %row.run_id, job_id = %row.id, "[synthetics dispatcher] increment_jobs_done: {e}");
-    }
-    // The bool is whether the status actually changed. Publishing on that — not
-    // on the write — is what keeps this off the per-run traffic budget: a check
-    // that is already failing re-reports 4 on every dispatch failure and sends
-    // nothing, while the first failure after a pass sends one message. Without
-    // it the other regions' LIST would keep showing the last status they
-    // themselves ran, or "Unknown".
-    match synthetics_checks::update_last_check_status(db, &row.synthetics_id, 4).await {
-        Ok(true) => {
-            #[cfg(feature = "enterprise")]
-            if o2_enterprise::enterprise::common::config::get_config()
-                .super_cluster
-                .enabled
-                && let Err(e) =
-                    o2_enterprise::enterprise::super_cluster::queue::synthetics_check_last_status(
-                        &row.org_id,
-                        &row.synthetics_id,
-                        4,
-                    )
-                    .await
-            {
-                // Logged, not returned: this function's caller reads the bool as
-                // "the failure was recorded", and it was. A replication hiccup
-                // must not make it look otherwise.
-                tracing::warn!(synthetics_id = %row.synthetics_id, run_id = %row.run_id, job_id = %row.id, "[synthetics dispatcher] super-cluster last_check_status publish: {e}");
-            }
-        }
-        // Unchanged — the steady state, and deliberately silent.
-        Ok(false) => {}
+    match synthetics_runs::finalize_run(db, &row.run_id, 4, now_us).await {
+        Ok(Some(done)) => crate::job_api::publish_check_status(&done).await,
+        Ok(None) => {}
         Err(e) => {
-            tracing::error!(synthetics_id = %row.synthetics_id, run_id = %row.run_id, job_id = %row.id, "[synthetics dispatcher] update_last_check_status: {e}");
+            tracing::error!(synthetics_id = %row.synthetics_id, run_id = %row.run_id, job_id = %row.id, "[synthetics dispatcher] finalize_run: {e}");
         }
     }
     true
@@ -449,7 +475,13 @@ async fn report_to_stream(
 }
 
 /// Invokes the browser probe Lambda for a leased check row.
-async fn invoke_probe(row: synthetics_jobs::LeasedRow) {
+async fn invoke_probe(row: synthetics_jobs::LeasedRow, stop: crate::StopToken) {
+    // Leased just before ownership moved: do not start the probe here. The
+    // lease expires and the new owner's reaper re-queues the row.
+    if stop.is_cancelled() {
+        tracing::info!(job_id = %row.id, "[synthetics dispatcher] ownership lost — not invoking");
+        return;
+    }
     // Derive AWS region from the job's location field.
     let region = match aws_region_from_location(&row.location) {
         Some(r) => r.to_owned(),
@@ -689,5 +721,18 @@ async fn handle_dispatch_failure(
             // customer's website being down. Do NOT send to customer alert
             // destinations.
         }
+    }
+}
+
+#[cfg(test)]
+mod lease_batch_tests {
+    use super::next_batch_limit;
+
+    #[test]
+    fn batch_limit_is_trimmed_to_the_tick_cap() {
+        assert_eq!(next_batch_limit(10, 0, 100), 10);
+        assert_eq!(next_batch_limit(10, 95, 100), 5);
+        assert_eq!(next_batch_limit(10, 100, 100), 0);
+        assert_eq!(next_batch_limit(10, 120, 100), 0);
     }
 }

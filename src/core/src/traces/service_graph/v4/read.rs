@@ -22,7 +22,7 @@ use std::{
 
 use config::meta::{
     alerts::incidents::EdgeType,
-    promql::value::{InstantValue, LabelsExt, Value},
+    promql::value::{InstantValue, LabelsExt, RangeValue, Value},
     service_graph::{
         EdgeIdentity, MetricEdge, MetricNode, TopologyInput, TopologyMeta, UnresolvedCounts,
     },
@@ -43,7 +43,9 @@ use super::{
 const EDGE_BY: &str = "client, client_type, server, connection_type";
 const EDGE_BY_ENV: &str = "client, client_type, server, connection_type, agent_env";
 const LABEL_AGENT_ENV: &str = "agent_env";
-const QUANTILES: [f64; 3] = [0.5, 0.95, 0.99];
+/// Only the v4 writer sets `trace_stream`; a collector connector's same-named series lack it.
+pub(super) const V4_ONLY: &str = "trace_stream!=\"\"";
+pub(super) const QUANTILES: [f64; 3] = [0.5, 0.95, 0.99];
 /// The engine ignores `step` on an instant query; any positive value works.
 const INSTANT_STEP_MICROS: i64 = 300_000_000;
 /// Positions inside a `plan_queries` result; `assemble` reads by these.
@@ -105,23 +107,41 @@ const NODE_QUANTILE_SLOTS: [fn(&mut MetricNode) -> &mut Option<u64>; 3] =
 pub struct ReadFilter {
     pub trace_stream: Option<String>,
     pub agent_env: Option<String>,
+    /// The trace streams the caller may read; `None` is every stream, collector series included.
+    pub visible_streams: Option<Vec<String>>,
 }
 
 impl ReadFilter {
+    /// No narrowing below what the caller may see; otherwise the org-scope queries run too.
     pub fn is_empty(&self) -> bool {
         self.trace_stream.is_none() && self.agent_env.is_none()
     }
 
     /// Values PromQL cannot quote are the caller's input error, not a read failure.
     pub fn validate(&self) -> Result<(), String> {
-        self.edge_matcher().map(|_| ())
+        self.edge_matcher(true)?;
+        self.org_matcher(true).map(|_| ())
     }
 
-    fn edge_matcher(&self) -> Result<String, String> {
-        let mut parts = Vec::with_capacity(2);
-        if let Some(s) = self.trace_stream.as_deref() {
-            parts.push(label_eq(LABEL_TRACE_STREAM, s)?);
+    /// Collector series carry no `trace_stream`, so only a reader of every stream may fall back.
+    fn reads_every_stream(&self) -> bool {
+        self.trace_stream.is_none() && self.visible_streams.is_none()
+    }
+
+    fn stream_matcher(&self, v4_only: bool) -> Result<Option<String>, String> {
+        match self.trace_stream.as_deref() {
+            Some(s) => label_eq(LABEL_TRACE_STREAM, s).map(Some),
+            None => self.org_matcher(v4_only),
         }
+    }
+
+    fn org_matcher(&self, v4_only: bool) -> Result<Option<String>, String> {
+        visible_matcher(self.visible_streams.as_deref(), v4_only)
+    }
+
+    fn edge_matcher(&self, v4_only: bool) -> Result<String, String> {
+        let mut parts = Vec::with_capacity(2);
+        parts.extend(self.stream_matcher(v4_only)?);
         if let Some(env) = self.agent_env.as_deref() {
             parts.push(label_eq(LABEL_AGENT_ENV, env)?);
         }
@@ -129,11 +149,8 @@ impl ReadFilter {
     }
 
     /// Node, unresolved and processed series carry no `agent_env` label.
-    fn node_matcher(&self) -> Result<String, String> {
-        match self.trace_stream.as_deref() {
-            None => Ok(String::new()),
-            Some(s) => label_eq(LABEL_TRACE_STREAM, s),
-        }
+    fn node_matcher(&self, v4_only: bool) -> Result<String, String> {
+        Ok(self.stream_matcher(v4_only)?.unwrap_or_default())
     }
 }
 
@@ -150,6 +167,36 @@ pub fn q_edge_exists(client: &str, server: &str, range_secs: i64) -> Result<Stri
     ))
 }
 
+/// On-call blast radius: every client that called `server` within the range.
+pub fn q_callers(server: &str, range_secs: i64) -> Result<String, String> {
+    Ok(format!(
+        "sum by (client, client_type, connection_type) (increase({}[{range_secs}s]))",
+        selector(M_REQUEST_TOTAL, &label_eq("server", server)?)
+    ))
+}
+
+/// Whether the org has any service graph traffic in the range at all.
+pub fn q_org_requests(range_secs: i64) -> String {
+    format!("sum(increase({M_REQUEST_TOTAL}[{range_secs}s]))")
+}
+
+/// Sorted callers with traffic; the synthetic `user` entry and the service itself are not callers.
+pub fn callers_from(rows: &[InstantValue], server: &str) -> Vec<String> {
+    let mut callers: Vec<String> = rows
+        .iter()
+        .filter(|r| count(r.sample.value) > 0.0)
+        .map(edge_identity)
+        .filter(drawn)
+        .filter(|(client, client_type, ..)| {
+            client_type != CLIENT_TYPE_USER && !client.is_empty() && client != server
+        })
+        .map(|(client, ..)| client)
+        .collect();
+    callers.sort();
+    callers.dedup();
+    callers
+}
+
 pub fn edge_type_from(forward: f64) -> EdgeType {
     if forward > 0.0 {
         EdgeType::ServiceDependency
@@ -164,33 +211,31 @@ pub async fn instant(
     query: &str,
     at_micros: i64,
 ) -> Result<Vec<InstantValue>, anyhow::Error> {
-    let req = promql_service::MetricsQueryRequest {
-        query: query.to_string(),
-        start: at_micros,
-        end: at_micros,
-        step: INSTANT_STEP_MICROS,
-        query_exemplars: false,
-        use_cache: None,
-        search_type: None,
-        search_event_context: None,
-        regions: vec![],
-        clusters: vec![],
-    };
-    #[cfg(not(feature = "enterprise"))]
-    let is_super_cluster = false;
-    #[cfg(feature = "enterprise")]
-    let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled;
-    let trace_id = config::ider::generate_trace_id();
-    let resp =
-        promql_service::search::search(&trace_id, org, &req, "", 0, is_super_cluster).await?;
-    match resp.value {
+    match run_query(org, query, at_micros, at_micros, INSTANT_STEP_MICROS).await? {
         Value::Vector(v) => Ok(v),
         Value::Instant(i) => Ok(vec![i]),
         Value::None => Ok(vec![]),
         other => anyhow::bail!(
             "service graph query returned {} instead of a vector: {query}",
+            other.get_type()
+        ),
+    }
+}
+
+/// Runs one range query over `[start, end]` evaluated every `step` microseconds.
+pub async fn range(
+    org: &str,
+    query: &str,
+    start: i64,
+    end: i64,
+    step: i64,
+) -> Result<Vec<RangeValue>, anyhow::Error> {
+    match run_query(org, query, start, end, step).await? {
+        Value::Matrix(m) => Ok(m),
+        Value::Range(r) => Ok(vec![r]),
+        Value::None => Ok(vec![]),
+        other => anyhow::bail!(
+            "service graph query returned {} instead of a matrix: {query}",
             other.get_type()
         ),
     }
@@ -225,9 +270,14 @@ where
     Fut: Future<Output = Result<Vec<InstantValue>, anyhow::Error>>,
 {
     // Range selectors are left-open; +1ms keeps the `start` sample, not a baseline 1ms before it.
-    let range_ms = ((end - start) / 1_000).max(1_000) + 1;
-    let plan = plan_queries(filter, range_ms, start, end).map_err(anyhow::Error::msg)?;
-    let (results, degraded) = settle_plan(run_plan(&plan, run).await)?;
+    let range_ms = (end.saturating_sub(start) / 1_000).max(1_000) + 1;
+    let plan =
+        |v4_only| plan_queries(filter, v4_only, range_ms, start, end).map_err(anyhow::Error::msg);
+    let mut results = run_plan(&plan(true)?, &run).await;
+    if filter.reads_every_stream() && no_v4_output(&results) {
+        results = run_plan(&plan(false)?, &run).await;
+    }
+    let (results, degraded) = settle_plan(results)?;
     let (mut input, mut meta) = assemble(results, filter.agent_env.as_deref())?;
     if degraded.iter().any(|d| d == PLAN_NAMES[IDX_SERVER_FAILED]) {
         input.nodes.iter_mut().for_each(|n| n.errors_server = None);
@@ -239,7 +289,7 @@ where
 /// Never drops a running search: its task and search-server registration would leak.
 async fn run_plan<F, Fut>(
     plan: &[(String, i64)],
-    run: F,
+    run: &F,
 ) -> Vec<Result<Vec<InstantValue>, anyhow::Error>>
 where
     F: Fn(String, i64) -> Fut,
@@ -271,15 +321,24 @@ fn settle_plan(
     Ok((settled, degraded))
 }
 
+/// No v4 edges and no processed mark: whatever graph the org has came from a collector connector.
+fn no_v4_output(results: &[Result<Vec<InstantValue>, anyhow::Error>]) -> bool {
+    [IDX_REQUESTS, IDX_PROCESSED]
+        .iter()
+        .all(|&i| matches!(results.get(i), Some(Ok(rows)) if rows.is_empty()))
+}
+
 /// Query text and evaluation time in the fixed order `assemble` consumes.
 fn plan_queries(
     filter: &ReadFilter,
+    v4_only: bool,
     range_ms: i64,
     start: i64,
     end: i64,
 ) -> Result<Vec<(String, i64)>, String> {
-    let e = &filter.edge_matcher()?;
-    let n = &filter.node_matcher()?;
+    let e = &filter.edge_matcher(v4_only)?;
+    let n = &filter.node_matcher(v4_only)?;
+    let org = &filter.org_matcher(v4_only)?.unwrap_or_default();
     let by_env = filter.agent_env.is_some();
     let mut plan = Vec::with_capacity(PLAN_LEN_FILTERED);
     plan.push((q_requests(e, by_env, range_ms), end));
@@ -293,8 +352,8 @@ fn plan_queries(
     plan.push((q_instances(e, by_env, range_ms), end));
     plan.extend(QUANTILES.map(|q| (q_client_quantile(q, e, by_env, range_ms), start)));
     if !filter.is_empty() {
-        plan.push((q_org_inbound(range_ms), end));
-        plan.push((q_org_server_count(range_ms), end));
+        plan.push((q_org_inbound(org, range_ms), end));
+        plan.push((q_org_server_count(org, range_ms), end));
     }
     Ok(plan)
 }
@@ -344,6 +403,37 @@ fn assemble(
     Ok((input, meta))
 }
 
+async fn run_query(
+    org: &str,
+    query: &str,
+    start: i64,
+    end: i64,
+    step: i64,
+) -> Result<Value, anyhow::Error> {
+    let req = promql_service::MetricsQueryRequest {
+        query: query.to_string(),
+        start,
+        end,
+        step,
+        query_exemplars: false,
+        use_cache: None,
+        search_type: Some(config::meta::search::SearchEventType::Other),
+        search_event_context: None,
+        regions: vec![],
+        clusters: vec![],
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let is_super_cluster = false;
+    #[cfg(feature = "enterprise")]
+    let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled;
+    let trace_id = config::ider::generate_trace_id();
+    let resp =
+        promql_service::search::search(&trace_id, org, &req, "", 0, is_super_cluster).await?;
+    Ok(resp.value)
+}
+
 /// PromQL string-literal escaping; control characters other than newline are refused.
 fn escape_label_value(v: &str) -> Result<String, String> {
     let mut out = String::with_capacity(v.len());
@@ -359,16 +449,43 @@ fn escape_label_value(v: &str) -> Result<String, String> {
     Ok(out)
 }
 
-fn label_eq(label: &str, value: &str) -> Result<String, String> {
+pub(super) fn label_eq(label: &str, value: &str) -> Result<String, String> {
     Ok(format!("{label}=\"{}\"", escape_label_value(value)?))
 }
 
-fn selector(metric: &str, matcher: &str) -> String {
+pub(super) fn selector(metric: &str, matcher: &str) -> String {
     if matcher.is_empty() {
         metric.to_string()
     } else {
         format!("{metric}{{{matcher}}}")
     }
+}
+
+/// `trace_stream` matcher for a reader limited to `visible`; `None` reads every v4 series.
+pub(super) fn visible_matcher(
+    visible: Option<&[String]>,
+    v4_only: bool,
+) -> Result<Option<String>, String> {
+    match visible {
+        Some(streams) => label_in(LABEL_TRACE_STREAM, streams).map(Some),
+        None => Ok(v4_only.then(|| V4_ONLY.to_string())),
+    }
+}
+
+/// An empty set is refused: `=~""` would match the unlabelled collector series.
+fn label_in(label: &str, values: &[String]) -> Result<String, String> {
+    if values.is_empty() {
+        return Err(format!("no {label} value to match"));
+    }
+    let alternation = values
+        .iter()
+        .map(|v| regex::escape(v))
+        .collect::<Vec<_>>()
+        .join("|");
+    Ok(format!(
+        "{label}=~\"{}\"",
+        escape_label_value(&alternation)?
+    ))
 }
 
 fn edge_by(by_env: bool) -> &'static str {
@@ -449,12 +566,18 @@ fn q_instances(edge_matcher: &str, by_env: bool, range_ms: i64) -> String {
 }
 
 /// Grouped, not matched: the writer omits an empty `connection_type` and `=""` skips null rows.
-fn q_org_inbound(range_ms: i64) -> String {
-    format!("sum by (server, connection_type) (increase({M_REQUEST_TOTAL}[{range_ms}ms]))")
+fn q_org_inbound(org_matcher: &str, range_ms: i64) -> String {
+    format!(
+        "sum by (server, connection_type) (increase({}[{range_ms}ms]))",
+        selector(M_REQUEST_TOTAL, org_matcher)
+    )
 }
 
-fn q_org_server_count(range_ms: i64) -> String {
-    format!("sum by (server) (increase({M_SERVER_SECONDS}_count[{range_ms}ms]))")
+fn q_org_server_count(org_matcher: &str, range_ms: i64) -> String {
+    format!(
+        "sum by (server) (increase({}[{range_ms}ms]))",
+        selector(&format!("{M_SERVER_SECONDS}_count"), org_matcher)
+    )
 }
 
 fn edge_rows(rows: &[InstantValue]) -> Vec<(EdgeIdentity, f64)> {
@@ -523,13 +646,18 @@ fn edge_identity(r: &InstantValue) -> EdgeIdentity {
     )
 }
 
+/// The collector's `virtual_node` edges that `edge_identity` did not map are unresolved, not drawn.
+fn drawn(id: &EdgeIdentity) -> bool {
+    id.3 != COLLECTOR_VIRTUAL_NODE
+}
+
 /// A counter value; the engine yields NaN for an empty range, which is "no requests".
-fn count(v: f64) -> f64 {
+pub(super) fn count(v: f64) -> f64 {
     if v.is_finite() { v } else { 0.0 }
 }
 
 /// Quantile seconds to whole nanoseconds; NaN means the histogram had no samples.
-fn secs_to_ns(v: f64) -> Option<u64> {
+pub(super) fn secs_to_ns(v: f64) -> Option<u64> {
     v.is_finite().then(|| (v * 1e9).round() as u64)
 }
 
@@ -603,11 +731,11 @@ fn assemble_edges(results: &[Vec<InstantValue>]) -> (Vec<MetricEdge>, u64) {
     let mut unresolved = 0.0;
     let edges = edges
         .into_iter()
-        .filter(|((_, _, _, connection_type), e)| {
-            if connection_type == COLLECTOR_VIRTUAL_NODE {
+        .filter(|(id, e)| {
+            if !drawn(id) {
                 unresolved += e.requests;
             }
-            connection_type != COLLECTOR_VIRTUAL_NODE
+            drawn(id)
         })
         .map(|((client, client_type, server, connection_type), mut e)| {
             e.streams.sort_by(|a, b| a.0.cmp(&b.0));
@@ -714,13 +842,20 @@ mod tests {
         let ok = ReadFilter {
             trace_stream: Some("default".to_string()),
             agent_env: Some("prod\"x".to_string()),
+            visible_streams: None,
         };
         assert!(ok.validate().is_ok());
         let bad = ReadFilter {
             trace_stream: Some("z\u{96}".to_string()),
             agent_env: None,
+            visible_streams: None,
         };
         assert!(bad.validate().is_err());
+        let none_visible = ReadFilter {
+            visible_streams: Some(vec![]),
+            ..Default::default()
+        };
+        assert!(none_visible.validate().is_err());
     }
 
     const M: &str = "trace_stream=\"default\"";
@@ -737,16 +872,37 @@ mod tests {
 
     impl RequestTotalProvider {
         fn new(with_env_column: bool, series: &[(&str, Option<&str>)]) -> Self {
-            let samples: Vec<(i64, f64)> = (0..10)
+            Self::with_samples(with_env_column, series, &Self::default_samples())
+        }
+
+        /// One series per `(client, trace_stream)`; `None` is a collector connector's series.
+        fn with_streams(series: &[(&str, Option<&str>)]) -> Self {
+            let clients: Vec<(&str, Option<&str>)> =
+                series.iter().map(|(client, _)| (*client, None)).collect();
+            let streams: Vec<Option<&str>> = series.iter().map(|(_, stream)| *stream).collect();
+            Self::build(false, &clients, &streams, &Self::default_samples())
+        }
+
+        fn default_samples() -> Vec<(i64, f64)> {
+            (0..10)
                 .map(|step| (BASE + step * 20 * SECOND, (step * 3) as f64))
-                .collect();
-            Self::with_samples(with_env_column, series, &samples)
+                .collect()
         }
 
         /// Every series gets the same `(timestamp, value)` samples.
         fn with_samples(
             with_env_column: bool,
             series: &[(&str, Option<&str>)],
+            samples: &[(i64, f64)],
+        ) -> Self {
+            let streams = vec![Some("default"); series.len()];
+            Self::build(with_env_column, series, &streams, samples)
+        }
+
+        fn build(
+            with_env_column: bool,
+            series: &[(&str, Option<&str>)],
+            streams: &[Option<&str>],
             samples: &[(i64, f64)],
         ) -> Self {
             let mut fields = vec![
@@ -781,7 +937,7 @@ mod tests {
                 text(&|_| Some(M_REQUEST_TOTAL.to_string())),
                 text(&|i| Some(series[i].0.to_string())),
                 text(&|_| Some("b".to_string())),
-                text(&|_| Some("default".to_string())),
+                text(&|i| streams[i].map(str::to_string)),
             ];
             if with_env_column {
                 columns.push(text(&|i| series[i].1.map(str::to_string)));
@@ -859,6 +1015,16 @@ mod tests {
         ReadFilter {
             trace_stream: trace_stream.map(str::to_string),
             agent_env: agent_env.map(str::to_string),
+            visible_streams: None,
+        }
+    }
+
+    const VISIBLE: &str = "trace_stream=~\"a|b\"";
+
+    fn visible(trace_stream: Option<&str>) -> ReadFilter {
+        ReadFilter {
+            visible_streams: Some(vec!["a".to_string(), "b".to_string()]),
+            ..filter(trace_stream, None)
         }
     }
 
@@ -898,7 +1064,7 @@ mod tests {
         agent_env: &str,
     ) -> (usize, TopologyInput) {
         let f = filter(None, Some(agent_env));
-        let query = q_requests(&f.edge_matcher().unwrap(), true, 60_000);
+        let query = q_requests(&f.edge_matcher(false).unwrap(), true, 60_000);
         let rows = engine_rows(provider, &query).await;
         let raw = rows.len();
         let mut r = empty_results(PLAN_LEN_FILTERED);
@@ -910,8 +1076,13 @@ mod tests {
         let seen = Mutex::new(vec![]);
         let seen_ref = &seen;
         let (input, _) = fetch_topology_with(f, 1_000_000_000, 1_060_000_000, |q, at| async move {
+            let processed = q.contains(PROCESSED_TIMESTAMP_STREAM);
             seen_ref.lock().unwrap().push((q, at));
-            Ok(vec![])
+            Ok(if processed {
+                vec![row(&[], 1_000.0)]
+            } else {
+                vec![]
+            })
         })
         .await
         .unwrap();
@@ -934,26 +1105,38 @@ mod tests {
     fn test_read_filter_matchers() {
         let empty = ReadFilter::default();
         assert!(empty.is_empty());
-        assert_eq!(empty.edge_matcher().unwrap(), "");
-        assert_eq!(empty.node_matcher().unwrap(), "");
+        assert_eq!(empty.edge_matcher(false).unwrap(), "");
+        assert_eq!(empty.node_matcher(false).unwrap(), "");
+        assert_eq!(empty.edge_matcher(true).unwrap(), V4_ONLY);
+        assert_eq!(empty.node_matcher(true).unwrap(), V4_ONLY);
 
         let stream = filter(Some("de\"f"), None);
         assert!(!stream.is_empty());
-        assert_eq!(stream.edge_matcher().unwrap(), "trace_stream=\"de\\\"f\"");
-        assert_eq!(stream.node_matcher().unwrap(), "trace_stream=\"de\\\"f\"");
+        for v4_only in [true, false] {
+            assert_eq!(
+                stream.edge_matcher(v4_only).unwrap(),
+                "trace_stream=\"de\\\"f\""
+            );
+            assert_eq!(
+                stream.node_matcher(v4_only).unwrap(),
+                "trace_stream=\"de\\\"f\""
+            );
+        }
 
         let env = filter(None, Some("prod"));
         assert!(!env.is_empty());
-        assert_eq!(env.edge_matcher().unwrap(), ENV);
-        assert_eq!(env.node_matcher().unwrap(), "");
+        assert_eq!(env.edge_matcher(false).unwrap(), ENV);
+        assert_eq!(env.node_matcher(false).unwrap(), "");
+        assert_eq!(env.edge_matcher(true).unwrap(), format!("{V4_ONLY},{ENV}"));
+        assert_eq!(env.node_matcher(true).unwrap(), V4_ONLY);
 
         let both = filter(Some("default"), Some("prod"));
-        assert_eq!(both.edge_matcher().unwrap(), BOTH);
-        assert_eq!(both.node_matcher().unwrap(), M);
+        assert_eq!(both.edge_matcher(true).unwrap(), BOTH);
+        assert_eq!(both.node_matcher(true).unwrap(), M);
 
-        assert!(filter(Some("a\u{1}"), None).edge_matcher().is_err());
-        assert!(filter(Some("a\u{1}"), None).node_matcher().is_err());
-        assert!(filter(None, Some("a\u{1}")).edge_matcher().is_err());
+        assert!(filter(Some("a\u{1}"), None).edge_matcher(true).is_err());
+        assert!(filter(Some("a\u{1}"), None).node_matcher(true).is_err());
+        assert!(filter(None, Some("a\u{1}")).edge_matcher(true).is_err());
     }
 
     #[test]
@@ -991,12 +1174,16 @@ mod tests {
             "sum by (server) (max_over_time(traces_service_graph_agent_instances[60000ms]))"
         );
         assert_eq!(
-            q_org_inbound(60_000),
+            q_org_inbound("", 60_000),
             "sum by (server, connection_type) (increase(traces_service_graph_request_total[60000ms]))"
         );
         assert_eq!(
-            q_org_server_count(60_000),
+            q_org_server_count("", 60_000),
             "sum by (server) (increase(traces_service_graph_request_server_seconds_count[60000ms]))"
+        );
+        assert_eq!(
+            q_org_server_count(V4_ONLY, 60_000),
+            "sum by (server) (increase(traces_service_graph_request_server_seconds_count{trace_stream!=\"\"}[60000ms]))"
         );
     }
 
@@ -1084,6 +1271,38 @@ mod tests {
         );
         assert!(q_edge_exists("a\tb", "c", 3600).is_err());
         assert!(q_edge_exists("a", "c\u{7}", 3600).is_err());
+    }
+
+    #[test]
+    fn test_blast_radius_queries() {
+        assert_eq!(
+            q_callers("checkout", 3600).unwrap(),
+            "sum by (client, client_type, connection_type) (increase(traces_service_graph_request_total{server=\"checkout\"}[3600s]))"
+        );
+        assert!(q_callers("a\u{7}", 3600).is_err());
+        assert_eq!(
+            q_org_requests(3600),
+            "sum(increase(traces_service_graph_request_total[3600s]))"
+        );
+    }
+
+    #[test]
+    fn test_callers_from_skips_user_self_idle_and_unnamed() {
+        let rows = vec![
+            row(&[("client", "frontend"), ("client_type", "")], 5.0),
+            row(&[("client", "user"), ("client_type", "user")], 9.0),
+            row(
+                &[("client", "user"), ("connection_type", "virtual_node")],
+                7.0,
+            ),
+            row(&[("client", "checkout")], 3.0),
+            row(&[("client", "api")], 0.0),
+            row(&[("client", "batch")], f64::NAN),
+            row(&[("client", "")], 4.0),
+            row(&[("client", "cart")], 1.0),
+            row(&[("client", "frontend"), ("client_type", "queue")], 2.0),
+        ];
+        assert_eq!(callers_from(&rows, "checkout"), vec!["cart", "frontend"]);
     }
 
     #[test]
@@ -1177,8 +1396,14 @@ mod tests {
 
     #[test]
     fn test_plan_queries_count_and_times() {
-        let plan =
-            plan_queries(&ReadFilter::default(), 60_000, 1_000_000_000, 1_060_000_000).unwrap();
+        let plan = plan_queries(
+            &ReadFilter::default(),
+            false,
+            60_000,
+            1_000_000_000,
+            1_060_000_000,
+        )
+        .unwrap();
         assert_eq!(plan.len(), PLAN_LEN_UNFILTERED);
         assert!(
             plan[..IDX_BASELINE_Q]
@@ -1203,7 +1428,7 @@ mod tests {
         );
 
         let both = filter(Some("default"), Some("prod"));
-        let plan = plan_queries(&both, 60_000, 1_000_000_000, 1_060_000_000).unwrap();
+        let plan = plan_queries(&both, true, 60_000, 1_000_000_000, 1_060_000_000).unwrap();
         assert_eq!(plan.len(), PLAN_LEN_FILTERED);
         assert_eq!(plan[IDX_SERVER_Q].0, q_server_quantile(0.5, M, 60_000));
         assert_eq!(plan[IDX_SERVER_COUNT].0, q_server_count(M, 60_000));
@@ -1218,9 +1443,12 @@ mod tests {
             plan[IDX_BASELINE_Q + 1].0,
             q_client_quantile(0.95, BOTH, true, 60_000)
         );
-        assert_eq!(plan[IDX_ORG_INBOUND].0, q_org_inbound(60_000));
-        assert_eq!(plan[IDX_ORG_SERVER_COUNT].0, q_org_server_count(60_000));
-        assert!(!plan[IDX_ORG_SERVER_COUNT].0.contains("trace_stream"));
+        assert_eq!(plan[IDX_ORG_INBOUND].0, q_org_inbound(V4_ONLY, 60_000));
+        assert_eq!(
+            plan[IDX_ORG_SERVER_COUNT].0,
+            q_org_server_count(V4_ONLY, 60_000)
+        );
+        assert!(!plan[IDX_ORG_SERVER_COUNT].0.contains(M));
     }
 
     #[test]
@@ -1229,7 +1457,7 @@ mod tests {
             filter(None, Some("prod")),
             filter(Some("default"), Some("prod")),
         ] {
-            let plan = plan_queries(&f, 60_000, 1_000_000_000, 1_060_000_000).unwrap();
+            let plan = plan_queries(&f, true, 60_000, 1_000_000_000, 1_060_000_000).unwrap();
             for (idx, (query, _)) in plan.iter().enumerate() {
                 assert_eq!(
                     IDX_EDGE_FAMILY.contains(&idx),
@@ -1245,7 +1473,7 @@ mod tests {
         let (queries, input) = issued(&ReadFilter::default()).await;
         assert_eq!(queries.len(), 16);
         assert!(input.node_only_services);
-        assert!(queries.iter().all(|(q, _)| !q.contains('{')));
+        assert!(queries.iter().all(|(q, _)| q.contains(V4_ONLY)));
         assert!(queries.iter().all(|(q, _)| !q.contains("[60000ms]")));
         assert_eq!(
             queries
@@ -1254,21 +1482,22 @@ mod tests {
                 .count(),
             3
         );
-        assert!(queries.contains(&(q_requests("", false, 60_001), 1_060_000_000)));
+        assert!(queries.contains(&(q_requests(V4_ONLY, false, 60_001), 1_060_000_000)));
 
         let (queries, input) = issued(&filter(Some("default"), None)).await;
         assert_eq!(queries.len(), 18);
         assert!(input.node_only_services);
         assert!(queries.contains(&(q_server_count(M, 60_001), 1_060_000_000)));
-        assert!(queries.contains(&(q_org_server_count(60_001), 1_060_000_000)));
+        assert!(queries.contains(&(q_org_server_count(V4_ONLY, 60_001), 1_060_000_000)));
 
         let (queries, input) = issued(&filter(None, Some("prod"))).await;
         assert_eq!(queries.len(), 18);
         assert!(!input.node_only_services);
-        assert!(queries.contains(&(q_requests(ENV, true, 60_001), 1_060_000_000)));
-        assert!(queries.contains(&(q_server_count("", 60_001), 1_060_000_000)));
-        assert!(queries.contains(&(q_org_inbound(60_001), 1_060_000_000)));
-        assert!(queries.contains(&(q_client_quantile(0.5, ENV, true, 60_001), 1_000_000_000)));
+        let v4_env = format!("{V4_ONLY},{ENV}");
+        assert!(queries.contains(&(q_requests(&v4_env, true, 60_001), 1_060_000_000)));
+        assert!(queries.contains(&(q_server_count(V4_ONLY, 60_001), 1_060_000_000)));
+        assert!(queries.contains(&(q_org_inbound(V4_ONLY, 60_001), 1_060_000_000)));
+        assert!(queries.contains(&(q_client_quantile(0.5, &v4_env, true, 60_001), 1_000_000_000)));
 
         let (queries, input) = issued(&filter(Some("default"), Some("prod"))).await;
         assert_eq!(queries.len(), 18);
@@ -1283,6 +1512,112 @@ mod tests {
             .await
             .is_err()
         );
+    }
+
+    async fn issued_with<F>(f: &ReadFilter, answer: F) -> Vec<String>
+    where
+        F: Fn(&str) -> Vec<InstantValue>,
+    {
+        let seen = Mutex::new(vec![]);
+        let (seen_ref, answer_ref) = (&seen, &answer);
+        fetch_topology_with(f, 1_000_000_000, 1_060_000_000, |q, _| async move {
+            let rows = answer_ref(&q);
+            seen_ref.lock().unwrap().push(q);
+            Ok(rows)
+        })
+        .await
+        .unwrap();
+        seen.into_inner().unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_fetch_reads_all_series_only_without_any_v4_output() {
+        let queries = issued_with(&ReadFilter::default(), |_| vec![]).await;
+        assert_eq!(queries.len(), 32);
+        assert!(queries[..16].iter().all(|q| q.contains(V4_ONLY)));
+        assert!(queries[16..].iter().all(|q| !q.contains('{')));
+
+        let queries = issued_with(&filter(None, Some("prod")), |_| vec![]).await;
+        assert_eq!(queries.len(), 36);
+        assert!(queries[18..].iter().all(|q| !q.contains(V4_ONLY)));
+    }
+
+    #[tokio::test]
+    async fn test_fetch_stays_v4_only_once_v4_wrote_edges_or_a_processed_mark() {
+        let edges = issued_with(&ReadFilter::default(), |q| {
+            if q.starts_with("sum by (client, client_type, server, connection_type, trace_stream)")
+            {
+                vec![edge_in("a", "b", "default", 1.0)]
+            } else {
+                vec![]
+            }
+        })
+        .await;
+        assert_eq!(edges.len(), 16);
+
+        let processed = issued_with(&ReadFilter::default(), |q| {
+            if q.contains(PROCESSED_TIMESTAMP_STREAM) {
+                vec![row(&[], 1_000.0)]
+            } else {
+                vec![]
+            }
+        })
+        .await;
+        assert_eq!(processed.len(), 16);
+    }
+
+    #[tokio::test]
+    async fn test_fetch_reads_only_the_visible_streams() {
+        let all = visible(None);
+        assert!(all.is_empty());
+        for v4_only in [true, false] {
+            assert_eq!(all.edge_matcher(v4_only).unwrap(), VISIBLE);
+            assert_eq!(all.node_matcher(v4_only).unwrap(), VISIBLE);
+        }
+        let queries = issued_with(&all, |_| vec![]).await;
+        assert_eq!(queries.len(), PLAN_LEN_UNFILTERED);
+        assert!(queries.iter().all(|q| q.contains(VISIBLE)));
+
+        let one = visible(Some("a"));
+        let queries = issued_with(&one, |_| vec![]).await;
+        assert_eq!(queries.len(), PLAN_LEN_FILTERED);
+        let a = "trace_stream=\"a\"";
+        assert!(queries[..IDX_ORG_INBOUND].iter().all(|q| q.contains(a)));
+        assert!(
+            queries[IDX_ORG_INBOUND..]
+                .iter()
+                .all(|q| q.contains(VISIBLE))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_fetch_never_falls_back_under_a_stream_filter() {
+        let queries = issued_with(&filter(Some("default"), None), |_| vec![]).await;
+        assert_eq!(queries.len(), 18);
+        assert!(queries[..IDX_ORG_INBOUND].iter().all(|q| q.contains(M)));
+        assert!(
+            queries[IDX_ORG_INBOUND..]
+                .iter()
+                .all(|q| q.contains(V4_ONLY))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_v4_only_matcher_through_engine_drops_collector_series() {
+        let series = [("svc", Some("default")), ("svc", None)];
+        let all = engine_rows(
+            RequestTotalProvider::with_streams(&series),
+            &q_requests("", false, 60_000),
+        )
+        .await;
+        assert_eq!(all.len(), 2, "a collector series groups apart from v4's");
+        let v4 = engine_rows(
+            RequestTotalProvider::with_streams(&series),
+            &q_requests(V4_ONLY, false, 60_000),
+        )
+        .await;
+        assert_eq!(v4.len(), 1);
+        assert_eq!(v4[0].labels.get_value(LABEL_TRACE_STREAM), "default");
     }
 
     #[test]
@@ -1601,7 +1936,7 @@ mod tests {
         let plan: Vec<(String, i64)> = (0..4).map(|i| (format!("q{i}"), 0)).collect();
         let completed = AtomicUsize::new(0);
         let completed = &completed;
-        let ret = run_plan(&plan, |q, _| async move {
+        let ret = run_plan(&plan, &|q, _| async move {
             if q == "q0" {
                 return Err(anyhow::anyhow!("boom"));
             }
@@ -1614,7 +1949,7 @@ mod tests {
         assert!(ret[1..].iter().all(Result::is_ok));
         assert_eq!(completed.load(Ordering::SeqCst), 3);
 
-        let ok = run_plan(&plan, |_, _| async move { Ok(vec![row(&[], 1.0)]) }).await;
+        let ok = run_plan(&plan, &|_, _| async move { Ok(vec![row(&[], 1.0)]) }).await;
         assert_eq!(ok.len(), 4);
         assert_eq!(ok[3].as_ref().unwrap()[0].sample.value, 1.0);
     }

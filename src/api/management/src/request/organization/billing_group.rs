@@ -27,12 +27,12 @@ pub struct InviteRequest {
     org_id: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct MembershipResponse {
     membership: Option<MemberResponseItem>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct MemberResponseItem {
     id: i32,
     payer_org_id: String,
@@ -44,7 +44,7 @@ pub struct MemberResponseItem {
     accepted_by: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct InviteResponseItem {
     id: i32,
     inviter_org_id: String,
@@ -54,6 +54,7 @@ pub struct InviteResponseItem {
     inviter_id: String,
     created_at: i64,
     expires_at: i64,
+    #[schema(value_type = String)]
     status: Status,
     token: String,
 }
@@ -69,18 +70,17 @@ async fn get_org_name(org_id: &str) -> String {
     path = "/{org_id}/billing_group/invites",
     context_path = "/api",
     operation_id = "ListBillingGroupInvites",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "List invites for and from the org for billing groups",
     description = "List invites for and from the org for billing groups",
+    security(("Authorization" = [])),
     responses(
-        (
-            status = 200,
-            description = "Storage details",
-            body = Object,
-            content_type = "application/json",
-        ),
+        (status = 200, description = "Invites for and from the org", content_type = "application/json", body = Vec<InviteResponseItem>),
     ),
     tag = "Organizations",
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Billings", "operation": "list"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
@@ -129,17 +129,13 @@ pub async fn list_invites(Path(org_id): Path<String>) -> Response {
     params(
         ("org_id" = String, Path, description = "Inviter Organization id"),
     ),
+    security(("Authorization" = [])),
     responses(
-        (
-            status = 200,
-            description = "Empty response",
-            body = (),
-            content_type = "application/json",
-        ),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(HttpResponse)),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
     tag = "Organizations",
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Billings", "operation": "create"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
@@ -167,9 +163,21 @@ pub async fn invite(
         return HttpResponse::bad_request("billing group is not enabled for this org".to_string());
     }
 
-    let org_info = openobserve_core::organization::get_org(&req.org_id).await;
-    if org_info.is_none() {
-        return HttpResponse::bad_request(format!("org with org_id {} does not exist", req.org_id));
+    // A deleted org keeps its row as a tombstone, so the row alone does not make it a target.
+    match db::org_status::read_active(&req.org_id).await {
+        Ok(true) => {}
+        Ok(false) => {
+            return HttpResponse::bad_request(format!(
+                "org with org_id {} does not exist",
+                req.org_id
+            ));
+        }
+        Err(e) => {
+            return HttpResponse::internal_error(format!(
+                "cannot read the status of org {}: {e}",
+                req.org_id
+            ));
+        }
     }
 
     if let Err(e) = billing_invites::invite_org(&user, &org_id, &req.org_id).await {
@@ -187,26 +195,17 @@ pub async fn invite(
     operation_id = "AcceptBillingGroupInvite",
     summary = "accept an invite as a billing group member",
     description = "accept an invite as a billing group member",
-    request_body(
-        content = inline(()),
-        description = "empty",
-        content_type = "application/json",
-    ),
     params(
         ("org_id" = String, Path, description = "Invitee Organization id"),
         ("token" = String, Path, description = "invite token"),
     ),
+    security(("Authorization" = [])),
     responses(
-        (
-            status = 200,
-            description = "Empty response",
-            body = (),
-            content_type = "application/json",
-        ),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(HttpResponse)),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
     tag = "Organizations",
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Billings", "operation": "create"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
@@ -230,26 +229,17 @@ pub async fn accept(
     operation_id = "RejectBillingGroupInvite",
     summary = "reject an invite as a billing group member",
     description = "reject an invite as a billing group member",
-    request_body(
-        content = inline(()),
-        description = "empty",
-        content_type = "application/json",
-    ),
     params(
         ("org_id" = String, Path, description = "Invitee Organization id"),
         ("token" = String, Path, description = "invite token"),
     ),
+    security(("Authorization" = [])),
     responses(
-        (
-            status = 200,
-            description = "Empty response",
-            body = (),
-            content_type = "application/json",
-        ),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(HttpResponse)),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
     tag = "Organizations",
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Billings", "operation": "delete"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
@@ -279,17 +269,13 @@ pub async fn reject(
         ("org_id" = String, Path, description = "Payer Organization id"),
         ("member_org_id" = String, Path, description = "Member Organization id"),
     ),
+    security(("Authorization" = [])),
     responses(
-        (
-            status = 200,
-            description = "Empty response",
-            body = (),
-            content_type = "application/json",
-        ),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(HttpResponse)),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
     tag = "Organizations",
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Billings", "operation": "delete"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
@@ -304,6 +290,23 @@ pub async fn remove_member(
     if let Err(e) = billing_group::remove_billing_member(&org_id, &member_org_id).await {
         return HttpResponse::bad_request(format!("error in removing member: {e}"));
     }
+
+    let org_id_copy = member_org_id.clone();
+
+    if let Err(e) = db::organization::update_org_setting(&org_id, move |settings| {
+        let before = settings.domain_org_mappings.len();
+        settings
+            .domain_org_mappings
+            .retain(|m| m.org_id != member_org_id);
+        settings.domain_org_mappings.len() != before
+    })
+    .await
+    {
+        log::error!(
+            "error updating domain mapping for {org_id_copy} after removing the membership from {org_id} : {e}"
+        );
+    };
+
     HttpResponse::ok("successfully removed")
 }
 
@@ -318,17 +321,13 @@ pub async fn remove_member(
     params(
         ("org_id" = String, Path, description = "Member Organization id"),
     ),
+    security(("Authorization" = [])),
     responses(
-        (
-            status = 200,
-            description = "Empty response",
-            body = (),
-            content_type = "application/json",
-        ),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(HttpResponse)),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
     tag = "Organizations",
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Billings", "operation": "delete"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
@@ -354,6 +353,23 @@ pub async fn leave_group(
     if let Err(e) = billing_group::remove_billing_member(&membership.payer_org_id, &org_id).await {
         return HttpResponse::bad_request(format!("error in leaving billing group: {e}"));
     }
+
+    let org_id_copy = org_id.clone();
+
+    if let Err(e) =
+        db::organization::update_org_setting(&membership.payer_org_id, move |settings| {
+            let before = settings.domain_org_mappings.len();
+            settings.domain_org_mappings.retain(|m| m.org_id != org_id);
+            settings.domain_org_mappings.len() != before
+        })
+        .await
+    {
+        log::error!(
+            "error updating domain mapping for {} after removing the membership of {org_id_copy} : {e}",
+            &membership.payer_org_id
+        );
+    };
+
     HttpResponse::ok("successfully left")
 }
 
@@ -365,25 +381,16 @@ pub async fn leave_group(
     operation_id = "GetBIllingGRoupMembership",
     summary = "get info about own billing group membership",
     description = "get info about own billing group membership",
-    request_body(
-        content = inline(()),
-        description = "empty",
-        content_type = "application/json",
-    ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
     ),
+    security(("Authorization" = [])),
     responses(
-        (
-            status = 200,
-            description = "Empty response",
-            body = (),
-            content_type = "application/json",
-        ),
+        (status = 200, description = "Billing group membership of the org", content_type = "application/json", body = MembershipResponse),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
     tag = "Organizations",
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Billings", "operation": "list"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
@@ -421,25 +428,16 @@ pub async fn check_membership(Path(org_id): Path<String>) -> Response {
     operation_id = "GetBIllingGRoupMembers",
     summary = "get info about members of own billing group",
     description = "get info about members of own billing group",
-    request_body(
-        content = inline(()),
-        description = "empty",
-        content_type = "application/json",
-    ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
     ),
+    security(("Authorization" = [])),
     responses(
-        (
-            status = 200,
-            description = "Empty response",
-            body = (),
-            content_type = "application/json",
-        ),
+        (status = 200, description = "Members of the billing group", content_type = "application/json", body = Vec<MemberResponseItem>),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
     tag = "Organizations",
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Billings", "operation": "list"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]

@@ -332,13 +332,51 @@ describe("ExperimentDetailPage", () => {
 
     const tasks = wrapper.get('[data-test="ai-experiment-detail-progress"]');
     expect(tasks.text()).toContain("Tasks");
-    expect(tasks.text()).toContain("29/30");
+    // Succeeded over total: the 4 failed slots are finished, not done.
+    expect(tasks.text()).toContain("25/30");
     expect(tasks.text()).toContain("25 succeeded · 4 failed · 1 pending · 0 skipped");
 
     const scores = wrapper.get('[data-test="ai-experiment-detail-scoring"]');
     expect(scores.text()).toContain("Scores");
     expect(scores.text()).toContain("25/30");
     expect(scores.text()).toContain("25 scored · 0 failed · 1 pending · 0 skipped · 4 unscored");
+  });
+
+  // An SDK run with no pinned Scorer whose code reports its own Scores.
+  it("shows client-reported score summaries, and keeps the scoring card when they are all there is", async () => {
+    const experiment = makeExperiment({ id: "exp-1", name: "sdk run", datasetId: "ds-1" });
+    get.mockResolvedValue(
+      makeExperimentDetail(experiment, {
+        results: {
+          executions: [],
+          scores: [],
+          scoringProgress: { completed: 0, total: 0, skipped: 0 },
+          scoreSummaries: [],
+          clientScoreSummaries: [
+            {
+              scoreConfigId: "cfg-quality",
+              scoreConfigName: "quality",
+              clientScorerKey: "ci_judge",
+              sampleCount: 10,
+              value: { kind: "numeric", mean: 0.42 },
+            },
+          ],
+        },
+      }),
+    );
+
+    const wrapper = mount(ExperimentDetailPage);
+    await flushPromises();
+
+    const scores = wrapper.get('[data-test="ai-experiment-detail-scoring"]');
+    expect(scores.text()).toContain("10");
+    expect(scores.text()).toContain("Reported by your code · 1 dimension");
+    const client = wrapper.get(
+      '[data-test="ai-experiment-detail-client-score-cfg-quality-ci_judge"]',
+    );
+    expect(client.text()).toContain("quality · client");
+    expect(client.text()).toContain("0.42");
+    expect(client.text()).toContain("10 scores · key ci_judge");
   });
 
   it("reads as prose: humanized task type and singular counts", async () => {
@@ -666,7 +704,7 @@ describe("ExperimentDetailPage", () => {
     const state = mounted.$.setupState;
     state.selectedRowDetail = {
       experimentId: "exp-1",
-      snapshot: { datasetId: "ds-1", datasetVersion: 1 },
+      snapshot: { datasetId: "ds-1", datasetVersion: 1, datasetWriteVersion: 1 },
       navigation: {
         rowIndex: 0,
         totalRows: 1,
@@ -1011,6 +1049,28 @@ describe("ExperimentDetailPage", () => {
         query: expect.objectContaining({ clone_of: "exp-1" }),
       }),
     );
+  });
+
+  it("drops the previous experiment's rows from the table when the route switches experiments", async () => {
+    get.mockResolvedValue(makeExperimentDetail(makeExperiment({ id: "exp-1" })));
+    const wrapper = mount(ExperimentDetailPage, {
+      global: {
+        stubs: {
+          OTable: {
+            props: ["loadingResetKey"],
+            template: `<table :data-reset="loadingResetKey" />`,
+          },
+        },
+      },
+    });
+    await flushPromises();
+    const resetKey = () => wrapper.get("table").attributes("data-reset");
+    expect(resetKey()).toBe("exp-1");
+
+    route.params.id = "exp-2";
+    await flushPromises();
+    expect(resetKey()).toBe("exp-2");
+    route.params.id = "exp-1";
   });
 
   it("re-fetches the results from the table toolbar", async () => {

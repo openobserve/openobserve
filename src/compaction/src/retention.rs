@@ -22,11 +22,14 @@ use config::{
     meta::{
         cluster::Role,
         stream::{
-            FileKey, FileListBookKeepMode, FileListDeleted, PartitionTimeLevel, StreamType,
-            TimeRange,
+            FileKey, FileListBookKeepMode, FileListDeleted, PartitionTimeLevel, StreamSettings,
+            StreamType, TimeRange,
         },
     },
-    utils::time::{BASE_TIME, HourFormat, day_micros, get_ymdh_from_micros, hour_micros},
+    utils::{
+        parquet::parse_file_key_columns,
+        time::{BASE_TIME, HourFormat, day_micros, get_ymdh_from_micros, hour_micros},
+    },
 };
 use db;
 use infra::{
@@ -37,13 +40,10 @@ use infra::{
 use itertools::Itertools;
 use search_service::{file_list, file_list_dump::generate_dump_stream_name};
 
+use crate::bloom::compact::bloom_files_deleted;
+
 pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    // check data retention
-    if cfg.compact.data_retention_days <= 0 {
-        return Ok(());
-    }
-
     // check if current hour is allowed for retention
     if !cfg.compact.retention_allowed_hours.is_empty() {
         let current_hour = Utc::now().hour();
@@ -66,8 +66,6 @@ pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
     }
 
     let now = config::utils::time::now();
-    let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
-
     let grouped = db::schema::list_all_streams_grouped().await;
     for (org_id, stream_types) in grouped {
         for (stream_type, streams) in stream_types {
@@ -83,39 +81,7 @@ pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
                 if LOCAL_NODE.name.ne(&node_name) {
                     continue; // not this node
                 }
-
-                let stream_settings =
-                    infra::schema::get_settings(&org_id, &stream_name, stream_type)
-                        .await
-                        .unwrap_or_default();
-                let stream_data_retention_end = if stream_settings.data_retention > 0 {
-                    now - Duration::try_days(stream_settings.data_retention).unwrap()
-                } else {
-                    data_lifecycle_end
-                };
-
-                // quick check with the cached stream stats, if the stream has no data older than
-                // the retention boundary we can skip it without any db call.
-                let retention_end_micros = stream_data_retention_end.timestamp_micros();
-                let retention_day_start =
-                    retention_end_micros - retention_end_micros % day_micros(1);
-                let stats =
-                    infra::cache::stats::get_stream_stats(&org_id, &stream_name, stream_type);
-                if stats.doc_time_min > 0 && stats.doc_time_min >= retention_day_start {
-                    continue;
-                }
-
-                let extended_retention_days = &stream_settings.extended_retention_days;
-                // creates jobs to delete data
-                if let Err(e) = generate_retention_job(
-                    &stream_data_retention_end,
-                    &org_id,
-                    stream_type,
-                    &stream_name,
-                    extended_retention_days,
-                )
-                .await
-                {
+                if let Err(e) = generate_stream_job(&org_id, stream_type, &stream_name, now).await {
                     log::error!(
                         "[COMPACTOR] lifecycle: generate_retention_job [{org_id}/{stream_type}/{stream_name}] error: {e}"
                     );
@@ -125,6 +91,56 @@ pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+async fn generate_stream_job(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    now: DateTime<Utc>,
+) -> Result<(), anyhow::Error> {
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
+        .await
+        .unwrap_or_default();
+    let retention_days = db::organization::stream_retention_days(
+        org_id,
+        stream_type,
+        stream_name,
+        stream_settings.data_retention,
+    )
+    .await?;
+    let Some(stream_data_retention_end) = retention_end(retention_days, now) else {
+        return Ok(()); // kept forever
+    };
+
+    // quick check with the cached stream stats, if the stream has no data older than
+    // the retention boundary we can skip it without any db call.
+    let retention_end_micros = stream_data_retention_end.timestamp_micros();
+    let retention_day_start = retention_end_micros - retention_end_micros % day_micros(1);
+    let stats = infra::cache::stats::get_stream_stats(org_id, stream_name, stream_type);
+    if stats.doc_time_min > 0 && stats.doc_time_min >= retention_day_start {
+        return Ok(());
+    }
+
+    // creates jobs to delete data
+    generate_retention_job(
+        &stream_data_retention_end,
+        org_id,
+        stream_type,
+        stream_name,
+        &stream_settings.extended_retention_days,
+    )
+    .await
+}
+
+/// The time before which a stream's data is deleted; `None` keeps it forever.
+fn retention_end(retention_days: i64, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
+    (retention_days > 0).then(|| now - Duration::try_days(retention_days).unwrap())
+}
+
+/// True when the retention job owns the data at `offset`, so compacting it would conflict.
+pub(crate) fn past_retention(offset: i64, retention_days: i64, now: DateTime<Utc>) -> bool {
+    retention_end(retention_days, now).is_some_and(|end| offset <= end.timestamp_micros())
 }
 
 /// This function will split the original time range based on the exclude range
@@ -161,10 +177,7 @@ fn generate_time_ranges_for_deletion(
             if range.start > original_time_range.end {
                 None
             } else if range.end > original_time_range.end {
-                Some(TimeRange::new(
-                    range.start,
-                    original_time_range.end,
-                ))
+                Some(TimeRange::new(range.start, original_time_range.end))
             } else {
                 Some(range)
             }
@@ -174,10 +187,7 @@ fn generate_time_ranges_for_deletion(
             if range.end < last_retained_time {
                 None
             } else if range.start < last_retained_time {
-                Some(TimeRange::new(
-                    last_retained_time,
-                    range.end,
-                ))
+                Some(TimeRange::new(last_retained_time, range.end))
             } else {
                 Some(range)
             }
@@ -427,6 +437,9 @@ fn generate_local_stream_dirs(
         PathBuf::from(format!(
             "{data_stream_dir}files/{org_id}/index/{stream_name}_{stream_type}"
         )),
+        PathBuf::from(format!(
+            "{data_stream_dir}files/{org_id}/bloom/{stream_name}_{stream_type}"
+        )),
     ];
     if stream_type == StreamType::Metrics {
         dirs.push(PathBuf::from(format!(
@@ -556,8 +569,62 @@ pub async fn delete_by_date(
         return Err(e);
     }
 
+    // only tidies the settings, the next deletion retries
+    if let Err(e) = prune_partition_time_level(org_id, stream_type, stream_name).await {
+        log::warn!(
+            "[COMPACTOR] prune partition level history [{org_id}/{stream_type}/{stream_name}] failed: {e}"
+        );
+    }
+
     // mark delete done
     handle_delete_by_date_done(org_id, stream_type, stream_name, date_range).await
+}
+
+/// Drops the partition level changes that only describe days retention has deleted.
+async fn prune_partition_time_level(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Result<(), anyhow::Error> {
+    let cached = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    if cached.is_none_or(|settings| settings.partition_time_level.changes.len() < 2) {
+        return Ok(());
+    }
+    // a whole-settings write must start from what is stored, not from a cached copy
+    let schema = infra::schema::get_from_db(org_id, stream_name, stream_type).await?;
+    let Some(mut settings) = infra::schema::unwrap_stream_settings(&schema) else {
+        return Ok(());
+    };
+    let retention_days = db::organization::stream_retention_days(
+        org_id,
+        stream_type,
+        stream_name,
+        settings.data_retention,
+    )
+    .await?;
+    let Some(cutoff) =
+        level_prune_cutoff(&settings, retention_days, config::utils::time::now_micros())
+    else {
+        return Ok(());
+    };
+    if settings.partition_time_level.prune(cutoff) {
+        schema::save_stream_settings(org_id, stream_name, stream_type, settings).await?;
+    }
+    Ok(())
+}
+
+/// Days before this hold no files; extended ranges still do, `None` means no retention.
+fn level_prune_cutoff(settings: &StreamSettings, retention_days: i64, now: i64) -> Option<i64> {
+    if retention_days <= 0 {
+        return None;
+    }
+    let retention_cutoff = now - retention_days * day_micros(1);
+    let extended_start = settings
+        .extended_retention_days
+        .iter()
+        .map(|r| r.start)
+        .min();
+    Some(extended_start.map_or(retention_cutoff, |start| start.min(retention_cutoff)))
 }
 
 pub async fn delete_from_file_list(
@@ -593,16 +660,30 @@ pub async fn delete_from_file_list(
     files.sort_unstable_by(|a, b| a.key.cmp(&b.key));
 
     // write file list to storage
-    write_file_list(org_id, &files).await?;
+    write_file_list(org_id, stream_type, stream_name, &files).await?;
 
     Ok(())
 }
 
 // write file list to db, all the files should be deleted
-async fn write_file_list(org_id: &str, files: &[FileKey]) -> Result<(), anyhow::Error> {
+async fn write_file_list(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    files: &[FileKey],
+) -> Result<(), anyhow::Error> {
     let cfg = get_config();
+    let keep_deleted = cfg
+        .compact
+        .file_list_deleted_mode
+        .eq(&FileListBookKeepMode::Deleted.to_string());
     // the db layer splits each batch by date itself, so a batch may span many hours
     for events in files.chunks(cfg.compact.file_list_deleted_batch_size.max(1)) {
+        let del_items = if keep_deleted {
+            deleted_items(org_id, stream_type, stream_name, events)?
+        } else {
+            Vec::new()
+        };
         // set to db, retry 5 times
         let mut success = false;
         let created_at = Utc::now().timestamp_micros();
@@ -632,29 +713,13 @@ async fn write_file_list(org_id: &str, files: &[FileKey]) -> Result<(), anyhow::
                 continue;
             }
             // store to file_list_deleted table, pending delete
-            if cfg
-                .compact
-                .file_list_deleted_mode
-                .eq(&FileListBookKeepMode::Deleted.to_string())
-            {
-                let del_items = events
-                    .iter()
-                    .map(|v| FileListDeleted {
-                        id: 0,
-                        account: v.account.clone(),
-                        file: v.key.clone(),
-                        index_file: v.meta.index_size > 0,
-                        mindex_file: v.meta.mindex_size > 0,
-                        flattened: v.meta.flattened,
-                    })
-                    .collect::<Vec<_>>();
-                if let Err(e) =
+            if keep_deleted
+                && let Err(e) =
                     infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
-                {
-                    log::error!("[COMPACTOR] batch_add_deleted to db failed, retrying: {e}");
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                    continue;
-                }
+            {
+                log::error!("[COMPACTOR] batch_add_deleted to db failed, retrying: {e}");
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                continue;
             }
             success = true;
             break;
@@ -664,6 +729,33 @@ async fn write_file_list(org_id: &str, files: &[FileKey]) -> Result<(), anyhow::
         }
     }
     Ok(())
+}
+
+// retention drops whole hours, so no surviving file can reference the `.bf` of a deleted file
+fn deleted_items(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    files: &[FileKey],
+) -> Result<Vec<FileListDeleted>, anyhow::Error> {
+    let mut bloom_hours = Vec::with_capacity(files.len());
+    for file in files.iter().filter(|file| file.meta.bloom_ver > 0) {
+        let (_, date_key, _) = parse_file_key_columns(&file.key)?;
+        bloom_hours.push((date_key, file.meta.bloom_ver));
+    }
+    let bloom_items = bloom_files_deleted(org_id, stream_type, stream_name, bloom_hours);
+    let mut del_items = Vec::with_capacity(files.len() + bloom_items.len());
+    del_items.extend(files.iter().map(|v| FileListDeleted {
+        id: 0,
+        account: v.account.clone(),
+        file: v.key.clone(),
+        index_file: v.meta.index_size > 0,
+        mindex_file: v.meta.mindex_size > 0,
+        flattened: v.meta.flattened,
+    }));
+    del_items.extend(bloom_items);
+
+    Ok(del_items)
 }
 
 fn generate_local_dirs(
@@ -747,7 +839,7 @@ async fn handle_delete_by_date_done(
 
 #[cfg(test)]
 mod tests {
-    use config::utils::time::parse_str_to_timestamp_micros;
+    use config::{meta::stream::FileMeta, utils::time::parse_str_to_timestamp_micros};
     use itertools::Itertools;
 
     use super::*;
@@ -833,6 +925,7 @@ mod tests {
             vec![
                 PathBuf::from("/data/files/org/metrics/cpu"),
                 PathBuf::from("/data/files/org/index/cpu_metrics"),
+                PathBuf::from("/data/files/org/bloom/cpu_metrics"),
                 PathBuf::from("/data/files/org/mindex/cpu"),
             ]
         );
@@ -841,6 +934,46 @@ mod tests {
             vec![
                 PathBuf::from("/data/files/org/logs/app"),
                 PathBuf::from("/data/files/org/index/app_logs"),
+                PathBuf::from("/data/files/org/bloom/app_logs"),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_deleted_items_add_one_bloom_file_per_hour_and_version() {
+        let file = |hour: &str, name: &str, bloom_ver: i64| {
+            FileKey::new(
+                0,
+                String::new(),
+                format!("files/org/logs/app/2026/08/19/{hour}/{name}.parquet"),
+                FileMeta {
+                    bloom_ver,
+                    ..Default::default()
+                },
+                true,
+            )
+        };
+        let files = [
+            file("07", "a", 7),
+            file("07", "b", 7),
+            file("07", "c", 9),
+            file("08", "d", 7),
+            file("08", "e", 0),
+        ];
+
+        let deleted = deleted_items("org", StreamType::Logs, "app", &files).unwrap();
+
+        assert_eq!(
+            deleted.iter().map(|item| item.file.as_str()).collect_vec(),
+            [
+                "files/org/logs/app/2026/08/19/07/a.parquet",
+                "files/org/logs/app/2026/08/19/07/b.parquet",
+                "files/org/logs/app/2026/08/19/07/c.parquet",
+                "files/org/logs/app/2026/08/19/08/d.parquet",
+                "files/org/logs/app/2026/08/19/08/e.parquet",
+                "files/org/bloom/app_logs/2026/08/19/07/7.bf",
+                "files/org/bloom/app_logs/2026/08/19/07/9.bf",
+                "files/org/bloom/app_logs/2026/08/19/08/7.bf",
             ]
         );
     }
@@ -1367,5 +1500,98 @@ mod tests {
                 "ranges overlap or are out of order"
             );
         }
+    }
+
+    #[test]
+    fn test_level_prune_cutoff_keeps_the_days_extended_retention_holds() {
+        let now = 1_790_640_000_000_000; // 2026-09-29T00:00:00Z
+        let days_ago = |days: i64| now - days * day_micros(1);
+        let settings = |data_retention, extended: &[(i64, i64)]| StreamSettings {
+            data_retention,
+            extended_retention_days: extended
+                .iter()
+                .map(|&(start, end)| TimeRange::new(days_ago(start), days_ago(end)))
+                .collect(),
+            ..Default::default()
+        };
+        let cutoff = |s: &StreamSettings, days| level_prune_cutoff(s, days, now);
+
+        assert_eq!(cutoff(&settings(0, &[]), 30), Some(days_ago(30)));
+        // no retention anywhere: no day is gone, whatever the history holds
+        assert_eq!(cutoff(&settings(0, &[]), 0), None);
+        // an extended range older than the cutoff still holds files, the earliest one counts
+        assert_eq!(
+            cutoff(&settings(7, &[(20, 18), (90, 80)]), 7),
+            Some(days_ago(90))
+        );
+        // one inside the retention window changes nothing
+        assert_eq!(cutoff(&settings(30, &[(5, 3)]), 30), Some(days_ago(30)));
+    }
+
+    #[test]
+    fn test_a_shorter_default_keeps_the_data_inside_an_extended_range() {
+        let now = Utc.timestamp_nanos(1_700_000_000_000_000_000);
+        let days_ago = |days| (now - Duration::days(days)).timestamp_micros();
+        let extended = TimeRange::new(days_ago(40), days_ago(35));
+        let created_at = days_ago(100);
+        let deleted_ranges = |retention_days| {
+            let end = retention_end(retention_days, now).unwrap();
+            let last_retained = (end - Duration::days(3650)).timestamp_micros();
+            generate_time_ranges_for_deletion(
+                vec![extended.clone()],
+                TimeRange::new(created_at, end.timestamp_micros()),
+                last_retained,
+            )
+        };
+
+        // whichever side of the range the default falls on
+        for retention_days in [90, 30, 7, 3] {
+            let ranges = deleted_ranges(retention_days);
+            assert!(!ranges.is_empty(), "{retention_days}");
+            for range in &ranges {
+                assert!(!range.intersects(&extended), "{retention_days}: {range}");
+            }
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_failed_org_settings_read_skips_the_stream() {
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        infra::db_init().await.expect("meta store");
+        infra_file_list::create_table().await.unwrap();
+        let org_id = format!("retention_unreadable_{}", config::utils::time::now_micros());
+        let key = format!("{}/{org_id}", db::organization::ORG_SETTINGS_KEY_PREFIX);
+        db::put(&key, "not json".into(), infra::db::NO_NEED_WATCH, None)
+            .await
+            .unwrap();
+
+        let now = config::utils::time::now();
+        let result = generate_stream_job(&org_id, StreamType::Logs, "app", now).await;
+        assert!(result.is_err(), "the global value must not be used instead");
+        let org_prefix = format!("{org_id}/");
+        assert!(
+            !db::compact::retention::list()
+                .await
+                .unwrap()
+                .iter()
+                .any(|job| job.starts_with(&org_prefix))
+        );
+    }
+
+    #[test]
+    fn test_retention_end_follows_resolved_days_not_the_global_value() {
+        let now = Utc.timestamp_nanos(1_700_000_000_000_000_000);
+        assert_eq!(retention_end(0, now), None);
+        assert_eq!(retention_end(3, now), Some(now - Duration::days(3)));
+
+        // a stream kept forever never conflicts with retention, whatever its offset
+        assert!(!past_retention(0, 0, now));
+        let boundary = (now - Duration::days(3)).timestamp_micros();
+        assert!(past_retention(boundary, 3, now));
+        assert!(!past_retention(boundary + 1, 3, now));
     }
 }

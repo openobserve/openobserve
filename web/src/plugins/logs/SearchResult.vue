@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex h-full max-h-full w-full flex-col overflow-hidden" ref="searchListContainer">
       <!-- Section header: static at top -->
       <div
-        class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
+        class="border-card-glass-border bg-card-glass-bg flex min-h-9 shrink-0 items-center border-b max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
       >
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
@@ -64,7 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 ps-2 text-left max-md:min-w-32"
+          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 ps-2 text-left transition-opacity max-md:min-w-32"
+          :class="{ [STALE_DIM]: summaryDimmed }"
           data-test="logs-search-result-title"
           :data-search-state="
             searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'
@@ -74,13 +75,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Logs mode: structured chips -->
           <template v-if="searchObj.meta.logsVisualizeToggle !== 'patterns'">
             <template v-if="recordsChips">
-              <OTag type="logsResultChip" value="neutral" data-test="logs-result-records-chip">{{
-                recordsChips.records
-              }}</OTag>
+              <OTag
+                type="logsResultChip"
+                value="neutral"
+                class="min-w-[26ch] tabular-nums"
+                data-test="logs-result-records-chip"
+                >{{ recordsChips.records }}</OTag
+              >
               <OTag
                 type="logsResultChip"
                 value="info"
-                class="max-md:hidden"
+                class="min-w-[10ch] tabular-nums max-md:hidden"
                 data-test="logs-result-time-chip"
                 >{{ recordsChips.time }}</OTag
               >
@@ -93,7 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ recordsChips.scan }}</OTag
               >
             </template>
-            <span v-else class="min-w-0 truncate">{{ noOfRecordsTitle }}</span>
+            <span v-else-if="!summaryView.updating" class="min-w-0 truncate">{{
+              noOfRecordsTitle
+            }}</span>
           </template>
           <!-- Patterns mode: structured chips -->
           <template v-else>
@@ -172,21 +179,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>
             <!-- Refresh in bordered wrapper -->
             <div
-              class="border-card-glass-border rounded-default inline-flex h-6 items-center overflow-hidden border px-1"
+              class="border-card-glass-border rounded-default inline-flex h-6 items-center border px-1"
             >
               <ORefreshButton
+                size="inset"
                 :last-run-at="searchObj.meta.lastRunAt"
-                :loading="searchObj.loading || searchObj.loadingHistogram"
-                :disabled="searchObj.loading || searchObj.loadingHistogram"
+                :loading="searchObj.loading || histogramSettling"
+                :disabled="searchObj.loading || histogramSettling"
                 @click="$emit('run-query')"
               />
             </div>
             <!-- Action buttons -->
-            <div v-if="showInspectBtn || showWrapBtn" class="inline-flex items-center gap-0.5">
+            <div v-if="inspectAvailable || showWrapBtn" class="inline-flex items-center gap-0.5">
               <OButton
-                v-if="showInspectBtn"
+                v-if="inspectAvailable"
                 variant="outline"
                 :size="showActionLabels ? 'chip' : 'icon-chip'"
+                :disabled="!showInspectBtn"
                 @click="openSearchJobInspector"
                 data-test="logs-inspect-button"
               >
@@ -252,17 +261,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tabindex="gridLockReason ? 0 : undefined"
             :aria-disabled="gridLockReason ? true : undefined"
             :aria-describedby="gridLockReason ? 'logs-pagination-reason' : undefined"
+            class="inline-flex justify-end"
+            :class="paginationMaxPages === 5 ? 'min-w-54' : 'min-w-39'"
           >
             <OPagination
               v-if="
                 searchObj.meta.resultGrid.showPagination &&
                 searchObj.meta.logsVisualizeToggle === 'logs'
               "
-              :disable="searchObj.loading || !!gridLockReason"
+              :disable="searchObj.loading || histogramSettling || !!gridLockReason"
               :data-locked="gridLockReason ? 'true' : undefined"
               v-model="pageNumberInput"
-              :key="searchObj.data.queryResults.total + '-' + searchObj.data.resultGrid.currentPage"
-              :max="pageCount"
+              :max="summaryView.pageCount"
               :max-pages="paginationMaxPages"
               class="paginator-section"
               @update:model-value="getPageData('pageChange')"
@@ -281,11 +291,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Outside scrollContainerRef so the results progress bar can't scroll away. -->
       <div class="relative">
-        <LoadingProgress
+        <div
           data-test="logs-results-progress"
-          :loading="searchObj.loading"
-          :loadingProgressPercentage="searchObj.loadingProgressPercentage || 0"
-        />
+          class="pointer-events-none absolute inset-x-0 top-0 z-999 h-0.5"
+          :class="showResultsLoader ? 'opacity-100' : 'opacity-0'"
+        >
+          <div
+            v-if="showResultsLoader"
+            role="progressbar"
+            :aria-label="t('search.resultsProgressLabel')"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-valuenow="resultsProgressWidth"
+            class="bg-accent h-full transition-[width] duration-300 ease-out"
+            :style="{ width: `${resultsProgressWidth}%` }"
+          />
+          <span
+            v-if="scannedSize"
+            class="text-text-secondary bg-card-glass-bg rounded-default absolute end-2 top-1 px-1.5 text-xs tabular-nums"
+            data-test="logs-result-scan-progress"
+            >{{ t("search.scannedSoFar", { size: scannedSize }) }}</span
+          >
+        </div>
       </div>
 
       <!-- Combined scroll: histogram + logs/patterns scroll together vertically.
@@ -307,20 +334,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.histogram.errorCode != -1
           "
         >
-          <!-- Streaming progress bar for the histogram chart: keeps the chart
-            visible while it refreshes/replaces, mirroring the results table. -->
-          <LoadingProgress
-            :loading="searchObj.loadingHistogram"
-            :loadingProgressPercentage="searchObj.loadingHistogramProgressPercentage || 0"
-          />
           <div
-            v-if="
-              searchObj.meta.showHistogram &&
-              (searchObj.data?.queryResults?.aggs?.length > 0 ||
-                (plotChart && Object.keys(plotChart)?.length > 0))
-            "
+            v-if="histogramView.phase === 'chart'"
             ref="histogramChartWrap"
-            class="histogram-chart"
+            class="histogram-chart transition-opacity"
+            :class="{
+              invisible: !histogramPainted,
+              [STALE_DIM]: histogramDimmed,
+            }"
             @click="onHistogramAreaClick"
           >
             <ChartRenderer
@@ -329,14 +350,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data="plotChart"
               class="h-full w-full"
               @updated:dataZoom="onChartUpdate"
+              @finished="onHistogramFinished"
             />
           </div>
 
           <div
-            v-else-if="
-              searchObj.meta.showHistogram && (searchObj.loadingHistogram || searchObj.loading)
+            v-if="
+              histogramView.phase === 'placeholder' ||
+              (histogramView.phase === 'chart' && !histogramPainted)
             "
             class="histogram-skeleton"
+            :class="{ 'histogram-skeleton--over-chart': histogramView.phase === 'chart' }"
             data-test="logs-search-histogram-skeleton"
           >
             <!-- main row: y-axis labels + plot area -->
@@ -366,9 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Same no-data treatment as dashboard panels (PanelSchemaRenderer);
                inline min-height/padding overridden to fit the 6.25rem strip. -->
           <OEmptyState
-            v-else-if="
-              searchObj.meta.showHistogram && !searchObj.loadingHistogram && !searchObj.loading
-            "
+            v-else-if="histogramView.phase === 'empty'"
             size="inline"
             icon="bar-chart"
             :title="t('logs.searchResult.noData')"
@@ -376,15 +398,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-no-data-histogram"
             class="histogram-empty !min-h-0 !p-2"
           />
-
-          <div
-            class="histogram-empty"
-            v-else-if="searchObj.meta.showHistogram && Object.keys(plotChart)?.length === 0"
-          >
-            <h5 class="text-center">
-              <span class="histogram-empty__message" style="color: transparent">.</span>
-            </h5>
-          </div>
         </div>
         <div
           :style="histogramPinStyle"
@@ -503,6 +516,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ searchObj?.data?.functionError }}</pre>
           </div>
 
+          <LogsTableSkeleton v-if="showTableSkeleton" />
+
           <!-- Row/cell actions live in a right-click context menu as well as the
                hover overlay: the overlay can only be offered on columns wide
                enough to host it, while the menu is anchored to the pointer so
@@ -511,16 +526,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #trigger>
               <div class="contents" @contextmenu.capture="handleTableContextMenu">
                 <OTable
+                  v-show="!showTableSkeleton"
                   ref="searchTableRef"
-                  :columns="getColumns || []"
-                  :data="searchObj.data.queryResults?.hits || []"
+                  :columns="tableColumns"
+                  :data="tableRows"
                   :wrap="searchObj.meta.toggleSourceWrap"
                   :cell-overflow-tooltip="false"
-                  :loading="isResultsSkeleton"
-                  :streaming="isResultsStreaming"
+                  :loading="isResultsSkeleton && !showStaleRows"
+                  :streaming="isResultsStreaming || showStaleRows"
+                  :data-stale-rows="showStaleRows ? 'true' : undefined"
                   :row-key="logsRowKey"
                   :row-height="20"
                   virtual-scroll
+                  skeleton-on-refetch
                   :fill-height="false"
                   :scroll-el="scrollContainerRef"
                   :horizontal-scroll="true"
@@ -545,6 +563,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)
                       ? 'min-h-full!'
                       : 'min-h-[calc(100%-6.25rem)]!',
+                    showStaleRows ? 'pointer-events-none' : '',
+                    rowsDimmed ? STALE_DIM : '',
                   ]"
                   @update:columnSizes="handleColumnSizesUpdate"
                   @column-order-change="handleColumnOrderUpdate"
@@ -558,13 +578,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- FTS-highlighted cell content; falls back to the plain value. -->
                   <template
-                    v-for="col in getColumns || []"
+                    v-for="col in tableColumns"
                     :key="col.id"
                     #[`cell-${col.id}`]="{ row, value }"
                   >
                     <span
                       v-if="logsCellHtml(col.id, row)"
                       class="log-cell-html"
+                      :class="severityFieldTextClass(col.id, value)"
                       :data-test="
                         col.id === logsTimestampCol ? 'log-row-timestamp-value' : undefined
                       "
@@ -572,6 +593,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <span
                       v-else
+                      :class="severityFieldTextClass(col.id, value)"
                       :data-test="
                         col.id === logsTimestampCol ? 'log-row-timestamp-value' : undefined
                       "
@@ -601,7 +623,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
                       :hide-search-term-actions="false"
                       :hide-ai="column.id === 'source'"
-                      @copy="copyLogToClipboard"
+                      copy-in-place
                       @add-search-term="addSearchTerm"
                       @send-to-ai-chat="sendToAiChat"
                     />
@@ -609,6 +631,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Expanded row → JSON preview -->
                   <template #expansion="{ row }">
+                    <div
+                      v-if="quickModeHiddenFields(row)"
+                      class="text-text-secondary flex items-center gap-2 px-2 pt-1.5 text-xs"
+                      data-test="logs-expanded-quick-mode-hint"
+                    >
+                      <span>
+                        {{
+                          t("search.quickModeHiddenFields", {
+                            shown: quickModeHiddenFields(row)!.shown,
+                            total: quickModeHiddenFields(row)!.total,
+                          })
+                        }}
+                      </span>
+                      <OButton
+                        variant="ghost"
+                        size="sm"
+                        data-test="logs-expanded-quick-mode-off"
+                        @click="turnOffQuickMode"
+                      >
+                        {{ t("search.turnOffQuickMode") }}
+                      </OButton>
+                    </div>
                     <JsonPreview
                       :value="row"
                       :index="logsRowIndex(row)"
@@ -616,7 +660,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       mode="expanded"
                       :highlight-query="searchObj.data.highlightQuery"
                       :hide-search-term-actions="false"
-                      @copy="copyLogToClipboard"
+                      copy-in-place
                       @add-field-to-table="addFieldToTable"
                       @add-search-term="addSearchTerm"
                       @view-trace="redirectToTraces(row)"
@@ -901,6 +945,7 @@ import { usePagination } from "@/composables/useLogs/usePagination";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { searchState } from "@/composables/useLogs/searchState";
+import { resolveHistogramView, useSettledSummary } from "@/composables/useLogs/settledResults";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import {
   failPendingPageNavigation,
@@ -925,15 +970,16 @@ import LogLineLinkPopover from "@/plugins/logs/LogLineLinkPopover.vue";
 import { traceDetailsLocation } from "@/composables/useLogs/useViewTraceAction";
 import { matchDetailRow, trustworthyFields } from "@/utils/logs/detailRowMatch";
 import { acceptsPageLoad, type PageLoad, type PendingPageSelection } from "@/utils/pageCrossing";
-import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { extractSeverity } from "@/utils/sourceEventSeverity";
 import config from "@/aws-exports";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { quickModeHiddenFieldCount } from "@/utils/query/quickModeFieldList";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -950,7 +996,7 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import LogsTableSkeleton from "@/plugins/logs/LogsTableSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import {
@@ -960,8 +1006,18 @@ import {
 import LogsMissingStreamBanner from "@/plugins/logs/LogsMissingStreamBanner.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
-import { severityIndicatorColor, severityRowClass } from "@/utils/logs/statusParser";
+import {
+  severityFieldTextClass,
+  severityIndicatorColor,
+  severityRowClass,
+} from "@/utils/logs/statusParser";
 import useLogSeverity from "@/composables/useLogs/useLogSeverity";
+import {
+  useDelayedFlag,
+  useResultsLoadingIndicator,
+} from "@/composables/useLogs/useResultsLoadingIndicator";
+import { useSettledValue } from "@/composables/useSettledValue";
+import { STALE_DIM, STALE_DIM_DELAY_MS } from "@/lib/styles/motion";
 import { isFilterableLogField } from "@/utils/logs/streamNameColumn";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
@@ -984,7 +1040,6 @@ export default defineComponent({
     OSelect,
     OPagination,
     OEmptyState,
-    LoadingProgress,
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -993,9 +1048,12 @@ export default defineComponent({
     OTable: defineAsyncComponent(() => import("@/lib/core/Table/OTable.vue")),
     CellActions,
     LogsMissingStreamBanner,
+    LogsTableSkeleton,
     O2AIContextAddBtn,
     JsonPreview: defineAsyncComponent(() => import("./JsonPreview.vue")),
-    TelemetryCorrelationDashboard,
+    TelemetryCorrelationDashboard: defineAsyncComponent(
+      () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
+    ),
     PatternList: defineAsyncComponent(() => import("./patterns/PatternList.vue")),
     PatternDetailsDialog: defineAsyncComponent(() => import("./patterns/PatternDetailsDialog.vue")),
     OIcon,
@@ -1259,7 +1317,7 @@ export default defineComponent({
     // `titleParts`, never the rendered title — parsing that back apart only worked
     // while it was hardcoded English and breaks in every other locale.
     const recordsChips = computed(() => {
-      const parts = searchObj.data.histogram.chartParams.titleParts;
+      const parts = summaryView.value.parts;
       if (!parts) return null;
 
       return {
@@ -1303,7 +1361,7 @@ export default defineComponent({
     const { refreshPagination } = useSearchStream(t);
     const { refreshPartitionPagination, refreshJobPagination } = usePagination();
     const { updatedLocalLogFilterField } = logsUtils();
-    const { extractFTSFields, filterHitsColumns } = useStreamFields();
+    const { extractFTSFields, filterHitsColumns, updateGridColumns } = useStreamFields();
 
     const { reorderSelectedFields, getFilterExpressionByFieldType, resolveDefaultColumns } =
       useLogs(t);
@@ -1402,6 +1460,11 @@ export default defineComponent({
     );
 
     const pageNumberInput = ref(1);
+    // A reset to page 1 from outside the pager would otherwise leave it on the old page.
+    watch(
+      () => searchObj.data.resultGrid.currentPage,
+      (page) => (pageNumberInput.value = page),
+    );
     const totalHeight = ref(0);
 
     // Histogram brush selection, read by the Drill down page (Index.vue)
@@ -1442,6 +1505,7 @@ export default defineComponent({
 
     // Flag to prevent duplicate correlation API calls
     const correlationFetchInProgress = ref(false);
+    const { locked: correlationLicenseLocked } = useLicenseLock("correlation");
 
     const shouldShowInlineDialog = computed(() => {
       return (
@@ -1732,6 +1796,8 @@ export default defineComponent({
     const columnSizes = ref({});
 
     const reDrawChart = () => {
+      // Partitions stream in while loading; the chart paints once when the histogram settles.
+      if (searchObj.loadingHistogram) return;
       if (
         Object.prototype.hasOwnProperty.call(searchObj.data.histogram, "xData") &&
         searchObj.data.histogram.xData.length > 0
@@ -1749,6 +1815,8 @@ export default defineComponent({
         } else {
           plotChart.value = convertLogData(xData, yData, chartParams);
         }
+        // An animated first paint grows the bars out of empty axes, which reads as another flicker.
+        if (plotChart.value?.options) plotChart.value.options.animation = false;
       }
     };
 
@@ -1808,7 +1876,7 @@ export default defineComponent({
 
     const openCorrelationFromLog = async (logData: any) => {
       // Prevent duplicate calls - if a fetch is already in progress, skip
-      if (correlationFetchInProgress.value) {
+      if (correlationFetchInProgress.value || correlationLicenseLocked.value) {
         return;
       }
 
@@ -1981,6 +2049,110 @@ export default defineComponent({
     );
     const searchAroundShown = () => searchObj.data.searchAround?.indexTimestamp > 0;
     const autoRefreshOn = () => Number(searchObj.meta.refreshInterval ?? 0) > 0;
+    // The histogram response lands frames before ECharts paints it, so the run settles on the paint.
+    const CHART_PAINT_WAIT_MS = 1500;
+    const chartPaintPending = ref(false);
+    let chartPaintTimer: ReturnType<typeof setTimeout> | undefined;
+    const settleChartPaint = () => {
+      clearTimeout(chartPaintTimer);
+      chartPaintPending.value = false;
+    };
+    // Sync, so the summary never settles in the gap between the response and the redraw.
+    watch(
+      () => !!searchObj.loadingHistogram,
+      (loadingNow, loadingBefore) => {
+        settleChartPaint();
+        if (!loadingBefore || loadingNow || !searchObj.meta.showHistogram || autoRefreshOn())
+          return;
+        chartPaintPending.value = true;
+        chartPaintTimer = setTimeout(settleChartPaint, CHART_PAINT_WAIT_MS);
+      },
+      { flush: "sync" },
+    );
+    const histogramSettling = computed(
+      () => !!searchObj.loadingHistogram || chartPaintPending.value,
+    );
+    const summaryView = useSettledSummary(() => ({
+      loading: !!searchObj.loading,
+      loadingHistogram: histogramSettling.value,
+      parts: searchObj.data.histogram.chartParams.titleParts,
+      // Search-around clears the chips on purpose, so its rows must not wait for parts that never come.
+      hasHits: (searchObj.data.queryResults?.hits?.length ?? 0) > 0 && !searchAroundShown(),
+      failed: !!searchObj.data.errorMsg,
+      pageCount: pageCount.value,
+    }));
+    const summaryDimmed = useDelayedFlag(
+      () => summaryView.value.updating && !autoRefreshOn(),
+      STALE_DIM_DELAY_MS,
+    );
+    // One bar spans the rows and the histogram: once the rows finish it holds full until the histogram lands, so it never refills.
+    const rowsDoneFirst = ref(false);
+    watch(
+      () => searchObj.loading,
+      (loading, wasLoading) => {
+        rowsDoneFirst.value = !!wasLoading && !loading && !!searchObj.loadingHistogram;
+      },
+    );
+    const runProgressPercentage = computed(() => {
+      if (searchObj.loading) return searchObj.loadingProgressPercentage || 0;
+      if (rowsDoneFirst.value) return 100;
+      return searchObj.loadingHistogram
+        ? searchObj.loadingHistogramProgressPercentage || 0
+        : searchObj.loadingProgressPercentage || 0;
+    });
+    const histogramView = computed(() =>
+      resolveHistogramView({
+        showHistogram: !!searchObj.meta.showHistogram,
+        hasChart: Object.keys(plotChart.value ?? {}).length > 0,
+        loading: !!searchObj.loading,
+        loadingHistogram: !!searchObj.loadingHistogram,
+        histogramPoints: searchObj.data.histogram?.xData?.length ?? 0,
+        liveMode: autoRefreshOn(),
+      }),
+    );
+    const histogramDimmed = useDelayedFlag(
+      () => histogramView.value.stale || chartPaintPending.value,
+      STALE_DIM_DELAY_MS,
+    );
+    const histogramPainted = ref(false);
+    const onHistogramFinished = () => {
+      histogramPainted.value = true;
+      settleChartPaint();
+    };
+    let histogramPaintFrame = 0;
+    // Reveal on "finished" so the bars never grow from empty axes; the frame cap only guards a lost event.
+    const revealHistogramIfNeverFinished = (frame = 0) => {
+      histogramPaintFrame = requestAnimationFrame(() => {
+        if (histogramPainted.value) return;
+        if (frame >= 90) histogramPainted.value = true;
+        else revealHistogramIfNeverFinished(frame + 1);
+      });
+    };
+    watch(
+      () => histogramView.value.phase === "chart",
+      (shown) => {
+        cancelAnimationFrame(histogramPaintFrame);
+        histogramPainted.value = false;
+        if (shown) revealHistogramIfNeverFinished();
+      },
+      { immediate: true },
+    );
+    watch(
+      () => !!searchObj.loadingHistogram,
+      (loadingNow, loadingBefore) => {
+        if (loadingBefore && !loadingNow && searchObj.meta.showHistogram) reDrawChart();
+        const chartComing =
+          histogramView.value.phase === "chart" &&
+          searchObj.meta.logsVisualizeToggle !== "patterns" &&
+          !searchObj.data.histogram?.errorMsg &&
+          searchObj.data.histogram?.errorCode != -1;
+        if (!chartComing) settleChartPaint();
+      },
+    );
+    onBeforeUnmount(() => {
+      cancelAnimationFrame(histogramPaintFrame);
+      clearTimeout(chartPaintTimer);
+    });
     const canChangePage = computed(
       () =>
         !!searchObj.meta.resultGrid.showPagination &&
@@ -2339,7 +2511,8 @@ export default defineComponent({
     const stopHitsComplete = onHitsComplete((payload) => {
       if (payload.type !== "search" || navigation().pendingPageSelection) return;
       if (!searchObj.meta.showDetailTab || !detailRow.value) return;
-      if (detailIsShared.value && sharedLineRecord.value) mapSharedLine();
+      if (!sharedLineRecord.value) detailIsShared.value = false;
+      if (detailIsShared.value) mapSharedLine();
       else rematchDetailRow();
     });
 
@@ -2353,6 +2526,9 @@ export default defineComponent({
       },
       { immediate: true },
     );
+
+    // The open record is component state, so a drawer left open across an unmount has nothing to show.
+    if (searchObj.meta.showDetailTab && !detailRow.value) searchObj.meta.showDetailTab = false;
 
     const endSharedDetail = () => {
       if (detailIsShared.value) clearPermalink();
@@ -2463,6 +2639,45 @@ export default defineComponent({
     // First paint has nothing to show, so the skeleton is right; once rows exist we switch to `streaming` so partial results stay on screen.
     const isResultsSkeleton = computed(() => searchObj.loading && !hasResultRows.value);
     const isResultsStreaming = computed(() => searchObj.loading && hasResultRows.value);
+    const { showLoader: showResultsLoader, scannedSize } = useResultsLoadingIndicator(
+      searchObj,
+      () => !!searchObj.loading || histogramSettling.value,
+    );
+    // A floor keeps the line visible before the first progress event arrives.
+    const resultsProgressWidth = computed(() =>
+      Math.round(Math.min(100, Math.max(5, runProgressPercentage.value))),
+    );
+
+    const streamsKey = () =>
+      `${searchObj.data.stream.streamType}:${searchObj.data.stream.selectedStream.join(",")}`;
+    // A re-run empties the results before its first rows land, so the last rows of the same streams stay up, dimmed, meanwhile; the columns stay the ones they were drawn with.
+    const keptRows = useSettledValue(() => ({
+      value: hasResultRows.value
+        ? {
+            hits: searchObj.data.queryResults.hits as Record<string, unknown>[],
+            columns: getColumns.value,
+          }
+        : null,
+      busy: !!searchObj.loading && !hasResultRows.value,
+      key: streamsKey(),
+      live: autoRefreshOn(),
+    }));
+    const showStaleRows = computed(() => keptRows.state.value.stale);
+    // With no columns yet the table draws no skeleton rows; this is also what SearchResultSkeleton shows before it.
+    const showTableSkeleton = computed(
+      () => isResultsSkeleton.value && !showStaleRows.value && getColumns.value.length === 0,
+    );
+    const tableColumns = computed(() =>
+      showStaleRows.value && keptRows.state.value.value
+        ? keptRows.state.value.value.columns
+        : getColumns.value,
+    );
+    // A fresh array, because the table caches cell values per data array and the stale rows may first have been drawn with restored columns that lost their formatters.
+    const tableRows = computed(() =>
+      showStaleRows.value && keptRows.state.value.value
+        ? [...keptRows.state.value.value.hits]
+        : searchObj.data.queryResults?.hits || [],
+    );
 
     const getPartitionPaginations = computed(() => {
       return searchObj.data.queryResults?.partitionDetail?.paginations || [];
@@ -2535,11 +2750,23 @@ export default defineComponent({
       return searchObj.meta.resetPlotChart;
     });
 
+    const resolveFtsDefaultColumns = () => {
+      const streamFields = searchObj.data.stream.selectedStreamFields;
+      // Mid-rebuild the list is empty, and picking from it would claim _source as the resolved default.
+      if (!streamFields?.length) return;
+      const hits = searchObj.data.queryResults?.hits || [];
+      const globalFtsKeys = store?.state?.zoConfig?.default_fts_keys || [];
+      const ftsDefaults = resolveDefaultColumns(streamFields, globalFtsKeys, hits);
+      // ftsDefaults is [] when no candidate has filled values → falls through to _source
+      searchObj.data.stream.selectedFields = ftsDefaults;
+      // Marked a system pick so it is never persisted, where it would leak back into later searches and SQL mode as a user choice.
+      searchObj.meta.isFtsDefaultColumn = ftsDefaults.length > 0;
+    };
+
     watch(
       () => searchObj.loading,
       (loading, wasLoading) => {
         if (wasLoading && !loading && searchObj.meta.searchApplied) {
-          searchObj.meta.lastRunAt = Date.now();
           // FTS default columns are a convenience for the default logs view only.
           // In SQL mode the user authored the exact SELECT list (custom queries,
           // CTEs, aggregates), so their result columns are authoritative — never
@@ -2559,21 +2786,42 @@ export default defineComponent({
           const currentFields = searchObj.data.stream.selectedFields;
           const canResolveDefault = !currentFields.length || searchObj.meta.isFtsDefaultColumn;
           if (canResolveDefault) {
-            const hits = searchObj.data.queryResults?.hits || [];
-            const globalFtsKeys = store?.state?.zoConfig?.default_fts_keys || [];
-            const ftsDefaults = resolveDefaultColumns(
-              searchObj.data.stream.selectedStreamFields,
-              globalFtsKeys,
-              hits,
-            );
-            // ftsDefaults is [] when no candidate has filled values → falls through to _source
-            searchObj.data.stream.selectedFields = ftsDefaults;
-            // Mark this as a system pick so it is not persisted to logFilterField.
-            // A stale persisted FTS default would otherwise leak back into later
-            // searches (and SQL mode) as if the user had chosen it.
-            searchObj.meta.isFtsDefaultColumn = ftsDefaults.length > 0;
+            resolveFtsDefaultColumns();
           }
         }
+      },
+    );
+
+    // Rows paint before the post-search column pass, so without this a first search draws them as raw source for a moment.
+    watch(
+      hasResultRows,
+      (hasRows, hadRows) => {
+        if (!hasRows || hadRows || !searchObj.loading) return;
+        if (searchObj.meta.sqlMode || columnsFromUrl.value) return;
+        if (searchObj.data.stream.selectedFields.length) return;
+        resolveFtsDefaultColumns();
+        if (searchObj.data.stream.selectedFields.length) updateGridColumns();
+      },
+      { flush: "sync" },
+    );
+
+    // extractFields() can still be rebuilding the emptied field list when the search finishes, and the resolution above then has no candidate to pick.
+    watch(
+      () => searchObj.data.stream.selectedStreamFields?.length ?? 0,
+      (count, before) => {
+        if (!count || before || searchObj.loading || !searchObj.meta.searchApplied) return;
+        if (searchObj.meta.sqlMode || columnsFromUrl.value) return;
+        if (searchObj.data.stream.selectedFields.length && !searchObj.meta.isFtsDefaultColumn)
+          return;
+        resolveFtsDefaultColumns();
+      },
+    );
+
+    // Stamped when the histogram has landed too, so the refresh label changes with the chips, not before them.
+    watch(
+      () => searchObj.loading || histogramSettling.value,
+      (busy, wasBusy) => {
+        if (wasBusy && !busy && searchObj.meta.searchApplied) searchObj.meta.lastRunAt = Date.now();
       },
     );
 
@@ -2768,6 +3016,8 @@ export default defineComponent({
     });
     const logsRowIndex = (row: any): number => logsHitIndexMap.value.get(row) ?? -1;
     const logsCellHtml = (columnId: string, row: any): string | null => {
+      // The highlight cache is keyed by row position in the current hits, which stale rows no longer match.
+      if (showStaleRows.value) return null;
       const idx = logsRowIndex(row);
       if (idx < 0) return null;
       return (processedResults.value as any)[`${columnId}_${idx}`] ?? null;
@@ -2843,6 +3093,21 @@ export default defineComponent({
     // the value off a single click. The parent already tracks `expandedLogs` as
     // hit indices, so use those directly.
     const logsRowKey = (row: any): string => String(logsRowIndex(row));
+
+    // Quick mode fetches only the interesting fields; say so in the expanded row.
+    const quickModeHiddenFields = (row: any) =>
+      quickModeHiddenFieldCount(row, {
+        quickMode: !!searchObj.meta.quickMode,
+        sqlMode: !!searchObj.meta.sqlMode,
+        streamCount: searchObj.data.stream.selectedStream.length,
+        interestingFields: searchObj.data.stream.interestingFieldList,
+        streamFields: searchObj.data.stream.selectedStreamFields,
+        allFieldsName: store.state.zoConfig?.all_fields_name,
+      });
+    const turnOffQuickMode = () => {
+      searchObj.meta.quickMode = false;
+      emit("run-query");
+    };
     const expandedLogIds = computed<string[]>(() =>
       ((props.expandedLogs as number[]) || []).map(String),
     );
@@ -2874,6 +3139,17 @@ export default defineComponent({
       gridLockReason,
       activeRowIndex,
       pageCount,
+      summaryView,
+      summaryDimmed,
+      histogramDimmed,
+      rowsDimmed: keptRows.dimmed,
+      STALE_DIM,
+      runProgressPercentage,
+      histogramView,
+      histogramSettling,
+      chartPaintPending,
+      onHistogramFinished,
+      histogramPainted,
       canChangePage,
       hasPrevPage,
       hasNextPage,
@@ -2926,8 +3202,11 @@ export default defineComponent({
       getLogRowStatusColor,
       getLogRowClass,
       logRowSeveritySrText,
+      severityFieldTextClass,
       expandedLogIds,
       onExpandedLogIdsChange,
+      quickModeHiddenFields,
+      turnOffQuickMode,
       openLogDetailsByRow,
       isFunctionErrorOpen,
       contextCell,
@@ -2974,6 +3253,13 @@ export default defineComponent({
       hasResultRows,
       isResultsSkeleton,
       isResultsStreaming,
+      showResultsLoader,
+      scannedSize,
+      resultsProgressWidth,
+      showStaleRows,
+      showTableSkeleton,
+      tableColumns,
+      tableRows,
       reorderSelectedFields,
       getPaginations,
       refreshPagination,
@@ -3045,13 +3331,18 @@ export default defineComponent({
     showActionLabels() {
       return this.containerWidth >= 900;
     },
-    showInspectBtn() {
+    inspectAvailable() {
       return (
-        this.searchObj.data?.queryResults?.hits?.length > 0 &&
-        this.searchObj.data.lastSearchTraceId &&
         this.config.isEnterprise == "true" &&
         this.config.isCloud == "false" &&
-        this.store.state.zoConfig.search_inspector_enabled
+        !!this.store.state.zoConfig.search_inspector_enabled
+      );
+    },
+    showInspectBtn() {
+      return (
+        this.inspectAvailable &&
+        this.searchObj.data?.queryResults?.hits?.length > 0 &&
+        this.searchObj.data.lastSearchTraceId
       );
     },
     showWrapBtn() {
@@ -3303,8 +3594,10 @@ export default defineComponent({
   border-radius: 0.5rem;
 }
 
-.histogram-empty__message {
-  min-height: 2rem;
+.histogram-skeleton--over-chart {
+  position: absolute;
+  top: 0.25rem;
+  inset-inline: 0;
 }
 
 .histogram-skeleton {
@@ -3362,13 +3655,15 @@ export default defineComponent({
   overflow: hidden;
   position: relative;
 
+  /* Moved with transform: animating `left` is a layout shift on every frame. */
   &::after {
     content: "";
     position: absolute;
     top: 0;
-    left: -100%;
+    left: 0;
     width: 100%;
     height: 100%;
+    transform: translateX(-100%);
     background: linear-gradient(
       90deg,
       transparent 0%,
@@ -3404,10 +3699,10 @@ export default defineComponent({
 
 @keyframes histogram-bar-shimmer {
   from {
-    left: -100%;
+    transform: translateX(-100%);
   }
   to {
-    left: 100%;
+    transform: translateX(100%);
   }
 }
 

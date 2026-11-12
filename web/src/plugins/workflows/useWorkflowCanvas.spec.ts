@@ -18,7 +18,7 @@
 // response (errors as an ARRAY, per-node inputs as a MAP) into the shared
 // testRun.result shape the canvas badges + step drawer read.
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import i18nInstance from "@/locales";
 
 const t = (i18nInstance.global as any).t;
@@ -313,6 +313,92 @@ describe("loadWorkflowRun — history run response mapping", () => {
     });
   });
 
+  it("folds a stored Branch Run Step's probes instead of reporting them as ghosts", async () => {
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf1",
+      name: "wf",
+      nodes: [
+        {
+          id: "b1",
+          data: { node_type: "branch", cases: [{ handle: "case_0" }], else_handle: "else" },
+        },
+        { id: "d0", data: { node_type: "destination" } },
+        { id: "d1", data: { node_type: "destination" } },
+      ],
+      edges: [
+        { source: "b1", sourceHandle: "case_0", target: "d0" },
+        { source: "b1", sourceHandle: "else", target: "d1" },
+      ],
+    } as any;
+    mockRun.mockResolvedValue({
+      data: {
+        errors: { data: [] },
+        data: {
+          input_map: {
+            b1: [{ a: 1 }, { a: 2 }, { a: 3 }],
+            "b1::path::case_0": [{ a: 1 }, { a: 2 }],
+            "b1::path::else": [{ a: 3 }],
+          },
+          output_map: {
+            b1: [{ a: 1 }, { a: 2 }, { a: 3 }],
+            "b1::path::case_0": [{ a: 1 }, { a: 2 }],
+            "b1::path::else": [{ a: 3 }],
+          },
+        },
+      },
+    });
+    await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "probe" });
+    const res: any = workflowObj.testRun.result;
+    expect(res.ghostNodeIds).toEqual([]);
+    expect(res.inputs).toEqual({ b1: [{ a: 1 }, { a: 2 }, { a: 3 }] });
+    expect(res.outputs).toEqual({
+      b1: { case_0: [{ a: 1 }, { a: 2 }], else: [{ a: 3 }] },
+    });
+  });
+
+  it("gives a stored run's wired path with no probe key an empty list, as a live Run Step does", async () => {
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf1",
+      name: "wf",
+      nodes: [
+        { id: "b1", data: { node_type: "branch", cases: [{ handle: "case_0" }] } },
+        { id: "d0", data: { node_type: "destination" } },
+        { id: "d1", data: { node_type: "destination" } },
+      ],
+      edges: [
+        { source: "b1", sourceHandle: "case_0", target: "d0" },
+        { source: "b1", sourceHandle: "else", target: "d1" },
+      ],
+    } as any;
+    mockRun.mockResolvedValue({
+      data: {
+        errors: { data: [] },
+        data: {
+          input_map: { b1: [{ a: 1 }], "b1::path::case_0": [{ a: 1 }] },
+          output_map: { b1: [{ a: 1 }], "b1::path::case_0": [{ a: 1 }] },
+        },
+      },
+    });
+    await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "probe-gap" });
+    const res: any = workflowObj.testRun.result;
+    expect(res.ghostNodeIds).toEqual([]);
+    expect(res.outputs).toEqual({ b1: { case_0: [{ a: 1 }], else: [] } });
+  });
+
+  it("leaves a run without probes exactly as stored", async () => {
+    const outputMap = { n1: [{ a: 1 }], n2: { "case-0": [{ a: 1 }] } };
+    mockRun.mockResolvedValue({
+      data: {
+        errors: { data: [] },
+        data: { input_map: { n1: [{ a: 1 }] }, output_map: outputMap },
+      },
+    });
+    await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "plain" });
+    const res: any = workflowObj.testRun.result;
+    expect(res.outputs).toEqual(outputMap);
+    expect(res.ghostNodeIds).toEqual([]);
+  });
+
   it("returns ok:false with the backend message on failure", async () => {
     mockRun.mockRejectedValue({ response: { data: { message: "nope" } } });
     const r = await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r4" });
@@ -427,6 +513,47 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     // Only the run node counts as ran — nothing upstream/downstream executed.
     const res: any = workflowObj.testRun.result;
     expect(res.ranNodeIds).toEqual(["f"]);
+  });
+
+  it("Run Step on a Branch probes each wired path and reports what each one routed", async () => {
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf1",
+      name: "wf",
+      nodes: [
+        {
+          id: "b",
+          data: {
+            node_type: "branch",
+            cases: [{ handle: "case-0" }, { handle: "case-1" }],
+            else_handle: "else",
+          },
+        },
+        { id: "d0", data: { node_type: "destination" } },
+        { id: "d1", data: { node_type: "destination" } },
+      ],
+      edges: [
+        { source: "b", sourceHandle: "case-0", target: "d0" },
+        { source: "b", sourceHandle: "case-1", target: "d1" },
+      ],
+    } as any;
+    mockTest.mockResolvedValue({
+      data: {
+        inputs: { b: [{ a: 1 }, { a: 2 }], "b::path::case-0": [{ a: 1 }] },
+        outputs: { b: [{ a: 1 }], "b::path::case-0": [{ a: 1 }] },
+      },
+    });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "b", singleNode: true });
+    const arg = mockTest.mock.calls[0][0];
+    // The server drops records on a handle without an edge, so every wired path needs a target.
+    expect(arg.workflow.nodes.map((n: any) => n.id)).toEqual([
+      "b",
+      "b::path::case-0",
+      "b::path::case-1",
+    ]);
+    expect(arg.workflow.edges.map((e: any) => e.source_handle)).toEqual(["case-0", "case-1"]);
+    const res: any = workflowObj.testRun.result;
+    expect(res.inputs).toEqual({ b: [{ a: 1 }, { a: 2 }] });
+    expect(res.outputs).toEqual({ b: { "case-0": [{ a: 1 }], "case-1": [] } });
   });
 
   it("Run Step accumulates: a second node's run keeps the first node's result", async () => {
@@ -3447,26 +3574,57 @@ describe("useWorkflowCanvas — flushing test state to the server", () => {
 // no stored input, and the endpoint answers 400 "Errored run info not found".
 describe("isRetryableRun — the gate that keeps retry off runs the backend must refuse", () => {
   it("accepts a failed run from a real trigger", () => {
-    expect(isRetryableRun({ event_type: "AlertFired", error: "boom" })).toBe(true);
+    expect(isRetryableRun({ event_type: "AlertFired", status: "failed", error: "boom" })).toBe(
+      true,
+    );
   });
 
   it("accepts the other real trigger types", () => {
     for (const et of ["IncidentEvent", "Webhook", "Manual"]) {
-      expect(isRetryableRun({ event_type: et, error: "boom" })).toBe(true);
+      expect(isRetryableRun({ event_type: et, status: "failed", error: "boom" })).toBe(true);
     }
   });
 
   it("rejects a SUCCESSFUL run — there is nothing to replay", () => {
-    expect(isRetryableRun({ event_type: "AlertFired", error: "" })).toBe(false);
+    expect(isRetryableRun({ event_type: "AlertFired", status: "succeeded", error: "" })).toBe(
+      false,
+    );
     expect(isRetryableRun({ event_type: "AlertFired" })).toBe(false);
   });
 
+  it("reads the outcome from the stored status, not the error text", () => {
+    expect(isRetryableRun({ event_type: "AlertFired", status: "succeeded", error: "boom" })).toBe(
+      false,
+    );
+    expect(isRetryableRun({ event_type: "Webhook", status: "failed", error: null })).toBe(true);
+  });
+
+  it("rejects HTTP runs that never executed or never finished — no input was stored", () => {
+    const runs = [
+      { status: "queued" },
+      { status: "running" },
+      { status: "expired" },
+      { status: "failed", error: "worker_lost" },
+      { status: "failed", error: "workflow_disabled" },
+      { status: "failed", error: "run_timeout" },
+      { status: "failed", error: "some node errored", http_request: { error: "worker_lost" } },
+    ];
+    for (const run of runs)
+      expect(isRetryableRun({ event_type: "Webhook", ...run } as any)).toBe(false);
+    expect(retryBlockedReason({ event_type: "Webhook", status: "expired" } as any)).toBe(
+      "no_input",
+    );
+    expect(
+      retryBlockedReason({ event_type: "Webhook", status: "failed", error: "worker_lost" } as any),
+    ).toBe("no_input");
+  });
+
   it("rejects a failed TEST run — /test never persists the run's input", () => {
-    expect(isRetryableRun({ event_type: "Test", error: "boom" })).toBe(false);
+    expect(isRetryableRun({ event_type: "Test", status: "failed", error: "boom" })).toBe(false);
   });
 
   it("rejects a failed RETRY run — retry_run records the run but stores no input", () => {
-    expect(isRetryableRun({ event_type: "Retry", error: "boom" })).toBe(false);
+    expect(isRetryableRun({ event_type: "Retry", status: "failed", error: "boom" })).toBe(false);
   });
 
   it("rejects null/undefined rather than throwing", () => {
@@ -3475,10 +3633,58 @@ describe("isRetryableRun — the gate that keeps retry off runs the backend must
   });
 
   it("names the blocker so a disabled affordance can say why", () => {
-    expect(retryBlockedReason({ event_type: "Test", error: "boom" })).toBe("test");
-    expect(retryBlockedReason({ event_type: "Retry", error: "boom" })).toBe("retry");
-    expect(retryBlockedReason({ event_type: "AlertFired", error: "" })).toBe("succeeded");
-    expect(retryBlockedReason({ event_type: "AlertFired", error: "boom" })).toBe("");
+    expect(retryBlockedReason({ event_type: "Test", status: "failed", error: "boom" })).toBe(
+      "test",
+    );
+    expect(retryBlockedReason({ event_type: "Retry", status: "failed", error: "boom" })).toBe(
+      "retry",
+    );
+    expect(retryBlockedReason({ event_type: "AlertFired", status: "succeeded", error: "" })).toBe(
+      "succeeded",
+    );
+    expect(retryBlockedReason({ event_type: "AlertFired", status: "failed", error: "boom" })).toBe(
+      "",
+    );
+  });
+});
+
+describe("loadWorkflowRun — a run with no stored step data is not fetched", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf1",
+      name: "wf",
+      nodes: [{ id: "n1" }],
+      edges: [],
+    } as any;
+    workflowObj.testRun.result = null;
+  });
+
+  afterEach(() => {
+    workflowObj.runsHistory.list = [] as any;
+  });
+
+  it("loads an expired HTTP run as an empty history result without calling the run API", async () => {
+    workflowObj.runsHistory.list = [
+      { run_id: "h1", event_type: "Webhook", status: "expired", error: null },
+    ] as any;
+    const r = await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "h1" });
+    expect(r.ok).toBe(true);
+    expect(mockRun).not.toHaveBeenCalled();
+    const res: any = workflowObj.testRun.result;
+    expect(res.mode).toBe("history");
+    expect(res.runId).toBe("h1");
+    expect(res.inputs).toEqual({});
+    expect(res.errors).toEqual({});
+  });
+
+  it("still fetches a finished run", async () => {
+    workflowObj.runsHistory.list = [
+      { run_id: "h2", event_type: "Webhook", status: "failed", error: "boom" },
+    ] as any;
+    mockRun.mockResolvedValue({ data: { errors: null, data: null } });
+    await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "h2" });
+    expect(mockRun).toHaveBeenCalledTimes(1);
   });
 });
 

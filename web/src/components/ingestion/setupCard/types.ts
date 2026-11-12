@@ -20,10 +20,27 @@
 // via markdown frontmatter (ai/content/richCard/buildFromMarkdown), and in-repo
 // data sources via typed builders (setupCard/content/*, setupCard/registry).
 
+import type { InjectionKey, Ref } from "vue";
+
 import type { I18nKey, I18nText } from "@/types/i18n";
 
 import type { FieldWidth } from "@/lib/forms/Input/OInput.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+
+/** Onboarding's tracing answer, kept in the page URL as `traces` and `langs`. */
+export interface SetupCardPresets {
+  /** Skipped, eBPF, or a library per language; undefined when the URL has no answer. */
+  traces?: "off" | "ebpf" | "library";
+  /** The card's library language ids, e.g. `["java", "nodejs"]`. Empty unless `traces` is "library". */
+  languages: string[];
+}
+
+/**
+ * Provided by onboarding around its guides, with the tracing answer from the page URL. Its
+ * presence also puts a card in onboarding mode, where its verify step reads "Check Your Data".
+ */
+export const SETUP_CARD_ONBOARDING: InjectionKey<Readonly<Ref<SetupCardPresets>>> =
+  Symbol("SetupCardOnboarding");
 
 // Card copy comes in pairs: `title` (resolved I18nText, for raw() tokens and
 // markdown-authored content) and `titleKey` (an I18nKey the renderer translates).
@@ -48,6 +65,9 @@ export interface CardSubstitutions {
   isPrimaryCloud?: boolean;
 }
 
+/** Whether the ingest token behind `{token}` is known yet; a block carrying it renders only when "ready". */
+export type IngestTokenState = "ready" | "loading" | "unavailable";
+
 /** Context of a step → drives both the title chip and the code-block chrome. */
 export type StepChipKind = "terminal" | "editor" | "run" | "traces";
 
@@ -58,6 +78,21 @@ export type StepChipKind = "terminal" | "editor" | "run" | "traces";
  * producing a command to copy).
  */
 export type StepCompleteOn = "copy" | "detect" | "action";
+
+/** A card-level setup path: the one-command installer, or the step-by-step manual sequence. */
+export type SetupMode = "auto" | "manual";
+
+/**
+ * One entry of the card's setup-mode toggle (see RichCardContent.setupModes).
+ * Steps tagged with this `id` render only while it is selected.
+ */
+export interface RichCardSetupMode {
+  id: SetupMode;
+  /** Toggle label. Omit when `labelKey` is set. */
+  label?: I18nText;
+  /** i18n key for the toggle label, translated by the renderer. */
+  labelKey?: I18nKey;
+}
 
 export interface RichCardChip {
   kind: StepChipKind;
@@ -136,6 +171,8 @@ export interface RichCardStepAction {
   variant?: "primary" | "secondary";
   /** Greys the button out — e.g. nothing selected yet. */
   disabled?: boolean;
+  /** Also disables the button: the renderer wraps it so the reason still shows on hover. */
+  disabledReason?: I18nText;
   /** Render the button only once detection connects (default: always visible). */
   showOnDetect?: boolean;
 }
@@ -192,6 +229,15 @@ export interface RichCardStep {
   required?: boolean;
   /** The step that hosts the live status bar + "most likely fix" box. */
   detectionAnchor?: boolean;
+  /**
+   * Render this step only while the card's setup-mode toggle is on this mode.
+   * Untagged steps render in every mode; ignored when the card has no `setupModes`.
+   */
+  mode?: SetupMode;
+  /** Optional step whose body starts folded; the user opens it from its heading. */
+  collapsed?: boolean;
+  /** The card's data check does not prove this step: tracing, on a card that checks for logs. */
+  notProvenByDetect?: boolean;
 }
 
 export interface RichCardDetect {
@@ -265,6 +311,8 @@ export interface RichCardExtras {
     /** i18n KEY for that paragraph, translated by the renderer. */
     descriptionKey?: I18nKey;
     code: RichCardCode;
+    /** Show the section only in this setup mode (cards with `setupModes`). */
+    mode?: SetupMode;
   };
   troubleshooting?: { q: I18nText; a: I18nText }[];
 }
@@ -340,11 +388,23 @@ export interface RichCardInput {
   flag?: string;
   /** Helm list value: goes into `{flags}` as `--set-string '<key>={a,b}'`, or `--set <key>=null` when blank. */
   helmSet?: string;
+  /** CLI flag for `{flag:<id>}`: a continued `<cliFlag>='<value>'` line, omitted when the field is blank. */
+  cliFlag?: string;
+  /** "slug" lowercases the value and turns anything outside [a-z0-9-] into "-", as the install scripts do. */
+  sanitize?: "slug";
+  /** Value `{flag:<id>}` uses while the field is blank, computed from the other inputs' trimmed values. */
+  fallback?: (get: (id: string) => string) => string;
 }
 
 export interface RichCardContent {
   provider: RichCardProvider;
   steps: RichCardStep[];
+  /**
+   * Setup paths the user chooses between with a toggle above the steps (the
+   * first is selected initially). Steps carry `mode` to belong to one path;
+   * completion and the active step only consider the visible steps.
+   */
+  setupModes?: RichCardSetupMode[];
   /** Omitted by cards with nothing to ingest (e.g. MCP) — no `detectionAnchor` then. */
   detect?: RichCardDetect;
   /** When set, the card shows a stream-name input (see RichCardStreamInput). */

@@ -20,6 +20,8 @@ test.describe("App Theme Default (Light/Dark) testcases", () => {
     // Seed before navigation: bootstrapTheme() reads localStorage.theme
     // synchronously in main.ts, so a write after navigateToBase has no effect.
     await page.addInitScript(() => {
+      // Init scripts also run in same-origin child frames, which would delete the key the app wrote.
+      if (window !== window.top) return;
       localStorage.removeItem('theme');
       localStorage.removeItem('appliedLightThemeName');
       localStorage.removeItem('appliedDarkThemeName');

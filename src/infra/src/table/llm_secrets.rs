@@ -197,6 +197,28 @@ pub async fn delete_by_owner<C: ConnectionTrait>(
         .rows_affected)
 }
 
+/// Ciphertext under the org DEK, so it must go before the DEK does.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(get_orm_client_rw().await)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_by_org_owner_kind<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    owner_kind: &str,
+) -> Result<u64, sea_orm::DbErr> {
+    Ok(Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::OwnerKind.eq(owner_kind))
+        .exec(db)
+        .await?
+        .rows_affected)
+}
+
 pub async fn delete_expired_retired<C: ConnectionTrait>(
     db: &C,
     now: i64,

@@ -226,6 +226,7 @@ export const useSavedGrantExpansion = (deps: ExpansionDeps) => {
           resource === "logs" ||
           resource === "metrics" ||
           resource === "traces" ||
+          resource === "profiles" ||
           resource === "index"
         ) {
           const streamResource = resourceMapper["stream"].entities.find(

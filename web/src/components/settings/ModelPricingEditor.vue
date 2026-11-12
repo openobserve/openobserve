@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :back="{
-      label: t('modelPricing.header'),
+      label: backToGaps ? t('modelPricing.unpriced.title') : t('modelPricing.header'),
       onClick: goBack,
       dataTest: 'model-pricing-editor-back-btn',
     }"
@@ -30,8 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Form Body -->
     <OForm :form="form" v-slot="{ isSubmitting }" class="flex min-h-0 flex-1 flex-col">
-      <div class="h-[calc(100vh-10.625rem)] min-h-0 flex-1 overflow-y-auto px-3 py-3">
-        <div class="flex max-w-190 flex-col gap-6">
+      <ConstrainedPage size="md" align="left" :padded="false" class="min-h-0 flex-1">
+        <div class="flex flex-col gap-6 px-3 py-3">
           <!-- ── Model Details Card ── -->
           <div class="border-card-glass-border rounded-default border">
             <div
@@ -99,6 +99,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </div>
             </div>
+            <!-- Known models the pattern would price if saved -->
+            <div
+              v-if="capturedPreview.pattern"
+              class="flex flex-col gap-2 px-4 pb-3"
+              data-test="model-pricing-captured-models"
+            >
+              <OText variant="meta" class="text-2xs block">
+                {{ t("modelPricing.capturedModelsTitle") }}
+              </OText>
+              <div v-if="capturedPreview.models.length" class="flex flex-wrap gap-1.5">
+                <OTag
+                  v-for="m in visibleCapturedModels"
+                  :key="m.model_name"
+                  :variant="m.primary ? 'default-soft' : 'warning-soft'"
+                  :data-test="`model-pricing-captured-${m.model_name}`"
+                >
+                  {{ m.model_name }}
+                  <OTooltip side="top" :content="capturedTooltip(m)" />
+                </OTag>
+                <OTag v-if="hiddenCapturedCount" variant="default-soft">
+                  {{ t("modelPricing.capturedModelsMore", { count: hiddenCapturedCount }) }}
+                </OTag>
+              </div>
+              <OText v-else variant="meta" class="text-2xs block">
+                {{ t("modelPricing.capturedModelsEmpty") }}
+              </OText>
+              <OBanner
+                v-if="otherCapturedModels.length"
+                variant="warning"
+                icon="warning"
+                data-test="model-pricing-captured-warning"
+                :content="
+                  t('modelPricing.capturedOtherModelsWarning', {
+                    count: otherCapturedModels.length,
+                    example: raw('^gpt-4o$'),
+                  })
+                "
+              />
+            </div>
           </div>
 
           <!-- Pattern Examples Dialog -->
@@ -159,13 +198,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="bg-surface-panel border-card-glass-border rounded-t-default flex flex-row items-center justify-between gap-3 border-b px-4 py-2.5"
             >
-              <div>
+              <div class="flex items-center gap-1">
                 <OText variant="panel-title" class="text-compact font-semibold">
                   {{ t("modelPricing.pricingTiers") }}
                 </OText>
-                <OText variant="meta" class="text-2xs mt-px block">
-                  {{ t("modelPricing.pricingTiersDesc") }}
-                </OText>
+                <OPopover
+                  v-model:open="tiersHintOpen"
+                  side="bottom"
+                  align="start"
+                  :aria-label="t('modelPricing.aboutPricingTiers')"
+                >
+                  <template #trigger>
+                    <OButton
+                      variant="ghost"
+                      size="xs"
+                      icon-left="info-outline"
+                      data-test="model-pricing-tiers-hint-trigger"
+                    >
+                      <span class="max-md:sr-only">{{ t("modelPricing.aboutPricingTiers") }}</span>
+                    </OButton>
+                  </template>
+                  <p
+                    class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
+                    data-test="model-pricing-tiers-hint"
+                  >
+                    <OText variant="meta">{{ t("modelPricing.pricingTiersDesc") }}</OText>
+                  </p>
+                </OPopover>
               </div>
             </div>
 
@@ -192,6 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="flex shrink-0 items-center gap-2">
                     <OButton
+                      :aria-label="t('common.remove')"
                       v-if="idx > 0"
                       variant="outline-destructive"
                       size="icon"
@@ -206,59 +266,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Tier Body -->
                 <div class="tier-body flex flex-col gap-3 p-3 px-4">
-                  <!-- Condition row (non-default tiers only) -->
                   <div
-                    v-if="idx > 0 && tier.condition"
+                    v-if="idx > 0"
                     class="rounded-default bg-surface-panel border-card-glass-border border px-3.5 py-3"
+                    :data-test="`model-pricing-tier-filter-${idx}`"
                   >
-                    <div class="mb-2 flex items-center justify-between gap-2">
-                      <OText variant="section">
-                        {{ t("modelPricing.applyTierWhen") }}
-                      </OText>
-                      <OButton
-                        variant="ghost"
-                        size="icon-xs-sq"
-                        type="button"
-                        :data-test="`model-pricing-tier-condition-remove-btn-${idx}`"
-                        @click="removeCondition(idx)"
-                      >
-                        <OIcon name="close" size="xs" />
-                        <OTooltip
-                          :side-offset="4"
-                          :content="t('modelPricing.removeUsageCondition')"
-                        />
-                      </OButton>
+                    <OText variant="section">
+                      {{ t("modelPricing.applyTierWhen") }}
+                    </OText>
+                    <div class="text-2xs mt-px mb-2 opacity-55">
+                      {{ t("modelPricing.attributeRulesDesc") }}
                     </div>
-                    <div class="flex flex-nowrap items-end gap-2">
-                      <div class="min-w-32.5 flex-1">
-                        <OFormInput
-                          :name="`tiers[${idx}].condition.usage_key`"
-                          :label="t('modelPricing.usageKeyCol')"
-                          :placeholder="
-                            t('modelPricing.usageKeyPlaceholder', {
-                              example: raw('input'),
-                            })
-                          "
-                          :data-test="`model-pricing-tier-condition-key-input-${idx}`"
-                        />
-                      </div>
-                      <div class="w-22.5 shrink-0">
-                        <OFormSelect
-                          :name="`tiers[${idx}].condition.operator`"
-                          :options="operators"
-                          label-key="label"
-                          value-key="value"
-                          :data-test="`model-pricing-tier-condition-operator-select-${idx}`"
-                        />
-                      </div>
-                      <div class="w-35 shrink-0">
-                        <OFormInput
-                          :name="`tiers[${idx}].condition.value`"
-                          :label="t('modelPricing.threshold')"
-                          type="number"
-                          :data-test="`model-pricing-tier-condition-value-input-${idx}`"
-                        />
-                      </div>
+                    <FilterBuilder
+                      profile="model-pricing"
+                      :model-value="tierFilter(tier)"
+                      :fields="tierFilterFields(tier)"
+                      :data-test="`model-pricing-tier-filter-builder-${idx}`"
+                      @update:model-value="(next) => setTierFilter(idx, next)"
+                    />
+                    <div
+                      v-if="tierFilterErrors(idx).length"
+                      class="text-input-error-text mt-1 flex flex-col text-xs"
+                      role="alert"
+                      :data-test="`model-pricing-tier-filter-errors-${idx}`"
+                    >
+                      <span v-for="message in tierFilterErrors(idx)" :key="message">{{
+                        message
+                      }}</span>
                     </div>
                   </div>
 
@@ -335,93 +369,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
 
-                  <div
-                    v-if="idx > 0 && tierRules(tier).length"
-                    class="rounded-default bg-surface-panel border-card-glass-border border px-3.5 py-3"
-                    :data-test="`model-pricing-tier-rules-${idx}`"
-                  >
-                    <OText variant="section">
-                      {{ t("modelPricing.attributeRules") }}
-                    </OText>
-                    <div class="text-2xs mt-px mb-2 opacity-55">
-                      {{ t("modelPricing.attributeRulesDesc") }}
-                    </div>
-                    <!-- Index keys: form fields bind to their name once, see the price-row note below. -->
-                    <div
-                      v-for="(rule, ruleIdx) in tierRules(tier)"
-                      :key="ruleIdx"
-                      class="flex flex-nowrap items-end gap-2 py-0.5"
-                    >
-                      <div class="min-w-50 flex-1">
-                        <OFormInput
-                          :name="`tiers[${idx}].rules[${ruleIdx}].keys`"
-                          :label="t('modelPricing.ruleKeys')"
-                          :placeholder="
-                            t('modelPricing.ruleKeysPlaceholder', {
-                              example: raw(
-                                'openai.response.service_tier, openai.request.service_tier',
-                              ),
-                            })
-                          "
-                          :data-test="`model-pricing-tier-rule-keys-input-${idx}-${ruleIdx}`"
-                        />
-                      </div>
-                      <div class="w-30 shrink-0">
-                        <OFormSelect
-                          :name="`tiers[${idx}].rules[${ruleIdx}].op`"
-                          :options="ruleOperatorOptions(rule.op)"
-                          :label="t('modelPricing.ruleOperator')"
-                          label-key="label"
-                          value-key="value"
-                          :searchable="false"
-                          :data-test="`model-pricing-tier-rule-op-select-${idx}-${ruleIdx}`"
-                        />
-                      </div>
-                      <div v-if="SET_RULE_OPS.includes(rule.op)" class="w-45 shrink-0">
-                        <OFormInput
-                          :name="`tiers[${idx}].rules[${ruleIdx}].values`"
-                          :label="t('modelPricing.ruleValues')"
-                          :placeholder="
-                            t('modelPricing.ruleValuesPlaceholder', { example: raw('flex') })
-                          "
-                          :data-test="`model-pricing-tier-rule-values-input-${idx}-${ruleIdx}`"
-                        />
-                      </div>
-                      <div v-else-if="NUMERIC_RULE_OPS.includes(rule.op)" class="w-35 shrink-0">
-                        <OFormInput
-                          :name="`tiers[${idx}].rules[${ruleIdx}].value`"
-                          :label="t('modelPricing.threshold')"
-                          type="number"
-                          :data-test="`model-pricing-tier-rule-value-input-${idx}-${ruleIdx}`"
-                        />
-                      </div>
-                      <div class="flex h-8.5 items-center">
-                        <OButton
-                          variant="outline-destructive"
-                          size="icon"
-                          type="button"
-                          :data-test="`model-pricing-tier-rule-remove-btn-${idx}-${ruleIdx}`"
-                          @click="removeRule(idx, ruleIdx)"
-                        >
-                          <OIcon name="delete" size="sm" />
-                          <OTooltip :side-offset="4" :content="t('modelPricing.removeRule')" />
-                        </OButton>
-                      </div>
-                    </div>
-                  </div>
-
                   <!-- Add a restriction to a non-default tier -->
                   <div v-if="idx > 0" class="flex flex-wrap items-center gap-2">
-                    <OButton
-                      v-if="!tier.condition"
-                      variant="outline"
-                      size="sm-action"
-                      type="button"
-                      :data-test="`model-pricing-tier-add-condition-btn-${idx}`"
-                      @click="addCondition(idx)"
-                    >
-                      {{ t("modelPricing.addUsageCondition") }}
-                    </OButton>
                     <OButton
                       variant="outline"
                       size="sm-action"
@@ -431,24 +380,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ t("modelPricing.addTimeWindow") }}
                     </OButton>
-                    <OButton
-                      variant="outline"
-                      size="sm-action"
-                      type="button"
-                      :disabled="tierRules(tier).length >= MAX_RULES_PER_TIER"
-                      :data-test="`model-pricing-tier-add-rule-btn-${idx}`"
-                      @click="addRule(idx)"
-                    >
-                      {{ t("modelPricing.addRule") }}
-                    </OButton>
-                    <div class="ms-auto w-30 shrink-0">
-                      <OFormInput
-                        :name="`tiers[${idx}].priority`"
-                        :label="t('modelPricing.tierPriority')"
-                        :help-text="t('modelPricing.tierPriorityHint')"
-                        type="number"
-                        :data-test="`model-pricing-tier-priority-input-${idx}`"
-                      />
+                    <div class="ms-auto flex shrink-0 items-end gap-1">
+                      <div class="w-30">
+                        <OFormInput
+                          :name="`tiers[${idx}].priority`"
+                          :label="t('modelPricing.tierPriority')"
+                          type="number"
+                          :data-test="`model-pricing-tier-priority-input-${idx}`"
+                        />
+                      </div>
+                      <!-- OFormInput's label only hosts a tooltip icon, so the popover trigger sits beside the input. -->
+                      <div class="flex h-8.5 items-center">
+                        <OPopover
+                          :open="priorityHintOpenIdx === idx"
+                          side="bottom"
+                          align="end"
+                          :aria-label="t('modelPricing.aboutTierPriority')"
+                          @update:open="
+                            (open: boolean) => (priorityHintOpenIdx = open ? idx : null)
+                          "
+                        >
+                          <template #trigger>
+                            <OButton
+                              variant="ghost"
+                              size="icon-xs-sq"
+                              icon-left="info-outline"
+                              :aria-label="t('modelPricing.aboutTierPriority')"
+                              :data-test="`model-pricing-tier-priority-hint-trigger-${idx}`"
+                            />
+                          </template>
+                          <p
+                            class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
+                            :data-test="`model-pricing-tier-priority-hint-${idx}`"
+                          >
+                            <OText variant="meta">{{ t("modelPricing.tierPriorityHint") }}</OText>
+                          </p>
+                        </OPopover>
+                      </div>
                     </div>
                   </div>
 
@@ -496,7 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="price-table-head text-2xs grid grid-cols-[1fr_10rem_auto] gap-2 px-3 py-1.5 font-semibold tracking-[0.01em] opacity-45 max-lg:grid-cols-[1fr_6rem_auto]"
                       >
                         <span>{{ t("modelPricing.usageKeyCol") }}</span>
-                        <span>{{ t("modelPricing.pricePerMillionHeader") }}</span>
+                        <span>{{ t("modelPricing.colPrice") }}</span>
                         <span></span>
                       </div>
 
@@ -540,6 +508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                            push the value input / this button downward). -->
                         <div class="flex h-8.5 items-center">
                           <OButton
+                            :aria-label="t('common.remove')"
                             variant="outline-destructive"
                             size="icon"
                             type="button"
@@ -589,6 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                         </OFormInput>
                         <OButton
+                          :aria-label="t('common.add')"
                           variant="outline"
                           size="icon"
                           type="button"
@@ -599,55 +569,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon name="add" size="xs" />
                         </OButton>
                       </div>
-                    </div>
-
-                    <!-- Price Preview Table -->
-                    <div
-                      v-if="previewEntries(tier).length"
-                      class="rounded-default bg-surface-panel border-card-glass-border mt-5 border"
-                    >
-                      <div
-                        class="text-text-secondary border-card-glass-border border-b px-4 py-2 text-xs font-semibold"
-                      >
-                        {{ t("modelPricing.pricePreview") }}
-                      </div>
-                      <table class="w-full border-collapse text-xs">
-                        <thead>
-                          <tr
-                            class="text-text-secondary border-card-glass-border border-b text-left"
-                          >
-                            <th class="px-4 py-2 font-medium">
-                              {{ t("modelPricing.usageType") }}
-                            </th>
-                            <th class="px-4 py-2 font-medium">
-                              {{ t("modelPricing.perThousand") }}
-                            </th>
-                            <th class="px-4 py-2 font-medium">
-                              {{ t("modelPricing.perMillion") }}
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr
-                            v-for="entry in previewEntries(tier)"
-                            :key="entry.pending ? '__pending__' : entry.key"
-                            class="border-card-glass-border border-b last:border-none"
-                            :class="{
-                              'preview-row-pending italic opacity-50': entry.pending,
-                            }"
-                          >
-                            <td class="text-text-body px-4 py-2 font-medium">
-                              {{ entry.key }}
-                            </td>
-                            <td class="text-text-body px-4 py-2">
-                              {{ "$" + formatPreviewCost(fromPerMillion(entry.value), 1000) }}
-                            </td>
-                            <td class="text-text-body px-4 py-2">
-                              {{ "$" + formatPreviewCost(fromPerMillion(entry.value), 1000000) }}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
                     </div>
                   </div>
                 </div>
@@ -704,7 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </div>
+      </ConstrainedPage>
 
       <!-- Footer -->
       <div
@@ -731,45 +652,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </OForm>
+
+    <ConfirmDialog
+      v-model="otherModelsConfirm.show"
+      :title="t('modelPricing.confirmOtherModelsTitle')"
+      :message="otherModelsConfirm.message"
+      :ok-label="t('modelPricing.confirmOtherModelsOk')"
+      focus-cancel
+      @update:ok="settleOtherModels(true)"
+      @update:cancel="settleOtherModels(false)"
+    />
+    <EditorDraftDialogs :draft="pricingDraft" />
   </OPageLayout>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onBeforeMount } from "vue";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { ref, computed, onBeforeMount, onBeforeUnmount, watch } from "vue";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import modelPricingService from "@/services/model_pricing";
 import { saveModelPricingMutation } from "@/services/model_pricing.queries";
 import { useMutation } from "@tanstack/vue-query";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import {
+  TIER_RULE_OPERATORS,
+  TIER_USAGE_OPERATORS,
+  TIER_USAGE_PAYLOAD,
+  type ModelPricingFilter,
+} from "@/components/filterBar/codecs";
+import type { FilterField } from "@/utils/query/filterBar";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormTime from "@/lib/forms/Time/OFormTime.vue";
 import UtcHoursBar, { type UtcHoursWindow } from "@/components/settings/UtcHoursBar.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatUtcWindowsInTz } from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
 import {
   findAmbiguousTiers,
   findUnreachableTiers,
   KNOWN_RULE_OPS,
   makeModelPricingSchema,
-  MAX_RULES_PER_TIER,
   MAX_TIERS,
   NUMERIC_RULE_OPS,
   splitList,
   SET_RULE_OPS,
+  stripInlineFlags,
   type ModelPricingForm,
   type ModelPricingTier,
   type ModelPricingTierRule,
@@ -784,6 +730,9 @@ const route = useRoute();
 const existingModels = ref<any[]>([]);
 
 const showExamples = ref(false);
+const tiersHintOpen = ref(false);
+// One index, not a flag, so opening one tier's hint never opens every tier's.
+const priorityHintOpenIdx = ref<number | null>(null);
 const copiedPattern = ref<string | null>(null);
 
 function copyPattern(pattern: string) {
@@ -816,7 +765,17 @@ const headerTitle = computed(() =>
   isEdit.value ? t("modelPricing.editTitle") : t("modelPricing.newTitle"),
 );
 
-const model = ref<any>(createEmptyModel());
+/** A new model can open prefilled through `?name=&match_pattern=`, as Pricing gaps' Create price does. */
+function prefilledNewModel() {
+  const empty = createEmptyModel();
+  if (route.query.id) return empty;
+  const { name, match_pattern } = route.query;
+  if (typeof name === "string") empty.name = name;
+  if (typeof match_pattern === "string") empty.match_pattern = match_pattern;
+  return empty;
+}
+
+const model = ref<any>(prefilledNewModel());
 
 // Dynamic defaults (edit-prefill projects the working model) → a typed computed.
 // `model.value` holds the API-shaped record (per-token price MAP); the form holds
@@ -839,6 +798,110 @@ const form = useOForm<ModelPricingForm>({
 const formTiers = form.useStore((s): ModelPricingTier[] => s.values.tiers ?? []);
 const ambiguousTierPairs = computed(() => findAmbiguousTiers(formTiers.value));
 const unreachableTierPairs = computed(() => findUnreachableTiers(formTiers.value));
+
+// ── Known models the pattern would price ─────────────────────────────────────
+// An org rule wins every model its pattern matches, even partly, so a loose
+// pattern such as `^gpt-4o` also prices `gpt-4o-mini` at this rule's price. The
+// editor previews those models as the pattern is typed, and save asks the user
+// to confirm before the rule takes over models other than the one it names.
+interface CapturedModel {
+  model_name: string;
+  match_kind: "exact" | "approximate";
+  /** The model the pattern itself names; every other one is caught on the side. */
+  primary: boolean;
+  replaces: { name: string; source: string } | null;
+}
+
+const CAPTURED_SHOWN = 24;
+const patternValue = form.useStore((s): string => s.values.match_pattern ?? "");
+const capturedPreview = ref<{ pattern: string; models: CapturedModel[] }>({
+  pattern: "",
+  models: [],
+});
+const visibleCapturedModels = computed(() => capturedPreview.value.models.slice(0, CAPTURED_SHOWN));
+const hiddenCapturedCount = computed(() =>
+  Math.max(0, capturedPreview.value.models.length - CAPTURED_SHOWN),
+);
+const otherCapturedModels = computed(() => capturedPreview.value.models.filter((m) => !m.primary));
+
+function capturedTooltip(m: CapturedModel) {
+  const parts = [
+    m.replaces
+      ? t("modelPricing.capturedReplaces", { name: m.replaces.name })
+      : t("modelPricing.capturedUnpriced"),
+  ];
+  if (m.match_kind === "approximate") parts.unshift(t("modelPricing.capturedPartialMatch"));
+  return raw(parts.join(" "));
+}
+
+function isPreviewablePattern(pattern: string) {
+  if (!pattern.trim()) return false;
+  try {
+    new RegExp(stripInlineFlags(pattern));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The known models `pattern` would price if saved; null when it cannot be previewed. */
+async function fetchCapturedModels(pattern: string): Promise<CapturedModel[] | null> {
+  if (!isPreviewablePattern(pattern)) return null;
+  try {
+    const res = await modelPricingService.test(orgIdentifier.value, {
+      model_name: "",
+      match_pattern: pattern,
+      rule_id: model.value.id || undefined,
+    });
+    return res.data?.captured_models ?? [];
+  } catch {
+    return null;
+  }
+}
+
+let previewTimer: ReturnType<typeof setTimeout> | undefined;
+watch(patternValue, (pattern) => {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(async () => {
+    const models = await fetchCapturedModels(pattern);
+    if (pattern !== patternValue.value) return; // superseded by a newer pattern
+    capturedPreview.value = models ? { pattern, models } : { pattern: "", models: [] };
+  }, 400);
+});
+onBeforeUnmount(() => clearTimeout(previewTimer));
+
+const otherModelsConfirm = ref<{ show: boolean; message?: I18nText }>({ show: false });
+let resolveOtherModelsConfirm: ((ok: boolean) => void) | null = null;
+
+function settleOtherModels(ok: boolean) {
+  resolveOtherModelsConfirm?.(ok);
+  resolveOtherModelsConfirm = null;
+}
+
+// Closing the dialog any other way (Esc, overlay) counts as cancel. The OK path
+// settles synchronously first, so this later watcher finds nothing to settle.
+watch(
+  () => otherModelsConfirm.value.show,
+  (show) => {
+    if (!show) settleOtherModels(false);
+  },
+);
+
+function confirmOtherModels(names: string[]): Promise<boolean> {
+  const LISTED = 10;
+  const listed = names.slice(0, LISTED).join(", ");
+  const models =
+    names.length > LISTED
+      ? t("modelPricing.confirmOtherModelsMore", { models: listed, count: names.length - LISTED })
+      : listed;
+  otherModelsConfirm.value = {
+    show: true,
+    message: t("modelPricing.confirmOtherModelsMessage", { models }),
+  };
+  return new Promise((resolve) => {
+    resolveOtherModelsConfirm = resolve;
+  });
+}
 
 function createEmptyModel() {
   return {
@@ -946,9 +1009,15 @@ function ruleToForm(rule: any): ModelPricingTierRule {
     keys: (rule?.keys ?? []).join(", "),
     op,
     values: (rule?.values ?? []).join(", "),
-    // An operator this build does not know keeps its threshold verbatim until the user picks one.
-    value: KNOWN_RULE_OPS.includes(op) ? Number(rule?.value ?? 0) || 0 : (rule?.value ?? ""),
+    value: ruleValueToForm(op, rule?.value),
   };
+}
+
+// An unknown operator keeps its threshold verbatim; a threshold rule still being written stays blank, not 0.
+function ruleValueToForm(op: string, value: unknown): number | string {
+  const blank = value === undefined || value === null || value === "";
+  if (blank && NUMERIC_RULE_OPS.includes(op)) return "";
+  return KNOWN_RULE_OPS.includes(op) ? Number(value ?? 0) || 0 : ((value as number | string) ?? "");
 }
 
 /** Form rule → API rule; only the fields the operator reads are sent. */
@@ -961,19 +1030,66 @@ function ruleToModel(rule: any) {
   const values = splitList(rule?.values);
   const value = String(rule?.value ?? "").trim();
   if (SET_RULE_OPS.includes(op)) out.values = values;
-  else if (NUMERIC_RULE_OPS.includes(op)) out.value = Number(rule?.value);
-  else if (!KNOWN_RULE_OPS.includes(op)) {
+  else if (NUMERIC_RULE_OPS.includes(op)) {
+    if (value !== "") out.value = Number(value);
+  } else if (!KNOWN_RULE_OPS.includes(op)) {
     if (values.length) out.values = values;
     if (value !== "" && Number.isFinite(Number(value))) out.value = Number(value);
   }
   return out;
 }
 
-/** The operator list, plus a loaded operator this build does not know so the select still shows it. */
-function ruleOperatorOptions(op: string) {
-  return !op || KNOWN_RULE_OPS.includes(op)
-    ? ruleOperators
-    : [...ruleOperators, { label: raw(op), value: op }];
+/** A tier's usage condition and rules in the API shape the filter builder edits. */
+function tierFilter(tier: any): ModelPricingFilter {
+  return { condition: tier?.condition ?? null, rules: tierRules(tier).map(ruleToModel) };
+}
+
+function setTierFilter(idx: number, next: unknown) {
+  const filter = next as ModelPricingFilter;
+  patchTier(idx, (tier) => ({
+    ...tier,
+    condition: filter.condition ?? null,
+    rules: (filter.rules ?? []).map(ruleToForm),
+  }));
+}
+
+// Usage keys come from the tier's prices; attribute keys are typed, the OpenAI pair being the common one.
+function tierFilterFields(tier: any): FilterField[] {
+  const keys = [
+    ...new Set(
+      [
+        ...(tier?.prices ?? []).map((row: any) => String(row?.key ?? "").trim()),
+        String(tier?.condition?.usage_key ?? "").trim(),
+        "input",
+        "output",
+      ].filter(Boolean),
+    ),
+  ];
+  return [
+    ...keys.map((name): FilterField => ({
+      name,
+      type: "number",
+      payload: TIER_USAGE_PAYLOAD,
+      operators: TIER_USAGE_OPERATORS,
+    })),
+    ...keys.map((key): FilterField => ({
+      name: `usage.${key}`,
+      type: "number",
+      operators: TIER_RULE_OPERATORS,
+    })),
+    { name: "openai.response.service_tier, openai.request.service_tier", type: "string" },
+  ];
+}
+
+// The schema checks the condition and rules by path; with no input per path, the errors are listed under the builder.
+const fieldMeta = form.useStore((s: any) => s.fieldMeta ?? {});
+function tierFilterErrors(idx: number): string[] {
+  const prefixes = [`tiers[${idx}].condition`, `tiers[${idx}].rules`];
+  const messages = Object.entries(fieldMeta.value as Record<string, any>)
+    .filter(([path]) => prefixes.some((prefix) => path.startsWith(prefix)))
+    .map(([, meta]) => firstFieldError(meta?.errors))
+    .filter((message): message is string => Boolean(message));
+  return [...new Set(messages)];
 }
 
 /** True when the tier has no restriction at all, i.e. the backend treats it as the default. */
@@ -1077,26 +1193,6 @@ const usageTemplates = [
   },
 ];
 
-const ruleOperators = [
-  { label: t("modelPricing.ruleOpIn"), value: "in" },
-  { label: t("modelPricing.ruleOpNotIn"), value: "not_in" },
-  { label: t("modelPricing.ruleOpExists"), value: "exists" },
-  { label: t("modelPricing.ruleOpNotExists"), value: "not_exists" },
-  { label: raw(">"), value: "gt" },
-  { label: raw(">="), value: "gte" },
-  { label: raw("<"), value: "lt" },
-  { label: raw("<="), value: "lte" },
-];
-
-const operators = [
-  { label: raw(">"), value: "gt" },
-  { label: raw(">="), value: "gte" },
-  { label: raw("<"), value: "lt" },
-  { label: raw("<="), value: "lte" },
-  { label: raw("="), value: "eq" },
-  { label: raw("!="), value: "neq" },
-];
-
 // ── Field-array operations (whole-array setFieldValue; `formTiers`
 //    (form.useStore) re-syncs reactively + re-renders) ──────────────────────
 function addTier() {
@@ -1121,17 +1217,6 @@ function patchTier(idx: number, patch: (_tier: any) => any) {
   setTiers(formTiers.value.map((tier: any, i: number) => (i === idx ? patch(tier) : tier)));
 }
 
-function addCondition(idx: number) {
-  patchTier(idx, (tier) => ({
-    ...tier,
-    condition: { usage_key: "input", operator: "gt", value: 200000 },
-  }));
-}
-
-function removeCondition(idx: number) {
-  patchTier(idx, (tier) => ({ ...tier, condition: null }));
-}
-
 // Seeded with DeepSeek's first peak window (01:00-04:00 UTC) — the common case
 // this exists for, and a concrete example of the HH:MM format.
 function addWindow(idx: number) {
@@ -1145,29 +1230,6 @@ function removeWindow(tierIdx: number, winIdx: number) {
   patchTier(tierIdx, (tier) => ({
     ...tier,
     utc_windows: (tier.utc_windows ?? []).filter((_: any, j: number) => j !== winIdx),
-  }));
-}
-
-// Seeded with OpenAI Flex so the "response key first, request key as fallback" order is visible.
-function addRule(idx: number) {
-  patchTier(idx, (tier) => ({
-    ...tier,
-    rules: [
-      ...(tier.rules ?? []),
-      {
-        keys: "openai.response.service_tier, openai.request.service_tier",
-        op: "in",
-        values: "flex",
-        value: 0,
-      },
-    ],
-  }));
-}
-
-function removeRule(tierIdx: number, ruleIdx: number) {
-  patchTier(tierIdx, (tier) => ({
-    ...tier,
-    rules: (tier.rules ?? []).filter((_: any, j: number) => j !== ruleIdx),
   }));
 }
 
@@ -1244,36 +1306,28 @@ function fromPerMillion(perMillion: number): number {
   return perMillion > 0 ? perMillion / 1_000_000 : 0;
 }
 
-/** Live preview = committed price rows + the (non-empty) draft. Values are
- *  PER-MILLION; the template converts to per-token for the cost columns. */
-function previewEntries(tier: any): Array<{ key: string; value: number; pending?: boolean }> {
-  const out = (tier.prices ?? [])
-    .filter((r: any) => String(r.key ?? "").trim())
-    .map((r: any) => ({ key: String(r.key), value: Number(r.value) || 0 }));
-  const dk = String(tier.draftKey ?? "").trim();
-  if (dk && !out.find((e: any) => e.key === dk)) {
-    out.push({ key: dk, value: Number(tier.draftValue) || 0, pending: true });
-  }
-  return out;
-}
-
-function formatPreviewCost(costPerUnit: number, multiplier: number) {
-  if (!costPerUnit) return "0";
-  const c = costPerUnit * multiplier;
-  if (c === 0) return "0";
-  if (c < 0.00001) return c.toExponential(2);
-  let str = c.toFixed(8);
-  str = str.replace(/0+$/, "").replace(/\.$/, "");
-  return str;
-}
-
 function validateUsageKey(key: string): string | null {
   if (/^\d+$/.test(key)) return t("modelPricing.usageKeyPureInteger");
   if (/\s/.test(key)) return t("modelPricing.usageKeyContainsSpaces");
   return null;
 }
 
+// Pricing gaps' Create price sets `from=gaps&stream=`, so Back and Save return to that stream's gaps.
+const backToGaps = computed(() => route.query.from === "gaps");
+
 function goBack() {
+  if (backToGaps.value) {
+    router.push({
+      name: "modelPricingGaps",
+      query: {
+        org_identifier: orgIdentifier.value,
+        stream: route.query.stream as string,
+        start_time: route.query.start_time,
+        end_time: route.query.end_time,
+      },
+    });
+    return;
+  }
   router.push({
     name: "modelPricing",
     query: { org_identifier: orgIdentifier.value },
@@ -1355,6 +1409,13 @@ async function save(value?: ModelPricingForm) {
     tiers: formToModelTiers(tiers),
   };
 
+  // Ask before the rule takes over models other than the one it names. A failed
+  // preview does not block the save; the server still validates the pattern.
+  const others = ((await fetchCapturedModels(m.match_pattern)) ?? []).filter((c) => !c.primary);
+  if (others.length && !(await confirmOtherModels(others.map((c) => c.model_name)))) {
+    return;
+  }
+
   // Warn if another enabled org entry has the same pattern and higher priority
   // (same valid_from context — it will shadow this entry at runtime).
   const patternConflicts = existingModels.value.filter((other: any) => {
@@ -1387,11 +1448,56 @@ async function save(value?: ModelPricingForm) {
         message: t("modelPricing.modelPricingSaved"),
       });
     }
+    if (leaveSave) {
+      leaveSave.saved = true;
+      return;
+    }
+    pricingDraft.markSaved();
     goBack();
   } catch (e: any) {
     notifyError(t("modelPricing.errSave"), e);
   }
 }
+
+const formValues = form.useStore((s): ModelPricingForm => s.values);
+// Set while the leave dialog's Save runs, so a successful save does not leave the editor itself.
+let leaveSave: { saved: boolean } | null = null;
+// The model as loaded in edit mode, or null once a load found it gone.
+const serverModel = ref<Record<string, unknown> | null>(null);
+
+// Only what this editor writes: `enabled` is toggled from the list and timestamps move on every save.
+type ComparableSource = Partial<
+  Record<"name" | "match_pattern" | "tiers" | "sort_order" | "valid_from", unknown>
+> | null;
+
+const comparableModel = (m: ComparableSource) => ({
+  name: m?.name ?? "",
+  match_pattern: m?.match_pattern ?? "",
+  tiers: m?.tiers ?? [],
+  sort_order: m?.sort_order ?? 0,
+  valid_from: m?.valid_from ?? null,
+});
+
+const pricingDraft = useEditorDraft<ModelPricingForm>({
+  kind: "model_pricing",
+  entityLabel: () => t("common.editorDraft.entities.model_pricing"),
+  entityId: () => (isEdit.value ? String(route.query.id) : null),
+  newVariant: () =>
+    route.query.id && route.query.duplicate === "true" ? `duplicate:${route.query.id}` : null,
+  snapshot: () => JSON.parse(JSON.stringify(formValues.value)) as ModelPricingForm,
+  apply: (data) => form.reset(data),
+  base: () => (route.query.id ? serverModel.value : null),
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+});
 
 onBeforeMount(async () => {
   const id = route.query.id as string | undefined;
@@ -1414,6 +1520,7 @@ onBeforeMount(async () => {
       const res = await modelPricingService.get(orgIdentifier.value, id);
       const found = res.data;
       if (found) {
+        serverModel.value = comparableModel(found);
         model.value = JSON.parse(JSON.stringify(found));
         if (isDuplicate) {
           model.value.id = null;
@@ -1429,7 +1536,10 @@ onBeforeMount(async () => {
       }
     } catch (e: any) {
       notifyError(t("modelPricing.errLoadModel"), e);
+      // A model that is gone still opens, so its stale draft is dropped; any other failure keeps it.
+      if (e?.response?.status !== 404) return;
     }
   }
+  await pricingDraft.start();
 });
 </script>

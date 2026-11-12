@@ -9,6 +9,8 @@ const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 const { getCloudConfig } = require('./cloud-auth.js');
 
 const istanbulCLIOutput = path.join(process.cwd(), '.nyc_output');
+// Only an istanbul build (VITE_COVERAGE=true) exposes window.__coverage__; otherwise the hooks only cost time.
+const coverageEnabled = process.env.VITE_COVERAGE === 'true';
 const authFile = path.join(__dirname, 'auth', 'user.json');
 
 function generateUUID() {
@@ -59,42 +61,50 @@ const test = baseTest.extend({
             }
           }
           if (email) sessionStorage.setItem(`connectDataSourcePromptShown:${email}`, 'true');
+          // Logs and traces open the filter builder by default; existing specs drive the code editor.
+          for (const key of ['o2.logs.queryInput', 'o2.traces.queryInput']) {
+            if (!localStorage.getItem(key)) localStorage.setItem(key, 'query');
+          }
         } catch (_) {}
       }, cloudUserEmail);
 
       // Add coverage collection (from original baseFixtures)
-      await context.addInitScript(() =>
-        window.addEventListener('beforeunload', () => {
+      if (coverageEnabled) {
+        await context.addInitScript(() =>
+          window.addEventListener('beforeunload', () => {
+            try {
+              (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__))
+            } catch (error) {
+              testLogger.error('Failed to collect coverage on page unload', { error });
+            }
+          }),
+        );
+
+        await fs.promises.mkdir(istanbulCLIOutput, { recursive: true });
+        await context.exposeFunction('collectIstanbulCoverage', async (coverageJSON) => {
+          if (!coverageJSON) return;
+          const filename = path.join(istanbulCLIOutput, `playwright_coverage_${generateUUID()}.json`);
           try {
-            (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__))
+            await fs.promises.writeFile(filename, coverageJSON);
           } catch (error) {
-            testLogger.error('Failed to collect coverage on page unload', { error });
+            testLogger.error('Failed to write coverage data', { error });
           }
-        }),
-      );
-      
-      await fs.promises.mkdir(istanbulCLIOutput, { recursive: true });
-      await context.exposeFunction('collectIstanbulCoverage', async (coverageJSON) => {
-        if (!coverageJSON) return;
-        const filename = path.join(istanbulCLIOutput, `playwright_coverage_${generateUUID()}.json`);
-        try {
-          await fs.promises.writeFile(filename, coverageJSON);
-        } catch (error) {
-          testLogger.error('Failed to write coverage data', { error });
-        }
-      });
-      
+        });
+      }
+
       await use(context);
-      
+
       // Collect final coverage
-      await Promise.all(context.pages().map(async (page) => {
-        try {
-          await page.evaluate(() => (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__)))
-        } catch (error) {
-          testLogger.error('Failed to collect final coverage for page', { error });
-        }
-      }));
-      
+      if (coverageEnabled) {
+        await Promise.all(context.pages().map(async (page) => {
+          try {
+            await page.evaluate(() => (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__)))
+          } catch (error) {
+            testLogger.error('Failed to collect final coverage for page', { error });
+          }
+        }));
+      }
+
     } finally {
       if (context) {
         await context.close();
@@ -180,6 +190,14 @@ async function navigateToBase(page) {
   }
   
   let isAuthenticated = await verifyAuthentication(page);
+
+  // A blank page here is usually a JS chunk that never downloaded, not a lost session; reload before re-login.
+  if (!isAuthenticated && isCloudEnvironment()) {
+    testLogger.warn('Auth check failed — reloading once before re-authentication');
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: navTimeout }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    isAuthenticated = await verifyAuthentication(page);
+  }
 
   // Self-heal on cloud: the shared session token is minted once at the start of the run
   // and reused by every shard, so on long runs (or when shards sharing an org contend on

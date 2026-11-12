@@ -99,6 +99,20 @@ describe("ODrawer", () => {
     expect(emitted?.[0]).toEqual([false]);
   });
 
+  it("stays open when closeGuard returns false, and closes when it returns true", async () => {
+    let allow = false;
+    const wrapper = mount(ODrawer, {
+      props: { open: true, title: "Drawer", closeGuard: () => allow },
+    });
+    const closeBtn = wrapper.find('button[aria-label="Close drawer"]');
+    await closeBtn.trigger("click");
+    expect(wrapper.emitted("update:open")).toBeFalsy();
+
+    allow = true;
+    await closeBtn.trigger("click");
+    expect(wrapper.emitted("update:open")?.[0]).toEqual([false]);
+  });
+
   it("shows the close button when persistent=true (persistent only blocks Escape/backdrop)", () => {
     const wrapper = mount(ODrawer, {
       props: { open: true, persistent: true, title: "Persistent" },
@@ -310,6 +324,19 @@ describe("ODrawer", () => {
       expect(emitted?.[0]).toEqual([false]);
     });
 
+    it("cancels Escape when closeGuard vetoes it, so the drawer stays open", async () => {
+      const guard = vi.fn(() => false);
+      const wrapper = mount(ODrawer, {
+        props: { open: true, title: "Test", closeGuard: guard },
+      });
+      const panel = findDrawerPanel(wrapper);
+      const event = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+      await panel.vm.$emit("escapeKeyDown", event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(guard).toHaveBeenCalledTimes(1);
+      expect(wrapper.emitted("update:open")).toBeFalsy();
+    });
+
     it("does NOT emit update:open when Escape is pressed and persistent=true", async () => {
       const wrapper = mount(ODrawer, {
         props: { open: true, title: "Test", persistent: true },
@@ -317,6 +344,26 @@ describe("ODrawer", () => {
       const panel = findDrawerPanel(wrapper);
       await panel.vm.$emit("escapeKeyDown", new KeyboardEvent("keydown", { key: "Escape" }));
       expect(wrapper.emitted("update:open")).toBeFalsy();
+    });
+
+    it("stays open on an outside interaction when modal=false", async () => {
+      const wrapper = mount(ODrawer, {
+        props: { open: true, title: "Test", modal: false, seamless: true },
+      });
+      const panel = findDrawerPanel(wrapper);
+      const event = new CustomEvent("interactOutside", { cancelable: true });
+      await panel.vm.$emit("interactOutside", event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(wrapper.emitted("update:open")).toBeFalsy();
+    });
+
+    it("still closes on Escape when modal=false", async () => {
+      const wrapper = mount(ODrawer, {
+        props: { open: true, title: "Test", modal: false },
+      });
+      const panel = findDrawerPanel(wrapper);
+      await panel.vm.$emit("escapeKeyDown", new KeyboardEvent("keydown", { key: "Escape" }));
+      expect(wrapper.emitted("update:open")?.[0]).toEqual([false]);
     });
   });
   describe("close focus (returnFocusTo / after-close)", () => {

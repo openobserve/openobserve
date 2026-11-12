@@ -52,6 +52,11 @@ vi.mock("echarts/core", async (importOriginal) => ({
 }));
 
 /** `n` values for one label, counts descending. */
+/** `expr` kept to the 10 values of `label` with the most requests over the whole window, ranked at its end. */
+const ranked = (expr: string, label: string, window = "4m") =>
+  `(${expr}) and on (${label}) topk(10, sum by (${label}) ` +
+  `(increase({__name__="http_requests_total",${label}!=""}[${window}] @ end())))`;
+
 const values = (prefix: string, n: number) =>
   Array.from({ length: n }, (_, i) => ({ zo_sql_key: `${prefix}${i}`, zo_sql_num: 1000 - i }));
 
@@ -315,9 +320,10 @@ describe("MetricBreakdown", () => {
       );
     });
 
-    it("charts the metric by each label, topk(10) for a 20+ label", async () => {
+    it("charts the metric by each label, a per-step topk(10) for a 20+ label", async () => {
       wrapper = mountBreakdown();
       await flushPromises();
+      // The overview stays cheap: the whole-window rank is only for the focused label.
       expect(exprs()).toEqual([
         'topk(10, sum by (instance) (rate({__name__="http_requests_total"}[4m])))',
         'sum by (method) (rate({__name__="http_requests_total"}[4m]))',
@@ -529,7 +535,7 @@ describe("MetricBreakdown", () => {
       await flushPromises();
 
       expect(runQuery).toHaveBeenCalledWith(
-        'topk(10, sum by (instance) (rate({__name__="http_requests_total"}[4m])))',
+        ranked('sum by (instance) (rate({__name__="http_requests_total"}[4m]))', "instance"),
         expect.any(AbortSignal),
       );
       expect(wrapper.find('[data-test="metrics-breakdown-topk"]').text()).toContain("top 10");
@@ -541,7 +547,7 @@ describe("MetricBreakdown", () => {
       await flushPromises();
 
       expect(runQuery).toHaveBeenCalledWith(
-        'topk(10, sum by (method) (rate({__name__="http_requests_total"}[4m])))',
+        ranked('sum by (method) (rate({__name__="http_requests_total"}[4m]))', "method"),
         expect.any(AbortSignal),
       );
     });
@@ -770,8 +776,8 @@ describe("MetricBreakdown", () => {
 
         // m2 is counted by `_values` but has no series in the chart.
         expect(rankedValues()).toEqual(["m1", "m0", "m2"]);
-        expect(cell("avg", "m2").text()).toBe("—");
-        expect(cell("latest", "m2").text()).toBe("—");
+        expect(cell("avg", "m2").find('[data-state="none"]').text()).toContain("—");
+        expect(cell("latest", "m2").find('[data-state="none"]').text()).toContain("—");
         expect(cell("trend", "m2").find("path").exists()).toBe(false);
         expect(cell("trend", "m1").find("path").exists()).toBe(true);
       });
@@ -828,7 +834,7 @@ describe("MetricBreakdown", () => {
         expect(wrapper.find('[data-test="metrics-breakdown-table"]').text()).toContain("Share");
         expect(cell("share", "m0").text()).toBe("57.1%");
         expect(cell("share", "m1").text()).toBe("42.9%");
-        expect(cell("share", "m2").text()).toBe("—");
+        expect(cell("share", "m2").find('[data-state="none"]').text()).toContain("—");
         // Avg stays the mean of real points.
         expect(cell("avg", "m1").text()).toBe("3.00c/s");
       });
@@ -1258,7 +1264,7 @@ describe("MetricBreakdown", () => {
         await flushPromises();
 
         expect(exprs()).toEqual([
-          'topk(10, sum by (tenant_id) (rate({__name__="http_requests_total"}[4m])))',
+          ranked('sum by (tenant_id) (rate({__name__="http_requests_total"}[4m]))', "tenant_id"),
         ]);
       });
 
@@ -1534,7 +1540,7 @@ describe("MetricBreakdown", () => {
         expect(cell("p99", "v11").text()).toBe(inSeconds(1, 2));
         const headers = table.findAll("th").map((th) => th.text());
         expect(headers.slice(1, 5)).toEqual(["Rate", "p50", "p90", "p99"]);
-        expect(cell("p50", "m0").text()).toBe("—");
+        expect(cell("p50", "m0").find('[data-state="none"]').text()).toContain("—");
       });
 
       it("adds the busiest value's heatmap to a dashboard, or the row picked", async () => {
@@ -1775,6 +1781,25 @@ describe("MetricBreakdown", () => {
       wrapper = mountBreakdown({ selectedLabel: "method" });
       await flushPromises();
       expect(button(wrapper).text()).toBe("Add to dashboard");
+      expect(wrapper.find('[data-test="metrics-breakdown-add-to-dashboard-lock"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("is disabled with a lock and opens no dialog when the license locks dashboards", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, features: { dashboards: "locked" } };
+      try {
+        wrapper = mountBreakdown({ selectedLabel: "method" });
+        await flushPromises();
+        expect(button(wrapper).attributes("disabled")).toBeDefined();
+        expect(wrapper.find('[data-test="metrics-breakdown-add-to-dashboard-lock"]').exists()).toBe(
+          true,
+        );
+        await button(wrapper).trigger("click");
+        expect(dialog(wrapper).props("open")).toBeFalsy();
+      } finally {
+        store.state.zoConfig = { ...store.state.zoConfig, features: {} };
+      }
     });
 
     it("hands the dialog a panel that reproduces the focused chart", async () => {
@@ -1882,7 +1907,11 @@ describe("MetricBreakdown", () => {
       await button(wrapper).trigger("click");
 
       expect(dialog(wrapper).props("dashboardPanelData")!.data.queries[0].query).toBe(
-        'topk(10, sum by (instance) (rate({__name__="http_requests_total"}[$__rate_interval])))',
+        ranked(
+          'sum by (instance) (rate({__name__="http_requests_total"}[$__rate_interval]))',
+          "instance",
+          "$__range",
+        ),
       );
     });
 
@@ -1953,6 +1982,267 @@ describe("MetricBreakdown", () => {
       wrapper = mountBreakdown();
       await flushPromises();
       expect(button(wrapper).exists()).toBe(false);
+    });
+  });
+
+  describe("the Outlying sort", () => {
+    const steady = (v: string): [number, string][] => [
+      [1, v],
+      [2, v],
+      [3, v],
+      [4, v],
+    ];
+    const rankedValues = () =>
+      wrapper
+        .findAll('[data-test^="metrics-breakdown-value-method-"]')
+        .map((c) => c.attributes("data-test")!.replace("metrics-breakdown-value-method-", ""));
+    const outliers = () =>
+      wrapper
+        .findAll('[data-test^="metrics-breakdown-outlier-method-"]')
+        .map((c) => c.attributes("data-test")!.replace("metrics-breakdown-outlier-method-", ""));
+
+    beforeEach(() => {
+      fieldValues.mockResolvedValue({
+        data: { hits: [{ field: "method", values: values("m", 4) }] },
+      });
+      // m0 has the lowest average, from a single dip the others never share.
+      runQuery.mockResolvedValue(
+        byMethod(
+          [
+            "m0",
+            [
+              [1, "39"],
+              [2, "39"],
+              [3, "0"],
+              [4, "39"],
+            ],
+          ],
+          ["m1", steady("39")],
+          ["m2", steady("38")],
+          ["m3", steady("40")],
+        ),
+      );
+    });
+
+    it("re-ranks the values by how far their series strays, and tags the standout", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      expect(rankedValues()).toEqual(["m3", "m1", "m2", "m0"]);
+      expect(outliers()).toEqual([]);
+
+      await wrapper.find('[data-test="metrics-breakdown-sort-outlying"]').trigger("click");
+      await flushPromises();
+      expect(rankedValues()[0]).toBe("m0");
+      expect(outliers()).toEqual(["m0"]);
+
+      await wrapper.find('[data-test="metrics-breakdown-sort-avg"]').trigger("click");
+      await flushPromises();
+      expect(outliers()).toEqual([]);
+    });
+
+    it("tags nothing when every series moves together", async () => {
+      runQuery.mockResolvedValue(byMethod(["m0", steady("5")], ["m1", steady("5")]));
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      await wrapper.find('[data-test="metrics-breakdown-sort-outlying"]').trigger("click");
+      await flushPromises();
+      expect(outliers()).toEqual([]);
+    });
+
+    it("is not offered on the label grid", async () => {
+      wrapper = mountBreakdown();
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-breakdown-sort"]').exists()).toBe(false);
+    });
+  });
+
+  describe("one failure message for the breakdown area (CS8)", () => {
+    const failure = (over: Record<string, any> = {}) => ({
+      error: "Forbidden",
+      cause: { status: 403 },
+      failedAt: Date.UTC(2026, 10, 1, 5, 17),
+      keptAt: null,
+      ...over,
+    });
+    const tiles = (w: VueWrapper<any>) => w.findAllComponents({ name: "MetricChartTile" });
+
+    it("reports tiles lost on first load to the page with no line of its own, and hands the page's retry token straight to them", async () => {
+      wrapper = mountBreakdown();
+      await flushPromises();
+      const all = tiles(wrapper);
+      expect(all.length).toBeGreaterThan(1);
+      for (const tile of all) tile.vm.$emit("failed", failure());
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "MetricsFailedLine" }).exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Couldn't load");
+      expect(wrapper.text()).toContain("Each chart splits this metric by one label");
+      expect(wrapper.emitted("failures")!.at(-1)).toEqual([
+        { total: all.length, kept: null, lost: all.length },
+      ]);
+
+      await wrapper.setProps({ retryToken: 7 });
+      expect(tiles(wrapper).every((tile) => tile.props("retryToken") === 7)).toBe(true);
+    });
+
+    it("leaves a failed refresh over kept charts to the page's one sentence, and says nothing here", async () => {
+      wrapper = mountBreakdown();
+      await flushPromises();
+      const all = tiles(wrapper);
+      const keptAt = Date.UTC(2026, 10, 1, 5, 12);
+      all[0].vm.$emit("failed", failure({ keptAt }));
+      await flushPromises();
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+      expect(wrapper.emitted("failures")!.at(-1)).toEqual([
+        {
+          total: all.length,
+          kept: { count: 1, failedAt: Date.UTC(2026, 10, 1, 5, 17), dataFrom: keptAt },
+          lost: 0,
+        },
+      ]);
+    });
+
+    const failFocused = async (w: VueWrapper<any>, over: Record<string, any> = {}) => {
+      const focusedTile = w.findComponent({ name: "MetricChartTile" });
+      focusedTile.vm.$emit("results", {
+        status: over.keptAt ? "done" : "error",
+        results: [],
+        periodEmpty: false,
+        forecastDrawn: false,
+      });
+      focusedTile.vm.$emit("failed", failure(over));
+      await flushPromises();
+      return focusedTile;
+    };
+
+    it("leaves a failed focused chart to the tile, with no line of its own and no word or dash in any stat cell (N2)", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      const focusedTile = await failFocused(wrapper);
+      expect(focusedTile.props("parentReportsFailures")).toBe(true);
+
+      expect(wrapper.findComponent({ name: "MetricsFailedLine" }).exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Couldn't load");
+      const table = wrapper.find('[data-test="metrics-breakdown-values"]');
+      expect(table.findAllComponents({ name: "OValue" })).toHaveLength(0);
+      expect(table.text()).not.toContain("—");
+
+      await wrapper.setProps({ retryToken: 7 });
+      expect(focusedTile.props("retryToken")).toBe(7);
+    });
+
+    it("reports a failed focused chart to the page, so it never says Updated over it (CS8)", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      await failFocused(wrapper);
+      expect(wrapper.emitted("failures")!.at(-1)).toEqual([{ total: 1, kept: null, lost: 1 }]);
+
+      const keptAt = Date.UTC(2026, 10, 1, 5, 12);
+      await failFocused(wrapper, { keptAt });
+      expect(wrapper.emitted("failures")!.at(-1)).toEqual([
+        {
+          total: 1,
+          kept: { count: 1, failedAt: Date.UTC(2026, 10, 1, 5, 17), dataFrom: keptAt },
+          lost: 0,
+        },
+      ]);
+      // A kept chart's failure is the page's one sentence; nothing is said here.
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    });
+
+    it("reports the focused chart's loading as busy, so the page's range status waits for it (CS2)", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      const focusedTile = wrapper.findComponent({ name: "MetricChartTile" });
+      focusedTile.vm.$emit("busy", true);
+      await flushPromises();
+      expect(wrapper.emitted("busy")!.at(-1)).toEqual([true]);
+      focusedTile.vm.$emit("busy", false);
+      await flushPromises();
+      expect(wrapper.emitted("busy")!.at(-1)).toEqual([false]);
+    });
+
+    it("adds no words of its own while the page announces a range change, but still reports busy", async () => {
+      vi.useFakeTimers();
+      wrapper = mountBreakdown({ announces: false });
+      await flushPromises();
+      const tile = tiles(wrapper)[0];
+      tile.vm.$emit("busy", true);
+      await wrapper.vm.$nextTick();
+      vi.advanceTimersByTime(400);
+      await wrapper.vm.$nextTick();
+      const polite =
+        document.body.querySelector('[data-test="region-announcer"]')?.textContent ?? "";
+      expect(polite).not.toContain("Loading");
+      expect(wrapper.emitted("busy")!.at(-1)).toEqual([true]);
+      vi.useRealTimers();
+    });
+
+    it("goes back to the hint once every tile has recovered", async () => {
+      wrapper = mountBreakdown();
+      await flushPromises();
+      const tile = tiles(wrapper)[0];
+      tile.vm.$emit("failed", failure());
+      await flushPromises();
+      tile.vm.$emit("failed", null);
+      await flushPromises();
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+      expect(wrapper.text()).toContain("Each chart splits this metric by one label");
+      expect(wrapper.emitted("failures")!.at(-1)![0]).toMatchObject({ kept: null, lost: 0 });
+    });
+  });
+
+  describe("one loader for the breakdown area (M-5)", () => {
+    it("holds placeholder tiles under one progress line while the metric's labels load", () => {
+      wrapper = mountBreakdown({ card: { ...CARD, labels: undefined }, labelsPending: true });
+      const pending = wrapper.find('[data-test="metrics-breakdown-pending"]');
+      expect(pending.exists()).toBe(true);
+      expect(pending.attributes("aria-busy")).toBe("true");
+      expect(pending.findAll('[role="img"]').length).toBeGreaterThan(0);
+      expect(pending.findAll('[role="progressbar"]')).toHaveLength(1);
+      expect(wrapper.find('[data-test="metrics-breakdown-no-labels"]').exists()).toBe(false);
+    });
+
+    it("reserves the hint line and each tile's title row while the labels load, so nothing drops when they land (CS9)", () => {
+      wrapper = mountBreakdown({ card: { ...CARD, labels: undefined }, labelsPending: true });
+      expect(wrapper.text()).toContain("Each chart splits this metric by one label");
+      const pending = wrapper.find('[data-test="metrics-breakdown-pending"]');
+      const tiles = pending.findAll(".h-56");
+      expect(tiles.length).toBe(3);
+      for (const tile of tiles) {
+        expect(tile.findComponent({ name: "PanelBar" }).exists()).toBe(true);
+        expect(tile.find('[role="img"]').exists()).toBe(true);
+      }
+    });
+
+    it("still says there are no labels once the schema has answered", () => {
+      wrapper = mountBreakdown({ card: { ...CARD, labels: [] }, labelsPending: false });
+      expect(wrapper.find('[data-test="metrics-breakdown-no-labels"]').exists()).toBe(true);
+    });
+
+    it("draws no grid-wide line: each tile draws its own panel line", async () => {
+      wrapper = mountBreakdown();
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-progress"]').exists()).toBe(false);
+      const tiles = wrapper.findAllComponents({ name: "MetricChartTile" });
+      expect(tiles.length).toBeGreaterThan(0);
+      expect(wrapper.findAllComponents({ name: "LoadingProgress" })).toHaveLength(tiles.length);
+      for (const tile of tiles) {
+        expect(tile.props("parentReportsFailures")).toBe(true);
+        expect(tile.findComponent({ name: "LoadingProgress" }).props()).toMatchObject({
+          loadingProgressPercentage: 0,
+          indeterminate: false,
+        });
+      }
+    });
+
+    it("draws the focused chart's own panel line, and no line over it from the breakdown", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-breakdown-chart-progress"]').exists()).toBe(false);
+      const focusedTile = wrapper.findComponent({ name: "MetricChartTile" });
+      expect(wrapper.findAllComponents({ name: "LoadingProgress" })).toHaveLength(1);
+      expect(focusedTile.findComponent({ name: "LoadingProgress" }).exists()).toBe(true);
     });
   });
 });

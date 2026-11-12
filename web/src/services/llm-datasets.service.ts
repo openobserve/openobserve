@@ -36,8 +36,12 @@ export interface LlmDataset {
   orgId?: string;
   name: string;
   description: string | null;
-  /** Dataset-wide MVCC sequence — bumped on every item insert/edit/delete. */
+  /** Per-row MVCC counter — every stored item row takes the next one. This is
+   *  the value an experiment pins; never display it. */
   globalVersion: number;
+  /** The version shown for the dataset: one per write request (a batch upsert
+   *  or import is one version, whatever its item count). */
+  writeVersion: number;
   /** Count of live (non-deleted) items. Derived server-side per read; the
    *  Dataset row stores no counter, so this cannot drift. */
   itemCount: number;
@@ -82,8 +86,11 @@ export interface LlmDatasetItem {
   rawExpectedOutput: unknown;
   source: LlmDatasetItemSource;
   tags: string[];
-  /** Dataset-wide MVCC sequence this row was written at (server-owned). */
+  /** Dataset-wide MVCC sequence this row was written at (server-owned). Orders
+   *  an item's history; not for display. */
   version: number;
+  /** The dataset version of the write that stored this row — what to display. */
+  writeVersion: number;
   /** Free-form dimensions stored on the item — what subset filters read. */
   metadata: Record<string, unknown> | null;
   /** Lineage — the trace id a telemetry-pushed golden was distilled from. */
@@ -159,6 +166,7 @@ function normalize(d: any): LlmDataset {
     name: d.name,
     description: d.description ?? null,
     globalVersion: d.global_version ?? d.globalVersion ?? 0,
+    writeVersion: d.write_version ?? d.writeVersion ?? 0,
     itemCount: d.item_count ?? d.itemCount ?? 0,
     tags: Array.isArray(d.tags) ? d.tags : [],
     sources: {
@@ -205,6 +213,31 @@ function objectOrNull(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+/** Names a `{{token}}` can carry; the playground renderer substitutes exactly these. */
+export const TEMPLATE_VARIABLE_NAME_SOURCE = "[a-zA-Z_][a-zA-Z0-9_]*";
+const TEMPLATE_VARIABLE_NAME = new RegExp(`^${TEMPLATE_VARIABLE_NAME_SOURCE}$`);
+/** `input` is bound to the whole value separately; `expected_output` only ever feeds scorers. */
+const NON_FIELD_VARIABLES: Record<string, true> = { input: true, expected_output: true };
+
+/** Top-level object-input fields as the runner renders them (non-strings as JSON); `{}` otherwise. */
+export function inputFieldVariables(rawInput: unknown): Record<string, string> {
+  const fields: Record<string, string> = {};
+  for (const [name, value] of Object.entries(objectOrNull(rawInput) ?? {})) {
+    if (!TEMPLATE_VARIABLE_NAME.test(name) || Object.hasOwn(NON_FIELD_VARIABLES, name)) continue;
+    fields[name] = typeof value === "string" ? value : JSON.stringify(value);
+  }
+  return fields;
+}
+
+/** Fields in every row's object input (the backend rejects partial keys); else `[]`. */
+export function commonInputFields(items: Pick<LlmDatasetItem, "rawInput">[]): string[] {
+  const objects = items.map((item) => objectOrNull(item.rawInput));
+  if (!objects.length || objects.some((object) => !object)) return [];
+  return Object.keys(inputFieldVariables(objects[0])).filter((name) =>
+    objects.every((object) => Object.hasOwn(object!, name)),
+  );
+}
+
 /** Fold an API item row into the normalized shape. The row's `id` is the LOGICAL
  *  id — `rowId` identifies this one immutable version and is never sent back. */
 function normalizeItem(d: any): LlmDatasetItem {
@@ -222,6 +255,7 @@ function normalizeItem(d: any): LlmDatasetItem {
     source: (d.source ?? "manual") as LlmDatasetItemSource,
     tags: Array.isArray(d.tags) ? d.tags : [],
     version: Number(d.globalVersion ?? d.global_version ?? 0),
+    writeVersion: Number(d.writeVersion ?? d.write_version ?? 0),
     metadata: objectOrNull(d.metadata),
     // Lineage stays as FOUR separate pointers: an annotation push carries both a
     // trace ref and a review submission, so collapsing them loses half the story.

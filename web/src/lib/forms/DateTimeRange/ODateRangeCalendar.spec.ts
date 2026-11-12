@@ -2,6 +2,7 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
+import { parseDate } from "@internationalized/date";
 import ODateRangeCalendar from "./ODateRangeCalendar.vue";
 
 describe("ODateRangeCalendar", () => {
@@ -144,6 +145,27 @@ describe("ODateRangeCalendar", () => {
         }
       }
     }
+  });
+
+  it("reports a first click as pending until the range is completed", async () => {
+    wrapper = mount(ODateRangeCalendar, {
+      props: { startDate: "2026/10/26", endDate: "2026/10/26" },
+    });
+    const root = wrapper.findComponent({ name: "RangeCalendarRoot" });
+
+    root.vm.$emit("update:modelValue", { start: parseDate("2026-10-20"), end: undefined });
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted("update:pendingDate")?.at(-1)).toEqual(["2026/10/20"]);
+    expect(wrapper.emitted("update:startDate")).toBeUndefined();
+
+    root.vm.$emit("update:modelValue", {
+      start: parseDate("2026-10-20"),
+      end: parseDate("2026-10-22"),
+    });
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted("update:pendingDate")?.at(-1)).toEqual([null]);
+    expect(wrapper.emitted("update:startDate")?.at(-1)).toEqual(["2026/10/20"]);
+    expect(wrapper.emitted("update:endDate")?.at(-1)).toEqual(["2026/10/22"]);
   });
 
   it("should pass YYYY/MM/DD startDate and endDate through to the calendar selection state", () => {

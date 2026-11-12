@@ -25,7 +25,7 @@ import { useMutation } from "@tanstack/vue-query";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, ref, watch, type Component } from "vue";
-import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
@@ -45,9 +45,17 @@ import { getFoldersListByType } from "@/utils/commons";
 import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { templateBindingError } from "@/utils/alerts/templateBindingError";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import {
+  describeCheckRedacted,
+  redactCheckDraftSecrets,
+  reentryValidationKey,
+} from "@/utils/synthetics/checkDraftSecrets";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTestSkeleton.vue";
@@ -107,6 +115,8 @@ function makeDefaultCheck(type: ProtocolCheckType): ProtocolCheck {
 }
 
 const check = ref<ProtocolCheck>(makeDefaultCheck(props.checkType));
+/** The check as the server returned it, kept unmodified so its draft hash is stable. */
+let serverCheck: ProtocolCheck | null = null;
 const isLoadingEdit = ref(false);
 const isSaving = ref(false);
 
@@ -246,7 +256,12 @@ async function openAgentSetup(locationId?: string) {
 
 async function loadDestinations(force = false) {
   try {
-    const options = destinationsQuery(store.state.selectedOrganization.identifier);
+    const options = destinationsQuery(
+      store.state.selectedOrganization.identifier,
+      undefined,
+      false,
+      ["jira"],
+    );
     // A destination created in another tab never expires this tab's cache, so refresh forces.
     if (force) {
       await queryClient.invalidateQueries({
@@ -262,84 +277,135 @@ async function loadDestinations(force = false) {
   }
 }
 
-async function loadForEdit(id: string) {
+/** A check missing from this org takes its drafts there with it. */
+function forgetMissingCheck() {
+  checkDraft.discard();
+  if (props.editId) {
+    deleteEditorDraftsFor({
+      kind: "synthetic_check",
+      org: orgIdentifier.value,
+      entityId: props.editId,
+    });
+  }
+  toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
+}
+
+function leaveMissingCheck() {
+  forgetMissingCheck();
+  router.push(backTo.value);
+}
+
+/** Resolves true once the check is in the form. */
+async function loadForEdit(id: string): Promise<boolean> {
   isLoadingEdit.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
     const res = await syntheticsService.get(org, id, String(route.query.folder ?? ""));
     check.value = mapResponseToProtocolCheck(res.data as Record<string, unknown>);
+    serverCheck = JSON.parse(JSON.stringify(check.value)) as ProtocolCheck;
+    return true;
   } catch (err: any) {
     // If the check doesn't exist in this org (e.g. user switched orgs while editing),
     // redirect to the synthetics list with a message.
     if (err?.response?.status === 404) {
-      forceLeave = true;
-      router.push(backTo.value);
-      toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
-      isLoadingEdit.value = false;
-      return;
+      leaveMissingCheck();
+      return false;
     }
     // Surface it — a silent catch here leaves a blank form that saves a
     // fresh check over the existing one.
     console.error("[synthetics] failed to load check for edit", err);
     toast({ variant: "error", message: t("synthetics.newCheck.loadEditFailed") });
+    return false;
   } finally {
     isLoadingEdit.value = false;
   }
 }
 
-onMounted(() => {
-  fetchFolders();
-  fetchLocations();
-  loadDestinations();
-
-  if (props.editId) {
-    loadForEdit(props.editId).catch(console.error);
-  } else {
-    const folderQuery = route.query.folder;
-    if (typeof folderQuery === "string" && folderQuery) {
-      check.value = { ...check.value, folder: folderQuery };
-    }
-  }
-});
-
-// ── Unsaved changes guard (same pattern as CreateBrowserTest) ────────────────
 const isDirty = ref(false);
-const showUnsavedDialog = ref(false);
-let pendingLeavePath: string | null = null;
-let forceLeave = false;
 
 function onConfigureUpdate(val: BrowserCheck) {
   check.value = val as ProtocolCheck;
   isDirty.value = true;
 }
 
-onBeforeRouteLeave((to, _from, next) => {
-  if (forceLeave || !isDirty.value) {
-    forceLeave = false;
-    next();
-    return;
-  }
-  next(false);
-  pendingLeavePath = to.fullPath;
-  showUnsavedDialog.value = true;
+const hostTarget = computed(() => ["tcp", "tls", "ssh"].includes(props.checkType));
+
+const checkDraft = useEditorDraft<ProtocolCheck>({
+  kind: "synthetic_check",
+  entityLabel: () => t("common.editorDraft.entities.synthetic_check"),
+  entityId: () => props.editId ?? null,
+  newVariant: () => props.checkType,
+  snapshot: () => check.value,
+  apply: (data) => {
+    check.value = data;
+    isDirty.value = true;
+  },
+  base: () => serverCheck,
+  redactBase: (base) =>
+    redactCheckDraftSecrets(base as ProtocolCheck, "", { hostTarget: hostTarget.value }).data,
+  hasChanges: () => isDirty.value,
+  save: async () => {
+    const result = await persistCheck();
+    // The leave guard is still pending, so a deleted check lets that navigation go on instead of opening the list.
+    if (result === "missing") forgetMissingCheck();
+    return result !== "failed";
+  },
+  redact: (data) => redactCheckDraftSecrets(data, "", { hostTarget: hostTarget.value }),
+  describeRedacted: (paths, data) =>
+    describeCheckRedacted(paths, data, t, { urlLabel: t("common.editorDraft.urlField") }),
 });
 
-function onConfirmLeave() {
-  showUnsavedDialog.value = false;
-  forceLeave = true;
-  if (pendingLeavePath) {
-    router.push(pendingLeavePath);
-    pendingLeavePath = null;
-  }
-}
+/** A changed secret the draft did not keep is flagged on its field until it is typed again. */
+const reentryErrors = computed<Record<string, string>>(() =>
+  Object.fromEntries(
+    checkDraft
+      .pendingReentries()
+      .map((path) => [reentryValidationKey(path), t("common.editorDraft.reenterField")]),
+  ),
+);
 
-async function saveCheck() {
+// A template refusal is about the stored pick; a new pick clears it.
+watch(
+  () => check.value.template,
+  () => {
+    if (!validationErrors.value.template) return;
+    const { template: _cleared, ...rest } = validationErrors.value;
+    validationErrors.value = rest;
+  },
+);
+
+onMounted(async () => {
+  fetchFolders();
+  fetchLocations();
+  loadDestinations();
+
+  if (props.editId) {
+    if (await loadForEdit(props.editId)) await checkDraft.start();
+    return;
+  }
+  const folderQuery = route.query.folder;
+  if (typeof folderQuery === "string" && folderQuery) {
+    check.value = { ...check.value, folder: folderQuery };
+  }
+  await checkDraft.start();
+});
+
+/** Saves without navigating; "missing" means the check is gone from this org. */
+async function persistCheck(): Promise<"saved" | "missing" | "failed"> {
+  if (checkDraft.pendingReentries().length) {
+    toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
+    return "failed";
+  }
   isSaving.value = true;
   const dismiss = toast({
     variant: "loading",
     message: t("synthetics.newCheck.saving"),
     timeout: 0,
   });
+  // A refusal names the template sent; a pick made during the request is not the one refused.
+  const submittedTemplate = check.value.template ?? null;
+  // The payload drops the template without a destination; read now, the user can edit during the save.
+  const sentNullTemplate = !check.value.notifications?.destinations?.length;
   try {
     const payload = buildCreateProtocolCheckPayload(check.value);
     if (props.editId) {
@@ -355,17 +421,18 @@ async function saveCheck() {
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
     }
+    // With no destination the payload sent a null template, so the hidden name must not come back.
+    if (sentNullTemplate && submittedTemplate && check.value.template === submittedTemplate) {
+      check.value = { ...check.value, template: null };
+    }
     isDirty.value = false;
-    router.push(backTo.value);
+    return "saved";
   } catch (err: any) {
     dismiss();
-    if (err?.response?.status === 404) {
-      forceLeave = true;
-      router.push(backTo.value);
-      toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
-      isSaving.value = false;
-      return;
-    }
+    if (err?.response?.status === 404) return "missing";
+    const templateError = templateBindingError(err);
+    if (templateError && (check.value.template ?? null) === submittedTemplate)
+      validationErrors.value = { ...validationErrors.value, template: templateError };
     toast({
       variant: "error",
       message:
@@ -374,9 +441,21 @@ async function saveCheck() {
         t("synthetics.newCheck.saveFailed"),
     });
     console.error("[synthetics] save failed", err);
+    return "failed";
   } finally {
     isSaving.value = false;
   }
+}
+
+async function saveCheck() {
+  const result = await persistCheck();
+  if (result === "missing") {
+    leaveMissingCheck();
+    return;
+  }
+  if (result !== "saved") return;
+  checkDraft.markSaved();
+  router.push(backTo.value);
 }
 </script>
 
@@ -401,7 +480,7 @@ async function saveCheck() {
           :destinations="destinations"
           :folders="folders"
           :folders-loading="foldersLoading"
-          :validation-errors="validationErrors"
+          :validation-errors="{ ...validationErrors, ...reentryErrors }"
           :allow-private-locations="privateLocationsEnabled"
           class="w-full!"
           @refresh:destinations="loadDestinations(true)"
@@ -414,6 +493,11 @@ async function saveCheck() {
             <component
               :is="typeConfigCards[checkType]"
               :check="check"
+              v-bind="
+                checkType === 'http'
+                  ? { validationErrors: { ...validationErrors, ...reentryErrors } }
+                  : {}
+              "
               @update:check="onConfigureUpdate"
             />
           </template>
@@ -465,20 +549,7 @@ async function saveCheck() {
           }
         "
       />
-
-      <!-- Unsaved changes dialog -->
-      <ODialog
-        v-model:open="showUnsavedDialog"
-        size="sm"
-        :title="t('synthetics.newCheck.unsavedTitle')"
-        :primary-button-label="t('synthetics.newCheck.leave')"
-        :secondary-button-label="t('synthetics.newCheck.stay')"
-        data-test="synthetics-create-unsaved-dialog"
-        @click:primary="onConfirmLeave"
-        @click:secondary="showUnsavedDialog = false"
-      >
-        <p class="py-2">{{ t("synthetics.newCheck.unsavedBody") }}</p>
-      </ODialog>
     </template>
+    <EditorDraftDialogs :draft="checkDraft" />
   </OPageLayout>
 </template>

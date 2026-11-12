@@ -46,9 +46,9 @@ use crate::{
     QueryPhase, QueryTracker, SearchResult,
     datafusion::{
         context::{SearchContextBuilder, register_table},
-        optimizer::{
-            context::{PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext},
-            create_physical_plan,
+        optimizer::create_physical_plan,
+        physical_optimizer::context::{
+            PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext,
         },
     },
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -95,11 +95,7 @@ pub async fn search(
     let role_group = req
         .search_event_type
         .as_ref()
-        .map(|v| {
-            SearchEventType::try_from(v.as_str())
-                .ok()
-                .map(RoleGroup::from)
-        })
+        .map(|v| v.parse::<SearchEventType>().ok().map(RoleGroup::from))
         .unwrap_or(Some(RoleGroup::Interactive));
     let clusters = get_cluster_nodes(trace_id, req_regions, req_clusters, role_group).await?;
     let clusters_num = clusters.len();
@@ -247,7 +243,7 @@ async fn run_datafusion(
     register_table(&ctx, &sql).await?;
 
     // create physical plan
-    let physical_plan = create_physical_plan(&ctx, &sql.sql).await?;
+    let physical_plan = create_physical_plan(&ctx, &sql.sql, req.analyze_profile).await?;
 
     if cfg.common.print_key_sql {
         log::info!("[trace_id {trace_id}] super cluster leader: physical plan");

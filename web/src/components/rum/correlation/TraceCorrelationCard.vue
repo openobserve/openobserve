@@ -37,6 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <!-- Trace ID Section -->
       <div class="bg-card-glass-bg p-3">
+        <OBanner
+          v-if="error"
+          variant="error-soft"
+          :content="t('correlation.failedToLoad')"
+          class="mb-3"
+          data-test="trace-correlation-error"
+        />
         <div class="mb-3 flex items-center">
           <div class="text-text-label w-1/4">{{ t("traces.correlation.traceIdLabel") }}</div>
           <div class="flex w-3/4 flex-nowrap items-center">
@@ -96,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Performance Breakdown -->
-        <div v-if="performanceData" class="mb-3">
+        <div v-if="performanceData && !error" class="mb-3">
           <div class="text-text-label mb-1">{{ t("traces.correlation.performanceBreakdown") }}</div>
           <div class="bg-surface-accent rounded-default p-2 text-sm">
             <div class="mb-1 flex items-center">
@@ -156,12 +163,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm-action"
             :disabled="!hasBackendTrace"
+            data-test="trace-correlation-card-view-details-btn"
             @click="viewTraceDetails"
           >
             <OIcon name="git-branch" size="sm" class="me-1" />
             {{ t("traces.correlation.viewTraceDetails") }}
             <OTooltip
-              v-if="!hasBackendTrace"
+              v-if="!hasBackendTrace && !error"
               :content="t('traces.correlation.backendTraceNotAvailable')"
             />
           </OButton>
@@ -171,7 +179,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Missing trace notice -->
-        <div v-if="!hasBackendTrace && traceId" class="bg-surface-accent rounded-default mt-3 p-2">
+        <div
+          v-if="!hasBackendTrace && traceId && !error"
+          class="bg-surface-accent rounded-default mt-3 p-2"
+          data-test="trace-correlation-card-not-available"
+        >
           <div class="flex items-center">
             <OIcon name="info" size="sm" class="me-2" />
             <div class="text-text-secondary text-xs">
@@ -185,9 +197,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { computed, onMounted, onUnmounted, watch } from "vue";
+import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
+import { normalizeTraceId } from "@/utils/rum/fields";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -197,6 +213,8 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
+const router = useRouter();
+const store = useStore();
 
 const props = defineProps({
   traceId: {
@@ -236,10 +254,12 @@ const correlationRange = computed(() =>
 
 const {
   isLoading,
+  error,
   hasBackendTrace,
   fetchCorrelation,
   backendSpanCount,
   performanceData,
+  traceLocation,
   cancelTracesStream,
 } = useTraceCorrelation(
   computed(() => props.traceId),
@@ -287,11 +307,19 @@ const copyTraceId = () => {
 };
 
 const viewTraceDetails = () => {
-  // TODO: Navigate to trace detail view
-  // This will be implemented once we know the trace viewer route
-  toast({
-    variant: "info",
-    message: t("toastMessages.correlation.traceDetailViewComingSoon"),
+  if (!traceLocation.value) return;
+  const { stream, traceId, startTime, endTime } = traceLocation.value;
+  // The location can still be the previous trace's while the kept-alive card refetches for a new error.
+  if (traceId !== (normalizeTraceId(props.traceId) || props.traceId)) return;
+  router.push({
+    name: "traceDetails",
+    query: {
+      stream,
+      trace_id: traceId,
+      from: startTime,
+      to: endTime,
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
   });
 };
 

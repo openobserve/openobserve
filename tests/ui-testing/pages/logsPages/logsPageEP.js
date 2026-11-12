@@ -48,6 +48,9 @@ async searchSchedulerSubmit() {
   await this.page.locator(submitBtn).click();
 
   const jobResponse = await jobResponsePromise;
+  if (!jobResponse.ok()) {
+    throw new Error(`Search job was not created: ${jobResponse.status()} ${await jobResponse.text().catch(() => '')}`);
+  }
   const body = await jobResponse.json();
   const match = body.message?.match(/\[Job_Id: (.+?)\]/);
   return match ? match[1] : null;

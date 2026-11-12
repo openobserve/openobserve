@@ -23,7 +23,7 @@ use config::{
         alerts::{FrequencyType, QueryType, TriggerEvalResults},
         pipeline::components::DerivedStream,
         search::{SearchEventContext, SearchEventType},
-        sql::resolve_stream_names,
+        sql::{TableReferenceExt, resolve_stream_names_with_type},
     },
     utils::sql::is_timestamp_selected,
 };
@@ -39,6 +39,23 @@ use crate::{
 
 pub async fn save(
     mut derived_stream: DerivedStream,
+    pipeline_name: &str,
+    pipeline_id: &str,
+    needs_validated: bool,
+) -> Result<(), anyhow::Error> {
+    validate(
+        &mut derived_stream,
+        pipeline_name,
+        pipeline_id,
+        needs_validated,
+    )
+    .await?;
+    upsert_trigger(&derived_stream, pipeline_name, pipeline_id).await
+}
+
+/// Runs a save's checks and fills in the schedule that `upsert_trigger` needs; writes nothing.
+pub async fn validate(
+    derived_stream: &mut DerivedStream,
     pipeline_name: &str,
     pipeline_id: &str,
     needs_validated: bool,
@@ -63,8 +80,8 @@ pub async fn save(
                 }
 
                 // Check the max_query_range of streams in the sql query
-                let stream_names = match resolve_stream_names(sql) {
-                    Ok(stream_names) => stream_names,
+                let stream_refs = match resolve_stream_names_with_type(sql) {
+                    Ok(stream_refs) => stream_refs,
                     Err(e) => {
                         return Err(anyhow::anyhow!(
                             "Error resolving stream names in SQL query: {e}"
@@ -72,13 +89,19 @@ pub async fn save(
                     }
                 };
                 let (org_id, stream_type) = (&derived_stream.org_id, derived_stream.stream_type);
-                for stream in stream_names.iter() {
-                    if let Some(settings) =
-                        infra::schema::get_settings(org_id, stream, stream_type).await
+                for stream_ref in stream_refs.iter() {
+                    let stream = stream_ref.stream_name();
+                    if let Some(settings) = infra::schema::get_settings(
+                        org_id,
+                        &stream,
+                        stream_ref.get_stream_type(stream_type),
+                    )
+                    .await
                     {
                         let max_query_range = settings.max_query_range;
                         if max_query_range > 0
-                            && derived_stream.trigger_condition.period > max_query_range * 60
+                            && derived_stream.trigger_condition.period
+                                > max_query_range.saturating_mul(60)
                         {
                             return Err(anyhow::anyhow!(
                                 "Query period is greater than max query range of {max_query_range} hours for stream \"{stream}\""
@@ -124,7 +147,7 @@ pub async fn save(
     }
     // an enable toggle re-saves the stored schedule with `needs_validated` off
     if needs_validated {
-        check_schedule(&derived_stream)?;
+        check_schedule(derived_stream)?;
     }
 
     let trigger_module_key = derived_stream.get_scheduler_module_key(pipeline_name, pipeline_id);
@@ -149,7 +172,16 @@ pub async fn save(
             ));
         };
     }
+    Ok(())
+}
 
+/// Creates the trigger, or gives an existing one a new next run and keeps its data.
+pub async fn upsert_trigger(
+    derived_stream: &DerivedStream,
+    pipeline_name: &str,
+    pipeline_id: &str,
+) -> Result<(), anyhow::Error> {
+    let trigger_module_key = derived_stream.get_scheduler_module_key(pipeline_name, pipeline_id);
     let next_run_at = if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
         match derived_stream.trigger_condition.get_next_trigger_time(
             false,
@@ -301,6 +333,47 @@ mod tests {
             .await
             .unwrap_err()
             .to_string()
+    }
+
+    #[tokio::test]
+    async fn save_checks_a_joined_stream_range_by_its_own_type() {
+        use config::meta::stream::{StreamSettings, StreamType};
+
+        let org_id = "test_org_ds_save_join_range";
+        let logs_key = format!("{org_id}/{}/app", StreamType::Logs);
+        let traces_key = format!("{org_id}/{}/spans", StreamType::Traces);
+        let limited = StreamSettings {
+            max_query_range: 1,
+            ..Default::default()
+        };
+        infra::schema::put_stream_settings_batch(vec![
+            (
+                logs_key.clone(),
+                std::sync::Arc::new(StreamSettings::default()),
+            ),
+            (traces_key.clone(), std::sync::Arc::new(limited)),
+        ])
+        .await;
+
+        let err = save_err(|d| {
+            d.org_id = org_id.to_string();
+            d.stream_type = StreamType::Logs;
+            d.query_condition.query_type = QueryType::SQL;
+            d.query_condition.sql = Some(
+                r#"SELECT a._timestamp AS _timestamp FROM "app" AS a JOIN "traces"."spans" AS b ON a.id = b.id"#
+                    .to_string(),
+            );
+            d.trigger_condition.period = 120;
+        })
+        .await;
+
+        infra::schema::remove_stream_settings(&logs_key).await;
+        infra::schema::remove_stream_settings(&traces_key).await;
+
+        assert!(
+            err.contains("max query range") && err.contains("\"spans\""),
+            "{err}"
+        );
     }
 
     #[tokio::test]

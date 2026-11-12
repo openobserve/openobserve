@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { gotoMetricsEditor } from '../commonActions.js';
+import { gotoMetricsVisualize } from '../commonActions.js';
 
 export class SharedComponentsFormValidationPage {
     /**
@@ -56,14 +56,9 @@ export class SharedComponentsFormValidationPage {
 
     // ── AddToDashboard helpers ────────────────────────────────────────────────
 
-    /**
-     * The AddToDashboard dialog under test is reached from the metrics panel
-     * EDITOR (run a query, then "Add to Dashboard"), so go there directly —
-     * the sidebar's Metrics item now opens the Metrics Explorer browse grid,
-     * which has no query bar at all.
-     */
+    /** The Add to Dashboard dialog is reached from Visualize mode, so this goes there directly. */
     async navigateToMetrics() {
-        await gotoMetricsEditor(this.page);
+        await gotoMetricsVisualize(this.page);
     }
 
     async waitForAddToDashboardDialog() {

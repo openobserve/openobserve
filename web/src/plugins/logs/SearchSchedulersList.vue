@@ -308,6 +308,7 @@
         <ConfirmDialog
           :title="t('search_scheduler_job.delete_job_title')"
           :message="t('search_scheduler_job.delete_job_message')"
+          ok-variant="destructive"
           @update:ok="deleteSearchJob"
           @update:cancel="confirmDelete = false"
           v-model="confirmDelete"
@@ -342,6 +343,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { searchState } from "@/composables/useLogs/searchState";
 import searchService from "@/services/search";
+import analytics from "@/services/product_analytics";
 import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -366,6 +368,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -417,7 +420,7 @@ export default defineComponent({
     );
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
     const showSearchResults = ref(false);
     const toBeCancelled = ref({});
     const confirmCancel = ref(false);
@@ -593,7 +596,7 @@ export default defineComponent({
             }
           })
           .catch((e) => {
-            forbidden.value = e?.response?.status === 403;
+            forbidden.value = forbiddenState(e);
             if (!forbidden.value) {
               toast({
                 variant: "error",
@@ -624,6 +627,7 @@ export default defineComponent({
           jobId: toBeCancelled.value.id,
         })
         .then(() => {
+          analytics.track("search_job_cancelled");
           toast({
             variant: "success",
             message: t("search_scheduler_job.job_cancelled_success"),
@@ -648,6 +652,7 @@ export default defineComponent({
           jobId: row.id,
         })
         .then(() => {
+          analytics.track("search_job_retried");
           toast({
             variant: "success",
             message: t("search_scheduler_job.job_restarted_success"),
@@ -680,6 +685,7 @@ export default defineComponent({
           jobId: toBeDeletedJob.value.id,
         })
         .then(() => {
+          analytics.track("search_job_deleted");
           fetchSearchHistory();
           toast({
             variant: "success",
@@ -897,6 +903,7 @@ export default defineComponent({
     };
 
     const fetchSearchResults = (row) => {
+      analytics.track("search_job_results_opened", { stream_type: row.stream_type ?? "logs" });
       searchObj.meta.jobId = row.id;
       goToLogs(row);
     };

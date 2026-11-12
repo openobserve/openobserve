@@ -25,12 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { useI18nTyped } from "@/types/i18n";
-import { computed, ref } from "vue";
+import { computed, inject, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { b64EncodeStandard } from "@/utils/zincutils";
 import { isPrimaryCloudWebUrl } from "@/utils/otelCollectorConfig";
 import useIngestion from "@/composables/useIngestion";
+import { useOrgCredential } from "@/composables/useOrgCredential";
+import { basicIngestToken } from "@/composables/useCredentialSnippet";
 import { importHostMetricsDashboard } from "@/composables/useHostMetricsDashboard";
 import analytics from "@/services/product_analytics";
 import {
@@ -38,11 +39,16 @@ import {
   importSetupDashboard,
 } from "@/composables/useSetupDashboardImport";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import type { CardSubstitutions } from "./types";
+import { SETUP_CARD_ONBOARDING, type CardSubstitutions, type IngestTokenState } from "./types";
+import type {
+  FirstEventResult,
+  FirstEventState,
+} from "@/composables/firstEvent/useFirstEventWatch";
 import { getDataSourceCard } from "./registry";
 import { HOST_AGENT_SLUGS } from "./content/osAgent";
 
@@ -63,29 +69,64 @@ const store = useStore();
 const router = useRouter();
 const { t } = useI18nTyped();
 const { endpoint } = useIngestion();
+// Hosts and Kubernetes embed this card outside Ingestion, so it loads the credential itself.
+const credential = useOrgCredential();
 
-// Per-org url/org/token — the same Basic-auth token every Data Sources card
-// uses: base64(email:<org ingestion passcode>) WITHOUT the "Basic " prefix.
 const subs = computed<CardSubstitutions>(() => {
   const email = store.state.userInfo?.email ?? "";
   const passcode = store.state.organizationData?.organizationPasscode ?? "";
   return {
     url: endpoint.value?.url ?? "",
     org: store.state.selectedOrganization?.identifier ?? "",
-    token: b64EncodeStandard(`${email}:${passcode}`) ?? "",
+    token: basicIngestToken(email, passcode),
     isPrimaryCloud: isPrimaryCloudWebUrl(store.state.zoConfig?.web_url),
   };
 });
 
-const content = computed(() => getDataSourceCard(props.slug, subs.value, t));
+// a settled read can still carry no token, so readiness alone does not make the commands usable
+const tokenState = computed<IngestTokenState>(() => {
+  if (!credential.ready.value) return "loading";
+  return store.state.organizationData?.organizationPasscode ? "ready" : "unavailable";
+});
+
+// Inside onboarding, its tracing answer shapes the card (the Kubernetes tracing step).
+const onboarding = inject(SETUP_CARD_ONBOARDING, null);
+const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
+  useLicenseLock("dashboards");
+const { locked: hostsLocked } = useLicenseLock("host_monitoring");
+const DASHBOARD_ACTIONS = new Set(["view-host-dashboard", "open-setup-dashboard"]);
+
+const content = computed(() => {
+  const card = getDataSourceCard(props.slug, subs.value, t, onboarding?.value);
+  if (!card || !dashboardsLocked.value) return card;
+  return {
+    ...card,
+    steps: card.steps.map((step) =>
+      step.action && DASHBOARD_ACTIONS.has(step.action.id)
+        ? {
+            ...step,
+            action: {
+              ...step.action,
+              icon: "lock" as const,
+              disabled: true,
+              disabledReason: dashboardsLockedReason.value,
+            },
+          }
+        : step,
+    ),
+  };
+});
 
 const passcodeForbidden = computed(
   () => !!store.state.organizationData?.organizationPasscodeForbidden,
 );
 
-// Detection is forwarded so an embedding page (Hosts empty state) can react to it.
+// Detection, the bar's state and its first-record result are forwarded so an embedding page
+// (Hosts empty state, onboarding) can react to them.
 const emit = defineEmits<{
   (e: "detected", count: number): void;
+  (e: "state", state: FirstEventState): void;
+  (e: "received", result: FirstEventResult): void;
 }>();
 
 // Host Metrics auto-import (design 4.2) — host-agent slugs only, so the AWS EC2 embed comes free.
@@ -156,6 +197,7 @@ const onOpenSetupDashboard = async () => {
 
 const onDetected = async (count: number) => {
   emit("detected", count);
+  if (dashboardsLocked.value) return;
   if (setupDashboard.value) return onSetupDashboardDetected();
   if (!isHostAgentSlug.value) return;
   // Captured at detect time — an org switch before the toast click must not retarget.
@@ -172,14 +214,17 @@ const onDetected = async (count: number) => {
         : "ingestion.setupCard.hostDashboardExists",
     ),
     timeout: 5000,
-    action: {
-      label: t("ingestion.setupCard.viewHosts"),
-      handler: () => router.push({ path: "/infra/hosts", query: { org_identifier: org } }),
-    },
+    action: hostsLocked.value
+      ? undefined
+      : {
+          label: t("ingestion.setupCard.viewHosts"),
+          handler: () => router.push({ path: "/infra/hosts", query: { org_identifier: org } }),
+        },
   });
 };
 
 const onStepAction = async (actionId: string) => {
+  if (dashboardsLocked.value && DASHBOARD_ACTIONS.has(actionId)) return;
   if (actionId === "open-setup-dashboard") return onOpenSetupDashboard();
   if (actionId !== "view-host-dashboard" || !isHostAgentSlug.value) return;
   const org = store.state.selectedOrganization?.identifier ?? "";
@@ -217,18 +262,29 @@ const onStepAction = async (actionId: string) => {
       data-test="data-source-setup-card-passcode-forbidden"
       :content="t('ingestion.passcodeForbiddenMessage')"
     />
-    <SetupCardRenderer
-      v-else-if="content"
-      :content="content"
-      :subs="subs"
-      data-test="data-source-setup-card"
-      @detected="onDetected"
-      @step-action="onStepAction"
-    >
-      <template v-if="$slots['hero-under-title']" #hero-under-title>
-        <slot name="hero-under-title" />
-      </template>
-    </SetupCardRenderer>
+    <template v-else-if="content">
+      <OBanner
+        v-if="tokenState === 'unavailable'"
+        variant="warning"
+        class="mb-2"
+        data-test="data-source-setup-card-passcode-unavailable"
+        :content="t('ingestion.passcodeUnavailableMessage')"
+      />
+      <SetupCardRenderer
+        :content="content"
+        :subs="subs"
+        :token-state="tokenState"
+        data-test="data-source-setup-card"
+        @detected="onDetected"
+        @state="emit('state', $event)"
+        @received="emit('received', $event)"
+        @step-action="onStepAction"
+      >
+        <template v-if="$slots['hero-under-title']" #hero-under-title>
+          <slot name="hero-under-title" />
+        </template>
+      </SetupCardRenderer>
+    </template>
     <template v-else>
       <CredentialCodeBlock v-if="fallbackContent" :slug="slug" :content="fallbackContent" />
       <IngestionDocLink v-if="fallbackDocUrl" :href="fallbackDocUrl" />

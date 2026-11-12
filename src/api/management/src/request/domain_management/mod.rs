@@ -46,10 +46,14 @@ fn validate_meta_org_access(org_id: &str) -> Result<(), infra::errors::Error> {
         ("org_id" = String, Path, description = "Organization name (must be meta org)"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = o2_enterprise::enterprise::domain_management::meta::DomainManagementResponse),
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "Not Found", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn get_domain_management_config(Path(org_id): Path<String>) -> Response {
@@ -94,10 +98,14 @@ pub async fn get_domain_management_config(Path(org_id): Path<String>) -> Respons
     ),
     request_body(content = inline(DomainManagementRequest), description = "Domain management configuration", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = o2_enterprise::enterprise::domain_management::meta::DomainOperationResponse),
         (status = 400, description = "Bad Request", content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn set_domain_management_config(

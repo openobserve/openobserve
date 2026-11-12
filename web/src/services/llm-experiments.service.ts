@@ -170,6 +170,9 @@ export interface LlmExperiment extends ExperimentCreatePayload {
   orgId: string;
   /** Resolved server-side from the pinned dataset; null when it was deleted. */
   datasetName: string | null;
+  /** What the pinned `datasetVersion` shows as — the dataset's write version.
+   *  Display this; `datasetVersion` is the pin key. */
+  datasetWriteVersion: number;
   scorers: PinnedExperimentScorer[];
   /** Consolidated execution + scoring lifecycle when summary data is available. */
   status: ExperimentStatus;
@@ -201,6 +204,8 @@ export interface LlmExperiment extends ExperimentCreatePayload {
   taskOutcomes?: ExperimentTaskOutcomes | null;
   scoreOutcomes?: ExperimentScoreOutcomes | null;
   scoreSummaries?: ExperimentScoreSummary[];
+  /** Dimensions the customer's own code reported, one per Score Config and client key. */
+  clientScoreSummaries?: ExperimentClientScoreSummary[];
   aggregateSummary?: ExperimentAggregateSummary | null;
 }
 
@@ -230,7 +235,7 @@ export interface ExperimentExecution {
 
 export interface ExperimentRowDetail {
   experimentId: string;
-  snapshot: { datasetId: string; datasetVersion: number };
+  snapshot: { datasetId: string; datasetVersion: number; datasetWriteVersion: number };
   navigation: {
     rowIndex: number;
     totalRows: number;
@@ -243,6 +248,8 @@ export interface ExperimentRowDetail {
   expectedOutput: unknown | null;
   trials: ExperimentResultSlot[];
   scoreSummaries: ExperimentScoreSummary[];
+  /** Per-case aggregates of the Scores the customer's own code reported. */
+  clientScoreSummaries?: ExperimentClientScoreSummary[];
 }
 
 export type ExperimentResultRowSort = "dataset" | "dispersion_desc";
@@ -260,6 +267,8 @@ export interface ExperimentResultRow {
   output: unknown | null;
   scoreSummaries: ExperimentScoreSummary[];
   p50LatencyMs: number | null;
+  /** First line of the most common error across the row's failed trials. */
+  errorMessage: string | null;
   dispersion: ExperimentRowDispersion | null;
 }
 
@@ -305,6 +314,8 @@ export interface ExperimentResults {
   scoreOutcomes?: ExperimentScoreOutcomes;
   skipSummary?: ExperimentSkipSummary;
   scoreSummaries?: ExperimentScoreSummary[];
+  /** Run-level aggregates of the Scores the customer's own code reported. */
+  clientScoreSummaries?: ExperimentClientScoreSummary[];
   aggregateSummary?: ExperimentAggregateSummary;
   rowDispersions?: ExperimentRowDispersion[];
   dispersionSummary?: ExperimentDispersionSummary;
@@ -326,6 +337,9 @@ export interface ExperimentResultSlot extends ExperimentSlot {
   taskStatus: "pending" | "queued" | "in_progress" | "ok" | "skipped" | "error";
   execution: ExperimentExecution | null;
   scores: ExperimentResultScore[];
+  /** Score records the customer's own code reported for this Slot. They are
+   *  not tied to a pinned Scorer, so they never appear in `scores`. */
+  clientScores?: Record<string, unknown>[];
 }
 
 export interface ExperimentResultPagination {
@@ -345,6 +359,18 @@ export interface ExperimentAggregateSummary {
   incompleteTaskSlots: number;
   incompleteScoreDimensions: number;
   errorTaskSlots: number;
+  /** Errored slots grouped by kind (or first message line when kindless), largest first (top 3). */
+  failureCauses: ExperimentFailureCause[];
+  /** Distinct causes across every errored slot, including those beyond the top 3. */
+  failureCauseCount: number;
+}
+
+export interface ExperimentFailureCause {
+  /** Shared taxonomy (`provider_auth`, `timeout`, …); null when the producer did not classify the failure. */
+  kind: string | null;
+  /** First line of the error message. */
+  message: string;
+  slotCount: number;
 }
 
 export interface ExperimentProgress {
@@ -395,6 +421,16 @@ export interface ExperimentScoreSummary {
   value: Record<string, unknown> | null;
 }
 
+/** Aggregate of one client-reported dimension (a client scorer key under one
+ *  Score Config). Not comparable with a platform Scorer's summary. */
+export interface ExperimentClientScoreSummary {
+  scoreConfigId: string;
+  scoreConfigName: string;
+  clientScorerKey: string;
+  sampleCount: number;
+  value: Record<string, unknown> | null;
+}
+
 export type ExperimentComparisonBucket =
   "regressed" | "improved" | "unchanged" | "inconclusive" | "new" | "missing";
 
@@ -431,7 +467,7 @@ export interface ExperimentComparisonDimension {
   normalized: boolean;
   baselineSampleCount: number;
   candidateSampleCount: number;
-  /** The side's own category name, when it has one unambiguous label. */
+  /** The side's own category or boolean value, when it has one unambiguous value. */
   baselineLabel: string | null;
   candidateLabel: string | null;
   /** Normalized trial spread per side; only where a side ran more than one trial. */
@@ -642,6 +678,7 @@ function normalizeExperiment(input: any): LlmExperiment {
     datasetId: value(input, "datasetId", "dataset_id", ""),
     datasetName: value(input, "datasetName", "dataset_name", null),
     datasetVersion: Number(value(input, "datasetVersion", "dataset_version", 0)),
+    datasetWriteVersion: Number(value(input, "datasetWriteVersion", "dataset_write_version", 0)),
     datasetFilter: value(input, "datasetFilter", "dataset_filter", null),
     task: input.task,
     scorers: (input.scorers ?? []).map((scorer: any) => ({
@@ -694,6 +731,11 @@ function normalizeExperiment(input: any): LlmExperiment {
     scoreSummaries: hasSummaryField(input, "scoreSummaries", "score_summaries")
       ? value<any[]>(input, "scoreSummaries", "score_summaries", []).map(normalizeScoreSummary)
       : undefined,
+    clientScoreSummaries: hasSummaryField(input, "clientScoreSummaries", "client_score_summaries")
+      ? value<unknown[]>(input, "clientScoreSummaries", "client_score_summaries", []).map(
+          normalizeClientScoreSummary,
+        )
+      : undefined,
     aggregateSummary: hasSummaryField(input, "aggregateSummary", "aggregate_summary")
       ? normalizeAggregateSummary(value<any>(input, "aggregateSummary", "aggregate_summary", {}))
       : undefined,
@@ -745,6 +787,16 @@ function normalizeAggregateSummary(aggregateSummary: any): ExperimentAggregateSu
       value(aggregateSummary, "incompleteScoreDimensions", "incomplete_score_dimensions", 0),
     ),
     errorTaskSlots: Number(value(aggregateSummary, "errorTaskSlots", "error_task_slots", 0)),
+    failureCauses: (
+      value<any[]>(aggregateSummary, "failureCauses", "failure_causes", []) ?? []
+    ).map((cause) => ({
+      kind: value<string | null>(cause, "kind", "kind", null),
+      message: String(value(cause, "message", "message", "")),
+      slotCount: Number(value(cause, "slotCount", "slot_count", 0)),
+    })),
+    failureCauseCount: Number(
+      value(aggregateSummary, "failureCauseCount", "failure_cause_count", 0),
+    ),
   };
 }
 
@@ -825,6 +877,12 @@ function normalizeResults(input: any, experimentSummary: any = {}): ExperimentRe
       "score_summaries",
       value<any[]>(input, "scoreSummaries", "score_summaries", []),
     ).map(normalizeScoreSummary),
+    clientScoreSummaries: value<unknown[]>(
+      experimentSummary,
+      "clientScoreSummaries",
+      "client_score_summaries",
+      value<unknown[]>(input, "clientScoreSummaries", "client_score_summaries", []),
+    ).map(normalizeClientScoreSummary),
     aggregateSummary: normalizeAggregateSummary(aggregateSummary),
   };
 }
@@ -870,6 +928,7 @@ function normalizeResultSlot(slot: any): ExperimentResultSlot {
     taskStatus,
     execution: slot.execution ? normalizeExecution(slot.execution) : null,
     scores,
+    clientScores: value<Record<string, unknown>[]>(slot, "clientScores", "client_scores", []),
   };
 }
 
@@ -890,6 +949,16 @@ function normalizeScoreSummary(summary: any): ExperimentScoreSummary {
     noTraceCount: Number(value(summary, "noTraceCount", "no_trace_count", 0)),
     skippedCount: Number(value(summary, "skippedCount", "skipped_count", 0)),
     value: summary.value ?? null,
+  };
+}
+
+function normalizeClientScoreSummary(summary: unknown): ExperimentClientScoreSummary {
+  return {
+    scoreConfigId: String(value(summary, "scoreConfigId", "score_config_id", "")),
+    scoreConfigName: String(value(summary, "scoreConfigName", "score_config_name", "")),
+    clientScorerKey: String(value(summary, "clientScorerKey", "client_scorer_key", "")),
+    sampleCount: Number(value(summary, "sampleCount", "sample_count", 0)),
+    value: value<Record<string, unknown> | null>(summary, "value", "value", null),
   };
 }
 
@@ -925,6 +994,7 @@ export function normalizeExperimentResultRowPage(input: any): ExperimentResultRo
         normalizeScoreSummary,
       ),
       p50LatencyMs: numberOrNull(value(row, "p50LatencyMs", "p50_latency_ms", null)),
+      errorMessage: value<string | null>(row, "errorMessage", "error_message", null),
       dispersion: row?.dispersion ? normalizeRowDispersion(row.dispersion) : null,
     })),
     pagination: {
@@ -944,6 +1014,9 @@ export function normalizeExperimentRowDetail(input: any): ExperimentRowDetail {
     snapshot: {
       datasetId: value(snapshot, "datasetId", "dataset_id", ""),
       datasetVersion: Number(value(snapshot, "datasetVersion", "dataset_version", 0)),
+      datasetWriteVersion: Number(
+        value(snapshot, "datasetWriteVersion", "dataset_write_version", 0),
+      ),
     },
     navigation: {
       rowIndex: Number(value(navigation, "rowIndex", "row_index", 0)),
@@ -959,6 +1032,12 @@ export function normalizeExperimentRowDetail(input: any): ExperimentRowDetail {
     scoreSummaries: value<any[]>(input, "scoreSummaries", "score_summaries", []).map(
       normalizeScoreSummary,
     ),
+    clientScoreSummaries: value<unknown[]>(
+      input,
+      "clientScoreSummaries",
+      "client_score_summaries",
+      [],
+    ).map(normalizeClientScoreSummary),
   };
 }
 

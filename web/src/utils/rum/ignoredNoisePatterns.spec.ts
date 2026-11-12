@@ -80,3 +80,15 @@ describe("isIgnoredNoise", () => {
     expect(isIgnoredNoise("Error while fetching config: Network Error")).toBe(false);
   });
 });
+
+describe("isIgnoredNoise clipboard permission", () => {
+  it("ignores Monaco's paste read denied by the browser", () => {
+    expect(isIgnoredNoise("NotAllowedError: Clipboard read operation is not allowed.")).toBe(true);
+  });
+
+  it("does not ignore an unrelated NotAllowedError", () => {
+    expect(isIgnoredNoise("NotAllowedError: play() failed because the user didn't interact")).toBe(
+      false,
+    );
+  });
+});

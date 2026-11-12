@@ -135,6 +135,7 @@ describe("IngestLogs Component", () => {
         "syslogNg",
         "splunkHec",
         "loongcollector",
+        "datadogAgentLogs",
       ]);
     });
   });
@@ -378,7 +379,6 @@ describe("IngestLogs Component", () => {
         button: "Copy to Clipboard",
         ingestion: "curl",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Ingestion",
       });
     });

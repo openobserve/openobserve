@@ -48,10 +48,20 @@ export interface SessionApiHit {
   gen_ai_usage_cost_estimated_without_cache?: number;
   gen_ai_usage_cost_cache_read_savings?: number;
   gen_ai_usage_cost_net_cache_impact?: number;
+  /** Tokens on spans whose model has no price (absent on servers without the unpriced marker). */
+  gen_ai_unpriced_tokens?: number;
+  /** Models of those unpriced spans. */
+  gen_ai_unpriced_models?: string[];
   /** Number of error spans across all traces in this session. */
   error_count: number;
   user_ids?: string[];
   first_user_message?: string | null;
+  /** Harness blocks hidden from the first message by the agent's patterns. */
+  harness_hidden?: number;
+  /** Set when the first message was only harness text: the tag that hid it. */
+  harness_only?: string;
+  /** Short title, when GenAI Agent Mapping turns titles on. */
+  session_title?: string;
 }
 
 export interface SessionApiResponse {
@@ -139,6 +149,7 @@ const sessions = {
     pageSize = 25,
     filter = "",
     keyword,
+    userId,
     timeout,
     sortBy = "end_time",
     sortOrder = "desc",
@@ -158,6 +169,8 @@ const sessions = {
      * with no message column at all just fall back to matching the user id.
      */
     keyword?: string;
+    /** Exact match on the session's user id: only that user's sessions. */
+    userId?: string;
     sortBy?: SessionSortField;
     sortOrder?: SessionSortOrder;
     timeout?: number;
@@ -170,6 +183,7 @@ const sessions = {
     });
     if (filter) params.set("filter", filter);
     if (keyword) params.set("keyword", keyword);
+    if (userId) params.set("user_id", userId);
     params.set("sort_by", sortBy);
     params.set("sort_order", sortOrder);
     if (timeout) params.set("timeout", String(timeout));

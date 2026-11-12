@@ -25,6 +25,17 @@ import { isUserDataStream } from "@/utils/internalStreams";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { TranslateFn, I18nText } from "@/types/i18n";
 
+// The "all" read fetches only these types.
+const ALL_STREAM_TYPES = [
+  "logs",
+  "metrics",
+  "traces",
+  "profiles",
+  "enrichment_tables",
+  "index",
+  "metadata",
+];
+
 // Keep the HTTP status on the rejection: callers need it to tell a denial (403)
 // apart from any other failure, and a bare Error would drop it.
 const withResponse = (err: Error, source: any): Error =>
@@ -32,7 +43,23 @@ const withResponse = (err: Error, source: any): Error =>
 
 // A cancelled fetch stays a CancelledError so callers can ignore superseded requests.
 const toStreamError = (e: any): Error =>
-  e instanceof CancelledError ? e : withResponse(new Error(e.message), e);
+  e instanceof CancelledError
+    ? e
+    : withResponse(
+        new Error(
+          e?.response?.data?.message ||
+            e?.message ||
+            (typeof e === "string" && e) ||
+            "Stream request failed",
+        ),
+        e,
+      );
+
+// A prefetch is used once and expires, so it never stands in for a later, fresher read.
+const SCHEMA_PREFETCH_TTL_MS = 30_000;
+const prefetchedSchemas = new Map<string, { at: number; request: Promise<any> }>();
+const schemaPrefetchKey = (org: string, streamType: string, streamName: string) =>
+  JSON.stringify([org, streamType, streamName]);
 
 const useStreams = (t: TranslateFn) => {
   const store = useStore();
@@ -56,6 +83,7 @@ const useStreams = (t: TranslateFn) => {
     enrichment_tables: computed(() => store.state.streams.enrichment_tables),
     index: computed(() => store.state.streams.index),
     metadata: computed(() => store.state.streams.metadata),
+    profiles: computed(() => store.state.streams.profiles),
   };
 
   const getStreams = async (
@@ -70,6 +98,9 @@ const useStreams = (t: TranslateFn) => {
       // We don't fetch schema while fetching all streams or specific type all streams
       // So keeping it false, don't change this
       schema = false;
+      const requestOrg = store.state.selectedOrganization.identifier;
+      // A response for an org the user has left must not land in the store of the one they are on.
+      const stillInOrg = () => store.state.selectedOrganization.identifier === requestOrg;
       void (async () => {
         try {
           // No global in-flight promise any more: each stream type is its own
@@ -78,17 +109,16 @@ const useStreams = (t: TranslateFn) => {
           // `force` must reach the server: invalidate the cached list first, otherwise
           // the query would answer from cache and force would be a no-op.
           if (force) {
-            const org = store.state.selectedOrganization.identifier;
             if (streamName === "all") {
-              await queryClient.invalidateQueries({ queryKey: streamKeys.all(org) });
+              await queryClient.invalidateQueries({ queryKey: streamKeys.all(requestOrg) });
             } else {
               // One type, exactly: a Metrics Explorer mount must not throw away the logs and traces lists too.
               await Promise.all([
                 queryClient.invalidateQueries({
-                  queryKey: streamKeys.nameList(org, streamName),
+                  queryKey: streamKeys.nameList(requestOrg, streamName),
                   exact: true,
                 }),
-                queryClient.invalidateQueries({ queryKey: streamKeys.pagesAll(org) }),
+                queryClient.invalidateQueries({ queryKey: streamKeys.pagesAll(requestOrg) }),
               ]);
             }
           }
@@ -108,34 +138,27 @@ const useStreams = (t: TranslateFn) => {
             // As in RBAC there can be permission on certain types of streams
             // So here added some additional logic to handle those
 
-            const streamList = [
-              "logs",
-              "metrics",
-              "traces",
-              "enrichment_tables",
-              "index",
-              "metadata",
-            ];
+            const streamList = ALL_STREAM_TYPES;
 
             // Every type, every time: each is its own query, so a fresh one
             // resolves from cache and only an expired one reaches the server.
             Promise.allSettled(
               streamList.map((streamType) =>
-                queryClient.fetchQuery(
-                  streamNameListQuery(store.state.selectedOrganization.identifier, streamType),
-                ),
+                queryClient.fetchQuery(streamNameListQuery(requestOrg, streamType)),
               ),
             )
               .then((results: any) => {
-                results.forEach((result: any, index: number) => {
-                  if (result.status === "fulfilled" && result.value?.length > 0) {
-                    setStreams(streamList[index], result.value);
-                  }
-                });
+                if (stillInOrg()) {
+                  results.forEach((result: any, index: number) => {
+                    if (result.status === "fulfilled" && result.value?.length > 0) {
+                      setStreams(streamList[index], result.value);
+                    }
+                  });
 
-                updateStreamsFetchedInStore(
-                  streamList.every((stream) => !!streamsCache[stream].value),
-                );
+                  updateStreamsFetchedInStore(
+                    streamList.every((stream) => !!streamsCache[stream].value),
+                  );
+                }
 
                 dismiss();
                 resolve(getAllStreamsPayload());
@@ -146,11 +169,9 @@ const useStreams = (t: TranslateFn) => {
               });
           } else {
             queryClient
-              .fetchQuery(
-                streamNameListQuery(store.state.selectedOrganization.identifier, _streamName),
-              )
+              .fetchQuery(streamNameListQuery(requestOrg, _streamName))
               .then((list: any) => {
-                setStreams(streamName, list);
+                if (stillInOrg()) setStreams(streamName, list);
                 const streamData = {
                   name: streamName,
                   list,
@@ -235,7 +256,7 @@ const useStreams = (t: TranslateFn) => {
     streamObject.name = "all";
     streamObject.schema = false;
 
-    Object.keys(streamsCache).forEach((key) => {
+    ALL_STREAM_TYPES.forEach((key) => {
       streamObject.list.push(...(streamsCache[key].value?.list || []));
     });
 
@@ -277,20 +298,26 @@ const useStreams = (t: TranslateFn) => {
 
             if ((schema && !hasSchema) || force) {
               try {
-                const _stream: any = await StreamService.schema(
-                  store.state.selectedOrganization.identifier,
-                  streamName,
-                  streamType,
-                );
+                const org = store.state.selectedOrganization.identifier;
+                const prefetched = force
+                  ? undefined
+                  : takePrefetchedSchema(org, streamType, streamName);
+                const _stream: any = await (prefetched ??
+                  StreamService.schema(org, streamName, streamType));
+                const fetched = removeSchemaFields(_stream.data);
+                if (store.state.selectedOrganization.identifier !== org) return resolve(fetched);
                 const streamList = deepCopy(streamsCache[streamType].value || {});
-                streamList.list[streamIndex] = removeSchemaFields(_stream.data);
+                streamList.list[streamIndex] = fetched;
                 updateStreamsInStore(streamType, streamList);
               } catch (err: any) {
                 return reject(
-                  new Error(
-                    t("logStream.errorWhileFetchingSchema", {
-                      message: err?.message || t("search.unknownError"),
-                    }),
+                  withResponse(
+                    new Error(
+                      t("logStream.errorWhileFetchingSchema", {
+                        message: err?.message || t("search.unknownError"),
+                      }),
+                    ),
+                    err,
                   ),
                 );
               }
@@ -320,6 +347,36 @@ const useStreams = (t: TranslateFn) => {
         }
       })();
     });
+  };
+
+  const takePrefetchedSchema = (org: string, streamType: string, streamName: string) => {
+    const key = schemaPrefetchKey(org, streamType, streamName);
+    const entry = prefetchedSchemas.get(key);
+    if (!entry) return undefined;
+    prefetchedSchemas.delete(key);
+    return Date.now() - entry.at < SCHEMA_PREFETCH_TTL_MS ? entry.request : undefined;
+  };
+
+  /** Starts a stream's schema request before its stream list arrives; getStream() uses it instead of asking again. */
+  const prefetchStreamSchema = (streamName: string, streamType: string) => {
+    const org = store.state.selectedOrganization?.identifier;
+    if (!streamName || !streamType || !org) return;
+    const now = Date.now();
+    for (const [key, entry] of prefetchedSchemas) {
+      if (now - entry.at >= SCHEMA_PREFETCH_TTL_MS) prefetchedSchemas.delete(key);
+    }
+    const key = schemaPrefetchKey(org, streamType, streamName);
+    if (prefetchedSchemas.has(key)) return;
+    const mapping = store.state.streams?.streamsIndexMapping?.[streamType];
+    if (mapping && Object.prototype.hasOwnProperty.call(mapping, streamName)) {
+      if (streamsCache[streamType]?.value?.list?.[mapping[streamName]]?.schema?.length) return;
+    }
+    // The URL may name a stream the user cannot read; the stream list reports that, not a toast from here.
+    const request = StreamService.schema(org, streamName, streamType, { silentForbidden: true });
+    request.catch(() => {
+      if (prefetchedSchemas.get(key)?.request === request) prefetchedSchemas.delete(key);
+    });
+    prefetchedSchemas.set(key, { at: now, request });
   };
 
   const getMultiStreams = async (
@@ -400,7 +457,7 @@ const useStreams = (t: TranslateFn) => {
   // "all" is one query per type, so its age is the oldest of them.
   const getStreamsFetchedAt = async (streamType: string = "all"): Promise<number | undefined> => {
     const org = store.state.selectedOrganization.identifier;
-    const types = streamType === "all" ? Object.keys(streamsCache) : [streamType];
+    const types = streamType === "all" ? ALL_STREAM_TYPES : [streamType];
     const times = types
       .map((type) => queryClient.getQueryState(streamKeys.nameList(org, type))?.dataUpdatedAt)
       .filter((t): t is number => !!t);
@@ -413,7 +470,7 @@ const useStreams = (t: TranslateFn) => {
     // only user data flips the flag: internal streams such as usage exist before any ingest
     if (
       !store.state.organizationData.isDataIngested &&
-      streamList.some((s) => isUserDataStream(s?.name ?? "", s?.stream_type ?? streamName))
+      streamList.some((s) => isUserDataStream(s, streamName))
     )
       store.dispatch("setIsDataIngested", true);
 
@@ -772,6 +829,7 @@ const useStreams = (t: TranslateFn) => {
   return {
     getStreams,
     getStream,
+    prefetchStreamSchema,
     setStreams,
     getMultiStreams,
     resetStreams,

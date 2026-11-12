@@ -234,7 +234,7 @@ pub async fn update_report<C: ConnectionTrait + TransactionTrait>(
     let txn = conn.begin().await?;
 
     let Some(models) = queries::SelectReportAndJoinRelationsResult::get(
-        conn,
+        &txn,
         &report.org_id,
         folder_snowflake_id,
         &report.name,
@@ -517,14 +517,59 @@ pub async fn delete_all<C: ConnectionTrait>(conn: &C) -> Result<(), Error> {
     Ok(())
 }
 
-/// Deletes all reports belonging to the given org.
-pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
-    let client = crate::db::get_orm_client_rw().await;
-    reports::Entity::delete_many()
+/// Deletes every report of the org; returns each `(id, folder_id)`, the folder's own id.
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, String)>, Error> {
+    use sea_orm::QuerySelect;
+
+    use super::entity::folders;
+
+    let txn = crate::db::get_orm_client_rw().await.begin().await?;
+    let folder_ids: std::collections::HashMap<String, String> = folders::Entity::find()
+        .select_only()
+        .column(folders::Column::Id)
+        .column(folders::Column::FolderId)
+        .filter(folders::Column::Org.eq(org_id))
+        .into_tuple::<(String, String)>()
+        .all(&txn)
+        .await?
+        .into_iter()
+        .collect();
+    let delete = reports::Entity::delete_many().filter(reports::Column::Org.eq(org_id));
+    let deleted: Vec<(String, String)> = crate::table::delete_returning(
+        &txn,
+        delete,
+        &[reports::Column::Id, reports::Column::FolderId],
+    )
+    .await?;
+    txn.commit().await?;
+    Ok(deleted
+        .into_iter()
+        .map(|(id, pk)| (id, folder_ids.get(&pk).cloned().unwrap_or(pk)))
+        .collect())
+}
+
+/// Each report of the org with its folder's `folder_id`, including reports no dashboard joins.
+pub async fn list_ids_by_org<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<Vec<(String, String)>, Error> {
+    use sea_orm::{QuerySelect, RelationTrait};
+
+    use super::entity::folders;
+
+    let ids = reports::Entity::find()
+        .select_only()
+        .column(reports::Column::Id)
+        .column(folders::Column::FolderId)
+        .join(
+            sea_orm::JoinType::InnerJoin,
+            reports::Relation::Folders.def(),
+        )
         .filter(reports::Column::Org.eq(org_id))
-        .exec(client)
+        .into_tuple::<(String, String)>()
+        .all(conn)
         .await?;
-    Ok(())
+    Ok(ids)
 }
 
 /// Lists the reports the satisfy the given parameters.
@@ -538,7 +583,40 @@ pub async fn list_reports<C: ConnectionTrait>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::time::Duration;
+
+    use sea_orm::{ConnectOptions, Database, Schema};
+
+    use super::{
+        super::entity::{dashboards, folders},
+        *,
+    };
+
+    #[tokio::test]
+    async fn test_update_report_on_single_connection_pool_does_not_deadlock() {
+        // Mirrors the SQLite read-write pool, which holds exactly one connection.
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1)
+            .acquire_timeout(Duration::from_secs(2));
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(folders::Entity),
+            schema.create_table_from_entity(dashboards::Entity),
+            schema.create_table_from_entity(reports::Entity),
+            schema.create_table_from_entity(report_dashboards::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        let report = MetaReport {
+            org_id: "org".to_string(),
+            name: "missing".to_string(),
+            ..Default::default()
+        };
+        let res = update_report(&db, "folder", None, report).await;
+        assert!(matches!(res, Err(Error::ReportNotFound)), "{res:?}");
+    }
 
     #[test]
     fn test_error_report_not_found_display() {

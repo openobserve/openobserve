@@ -325,6 +325,18 @@ export default class DashboardPanel {
     return this.page.locator('[data-test="dashboard-panel-container"]');
   }
 
+  // Create Alert menu item (dropdown item) for disabled/state assertions.
+  getCreateAlertFromPanelItem() {
+    return this.createAlertFromPanel;
+  }
+
+  // The disabled-reason description rendered under the item (ODropdownItem).
+  getCreateAlertFromPanelReason() {
+    return this.page.locator(
+      '[data-test="dashboard-create-alert-from-panel-reason"]'
+    );
+  }
+
   // Alert context menu options (shown on chart right-click).
   getAlertContextMenuAbove() {
     return this.alertContextMenuAbove;

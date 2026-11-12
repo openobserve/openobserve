@@ -33,10 +33,26 @@ import syntheticsService from "@/services/synthetics";
 import downtimesService from "@/services/downtimes";
 import type { SyntheticsEnvironment } from "@/types/synthetics";
 import workflowService from "@/services/workflows";
+import fleetService from "@/services/fleet";
 import onlineEvalsService from "@/services/online-evals.service";
 import llmQueuesService from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
 import llmPromptsService from "@/services/llm-prompts.service";
+import { featureState } from "@/utils/featureGate";
+
+// A locked feature's list API answers 403, so its rows stay empty instead of raising the license bar.
+const LOADER_LICENSE_FEATURE: Record<string, string> = {
+  dashboard: "dashboards",
+  dfolder: "dashboards",
+  pipeline: "pipelines",
+  alert: "alerts",
+  downtime_folder: "alerts",
+  downtime: "alerts",
+  report: "reports",
+  synthetic_folder: "synthetics",
+  synthetics: "synthetics",
+  synthetic_environment: "synthetics",
+};
 
 type RowBuilders = {
   updateResourceEntities: (
@@ -84,6 +100,11 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
   // Keyed by the row itself: two rows can share a name (every folder list has a `default`).
   const entityLoads = new WeakMap<object, Promise<unknown>>();
 
+  const isLicenseLocked = (loaderKey: string): boolean => {
+    const feature = LOADER_LICENSE_FEATURE[loaderKey];
+    return !!feature && featureState(store.state.zoConfig?.features, feature) === "locked";
+  };
+
   const getResourceEntities = (resource: Resource | Entity) => {
     if (!resource) return Promise.resolve(true);
 
@@ -95,6 +116,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       logs: getLogs,
       metrics: getMetrics,
       traces: getTraces,
+      profiles: getProfiles,
       index: getIndexStreams,
       alert: getAlerts,
       template: getTemplates,
@@ -121,6 +143,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       synthetic_environment: getSyntheticEnvironments,
       workflow_folder: getWorkflowFolders,
       workflows: getWorkflows,
+      fleets: getFleets,
       re_patterns: getRePatterns,
       provider: getProviders,
       score_config: getScoreConfigs,
@@ -145,11 +168,10 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
           if (!resource.entities?.length) {
             resource.is_loading = true;
             try {
-              const listEntities = resource.childName
-                ? listEntitiesFnMap[resource.childName]
-                : listEntitiesFnMap[resource.resourceName];
+              const key = resource.childName || resource.resourceName;
+              const listEntities = listEntitiesFnMap[key];
 
-              if (listEntities) {
+              if (listEntities && !isLicenseLocked(key)) {
                 await listEntities(resource);
               }
             } finally {
@@ -400,6 +422,15 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       resolve(true);
     });
   };
+  // Collectors are not FGA objects, so a fleet has no child entities to expand.
+  // Fleets have their own API; the folders API no longer exposes them.
+  const getFleets = async () => {
+    const res = await fleetService.listFleets(store.state.selectedOrganization.identifier);
+    const list = (res.data?.items ?? []).map((f) => ({ id: f.id, name: f.name }));
+    if (!list.some((f) => f.id === "default")) list.unshift({ id: "default", name: "default" });
+    updateResourceEntities("fleets", ["id"], list, false, "name");
+    return true;
+  };
   const _getGroups = async () => {
     const groups = await getGroups(store.state.selectedOrganization.identifier);
     updateResourceEntities("group", [], [...groups.data]);
@@ -560,6 +591,16 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     });
   };
 
+  const getProfiles = async (resource: Resource | Entity) => {
+    const profiles: any = await getStreams("profiles", false);
+
+    updateEntityEntities(resource, ["name"], profiles.list);
+
+    return new Promise((resolve) => {
+      resolve(true);
+    });
+  };
+
   const getMetadataStreams = async () => {
     const metadata: any = await getStreams("metadata", false);
 
@@ -575,6 +616,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       { stream_type: "logs", name: t("common.logs") },
       { stream_type: "traces", name: t("common.traces") },
       { stream_type: "metrics", name: t("common.metrics") },
+      { stream_type: "profiles", name: t("menu.profiles") },
       { stream_type: "index", name: t("iam.indices") },
     ];
 
@@ -784,6 +826,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     getSyntheticEnvironments,
     getWorkflowFolders,
     getWorkflows,
+    getFleets,
     _getGroups,
     _getRoles,
     getFunctions,
@@ -798,6 +841,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     getIndexStreams,
     getMetrics,
     getTraces,
+    getProfiles,
     getMetadataStreams,
     getStreamsTypes,
     getReportFolders,

@@ -49,9 +49,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
         if config.incidents.auto_resolve_after_minutes <= 0 {
             log::info!(
-                "[INCIDENTS::JOB] Auto-resolve is disabled (auto_resolve_after_minutes=0), only manual resolution allowed"
+                "[INCIDENTS::JOB] Auto-resolve is disabled (auto_resolve_after_minutes=0); only security cases with an org auto-close setting close on their own"
             );
-            return Ok(());
         }
 
         log::info!(
@@ -64,9 +63,14 @@ pub async fn run() -> Result<(), anyhow::Error> {
             "incidents_auto_resolve",
             config.incidents.cleanup_interval_secs,
             {
-                log::debug!("[INCIDENTS::JOB] Running incident auto-resolve");
-                if let Err(e) = auto_resolve_stale_incidents().await {
-                    log::error!("[INCIDENTS::JOB] Auto-resolve failed: {e}");
+                // license read per tick so a change applies; `continue` here would skip sleep_after
+                if o2_enterprise::enterprise::license::check_features(&[
+                    config::meta::feature::Feature::Incidents,
+                ]) {
+                    log::debug!("[INCIDENTS::JOB] Running incident auto-resolve");
+                    if let Err(e) = auto_resolve_stale_incidents().await {
+                        log::error!("[INCIDENTS::JOB] Auto-resolve failed: {e}");
+                    }
                 }
             },
             sleep_after
@@ -83,14 +87,37 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 #[cfg(feature = "enterprise")]
 async fn auto_resolve_stale_incidents() -> Result<(), anyhow::Error> {
+    use infra::table::alert_incidents::{StaleScope, auto_resolve_stale};
+
     let config = get_o2_config();
     let threshold_minutes = config.incidents.auto_resolve_after_minutes;
 
-    // Convert minutes to microseconds
-    let threshold_micros = (threshold_minutes as i64) * 60 * 1_000_000;
+    let (mut resolved_count, mut resolved_ids) = if threshold_minutes > 0 {
+        auto_resolve_stale(
+            threshold_minutes.saturating_mul(60 * 1_000_000),
+            StaleScope::Ops,
+        )
+        .await?
+    } else {
+        (0, Vec::new())
+    };
 
-    let (resolved_count, resolved_ids) =
-        infra::table::alert_incidents::auto_resolve_stale(threshold_micros).await?;
+    // Security cases never close on the global threshold, only on their org's own setting.
+    for org_id in &infra::table::alert_incidents::orgs_with_open_cases().await? {
+        let days = db::organization::read_org_setting(org_id, |s| s.security_cases.auto_close_days)
+            .await
+            .unwrap_or_default();
+        if days == 0 {
+            continue;
+        }
+        let (count, cases) = auto_resolve_stale(
+            i64::from(days).saturating_mul(MICROS_PER_DAY),
+            StaleScope::OrgCases(org_id),
+        )
+        .await?;
+        resolved_count += count;
+        resolved_ids.extend(cases);
+    }
 
     if resolved_count > 0 {
         log::info!(

@@ -190,8 +190,6 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
 
 #[cfg(test)]
 mod tests {
-    use sea_orm_migration::prelude::*;
-
     use super::*;
 
     #[test]

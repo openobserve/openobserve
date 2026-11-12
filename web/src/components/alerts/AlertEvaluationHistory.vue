@@ -34,6 +34,7 @@
     v-model:page-size="pageSize"
     :total-count="totalCount"
     :loading="loading"
+    :loading-reset-key="alertId"
     :frame="false"
     :show-global-filter="false"
     :persist-columns="true"
@@ -84,7 +85,7 @@
       <span class="inline-flex">
         <OTag
           type="alertState"
-          :value="row.status"
+          :value="historyStatusOf(row)"
           size="sm"
           data-test="alerts-alertevaluationhistory-status"
         />
@@ -169,6 +170,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { conditionSummary } from "@/utils/alerts/runOutcome";
+import { historyStatusOf } from "@/utils/alerts/ackState";
 
 const props = withDefaults(
   defineProps<{ alertId: string; isComposite?: boolean; isAnomaly?: boolean }>(),

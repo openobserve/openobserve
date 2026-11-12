@@ -27,6 +27,8 @@ pub struct Model {
     pub accent_color: Option<String>,
     /// Base64-encoded image. Enterprise-gated on write; always served once set.
     pub logo_img: Option<String>,
+    /// Base64-encoded browser-tab icon, independent of `logo_img`; same gating.
+    pub favicon_img: Option<String>,
     /// Set at first publish; uptime denominators never reach past it.
     pub tracking_since: Option<i64>,
     pub owner: Option<String>,

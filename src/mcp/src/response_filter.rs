@@ -38,6 +38,7 @@ const SEARCH_SQL_KEEP_FIELDS: &[&str] = &[
     "data",
     "format",
     "advisory",
+    "is_partial",
 ];
 
 /// Filter a tool's response body based on the requested detail level.
@@ -453,6 +454,7 @@ mod tests {
         assert_eq!(parsed["scan_size"], 2048);
         assert_eq!(parsed["columns"][0], "log");
         assert_eq!(parsed["function_error"][0], "warning: something");
+        assert_eq!(parsed["is_partial"], false);
 
         // Dropped
         assert!(parsed.get("took_detail").is_none());
@@ -463,9 +465,21 @@ mod tests {
         assert!(parsed.get("idx_scan_size").is_none());
         assert!(parsed.get("trace_id").is_none());
         assert!(parsed.get("response_type").is_none());
-        assert!(parsed.get("is_partial").is_none());
         assert!(parsed.get("histogram_interval").is_none());
         assert!(parsed.get("peak_memory_usage").is_none());
+    }
+
+    #[test]
+    fn test_search_sql_keeps_is_partial_for_the_slack_partial_notice() {
+        let body = serde_json::to_string(&json!({
+            "took": 5, "hits": [{"n": 1}], "total": 1, "is_partial": true,
+            "function_error": ["Query duration is modified due to query range restriction"]
+        }))
+        .unwrap();
+        let parsed: Value =
+            serde_json::from_str(&filter_response("SearchSQL", &body, &DetailLevel::Summary))
+                .unwrap();
+        assert_eq!(parsed["is_partial"], true);
     }
 
     #[test]

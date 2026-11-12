@@ -48,10 +48,7 @@
         <!-- Data-type breakdown (catalog signal) — doubles as a filter synced to
              the type dropdown; Total last, never itself the active tile. -->
         <template #subheader>
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="score-config-list-summary"
-          >
+          <div data-test="score-config-list-summary">
             <OStatStrip
               :items="summaryStats"
               :loading="loading"
@@ -159,6 +156,7 @@
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
+                  :aria-label="t('common.moreActions')"
                   icon-left="more-vert"
                   variant="ghost"
                   size="icon-xs-sq"
@@ -221,6 +219,7 @@ import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
 import { dataTypeOf, entityId, valueOf } from "./utils/evalEntity";
 import EvalListShell from "./EvalListShell.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
+import type { ForbiddenState } from "@/utils/featureGate";
 
 type DataType = "numeric" | "categorical" | "boolean";
 
@@ -230,7 +229,7 @@ const props = defineProps<{
   scorers: Scorer[];
   search: string;
   loading?: boolean;
-  forbidden?: boolean;
+  forbidden?: ForbiddenState;
   /** Epoch-ms of the last list read, for the refresh button's age label. */
   lastRunAt?: number | null;
   /** A reload is in flight — spins the refresh button and blocks a second click. */

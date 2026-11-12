@@ -1,10 +1,11 @@
-import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { enableAutoUnmount, flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h, nextTick, reactive, ref, watch } from "vue";
 import Profiles from "@/plugins/profiles/Index.vue";
 import FlameGraphView from "@/components/common/FlameGraphView.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import analytics from "@/services/product_analytics";
 
 const mocks = vi.hoisted(() => ({
   nowMs: 1_700_000_000_000,
@@ -51,6 +52,8 @@ vi.mock("vue-router", () => ({
   useRoute: () => route,
   useRouter: () => router,
 }));
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/utils/date", () => ({
   getConsumableRelativeTime: mocks.getConsumableRelativeTime,
@@ -105,6 +108,16 @@ const mergeResponse = {
 };
 
 // Lets requests resolve, then waits out OTable's minimum skeleton time (50 ms) so rows are drawn.
+/** The row menu button of a Top Table function, found by name: rows sort by Self, so the order varies per test. */
+const topRowMenu = (wrapper: VueWrapper, name: string) =>
+  wrapper
+    .findAll("tbody tr")
+    .find((row) => row.find("td").text().includes(name))!
+    .find('[data-test^="profiles-top-row-"][data-test$="-menu"]');
+
+// The label filter bar is the shared FilterBuilder; tests drive it through its model and value loader.
+const filterBuilder = (wrapper: VueWrapper) => wrapper.findComponent({ name: "FilterBuilder" });
+
 const settle = async () => {
   await flushPromises();
   await new Promise((resolve) => setTimeout(resolve, 60));
@@ -240,13 +253,32 @@ describe("Profiles page", () => {
   });
 
   it("runs the query once when the page opens", async () => {
+    vi.mocked(analytics.track).mockClear();
     mountPage();
     await flushPromises();
     await nextTick();
 
-    expect(mocks.meta).toHaveBeenCalledTimes(1);
+    // Once to learn the services, once more for the picked service's profile types.
+    expect(mocks.meta).toHaveBeenCalledTimes(2);
+    expect(mocks.meta.mock.calls[1][2]).toMatchObject({ service_name: "service-a" });
     expect(mocks.merge).toHaveBeenCalledTimes(1);
     expect(mocks.series).toHaveBeenCalledTimes(1);
+    expect(analytics.track).not.toHaveBeenCalledWith("profiles_query_completed", expect.anything());
+  });
+
+  it("tracks a query run started from the Run button", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mountPage();
+    await settle();
+    vi.mocked(analytics.track).mockClear();
+
+    await wrapper.find('[data-test="profiles-run-query"]').trigger("click");
+    await flushPromises();
+
+    expect(analytics.track).toHaveBeenCalledWith("profiles_query_completed", {
+      filter_count: 0,
+      has_breakdown: false,
+    });
   });
 
   it("runs the query once when the page opens with the real date picker", async () => {
@@ -258,7 +290,7 @@ describe("Profiles page", () => {
     await flushPromises();
 
     expect(wrapper.findComponent({ name: "DateTime" }).exists()).toBe(true);
-    expect(mocks.meta).toHaveBeenCalledTimes(1);
+    expect(mocks.meta).toHaveBeenCalledTimes(2);
     expect(mocks.merge).toHaveBeenCalledTimes(1);
     expect(mocks.series).toHaveBeenCalledTimes(1);
   });
@@ -333,6 +365,110 @@ describe("Profiles page", () => {
       profile_unit: "nanoseconds",
     });
   });
+
+  it("labels sample counts as CPU samples without runtime metadata", async () => {
+    route.query = { stream: "profiles-a", profile_type: "samples", profile_unit: "count" };
+    mocks.meta.mockResolvedValue({
+      data: {
+        ...profileMetaResponse.data,
+        profile_types: [
+          { type: "samples", unit: "count" },
+          { type: "alloc_space", unit: "bytes" },
+        ],
+      },
+    });
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        profile_type: "samples",
+        unit: "count",
+        series: [{ timestamp: 60_000_000, value: 7, rate: 1000 }],
+      },
+    });
+    mocks.merge.mockResolvedValue({
+      data: { ...mergeResponse.data, profile_type: "samples", unit: "count" },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const select = wrapper.get('[data-test="profiles-type-select"] select');
+    expect(select.findAll("option").map((option) => option.text())).toEqual([
+      "CPU samples (count)",
+      "alloc_space (bytes)",
+    ]);
+    expect((select.element as HTMLSelectElement).value).toBe("samples\u0000count");
+    expect(mocks.merge.mock.calls[0][2]).toMatchObject({
+      profile_type: "samples",
+      profile_unit: "count",
+    });
+    expect(route.query).toMatchObject({ profile_type: "samples", profile_unit: "count" });
+    expect(
+      wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options.series[0].data,
+    ).toEqual([[60_000, 7]]);
+    expect(wrapper.get('[data-test="profiles-series-card"]').text()).not.toContain("CPU usage");
+  });
+
+  it("labels seeded sample counts as CPU samples while metadata is loading", async () => {
+    route.query = { stream: "profiles-a", profile_type: "samples", profile_unit: "count" };
+    mocks.meta.mockReturnValue(new Promise(() => {}));
+    const wrapper = mountPage();
+    await flushPromises();
+    const select = wrapper.get('[data-test="profiles-type-select"] select');
+    expect(select.text()).toBe("CPU samples (count)");
+    expect((select.element as HTMLSelectElement).value).toBe("samples\u0000count");
+  });
+
+  it.each(["nanoseconds", "ns", "NS"])(
+    "labels a seeded CPU time %s option while metadata is loading",
+    async (unit) => {
+      route.query = { stream: "profiles-a", profile_type: "cpu", profile_unit: unit };
+      mocks.meta.mockReturnValue(new Promise(() => {}));
+      const wrapper = mountPage();
+      await flushPromises();
+      expect(wrapper.get('[data-test="profiles-type-select"] select').text()).toBe("CPU time");
+    },
+  );
+
+  it.each(["nanoseconds", "nanosecond", "nanos", "ns", "NS"])(
+    "keeps CPU labels and numeric units consistent for %s",
+    async (unit) => {
+      mocks.meta.mockResolvedValue({
+        data: { ...profileMetaResponse.data, profile_types: [{ type: "cpu", unit }] },
+      });
+      mocks.series.mockResolvedValue({
+        data: {
+          ...seriesResponse.data,
+          unit,
+          series: [
+            { timestamp: 60_000_000, value: 6e9, rate: 4.2e8 },
+            { timestamp: 120_000_000, value: 6e9 },
+          ],
+        },
+      });
+      mocks.merge.mockResolvedValue({ data: { ...mergeResponse.data, unit } });
+      const wrapper = mountPage();
+      await settle();
+
+      const select = wrapper.get('[data-test="profiles-type-select"] select');
+      expect(select.text()).toBe("CPU time");
+      expect((select.element as HTMLSelectElement).value).toBe(`cpu\u0000${unit}`);
+      expect(mocks.merge.mock.calls[0][2]).toMatchObject({
+        profile_type: "cpu",
+        profile_unit: unit,
+      });
+      expect(route.query).toMatchObject({ profile_type: "cpu", profile_unit: unit });
+      expect(wrapper.get('[data-test="profiles-series-card"]').text()).toContain(
+        "CPU usage (cores)",
+      );
+      const options = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options;
+      expect(options.series[0].data).toEqual([
+        [60_000, 0.42],
+        [120_000, 0.1],
+      ]);
+      expect(options.tooltip.valueFormatter(0.42)).toBe("0.42 cores");
+      expect(wrapper.get('[data-test="profiles-top-table"]').text()).toContain("10 ns");
+    },
+  );
 
   it("switches to another stream from the selector", async () => {
     const wrapper = mountPage();
@@ -431,60 +567,91 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    await wrapper.find('[data-test="profiles-add-filter"]').trigger("click");
-    await nextTick();
-    await wrapper.find('[data-test="profiles-tag-key-select"] select').setValue("k8s_pod_name");
-    await flushPromises();
-    await nextTick();
-
+    const builder = filterBuilder(wrapper);
+    expect(builder.props("profile")).toBe("profiles");
+    const values = await builder.props("loadValues")("k8s_pod_name", "");
     expect(mocks.tagValues).toHaveBeenCalledWith(
       orgIdentifier,
       "profiles-a",
       expect.objectContaining({ tag: "k8s_pod_name" }),
     );
+    expect(Array.isArray(values)).toBe(true);
 
-    await wrapper.find('[data-test="profiles-tag-value-select"] select').setValue("pod-a");
-    await flushPromises();
-    await nextTick();
+    builder.vm.$emit("update:modelValue", [{ key: "k8s_pod_name", op: "=", value: "pod-a" }]);
+    await settle();
 
-    expect(wrapper.find('[data-test="profiles-filter-chip-k8s_pod_name"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="profiles-filter-builder-chip-k8s_pod_name"]').exists()).toBe(
+      true,
+    );
     const lastSeriesPayload = mocks.series.mock.calls[mocks.series.mock.calls.length - 1][2];
     expect(lastSeriesPayload.filters).toEqual([{ key: "k8s_pod_name", op: "=", value: "pod-a" }]);
   });
 
-  it("edits a filter chip in place, without narrowing its own value list", async () => {
+  it("keeps one filter per label, because the server joins filters with AND", async () => {
     mocks.merge.mockResolvedValue(mergeResponse);
     const wrapper = mountPage();
     await settle();
 
-    await wrapper.find('[data-test="profiles-add-filter"]').trigger("click");
-    await nextTick();
-    await wrapper.find('[data-test="profiles-tag-key-select"] select').setValue("k8s_pod_name");
-    await flushPromises();
-    await wrapper.find('[data-test="profiles-tag-value-select"] select').setValue("pod-a");
-    await flushPromises();
-    await nextTick();
+    filterBuilder(wrapper).vm.$emit("update:modelValue", [
+      { key: "k8s_pod_name", op: "=", value: "pod-a" },
+      { key: "service", op: "=", value: "api" },
+      { key: "k8s_pod_name", op: "=", value: "pod-b" },
+    ]);
+    await settle();
+
+    expect(wrapper.findAll('[data-test="profiles-filter-builder-chip-k8s_pod_name"]')).toHaveLength(
+      1,
+    );
+    const lastSeriesPayload = mocks.series.mock.calls[mocks.series.mock.calls.length - 1][2];
+    expect(lastSeriesPayload.filters).toEqual([
+      { key: "k8s_pod_name", op: "=", value: "pod-b" },
+      { key: "service", op: "=", value: "api" },
+    ]);
+  });
+
+  it("fetches a label's values once and filters later searches locally", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    mocks.tagValues.mockResolvedValue({
+      data: { tag: "k8s_pod_name", values: ["api-1", "api-2", "web-1"], took: 1 },
+    });
+    const wrapper = mountPage();
+    await settle();
     mocks.tagValues.mockClear();
 
-    await wrapper.find('[data-test="profiles-filter-edit-k8s_pod_name"]').trigger("click");
-    await flushPromises();
-    await nextTick();
+    const load = filterBuilder(wrapper).props("loadValues");
+    expect(await load("k8s_pod_name", "")).toEqual(["api-1", "api-2", "web-1"]);
+    expect(await load("k8s_pod_name", "a")).toEqual(["api-1", "api-2"]);
+    expect(await load("k8s_pod_name", "WEB")).toEqual(["web-1"]);
+    expect(mocks.tagValues).toHaveBeenCalledTimes(1);
 
+    await load("service", "a");
+    expect(mocks.tagValues).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not narrow a label's value list by its own filter", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mountPage();
+    await settle();
+
+    filterBuilder(wrapper).vm.$emit("update:modelValue", [
+      { key: "k8s_pod_name", op: "=", value: "pod-a" },
+      { key: "service", op: "=", value: "api" },
+    ]);
+    await settle();
+    mocks.tagValues.mockClear();
+
+    await filterBuilder(wrapper).props("loadValues")("k8s_pod_name", "");
     expect(mocks.tagValues).toHaveBeenCalledWith(
       orgIdentifier,
       "profiles-a",
-      expect.objectContaining({ tag: "k8s_pod_name", filters: [] }),
+      expect.objectContaining({
+        tag: "k8s_pod_name",
+        filters: [{ key: "service", op: "=", value: "api" }],
+      }),
     );
-
-    await wrapper.find('[data-test="profiles-tag-value-select"] select').setValue("pod-b");
-    await flushPromises();
-    await nextTick();
-
-    const lastSeriesPayload = mocks.series.mock.calls[mocks.series.mock.calls.length - 1][2];
-    expect(lastSeriesPayload.filters).toEqual([{ key: "k8s_pod_name", op: "=", value: "pod-b" }]);
   });
 
-  it("steps the bytes axis on round binary values with the shared short labels", async () => {
+  it("steps the bytes axis on round binary values in the table's binary units", async () => {
     const gib = 1024 ** 3;
     mocks.meta.mockResolvedValue({
       data: {
@@ -512,9 +679,327 @@ describe("Profiles page", () => {
     const chart = wrapper.findComponent({ name: "ChartRendererStub" });
     const yAxis = chart.props("data").options.yAxis;
     expect(yAxis.interval).toBe(2.5 * gib);
-    expect(yAxis.axisLabel.formatter(5 * gib)).toBe("5.00GB");
+    expect(yAxis.axisLabel.formatter(5 * gib)).toBe("5 GiB");
     expect(yAxis.name).toBeUndefined();
     expect(chart.props("data").options.tooltip.textStyle.fontSize).toBe(12);
+  });
+
+  it("shows memory in the same binary units on the chart axis, its tooltip and the table", async () => {
+    const mib = 1024 ** 2;
+    mocks.meta.mockResolvedValue({
+      data: {
+        ...profileMetaResponse.data,
+        profile_types: [{ type: "inuse_space", unit: "bytes" }],
+      },
+    });
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        unit: "bytes",
+        profile_type: "inuse_space",
+        series: [{ timestamp: 1_000_000, value: 3 * mib }],
+      },
+    });
+    mocks.merge.mockResolvedValue({
+      data: {
+        ...mergeResponse.data,
+        unit: "bytes",
+        profile_type: "inuse_space",
+        total: 3 * mib,
+        merged_total: 3 * mib,
+        top: [{ name: "fn-a", self: 3 * mib, total: 3 * mib }],
+      },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const options = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options;
+    expect(options.yAxis.axisLabel.formatter(3 * mib)).toBe("3 MiB");
+    expect(options.tooltip.valueFormatter(3 * mib)).toBe("3 MiB");
+    expect(wrapper.find('[data-test="profiles-top-table"]').text()).toContain("3 MiB");
+  });
+
+  it("draws straight lines that drop to zero across empty buckets, on a transparent background", async () => {
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        step_secs: 60,
+        series: [
+          { timestamp: 60_000_000, value: 60e9 },
+          { timestamp: 120_000_000, value: 120e9 },
+          { timestamp: 360_000_000, value: 60e9 },
+        ],
+      },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const options = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options;
+    expect(wrapper.get('[data-test="profiles-type-select"] select').text()).toBe("CPU time");
+    expect(wrapper.get('[data-test="profiles-series-card"]').text()).toContain("CPU usage (cores)");
+    expect(options.backgroundColor).toBe("transparent");
+    expect(options.series[0].smooth).toBe(false);
+    expect(options.series[0].data).toEqual([
+      [60_000, 1],
+      [120_000, 2],
+      [180_000, 0],
+      [300_000, 0],
+      [360_000, 1],
+    ]);
+  });
+
+  it("leaves in-use memory gaps unfilled, since a missing snapshot is not 0 B", async () => {
+    mocks.meta.mockResolvedValue({
+      data: {
+        ...profileMetaResponse.data,
+        profile_types: [{ type: "inuse_space", unit: "bytes" }],
+      },
+    });
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        unit: "bytes",
+        profile_type: "inuse_space",
+        step_secs: 60,
+        series: [
+          { timestamp: 60_000_000, value: 100 },
+          { timestamp: 120_000_000, value: 200 },
+          { timestamp: 360_000_000, value: 300 },
+        ],
+      },
+    });
+    mocks.merge.mockResolvedValue({
+      data: { ...mergeResponse.data, unit: "bytes", profile_type: "inuse_space" },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const series = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options
+      .series[0];
+    expect(series.data).toEqual([
+      [60_000, 100],
+      [120_000, 200],
+      [180_000, null],
+      [360_000, 300],
+    ]);
+    expect(series.showSymbol).toBe(true);
+    expect(
+      series.data.map((datum: unknown, dataIndex: number) => series.symbol(datum, { dataIndex })),
+    ).toEqual(["none", "none", "none", "emptyCircle"]);
+    const { tooltip } = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options;
+    expect(tooltip.valueFormatter(null)).toBe("—");
+    expect(tooltip.valueFormatter(200)).toBe("200 B");
+  });
+
+  it("keeps symbols off for an in-use line whose gap leaves no point on its own", async () => {
+    mocks.meta.mockResolvedValue({
+      data: {
+        ...profileMetaResponse.data,
+        profile_types: [{ type: "inuse_space", unit: "bytes" }],
+      },
+    });
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        unit: "bytes",
+        profile_type: "inuse_space",
+        step_secs: 60,
+        series: [
+          { timestamp: 60_000_000, value: 100 },
+          { timestamp: 120_000_000, value: 200 },
+          { timestamp: 360_000_000, value: 300 },
+          { timestamp: 420_000_000, value: 400 },
+        ],
+      },
+    });
+    mocks.merge.mockResolvedValue({
+      data: { ...mergeResponse.data, unit: "bytes", profile_type: "inuse_space" },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const series = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options
+      .series[0];
+    expect(series.data).toContainEqual([180_000, null]);
+    expect(series.showSymbol).toBe(false);
+    expect(series.symbol).toBeUndefined();
+  });
+
+  it("leaves the series unfilled when the response has no step", async () => {
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        step_secs: undefined,
+        series: [
+          { timestamp: 60_000_000, value: 6e9, rate: 1e9 },
+          { timestamp: 120_000_000, value: 6e9, rate: 1e9 },
+        ],
+      },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const data = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options
+      .series[0].data;
+    expect(data).toEqual([
+      [60_000, 1],
+      [120_000, 1],
+    ]);
+  });
+
+  it("shows a seeded profile type by its label, not its raw id, while meta is loading", async () => {
+    route.query = { stream: "profiles-a", profile_type: "inuse_space", profile_unit: "bytes" };
+    mocks.meta.mockReturnValue(new Promise(() => {}));
+    const wrapper = mountPage();
+    await flushPromises();
+    await nextTick();
+
+    const select = wrapper.find('[data-test="profiles-type-select"] select');
+    expect((select.element as HTMLSelectElement).value).toBe("inuse_space\u0000bytes");
+    const labels = select.findAll("option").map((option) => option.text());
+    expect(labels).toEqual(["inuse_space (bytes)"]);
+  });
+
+  it("uses sentence case like Logs and Traces, with no dot before Label filters", async () => {
+    const wrapper = mountPage();
+    await settle();
+
+    const filters = wrapper.get('[data-test="profiles-label-filters"]');
+    expect(filters.text()).toContain("Label filters");
+    expect(filters.find(".bg-badge-orange-ol-text").exists()).toBe(false);
+    const t = i18n.global.t;
+    expect(t("emptyState.noProfiles.title")).toBe("No profiles found");
+    expect(t("profiles.noSeries")).toBe("No data");
+    expect(t("profiles.rootAtBottom")).toBe("Root at bottom");
+    expect(t("profiles.runOptions")).toBe("Run options");
+  });
+
+  it("draws CPU as cores per second of profiled time when the server sends a rate", async () => {
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        series: [
+          { timestamp: 1_000_000, value: 6e9, rate: 4.2e8 },
+          { timestamp: 61_000_000, value: 60e9 },
+        ],
+      },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const data = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options
+      .series[0].data;
+    // 0.42 cores while profiled; the point without a rate falls back to the 60 s step.
+    expect(data.map(([, value]: number[]) => value)).toEqual([0.42, 1]);
+  });
+
+  it("breaks the chart down by a label and filters to a value from its legend chip", async () => {
+    const wrapper = mountPage();
+    await settle();
+    mocks.series.mockResolvedValueOnce({
+      data: {
+        ...seriesResponse.data,
+        groups: [
+          { value: "pod-a", total: 9, others: false, series: [{ timestamp: 1_000_000, value: 9 }] },
+          { value: "", total: 1, others: true, series: [{ timestamp: 1_000_000, value: 1 }] },
+        ],
+      },
+    });
+
+    await wrapper.find('[data-test="profiles-breakdown-select"] select').setValue("k8s_pod_name");
+    await flushPromises();
+    await nextTick();
+
+    expect(mocks.series).toHaveBeenLastCalledWith(
+      orgIdentifier,
+      "profiles-a",
+      expect.objectContaining({ group_by: "k8s_pod_name", group_limit: 10 }),
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+    const series = wrapper.findComponent({ name: "ChartRendererStub" }).props("data")
+      .options.series;
+    expect(series.map((line: { name: string }) => line.name)).toEqual(["pod-a", "Others"]);
+    expect(analytics.track).toHaveBeenCalledWith("profiles_breakdown_changed", {
+      has_breakdown: true,
+    });
+    expect(route.query.breakdown ?? router.replace.mock.calls.at(-1)?.[0].query.breakdown).toBe(
+      "k8s_pod_name",
+    );
+
+    mocks.merge.mockClear();
+    await wrapper.find('[data-test="profiles-breakdown-chip-0"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="profiles-filter-builder-chip-k8s_pod_name"]').exists()).toBe(
+      true,
+    );
+    expect(mocks.merge).toHaveBeenCalledWith(
+      orgIdentifier,
+      "profiles-a",
+      expect.objectContaining({ filters: [{ key: "k8s_pod_name", op: "=", value: "pod-a" }] }),
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+  });
+
+  it("re-reads the series and Others colours when the theme switches", async () => {
+    const html = document.documentElement;
+    const startTheme = store.state.theme;
+    html.style.setProperty("--color-chart-series-1", "rgb(1, 2, 3)");
+    html.style.setProperty("--color-border-strong", "rgb(4, 5, 6)");
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        groups: [
+          { value: "pod-a", total: 9, others: false, series: [{ timestamp: 1_000_000, value: 9 }] },
+          { value: "", total: 1, others: true, series: [{ timestamp: 1_000_000, value: 1 }] },
+        ],
+      },
+    });
+    try {
+      const wrapper = mountPage();
+      await settle();
+      await wrapper.find('[data-test="profiles-breakdown-select"] select').setValue("k8s_pod_name");
+      await flushPromises();
+      await nextTick();
+      const colorsOf = () =>
+        wrapper
+          .findComponent({ name: "ChartRendererStub" })
+          .props("data")
+          .options.series.map((line: { color?: string }) => line.color);
+      expect(colorsOf()).toEqual(["rgb(1, 2, 3)", "rgb(4, 5, 6)"]);
+
+      html.style.setProperty("--color-chart-series-1", "rgb(7, 8, 9)");
+      html.style.setProperty("--color-border-strong", "rgb(10, 11, 12)");
+      store.state.theme = startTheme === "dark" ? "light" : "dark";
+      await nextTick();
+      expect(colorsOf()).toEqual(["rgb(7, 8, 9)", "rgb(10, 11, 12)"]);
+    } finally {
+      store.state.theme = startTheme;
+      html.style.removeProperty("--color-chart-series-1");
+      html.style.removeProperty("--color-border-strong");
+    }
+  });
+
+  it("re-reads the series colours when a theme colour preset is applied", async () => {
+    const html = document.documentElement;
+    html.style.setProperty("--color-chart-series-1", "rgb(1, 2, 3)");
+    mocks.series.mockResolvedValue({
+      data: { ...seriesResponse.data, series: [{ timestamp: 1_000_000, value: 9 }] },
+    });
+    try {
+      const wrapper = mountPage();
+      await settle();
+      const colorOf = () =>
+        wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options.series[0].color;
+      expect(colorOf()).toBe("rgb(1, 2, 3)");
+
+      html.style.setProperty("--color-chart-series-1", "rgb(7, 8, 9)");
+      window.dispatchEvent(new CustomEvent("themeColorChanged"));
+      await nextTick();
+      expect(colorOf()).toBe("rgb(7, 8, 9)");
+    } finally {
+      html.style.removeProperty("--color-chart-series-1");
+    }
   });
 
   it("says how much of the samples the views show when the result is cut", async () => {
@@ -524,7 +1009,7 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    expect(wrapper.find('[data-test="profiles-partial-result"]').text()).toContain("90.0%");
+    expect(wrapper.find('[data-test="profiles-partial-result"]').text()).toContain("90.00%");
   });
 
   it("marks the page as beta in the title line, as Workflows does", async () => {
@@ -641,7 +1126,7 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    const firstRow = wrapper.find('[data-test^="profiles-top-row-"][data-test$="-menu"]');
+    const firstRow = topRowMenu(wrapper, "fn-b");
     const prefix = firstRow.attributes("data-test")!.replace(/-menu$/, "");
     // The button stops click propagation (rows must not react); the real menu opens on pointerdown.
     (firstRow.element.parentElement as HTMLElement).click();
@@ -686,8 +1171,7 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    // Top Table rows sort by total, so the first row is fn-b.
-    const firstRow = wrapper.find('[data-test^="profiles-top-row-"][data-test$="-menu"]');
+    const firstRow = topRowMenu(wrapper, "fn-b");
     const prefix = firstRow.attributes("data-test")!.replace(/-menu$/, "");
     (firstRow.element.parentElement as HTMLElement).click();
     await nextTick();
@@ -711,10 +1195,10 @@ describe("Profiles page", () => {
       children: [{ name: "fn-c", total: 10 }],
     });
     // fn-b has 30 samples in the Top list, but only 15 sit in the drawn tree.
-    expect(wrapper.find('[data-test="profiles-sandwich-coverage"]').text()).toContain("50.0%");
+    expect(wrapper.find('[data-test="profiles-sandwich-coverage"]').text()).toContain("50.00%");
   });
 
-  it("shows Function Details for a row and closes them", async () => {
+  it("shows Function details for a row and closes them", async () => {
     mocks.merge.mockResolvedValue({
       data: {
         ...mergeResponse.data,
@@ -736,7 +1220,7 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    const firstRow = wrapper.find('[data-test^="profiles-top-row-"][data-test$="-menu"]');
+    const firstRow = topRowMenu(wrapper, "fn-b");
     const prefix = firstRow.attributes("data-test")!.replace(/-menu$/, "");
     (firstRow.element.parentElement as HTMLElement).click();
     await nextTick();
@@ -745,10 +1229,17 @@ describe("Profiles page", () => {
 
     const panel = wrapper.find('[data-test="profiles-function-details"]');
     expect(panel.text()).toContain("fn-b");
-    expect(panel.find('[data-test="profiles-function-details-self"]').text()).toBe("5 ns · 16.7%");
+    expect(panel.find('[data-test="profiles-function-details-self"]').text()).toBe("5 ns · 16.67%");
     expect(panel.find('[data-test="profiles-function-details-total"]').text()).toBe(
-      "30 ns · 100.0%",
+      "30 ns · 100.00%",
     );
+    // The table's Self % cell for the same function uses the same precision.
+    const tableRow = wrapper
+      .findAll("tbody tr")
+      .find((row) => row.find("td").text().includes("fn-b"))!;
+    expect(tableRow.text()).toContain("16.67%");
+    // fn-b has no package separator, so there is no Package row repeating its name.
+    expect(panel.find('[data-test="profiles-function-details-package"]').exists()).toBe(false);
     expect(panel.find('[data-test="profiles-function-details-called-by"]').text()).toContain(
       "main",
     );
@@ -775,7 +1266,7 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    const firstRow = wrapper.find('[data-test^="profiles-top-row-"][data-test$="-menu"]');
+    const firstRow = topRowMenu(wrapper, "fn-b");
     const prefix = firstRow.attributes("data-test")!.replace(/-menu$/, "");
     (firstRow.element.parentElement as HTMLElement).click();
     await nextTick();
@@ -817,7 +1308,7 @@ describe("Profiles page", () => {
     await nextTick();
     // The recursive main.hash counts once: 40 of 100.
     expect(wrapper.find('[data-test="profiles-search-summary"]').text()).toBe(
-      "1 function · 40.0% of samples",
+      "1 function · 40.00% of samples",
     );
 
     await wrapper.find('[data-test="profiles-search-functions"]').setValue("nothing");
@@ -857,7 +1348,8 @@ describe("Profiles page", () => {
       valueType: "relative",
     });
     await flushPromises();
-    expect(mocks.meta).toHaveBeenCalledTimes(2);
+    // Two on open, one for the new service's profile types, one for the new window.
+    expect(mocks.meta).toHaveBeenCalledTimes(4);
     expect(mocks.merge).toHaveBeenCalledTimes(4);
   });
 
@@ -877,6 +1369,110 @@ describe("Profiles page", () => {
 
     expect(wrapper.find('[data-test="profiles-search-cancelled"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="profiles-no-results"]').exists()).toBe(false);
+  });
+
+  it("lists only the profile types of the selected service", async () => {
+    const typesByService: Record<string, Array<{ type: string; unit: string }>> = {
+      "service-a": [
+        { type: "cpu", unit: "nanoseconds" },
+        { type: "heap", unit: "bytes" },
+      ],
+      checkout: [{ type: "cpu", unit: "nanoseconds" }],
+    };
+    mocks.meta.mockImplementation(async (_org, _stream, payload) => ({
+      data: {
+        ...profileMetaResponse.data,
+        services: ["service-a", "checkout"],
+        profile_types: payload.service_name
+          ? typesByService[payload.service_name]
+          : Object.values(typesByService).flat(),
+      },
+    }));
+    const wrapper = mountPage();
+    await settle();
+    const typeOptions = () =>
+      wrapper
+        .findAll('[data-test="profiles-type-select"] option')
+        .map((option) => option.attributes("value"));
+    expect(typeOptions()).toEqual(["cpu\u0000nanoseconds", "heap\u0000bytes"]);
+
+    await wrapper.find('[data-test="profiles-service-select"] select').setValue("checkout");
+    await flushPromises();
+
+    expect(mocks.meta.mock.lastCall?.[2]).toMatchObject({ service_name: "checkout" });
+    expect(typeOptions()).toEqual(["cpu\u0000nanoseconds"]);
+    expect(mocks.merge.mock.lastCall?.[2]).toMatchObject({
+      service_name: "checkout",
+      profile_type: "cpu",
+    });
+  });
+
+  it("keeps the chosen service through an empty window and says why Run query is off", async () => {
+    let empty = false;
+    mocks.meta.mockImplementation(async () => ({
+      data: empty
+        ? { ...profileMetaResponse.data, services: [], profile_types: [], label_names: [] }
+        : { ...profileMetaResponse.data, services: ["service-a", "payments"] },
+    }));
+    const wrapper = mountPage();
+    await settle();
+    await wrapper.find('[data-test="profiles-service-select"] select').setValue("payments");
+    await flushPromises();
+    const picker = wrapper.findComponent({ name: "DateTimePickerDashboard" });
+    const pickWindow = async (relativeTimePeriod: string) => {
+      picker.vm.$emit("update:modelValue", {
+        startTime: 0,
+        endTime: 0,
+        relativeTimePeriod,
+        valueType: "relative",
+      });
+      await flushPromises();
+    };
+
+    empty = true;
+    await pickWindow("5m");
+    const run = wrapper.find('[data-test="profiles-run-query"]');
+    expect(run.attributes("disabled")).toBeDefined();
+    expect(run.find("span[content]").attributes("content")).toBe(
+      "Pick a stream and a profile type with data in this time range",
+    );
+
+    empty = false;
+    await pickWindow("1h");
+    expect(mocks.meta.mock.lastCall?.[2]).toMatchObject({ service_name: "payments" });
+    expect(
+      (wrapper.find('[data-test="profiles-service-select"] select').element as HTMLSelectElement)
+        .value,
+    ).toBe("payments");
+    expect(mocks.merge.mock.lastCall?.[2]).toMatchObject({ service_name: "payments" });
+  });
+
+  it("draws a lone point as a dot on an axis that spans the run's window", async () => {
+    const startMs = mocks.nowMs - 15 * 60 * 1000;
+    mocks.series.mockResolvedValue({
+      data: { ...seriesResponse.data, series: [{ timestamp: startMs * 1000, value: 6e9 }] },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const options = () =>
+      wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options;
+    expect(options().series[0].showSymbol).toBe(true);
+    expect(options().xAxis.min).toBe(startMs);
+    expect(options().xAxis.max).toBe(mocks.nowMs);
+
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        series: [0, 1, 2].map((step) => ({
+          timestamp: (startMs + step * 60_000) * 1000,
+          value: 6e9,
+        })),
+      },
+    });
+    await wrapper.find('[data-test="profiles-run-query"]').trigger("click");
+    await settle();
+    expect(options().series[0].showSymbol).toBe(false);
   });
 
   describe("URL and share link", () => {
@@ -917,9 +1513,11 @@ describe("Profiles page", () => {
 
       await wrapper.find('[data-test="profiles-view-flame"]').trigger("click");
       await nextTick();
+      expect(analytics.track).toHaveBeenCalledWith("profiles_view_changed", { view: "flame" });
       const graph = wrapper.findComponent({ name: "FlameGraphStub" });
       graph.vm.$emit("focus", "root/0");
       graph.vm.$emit("details", "fn-b");
+      expect(analytics.track).toHaveBeenCalledWith("profiles_function_details_opened");
       await wrapper.find('[data-test="profiles-search-functions"]').setValue("fn");
       graph.vm.$emit("sandwich", "fn-c");
       await flushPromises();
@@ -966,6 +1564,60 @@ describe("Profiles page", () => {
       await nextTick();
       await nextTick();
       expect(focusCalls).toHaveBeenCalledWith("root/0");
+    });
+
+    it("drops the flame graph focus when a new run returns another tree", async () => {
+      mocks.merge.mockResolvedValue(mergeResponse);
+      route.query = {
+        org_identifier: orgIdentifier,
+        stream: "profiles-a",
+        period: "15m",
+        view: "flame",
+        focus: "root/0",
+      };
+      focusCalls.mockClear();
+      const wrapper = mountWithFlame();
+      await settle();
+      expect(focusCalls).toHaveBeenCalledWith("root/0");
+      wrapper.findComponent({ name: "FlameGraphStub" }).vm.$emit("focus", "root/0/2");
+      await flushPromises();
+      expect(router.replace.mock.lastCall?.[0].query.focus).toBe("root/0/2");
+      focusCalls.mockClear();
+
+      await wrapper.find('[data-test="profiles-run-query"]').trigger("click");
+      await settle();
+
+      expect(wrapper.findComponent({ name: "FlameGraphStub" }).exists()).toBe(true);
+      expect(focusCalls).not.toHaveBeenCalled();
+      expect(router.replace.mock.lastCall?.[0].query).not.toHaveProperty("focus");
+      expect(Object.fromEntries(shareUrl(wrapper).searchParams)).not.toHaveProperty("focus");
+    });
+
+    it("drops a link's focus when metadata replaces the linked service and runs again", async () => {
+      mocks.merge.mockResolvedValue(mergeResponse);
+      route.query = {
+        org_identifier: orgIdentifier,
+        stream: "profiles-a",
+        period: "15m",
+        service_name: "service-gone",
+        profile_type: "cpu",
+        profile_unit: "nanoseconds",
+        view: "flame",
+        focus: "root/0",
+      };
+      // The linked run answers only after the second run started, so it is superseded.
+      let answerLinkedRun!: (value: typeof mergeResponse) => void;
+      mocks.merge.mockReturnValueOnce(new Promise((resolve) => (answerLinkedRun = resolve)));
+      focusCalls.mockClear();
+      mountWithFlame();
+      await settle();
+      answerLinkedRun(mergeResponse);
+      await settle();
+
+      expect(mocks.merge).toHaveBeenCalledTimes(2);
+      expect(mocks.merge.mock.lastCall?.[2]).toMatchObject({ service_name: "service-a" });
+      expect(focusCalls).not.toHaveBeenCalled();
+      expect(router.replace.mock.lastCall?.[0].query).not.toHaveProperty("focus");
     });
 
     it("shares the window of the last run, not of the first one", async () => {
@@ -1044,7 +1696,7 @@ describe("Profiles page", () => {
       );
     });
 
-    it("shows skeletons for the chart and the table while a query runs", async () => {
+    it("shows skeletons for the chart and keeps the last table rows, marked stale, while a query runs", async () => {
       mocks.merge.mockResolvedValue(mergeResponse);
       const wrapper = mountPage();
       await settle();
@@ -1055,9 +1707,38 @@ describe("Profiles page", () => {
       await nextTick();
 
       expect(wrapper.find('[data-test="profiles-series-skeleton"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table"]').attributes("data-test-loading")).toBe("true");
+      expect(wrapper.find('[data-test="o2-table-body"]').attributes("data-test-stale")).toBe(
+        "true",
+      );
       await wrapper.find('[data-test="profiles-view-flame"]').trigger("click");
       expect(wrapper.find('[data-test="profiles-flame-skeleton"]').exists()).toBe(true);
+    });
+
+    it("shows the table skeleton, not the last type's rows in the new unit, when the profile type changes", async () => {
+      mocks.meta.mockResolvedValue({
+        data: {
+          ...profileMetaResponse.data,
+          profile_types: [
+            { type: "cpu", unit: "nanoseconds" },
+            { type: "heap", unit: "bytes" },
+          ],
+        },
+      });
+      mocks.merge.mockResolvedValue(mergeResponse);
+      const wrapper = mountPage();
+      await settle();
+      expect(wrapper.find('[data-test="o2-table-body"]').exists()).toBe(true);
+
+      mocks.merge.mockImplementationOnce(() => new Promise(() => {}));
+      await wrapper.find('[data-test="profiles-type-select"] select').setValue("heap\u0000bytes");
+      await flushPromises();
+
+      expect(wrapper.find('[data-test-stale="true"]').exists()).toBe(false);
+      await vi.waitFor(() =>
+        expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true),
+      );
+      expect(wrapper.find('[data-test-stale="true"]').exists()).toBe(false);
     });
 
     it("cancels a running query, keeps the last results and marks the run pending", async () => {
@@ -1086,7 +1767,7 @@ describe("Profiles page", () => {
     });
   });
 
-  it("reloads tag values when the service or profile type changes", async () => {
+  it("asks for tag values under the current service and profile type", async () => {
     mocks.meta.mockResolvedValue({
       data: {
         ...profileMetaResponse.data,
@@ -1100,32 +1781,17 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    await wrapper.find('[data-test="profiles-add-filter"]').trigger("click");
-    await nextTick();
-    await wrapper.find('[data-test="profiles-tag-key-select"] select').setValue("k8s_pod_name");
-    await flushPromises();
-    await nextTick();
-    mocks.tagValues.mockClear();
-
     await wrapper.find('[data-test="profiles-service-select"] select').setValue("service-b");
-    await flushPromises();
-    await nextTick();
-
-    expect(mocks.tagValues).toHaveBeenCalledWith(
-      orgIdentifier,
-      "profiles-a",
-      expect.objectContaining({ service_name: "service-b", tag: "k8s_pod_name" }),
-    );
-
-    mocks.tagValues.mockClear();
     await wrapper.find('[data-test="profiles-type-select"] select').setValue("heap\u0000bytes");
-    await flushPromises();
-    await nextTick();
+    await settle();
+    mocks.tagValues.mockClear();
 
+    await filterBuilder(wrapper).props("loadValues")("k8s_pod_name", "");
     expect(mocks.tagValues).toHaveBeenCalledWith(
       orgIdentifier,
       "profiles-a",
       expect.objectContaining({
+        service_name: "service-b",
         profile_type: "heap",
         profile_unit: "bytes",
         tag: "k8s_pod_name",
@@ -1139,9 +1805,7 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    await wrapper.find('[data-test="profiles-add-filter"]').trigger("click");
-    await nextTick();
-    await wrapper.find('[data-test="profiles-tag-key-select"] select').setValue("k8s_pod_name");
+    expect(await filterBuilder(wrapper).props("loadValues")("k8s_pod_name", "")).toEqual([]);
     await flushPromises();
 
     expect(wrapper.find('[data-test="profiles-error-banner"]').exists()).toBe(false);
@@ -1149,7 +1813,7 @@ describe("Profiles page", () => {
     expect(wrapper.find('[data-test="profiles-top-table"]').exists()).toBe(true);
   });
 
-  it("drops tag values that arrive after the draft tag is cleared", async () => {
+  it("drops tag values that arrive after the stream changes", async () => {
     let resolveTag:
       ((value: { data: { tag: string; values: string[]; took: number } }) => void) | undefined;
     mocks.tagValues.mockImplementation(
@@ -1162,23 +1826,16 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    await wrapper.find('[data-test="profiles-add-filter"]').trigger("click");
-    await nextTick();
-    await wrapper.find('[data-test="profiles-tag-key-select"] select').setValue("k8s_pod_name");
-    await nextTick();
-
+    const pending = filterBuilder(wrapper).props("loadValues")("k8s_pod_name", "");
     await wrapper.find('[data-test="profiles-stream-select"] select').setValue("profiles-b");
     await flushPromises();
     await nextTick();
 
     resolveTag?.({ data: { tag: "k8s_pod_name", values: ["stale-pod"], took: 1 } });
-    await flushPromises();
-    await nextTick();
-
-    expect(wrapper.text()).not.toContain("stale-pod");
+    expect(await pending).toEqual([]);
   });
 
-  it("sorts the top table by Self when the column header is clicked", async () => {
+  it("opens the top table sorted by Self, and sorts by Total on a header click", async () => {
     mocks.merge.mockResolvedValue(mergeResponse);
     const wrapper = mountPage();
     await settle();
@@ -1190,12 +1847,12 @@ describe("Profiles page", () => {
       .findAll("tbody tr")
       .map((row) => row.find("td").text())
       .filter(Boolean);
-    expect(namesBefore[0]).toBe("fn-b");
+    expect(namesBefore[0]).toBe("fn-c");
     // One scrolling list, no pager (as on Traces).
     expect(wrapper.find('[data-test="o2-table-pagination-info"]').exists()).toBe(false);
 
     await wrapper
-      .find('[data-test="o2-table-th-self"] [data-test="o2-table-th-sort-trigger"]')
+      .find('[data-test="o2-table-th-total"] [data-test="o2-table-th-sort-trigger"]')
       .trigger("click");
     await nextTick();
 
@@ -1203,7 +1860,7 @@ describe("Profiles page", () => {
       .findAll("tbody tr")
       .map((row) => row.find("td").text())
       .filter(Boolean);
-    expect(namesAfter[0]).toBe("fn-c");
+    expect(namesAfter[0]).toBe("fn-b");
   });
 
   it("opens the Call Tree with the root expanded, children by total, and their counts", async () => {
@@ -1370,8 +2027,12 @@ describe("Profiles page", () => {
         }),
         expect.objectContaining({ signal: expect.anything() }),
       );
-      expect(wrapper.find('[data-test="profiles-filter-chip-trace_id"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="profiles-filter-chip-span_id"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="profiles-filter-builder-chip-trace_id"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="profiles-filter-builder-chip-span_id"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.find('[data-test="profiles-view-flame"]').attributes("data-state")).toBe("on");
     });
 
@@ -1381,7 +2042,40 @@ describe("Profiles page", () => {
       expect(mocks.meta).toHaveBeenCalledWith(orgIdentifier, "profiles-b", {
         start_time: FROM,
         end_time: TO,
+        service_name: "service-b",
       });
+    });
+
+    it("starts the seeded query without waiting for metadata", async () => {
+      const meta = deferred<unknown>();
+      mocks.meta.mockReturnValueOnce(meta.promise);
+      mountSeeded();
+      await flushPromises();
+
+      expect(mocks.merge).toHaveBeenCalledTimes(1);
+      meta.resolve({
+        data: {
+          ...profileMetaResponse.data,
+          services: ["service-a", "service-b"],
+          profile_types: [{ type: "cpu", unit: "nanoseconds" }],
+        },
+      });
+      await flushPromises();
+      expect(mocks.merge).toHaveBeenCalledTimes(1);
+    });
+
+    it("runs again when metadata replaces a seeded service that has no data", async () => {
+      route.query = { ...seedQuery, service_name: "service-gone" };
+      mountSeeded();
+      await flushPromises();
+
+      expect(mocks.merge).toHaveBeenCalledTimes(2);
+      expect(mocks.merge).toHaveBeenLastCalledWith(
+        orgIdentifier,
+        "profiles-b",
+        expect.objectContaining({ service_name: "service-a" }),
+        expect.objectContaining({ signal: expect.anything() }),
+      );
     });
 
     it("loads metadata once and queries once, even with delayed responses", async () => {
@@ -1405,7 +2099,9 @@ describe("Profiles page", () => {
       expect(mocks.meta).toHaveBeenCalledTimes(1);
       expect(mocks.series).toHaveBeenCalledTimes(1);
       expect(mocks.merge).toHaveBeenCalledTimes(1);
-      expect(wrapper.find('[data-test="profiles-filter-chip-trace_id"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="profiles-filter-builder-chip-trace_id"]').exists()).toBe(
+        true,
+      );
     });
 
     it("re-seeds when the route query changes", async () => {
@@ -1473,8 +2169,12 @@ describe("Profiles page", () => {
         (wrapper.find('[data-test="profiles-stream-select"] select').element as HTMLSelectElement)
           .value,
       ).toBe("profiles-a");
-      expect(mocks.meta).toHaveBeenCalledTimes(1);
-      expect(mocks.meta).toHaveBeenCalledWith(orgIdentifier, "profiles-a", window);
+      expect(mocks.meta).toHaveBeenCalledTimes(2);
+      expect(mocks.meta).toHaveBeenNthCalledWith(1, orgIdentifier, "profiles-a", window);
+      expect(mocks.meta).toHaveBeenNthCalledWith(2, orgIdentifier, "profiles-a", {
+        ...window,
+        service_name: "service-a",
+      });
       expect(mocks.merge).toHaveBeenCalledTimes(1);
       expect(mocks.merge).toHaveBeenCalledWith(
         orgIdentifier,
@@ -1513,7 +2213,7 @@ describe("Profiles page", () => {
         start_time: (mocks.nowMs - 15 * 60 * 1000) * 1000,
         end_time: mocks.nowMs * 1000,
       });
-      expect(wrapper.find('[data-test^="profiles-filter-chip-"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test^="profiles-filter-builder-chip-"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="profiles-view-top"]').attributes("data-state")).toBe("on");
     });
   });

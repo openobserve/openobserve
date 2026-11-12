@@ -522,6 +522,7 @@ and each domain has its own reference below.
 | **Form validation** | `OForm` + a colocated Zod `<Form>.schema.ts`; fields are `OForm*` bound **only by `name=`** (no `v-model`/`ref` mirror, no `formData`); submit + loading automatic; payload built with explicit keys; field arrays use `:key="index"` | [forms-validation](references/forms-validation.md) |
 | **New page in nav** | a route **+ exactly one** surface (rail item / flyout child / Settings / IAM sub-page) **+** an env/role gate — the route condition, the nav-entry gate, and the SectionRail `visible` all express the same rule | [navigation-menus](references/navigation-menus.md) |
 | **Keyboard shortcuts** | registry-driven — declare in `shortcutRegistry.ts`, bind with `useShortcuts([{ id, handler }])`; never an ad-hoc `keydown` listener or a hardcoded `⌘N` in a template | [keyboard-shortcuts](references/keyboard-shortcuts.md) |
+| **Product analytics events** | a new feature or primary action (create/save/run/import/share) fires **one** `productAnalytics.track("<object>_<action>", { … })` **after it succeeds**; a new feature page fires `<feature>_opened`. Past-tense snake_case, never a generic name like `Button Click`, never rename an existing event, no personal data or free text in properties. Fixes, refactors and styling changes add **no** events — RUM already captures clicks | [product-analytics](references/product-analytics.md) |
 | **Cancel / Save row** | cancel = `variant="outline"`, save = `variant="primary"`, both `size="sm-action"`, spaced with `gap-2` on the parent | [conventions](references/conventions.md) |
 | **Responsive** | `max-md:`/`max-lg:` variants + `useBreakpoint()` for structure; desktop unchanged; one row of header/toolbar/stat chrome; rails → anchored drawers; row actions → kebab; popups ≤ viewport | [responsive](references/responsive.md) |
 | **Nothing fits** | build a reusable component — generic primitive → a new `O*` in `web/src/lib`; app-specific composition → a named component in `web/src/components`. Never hand-assemble `<div>` + utility classes to fake a component | [creating-components](references/creating-components.md) |
@@ -832,7 +833,7 @@ considering the UI done:
       component's visual change is gated below lg or on a flag only your page sets,
       and a regular page using it is unchanged at ≥1024. See
       [conventions § A UI pass changes UI only](references/conventions.md).
-- [ ] **Comments are one line, or none** — the *why* of a non-obvious constraint,
+- [ ] **Comments are two lines, or none** — the *why* of a non-obvious constraint,
       never layout narration ("< md this wraps"), a re-telling of the code, or the
       history of the PR that added it (no ticket ids, "review finding", "as
       discussed"). Same in specs. See

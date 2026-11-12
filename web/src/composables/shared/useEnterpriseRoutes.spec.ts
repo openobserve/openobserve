@@ -267,6 +267,13 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(routes.length).toBe(18);
     });
 
+    // Fleet APIs 403 on OSS, so the routes must be absent, which also drops the nav entry via router.hasRoute.
+    it("should not register the Fleet routes", () => {
+      const names = useEnterpriseRoutes().map((route: any) => route.name);
+      expect(names).not.toContain("fleet");
+      expect(names).not.toContain("fleetConfigEditor");
+    });
+
     // Synthetics moved out of `o2_enterprise` into `src/synthetics`; only the
     // private-VPC-agent half stays enterprise, so the pages register in an OSS
     // build and the backend `/config` flag decides whether they are reachable.
@@ -387,10 +394,10 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(12);
     });
 
-    // Test 34: iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + workflows = 18
-    it("should have 18 routes in cloud configuration", () => {
+    // Test 34: iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + workflows + onboarding = 19
+    it("should have 19 routes in cloud configuration", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(18);
+      expect(routes.length).toBe(19);
     });
   });
 
@@ -408,13 +415,22 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(11);
     });
 
-    // Test 37: iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + 2 autoobserve + workflows = 20
-    it("should have enterprise routes structure", () => {
-      const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(20);
+    it.each([
+      ["fleet", "fleet"],
+      ["fleet/configurations/:id", "fleetConfigEditor"],
+    ])("should register the Fleet route %s as %s", (path, name) => {
+      const route = useEnterpriseRoutes().find((r: any) => r.name === name);
+      expect(route?.path).toBe(path);
+      expect(typeof route?.beforeEnter).toBe("function");
     });
 
-    // On-call is configured before any data flows, so the empty-data gate must not block it.
+    // Test 37: iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + 2 autoobserve + 2 fleet + workflows = 22
+    it("should have enterprise routes structure", () => {
+      const routes = useEnterpriseRoutes();
+      expect(routes.length).toBe(22);
+    });
+
+    // On-call and Fleet are set up before any data flows, so the empty-data gate must not block them.
     it.each([
       "onCallResponses",
       "onCallResponseDetail",
@@ -423,6 +439,8 @@ describe("useEnterpriseRoutes.ts", () => {
       "onCallTeamDetail",
       "onCallPolicies",
       "onCallRouting",
+      "fleet",
+      "fleetConfigEditor",
     ])("should flag the %s route as allowOnEmptyData", (name) => {
       const routes = useEnterpriseRoutes();
       const route = routes.find((r: any) => r.name === name);
@@ -457,10 +475,10 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "true";
     });
 
-    // Test 38: Should add all routes when both flags are true (iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + 2 autoobserve + workflows = 20)
+    // Test 38: Should add all routes when both flags are true (iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + 2 autoobserve + 2 fleet + workflows + onboarding = 23)
     it("should add all routes when both flags are true", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(20);
+      expect(routes.length).toBe(23);
     });
 
     // Test 39: Should have all IAM children when both flags are true
@@ -655,6 +673,84 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(mockNext).toHaveBeenCalledWith(
         expect.objectContaining({ name: "enterpriseFeatureLocked" }),
       );
+    });
+  });
+
+  describe("license-locked features", () => {
+    const find = (routes: any[], name: string): any =>
+      routes.flatMap((r) => [r, ...(r.children ?? [])]).find((r) => r.name === name);
+
+    beforeEach(async () => {
+      const config = await import("@/aws-exports");
+      config.default.isEnterprise = "true";
+    });
+
+    it.each([
+      ["workflows", "workflows"],
+      ["workflowRuns", "workflows"],
+      ["onCallTeams", "oncall"],
+      ["onCallTeamDetail", "oncall"],
+      ["onCallMine", "oncall"],
+      ["incidentList", "incidents"],
+      ["incidentDetail", "incidents"],
+      ["groups", "rbac"],
+      ["editGroup", "rbac"],
+      ["roles", "rbac"],
+      ["editRole", "rbac"],
+      ["quota", "ratelimit"],
+      ["mcpServer", "mcp"],
+      ["syntheticsTokens", "synthetics"],
+      ["synthetics", "synthetics"],
+      ["synthetics-add", "synthetics"],
+      ["synthetics-edit", "synthetics"],
+      ["synthetics-status-page-edit", "synthetics"],
+      ["synthetic-private-location", "synthetics"],
+      ["synthetic-monitor-results", "synthetics"],
+      ["synthetics-run-detail", "synthetics"],
+    ])("tags %s, child routes included, with meta.licenseFeature %s", (name, feature) => {
+      expect(find(useEnterpriseRoutes(), name).meta.licenseFeature).toBe(feature);
+    });
+
+    it.each(["users", "serviceAccounts", "organizations", "ingestionTokens"])(
+      "leaves %s, which the rbac license does not gate, untagged",
+      (name) => {
+        expect(find(useEnterpriseRoutes(), name).meta?.licenseFeature).toBeUndefined();
+      },
+    );
+
+    it.each([
+      ["workflows", { workflows_enabled: false }],
+      ["onCallTeams", { oncall_enabled: false }],
+      ["incidentList", {}],
+      ["roles", { rbac_enabled: true }],
+      ["synthetics", { synthetics_enabled: false }],
+      ["syntheticsTokens", { synthetics_enabled: false }],
+      [
+        "synthetic-private-location",
+        { synthetics_enabled: false, synthetics_private_locations_enabled: false },
+      ],
+    ])("lets a locked %s through to its own page", async (name, flags) => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const feature = find(useEnterpriseRoutes(), name).meta.licenseFeature;
+      store.state.zoConfig = { ...flags, features: { [feature]: "locked" } };
+      const next = vi.fn();
+      find(useEnterpriseRoutes(), name).beforeEnter({ query: {} }, {}, next);
+      expect(routeGuard).toHaveBeenCalled();
+      expect(next).toHaveBeenCalledWith();
+    });
+
+    it("still sends a hidden feature whose legacy flag is off home", () => {
+      store.state.zoConfig = { workflows_enabled: false, features: { workflows: "hidden" } };
+      const next = vi.fn();
+      find(useEnterpriseRoutes(), "workflows").beforeEnter({ query: {} }, {}, next);
+      expect(next).toHaveBeenCalledWith("/");
+    });
+
+    it("still sends hidden synthetics whose flag is off home", () => {
+      store.state.zoConfig = { synthetics_enabled: false, features: { synthetics: "hidden" } };
+      const next = vi.fn();
+      find(useEnterpriseRoutes(), "synthetics").beforeEnter({ query: {} }, {}, next);
+      expect(next).toHaveBeenCalledWith("/");
     });
   });
 

@@ -5,6 +5,7 @@ import { createI18n } from "vue-i18n";
 import enUS from "@/locales/languages/en-US.json";
 import { createRouter, createWebHistory } from "vue-router";
 import AWSIntegrationTile from "./AWSIntegrationTile.vue";
+import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
 
 vi.mock("../../../aws-exports", () => ({
   default: { API_ENDPOINT: "http://localhost:5080", region: "us-east-1" },
@@ -212,6 +213,22 @@ describe("AWSIntegrationTile.vue", () => {
       wrapper = createWrapper();
       const dashboardBtn = wrapper.find('[data-test="aws-cloudwatch-logs-add-dashboard-btn"]');
       expect(dashboardBtn.exists()).toBe(true);
+    });
+
+    it("locks Add Dashboard and fetches nothing when dashboards are license-locked", async () => {
+      (mockStore.state as any).zoConfig = { features: { dashboards: "locked" } };
+      try {
+        wrapper = createWrapper();
+        const btn = wrapper
+          .findAllComponents({ name: "OButton" })
+          .find((b) => b.attributes("data-test") === "aws-cloudwatch-logs-add-dashboard-btn")!;
+        expect(btn.props("disabled")).toBe(true);
+        expect(btn.props("iconLeft")).toBe("lock");
+        await (wrapper.vm as any).handleAddDashboard();
+        expect(fetch).not.toHaveBeenCalled();
+      } finally {
+        delete (mockStore.state as any).zoConfig;
+      }
     });
 
     it("should render documentation button when documentationUrl present", () => {
@@ -598,6 +615,34 @@ describe("AWSIntegrationTile.vue", () => {
       await flushPromises();
 
       expect(analytics.track).not.toHaveBeenCalledWith("dashboard_created");
+    });
+  });
+
+  describe("replace existing dashboard confirm", () => {
+    it("names the integration in bold in the real provider with a destructive button", async () => {
+      const dashboardsService = (await import("@/services/dashboards")).default;
+      vi.mocked(dashboardsService.list).mockResolvedValueOnce({
+        data: { dashboards: [{ title: "CloudWatch Dashboard", dashboardId: "d-old" }] },
+      } as any);
+      const provider = mount(ConfirmDialogProvider, {
+        global: { plugins: [mockI18n], stubs: { ODialog: ODialogStub } },
+      });
+      wrapper = createWrapper();
+
+      const pending = (wrapper.vm as any).handleAddDashboard();
+      await flushPromises();
+
+      const dialog = provider.findComponent(ODialogStub);
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      const name = provider.find('[data-test="confirm-dialog-provider-name"]');
+      expect(name.text()).toBe("CloudWatch Logs");
+      expect(name.classes()).toContain("font-semibold");
+      expect(provider.text()).toContain("A dashboard for CloudWatch Logs already exists.");
+
+      await provider.find('[data-test="o-dialog-stub-secondary"]').trigger("click");
+      await pending;
+      expect(dashboardsService.delete).not.toHaveBeenCalled();
+      provider.unmount();
     });
   });
 });

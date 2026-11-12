@@ -16,6 +16,7 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import SettingsIndex from "./index.vue";
+import type { SectionHubGroup } from "@/components/common/SectionHub.vue";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 
@@ -53,7 +54,7 @@ const mockStore = {
     },
     zoConfig: {
       service_streams_enabled: true,
-    },
+    } as Record<string, boolean>,
   },
 };
 
@@ -195,6 +196,13 @@ describe("SettingsIndex", () => {
       expect(items.some((i: any) => i.dataTest === "pipeline-destinations-tab")).toBe(true);
     });
 
+    it("lists no LLM Providers or Agent Mapping item, even with evaluations on", () => {
+      mockStore.state.zoConfig = { service_streams_enabled: true, online_evals_enabled: true };
+      const items = getAllItems(createWrapper());
+      expect(items.some((i: any) => i.key === "llm_providers")).toBe(false);
+      expect(items.some((i: any) => i.key === "gen_ai_agent_mapping")).toBe(false);
+    });
+
     it("lists Telephony with the page's icon, gated on enterprise and on-call", () => {
       const telephony = () => getAllItems(createWrapper()).find((i: any) => i.key === "telephony");
       expect(telephony()).toMatchObject({
@@ -247,6 +255,71 @@ describe("SettingsIndex", () => {
       expect(domainItem?.visible).toBe(true);
       expect(orgManagementItem?.visible).toBe(true);
       expect(syntheticsItem?.visible).toBe(true);
+    });
+
+    describe("license-gated items", () => {
+      const byKeyUnder = (zoConfig: Record<string, unknown>) => {
+        mockStore.state.zoConfig = { service_streams_enabled: true, ...zoConfig } as any;
+        const items = getAllItems(createWrapper());
+        return (key: string) => items.find((i: any) => i.key === key);
+      };
+
+      it.each([
+        ["synthetics_locations", "synthetics"],
+        ["queryManagement", "query_management"],
+        ["storageSettings", "byob"],
+      ])("marks %s license-locked under a locked %s license", (key, feature) => {
+        const byKey = byKeyUnder({ features: { [feature]: "locked" } });
+        expect(byKey(key)?.licenseLocked).toBe(true);
+      });
+
+      it("locks Correlation only when the alerts feature it also runs on is locked", () => {
+        const only = byKeyUnder({ features: { correlation: "locked" } });
+        expect(only("correlation_settings")?.licenseLocked).toBe(false);
+        const both = byKeyUnder({ features: { correlation: "locked", alerts: "locked" } });
+        expect(both("correlation_settings")?.licenseLocked).toBe(true);
+      });
+
+      it("keeps Telephony visible and locked under a locked oncall license", () => {
+        const byKey = byKeyUnder({ oncall_enabled: false, features: { oncall: "locked" } });
+        expect(byKey("telephony")).toMatchObject({ visible: true, licenseLocked: true });
+      });
+
+      it.each([
+        ["synthetics_locations", "synthetics"],
+        ["queryManagement", "query_management"],
+        ["storageSettings", "byob"],
+        ["correlation_settings", "correlation"],
+      ])("hides %s under a hidden %s license", (key, feature) => {
+        const byKey = byKeyUnder({ features: { [feature]: "hidden" } });
+        expect(byKey(key)?.visible).toBe(false);
+      });
+
+      it("keeps locked synthetics locations and correlation visible though their flags are off", () => {
+        const byKey = byKeyUnder({
+          synthetics_enabled: false,
+          service_streams_enabled: false,
+          features: { synthetics: "locked", correlation: "locked", alerts: "locked" },
+        });
+        expect(byKey("synthetics_locations")).toMatchObject({ visible: true, licenseLocked: true });
+        expect(byKey("correlation_settings")).toMatchObject({ visible: true, licenseLocked: true });
+      });
+
+      it("leaves every item unlocked when the license enables it", () => {
+        const byKey = byKeyUnder({});
+        for (const key of [
+          "synthetics_locations",
+          "queryManagement",
+          "storageSettings",
+          "correlation_settings",
+          "telephony",
+        ]) {
+          expect(byKey(key)?.licenseLocked).toBe(false);
+        }
+        expect(byKey("synthetics_locations")?.visible).toBe(true);
+        expect(byKey("queryManagement")?.visible).toBe(true);
+        expect(byKey("correlation_settings")?.visible).toBe(true);
+      });
     });
   });
 
@@ -323,6 +396,31 @@ describe("SettingsIndex", () => {
         "pipeline_destinations",
         "telephony",
       ]);
+    });
+
+    it("AC-12.5 puts the Integrations group with Slack right after Destinations", () => {
+      mockStore.state.zoConfig = { service_streams_enabled: true, slack_enabled: true } as any;
+      const wrapper = createWrapper();
+      const labels = (wrapper.vm.sectionGroups as any[]).map((g: any) => g.label);
+      expect(labels.indexOf("Integrations")).toBe(labels.indexOf("Destinations") + 1);
+    });
+
+    it("gives the Slack section no page subtitle", () => {
+      mockStore.state.zoConfig = { service_streams_enabled: true, slack_enabled: true };
+      const wrapper = createWrapper();
+      const items = (wrapper.vm.sectionGroups as SectionHubGroup[]).flatMap((g) => g.items);
+      expect(items.find((i) => i.key === "slack")?.description).toBeUndefined();
+    });
+
+    it("AC-1.4 shows no Slack rail item on Cloud while Slack is disabled", () => {
+      mockStore.state.zoConfig = {
+        service_streams_enabled: true,
+        slack_enabled: false,
+        slack_disabled_reason: "flag",
+      } as any;
+      const wrapper = createWrapper();
+      const items = (wrapper.vm.sectionGroups as any[]).flatMap((g: any) => g.items);
+      expect(items.find((i: any) => i.key === "slack")?.visible).toBe(false);
     });
 
     it("should contain a Synthetics group", () => {

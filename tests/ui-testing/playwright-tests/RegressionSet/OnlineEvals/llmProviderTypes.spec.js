@@ -1,19 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// Online Evals — LLM Provider Types & API Key Handling (enterprise/cloud-only)
-// Covers:
-//   - New provider types (vLLM, OpenAI-compatible) selectable in the create form
-//   - API-key "required" marker toggles with the provider type (create mode only)
-//   - Create a keyless vLLM provider (default endpoint, no API key)
-//   - Create an OpenAI-compatible provider with a custom endpoint + key
-//   - OpenAI-compatible without an endpoint → "endpoint is required" error
-//   - Editing a provider with a blank key preserves the stored key
-//   - No API-key "required" marker in edit mode
-//   - Cancel returns to the provider list without persisting
-//
-// Enterprise gating: the `llm_providers` route only exists on enterprise/cloud
-// builds (useManagementRoutes.ts pushes it when isEnterprise || isCloud). Each test
-// probes navigateToLlmProviders() and skips cleanly on the OSS binary.
+// The route is enterprise/cloud-only, so each test skips cleanly on OSS builds via navigateToLlmProviders().
 
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');

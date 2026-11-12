@@ -91,7 +91,7 @@ number.
 
 | Tier | Constant | Modules (current declarations) |
 | --- | --- | --- |
-| 1 min | `LIVE_STALE_TIME` | alerts (list, detail, history, dependencies), alert sources, anomaly detection, incidents (list, detail), SLOs, synthetics monitors, enrichment-table job statuses, on-call **state** (who is on call, team overview, escalation preview + progress, responses, deliveries, coverage gaps, unrouted signals, my on-call, my contact and phone status), DB monitoring tab counts on a relative range, Infra Kubernetes 2 |
+| 1 min | `LIVE_STALE_TIME` | alerts (list, detail, history, dependencies), alert sources, anomaly detection, incidents (list, detail), SLOs, synthetics monitors, enrichment-table job statuses, on-call **state** (who is on call, team overview, escalation preview + progress, responses, deliveries, coverage gaps, unrouted signals, my on-call, my contact and phone status), DB monitoring tab counts on a relative range, Infra Kubernetes 2, Fleet Manager (collectors list, collector detail, fleet summary, enrollment tokens) |
 | 5 min | `MEDIUM_STALE_TIME` | logs & streams (name list, stream page, schema), saved views, traces (DAG, service graph), service correlation (semantic groups, identity config, discovered services, dimension analytics), org summary counts, AI observability (agents, experiments, remote tasks, datasets, queues), online evals, on-call **derived** (reachability, config risks, team load, resolved schedule, overrides, unavailability, ownership stats), DB monitoring instances |
 | 1 h | `NORMAL_STALE_TIME` | dashboards (+ annotations), pipelines (+ history), functions, query functions, workflows (folder lists, search, run history), reports, folders, nodes, IAM (users, roles, groups, resources, service accounts), ingestion/RUM tokens, org passcode, cipher keys, org settings, settings KV, alert destinations + templates, regex patterns, model pricing, AI toolsets, synthetics agent tokens, on-call **config** (teams, members, schedule, policy, presets, routing config, ownership rules, response history + prior causes), DB monitoring tab counts on an absolute range |
 | ∞ | `SESSION_STALE_TIME` | the two `/config` reads |
@@ -175,11 +175,13 @@ const saveThing = useMutation(() => saveThingMutation(orgId.value, () => isEdit.
 
 | UI need | Source |
 | --- | --- |
-| table skeleton (nothing to show yet) | `isPending` — false whenever cached data exists |
+| table `:loading` | `isPending` — false whenever cached data exists; on a refetch OTable keeps the last rows (dimmed) and draws the skeleton only on a cold load |
 | refresh-button spinner | `isFetching` — true for any request, including one with rows on screen |
 | `ORefreshButton :last-run-at` | `dataUpdatedAt` (the fetch time, not `Date.now()`) |
 | Refresh click | a named handler calling `refetch()` (always hits the server) **plus** a forced read of every secondary list on the view |
 | `:forbidden` | the query's `error` status (this list's own request only) |
+
+When the query key follows a folder, tab or entity, also bind `:loading-reset-key` to it so a switch shows the skeleton, not the previous context's rows; `skeleton-on-refetch` opts a table out of kept rows.
 
 `FunctionList.vue` and `TemplateList.vue` are reference list pages.
 

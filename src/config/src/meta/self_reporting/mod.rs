@@ -49,6 +49,7 @@ pub enum ReportingData {
     Trigger(Box<TriggerData>),
     Error(Box<ErrorData>),
     Redaction(Box<RedactionEvidence>),
+    AutoInvestigateDecision(Box<crate::meta::alerts::auto_investigate::DecisionRow>),
 }
 
 /// Error type for enqueue operations with timeout
@@ -97,6 +98,7 @@ impl ReportingQueue {
             ReportingData::Trigger(_) => "Trigger",
             ReportingData::Error(_) => "Error",
             ReportingData::Redaction(_) => "Redaction",
+            ReportingData::AutoInvestigateDecision(_) => "AutoInvestigateDecision",
         };
 
         log::trace!(
@@ -139,6 +141,7 @@ impl ReportingQueue {
             ReportingData::Trigger(_) => "Trigger",
             ReportingData::Error(_) => "Error",
             ReportingData::Redaction(_) => "Redaction",
+            ReportingData::AutoInvestigateDecision(_) => "AutoInvestigateDecision",
         };
 
         match self
@@ -183,6 +186,7 @@ impl ReportingQueue {
             ReportingData::Trigger(_) => "Trigger",
             ReportingData::Error(_) => "Error",
             ReportingData::Redaction(_) => "Redaction",
+            ReportingData::AutoInvestigateDecision(_) => "AutoInvestigateDecision",
         };
 
         log::trace!(
@@ -384,9 +388,6 @@ mod tests {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             actual_value: None,
@@ -394,12 +395,25 @@ mod tests {
             threshold_value: None,
             threshold_operator: None,
             level: None,
+            #[cfg(feature = "enterprise")]
+            severity: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
+            #[cfg(feature = "enterprise")]
+            historical: None,
+            #[cfg(feature = "enterprise")]
+            siem_groups: None,
             group_label: None,
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
             delivery_attempted: None,
+            repeat_suppressed: None,
             trigger_source: None,
             triggered_by: None,
             recipient_count: None,
@@ -943,9 +957,6 @@ mod tests {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             actual_value: None,
@@ -953,12 +964,25 @@ mod tests {
             threshold_value: None,
             threshold_operator: None,
             level: None,
+            #[cfg(feature = "enterprise")]
+            severity: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
+            #[cfg(feature = "enterprise")]
+            historical: None,
+            #[cfg(feature = "enterprise")]
+            siem_groups: None,
             group_label: None,
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
             delivery_attempted: None,
+            repeat_suppressed: None,
             trigger_source: None,
             triggered_by: None,
             recipient_count: None,
@@ -996,6 +1020,7 @@ mod tests {
                 ReportingData::Trigger(_) => trigger_count += 1,
                 ReportingData::Error(_) => error_count += 1,
                 ReportingData::Redaction(_) => redaction_count += 1,
+                ReportingData::AutoInvestigateDecision(_) => panic!("none was pushed"),
             }
         }
 
@@ -1033,9 +1058,6 @@ mod tests {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             actual_value: None,
@@ -1043,12 +1065,25 @@ mod tests {
             threshold_value: None,
             threshold_operator: None,
             level: None,
+            #[cfg(feature = "enterprise")]
+            severity: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
+            #[cfg(feature = "enterprise")]
+            historical: None,
+            #[cfg(feature = "enterprise")]
+            siem_groups: None,
             group_label: None,
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
             delivery_attempted: None,
+            repeat_suppressed: None,
             trigger_source: None,
             triggered_by: None,
             recipient_count: None,
@@ -1108,9 +1143,6 @@ mod tests {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             actual_value: None,
@@ -1118,12 +1150,25 @@ mod tests {
             threshold_value: None,
             threshold_operator: None,
             level: None,
+            #[cfg(feature = "enterprise")]
+            severity: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
+            #[cfg(feature = "enterprise")]
+            historical: None,
+            #[cfg(feature = "enterprise")]
+            siem_groups: None,
             group_label: None,
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
             delivery_attempted: None,
+            repeat_suppressed: None,
             trigger_source: None,
             triggered_by: None,
             recipient_count: None,

@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { getPropsByChartTypeForSeries } from "@/utils/dashboard/promqlChartSeriesProps";
+import {
+  getPropsByChartTypeForSeries,
+  getSeriesItemOpacity,
+} from "@/utils/dashboard/promqlChartSeriesProps";
 
 describe("promqlChartSeriesProps", () => {
   describe("getPropsByChartTypeForSeries", () => {
@@ -161,12 +164,46 @@ describe("promqlChartSeriesProps", () => {
       expect((result as any).symbolSize).toBe(5);
     });
 
+    it("scatter reads symbol_size from the config", () => {
+      const result = getPropsByChartTypeForSeries("scatter", { symbol_size: 9 });
+      expect((result as any).symbolSize).toBe(9);
+    });
+
     it("h-bar and h-stacked have horizontal orientation", () => {
       const hBar = getPropsByChartTypeForSeries("h-bar");
       const hStacked = getPropsByChartTypeForSeries("h-stacked");
       expect((hBar as any).orientation).toBe("h");
       expect((hStacked as any).orientation).toBe("h");
     });
+
+    const lineWidth = (type: string, config?: { line_thickness?: unknown } | null) => {
+      const props: { lineStyle?: { width?: number } } = getPropsByChartTypeForSeries(type, config);
+      return props.lineStyle?.width;
+    };
+
+    it.each(["line", "area", "area-stacked"])("%s uses the given line thickness", (type) => {
+      expect(lineWidth(type, { line_thickness: 3 })).toBe(3);
+      expect(lineWidth(type, { line_thickness: 0.5 })).toBe(0.5);
+    });
+
+    it.each(["line", "area", "area-stacked"])(
+      "%s falls back to 1.5 when the thickness is unset, zero or negative",
+      (type) => {
+        expect(lineWidth(type)).toBe(1.5);
+        expect(lineWidth(type, null)).toBe(1.5);
+        expect(lineWidth(type, { line_thickness: null })).toBe(1.5);
+        expect(lineWidth(type, { line_thickness: 0 })).toBe(1.5);
+        expect(lineWidth(type, { line_thickness: -1 })).toBe(1.5);
+        expect(lineWidth(type, { line_thickness: "3" })).toBe(1.5);
+      },
+    );
+
+    it.each(["bar", "stacked", "h-bar", "h-stacked", "pie", "donut"])(
+      "%s ignores the line thickness",
+      (type) => {
+        expect(lineWidth(type, { line_thickness: 4 })).toBe(1.5);
+      },
+    );
 
     it("all common chart types return valid objects", () => {
       const types = [
@@ -189,6 +226,38 @@ describe("promqlChartSeriesProps", () => {
         expect(typeof result).toBe("object");
         expect(result).toHaveProperty("type");
       });
+    });
+  });
+
+  describe("getSeriesItemOpacity", () => {
+    it("adds nothing to an unshifted series without symbol_opacity", () => {
+      expect(getSeriesItemOpacity("scatter", {}, false)).toEqual({});
+      expect(getSeriesItemOpacity("bar", {}, false)).toEqual({});
+    });
+
+    it("applies symbol_opacity to scatter only", () => {
+      expect(getSeriesItemOpacity("scatter", { symbol_opacity: 60 }, false)).toEqual({
+        opacity: 0.6,
+      });
+      expect(getSeriesItemOpacity("bar", { symbol_opacity: 60 }, false)).toEqual({});
+      expect(getSeriesItemOpacity("line", { symbol_opacity: 60 }, false)).toEqual({});
+    });
+
+    it("draws a shifted bar or scatter twin at half its base opacity", () => {
+      expect(getSeriesItemOpacity("bar", {}, true)).toEqual({ opacity: 0.5 });
+      // An unset scatter draws at ECharts' 0.8, so its twin matches typing the placeholder 80.
+      expect(getSeriesItemOpacity("scatter", {}, true)).toEqual({ opacity: 0.4 });
+      expect(getSeriesItemOpacity("scatter", { symbol_opacity: 80 }, true)).toEqual({
+        opacity: 0.4,
+      });
+      expect(getSeriesItemOpacity("scatter", { symbol_opacity: 60 }, true)).toEqual({
+        opacity: 0.3,
+      });
+    });
+
+    it("leaves shifted line and area series unfaded", () => {
+      expect(getSeriesItemOpacity("line", { symbol_opacity: 60 }, true)).toEqual({});
+      expect(getSeriesItemOpacity("area", {}, true)).toEqual({});
     });
   });
 });

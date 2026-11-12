@@ -64,6 +64,7 @@ vi.mock("vue-router", () => ({
     },
   })),
   onBeforeRouteLeave: vi.fn((fn) => fn),
+  onBeforeRouteUpdate: vi.fn((fn) => fn),
 }));
 
 describe("AddFunction Component", () => {
@@ -123,6 +124,7 @@ describe("AddFunction Component", () => {
           FullViewContainer: true,
           TestFunction: true,
           ConfirmDialog: true,
+          EditorDraftDialogs: true,
           O2AIChat: true,
           "query-editor": true,
         },
@@ -400,25 +402,43 @@ describe("AddFunction Component", () => {
       expect(wrapper.vm.confirmDialogMeta.show).toBe(false);
     });
 
-    it("handles confirmation dialog confirm action", async () => {
-      // Simulate unsaved changes
-      wrapper.vm.isFunctionDataChanged = true;
-
-      // Call cancelAddFunction
-      await wrapper.vm.cancelAddFunction();
+    it("opens the leave dialog instead of a confirm on the Functions page", async () => {
+      window.dispatchEvent(new Event("pointerdown"));
+      wrapper.vm.handleFunctionUpdate(". = .");
       await nextTick();
-
-      // Simulate confirming the dialog
-      await wrapper.vm.confirmDialogMeta.onConfirm();
-      await nextTick();
-
-      // Check if cancel event was emitted
+      const pending = wrapper.vm.cancelAddFunction();
+      await flushPromises();
+      expect(wrapper.vm.functionDraft.state.leaveOpen).toBe(true);
+      expect(wrapper.vm.confirmDialogMeta.show).toBe(false);
+      expect(wrapper.emitted()["cancel:hideform"]).toBeFalsy();
+      wrapper.vm.functionDraft.chooseLeave("discard");
+      await pending;
       expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
+    });
 
-      // Check if dialog was reset
+    it("keeps the confirm dialog when embedded outside the Functions page", async () => {
+      wrapper.unmount();
+      mockRouter.currentRoute.value.name = "pipelineEditor";
+      wrapper = mount(AddFunction, {
+        global: {
+          plugins: [i18n],
+          provide: { store: mockStore, router: mockRouter },
+          stubs: { FunctionsToolbar: true, TestFunction: true, O2AIChat: true },
+        },
+        props: { modelValue: { name: "", function: "", params: "row", transType: "0" } },
+      });
+      await flushPromises();
+      wrapper.vm.handleFunctionUpdate(". = .");
+      await nextTick();
+
+      await wrapper.vm.cancelAddFunction();
+      expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
+      expect(wrapper.emitted()["cancel:hideform"]).toBeFalsy();
+
+      await wrapper.vm.confirmDialogMeta.onConfirm();
+      expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
       expect(wrapper.vm.confirmDialogMeta.show).toBe(false);
       expect(wrapper.vm.confirmDialogMeta.title).toBe("");
-      expect(wrapper.vm.confirmDialogMeta.message).toBe("");
     });
 
     it("resets confirmation dialog properly", async () => {

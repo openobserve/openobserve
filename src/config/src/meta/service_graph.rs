@@ -42,7 +42,7 @@ pub struct ServiceNode {
     /// The UI renders inferred nodes with a dotted style + type icon.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_type: Option<String>,
-    /// `service|database|queue|rpc|external|agent|tool|model`; empty on the v1 path.
+    /// `service|database|queue|rpc|external|agent|tool|model`.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub kind: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -59,10 +59,10 @@ pub struct ServiceNode {
     pub instances: Option<u64>,
 }
 
-/// Which store the topology was read from plus the v4 job's progress and unresolved counts.
+/// The v4 job's progress and unresolved counts behind a topology response.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct TopologyMeta {
-    /// "v1" | "v4"
+    /// Always "v4"; kept so the response shape does not change.
     pub source: String,
     /// Seconds; max over the org's trace streams.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -171,7 +171,7 @@ pub struct TopologyInput {
 }
 
 /// One time-series data point in an edge latency trend
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct EdgeTrendDataPoint {
     pub timestamp: i64,
     pub p50_latency_ns: u64,
@@ -457,11 +457,7 @@ mod tests {
         assert!(val["meta"].get("degraded").is_none());
         assert_eq!(val["meta"]["processed_up_to"], 1_700_000_000_i64);
         assert_eq!(val["meta"]["unresolved"]["ip_only"], 2_u64);
-        let v1 = TopologyMeta {
-            source: "v1".to_string(),
-            ..Default::default()
-        };
-        let val = serde_json::to_value(&v1).unwrap();
+        let val = serde_json::to_value(TopologyMeta::default()).unwrap();
         assert!(val.get("processed_up_to").is_none());
         assert_eq!(val["unresolved"]["no_peer"], 0_u64);
     }

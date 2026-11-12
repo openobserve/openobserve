@@ -50,7 +50,7 @@ pub async fn search(
         source.stream_type,
         time_range,
         &settings,
-        req.index_info.index_optimize_mode.clone().map(Into::into),
+        &req.index_info,
     )?;
 
     let query = Arc::new(QueryParams {

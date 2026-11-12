@@ -371,8 +371,12 @@ pub(crate) mod billing {
         // e. Clamp + zero fallback.
         let steps = resolve_billable(flags, &i);
 
-        // Queue and config errors never ran: nothing billed, and no zero-fallback warning.
-        if i.error_source == "queue" || i.error_source == crate::alerting::ERROR_SOURCE_CONFIG {
+        // Queue, control plane and config errors never ran: nothing billed, no zero-fallback
+        // warning.
+        if i.error_source == "queue"
+            || i.error_source == crate::alerting::ERROR_SOURCE_CONTROL_PLANE
+            || i.error_source == crate::alerting::ERROR_SOURCE_CONFIG
+        {
             return Vec::new();
         }
 
@@ -490,6 +494,7 @@ use infra::{
     },
 };
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{RESULTS_STREAM, STEP_RESULTS_STREAM};
 
@@ -501,14 +506,16 @@ pub struct ResolveRequest {
 }
 
 /// Viewport dimensions delivered to the probe so it doesn't need hardcoded device tables.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[schema(as = SyntheticsViewport)]
 pub struct Viewport {
     pub width: u32,
     pub height: u32,
 }
 
 /// One engine+device combination with a pre-generated execution_id (from the scheduler).
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[schema(as = SyntheticsBrowserDevice)]
 pub struct BrowserDeviceEntry {
     pub execution_id: String,
     pub engine: String,
@@ -516,7 +523,8 @@ pub struct BrowserDeviceEntry {
     pub viewport: Viewport,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[schema(as = SyntheticsJobResolveResponse)]
 pub struct ResolveResponse {
     pub job_id: String,
     pub run_id: String,
@@ -553,7 +561,8 @@ pub struct ResolveResponse {
 }
 
 /// Ingest destination for probe result records.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[schema(as = SyntheticsIngestInfo)]
 pub struct IngestInfo {
     pub base_url: String,
     pub org: String,
@@ -895,20 +904,20 @@ pub async fn artifact_urls(
 /// How long presigned download URLs stay valid (seconds).
 const PRESIGN_DOWNLOAD_EXPIRES_SECS: u64 = 180;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct PresignArtifactsRequest {
     /// Full object-store keys as stored in the stream records
     /// (`screenshot_key`, `trace_key`).
     pub keys: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct PresignedArtifact {
     pub key: String,
     pub url: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct PresignArtifactsResponse {
     /// "presigned" — urls point directly at object storage (S3/MinIO/Azure).
     /// "proxy" — local disk mode; urls are relative API paths that stream bytes.
@@ -971,7 +980,8 @@ pub async fn presign_artifacts(
     })
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[schema(as = SyntheticsJobAckResponse)]
 pub struct AckResponse {
     pub run_complete: bool,
     /// Aggregate run status string when run_complete = true: "passed"|"warning"|"failed"|"error".
@@ -1032,11 +1042,15 @@ pub struct AckResponse {
     /// The downtime that muted this run; server-side only, since the ack body goes to a probe.
     #[serde(skip)]
     pub suppressed_by: Option<String>,
+    /// The check's template override; server-side only.
+    #[serde(skip)]
+    pub template: Option<String>,
 }
 
 /// The notification a completed run should send, resolved against the check's
 /// `alert_if_fails` / `cooldown_mins` settings and its persisted alert state.
-#[derive(Debug, Clone, Copy, Default, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Serialize, PartialEq, Eq, utoipa::ToSchema)]
+#[schema(as = SyntheticsAlertDecision)]
 pub enum AlertDecision {
     /// Say nothing: the run is still below the failure threshold, inside the
     /// cooldown window, or healthy and was never alerting.
@@ -1641,6 +1655,7 @@ fn stale_lease_response(
         failing_environments: Vec::new(),
         usage_events: Vec::new(),
         suppressed_by: None,
+        template: None,
     }
 }
 
@@ -1651,6 +1666,36 @@ async fn run_trigger_type<C: sea_orm::ConnectionTrait>(conn: &C, run_id: &str) -
         .flatten()
         .map(|r| r.trigger_type)
         .unwrap_or_else(|| "schedule".to_string())
+}
+
+/// Replicates a changed check row to the other regions; a no-op unless the row changed.
+///
+/// Only the region that ran the check writes the row. Logged, never returned: the run is
+/// already recorded, and a stale badge in another region is fixed by the next change.
+pub(crate) async fn publish_check_status(done: &synthetics_runs::RunFinalized) {
+    let Some(_streaks) = done.check_update else {
+        return;
+    };
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && let Err(e) =
+            o2_enterprise::enterprise::super_cluster::queue::synthetics_check_last_status(
+                &done.org_id,
+                &done.synthetics_id,
+                _streaks.last_check_status,
+                _streaks.down_runs,
+                _streaks.up_runs,
+                _streaks.run_ts,
+            )
+            .await
+    {
+        tracing::warn!(
+            synthetics_id = %done.synthetics_id,
+            "[synthetics] super-cluster last_check_status publish: {e}"
+        );
+    }
 }
 
 /// Acknowledges completion of a job.
@@ -1720,69 +1765,27 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         return Ok(stale_lease_response(req.job_id, req.trigger_type, check));
     }
 
-    // Increment run counter; Some(run_result) when all jobs have acked.
-    let run_completion =
-        synthetics_runs::increment_jobs_done(conn, &check.run_id, status_db, now_us)
-            .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    // Some only for the ack that completed the run; the check row is already written by then.
+    let run_completion = synthetics_runs::finalize_run(conn, &check.run_id, status_db, now_us)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     let run_complete = run_completion.is_some();
-    let (run_status, job_count) = match run_completion {
-        Some((run_result, count)) => {
-            let status = match config::meta::synthetics::SyntheticStatus::from_db(run_result) {
-                config::meta::synthetics::SyntheticStatus::Passed => "passed",
-                config::meta::synthetics::SyntheticStatus::Warning => "warning",
-                config::meta::synthetics::SyntheticStatus::Failed => "failed",
-                _ => "error",
-            }
-            .to_string();
-            (Some(status), count)
+    let (run_status, job_count) = match &run_completion {
+        Some(done) => {
+            let status =
+                match config::meta::synthetics::SyntheticStatus::from_db(done.run_result) {
+                    config::meta::synthetics::SyntheticStatus::Passed => "passed",
+                    config::meta::synthetics::SyntheticStatus::Warning => "warning",
+                    config::meta::synthetics::SyntheticStatus::Failed => "failed",
+                    _ => "error",
+                }
+                .to_string();
+            (Some(status), done.job_count)
         }
         None => (None, 1),
     };
-
-    // Denormalize last check status onto the synthetic row.
-    //
-    // The write returns whether it CHANGED the stored value, and that bool is
-    // the whole reason the publish below is affordable: this runs on every ack,
-    // so publishing unconditionally would put a super-cluster message on the
-    // queue for every run of every check. Publishing on the transition instead
-    // means a check that keeps passing sends nothing at all.
-    match synthetics_checks::update_last_check_status(conn, &check.synthetics_id, status_db).await {
-        // Only the region that ran the check writes this column, so without the
-        // broadcast every other region's LIST shows "Unknown" for a check its
-        // own detail page — federated search over the results stream — reports
-        // as passing.
-        Ok(true) => {
-            #[cfg(feature = "enterprise")]
-            if o2_enterprise::enterprise::common::config::get_config()
-                .super_cluster
-                .enabled
-                && let Err(e) =
-                    o2_enterprise::enterprise::super_cluster::queue::synthetics_check_last_status(
-                        &check.org_id,
-                        &check.synthetics_id,
-                        status_db,
-                    )
-                    .await
-            {
-                // Logged, never propagated. The probe has done its work and is
-                // owed its 200; failing the ack here would lose the run, and a
-                // status badge that is stale in another region until the next
-                // flip is cosmetic by comparison.
-                tracing::warn!(
-                    synthetics_id = %check.synthetics_id,
-                    "[synthetics] super-cluster last_check_status publish: {e}"
-                );
-            }
-        }
-        // Unchanged — the steady state, and deliberately silent.
-        Ok(false) => {}
-        Err(e) => {
-            tracing::warn!(
-                synthetics_id = %check.synthetics_id,
-                "[synthetics] update_last_check_status: {e}"
-            );
-        }
+    if let Some(done) = &run_completion {
+        publish_check_status(done).await;
     }
 
     // Fetch synthetic for type, target, and destinations — all definition
@@ -1894,6 +1897,7 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         usage_events,
         failing_environments,
         suppressed_by,
+        template: synthetic.template.clone(),
     })
 }
 
@@ -2635,6 +2639,13 @@ mod tests {
         fn a_config_errored_ack_bills_nothing_and_does_not_take_the_zero_fallback() {
             let mut i = browser(16, 1, 0, 0);
             i.error_source = crate::alerting::ERROR_SOURCE_CONFIG;
+            assert!(events_for_ack(LIVE, i).is_empty());
+        }
+
+        #[test]
+        fn a_control_plane_errored_ack_bills_nothing() {
+            let mut i = browser(14, 1, 0, 14);
+            i.error_source = crate::alerting::ERROR_SOURCE_CONTROL_PLANE;
             assert!(events_for_ack(LIVE, i).is_empty());
         }
 

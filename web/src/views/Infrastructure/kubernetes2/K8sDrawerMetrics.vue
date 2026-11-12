@@ -15,13 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { computed, ref, watch } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { escapeLabel, podMatchers, regexEscape } from "./kubernetesQueries";
-import { promqlPanelSchema, type PanelArgs, type PanelQuery } from "./kubernetesPanels";
+import {
+  promqlPanelSchema,
+  type MarkLine,
+  type PanelArgs,
+  type PanelQuery,
+} from "./kubernetesPanels";
 import { encodeDetails, type DetailsRef } from "./kubernetesUrlState";
 import {
   membersOf,
@@ -38,6 +44,12 @@ interface Tab {
   streams: string[];
   unit: PanelArgs["unit"];
   queries: PanelQuery[];
+  markLines?: MarkLine[];
+}
+
+interface PodMarks {
+  cpu: MarkLine[];
+  memory: MarkLine[];
 }
 
 interface PodMatchers {
@@ -70,13 +82,16 @@ const ALLOCATABLE = "kube_node_status_allocatable";
 
 const q = (value: string) => `"${escapeLabel(value)}"`;
 
-const podTabs = (m: PodMatchers): Tab[] => [
+const NO_MARKS: PodMarks = { cpu: [], memory: [] };
+
+const podTabs = (m: PodMatchers, marks: PodMarks = NO_MARKS): Tab[] => [
   {
     id: "cpu",
     label: t("infra.k8s2.columnCpu"),
     streams: [POD_STREAMS.cpu],
     unit: null,
     queries: [{ query: `sum(${POD_STREAMS.cpu}{${m.cpu}})`, stream: POD_STREAMS.cpu }],
+    markLines: marks.cpu,
   },
   {
     id: "memory",
@@ -84,6 +99,7 @@ const podTabs = (m: PodMatchers): Tab[] => [
     streams: [POD_STREAMS.memory],
     unit: "bytes",
     queries: [{ query: `sum(${POD_STREAMS.memory}{${m.memory}})`, stream: POD_STREAMS.memory }],
+    markLines: marks.memory,
   },
   {
     id: "network",
@@ -108,6 +124,42 @@ const podTabs = (m: PodMatchers): Tab[] => [
     ],
   },
 ];
+
+// A total is honest only when every pod reports it, so one gap drops the line.
+const summed = (pods: PodRow[], pick: (pod: PodRow) => PodRow["cpuRequest"]) => {
+  if (!pods.length) return null;
+  let sum = 0;
+  for (const pod of pods) {
+    const value = pick(pod);
+    if (typeof value !== "number") return null;
+    sum += value;
+  }
+  return sum > 0 ? sum : null;
+};
+
+const marksOf = (pods: PodRow[]): PodMarks => {
+  const lines = (
+    request: (pod: PodRow) => PodRow["cpuRequest"],
+    limit: (pod: PodRow) => PodRow["cpuRequest"],
+  ): MarkLine[] => {
+    const out: MarkLine[] = [];
+    const req = summed(pods, request);
+    const lim = summed(pods, limit);
+    if (req != null) out.push({ name: String(t("infra.k8s2.drawerRequest")), value: req });
+    if (lim != null) out.push({ name: String(t("infra.k8s2.drawerLimit")), value: lim });
+    return out;
+  };
+  return {
+    cpu: lines(
+      (p) => p.cpuRequest,
+      (p) => p.cpuLimit,
+    ),
+    memory: lines(
+      (p) => p.memoryRequest,
+      (p) => p.memoryLimit,
+    ),
+  };
+};
 
 const podTarget = (pod: PodRow, matcher: SeriesMatcher | null) =>
   podMatchers({
@@ -220,17 +272,21 @@ const allTabs = computed<Tab[]>(() => {
   const row = props.row;
   switch (row.kind) {
     case "pod":
-      return podTabs({
-        cpu: podTarget(row, row.series.cpu ?? row.series.memory),
-        memory: podTarget(row, row.series.memory ?? row.series.cpu),
-        other: podTarget(row, row.series.cpu ?? row.series.memory),
-      });
+      return podTabs(
+        {
+          cpu: podTarget(row, row.series.cpu ?? row.series.memory),
+          memory: podTarget(row, row.series.memory ?? row.series.cpu),
+          other: podTarget(row, row.series.cpu ?? row.series.memory),
+        },
+        marksOf([row]),
+      );
     case "node":
       return nodeTabs(row);
     case "namespace": {
       const pods = membersOf(props.inventory.pods, row);
       return podTabs(
         sameFor(`${labelOf(pods)}=${q(row.cluster)},k8s_namespace_name=${q(row.name)}`),
+        marksOf(pods),
       );
     }
     case "pvc":
@@ -246,6 +302,7 @@ const allTabs = computed<Tab[]>(() => {
         sameFor(
           `${labelOf(pods)}=${q(row.cluster)},k8s_namespace_name=${q(row.namespace)},k8s_pod_name=~"${names}"`,
         ),
+        marksOf(pods),
       );
     }
   }
@@ -253,17 +310,50 @@ const allTabs = computed<Tab[]>(() => {
 
 const tabs = computed(() => allTabs.value.filter((tab) => tab.streams.every(props.hasStream)));
 
-const selected = ref<string | null>(null);
+const missing = computed(() => allTabs.value.filter((tab) => !tabs.value.includes(tab)));
 
-const active = computed(() => tabs.value.find((tab) => tab.id === selected.value) ?? tabs.value[0]);
+const unavailable = computed(() => {
+  if (!missing.value.length) return null;
+  const streams = [
+    ...new Set(missing.value.flatMap((tab) => tab.streams.filter((s) => !props.hasStream(s)))),
+  ];
+  return t(
+    "infra.k8s2.drawerMetricsUnavailable",
+    {
+      metrics: raw(missing.value.map((tab) => String(tab.label)).join(", ")),
+      streams: raw(streams.join(", ")),
+    },
+    streams.length,
+  );
+});
 
-const schema = computed(() =>
-  promqlPanelSchema({
-    id: `k8s2-drawer-${active.value.id}`,
-    type: "area",
-    unit: active.value.unit,
-    queries: active.value.queries,
-  }),
+const schemas = computed(() =>
+  tabs.value.map((tab) => ({
+    tab,
+    schema: promqlPanelSchema({
+      id: `k8s2-drawer-${tab.id}`,
+      type: "area",
+      unit: tab.unit,
+      queries: tab.queries,
+      markLines: tab.markLines,
+    }),
+  })),
+);
+
+const PRIMARY = ["cpu", "memory"];
+
+const split = computed(() => {
+  const primary = schemas.value.filter(({ tab }) => PRIMARY.includes(tab.id));
+  if (!primary.length) return { primary: schemas.value, more: [] };
+  return { primary, more: schemas.value.filter(({ tab }) => !PRIMARY.includes(tab.id)) };
+});
+
+const moreOpen = ref(false);
+watch(
+  () => encodeDetails(props.details),
+  () => {
+    moreOpen.value = false;
+  },
 );
 
 // The dashboard engine reads these Dates as microsecond epochs, as DbmMetricPanel passes them.
@@ -272,38 +362,71 @@ const timeObj = computed(() => ({
   end_time: new Date(props.range.end),
 }));
 
-// A new object, tab or Refresh remounts the renderer, so a late response never paints here.
-const chartKey = computed(
-  () => `${encodeDetails(props.details)}|${active.value.id}|${props.refreshNonce}`,
-);
+// A new object or Refresh remounts the renderers, so a late response never paints here.
+const chartKey = (id: string) => `${encodeDetails(props.details)}|${id}|${props.refreshNonce}`;
 </script>
 
 <template>
-  <div v-if="active" class="flex flex-col gap-2" data-test="k8s2-drawer-section-metrics">
-    <OToggleGroup
-      :model-value="active.id"
-      class="self-start"
-      data-test="k8s2-drawer-metric-tabs"
-      @update:model-value="(v: unknown) => (selected = String(v))"
+  <div v-if="allTabs.length" class="flex flex-col gap-2" data-test="k8s2-drawer-section-metrics">
+    <OText variant="card-title" as="h3" class="border-border-default border-b pb-1">{{
+      t("infra.k8s2.drawerMetricsTitle")
+    }}</OText>
+    <div
+      v-for="{ tab, schema } in split.primary"
+      :key="tab.id"
+      class="flex min-w-0 flex-col gap-1"
+      :data-test="`k8s2-drawer-metric-${tab.id}`"
     >
-      <OToggleGroupItem
-        v-for="tab in tabs"
-        :key="tab.id"
-        :value="tab.id"
-        size="sm"
-        :data-test="`k8s2-drawer-tab-${tab.id}`"
-        >{{ tab.label }}</OToggleGroupItem
-      >
-    </OToggleGroup>
-    <div class="h-50 min-w-0" data-test="k8s2-drawer-chart">
-      <PanelSchemaRenderer
-        :key="chartKey"
-        :panel-schema="schema"
-        :selected-time-obj="timeObj"
-        :variables-data="{}"
-        :force-load="true"
-        search-type="ui"
-      />
+      <OText variant="label" as="h4" :data-test="`k8s2-drawer-tab-${tab.id}`">{{
+        tab.label
+      }}</OText>
+      <div class="h-36 min-w-0" :data-test="`k8s2-drawer-chart-${tab.id}`">
+        <PanelSchemaRenderer
+          :key="chartKey(tab.id)"
+          :panel-schema="schema"
+          :selected-time-obj="timeObj"
+          :variables-data="{}"
+          :force-load="true"
+          search-type="ui"
+        />
+      </div>
     </div>
+    <OCollapsible
+      v-if="split.more.length"
+      v-model="moreOpen"
+      :label="t('infra.k8s2.drawerMoreMetrics')"
+      data-test="k8s2-drawer-more-metrics"
+    >
+      <div v-if="moreOpen" class="flex flex-col gap-2">
+        <div
+          v-for="{ tab, schema } in split.more"
+          :key="tab.id"
+          class="flex min-w-0 flex-col gap-1"
+          :data-test="`k8s2-drawer-metric-${tab.id}`"
+        >
+          <OText variant="label" as="h4" :data-test="`k8s2-drawer-tab-${tab.id}`">{{
+            tab.label
+          }}</OText>
+          <div class="h-36 min-w-0" :data-test="`k8s2-drawer-chart-${tab.id}`">
+            <PanelSchemaRenderer
+              :key="chartKey(tab.id)"
+              :panel-schema="schema"
+              :selected-time-obj="timeObj"
+              :variables-data="{}"
+              :force-load="true"
+              search-type="ui"
+            />
+          </div>
+        </div>
+      </div>
+    </OCollapsible>
+    <p
+      v-if="unavailable"
+      class="text-text-secondary flex items-start gap-1 text-xs"
+      data-test="k8s2-drawer-metrics-unavailable"
+    >
+      <OIcon name="info" size="sm" class="mt-0.5 shrink-0" />
+      <span>{{ unavailable }}</span>
+    </p>
   </div>
 </template>

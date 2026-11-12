@@ -26,6 +26,8 @@ import { toZonedTime } from "date-fns-tz";
 import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
 import { RE2JS } from "re2js";
+import { metricThresholdColor, type Thresholds } from "./thresholds";
+import { isSeriesOverrideEntry } from "./seriesOverrides";
 
 /** Persisted `override_config` item type discriminants (mirrored in the Rust schema). */
 export const OVERRIDE_CONFIG_TYPES = {
@@ -43,6 +45,10 @@ const MAX_VALUE_MAPPING_PATTERN_LENGTH = 256;
 const MAX_VALUE_MAPPING_TEST_LENGTH = 1024;
 
 const REGEX_KEY_PREFIX = "__regex_";
+const SPECIAL_KEY_PREFIX = "__special_";
+
+/** What a "special" value mapping can match. */
+export const SPECIAL_VALUE_MATCHES: readonly string[] = ["null", "nan", "empty", "true", "false"];
 
 // Compiled at cache build so a table never recompiles a pattern per cell.
 const compiledRegexByCache = new WeakMap<Map<any, any>, Map<string, RE2JS | null>>();
@@ -59,9 +65,13 @@ const warnedValueMappingPatterns = new Set<string>();
 /** Why a value-mapping regex cannot be saved. */
 export type ValueMappingPatternError = "tooLong" | "unsupported";
 
-/** Apply a per-column field-type override ("num"/"text" force; "auto"/absent keep detected). */
+/** Apply a per-column field-type override ("num"/"bar_gauge" and "text"/"json" force; "sparkline", "auto" and absent keep detected). */
 export const resolveIsNumber = (detected: boolean, fieldType: string | undefined): boolean =>
-  fieldType === "num" ? true : fieldType === "text" ? false : detected;
+  fieldType === "num" || fieldType === "bar_gauge"
+    ? true
+    : fieldType === "text" || fieldType === "json"
+      ? false
+      : detected;
 
 // ---------------------------------------------------------------------------
 // Value-mapping helpers
@@ -110,7 +120,11 @@ export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
 
     const type = mapping.type ?? (mapping.pattern ? "regex" : hasRange ? "range" : "value");
 
-    if (type === "regex") {
+    if (type === "special") {
+      if (SPECIAL_VALUE_MATCHES.includes(mapping.match)) {
+        cache.set(`${SPECIAL_KEY_PREFIX}${mapping.match}`, mapping);
+      }
+    } else if (type === "regex") {
       const key = `${REGEX_KEY_PREFIX}${mapping.pattern ?? ""}`;
       cache.set(key, mapping);
       compiled.set(key, compileValueMappingRegex(String(mapping.pattern ?? "")));
@@ -142,8 +156,12 @@ export const lookupValueMappingFull = (
 
   const ok = (m: any) => !requireField || (m && m[requireField] != null && m[requireField] !== "");
 
+  const special = specialMatchOf(value);
+  let m = special ? cache.get(`${SPECIAL_KEY_PREFIX}${special}`) : undefined;
+  if (m !== undefined && ok(m)) return m;
+
   // Direct match (then string-coerced, e.g. key "3" vs numeric value 3)
-  let m = cache.get(value);
+  m = cache.get(value);
   if (m !== undefined && ok(m)) return m;
 
   const strValue = String(value);
@@ -200,6 +218,36 @@ export const lookupValueMappingFull = (
   }
 
   return null;
+};
+
+/** Which special mapping a value meets: null, NaN, the empty string, or a true/false boolean or text. */
+export const specialMatchOf = (value: unknown): string | null => {
+  if (value === null || value === undefined) return "null";
+  if (typeof value === "number") return Number.isNaN(value) ? "nan" : null;
+  if (typeof value === "boolean") return String(value);
+  if (typeof value !== "string") return null;
+  if (value === "") return "empty";
+  const text = value.trim().toLowerCase();
+  if (text === "nan") return "nan";
+  return text === "true" || text === "false" ? text : null;
+};
+
+/** True when the panel names what a missing value shows: a no-value replacement or a special null mapping. */
+export const showsMissingValue = (config: any): boolean =>
+  String(config?.no_value_replacement ?? "") !== "" ||
+  (Array.isArray(config?.mappings) &&
+    config.mappings.some((m: any) => m?.type === "special" && m?.match === "null"));
+
+/** A missing cell's text: a matching special mapping's text, else the no-value replacement. */
+export const missingCellText = (
+  value: unknown,
+  cache: Map<any, any> | null,
+  missingValue: string,
+): string => {
+  const special = specialMatchOf(value);
+  // Only special mappings, so a value mapping on the text "null" keeps missing cells on the replacement.
+  const text = special ? cache?.get(`${SPECIAL_KEY_PREFIX}${special}`)?.text : null;
+  return text != null && text !== "" ? text : String(missingValue);
 };
 
 /** Look up the mapped display text for a value (null when none has text). */
@@ -338,6 +386,8 @@ export const parseOverrideConfigs = (overrideConfigs: any[] | undefined): Overri
     return { colorConfigMap, unitConfigMap, styleConfigMap, conditionalRulesMap, fieldTypeMap };
 
   for (const o of overrideConfigs) {
+    // Chart series overrides share the array; they never style a table column.
+    if (isSeriesOverrideEntry(o)) continue;
     const alias = o?.field?.value;
     if (!alias) continue;
     const aliasLower = alias.toLowerCase();
@@ -425,7 +475,9 @@ export const formatNumericValue = (
   decimals: number,
   missingValue = "",
 ): string => {
-  if (val === null || val === undefined || val === "") return String(missingValue);
+  if (val === null || val === undefined || val === "") {
+    return missingCellText(val, valueMappingCache, missingValue);
+  }
 
   const mapped = lookupValueMapping(val, valueMappingCache);
   if (mapped != null) return mapped;
@@ -439,6 +491,12 @@ export const formatNumericValue = (
 // ---------------------------------------------------------------------------
 // Metric single-value styling (driven by config.mappings)
 // ---------------------------------------------------------------------------
+
+export interface DisplayedValueMapping {
+  text?: string | null;
+  color?: string | null;
+  textColor?: string | null;
+}
 
 export interface ResolvedMetricStyle {
   /** Display text: mapped string when a mapping matched, else the unit-formatted value. */
@@ -455,6 +513,10 @@ export interface MetricStyleOptions {
   customUnit: string | null | undefined;
   decimals: number | null | undefined;
   panelBackground: string;
+  /** Panel threshold steps; a step colour sits between a mapping colour and the panel background. */
+  thresholds?: Thresholds | null;
+  /** Text for a missing value (null, empty or NaN); empty keeps today's text. */
+  missingValue?: string | null;
 }
 
 /**
@@ -462,16 +524,38 @@ export interface MetricStyleOptions {
  * `config.mappings` (value / range / regex / thresholds → text + colors). Precedence:
  *   text: mapping text → unit-formatted value
  *   fill: mapping textColor → (caller contrast fallback)
- *   bg:   mapping color → panel background
+ *   bg:   mapping color → threshold step color → panel background
  */
 export const resolveMetricValueStyle = (
   rawValue: unknown,
   opts: MetricStyleOptions,
 ): ResolvedMetricStyle => {
-  const { mappings, unit, customUnit, decimals, panelBackground } = opts;
-  const cache = buildValueMappingCache(mappings);
-  let mapping = lookupValueMappingFull(rawValue, cache);
+  const { mappings, unit, customUnit, decimals, panelBackground, thresholds } = opts;
+  const mapping = lookupDisplayedValueMapping(rawValue, buildValueMappingCache(mappings), decimals);
 
+  const missingValue = String(opts.missingValue ?? "");
+  const isMissing =
+    rawValue === null || rawValue === undefined || rawValue === "" || String(rawValue) === "NaN";
+  const formatted =
+    missingValue !== "" && isMissing
+      ? missingValue
+      : formatNumericValue(rawValue, null, unit, customUnit, decimals ?? 2);
+  const mappedText = mapping?.text;
+  const text = mappedText != null && mappedText !== "" ? mappedText : formatted;
+  const textColor = mapping?.textColor || undefined;
+  const bgColor =
+    mapping?.color || metricThresholdColor(rawValue, thresholds ?? null) || panelBackground || "";
+
+  return { text, textColor, bgColor };
+};
+
+/** First mapping for a single displayed value, also trying the value as rounded to `decimals`. */
+export const lookupDisplayedValueMapping = (
+  rawValue: unknown,
+  cache: ReturnType<typeof buildValueMappingCache>,
+  decimals: number | null | undefined,
+): DisplayedValueMapping | null => {
+  let mapping = lookupValueMappingFull(rawValue, cache);
   const numValue =
     rawValue === null || rawValue === undefined || rawValue === "" ? NaN : Number(rawValue);
   if (!mapping && cache && !Number.isNaN(numValue)) {
@@ -486,17 +570,11 @@ export const resolveMetricValueStyle = (
       }
     }
   }
-
-  const formatted = formatNumericValue(rawValue, null, unit, customUnit, decimals ?? 2);
-  const mappedText = mapping?.text;
-  const text = mappedText != null && mappedText !== "" ? mappedText : formatted;
-  const textColor = mapping?.textColor || undefined;
-  const bgColor = mapping?.color || panelBackground || "";
-
-  return { text, textColor, bgColor };
+  return mapping;
 };
 
-const tryCompileLinearRegex = (input: string): RE2JS | null => {
+/** Compile a `/pattern/flags` or plain pattern with the linear-time engine; null when it does not compile. */
+export const tryCompileLinearRegex = (input: string): RE2JS | null => {
   const { pattern, flags } = parseRegexPattern(input);
   let re2Flags = 0;
   for (const flag of flags) re2Flags |= RE2_FLAG_BY_JS_FLAG[flag] ?? 0;

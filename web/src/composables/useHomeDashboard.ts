@@ -19,6 +19,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { fetchInto } from "@/composables/query/fetchInto";
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
+import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
@@ -34,15 +35,35 @@ const SETTING_CATEGORY = "ui";
 // Module-level shared reactive state — one source for all consumers.
 const homeDashboard: Ref<HomeDashboard | null> = ref(null);
 const isLoading = ref(false);
+// The pin is per org but this state is shared, so loads are keyed to the org they were started for.
+const currentOrg = ref("");
+const loadedOrg = ref("");
+// Pages mount before the pin read answers, so a read older than a pin change must not undo it.
+let pinWrites = 0;
+
+function notePinWrite(org: string): void {
+  pinWrites++;
+  void queryClient.cancelQueries({ queryKey: settingKeys.one(org, SETTING_KEY), exact: true });
+}
 
 export function useHomeDashboard(t: TranslateFn) {
   const isHome = (dashboardId: string) => homeDashboard.value?.dashboardId === dashboardId;
 
+  const isLoadedFor = (org: string | undefined) => !!org && loadedOrg.value === org;
+
   /** Cached read — see useFavoriteDashboards.load for the same rationale. */
   const load = async (org: string, force = false) => {
     if (!org) return;
+    if (org !== currentOrg.value) {
+      if (currentOrg.value) homeDashboard.value = null;
+      currentOrg.value = org;
+      loadedOrg.value = "";
+    }
+    const writesAtStart = pinWrites;
     const apply = (val: any) => {
+      if (org !== currentOrg.value || pinWrites !== writesAtStart) return;
       homeDashboard.value = val && val.dashboardId ? (val as HomeDashboard) : null;
+      loadedOrg.value = org;
     };
     try {
       if (force) {
@@ -62,7 +83,10 @@ export function useHomeDashboard(t: TranslateFn) {
     } catch {
       // A 404 already arrives as `null` from the query; anything else is transient and must not drop the pin.
     } finally {
-      isLoading.value = false;
+      if (org === currentOrg.value) {
+        isLoading.value = false;
+        loadedOrg.value = org;
+      }
     }
   };
 
@@ -73,11 +97,13 @@ export function useHomeDashboard(t: TranslateFn) {
 
   const setHomeDashboard = async (org: string, d: HomeDashboard) => {
     if (!org) return; // no org → don't hit the API with an undefined segment
+    notePinWrite(org);
     const prev = homeDashboard.value;
     homeDashboard.value = d; // optimistic
     try {
       await settings.setOrgSetting(org, SETTING_KEY, d, SETTING_CATEGORY);
       queryClient.setQueryData(settingKeys.one(org, SETTING_KEY), d);
+      analytics.track("home_dashboard_pinned");
     } catch (e: any) {
       homeDashboard.value = prev; // revert
       toast({
@@ -89,6 +115,7 @@ export function useHomeDashboard(t: TranslateFn) {
 
   const clearHomeDashboard = async (org: string) => {
     if (!org) return; // no org → don't hit the API with an undefined segment
+    notePinWrite(org);
     const prev = homeDashboard.value;
     homeDashboard.value = null; // optimistic
     try {
@@ -124,7 +151,9 @@ export function useHomeDashboard(t: TranslateFn) {
       homeDashboard.value = updated;
       if (org) {
         settings
-          .setOrgSetting(org, SETTING_KEY, updated, SETTING_CATEGORY)
+          .setOrgSetting(org, SETTING_KEY, updated, SETTING_CATEGORY, undefined, {
+            silentForbidden: true,
+          })
           .then(() => queryClient.setQueryData(settingKeys.one(org, SETTING_KEY), updated))
           .catch(() => {
             /* label persist is best-effort; ref already shows the fresh label */
@@ -137,6 +166,7 @@ export function useHomeDashboard(t: TranslateFn) {
     homeDashboard,
     isLoading,
     isHome,
+    isLoadedFor,
     load,
     setHomeDashboard,
     clearHomeDashboard,

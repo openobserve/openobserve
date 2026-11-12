@@ -294,6 +294,21 @@ describe("unknown windows and the super-cluster check (H1, M5)", () => {
       (config as any).isEnterprise = enterprise;
     }
   });
+
+  it("is no super cluster while the license locks super_cluster", () => {
+    const enterprise = (config as any).isEnterprise;
+    (config as any).isEnterprise = "true";
+    fakeStore.state.zoConfig.super_cluster_enabled = true;
+    fakeStore.state.zoConfig.features = { super_cluster: "locked" };
+    try {
+      expect(isSuperCluster()).toBe(false);
+      fakeStore.state.zoConfig.features = { super_cluster: "enabled" };
+      expect(isSuperCluster()).toBe(true);
+    } finally {
+      delete fakeStore.state.zoConfig.features;
+      (config as any).isEnterprise = enterprise;
+    }
+  });
 });
 
 describe("transport binding (AC4.1, P2 records)", () => {
@@ -777,5 +792,107 @@ describe("item 1: scan consent in the signature, the Stop guard and G1 inputs", 
     expect(String(run().persistReason("logs", "create-alert"))).toContain(
       "Choose how to search text first",
     );
+  });
+});
+
+describe("recent searches: settled runs", () => {
+  const dispatch = (reason: "run" | "refresh") => {
+    let generation: { id: number } | null = null;
+    run().setExecutors({
+      logs: (ctx: { generation: { id: number } }) => {
+        generation = ctx.generation;
+      },
+    });
+    run().engine.requestRun(reason);
+    return generation as unknown as { id: number };
+  };
+  const hitsOf = (generationId: number, extra: Record<string, unknown> = {}) => ({
+    traceId: "t-hits",
+    type: "search",
+    generationId,
+    queryReq: { query: { start_time: 10, end_time: 20 } },
+    ...extra,
+  });
+
+  it("reports the first page of a run with its reasons and request window", () => {
+    const settled = vi.fn();
+    run().onRunSettled(settled);
+    const hits = hitsOf(dispatch("run").id);
+    run().bindPayload(hits);
+    run().onPayloadComplete(hits);
+    expect(settled).toHaveBeenCalledTimes(1);
+    expect(settled.mock.calls[0][0]).toMatchObject({
+      reasons: ["run"],
+      startUs: 10,
+      endUs: 20,
+      partial: false,
+      error: null,
+    });
+  });
+
+  describe("noResults", () => {
+    const settle = (
+      results: Record<string, unknown>,
+      error?: { code: number; message: string },
+    ) => {
+      const settled = vi.fn();
+      run().onRunSettled(settled);
+      const hits = hitsOf(dispatch("run").id);
+      run().bindPayload(hits);
+      fakeSearchObj.value.data.queryResults = results;
+      if (error) run().onPayloadError(hits, error);
+      else run().onPayloadComplete(hits);
+      return settled;
+    };
+
+    it("is true for a finished run with no hits and a zero total", () => {
+      expect(settle({ hits: [], total: 0 }).mock.calls[0][0].noResults).toBe(true);
+    });
+
+    it("is false when rows came back or the total is positive", () => {
+      expect(settle({ hits: [{ a: 1 }], total: 1 }).mock.calls[0][0].noResults).toBe(false);
+      expect(settle({ hits: [], total: 5 }).mock.calls[0][0].noResults).toBe(false);
+    });
+
+    it("is false when the result is not an array yet", () => {
+      expect(settle({}).mock.calls[0][0].noResults).toBe(false);
+    });
+
+    it("is false for a failed run", () => {
+      const call = settle({ hits: [], total: 0 }, { code: 1, message: "x" }).mock.calls[0][0];
+      expect(call.noResults).toBe(false);
+      expect(call.error).not.toBeNull();
+    });
+
+    it("still reports a partial run as partial, whatever its rows", () => {
+      const call = settle({ hits: [], total: 0, is_partial: true }).mock.calls[0][0];
+      expect(call.partial).toBe(true);
+    });
+  });
+
+  it("reports a failed search with its error", () => {
+    const settled = vi.fn();
+    run().onRunSettled(settled);
+    const hits = hitsOf(dispatch("run").id);
+    run().bindPayload(hits);
+    run().onPayloadError(hits, { code: 20001, message: "syntax" });
+    expect(settled.mock.calls[0][0].error).toEqual({ code: 20001, message: "syntax" });
+  });
+
+  it("never reports a page fetch, a histogram or a run after unsubscribing", () => {
+    const settled = vi.fn();
+    const stop = run().onRunSettled(settled);
+    const id = dispatch("run").id;
+    const page = hitsOf(id, { isPagination: true });
+    run().bindPayload(page);
+    run().onPayloadComplete(page);
+    run().onPayloadComplete({ traceId: "t-h", type: "histogram", generationId: id });
+    expect(settled).not.toHaveBeenCalled();
+
+    stop();
+    const hits = hitsOf(dispatch("run").id);
+    run().bindPayload(hits);
+    run().onPayloadComplete(hits);
+    expect(settled).not.toHaveBeenCalled();
   });
 });

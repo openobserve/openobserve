@@ -116,12 +116,19 @@ const mountHeatmap = async (
   return wrapper;
 };
 
+const selectionDropdown = (wrapper: any) =>
+  wrapper
+    .findAllComponents({ name: "ODropdown" })
+    .find((dropdown: any) => dropdown.props("side") === "right");
+
 const options = (wrapper: any) =>
   wrapper.findComponent({ name: "ChartRenderer" }).props("data").options;
 
 // The series cell itself, so the tooltip is fed what ECharts would pass, colour rank included.
 const cellWithCount = (wrapper: any, count: number) =>
   options(wrapper).series[0].data.find((c: number[]) => c[3] === count);
+
+const panelLine = (wrapper: any) => wrapper.findComponent({ name: "LoadingProgress" });
 
 let wrapper: any = null;
 
@@ -152,6 +159,188 @@ describe("TracesLatencyHeatmap", () => {
       wrapper = await mountHeatmap();
       expect(wrapper.find('[data-test="traces-latency-heatmap-loading"]').exists()).toBe(true);
       expect(wrapper.findComponent({ name: "ChartRenderer" }).exists()).toBe(false);
+    });
+
+    it("keeps the drawn grid at full opacity through a re-run, under its panel line", async () => {
+      wrapper = await mountHeatmap();
+      let answer!: (v: any) => void;
+      search.mockReturnValueOnce(new Promise((r) => (answer = r)) as any);
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+
+      const body = wrapper.find('[data-test="traces-latency-heatmap-body"]');
+      expect(wrapper.find('[data-test="traces-latency-heatmap-loading"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
+      expect(body.attributes("aria-busy")).toBe("true");
+      expect(panelLine(wrapper).props("loading")).toBe(true);
+      await new Promise((r) => setTimeout(r, 160));
+      expect(body.classes()).not.toContain("opacity-60");
+
+      answer({ data: { hits: HITS, histogram_interval: 10 } });
+      await settle();
+      expect(body.attributes("aria-busy")).toBeUndefined();
+      expect(panelLine(wrapper).props("loading")).toBe(false);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
+    });
+
+    it("draws the dashboard panel line on its header edge through the first load and each re-run, and none once drawn", async () => {
+      let first!: (v: any) => void;
+      search.mockReturnValueOnce(new Promise((r) => (first = r)) as any);
+      wrapper = await mountHeatmap();
+      const line = panelLine(wrapper);
+      expect(line.element.parentElement?.getAttribute("data-test")).toBe(
+        "traces-latency-heatmap-body",
+      );
+      expect(line.element.parentElement?.firstElementChild).toBe(line.element);
+      expect(line.props()).toMatchObject({
+        loading: true,
+        loadingProgressPercentage: 0,
+        indeterminate: false,
+      });
+      expect(wrapper.find('[data-test="traces-latency-heatmap-loading"]').exists()).toBe(true);
+
+      first({ data: { hits: HITS, histogram_interval: 10 } });
+      await settle();
+      expect(panelLine(wrapper).props("loading")).toBe(false);
+
+      let again!: (v: any) => void;
+      search.mockReturnValueOnce(new Promise((r) => (again = r)) as any);
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+      expect(panelLine(wrapper).props("loading")).toBe(true);
+
+      again({ data: { hits: HITS, histogram_interval: 10 } });
+      await settle();
+      expect(panelLine(wrapper).props("loading")).toBe(false);
+    });
+
+    it("never keeps another stream's grid while the new stream's loads", async () => {
+      wrapper = await mountHeatmap({ request: request(), stream: "a" });
+      search.mockReturnValueOnce(new Promise(() => {}) as any);
+      await wrapper.setProps({ request: request("SELECT 2"), stream: "b" });
+      await settle();
+
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-loading"]').exists()).toBe(true);
+    });
+
+    it("keeps the drawn grid at full opacity when the re-run fails", async () => {
+      wrapper = await mountHeatmap();
+      const drawn = options(wrapper);
+      let fail!: (e: unknown) => void;
+      search.mockReturnValueOnce(new Promise((_, reject) => (fail = reject)) as any);
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+      await new Promise((r) => setTimeout(r, 160));
+      const body = wrapper.find('[data-test="traces-latency-heatmap-body"]');
+      expect(body.classes()).not.toContain("opacity-60");
+
+      fail(new Error("boom"));
+      await settle();
+      expect(wrapper.find('[data-test="traces-latency-heatmap-error"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
+      expect(options(wrapper)).toEqual(drawn);
+      expect(body.attributes("aria-busy")).toBeUndefined();
+      expect(body.classes()).not.toContain("opacity-60");
+      expect(panelLine(wrapper).props("loading")).toBe(false);
+      expect(wrapper.emitted("refresh-failed")).toHaveLength(1);
+    });
+
+    it("reports a refused re-run (4xx) to the page and keeps the grid", async () => {
+      wrapper = await mountHeatmap();
+      const drawn = options(wrapper);
+      search.mockRejectedValueOnce({
+        response: { status: 400, data: { code: 400, message: "Bad Request" } },
+      });
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+
+      expect(wrapper.emitted("refresh-failed")).toHaveLength(1);
+      expect(options(wrapper)).toEqual(drawn);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-error"]').exists()).toBe(false);
+    });
+
+    it("shows the error state, not the previous query's grid, when a same-stream re-run of a new query fails", async () => {
+      wrapper = await mountHeatmap({ request: request(), stream: "a", source: "a|spans|q1" });
+      search.mockRejectedValueOnce(new Error("boom"));
+      await wrapper.setProps({ request: request("SELECT 2"), source: "a|spans|q2" });
+      await settle();
+
+      expect(wrapper.find('[data-test="traces-latency-heatmap-error"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(false);
+      expect(wrapper.emitted("refresh-failed")).toBeUndefined();
+    });
+
+    it("keeps the grid when a re-run of the same query fails", async () => {
+      wrapper = await mountHeatmap({ request: request(), stream: "a", source: "a|spans|q1" });
+      search.mockRejectedValueOnce(new Error("boom"));
+      await wrapper.setProps({ request: request("SELECT 2"), source: "a|spans|q1" });
+      await settle();
+
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
+      expect(wrapper.emitted("refresh-failed")).toHaveLength(1);
+    });
+
+    it("keeps the empty state when a re-run over no data fails", async () => {
+      respond({ hits: [], histogram_interval: 10 });
+      wrapper = await mountHeatmap();
+      search.mockRejectedValueOnce(new Error("boom"));
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+
+      expect(wrapper.find('[data-test="traces-latency-heatmap-no-data"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-error"]').exists()).toBe(false);
+      expect(wrapper.emitted("refresh-failed")).toHaveLength(1);
+    });
+
+    it("shows the error state when another stream's first load fails", async () => {
+      wrapper = await mountHeatmap({ request: request(), stream: "a" });
+      search.mockRejectedValueOnce(new Error("boom"));
+      await wrapper.setProps({ request: request("SELECT 2"), stream: "b" });
+      await settle();
+
+      expect(wrapper.find('[data-test="traces-latency-heatmap-error"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(false);
+      expect(wrapper.emitted("refresh-failed")).toBeUndefined();
+    });
+
+    it("keeps the static block over the mounted chart until its first frame is drawn, and not again on a re-run", async () => {
+      wrapper = await mountHeatmap();
+      const cover = () => wrapper!.find('[data-test="traces-latency-heatmap-first-frame"]');
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
+      expect(cover().exists()).toBe(true);
+      expect(cover().attributes("role")).toBe("img");
+      expect(cover().attributes("aria-label")).toBe("Loading chart");
+      expect(cover().classes()).toEqual(expect.arrayContaining(["absolute", "inset-0"]));
+      expect(cover().element.childElementCount).toBe(0);
+
+      wrapper.findComponent({ name: "ChartRenderer" }).vm.$emit("painted");
+      await settle();
+      expect(cover().exists()).toBe(false);
+
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+      expect(cover().exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
+    });
+
+    it("waits for the first frame again after the chart was replaced by another stream's load", async () => {
+      wrapper = await mountHeatmap({ request: request(), stream: "a" });
+      wrapper.findComponent({ name: "ChartRenderer" }).vm.$emit("painted");
+      await settle();
+      await wrapper.setProps({ request: request("SELECT 2"), stream: "b" });
+      await settle();
+      expect(wrapper.find('[data-test="traces-latency-heatmap-first-frame"]').exists()).toBe(true);
+    });
+
+    it("draws a blank Loading chart box, not a spinner or skeleton, before its first grid", async () => {
+      search.mockReturnValue(new Promise(() => {}) as any);
+      wrapper = await mountHeatmap();
+      const loading = wrapper.find('[data-test="traces-latency-heatmap-loading"]');
+      expect(loading.attributes("role")).toBe("img");
+      expect(loading.attributes("aria-label")).toBe("Loading chart");
+      expect(wrapper.findComponent({ name: "OSpinner" }).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OSkeleton" }).exists()).toBe(false);
     });
 
     it("renders the empty state component for no hits", async () => {
@@ -259,6 +448,35 @@ describe("TracesLatencyHeatmap", () => {
     });
   });
 
+  describe("header actions", () => {
+    const inlineMenu = {
+      ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
+      ODropdownItem: {
+        emits: ["select"],
+        template: "<div v-bind='$attrs' @click=\"$emit('select')\"><slot /></div>",
+      },
+    };
+
+    it("shows a labelled ⋮ on the Duration header", async () => {
+      wrapper = await mountHeatmap(undefined, inlineMenu);
+      const btn = wrapper.find('[data-test="traces-duration-actions-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.attributes("aria-label")).toBe(i18n.global.t("traces.redActions.durationActions"));
+    });
+
+    it("emits create-alert from Create alert", async () => {
+      wrapper = await mountHeatmap(undefined, inlineMenu);
+      await wrapper.find('[data-test="traces-duration-create-alert"]').trigger("click");
+      expect(wrapper.emitted("create-alert")).toHaveLength(1);
+    });
+
+    it("emits add-to-dashboard from Add to dashboard", async () => {
+      wrapper = await mountHeatmap(undefined, inlineMenu);
+      await wrapper.find('[data-test="traces-duration-add-to-dashboard"]').trigger("click");
+      expect(wrapper.emitted("add-to-dashboard")).toHaveLength(1);
+    });
+  });
+
   describe("chart option", () => {
     it("uses two category axes, a hidden x/y box zoom and a hidden visual map", async () => {
       wrapper = await mountHeatmap();
@@ -274,6 +492,13 @@ describe("TracesLatencyHeatmap", () => {
       expect(o.visualMap.min).toBe(0);
       expect(o.visualMap.max).toBe(1);
       expect(o.series[0].type).toBe("heatmap");
+    });
+
+    it("renders the tooltip on the body, so the card does not clip it", async () => {
+      wrapper = await mountHeatmap();
+      const o = options(wrapper);
+      expect(o.tooltip.appendToBody).toBe(true);
+      expect(o.tooltip.className).toBe("o2-echarts-tooltip");
     });
 
     it("draws cells without borders, so a dense grid is not striped", async () => {
@@ -471,5 +696,312 @@ describe("TracesLatencyHeatmap", () => {
         });
       });
     }
+  });
+
+  describe("drawn selection", () => {
+    const BOX = { start: 1, end: 2, start1: 0, end1: 1 };
+    const SELECTED = {
+      timeStartUs: START + 10 * S,
+      timeEndUs: START + 30 * S,
+      durationLoUs: 100_000,
+      durationHiUs: 500_000,
+    };
+    // The real menu portals into <body>, so the heatmap is attached and queried there.
+    const mountAttached = async (props: Record<string, unknown> = {}) => {
+      const w = mount(TracesLatencyHeatmap, {
+        props: { request: request(), selection: null, ...props },
+        attachTo: document.body,
+        global: { plugins: [i18n, store] },
+      });
+      await settle();
+      return w;
+    };
+    const el = (name: string) =>
+      document.body.querySelector<HTMLElement>(
+        `[data-test="traces-latency-heatmap-selection-${name}"]`,
+      );
+    const menu = () => document.body.querySelector<HTMLElement>('[role="menu"]');
+    const drawn = () => wrapper.find('[data-test="traces-latency-heatmap-selection"]');
+    // The parent stores what the heatmap emits and hands it back, as TracesMetricsDashboard does.
+    const drawBox = async () => {
+      wrapper.findComponent({ name: "ChartRenderer" }).vm.$emit("updated:dataZoom", BOX);
+      await wrapper.setProps({ selection: wrapper.emitted("select")!.at(-1)![0] });
+      await settle();
+    };
+    const press = async (key: string, target: Element | null = document.activeElement) => {
+      target!.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+      await settle();
+    };
+    const choose = async (name: string) => {
+      el(name)!.click();
+      await settle();
+    };
+
+    afterEach(() => {
+      wrapper?.unmount();
+      wrapper = null;
+      document.body.innerHTML = "";
+    });
+
+    it("keeps the box drawn after the chart resets its zoom brush", async () => {
+      wrapper = await mountAttached();
+      expect(drawn().exists()).toBe(false);
+      await drawBox();
+      expect(wrapper.emitted("select")).toEqual([[SELECTED]]);
+      expect(drawn().exists()).toBe(true);
+      expect(drawn().classes()).toContain("border-accent");
+      // The chart's own option never carries the box, so the reset after a zoom cannot erase it.
+      expect(JSON.stringify(options(wrapper))).not.toContain("markArea");
+    });
+
+    it("opens as a menu headed by the span count, duration band and time window", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      expect(menu()).not.toBeNull();
+      expect(el("count")!.textContent!.trim()).toBe("40 spans selected");
+      expect(el("range")!.textContent!.trim()).toBe("100ms–500ms · 10:00:10–10:00:30");
+      expect(menu()!.querySelector('[role="separator"]')).not.toBeNull();
+    });
+
+    it("lists each action as a menu item with its icon and key hint", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      const items = [...menu()!.querySelectorAll('[role="menuitem"]')];
+      expect(items.map((i) => i.getAttribute("data-test"))).toEqual([
+        "traces-latency-heatmap-selection-filter",
+        "traces-latency-heatmap-selection-drill-down",
+        "traces-latency-heatmap-selection-clear",
+      ]);
+      const hint = (i: Element) => i.querySelector("kbd")!.textContent!.trim();
+      const label = (i: Element) => {
+        const copy = i.cloneNode(true) as Element;
+        copy.querySelector("kbd")!.remove();
+        return copy.textContent!.trim();
+      };
+      expect(items.map(label)).toEqual(["Filter to selection", "Drill down", "Clear selection"]);
+      expect(items.map(hint)).toEqual(["F", "D", "Esc"]);
+      for (const item of items) expect(item.querySelector("svg")).not.toBeNull();
+    });
+
+    it("moves focus into the menu when it opens", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      expect(menu()!.contains(document.activeElement)).toBe(true);
+    });
+
+    it("moves between items with the arrow keys, like the other menus", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      el("filter")!.focus();
+      await press("ArrowDown");
+      expect(document.activeElement).toBe(el("drill-down"));
+      await press("ArrowDown");
+      expect(document.activeElement).toBe(el("clear"));
+    });
+
+    it("runs F as soon as the menu opens, while the menu itself holds focus", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await press("f");
+      expect(wrapper.emitted("filter")).toHaveLength(1);
+      expect(menu()).toBeNull();
+    });
+
+    it("keeps the box but closes the menu after Filter to selection", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await choose("filter");
+      expect(wrapper.emitted("filter")).toHaveLength(1);
+      expect(menu()).toBeNull();
+      expect(drawn().exists()).toBe(true);
+      expect(el("reopen")).not.toBeNull();
+    });
+
+    it("closes the menu and erases the box after Drill down, the parent still holding the selection", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await choose("drill-down");
+      expect(wrapper.emitted("drill-down")).toHaveLength(1);
+      expect(menu()).toBeNull();
+      expect(drawn().exists()).toBe(false);
+      expect(wrapper.emitted("clear")).toBeUndefined();
+    });
+
+    it("closes the menu and erases the box after Clear selection", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await choose("clear");
+      expect(wrapper.emitted("clear")).toHaveLength(1);
+      expect(menu()).toBeNull();
+      expect(drawn().exists()).toBe(false);
+    });
+
+    it("clears the selection on Escape", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await press("Escape");
+      expect(wrapper.emitted("clear")).toHaveLength(1);
+      expect(menu()).toBeNull();
+      expect(drawn().exists()).toBe(false);
+    });
+
+    it.each([
+      ["f", "filter", true],
+      ["d", "drill-down", false],
+    ])("runs the action whose hint is %s", async (key, event, boxStays) => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await press(key);
+      expect(wrapper.emitted(event)).toHaveLength(1);
+      expect(menu()).toBeNull();
+      expect(drawn().exists()).toBe(boxStays);
+    });
+
+    it("leaves the box and the parent selection alone when the menu is dismissed outside", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      selectionDropdown(wrapper).vm.$emit("update:open", false);
+      await settle();
+      expect(drawn().exists()).toBe(true);
+      expect(wrapper.emitted("clear")).toBeUndefined();
+    });
+
+    it("reopens the menu from the box's corner control, a labelled button, after it was dismissed", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      selectionDropdown(wrapper).vm.$emit("update:open", false);
+      await settle();
+      expect(menu()).toBeNull();
+      const reopen = el("reopen")!;
+      expect(reopen.tagName).toBe("BUTTON");
+      expect(reopen.getAttribute("aria-label")).toBe("Show selection actions");
+      expect(reopen.classList).toContain("pointer-events-auto");
+      expect(drawn().element.contains(reopen)).toBe(true);
+      reopen.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await settle();
+      expect(el("count")).not.toBeNull();
+    });
+
+    it("lets a drag that starts inside the box reach the chart, so a smaller box can be drawn", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      expect(drawn().element.tagName).not.toBe("BUTTON");
+      expect(drawn().classes()).toContain("pointer-events-none");
+    });
+
+    it("groups the span count's digits, as the Drill down panel does", async () => {
+      respond({
+        hits: [{ ...HITS[0], span_count: 460_122 }, HITS[1]],
+        histogram_interval: 10,
+      });
+      wrapper = await mountAttached();
+      await drawBox();
+      expect(el("count")!.textContent!.trim()).toBe(`${(460_122).toLocaleString()} spans selected`);
+    });
+
+    it("erases the box once the parent drops the selection", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await wrapper.setProps({ selection: null });
+      expect(drawn().exists()).toBe(false);
+    });
+
+    it("forgets the box when a new search reloads the grid", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+      expect(drawn().exists()).toBe(false);
+    });
+
+    const reopenMenu = async () => {
+      el("reopen")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await settle();
+    };
+
+    it.each([
+      ["drill-down", false],
+      ["ask-ai", true],
+    ])(
+      "keeps the box of a filtered selection after %s, so Clear can still undo the filter",
+      async (action, aiEnabled) => {
+        wrapper = await mountAttached({ aiEnabled });
+        await drawBox();
+        await choose("filter");
+        await reopenMenu();
+        await choose(action);
+        expect(wrapper.emitted(action)).toHaveLength(1);
+        expect(menu()).toBeNull();
+        expect(drawn().exists()).toBe(true);
+        expect(wrapper.emitted("clear")).toBeUndefined();
+        await reopenMenu();
+        await choose("clear");
+        expect(wrapper.emitted("clear")).toHaveLength(1);
+        expect(drawn().exists()).toBe(false);
+      },
+    );
+
+    it("erases a new box on Drill down again after a filtered box was cleared", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await choose("filter");
+      await reopenMenu();
+      await choose("clear");
+      await wrapper.setProps({ selection: null });
+      await drawBox();
+      await choose("drill-down");
+      expect(drawn().exists()).toBe(false);
+    });
+
+    it("erases a new box on Drill down after a reload dropped the filtered one", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await choose("filter");
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+      await drawBox();
+      await choose("drill-down");
+      expect(drawn().exists()).toBe(false);
+    });
+
+    it("closes the menu when a new search reloads the grid while it is open", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+      // The menu is gone with the box, so its open flag is the only trace left of the old box.
+      expect((wrapper.vm as any).popoverOpen).toBe(false);
+    });
+
+    it("draws a new box after an erased one, with the menu open again", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await choose("drill-down");
+      await drawBox();
+      expect(drawn().exists()).toBe(true);
+      expect(menu()).not.toBeNull();
+    });
+
+    describe("Ask AI", () => {
+      it("is hidden when AI is off", async () => {
+        wrapper = await mountAttached({ aiEnabled: false });
+        await drawBox();
+        expect(el("ask-ai")).toBeNull();
+      });
+
+      it("hands the selection to AI, then closes the menu and erases the box", async () => {
+        wrapper = await mountAttached({ aiEnabled: true });
+        await drawBox();
+        expect(el("ask-ai")!.textContent!.trim()).toBe("Ask AI");
+        expect(el("ask-ai")!.querySelector("img")).not.toBeNull();
+        await choose("ask-ai");
+        expect(wrapper.emitted("ask-ai")).toEqual([
+          [{ selection: SELECTED, count: 40, band: "100ms–500ms", window: "10:00:10–10:00:30" }],
+        ]);
+        expect(menu()).toBeNull();
+        expect(drawn().exists()).toBe(false);
+        expect(wrapper.emitted("clear")).toBeUndefined();
+      });
+    });
   });
 });

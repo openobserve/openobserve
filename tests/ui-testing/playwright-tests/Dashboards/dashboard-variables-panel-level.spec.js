@@ -52,7 +52,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     // Wait for panel to be added to dashboard and panel editor to close
     await scopedVars.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
     // Wait for settings button to be available (indicates panel editor has closed)
-    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Add panel-scoped variable using panel name
     await pm.dashboardSetting.openSetting();
@@ -151,7 +151,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     // and off-screen panels only render a lazy placeholder — the full panel
     // container mounts when the panel is scrolled near the viewport.
     await scopedVars.getGridStackItem(6).waitFor({ state: "attached", timeout: 15000 });
-    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
 
     // Scroll to top to ensure Panel1 is out of viewport
@@ -305,7 +305,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
 
     // Wait for panel to be added to dashboard
     await scopedVars.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
-    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Add panel variable that depends on both global and tab using panel name
     await pm.dashboardSetting.openSetting();
@@ -367,7 +367,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
 
     // Wait for Panel1 to be added
     await scopedVars.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
-    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Add second panel
     await pm.dashboardCreate.addPanelToExistingDashboard();
@@ -424,11 +424,8 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await filterValueInput.waitFor({ state: "visible", timeout: 5000 });
     await filterValueInput.click();
 
-    // OCombobox opens on focus; wait briefly for options to appear
-    const hasDropdown = await scopedVars.getFilterValueOptions().first().isVisible({ timeout: 2000 }).catch(() => false);
-    const optionTexts = hasDropdown
-      ? await scopedVars.getFilterValueOptionTexts()
-      : [];
+    await expect(scopedVars.getFilterValueList()).toBeVisible({ timeout: 10000 });
+    const optionTexts = await scopedVars.getFilterValueOptionTexts();
 
     // Panel1's variable should NOT be in the list
     expect(optionTexts).not.toContain(panelVar1);
@@ -472,7 +469,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
 
     // Wait for panel to be added to dashboard
     await scopedVars.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
-    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Add panel variable using panel name
     await pm.dashboardSetting.openSetting();
@@ -551,7 +548,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
 
     // Wait for panel to be added to dashboard
     await scopedVars.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
-    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Now create panel variable
     await pm.dashboardSetting.openSetting();
@@ -657,7 +654,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
 
     // Wait for panel to be added to dashboard
     await scopedVars.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
-    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Add second panel
     await pm.dashboardCreate.addPanelToExistingDashboard();

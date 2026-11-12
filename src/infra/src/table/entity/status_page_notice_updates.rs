@@ -1,8 +1,4 @@
-//! `SeaORM` Entity for the status_page_notice_updates table.
-//!
-//! One append-only row per posted narrative update on a notice — the
-//! "Elevated errors — investigating / mitigated / resolved" timeline visitors
-//! see under a notice. No update/delete op: the timeline is immutable.
+//! A notice's append-only update timeline; only an org deletion removes its rows.
 
 use sea_orm::entity::prelude::*;
 

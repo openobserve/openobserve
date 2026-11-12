@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-global-filter="false"
         class="min-h-0 flex-1"
         :loading="loading && !rows.length"
+        :loading-reset-key="activeSection?.id"
         :streaming="loading && rows.length > 0"
         :error="error"
         show-index
@@ -228,7 +229,10 @@ const emitSections = () => {
   if (!shown || (!isRetention.value && !schemaRead.value)) return;
   const available = new Set(sections.value.map((item) => item.id));
   emit("sections", {
-    sections: allSections.value,
+    // The schema-fitted ones where available, so the chart filters exactly as the table does.
+    sections: allSections.value.map(
+      (item) => sections.value.find((fitted) => fitted.id === item.id) ?? item,
+    ),
     unavailable: allSections.value.filter((item) => !available.has(item.id)).map((item) => item.id),
     activeId: activeSection.value?.id,
   });
@@ -268,7 +272,8 @@ const columns = computed<OTableColumnDef<BreakdownRow>[]>(() => {
   const name: OTableColumnDef<BreakdownRow> = {
     id: "name",
     header: isRetention.value ? t("billing.usageV2.colStream") : groupLabel.value,
-    accessorKey: "name",
+    // Display only: the chart matches its bands on the real name, which is empty for searches with no user.
+    accessorFn: (row) => row.name || "—",
     meta: { isName: true, autoWidth: true },
     minSize: 160,
   };

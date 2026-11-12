@@ -227,8 +227,6 @@ mod tests {
             assert_eq!(dictionary.location_table[1].lines[0].function_index, 1);
             assert_eq!(dictionary.location_table[1].mapping_index, 1);
             let (records, rejected) = super::super::build_sample_records(
-                "default",
-                "profiles",
                 resource,
                 scope,
                 profile,

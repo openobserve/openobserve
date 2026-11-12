@@ -33,7 +33,10 @@ use config::{
         cluster::RoleGroup,
         function::RESULT_ARRAY,
         search::{self},
-        self_reporting::usage::{RequestStats, UsageType},
+        self_reporting::{
+            ai_chat::AI_CHAT_EVENTS_STREAM,
+            usage::{RequestStats, UsageType},
+        },
         sql::{OrderBy, resolve_stream_names},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
@@ -84,13 +87,16 @@ pub mod work_group;
 
 use ::search::{
     bloom_pruner,
-    datafusion::{self, distributed_plan::streaming_aggs_exec},
+    datafusion::{self, physical_plan::streaming_aggs_exec},
     index, inspector, sql, tantivy, utils,
 };
 #[cfg(feature = "enterprise")]
 pub use searcher::QueryPhase;
 use searcher::Searcher;
 pub use searcher::{LeaderInfo, QueryRegistration, QueryTracker};
+
+/// Streams no customer can write that every org still reads while search is blocked.
+pub const OPERATIONAL_STREAMS: [&str; 1] = [AI_CHAT_EVENTS_STREAM];
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
@@ -163,6 +169,8 @@ pub async fn search(
         request.set_local_mode(Some(v));
     }
     request.set_use_cache(in_req.use_cache);
+    request.set_use_index(in_req.use_index);
+    request.set_analyze_profile(in_req.query.analyze_profile);
     // Before the query is planned again in spawned tasks (cluster::http).
     request.mark_chat_history_reader();
     let meta = Sql::new_from_req(&request, &query).await?;
@@ -237,6 +245,7 @@ pub async fn search(
                             | search::SearchEventType::Other
                             | search::SearchEventType::Alerts
                             | search::SearchEventType::DerivedStream
+                            | search::SearchEventType::PublicDashboard
                     ) {
                         (false, None, None)
                     } else {
@@ -302,7 +311,7 @@ pub async fn search(
         }
         Err(e) => {
             if let Some(streaming_id) = in_req.query.streaming_id.as_ref() {
-                streaming_aggs_exec::remove_cache(streaming_id)
+                streaming_aggs_exec::registry::remove_cache(streaming_id)
             }
             Err(e)
         }
@@ -396,7 +405,6 @@ pub async fn search_multi(
                 multi_res.scan_records += res.scan_records;
                 multi_res.columns.extend(res.columns);
 
-                multi_res.response_type = res.response_type;
                 multi_res.trace_id = res.trace_id;
                 multi_res.cached_ratio = res.cached_ratio;
                 log::debug!(
@@ -756,7 +764,8 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         };
         let work_group = result.work_group.clone().unwrap_or_default();
         let search_type: Option<search::SearchEventType> = result.search_type.map(|s_event_type| {
-            search::SearchEventType::try_from(s_event_type.as_str())
+            s_event_type
+                .parse::<search::SearchEventType>()
                 .unwrap_or(search::SearchEventType::UI)
         });
         status.push(search::QueryStatus {
@@ -776,6 +785,14 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     }
 
     Ok(search::QueryStatusResponse { status })
+}
+
+/// Aborts this node's `trace_id` search and its `{trace_id}-` children in `org_id`; OSS no-op.
+pub async fn abort_trace_family(org_id: &str, trace_id: &str) {
+    #[cfg(feature = "enterprise")]
+    SEARCH_SERVER.cancel(org_id, trace_id);
+    #[cfg(not(feature = "enterprise"))]
+    let _ = (org_id, trace_id);
 }
 
 /// Cancels `trace_id` in `org_id` on every querier.
@@ -987,6 +1004,7 @@ pub async fn search_partition_multi(
                 histogram_interval: req.histogram_interval,
                 sampling_ratio: None,
                 search_type: None,
+                timezone: None,
             },
             false,
             false, // disable aggs cache
@@ -1049,7 +1067,10 @@ pub fn leader_trace_id(trace_id: &str) -> String {
 }
 
 #[inline]
-pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), Error> {
+pub fn check_search_allowed(
+    _org_id: &str,
+    _stream: Option<(&str, StreamType)>,
+) -> Result<(), Error> {
     #[cfg(feature = "enterprise")]
     {
         if is_license_exempt_stream(_org_id, _stream) {
@@ -1057,9 +1078,9 @@ pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), 
         }
         // this is installation level limit for all orgs combined
         if !o2_enterprise::enterprise::license::search_allowed() {
-            Err(Error::Message(
-                "Search is temporarily disabled due to exceeding allotted ingestion limit. Please contact your administrator.".to_string(),
-            ))
+            Err(Error::Message(search_blocked_message(
+                o2_enterprise::enterprise::license::current_license_id().as_deref(),
+            )))
         } else {
             Ok(())
         }
@@ -1067,6 +1088,21 @@ pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), 
 
     #[cfg(not(feature = "enterprise"))]
     Ok(())
+}
+
+/// The gate for a handler whose request may read streams it does not name.
+#[inline]
+pub fn check_org_search_allowed(org_id: &str) -> Result<(), Error> {
+    // the meta org passes as it does on the gated routes, where operators diagnose the gate
+    #[cfg(feature = "enterprise")]
+    if org_id == META_ORG_ID {
+        return Ok(());
+    }
+    check_search_allowed(org_id, None)
+}
+
+pub fn is_operational_stream(stream: &str) -> bool {
+    OPERATIONAL_STREAMS.contains(&stream)
 }
 
 /// The first row of each query; two orgs may run the same trace id, so a query is its org and id.
@@ -1095,11 +1131,26 @@ fn merge_cancel_outcomes(outcomes: Vec<Result<bool, Error>>) -> Result<bool, Err
     first_err.map_or(Ok(false), Err)
 }
 
-/// The meta org's own usage and audit streams must stay searchable to diagnose the license gate.
+/// The meta org's usage and audit logs, and every org's own operational logs, stay searchable.
 #[cfg(any(feature = "enterprise", test))]
 #[inline]
-fn is_license_exempt_stream(org_id: &str, stream: Option<&str>) -> bool {
-    org_id == META_ORG_ID && (stream == Some(USAGE_STREAM) || stream == Some(AUDIT_STREAM))
+fn is_license_exempt_stream(org_id: &str, stream: Option<(&str, StreamType)>) -> bool {
+    // a customer can ingest traces or metrics under any name, so only the logs stream is exempt
+    let Some((name, StreamType::Logs)) = stream else {
+        return false;
+    };
+    (org_id == META_ORG_ID && (name == USAGE_STREAM || name == AUDIT_STREAM))
+        || is_operational_stream(name)
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn search_blocked_message(license_id: Option<&str>) -> String {
+    match license_id.filter(|id| !id.is_empty()) {
+        Some(id) => format!(
+            "Search is temporarily disabled due to exceeding allotted ingestion limit. License ID: {id}. Please contact your administrator."
+        ),
+        None => "Search is temporarily disabled due to exceeding allotted ingestion limit. Please contact your administrator.".to_string(),
+    }
 }
 
 fn flatten_vrl_result(value: json::Value) -> Option<json::Value> {
@@ -1228,7 +1279,22 @@ mod tests {
     #[test]
     fn test_check_search_allowed_non_enterprise_always_ok() {
         assert!(check_search_allowed("myorg", None).is_ok());
-        assert!(check_search_allowed("myorg", Some("logs")).is_ok());
+        assert!(check_search_allowed("myorg", Some(("logs", StreamType::Logs))).is_ok());
+    }
+
+    #[test]
+    fn test_search_blocked_message_names_the_license() {
+        assert_eq!(
+            search_blocked_message(Some("2HbQ7f3aZk")),
+            "Search is temporarily disabled due to exceeding allotted ingestion limit. License ID: 2HbQ7f3aZk. Please contact your administrator."
+        );
+    }
+
+    #[test]
+    fn test_search_blocked_message_without_a_license_keeps_the_old_text() {
+        let old = "Search is temporarily disabled due to exceeding allotted ingestion limit. Please contact your administrator.";
+        assert_eq!(search_blocked_message(None), old);
+        assert_eq!(search_blocked_message(Some("")), old);
     }
 
     #[test]
@@ -1296,18 +1362,229 @@ mod tests {
     }
 
     #[test]
-    fn test_is_license_exempt_stream_is_meta_org_only() {
-        assert!(is_license_exempt_stream(META_ORG_ID, Some(USAGE_STREAM)));
-        assert!(is_license_exempt_stream(META_ORG_ID, Some(AUDIT_STREAM)));
-        assert!(!is_license_exempt_stream(
-            "customer_org",
-            Some(AUDIT_STREAM)
+    fn usage_and_audit_stay_meta_only() {
+        assert!(is_license_exempt_stream(
+            META_ORG_ID,
+            Some((USAGE_STREAM, StreamType::Logs))
+        ));
+        assert!(is_license_exempt_stream(
+            META_ORG_ID,
+            Some((AUDIT_STREAM, StreamType::Logs))
         ));
         assert!(!is_license_exempt_stream(
             "customer_org",
-            Some(USAGE_STREAM)
+            Some((AUDIT_STREAM, StreamType::Logs))
         ));
-        assert!(!is_license_exempt_stream(META_ORG_ID, Some("logs")));
+        assert!(!is_license_exempt_stream(
+            "customer_org",
+            Some((USAGE_STREAM, StreamType::Logs))
+        ));
+        assert!(!is_license_exempt_stream(
+            META_ORG_ID,
+            Some(("logs", StreamType::Logs))
+        ));
         assert!(!is_license_exempt_stream(META_ORG_ID, None));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_abort_trace_family_reaches_every_child_and_delta() {
+        let org = "abort_family_org";
+        let family = ider::generate_trace_id();
+        let other = ider::generate_trace_id();
+        let leader = |trace_id: &str| {
+            SEARCH_SERVER.register_leader(
+                org,
+                trace_id,
+                LeaderInfo {
+                    user_id: None,
+                    stream_type: "logs",
+                    sql: "select 1",
+                    start_time: 0,
+                    end_time: 0,
+                    search_type: Some("public_dashboard".to_string()),
+                    search_event_context: None,
+                },
+            )
+        };
+        let child = leader(&format!("{family}-0"));
+        let sibling = leader(&format!("{family}-1"));
+        let delta = leader(&format!("{family}-0-1"));
+        let unrelated = leader(&other);
+        let receiver = |r: &QueryRegistration, phase| r.tracker().abort_receiver(phase).unwrap();
+        let aborts = [
+            receiver(&child, QueryPhase::Queued),
+            receiver(&sibling, QueryPhase::Running),
+            receiver(&delta, QueryPhase::Queued),
+        ];
+        let mut unrelated_abort = receiver(&unrelated, QueryPhase::Queued);
+
+        abort_trace_family(org, &family).await;
+
+        for abort in aborts {
+            tokio::time::timeout(std::time::Duration::from_secs(1), abort)
+                .await
+                .expect("every family search is aborted")
+                .unwrap();
+        }
+        assert!(unrelated_abort.try_recv().is_err());
+        assert!(
+            child.tracker().abort_receiver(QueryPhase::Queued).is_err(),
+            "a cancelled child cannot start afterwards"
+        );
+        assert!(
+            unrelated
+                .tracker()
+                .abort_receiver(QueryPhase::Queued)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn operational_streams_are_exempt_in_every_org() {
+        for org in ["acme", META_ORG_ID] {
+            for stream in OPERATIONAL_STREAMS {
+                assert!(is_operational_stream(stream), "{stream}");
+                assert!(
+                    is_license_exempt_stream(org, Some((stream, StreamType::Logs))),
+                    "{org} {stream}"
+                );
+            }
+        }
+        assert!(!is_license_exempt_stream("acme", None));
+        for stream in [
+            "logs",
+            "synthetics_step_results",
+            "errors",
+            "_anomalies",
+            "_llm_scores",
+            "_agent_signals",
+        ] {
+            assert!(!is_operational_stream(stream), "{stream}");
+            assert!(
+                !is_license_exempt_stream("acme", Some((stream, StreamType::Logs))),
+                "{stream}"
+            );
+        }
+    }
+
+    #[test]
+    fn only_logs_streams_are_exempt() {
+        for stream_type in [
+            StreamType::Traces,
+            StreamType::Metrics,
+            StreamType::Metadata,
+        ] {
+            for stream in OPERATIONAL_STREAMS {
+                assert!(
+                    !is_license_exempt_stream("acme", Some((stream, stream_type))),
+                    "{stream} {stream_type}"
+                );
+            }
+            for stream in [USAGE_STREAM, AUDIT_STREAM] {
+                assert!(
+                    !is_license_exempt_stream(META_ORG_ID, Some((stream, stream_type))),
+                    "{stream} {stream_type}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn user_writable_history_streams_are_not_exempt() {
+        use config::meta::self_reporting::usage::TRIGGERS_STREAM;
+
+        for stream in [TRIGGERS_STREAM, "synthetics_results"] {
+            assert!(!is_operational_stream(stream), "{stream}");
+            for org in ["acme", META_ORG_ID] {
+                assert!(
+                    !is_license_exempt_stream(org, Some((stream, StreamType::Logs))),
+                    "{org} {stream}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_exempt_operational_stream_is_refused_by_otlp_ingest() {
+        for stream in OPERATIONAL_STREAMS {
+            assert!(
+                config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(stream),
+                "{stream}"
+            );
+        }
+    }
+
+    #[test]
+    fn otlp_writable_calibration_digests_stay_gated() {
+        let digests = "_o2_alert_calibration_digests";
+        assert!(!config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(digests));
+        assert!(!is_operational_stream(digests));
+        for org in ["acme", META_ORG_ID] {
+            assert!(
+                !is_license_exempt_stream(org, Some((digests, StreamType::Logs))),
+                "{org}"
+            );
+        }
+    }
+
+    #[test]
+    fn operational_allowlist_is_exactly_the_design_list() {
+        assert_eq!(OPERATIONAL_STREAMS, ["_o2_ai_chat_events"]);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn check_search_allowed_passes_operational_streams_with_the_gate_closed() {
+        use config::meta::self_reporting::usage::TRIGGERS_STREAM;
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        let _gate = close_search_gate_for_tests().await;
+        for stream in OPERATIONAL_STREAMS {
+            assert!(
+                check_search_allowed("acme", Some((stream, StreamType::Logs))).is_ok(),
+                "{stream}"
+            );
+        }
+        let refused = check_search_allowed("acme", Some(("logs", StreamType::Logs)))
+            .unwrap_err()
+            .to_string();
+        assert!(
+            refused.starts_with("Error# Search is temporarily disabled"),
+            "{refused}"
+        );
+        assert!(check_search_allowed("acme", None).is_err());
+        assert!(check_search_allowed("acme", Some((TRIGGERS_STREAM, StreamType::Logs))).is_err());
+        assert!(
+            check_search_allowed("acme", Some((AI_CHAT_EVENTS_STREAM, StreamType::Traces)))
+                .is_err()
+        );
+        assert!(
+            check_search_allowed("acme", Some(("synthetics_results", StreamType::Logs))).is_err()
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_org_wide_gate_passes_only_the_meta_org_while_search_is_blocked() {
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        let _gate = close_search_gate_for_tests().await;
+        assert!(check_org_search_allowed(META_ORG_ID).is_ok());
+        let refused = check_org_search_allowed("acme").unwrap_err().to_string();
+        assert!(
+            refused.starts_with("Error# Search is temporarily disabled"),
+            "{refused}"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_org_wide_gate_passes_every_org_while_search_is_open() {
+        let _held = o2_enterprise::enterprise::license::TEST_STATICS_LOCK
+            .lock()
+            .await;
+        assert!(check_org_search_allowed("acme").is_ok());
+        assert!(check_org_search_allowed(META_ORG_ID).is_ok());
     }
 }

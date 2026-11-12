@@ -1,10 +1,12 @@
 // tracesPage.js
 import { expect } from '@playwright/test';
+import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 
 
 import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../commonActions.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
+const { ingestTraces } = require('../../playwright-tests/utils/trace-ingestion.js');
 
 // Rate and Errors come from web/src/plugins/traces/metrics/metrics.json; Duration is the latency heatmap.
 const TRACES_METRICS_PANELS = ['Rate', 'Errors', 'Duration'];
@@ -12,8 +14,50 @@ const CHART_ZOOM_START_RATIO = 0.35;
 const CHART_ZOOM_END_RATIO = 0.75;
 const CHART_DRAG_STEPS = 20;
 const QUERY_CLEAR_ATTEMPTS = 10;
+const DURATION_UNIT_US = { us: 1, ms: 1000, s: 1000000 };
+
+export function decodedSqlOf(request) {
+  if (request.method() !== 'POST' || !/_search/.test(request.url())) return null;
+  const body = request.postDataJSON?.() ?? null;
+  const query = body?.query ?? {};
+  if (typeof query.sql !== 'string') return null;
+  const base64 = body.encoding === 'base64' || query.encoding === 'base64';
+  return {
+    sql: base64 ? Buffer.from(query.sql, 'base64').toString('utf8') : query.sql,
+    start: query.start_time,
+    end: query.end_time,
+  };
+}
+
+// The comparison sends its own counts and LIMIT 4000 samples; nothing else does.
+export const isComparison = (q) => /^SELECT count\(\*\) AS n\b/.test(q.sql) || /LIMIT 4000$/.test(q.sql);
+export const isCount = (q) => /^SELECT count\(\*\) AS n\b/.test(q.sql);
+// The table search: spans mode posts a base64 `SELECT *` SQL.
+export const isTableSearch = (q) => /^SELECT \* FROM/.test(q.sql);
+
+// The band's bounds in µs as the SQL writes them; a missing side is absent.
+export function bandSql(editorBand) {
+  const toUs = (m) => (m ? Number(m[1]) * DURATION_UNIT_US[m[2]] : null);
+  const lo = toUs(editorBand.match(/duration >= '(\d+)(us|ms|s)'/));
+  const hi = toUs(editorBand.match(/duration < '(\d+)(us|ms|s)'/));
+  return [lo ? `duration >= ${lo}` : '', hi !== null ? `duration < ${hi}` : ''].filter(Boolean).join(' AND ');
+}
 
 export class TracesPage {
+  // Static so a beforeAll, which has no page fixture, can seed through its own context.
+  static async seedTraces(browser, ageMs = 0) {
+    const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
+    const page = await context.newPage();
+    try {
+      for (const scenario of [{ count: 6, forceScenario: 'error' }, { count: 10, forceScenario: 'success' }]) {
+        const seeded = await ingestTraces(page, scenario.count, { forceScenario: scenario.forceScenario, ageMs });
+        expect(seeded.failed, `Seeding ${scenario.forceScenario} traces must succeed`).toBe(0);
+      }
+    } finally {
+      await context.close();
+    }
+  }
+
   constructor(page) {
     this.page = page;
 
@@ -24,14 +68,10 @@ export class TracesPage {
     // Source: web/src/plugins/traces/SearchBar.vue
     this.searchToggle = '[data-test="traces-search-mode-traces-btn"]';
     this.spansToggle = '[data-test="traces-search-mode-spans-btn"]';
-    // Service Graph and Services are reachable two ways with different
-    // semantics: (a) the Traces rail tile's hover flyout navigates to the
-    // standalone routes (/traces/service-graph, /traces/services), and
-    // (b) toolbar tabs on the Traces page switch the view IN-PAGE — the URL
-    // stays on /traces and gains ?tab=. Keep both paths covered.
+    // Since #13852 the rail flyout and the toolbar tabs both open the in-page ?tab= view; the standalone routes are legacy redirects.
     this.tracesRailTile = '[data-test="nav-group-traces"]';
-    this.serviceMapsNavItem = '[data-test="nav-group-item-serviceGraph"]';
-    this.servicesCatalogNavItem = '[data-test="nav-group-item-servicesCatalog"]';
+    // #13852: flyout child id is `nav-group-item-${child.name}-${child.tab}` (ONavGroup.vue:336).
+    this.serviceMapsNavItem = '[data-test="nav-group-item-traces-service-graph"]';
     this.serviceGraphTabToggle = '[data-test="traces-service-graph-toggle"]';
     this.servicesCatalogTabToggle = '[data-test="traces-search-mode-services-catalog-btn"]';
     // Inline-safe selectors (defined in the inner components, so they work for
@@ -54,6 +94,7 @@ export class TracesPage {
 
     // Main Components
     this.searchBar = '[data-test="logs-search-bar"]';
+    this.queryPlaceholderTypewriter = '.query-editor-placeholder-typewriter';
     this.indexList = '[data-test="traces-search-index-list"]';
     this.fieldListCollapseButton = '[data-test="traces-search-field-list-collapse-btn"]';
     this.searchResult = '[data-test="logs-search-search-result"]';
@@ -71,6 +112,7 @@ export class TracesPage {
 
     // Trace Details
     this.traceDetailsHeader = '[data-test="trace-details-header"]';
+    this.traceDetailsSpanIdLabel = '[data-test="trace-details-sidebar-header-toolbar-span-id"]';
     this.traceDetailsBackButton = '[data-test="trace-details-back-btn"]';
     this.traceDetailsCloseButton = '[data-test="trace-details-close-btn"]';
     this.traceDetailsCopyTraceIdButton = '[data-test="trace-details-copy-trace-id-btn"]';
@@ -106,8 +148,6 @@ export class TracesPage {
     // Service Graph (Enterprise)
     this.serviceGraphChart = '[data-test="service-graph-chart"]';
     this.serviceGraphRefreshButton = '[data-test="service-graph-refresh-btn"]';
-    // Standalone Service Graph page (rail-flyout route /traces/service-graph).
-    this.serviceGraphPage = '[data-test="service-graph-page"]';
 
     // ===== DRILL DOWN AND RED CHART SELECTORS (VERIFIED against Vue source) =====
     this.insightsButton = '[data-test="insights-button"]';
@@ -122,6 +162,12 @@ export class TracesPage {
     this.tracesNoStreamCard = '[data-test="traces-no-stream-select-stream-card"]';
     // Duration latency heatmap — source: web/src/plugins/traces/metrics/TracesLatencyHeatmap.vue
     this.latencyHeatmap = '[data-test="traces-latency-heatmap"]';
+    // A drawn box opens a popover; nothing is applied until one of its actions is clicked.
+    this.heatmapSelectionBox = '[data-test="traces-latency-heatmap-selection"]';
+    this.heatmapSelectionCount = '[data-test="traces-latency-heatmap-selection-count"]';
+    this.heatmapSelectionFilter = '[data-test="traces-latency-heatmap-selection-filter"]';
+    this.heatmapSelectionDrillDown = '[data-test="traces-latency-heatmap-selection-drill-down"]';
+    this.heatmapSelectionClear = '[data-test="traces-latency-heatmap-selection-clear"]';
     // Auto Run (live mode) toggle in the Run Query dropdown — source: web/src/plugins/traces/SearchBar.vue
     this.liveModeToggleItem = '[data-test="traces-search-bar-live-mode-toggle-btn"]';
 
@@ -136,6 +182,7 @@ export class TracesPage {
     this.comparisonBaselineBefore = '[data-test="traces-comparison-baseline-toggle-before"]';
     this.comparisonBaselineOutside = '[data-test="traces-comparison-baseline-toggle-outside"]';
     this.comparisonFieldCards = '[data-test^="traces-comparison-field-"]';
+    this.drillDownPage = '[data-test="traces-drill-down-page"]';
     this.drillDownBackButton = '[data-test="traces-drill-down-back-btn"]';
 
     // Index List / Field List
@@ -192,19 +239,48 @@ export class TracesPage {
 
     // Trace details span attribute table (rendered inside trace-details-sidebar)
     this.traceDetailsSidebarRow = '[data-test="trace-details-sidebar"] [data-test^="o2-table-row-"]';
+
+    this.moreMenuButton = '[data-test="traces-search-bar-more-menu-btn"]';
+    this.openDropdownMenu = page.getByRole('menu');
+    this.menuPinSavedViewsButton = '[data-test="traces-search-bar-menu-pin-saved-views-btn"]';
+    this.menuListSavedViewsButton = '[data-test="traces-search-bar-menu-list-saved-views-btn"]';
+    this.menuCreateSavedViewButton = '[data-test="traces-search-bar-menu-create-saved-view-btn"]';
+    this.pinnedSavedViewsGroup = '[data-test="traces-search-bar-saved-views"]';
+    this.pinnedSavedViewsTrigger = '[data-test="traces-search-bar-saved-views-btn"]';
+    this.pinnedSavedViewItemPrefix = '[data-test^="traces-saved-view-apply-"]';
+    this.savedViewNameInput = '[data-test="traces-saved-view-name-input"]';
+
+    this.waterfallAxisLastLabels = '[data-test="trace-header-tic-label-3"]';
+    this.spanBar = '[data-test="span-marker"]';
+    this.spanRow = '[data-test="span-block-container"]';
+    this.spanBarTrack = '[data-test="span-block-select-trigger"]';
+
+    // Span sidebar → Attributes → Apply & Search (TraceDetailsSidebar.vue)
+    this.sidebarAttributesTab = '[data-test="trace-details-sidebar-tabs-attributes"]';
+    this.sidebarAttributesViewJson = '[data-test="trace-details-sidebar-attributes-view-json"]';
+    this.sidebarAttributesViewTable = '[data-test="trace-details-sidebar-attributes-view-table"]';
+    this.sidebarAttributesTable = '[data-test="trace-details-sidebar-attributes-tenstack-table"]';
+    this.sidebarAttributesJson = '[data-test="trace-details-sidebar-attributes-table"]';
+    this.sidebarServiceName = '[data-test="trace-details-sidebar-header-toolbar-service-name"]';
+    this.sidebarAttributeFieldCell = '[data-test="o2-table-cell-field"]';
+    this.sidebarAttributeRow = '[data-test^="o2-table-row-"]';
+    this.attributeValueDropdownBtn = '[data-test="attribute-value-cell-dropdown-btn"]';
+    this.attributeFilterActionPrefix = 'trace-details-sidebar-attr-filter-action-';
+    this.jsonFilterActionPrefix = 'trace-details-sidebar-json-filter-action-';
+    this.jsonPreviewKeyPrefix = 'json-preview-key-';
+    this.jsonFieldDropdownBtn = '[data-test="json-preview-field-dropdown-btn"]';
+    this.flameGraphCanvas = '[data-test="flame-graph-view-chart-wrapper"] canvas';
+    this.flameGraphSidebar = '[data-test="trace-details-flame-graph-sidebar"]';
+
+    // Run query / Cancel and the result-area states around a cancelled search
+    this.cancelSearchButton = '[data-test="traces-search-bar-cancel-btn"]';
+    this.searchCancelledState = '[data-test="traces-search-cancelled-state"]';
+    this.traceListStreamUrl = '**/traces/latest_stream**';
   }
 
   // Getter methods for common trace elements
-  getTraceDetailsElements() {
-    return this.page.locator('[data-test="trace-details-header"], [data-test="trace-details-tree"], [data-test="trace-details-sidebar"]');
-  }
-
   getTraceResultItems() {
     return this.page.locator(this.searchResultItem);
-  }
-
-  getResultsContainer() {
-    return this.page.locator(this.searchResultList).first();
   }
 
   async navigateToTraces() {
@@ -458,9 +534,12 @@ export class TracesPage {
   }
 
   async switchToServiceMaps() {
+    // Flyout opens on a hover REST (~300ms), not the first hover — wait for the item before clicking.
+    const item = this.page.locator(this.serviceMapsNavItem);
     await this.page.locator(this.tracesRailTile).hover();
-    await this.page.locator(this.serviceMapsNavItem).click();
-    await this.page.waitForURL(/\/traces\/service-graph/, { timeout: 10000 }).catch(() => {});
+    await item.waitFor({ state: 'visible', timeout: 10000 });
+    await item.click();
+    await this.page.waitForURL(/\/traces\?.*tab=service-graph/, { timeout: 10000 }).catch(() => {});
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
@@ -545,12 +624,7 @@ export class TracesPage {
       .toHaveAttribute('data-state', 'on', { timeout: 10000 });
   }
 
-  // Standalone Service Graph page rendered from the rail flyout route.
-  async expectStandaloneServiceGraphPageVisible() {
-    await expect(this.page.locator(this.serviceGraphPage))
-      .toBeVisible({ timeout: 10000 });
-  }
-
+  // Refresh the in-page Service Graph view.
   async refreshServiceGraph() {
     await this.page.locator(this.serviceGraphRefreshButton).click();
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -592,8 +666,17 @@ export class TracesPage {
 
     const selector = rangeMap[range] || '[data-test="date-time-relative-15-m-btn"]';
     await this.page.locator(selector).click();
-    // Wait for datetime dropdown to close
-    await this.page.locator(this.dateTimeButton).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await this.closeDateTimePickerIfOpen();
+  }
+
+  /** The auto-apply picker stays open after a pick, and its panel covers part of the query editor. */
+  async closeDateTimePickerIfOpen() {
+    const panel = this.page.locator('#date-time-menu');
+    if (!(await panel.isVisible().catch(() => false))) return;
+    await this.page.keyboard.press('Escape');
+    const closed = await panel.waitFor({ state: 'hidden', timeout: 2000 }).then(() => true).catch(() => false);
+    if (!closed) await this.page.locator(this.dateTimeButton).click();
+    await expect(panel).toBeHidden({ timeout: 5000 });
   }
 
   async runSearch() {
@@ -633,6 +716,7 @@ export class TracesPage {
   async signOut() {
     await this.profileButton.click();
     await this.signOutButton.click();
+    await confirmDraftSignOut(this.page);
   }
 
   // Query Editor Methods
@@ -875,6 +959,32 @@ export class TracesPage {
     }
   }
 
+  traceRowLinks() {
+    return this.page.locator('[data-test="trace-row-link"]');
+  }
+
+  // A cell without the link, so the row's own middle-click handler runs rather than the browser's native link handling.
+  firstRowNonLinkCell() {
+    return this.page
+      .locator('[data-test^="o2-table-row-"]')
+      .first()
+      .locator('td[data-test^="o2-table-cell-"]:not(:has(a))')
+      .first();
+  }
+
+  trackNewPages(context) {
+    const opened = [];
+    context.on('page', (p) => opened.push(p));
+    return opened;
+  }
+
+  // The fixed wait is deliberate: a second tab would open late, and there is no event for "nothing else opened".
+  async expectOneNewPage(opened) {
+    await expect.poll(() => opened.length, { timeout: 10000 }).toBe(1);
+    await this.page.waitForTimeout(1000);
+    expect(opened, 'exactly one new tab must open').toHaveLength(1);
+  }
+
   /**
    * Setup trace search with stream and time range
    * @param {string} streamName - Stream name to select
@@ -1061,14 +1171,6 @@ export class TracesPage {
   }
 
   /**
-   * Get trace count from results
-   * @returns {number} Number of visible traces
-   */
-  async getTraceCount() {
-    return await this.page.locator(this.searchResultItem).count();
-  }
-
-  /**
    * Wait for search to complete with proper error handling
    * @param {number} timeout - Maximum time to wait in milliseconds
    * @returns {Object} Search result status
@@ -1140,8 +1242,8 @@ export class TracesPage {
    * @param {string} text - Text to check for
    */
   async expectQueryEditorContains(text) {
-    const content = await this.getQueryEditorContent();
-    expect(content).toContain(text);
+    // Monaco loads lazily and reads '' until window.monaco exists, so a single read races the editor.
+    await expect.poll(() => this.getQueryEditorContent(), { timeout: 30000 }).toContain(text);
   }
 
   /**
@@ -2020,6 +2122,12 @@ export class TracesPage {
     return '';
   }
 
+  /** Leave the Drill down page with its back button and wait for it to close. */
+  async closeComparison() {
+    await this.page.locator(this.drillDownBackButton).click();
+    await this.page.locator(this.drillDownPage).waitFor({ state: 'hidden', timeout: 15000 });
+  }
+
   /** @returns {Promise<{ name: string, score: number }[]>} the comparison cards in render order */
   async getComparisonCards() {
     return await this.page.locator(this.comparisonFieldCards).evaluateAll((cards) =>
@@ -2196,17 +2304,41 @@ export class TracesPage {
   }
 
   /**
-   * Drag across both axes of the Duration panel so the selection carries a real
-   * duration band; a flat horizontal drag collapses it to a single value.
-   * @returns {Promise<boolean>} true when the drag was performed
+   * Draw a box on the Duration heatmap and wait for its popover; the box alone writes nothing.
+   * @param {{ startRatio?: number, endRatio?: number, yStartRatio?: number, yEndRatio?: number }} [range]
+   * @returns {Promise<boolean>} true when the box was drawn and its popover opened
+   */
+  async boxDurationBand(range = { startRatio: 0.25, endRatio: 0.8, yStartRatio: 0.15, yEndRatio: 0.85 }) {
+    if (!(await this.zoomOnMetricsPanel('Duration', range))) return false;
+    return await this.page
+      .locator(this.heatmapSelectionCount)
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  /** Click "Filter to selection" in the open heatmap popover and wait for the popover to close. */
+  async filterToHeatmapSelection() {
+    await this.page.locator(this.heatmapSelectionFilter).click();
+    await this.page.locator(this.heatmapSelectionCount).waitFor({ state: 'hidden', timeout: 15000 });
+    await this.page.waitForTimeout(1000);
+  }
+
+  /** Click "Drill down" in the open heatmap popover; returns the comparison's terminal state. */
+  async drillDownHeatmapSelection() {
+    await this.page.locator(this.heatmapSelectionDrillDown).click();
+    return await this.waitForComparisonState();
+  }
+
+  /**
+   * Box a real duration band on the Duration heatmap and apply it with "Filter to selection",
+   * which writes the band into the editor.
+   * @returns {Promise<boolean>} true when the box was drawn and applied
    */
   async zoomDurationBand() {
-    return await this.zoomOnMetricsPanel('Duration', {
-      startRatio: 0.25,
-      endRatio: 0.8,
-      yStartRatio: 0.15,
-      yEndRatio: 0.85,
-    });
+    if (!(await this.boxDurationBand())) return false;
+    await this.filterToHeatmapSelection();
+    return true;
   }
 
   /**
@@ -3065,10 +3197,7 @@ export class TracesPage {
   }
 
   async applySavedView(viewName) {
-    await this.page.locator('[data-test="traces-search-bar-saved-views-btn"]').click();
-    const view = this.page.locator('[data-test^="traces-saved-view-apply-"]').filter({ hasText: viewName }).first();
-    await view.waitFor({ state: 'visible', timeout: 10000 });
-    await view.click();
+    await this.applySavedViewFromMoreMenu(viewName);
   }
 
   // enterTraceQuery appends to existing text, so clear first and confirm the editor holds only `query`.
@@ -3125,5 +3254,377 @@ export class TracesPage {
 
   async expectServiceSidePanelVisible() {
     await expect(this.page.locator('[data-test="service-graph-side-panel"]')).toBeVisible({ timeout: 15000 });
+  }
+
+  async openMoreMenu() {
+    await this.page.locator(this.moreMenuButton).click();
+    await expect(this.openDropdownMenu).toBeVisible({ timeout: 10000 });
+  }
+
+  async closeMoreMenu() {
+    // A nested submenu consumes the first Escape, so repeat until no menu is left.
+    await expect(async () => {
+      if (await this.openDropdownMenu.count()) await this.page.keyboard.press('Escape');
+      await expect(this.openDropdownMenu).toHaveCount(0, { timeout: 1000 });
+    }).toPass({ timeout: 10000 });
+  }
+
+  async expectMoreMenuSavedViewsEntriesVisible() {
+    const trigger = this.page.locator(this.menuListSavedViewsButton);
+    await expect(trigger).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.menuPinSavedViewsButton)).toBeVisible();
+    await expect(trigger).toContainText(/saved views/i);
+    await trigger.click();
+    await expect(this.page.locator(this.menuCreateSavedViewButton)).toContainText(/create saved view/i);
+  }
+
+  /** Asserts on an open menu, so an unopened menu cannot pass for a missing group. */
+  async expectMoreMenuSavedViewsEntriesHidden() {
+    await expect(this.openDropdownMenu).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.menuListSavedViewsButton)).toHaveCount(0);
+    await expect(this.page.locator(this.menuCreateSavedViewButton)).toHaveCount(0);
+  }
+
+  async toggleSavedViewsPinFromMoreMenu() {
+    await this.openMoreMenu();
+    await this.page.locator(this.menuPinSavedViewsButton).click();
+  }
+
+  async expectSavedViewsPinTitle(title) {
+    await expect(this.page.locator(this.menuPinSavedViewsButton)).toHaveAttribute('title', title);
+  }
+
+  async expectPinnedSavedViewsInToolbar() {
+    await expect(this.page.locator(this.pinnedSavedViewsGroup)).toBeVisible({ timeout: 15000 });
+    await expect(this.page.locator(this.pinnedSavedViewsGroup).locator(this.pinnedSavedViewsTrigger)).toBeVisible();
+  }
+
+  /** Waits for the toolbar's More button first, so a toolbar that never rendered cannot pass. */
+  async expectPinnedSavedViewsNotInToolbar() {
+    await expect(this.page.locator(this.moreMenuButton)).toBeVisible({ timeout: 15000 });
+    await expect(this.page.locator(this.pinnedSavedViewsGroup)).toHaveCount(0);
+  }
+
+  async openCreateSavedViewFromMoreMenu() {
+    await this.openMoreMenu();
+    await this.page.locator(this.menuListSavedViewsButton).click();
+    await this.page.locator(this.menuCreateSavedViewButton).click();
+    await expect(this.page.locator(this.savedViewNameInput)).toBeVisible({ timeout: 10000 });
+  }
+
+  async applySavedViewFromPinnedGroup(viewName) {
+    await this.page.locator(this.pinnedSavedViewsGroup).locator(this.pinnedSavedViewsTrigger).click();
+    const view = this.page.locator(this.pinnedSavedViewItemPrefix).filter({ hasText: viewName });
+    await expect(view).toHaveCount(1, { timeout: 15000 });
+    await view.click();
+  }
+
+  async applySavedViewFromMoreMenu(viewName) {
+    await this.openMoreMenu();
+    await this.page.locator(this.menuListSavedViewsButton).click();
+    const view = this.page
+      .locator('[data-test^="traces-search-bar-menu-saved-views-apply-"]')
+      .filter({ has: this.page.getByText(viewName, { exact: true }) });
+    await expect(view).toBeVisible({ timeout: 15000 });
+    await view.click();
+  }
+
+  async expectQueryEditorEventuallyContains(text) {
+    await expect.poll(() => this.getQueryEditorContent(), { timeout: 15000 }).toContain(text);
+  }
+
+  /** Reads the axis end label (the last of the two labels in the final quarter) as milliseconds; NaN until it renders. */
+  async getWaterfallAxisEndMs() {
+    const text = await this.page.locator(this.waterfallAxisLastLabels).textContent({ timeout: 5000 }).catch(() => '');
+    const matches = [...(text || '').matchAll(/(\d+(?:\.\d+)?)(us|ms|s|m)/g)];
+    if (!matches.length) return NaN;
+    const [, value, unit] = matches[matches.length - 1];
+    const toMs = { us: 0.001, ms: 1, s: 1000, m: 60000 };
+    return Number(value) * toMs[unit];
+  }
+
+  /** Width of a span's bar as a share of its row's timeline track, plus the bar's pixel width; zero until both lay out. */
+  async getSpanBarShare(spanId) {
+    const row = this.page.locator(`${this.spanRow}[id="${spanId}"]`);
+    const bar = await row.locator(this.spanBar).boundingBox({ timeout: 5000 }).catch(() => null);
+    const track = await row.locator(this.spanBarTrack).boundingBox({ timeout: 5000 }).catch(() => null);
+    if (!bar || !track?.width) return { barPx: 0, share: 0 };
+    return { barPx: bar.width, share: bar.width / track.width };
+  }
+
+  async expectWaterfallSpanRow(spanId) {
+    await expect(this.page.locator(`${this.spanRow}[id="${spanId}"]`)).toBeVisible({ timeout: 30000 });
+  }
+
+  startCollectingPageErrors() {
+    this.pageErrors = [];
+    this.page.on('pageerror', (error) => this.pageErrors.push(error.message));
+  }
+
+  getPageErrors() {
+    return [...(this.pageErrors || [])];
+  }
+
+  async navigateToTracesWithFilter({ filter, stream = 'default', period = '15m', org = process.env['ORGNAME'] || 'default' }) {
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    // Same url-safe base64 alphabet as b64EncodeUnicode in web/src/utils/formatters.ts.
+    const query = Buffer.from(filter, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '.');
+    await this.page.goto(`${baseUrl}/web/traces?stream=${encodeURIComponent(stream)}&period=${period}&query=${query}&org_identifier=${org}`);
+  }
+
+  async navigateToTraceDetailsSpanUrl({ traceId, spanId, fromUs, toUs, stream = 'default', org = process.env['ORGNAME'] || 'default' }) {
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    await this.page.goto(`${baseUrl}/web/traces/trace-details?stream=${encodeURIComponent(stream)}&trace_id=${traceId}&span_id=${spanId}&from=${fromUs}&to=${toUs}&org_identifier=${org}`);
+  }
+
+  async hardReload() {
+    await this.page.reload({ waitUntil: 'load' });
+  }
+
+  async expectTracesListRendered() {
+    await expect(this.page.locator(this.searchBar)).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.searchResultItem).first()).toBeVisible({ timeout: 30000 });
+  }
+
+  async expectTracesSearchBarRendered() {
+    await expect(this.page.locator(this.searchBar)).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.queryEditor).first()).toBeVisible({ timeout: 30000 });
+  }
+
+  async expectTraceDetailsSelectedSpan(spanId) {
+    await expect(this.page.locator(this.traceDetailsHeader)).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.traceDetailsSpanIdLabel).first()).toContainText(spanId, { timeout: 30000 });
+  }
+
+  // An example counts only once the typewriter moves off it, so a half-typed string is never mistaken for one.
+  async sampleQueryPlaceholder({ minExamples = 2, maxMs = 12000, intervalMs = 100 } = {}) {
+    const typewriter = this.page.locator(`${this.searchBar} ${this.queryPlaceholderTypewriter}`);
+    await expect(typewriter).toHaveText(/\S/, { timeout: 30000 });
+    return typewriter.evaluate((el, { minExamples, maxMs, intervalMs }) => new Promise((resolve) => {
+      const seen = new Set();
+      const peaks = new Set();
+      let prev = '';
+      const summarize = () => {
+        const samples = [...seen].filter((s) => s.trim());
+        const examples = [...peaks].filter((p) => p.trim() && !samples.some((o) => o !== p && o.startsWith(p)));
+        return { samples, examples };
+      };
+      const finish = () => { clearInterval(timer); clearTimeout(cap); resolve(summarize()); };
+      const timer = setInterval(() => {
+        const cur = el.textContent || '';
+        seen.add(cur);
+        if (!cur.startsWith(prev)) peaks.add(prev);
+        prev = cur;
+        if (summarize().examples.length >= minExamples) finish();
+      }, intervalMs);
+      const cap = setTimeout(finish, maxMs);
+    }), { minExamples, maxMs, intervalMs });
+  }
+
+  // ============================================
+  // CREATE ALERT / ADD TO DASHBOARD (RED actions)
+  // Source: web/src/plugins/traces/SearchBar.vue, PanelContainer.vue, metrics/TracesLatencyHeatmap.vue
+  // ============================================
+
+  async openMoreActionsMenu() {
+    await this.page.locator('[data-test="traces-search-bar-more-actions-btn"]').click();
+  }
+
+  async clickAddRedChartsToDashboard() {
+    await this.openMoreActionsMenu();
+    await this.page.locator('[data-test="traces-add-red-to-dashboard-btn"]').click();
+  }
+
+  async createAlertFromChartMenu(title) {
+    const panel = this.metricsPanelLocator(title);
+    if (title === 'Duration') {
+      await panel.hover();
+      await this.page.locator('[data-test="traces-duration-actions-btn"]').click();
+      await this.page.locator('[data-test="traces-duration-create-alert"]').click();
+      return;
+    }
+    // Hovering the chart body opens its tooltip, which then covers this button.
+    const actionsBtn = panel.locator('[data-test="panel-explore-actions-btn"]');
+    await actionsBtn.hover();
+    await actionsBtn.click();
+    await this.page.locator('[data-test="panel-explore-create-alert"]').click();
+  }
+
+  async expectAddToDashboardPanels(count) {
+    const dialog = this.page.locator('[data-test="add-to-dashboard-dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 15000 });
+    await expect(this.page.locator('[data-test="add-to-dashboard-notice"]')).toBeVisible();
+    await expect(this.page.locator('[data-test="add-to-dashboard-panel-title"]')).toHaveCount(count);
+  }
+
+  async selectDashboardInAddDialog(title) {
+    await this.page.locator('[data-test="dashboard-dropdown-dashboard-selection-trigger"]').click();
+    await this.page
+      .locator('[data-test="dashboard-dropdown-dashboard-selection-option"]')
+      .filter({ hasText: title })
+      .first()
+      .click();
+  }
+
+  async confirmAddToDashboard() {
+    await this.page
+      .locator('[data-test="add-to-dashboard-dialog"] [data-test="o-dialog-primary-btn"]')
+      .click();
+  }
+
+  async expectAlertFormPrefilledFromTraces() {
+    await expect(this.page).toHaveURL(/prefill=traces/, { timeout: 30000 });
+    await expect(
+      this.page.locator('[data-test="add-alert-stream-type-select-dropdown"]').first()
+    ).toContainText('traces', { timeout: 30000 });
+    await expect(
+      this.page.locator('[data-test="alert-trigger-threshold-input-field"]').first()
+    ).toHaveValue('1');
+    await expect(
+      this.page.locator('[data-test="alert-trigger-operator-select"]').first()
+    ).toContainText('>=');
+  }
+
+  /** Open the explorer for `streamName` on `tab`; the `stream` param makes the page search on load. */
+  async navigateToTracesTab(streamName, tab = 'traces', period = '15m') {
+    const org = process.env['ORGNAME'] || 'default';
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    await this.page.goto(
+      `${baseUrl}/web/traces?org_identifier=${org}&stream=${encodeURIComponent(streamName)}&period=${period}&tab=${tab}`,
+    );
+  }
+
+  async expectTraceResultWithOperationName(operationName, timeout = 30000) {
+    await expect(
+      this.page.locator(`${this.searchResultList} ${this.traceRowOperationName}`)
+        .filter({ hasText: operationName })
+        .first(),
+    ).toBeVisible({ timeout });
+  }
+
+  async openTraceResultByOperationName(operationName, attempts = 3) {
+    const onDetails = (url) => /\/traces\/trace-details\?/.test(url.toString());
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      if (onDetails(this.page.url())) return;
+      await this.expectTraceResultWithOperationName(operationName);
+      await this.page.locator(`${this.searchResultList} ${this.traceRowOperationName}`)
+        .filter({ hasText: operationName })
+        .first()
+        .click();
+      // The explorer's own URL sync after a search can supersede the row's push, so an early click can be lost.
+      if (await this.page.waitForURL(onDetails, { timeout: 10000 }).then(() => true).catch(() => false)) return;
+      testLogger.warn(`Trace row "${operationName}" did not open trace details (attempt ${attempt}/${attempts})`, { url: this.page.url() });
+    }
+    expect(onDetails(this.page.url()), `trace row "${operationName}" never opened trace details`).toBe(true);
+  }
+
+  async selectWaterfallSpan(operationName) {
+    expect(await this.openTraceDetailsTab('waterfall'), 'the waterfall tab must exist').toBe(true);
+    expect(
+      await this.clickTraceTreeSpanByOperationName(operationName),
+      `span "${operationName}" must be on the waterfall`,
+    ).toBe(true);
+  }
+
+  /** The flame graph is a canvas; its depth-0 bar is the root span and spans the full chart width at the top. */
+  async selectFlameGraphRootSpan() {
+    expect(await this.openTraceDetailsTab('flame-graph'), 'the flame graph tab must exist').toBe(true);
+    const canvas = this.page.locator(this.flameGraphCanvas).first();
+    await expect(canvas).toBeVisible({ timeout: 15000 });
+    const box = await canvas.boundingBox();
+    expect(box, 'the flame graph canvas must lay out').not.toBeNull();
+    await this.page.mouse.click(box.x + box.width / 2, box.y + 14);
+    await expect(this.page.locator(this.flameGraphSidebar)).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectSidebarServiceName(serviceName) {
+    await expect(this.page.locator(this.sidebarServiceName).filter({ visible: true }).first())
+      .toHaveText(serviceName, { timeout: 15000 });
+  }
+
+  /** Attributes → Table or JSON → the field's value menu → Apply & Search with `operator`; waits for the explorer. */
+  async applyAndSearchFromSpanAttributes({ field, operator = '=', view = 'table' }) {
+    await this.page.locator(this.sidebarAttributesTab).filter({ visible: true }).first().click();
+    if (view === 'table') {
+      const toggle = this.page.locator(this.sidebarAttributesViewTable).filter({ visible: true }).first();
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('data-state', 'on');
+      const fieldCell = this.page.locator(this.sidebarAttributeFieldCell, {
+        hasText: new RegExp(`^\\s*${field}\\s*$`),
+      });
+      const row = this.page.locator(`${this.sidebarAttributesTable} ${this.sidebarAttributeRow}`)
+        .filter({ has: fieldCell })
+        .first();
+      await row.locator(this.attributeValueDropdownBtn).click();
+      await this.page.locator(`[data-test="${this.attributeFilterActionPrefix}${operator}"]`).click();
+    } else {
+      const toggle = this.page.locator(this.sidebarAttributesViewJson).filter({ visible: true }).first();
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('data-state', 'on');
+      await this.page.locator(
+        `${this.sidebarAttributesJson} div:has(> [data-test="${this.jsonPreviewKeyPrefix}${field}"]) ${this.jsonFieldDropdownBtn}`,
+      ).first().click();
+      await this.page.locator(`[data-test="${this.jsonFilterActionPrefix}${operator}"]`).click();
+    }
+    await this.page.waitForURL(/\/web\/traces\?/, { timeout: 30000 });
+  }
+
+  /** The explorer query carried in the URL's base64url `query` param, decoded. */
+  getUrlQueryText() {
+    const encoded = new URL(this.page.url()).searchParams.get('query') || '';
+    const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '=');
+    return Buffer.from(base64, 'base64').toString('utf8');
+  }
+
+  getUrlSearchTab() {
+    return new URL(this.page.url()).searchParams.get('tab');
+  }
+
+  /** Hold every trace-list search until the returned release() runs, so a running search can be seen and cancelled. */
+  async holdTraceListSearches() {
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    await this.page.route(this.traceListStreamUrl, async (route) => {
+      await gate;
+      await route.continue().catch(() => {});
+    });
+    return async () => {
+      release();
+      await this.page.unroute(this.traceListStreamUrl);
+    };
+  }
+
+  async startTraceSearch() {
+    await this.page.locator(this.refreshButton).click();
+  }
+
+  async cancelRunningSearch() {
+    const cancel = this.page.locator(this.cancelSearchButton);
+    await expect(cancel).toBeVisible({ timeout: 15000 });
+    await cancel.click();
+    await expect(cancel).toBeHidden({ timeout: 15000 });
+  }
+
+  async getResultRowCount() {
+    return await this.page.locator(this.searchResultItem).count();
+  }
+
+  async expectNoEventsStateHidden() {
+    await expect(this.page.locator(this.resultNotFoundText)).toHaveCount(0);
+  }
+
+  async expectSearchCancelledStateVisible() {
+    await expect(this.page.locator(this.searchCancelledState)).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectSearchCancelledStateHidden() {
+    await expect(this.page.locator(this.searchCancelledState)).toHaveCount(0);
+  }
+
+  /** The cancelled state's only button is its Run query card. */
+  async runQueryFromCancelledState() {
+    await this.page.locator(this.searchCancelledState).getByRole('button').click();
   }
 }

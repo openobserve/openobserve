@@ -10,6 +10,9 @@ export class FirstEventPage {
         this.firstRecord = page.locator('[data-test="first-event-status-first-record"]');
         this.openBtn = page.locator('[data-test="first-event-status-open-btn"]');
         this.troubleshootBtn = page.locator('[data-test="first-event-status-troubleshoot-btn"]');
+        this.checkNowBtn = page.locator('[data-test="first-event-status-check-now-btn"]');
+        this.connectSourceBtn = page.locator('[data-test="first-event-status-connect-source-btn"]');
+        this.setupAnotherBtn = page.locator('[data-test="first-event-status-setup-another-btn"]');
         this.diagnosis = page.locator('[data-test="first-event-diagnosis"]');
         this.diagnosisFix = page.locator('[data-test="first-event-diagnosis-fix"]');
         this.diagnosisCopyBtn = page.locator('[data-test="first-event-diagnosis-copy-btn"]');
@@ -17,6 +20,7 @@ export class FirstEventPage {
         this.diagnosisEndpoint = page.locator('[data-test="first-event-diagnosis-endpoint"]');
         this.stillStuck = page.locator('[data-test="first-event-diagnosis-still-stuck"]');
         this.docsLink = page.locator('[data-test="first-event-diagnosis-docs-link"]');
+        this.askAiBtn = page.locator('[data-test="first-event-diagnosis-ask-ai-btn"]');
         this.contactSupportLink = page.locator('[data-test="first-event-diagnosis-contact-support-link"]');
         this.notice = page.locator('[data-test="first-data-notice"]');
         this.noticeText = page.locator('[data-test="first-data-notice-text"]');
@@ -46,6 +50,10 @@ export class FirstEventPage {
 
     async clickTroubleshoot() {
         await this.troubleshootBtn.click();
+    }
+
+    async clickCheckNow() {
+        await this.checkNowBtn.click();
     }
 
     async clickOpen() {

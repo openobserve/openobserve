@@ -26,6 +26,7 @@ import { cloneDeep } from "lodash-es";
 import { SearchRequestPayload } from "@/ts/interfaces/query";
 import { getConsumableRelativeTime } from "@/utils/date";
 import config from "@/aws-exports";
+import { featureState } from "@/utils/featureGate";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { hasLimitClause } from "@/utils/query/nonSqlLimit";
@@ -34,6 +35,7 @@ import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { buildContextualSqlMessage, isParserLimitation } from "@/utils/query/sqlDiagnostics";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
+import { isExplainQuery } from "@/utils/query/sqlUtils";
 import { stripSqlComments } from "@/utils/query/sqlComments";
 import { raw, type TranslateFn } from "@/types/i18n";
 import {
@@ -557,6 +559,7 @@ export const useSearchQuery = (t: TranslateFn) => {
         !readOnly &&
         searchObj.meta.sqlMode &&
         query &&
+        !isExplainQuery(query) &&
         maxParenDepth(query) <= SQL_PARSE_MAX_DEPTH
       ) {
         try {
@@ -601,7 +604,11 @@ export const useSearchQuery = (t: TranslateFn) => {
         },
       };
 
-      if (config.isEnterprise == "true" && store.state.zoConfig.super_cluster_enabled) {
+      if (
+        config.isEnterprise == "true" &&
+        store.state.zoConfig.super_cluster_enabled &&
+        featureState(store.state.zoConfig.features, "super_cluster") !== "locked"
+      ) {
         req["regions"] = searchObj.meta.regions;
         req["clusters"] = searchObj.meta.clusters;
       }

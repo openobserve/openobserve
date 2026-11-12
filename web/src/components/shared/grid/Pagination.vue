@@ -94,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OButtonGroup>
         <OButton
+          :aria-label="t('common.previous')"
           variant="outline"
           size="icon-sm"
           :disabled="scope.isFirstPage"
@@ -102,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         </OButton>
         <OButton
+          :aria-label="t('common.next')"
           variant="outline"
           size="icon-sm"
           :disabled="scope.isLastPage"

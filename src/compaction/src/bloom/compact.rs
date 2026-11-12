@@ -34,7 +34,10 @@
 //! data-retention to reap. Neither affects correctness, so neither
 //! propagates to the caller as a hard error.
 
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{BTreeSet, HashSet},
+    sync::Arc,
+};
 
 use anyhow::Context;
 use bytes::Bytes;
@@ -55,11 +58,14 @@ use tantivy_utils::puffin_directory::{
 
 use super::builder::build_blooms_from_index;
 
+/// `bloom_ver`s of the files a merge round retired, by the `file_list.date` of each file.
+pub(crate) type OrphanBlooms = hashbrown::HashMap<String, Vec<i64>>;
+
 /// Clean orphan `.bf`s for `orphan_blooms`, then build `.bf` coverage for the
 /// bucket's `bloom_ver = 0` files (queried internally via `query_for_bloom`).
 ///
 /// `date_key` is the `YYYY/MM/DD/HH` string used in `file_list.date`.
-/// `orphan_blooms` is the `bloom_ver` values of the files the merge round just
+/// `orphan_blooms` (see [`OrphanBlooms`]) come from the files the merge round just
 /// deleted — used only for cleanup. Files already carrying a non-zero
 /// `bloom_ver` are never re-stamped, so no live file migrates off a `bloom_ver`
 /// that a dumped row may still point to.
@@ -74,18 +80,20 @@ pub(crate) async fn build_for_stream(
     stream_name: &str,
     date_key: &str,
     is_incremental: bool,
-    orphan_blooms: Vec<i64>,
+    orphan_blooms: OrphanBlooms,
 ) -> Result<bool> {
     let cfg = get_config();
     if !cfg.common.bloom_filter_enabled {
         return Ok(false);
     }
 
-    // clean up orphan blooms
-    if let Err(e) =
-        cleanup_orphan_blooms(org_id, stream_type, stream_name, date_key, orphan_blooms).await
-    {
-        log::warn!("[BLOOM_BUILD] cleanup orphan blooms failed: {e}");
+    // a day-wide job retires files of other hours, whose `.bf`s live under those hours
+    for (date, bloom_vers) in orphan_blooms {
+        if let Err(e) =
+            cleanup_orphan_blooms(org_id, stream_type, stream_name, &date, bloom_vers).await
+        {
+            log::warn!("[BLOOM_BUILD] cleanup orphan blooms of {date} failed: {e}");
+        }
     }
 
     // don't build bloom for incremental round
@@ -161,6 +169,45 @@ pub(crate) async fn build_for_stream(
     }
 
     Ok(true)
+}
+
+/// The `file_list_deleted` entries for the `.bf` files behind the given (hour, `bloom_ver`)
+/// pairs, one per distinct pair; pairs with `bloom_ver == 0` have no `.bf` and are skipped.
+pub(crate) fn bloom_files_deleted(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    bloom_hours: impl IntoIterator<Item = (String, i64)>,
+) -> Vec<FileListDeleted> {
+    bloom_hours
+        .into_iter()
+        .filter(|(_, bloom_ver)| *bloom_ver > 0)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|(date_key, bloom_ver)| {
+            bloom_file_deleted(org_id, stream_type, stream_name, &date_key, bloom_ver)
+        })
+        .collect()
+}
+
+/// The `file_list_deleted` entry that retires the `.bf` of one (stream, hour, `bloom_ver`).
+fn bloom_file_deleted(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date_key: &str,
+    bloom_ver: i64,
+) -> FileListDeleted {
+    let path = bloom_path(org_id, stream_type, stream_name, date_key, bloom_ver);
+    let account = storage::get_account(org_id, &path).unwrap_or_default();
+    FileListDeleted {
+        id: 0,
+        account,
+        file: path,
+        index_file: false, // a `.bf` has no companion `.ttv`
+        mindex_file: false,
+        flattened: false,
+    }
 }
 
 // B for this chunk is sized from the chunk's MAX record count, used as
@@ -313,16 +360,13 @@ async fn cleanup_orphan_blooms(
         {
             Ok(true) => {} // still referenced by a live file — keep the `.bf`
             Ok(false) => {
-                let path = bloom_path(org_id, stream_type, stream_name, date_key, v_old);
-                let account = storage::get_account(org_id, &path).unwrap_or_default();
-                orphans.push(FileListDeleted {
-                    id: 0,
-                    account,
-                    file: path,
-                    index_file: false, // a `.bf` has no companion `.ttv`
-                    mindex_file: false,
-                    flattened: false,
-                });
+                orphans.push(bloom_file_deleted(
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    date_key,
+                    v_old,
+                ));
             }
             Err(e) => {
                 log::warn!(

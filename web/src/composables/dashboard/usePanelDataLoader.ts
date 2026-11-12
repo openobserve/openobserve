@@ -31,7 +31,8 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 
 import { usePanelCache } from "./usePanelCache";
-import { usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
+import { cachedWindowDiffers, usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
+import { useFailedRefreshHold } from "./panelFailedRefreshHold";
 import { isEqual, omit } from "lodash-es";
 
 import { useAnnotations } from "./useAnnotations";
@@ -39,8 +40,14 @@ import useHttpStreamingSearch from "../useStreamingSearch";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import { usePanelPromQLExecutor } from "./usePanelPromQLExecutor";
 import { usePanelSQLExecutor } from "./usePanelSQLExecutor";
+import useStreams from "@/composables/useStreams";
+import { gt } from "@/types/i18n";
+import { getEnrichmentTableRange } from "@/utils/dashboard/streamLifetime";
 
-import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
+import {
+  isSkippedByPanelRefresh,
+  settlePanelRefresh,
+} from "@/utils/dashboard/convertCustomChartData";
 import { usePanelVariableSubstitution } from "./usePanelVariableSubstitution";
 import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
 import { DASHBOARD_FRESH_PANEL_TIME } from "./dashboardFreshPanelTime";
@@ -91,6 +98,7 @@ export const usePanelDataLoader = (
   let isVariablesTriggeredLoad = false;
 
   const store = useStore();
+  const { getStream } = useStreams(gt);
 
   const getRegionClusterParams = () => {
     if (regionClusterParams?.value?.regions || regionClusterParams?.value?.clusters) {
@@ -122,6 +130,7 @@ export const usePanelDataLoader = (
       "scatter",
       "stacked",
       "h-stacked",
+      "state-timeline",
     ].includes(panelSchema.value.type);
   };
 
@@ -201,14 +210,20 @@ export const usePanelDataLoader = (
   const isVisible: any = ref(false);
 
   const refreshAfterRestore = usePanelRefreshAfterRestore({ state, panelSchema, dashboardId });
+  const failedRefreshHold = useFailedRefreshHold(state, () => panelSchema.value);
 
   // Until the first load settles the panel has no answer yet, so "No Data" would flash over a cached result.
   const isFirstLoadSettled = ref(false);
   let latestLoadCall = 0;
+  // A single-panel refresh ends when its targets settle; until then, every other custom chart skips its re-runs.
+  const settleLoad = () => {
+    isFirstLoadSettled.value = true;
+    settlePanelRefresh(panelSchema.value?.id);
+  };
   watch(
     () => state.loading,
     (loading) => {
-      if (!loading) isFirstLoadSettled.value = true;
+      if (!loading) settleLoad();
     },
     { flush: "sync" },
   );
@@ -404,6 +419,7 @@ export const usePanelDataLoader = (
 
   const loadData = async () => {
     const loadCall = ++latestLoadCall;
+    failedRefreshHold.loadScheduled();
     log("[usePanelDataLoader] " + panelSchema?.value?.title + ": loadData() PROCEEDING");
 
     // Only reset isPartialData if we're starting a fresh load and not restoring from cache
@@ -426,7 +442,29 @@ export const usePanelDataLoader = (
       invalidateRun();
 
       // Create a new AbortController for the new operation
-      abortController = new AbortController();
+      const runController = new AbortController();
+      abortController = runController;
+      // Injected-data path: the caller already fetched the PromQL results and
+      // owns the fetch lifecycle (the metrics explorer's preview queue —
+      // concurrency-capped, viewport-gated, cancellable, cached). Render those
+      // results directly instead of firing our own query_range. Skips the
+      // debounce, cache restore, visibility and variable waits — the caller
+      // already gated all of that. See MetricCard. Runs before the query check
+      // because injected callers (public dashboards) may carry no query text.
+      if (injectedPromqlData?.value != null) {
+        log("loadData: rendering injected PromQL data");
+        state.loading = false;
+        state.isOperationCancelled = false;
+        state.isPartialData = false;
+        state.data = markRaw(injectedPromqlData.value.data ?? []);
+        state.metadata = injectedPromqlData.value.metadata ?? { queries: [] };
+        state.resultMetaData = injectedPromqlData.value.resultMetaData ?? [];
+        state.annotations = [];
+        state.errorDetail = injectedPromqlData.value.errorDetail ?? { message: "", code: "" };
+        runCount++;
+        return;
+      }
+
       // Checking if there are queries to execute
       if (!panelSchema.value.queries?.length || !hasAtLeastOneQuery()) {
         log("loadData: there are no queries to execute");
@@ -440,48 +478,37 @@ export const usePanelDataLoader = (
         return;
       }
 
-      // Injected-data path: the caller already fetched the PromQL results and
-      // owns the fetch lifecycle (the metrics explorer's preview queue —
-      // concurrency-capped, viewport-gated, cancellable, cached). Render those
-      // results directly instead of firing our own query_range. Skips the
-      // debounce, cache restore, visibility and variable waits — the caller
-      // already gated all of that. See MetricCard.
-      if (injectedPromqlData?.value != null) {
-        log("loadData: rendering injected PromQL data");
-        state.loading = false;
-        state.isOperationCancelled = false;
-        state.isPartialData = false;
-        state.data = markRaw(injectedPromqlData.value.data ?? []);
-        state.metadata = injectedPromqlData.value.metadata ?? { queries: [] };
-        state.resultMetaData = injectedPromqlData.value.resultMetaData ?? [];
-        state.annotations = [];
-        state.errorDetail = { message: "", code: "" };
-        runCount++;
-        return;
-      }
-
       log("loadData: now waiting for the timeout to avoid frequent updates");
 
-      await waitForTimeout(abortController.signal);
+      await waitForTimeout(runController.signal);
 
       log("loadData: now waiting for the panel to become visible");
 
       state.lastTriggeredAt = new Date().getTime();
 
+      // The superseded run was aborted above, so an off-screen panel must not keep reporting it as loading.
+      if (!isVisible.value && forceLoad?.value != true) {
+        state.loading = false;
+        // An off-screen target loads only once shown, so it must not hold a single-panel refresh open.
+        settlePanelRefresh(panelSchema.value?.id);
+      }
+
       // Wait for visibility BEFORE the cache restore below — restoring first
       // rendered every cached panel on mount, visible or not.
-      await waitForThePanelToBecomeVisible(abortController.signal);
+      await waitForThePanelToBecomeVisible(runController.signal);
 
       // if force load is true, skip restoring from cache
       if (runCount == 0 && forceLoad?.value != true) {
         log("loadData: panelcache: run count is 0");
         // restore from the cache and return
         const isRestoredFromCache = await restoreFromCache();
+        if (runController.signal.aborted) return;
         log("loadData: panelcache: isRestoredFromCache", isRestoredFromCache);
         if (isRestoredFromCache) {
           state.loading = false;
           state.isOperationCancelled = false;
           log("loadData: panelcache: restored from cache");
+          failedRefreshHold.loadRestored();
           runCount++;
           if (!refreshAfterRestore.queueRefresh()) return;
         }
@@ -490,7 +517,7 @@ export const usePanelDataLoader = (
       log("loadData: now waiting for the variables to load");
 
       // Wait for variables to load
-      await waitForTheVariablesToLoad(abortController.signal);
+      await waitForTheVariablesToLoad(runController.signal);
 
       log("loadData: good to go... starting query executions...");
 
@@ -513,6 +540,15 @@ export const usePanelDataLoader = (
         return;
       }
 
+      // Enrichment rows carry their upload time, so the dashboard range would hide them; Explore does the same.
+      const tableRange = await getEnrichmentTableRange(getStream, panelSchema.value);
+      // A newer run started during the lookup; resuming would abort it after it cleared the panel's data.
+      if (runController.signal.aborted) return;
+      if (tableRange) {
+        startISOTimestamp = tableRange.from;
+        endISOTimestamp = tableRange.to;
+      }
+
       renderedTimeRange = { start: startISOTimestamp, end: endISOTimestamp };
 
       log("loadData: panelcache: no cache restored, continue firing, runCount ", runCount);
@@ -520,6 +556,7 @@ export const usePanelDataLoader = (
       runCount++;
 
       refreshAfterRestore.holdIfQueued();
+      failedRefreshHold.loadStarted();
       state.loading = true;
       state.isCachedDataDifferWithCurrentTimeRange = false;
 
@@ -531,12 +568,12 @@ export const usePanelDataLoader = (
 
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
-        await executePromQL(startISOTimestamp, endISOTimestamp, abortController);
+        await executePromQL(startISOTimestamp, endISOTimestamp, runController);
       } else if (panelSchema.value.queries.length > 1) {
         const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
-        await executeMultiSQL(startISOTimestamp, endISOTimestamp, abortController, pageType);
+        await executeMultiSQL(startISOTimestamp, endISOTimestamp, runController, pageType);
       } else {
-        await executeSQL(startISOTimestamp, endISOTimestamp, abortController);
+        await executeSQL(startISOTimestamp, endISOTimestamp, runController);
       }
     } catch (error: any) {
       if (error.name === "AbortError" || error.message === "Aborted waiting for loading") {
@@ -546,7 +583,7 @@ export const usePanelDataLoader = (
       }
     } finally {
       // Covers every early return: a call that was not superseded and left nothing running has its answer.
-      if (loadCall === latestLoadCall && !state.loading) isFirstLoadSettled.value = true;
+      if (loadCall === latestLoadCall && !state.loading) settleLoad();
     }
   };
 
@@ -556,9 +593,8 @@ export const usePanelDataLoader = (
     async () => {
       log("PanelSchema/Time Wather: called");
 
-      // If panelIdToBeRefreshed is set and doesn't match this panel, skip loading
       // This prevents all panels from refreshing when only one panel's time changes
-      if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.value.id) {
+      if (isSkippedByPanelRefresh(panelSchema.value.id)) {
         log("PanelSchema/Time Wather: skipping - different panel is being refreshed");
         return;
       }
@@ -794,6 +830,8 @@ export const usePanelDataLoader = (
 
   // remove intersection observer
   onUnmounted(() => {
+    // An aborted stream never reports loading=false, so an unmounted target would block other panels' re-runs.
+    settlePanelRefresh(panelSchema.value?.id);
     // abort on unmount
     if (abortController) {
       // Only set isPartialData if we're still loading or haven't received complete response
@@ -883,9 +921,11 @@ export const usePanelDataLoader = (
     const cachedIncompleteLoad =
       tempPanelCacheValue?.loading === true || tempPanelCacheValue?.isPartialData === true;
 
-    const cachedRangeDiffers =
-      selectedTimeObj?.value?.end_time - selectedTimeObj?.value?.start_time !==
-      cache?.cacheTimeRange?.end_time - cache?.cacheTimeRange?.start_time;
+    const cachedRangeDiffers = cachedWindowDiffers(
+      cache?.cacheTimeRange,
+      selectedTimeObj?.value,
+      refreshAfterRestore.isCalendarRange(selectedTimeObj?.value),
+    );
     // A query variable's values come from the time range, so a result from another range was filtered by other values.
     const rangeBoundToQueryVariable =
       cachedRangeDiffers && (getDependentVariablesData() ?? []).some(isCustomQueryVariable);
@@ -923,7 +963,6 @@ export const usePanelDataLoader = (
         };
       }
 
-      // if selected time range is not matched with the cache time range
       if (cachedRangeDiffers) {
         state.isCachedDataDifferWithCurrentTimeRange = true;
       }

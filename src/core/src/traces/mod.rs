@@ -26,7 +26,6 @@ use axum::{
     http,
     response::{IntoResponse, Response as HttpResponse},
 };
-use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
     O2_INGEST_TS_COL_NAME, TIMESTAMP_COL_NAME, get_config,
@@ -47,6 +46,7 @@ use opentelemetry_proto::tonic::{
     collector::trace::v1::{
         ExportTracePartialSuccess, ExportTraceServiceRequest, ExportTraceServiceResponse,
     },
+    resource::v1::Resource,
     trace::v1::{Status, status::StatusCode},
 };
 use prost::Message;
@@ -71,7 +71,7 @@ use crate::{
     alerts::alert::AlertExt,
     common::meta::{
         http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value},
-        otlp::{otlp_error_response, otlp_rejection_response},
+        otlp::{otlp_error_response, otlp_export_response, otlp_rejection_response},
         stream::SchemaRecords,
         traces::{Event, Span, SpanLink, SpanLinkContext},
     },
@@ -80,7 +80,7 @@ use crate::{
         evaluate_trigger, get_thread_id, grpc::get_val, write_file,
     },
     logs::IngestJsonData,
-    traces::otel::{OtelIngestionProcessor, is_llm_trace},
+    traces::otel::{OtelIngestionProcessor, SpanContext, is_llm_trace},
 };
 
 const SERVICE_NAME: &str = "service.name";
@@ -88,7 +88,7 @@ const SERVICE: &str = "service";
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
-const RESERVED_SPAN_FIELDS: [&str; 33] = [
+const RESERVED_SPAN_FIELDS: [&str; 34] = [
     "trace_id",
     "span_id",
     "flags",
@@ -122,6 +122,10 @@ const RESERVED_SPAN_FIELDS: [&str; 33] = [
     crate::db_monitoring::O2_DB_ENV,
     crate::db_monitoring::O2_DB_STMT_CLASS,
     crate::db_monitoring::O2_DB_BATCH_MULTIPLIER,
+    // The ingest pricing marker: any spelling a client sends (`gen_ai.usage.cost_status`,
+    // `gen_ai_usage_cost_status`, …) on any span gets the attr_ prefix, so only the
+    // processor's own value reaches the column.
+    config::meta::model_pricing::COST_STATUS_COLUMN,
     "events",
     "links",
     TIMESTAMP_COL_NAME,
@@ -173,7 +177,79 @@ struct CanonicalAgentFields {
     version: Option<String>,
 }
 
+struct SpanServiceScope<'a> {
+    fallback: &'a str,
+    name: String,
+    attrs: HashMap<String, json::Value>,
+    explicit: bool,
+}
+
+impl<'a> SpanServiceScope<'a> {
+    fn new(fallback: &'a str) -> Self {
+        Self {
+            fallback,
+            name: fallback.to_string(),
+            attrs: HashMap::new(),
+            explicit: false,
+        }
+    }
+
+    fn enter_resource(&mut self, resource: Option<Resource>) {
+        // one export request carries many resources; none may inherit another's service name
+        self.name = self.fallback.to_string();
+        self.attrs = HashMap::new();
+        self.explicit = false;
+        let Some(resource) = resource else {
+            return;
+        };
+        for res_attr in resource.attributes {
+            if res_attr.key.eq(SERVICE_NAME) {
+                let loc_service_name = get_val(&res_attr.value.as_ref());
+                if let Some(name) = loc_service_name.as_str() {
+                    self.name = name.to_string();
+                    self.attrs
+                        .insert(SERVICE_NAME.to_string(), loc_service_name);
+                    if self.name.to_lowercase().replace("_", " ") != "unknown service" {
+                        self.explicit = true;
+                    }
+                }
+            } else {
+                let key = resource_attribute_key(res_attr.key);
+                self.attrs.insert(key, get_val(&res_attr.value.as_ref()));
+            }
+        }
+    }
+
+    fn attrs(&self) -> &HashMap<String, json::Value> {
+        &self.attrs
+    }
+
+    /// An LLM span's own service name applies to that span only.
+    fn for_span(
+        &self,
+        is_llm_span: bool,
+        span_att_map: &HashMap<String, json::Value>,
+        otel_processor: &OtelIngestionProcessor,
+    ) -> (String, std::borrow::Cow<'_, HashMap<String, json::Value>>) {
+        if is_llm_span
+            && !self.explicit
+            && let Some(val) = otel_processor.extract_service_name_from_span(span_att_map)
+        {
+            let mut attrs = self.attrs.clone();
+            attrs.insert(SERVICE_NAME.to_string(), json::json!(val));
+            return (val, std::borrow::Cow::Owned(attrs));
+        }
+        (self.name.clone(), std::borrow::Cow::Borrowed(&self.attrs))
+    }
+}
+
 fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
+    if let Some(value) = record_val.get_mut("gen_ai_prompt_version")
+        && let Some(num) = value.as_i64()
+    {
+        *value = json::Value::String(num.to_string());
+    }
+
     for &field in GEN_AI_INT64_FIELDS.iter() {
         if let Some(value) = record_val.get_mut(field)
             && value.as_i64().is_none()
@@ -281,7 +357,11 @@ fn restore_canonical_agent_fields(
 }
 
 #[cfg(feature = "enterprise")]
-async fn queue_gen_ai_agent_observations(org_id: &str, observations: AgentObservationBuffer) {
+async fn queue_gen_ai_agent_observations(org_id: &str, mut observations: AgentObservationBuffer) {
+    // spans of a destination skipped for its key length were never written
+    observations.retain(|_, o| {
+        infra::file_list::stream_key_violation(org_id, StreamType::Traces, &o.stream_name).is_none()
+    });
     o2_enterprise::enterprise::llm_evaluations::agent_registry::queue_observations(
         org_id.to_string(),
         observations,
@@ -289,15 +369,18 @@ async fn queue_gen_ai_agent_observations(org_id: &str, observations: AgentObserv
     .await;
 }
 
-/// Strip client-supplied derived-identity keys (`o2_db_*`, `infer_service_*`)
-/// from a JSON-path record BEFORE re-derivation (design D1 condition 1):
+/// Strip client-supplied derived keys (`o2_db_*`, `infer_service_*`, the ingest pricing
+/// marker) from a JSON-path record BEFORE re-derivation (design D1 condition 1):
 /// `RESERVED_SPAN_FIELDS` protects the OTLP path only — the JSON ingest path
 /// flattens the caller's record keys directly, so a spoofed `o2_db_fingerprint`
 /// (or `infer_service_name`, fixed in the same PR per the design) would land as
 /// a trusted aggregation key. Legitimate values written by a first-pass OTLP
 /// enrichment re-derive identically from the raw `db_*` / peer attributes that
-/// are still on the record (the derivations are deterministic).
+/// are still on the record (the derivations are deterministic). This path does not
+/// price spans, so it never sets `gen_ai_usage_cost_status`; a value on the record is
+/// not ingest's.
 fn strip_client_supplied_derived_fields(record_val: &mut Map<String, json::Value>) {
+    record_val.remove(config::meta::model_pricing::COST_STATUS_COLUMN);
     // one key scan instead of 20 map removals: a record almost never carries a derived key
     if !record_val
         .keys()
@@ -335,6 +418,27 @@ fn restore_derived_fields(
 ) {
     for (field, value) in saved {
         record_val.insert(field.to_string(), value);
+    }
+}
+
+/// Packs a batch into a UDS its own schema check turned on, keeping what per-span packing keeps.
+fn repack_for_new_uds(json_data: &mut [(i64, Map<String, json::Value>)], fields: &HashSet<String>) {
+    let mut fields = fields.clone();
+    // per-span packing writes these after refactor_map, so they stay columns
+    fields.extend(
+        [
+            "gen_ai_agent_name",
+            "gen_ai_agent_id",
+            "gen_ai_agent_env",
+            "gen_ai_agent_version",
+            O2_INGEST_TS_COL_NAME,
+        ]
+        .map(str::to_string),
+    );
+    for (_, record_val) in json_data.iter_mut() {
+        let saved_fields = save_derived_fields_for_uds(record_val, &fields);
+        *record_val = crate::ingestion::refactor_map(std::mem::take(record_val), &fields);
+        restore_derived_fields(record_val, saved_fields);
     }
 }
 
@@ -617,8 +721,7 @@ pub async fn otlp_json(
     in_stream_name: Option<&str>,
     user: IngestUser,
 ) -> Result<HttpResponse, Error> {
-    let request = match json::from_slice_lenient_floats::<ExportTraceServiceRequest>(body.as_ref())
-    {
+    let request = match json::from_slice_lenient_otlp::<ExportTraceServiceRequest>(body.as_ref()) {
         Ok(req) => req,
         Err(e) => {
             log::error!("[TRACES:OTLP] Invalid json: org_id: {org_id}, error: {e}");
@@ -698,6 +801,14 @@ pub async fn handle_otlp_request(
         Some(name) => format_stream_name(name.to_string()),
         None => "default".to_owned(),
     };
+    // before anything that writes for the stream, so one that cannot be stored is never created
+    if let Err(e) = schema::check_stream_key_len(org_id, StreamType::Traces, &traces_stream_name) {
+        return Ok(otlp_rejection_response(
+            req_type,
+            http::StatusCode::BAD_REQUEST,
+            e.to_string(),
+        ));
+    }
     // Refused before the pipelines run: a remote-stream destination writes inside them.
     #[cfg(feature = "vectorscan")]
     if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
@@ -766,7 +877,7 @@ pub async fn handle_otlp_request(
     .await;
     // End get user defined schema
 
-    let mut service_name: String = traces_stream_name.to_string();
+    let mut service_scope = SpanServiceScope::new(&traces_stream_name);
     let res_spans = request.resource_spans;
     let mut json_data_by_stream = HashMap::new();
     let mut partial_success = ExportTracePartialSuccess::default();
@@ -775,41 +886,20 @@ pub async fn handle_otlp_request(
     let otel_processor = OtelIngestionProcessor::new();
 
     // Pre-load user-defined model pricing entries for this org (in-memory cache, no I/O).
-    // When ZO_MODEL_PRICING_ENABLED=false, skip DB pricing and fall back to hardcoded values.
-    static EMPTY_PRICING: std::sync::OnceLock<
-        std::sync::Arc<Vec<crate::db::model_pricing::CachedModelPricing>>,
-    > = std::sync::OnceLock::new();
-    let org_pricing_entries = if config::get_config().common.model_pricing_enabled {
-        crate::db::model_pricing::get_org_pricing_entries(org_id)
-    } else {
-        std::sync::Arc::clone(EMPTY_PRICING.get_or_init(|| std::sync::Arc::new(vec![])))
-    };
+    // When ZO_MODEL_PRICING_ENABLED=false, nothing is priced or marked and spans keep only
+    // reported costs.
+    let org_pricing_entries = config::get_config()
+        .common
+        .model_pricing_enabled
+        .then(|| crate::db::model_pricing::get_org_pricing_entries(org_id));
 
     let gen_ai_agent_mapping_config =
         crate::db::system_settings::get_gen_ai_agent_mapping_config(org_id).await;
     let mut agent_observations = AgentObservationBuffer::default();
 
     for res_span in res_spans {
-        let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
-        let mut service_name_explicitly_set = false;
-        if let Some(resource) = res_span.resource {
-            for res_attr in resource.attributes {
-                if res_attr.key.eq(SERVICE_NAME) {
-                    let loc_service_name = get_val(&res_attr.value.as_ref());
-                    if let Some(name) = loc_service_name.as_str() {
-                        service_name = name.to_string();
-                        service_att_map.insert(SERVICE_NAME.to_string(), loc_service_name);
-                        if service_name.to_lowercase().replace("_", " ") != "unknown service" {
-                            service_name_explicitly_set = true;
-                        }
-                    }
-                } else {
-                    let key = resource_attribute_key(res_attr.key);
-                    service_att_map.insert(key, get_val(&res_attr.value.as_ref()));
-                }
-            }
-        }
-        let mut resource_keys = normalized_resource_keys(&service_att_map);
+        service_scope.enter_resource(res_span.resource);
+        let resource_keys = normalized_resource_keys(service_scope.attrs());
         let inst_resources = res_span.scope_spans;
         for inst_span in inst_resources {
             let spans = inst_span.spans;
@@ -851,20 +941,10 @@ pub async fn handle_otlp_request(
                     span_att_map.insert(key, get_val(&span_att.value.as_ref()));
                 }
 
-                // Use span attributes as service_name fallback if service_name is not explicitly
-                // set This handles the case where service.name is not present in
-                // resource attributes
                 let scope_name = inst_span.scope.as_ref().map(|s| s.name.as_str());
                 let is_llm_span = is_llm_trace(&span_att_map, scope_name);
-                if is_llm_span
-                    && !service_name_explicitly_set
-                    && let Some(val) = otel_processor.extract_service_name_from_span(&span_att_map)
-                {
-                    service_name = val.clone();
-                    service_att_map.insert(SERVICE_NAME.to_string(), json::json!(val));
-                    resource_keys.insert(SERVICE_NAME.to_string());
-                    service_name_explicitly_set = true;
-                }
+                let (service_name, service_att_map) =
+                    service_scope.for_span(is_llm_span, &span_att_map, &otel_processor);
 
                 // special addition for https://github.com/openobserve/openobserve/issues/4851
                 // we set the status (error/non-error) properly, but skip the message
@@ -897,8 +977,15 @@ pub async fn handle_otlp_request(
                         &service_att_map,
                         scope_name,
                         &events,
-                        &org_pricing_entries,
-                        start_time,
+                        org_pricing_entries.as_deref().map(Vec::as_slice),
+                        SpanContext {
+                            name: &span.name,
+                            start_nanos: start_time,
+                            is_error: span
+                                .status
+                                .as_ref()
+                                .is_some_and(|s| s.code == StatusCode::Error as i32),
+                        },
                         &gen_ai_agent_mapping_config,
                     );
 
@@ -978,9 +1065,9 @@ pub async fn handle_otlp_request(
                     end_time,
                     duration: span_duration_micros(start_time, end_time),
                     reference: span_ref,
-                    service_name: service_name.clone(),
+                    service_name,
                     attributes: span_att_map,
-                    service: service_att_map.clone(),
+                    service: service_att_map.into_owned(),
                     flags: 1, // TODO add appropriate value
                     events: if events.is_empty() {
                         "[]".to_string()
@@ -1036,30 +1123,18 @@ pub async fn handle_otlp_request(
     // batch process records through pipeline
     if !executable_pipelines.is_empty() {
         let records = stream_pipeline_inputs.clone();
-        let mut evaluation_tasks = tokio::task::JoinSet::new();
+        let evaluation_tasks = crate::ingestion::spawn_llm_evaluations(
+            org_id,
+            &traces_stream_name,
+            &executable_pipelines,
+            &records,
+            in_stream_name,
+        );
 
-        for exec_pl in &executable_pipelines {
-            if exec_pl.kind == config::meta::pipeline::PipelineKind::Evaluation
-                && exec_pl.contains_llm_evaluation_node()
-            {
-                let exec_pl = exec_pl.clone();
-                let org_id = org_id.to_string();
-                let records = records.clone();
-                let in_stream_name = in_stream_name.map(String::from);
-                let traces_stream_name = traces_stream_name.clone();
-                evaluation_tasks.spawn(async move {
-                    if let Err(e) = exec_pl
-                        .process_batch(&org_id, records, in_stream_name)
-                        .await
-                    {
-                        log::error!(
-                            "[TRACES:OTLP] evaluation pipeline({org_id}/{traces_stream_name}) batch execution error: {e}."
-                        );
-                    }
-                });
-                continue;
-            }
-
+        for exec_pl in executable_pipelines
+            .iter()
+            .filter(|p| !crate::ingestion::is_llm_evaluation(p))
+        {
             let records_count = records.len();
             match exec_pl
                 .process_batch(org_id, records.clone(), in_stream_name.map(String::from))
@@ -1149,29 +1224,14 @@ pub async fn handle_otlp_request(
             }
         } // for each pipeline
 
-        while let Some(result) = evaluation_tasks.join_next().await {
-            if let Err(e) = result {
-                log::error!(
-                    "[TRACES:OTLP] evaluation pipeline task({org_id}/{traces_stream_name}) failed: {e}.",
-                );
-            }
-        }
+        crate::ingestion::join_llm_evaluations(evaluation_tasks, org_id, &traces_stream_name).await;
 
-        // When only evaluation pipelines exist for this stream (no user pipeline
-        // is responsible for writing to the source stream), preserve original
-        // records by writing them back to the source stream.
-        let has_user_pipeline = executable_pipelines
-            .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
-        let has_evaluation_pipeline = executable_pipelines
-            .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::Evaluation);
-        log::debug!(
-            "[TRACES:OTLP] source preservation check org_id={org_id}, stream={traces_stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, has_evaluation_pipeline={has_evaluation_pipeline}, source_buffered={}",
-            executable_pipelines.len(),
-            json_data_by_stream.contains_key(&traces_stream_name)
-        );
-        if !has_user_pipeline && !json_data_by_stream.contains_key(&traces_stream_name) {
+        if crate::ingestion::should_preserve_source(
+            org_id,
+            &traces_stream_name,
+            &executable_pipelines,
+            json_data_by_stream.contains_key(&traces_stream_name),
+        ) {
             for value in &stream_pipeline_inputs {
                 let _ = finalize_and_buffer_trace_span(
                     value.clone(),
@@ -1278,6 +1338,7 @@ pub async fn handle_otlp_request(
         (started_at, &start),
         json_data_by_stream,
         &user.to_email(),
+        &mut partial_success,
     )
     .await
     {
@@ -1409,6 +1470,11 @@ pub async fn ingest_json(
             )
                 .into_response());
         }
+    }
+
+    // before anything that writes for the stream, so one that cannot be stored is never created
+    if let Err(e) = schema::check_stream_key_len(org_id, StreamType::Traces, traces_stream_name) {
+        return Ok(MetaHttpResponse::bad_request(e));
     }
 
     let start = std::time::Instant::now();
@@ -1625,6 +1691,7 @@ pub async fn ingest_json(
         (started_at, &start),
         json_data_by_stream,
         &user.to_email(),
+        &mut partial_success,
     )
     .await
     {
@@ -1686,8 +1753,12 @@ fn format_response(
     let partial = partial_success.rejected_spans > 0;
 
     let res = if partial {
-        partial_success.error_message =
-            "Some spans were rejected due to exceeding the allowed retention period".to_string();
+        // the retention checks set no reason of their own
+        if partial_success.error_message.is_empty() {
+            partial_success.error_message =
+                "Some spans were rejected due to exceeding the allowed retention period"
+                    .to_string();
+        }
         ExportTraceServiceResponse {
             partial_success: Some(partial_success),
         }
@@ -1695,23 +1766,7 @@ fn format_response(
         ExportTraceServiceResponse::default()
     };
 
-    match req_type {
-        OtlpRequestType::HttpJson => Ok(if partial {
-            (http::StatusCode::PARTIAL_CONTENT, Json(res)).into_response()
-        } else {
-            MetaHttpResponse::json(res)
-        }),
-        _ => {
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            Ok((
-                http::StatusCode::OK,
-                [(http::header::CONTENT_TYPE, "application/x-protobuf")],
-                out.to_vec(),
-            )
-                .into_response())
-        }
-    }
+    Ok(otlp_export_response(&res, req_type))
 }
 
 /// Schema rejections are tagged `InvalidData`; a failed WAL write carries the ingestion error.
@@ -1732,8 +1787,17 @@ async fn write_traces_by_stream(
     time_stats: (i64, &Instant),
     json_data_by_stream: HashMap<String, IngestJsonData>,
     user_email: &str,
+    partial_success: &mut ExportTracePartialSuccess,
 ) -> Result<(), Error> {
     for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
+        // only a pipeline destination can fail here; the request's own stream is checked on entry
+        if let Err(e) =
+            schema::check_stream_key_len(org_id, StreamType::Traces, &traces_stream_name)
+        {
+            partial_success.rejected_spans += json_data.len() as i64;
+            partial_success.error_message = e.to_string();
+            continue;
+        }
         if crate::ingestion::checks_for_new_stream(org_id)
             && !infra::schema::exists(org_id, StreamType::Traces, &traces_stream_name).await
         {
@@ -1796,7 +1860,7 @@ async fn write_traces_by_stream(
 async fn write_traces(
     org_id: &str,
     stream_name: &str,
-    json_data: Vec<(i64, json::Map<String, json::Value>)>,
+    mut json_data: Vec<(i64, json::Map<String, json::Value>)>,
 ) -> Result<RequestStats, Error> {
     let cfg = get_config();
     // get schema and stream settings
@@ -1837,6 +1901,9 @@ async fn write_traces(
     let mut triggers: TriggerAlertData =
         Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
     let mut evaluated_alerts = HashSet::new();
+    // An org with an alert downtime classifies every matching row, so a muted row hides none.
+    let mut mute_split = cur_stream_alerts
+        .and_then(|_| crate::ingestion::realtime_mute::RealtimeMuteSplit::for_org(org_id, 1));
     // End get stream alert
 
     // Start check for schema
@@ -1855,6 +1922,25 @@ async fn write_traces(
     )
     .await
     .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
+    // the check that turned the UDS on projected the schema, which would drop unpacked columns
+    if let Some(fields) = crate::ingestion::newly_enabled_uds_fields(
+        StreamType::Traces,
+        has_uds,
+        traces_schema_map.get(stream_name),
+    ) {
+        repack_for_new_uds(&mut json_data, &fields);
+        check_batch_schema(
+            org_id,
+            stream_name,
+            StreamType::Traces,
+            &mut traces_schema_map,
+            &json_data,
+            false,
+            true,
+        )
+        .await
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
+    }
     let record_schema = traces_schema_map
         .get(stream_name)
         .unwrap()
@@ -1878,7 +1964,10 @@ async fn write_traces(
     for (timestamp, record_val) in json_data {
         // Start check for alert trigger
         if let Some(alerts) = cur_stream_alerts
-            && triggers.len() < alerts.len()
+            && match &mute_split {
+                Some(split) => split.full_alerts() < alerts.len(),
+                None => triggers.len() < alerts.len(),
+            }
         {
             let alert_end_time = now_micros();
             for alert in alerts {
@@ -1890,7 +1979,11 @@ async fn write_traces(
                     alert.get_unique_key()
                 );
                 // check if alert already evaluated
-                if evaluated_alerts.contains(&key) {
+                let done = match &mute_split {
+                    Some(split) => split.is_full(&key),
+                    None => evaluated_alerts.contains(&key),
+                };
+                if done {
                     continue;
                 }
 
@@ -1899,8 +1992,17 @@ async fn write_traces(
                     .await
                     .map(|res| res.data)
                 {
-                    triggers.push((alert.clone(), data));
-                    evaluated_alerts.insert(key);
+                    match mute_split.as_mut() {
+                        Some(split) => split.push(&key, alert, data, None).await,
+                        None => {
+                            triggers.push((
+                                alert.clone(),
+                                data,
+                                crate::ingestion::RealtimeMute::Unchecked,
+                            ));
+                            evaluated_alerts.insert(key);
+                        }
+                    }
                 }
             }
         }
@@ -1943,6 +2045,9 @@ async fn write_traces(
         std::io::Error::other(e)
     })?;
 
+    if let Some(split) = mute_split {
+        tokio::spawn(split.evaluate());
+    }
     // only one trigger per request; notification/db work must not block ingestion
     if !triggers.is_empty() {
         tokio::spawn(evaluate_trigger(triggers));
@@ -1981,7 +2086,7 @@ fn detect_llm_stream(contains_key: impl Fn(&str) -> bool) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use config::utils::json::json;
+    use config::utils::json::{self, json};
     use opentelemetry_proto::tonic::trace::v1::{Status, status::StatusCode};
 
     fn attr_key(
@@ -1997,6 +2102,45 @@ mod tests {
     use super::span_duration_micros;
 
     #[test]
+    fn test_otlp_json_decodes_empty_any_values() {
+        use opentelemetry_proto::tonic::{
+            collector::trace::v1::ExportTraceServiceRequest,
+            common::v1::{ArrayValue, KeyValue, KeyValueList, any_value::Value},
+        };
+
+        let body = br#"{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"repro"}},{"key":"geo.locality.region","value":{}}]},"scopeSpans":[{"scope":{"name":"s","attributes":[{"key":"scope.empty","value":{}}]},"spans":[{"traceId":"5b8efff798038103d269b633813fc60c","spanId":"0123456789abcdef","name":"repro","kind":1,"startTimeUnixNano":"1793184000000000000","endTimeUnixNano":"1793184000000000001","attributes":[{"key":"probe","value":{}},{"key":"list","value":{"arrayValue":{}}},{"key":"map","value":{"kvlistValue":{}}}],"events":[{"timeUnixNano":"1793184000000000000","name":"e","attributes":[{"key":"b","value":{}}]}],"links":[{"traceId":"5b8efff798038103d269b633813fc60c","spanId":"0123456789abcdee","attributes":[{"key":"c","value":{}}]}]}]}]}]}"#;
+        assert!(config::utils::json::from_slice::<ExportTraceServiceRequest>(body).is_err());
+
+        let request: ExportTraceServiceRequest =
+            config::utils::json::from_slice_lenient_otlp(body).unwrap();
+        let value = |kv: &KeyValue| kv.value.as_ref().and_then(|v| v.value.clone());
+        let resource_spans = &request.resource_spans[0];
+        let resource = resource_spans.resource.as_ref().unwrap();
+        assert_eq!(
+            value(&resource.attributes[0]),
+            Some(Value::StringValue("repro".into()))
+        );
+        assert_eq!(resource.attributes[1].value, None);
+        let scope_spans = &resource_spans.scope_spans[0];
+        assert_eq!(
+            scope_spans.scope.as_ref().unwrap().attributes[0].value,
+            None
+        );
+        let span = &scope_spans.spans[0];
+        assert_eq!(span.attributes[0].value, None);
+        assert_eq!(
+            value(&span.attributes[1]),
+            Some(Value::ArrayValue(ArrayValue { values: vec![] }))
+        );
+        assert_eq!(
+            value(&span.attributes[2]),
+            Some(Value::KvlistValue(KeyValueList { values: vec![] }))
+        );
+        assert_eq!(span.events[0].attributes[0].value, None);
+        assert_eq!(span.links[0].attributes[0].value, None);
+    }
+
+    #[test]
     fn test_otlp_json_decodes_non_canonical_doubles() {
         use opentelemetry_proto::tonic::{
             collector::trace::v1::ExportTraceServiceRequest,
@@ -2007,7 +2151,7 @@ mod tests {
         assert!(config::utils::json::from_slice::<ExportTraceServiceRequest>(body).is_err());
 
         let request: ExportTraceServiceRequest =
-            config::utils::json::from_slice_lenient_floats(body).unwrap();
+            config::utils::json::from_slice_lenient_otlp(body).unwrap();
         let value = |kv: &KeyValue| kv.value.as_ref().and_then(|v| v.value.clone());
         let resource_spans = &request.resource_spans[0];
         let resource = resource_spans.resource.as_ref().unwrap();
@@ -2130,6 +2274,7 @@ mod tests {
             "gen_ai_usage_cost_cache_read_savings": "0.18",
             "gen_ai_usage_cost_net_cache_impact": "0.11",
             "gen_ai_usage_cost": false,
+            "gen_ai_prompt_version": 3,
             "unrelated": "value"
         })
         .as_object()
@@ -2221,6 +2366,10 @@ mod tests {
             Some(0.0)
         );
         assert_eq!(
+            record.get("gen_ai_prompt_version").and_then(|v| v.as_str()),
+            Some("3")
+        );
+        assert_eq!(
             record.get("unrelated").and_then(|v| v.as_str()),
             Some("value")
         );
@@ -2244,22 +2393,113 @@ mod tests {
         assert_eq!(response.status(), http::StatusCode::OK);
     }
 
-    #[test]
-    fn test_format_response_partial_success() {
+    #[tokio::test]
+    async fn test_format_response_partial_success() {
         let partial_success =
             opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
                 rejected_spans: 5,
                 error_message: "Some spans rejected".to_string(),
             };
 
-        let result = super::format_response(
+        let response = super::format_response(
             partial_success,
             config::meta::otlp::OtlpRequestType::HttpJson,
+        )
+        .unwrap();
+        assert_eq!(response.status(), http::StatusCode::OK);
+        assert_eq!(
+            response.headers()[http::header::CONTENT_TYPE],
+            crate::common::meta::http::CONTENT_TYPE_JSON
         );
-        assert!(result.is_ok());
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: json::Value = json::from_slice(&body).unwrap();
+        assert_eq!(
+            body,
+            json::json!({
+                "partialSuccess": {
+                    "rejectedSpans": "5",
+                    "errorMessage": "Some spans rejected"
+                }
+            })
+        );
+    }
 
-        let response = result.unwrap();
-        assert_eq!(response.status(), http::StatusCode::PARTIAL_CONTENT);
+    #[tokio::test]
+    async fn test_format_response_json_partial_success_default_message() {
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: 2,
+                error_message: String::new(),
+            };
+
+        let response = super::format_response(
+            partial_success,
+            config::meta::otlp::OtlpRequestType::HttpJson,
+        )
+        .unwrap();
+        assert_eq!(response.status(), http::StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: json::Value = json::from_slice(&body).unwrap();
+        assert_eq!(body["partialSuccess"]["rejectedSpans"], "2");
+        assert!(
+            body["partialSuccess"]["errorMessage"]
+                .as_str()
+                .unwrap()
+                .contains("retention period")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_format_response_keeps_specific_error_message() {
+        use prost::Message;
+
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: 2,
+                error_message: "Pipeline batch execution error: boom".to_string(),
+            };
+        let response = super::format_response(
+            partial_success,
+            config::meta::otlp::OtlpRequestType::HttpProtobuf,
+        )
+        .unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let decoded =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceResponse::decode(
+                body,
+            )
+            .unwrap()
+            .partial_success
+            .unwrap();
+        assert_eq!(decoded.rejected_spans, 2);
+        assert_eq!(
+            decoded.error_message,
+            "Pipeline batch execution error: boom"
+        );
+
+        let generic = opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+            rejected_spans: 1,
+            error_message: String::new(),
+        };
+        let response =
+            super::format_response(generic, config::meta::otlp::OtlpRequestType::Grpc).unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let decoded =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceResponse::decode(
+                body,
+            )
+            .unwrap()
+            .partial_success
+            .unwrap();
+        assert!(decoded.error_message.contains("retention period"));
     }
 
     #[test]
@@ -2333,7 +2573,7 @@ mod tests {
     #[test]
     fn test_reserved_span_fields() {
         let reserved_span_fields = &super::RESERVED_SPAN_FIELDS;
-        assert_eq!(reserved_span_fields.len(), 33);
+        assert_eq!(reserved_span_fields.len(), 34);
         // All eleven DBM identity columns are reserved (design D1 condition 1).
         for field in crate::db_monitoring::ALL_DB_FIELDS {
             assert!(
@@ -2760,6 +3000,37 @@ mod tests {
     }
 
     #[test]
+    fn test_span_attribute_key_blocks_cost_status_spoofing() {
+        // Only the processor's own marker may reach gen_ai_usage_cost_status; a client's
+        // value in any spelling, on any span, keeps its data under an attr_ key.
+        let service_att_map = std::collections::HashMap::new();
+        for raw in [
+            "gen_ai.usage.cost_status",
+            "gen_ai_usage_cost_status",
+            "Gen_AI.Usage.Cost-Status",
+        ] {
+            assert_eq!(attr_key(raw, &service_att_map), format!("attr_{raw}"));
+        }
+    }
+
+    #[test]
+    fn test_strip_client_cost_status_on_json_path() {
+        use config::utils::json;
+
+        let mut record_val: json::Map<String, json::Value> = json::Map::new();
+        record_val.insert(
+            config::meta::model_pricing::COST_STATUS_COLUMN.to_string(),
+            json::json!("unpriced"),
+        );
+        record_val.insert("gen_ai_usage_cost".to_string(), json::json!(0.25));
+
+        super::strip_client_supplied_derived_fields(&mut record_val);
+
+        assert!(!record_val.contains_key(config::meta::model_pricing::COST_STATUS_COLUMN));
+        assert!(record_val.contains_key("gen_ai_usage_cost"));
+    }
+
+    #[test]
     fn test_strip_client_supplied_derived_fields_on_json_path() {
         // The JSON ingest path flattens client keys directly — RESERVED_SPAN_FIELDS
         // protects OTLP only. Incoming o2_db_* AND infer_service_* keys must be
@@ -2844,6 +3115,34 @@ mod tests {
         record_val.insert("infer_self_ip".to_string(), json::json!("10.0.0.2"));
         super::strip_client_supplied_derived_fields(&mut record_val);
         assert_eq!(record_val, before);
+    }
+
+    #[test]
+    fn test_repack_for_new_uds_keeps_derived_and_agent_columns() {
+        use config::utils::json;
+
+        let record = json::json!({
+            "trace_id": "5b8efff798038103d269b633813fc60c",
+            "o2_db_system": "postgresql",
+            "infer_peer_key": "db:5432",
+            "gen_ai_agent_name": "planner",
+            "junk_attr": "packed",
+        });
+        let mut json_data = vec![(1, record.as_object().unwrap().clone())];
+        let fields = std::collections::HashSet::from(["trace_id".to_string()]);
+
+        super::repack_for_new_uds(&mut json_data, &fields);
+
+        let record = &json_data[0].1;
+        for name in [
+            "trace_id",
+            "o2_db_system",
+            "infer_peer_key",
+            "gen_ai_agent_name",
+        ] {
+            assert!(record.contains_key(name), "missing {name}");
+        }
+        assert!(!record.contains_key("junk_attr"));
     }
 
     #[test]
@@ -3431,6 +3730,416 @@ mod tests {
             trace_write_error_status(&fault),
             http::StatusCode::INTERNAL_SERVER_ERROR
         );
+    }
+
+    fn string_kv(key: &str, val: &str) -> opentelemetry_proto::tonic::common::v1::KeyValue {
+        use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value};
+        KeyValue {
+            key: key.to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(val.to_string())),
+            }),
+            ..Default::default()
+        }
+    }
+
+    fn llm_span_attrs(source: &str) -> Vec<opentelemetry_proto::tonic::common::v1::KeyValue> {
+        use super::otel::attributes::{GenAiAttributes, LangfuseAttributes};
+        vec![
+            string_kv(GenAiAttributes::OPERATION_NAME, "chat"),
+            string_kv(LangfuseAttributes::METADATA_SOURCE, source),
+        ]
+    }
+
+    type ResourceInput<'a> = (
+        Option<&'a str>,
+        Vec<Vec<opentelemetry_proto::tonic::common::v1::KeyValue>>,
+    );
+
+    fn export_request(
+        resources: Vec<ResourceInput<'_>>,
+    ) -> opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest {
+        use opentelemetry_proto::tonic::{
+            collector::trace::v1::ExportTraceServiceRequest,
+            resource::v1::Resource,
+            trace::v1::{ResourceSpans, ScopeSpans, Span},
+        };
+        let now = chrono::Utc::now().timestamp_nanos_opt().unwrap() as u64;
+        let mut next_span_id = 0u8;
+        let resource_spans = resources
+            .into_iter()
+            .map(|(service_name, spans)| {
+                let mut attributes = vec![string_kv("host.name", "node-1")];
+                if let Some(name) = service_name {
+                    attributes.push(string_kv(super::SERVICE_NAME, name));
+                }
+                let spans = spans
+                    .into_iter()
+                    .map(|attributes| {
+                        next_span_id += 1;
+                        Span {
+                            trace_id: vec![9; 16],
+                            span_id: vec![next_span_id; 8],
+                            name: "op".to_string(),
+                            start_time_unix_nano: now,
+                            end_time_unix_nano: now + 1000,
+                            attributes,
+                            ..Default::default()
+                        }
+                    })
+                    .collect();
+                ResourceSpans {
+                    resource: Some(Resource {
+                        attributes,
+                        ..Default::default()
+                    }),
+                    scope_spans: vec![ScopeSpans {
+                        spans,
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }
+            })
+            .collect();
+        ExportTraceServiceRequest { resource_spans }
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_too_long_stream_key_is_rejected_on_entry() {
+        use config::meta::stream::StreamType;
+        use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+
+        let org_id = "test_org_id";
+        let long_name = "t".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let bounded =
+            infra::file_list::stream_key_violation(org_id, StreamType::Traces, &long_name)
+                .is_some();
+        let expected = if bounded {
+            axum::http::StatusCode::BAD_REQUEST
+        } else {
+            axum::http::StatusCode::OK
+        };
+
+        let resp = super::handle_otlp_request(
+            org_id,
+            ExportTraceServiceRequest::default(),
+            config::meta::otlp::OtlpRequestType::HttpProtobuf,
+            Some(&long_name),
+            ingestion_common::IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.status(), expected);
+
+        let resp = super::ingest_json(
+            org_id,
+            bytes::Bytes::from_static(b"[]"),
+            config::meta::otlp::OtlpRequestType::HttpJson,
+            &long_name,
+            ingestion_common::IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.status(), expected);
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_write_skips_only_a_destination_whose_stream_key_is_too_long() {
+        use std::collections::HashMap;
+
+        use config::meta::stream::StreamType;
+        use opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess;
+
+        let org_id = "test_org_id";
+        let long_name = "t".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let bounded =
+            infra::file_list::stream_key_violation(org_id, StreamType::Traces, &long_name)
+                .is_some();
+        let now = config::utils::time::now_micros();
+        let span = json!({
+            "_timestamp": now,
+            "trace_id": "0af7651916cd43dd8448eb211c80319c",
+            "span_id": "b7ad6b7169203331",
+            "start_time": now * 1000,
+            "end_time": now * 1000 + 1000,
+        });
+        let rows = |n: usize| {
+            let row = (now, span.as_object().unwrap().clone());
+            (vec![row; n], None)
+        };
+        let json_data_by_stream = HashMap::from([
+            ("test_traces_key_len_ok".to_string(), rows(1)),
+            (long_name.clone(), rows(2)),
+        ]);
+        let mut partial_success = ExportTracePartialSuccess::default();
+        super::write_traces_by_stream(
+            org_id,
+            (now, &std::time::Instant::now()),
+            json_data_by_stream,
+            "a@a.com",
+            &mut partial_success,
+        )
+        .await
+        .unwrap();
+
+        if bounded {
+            assert_eq!(partial_success.rejected_spans, 2);
+            assert!(
+                partial_success
+                    .error_message
+                    .starts_with("Stream name too long")
+            );
+        } else {
+            assert_eq!(partial_success.rejected_spans, 0);
+        }
+        assert!(infra::schema::exists(org_id, StreamType::Traces, "test_traces_key_len_ok").await);
+        assert_eq!(
+            infra::schema::exists(org_id, StreamType::Traces, &long_name).await,
+            !bounded
+        );
+    }
+
+    async fn ingest_and_read_service_names(
+        stream: &str,
+        resources: Vec<ResourceInput<'_>>,
+    ) -> Vec<String> {
+        use arrow::{array::StringArray, compute::cast, datatypes::DataType};
+
+        let org_id = "test_service_name_scope_org";
+        let resp = super::handle_otlp_request(
+            org_id,
+            export_request(resources),
+            config::meta::otlp::OtlpRequestType::HttpProtobuf,
+            Some(stream),
+            ingestion_common::IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+
+        let (_, batches) = ingester::read_from_memtable(
+            org_id,
+            config::meta::stream::StreamType::Traces.as_str(),
+            stream,
+            None,
+            &[],
+        )
+        .await
+        .unwrap();
+        let mut by_span_id = std::collections::BTreeMap::new();
+        for entry in batches.into_iter().flat_map(|(_, entries)| entries) {
+            let column = |name: &str| {
+                cast(entry.data.column_by_name(name).unwrap(), &DataType::Utf8).unwrap()
+            };
+            let span_ids = column("span_id");
+            let names = column("service_name");
+            let span_ids = span_ids.as_any().downcast_ref::<StringArray>().unwrap();
+            let names = names.as_any().downcast_ref::<StringArray>().unwrap();
+            for row in 0..entry.data.num_rows() {
+                by_span_id.insert(
+                    span_ids.value(row).to_string(),
+                    names.value(row).to_string(),
+                );
+            }
+        }
+        by_span_id.into_values().collect()
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_handle_otlp_request_resource_without_service_name_gets_stream_fallback() {
+        let stream = "test_svc_scope_resource";
+        let names = ingest_and_read_service_names(
+            stream,
+            vec![(Some("svc-a"), vec![vec![]]), (None, vec![vec![], vec![]])],
+        )
+        .await;
+        assert_eq!(names, ["svc-a", stream, stream]);
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_handle_otlp_request_llm_span_service_name_stays_on_its_span() {
+        let stream = "test_svc_scope_llm";
+        let names = ingest_and_read_service_names(
+            stream,
+            vec![
+                (
+                    None,
+                    vec![
+                        vec![],
+                        llm_span_attrs("llm-svc"),
+                        vec![],
+                        llm_span_attrs("other-svc"),
+                    ],
+                ),
+                (None, vec![vec![]]),
+            ],
+        )
+        .await;
+        assert_eq!(names, [stream, "llm-svc", stream, "other-svc", stream]);
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_handle_otlp_request_llm_span_service_name_only_replaces_placeholder() {
+        let names = ingest_and_read_service_names(
+            "test_svc_scope_placeholder",
+            vec![
+                (Some("svc-a"), vec![llm_span_attrs("llm-svc")]),
+                (
+                    Some("unknown_service"),
+                    vec![llm_span_attrs("llm-svc"), vec![]],
+                ),
+            ],
+        )
+        .await;
+        assert_eq!(names, ["svc-a", "llm-svc", "unknown_service"]);
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_handle_otlp_request_llm_processing_sees_span_name_and_error_status() {
+        use arrow::{
+            array::{Array, StringArray},
+            compute::cast,
+            datatypes::DataType,
+        };
+        use opentelemetry_proto::tonic::{
+            collector::trace::v1::ExportTraceServiceRequest,
+            common::v1::InstrumentationScope,
+            resource::v1::Resource,
+            trace::v1::{ResourceSpans, ScopeSpans, Span, Status, status::StatusCode},
+        };
+
+        let org_id = "test_llm_span_context_org";
+        let stream = "test_llm_span_context";
+        let now = chrono::Utc::now().timestamp_nanos_opt().unwrap() as u64;
+        let call_attrs = || {
+            vec![
+                string_kv("ai.model.id", "gpt-4o"),
+                string_kv(
+                    "ai.prompt.messages",
+                    r#"[{"role":"user","content":"Say hello to everyone"}]"#,
+                ),
+            ]
+        };
+        let span = |id: u8, name: &str, attributes, status| Span {
+            trace_id: vec![7; 16],
+            span_id: vec![id; 8],
+            name: name.to_string(),
+            start_time_unix_nano: now,
+            end_time_unix_nano: now + 1000,
+            attributes,
+            status,
+            ..Default::default()
+        };
+        let wrapper = span(
+            1,
+            "ai.generateText",
+            vec![
+                string_kv("ai.model.id", "gpt-4o"),
+                string_kv("ai.prompt", r#"{"prompt":"Say hello to everyone"}"#),
+                string_kv("ai.response.text", "Hello everyone!"),
+            ],
+            None,
+        );
+        let failed = span(
+            2,
+            "ai.generateText.doGenerate",
+            call_attrs(),
+            Some(Status {
+                code: StatusCode::Error as i32,
+                message: "upstream 500".to_string(),
+            }),
+        );
+        let succeeded = span(3, "ai.generateText.doGenerate", call_attrs(), None);
+        let request = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource: Some(Resource {
+                    attributes: vec![string_kv(super::SERVICE_NAME, "svc")],
+                    ..Default::default()
+                }),
+                scope_spans: vec![ScopeSpans {
+                    scope: Some(InstrumentationScope {
+                        name: "ai".to_string(),
+                        ..Default::default()
+                    }),
+                    spans: vec![wrapper, failed, succeeded],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let resp = super::handle_otlp_request(
+            org_id,
+            request,
+            config::meta::otlp::OtlpRequestType::HttpProtobuf,
+            Some(stream),
+            ingestion_common::IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+
+        let (_, batches) = ingester::read_from_memtable(
+            org_id,
+            config::meta::stream::StreamType::Traces.as_str(),
+            stream,
+            None,
+            &[],
+        )
+        .await
+        .unwrap();
+        // span_id -> (operation, input tokens, response model)
+        let mut rows = std::collections::BTreeMap::new();
+        for entry in batches.into_iter().flat_map(|(_, entries)| entries) {
+            let column = |name: &str| {
+                entry
+                    .data
+                    .column_by_name(name)
+                    .map(|c| cast(c, &DataType::Utf8).unwrap())
+            };
+            let value = |col: &Option<arrow::array::ArrayRef>, row: usize| {
+                col.as_ref().and_then(|c| {
+                    let c = c.as_any().downcast_ref::<StringArray>().unwrap();
+                    (!c.is_null(row)).then(|| c.value(row).to_string())
+                })
+            };
+            let (span_ids, ops, input_tokens, response_models) = (
+                column("span_id"),
+                column("gen_ai_operation_name"),
+                column("gen_ai_usage_input_tokens"),
+                column("gen_ai_response_model"),
+            );
+            for row in 0..entry.data.num_rows() {
+                rows.insert(
+                    value(&span_ids, row).unwrap(),
+                    (
+                        value(&ops, row),
+                        value(&input_tokens, row)
+                            .map(|v| v.parse::<i64>().unwrap())
+                            .unwrap_or(0),
+                        value(&response_models, row),
+                    ),
+                );
+            }
+        }
+        let rows: Vec<_> = rows.into_values().collect();
+        // The wrapper is recognised by its span name alone and is not estimated.
+        assert_eq!(rows[0].0.as_deref(), Some("invoke_workflow"));
+        assert_eq!(rows[0].1, 0);
+        // The ERROR call without usage gets no estimate and no request-derived response model.
+        assert_eq!(rows[1], (Some("chat".to_string()), 0, None));
+        // The same call without an error status is estimated.
+        assert_eq!(rows[2].0.as_deref(), Some("chat"));
+        assert!(rows[2].1 > 0);
+        assert_eq!(rows[2].2.as_deref(), Some("gpt-4o"));
     }
 
     // cloud builds reject the unknown test org at the trial check before the columns check

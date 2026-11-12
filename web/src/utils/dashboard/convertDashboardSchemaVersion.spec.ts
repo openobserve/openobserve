@@ -639,4 +639,42 @@ describe("convertDashboardSchemaVersion", () => {
     expect(result.tabs[0].panels[0].queries[0].fields.x).toEqual([]); // unchanged
     expect(result.tabs[0].panels[0].queries[0].fields.breakdown).toEqual([]); // empty array added
   });
+
+  it("carries annotationSources through every migration step untouched", () => {
+    const annotationSources = [
+      {
+        id: "s1",
+        name: "Deploys",
+        enabled: true,
+        mode: "builder",
+        streamType: "logs",
+        stream: "k8s_events",
+        filters: [{ field: "event", operator: "=", value: "deploy" }],
+        title: "{service}",
+        panels: ["panel-1"],
+      },
+    ];
+    const dataV6 = {
+      version: 6,
+      title: "Test Dashboard",
+      annotationSources: JSON.parse(JSON.stringify(annotationSources)),
+      tabs: [
+        {
+          panels: [
+            {
+              id: "panel-1",
+              type: "line",
+              layout: { x: 0, y: 1, h: 8, w: 48, i: "panel-1" },
+              queries: [],
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = convertDashboardSchemaVersion(dataV6);
+
+    expect(result.version).toBe(8);
+    expect(result.annotationSources).toEqual(annotationSources);
+  });
 });

@@ -16,6 +16,7 @@
 use config::{
     META_ORG_ID, get_config,
     meta::{
+        alerts::auto_investigate::{AUTO_INVESTIGATE_DECISIONS_STREAM, DecisionRow},
         self_reporting::{
             ReportingData,
             redaction::{EvidenceScope, GapReason, REDACTION_EVIDENCE_STREAM, RedactionEvidence},
@@ -46,6 +47,7 @@ struct BufferedData {
     errors: Vec<json::Value>,
     raw_errors: Vec<config::meta::self_reporting::error::ErrorData>,
     redactions: Vec<RedactionEvidence>,
+    decisions: Vec<DecisionRow>,
 }
 
 fn collect_additional_reporting_orgs(configured: &str) -> Vec<String> {
@@ -74,6 +76,7 @@ fn partition_buffered_data(buffered: Vec<ReportingData>) -> BufferedData {
                 out.raw_errors.push(error_data);
             }
             ReportingData::Redaction(evidence) => out.redactions.push(*evidence),
+            ReportingData::AutoInvestigateDecision(row) => out.decisions.push(*row),
         }
     }
     out
@@ -91,10 +94,15 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
         errors,
         raw_errors,
         redactions,
+        decisions,
     } = partition_buffered_data(buffered);
 
     if !redactions.is_empty() {
         ingest_redaction_evidence(redactions).await;
+    }
+
+    if !decisions.is_empty() {
+        ingest_auto_investigate_decisions(decisions).await;
     }
 
     let cfg = get_config();
@@ -265,6 +273,27 @@ fn group_redactions_by_org(
     per_org
 }
 
+/// Always `_meta`, whatever org a row is about: the log is never written to or billed to that org.
+fn decisions_stream() -> StreamParams {
+    StreamParams::new(
+        META_ORG_ID,
+        AUTO_INVESTIGATE_DECISIONS_STREAM,
+        StreamType::Logs,
+    )
+}
+
+/// Never re-enqueued, like redaction evidence: a lost decision row is only a gap in the log.
+async fn ingest_auto_investigate_decisions(decisions: Vec<DecisionRow>) {
+    let count = decisions.len();
+    let values: Vec<_> = decisions
+        .iter()
+        .filter_map(|row| json::to_value(row).ok())
+        .collect();
+    if let Err(e) = super::ingestion::ingest_reporting_data(values, decisions_stream()).await {
+        log::error!("[SELF-REPORTING] Failed to ingest {count} auto-investigate decisions: {e}");
+    }
+}
+
 async fn ingest_redaction_evidence(redactions: Vec<RedactionEvidence>) {
     for (org, rows) in group_redactions_by_org(redactions) {
         if let Err(e) =
@@ -349,6 +378,50 @@ mod tests {
         assert!(partitioned.errors.is_empty());
         assert!(partitioned.raw_errors.is_empty());
         assert_eq!(partitioned.redactions[0].redacted_regions, 2);
+    }
+
+    #[test]
+    fn auto_investigate_decisions_go_to_the_meta_stream_never_the_alerts_org() {
+        use config::meta::alerts::auto_investigate::{
+            BudgetCheck, DecisionContext, GateInputs, GateSettings, MarkLookup,
+            decide_auto_investigate,
+        };
+
+        let inputs = GateInputs {
+            is_new_fire: true,
+            level: Some(config::meta::alerts::level::AlertLevel::Critical),
+            rca_running: false,
+            last_auto_investigated_at: None,
+            protected: false,
+            mark_lookup: MarkLookup::NotChecked,
+            onsets_7d: 1,
+            evaluations_7d: 10,
+            fire_share_7d: 0.1,
+            budget: BudgetCheck::Allowed,
+            now: 1_000,
+            settings: GateSettings::default(),
+            settings_version: None,
+        };
+        let row = DecisionRow::new(
+            &decide_auto_investigate(&inputs),
+            &inputs,
+            DecisionContext {
+                org_id: "tenant".to_string(),
+                ..Default::default()
+            },
+        );
+        let partitioned = partition_buffered_data(vec![
+            ReportingData::AutoInvestigateDecision(Box::new(row.clone())),
+            ReportingData::Trigger(Box::new(TriggerData::init_for_reflection())),
+        ]);
+        assert_eq!(partitioned.decisions, vec![row]);
+        assert_eq!(partitioned.triggers.len(), 1);
+        assert!(partitioned.redactions.is_empty());
+
+        let stream = decisions_stream();
+        assert_eq!(stream.org_id.as_str(), META_ORG_ID);
+        assert_eq!(stream.stream_name.as_str(), "auto_investigate_decisions");
+        assert_eq!(stream.stream_type, StreamType::Logs);
     }
 
     #[test]

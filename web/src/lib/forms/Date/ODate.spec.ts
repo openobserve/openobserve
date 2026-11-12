@@ -21,6 +21,20 @@ describe("ODate", () => {
     expect(wrapper.text()).toContain("Date of birth");
   });
 
+  it("should render the label above the field by default", () => {
+    wrapper = mount(ODate, { props: { label: "From" } });
+    expect(wrapper.find(".o-input-label").text()).toBe("From");
+    expect(wrapper.find('[role="group"] label').exists()).toBe(false);
+  });
+
+  it("should render the label inside the field border when labelPosition is inside", () => {
+    wrapper = mount(ODate, { props: { label: "From", labelPosition: "inside" } });
+    expect(wrapper.find(".o-input-label").exists()).toBe(false);
+    const inside = wrapper.find('[role="group"] label');
+    expect(inside.text()).toBe("From");
+    expect(wrapper.find('[role="group"]').classes()).toContain("relative");
+  });
+
   it("should render label slot content", () => {
     wrapper = mount(ODate, { slots: { label: "Custom label" } });
     expect(wrapper.text()).toContain("Custom label");
@@ -87,5 +101,14 @@ describe("ODate", () => {
   it("should render the calendar trigger button", () => {
     wrapper = mount(ODate);
     expect(wrapper.find('[aria-label="Open calendar"]').exists()).toBe(true);
+  });
+
+  it("draws its label like the other form fields", () => {
+    const w = mount(ODate, { props: { label: "Expires" } });
+    const label = w.find("label");
+    expect(label.classes()).toEqual(
+      expect.arrayContaining(["text-compact", "font-medium", "text-input-label-text"]),
+    );
+    expect(label.classes()).not.toContain("font-semibold");
   });
 });

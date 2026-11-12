@@ -7,6 +7,7 @@
  */
 const { test, expect } = require('@playwright/test');
 const testLogger = require('./test-logger.js');
+const { ingestBase } = require('./ingest-url.js');
 
 const {
   generateFullTopology,
@@ -71,7 +72,7 @@ test.describe('Service Graph Data Ingestion', () => {
     };
 
     // Step 4: Verify auth works for ingestion
-    const testResp = await page.request.post(`${baseUrl}/api/${orgId}/v1/traces`, {
+    const testResp = await page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/v1/traces`, {
       headers: authHeaders,
       data: { resourceSpans: [] },
     });
@@ -91,7 +92,7 @@ test.describe('Service Graph Data Ingestion', () => {
       const payload = allTraces[i].payload || allTraces[i];
       try {
         const response = await page.request.post(
-          `${baseUrl}/api/${orgId}/v1/traces`,
+          `${ingestBase(baseUrl)}/api/${orgId}/v1/traces`,
           { headers: authHeaders, data: payload }
         );
         if (response.status() === 200) {

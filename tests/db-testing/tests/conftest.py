@@ -3,6 +3,7 @@ Pytest configuration and fixtures for DB validation tests.
 """
 import os
 import time
+import uuid
 import pytest
 import psycopg2
 import requests
@@ -127,3 +128,47 @@ def query_api(openobserve_base_url, auth_credentials, test_org):
         return response.json()
 
     return _query
+
+
+# The SSRF guard refuses loopback and private destination URLs.
+WEBHOOK_URL = "https://example.com/o2-db-testing"
+
+
+def unique_name(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:8]}"
+
+
+@pytest.fixture
+def api(openobserve_base_url, auth_credentials, test_org):
+    """Call `/api/{org}/<path>` (or `/api/v2/...` with v2=True) as root."""
+    session = requests.Session()
+    session.auth = auth_credentials
+
+    def _call(method: str, path: str, *, v2: bool = False, **kwargs) -> requests.Response:
+        prefix = "api/v2" if v2 else "api"
+        return session.request(method, f"{openobserve_base_url}/{prefix}/{test_org}/{path}", **kwargs)
+
+    yield _call
+    session.close()
+
+
+@pytest.fixture
+def destination(api, ingest_test_data):
+    """An http template + webhook destination, on a stream that exists."""
+    ingest_test_data([{"level": "error", "message": "roundtrip seed"}])
+    template = unique_name("rt_template")
+    resp = api("POST", "alerts/templates", json={"name": template, "body": '{"text": "{alert_name}"}', "type": "http", "title": ""})
+    assert resp.status_code == 200, f"template create: {resp.status_code} {resp.text}"
+
+    dest = unique_name("rt_dest")
+    resp = api(
+        "POST",
+        "alerts/destinations",
+        json={"name": dest, "url": WEBHOOK_URL, "method": "post", "template": template, "headers": {}, "skip_tls_verify": False},
+    )
+    assert resp.status_code == 200, f"destination create: {resp.status_code} {resp.text}"
+
+    yield dest
+
+    api("DELETE", f"alerts/destinations/{dest}")
+    api("DELETE", f"alerts/templates/{template}")

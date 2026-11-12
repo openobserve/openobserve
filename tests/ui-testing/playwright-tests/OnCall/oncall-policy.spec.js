@@ -64,19 +64,17 @@ const BUDGET_MAX = 600;
 /**
  * A team with one rotation and members, in the order the server accepts.
  *
- * Schedule before members: adding the first member to a rotationless team
- * auto-provisions a `source: "default"` rotation and repoints P1-P3 at it, and
- * a schedule written afterwards is then the §8.5 replacement the server
- * refuses.
+ * Members before schedule: a schedule naming somebody not on the team is
+ * refused with a 400.
  */
 async function stageTeam(page, name, { memberCount = 3 } = {}) {
   const users = await createOrgUsers(page, name, memberCount);
   const team = await createTeam(page, { name, timezone: 'UTC' });
+  await addTeamMembers(page, team.id, users);
   await setTeamSchedule(page, team.id, {
     timezone: 'UTC',
     rotations: [rotation({ id: 'Primary', members: users })],
   });
-  await addTeamMembers(page, team.id, users);
   return { team, users };
 }
 
@@ -300,17 +298,18 @@ test.describe('On-call escalation policy editor', {
    * arrive from legacy data or a newer engine. Writing one needs a fixture at
    * the storage layer, which is a decision, not a test.
    */
-  test.fixme('TS-10.08b an unrecognised target kind renders as unrecognised rather than as a deleted rotation — not wired: POST/PUT policy 422s any kind outside rotation|user|whole_team, so the state cannot be seeded through the API, verified 16 Sep on :5090. o2-enterprise#2481.', {
+  test.fixme('TS-10.08b an unrecognised target kind renders as unrecognised rather than as a deleted rotation — the API 422s an unknown kind, so it cannot be seeded. o2-enterprise#2481.', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
     const name = uniqueName(`${workerPrefix(testInfo)}_kind`);
     const { team } = await stageTeam(page, name);
-    await putPolicy(page, team.id, {
+    const seeded = await putPolicy(page, team.id, {
       rungs: [{
         priority: 2, channels: ['email'],
         steps: [{ after_micros: 0, targets: [{ kind: 'martian_relay' }] }],
       }],
     });
+    expect(seeded.status, `the unknown-kind policy must be stored before its rendering can be read: ${seeded.text}`).toBe(200);
 
     await pm.oncallPolicyEditorPage.gotoEscalationTab(ORG, team.id);
     await pm.oncallPolicyEditorPage.openEditor();
@@ -361,13 +360,15 @@ test.describe('On-call escalation policy editor', {
     await pm.oncallPolicyEditorPage.openTab('delivery');
     await pm.oncallPolicyEditorPage.expectTeamChannelVisible();
     await pm.oncallPolicyEditorPage.expectChannelSilentWarning();
-    const silentSource = await pm.oncallPolicyEditorPage.readChannelSourceText();
-    expect(silentSource.toLowerCase(),
+    const silentSource = await pm.oncallPolicyEditorPage.readChannelSource();
+    expect(silentSource,
       'the screen must attribute the deliberate silence to the team')
-      .toContain('team');
+      .toBe('team');
 
     // None — never set, so the policy's list applies again.
     await pm.oncallPolicyEditorPage.clearTeamChannel();
+    // The channel choice is only a draft until the policy's Save, which also closes the editor.
+    await pm.oncallPolicyEditorPage.savePolicy();
     await expect
       .poll(async () => (await getTeamChannel(page, team.id))?.source, {
         timeout: 20000,
@@ -379,10 +380,12 @@ test.describe('On-call escalation policy editor', {
     expect(cleared.destinations,
       'both states render an empty list — which is exactly why source has to carry the difference')
       .toEqual([]);
-    const policySource = await pm.oncallPolicyEditorPage.readChannelSourceText();
-    expect(policySource.toLowerCase(),
+    await pm.oncallPolicyEditorPage.openEditor();
+    await pm.oncallPolicyEditorPage.openTab('delivery');
+    const policySource = await pm.oncallPolicyEditorPage.readChannelSource();
+    expect(policySource,
       'and the screen must now attribute it to the policy instead')
-      .toContain('policy');
+      .toBe('policy');
   });
 
   /**
@@ -443,5 +446,66 @@ test.describe('On-call escalation policy editor', {
     ).toEqual([]);
     expect(offered, 'both edges of the documented range must be reachable from the UI')
       .toEqual(expect.arrayContaining([BUDGET_MIN, BUDGET_MAX]));
+  });
+
+  test('UN-02 SMS without Email warns and the save is held, while Webhook alone is fine', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    const name = uniqueName(`${workerPrefix(testInfo)}_tel_ticks`);
+    const { team } = await stageTeam(page, name, { memberCount: 1 });
+    const before = (await getPolicy(page, team.id)).rungs.find((rung) => rung.priority === 1);
+
+    await pm.oncallPolicyEditorPage.gotoEscalationTab(ORG, team.id);
+    await pm.oncallPolicyEditorPage.openEditor();
+    await pm.oncallPolicyEditorPage.selectPriority(1);
+    await pm.oncallPolicyEditorPage.setChannel(1, 'sms', true);
+    await pm.oncallPolicyEditorPage.setChannel(1, 'email', false);
+    testLogger.info('Expect the inline warning (D13, U4, guide 5)');
+    await pm.oncallPolicyEditorPage.expectPhoneWithoutEmailWarning(
+      'Texts and calls need Email too: people without a phone would get nothing.',
+    );
+
+    const refused = await pm.oncallPolicyEditorPage.savePolicyExpectingRefusal();
+    expect(refused === null || refused === 400, `the save must be refused, got HTTP ${refused}`).toBe(true);
+    await pm.oncallPolicyEditorPage.expectEditorVisible();
+    const after = (await getPolicy(page, team.id)).rungs.find((rung) => rung.priority === 1);
+    expect(after.channels, 'a refused save must leave the stored ticks alone').toEqual(before.channels);
+
+    await pm.oncallPolicyEditorPage.setChannel(1, 'sms', false);
+    await pm.oncallPolicyEditorPage.setChannel(1, 'voice', false);
+    await pm.oncallPolicyEditorPage.setChannel(1, 'webhook', true);
+    testLogger.info('Expect no warning for Webhook alone (D13)');
+    await pm.oncallPolicyEditorPage.expectNoPhoneWithoutEmailWarning();
+  });
+
+  test('UN-03 with no provider the Delivery tab says so, with the default ticks per priority', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    const name = uniqueName(`${workerPrefix(testInfo)}_tel_note`);
+    const { team } = await stageTeam(page, name, { memberCount: 1 });
+
+    await pm.oncallPolicyEditorPage.gotoEscalationTab(ORG, team.id);
+    const contact = await pm.oncallPolicyEditorPage.openEditorReadingContact();
+    expect(contact.phone_provider_available, 'the read the note hangs on').toBe(false);
+
+    await pm.oncallPolicyEditorPage.selectPriority(1);
+    testLogger.info('Expect the no-provider note and its link (guide 5)');
+    await pm.oncallPolicyEditorPage.expectNoProviderNote({
+      note: 'No phone provider is connected, so SMS and Voice are skipped and these pages go by email.',
+      link: /Connect one in Settings\s*(→|->)\s*Telephony/,
+    });
+
+    // o2-enterprise#3420 D6: the guide explains "Everyone paged" but the app dropped the hint, so the tab's words for it are not read.
+    testLogger.info('Expect P1 and P2 on all three, P3 on Email alone (D14, guide 5)');
+    for (const priority of [1, 2]) {
+      await pm.oncallPolicyEditorPage.selectPriority(priority);
+      await pm.oncallPolicyEditorPage.expectChannelTicked(priority, 'email', true);
+      await pm.oncallPolicyEditorPage.expectChannelTicked(priority, 'sms', true);
+      await pm.oncallPolicyEditorPage.expectChannelTicked(priority, 'voice', true);
+    }
+    await pm.oncallPolicyEditorPage.selectPriority(3);
+    await pm.oncallPolicyEditorPage.expectChannelTicked(3, 'email', true);
+    await pm.oncallPolicyEditorPage.expectChannelTicked(3, 'sms', false);
+    await pm.oncallPolicyEditorPage.expectChannelTicked(3, 'voice', false);
   });
 });

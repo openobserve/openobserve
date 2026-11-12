@@ -59,6 +59,10 @@ export class AlertTemplatesPage {
         this.headerCheckbox = '[data-test="o2-table-select-all"]';
         this.addTemplateTitle = '[data-test="add-template-title"]';
         this.templateCancelBtn = '[data-test="add-template-cancel-btn"]';
+        this.toastDismissBtn = '[data-test="o-toast-dismiss"]';
+        // Editor drafts: Cancel with unsaved changes opens the shared leave dialog
+        this.draftLeaveDialog = '[data-test="editor-draft-leave-dialog"]';
+        this.draftLeaveDiscardBtn = '[data-test="editor-draft-leave-dialog"] [data-test="o-dialog-neutral-btn"]';
         this.templateCloneBtnPattern = '[data-test="alert-template-list-{templateName}-clone-template"]';
 
         // Inline locators moved from methods
@@ -187,6 +191,20 @@ export class AlertTemplatesPage {
         await expect(
             this.page.locator('[data-test^="o2-table-row-"]').first(),
         ).toBeVisible({ timeout: 20000 });
+    }
+
+    /**
+     * Bounding boxes of the list toolbar: Applies to filter, search box, and Refresh.
+     * Waits until the search box is attached, then reads all three.
+     */
+    async getToolbarBoxes() {
+        const search = this.page.locator('[data-test="template-list-search-input"]').first();
+        await search.waitFor({ state: 'attached', timeout: 30000 });
+        return {
+            filter: await this.page.locator('[data-test="template-list-applies-to-filter"]').first().boundingBox(),
+            search: await search.boundingBox(),
+            refresh: await this.page.locator('[data-test="template-list-refresh-btn"]').first().boundingBox(),
+        };
     }
 
     /**
@@ -1216,8 +1234,30 @@ export class AlertTemplatesPage {
         await this.page.waitForTimeout(2000);
     }
 
+    // Polls rather than loops over a count because a toast can auto-dismiss between the check and the click.
+    async dismissVisibleToasts() {
+        const closers = this.page.locator(this.toastDismissBtn).filter({ visible: true });
+        await expect(async () => {
+            if (await closers.count() > 0) {
+                await closers.first().click({ timeout: 2000 });
+            }
+            await expect(closers).toHaveCount(0, { timeout: 500 });
+        }).toPass({ timeout: 15000 });
+    }
+
     async clickTemplateCancelBtn() {
+        // Validation toasts sit over the form footer and a hovering mouse pauses their auto-dismiss timer.
+        await this.dismissVisibleToasts();
         await this.page.locator(this.templateCancelBtn).click();
+        // Unsaved changes are discarded through the leave dialog so no draft is left behind.
+        const asked = await this.page.locator(this.draftLeaveDialog)
+            .waitFor({ state: 'visible', timeout: 2000 })
+            .then(() => true)
+            .catch(() => false);
+        if (asked) {
+            await this.page.locator(this.draftLeaveDiscardBtn).click();
+            await this.page.locator(this.draftLeaveDialog).waitFor({ state: 'hidden', timeout: 10000 });
+        }
         await this.page.waitForTimeout(1000);
     }
 

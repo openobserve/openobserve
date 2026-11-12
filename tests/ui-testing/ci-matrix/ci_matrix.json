@@ -4,10 +4,9 @@
     "actual_folder": "Alerts",
     "browser": "chrome",
     "run_files": [
-      "alerts-ui-operations.spec.js",
+      "alerts-help-drawer.spec.js",
       "alerts-import.spec.js",
       "alerts-metrics-notification.spec.js",
-      "alerts-destinations-prebuilt.spec.js",
       "dl-email-destinations.spec.js",
       "alerts-vrl-encoding.spec.js",
       "alerts-history.spec.js",
@@ -15,21 +14,17 @@
       "alerts-form-validation.spec.js",
       "alerts-priority-tags.spec.js",
       "alerts-multialert-ui.spec.js",
-      "alert-library.spec.js",
       "alerts-add-alert-org-identifier.spec.js",
-      "alerts-composite-builder.spec.js",
-      "alerts-composite-list.spec.js",
-      "alerts-clone-dialog.spec.js",
-      "alerts-composite-preview.spec.js",
-      "alerts-composite-detail.spec.js",
-      "alerts-evaluation-chart.spec.js",
       "alerts-chart-error-state.spec.js",
       "alertsPagination.spec.js",
       "alertTemplatesPagination.spec.js",
+      "alertTemplatesToolbar.spec.js",
       "alertDestinationsPagination.spec.js",
       "alerts-destinations-usage.spec.js",
-      "alerts-save-query-mode.spec.js",
-      "alerts-no-destination.spec.js"
+      "alerts-no-destination.spec.js",
+      "alerts-from-panel.spec.js",
+      "alertCalibration.spec.js",
+      "alerts-content-templates.spec.js"
     ],
     "disabled": [
       {
@@ -47,6 +42,25 @@
     ]
   },
   {
+    "testfolder": "Alerts-Composite-Library",
+    "actual_folder": "Alerts",
+    "browser": "chrome",
+    "run_files": [
+      "alerts-ui-operations.spec.js",
+      "alerts-destinations-prebuilt.spec.js",
+      "alert-library.spec.js",
+      "alert-library-anomaly.spec.js",
+      "alerts-composite-builder.spec.js",
+      "alerts-composite-detail.spec.js",
+      "alerts-composite-list.spec.js",
+      "alerts-composite-preview.spec.js",
+      "alerts-clone-dialog.spec.js",
+      "alerts-save-query-mode.spec.js",
+      "alerts-evaluation-chart.spec.js"
+    ],
+    "disabled": []
+  },
+  {
     "testfolder": "Dashboard-Config-Settings",
     "actual_folder": "Dashboards",
     "browser": "chrome",
@@ -54,17 +68,20 @@
       "dashboard-series-color-multiwindow.spec.js",
       "dashboard-config-advanced.spec.js",
       "dashboard-config-axis.spec.js",
+      "dashboard-stacked-axis-bounds.spec.js",
       "dashboard-config-gauge-maps.spec.js",
+      "dashboard-config-bar-gauge.spec.js",
       "dashboard-config-general.spec.js",
+      "dashboard-config-heatmap.spec.js",
       "dashboard-config-legends.spec.js",
       "dashboard-config-line-style.spec.js",
       "dashboard-config-panel-time.spec.js",
       "dashboard-config-table.spec.js",
       "dashboard-config-trellis.spec.js",
-      "dashboard-config-drilldown.spec.js",
       "dashboard-config-promql.spec.js",
       "dashboard-config-markline.spec.js",
-      "dashboard-config-unit-locale.spec.js"
+      "dashboard-config-unit-locale.spec.js",
+      "dashboard-chart-options-foundation.spec.js"
     ],
     "disabled": []
   },
@@ -79,11 +96,15 @@
       "dashboard-maps.spec.js",
       "dashboard-multi-y-axis.spec.js",
       "dashboard-html-chart.spec.js",
+      "dashboard-text-panel-variables.spec.js",
       "dashboard-sankey.spec.js",
       "dashboard-pie-donut.spec.js",
+      "dashboard-pie-legend-values.spec.js",
+      "dashboard-enrichment-table-panel.spec.js",
       "dashboard-metric-camelcase.spec.js",
       "dashboard-create-alert.spec.js",
-      "dashboard-zoom-brush.spec.js"
+      "dashboard-zoom-brush.spec.js",
+      "dashboard-config-drilldown.spec.js"
     ],
     "disabled": []
   },
@@ -92,6 +113,7 @@
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
+      "dashboard-sql-autocomplete-values.spec.js",
       "dashboard.spec.js",
       "dashboard2.spec.js",
       "dashboardtype.spec.js",
@@ -102,30 +124,26 @@
       "dashboard-promql-suggestions.spec.js",
       "dashboard-sql-autocomplete.spec.js",
       "dashboard-share-link.spec.js",
-      "crossLinking.spec.js",
-      "dashboard-multi-sql.spec.js",
-      "crossLinkMultiStream.spec.js",
-      "dashboards-form-validation.spec.js",
-      "dashboard-panel-unsaved-changes.spec.js",
       "dashboard-panel-live-preview.spec.js",
       "dashboard-refresh-without-cache.spec.js",
       "dashboard-print-layout.spec.js",
       "dashboard-layout-edit-mode.spec.js",
-      "dashboardPagination.spec.js"
+      "dashboardPagination.spec.js",
+      "dashboard-save-conflict.spec.js",
+      "refreshCancelButtons.spec.js",
+      "dashboard-refresh-button.spec.js",
+      "panelNotices.spec.js",
+      "promqlAutocomplete.spec.js"
     ],
-    "disabled": [
-      {
-        "file": "promqlAutocomplete.spec.js",
-        "reason": "silently dead: manifest listed it under the wrong folder, so it never ran; revalidate before enabling"
-      }
-    ]
+    "disabled": []
   },
   {
     "testfolder": "Dashboards-Isolated",
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
-      "dashboard-favorites.spec.js"
+      "dashboard-favorites.spec.js",
+      "dashboard-tv-playlist.spec.js"
     ],
     "disabled": []
   },
@@ -138,7 +156,8 @@
       "dashboard-panel-time-url-priority.spec.js",
       "dashboard-panel-time-advanced-edge-cases.spec.js",
       "dashboard-panel-time-apply-behavior.spec.js",
-      "dashboard-panel-time-variables-behavior.spec.js"
+      "dashboard-panel-time-variables-behavior.spec.js",
+      "dashboard-time-range-apply.spec.js"
     ],
     "disabled": []
   },
@@ -154,7 +173,8 @@
       "dashboard-join.spec.js",
       "dashboard-nested-functions.spec.js",
       "dashboard-legends-copy.spec.js",
-      "dashboard-raw-query.spec.js"
+      "dashboard-raw-query.spec.js",
+      "dashboards-form-validation.spec.js"
     ],
     "disabled": []
   },
@@ -163,7 +183,10 @@
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
-      "dashboard-streaming.spec.js"
+      "dashboard-streaming.spec.js",
+      "dashboard-multi-sql.spec.js",
+      "dashboard-variables-stream-field.spec.js",
+      "dashboard-variables-dependency.spec.js"
     ],
     "disabled": []
   },
@@ -181,7 +204,8 @@
       "dashboard-table-pagination.spec.js",
       "dashboard-pivot-table.spec.js",
       "interactive-dashboard-table.spec.js",
-      "dashboard-cell-explorer-detail.spec.js"
+      "dashboard-cell-explorer-detail.spec.js",
+      "dashboard-panel-unsaved-changes.spec.js"
     ],
     "disabled": []
   },
@@ -194,13 +218,11 @@
       "dashboard-variables-global.spec.js",
       "dashboard-variables-tab-level.spec.js",
       "dashboard-variables-panel-level.spec.js",
-      "dashboard-variables-dependency.spec.js",
       "dashboard-variables-refresh.spec.js",
       "dashboard-variables-url-sync.spec.js",
       "dashboard-variables-creation-scopes.spec.js",
       "dashboard-variables-default-values-chain.spec.js",
       "dashboard-variables-custom-parents.spec.js",
-      "dashboard-variables-stream-field.spec.js",
       "dashboard-mustache-variables.spec.js",
       "dashboard-variable-select-all.spec.js",
       "dashboard-variables-auto-run.spec.js"
@@ -213,7 +235,9 @@
     "browser": "chrome",
     "run_files": [
       "visualize.spec.js",
-      "visualize-vrl.spec.js"
+      "visualize-vrl.spec.js",
+      "crossLinking.spec.js",
+      "crossLinkMultiStream.spec.js"
     ],
     "disabled": [],
     "paths": [
@@ -241,6 +265,9 @@
     "actual_folder": "GeneralTests",
     "browser": "chrome",
     "run_files": [
+      "navRailShortScreen.spec.js",
+      "navRailKeyboard.spec.js",
+      "navRailGeometry.spec.js",
       "sanity.spec.js",
       "landingPage.spec.js",
       "datetime-picker-copy-paste.spec.js",
@@ -250,9 +277,20 @@
       "shared-components-form-validation.spec.js",
       "ai-toolsets-form-validation.spec.js",
       "annotationQueueInputPreview.spec.js",
-      "login-form-validation.spec.js"
+      "login-form-validation.spec.js",
+      "runningQueriesCancel.spec.js",
+      "navRailHeaderKeyboard.spec.js"
     ],
-    "disabled": []
+    "disabled": [
+      {
+        "file": "organizationStatusSteps.spec.js",
+        "reason": "cloud-only: the \"Synthetics Status Steps Quota (Organization Management)\" describe calls test.skip(!isCloudEnvironment()), so an OSS shard would report 5 permanent skips. Its home is the enterprise repo's ci_matrix_cloud.json"
+      },
+      {
+        "file": "navRailLocale.spec.js",
+        "reason": "10 of 12 cases pass on a live env; the two that fail are \"Logs keeps a typed, unrun query and the time range across the language reload\" and \"a dirty pipeline editor asks before the language reload\", both undiagnosed"
+      }
+    ]
   },
   {
     "testfolder": "Management",
@@ -293,7 +331,10 @@
       "logsquickmode.spec.js",
       "logshistogram.spec.js",
       "logsQuickPick.spec.js",
-      "logs-jk-navigation.spec.js"
+      "logs-jk-navigation.spec.js",
+      "monaco-query-prefill.spec.js",
+      "logsVisualizePersistence.spec.js",
+      "logsqueries.matchall.spec.js"
     ],
     "disabled": []
   },
@@ -306,7 +347,6 @@
       "logsQueryBuilder-filters-basic.spec.js",
       "pagination.spec.js",
       "unflattened.spec.js",
-      "logsFreeText.spec.js",
       "logsNoFtsRecovery.spec.js"
     ],
     "disabled": []
@@ -316,21 +356,22 @@
     "actual_folder": "Logs",
     "browser": "chrome",
     "run_files": [
+      "streamsExploreLogsTypePersistence.spec.js",
       "logspage.spec.js",
       "logstable.spec.js",
       "logsqueries.spec.js",
       "join.spec.js",
       "shareLink.spec.js",
       "logsAnalyzeDimensions.spec.js",
-      "monaco-query-prefill.spec.js",
-      "logsqueries.matchall.spec.js",
       "ftsDefaultColumn.spec.js",
-      "logsVisualizePersistence.spec.js",
       "streamNotFound.spec.js",
       "logsRefreshCacheDropdown.spec.js",
       "logs-highlighting.spec.js",
       "logs-search-around-multistream.spec.js",
-      "logs-default-columns.spec.js"
+      "logs-default-columns.spec.js",
+      "logsResultsToolbar.spec.js",
+      "logsSavedFunctionOverwrite.spec.js",
+      "logs-explain-analyze.spec.js"
     ],
     "disabled": [
       {
@@ -344,6 +385,7 @@
     "actual_folder": "Logs",
     "browser": "chrome",
     "run_files": [
+      "logs-autocomplete-quote-enter.spec.js",
       "logs-autocomplete-suggestions.spec.js",
       "logs-sql-autocomplete.spec.js",
       "logsqueries.cte.spec.js",
@@ -356,7 +398,11 @@
       "searchPatternsMultiStream.spec.js",
       "logsActionReasons.spec.js",
       "logsSearchCancelled.spec.js",
-      "logsToolbarPins.spec.js"
+      "logsToolbarPins.spec.js",
+      "logs-query-editor-keyboard.spec.js",
+      "logsCrossLinks.spec.js",
+      "logsFieldValuePaging.spec.js",
+      "logsFreeText.spec.js"
     ],
     "disabled": [
       {
@@ -390,6 +436,7 @@
     "actual_folder": "Metrics",
     "browser": "chrome",
     "run_files": [
+      "metrics-explorer-exemplars.spec.js",
       "metrics.spec.js",
       "metrics-queries.spec.js",
       "metrics-aggregations.spec.js",
@@ -422,10 +469,7 @@
     "actual_folder": "Pipelines",
     "browser": "chrome",
     "run_files": [
-      "pipeline-conditions.spec.js",
-      "pipeline-conditions-validation.spec.js",
       "pipelines.spec.js",
-      "pipeline-dynamic.spec.js",
       "pipeline-core.spec.js",
       "pipeline-traces.spec.js",
       "pipeline-metrics.spec.js",
@@ -443,6 +487,17 @@
     ]
   },
   {
+    "testfolder": "Pipelines-Conditions",
+    "actual_folder": "Pipelines",
+    "browser": "chrome",
+    "run_files": [
+      "pipeline-conditions.spec.js",
+      "pipeline-conditions-validation.spec.js",
+      "pipeline-dynamic.spec.js"
+    ],
+    "disabled": []
+  },
+  {
     "testfolder": "Reports",
     "actual_folder": "Reports",
     "browser": "chrome",
@@ -453,7 +508,8 @@
       "reports-bulk-operations.spec.js",
       "reports-form-validation.spec.js",
       "reportCsvMediaType.spec.js",
-      "scheduledReportsDrawer.spec.js"
+      "scheduledReportsDrawer.spec.js",
+      "reportHistory.spec.js"
     ],
     "disabled": [],
     "paths": [
@@ -473,7 +529,8 @@
       "rum-onboarding-snippets.spec.js",
       "sourcemap-ui.spec.js",
       "sourcemap-upload-pretty.spec.js",
-      "rum-form-validation.spec.js"
+      "rum-form-validation.spec.js",
+      "app-performance.spec.js"
     ],
     "disabled": []
   },
@@ -516,10 +573,12 @@
       "ingestion-config.spec.js",
       "ingestionTokens.spec.js",
       "ingestion-passcode-forbidden.spec.js",
-      "connectDataSourcePopup.spec.js",
+      "ingestion-passcode-loading.spec.js",
       "splunk-hec-ingestion-window.spec.js",
       "enrichment.spec.js",
-      "schema.spec.js"
+      "schema.spec.js",
+      "first-event-status.spec.js",
+      "ingestion-setup-card-tracing.spec.js"
     ],
     "disabled": []
   },
@@ -529,18 +588,29 @@
     "browser": "chrome",
     "run_files": [
       "service-catalog.spec.js",
-      "tracesSearch.spec.js",
-      "traceQueryEditor.spec.js",
-      "traceErrorFilter.spec.js",
-      "traceDetails.spec.js",
       "traceDetailsPaging.spec.js",
-      "traceAdvancedFiltering.spec.js",
       "tracesTriageLoop.spec.js",
-      "traces-autocomplete-suggestions.spec.js",
       "traceGenAiParts.spec.js",
       "tracesCharts.spec.js",
+      "tracesRedActions.spec.js",
       "traceSessionReplay.spec.js",
-      "traces-jk-navigation.spec.js"
+      "traces-jk-navigation.spec.js",
+      "service-graph-side-panel.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Traces-Search",
+    "actual_folder": "Traces",
+    "browser": "chrome",
+    "run_files": [
+      "tracesSearch.spec.js",
+      "traceAdvancedFiltering.spec.js",
+      "traceErrorFilter.spec.js",
+      "traceQueryEditor.spec.js",
+      "traces-autocomplete-suggestions.spec.js",
+      "traces-autocomplete-filter-mode.spec.js",
+      "traceDetails.spec.js"
     ],
     "disabled": []
   },
@@ -555,13 +625,14 @@
       "slo-crud.spec.js",
       "slo-form-validation.spec.js",
       "slo-required-fields.spec.js",
-      "slo-alert-sli.spec.js"
+      "slo-alert-sli.spec.js",
+      "slo-import.spec.js"
     ],
     "disabled": []
   },
   {
     "testfolder": "Synthetics",
-    "_comment": "Own shard because the synthetics routes only exist when the server runs with ZO_SYNTHETICS_ENABLED=true (router registers /api/{org}/synthetics* conditionally). The flag is read once at process start, so it cannot vary between tests sharing a backend — each shard gets its own OpenObserve process; every other shard omits synthetics_enabled and keeps the default (false). Pinned to 3 workers: every create/list test writes a check and 5 concurrent writers trip SQLite's 'database is locked' (SLO shard precedent). Results/run-detail pages are fed by seeding the synthetics_results streams in beforeAll — no probe runs on CI. status-pages-enterprise-gating lives here because the status-page routes sit inside the same gate.",
+    "_comment": "Own shard because the synthetics routes only exist when the server runs with ZO_SYNTHETICS_ENABLED=true (router registers /api/{org}/synthetics* conditionally). The flag is read once at process start, so it cannot vary between tests sharing a backend \u2014 each shard gets its own OpenObserve process; every other shard omits synthetics_enabled and keeps the default (false). Pinned to 3 workers: every create/list test writes a check and 5 concurrent writers trip SQLite's 'database is locked' (SLO shard precedent). Results/run-detail pages are fed by seeding the synthetics_results streams in beforeAll \u2014 no probe runs on CI. status-pages-enterprise-gating lives here because the status-page routes sit inside the same gate.",
     "actual_folder": "Synthetics",
     "browser": "chrome",
     "synthetics_enabled": "true",
@@ -590,6 +661,21 @@
     "run_files": [
       "slo-timeslice.spec.js",
       "slo-alerts.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Profiles",
+    "actual_folder": "Profiles",
+    "browser": "chrome",
+    "run_files": [
+      "profiles-navigation-entry.spec.js",
+      "profiles-query-controls.spec.js",
+      "profiles-chart-breakdown.spec.js",
+      "profiles-views.spec.js",
+      "profiles-flame-graph.spec.js",
+      "profiles-compare.spec.js",
+      "profiles-states-edge.spec.js"
     ],
     "disabled": []
   }

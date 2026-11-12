@@ -1,5 +1,10 @@
+const path = require('path');
+const { request } = require('@playwright/test');
 const testLogger = require('./test-logger');
 const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('./cloud-auth');
+const { ingestBase } = require('./ingest-url.js');
+
+const AUTH_FILE = path.join(__dirname, 'auth', 'user.json');
 
 /**
  * OTLP Metrics Ingestion Module for OpenObserve E2E Tests
@@ -20,7 +25,7 @@ class MetricsIngestion {
             // Normalize the endpoint to avoid double slashes
             endpoint = endpoint.replace(/\/+/g, '/').replace('http:/', 'http://').replace('https:/', 'https://');
         } else {
-            endpoint = `${baseUrl}/api/${orgName}/v1/metrics`;
+            endpoint = `${ingestBase(baseUrl)}/api/${orgName}/v1/metrics`;
         }
 
         // On cloud, auth is handled by getAuthHeaders() (email:passcode from cloud-config.json)
@@ -33,6 +38,7 @@ class MetricsIngestion {
 
         this.config = {
             endpoint: endpoint,
+            queryBase: process.env.METRICS_ENDPOINT ? endpoint.replace('/v1/metrics', '') : `${baseUrl}/api/${orgName}`,
             username: process.env.ZO_ROOT_USER_EMAIL || '',
             password: process.env.ZO_ROOT_USER_PASSWORD || '',
             orgId: orgName,
@@ -395,29 +401,39 @@ class MetricsIngestion {
      * so callers proceed and let the test's own data assertion fail loudly.
      */
     async waitForMetricQueryable(metricName, maxRetries = 30, interval = 1000) {
-        const base = this.config.endpoint.replace('/v1/metrics', '');
+        const base = this.config.queryBase;
         const url = `${base}/prometheus/api/v1/query?query=${encodeURIComponent(metricName)}`;
-        const headers = getAuthHeaders();
-        for (let i = 0; i < maxRetries; i++) {
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const response = await fetch(url, { method: 'GET', headers, signal: controller.signal });
-                clearTimeout(timeoutId);
-                if (response.ok) {
-                    const body = await response.json();
-                    const result = body?.data?.result;
-                    if (Array.isArray(result) && result.length > 0) {
-                        testLogger.info(`Metric "${metricName}" queryable after ${i + 1} poll(s)`, { series: result.length });
-                        return true;
+        // A regular user's passcode only authenticates ingestion routes, so cloud reads use the login session.
+        const context = await request.newContext(
+            isCloudEnvironment() ? { storageState: AUTH_FILE } : { extraHTTPHeaders: getAuthHeaders() }
+        );
+        let lastStatus = null;
+        let failureLogged = false;
+        try {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await context.get(url, { timeout: 5000 });
+                    lastStatus = response.status();
+                    if (response.ok()) {
+                        const body = await response.json();
+                        const result = body?.data?.result;
+                        if (Array.isArray(result) && result.length > 0) {
+                            testLogger.info(`Metric "${metricName}" queryable after ${i + 1} poll(s)`, { series: result.length });
+                            return true;
+                        }
+                    } else if (!failureLogged) {
+                        testLogger.warn(`Metric "${metricName}" query returned HTTP ${lastStatus} on poll ${i + 1}`);
+                        failureLogged = true;
                     }
+                } catch (error) {
+                    testLogger.debug(`waitForMetricQueryable attempt ${i + 1} error`, { error: error.message });
                 }
-            } catch (error) {
-                testLogger.debug(`waitForMetricQueryable attempt ${i + 1} error`, { error: error.message });
+                await new Promise(resolve => setTimeout(resolve, interval));
             }
-            await new Promise(resolve => setTimeout(resolve, interval));
+        } finally {
+            await context.dispose();
         }
-        testLogger.warn(`Metric "${metricName}" not queryable after ${maxRetries} polls`);
+        testLogger.warn(`Metric "${metricName}" not queryable after ${maxRetries} polls`, { lastStatus });
         return false;
     }
 
@@ -581,6 +597,49 @@ class MetricsIngestion {
             successfulBatches: successCount,
             results
         };
+    }
+
+    /**
+     * Send several request_count points into one fixed series so rate() over it is never empty.
+     */
+    async ingestFixedRequestCountSeries(points = 5, spacingMs = 15000) {
+        const now = Date.now();
+        const dataPoints = [];
+        for (let i = 0; i < points; i++) {
+            dataPoints.push({
+                timeUnixNano: ((now - (points - 1 - i) * spacingMs) * 1000000).toString(),
+                asDouble: 100 + i * 10,
+                attributes: [
+                    { key: "node", value: { stringValue: "server-01" } },
+                    { key: "service", value: { stringValue: "api-gateway" } },
+                    { key: "region", value: { stringValue: "us-east-1" } }
+                ]
+            });
+        }
+        const metricsData = {
+            resourceMetrics: [{
+                resource: {
+                    attributes: [
+                        { key: "service.name", value: { stringValue: "api-gateway" } },
+                        { key: "service.version", value: { stringValue: "1.0.0" } },
+                        { key: "environment", value: { stringValue: "production" } },
+                        { key: "host.name", value: { stringValue: "server-01" } },
+                        { key: "region", value: { stringValue: "us-east-1" } }
+                    ]
+                },
+                scopeMetrics: [{
+                    scope: { name: "opentelemetry-instrumentation", version: "1.0.0" },
+                    metrics: [{ name: "request_count", unit: "count", gauge: { dataPoints } }]
+                }]
+            }]
+        };
+        const result = await this.sendMetrics(metricsData);
+        if (result.success) {
+            testLogger.info('Sent fixed request_count series', { points });
+        } else {
+            testLogger.error('Failed to send fixed request_count series', { error: result.error });
+        }
+        return result;
     }
 
     /**

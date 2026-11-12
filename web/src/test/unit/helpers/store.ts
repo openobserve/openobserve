@@ -25,6 +25,7 @@ const organizationObj = {
   rumToken: {
     rum_token: "",
   },
+  rumTokenForbidden: false,
   // Mirror of the production organizationObj — see src/stores/index.ts.
   correlatedTracesStreams: {
     byTraceId: {} as Record<string, { stream: string; range?: TraceTimeRange }>,
@@ -56,6 +57,9 @@ const store = createStore({
     organizations: [] as unknown[],
     searchCollapsibleSection: 20,
     printMode: false,
+    kioskMode: false,
+    solutionMode: "observability",
+    themeOverride: null as string | null,
     savedViewFlag: false,
     savedFunctionDialog: false,
     hiddenMenus: [] as unknown[],
@@ -92,6 +96,7 @@ const store = createStore({
     savedViewDialog: false,
     regionInfo: [],
     zoConfig: {
+      query_history_enabled: true,
       service_account_enabled: true,
       // Enterprise-shaped by default, which is what the synthetics specs were
       // written against. The specs that cover the OSS shape set it to false
@@ -171,6 +176,7 @@ const store = createStore({
       rumToken: {
         rum_token: "",
       },
+      rumTokenForbidden: false,
       quotaThresholdMsg: "",
       functions: [],
       streams: {} as Record<string, unknown>,
@@ -251,6 +257,9 @@ const store = createStore({
     setRUMToken(state, payload) {
       state.organizationData.rumToken = payload;
     },
+    setRUMTokenForbidden(state, payload) {
+      state.organizationData.rumTokenForbidden = payload;
+    },
     setCorrelatedTracesStream(
       state,
       payload: { traceId: string; stream: string; range?: TraceTimeRange },
@@ -326,6 +335,12 @@ const store = createStore({
     },
     setPrintMode(state, payload) {
       state.printMode = payload;
+    },
+    setKioskMode(state, payload) {
+      state.kioskMode = payload;
+    },
+    setThemeOverride(state, payload) {
+      state.themeOverride = payload;
     },
     setTimezone(state, payload) {
       state.timezone = payload;
@@ -510,6 +525,9 @@ const store = createStore({
     setRUMToken(context, payload) {
       context.commit("setRUMToken", payload);
     },
+    setRUMTokenForbidden(context, payload) {
+      context.commit("setRUMTokenForbidden", payload);
+    },
     // setAllCurrentDashboards(context, payload) {
     //   context.commit('setAllCurrentDashboards', payload);
     // },
@@ -572,6 +590,9 @@ const store = createStore({
     },
     setPrintMode(context, payload) {
       context.commit("setPrintMode", payload);
+    },
+    setKioskMode(context, payload) {
+      context.commit("setKioskMode", payload);
     },
     setTimezone(context, payload) {
       context.commit("setTimezone", payload);

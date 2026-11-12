@@ -55,6 +55,8 @@ test.describe("Dashboard Table Chart - Core Features", () => {
   test.describe.configure({ mode: "parallel", retries: 1 });
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
+    // Where auto_query_enabled, a live-preview run can start as Apply is clicked and turn that click into Cancel.
+    await new PageManager(page).dashboardAutoRun.setStoredAutoRun("false");
     await ingestion(page);
   });
 
@@ -656,6 +658,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
 
       // Build table panel in the panel editor
       await setupTestDashboard(page, pm, dashboardName);
+      await pm.dashboardSetting.enableDynamicFilters();
       await pm.dashboardCreate.addPanel();
       await pm.dashboardPanelActions.addPanelName("Dynamic Filter Table");
 

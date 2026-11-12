@@ -15,8 +15,14 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { flushPromises, mount, VueWrapper, config } from "@vue/test-utils";
+import { createStore } from "vuex";
 import i18n from "@/locales";
 import CustomChartRenderer from "./CustomChartRenderer.vue";
+import {
+  fakeCanvasPainter,
+  fakeDevicePixelRatio,
+  type DevicePixelRatioFake,
+} from "@/test/unit/helpers/devicePixelRatioFake";
 
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
@@ -28,6 +34,7 @@ const mockChart = {
   on: vi.fn(),
   off: vi.fn(),
   clear: vi.fn(),
+  getZr: vi.fn((): any => ({})),
 };
 
 // Mock ECharts
@@ -75,6 +82,21 @@ Object.defineProperty(window, "removeEventListener", {
   value: vi.fn(),
 });
 
+class MockResizeObserver {
+  static instances: MockResizeObserver[] = [];
+  disconnected = false;
+  constructor(public callback: () => void) {
+    MockResizeObserver.instances.push(this);
+  }
+  observe() {}
+  disconnect() {
+    this.disconnected = true;
+  }
+}
+vi.stubGlobal("ResizeObserver", MockResizeObserver);
+
+const store = createStore({ state: { theme: "light" } });
+
 describe("CustomChartRenderer", () => {
   let wrapper: VueWrapper<any>;
 
@@ -110,7 +132,7 @@ describe("CustomChartRenderer", () => {
         ...props,
       },
       global: {
-        plugins: [],
+        plugins: [store],
         provide: {
           hoveredSeriesState: null,
         },
@@ -131,6 +153,8 @@ describe("CustomChartRenderer", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    store.state.theme = "light";
+    MockResizeObserver.instances = [];
     // Reset all mocks to their original implementation
     const echarts = await import("echarts");
     echarts.init.mockReturnValue(mockChart);
@@ -216,71 +240,38 @@ describe("CustomChartRenderer", () => {
 
       expect(echarts.init).toHaveBeenCalledWith(expect.any(Object), undefined, {
         renderer: "canvas",
+        devicePixelRatio: 1,
       });
     });
   });
 
-  describe("Function Conversion", () => {
-    it("should convert string functions to executable functions", () => {
-      const stringFunction = "function() { return 'test'; }";
+  describe("Function-looking strings", () => {
+    afterEach(() => {
+      document.documentElement.removeAttribute("data-audit-chart");
+    });
 
+    it("never executes a function string in the app page", async () => {
       wrapper = createWrapper({
         data: {
           ...mockChartData,
-          customFunction: stringFunction,
+          audit_probe:
+            "function(){document.documentElement.setAttribute('data-audit-chart','executed')}()",
+          tooltip: { formatter: "function(p){ return p.name; }" },
         },
       });
+      await waitForChartInit(wrapper);
 
-      // Component should handle function conversion without errors
-      expect(wrapper.exists()).toBe(true);
+      expect(document.documentElement.getAttribute("data-audit-chart")).toBeNull();
+      const option = mockChart.setOption.mock.calls.at(-1)[0];
+      expect(typeof option.tooltip.formatter).toBe("string");
     });
 
-    it("should handle invalid function strings gracefully", () => {
-      const invalidFunction = "function() { invalid syntax }";
+    it("passes real callbacks through untouched", async () => {
+      const formatter = (p: { name: string }) => p.name;
+      wrapper = createWrapper({ data: { ...mockChartData, tooltip: { formatter } } });
+      await waitForChartInit(wrapper);
 
-      expect(() => {
-        wrapper = createWrapper({
-          data: {
-            ...mockChartData,
-            customFunction: invalidFunction,
-          },
-        });
-      }).not.toThrow();
-    });
-
-    it("should process arrays with function strings", () => {
-      const dataWithFunctionArray = {
-        ...mockChartData,
-        formatters: ["function(val) { return val + '%'; }", "function(val) { return '$' + val; }"],
-      };
-
-      expect(() => {
-        wrapper = createWrapper({ data: dataWithFunctionArray });
-      }).not.toThrow();
-    });
-
-    it("should handle nested objects with functions", () => {
-      const nestedData = {
-        ...mockChartData,
-        tooltip: {
-          formatter: "function(params) { return params.name + ': ' + params.value; }",
-        },
-      };
-
-      expect(() => {
-        wrapper = createWrapper({ data: nestedData });
-      }).not.toThrow();
-    });
-
-    it("should return non-function strings as-is", () => {
-      const regularData = {
-        ...mockChartData,
-        title: { text: "Regular title text" },
-      };
-
-      wrapper = createWrapper({ data: regularData });
-
-      expect(wrapper.exists()).toBe(true);
+      expect(mockChart.setOption.mock.calls.at(-1)[0].tooltip.formatter).toBe(formatter);
     });
   });
 
@@ -326,7 +317,7 @@ describe("CustomChartRenderer", () => {
       const eventData = {
         ...mockChartData,
         o2_events: {
-          click: "function(params) { console.log('clicked', params); }",
+          click: (params: unknown) => params,
         },
       };
 
@@ -342,8 +333,8 @@ describe("CustomChartRenderer", () => {
       const multiEventData = {
         ...mockChartData,
         o2_events: {
-          click: "function(params) { return params; }",
-          mouseover: "function(params) { return params; }",
+          click: (params: unknown) => params,
+          mouseover: (params: unknown) => params,
         },
       };
 
@@ -354,6 +345,15 @@ describe("CustomChartRenderer", () => {
       expect(mockChart.off).toHaveBeenCalledWith("mouseover");
       expect(mockChart.on).toHaveBeenCalledWith("click", expect.any(Function));
       expect(mockChart.on).toHaveBeenCalledWith("mouseover", expect.any(Function));
+    });
+
+    it("does not bind o2_events entries that are strings", async () => {
+      wrapper = createWrapper({
+        data: { ...mockChartData, o2_events: { click: "function(params) { return params; }" } },
+      });
+      await waitForChartInit(wrapper);
+
+      expect(mockChart.on).not.toHaveBeenCalled();
     });
 
     it("should not set up events when o2_events is empty", async () => {
@@ -375,7 +375,7 @@ describe("CustomChartRenderer", () => {
           data: mockChartData,
         },
         global: {
-          plugins: [],
+          plugins: [store],
           provide: {
             hoveredSeriesState: hoveredState,
           },
@@ -404,7 +404,7 @@ describe("CustomChartRenderer", () => {
           data: mockChartData,
         },
         global: {
-          plugins: [],
+          plugins: [store],
           provide: {
             hoveredSeriesState: null,
           },
@@ -417,6 +417,138 @@ describe("CustomChartRenderer", () => {
         chartElement.trigger("mouseover");
         chartElement.trigger("mouseleave");
       }).not.toThrow();
+    });
+  });
+
+  describe("Theme", () => {
+    const lastOption = () => mockChart.setOption.mock.calls.at(-1)?.[0];
+
+    it("keeps the default theme and no background in light mode", async () => {
+      const echarts = await import("echarts");
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      expect(echarts.init).toHaveBeenCalledWith(expect.any(Object), undefined, {
+        renderer: "canvas",
+        devicePixelRatio: 1,
+      });
+      expect(lastOption()).not.toHaveProperty("backgroundColor");
+    });
+
+    it("inits with the dark theme and a transparent background in dark mode", async () => {
+      const echarts = await import("echarts");
+      store.state.theme = "dark";
+
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      expect(echarts.init).toHaveBeenCalledWith(expect.any(Object), "dark", {
+        renderer: "canvas",
+        devicePixelRatio: 1,
+      });
+      expect(lastOption().backgroundColor).toBe("transparent");
+    });
+
+    it("keeps a background the chart code sets in dark mode", async () => {
+      store.state.theme = "dark";
+
+      wrapper = createWrapper({ data: { ...mockChartData, backgroundColor: "#123456" } });
+      await waitForChartInit(wrapper);
+
+      expect(lastOption().backgroundColor).toBe("#123456");
+    });
+
+    it("uses a transparent background when the code leaves it undefined in dark mode", async () => {
+      store.state.theme = "dark";
+
+      wrapper = createWrapper({ data: { ...mockChartData, backgroundColor: undefined } });
+      await waitForChartInit(wrapper);
+
+      expect(lastOption().backgroundColor).toBe("transparent");
+    });
+
+    it("colours unstyled series from the panel palette in dark mode, keeping a palette the code sets", async () => {
+      const { getColorPalette } = await import("@/utils/dashboard/colorPalette");
+      store.state.theme = "dark";
+
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      expect(lastOption().color).toEqual(getColorPalette());
+      wrapper.unmount();
+
+      wrapper = createWrapper({ data: { ...mockChartData, color: ["red"] } });
+      await waitForChartInit(wrapper);
+      expect(lastOption().color).toEqual(["red"]);
+    });
+
+    it("leaves the series palette to the chart in light mode", async () => {
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      expect(lastOption()).not.toHaveProperty("color");
+    });
+
+    it("re-creates the instance in the new theme when the theme changes", async () => {
+      const echarts = await import("echarts");
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      store.state.theme = "dark";
+      await waitForChartInit(wrapper);
+
+      expect(mockChart.dispose).toHaveBeenCalledTimes(1);
+      expect(echarts.init).toHaveBeenLastCalledWith(expect.any(Object), "dark", {
+        renderer: "canvas",
+        devicePixelRatio: 1,
+      });
+    });
+  });
+
+  describe("Zero-size mount", () => {
+    const setSize = (el: Element, width: number, height: number) => {
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: width });
+      Object.defineProperty(el, "clientHeight", { configurable: true, value: height });
+    };
+
+    it("re-inits the chart once a zero-size container gets a real size", async () => {
+      const echarts = await import("echarts");
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      expect(MockResizeObserver.instances).toHaveLength(1);
+      const observer = MockResizeObserver.instances[0];
+
+      observer.callback();
+      expect(mockChart.dispose).not.toHaveBeenCalled();
+
+      setSize(wrapper.find('[data-test="chart-renderer"]').element, 400, 300);
+      observer.callback();
+      await waitForChartInit(wrapper);
+
+      expect(observer.disconnected).toBe(true);
+      expect(mockChart.dispose).toHaveBeenCalledTimes(1);
+      expect(echarts.init).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not watch the size when the container already has one", async () => {
+      setSize(HTMLElement.prototype, 400, 300);
+      try {
+        wrapper = createWrapper();
+        await waitForChartInit(wrapper);
+
+        expect(MockResizeObserver.instances).toHaveLength(0);
+      } finally {
+        delete (HTMLElement.prototype as any).clientWidth;
+        delete (HTMLElement.prototype as any).clientHeight;
+      }
+    });
+
+    it("stops watching the size on unmount", async () => {
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      wrapper.unmount();
+
+      expect(MockResizeObserver.instances[0].disconnected).toBe(true);
     });
   });
 
@@ -689,6 +821,94 @@ describe("CustomChartRenderer", () => {
 
       // Should be able to receive focus
       expect(chartElement.element.tabIndex).toBeDefined();
+    });
+  });
+
+  describe("Device pixel ratio", () => {
+    let display: DevicePixelRatioFake;
+
+    afterEach(() => {
+      display.restore();
+      mockChart.getZr.mockImplementation(() => ({}));
+    });
+
+    it("inits at the live ratio", async () => {
+      const echarts = await import("echarts");
+      display = fakeDevicePixelRatio(2);
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      expect(echarts.init).toHaveBeenCalledWith(expect.any(Object), undefined, {
+        renderer: "canvas",
+        devicePixelRatio: 2,
+      });
+      expect(wrapper.classes()).not.toContain("chart-canvas-pixelated");
+    });
+
+    it("pixel-snaps its canvases only while the ratio is fractional", async () => {
+      display = fakeDevicePixelRatio(1.25);
+      const painter = fakeCanvasPainter(1.25);
+      mockChart.getZr.mockImplementation(() => ({ painter }));
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      const pixelated = () => wrapper.classes().includes("chart-canvas-pixelated");
+      expect(pixelated()).toBe(true);
+
+      display.setRatio(2);
+      await flushPromises();
+      expect(pixelated()).toBe(false);
+      display.setRatio(1);
+      await flushPromises();
+      expect(pixelated()).toBe(false);
+      display.setRatio(1.5);
+      await flushPromises();
+      expect(pixelated()).toBe(true);
+    });
+
+    it("stays smooth at a fractional ratio its echarts-gl canvas could not be re-rasterized at", async () => {
+      display = fakeDevicePixelRatio(1);
+      const painter = fakeCanvasPainter(1);
+      painter.getLayers.mockReturnValue({ ...painter.layers, gl: { dpr: 1, resize: vi.fn() } });
+      mockChart.getZr.mockImplementation(() => ({ painter }));
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      display.setRatio(1.5);
+      await flushPromises();
+
+      expect(painter.dpr).toBe(1);
+      expect(wrapper.classes()).not.toContain("chart-canvas-pixelated");
+    });
+
+    it("re-rasterizes the instance in place when the window changes display", async () => {
+      const echarts = await import("echarts");
+      display = fakeDevicePixelRatio(1);
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      const painter = fakeCanvasPainter(1);
+      mockChart.getZr.mockImplementation(() => ({ painter }));
+      mockChart.setOption.mockClear();
+
+      display.setRatio(2);
+      await flushPromises();
+
+      expect(echarts.init).toHaveBeenCalledTimes(1);
+      expect(mockChart.dispose).not.toHaveBeenCalled();
+      expect(mockChart.clear).not.toHaveBeenCalled();
+      expect(mockChart.setOption).not.toHaveBeenCalled();
+      expect(painter.dpr).toBe(2);
+      expect(painter.refresh).toHaveBeenCalledWith({ paintAll: true });
+    });
+
+    it("stops listening on unmount", async () => {
+      display = fakeDevicePixelRatio(1);
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      expect(display.listenerCount()).toBe(1);
+
+      wrapper.unmount();
+      wrapper = undefined as any;
+      expect(display.listenerCount()).toBe(0);
     });
   });
 });

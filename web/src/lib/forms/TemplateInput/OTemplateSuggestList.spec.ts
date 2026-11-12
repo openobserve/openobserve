@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { h } from "vue";
 import OTemplateSuggestList from "./OTemplateSuggestList.vue";
 import type { TemplateSuggestion } from "./OTemplateInput.types";
+import { tokenFor } from "./useTemplateSuggest";
 
 interface RichSuggestion extends TemplateSuggestion {
   secret: boolean;
@@ -76,6 +77,7 @@ describe("OTemplateSuggestList", { timeout: 20_000 }, () => {
   async function mountList(
     options: {
       highlightedIndex?: number;
+      format?: (_name: string) => string;
       slot?: (props: { suggestion: RichSuggestion; active: boolean }) => unknown;
     } = {},
   ) {
@@ -87,6 +89,7 @@ describe("OTemplateSuggestList", { timeout: 20_000 }, () => {
         boundary,
         matches: MATCHES,
         highlightedIndex: options.highlightedIndex ?? 0,
+        format: options.format,
         dataTest: "msg",
       },
       slots: options.slot ? { suggestion: options.slot } : undefined,
@@ -108,6 +111,15 @@ describe("OTemplateSuggestList", { timeout: 20_000 }, () => {
       "{{BASE_URL}}",
       "{{TOKEN}}",
       "{{input}}",
+    ]);
+  });
+
+  it("with a single-brace format, renders {name} in each row instead of {{name}}", async () => {
+    await mountList({ format: (name) => tokenFor(name, "single") });
+    expect(rows().map((row) => row.textContent?.trim())).toEqual([
+      "{BASE_URL}",
+      "{TOKEN}",
+      "{input}",
     ]);
   });
 

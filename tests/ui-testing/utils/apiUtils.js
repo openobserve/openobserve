@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import http from 'http';
 import https from 'https';
+import { ingestBase } from '../playwright-tests/utils/ingest-url.js';
 
 // Cache cloud config to avoid re-reading on every call
 let _cachedCloudConfig = null;
@@ -50,7 +51,7 @@ export const getHeaders = () => {
 };
 
 export const getIngestionUrl = (orgId, streamName) => {
-  return `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+  return `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`;
 };
 
 export const sendRequest = async (page, url, payload, headers) => {

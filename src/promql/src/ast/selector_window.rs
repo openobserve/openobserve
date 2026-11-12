@@ -48,9 +48,18 @@ pub fn selector_window(expr: &Expr) -> SelectorWindow {
         Expr::MatrixSelector(ms) => vector_selector_window(&ms.vs),
         Expr::Subquery(sq) => {
             let inner = selector_window(&sq.expr);
-            SelectorWindow {
-                ahead: inner.ahead + negative_offset(&sq.offset),
-                pinned: inner.pinned,
+            match &sq.at {
+                // the inner steps end at the pinned instant, whatever range is evaluated
+                Some(at) => SelectorWindow {
+                    ahead: Duration::ZERO,
+                    pinned: inner.pinned.max(Some(
+                        pinned_read_end(at, &sq.offset).saturating_add(micros(inner.ahead)),
+                    )),
+                },
+                None => SelectorWindow {
+                    ahead: inner.ahead + negative_offset(&sq.offset),
+                    pinned: inner.pinned,
+                },
             }
         }
         Expr::Aggregate(agg) => {
@@ -146,6 +155,18 @@ mod tests {
             Some(at)
         );
         assert_eq!(pinned("a @ end()"), Some(i64::MAX));
+        assert_eq!(
+            window("max_over_time((a offset -2m)[1h:1m] @ 1600000000 offset 1m)"),
+            SelectorWindow {
+                ahead: Duration::ZERO,
+                pinned: Some(at + 60_000_000),
+            }
+        );
+        assert_eq!(
+            pinned("max_over_time((a @ 1700000000)[1h:1m] @ 1600000000)"),
+            Some(1_700_000_000_000_000)
+        );
+        assert_eq!(pinned("max_over_time(a[1h:1m] @ end())"), Some(i64::MAX));
     }
 
     #[test]

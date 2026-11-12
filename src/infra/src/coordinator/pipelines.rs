@@ -21,19 +21,14 @@ pub const PIPELINES_WATCH_PREFIX: &str = "/pipelines/";
 /// into the database.
 pub async fn emit_put_event(pipeline_id: &str) -> Result<(), Error> {
     let key = format!("{PIPELINES_WATCH_PREFIX}{pipeline_id}");
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator
-        .put(&key, bytes::Bytes::from(""), true, None)
-        .await?;
-    Ok(())
+    super::emit_put(&key).await
 }
 
 /// Sends event to the cluster coordinator indicating that a pipeline has been
 /// deleted from the database.
 pub async fn emit_delete_event(pipeline_id: &str) -> Result<(), Error> {
     let key = format!("{PIPELINES_WATCH_PREFIX}{pipeline_id}");
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator.delete(&key, false, true, None).await
+    super::emit_delete(&key).await
 }
 
 #[cfg(test)]

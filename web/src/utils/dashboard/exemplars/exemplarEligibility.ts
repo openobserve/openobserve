@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /** Chart types that draw time on the horizontal axis without stacking. */
-export const EXEMPLAR_CHART_TYPES = ["line", "area", "bar", "scatter"] as const;
+export const EXEMPLAR_CHART_TYPES = ["line", "area", "bar", "scatter", "heatmap"] as const;
 
 export interface ExemplarPanelLike {
   type?: string;

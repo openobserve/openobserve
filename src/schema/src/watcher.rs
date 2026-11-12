@@ -234,6 +234,7 @@ async fn watch(
                 {
                     log::error!("[Schema:watch] del_offset: {e}");
                 }
+                ::db::compact::downsampling::evict_stream(org_id, stream_type, stream_name).await;
 
                 if stream_type.eq(&StreamType::EnrichmentTables) && is_local_disk_storage() {
                     let data_dir = format!(
@@ -285,13 +286,12 @@ async fn flush_cache_for_stream(
     // flush all memtables and persist to disk also delete parquet files from wal on ingester
     if config::cluster::LOCAL_NODE.is_ingester() {
         // get current max memtable id
-        let max_memtable_id = ingester::get_max_writer_seq_id().await;
-        // flush all writers
-        ingester::flush_all().await?;
+        let max_memtable_id = ingester::get_max_memtable_id().await;
+        ingester::rotate_all().await?;
         let ttl = get_config().limit.mem_persist_interval;
         // wait for max memtable id to be updated, skip it after retry 10 times
         for _ in 0..10 {
-            let new_max_id = ingester::get_max_writer_seq_id().await;
+            let new_max_id = ingester::get_max_memtable_id().await;
             if new_max_id > max_memtable_id {
                 break;
             }

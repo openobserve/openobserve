@@ -40,11 +40,14 @@ export const reportsQuery = (org: string, filters: ReportListFilters) =>
       ).data ?? [],
     staleTime: NORMAL_STALE_TIME,
   });
-
-export const reportByIdQuery = (org: string, reportId: string) =>
+export const reportByIdQuery = (
+  org: string,
+  reportId: string,
+  options?: { silentForbidden?: boolean },
+) =>
   queryOptions({
     queryKey: reportKeys.detail(org, reportId),
-    queryFn: async () => (await reports.getReportById(org, reportId)).data,
+    queryFn: async () => (await reports.getReportById(org, reportId, options)).data,
     staleTime: NORMAL_STALE_TIME,
   });
 

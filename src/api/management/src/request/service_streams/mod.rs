@@ -26,6 +26,15 @@ use openobserve_core::auth::check_permissions;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
+/// One registry row as the service list returns it.
+#[derive(Debug, serde::Serialize)]
+struct ServiceRow {
+    #[serde(flatten)]
+    record: infra::table::service_streams::ServiceRecord,
+    /// Discovery fell back to the stream's name, so the row names no service.
+    named_after_stream: bool,
+}
+
 /// GET /api/{org_id}/service_streams/_analytics
 ///
 /// Get comprehensive dimension analytics including cardinality classification
@@ -41,6 +50,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 #[utoipa::path(
     get,
     path = "/{org_id}/service_streams/_analytics",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "GetServiceStreamAnalytics",
     params(
@@ -54,6 +64,10 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
     ),
     security(
         ("Authorization" = [])
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Service Streams", "operation": "list"}))
     )
 )]
 pub async fn get_dimension_analytics(
@@ -100,18 +114,23 @@ pub async fn get_dimension_analytics(
 #[utoipa::path(
     get,
     path = "/{org_id}/service_streams",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "ListServiceStreams",
     params(
         ("org_id" = String, Path, description = "Organization ID")
     ),
     responses(
-        (status = 200, description = "List of discovered services"),
+        (status = 200, description = "List of discovered services. When RBAC is enforced, a non-admin caller gets only the services with a stream they can read, each listing only those streams"),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - Enterprise feature"),
+        (status = 403, description = "Forbidden - Enterprise feature, or no service_streams permission"),
         (status = 500, description = "Internal server error")
     ),
-    security(("Authorization" = []))
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Service Streams", "operation": "list"}))
+    )
 )]
 pub async fn list_services(
     Path(org_id): Path<String>,
@@ -148,11 +167,53 @@ pub async fn list_services(
         } else {
             records
         };
-        MetaHttpResponse::json(records)
+        // after the merge, which needs every record's streams to spot a stream-name fallback
+        let checker = openobserve_core::authz::active_checker();
+        let records = openobserve_core::authz::readable_service_records(
+            checker.as_ref(),
+            &user_email.user_id,
+            &org_id,
+            records,
+        )
+        .await;
+        // The ids ingest names a service from, set `distinguish_by` included.
+        let tracked = &identity_config.naming_alias_ids();
+        let rows: Vec<ServiceRow> = records
+            .into_iter()
+            .map(|record| {
+                let dimensions: std::collections::HashMap<String, String> = record
+                    .all_dimensions
+                    .as_object()
+                    .map(|m| {
+                        m.iter()
+                            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                ServiceRow {
+                    named_after_stream:
+                        o2_enterprise::enterprise::service_streams::processor::named_after_its_stream(
+                            &dimensions,
+                            tracked,
+                        ),
+                    record,
+                }
+            })
+            .collect();
+        MetaHttpResponse::json(rows)
     }
     #[cfg(not(feature = "enterprise"))]
     match infra::table::service_streams::list(&org_id).await {
-        Ok(records) => MetaHttpResponse::json(records),
+        // Without discovery's identity config there is no stream-name fallback to detect.
+        Ok(records) => MetaHttpResponse::json(
+            records
+                .into_iter()
+                .map(|record| ServiceRow {
+                    record,
+                    named_after_stream: false,
+                })
+                .collect::<Vec<_>>(),
+        ),
         Err(e) => MetaHttpResponse::internal_error(format!("Failed to list services: {e}")),
     }
 }
@@ -178,10 +239,12 @@ pub async fn list_services(
 /// - The matched service
 /// - Which dimensions were used for matching (minimal set)
 /// - Which dimensions are available for additional filtering
-/// - All related streams (logs/traces/metrics) with their dimension requirements
+/// - The related streams (logs/traces/metrics/profiles) the caller can read, with their dimension
+///   requirements; with RBAC enforced, a non-admin caller may get empty lists for a matched service
 #[utoipa::path(
     post,
     path = "/{org_id}/service_streams/_correlate",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "CorrelateServiceStreams",
     params(
@@ -195,7 +258,7 @@ pub async fn list_services(
         (status = 200, description = "Correlation results", body = CorrelationResponse),
         (status = 400, description = "Bad request"),
         (status = 401, description = "Unauthorized - Authentication required"),
-        (status = 403, description = "Forbidden - Enterprise feature"),
+        (status = 403, description = "Forbidden - Enterprise feature, or no service_streams permission"),
         (status = 404, description = "No matching service found"),
         (status = 500, description = "Internal server error")
     ),
@@ -203,7 +266,8 @@ pub async fn list_services(
         ("Authorization" = [])
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Service Streams", "operation": "create"}))
     )
 )]
 pub async fn correlate_streams(
@@ -211,8 +275,6 @@ pub async fn correlate_streams(
     Headers(user_email): Headers<UserEmail>, // Require authentication
     #[allow(unused_variables)] Json(req): Json<CorrelationRequest>,
 ) -> Response {
-    // Note: No stream-specific permissions needed - user already has access to source stream
-
     #[cfg(feature = "enterprise")]
     {
         if !check_permissions(
@@ -275,6 +337,16 @@ pub async fn correlate_streams(
                 // guess which resolved stream (and field aliases) the source maps to.
                 response.source_stream = Some(req.source_stream.clone());
                 response.source_type = Some(req.source_type.clone());
+                let checker = openobserve_core::authz::active_checker();
+                response.related_streams = openobserve_core::authz::readable_related_streams(
+                    checker.as_ref(),
+                    &user_email.user_id,
+                    &org_id,
+                    response.related_streams,
+                )
+                .await;
+                // all_streams is a flattened copy, so it would still list the dropped streams
+                response.build_all_streams();
                 MetaHttpResponse::json(response)
             }
             Ok(None) => {
@@ -327,6 +399,7 @@ pub struct CorrelationRequest {
 #[utoipa::path(
     get,
     path = "/{org_id}/service_streams/config/identity",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "GetServiceIdentityConfig",
     params(("org_id" = String, Path, description = "Organization ID")),
@@ -335,7 +408,11 @@ pub struct CorrelationRequest {
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
-    security(("Authorization" = []))
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Service Streams", "operation": "list"}))
+    )
 )]
 pub async fn get_identity_config(
     Path(org_id): Path<String>,
@@ -368,6 +445,7 @@ pub async fn get_identity_config(
 #[utoipa::path(
     put,
     path = "/{org_id}/service_streams/config/identity",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "SaveServiceIdentityConfig",
     params(("org_id" = String, Path, description = "Organization ID")),
@@ -378,7 +456,11 @@ pub async fn get_identity_config(
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
-    security(("Authorization" = []))
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Service Streams", "operation": "update"}))
+    )
 )]
 pub async fn save_identity_config(
     Path(org_id): Path<String>,
@@ -480,7 +562,7 @@ pub async fn save_identity_config(
         updated_by: Some(user_email.user_id),
     };
 
-    match infra::table::system_settings::set(&setting).await {
+    match db::system_settings::set_service_identity_config(&setting).await {
         Ok(_) => {
             #[cfg(feature = "enterprise")]
             {
@@ -520,19 +602,25 @@ pub async fn save_identity_config(
 #[utoipa::path(
     delete,
     path = "/{org_id}/service_streams/_reset",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "ResetServiceStreams",
+    summary = "Reset service stream discovery",
     params(
         ("org_id" = String, Path, description = "Organization ID")
     ),
     responses(
-        (status = 200, description = "Services reset successfully"),
+        (status = 200, description = "Services reset successfully", content_type = "application/json", body = Object),
         (status = 401, description = "Unauthorized - Authentication required"),
         (status = 403, description = "Forbidden - Enterprise feature"),
         (status = 500, description = "Internal server error")
     ),
     security(
         ("Authorization" = [])
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Service Streams", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn reset_services(
@@ -610,7 +698,7 @@ mod tests {
         stream::StreamType,
     };
 
-    use super::CorrelationRequest;
+    use super::{CorrelationRequest, ServiceRow};
 
     // -----------------------------------------------------------------------
     // Group A: CorrelationRequest serialization / deserialization
@@ -984,5 +1072,31 @@ mod tests {
             let deserialized: CardinalityClass = serde_json::from_str(&json).unwrap();
             assert_eq!(class, deserialized);
         }
+    }
+
+    /// The picker reads the flag beside the row's own fields, not nested under it.
+    #[test]
+    fn test_a_service_row_carries_named_after_stream_beside_its_fields() {
+        let record = infra::table::service_streams::ServiceRecord {
+            id: "s1".into(),
+            org_id: "default".into(),
+            service_name: "slo_slices".into(),
+            set_id: "default".into(),
+            disambiguation: serde_json::json!({}),
+            all_dimensions: serde_json::json!({}),
+            logs_streams: serde_json::json!(["slo_slices"]),
+            traces_streams: serde_json::json!([]),
+            metrics_streams: serde_json::json!([]),
+            profiles_streams: serde_json::json!([]),
+            field_name_mapping: None,
+            last_seen: 0,
+        };
+        let row = serde_json::to_value(ServiceRow {
+            record,
+            named_after_stream: true,
+        })
+        .unwrap();
+        assert_eq!(row["service_name"], "slo_slices");
+        assert_eq!(row["named_after_stream"], true);
     }
 }

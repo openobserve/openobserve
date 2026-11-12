@@ -13,10 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { buildInventory, type Series } from "./kubernetesModel";
 import type { QueryId } from "./kubernetesQueries";
-import { joinObjects, objectDetailSql, objectListSql, parseObjects } from "./kubernetesObjects";
+import { setStreamColumns } from "./kubernetesFlatten";
+import { SCHEMAS, missingColumns } from "./__fixtures__/flattenSchemas";
+import {
+  LIST_OBJECT_KINDS,
+  MAP_COLUMNS,
+  OVERVIEW_COLUMNS,
+  joinObjects,
+  objectDetailSql,
+  objectListSql,
+  parseObjects,
+} from "./kubernetesObjects";
 
 const ksm = (metric: Record<string, string>, value = 1): Series => ({
   metric: { k8s_cluster: "prod", ...metric },
@@ -45,6 +55,23 @@ describe("object SQL", () => {
     expect(sql).toContain("AND k8s_namespace_name IN ('data', 'o''b')");
     expect(sql).toContain("json_get_json(body_object_status,'conditions') AS conditions");
     expect(sql).toMatch(/WHERE rn = 1 ORDER BY _timestamp DESC LIMIT 5000$/);
+  });
+
+  it("reads only conditions and container statuses for the overview variant", () => {
+    const sql = objectListSql("pod", "prod", [], OVERVIEW_COLUMNS.pod);
+    expect(sql).toContain("json_get_json(body_object_status,'conditions') AS conditions");
+    expect(sql).toContain(
+      "json_get_json(body_object_status,'containerStatuses') AS container_statuses",
+    );
+    expect(sql).not.toContain("qos_class");
+    const [one] = parseObjects([
+      record({
+        conditions: JSON.stringify([{ type: "Ready", status: "False" }]),
+        container_statuses: JSON.stringify([{ name: "app", restartCount: 2 }]),
+      }),
+    ]);
+    expect(one.object.status.conditions).toEqual([{ type: "Ready", status: "False" }]);
+    expect(one.object.status.containerStatuses).toEqual([{ name: "app", restartCount: 2 }]);
   });
 
   it("uses replicasets as the ReplicaSet resource name", () => {
@@ -246,5 +273,48 @@ describe("object join", () => {
     );
     expect(inventory.daemonsets[0].nodeSelector).toEqual({ disk: "ssd" });
     expect(inventory.cronjobs[0].lastSchedule).toBe(Date.parse("2026-10-06T02:00:00Z") * 1000);
+  });
+});
+
+describe("flatten-level aware object SQL", () => {
+  afterEach(() => setStreamColumns(null));
+  const build = () => ({
+    ...Object.fromEntries(
+      LIST_OBJECT_KINDS.map((k) => [`list ${k}`, objectListSql(k, "prod", ["data"])]),
+    ),
+    mapPod: objectListSql("pod", "prod", [], MAP_COLUMNS.pod),
+    mapNode: objectListSql("node", "prod", [], MAP_COLUMNS.node),
+    overviewPod: objectListSql("pod", "prod", [], OVERVIEW_COLUMNS.pod),
+    detail: objectDetailSql("pod", "prod", { namespace: "data", name: "x", uid: "u1" }),
+  });
+
+  for (const [level, schema] of Object.entries(SCHEMAS)) {
+    it(`reads only columns that exist at ${level}`, () => {
+      setStreamColumns(schema);
+      for (const [id, sql] of Object.entries(build())) {
+        expect(missingColumns(sql, schema), id).toEqual([]);
+      }
+    });
+  }
+
+  it("leaves the level 3 SQL identical to the schema-less SQL", () => {
+    const before = build();
+    setStreamColumns(SCHEMAS["level 3"]);
+    expect(build()).toEqual(before);
+  });
+
+  it("reads json parents from body_object at level 2 and keeps the aliases", () => {
+    setStreamColumns(SCHEMAS["level 2"]);
+    const sql = objectDetailSql("pod", "prod", { namespace: "data", name: "x", uid: null });
+    expect(sql).toContain("json_get_json(body_object,'metadata') AS body_object_metadata");
+    expect(sql).toContain("json_get_str(body_object,'metadata','uid') AS uid");
+  });
+
+  it("uses the flattened column at level 0 and a null for what cannot be rebuilt", () => {
+    setStreamColumns(SCHEMAS["level 0"]);
+    const sql = objectListSql("pod", "prod", []);
+    expect(sql).toContain("body_object_status_qosclass AS qos_class");
+    expect(sql).toContain("body_object_metadata_uid AS uid");
+    expect(sql).toContain("body_object_metadata_creationtimestamp AS created");
   });
 });

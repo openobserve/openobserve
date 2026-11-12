@@ -56,10 +56,11 @@ use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::http::{
-            get_clear_cache_from_request, get_fallback_order_by_col_from_request,
-            get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
-            get_or_create_trace_id, get_search_event_context_from_request,
-            get_search_type_from_request, get_stream_type_from_request, get_use_cache_from_request,
+            get_clear_cache_from_request, get_client_search_type,
+            get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
+            get_is_ui_histogram_from_request, get_or_create_trace_id,
+            get_search_event_context_from_request, get_stream_type_from_request,
+            get_use_cache_from_request,
         },
     },
     search::{
@@ -240,17 +241,8 @@ pub async fn search_http2_stream(
         }
     };
     #[cfg(feature = "enterprise")]
-    for stream in stream_names.iter() {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(stream)) {
-            return (
-                StatusCode::TOO_MANY_REQUESTS,
-                axum::Json(MetaHttpResponse::error(
-                    StatusCode::TOO_MANY_REQUESTS,
-                    e.to_string(),
-                )),
-            )
-                .into_response();
-        }
+    if let Some(refused) = super::search_license_refusal(&org_id, &req.query.sql, stream_type) {
+        return refused;
     }
 
     let mut sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
@@ -430,40 +422,38 @@ pub async fn search_http2_stream(
     // Set use_cache from query params
     req.use_cache = get_use_cache_from_request(&query) && !req.clear_cache;
 
-    // Set search type if not set
-    if req.search_type.is_none() {
-        req.search_type = match get_search_type_from_request(&query) {
-            Ok(v) => v,
-            Err(e) => {
-                #[cfg(feature = "enterprise")]
-                let error_message = e.to_string();
+    // Set search type from the body, else the URL
+    req.search_type = match get_client_search_type(req.search_type, &query) {
+        Ok(v) => v,
+        Err(e) => {
+            #[cfg(feature = "enterprise")]
+            let error_message = e.to_string();
 
-                let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
+            let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
 
-                // Add audit before closing
-                #[cfg(feature = "enterprise")]
-                {
-                    report_to_audit(
-                        user_id,
-                        org_id.clone(),
-                        trace_id,
-                        http_response.status().into(),
-                        Some(error_message),
-                        "POST".to_string(),
-                        format!("/api/{}/_search_stream", org_id),
-                        query
-                            .iter()
-                            .map(|(k, v)| format!("{}={}", k, v))
-                            .collect::<Vec<_>>()
-                            .join("&"),
-                        body_bytes,
-                    )
-                    .await;
-                }
-                return http_response;
+            // Add audit before closing
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id,
+                    org_id.clone(),
+                    trace_id,
+                    http_response.status().into(),
+                    Some(error_message),
+                    "POST".to_string(),
+                    format!("/api/{}/_search_stream", org_id),
+                    query
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join("&"),
+                    body_bytes,
+                )
+                .await;
             }
-        };
-    }
+            return http_response;
+        }
+    };
 
     let fallback_order_by_col = get_fallback_order_by_col_from_request(&query);
 
@@ -485,38 +475,33 @@ pub async fn search_http2_stream(
         };
 
     #[cfg(feature = "enterprise")]
-    for stream_name in stream_names.iter() {
-        if let Some(res) = check_stream_permissions(
-            stream_name,
-            &org_id,
-            &user_id,
-            &stream_type,
-            permission_resource_type,
+    if let Some(res) = crate::search::check_sql_stream_permissions(
+        &req.query.sql,
+        &org_id,
+        &user_id,
+        stream_type,
+        permission_resource_type,
+        &trace_id,
+    )
+    .await
+    {
+        report_to_audit(
+            user_id,
+            org_id.clone(),
+            trace_id,
+            res.status().into(),
+            Some("Unauthorized Access".to_string()),
+            "POST".to_string(),
+            format!("/api/{}/_search_stream", org_id),
+            query
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&"),
+            body_bytes,
         )
-        .await
-        {
-            // Add audit before closing
-            #[cfg(feature = "enterprise")]
-            {
-                report_to_audit(
-                    user_id,
-                    org_id.clone(),
-                    trace_id,
-                    res.status().into(),
-                    Some("Unauthorized Access".to_string()),
-                    "POST".to_string(),
-                    format!("/api/{}/_search_stream", org_id),
-                    query
-                        .iter()
-                        .map(|(k, v)| format!("{}={}", k, v))
-                        .collect::<Vec<_>>()
-                        .join("&"),
-                    body_bytes,
-                )
-                .await;
-            }
-            return res;
-        }
+        .await;
+        return res;
     }
 
     #[cfg(feature = "enterprise")]
@@ -774,8 +759,8 @@ pub async fn values_http2_stream(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&values_req.stream_name))
-        {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 axum::Json(MetaHttpResponse::error(

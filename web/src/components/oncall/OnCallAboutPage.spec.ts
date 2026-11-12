@@ -65,19 +65,16 @@ describe("OnCallAboutPage", () => {
     );
   });
 
-  /// `parseRoutingReason` only understands today's four sentence shapes. A
-  /// fifth one the server starts sending ("...as an impacted caller of the
-  /// failing service") still opens "routed to <id>" — that id is trustworthy
-  /// even when the prose around it isn't, so it is kept and linked to the
-  /// team rather than dumping the whole sentence on the card.
-  it("keeps just the id, linked, from a routing sentence it doesn't recognise", () => {
+  /// Unrecognised wording still shows the record's team, linked by the record's own id.
+  it("keeps just the team, linked by the record's id, from a routing sentence it doesn't recognise", () => {
     const wrapper = render({
-      routingReason: "routed to tm_9 as an impacted caller of the failing service",
+      routingReason: "routed to Platform SRE as an impacted caller of the failing service",
       teamId: "tm_9",
+      teamName: "Platform SRE",
     });
 
     const reason = wrapper.find('[data-test="oncall-about-routing-reason"]');
-    expect(reason.text()).toBe("tm_9");
+    expect(reason.text()).toBe("Platform SRE");
     expect(reason.text()).not.toContain("impacted caller");
 
     const link = wrapper
@@ -88,6 +85,18 @@ describe("OnCallAboutPage", () => {
       params: { teamId: "tm_9", tab: "overview" },
       query: { org_identifier: "default" },
     });
+  });
+
+  it("does not link a deleted team from an unrecognised routing sentence", () => {
+    const wrapper = render({
+      routingReason: "routed to Platform SRE as an impacted caller of the failing service",
+      teamId: "tm_9",
+      teamName: "tm_9",
+      teamDeleted: true,
+    });
+
+    expect(wrapper.find('[data-test="oncall-about-routing-id-link"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-about-routing-reason"]').text()).toBe("Deleted team");
   });
 
   /// The winning rule was spelled as a path and the team as a ksuid — neither
@@ -147,6 +156,21 @@ describe("OnCallAboutPage", () => {
   /// The id here IS the rule that woke somebody, and the trip to change it was
   /// a copy-paste into the alert list's search box. The editor lives on the
   /// list route behind `action=update` — `AlertDetail` navigates the same way.
+  /// An unrouted page has no team to link to; a link with a null id throws in the router.
+  it("says a page with no team is unrouted, without a link", () => {
+    const wrapper = render({ teamId: null, teamName: "" });
+
+    expect(wrapper.find('[data-test="oncall-about-team-link"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-about-team-none"]').text()).toBe("Unrouted");
+  });
+
+  it("says the team was deleted instead of linking to it", () => {
+    const wrapper = render({ teamName: "team_1", teamDeleted: true });
+
+    expect(wrapper.find('[data-test="oncall-about-team-link"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-about-team-deleted"]').text()).toBe("Deleted team");
+  });
+
   it("opens the alert's editor from its id", () => {
     const link = render()
       .findAllComponents({ name: "RouterLink" })
@@ -172,7 +196,7 @@ describe("OnCallAboutPage", () => {
     expect(wrapper.find('[data-test="oncall-about-subject-id"]').exists()).toBe(false);
   });
 
-  it("links an incident once the page has been promoted into one, with its own copy control", () => {
+  it("links an incident once the page has been promoted into one", () => {
     expect(render().find('[data-test="oncall-about-incident-link"]').exists()).toBe(false);
 
     const wrapper = render({ incidentId: "inc_9" });
@@ -182,7 +206,23 @@ describe("OnCallAboutPage", () => {
     // Details card uses — not repeated inside the value.
     expect(link.text()).not.toContain("Incident");
     expect(wrapper.text()).toContain("Incident");
-    expect(wrapper.find('[data-test="oncall-about-copy-incident"]').exists()).toBe(true);
+  });
+
+  it("names the incident by its title once it is known", () => {
+    const link = render({ incidentId: "inc_9", incidentTitle: "Checkout outage" }).find(
+      '[data-test="oncall-about-incident-link"]',
+    );
+    expect(link.text()).toContain("Checkout outage");
+    expect(link.text()).not.toContain("inc_9");
+  });
+
+  /// While the title is on its way the row waits, so a raw id never flashes in first.
+  it("skeletons the incident and team rows while their names load", () => {
+    const wrapper = render({ incidentId: "inc_9", incidentLoading: true, teamName: "" });
+    expect(wrapper.find('[data-test="oncall-about-incident-pending"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-about-incident-link"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-about-team-pending"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("inc_9");
   });
 
   /// The id is here to be pasted into a channel, so it keeps its copy control

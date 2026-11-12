@@ -1,10 +1,9 @@
-// modelPricingPage.js — Page object for Settings > Model Pricing
-// Feature: Enterprise/Cloud only — the route isn't registered on the OSS build (see useManagementRoutes.ts).
-// Routes:
-//   List:   /web/settings/model_pricing?org_identifier={org}
-//   Editor: /web/settings/model_pricing/edit?org_identifier={org}&id={id}
+// Enterprise/Cloud only: the route isn't registered on the OSS build.
 
 import { expect } from '@playwright/test';
+import { discardEditorDraftIfAsked, clearEditorDrafts } from '../alertsPages/editorDraftHelpers.js';
+const modelPricingStrings = require('../../../../web/src/locales/languages/en-US.json').modelPricing;
+const { FilterBuilderDriver } = require('./filterBuilderPage.js');
 
 export class ModelPricingPage {
     constructor(page) {
@@ -14,7 +13,6 @@ export class ModelPricingPage {
         // Navigation
         // ============================================================
         this.settingsMenuLink = page.locator('[data-test="menu-link-settings-item"]');
-        this.modelPricingTab   = page.locator('[data-test="model-pricing-tab"]');
 
         // ============================================================
         // List page — header controls
@@ -46,8 +44,8 @@ export class ModelPricingPage {
         this.listTable          = page.locator('[data-test="model-pricing-list-table"]');
         this.toggleBtn          = page.locator('[data-test="model-pricing-toggle-btn"]');
         this.editBtn            = page.locator('[data-test="model-pricing-edit-btn"]');
-        this.deleteBtn          = page.locator('[data-test="model-pricing-delete-btn"]');
-        this.duplicateBtn       = page.locator('[data-test="model-pricing-duplicate-btn"]');
+        this.deleteBtn          = page.locator('[data-test="model-pricing-delete-btn-menu"]');
+        this.duplicateBtn       = page.locator('[data-test="model-pricing-duplicate-btn-menu"]');
         this.cloneBtn           = page.locator('[data-test="model-pricing-clone-btn"]');
         this.pricingDrawer      = page.locator('[data-test="model-pricing-list-pricing-drawer"]');
 
@@ -73,7 +71,7 @@ export class ModelPricingPage {
         // ============================================================
         // Editor page — optional feature buttons (may not exist in all builds)
         // ============================================================
-        this.addTierBtn     = page.locator('button').filter({ hasText: /add.?tier/i }).first();
+        this.addTierBtn     = page.locator('[data-test="model-pricing-add-tier-btn"]');
         this.templateBtn    = page.locator('button').filter({ hasText: /openai/i }).first();
         this.priceValueInput = page.getByPlaceholder('0.00').first();
         this.examplesBtn    = page.locator('button').filter({ hasText: /example/i }).first();
@@ -113,6 +111,18 @@ export class ModelPricingPage {
         this.testMatchResult    = page.locator('[data-test="test-match-result"]');
 
         // ============================================================
+        // Editor page — attribute rules (per-tier)
+        // ============================================================
+        this.tieWarning     = page.locator('[data-test="model-pricing-tier-tie-warning"]');
+        this.drawerTierRule = page.locator('[data-test="model-pricing-drawer-tier-rule"]');
+
+        // ============================================================
+        // Test Match Dialog — attribute rows
+        // ============================================================
+        this.testMatchAttributeAdd = page.locator('[data-test="test-match-attribute-add"]');
+        this.testMatchTierRule     = page.locator('[data-test="test-match-tier-rule"]');
+
+        // ============================================================
         // Confirm dialog (ODialog generic buttons)
         // ============================================================
         this.confirmOkBtn       = page.locator('[data-test="o-dialog-primary-btn"]');
@@ -131,7 +141,7 @@ export class ModelPricingPage {
     async gotoModelPricingPage() {
         const org = process.env['ORGNAME'] || 'default';
         await this.page.goto(
-            `${process.env['ZO_BASE_URL']}/web/settings/model_pricing?org_identifier=${org}`
+            `${process.env['ZO_BASE_URL']}/web/ai/model-pricing?org_identifier=${org}`
         );
         await this.listTitle.waitFor({ state: 'visible', timeout: 15000 });
     }
@@ -139,7 +149,7 @@ export class ModelPricingPage {
     async gotoEditorCreate() {
         const org = process.env['ORGNAME'] || 'default';
         await this.page.goto(
-            `${process.env['ZO_BASE_URL']}/web/settings/model_pricing/edit?org_identifier=${org}`
+            `${process.env['ZO_BASE_URL']}/web/ai/model-pricing/edit?org_identifier=${org}`
         );
         await this.editorTitle.waitFor({ state: 'visible', timeout: 15000 });
     }
@@ -147,7 +157,7 @@ export class ModelPricingPage {
     async gotoEditorDuplicate(modelId) {
         const org = process.env['ORGNAME'] || 'default';
         await this.page.goto(
-            `${process.env['ZO_BASE_URL']}/web/settings/model_pricing/edit?org_identifier=${org}&id=${modelId}&duplicate=true`
+            `${process.env['ZO_BASE_URL']}/web/ai/model-pricing/edit?org_identifier=${org}&id=${modelId}&duplicate=true`
         );
         await this.editorTitle.waitFor({ state: 'visible', timeout: 15000 });
         await this.waitForEditorHydrated();
@@ -156,7 +166,7 @@ export class ModelPricingPage {
     async gotoEditorEdit(modelId) {
         const org = process.env['ORGNAME'] || 'default';
         await this.page.goto(
-            `${process.env['ZO_BASE_URL']}/web/settings/model_pricing/edit?org_identifier=${org}&id=${modelId}`
+            `${process.env['ZO_BASE_URL']}/web/ai/model-pricing/edit?org_identifier=${org}&id=${modelId}`
         );
         await this.editorTitle.waitFor({ state: 'visible', timeout: 15000 });
         await this.waitForEditorHydrated();
@@ -167,11 +177,13 @@ export class ModelPricingPage {
     // ----------------------------------------------------------------
 
     async clickAdd() {
+        await clearEditorDrafts(this.page);
         await this.addBtn.click();
         await this.editorTitle.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async clickEmptyAdd() {
+        await clearEditorDrafts(this.page);
         await this.emptyAddBtn.click();
         await this.editorTitle.waitFor({ state: 'visible', timeout: 10000 });
     }
@@ -193,11 +205,18 @@ export class ModelPricingPage {
             .locator('[data-test="model-pricing-edit-btn"]');
     }
 
-    deleteBtnForModel(name) {
-        return this.page
+    // Duplicate and Delete live in the row's ⋮ menu, which renders in a portal outside the row.
+    async openRowMenuForModel(name) {
+        await this.page
             .locator('[data-test="model-pricing-list-table"]')
             .locator(`tr:has-text("${name}")`)
-            .locator('[data-test="model-pricing-delete-btn"]');
+            .locator('[data-test="model-pricing-row-more-actions"]')
+            .click();
+    }
+
+    async clickDeleteForModel(name) {
+        await this.openRowMenuForModel(name);
+        await this.deleteBtn.click();
     }
 
     toggleBtnForModel(name) {
@@ -207,11 +226,9 @@ export class ModelPricingPage {
             .locator('[data-test="model-pricing-toggle-btn"]');
     }
 
-    duplicateBtnForModel(name) {
-        return this.page
-            .locator('[data-test="model-pricing-list-table"]')
-            .locator(`tr:has-text("${name}")`)
-            .locator('[data-test="model-pricing-duplicate-btn"]');
+    async clickDuplicateForModel(name) {
+        await this.openRowMenuForModel(name);
+        await this.duplicateBtn.click();
     }
 
     cloneBtnForRow(rowLocator) {
@@ -228,6 +245,8 @@ export class ModelPricingPage {
             .locator(`tr:has-text("${name}")`);
         // OCheckbox renders as button[role="checkbox"] — data-test="o2-table-select-{id}"
         const checkbox = row.locator('button[role="checkbox"]').first();
+        // Clicking a ticked box unticks it, so a re-select must leave checked rows alone.
+        if ((await checkbox.getAttribute('aria-checked')) === 'true') return;
         await checkbox.click();
     }
 
@@ -320,6 +339,7 @@ export class ModelPricingPage {
         await valueInput.fill(String(valuePricePerMillion));
     }
 
+    /** Saves the editor and returns the saved model body; throws when no save request completes or it fails. */
     async clickSave() {
         // /llm/models/test and /llm/models/refresh-built-in share the prefix but are not saves, so match only the collection and item paths.
         const isSaveUrl = (url) => {
@@ -334,7 +354,12 @@ export class ModelPricingPage {
                 { timeout: 60000 }
             )
             .then(
-                resp => ({ method: resp.request().method(), status: resp.status(), ok: resp.ok() }),
+                async resp => ({
+                    method: resp.request().method(),
+                    status: resp.status(),
+                    ok: resp.ok(),
+                    body: resp.ok() ? await resp.json().catch(() => null) : null,
+                }),
                 () => null
             );
 
@@ -357,15 +382,19 @@ export class ModelPricingPage {
             this.listTitle.waitFor({ state: 'visible', timeout: 15000 }),
             this.toastMessage.first().waitFor({ state: 'visible', timeout: 15000 }),
         ]).catch(() => {});
+
+        return response.body;
     }
 
     async clickCancel() {
         await this.cancelBtn.click();
+        await discardEditorDraftIfAsked(this.page);
         await this.listTitle.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async clickEditorBack() {
         await this.editorBackBtn.click();
+        await discardEditorDraftIfAsked(this.page);
         await this.listTitle.waitFor({ state: 'visible', timeout: 10000 });
     }
 
@@ -396,7 +425,8 @@ export class ModelPricingPage {
     /** Fill the test-match input. data-test is on the OInput wrapper — use inner <input>. */
     async fillTestMatchInput(modelName) {
         const input = this.testMatchInput.locator('input').first();
-        await input.fill(modelName, { force: true });
+        await expect(input).toBeVisible({ timeout: 5000 });
+        await input.fill(modelName);
     }
 
     async clickTestMatchRun() {
@@ -412,6 +442,95 @@ export class ModelPricingPage {
         const closeBtn = this.testMatchDialog.locator('[data-test="o-dialog-close-btn"]');
         await closeBtn.click();
         await this.testMatchDialog.waitFor({ state: 'hidden', timeout: 5000 });
+    }
+
+    // ----------------------------------------------------------------
+    // Attribute rules actions (editor, per non-default tier)
+    // ----------------------------------------------------------------
+
+    async clickAddTier() {
+        await this.addTierBtn.click();
+    }
+
+    /** A tier's usage condition and attribute rules are one shared FilterBuilder per non-default tier. */
+    tierFilter(tierIndex) {
+        return new FilterBuilderDriver(this.page, `model-pricing-tier-filter-builder-${tierIndex}`);
+    }
+
+    /** Adds a rule or the usage condition; `field` is the key list (`a, b`) or a usage key, `operator` a builder id (in, gt, is_not_null, eq, ...). */
+    async addTierCondition(tierIndex, { field, operator, values = [], search }) {
+        await this.tierFilter(tierIndex).addCondition({ field, operator, values, search });
+    }
+
+    async removeTierCondition(tierIndex, field, nth = 0) {
+        await this.tierFilter(tierIndex).removeChip(field, nth);
+    }
+
+    async expectTierCondition(tierIndex, field, text) {
+        await this.tierFilter(tierIndex).expectChip(field, text);
+    }
+
+    async expectTierConditionCount(tierIndex, count) {
+        await this.tierFilter(tierIndex).expectChipCount(count);
+    }
+
+    async expectTierAddConditionDisabled(tierIndex) {
+        await this.tierFilter(tierIndex).expectAddDisabled();
+    }
+
+    /** The schema's errors for the tier's condition and rules, listed under its builder. */
+    async expectTierFilterError(tierIndex, text) {
+        const errors = this.page.locator(`[data-test="model-pricing-tier-filter-errors-${tierIndex}"]`);
+        await expect(errors).toBeVisible({ timeout: 5000 });
+        if (text) await expect(errors).toContainText(text);
+    }
+
+    async expectTieWarningVisible() {
+        await expect(this.tieWarning).toBeVisible({ timeout: 10000 });
+    }
+
+    /** Open the pricing drawer by clicking the model's row. */
+    async openPricingDrawerForModel(name) {
+        await this.listTable.locator(`tr:has-text("${name}")`).getByText(name, { exact: true }).first().click();
+        await expect(this.pricingDrawer).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectDrawerTierRuleVisible(textFragment) {
+        await expect(this.drawerTierRule.filter({ hasText: textFragment }).first())
+            .toBeVisible({ timeout: 10000 });
+    }
+
+    // ----------------------------------------------------------------
+    // Test Match Dialog — attribute rows
+    // ----------------------------------------------------------------
+
+    async clickTestMatchAttributeAdd() {
+        await this.testMatchAttributeAdd.click();
+    }
+
+    async fillTestMatchAttributeKey(attrIndex, value) {
+        const input = this.page
+            .locator(`[data-test="test-match-attribute-key-${attrIndex}"]`)
+            .locator('input')
+            .first();
+        await input.fill(value);
+    }
+
+    async fillTestMatchAttributeValue(attrIndex, value) {
+        const input = this.page
+            .locator(`[data-test="test-match-attribute-value-${attrIndex}"]`)
+            .locator('input')
+            .first();
+        await input.fill(value);
+    }
+
+    async expectTestMatchResultVisible() {
+        await expect(this.testMatchResult).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectTestMatchTierRuleVisible(textFragment) {
+        await expect(this.testMatchTierRule.filter({ hasText: textFragment }).first())
+            .toBeVisible({ timeout: 10000 });
     }
 
     // ----------------------------------------------------------------

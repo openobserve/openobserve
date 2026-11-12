@@ -284,6 +284,7 @@ import {
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
 import { ingestionTokensQuery } from "@/services/organizations.queries";
+import analytics from "@/services/product_analytics";
 import { ref, computed, defineComponent, onBeforeMount, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
@@ -312,6 +313,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { getBasicAuth } from "@/utils/auth";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { forbiddenState } from "@/utils/featureGate";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
@@ -374,7 +376,7 @@ export default defineComponent({
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = tokensList.error.value;
-      return e?.status === 403 || e?.response?.status === 403;
+      return forbiddenState(e) || e?.status === 403;
     });
     const filterQuery = ref("");
     const showCreateForm = ref(false);
@@ -458,7 +460,6 @@ export default defineComponent({
     // The query owns its failure now, so this reports it once per error however
     // the read was triggered.
     watch(tokensList.error, (e: any) => {
-      // The grouped access toast already reports a 403; a second red toast adds nothing.
       if (!e || forbidden.value) return;
       toast({
         variant: "error",
@@ -529,6 +530,7 @@ export default defineComponent({
       loading.value = true;
       try {
         await setIngestionTokenEnabled.mutateAsync({ name, enabled });
+        analytics.track(enabled ? "ingestion_token_enabled" : "ingestion_token_disabled");
         await fetchTokens();
         store.dispatch("setOrgTokens", tokens.value);
         toast({
@@ -553,9 +555,11 @@ export default defineComponent({
       if (!generate) {
         const confirmed = await confirm({
           title: t("ingestion.splunkTokenRevokeTitle"),
-          message: t("ingestion.splunkTokenRevokeMessage"),
+          messageKeypath: "ingestion.splunkTokenRevokeMessage",
+          messageName: name,
           confirmLabel: t("ingestion.splunkTokenRevoke"),
           cancelLabel: t("common.cancel"),
+          confirmVariant: "destructive",
         });
         if (!confirmed) return;
       }
@@ -565,6 +569,9 @@ export default defineComponent({
           name,
           action: generate ? "generate" : "revoke",
         });
+        analytics.track(
+          generate ? "ingestion_splunk_token_generated" : "ingestion_splunk_token_revoked",
+        );
         await fetchTokens();
         toast({
           variant: "success",

@@ -40,8 +40,9 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
 }));
 
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
 vi.mock("@/composables/useConfirmDialog", () => ({
-  useConfirmDialog: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
+  useConfirmDialog: () => ({ confirm: confirmMock }),
 }));
 
 // ── Component under test ───────────────────────────────────────────────────
@@ -193,6 +194,26 @@ describe("NoticeHistoryDialog", () => {
       const affected = wrapper.find('[data-test="status-page-notice-components-notice-1"]');
       expect(affected.text()).toContain("statusPages.notices.componentsUnavailable");
       expect(wrapper.text()).not.toContain("comp-gone");
+    });
+  });
+
+  describe("delete confirm", () => {
+    it("names the update and asks with a destructive confirm", async () => {
+      confirmMock.mockResolvedValue(false);
+      mockListNotices.mockResolvedValue({ data: [makeNotice()] });
+      wrapper = makeWrapper();
+      await flushPromises();
+
+      await wrapper.find('[data-test="status-page-notice-delete-notice-1"]').trigger("click");
+      await flushPromises();
+
+      expect(confirmMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageKeypath: "statusPages.notices.deleteBody",
+          messageName: "Elevated error rates",
+          confirmVariant: "destructive",
+        }),
+      );
     });
   });
 });

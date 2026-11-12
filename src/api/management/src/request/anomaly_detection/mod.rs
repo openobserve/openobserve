@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use axum::{
     Json,
     extract::{Path, Query},
@@ -36,13 +38,14 @@ use utoipa::ToSchema;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
+    request::alerts::{AlertVisibility, permitted_alert_visibility, visible_alert},
     service::anomaly_detection as anomaly_service,
 };
 
 /// Anomaly detection can be turned off at runtime via O2_ANOMALY_DETECTION_DISABLED.
 /// When off, every endpoint in this module returns 403. Returns the short-circuit
 /// response to bail with, or `None` when the feature is live.
-fn disabled_response() -> Option<Response> {
+pub(crate) fn disabled_response() -> Option<Response> {
     if o2_enterprise::enterprise::common::config::get_config()
         .anomaly_detection
         .disabled
@@ -74,19 +77,29 @@ fn disabled_response() -> Option<Response> {
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<AnomalyConfigResponse>),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "List anomaly detection configs", "category": "anomaly_detection"}))
+        ("x-o2-mcp" = json!({"description": "List anomaly detection configs", "category": "anomaly_detection"})),
+        ("x-o2-ratelimit" = json!({"module": "Anomaly Detection", "operation": "list"}))
     )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
-pub async fn list_configs(Path(org_id): Path<String>) -> Response {
+pub async fn list_configs(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     if let Some(resp) = disabled_response() {
         return resp;
     }
+    let visibility = match permitted_alert_visibility(&org_id, &user_email.user_id).await {
+        Ok(visibility) => visibility,
+        Err(e) => return e.into(),
+    };
     match anomaly_service::list_configs(&org_id, None, None).await {
-        Ok(mut configs) => {
+        Ok(configs) => {
+            let mut configs = visible_configs(&visibility, configs);
             add_active_downtimes(&org_id, &mut configs).await;
             MetaHttpResponse::json(configs)
         }
@@ -151,7 +164,7 @@ async fn add_active_downtimes(_org_id: &str, _configs: &mut [serde_json::Value])
 /// Get a specific anomaly detection configuration
 #[utoipa::path(
     get,
-    path = "/{org_id}/anomaly_detection/{anomaly_id}",
+    path = "/{org_id}/anomaly_detection/{config_id}",
     context_path = "/api",
     tag = "Anomaly Detection",
     operation_id = "GetAnomalyConfig",
@@ -160,15 +173,17 @@ async fn add_active_downtimes(_org_id: &str, _configs: &mut [serde_json::Value])
     ),
     params(
         ("org_id" = String, Path, description = "Organization identifier"),
-        ("anomaly_id" = String, Path, description = "Anomaly config identifier"),
+        ("config_id" = String, Path, description = "Anomaly config identifier"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = AnomalyConfigResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Get an anomaly detection config by ID", "category": "anomaly_detection"}))
+        ("x-o2-mcp" = json!({"description": "Get an anomaly detection config by ID", "category": "anomaly_detection"})),
+        ("x-o2-ratelimit" = json!({"module": "Anomaly Detection", "operation": "get"}))
     )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
@@ -267,6 +282,31 @@ fn update_error(e: anyhow::Error) -> Response {
         .into_response()
 }
 
+/// The configs of `configs` the caller may list, as the v2 alert list filters them. [pure]
+fn visible_configs(
+    visibility: &AlertVisibility,
+    configs: Vec<serde_json::Value>,
+) -> Vec<serde_json::Value> {
+    configs
+        .into_iter()
+        .filter(|config| {
+            let text = |key: &str| config.get(key).and_then(|v| v.as_str()).unwrap_or_default();
+            visible_alert(
+                visibility,
+                text("anomaly_id"),
+                text("folder_id"),
+                text("name"),
+            )
+        })
+        .collect()
+}
+
+/// The folder a create writes into: the body's, else the `?folder=` the route gate checked. [pure]
+fn create_folder(body: Option<String>, query: Option<&String>) -> Option<String> {
+    body.filter(|folder| !folder.is_empty())
+        .or_else(|| query.filter(|folder| !folder.is_empty()).cloned())
+}
+
 /// Falls back to `fallback` when `owner` is absent or empty.
 fn resolve_owner(owner: Option<String>, fallback: &str) -> Option<String> {
     if owner.as_deref().unwrap_or("").is_empty() {
@@ -288,6 +328,7 @@ fn resolve_owner(owner: Option<String>, fallback: &str) -> Option<String> {
     ),
     params(
         ("org_id" = String, Path, description = "Organization identifier"),
+        ("folder" = Option<String>, Query, description = "Folder to create the config in when the body names none"),
     ),
     responses(
         (status = 200, description = "Created", content_type = "application/json", body = AnomalyConfigResponse),
@@ -301,12 +342,14 @@ fn resolve_owner(owner: Option<String>, fallback: &str) -> Option<String> {
         content_type = "application/json",
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Create an anomaly detection config", "category": "anomaly_detection"}))
+        ("x-o2-mcp" = json!({"description": "Create an anomaly detection config", "category": "anomaly_detection"})),
+        ("x-o2-ratelimit" = json!({"module": "Anomaly Detection", "operation": "create"}))
     )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
 pub async fn create_config(
     Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
     Json(mut req): Json<CreateAnomalyConfigRequest>,
 ) -> Response {
@@ -314,6 +357,7 @@ pub async fn create_config(
         return resp;
     }
     req.owner = resolve_owner(req.owner, &user_email.user_id);
+    req.folder_id = create_folder(req.folder_id, query.get("folder"));
     // The route gate resolves `?folder=`; this body folder is what actually gets written.
     #[cfg(feature = "enterprise")]
     if let Some(folder) = req.folder_id.as_deref().filter(|f| !f.is_empty())
@@ -335,7 +379,7 @@ pub async fn create_config(
 /// Update an existing anomaly detection configuration
 #[utoipa::path(
     put,
-    path = "/{org_id}/anomaly_detection/{anomaly_id}",
+    path = "/{org_id}/anomaly_detection/{config_id}",
     context_path = "/api",
     tag = "Anomaly Detection",
     operation_id = "UpdateAnomalyConfig",
@@ -344,7 +388,7 @@ pub async fn create_config(
     ),
     params(
         ("org_id" = String, Path, description = "Organization identifier"),
-        ("anomaly_id" = String, Path, description = "Anomaly config identifier"),
+        ("config_id" = String, Path, description = "Anomaly config identifier"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = AnomalyConfigResponse),
@@ -359,7 +403,8 @@ pub async fn create_config(
         content_type = "application/json",
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Update an anomaly detection config", "category": "anomaly_detection"}))
+        ("x-o2-mcp" = json!({"description": "Update an anomaly detection config", "category": "anomaly_detection"})),
+        ("x-o2-ratelimit" = json!({"module": "Anomaly Detection", "operation": "update"}))
     )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
@@ -394,7 +439,7 @@ pub async fn update_config(
 /// Delete an anomaly detection configuration
 #[utoipa::path(
     delete,
-    path = "/{org_id}/anomaly_detection/{anomaly_id}",
+    path = "/{org_id}/anomaly_detection/{config_id}",
     context_path = "/api",
     tag = "Anomaly Detection",
     operation_id = "DeleteAnomalyConfig",
@@ -403,15 +448,17 @@ pub async fn update_config(
     ),
     params(
         ("org_id" = String, Path, description = "Organization identifier"),
-        ("anomaly_id" = String, Path, description = "Anomaly config identifier"),
+        ("config_id" = String, Path, description = "Anomaly config identifier"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = DeleteResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Delete an anomaly detection config by ID", "category": "anomaly_detection", "requires_confirmation": true}))
+        ("x-o2-mcp" = json!({"description": "Delete an anomaly detection config by ID", "category": "anomaly_detection", "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Anomaly Detection", "operation": "delete"}))
     )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
@@ -439,7 +486,7 @@ pub async fn delete_config(Path((org_id, anomaly_id)): Path<(String, String)>) -
 /// Trigger manual training for a configuration
 #[utoipa::path(
     post,
-    path = "/{org_id}/anomaly_detection/{anomaly_id}/train",
+    path = "/{org_id}/anomaly_detection/{config_id}/train",
     context_path = "/api",
     tag = "Anomaly Detection",
     operation_id = "TrainAnomalyModel",
@@ -448,15 +495,17 @@ pub async fn delete_config(Path((org_id, anomaly_id)): Path<(String, String)>) -
     ),
     params(
         ("org_id" = String, Path, description = "Organization identifier"),
-        ("anomaly_id" = String, Path, description = "Anomaly config identifier"),
+        ("config_id" = String, Path, description = "Anomaly config identifier"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Start training the model for an anomaly detection config", "category": "anomaly_detection"}))
+        ("x-o2-mcp" = json!({"description": "Start training the model for an anomaly detection config", "category": "anomaly_detection"})),
+        ("x-o2-ratelimit" = json!({"module": "Anomaly Detection", "operation": "create"}))
     )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
@@ -487,7 +536,7 @@ pub async fn train_model(
 /// Cancel an in-progress training run
 #[utoipa::path(
     delete,
-    path = "/{org_id}/anomaly_detection/{anomaly_id}/train",
+    path = "/{org_id}/anomaly_detection/{config_id}/train",
     context_path = "/api",
     tag = "Anomaly Detection",
     operation_id = "CancelAnomalyTraining",
@@ -496,15 +545,17 @@ pub async fn train_model(
     ),
     params(
         ("org_id" = String, Path, description = "Organization identifier"),
-        ("anomaly_id" = String, Path, description = "Anomaly config identifier"),
+        ("config_id" = String, Path, description = "Anomaly config identifier"),
     ),
     responses(
         (status = 200, description = "Training cancelled"),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Cancel in-progress training for an anomaly detection config", "category": "anomaly_detection"}))
+        ("x-o2-mcp" = json!({"description": "Cancel in-progress training for an anomaly detection config", "category": "anomaly_detection", "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Anomaly Detection", "operation": "delete"}))
     )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
@@ -527,7 +578,7 @@ pub async fn cancel_training(Path((org_id, anomaly_id)): Path<(String, String)>)
 /// Trigger manual detection for a configuration
 #[utoipa::path(
     post,
-    path = "/{org_id}/anomaly_detection/{anomaly_id}/detect",
+    path = "/{org_id}/anomaly_detection/{config_id}/detect",
     context_path = "/api",
     tag = "Anomaly Detection",
     operation_id = "DetectAnomalies",
@@ -536,15 +587,17 @@ pub async fn cancel_training(Path((org_id, anomaly_id)): Path<(String, String)>)
     ),
     params(
         ("org_id" = String, Path, description = "Organization identifier"),
-        ("anomaly_id" = String, Path, description = "Anomaly config identifier"),
+        ("config_id" = String, Path, description = "Anomaly config identifier"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Run anomaly detection now for a config", "category": "anomaly_detection"}))
+        ("x-o2-mcp" = json!({"description": "Run anomaly detection now for a config", "category": "anomaly_detection"})),
+        ("x-o2-ratelimit" = json!({"module": "Anomaly Detection", "operation": "create"}))
     )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
@@ -575,7 +628,7 @@ pub async fn detect_anomalies(
 /// Get detection history for a configuration
 #[utoipa::path(
     get,
-    path = "/{org_id}/anomaly_detection/{anomaly_id}/history",
+    path = "/{org_id}/anomaly_detection/{config_id}/history",
     context_path = "/api",
     tag = "Anomaly Detection",
     operation_id = "GetDetectionHistory",
@@ -584,16 +637,18 @@ pub async fn detect_anomalies(
     ),
     params(
         ("org_id" = String, Path, description = "Organization identifier"),
-        ("anomaly_id" = String, Path, description = "Anomaly config identifier"),
+        ("config_id" = String, Path, description = "Anomaly config identifier"),
         ("limit" = Option<i64>, Query, description = "Maximum number of results"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<DetectionHistoryItem>),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         // The core getter is still a stub returning [], so an agent would report no history
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Anomaly Detection", "operation": "list"}))
     )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
@@ -649,7 +704,48 @@ pub struct DeleteResponse {
 
 #[cfg(test)]
 mod tests {
-    use super::resolve_owner;
+    use super::{create_folder, resolve_owner, visible_configs};
+
+    #[test]
+    fn test_list_keeps_only_the_configs_the_caller_may_list() {
+        let config = |id: &str, folder: &str| serde_json::json!({"anomaly_id": id, "folder_id": folder, "name": format!("n-{id}")});
+        let all = || vec![config("a1", "A"), config("b1", "B")];
+        let grants =
+            |objects: &[&str]| Some((false, objects.iter().map(|o| o.to_string()).collect()));
+        let cases = [
+            (None, vec!["a1", "b1"]),
+            (Some((true, Default::default())), vec!["a1", "b1"]),
+            (grants(&["afolder:A"]), vec!["a1"]),
+            (grants(&["alert:b1"]), vec!["b1"]),
+            (grants(&["afolder:default"]), vec![]),
+        ];
+        for (visibility, expected) in cases {
+            let ids: Vec<String> = visible_configs(&visibility, all())
+                .iter()
+                .map(|c| c["anomaly_id"].as_str().unwrap().to_string())
+                .collect();
+            assert_eq!(ids, expected, "{visibility:?}");
+        }
+    }
+
+    #[test]
+    fn test_create_writes_the_body_folder_else_the_gated_query_folder() {
+        let s = |v: &str| Some(v.to_string());
+        let cases = [
+            (s("body"), s("query"), s("body")),
+            (None, s("query"), s("query")),
+            (s(""), s("query"), s("query")),
+            (None, s(""), None),
+            (None, None, None),
+        ];
+        for (body, query, expected) in cases {
+            assert_eq!(
+                create_folder(body.clone(), query.as_ref()),
+                expected,
+                "{body:?} {query:?}"
+            );
+        }
+    }
 
     #[test]
     fn test_owner_fallback_when_absent() {
@@ -733,7 +829,13 @@ mod tests {
                 "detection_window_seconds": 3600
             }))
             .unwrap();
-            let resp = create_config(Path("ad_org1".to_string()), denied_user(), Json(req)).await;
+            let resp = create_config(
+                Path("ad_org1".to_string()),
+                Query(Default::default()),
+                denied_user(),
+                Json(req),
+            )
+            .await;
             let (status, message) = status_and_message(resp).await;
             assert_eq!(status, StatusCode::BAD_REQUEST);
             assert!(message.contains("validation error"), "{message}");

@@ -20,11 +20,12 @@
 
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder,
+    sea_query::Query,
 };
 
 use crate::{
     errors::{self, Error},
-    table::entity::anomaly_detection_models,
+    table::entity::{anomaly_detection_config, anomaly_detection_models},
 };
 
 type Model = anomaly_detection_models::Model;
@@ -72,6 +73,21 @@ pub async fn delete_by_key<C: ConnectionTrait>(
     anomaly_detection_models::Entity::delete_many()
         .filter(anomaly_detection_models::Column::AnomalyId.eq(anomaly_id))
         .filter(anomaly_detection_models::Column::Version.eq(version))
+        .exec(conn)
+        .await
+        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+    Ok(())
+}
+
+/// Deletes the model-metadata rows of every config of an org; must run before the configs go.
+pub async fn delete_by_org<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result<()> {
+    let anomaly_ids = Query::select()
+        .column(anomaly_detection_config::Column::AnomalyId)
+        .from(anomaly_detection_config::Entity)
+        .and_where(anomaly_detection_config::Column::OrgId.eq(org_id))
+        .to_owned();
+    anomaly_detection_models::Entity::delete_many()
+        .filter(anomaly_detection_models::Column::AnomalyId.in_subquery(anomaly_ids))
         .exec(conn)
         .await
         .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;

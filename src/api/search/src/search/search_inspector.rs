@@ -63,12 +63,12 @@ use crate::{
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("trace_id" = Option<String>, Query, description = "trace_id, eg: trace_id=684a4e5dac43429a86a0a2ef9adf62c2"),
-        ("start_time" = i64, Query, description = "start time"),
-        ("end_time" = i64, Query, description = "end time"),
+        ("trace_id" = String, Query, description = "trace_id, eg: trace_id=684a4e5dac43429a86a0a2ef9adf62c2"),
+        ("start_time" = Option<i64>, Query, description = "start time; defaults from the trace id"),
+        ("end_time" = Option<i64>, Query, description = "end time; defaults from the trace id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = SearchInspector, example = json!({
           "sql": "SELECT count(*) FROM \"default\" WHERE match_all('m')",
           "start_time": "1744168877746000",
           "end_time": "1744773677746000",
@@ -90,7 +90,7 @@ use crate::{
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
@@ -181,10 +181,12 @@ pub async fn get_search_profile(
         let max_query_range =
             get_settings_max_query_range(settings.max_query_range, meta_org_id, Some(&user_id))
                 .await;
-        if max_query_range > 0
-            && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
-        {
-            req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
+        if let Some(clamped) = config::utils::query_range::clamp_start_time(
+            req.query.start_time,
+            req.query.end_time,
+            max_query_range,
+        ) {
+            req.query.start_time = clamped;
             range_error = format!(
                 "Query duration is modified due to query range restriction of {max_query_range} hours"
             );
@@ -243,6 +245,7 @@ pub async fn get_search_profile(
                         use_all_org: false,
                         use_self_context: false,
                         use_self_parent: true,
+                        feature: None,
                     },
                     user.role,
                     user.is_external,

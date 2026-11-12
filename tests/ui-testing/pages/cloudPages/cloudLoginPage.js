@@ -20,6 +20,10 @@ class CloudLoginPage {
         await expect(this.homePageMenu).toBeVisible({ timeout });
     }
 
+    async expectHomeMenuVisible(timeout = 30000) {
+        await expect(this.homePageMenu).toBeVisible({ timeout });
+    }
+
     async expectOnWebPage(timeout = 15000) {
         await expect(this.page).toHaveURL(/web/, { timeout });
     }

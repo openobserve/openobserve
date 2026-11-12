@@ -17,10 +17,7 @@
 
 use std::sync::{Arc, LazyLock as Lazy};
 
-use config::{
-    meta::promql::value::Labels,
-    utils::hash::{Sum64, gxhash},
-};
+use config::{meta::promql::value::Labels, utils::hash::key_sum64};
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 use parking_lot::Mutex;
@@ -163,7 +160,7 @@ fn context_fingerprint(org_id: &str, stream_name: &str, label_cols: &[String]) -
         key.push('\u{0}');
         key.push_str(col);
     }
-    gxhash::new().sum64(&key)
+    key_sum64(&key)
 }
 
 struct CacheWriter {

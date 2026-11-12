@@ -48,10 +48,7 @@
         <!-- Type breakdown (catalog signal) — doubles as a filter synced to the
              type dropdown; Total last, never itself the active tile. -->
         <template #subheader>
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="scorer-list-summary"
-          >
+          <div data-test="scorer-list-summary">
             <OStatStrip
               :items="summaryStats"
               :loading="loading"
@@ -118,6 +115,18 @@
           </OButton>
         </template>
 
+        <template #cell-name="{ row }">
+          <div class="flex min-w-0 items-center gap-2">
+            <OTruncatedText>{{ row.name }}</OTruncatedText>
+            <EditorDraftDot
+              v-if="scorerDrafts.ids.has(entityId(row))"
+              :saved-at="scorerDrafts.savedAt(entityId(row))"
+              class="shrink-0"
+              :data-test="`scorer-list-${entityId(row)}-draft-dot`"
+            />
+          </div>
+        </template>
+
         <template #cell-type="{ row }">
           <OTag type="scorerType" :value="scorerTypeOf(row)" />
         </template>
@@ -168,6 +177,7 @@
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
+                  :aria-label="t('common.moreActions')"
                   icon-left="more-vert"
                   variant="ghost"
                   size="icon-xs-sq"
@@ -235,6 +245,10 @@ import { entityId, scorerTypeOf, valueOf } from "./utils/evalEntity";
 import EvalListShell from "./EvalListShell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import type { ForbiddenState } from "@/utils/featureGate";
 
 const props = defineProps<{
   rows: Scorer[];
@@ -244,7 +258,7 @@ const props = defineProps<{
   providers: Provider[];
   search: string;
   loading?: boolean;
-  forbidden?: boolean;
+  forbidden?: ForbiddenState;
   /** Epoch-ms of the last list read, for the refresh button's age label. */
   lastRunAt?: number | null;
   /** A reload is in flight — spins the refresh button and blocks a second click. */
@@ -267,6 +281,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const scorerDrafts = useEditorDraftIds("eval_scorer");
 const typeFilter = ref<ScorerType | null>(null);
 const selectedIds = ref<string[]>([]);
 
@@ -358,12 +373,14 @@ const typeCounts = computed(() => {
   const rows = props.rows || [];
   let llm = 0;
   let remote = 0;
+  let code = 0;
   for (const r of rows) {
     const ty = scorerTypeOf(r);
     if (ty === "llm_judge") llm += 1;
     else if (ty === "remote") remote += 1;
+    else if (ty === "code") code += 1;
   }
-  return { llm, remote, total: rows.length };
+  return { llm, remote, code, total: rows.length };
 });
 const summaryStats = computed<StatItem[]>(() => {
   const c = typeCounts.value;
@@ -388,6 +405,15 @@ const summaryStats = computed<StatItem[]>(() => {
       tone: "teal",
       max: share,
       dataTest: "scorer-summary-remote",
+    },
+    {
+      key: "code",
+      label: t("codeScorer.summaryLabel"),
+      value: v(c.code),
+      icon: "code",
+      tone: "purple",
+      max: share,
+      dataTest: "scorer-summary-code",
     },
     {
       key: "all",

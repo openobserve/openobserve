@@ -396,6 +396,139 @@ describe("DomainManagement Component", () => {
       expect(vm.confirmRemoveDomainOpen).toBe(false);
       expect(vm.pendingRemoveDomainIndex).toBeNull();
     });
+
+    it("names the domain in bold with a red OK button", async () => {
+      const vm = wrapper.vm;
+      vm.domains.push({ name: "named.com", policy: "allow_all", allowedEmails: [] });
+      await nextTick();
+      await vm.removeDomain(vm.domains.length - 1);
+      await flushPromises();
+
+      const message = document.querySelector(
+        '[data-test="domain-management-remove-domain-message"]',
+      );
+      expect(message?.querySelector("span.font-semibold")?.textContent).toBe("named.com");
+      const ok = message
+        ?.closest('[role="dialog"]')
+        ?.querySelector('[data-test="o-dialog-primary-btn"]');
+      expect(ok?.className).toContain("bg-button-destructive");
+    });
+
+    it("keeps the removed domain's name for the closing fade", async () => {
+      const vm = wrapper.vm;
+      vm.domains.push({ name: "fading.com", policy: "allow_all", allowedEmails: [] });
+      await nextTick();
+      await vm.removeDomain(vm.domains.length - 1);
+      await vm.doRemoveDomain();
+
+      expect(vm.confirmRemoveDomainOpen).toBe(false);
+      expect(vm.domains.some((d: { name: string }) => d.name === "fading.com")).toBe(false);
+      expect(vm.pendingRemoveDomainName).toBe("fading.com");
+    });
+
+    it("keeps unblocking an email non-destructive and names the email in bold", async () => {
+      const vm = wrapper.vm;
+      const domain = {
+        name: "x.com",
+        policy: "allow_all",
+        allowedEmails: ["a@x.com"],
+        blockedEmails: ["b@x.com"],
+      };
+      vm.removeBlockedEmail(domain, 0);
+      await flushPromises();
+      const blocked = document.querySelector(
+        '[data-test="domain-management-remove-email-message"]',
+      );
+      expect(blocked?.querySelector("span.font-semibold")?.textContent).toBe("b@x.com");
+      const okBlocked = blocked
+        ?.closest('[role="dialog"]')
+        ?.querySelector('[data-test="o-dialog-primary-btn"]');
+      expect(okBlocked?.className).not.toContain("bg-button-destructive");
+
+      vm.confirmRemoveEmailOpen = false;
+      await flushPromises();
+      vm.removeEmail(domain, 0);
+      await flushPromises();
+      const allowed = document.querySelector(
+        '[data-test="domain-management-remove-email-message"]',
+      );
+      expect(allowed?.querySelector("span.font-semibold")?.textContent).toBe("a@x.com");
+      const okAllowed = allowed
+        ?.closest('[role="dialog"]')
+        ?.querySelector('[data-test="o-dialog-primary-btn"]');
+      expect(okAllowed?.className).toContain("bg-button-destructive");
+    });
+
+    it("keeps the unblock confirm's text and colour after OK, while it fades out", async () => {
+      const vm = wrapper.vm;
+      const domain = {
+        name: "x.com",
+        policy: "allow_all",
+        allowedEmails: [],
+        blockedEmails: ["b@x.com"],
+      };
+      vm.removeBlockedEmail(domain, 0);
+      await flushPromises();
+      vm.doRemoveEmail();
+      await flushPromises();
+
+      expect(domain.blockedEmails).toEqual([]);
+      expect(vm.confirmRemoveEmailOpen).toBe(false);
+      expect(vm.shownRemoveEmail).toEqual({ email: "b@x.com", blocked: true });
+    });
+
+    it("removes only the chosen email when OK is clicked twice", async () => {
+      const vm = wrapper.vm;
+      const domain = {
+        name: "x.com",
+        policy: "allow_specific",
+        allowedEmails: ["a@x.com", "b@x.com", "c@x.com"],
+        blockedEmails: [],
+      };
+      vm.removeEmail(domain, 0);
+      await flushPromises();
+      vm.doRemoveEmail();
+      vm.doRemoveEmail();
+      await flushPromises();
+
+      expect(domain.allowedEmails).toEqual(["b@x.com", "c@x.com"]);
+      expect(vm.pendingRemoveEmail).toBeNull();
+    });
+
+    it("removes nothing when OK is clicked after Cancel", async () => {
+      const vm = wrapper.vm;
+      const domain = {
+        name: "x.com",
+        policy: "allow_specific",
+        allowedEmails: ["a@x.com", "b@x.com"],
+        blockedEmails: [],
+      };
+      vm.removeEmail(domain, 0);
+      await flushPromises();
+      vm.cancelRemoveEmail();
+      vm.doRemoveEmail();
+      await flushPromises();
+
+      expect(domain.allowedEmails).toEqual(["a@x.com", "b@x.com"]);
+    });
+
+    it("removes nothing when OK is clicked after the dialog was closed another way", async () => {
+      const vm = wrapper.vm;
+      const domain = {
+        name: "x.com",
+        policy: "allow_specific",
+        allowedEmails: ["a@x.com", "b@x.com"],
+        blockedEmails: [],
+      };
+      vm.removeEmail(domain, 0);
+      await flushPromises();
+      vm.confirmRemoveEmailOpen = false;
+      await flushPromises();
+      vm.doRemoveEmail();
+      await flushPromises();
+
+      expect(domain.allowedEmails).toEqual(["a@x.com", "b@x.com"]);
+    });
   });
 
   describe("Email Management", () => {
@@ -593,6 +726,45 @@ describe("DomainManagement Component", () => {
 
       const noDomainMessage = wrapper.find('[data-test="domain-management-no-domain-message"]');
       expect(noDomainMessage.exists()).toBeTruthy();
+    });
+  });
+
+  describe("Show more errors under a logs license lock", () => {
+    const openErrors = async () => {
+      // the lock composable was loaded before this file mocked vuex, so it injects the store
+      wrapper = mount(DomainManagement, {
+        attachTo: `#${uniqueNodeId}`,
+        global: { plugins: [i18n], provide: { store: mockStore } },
+      });
+      await flushPromises();
+      wrapper.vm.claimParserFunction = "parse";
+      wrapper.vm.showVrlInfo = true;
+      await flushPromises();
+      wrapper.vm.loadingErrors = false;
+      wrapper.vm.recentErrors = [{ error: "boom", _timestamp: 1 }];
+      await flushPromises();
+      return document.querySelector<HTMLButtonElement>(
+        '[data-test="domain-management-view-all-errors"]',
+      );
+    };
+
+    afterEach(() => {
+      delete (mockStore.state.zoConfig as Record<string, unknown>).features;
+    });
+
+    it("disables Show more while logs is locked", async () => {
+      (mockStore.state.zoConfig as Record<string, unknown>).features = { logs: "locked" };
+      const btn = await openErrors();
+      expect(btn?.disabled).toBe(true);
+    });
+
+    it("opens Logs from Show more when logs is enabled", async () => {
+      const push = vi.fn();
+      (mockRouter as Record<string, unknown>).push = push;
+      const btn = await openErrors();
+      expect(btn?.disabled).toBe(false);
+      btn?.click();
+      expect(push).toHaveBeenCalledWith(expect.objectContaining({ path: "/logs" }));
     });
   });
 

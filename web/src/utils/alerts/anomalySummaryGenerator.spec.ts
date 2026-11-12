@@ -79,16 +79,30 @@ describe("generateAnomalySummary — sensitivity line", () => {
   // The level input can be emptied, and the write-back passes "" through
   // unchanged; a blank must not be numberified into a claim.
   it.each([
-    ["", "empty string"],
     [null, "null"],
     [undefined, "undefined"],
-    ["abc", "non-numeric"],
   ])("reads a blank band width %s (%s) as Auto", (band_width) => {
     const summary = generateAnomalySummary(config({ band_width }), [], t);
     expect(summary).toContain(String(t("alerts.anomaly.sensitivityAuto")));
     expect(summary).not.toMatch(/\d+(\.\d+)?σ/);
     // The rest of the summary still renders.
     expect(summary).toContain("14 days");
+  });
+});
+
+describe("generateAnomalySummary — invalid manual drafts", () => {
+  it.each(["", "abc", 0, 11, Infinity])("does not summarize manual %s as Auto", (band_width) => {
+    const summary = generateAnomalySummary(config({ band_width }), [], t);
+    expect(summary).not.toContain(">Auto<");
+    expect(summary).toContain(String(t("alerts.anomaly.bandWidthRange")));
+  });
+  it.each([
+    { status: "failed", is_trained: true, current_model_version: 1 },
+    { status: "training", is_trained: true, current_model_version: 1 },
+    { status: "ready", is_trained: true, current_model_version: 1, sensitivity_model_stale: true },
+  ])("does not call an unconfirmed or stale learned level current", (model) => {
+    const summary = generateAnomalySummary(config({ ...model, band_k: 3.4567 }), [], t);
+    expect(summary).not.toContain("3.46");
   });
 });
 
@@ -131,7 +145,17 @@ describe("generateAnomalySummary — band width and delivery", () => {
   });
 
   it("names the trained k beside Auto on an edit of a trained Auto alert", () => {
-    const summary = generateAnomalySummary(config({ band_width: null, band_k: 3.4567 }), [], t);
+    const summary = generateAnomalySummary(
+      config({
+        band_width: null,
+        band_k: 3.4567,
+        status: "ready",
+        is_trained: true,
+        current_model_version: 1,
+      }),
+      [],
+      t,
+    );
     expect(summary).toContain(String(t("alerts.anomaly.sensitivityAutoTrained", { k: 3.46 })));
   });
 

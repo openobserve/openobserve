@@ -1,6 +1,7 @@
 // The JSON metrics endpoint takes `_timestamp` in MILLIseconds (the logs one takes micros).
 const { expect } = require('@playwright/test');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
+const { ingestBase } = require('./ingest-url.js');
 
 const org = () => getOrgIdentifier() || process.env.ORGNAME || 'default';
 const baseUrl = () => (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, '');
@@ -14,7 +15,7 @@ const RELATED_METRIC = 'e2e_mef_http_errors_total';
 const RELATED_GAUGE = 'e2e_mef_http_inflight';
 
 async function postRows(request, rows) {
-  const res = await request.post(`${baseUrl()}/api/${org()}/ingest/metrics/_json`, {
+  const res = await request.post(`${ingestBase(baseUrl())}/api/${org()}/ingest/metrics/_json`, {
     headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
     data: rows,
   });

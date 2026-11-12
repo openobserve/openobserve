@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OIcon>
                   </span>
                   <span v-else-if="row.aggregateStatus === 'processing'">
-                    <OIcon name="sync" size="sm" class="animate-spin">
+                    <OIcon name="sync" size="sm" class="o2-motion-keep animate-spin">
                       <OTooltip>
                         <template #content>
                           <div style="max-width: 18.75rem">
@@ -288,6 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
                     <OButton
+                      :aria-label="t('common.moreActions')"
                       icon-left="more-vert"
                       variant="ghost"
                       size="icon-xs-sq"
@@ -391,7 +392,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <ConfirmDialog
       :title="t('function.deleteEnrichmentTableTitle')"
-      :message="t('function.deleteEnrichmentTableConfirm')"
+      message-keypath="function.deleteEnrichmentTableConfirm"
+      :message-name="selectedDelete?.name"
+      ok-variant="destructive"
       @update:ok="deleteLookupTable"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -401,6 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :message="
         t('functions.confirmDeleteEnrichmentTables', { count: selectedEnrichmentTables.length })
       "
+      ok-variant="destructive"
       @update:ok="bulkDeleteEnrichmentTables"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -907,7 +911,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: action,
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Functions",
       });
     };
@@ -971,7 +974,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Delete Enrichment Table",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         function_name: selectedDelete.value.name,
         is_ingest_func: selectedDelete.value.ingest,
         page: "Functions",

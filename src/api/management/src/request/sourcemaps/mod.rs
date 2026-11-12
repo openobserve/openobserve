@@ -29,7 +29,7 @@ use utoipa::ToSchema;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 struct SourceMapRepr {
     pub service: Option<String>,
     pub env: Option<String>,
@@ -48,9 +48,21 @@ pub struct StacktraceRequest {
     stacktrace: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 struct StacktraceResponse {
     stacktrace: TranslatedStack,
+}
+
+// Only documents the multipart body: the handler reads the form fields by hand.
+#[derive(ToSchema)]
+#[allow(dead_code)]
+struct SourcemapUploadForm {
+    /// ZIP with the minified sources and their sourcemaps.
+    #[schema(value_type = String, format = Binary)]
+    file: Vec<u8>,
+    service: Option<String>,
+    env: Option<String>,
+    version: Option<String>,
 }
 
 /// ListSourcemaps
@@ -67,13 +79,16 @@ struct StacktraceResponse {
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-      ),
+        ("service" = Option<String>, Query, description = "Service filter"),
+        ("env" = Option<String>, Query, description = "Environment filter"),
+        ("version" = Option<String>, Query, description = "Version filter"),
+    ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<SourceMapRepr>),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List sourcemaps", "category": "sourcemaps"}))
+        ("x-o2-mcp" = json!({"enabled": false, "description": "List sourcemaps", "category": "sourcemaps"}))
     )
 )]
 pub async fn list(
@@ -122,13 +137,16 @@ pub async fn list(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-      ),
+        ("service" = Option<String>, Query, description = "Service filter"),
+        ("env" = Option<String>, Query, description = "Environment filter"),
+        ("version" = Option<String>, Query, description = "Version filter"),
+    ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "List sourcemaps", "category": "sourcemaps"}))
+        ("x-o2-mcp" = json!({"enabled": false, "description": "List sourcemaps", "category": "sourcemaps"}))
     )
 )]
 pub async fn delete(
@@ -163,12 +181,13 @@ pub async fn delete(
     params(
         ("org_id" = String, Path, description = "Organization name"),
       ),
+    request_body(content = inline(StacktraceRequest), description = "Minified stacktrace and the sourcemap group to translate it with", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = StacktraceResponse),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "List sourcemaps", "category": "sourcemaps"}))
+        ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false, "description": "List sourcemaps", "category": "sourcemaps"}))
     )
 )]
 pub async fn translate_stacktrace(
@@ -208,13 +227,14 @@ pub async fn translate_stacktrace(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
+    request_body(content = inline(SourcemapUploadForm), description = "ZIP file with its service, env and version", content_type = "multipart/form-data"),
     responses(
-        (status = 200, description = "Sourcemaps stored successfully", content_type = "application/json", body = String),
+        (status = 201, description = "Sourcemaps stored successfully", content_type = "application/json", body = inline(MetaHttpResponse)),
         (status = 400, description = "Error processing action", content_type = "application/json", body = String),
         (status = 500, description = "Internal server error", content_type = "application/json", body = String),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "create"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
@@ -233,8 +253,13 @@ pub async fn upload_maps(
         let Ok(content_length) = String::from_utf8_lossy(v.as_bytes()).parse::<u64>() else {
             return MetaHttpResponse::bad_request("Invalid Content-Length header");
         };
-        if content_length > 10 * config::SOURCEMAP_FILE_MAX_SIZE {
-            return MetaHttpResponse::bad_request("file is too large");
+        let limit = &config::get_config().limit;
+        if let Err(msg) = check_upload_size(
+            content_length,
+            limit.sourcemap_zip_max_size,
+            limit.req_payload_limit as u64,
+        ) {
+            return MetaHttpResponse::bad_request(msg);
         }
     } else {
         return MetaHttpResponse::bad_request("Missing content-length header");
@@ -333,11 +358,11 @@ pub async fn upload_maps(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = db_sourcemaps::ParamValues),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List sourcemaps", "category": "sourcemaps"}))
+        ("x-o2-mcp" = json!({"enabled": false, "description": "List sourcemaps", "category": "sourcemaps"}))
     )
 )]
 pub async fn list_values(Path(org_id): Path<String>) -> Response {
@@ -352,9 +377,56 @@ pub async fn list_values(Path(org_id): Path<String>) -> Response {
     MetaHttpResponse::json(values)
 }
 
+fn check_upload_size(
+    content_length: u64,
+    zip_max_size: u64,
+    payload_limit: u64,
+) -> Result<(), String> {
+    const MB: u64 = 1024 * 1024;
+    // the body limit layer rejects past ZO_PAYLOAD_LIMIT with a generic error
+    if content_length > payload_limit && payload_limit < zip_max_size {
+        return Err(format!(
+            "upload of {content_length} bytes exceeds the maximum of {payload_limit} bytes (ZO_PAYLOAD_LIMIT)"
+        ));
+    }
+    if content_length > zip_max_size {
+        return Err(format!(
+            "upload of {} MB exceeds the maximum of {} MB (ZO_SOURCEMAP_ZIP_MAX_SIZE)",
+            content_length.div_ceil(MB),
+            zip_max_size / MB
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_check_upload_size_within_limit() {
+        assert!(check_upload_size(500 * 1024 * 1024, 500 * 1024 * 1024, 600 * 1024 * 1024).is_ok());
+    }
+
+    #[test]
+    fn test_check_upload_size_payload_limit_below_zip_budget_names_payload_limit() {
+        let msg =
+            check_upload_size(300 * 1024 * 1024, 500 * 1024 * 1024, 200 * 1024 * 1024).unwrap_err();
+        assert_eq!(
+            msg,
+            "upload of 314572800 bytes exceeds the maximum of 209715200 bytes (ZO_PAYLOAD_LIMIT)"
+        );
+    }
+
+    #[test]
+    fn test_check_upload_size_over_limit_names_limit() {
+        let msg =
+            check_upload_size(601 * 1024 * 1024, 500 * 1024 * 1024, 900 * 1024 * 1024).unwrap_err();
+        assert_eq!(
+            msg,
+            "upload of 601 MB exceeds the maximum of 500 MB (ZO_SOURCEMAP_ZIP_MAX_SIZE)"
+        );
+    }
 
     #[test]
     fn test_stacktrace_request_deserialize_with_all_fields() {

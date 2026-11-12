@@ -14,15 +14,45 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
-import organizations from "./organizations";
+import organizations, {
+  type BillingGroupMember,
+  type OrgDomainOwnership,
+  type OrgDomainRequest,
+} from "./organizations";
+import billings from "./billings";
 import { organizationKeys } from "./organizations.querykeys";
 import { MEDIUM_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
+
+export interface CallerOrganization {
+  identifier: string;
+  name: string;
+  type?: string;
+}
+
+/** The caller's own orgs; pages outside MainLayout use it when no org is selected yet. */
+export const myOrganizationsQuery = () =>
+  queryOptions({
+    queryKey: organizationKeys.mine(),
+    queryFn: async () => {
+      const res = await organizations.list(0, 100, "id", false, "");
+      return (res.data as { data: CallerOrganization[] }).data;
+    },
+    staleTime: NORMAL_STALE_TIME,
+  });
 
 // Memory only: settings pages post this object back whole, so a disk copy could overwrite newer server values.
 export const orgSettingsQuery = (org: string) =>
   queryOptions({
     queryKey: organizationKeys.settings(org),
-    queryFn: async () => (await organizations.get_organization_settings(org)).data,
+    queryFn: async () => {
+      try {
+        return (await organizations.get_organization_settings(org)).data;
+      } catch (e: any) {
+        // A role without the settings grant gets 403 for good; cached as "none" so every page load stops asking.
+        if (e?.response?.status === 403 || e?.response?.status === 404) return null;
+        throw e;
+      }
+    },
     staleTime: NORMAL_STALE_TIME,
   });
 
@@ -62,27 +92,74 @@ export const orgPasscodeQuery = (org: string) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
+export const orgDomainsQuery = (org: string) =>
+  queryOptions({
+    queryKey: organizationKeys.domains(org),
+    queryFn: async (): Promise<OrgDomainOwnership[]> =>
+      (await organizations.list_org_domains(org)).data ?? [],
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+// On the meta org this lists every org's requests.
+export const orgDomainRequestsQuery = (org: string) =>
+  queryOptions({
+    queryKey: organizationKeys.domainRequests(org),
+    queryFn: async (): Promise<OrgDomainRequest[]> =>
+      (await organizations.list_org_domain_requests(org)).data ?? [],
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+export const billingGroupMembersQuery = (org: string) =>
+  queryOptions({
+    queryKey: organizationKeys.billingGroupMembers(org),
+    queryFn: async (): Promise<BillingGroupMember[]> =>
+      (await billings.list_billing_group_members(org)).data ?? [],
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+/** Every org, readable from the meta org only. */
+export const adminOrgsQuery = (org: string) =>
+  queryOptions({
+    queryKey: organizationKeys.adminOrgs(org),
+    queryFn: async (): Promise<{ identifier: string; name: string }[]> =>
+      (await organizations.get_admin_org(org)).data?.data ?? [],
+    staleTime: MEDIUM_STALE_TIME,
+  });
+
 // ── Writes ──────────────────────────────────────────────────────────────────
 
+// Callers copy the token list into the store and re-arm row buttons as soon as these resolve.
 export const createIngestionTokenMutation = (org: string) =>
   mutationOptions({
     mutationFn: (data: { name: string; description?: string; splunk_token?: boolean }) =>
       organizations.create_org_ingestion_token(org, data),
-    meta: { invalidates: [organizationKeys.ingestionTokens(org)], silentError: true },
+    meta: {
+      invalidates: [organizationKeys.ingestionTokens(org)],
+      awaitInvalidation: true,
+      silentError: true,
+    },
   });
 
 export const setIngestionTokenEnabledMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { name: string; enabled: boolean }) =>
       organizations.enable_disable_org_ingestion_token(org, vars.name, vars.enabled),
-    meta: { invalidates: [organizationKeys.ingestionTokens(org)], silentError: true },
+    meta: {
+      invalidates: [organizationKeys.ingestionTokens(org)],
+      awaitInvalidation: true,
+      silentError: true,
+    },
   });
 
 export const setIngestionSplunkTokenMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { name: string; action: "generate" | "revoke" }) =>
       organizations.set_org_ingestion_splunk_token(org, vars.name, vars.action),
-    meta: { invalidates: [organizationKeys.ingestionTokens(org)], silentError: true },
+    meta: {
+      invalidates: [organizationKeys.ingestionTokens(org)],
+      awaitInvalidation: true,
+      silentError: true,
+    },
   });
 
 export const resetPasscodeMutation = (org: string) =>
@@ -97,5 +174,45 @@ export const updateOrgSettingsMutation = (org: string) =>
     // Not the selected org: domain management writes the meta org.
     mutationFn: (payload: any) => organizations.post_organization_settings(org, payload),
     // Every call site renders its own success and failure toasts.
-    meta: { invalidates: [organizationKeys.settings(org)], silentError: true },
+    meta: {
+      invalidates: [organizationKeys.settings(org)],
+      awaitInvalidation: true,
+      silentError: true,
+    },
+  });
+
+export const linkOrgDomainMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (domain: string) => organizations.link_org_domain(org, domain),
+    meta: { invalidates: [organizationKeys.domains(org)], silentError: true },
+  });
+
+export const unlinkOrgDomainMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (domain: string) => organizations.unlink_org_domain(org, domain),
+    meta: { invalidates: [organizationKeys.domains(org)], silentError: true },
+  });
+
+export const verifyOrgDomainMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (domain: string) => organizations.verify_org_domain(org, domain),
+    meta: { invalidates: [organizationKeys.domains(org)], silentError: true },
+  });
+
+export const raiseOrgDomainRequestMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (domain: string) => organizations.raise_org_domain_request(org, domain),
+    meta: { invalidates: [organizationKeys.domainRequests(org)], silentError: true },
+  });
+
+export const decideOrgDomainRequestMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { id: string; approve: boolean; reason: string }) =>
+      vars.approve
+        ? organizations.approve_org_domain_request(org, vars.id, vars.reason)
+        : organizations.reject_org_domain_request(org, vars.id, vars.reason),
+    meta: {
+      invalidates: [organizationKeys.domainRequests(org), organizationKeys.domains(org)],
+      silentError: true,
+    },
   });

@@ -396,6 +396,17 @@ describe("TraceDetailsSidebar", async () => {
     expect(spanId.text()).toContain(mockSpan.span_id);
   });
 
+  it("wraps the header chips and keeps the action group from shrinking", () => {
+    const chips = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-chips"]');
+    const actions = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-actions"]');
+    expect(chips.classes()).toEqual(expect.arrayContaining(["flex-wrap", "min-w-0"]));
+    expect(chips.classes()).not.toContain("flex-nowrap");
+    expect(actions.classes()).toContain("shrink-0");
+    expect(
+      actions.find('[data-test="trace-details-sidebar-header-toolbar-span-id"]').exists(),
+    ).toBe(true);
+  });
+
   it("should emit close when close button is clicked", async () => {
     const closeBtn = wrapper.find('[data-test="trace-details-sidebar-header-close-btn"]');
     expect(closeBtn.exists()).toBe(true);
@@ -516,22 +527,210 @@ describe("TraceDetailsSidebar", async () => {
         pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
       });
 
-      it("should toast a warning instead of navigating when nothing is correlated", async () => {
-        const viewLogsBtn = viewLogsWrapper.find(
-          '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
-        );
-        expect(viewLogsBtn.exists()).toBe(true);
+      const viewLogsButton = () =>
+        viewLogsWrapper.find('[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]');
+      const notice = () => viewLogsWrapper.find('[data-test="traces-span-drawer-no-logs-notice"]');
 
-        await viewLogsBtn.trigger("click");
+      it("stays on the trace and shows the amber notice as a status, with focus back on View Logs", async () => {
+        expect(viewLogsButton().exists()).toBe(true);
+        (viewLogsButton().element as HTMLElement).focus();
+
+        await viewLogsButton().trigger("click");
         await flushPromises();
 
-        expect(mockToast).toHaveBeenCalledWith(
-          expect.objectContaining({
-            variant: "warning",
-            message: "No correlated logs found for this span",
-          }),
-        );
+        expect(mockToast).not.toHaveBeenCalled();
         expect(pushSpy).not.toHaveBeenCalled();
+        expect(notice().exists()).toBe(true);
+        expect(notice().attributes("role")).toBe("status");
+        expect(notice().text()).toContain("No log stream has logs for this trace.");
+        expect(document.activeElement).toBe(viewLogsButton().element);
+      });
+
+      it("is busy at once and keeps its label while the lookup runs", async () => {
+        let resolveLookup: (v: any) => void = () => {};
+        mockFindRelatedTelemetry.mockImplementationOnce(
+          () => new Promise((resolve) => (resolveLookup = resolve)),
+        );
+        await viewLogsButton().trigger("click");
+        await viewLogsWrapper.vm.$nextTick();
+
+        expect(viewLogsButton().attributes("aria-busy")).toBe("true");
+        expect(viewLogsButton().attributes("disabled")).toBeUndefined();
+        expect(viewLogsButton().text()).toContain("View Logs");
+
+        resolveLookup(null);
+        await flushPromises();
+        expect(viewLogsButton().attributes("aria-busy")).toBeUndefined();
+      });
+
+      it("shows the notice when every correlated stream turns out to lack the trace", async () => {
+        mockFindRelatedTelemetry.mockResolvedValueOnce({
+          correlationData: {
+            service_name: "svc",
+            matched_dimensions: {},
+            related_streams: {
+              logs: [{ stream_name: "app_logs", filters: {} }],
+              metrics: [],
+              traces: [],
+              profiles: [],
+            },
+          },
+        });
+        mockNavigateToCorrelatedLogs.mockResolvedValueOnce("none");
+
+        await viewLogsButton().trigger("click");
+        await flushPromises();
+
+        expect(mockNavigateToCorrelatedLogs).toHaveBeenCalledTimes(1);
+        expect(notice().exists()).toBe(true);
+      });
+
+      it("shows a red couldn't-load alert, not the none notice, when every probe failed on the server", async () => {
+        viewLogsWrapper.unmount();
+        viewLogsWrapper = mountSidebar({
+          parentMode: "standalone",
+          streamName: "default",
+          serviceStreamsEnabled: true,
+        });
+        mockFindRelatedTelemetry.mockResolvedValueOnce({
+          correlationData: {
+            service_name: "svc",
+            matched_dimensions: {},
+            related_streams: {
+              logs: [{ stream_name: "app_logs", filters: {} }],
+              metrics: [],
+              traces: [],
+              profiles: [],
+            },
+          },
+        });
+        mockNavigateToCorrelatedLogs.mockResolvedValueOnce({
+          failed: true,
+          error: { response: { status: 502 } },
+        });
+        (viewLogsButton().element as HTMLElement).focus();
+
+        await viewLogsButton().trigger("click");
+        await flushPromises();
+
+        const failed = viewLogsWrapper.find('[data-test="traces-span-drawer-logs-failed-notice"]');
+        expect(notice().exists()).toBe(false);
+        expect(failed.exists()).toBe(true);
+        expect(failed.attributes("role")).toBe("alert");
+        expect(failed.classes()).toContain("bg-status-error-bg");
+        expect(failed.text()).toContain(
+          "Couldn't load: the server returned an error. Refresh to try again.",
+        );
+        expect(failed.text()).not.toContain("No log stream has logs");
+        expect(failed.find('[data-test="traces-span-drawer-open-logs-tab"]').text()).toBe(
+          "Open Logs tab",
+        );
+        expect(mockToast).not.toHaveBeenCalled();
+        expect(pushSpy).not.toHaveBeenCalled();
+        expect(document.activeElement).toBe(viewLogsButton().element);
+      });
+
+      it("names a timeout as the cause when the probes ran out of time", async () => {
+        mockFindRelatedTelemetry.mockResolvedValueOnce({
+          correlationData: {
+            service_name: "svc",
+            matched_dimensions: {},
+            related_streams: {
+              logs: [{ stream_name: "app_logs", filters: {} }],
+              metrics: [],
+              traces: [],
+              profiles: [],
+            },
+          },
+        });
+        mockNavigateToCorrelatedLogs.mockResolvedValueOnce({
+          failed: true,
+          error: { code: "ETIMEDOUT" },
+        });
+
+        await viewLogsButton().trigger("click");
+        await flushPromises();
+
+        expect(
+          viewLogsWrapper.find('[data-test="traces-span-drawer-logs-failed-notice"]').text(),
+        ).toContain("Couldn't load: the request timed out. Refresh to try again.");
+      });
+
+      it("opens the drawer's Logs tab from the notice and clears it", async () => {
+        viewLogsWrapper.unmount();
+        viewLogsWrapper = mountSidebar({
+          parentMode: "standalone",
+          streamName: "default",
+          serviceStreamsEnabled: true,
+        });
+        await viewLogsButton().trigger("click");
+        await flushPromises();
+
+        const open = viewLogsWrapper.find('[data-test="traces-span-drawer-open-logs-tab"]');
+        expect(open.text()).toBe("Open Logs tab");
+        await open.trigger("click");
+
+        expect(viewLogsWrapper.emitted("update:activeTab")?.at(-1)).toEqual(["correlated-logs"]);
+        expect(notice().exists()).toBe(false);
+      });
+
+      it("says it is finding logs only once the lookup passes 1 s, and withdraws it after", async () => {
+        vi.useFakeTimers();
+        try {
+          let resolveLookup: (v: any) => void = () => {};
+          mockFindRelatedTelemetry.mockImplementationOnce(
+            () => new Promise((resolve) => (resolveLookup = resolve)),
+          );
+          const region = () => document.querySelector('[data-test="region-announcer"]');
+          const run = viewLogsWrapper.vm.viewSpanLogs();
+          await vi.advanceTimersByTimeAsync(900);
+          expect(region()?.textContent ?? "").toBe("");
+          await vi.advanceTimersByTimeAsync(200);
+          expect(region()?.textContent).toBe("Finding logs for this trace…");
+          resolveLookup(null);
+          await run;
+          expect(region()?.textContent).toBe("");
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it("keeps the View Logs label beside its spinner, which waits 300 ms", async () => {
+        vi.useFakeTimers();
+        try {
+          let resolveLookup: (v: any) => void = () => {};
+          mockFindRelatedTelemetry.mockImplementationOnce(
+            () => new Promise((resolve) => (resolveLookup = resolve)),
+          );
+          const spinner = () =>
+            viewLogsButton().find(
+              '[data-test="trace-details-sidebar-header-toolbar-view-logs-spinner"]',
+            );
+          const run = viewLogsWrapper.vm.viewSpanLogs();
+          await vi.advanceTimersByTimeAsync(0);
+          expect(viewLogsButton().attributes("aria-busy")).toBe("true");
+          expect(spinner().exists()).toBe(false);
+          await vi.advanceTimersByTimeAsync(300);
+          expect(spinner().exists()).toBe(true);
+          expect(viewLogsButton().text()).toBe("View Logs");
+          expect(viewLogsButton().find(".text-transparent").exists()).toBe(false);
+          resolveLookup(null);
+          await run;
+          await vi.advanceTimersByTimeAsync(0);
+          expect(spinner().exists()).toBe(false);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it("drops the notice when another span is shown", async () => {
+        await viewLogsButton().trigger("click");
+        await flushPromises();
+        expect(notice().exists()).toBe(true);
+
+        await viewLogsWrapper.setProps({ span: { ...mockSpan, span_id: "span-other" } });
+
+        expect(notice().exists()).toBe(false);
       });
 
       it("should not call navigateToCorrelatedLogs when nothing is correlated", async () => {
@@ -1304,6 +1503,30 @@ describe("TraceDetailsSidebar", async () => {
         await linkRow.trigger("click");
 
         expect(wrapper.emitted("open-trace")).toBeTruthy();
+      });
+
+      it("should keep the originating search tab in the linked trace's URL", async () => {
+        const routeSpy = vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+          value: {
+            name: "traceDetails",
+            query: { stream: "default", trace_id: mockSpan.trace_id, tab: "traces" },
+          },
+        } as any);
+        const pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
+
+        await wrapper.find('[data-test="trace-event-detail-link-0"]').trigger("click");
+
+        expect(pushSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: "traceDetails",
+            query: expect.objectContaining({
+              trace_id: JSON.parse(mockLinks)[0].context.traceId,
+              tab: "traces",
+            }),
+          }),
+        );
+        routeSpy.mockRestore();
+        pushSpy.mockRestore();
       });
 
       it("should emit select-span when a same trace link is clicked", async () => {
@@ -2810,6 +3033,176 @@ describe("TraceDetailsSidebar — span to profile link", () => {
     expect(profileCalls()).toHaveLength(2);
     expect(mockStreamNameList).toHaveBeenCalledTimes(1);
     expect(w.find(BUTTON).exists()).toBe(true);
+    w.unmount();
+  });
+
+  it("skips discovery and shows a disabled locked button when continuous_profiling is locked", async () => {
+    setStreams({ prof: FULL_SCHEMA });
+    profileHits.prof = [{ profile_type: "cpu", profile_unit: "nanoseconds", c: 1 }];
+    mockStore.state.zoConfig.features = { continuous_profiling: "locked" };
+    try {
+      const w = await mountWith();
+      expect(mockStreamNameList).not.toHaveBeenCalled();
+      expect(profileCalls()).toHaveLength(0);
+      expect(w.find(BUTTON).attributes("disabled")).toBeDefined();
+      expect(w.find(BUTTON).findComponent({ name: "OIcon" }).props("name")).toBe("lock");
+      w.unmount();
+    } finally {
+      delete mockStore.state.zoConfig.features;
+    }
+  });
+});
+
+describe("TraceDetailsSidebar — correlation license lock", () => {
+  const LOGS_TAB = '[data-test="trace-details-sidebar-tabs-correlated-logs"]';
+
+  afterEach(() => {
+    delete mockStore.state.zoConfig.features;
+    mockFindRelatedTelemetry.mockClear();
+  });
+
+  it("shows locked tabs and LicenseDeniedState without a correlation lookup when locked", async () => {
+    mockStore.state.zoConfig.features = { correlation: "locked" };
+    const w = mountSidebar({
+      streamName: "default",
+      serviceStreamsEnabled: true,
+      activeTab: "correlated-logs",
+    });
+    await w.setProps({ span: { ...mockSpan, span_id: "another" } });
+    await flushPromises();
+    expect(w.find(LOGS_TAB).attributes("suffix-icon")).toBe("lock");
+    expect(
+      w.find('[data-test="trace-details-sidebar-correlated-logs-license-denied"]').exists(),
+    ).toBe(true);
+    expect(mockFindRelatedTelemetry).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("opens View Logs as a plain logs search when correlation is locked", async () => {
+    mockStore.state.zoConfig.features = { correlation: "locked" };
+    mockNavigateToLogs.mockClear();
+    const w = mountSidebar({ streamName: "default", parentMode: "standalone" });
+    await w
+      .find('[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]')
+      .trigger("click");
+    await flushPromises();
+    expect(mockNavigateToLogs).toHaveBeenCalled();
+    expect(mockFindRelatedTelemetry).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("keeps the correlation lookup and unlocked tabs when correlation is enabled", async () => {
+    const w = mountSidebar({ streamName: "default", serviceStreamsEnabled: true });
+    await w.setProps({ activeTab: "correlated-logs" });
+    await flushPromises();
+    expect(w.find(LOGS_TAB).attributes("suffix-icon")).toBeUndefined();
+    expect(mockFindRelatedTelemetry).toHaveBeenCalled();
+    w.unmount();
+  });
+});
+
+describe("TraceDetailsSidebar — Ask AI about this span", () => {
+  const ASK_AI = '[data-test="trace-span-ask-ai-btn"]';
+
+  async function mountWith(props: Record<string, unknown> = {}) {
+    const w = mountSidebar({ streamName: "default", ...props });
+    await flushPromises();
+    return w;
+  }
+
+  beforeEach(() => {
+    mockSearch.mockReset();
+    mockSearch.mockResolvedValue({
+      data: { hits: [{ n: 120, p50: 1000, p75: 2000, p90: 4000, p99: 8000 }] },
+    });
+    mockSearchObj.data = {
+      stream: { selectedStream: { label: "default", value: "default" } },
+      queryPayload: { query: { start_time: 1752490000000000, end_time: 1752490900000000 } },
+      traceDetails: {
+        selectedTrace: { trace_start_time: 1752490492843000, trace_end_time: 1752490493164419 },
+      },
+    };
+  });
+
+  afterEach(() => {
+    delete (mockSearchObj as Record<string, unknown>).data;
+  });
+
+  it("is hidden unless the parent turns it on", async () => {
+    const w = await mountWith();
+    expect(w.find(ASK_AI).exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("sits in the always-visible action group, not beside the standalone-only View logs", async () => {
+    const w = await mountWith({ showAskAi: true, parentMode: "embedded" });
+    const actions = w.find('[data-test="trace-details-sidebar-header-toolbar-actions"]');
+    expect(actions.find(ASK_AI).exists()).toBe(true);
+    w.unmount();
+  });
+
+  it("emits sendToAiChat with the span payload and its operation p50", async () => {
+    const w = await mountWith({ showAskAi: true });
+    await w.find(ASK_AI).trigger("click");
+    const [payload] = w.emitted("sendToAiChat")![0] as [Record<string, any>];
+    expect(payload.query).toBe("Why did this span take 321.37 ms? Its operation's p50 is 1 ms.");
+    expect(payload.chipName).toBe(`Span · ${mockSpan.operation_name}`);
+    expect(payload).toMatchObject({ newChat: true, autoSend: false });
+    expect(payload.context).toMatchObject({
+      currentPage: "traces",
+      streamType: "traces",
+      selectedStreams: ["default"],
+      traceId: mockSpan.trace_id,
+      traceStartTime: 1752490492843000,
+      traceEndTime: 1752490493164419,
+      span: {
+        span_id: mockSpan.span_id,
+        duration_us: mockSpan.duration,
+        operation_p50_us: 1000,
+      },
+    });
+    w.unmount();
+  });
+
+  it("sends a null p50 when the operation has too few samples", async () => {
+    mockSearch.mockResolvedValue({
+      data: { hits: [{ n: 3, p50: 1000, p75: 2000, p90: 4000, p99: 8000 }] },
+    });
+    const w = await mountWith({ showAskAi: true });
+    await w.find(ASK_AI).trigger("click");
+    const [payload] = w.emitted("sendToAiChat")![0] as [Record<string, any>];
+    expect(payload.context.span.operation_p50_us).toBeNull();
+    w.unmount();
+  });
+});
+
+describe("TraceDetailsSidebar — logs license lock", () => {
+  const VIEW_LOGS = '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]';
+
+  afterEach(() => {
+    delete mockStore.state.zoConfig.features;
+  });
+
+  it("disables View Logs with a lock and the logs reason while logs is locked", async () => {
+    mockStore.state.zoConfig.features = { logs: "locked" };
+    mockNavigateToLogs.mockClear();
+    const w = mountSidebar({ streamName: "default", parentMode: "standalone" });
+    await flushPromises();
+    const btn = w.find(VIEW_LOGS);
+    expect(btn.attributes("disabled")).toBeDefined();
+    expect(w.vm.logsLocked).toBe(true);
+    expect(w.vm.viewLogsTooltipContent).toMatch(/needs logs/i);
+    await btn.trigger("click");
+    await flushPromises();
+    expect(mockNavigateToLogs).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("keeps View Logs enabled while logs is licensed", async () => {
+    const w = mountSidebar({ streamName: "default", parentMode: "standalone" });
+    await flushPromises();
+    expect(w.vm.logsLocked).toBe(false);
+    expect(w.vm.viewLogsTooltipContent).toBe("View Logs");
     w.unmount();
   });
 });

@@ -9,6 +9,7 @@ import { gt } from "@/types/i18n";
 
 import http from "./http";
 import analytics from "./product_analytics";
+import type { HarnessPatternRule, HarnessStripped } from "@/plugins/traces/harnessText";
 import { RETENTION_MS } from "@/plugins/traces/versionCompare/constants";
 
 /** One arm (A or B) of a version-compare request — mirrors the backend
@@ -96,6 +97,17 @@ export interface GenAiAgentMappingConfig {
   agent_id_fields: string[];
   env_fields: string[];
   version_fields: string[];
+  /** Per-agent harness text hidden when sessions are read. */
+  harness_patterns: HarnessPatternRule[];
+  session_title: "off" | "first_request";
+  /** Cost attribution fallbacks copied to user.id / feature.name / tenant.id at ingest. */
+  attribution_fields: AttributionFields;
+}
+
+export interface AttributionFields {
+  user: string[];
+  feature: string[];
+  tenant: string[];
 }
 
 export interface GenAiAgentListItem {
@@ -120,12 +132,21 @@ export interface ClearGenAiAgentRegistryResponse {
   cleared_buffer_count: number;
 }
 
+/** Texts per strip request: the backend's `MAX_HARNESS_STRIP_TEXTS`. */
+export const HARNESS_STRIP_BATCH = 500;
+
 const emptyConfig = (): GenAiAgentMappingConfig => ({
   agent_name_fields: [],
   agent_id_fields: [],
   env_fields: [],
   version_fields: [],
+  harness_patterns: [],
+  session_title: "off",
+  attribution_fields: { user: [], feature: [], tenant: [] },
 });
+
+const stringList = (value: any): string[] =>
+  Array.isArray(value) ? value.filter((field: any) => typeof field === "string") : [];
 
 const normalizeConfig = (value: any): GenAiAgentMappingConfig => ({
   agent_name_fields: Array.isArray(value?.agent_name_fields)
@@ -140,6 +161,20 @@ const normalizeConfig = (value: any): GenAiAgentMappingConfig => ({
   version_fields: Array.isArray(value?.version_fields)
     ? value.version_fields.filter((field: any) => typeof field === "string")
     : [],
+  harness_patterns: Array.isArray(value?.harness_patterns)
+    ? value.harness_patterns
+        .filter((r: any) => typeof r?.agent === "string" && Array.isArray(r?.patterns))
+        .map((r: any) => ({
+          agent: r.agent,
+          patterns: r.patterns.filter((p: any) => typeof p === "string"),
+        }))
+    : [],
+  session_title: value?.session_title === "first_request" ? "first_request" : "off",
+  attribution_fields: {
+    user: stringList(value?.attribution_fields?.user),
+    feature: stringList(value?.attribution_fields?.feature),
+    tenant: stringList(value?.attribution_fields?.tenant),
+  },
 });
 
 export async function fetchDefaultGenAiAgentMapping(): Promise<GenAiAgentMappingConfig> {
@@ -147,9 +182,7 @@ export async function fetchDefaultGenAiAgentMapping(): Promise<GenAiAgentMapping
     credentials: "omit",
   });
   if (!response.ok) {
-    throw new Error(
-      gt("settings.genAiAgentMapping.defaultsFetchFailed", { status: response.status }),
-    );
+    throw new Error(gt("genAiAgentMapping.defaultsFetchFailed", { status: response.status }));
   }
 
   return normalizeConfig(await response.json());
@@ -202,19 +235,34 @@ const genAiAgentMappingService = {
     analytics.track("gen_ai_agent_mapping_saved");
     return normalizeConfig(response.data);
   },
-  // Wide-window (retention-scoped) version enumeration for the version-compare
-  // slot pickers. Deliberately ignores the page date-picker window: a baseline
-  // version's last_seen may predate the page window, and it must still appear
-  // as a selectable compare slot. UNIT CONTRACT: `nowMicros` is epoch
-  // MICROSECONDS (= Date.now() * 1000). RETENTION_MS is milliseconds, so it is
-  // multiplied by 1000 here to convert to microseconds before subtracting.
+  /** Uses the server's patterns engine so results match the Sessions list. */
+  stripHarness: async (
+    orgIdentifier: string,
+    patterns: string[],
+    texts: string[],
+  ): Promise<HarnessStripped[]> => {
+    const batches: string[][] = [];
+    for (let i = 0; i < texts.length; i += HARNESS_STRIP_BATCH)
+      batches.push(texts.slice(i, i + HARNESS_STRIP_BATCH));
+    const responses = await Promise.all(
+      batches.map((batch) =>
+        http().post<{ results: HarnessStripped[] }>(
+          `/api/${orgIdentifier}/settings/gen_ai/harness_strip`,
+          { patterns, texts: batch },
+        ),
+      ),
+    );
+    return responses.flatMap((r) => r.data.results);
+  },
+  // Reaches back to the page start so every version the Version dropdown lists is offered as a compare slot.
   listVersionsForCompare: async (
     orgIdentifier: string,
     agentName: string,
     env: string | null,
     nowMicros: number,
+    pageStartMicros?: number,
   ): Promise<GenAiAgentListItem[]> => {
-    const start = nowMicros - RETENTION_MS * 1000;
+    const start = Math.min(nowMicros - RETENTION_MS * 1000, pageStartMicros ?? Infinity);
     const response = await genAiAgentMappingService.listAgents(orgIdentifier, start, nowMicros);
     return response.agents.filter(
       (agent) =>

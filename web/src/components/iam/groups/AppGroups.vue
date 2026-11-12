@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="group_name"
           :loading="loading"
           :forbidden="forbidden"
+          forbidden-resource="groups"
           :selected-ids="selectedGroupNames"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
@@ -144,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    :aria-label="t('common.moreActions')"
                     icon-left="more-vert"
                     variant="ghost"
                     size="icon-xs-sq"
@@ -202,10 +204,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <ConfirmDialog
       :title="t('iam.appGroups.deleteGroupTitle')"
-      :message="
-        t('iam.appGroups.deleteGroupConfirm', { name: deleteConformDialog?.data?.group_name })
-      "
+      message-keypath="iam.appGroups.deleteGroupConfirm"
+      :message-name="deleteConformDialog.data?.group_name"
       :warning-message="deleteImpactMessage"
+      ok-variant="destructive"
       @update:ok="_deleteGroup"
       @update:cancel="deleteConformDialog.show = false"
       v-model="deleteConformDialog.show"
@@ -213,6 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('iam.appGroups.bulkDeleteGroupsTitle')"
       :message="t('iam.appGroups.bulkDeleteGroupsConfirm', { count: selectedGroups.length })"
+      ok-variant="destructive"
       :warning-message="bulkDeleteImpactMessage"
       @update:ok="bulkDeleteUserGroups"
       @update:cancel="confirmBulkDelete = false"
@@ -254,6 +257,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { forbiddenState } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
 
 const showAddGroup = ref(false);
@@ -489,7 +493,7 @@ const lastUpdatedAt = groupsList.dataUpdatedAt;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = groupsList.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+  return forbiddenState(e) || e?.status === 403;
 });
 // `force` for every reload that follows a write or an explicit refresh —
 // an "added" event means the server has something new to show.
@@ -640,7 +644,7 @@ const bulkDeleteUserGroups = async () => {
     selectedGroups.value = [];
     confirmBulkDelete.value = false;
   } catch (error: any) {
-    if (error.response?.status != 403 || error?.status != 403) {
+    if (error.response?.status !== 403 && error?.status !== 403) {
       toast({
         message:
           error.response?.data?.message || error?.message || t("iam.appGroups.errorDeletingGroups"),

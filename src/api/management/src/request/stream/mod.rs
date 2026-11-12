@@ -21,6 +21,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+#[cfg(feature = "enterprise")]
+use config::meta::stream::SecuritySourceSetting;
 use config::{
     meta::stream::{StreamType, TimeRange, UpdateStreamSettings},
     utils::schema::format_stream_name,
@@ -43,6 +45,8 @@ use crate::common::{
     },
     utils::http::{get_stream_type_from_request, get_ts_from_request_with_key},
 };
+#[cfg(feature = "enterprise")]
+use crate::request::security;
 
 /// GetSchema
 #[utoipa::path(
@@ -65,7 +69,7 @@ use crate::common::{
         ("limit" = Option<u32>, Query, description = "Pagination limit (default: 0 = all)"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = crate::common::meta::stream::Stream),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -99,20 +103,22 @@ pub async fn schema(
         )
             .into_response();
     };
+    schema.inherited_retention_days =
+        db::organization::stream_retention_days(&org_id, stream_type, &stream_name, 0)
+            .await
+            .inspect_err(|e| {
+                log::warn!("[RETENTION] stream {org_id}/{stream_name} default unreadable: {e}")
+            })
+            .ok();
     if !schema.settings.defined_schema_fields.is_empty() {
-        let mut schema_fields = schema
-            .schema
-            .iter()
-            .map(|f| (&f.name, f))
-            .collect::<HashMap<_, _>>();
         // internal columns are implicit in the UDS even when not persisted
         let internal_columns = schema.settings.uds_internal_columns();
+        let uds_fields =
+            schema::effective_uds_fields(stream_type, &schema.settings.defined_schema_fields);
         schema.uds_schema = schema
-            .settings
-            .defined_schema_fields
+            .schema
             .iter()
-            .chain(internal_columns.iter())
-            .filter_map(|f| schema_fields.remove(f))
+            .filter(|f| uds_fields.contains(&f.name) || internal_columns.contains(&f.name))
             .cloned()
             .collect::<Vec<_>>();
     }
@@ -165,7 +171,7 @@ pub async fn schema(
     ),
     request_body(content = inline(StreamCreate), description = "Stream create", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
@@ -177,8 +183,10 @@ pub async fn schema(
 pub async fn create(
     Path((org_id, stream_name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
-    Json(stream): Json<StreamCreate>,
+    Json(mut stream): Json<StreamCreate>,
 ) -> Response {
+    // The security setting is written only through the settings API, which validates and audits it.
+    stream.settings.security = None;
     let mut stream_name = stream_name;
     if !config::get_config().common.skip_formatting_stream_name {
         stream_name = format_stream_name(stream_name);
@@ -220,7 +228,7 @@ pub async fn create(
     ),
     request_body(content = inline(UpdateStreamSettings), description = "Stream settings", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
@@ -233,7 +241,8 @@ pub async fn create(
 pub async fn update_settings(
     Path((org_id, stream_name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
-    Json(stream_settings): Json<UpdateStreamSettings>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(mut stream_settings): Json<UpdateStreamSettings>,
 ) -> Response {
     let cfg = config::get_config();
     let mut stream_name = stream_name;
@@ -251,6 +260,44 @@ pub async fn update_settings(
         )
             .into_response();
     }
+    #[cfg(feature = "enterprise")]
+    let touches_security = match security::streams::guard_settings_update(
+        &org_id,
+        &user_email.user_id,
+        &stream_name,
+        stream_type,
+        &stream_settings,
+    )
+    .await
+    {
+        Ok(touches) => touches,
+        Err(resp) => return resp,
+    };
+    // Security is enterprise-only, so an OSS build never acts on the setting.
+    #[cfg(not(feature = "enterprise"))]
+    {
+        stream_settings.security = None;
+    }
+    #[cfg(feature = "enterprise")]
+    let mut security_change = None;
+    #[cfg(feature = "enterprise")]
+    if let Some(security) = stream_settings.security.take() {
+        match prepare_security_setting(
+            &org_id,
+            &stream_name,
+            stream_type,
+            &user_email.user_id,
+            security,
+        )
+        .await
+        {
+            Ok((security, change)) => {
+                stream_settings.security = Some(security);
+                security_change = change;
+            }
+            Err(resp) => return resp,
+        }
+    }
     match stream_service::update_stream_settings(
         &org_id,
         &stream_name,
@@ -259,7 +306,21 @@ pub async fn update_settings(
     )
     .await
     {
-        Ok(resp) => resp,
+        Ok(resp) => {
+            #[cfg(feature = "enterprise")]
+            if resp.status() == StatusCode::OK {
+                if security::streams::audits_settings_request(
+                    touches_security,
+                    security_change.is_some(),
+                ) {
+                    o2_enterprise::enterprise::security::audit::mark();
+                }
+                if let Some(change) = security_change {
+                    audit_security_change(&org_id, &stream_name, &user_email.user_id, change).await;
+                }
+            }
+            resp
+        }
         Err(e) => MetaHttpResponse::internal_error(e),
     }
 }
@@ -273,6 +334,7 @@ pub async fn update_settings(
     context_path = "/api",
     tag = "Streams",
     operation_id = "UpdateStreamFields",
+    summary = "Update stream field types",
     security(("Authorization"= [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -281,10 +343,10 @@ pub async fn update_settings(
     ),
     request_body(content = inline(StreamUpdateFields), description = "Update stream fields to a specific data type", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = Object),
     ),
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Streams", "operation": "update"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
@@ -350,7 +412,7 @@ pub async fn update_fields(
     ),
     request_body(content = inline(StreamDeleteFields), description = "Stream delete fields", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
@@ -362,6 +424,7 @@ pub async fn update_fields(
 pub async fn delete_fields(
     Path((org_id, stream_name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(fields): Json<StreamDeleteFields>,
 ) -> Response {
     let mut stream_name = stream_name;
@@ -369,6 +432,17 @@ pub async fn delete_fields(
         stream_name = format_stream_name(stream_name);
     }
     let stream_type = get_stream_type_from_request(&query);
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::streams::guard_stream_delete(
+        &org_id,
+        &user_email.user_id,
+        &stream_name,
+        stream_type.unwrap_or_default(),
+    )
+    .await
+    {
+        return resp;
+    }
     match stream_service::delete_fields(&org_id, &stream_name, stream_type, &fields.fields).await {
         Ok(_) => (
             StatusCode::OK,
@@ -403,7 +477,7 @@ pub async fn delete_fields(
         ("delete_all" = bool, Query, description = "Delete all related feature resources"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -414,8 +488,26 @@ pub async fn delete_fields(
 pub async fn delete(
     Path((org_id, stream_name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    #[cfg(feature = "enterprise")]
+    let stored_name = if config::get_config().common.skip_formatting_stream_name {
+        stream_name.clone()
+    } else {
+        format_stream_name(stream_name.clone())
+    };
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::streams::guard_stream_delete(
+        &org_id,
+        &user_email.user_id,
+        &stored_name,
+        stream_type,
+    )
+    .await
+    {
+        return resp;
+    }
     let del_related_feature_resources = query
         .get("delete_all")
         .and_then(|v| v.parse::<bool>().ok())
@@ -445,7 +537,7 @@ pub async fn delete(
     tag = "Streams",
     operation_id = "StreamList",
     summary = "List organization streams",
-    description = "Retrieves a paginated list of streams within the organization, with optional filtering by type and keyword. Supports sorting by various metrics",
+    description = "Retrieves a paginated list of streams within the organization, with optional filtering by type and keyword. Supports sorting by various metrics. Streams written by OpenObserve itself carry `is_internal: true`; the field is omitted for user streams.",
     security(
         ("Authorization"= [])
     ),
@@ -464,9 +556,9 @@ pub async fn delete(
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "list"})),
         ("x-o2-mcp" = json!({
-            "description": "List all streams in the organization, you can filter by type and keyword.",
+            "description": "List all streams in the organization, you can filter by type and keyword. is_internal marks streams OpenObserve writes itself and is omitted when false.",
             "category": "streams",
-            "summary_fields": ["name", "stream_type", "stats.storage_size"],
+            "summary_fields": ["name", "stream_type", "stats.storage_size", "is_internal"],
             "pinned": true
         }))
     )
@@ -519,6 +611,8 @@ pub async fn list(
         // Get List of allowed objects ends
     }
 
+    #[cfg(feature = "enterprise")]
+    let listed_by_permission = _stream_list_from_rbac.is_some();
     let mut indices = stream_service::get_streams(
         org_id.as_str(),
         stream_type,
@@ -585,6 +679,22 @@ pub async fn list(
         indices.drain(..offset);
     }
 
+    #[cfg(feature = "enterprise")]
+    if !listed_by_permission
+        && !db::user::is_root_user(&_user_email.user_id)
+        && openobserve_core::authz::rbac_enforced().await
+    {
+        let (org_id, user_id) = (org_id.as_str(), _user_email.user_id.as_str());
+        let role = openobserve_core::users::get_user(Some(org_id), user_id)
+            .await
+            .map(|user| user.role.to_string());
+        let granted = granted_ids_by_type(&indices, |stream_type| {
+            list_readable_stream_ids(org_id, user_id, role.as_deref(), stream_type)
+        })
+        .await;
+        hide_unreadable_schemas(&mut indices, |s| is_readable(&granted, org_id, s));
+    }
+
     (
         StatusCode::OK,
         Json(ListStream {
@@ -593,6 +703,160 @@ pub async fn list(
         }),
     )
         .into_response()
+}
+
+/// Gates a direct `security` write on Security PUT, then plans it as [`plan_security_setting`].
+#[cfg(feature = "enterprise")]
+pub(crate) async fn prepare_security_setting(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    user_id: &str,
+    security: Option<SecuritySourceSetting>,
+) -> Result<(Option<SecuritySourceSetting>, Option<String>), Response> {
+    if !security::security_allowed(org_id, user_id, "PUT").await {
+        return Err(MetaHttpResponse::forbidden(
+            "Changing a security source needs the Security permission",
+        ));
+    }
+    plan_security_setting(org_id, stream_name, stream_type, user_id, security).await
+}
+
+/// Validates and stamps an already authorized `security` write: the value to store, what changed.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn plan_security_setting(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    user_id: &str,
+    security: Option<SecuritySourceSetting>,
+) -> Result<(Option<SecuritySourceSetting>, Option<String>), Response> {
+    use o2_enterprise::enterprise::security::sources;
+
+    if let Some(new) = security.as_ref()
+        && let Err(e) = sources::validate(new)
+    {
+        return Err(MetaHttpResponse::bad_request(e));
+    }
+    let current = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    let old = current.as_ref().and_then(|s| s.security.as_ref());
+    let now = config::utils::time::now_micros();
+    let change = sources::describe_change(old, security.as_ref());
+    let stored = security.map(|new| sources::stamped(old, new, user_id, now));
+    Ok((stored, (!change.is_empty()).then_some(change)))
+}
+
+#[cfg(feature = "enterprise")]
+pub(crate) async fn audit_security_change(
+    org_id: &str,
+    stream_name: &str,
+    user_id: &str,
+    change: String,
+) {
+    use o2_enterprise::enterprise::common::auditor;
+
+    log::info!("[SECURITY] {org_id}/{stream_name} security source changed by {user_id}: {change}");
+    audit::audit(auditor::AuditMessage {
+        login_ip: None,
+        user_agent: None,
+        user_email: user_id.to_string(),
+        org_id: org_id.to_string(),
+        _timestamp: config::utils::time::now_micros(),
+        protocol: auditor::Protocol::Http,
+        delegated: None,
+        fleet_id: None,
+        target: None,
+        response_meta: auditor::ResponseMeta {
+            http_method: "PUT".to_string(),
+            http_path: format!("/api/{org_id}/streams/{stream_name}/settings/security"),
+            http_query_params: String::new(),
+            http_body: change,
+            http_response_code: 200,
+            error_msg: None,
+            trace_id: None,
+        },
+    })
+    .await;
+}
+
+/// Keeps only the name and stats of each stream `can_read` refuses: settings name fields too.
+#[cfg(any(feature = "enterprise", test))]
+fn hide_unreadable_schemas(
+    streams: &mut [meta::stream::Stream],
+    can_read: impl Fn(&meta::stream::Stream) -> bool,
+) {
+    for stream in streams.iter_mut().filter(|s| !can_read(s)) {
+        stream.schema.clear();
+        stream.uds_schema.clear();
+        stream.total_fields = 0;
+        stream.settings = Default::default();
+        stream.pattern_associations.clear();
+    }
+}
+
+/// Granted object ids per stream type, looked up once per type present in `streams`.
+#[cfg(any(feature = "enterprise", test))]
+async fn granted_ids_by_type<F, Fut>(
+    streams: &[meta::stream::Stream],
+    list_granted: F,
+) -> HashMap<StreamType, Vec<String>>
+where
+    F: Fn(StreamType) -> Fut,
+    Fut: std::future::Future<Output = Vec<String>>,
+{
+    let mut granted = HashMap::new();
+    for stream in streams {
+        if !granted.contains_key(&stream.stream_type) {
+            let ids = list_granted(stream.stream_type).await;
+            granted.insert(stream.stream_type, ids);
+        }
+    }
+    granted
+}
+
+/// Mirrors `check_stream_permissions`: a grant on the stream or on all streams of its type.
+#[cfg(any(feature = "enterprise", test))]
+fn is_readable(
+    granted: &HashMap<StreamType, Vec<String>>,
+    org_id: &str,
+    stream: &meta::stream::Stream,
+) -> bool {
+    let Some(ids) = granted.get(&stream.stream_type) else {
+        return false;
+    };
+    let all = format!("_all_{org_id}");
+    let own = config::utils::str::into_ofga_supported_format(&stream.name);
+    ids.iter().any(|id| *id == all || *id == own)
+}
+
+/// An unknown user or a failed lookup grants nothing, as the per-stream check denies both.
+#[cfg(feature = "enterprise")]
+async fn list_readable_stream_ids(
+    org_id: &str,
+    user_id: &str,
+    role: Option<&str>,
+    stream_type: StreamType,
+) -> Vec<String> {
+    use o2_openfga::meta::mapping::OFGA_MODELS;
+
+    let Some(role) = role else {
+        return vec![];
+    };
+    let object_type = OFGA_MODELS
+        .get(stream_type.as_str())
+        .map_or(stream_type.as_str(), |model| model.key);
+    match o2_openfga::authorizer::authz::list_objects(user_id, "GET", object_type, org_id, role)
+        .await
+    {
+        Ok(objects) => objects
+            .into_iter()
+            .filter_map(|object| object.split_once(':').map(|(_, id)| id.to_string()))
+            .collect(),
+        Err(e) => {
+            log::warn!("stream list: listing {object_type} grants for {user_id} failed: {e}");
+            vec![]
+        }
+    }
 }
 
 /// Compares two streams for sorting based on the field and ASC/DESC
@@ -648,10 +912,10 @@ fn stream_comparator(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces. Defaults to logs."),
-        ("ts" = i64, Query, description = "Timestamp in microseconds. If provided, must be > 0. Cache from this timestamp onwards will be retained, older cache will be deleted."),
+        ("ts" = Option<i64>, Query, description = "Timestamp in microseconds. If provided, must be > 0. Cache from this timestamp onwards will be retained, older cache will be deleted."),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -730,13 +994,14 @@ pub async fn delete_stream_cache(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "delete"}))
     )
 )]
 pub async fn delete_stream_data_by_time_range(
     Path((org_id, stream_name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let cfg = config::get_config();
     let mut stream_name = stream_name;
@@ -744,6 +1009,17 @@ pub async fn delete_stream_data_by_time_range(
         stream_name = format_stream_name(stream_name);
     }
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::streams::guard_stream_delete(
+        &org_id,
+        &user_email.user_id,
+        &stream_name,
+        stream_type,
+    )
+    .await
+    {
+        return resp;
+    }
     let start = match get_ts_from_request_with_key(&query, "start") {
         Ok(ts) => ts,
         Err(e) => {
@@ -807,14 +1083,15 @@ pub async fn delete_stream_data_by_time_range(
         ("Authorization"= [])
     ),
     params(
+        ("id" = String, Path, description = "Deletion job id"),
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = infra::table::compactor_manual_jobs::CompactorManualJobStatusRes),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "get"}))
     )
 )]
@@ -1055,7 +1332,127 @@ mod tests {
             total_fields: 0,
             pattern_associations: vec![],
             is_derived: None,
+            is_internal: false,
+            inherited_retention_days: None,
         }
+    }
+
+    #[tokio::test]
+    async fn listing_drops_the_fields_of_streams_the_caller_cannot_read() {
+        let field = config::meta::stream::StreamField {
+            name: "card_bin".to_string(),
+            r#type: "Utf8".to_string(),
+        };
+        let mut streams = vec![
+            make_stream("hidden", 3, 1.0, 1.0, 0.0),
+            make_stream("readable", 3, 1.0, 1.0, 0.0),
+        ];
+        for s in streams.iter_mut() {
+            s.schema = vec![field.clone()];
+            s.total_fields = 1;
+        }
+        hide_unreadable_schemas(&mut streams, |s| s.name == "readable");
+        assert_eq!(streams[0].name, "hidden");
+        assert!(streams[0].schema.is_empty());
+        assert_eq!(streams[0].total_fields, 0);
+        assert_eq!(streams[0].stats.doc_num, 3);
+        assert_eq!(streams[1].schema.len(), 1);
+        assert_eq!(streams[1].total_fields, 1);
+    }
+
+    #[test]
+    fn listing_drops_the_settings_of_streams_the_caller_cannot_read() {
+        let field = config::meta::stream::StreamField {
+            name: "card_bin".to_string(),
+            r#type: "Utf8".to_string(),
+        };
+        let mut streams = vec![
+            make_stream("hidden", 3, 1.0, 1.0, 0.0),
+            make_stream("readable", 3, 1.0, 1.0, 0.0),
+        ];
+        for s in streams.iter_mut() {
+            s.uds_schema = vec![field.clone()];
+            s.settings.partition_keys =
+                vec![config::meta::stream::StreamPartition::new("card_bin")];
+            s.settings.full_text_search_keys = vec!["card_bin".to_string()];
+            s.settings.index_fields = vec!["card_bin".to_string()];
+            s.settings.bloom_filter_fields = vec!["card_bin".to_string()];
+            s.settings.defined_schema_fields = vec!["card_bin".to_string()];
+            s.settings.data_retention = 7;
+        }
+        let readable_settings = streams[1].settings.clone();
+        hide_unreadable_schemas(&mut streams, |s| s.name == "readable");
+        assert_eq!(streams[0].settings, Default::default());
+        assert!(streams[0].uds_schema.is_empty());
+        assert!(!format!("{:?}", streams[0]).contains("card_bin"));
+        assert_eq!(streams[0].name, "hidden");
+        assert_eq!(streams[0].stats.doc_num, 3);
+        assert_eq!(streams[1].settings, readable_settings);
+        assert_eq!(streams[1].uds_schema.len(), 1);
+    }
+
+    fn typed_stream(name: &str, stream_type: StreamType) -> meta::stream::Stream {
+        let mut stream = make_stream(name, 1, 1.0, 1.0, 0.0);
+        stream.stream_type = stream_type;
+        stream
+    }
+
+    #[tokio::test]
+    async fn stream_list_looks_up_grants_once_per_stream_type() {
+        let types = [StreamType::Logs, StreamType::Metrics, StreamType::Traces];
+        let mut streams: Vec<_> = (0..30)
+            .map(|i| typed_stream(&format!("s{i}"), types[i % 3]))
+            .collect();
+        streams.push(typed_stream("http:requests", StreamType::Metrics));
+        let calls = std::sync::atomic::AtomicUsize::new(0);
+        let granted = granted_ids_by_type(&streams, |stream_type| {
+            calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let ids: Vec<String> = match stream_type {
+                StreamType::Logs => vec!["_all_org1".into()],
+                StreamType::Metrics => vec!["s1".into(), "s4".into(), "http.requests".into()],
+                _ => vec!["_all_org2".into(), "s2x".into()],
+            };
+            async move { ids }
+        })
+        .await;
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), types.len());
+
+        let per_stream_check = |s: &meta::stream::Stream| match s.stream_type {
+            StreamType::Logs => true,
+            StreamType::Metrics => ["s1", "s4", "http:requests"].contains(&s.name.as_str()),
+            _ => false,
+        };
+        for stream in &streams {
+            assert_eq!(
+                is_readable(&granted, "org1", stream),
+                per_stream_check(stream),
+                "{}",
+                stream.name
+            );
+        }
+    }
+
+    #[test]
+    fn a_stream_type_without_a_grant_lookup_is_unreadable() {
+        let granted = HashMap::new();
+        assert!(!is_readable(
+            &granted,
+            "org1",
+            &typed_stream("a", StreamType::Logs)
+        ));
+    }
+
+    #[test]
+    fn stream_list_checks_read_permission_before_returning_schemas() {
+        let text = include_str!("mod.rs");
+        let start = text.find("pub async fn list(").expect("list handler");
+        let body = &text[start..];
+        let body = &body[..body.find("\n}\n").expect("handler end")];
+        assert!(body.contains("hide_unreadable_schemas("));
+        assert!(
+            !body.contains("if fetch_schema"),
+            "settings carry field names, so the guard runs with or without fetchSchema"
+        );
     }
 
     #[test]

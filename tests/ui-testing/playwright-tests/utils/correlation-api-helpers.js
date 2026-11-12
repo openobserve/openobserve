@@ -27,6 +27,7 @@ const {
   isCloudEnvironment,
   authedRequest,
 } = require("./cloud-auth.js");
+const { ingestBase } = require("./ingest-url.js");
 
 const BASE = process.env.ZO_BASE_URL || "http://localhost:5080";
 
@@ -148,7 +149,7 @@ async function deleteOrg(page, org) {
 async function ingestLogs(page, org, stream, records) {
   const ts = nowMicros();
   const data = records.map((r) => ({ _timestamp: ts, ...r }));
-  const res = await page.request.post(`${BASE}/api/${org}/${stream}/_json`, {
+  const res = await page.request.post(`${ingestBase(BASE)}/api/${org}/${stream}/_json`, {
     headers: await ingestHeaders(page, org),
     data,
   });
@@ -171,7 +172,7 @@ async function ingestMetrics(page, org, records) {
     ...r,
   }));
   const res = await page.request.post(
-    `${BASE}/api/${org}/ingest/metrics/_json`,
+    `${ingestBase(BASE)}/api/${org}/ingest/metrics/_json`,
     { headers: await ingestHeaders(page, org), data },
   );
   const body = await res.json().catch(() => ({}));
@@ -229,7 +230,7 @@ async function ingestTraces(page, org, serviceName, attrs, childCount = 1) {
       },
     ],
   };
-  const res = await page.request.post(`${BASE}/api/${org}/v1/traces`, {
+  const res = await page.request.post(`${ingestBase(BASE)}/api/${org}/v1/traces`, {
     headers: await ingestHeaders(page, org),
     data,
   });

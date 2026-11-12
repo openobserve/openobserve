@@ -15,6 +15,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { setupTestDashboard, deleteDashboard } = require('./utils/dashCreation.js');
 const { ingestion } = require('./utils/dashIngestion.js');
+const { settlePanelLeave } = require('../../pages/dashboardPages/panel-leave-dialog.js');
 
 // ── Fixture helpers ───────────────────────────────────────────────────────────
 
@@ -479,8 +480,8 @@ test.describe("Dashboard AddSettingVariable form validation", () => {
         pm = new PageManager(page);
         dashName = await createOwnedDashboard(page, pm, 'e2e_fv_variable_settings');
         // Navigate to Settings > Variables tab > Add Variable
-        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().waitFor({ state: 'visible', timeout: 15000 });
-        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().click();
+        await pm.dashboardsFormValidation.getMoreOptionsBtnLocator().waitFor({ state: 'visible', timeout: 15000 });
+        await pm.dashboardsFormValidation.clickDashboardSettingsBtn();
         await pm.dashboardsFormValidation.getSettingsVariablesTabLocator().waitFor({ state: 'visible', timeout: 10000 });
         await pm.dashboardsFormValidation.getSettingsVariablesTabLocator().click();
         await pm.dashboardsFormValidation.getVariableAddBtnLocator().waitFor({ state: 'visible', timeout: 10000 });
@@ -553,8 +554,7 @@ test.describe("Dashboard AddCondition form validation", () => {
         // Enter panel edit mode
         await pm.dashboardPanelActions.selectPanelAction(panelName, 'Edit');
 
-        // Add a condition row. The "+" is an ODropdown trigger, so this picks
-        // "Add Condition" from the menu it opens and waits for the row.
+        // Add a complete condition through the filter bar's field, operator and value lists.
         await pm.dashboardsFormValidation.addConditionRow();
 
         testLogger.info('Condition row added in panel editor');
@@ -572,10 +572,8 @@ test.describe("Dashboard AddCondition form validation", () => {
         await expect(pm.dashboardsFormValidation.getConditionColumn0Locator()).toBeVisible();
         await expect(pm.dashboardsFormValidation.getConditionCondition0Locator()).toBeVisible();
 
-        // The value control lives in the Condition tab panel; the popup opens on
-        // the List tab, where it is not rendered at all. Switch tabs first.
-        await pm.dashboardsFormValidation.openConditionTab(0);
         await expect(pm.dashboardsFormValidation.getConditionValueLocator()).toBeVisible();
+        await pm.dashboardsFormValidation.openConditionTab(0);
 
         testLogger.info('Condition row elements rendered correctly');
     });
@@ -614,7 +612,7 @@ test.describe("Dashboard GeneralSettings form validation", () => {
         pm = new PageManager(page);
         dashName = await createOwnedDashboard(page, pm, 'e2e_fv_general_settings');
         cleanupCandidates = [dashName];
-        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().waitFor({ state: 'visible', timeout: 15000 });
+        await pm.dashboardsFormValidation.getMoreOptionsBtnLocator().waitFor({ state: 'visible', timeout: 15000 });
         testLogger.info('Dashboard opened for GeneralSettings tests');
     });
 
@@ -627,7 +625,7 @@ test.describe("Dashboard GeneralSettings form validation", () => {
     }, async ({ page }) => {
         testLogger.info('TC-GS-001: Empty name → required error in GeneralSettings');
 
-        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().click();
+        await pm.dashboardsFormValidation.clickDashboardSettingsBtn();
         const nameField = pm.dashboardsFormValidation.getGeneralSettingNameFieldLocator();
         await nameField.waitFor({ state: 'visible', timeout: 10000 });
 
@@ -647,7 +645,7 @@ test.describe("Dashboard GeneralSettings form validation", () => {
     }, async ({ page }) => {
         testLogger.info('TC-GS-002: Cancel closes GeneralSettings');
 
-        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().click();
+        await pm.dashboardsFormValidation.clickDashboardSettingsBtn();
         const nameField = pm.dashboardsFormValidation.getGeneralSettingNameFieldLocator();
         await nameField.waitFor({ state: 'visible', timeout: 10000 });
 
@@ -661,7 +659,7 @@ test.describe("Dashboard GeneralSettings form validation", () => {
     }, async ({ page }) => {
         testLogger.info('TC-GS-003: Valid name → save succeeds in GeneralSettings');
 
-        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().click();
+        await pm.dashboardsFormValidation.clickDashboardSettingsBtn();
         const nameField = pm.dashboardsFormValidation.getGeneralSettingNameFieldLocator();
         await nameField.waitFor({ state: 'visible', timeout: 10000 });
 
@@ -892,34 +890,24 @@ test.describe("Dashboard AddCondition form validation", () => {
         testLogger.info('Condition row rendered with column and condition selectors');
     });
 
-    test("should clear the selected column but keep the row when remove-column is clicked", {
+    test("should keep the condition when its field is changed", {
         tag: ['@domainFormValidation', '@P1']
     }, async ({ page }) => {
-        // This used to assert the ROW disappeared. It does not: the handler is
-        //   const removeColumnName = () => { conditionModel.value.column = {}; };
-        // which clears the chosen COLUMN and leaves the row in place. Deleting the
-        // row is `dashboard-add-condition-remove`, covered by the sibling test.
-        testLogger.info('TC-AC-003: Remove-column clears the column, row survives');
+        testLogger.info('TC-AC-003: Changing the field keeps the condition and its operator');
 
         await pm.dashboardsFormValidation.addConditionRow();
-
         const conditionColumn = pm.dashboardsFormValidation.getConditionColumnLocator();
-        await expect(conditionColumn).toBeVisible({ timeout: 5000 });
+        const before = (await conditionColumn.innerText()).trim();
 
-        await pm.dashboardsFormValidation.getConditionRemoveColumnLocator().click();
+        await conditionColumn.click();
+        const suggest = page.locator('[data-test="dashboard-filter-builder-suggest"]');
+        await suggest.waitFor({ state: 'visible', timeout: 10000 });
+        await suggest.getByRole('option').nth(1).click();
 
-        // Row still present, and its label chip carries no column name (the
-        // data-test is `dashboard-add-condition-label-<i>-<computedLabel>`, so an
-        // empty selection leaves the trailing segment blank).
-        await expect(conditionColumn).toBeVisible({ timeout: 5000 });
-        // Match the label chip by PREFIX. Its data-test embeds computedLabel(),
-        // which falls back to `condition.column.field` — and that is `undefined`
-        // for a cleared column, so the attribute ends up "…-label-0-undefined",
-        // never a bare "…-label-0-".
-        await expect(
-            pm.dashboardsFormValidation.getConditionLabelLocator()
-        ).toBeVisible({ timeout: 5000 });
-        testLogger.info('Column cleared, condition row retained');
+        await expect(conditionColumn).not.toHaveText(before, { timeout: 5000 });
+        await expect(pm.dashboardsFormValidation.getConditionConditionLocator()).toHaveText('=');
+        await expect(page.locator(pm.dashboardsFormValidation.filterChips)).toHaveCount(1);
+        testLogger.info('Field changed, condition retained');
     });
 });
 
@@ -1164,17 +1152,12 @@ test.describe("Dashboard AddPanel panel name form validation", () => {
     }, async ({ page }) => {
         testLogger.info('TC-AP-003: Discard button navigates away from panel editor');
 
-        // Leaving the panel editor with unsaved edits fires AddPanel.vue's
-        // onBeforeRouteLeave window.confirm. Playwright auto-DISMISSES dialogs,
-        // and a dismissed confirm means next(false) — the route change is
-        // cancelled, so the click appears to do nothing and the URL wait below
-        // burns its full timeout. Accept it for the duration of the discard.
-        page.once('dialog', (dialog) => dialog.accept());
-
         await pm.dashboardsFormValidation.getPanelDiscardBtnLocator().waitFor({ state: 'visible', timeout: 5000 });
         await pm.dashboardsFormValidation.getPanelDiscardBtnLocator().click();
 
-        // After discard we should leave the /add_panel URL
+        // An edited panel opens the in-app leave dialog; answering it leaves /add_panel
+        await settlePanelLeave(page, { timeout: 15000 });
+        // settlePanelLeave returns false instead of throwing when neither the dialog nor a navigation happens.
         await page.waitForURL(url => !url.pathname.includes('add_panel'), { timeout: 15000 });
         testLogger.info('Navigated away from panel editor after Discard');
     });

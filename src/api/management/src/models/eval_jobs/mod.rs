@@ -13,13 +13,77 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::pipeline::components::ScorerRef;
+use config::meta::{
+    eval_job_health::{EvalJobHealth, EvalJobState},
+    pipeline::components::ScorerRef,
+};
 use infra::table::online_eval_jobs::{
-    JobInputMapping, SamplingMode, SessionEvalConfig, SpanSelector, SpanSelectorBindings,
-    TargetScope, TraceEvalConfig,
+    BudgetAction, BudgetPatch, EvalJobBudget, JobInputMapping, SamplingMode, SessionEvalConfig,
+    SpanSelector, SpanSelectorBindings, TargetScope, TraceEvalConfig,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+// Only documents ScorerRef's hand-written serde: a bare id tracks the latest version.
+#[derive(ToSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+pub enum ScorerRefForm {
+    Latest(String),
+    Pinned { id: String, version: Option<i32> },
+}
+
+/// A job's daily judge spend limit in a create or update request.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EvalJobBudgetRequest {
+    /// Judge spend allowed per UTC day, in USD; must be positive.
+    pub daily_usd: f64,
+    /// Omitted on create means `pause`; omitted on update keeps the stored action.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_reach: Option<BudgetAction>,
+    /// Server-owned, as returned by a read; accepted so a read can be sent back, and ignored.
+    #[serde(default, skip_serializing)]
+    #[schema(value_type = Option<i64>)]
+    pub paused_at: Option<serde::de::IgnoredAny>,
+    /// Server-owned, as returned by a read; ignored.
+    #[serde(default, skip_serializing)]
+    #[schema(value_type = Option<f64>)]
+    pub paused_spend_usd: Option<serde::de::IgnoredAny>,
+    /// Server-owned, as returned by a read; ignored.
+    #[serde(default, skip_serializing)]
+    #[schema(value_type = Option<i64>)]
+    pub lifted_until: Option<serde::de::IgnoredAny>,
+}
+
+impl EvalJobBudgetRequest {
+    fn patch(&self) -> BudgetPatch {
+        BudgetPatch::Set {
+            daily_usd: self.daily_usd,
+            on_reach: self.on_reach,
+        }
+    }
+
+    /// A new job's budget: `pause` unless the request says otherwise, with no pause state.
+    fn into_budget(self) -> EvalJobBudget {
+        EvalJobBudget {
+            daily_usd: self.daily_usd,
+            on_reach: self.on_reach.unwrap_or_default(),
+            paused_at: None,
+            paused_spend_usd: None,
+            lifted_until: None,
+        }
+    }
+}
+
+/// `null` → `Some(None)`; an absent field stays `None` through `#[serde(default)]`.
+fn double_option<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    Deserialize::deserialize(deserializer).map(Some)
+}
 
 /// HTTP request body for creating or updating an Online Eval Job.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -34,8 +98,10 @@ pub struct EvalJobRequestBody {
     #[schema(value_type = String)]
     pub target_scope: TargetScope,
     pub filter_condition: serde_json::Value,
+    #[schema(value_type = Vec<ScorerRefForm>)]
     pub scorers: Vec<ScorerRef>,
     #[serde(default)]
+    #[schema(value_type = Option<Object>)]
     pub input_mapping: Option<JobInputMapping>,
     #[serde(default)]
     #[schema(value_type = Vec<Object>)]
@@ -44,14 +110,33 @@ pub struct EvalJobRequestBody {
     #[schema(value_type = Object)]
     pub span_selector_bindings: SpanSelectorBindings,
     #[serde(default)]
-    #[schema(value_type = Object)]
+    #[schema(value_type = Option<Object>)]
     pub trace_config: Option<TraceEvalConfig>,
     #[serde(default)]
-    #[schema(value_type = Object)]
+    #[schema(value_type = Option<Object>)]
     pub session_config: Option<SessionEvalConfig>,
+    /// Daily judge spend limit. On update, omitted keeps the stored one and `null` removes it.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<EvalJobBudgetRequest>, nullable)]
+    pub budget: Option<Option<EvalJobBudgetRequest>>,
     #[schema(value_type = String)]
     pub sampling_mode: SamplingMode,
     pub sampling_value: serde_json::Value,
+}
+
+impl EvalJobRequestBody {
+    /// What an update asks of the stored budget.
+    pub fn budget_patch(&self) -> BudgetPatch {
+        match &self.budget {
+            None => BudgetPatch::Keep,
+            Some(None) => BudgetPatch::Clear,
+            Some(Some(budget)) => budget.patch(),
+        }
+    }
 }
 
 /// HTTP response body for a single Online Eval Job.
@@ -67,16 +152,20 @@ pub struct EvalJobResponseBody {
     #[schema(value_type = String)]
     pub target_scope: TargetScope,
     pub filter_condition: serde_json::Value,
+    #[schema(value_type = Vec<ScorerRefForm>)]
     pub scorers: Vec<ScorerRef>,
+    #[schema(value_type = Option<Object>)]
     pub input_mapping: Option<JobInputMapping>,
     #[schema(value_type = Vec<Object>)]
     pub span_selectors: Vec<SpanSelector>,
     #[schema(value_type = Object)]
     pub span_selector_bindings: SpanSelectorBindings,
-    #[schema(value_type = Object)]
+    #[schema(value_type = Option<Object>)]
     pub trace_config: Option<TraceEvalConfig>,
-    #[schema(value_type = Object)]
+    #[schema(value_type = Option<Object>)]
     pub session_config: Option<SessionEvalConfig>,
+    #[schema(nullable)]
+    pub budget: Option<EvalJobBudget>,
     #[schema(value_type = String)]
     pub sampling_mode: SamplingMode,
     pub sampling_value: serde_json::Value,
@@ -85,6 +174,9 @@ pub struct EvalJobResponseBody {
     pub pipeline_id: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
+    /// Measured health; absent for jobs that are not active or paused, or not yet measured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub health: Option<EvalJobHealthBody>,
 }
 
 /// HTTP response body for listing Online Eval Jobs.
@@ -110,6 +202,58 @@ pub struct EvalJobStatusActionResponseBody {
     pub status: String,
     pub pipeline_id: Option<String>,
     pub updated_at: i64,
+}
+
+/// Run state measured from `_evaluator` scorer spans; never changes the job's `status`.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EvalJobHealthBody {
+    /// `healthy`, `degraded`, `waiting_for_credentials` or `no_recent_runs`.
+    #[schema(value_type = String)]
+    pub state: EvalJobHealth,
+    /// When `state` last changed, in microseconds.
+    pub since: i64,
+    /// When the job was last measured, in microseconds.
+    pub evaluated_at: i64,
+    /// Scorer runs in the last 15 minutes.
+    pub recent_runs: u64,
+    /// Failed scorer runs in the last 15 minutes.
+    pub recent_errors: u64,
+    /// Successful scorer runs in the last 24 hours.
+    pub scores_24h: u64,
+    /// Newest successful scorer run in the last 24 hours, in microseconds.
+    pub last_success_at: Option<i64>,
+    /// Newest failed scorer run in the last 24 hours.
+    pub last_error: Option<EvalJobLastErrorBody>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EvalJobLastErrorBody {
+    /// e.g. `provider_auth`, `rate_limited`, `timeout`, `provider_5xx`, `parse_error`.
+    pub kind: String,
+    pub message: String,
+    /// When the error happened, in microseconds.
+    pub at: i64,
+}
+
+impl From<EvalJobState> for EvalJobHealthBody {
+    fn from(value: EvalJobState) -> Self {
+        Self {
+            state: value.health,
+            since: value.since,
+            evaluated_at: value.evaluated_at,
+            recent_runs: value.recent_runs,
+            recent_errors: value.recent_errors,
+            scores_24h: value.scores_24h,
+            last_success_at: value.last_success_at,
+            last_error: value.last_error.map(|error| EvalJobLastErrorBody {
+                kind: error.kind,
+                message: error.message,
+                at: error.at,
+            }),
+        }
+    }
 }
 
 impl TryFrom<EvalJobRequestBody> for infra::table::online_eval_jobs::OnlineEvalJob {
@@ -145,6 +289,10 @@ impl TryFrom<EvalJobRequestBody> for infra::table::online_eval_jobs::OnlineEvalJ
             span_selector_bindings: value.span_selector_bindings,
             trace_config: value.trace_config,
             session_config: value.session_config,
+            budget: value
+                .budget
+                .flatten()
+                .map(EvalJobBudgetRequest::into_budget),
             sampling_mode: value.sampling_mode,
             sampling_value: value.sampling_value,
             status: "draft".to_string(),
@@ -182,6 +330,7 @@ impl From<infra::table::online_eval_jobs::OnlineEvalJob> for EvalJobResponseBody
             span_selector_bindings: value.span_selector_bindings,
             trace_config: value.trace_config,
             session_config: value.session_config,
+            budget: value.budget,
             sampling_mode: value.sampling_mode,
             sampling_value,
             status: value.status,
@@ -189,6 +338,7 @@ impl From<infra::table::online_eval_jobs::OnlineEvalJob> for EvalJobResponseBody
             pipeline_id: value.pipeline_id,
             created_at: value.created_at,
             updated_at: value.updated_at,
+            health: None,
         }
     }
 }
@@ -244,6 +394,7 @@ mod tests {
             span_selector_bindings: Default::default(),
             trace_config: None,
             session_config: None,
+            budget: None,
             sampling_mode: SamplingMode::Rate,
             sampling_value: serde_json::json!(0.1),
             status: "active".to_string(),
@@ -272,6 +423,7 @@ mod tests {
             span_selector_bindings: Default::default(),
             trace_config: None,
             session_config: None,
+            budget: None,
             sampling_mode: SamplingMode::All,
             sampling_value: serde_json::json!(null),
         };
@@ -305,6 +457,7 @@ mod tests {
             span_selector_bindings: Default::default(),
             trace_config: None,
             session_config: None,
+            budget: None,
             sampling_mode: SamplingMode::All,
             sampling_value: serde_json::Value::Null,
         };
@@ -403,6 +556,83 @@ mod tests {
         assert!(body.input_mapping.is_none());
         assert!(body.description.is_none());
         assert_eq!(body.target_scope, TargetScope::Span);
+    }
+
+    #[test]
+    fn test_eval_job_request_body_budget_ignores_client_pause_state() {
+        let json = r#"{
+            "name": "j",
+            "stream": "default",
+            "streamType": "traces",
+            "filterCondition": {},
+            "scorers": ["a"],
+            "budget": {"dailyUsd": 5, "onReach": "pause", "pausedAt": 1, "pausedSpendUsd": 6, "liftedUntil": 2},
+            "samplingMode": "rate",
+            "samplingValue": 0.1
+        }"#;
+        let body: EvalJobRequestBody = serde_json::from_str(json).unwrap();
+        let job = infra::table::online_eval_jobs::OnlineEvalJob::try_from(body).unwrap();
+        let budget = job.budget.clone().unwrap();
+        assert_eq!(budget.daily_usd, 5.0);
+        assert_eq!(
+            (
+                budget.paused_at,
+                budget.paused_spend_usd,
+                budget.lifted_until
+            ),
+            (None, None, None)
+        );
+
+        let response = serde_json::to_value(EvalJobResponseBody::from(job)).unwrap();
+        assert_eq!(
+            response["budget"],
+            serde_json::json!({"dailyUsd": 5.0, "onReach": "pause"})
+        );
+    }
+
+    #[test]
+    fn test_eval_job_request_body_budget_patch() {
+        let body = |budget: &str| {
+            serde_json::from_str::<EvalJobRequestBody>(&format!(
+                r#"{{"name": "j", "stream": "default", "streamType": "traces",
+                    "filterCondition": {{}}, "scorers": ["a"], "samplingMode": "rate",
+                    "samplingValue": 0.1 {budget}}}"#
+            ))
+        };
+        let patch = |budget: &str| body(budget).unwrap().budget_patch();
+
+        assert_eq!(patch(""), BudgetPatch::Keep);
+        assert_eq!(patch(r#", "budget": null"#), BudgetPatch::Clear);
+        assert_eq!(
+            patch(r#", "budget": {"dailyUsd": 7}"#),
+            BudgetPatch::Set {
+                daily_usd: 7.0,
+                on_reach: None
+            }
+        );
+        assert_eq!(
+            patch(r#", "budget": {"dailyUsd": 7, "onReach": "keep_running"}"#),
+            BudgetPatch::Set {
+                daily_usd: 7.0,
+                on_reach: Some(BudgetAction::KeepRunning)
+            }
+        );
+        // Unknown keys are refused, a snake_case action included, not dropped.
+        assert!(body(r#", "budget": {"dailyUsd": 5, "qaUnknown": 1}"#).is_err());
+        assert!(body(r#", "budget": {"dailyUsd": 5, "on_reach": "keep_running"}"#).is_err());
+
+        // A new job without a budget has none; one without an action pauses.
+        let job = |budget: &str| {
+            infra::table::online_eval_jobs::OnlineEvalJob::try_from(body(budget).unwrap()).unwrap()
+        };
+        assert!(job(r#", "budget": null"#).budget.is_none());
+        assert_eq!(
+            job(r#", "budget": {"dailyUsd": 5}"#)
+                .budget
+                .unwrap()
+                .on_reach,
+            BudgetAction::Pause
+        );
     }
 
     #[test]
@@ -754,5 +984,47 @@ mod tests {
         let err = infra::table::online_eval_jobs::OnlineEvalJob::try_from(body).unwrap_err();
 
         assert_eq!(err, "Invalid target scope");
+    }
+
+    #[test]
+    fn test_job_health_serializes_in_the_shape_the_ui_reads() {
+        use config::meta::eval_job_health::EvalJobLastError;
+
+        let mut body = EvalJobResponseBody::from(sample_job());
+        let unmeasured = serde_json::to_value(&body).unwrap();
+        assert!(unmeasured.get("health").is_none());
+
+        body.health = Some(
+            EvalJobState {
+                job_id: "job-1".to_string(),
+                org_id: "org1".to_string(),
+                health: EvalJobHealth::WaitingForCredentials,
+                since: 10,
+                evaluated_at: 20,
+                recent_runs: 3,
+                recent_errors: 2,
+                scores_24h: 1,
+                last_success_at: Some(5),
+                last_error: Some(EvalJobLastError {
+                    kind: "provider_auth".to_string(),
+                    message: "401".to_string(),
+                    at: 15,
+                }),
+            }
+            .into(),
+        );
+        assert_eq!(
+            serde_json::to_value(&body).unwrap()["health"],
+            serde_json::json!({
+                "state": "waiting_for_credentials",
+                "since": 10,
+                "evaluatedAt": 20,
+                "recentRuns": 3,
+                "recentErrors": 2,
+                "scores24h": 1,
+                "lastSuccessAt": 5,
+                "lastError": {"kind": "provider_auth", "message": "401", "at": 15},
+            })
+        );
     }
 }

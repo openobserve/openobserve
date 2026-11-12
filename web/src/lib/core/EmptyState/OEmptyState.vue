@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     • hero   full page / section (dashboards list, alerts page) — big
              illustration, rich copy, fills its container, dot-grid backdrop
     • block  inside a card or panel — medium illustration, tighter copy
+    • slim    one text line inside a card section — no icon, no illustration
     • inline  inside a table body / dropdown — tiny: just icon + one line
 
   Driven by a PRESET (the common path) or by props/slots (the escape hatch):
@@ -43,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ]"
     data-test="o2-empty-state"
   >
-    <!-- decorative dot-grid backdrop (hero/block only) -->
+    <!-- decorative dot-grid backdrop (hero, block and compact only) -->
     <div
       v-if="showBackdrop"
       aria-hidden="true"
@@ -83,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div :class="['flex max-w-xl flex-col', sizeClass.copy]">
         <component
-          :is="size === 'inline' ? 'p' : 'h2'"
+          :is="isInlineCopy ? 'p' : 'h2'"
           :class="['text-text-heading font-medium tracking-[-0.01em]', sizeClass.title]"
         >
           <slot name="title">{{ resolvedTitle }}</slot>
@@ -107,14 +108,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sizeClass.actions,
         ]"
       >
+        <!-- Every action carries `data-test="o2-empty-state-action-<id>"` (RUM
+             uses data-test as the click's action name, so a CTA click reads
+             apart from a dead click on the illustration) and
+             `data-empty-state-action="<id>"`. -->
         <slot name="actions">
           <template v-if="showCards">
             <EmptyStateActionCard
               v-for="(a, i) in resolvedActions"
               :key="a.id || i"
               :icon="a.icon"
-              :label="t(a.titleKey)"
-              :sublabel="a.descriptionKey ? t(a.descriptionKey) : undefined"
+              :label="t(a.titleKey, a.titleParams ?? {})"
+              :sublabel="
+                a.descriptionKey ? t(a.descriptionKey, a.descriptionParams ?? {}) : undefined
+              "
+              :data-test="`o2-empty-state-action-${a.id}`"
+              :data-empty-state-action="a.id"
               @click="emit('action', a.id)"
             />
           </template>
@@ -122,8 +131,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="resolvedActionLabel"
               :variant="actionVariant"
-              :size="size === 'inline' ? 'sm' : 'md'"
+              :size="isInlineCopy ? 'sm' : 'md'"
               :icon-left="resolvedActionIcon"
+              :data-test="`o2-empty-state-action-${actionId}`"
+              :data-empty-state-action="actionId"
               @click="emit('action')"
             >
               {{ resolvedActionLabel }}
@@ -131,7 +142,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="secondaryActionLabel"
               variant="ghost"
-              :size="size === 'inline' ? 'sm' : 'md'"
+              :size="isInlineCopy ? 'sm' : 'md'"
+              :data-test="`o2-empty-state-action-${secondaryActionId}`"
+              :data-empty-state-action="secondaryActionId"
               @click="emit('secondaryAction')"
             >
               {{ secondaryActionLabel }}
@@ -166,7 +179,7 @@ import {
   type EmptyStateVariant,
 } from "./presets";
 
-type Size = "hero" | "block" | "compact" | "inline";
+type Size = "hero" | "block" | "compact" | "inline" | "slim";
 
 const props = withDefaults(
   defineProps<{
@@ -188,8 +201,12 @@ const props = withDefaults(
     /** Simple primary button (used instead of cards); emits `action` on click. */
     actionLabel?: I18nText;
     actionIcon?: IconName;
+    /** Stable id of the simple primary button, for its `data-test` (see the actions block). */
+    actionId?: string;
     /** Secondary action; emits `secondaryAction` on click. */
     secondaryActionLabel?: I18nText;
+    /** Stable id of the secondary button, for its `data-test`. */
+    secondaryActionId?: string;
     /** Suppress the preset's actions (e.g. table empties with no CTA). */
     hideAction?: boolean;
     /**
@@ -207,7 +224,7 @@ const props = withDefaults(
     /** Force the dot-grid backdrop on/off (default: on for hero/block). */
     backdrop?: boolean;
   }>(),
-  { size: "block" },
+  { size: "block", actionId: "primary", secondaryActionId: "secondary" },
 );
 
 const emit = defineEmits<{
@@ -225,6 +242,7 @@ const preset = computed<EmptyStatePreset | undefined>(() =>
 );
 
 const size = computed(() => props.size);
+const isInlineCopy = computed(() => size.value === "inline" || size.value === "slim");
 
 // --- filtered (search/filter matched nothing) vs first-run ------------------
 const isFiltered = computed(() => !!props.filtered);
@@ -259,7 +277,7 @@ const resolvedActions = computed<EmptyStateAction[]>(() => {
   if (isFiltered.value) return [FILTERED_ACTION];
   return props.actions ?? preset.value?.actions ?? [];
 });
-const showCards = computed(() => size.value !== "inline" && resolvedActions.value.length > 0);
+const showCards = computed(() => !isInlineCopy.value && resolvedActions.value.length > 0);
 
 // Simple button fallback (only when a call site passes actionLabel directly and
 // there are no cards).
@@ -281,10 +299,10 @@ const illustrationComponent = computed(() =>
 );
 // inline never shows the full illustration — it uses a compact icon instead.
 const hasIllustration = computed(
-  () => size.value !== "inline" && (!!slots.illustration || !!illustrationComponent.value),
+  () => !isInlineCopy.value && (!!slots.illustration || !!illustrationComponent.value),
 );
 const inlineIcon = computed<IconName | undefined>(() => {
-  if (size.value !== "inline") return undefined;
+  if (size.value !== "inline") return undefined; // slim is text only
   if (props.icon) return props.icon;
   // sensible default icon per tone
   return variant.value === "error" ? "error-outline" : "search-off";
@@ -306,7 +324,7 @@ onMounted(() => {
 onBeforeUnmount(() => mq?.removeEventListener?.("change", syncMotion));
 
 // --- backdrop ---------------------------------------------------------------
-const showBackdrop = computed(() => props.backdrop ?? size.value !== "inline");
+const showBackdrop = computed(() => props.backdrop ?? !isInlineCopy.value);
 const dotGridStyle =
   // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
   "background-image: radial-gradient(var(--empty-dot) 1.25px, transparent 1.25px);" +
@@ -349,7 +367,7 @@ const SIZE_MAP: Record<
   block: {
     root: "w-full min-h-65 px-6 py-10 max-md:min-h-0 max-md:px-4 max-md:py-5",
     stack: "gap-5 max-md:gap-3",
-    copy: "gap-2 max-md:gap-1",
+    copy: "gap-2 max-md:gap-1.5",
     actions: "gap-2.5 pt-0.5 max-md:gap-2 max-md:pt-0",
     extra: "w-full flex flex-col items-center gap-2 pt-1 max-md:pt-0",
     title: raw("text-lg! max-md:text-base!"),
@@ -361,13 +379,25 @@ const SIZE_MAP: Record<
   compact: {
     root: "w-full min-h-0 px-6 py-4 max-md:px-4",
     stack: "gap-3",
-    copy: "gap-2 max-md:gap-1",
+    copy: "gap-2 max-md:gap-1.5",
     actions: "gap-2.5 pt-0.5 max-md:gap-2 max-md:pt-0",
     extra: "w-full flex flex-col items-center gap-2 pt-1 max-md:pt-0",
     title: raw("text-lg! max-md:text-base!"),
     description: raw("text-sm"),
     illustrationWidth: 150,
     illustration: "max-md:[&>svg]:h-auto max-md:[&>svg]:w-28",
+    iconWrap: "",
+  },
+  slim: {
+    root: "w-full min-h-0 px-4 py-3",
+    stack: "gap-0",
+    copy: "gap-0",
+    actions: "gap-2 pt-1",
+    extra: "w-full flex flex-col items-center gap-1.5 pt-1",
+    title: raw("text-sm!"),
+    description: raw("text-xs"),
+    illustrationWidth: 0,
+    illustration: "",
     iconWrap: "",
   },
   inline: {

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     io::{BufRead, BufReader},
 };
 
@@ -30,25 +30,57 @@ use config::{
     },
 };
 use infra::errors::Result;
-use ingestion_common::{
-    BulkResponse, BulkResponseError, BulkResponseItem, IngestionRequest, IngestionValueType,
-};
+use ingestion_common::{BulkResponse, BulkResponseError, BulkResponseItem};
 use schema::{get_future_discard_error, get_upto_discard_error};
 use transform::TRANSFORM_FAILED;
 
 use crate::{
     ingestion::check_ingestion_allowed,
-    logs::{ingestion_log_enabled, log_failed_record},
+    logs::{ingest::BulkPlan, ingestion_log_enabled, log_failed_record},
 };
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 pub const PIPELINE_EXEC_FAILED: &str = "pipeline_execution_failed";
+pub const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
+pub const ACTION_PARSE_FAILED: &str = "action_parse_failed";
+
+/// Request positions of one stream's `_bulk` actions, kept beside its records.
+#[derive(Default)]
+pub(super) struct BulkResponseOrder {
+    /// One per JSON record handed to the write, in record order.
+    pub records: Vec<usize>,
+    /// The records finalization buffered, in the order the write consumes them.
+    pub accepted: VecDeque<usize>,
+    /// One per row the columnar fast path parsed, in row order.
+    pub columnar: Vec<usize>,
+}
+
+struct BulkStream {
+    plan: Option<BulkPlan>,
+    order: BulkResponseOrder,
+}
+
+enum BulkLine {
+    Action,
+    Data,
+    RejectedData,
+}
 
 pub async fn ingest(
     thread_id: usize,
     org_id: &str,
     body: Bytes,
     user: ingestion_common::IngestUser,
+) -> Result<BulkResponse> {
+    ingest_with_blocked_streams(thread_id, org_id, body, user, &BLOCKED_STREAMS).await
+}
+
+async fn ingest_with_blocked_streams(
+    thread_id: usize,
+    org_id: &str,
+    body: Bytes,
+    user: ingestion_common::IngestUser,
+    blocked_keys: &[String],
 ) -> Result<BulkResponse> {
     let start = std::time::Instant::now();
 
@@ -69,13 +101,17 @@ pub async fn ingest(
 
     let log_ingestion_errors = ingestion_log_enabled().await;
     let mut action = String::new();
+    let mut raw_stream_name = String::new();
     let mut stream_name = String::new();
     let mut doc_id: Option<String> = None;
     let stream_type = StreamType::Logs;
 
-    let mut stream_key_cache: HashMap<String, String> = HashMap::new();
+    let mut blocked_streams: HashMap<String, bool> = HashMap::new();
     let mut streams_data: HashMap<String, Vec<json::Value>> = HashMap::new();
-    let mut next_line_is_data = false;
+    let mut plans: HashMap<String, BulkStream> = HashMap::new();
+    let mut action_position = 0;
+    let mut action_count = 0;
+    let mut next_line = BulkLine::Action;
     // Read lines as bytes to handle potential invalid UTF-8 characters
     let mut line_buffer = Vec::new();
     let mut reader = BufReader::new(body.as_ref());
@@ -94,53 +130,93 @@ pub async fn ingest(
         if line_buffer.is_empty() {
             continue;
         }
+
+        let is_data = match std::mem::replace(&mut next_line, BulkLine::Action) {
+            BulkLine::Action => false,
+            BulkLine::Data => true,
+            BulkLine::RejectedData => continue,
+        };
+        if is_data {
+            let stream = stream_plan(&mut plans, org_id, &stream_name, (min_ts, max_ts)).await;
+            if stream
+                .plan
+                .as_mut()
+                .is_some_and(|p| p.columnar.parse_bulk_line(&line_buffer, doc_id.as_deref()))
+            {
+                stream.order.columnar.push(action_position);
+                tokio::task::coop::consume_budget().await;
+                continue;
+            }
+        }
         // Use from_utf8_lossy to handle potential invalid UTF-8 characters
         // Invalid UTF-8 sequences will be replaced with the replacement character (�)
         let line_str = String::from_utf8_lossy(&line_buffer);
-        let mut value: json::Value = json::from_slice(line_str.as_bytes())?;
+        let value: json::Value = json::from_slice(line_str.as_bytes())?;
 
-        if !next_line_is_data {
+        if !is_data {
             // check bulk operate
-            let Some((line_action, line_stream_name, line_doc_id)) =
-                super::parse_bulk_index(&value)
-            else {
+            let Some(parsed) = super::parse_bulk_index(&value) else {
                 continue;
+            };
+            next_line = BulkLine::RejectedData;
+            action_position = action_count;
+            action_count += 1;
+            let (line_action, line_stream_name, line_doc_id) = match parsed {
+                Ok(parsed) => parsed,
+                Err((line_action, line_doc_id, reason)) => {
+                    log::warn!("[LOGS:BULK] {reason}: {line_str}, org_id: {org_id}");
+                    bulk_res.errors = true;
+                    let mut item = failed_item(
+                        line_action.to_string(),
+                        String::new(),
+                        line_doc_id.unwrap_or_default().to_string(),
+                        Some(value),
+                        ACTION_PARSE_FAILED.to_string(),
+                        reason.to_string(),
+                    );
+                    if let Some(failed) = item.values_mut().next() {
+                        failed.request_position = Some(action_position);
+                    }
+                    bulk_res.items.push(item);
+                    continue;
+                }
             };
             if line_action != action {
                 action = line_action.to_string();
             }
-            if line_stream_name != stream_name {
-                stream_name = line_stream_name.to_string();
+            // formatting reads the shared config, too costly to repeat for every action line
+            if line_stream_name != raw_stream_name {
+                raw_stream_name = line_stream_name.to_string();
+                stream_name = if cfg.common.skip_formatting_stream_name {
+                    raw_stream_name.clone()
+                } else {
+                    format_stream_name(raw_stream_name.clone())
+                };
             }
             doc_id = line_doc_id.map(|id| id.to_string());
 
-            if stream_name.is_empty() || stream_name == "_" || stream_name == "/" {
+            if raw_stream_name.is_empty() || raw_stream_name == "_" || raw_stream_name == "/" {
                 let err_msg = "Invalid stream name: ".to_string() + &line_str;
                 log::warn!("[LOGS:BULK] {err_msg}, org_id: {org_id}");
                 bulk_res.errors = true;
                 let err = BulkResponseError::new(
                     err_msg.to_string(),
-                    stream_name.to_string(),
+                    raw_stream_name.to_string(),
                     err_msg,
                     "0".to_string(),
                 );
-                let mut item = HashMap::new();
-                item.insert(
-                    action.to_string(),
-                    BulkResponseItem::new_failed(
-                        stream_name.to_string(),
-                        doc_id.clone().unwrap_or_default(),
-                        err,
-                        Some(value),
-                        stream_name.to_string(),
-                    ),
+                let mut failed = BulkResponseItem::new_failed(
+                    raw_stream_name.to_string(),
+                    doc_id.clone().unwrap_or_default(),
+                    err,
+                    Some(value),
+                    raw_stream_name.to_string(),
                 );
-                bulk_res.items.push(item);
+                failed.request_position = Some(action_position);
+                bulk_res
+                    .items
+                    .push(HashMap::from([(action.to_string(), failed)]));
                 continue; // skip
-            }
-
-            if !cfg.common.skip_formatting_stream_name {
-                stream_name = format_stream_name(stream_name);
             }
 
             // Reject internal rollup streams (_o2_*, _agent_signals) in ALL
@@ -159,85 +235,62 @@ pub async fn ingest(
                     err_msg,
                     "0".to_string(),
                 );
-                let mut item = HashMap::new();
-                item.insert(
-                    action.to_string(),
-                    BulkResponseItem::new_failed(
-                        stream_name.to_string(),
-                        doc_id.clone().unwrap_or_default(),
-                        err,
-                        Some(value),
-                        stream_name.to_string(),
-                    ),
+                let mut failed = BulkResponseItem::new_failed(
+                    stream_name.to_string(),
+                    doc_id.clone().unwrap_or_default(),
+                    err,
+                    Some(value),
+                    stream_name.to_string(),
                 );
-                bulk_res.items.push(item);
+                failed.request_position = Some(action_position);
+                bulk_res
+                    .items
+                    .push(HashMap::from([(action.to_string(), failed)]));
                 continue; // skip
             }
 
-            // skip blocked streams
-            if !stream_key_cache.contains_key(&stream_name) {
-                let key = format!("{org_id}/{}/{stream_name}", stream_type);
-                stream_key_cache.insert(stream_name.clone(), key.clone());
-                if BLOCKED_STREAMS.contains(&key) {
-                    log::warn!(
-                        "[LOGS:BULK] stream [{org_id}/{stream_name}] is blocked from ingestion"
-                    );
-                    continue; // skip
-                }
-            }
-            next_line_is_data = true;
-        } else {
-            next_line_is_data = false;
-
-            // get json object
-            let mut local_val = match value.take() {
-                json::Value::Object(v) => v,
-                _ => unreachable!(),
-            };
-
-            // set _id
-            if let Some(doc_id) = &doc_id {
-                local_val.insert("_id".to_string(), json::Value::String(doc_id.to_string()));
-            }
-
-            // check _timestamp
-            let (timestamp, has_valid_timestamp) = match local_val.get(TIMESTAMP_COL_NAME) {
-                Some(v) => match parse_timestamp_micro_from_value(v) {
-                    Ok(t) => (t.0, t.1),
-                    Err(_e) => {
-                        bulk_res.errors = true;
-                        metrics::INGEST_ERRORS
-                            .with_label_values(&[
-                                org_id,
-                                StreamType::Logs.as_str(),
-                                &stream_name,
-                                TS_PARSE_FAILED,
-                            ])
-                            .inc();
-                        log_failed_record(log_ingestion_errors, &value, TS_PARSE_FAILED);
-                        add_record_status(
-                            stream_name.to_string(),
-                            doc_id.clone(),
-                            action.to_string(),
-                            Some(value),
-                            &mut bulk_res,
-                            Some(TS_PARSE_FAILED.to_string()),
-                            Some(TS_PARSE_FAILED.to_string()),
+            let blocked = match blocked_streams.get(&stream_name) {
+                Some(blocked) => *blocked,
+                None => {
+                    let key = format!("{org_id}/{stream_type}/{stream_name}");
+                    let blocked = blocked_keys.contains(&key);
+                    if blocked {
+                        log::warn!(
+                            "[LOGS:BULK] stream [{org_id}/{stream_name}] is blocked from ingestion"
                         );
-                        continue;
                     }
-                },
-                None => (now_micros(), false),
+                    blocked_streams.insert(stream_name.clone(), blocked);
+                    blocked
+                }
+            };
+            if blocked {
+                continue; // skip
+            }
+            next_line = BulkLine::Data;
+        } else {
+            let mut local_val = match value {
+                json::Value::Object(v) => v,
+                other => {
+                    bulk_res.errors = true;
+                    if let Some(item) = add_record_status(
+                        stream_name.to_string(),
+                        doc_id.clone(),
+                        action.to_string(),
+                        Some(other),
+                        &mut bulk_res,
+                        Some(SCHEMA_CONFORMANCE_FAILED.to_string()),
+                        Some("document must be a JSON object".to_string()),
+                    ) {
+                        item.request_position = Some(action_position);
+                    }
+                    continue;
+                }
             };
 
-            // check ingestion time
-            if timestamp < min_ts || timestamp > max_ts {
+            if let Err(failure_reason) =
+                prepare_bulk_record(&mut local_val, doc_id.as_deref(), min_ts, max_ts)
+            {
                 bulk_res.errors = true;
-                let failure_reason = if timestamp < min_ts {
-                    Some(get_upto_discard_error().to_string())
-                } else {
-                    Some(get_future_discard_error().to_string())
-                };
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,
@@ -246,25 +299,29 @@ pub async fn ingest(
                         TS_PARSE_FAILED,
                     ])
                     .inc();
+                let value = json::Value::Object(local_val);
                 log_failed_record(log_ingestion_errors, &value, TS_PARSE_FAILED);
-                add_record_status(
+                if let Some(item) = add_record_status(
                     stream_name.to_string(),
                     doc_id.clone(),
                     action.to_string(),
                     Some(value),
                     &mut bulk_res,
                     Some(TS_PARSE_FAILED.to_string()),
-                    failure_reason,
-                );
+                    Some(failure_reason),
+                ) {
+                    item.request_position = Some(action_position);
+                }
                 continue;
             }
-            if !has_valid_timestamp {
-                local_val.insert(
-                    TIMESTAMP_COL_NAME.to_string(),
-                    json::Value::Number(timestamp.into()),
-                );
-            }
 
+            // A data line has already initialized its stream plan.
+            plans
+                .get_mut(&stream_name)
+                .unwrap()
+                .order
+                .records
+                .push(action_position);
             let val = json::Value::Object(local_val);
             match streams_data.get_mut(&stream_name) {
                 Some(v) => v.push(val),
@@ -274,6 +331,12 @@ pub async fn ingest(
             }
         }
         tokio::task::coop::consume_budget().await;
+    }
+
+    for (stream, state) in &plans {
+        if state.plan.as_ref().is_some_and(|p| p.columnar.rows() > 0) {
+            streams_data.entry(stream.clone()).or_default();
+        }
     }
 
     // Checked up front, pipeline destinations included: a whole-request 503 is retried safely.
@@ -298,16 +361,17 @@ pub async fn ingest(
     #[cfg(feature = "vectorscan")]
     let mut written_any = false;
     for (stream_name, records) in streams_data {
-        #[cfg(feature = "vectorscan")]
-        let record_count = records.len();
-        match super::ingest::ingest(
+        // Every buffered row initialized its stream plan before parsing.
+        let mut stream = plans.remove(&stream_name).unwrap();
+        let plan = stream.plan.filter(|p| p.columnar.rows() > 0);
+        match super::ingest::ingest_bulk(
             thread_id,
             org_id,
             &stream_name,
-            IngestionRequest::JsonValues(IngestionValueType::Bulk, records),
+            records,
+            plan,
             user.clone(),
-            None,
-            false,
+            &mut stream.order,
         )
         .await
         {
@@ -317,6 +381,12 @@ pub async fn ingest(
                     written_any = true;
                 }
                 for status in v.status {
+                    // the stream status keeps the items but not the write's errors flag
+                    bulk_res.errors |= status
+                        .items
+                        .iter()
+                        .flat_map(|item| item.values())
+                        .any(|item| item.error.is_some());
                     bulk_res.items.extend(status.items);
                 }
             }
@@ -329,8 +399,8 @@ pub async fn ingest(
                         return Err(e);
                     }
                     bulk_res.errors = true;
-                    for _ in 0..record_count {
-                        add_record_status(
+                    for &position in &stream.order.records {
+                        if let Some(item) = add_record_status(
                             stream_name.to_string(),
                             None,
                             action.to_string(),
@@ -338,13 +408,9 @@ pub async fn ingest(
                             &mut bulk_res,
                             Some("service_unavailable".to_string()),
                             Some(e.to_string()),
-                        );
-                        if let Some(item) = bulk_res
-                            .items
-                            .last_mut()
-                            .and_then(|i| i.values_mut().next())
-                        {
+                        ) {
                             item.status = 503;
+                            item.request_position = Some(position);
                         }
                     }
                     continue;
@@ -370,6 +436,7 @@ pub async fn ingest(
             }
         }
     }
+    restore_response_order(&mut bulk_res.items);
 
     // metric + data usage
     let status_code = if bulk_res.errors { "500" } else { "200" };
@@ -405,8 +472,7 @@ pub fn add_record_status(
     bulk_res: &mut BulkResponse,
     failure_type: Option<String>,
     failure_reason: Option<String>,
-) {
-    let mut item = HashMap::new();
+) -> Option<&mut BulkResponseItem> {
     let action = if action.is_empty() {
         "index".to_string()
     } else {
@@ -418,38 +484,174 @@ pub fn add_record_status(
         None => "".to_string(),
     };
 
-    match failure_type {
-        Some(failure_type) => {
-            let bulk_err = BulkResponseError::new(
-                failure_type,
-                stream_name.clone(),
-                failure_reason.unwrap(),
-                "0".to_owned(),
-            );
+    let item = match failure_type {
+        Some(failure_type) => failed_item(
+            action,
+            stream_name,
+            doc_id,
+            value,
+            failure_type,
+            failure_reason.unwrap(),
+        ),
+        None if get_config().common.bulk_api_response_errors_only => return None,
+        None => success_item(action, &stream_name, doc_id, None),
+    };
+    bulk_res.items.push(item);
+    bulk_res.items.last_mut()?.values_mut().next()
+}
 
-            item.insert(
-                action,
-                BulkResponseItem::new_failed(
-                    stream_name.clone(),
-                    doc_id,
-                    bulk_err,
-                    value,
-                    stream_name,
-                ),
-            );
+/// The response item of a record the request could not write.
+pub fn failed_item(
+    action: String,
+    stream_name: String,
+    doc_id: String,
+    value: Option<json::Value>,
+    failure_type: String,
+    failure_reason: String,
+) -> HashMap<String, BulkResponseItem> {
+    let bulk_err = BulkResponseError::new(
+        failure_type,
+        stream_name.clone(),
+        failure_reason,
+        "0".to_owned(),
+    );
+    HashMap::from([(
+        action,
+        BulkResponseItem::new_failed(stream_name.clone(), doc_id, bulk_err, value, stream_name),
+    )])
+}
 
-            bulk_res.items.push(item);
-        }
-        None => {
-            item.insert(
-                action,
-                BulkResponseItem::new(stream_name.clone(), doc_id, value, stream_name),
-            );
-            if !get_config().common.bulk_api_response_errors_only {
-                bulk_res.items.push(item);
-            }
-        }
+/// The response item of a written record; callers skip it under `bulk_api_response_errors_only`.
+pub fn success_item(
+    action: String,
+    stream_name: &str,
+    doc_id: String,
+    request_position: Option<usize>,
+) -> HashMap<String, BulkResponseItem> {
+    let mut item = BulkResponseItem::new(
+        stream_name.to_string(),
+        doc_id,
+        None,
+        stream_name.to_string(),
+    );
+    item.request_position = request_position;
+    HashMap::from([(action, item)])
+}
+
+/// Success items for records written together, reading the config once rather than per record.
+pub fn add_success_items(
+    stream_name: &str,
+    rows: impl IntoIterator<Item = (Option<String>, Option<usize>)>,
+    bulk_res: &mut BulkResponse,
+) {
+    if get_config().common.bulk_api_response_errors_only {
+        return;
     }
+    bulk_res
+        .items
+        .extend(rows.into_iter().map(|(doc_id, position)| {
+            success_item(
+                "index".to_string(),
+                stream_name,
+                doc_id.unwrap_or_default(),
+                position,
+            )
+        }));
+}
+
+/// `_bulk`'s own step for a data record: set the action's `_id`, then check and set `_timestamp`.
+pub(super) fn prepare_bulk_record(
+    record: &mut json::Map<String, json::Value>,
+    doc_id: Option<&str>,
+    min_ts: i64,
+    max_ts: i64,
+) -> std::result::Result<(), String> {
+    if let Some(doc_id) = doc_id {
+        record.insert("_id".to_string(), json::Value::String(doc_id.to_string()));
+    }
+    let parsed = record
+        .get(TIMESTAMP_COL_NAME)
+        // flattening renames a key such as `@timestamp` to `_timestamp`
+        .or_else(|| {
+            record
+                .iter()
+                .find(|(key, value)| {
+                    // what `format_key` turns into `_timestamp`, matched without allocating
+                    let key = key.as_bytes();
+                    key.len() == TIMESTAMP_COL_NAME.len()
+                        && !key[0].is_ascii_alphanumeric()
+                        && key[1..].eq_ignore_ascii_case(&TIMESTAMP_COL_NAME.as_bytes()[1..])
+                        && (value.is_string() || value.is_number())
+                })
+                .map(|(_, value)| value)
+        })
+        .map(parse_timestamp_micro_from_value);
+    let (timestamp, has_valid_timestamp) = resolve_bulk_timestamp(parsed, min_ts, max_ts)?;
+    // inserted last, a stamped `_timestamp` is the one flattening keeps
+    if !has_valid_timestamp || !record.contains_key(TIMESTAMP_COL_NAME) {
+        record.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            json::Value::Number(timestamp.into()),
+        );
+    }
+    Ok(())
+}
+
+/// `_bulk`'s verdict on a parsed `_timestamp`, stamping now when absent; the error is the reason.
+pub(super) fn resolve_bulk_timestamp(
+    parsed: Option<anyhow::Result<(i64, bool)>>,
+    min_ts: i64,
+    max_ts: i64,
+) -> std::result::Result<(i64, bool), String> {
+    let (timestamp, has_valid_timestamp) = match parsed {
+        Some(parsed) => parsed.map_err(|_| TS_PARSE_FAILED.to_string())?,
+        None => (now_micros(), false),
+    };
+    if timestamp < min_ts {
+        return Err(get_upto_discard_error().to_string());
+    }
+    if timestamp > max_ts {
+        return Err(get_future_discard_error().to_string());
+    }
+    Ok((timestamp, has_valid_timestamp))
+}
+
+/// Puts items in the order of the actions they answer; items with no action keep their order, last.
+pub(super) fn restore_response_order(items: &mut [HashMap<String, BulkResponseItem>]) {
+    items.sort_by_key(|item| {
+        item.values()
+            .next()
+            .and_then(|item| item.request_position)
+            .unwrap_or(usize::MAX)
+    });
+}
+
+/// Pairs rows with their request positions; rows past the known positions have none.
+pub(super) fn padded_positions(positions: Vec<usize>) -> impl Iterator<Item = Option<usize>> {
+    positions
+        .into_iter()
+        .map(Some)
+        .chain(std::iter::repeat(None))
+}
+
+async fn stream_plan<'a>(
+    plans: &'a mut HashMap<String, BulkStream>,
+    org_id: &str,
+    stream_name: &str,
+    time_range: (i64, i64),
+) -> &'a mut BulkStream {
+    if !plans.contains_key(stream_name) {
+        let plan = super::ingest::plan_bulk_columnar(org_id, stream_name, time_range).await;
+        plans.insert(
+            stream_name.to_string(),
+            BulkStream {
+                plan,
+                order: BulkResponseOrder::default(),
+            },
+        );
+    }
+    // The stream was present or inserted above.
+    plans.get_mut(stream_name).unwrap()
 }
 
 #[cfg(test)]
@@ -457,6 +659,73 @@ mod tests {
     use ingestion_common::IngestUser;
 
     use super::*;
+
+    #[test]
+    fn test_restore_response_order_preserves_sparse_and_unknown_positions() {
+        for (positions, expected) in [
+            (vec![Some(2), Some(0), Some(1)], vec![1, 2, 0]),
+            (vec![Some(8), Some(1), Some(5)], vec![1, 2, 0]),
+            (
+                vec![None, Some(3), None, Some(0), Some(2)],
+                vec![3, 4, 1, 0, 2],
+            ),
+            (vec![Some(1), Some(4), Some(9)], vec![0, 1, 2]),
+            (vec![Some(1), Some(1), Some(0)], vec![2, 0, 1]),
+            (vec![], vec![]),
+        ] {
+            let mut items: Vec<_> = positions
+                .into_iter()
+                .enumerate()
+                .map(|(index, position)| {
+                    success_item(
+                        "index".to_string(),
+                        &index.to_string(),
+                        String::new(),
+                        position,
+                    )
+                })
+                .collect();
+            restore_response_order(&mut items);
+            let sources: Vec<usize> = items
+                .iter()
+                .map(|item| item["index"]._index.parse().unwrap())
+                .collect();
+            assert_eq!(sources, expected);
+        }
+    }
+
+    #[test]
+    fn test_add_record_status_returns_the_pushed_item() {
+        let mut bulk_res = BulkResponse {
+            took: 0,
+            errors: false,
+            items: vec![],
+        };
+        let failed = add_record_status(
+            "s".to_string(),
+            None,
+            String::new(),
+            None,
+            &mut bulk_res,
+            Some(TS_PARSE_FAILED.to_string()),
+            Some("bad".to_string()),
+        );
+        failed.unwrap().request_position = Some(4);
+        let success = add_record_status(
+            "s".to_string(),
+            None,
+            String::new(),
+            None,
+            &mut bulk_res,
+            None,
+            None,
+        );
+        assert_eq!(
+            success.is_none(),
+            get_config().common.bulk_api_response_errors_only
+        );
+        assert_eq!(bulk_res.items[0]["index"].request_position, Some(4));
+    }
 
     #[test]
     fn test_add_record_status() {
@@ -475,6 +744,245 @@ mod tests {
             None,
         );
         assert!(bulk_res.items.len() == 1);
+    }
+
+    #[test]
+    fn test_prepare_bulk_record() {
+        let now = now_micros();
+        let (min_ts, max_ts) = (now - 3_600_000_000, now + 3_600_000_000);
+        let prepare = |record: json::Value, doc_id: Option<&str>| {
+            let mut record = record.as_object().unwrap().clone();
+            prepare_bulk_record(&mut record, doc_id, min_ts, max_ts).map(|()| record)
+        };
+        let record = prepare(json::json!({"_id": "own", "_timestamp": now}), Some("a")).unwrap();
+        assert_eq!(record["_id"], "a");
+        assert_eq!(record["_timestamp"], json::json!(now));
+        let record = prepare(json::json!({"_id": "own", "level": "x"}), None).unwrap();
+        assert_eq!(record["_id"], "own");
+        assert!(record["_timestamp"].as_i64().is_some_and(|ts| ts >= now));
+        let record = prepare(json::json!({"_timestamp": now / 1_000_000}), None).unwrap();
+        assert_eq!(
+            record["_timestamp"],
+            json::json!(now / 1_000_000 * 1_000_000)
+        );
+        assert_eq!(
+            prepare(json::json!({"_timestamp": "garbage"}), None),
+            Err(TS_PARSE_FAILED.to_string())
+        );
+        assert_eq!(
+            prepare(json::json!({"_timestamp": min_ts - 1}), None),
+            Err(get_upto_discard_error().to_string())
+        );
+        assert_eq!(
+            prepare(json::json!({"_timestamp": max_ts + 1}), None),
+            Err(get_future_discard_error().to_string())
+        );
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_rejected_actions_consume_their_data_lines() {
+        use arrow::{array::StringArray, compute::cast, datatypes::DataType};
+
+        infra::db::create_table().await.unwrap();
+        infra::schema::init().await.unwrap();
+        let org = "bulk_rejected_action_framing";
+        let blocked_keys = [format!("{org}/logs/framing_blocked")];
+        let errors_only = get_config().common.bulk_api_response_errors_only;
+        for case in ["invalid", "internal", "malformed", "blocked"] {
+            let allowed = format!("framing_allowed_{case}");
+            let forged_stream = format!("framing_forged_{case}");
+            let user = IngestUser::from_user_email("framing@example.com");
+            let warm = format!(
+                "{{\"index\":{{\"_index\":\"{allowed}\",\"_id\":\"warm\"}}}}\n{{\"message\":\"warm\"}}\n"
+            );
+            ingest(0, org, Bytes::from(warm), user.clone())
+                .await
+                .unwrap();
+            #[cfg(not(feature = "vectorscan"))]
+            assert!(
+                super::super::ingest::plan_bulk_columnar(org, &allowed, (0, i64::MAX))
+                    .await
+                    .is_some()
+            );
+            let rejected_action = |action: &str, id: &str| match case {
+                "invalid" => json::json!({action: {"_index": "_", "_id": id}}),
+                "internal" => json::json!({action: {"_index": "_o2_rejected_framing", "_id": id}}),
+                "malformed" => json::json!({action: {"_id": id}}),
+                _ => json::json!({action: {"_index": "framing_blocked", "_id": id}}),
+            };
+            let lines = [
+                rejected_action("index", "rejected1"),
+                json::json!({"message": "discard this document"}),
+                rejected_action("create", "rejected2"),
+                json::json!({"index": {"_index": &forged_stream, "_id": "forged"}}),
+                json::json!({"index": {"_index": &allowed, "_id": "real"}}),
+                json::json!({"message": "must survive"}),
+            ];
+            let body = lines
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join("\n\n")
+                + "\n";
+            let response =
+                ingest_with_blocked_streams(0, org, Bytes::from(body), user, &blocked_keys)
+                    .await
+                    .unwrap();
+            let mut expected = Vec::new();
+            if case != "blocked" {
+                expected.extend([("rejected1", 0), ("rejected2", 1)]);
+            }
+            if !errors_only {
+                expected.push(("real", 2));
+            }
+            let items: Vec<_> = response
+                .items
+                .iter()
+                .flat_map(|item| item.values())
+                .map(|item| (item._id.as_str(), item.request_position.unwrap()))
+                .collect();
+            assert_eq!(items, expected, "{case}");
+            assert_eq!(response.errors, case != "blocked", "{case}");
+            assert!(!infra::schema::exists(org, StreamType::Logs, &forged_stream).await);
+            let (_, batches) = ingester::read_from_memtable(org, "logs", &allowed, None, &[])
+                .await
+                .unwrap();
+            let mut stored = Vec::new();
+            for entry in batches.into_iter().flat_map(|(_, entries)| entries) {
+                let ids = cast(entry.data.column_by_name("_id").unwrap(), &DataType::Utf8).unwrap();
+                let messages = cast(
+                    entry.data.column_by_name("message").unwrap(),
+                    &DataType::Utf8,
+                )
+                .unwrap();
+                let ids = ids.as_any().downcast_ref::<StringArray>().unwrap();
+                let messages = messages.as_any().downcast_ref::<StringArray>().unwrap();
+                for row in 0..entry.data.num_rows() {
+                    stored.push((ids.value(row).to_string(), messages.value(row).to_string()));
+                }
+            }
+            stored.sort();
+            assert_eq!(
+                stored,
+                [
+                    ("real".to_string(), "must survive".to_string()),
+                    ("warm".to_string(), "warm".to_string())
+                ]
+            );
+            let (_, forged) = ingester::read_from_memtable(org, "logs", &forged_stream, None, &[])
+                .await
+                .unwrap();
+            assert!(forged.is_empty());
+        }
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_fails_only_the_stream_whose_key_is_too_long() {
+        let long_name = "b".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let body = format!(
+            "{{\"index\": {{\"_index\": \"test_bulk_key_len_ok\", \"_id\": \"1\"}}}}\n{{\"message\": \"a\"}}\n\
+             {{\"index\": {{\"_index\": \"{long_name}\", \"_id\": \"2\"}}}}\n{{\"message\": \"b\"}}\n"
+        );
+        let resp = ingest(
+            1,
+            "test_org_id",
+            Bytes::from(body),
+            IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+
+        let bounded =
+            infra::file_list::stream_key_violation("test_org_id", StreamType::Logs, &long_name)
+                .is_some();
+        let rejected: Vec<&BulkResponseItem> = resp
+            .items
+            .iter()
+            .flat_map(|item| item.values())
+            .filter(|item| {
+                item.error
+                    .as_ref()
+                    .is_some_and(|e| e.err_type == STREAM_NAME_TOO_LONG)
+            })
+            .collect();
+        if bounded {
+            assert_eq!(rejected.len(), 1);
+            assert_eq!(rejected[0]._id, "2");
+            assert_eq!(rejected[0]._index, long_name);
+        } else {
+            assert!(rejected.is_empty());
+        }
+        assert_eq!(resp.errors, bounded);
+        assert!(
+            infra::schema::exists("test_org_id", StreamType::Logs, "test_bulk_key_len_ok").await
+        );
+        assert_eq!(
+            infra::schema::exists("test_org_id", StreamType::Logs, &long_name).await,
+            !bounded
+        );
+    }
+
+    #[test]
+    fn test_prepare_bulk_record_reads_a_key_flattened_into_timestamp() {
+        let now = now_micros();
+        let (min_ts, max_ts) = (now - 3_600_000_000, now + 3_600_000_000);
+        let ts = (now - 60_000_000) / 1000 * 1000;
+        let iso = chrono::DateTime::from_timestamp_micros(ts)
+            .unwrap()
+            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let stored = |record: json::Value| {
+            let mut record = record.as_object().unwrap().clone();
+            prepare_bulk_record(&mut record, None, min_ts, max_ts)?;
+            crate::logs::ingest::prepare_record(json::Value::Object(record), 0, min_ts, max_ts)
+                .map(|(_, timestamp)| timestamp)
+                .map_err(|_| "rejected after flattening".to_string())
+        };
+        assert_eq!(
+            stored(json::json!({"@timestamp": ts, "level": "a"})),
+            Ok(ts)
+        );
+        assert_eq!(stored(json::json!({"@timestamp": iso})), Ok(ts));
+        assert_eq!(stored(json::json!({"_Timestamp": ts})), Ok(ts));
+        assert!(stored(json::json!({"Atimestamp": ts, "éimestamp": ts})).unwrap() >= now);
+        // the checked value is the stored one, also when a second key is renamed
+        assert_eq!(
+            stored(json::json!({"@timestamp": ts, "-timestamp": min_ts - 1})),
+            Ok(ts)
+        );
+        assert_eq!(
+            stored(json::json!({"@timestamp": "garbage"})),
+            Err(TS_PARSE_FAILED.to_string())
+        );
+        assert_eq!(
+            stored(json::json!({"@timestamp": min_ts - 1})),
+            Err(get_upto_discard_error().to_string())
+        );
+        assert_eq!(
+            stored(json::json!({"@timestamp": max_ts + 1})),
+            Err(get_future_discard_error().to_string())
+        );
+        // a value that is neither a string nor a number is not a time, so the record is stamped now
+        for value in [
+            json::Value::Null,
+            json::json!(true),
+            json::json!([ts]),
+            json::json!({"a": ts}),
+        ] {
+            let stamped = stored(json::json!({"@timestamp": value})).unwrap();
+            assert!(stamped >= now, "{value}");
+        }
+        // `_timestamp` is stamped as before, now with the record's own time
+        let mut record = json::json!({"@timestamp": ts});
+        let record = record.as_object_mut().unwrap();
+        prepare_bulk_record(record, None, min_ts, max_ts).unwrap();
+        assert_eq!(record[TIMESTAMP_COL_NAME], json::json!(ts));
+        // `_timestamp` itself is checked first
+        let mut record = json::json!({"@timestamp": min_ts - 1, "_timestamp": ts});
+        let record = record.as_object_mut().unwrap();
+        assert_eq!(prepare_bulk_record(record, None, min_ts, max_ts), Ok(()));
     }
 
     #[tokio::test]
@@ -715,6 +1223,7 @@ mod tests {
                 TS_PARSE_FAILED,
                 SCHEMA_CONFORMANCE_FAILED,
                 PIPELINE_EXEC_FAILED,
+                ACTION_PARSE_FAILED,
             ];
 
             let mut unique_constants = constants.clone();

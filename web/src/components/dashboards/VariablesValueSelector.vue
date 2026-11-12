@@ -91,6 +91,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onVariablesValueUpdated(Number(index))"
         />
       </div>
+      <div v-else-if="item.type == 'date'" class="max-w-[40rem] min-w-37.5">
+        <ODate
+          v-show="!item.hideOnDashboard"
+          class="me-4 mt-1 w-37.5!"
+          v-model="item.value"
+          :label="item.label || item.name"
+          label-position="inside"
+          :clearable="!item.readOnly"
+          :readonly="item.readOnly === true"
+          :data-test="`variable-selector-${item.name}`"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
+        />
+      </div>
       <div v-else-if="item.type == 'custom'" class="max-w-[40rem] min-w-37.5">
         <VariableCustomValueSelector
           v-show="!item.hideOnDashboard"
@@ -149,6 +162,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import ODate from "@/lib/forms/Date/ODate.vue";
 import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import { b64EncodeUnicode, escapeSingleQuotes, generateTraceContext } from "@/utils/zincutils";
@@ -156,6 +170,7 @@ import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/varia
 import {
   normalizeVariableSyntax,
   replaceVariablePlaceholders,
+  formatDateVariable,
 } from "@/utils/dashboard/variables/variablesUtils";
 import {
   buildFilterGroupSql,
@@ -171,13 +186,6 @@ import {
   usesQueryVariableLoader,
   type QueryVariableOption,
 } from "@/utils/dashboard/variables/queryVariableUtils";
-import {
-  conditionToLegacyFilter,
-  getFilterGroupConditions,
-  getVariableFilterGroup,
-  isLegacyCompatibleFilterGroup,
-  type LegacyVariableFilter,
-} from "@/utils/dashboard/variables/variableFilterGroupUtils";
 import {
   getQueryVariableErrorMessage,
   loadQueryVariableValues,
@@ -248,6 +256,7 @@ export default defineComponent({
     OInput,
     OIcon,
     OTruncatedText,
+    ODate,
   },
   setup(props: any, { emit }) {
     const store = useStore();
@@ -477,6 +486,41 @@ export default defineComponent({
       }
     };
 
+    const isEmptyValue = (value: any) =>
+      value === null || value === undefined || (Array.isArray(value) && value.length === 0);
+
+    const selectQueryValuesValue = (variableObject: any) => {
+      if (oldVariablesData[variableObject.name] !== undefined) {
+        variableLog(
+          variableObject.name,
+          `Old values before processing: ${JSON.stringify(oldVariablesData[variableObject.name])}`,
+        );
+
+        const oldValues = Array.isArray(oldVariablesData[variableObject.name])
+          ? oldVariablesData[variableObject.name]
+          : [oldVariablesData[variableObject.name]];
+
+        handleQueryValuesLogic(variableObject, oldValues);
+        return;
+      }
+
+      variableLog(variableObject.name, `Old values not found - keeping existing value if set`);
+
+      if (!isEmptyValue(variableObject.value)) return;
+
+      // Don't auto-select a blank option as default. Find the first non-blank option.
+      const firstNonBlankOption = variableObject.options.find(
+        (opt: any) => opt.value !== "" && opt.label !== "<blank>",
+      );
+      if (firstNonBlankOption) {
+        variableObject.value = variableObject.multiSelect
+          ? [firstNonBlankOption.value]
+          : firstNonBlankOption.value;
+      } else {
+        variableObject.value = variableObject.multiSelect ? [] : null;
+      }
+    };
+
     const handleSearchResponse = (payload: any, response: any, variableObject: any) => {
       variableLog(variableObject.name, `Received response...`);
 
@@ -502,6 +546,11 @@ export default defineComponent({
         (response.type === "event_progress" && response.content.percent === 100) ||
         response.type === "end"
       ) {
+        // A cached query streams its empty newest delta first, which settled the value before any rows arrived.
+        if (isEmptyValue(variableObject.value) && variableObject.options?.length) {
+          selectQueryValuesValue(variableObject);
+        }
+
         // Mark as partially loaded
         variableObject.isVariablePartialLoaded = true;
 
@@ -622,7 +671,7 @@ export default defineComponent({
             const originalValue = JSON.parse(JSON.stringify(variableObject.value));
 
             if (isFirstResponse) {
-              selectValueForLoadedOptions(variableObject);
+              selectQueryValuesValue(variableObject);
 
               const hasValueChanged =
                 Array.isArray(originalValue) && Array.isArray(variableObject.value)
@@ -844,7 +893,7 @@ export default defineComponent({
           newOptions.push({ label: value, value });
         });
         variableObject.options = newOptions;
-        selectValueForLoadedOptions(variableObject);
+        selectQueryValuesValue(variableObject);
       }
       const hasValueChanged =
         JSON.stringify(originalValue) !== JSON.stringify(variableObject.value ?? null);
@@ -1103,8 +1152,8 @@ export default defineComponent({
             variableData.value = item.multiSelect ? [] : null;
           }
         } else if (item.type != "constant") {
-          // for textbox type variable, if initial value is not exist, use the default value
-          if (item.type == "textbox") {
+          // for textbox/date type variable, if initial value is not exist, use the default value
+          if (item.type == "textbox" || item.type == "date") {
             variableData.value = initialValue ?? variableData.value;
           } else {
             // use the initial value
@@ -1704,37 +1753,6 @@ export default defineComponent({
      * Resets the state of the given variable.
      * @param {object} variableObject - The variable object to reset.
      */
-    // Restores the previous selection once options arrive, else picks the first non-blank option.
-    const selectValueForLoadedOptions = (variableObject: any) => {
-      const previous = oldVariablesData[variableObject.name];
-      if (previous !== undefined) {
-        variableLog(
-          variableObject.name,
-          `Old values before processing: ${JSON.stringify(previous)}`,
-        );
-        handleQueryValuesLogic(variableObject, Array.isArray(previous) ? previous : [previous]);
-        return;
-      }
-
-      variableLog(variableObject.name, `Old values not found - keeping existing value if set`);
-      const isEmpty =
-        variableObject.value === null ||
-        variableObject.value === undefined ||
-        (Array.isArray(variableObject.value) && variableObject.value.length === 0);
-      if (!isEmpty) return;
-
-      const firstNonBlankOption = (variableObject.options ?? []).find(
-        (opt: any) => opt.value !== "" && opt.label !== "<blank>",
-      );
-      if (firstNonBlankOption) {
-        variableObject.value = variableObject.multiSelect
-          ? [firstNonBlankOption.value]
-          : firstNonBlankOption.value;
-      } else {
-        variableObject.value = variableObject.multiSelect ? [] : null;
-      }
-    };
-
     const resetVariableState = (variableObject: any) => {
       // Reset the value of the variable to either an empty array if multiSelect is true, or null if not.
       variableObject.value = variableObject.multiSelect ? [] : null;
@@ -2093,6 +2111,7 @@ export default defineComponent({
         }
         case "constant":
         case "textbox":
+        case "date":
         case "dynamic_filters": {
           finalizePartialVariableLoading(variableObject, true, isInitialLoad);
           finalizeVariableLoading(variableObject, true);
@@ -2193,17 +2212,21 @@ export default defineComponent({
         }
       }
 
-      const expandFilter = (filter: LegacyVariableFilter) =>
+      const expandFilter = <T extends { operator?: string | null; value?: unknown }>(filter: T) =>
         expandMultiValueFilter(filter, (name) => {
           const parent = variablesByName.get(name);
           return parent?.isVariablePartialLoaded ? parent.value : undefined;
         });
-      const filterGroup = getVariableFilterGroup(variableObject.query_data);
+      const filterGroup = variableObject.query_data?.filter_group;
 
       let queryContext: string;
-      if (isLegacyCompatibleFilterGroup(filterGroup)) {
-        const constructedFilter = getFilterGroupConditions(filterGroup).map((condition) =>
-          expandFilter(conditionToLegacyFilter(condition)),
+      if (!filterGroup) {
+        const constructedFilter = (variableObject.query_data?.filter || []).map((condition: any) =>
+          expandFilter({
+            name: condition.name,
+            operator: condition.operator,
+            value: condition.value,
+          }),
         );
         queryContext = constructedFilter.length
           ? await addLabelsToSQlQuery(dummyQuery, constructedFilter)
@@ -2223,7 +2246,7 @@ export default defineComponent({
       queryContext = replaceVariablePlaceholders(
         queryContext,
         variablesByName.keys(),
-        ({ name, quoted }) => {
+        ({ name, quoted, format }) => {
           const variable = variablesByName.get(name);
           // an unloaded variable keeps its placeholder rather than resolving as a shorter name
           if (!variable.isVariablePartialLoaded) return undefined;
@@ -2236,7 +2259,8 @@ export default defineComponent({
               : values.map((value: any) => `'${value}'`).join(", ");
           }
           if (variable.value === null || variable.value === undefined) return undefined;
-          return `${escapeSingleQuotes(variable.value)}`;
+          // a date variable passes its effective format, like a scalar value
+          return `${escapeSingleQuotes(formatDateVariable(variable, format) ?? variable.value)}`;
         },
       );
 

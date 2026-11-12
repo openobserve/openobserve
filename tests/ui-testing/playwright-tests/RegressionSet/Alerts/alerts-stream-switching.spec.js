@@ -4,6 +4,7 @@ const PageManager = require('../../../pages/page-manager.js');
 const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
 const logData = require("../../../fixtures/log.json");
 const { ingestTestData } = require('../../utils/data-ingestion.js');
+const { ingestBase } = require('../../utils/ingest-url.js');
 
 /**
  * Alerts Stream Switching Regression Tests
@@ -498,7 +499,7 @@ test.describe("Alerts Stream Switching Regression", () => {
 async function ingestMetricsData(page, orgId) {
   const streamName = 'e2e_test_cpu_usage';
   const baseUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080';
-  const ingestionUrl = `${baseUrl}/api/${orgId}/ingest/metrics/_json`;
+  const ingestionUrl = `${ingestBase(baseUrl)}/api/${orgId}/ingest/metrics/_json`;
 
   const basicAuthCredentials = Buffer.from(
     `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`

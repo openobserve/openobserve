@@ -104,3 +104,14 @@ export function domainStateBadge(state: number): {
       return { variant: "default-outline", labelKey: "statusPages.domains.state.pending" };
   }
 }
+
+// Images are stored as bare base64, and a type-less `data:image;base64,` URI never renders an SVG.
+export function imageDataUrl(base64: string): string {
+  let type = "image/png";
+  if (base64.startsWith("/9j/")) type = "image/jpeg";
+  else if (base64.startsWith("R0lGOD")) type = "image/gif";
+  else if (base64.startsWith("UklGR")) type = "image/webp";
+  else if (base64.startsWith("AAABAA")) type = "image/x-icon";
+  else if (base64.startsWith("PHN2Zy") || base64.startsWith("PD94bW")) type = "image/svg+xml";
+  return `data:${type};base64,${base64}`;
+}

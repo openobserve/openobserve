@@ -425,7 +425,6 @@ export default defineComponent({
             ? `Update Enrichment Table (${value.updateMode})`
             : "Save Enrichment Table from URL",
           user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
           function_name: value.name,
           page: "Add/Update Enrichment Table",
         });
@@ -472,7 +471,6 @@ export default defineComponent({
         analytics.track("Button Click", {
           button: "Save Enrichment Table",
           user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
           function_name: value.name,
           page: "Add/Update Enrichment Table",
         });

@@ -56,7 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OToggleGroupItem
           value="agent"
           size="sm"
-          :icon-right="!showAgentToggle ? 'lock' : undefined"
+          :icon-right="!showAgentToggle || aiObsLock.locked.value ? 'lock' : undefined"
+          :disabled="aiObsLock.locked.value"
+          :focusable-unavailable="aiObsLock.locked.value"
+          :tooltip="aiObsLock.locked.value ? aiObsLock.lockedReason.value : undefined"
         >
           {{ labels.agent }}
         </OToggleGroupItem>
@@ -113,9 +116,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selected-agent-name="selectedAgentName"
         :selected-version="selectedVersion"
         :show-version="showVersion"
+        :agent-streams="agentStreams"
+        :selected-stream="selectedAgentStream"
         @update:selected-env="onSelectedEnvChange"
         @update:selected-agent-name="onSelectedAgentNameChange"
         @update:selected-version="onSelectedVersionChange"
+        @update:selected-stream="onSelectedAgentStreamChange"
       />
       <!-- Page-supplied affordance beside the cascade (agent mode only). Agent
            Graph rides its version-agnostic hint here since it hides the Version
@@ -137,6 +143,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import StreamAgentCountBadge from "@/components/shared/StreamAgentCountBadge.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import AgentScopeCascade from "./AgentScopeCascade.vue";
 
 type FilterMode = "stream" | "agent";
@@ -182,6 +189,9 @@ const props = withDefaults(
     selectedAgentName: string;
     /** Selected version (two-way via update:selectedVersion). */
     selectedVersion: string;
+    /** Streams carrying the selected agent; two or more show the cascade's Stream dropdown. */
+    agentStreams?: SelectOption[];
+    selectedAgentStream?: string;
     /** Gate the stream select behind an OSkeleton until streams load
         (Sessions/LLM). Graph/Behavior derive the stream from the agents API
         and never skeleton it. */
@@ -229,6 +239,8 @@ const props = withDefaults(
     showVersion: true,
     showAgentToggle: true,
     agentToggleLockedMessage: undefined,
+    agentStreams: () => [],
+    selectedAgentStream: "",
   },
 );
 
@@ -242,8 +254,11 @@ const emit = defineEmits<{
   (e: "update:selectedEnv", value: string): void;
   (e: "update:selectedAgentName", value: string): void;
   (e: "update:selectedVersion", value: string): void;
+  (e: "update:selectedAgentStream", value: string): void;
   (e: "filter-mode-change", value: FilterMode): void;
   (e: "stream-change", value: string): void;
+  /** The user picked an env, agent, version or stream: the agent scope is now an explicit choice. */
+  (e: "agent-pick"): void;
 }>();
 
 // v-model bridge for the stream picker — read the prop, write both the model
@@ -254,6 +269,7 @@ const activeStreamModel = computed({
 });
 
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+const aiObsLock = useLicenseLock("ai_observability");
 
 // OToggleGroup is controlled (`:model-value`), so refusing to emit the mode
 // change here is what keeps the locked Agent toggle from actually switching —
@@ -276,13 +292,21 @@ const onStreamChange = (value: unknown) => {
 // useAgentScope selection refs and re-derives the lower lists).
 const onSelectedEnvChange = (value: string) => {
   emit("update:selectedEnv", value);
+  emit("agent-pick");
 };
 
 const onSelectedAgentNameChange = (value: string) => {
   emit("update:selectedAgentName", value);
+  emit("agent-pick");
 };
 
 const onSelectedVersionChange = (value: string) => {
   emit("update:selectedVersion", value);
+  emit("agent-pick");
+};
+
+const onSelectedAgentStreamChange = (value: string) => {
+  emit("update:selectedAgentStream", value);
+  emit("agent-pick");
 };
 </script>

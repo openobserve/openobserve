@@ -184,6 +184,33 @@ def test_js_body_is_stored_verbatim(client: OpenObserveClient):
         client.delete(f"functions/{name}")
 
 
+def test_missing_or_null_trans_type_is_treated_as_vrl(client: OpenObserveClient):
+    """A file without `transType` imports as VRL. An explicit `null` slips past
+    the serde field default, so the update path has to store it as VRL too."""
+    name = unique_name("pytest_impexp_tt")
+    try:
+        resp = client.post("functions", json={"name": name, "function": ".a = 1", "params": "row"})
+        assert resp.status_code == 200, f"create failed: {resp.status_code} {resp.text}"
+
+        created = fetch_function(client, name)
+        assert created is not None
+        assert created["transType"] == 0, f"absent transType should mean VRL: {created}"
+        assert created["function"] == ".a = 1" + VRL_RETURN_SUFFIX
+
+        resp = client.put(
+            f"functions/{name}",
+            json={"name": name, "function": ".b = 2", "params": "row", "transType": None},
+        )
+        assert resp.status_code == 200, f"update failed: {resp.status_code} {resp.text}"
+
+        updated = fetch_function(client, name)
+        assert updated is not None
+        assert updated["transType"] == 0, f"null transType should be stored as VRL: {updated}"
+        assert updated["function"] == ".b = 2" + VRL_RETURN_SUFFIX
+    finally:
+        client.delete(f"functions/{name}")
+
+
 # ----- the wire shape the export file is built from -----
 
 

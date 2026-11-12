@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bleed
       :title="t('statusPages.editTitle')"
       :subtitle="pageName ? raw(pageName) : undefined"
-      :back="{ label: t('statusPages.back'), onClick: goBack, dataTest: 'status-page-editor-back' }"
+      :back="{ label: t('statusPages.back'), onClick: cancel, dataTest: 'status-page-editor-back' }"
       title-overflow="truncate"
     >
       <template #actions>
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline-destructive"
           size="sm-action"
           data-test="status-page-editor-cancel"
-          @click="goBack"
+          @click="cancel"
           >{{ t("common.cancel") }}</OButton
         >
         <OButton
@@ -113,80 +113,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <OFormInput name="brand_name" :label="t('statusPages.fields.brandName')" />
 
-                  <!-- Logo and accent colour are one branding decision, so they
-                       share a row; grid-cols-1 keeps them stacked until the
-                       config pane is wide enough for two readable columns. -->
+                  <!-- Logo, favicon and accent colour are one branding decision, so they share a grid. -->
                   <div
                     class="grid grid-cols-1 items-start gap-x-6 gap-y-5 sm:grid-cols-2"
                     data-test="status-page-branding-row"
                   >
-                    <!-- Logo — mirrors the field-level lock pattern used for
-                         Notices/Custom Domains dropdown items in StatusPagesList,
-                         adapted to an input: a disabled control plus a lock icon
-                         and tooltip rather than a disabled menu item. -->
-                    <div class="flex min-w-0 flex-col gap-1.5" data-test="status-page-logo-field">
-                      <div class="flex items-center gap-1.5">
-                        <span class="text-text-label text-sm font-medium">{{
-                          t("statusPages.fields.logo")
-                        }}</span>
-                        <OIcon
-                          v-if="!logoUploadEnabled"
-                          name="lock"
-                          size="xs"
-                          class="text-warning-600"
-                          aria-hidden="true"
-                          data-test="status-page-logo-lock"
-                        />
-                      </div>
+                    <StatusPageImageField
+                      :label="t('statusPages.fields.logo')"
+                      :upload-label="t('statusPages.fields.logoUpload')"
+                      :clear-label="
+                        usingOrgLogoDefault
+                          ? t('statusPages.fields.logoRevertToOrg')
+                          : t('statusPages.fields.logoRemove')
+                      "
+                      :note="
+                        orgLogoOverrideEnabled && usingOrgLogoDefault
+                          ? t('statusPages.fields.logoUsingOrgDefault')
+                          : undefined
+                      "
+                      :image="previewValues.logo_img"
+                      :locked="!logoUploadEnabled"
+                      data-test="status-page-logo"
+                      @select="(value) => onImageSelected('logo_img', value)"
+                      @clear="clearLogo"
+                      @locked="openUpgradeDialog"
+                    />
 
-                      <p
-                        v-if="orgLogoOverrideEnabled && usingOrgLogoDefault"
-                        class="text-text-secondary text-xs"
-                      >
-                        {{ t("statusPages.fields.logoUsingOrgDefault") }}
-                      </p>
-
-                      <div v-if="logoPreview" class="flex min-w-0 items-center gap-2">
-                        <img
-                          :src="logoPreview"
-                          :alt="t('statusPages.fields.logo')"
-                          data-test="status-page-logo-preview"
-                          class="max-h-9 max-w-37.5 object-contain"
-                        />
-                        <OButton
-                          v-if="logoUploadEnabled"
-                          type="button"
-                          variant="ghost-destructive"
-                          size="icon-xs-sq"
-                          icon-left="close"
-                          data-test="status-page-logo-clear"
-                          @click="clearLogo"
-                        >
-                          <OTooltip
-                            side="bottom"
-                            :content="
-                              usingOrgLogoDefault
-                                ? t('statusPages.fields.logoRevertToOrg')
-                                : t('statusPages.fields.logoRemove')
-                            "
-                          />
-                        </OButton>
-                      </div>
-                      <div
-                        v-else
-                        class="contents"
-                        @click.capture="!logoUploadEnabled ? onLockedLogoClick($event) : undefined"
-                      >
-                        <OFile
-                          class="min-w-0"
-                          :model-value="null"
-                          :placeholder="t('statusPages.fields.logoUpload')"
-                          accept=".png, .jpg, .jpeg, .gif, .svg, image/*"
-                          data-test="status-page-logo-upload"
-                          @update:model-value="onLogoFileSelected"
-                        />
-                      </div>
-                    </div>
+                    <StatusPageImageField
+                      :label="t('statusPages.fields.favicon')"
+                      :upload-label="t('statusPages.fields.faviconUpload')"
+                      :clear-label="t('statusPages.fields.faviconRemove')"
+                      :image="previewValues.favicon_img"
+                      :locked="!logoUploadEnabled"
+                      square
+                      data-test="status-page-favicon"
+                      @select="(value) => onImageSelected('favicon_img', value)"
+                      @clear="form.setFieldValue('favicon_img', '')"
+                      @locked="openUpgradeDialog"
+                    />
 
                     <OFormColor
                       name="accent_color"
@@ -357,6 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :brand-name="previewValues.brand_name"
               :accent-color="previewValues.accent_color"
               :logo-img="previewValues.logo_img"
+              :favicon-img="previewValues.favicon_img"
               :visibility="previewValues.visibility"
               :show-uptime-percent="previewValues.show_uptime_percent"
               :show-timeline-bars="previewValues.show_timeline_bars"
@@ -367,6 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSplitter>
     </OPageLayout>
+    <EditorDraftDialogs :draft="statusPageDraft" />
   </OForm>
 </template>
 
@@ -375,10 +341,10 @@ import { computed, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
-import { useOForm } from "@/lib/forms/Form/useOForm";
+import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormColor from "@/lib/forms/Color/OFormColor.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
@@ -392,15 +358,15 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
-import OFile from "@/lib/forms/File/OFile.vue";
 import type { FileValue } from "@/lib/forms/File/OFile.types";
 import StatusPagePreview from "./StatusPagePreview.vue";
+import StatusPageImageField from "./StatusPageImageField.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { getFoldersListByType } from "@/utils/commons";
 import statusPagesService, { type StatusPageListItem } from "@/services/status_pages";
+import analytics from "@/services/product_analytics";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import syntheticsService from "@/services/synthetics";
 import {
@@ -411,6 +377,9 @@ import {
 } from "./EditStatusPage.schema";
 import { publicStatusPageUrl } from "./statusPageBadges";
 import { syntheticsListRoute, syntheticsNavContextFromRoute } from "@/utils/synthetics/routes";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { hashDraftValue } from "@/utils/drafts/editorDraftStore";
 
 // A component row carries a client-only stable id so the v-for key never keys on
 // the array index — index keys made "add a second component" reuse the first
@@ -421,6 +390,18 @@ interface ComponentRow {
   name: string;
   description: string;
   check_ids: string[];
+}
+
+type StoredComponent = Omit<ComponentRow, "_uid">;
+
+interface StatusPageDraftData {
+  // An image the user did not change is stored as null: it can be large, and the page still holds it.
+  values: Omit<EditStatusPageForm, "logo_img" | "favicon_img"> & {
+    logo_img: string | null;
+    favicon_img: string | null;
+  };
+  usingOrgLogoDefault: boolean;
+  components: StoredComponent[];
 }
 
 const FORM_ID = "status-page-edit-form";
@@ -442,11 +423,6 @@ const logoUploadEnabled = computed(
   () => config.isCloud === "true" || config.isEnterprise === "true",
 );
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
-function onLockedLogoClick(event: MouseEvent) {
-  event.preventDefault();
-  event.stopPropagation();
-  openUpgradeDialog();
-}
 
 // Self-hosted enterprise only, never cloud: the org-wide logo (Settings →
 // General) is an on-prem-org concept, so defaulting/overriding a status
@@ -479,6 +455,7 @@ const emptyDefaults = (): EditStatusPageForm => ({
   brand_name: "",
   accent_color: "",
   logo_img: "",
+  favicon_img: "",
   visibility: "draft",
   password: "",
   noindex: false,
@@ -501,6 +478,7 @@ function defaultsFromPage(p: StatusPageListItem): EditStatusPageForm {
     brand_name: p.brand_name ?? "",
     accent_color: p.accent_color ?? "",
     logo_img: hasOwnLogo ? p.logo_img : orgLogoImg.value,
+    favicon_img: p.favicon_img ?? "",
     visibility: visibilityToMode(p.visibility),
     password: "",
     noindex: p.noindex,
@@ -519,6 +497,7 @@ const form = useOForm<EditStatusPageForm>({
 });
 
 const visibilityMode = form.useStore((s: any) => s.values.visibility);
+const formValues = form.useStore((s: { values: EditStatusPageForm }) => s.values);
 
 // Live form values that drive the preview pane.
 const previewValues = form.useStore((s: any) => ({
@@ -526,15 +505,11 @@ const previewValues = form.useStore((s: any) => ({
   brand_name: s.values.brand_name ?? "",
   accent_color: s.values.accent_color ?? "",
   logo_img: s.values.logo_img ?? "",
+  favicon_img: s.values.favicon_img ?? "",
   visibility: s.values.visibility ?? "draft",
   show_uptime_percent: !!s.values.show_uptime_percent,
   show_timeline_bars: !!s.values.show_timeline_bars,
 }));
-
-const logoPreview = computed(() => {
-  const v = previewValues.value.logo_img;
-  return v ? `data:image;base64,${v}` : "";
-});
 
 function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -550,7 +525,7 @@ function readFileAsBase64(file: File): Promise<string> {
   });
 }
 
-async function onLogoFileSelected(value: FileValue) {
+async function onImageSelected(field: "logo_img" | "favicon_img", value: FileValue) {
   if (!logoUploadEnabled.value) {
     openUpgradeDialog();
     return;
@@ -559,10 +534,10 @@ async function onLogoFileSelected(value: FileValue) {
   if (!file) return;
   try {
     const base64 = await readFileAsBase64(file);
-    usingOrgLogoDefault.value = false;
-    form.setFieldValue("logo_img", base64);
+    if (field === "logo_img") usingOrgLogoDefault.value = false;
+    form.setFieldValue(field, base64);
   } catch (err) {
-    console.error("[status-pages] failed to read logo file", err);
+    console.error("[status-pages] failed to read image file", err);
     toast({ variant: "error", message: t("statusPages.fields.logoReadFailed") });
   }
 }
@@ -649,17 +624,24 @@ async function load() {
       description: c.description ?? "",
       check_ids: c.check_ids ?? [],
     }));
+    loadedImages = { logo_img: form.state.values.logo_img, favicon_img: p.favicon_img ?? "" };
+    loadedOrgLogoDefault = usingOrgLogoDefault.value;
+    serverPage = serverSnapshot();
     loadChecks();
   } catch (err) {
     console.error("[status-pages] failed to load page", err);
     page.value = null;
+    serverPage = null;
+    pageGone = (err as { response?: { status?: number } } | null)?.response?.status === 404;
   } finally {
     loading.value = false;
   }
+  // A deleted page still starts the draft, so a draft left for it is dropped with a notice.
+  if (page.value || pageGone) await statusPageDraft.start();
 }
 
 async function saveSettings(values: EditStatusPageForm) {
-  if (!page.value) return;
+  if (!page.value || blockOnPendingReentries()) return;
   const payload: Record<string, unknown> = {
     name: values.name,
     description: values.description,
@@ -668,6 +650,7 @@ async function saveSettings(values: EditStatusPageForm) {
     // Still on the org default: persist nothing page-specific so a later org
     // logo change keeps following through, rather than freezing today's copy.
     logo_img: usingOrgLogoDefault.value ? "" : values.logo_img,
+    favicon_img: values.favicon_img,
     visibility: modeToVisibility(values.visibility),
     noindex: values.noindex,
     show_uptime_percent: values.show_uptime_percent,
@@ -693,8 +676,14 @@ async function saveSettings(values: EditStatusPageForm) {
           check_ids: c.check_ids,
         })),
     );
+    analytics.track("status_page_updated");
     dismiss();
     toast({ variant: "success", message: t("statusPages.toast.saved") });
+    if (leaveSave) {
+      leaveSave.saved = true;
+      return;
+    }
+    statusPageDraft.markSaved();
     goBack();
   } catch (err: any) {
     dismiss();
@@ -740,6 +729,134 @@ function goBack() {
   if (!ctx.orgIdentifier && orgIdentifier.value) ctx.orgIdentifier = orgIdentifier.value;
   router.push(syntheticsListRoute(ctx, { section: "status-pages" }));
 }
+
+async function cancel() {
+  if (await statusPageDraft.confirmLeave()) goBack();
+}
+
+// The images the page loaded with, so an unchanged one is left out of the draft.
+let loadedImages = { logo_img: "", favicon_img: "" };
+let loadedOrgLogoDefault = false;
+// The page as the form shows it after loading; the raw item carries health and timestamps that move on their own.
+let serverPage: StatusPageDraftData | null = null;
+let pageGone = false;
+// Set while the leave dialog's Save runs, so a successful save does not go back to the list itself.
+let leaveSave: { saved: boolean } | null = null;
+
+const PASSWORD_PATH = "/values/password";
+// A base64 image above this would take most of the browser's storage quota, so it is not drafted.
+const MAX_DRAFT_IMAGE_CHARS = 256 * 1024;
+const IMAGE_PATHS: Record<string, "logo_img" | "favicon_img"> = {
+  "/values/logo_img": "logo_img",
+  "/values/favicon_img": "favicon_img",
+};
+
+function statusPageSnapshot(): StatusPageDraftData {
+  const values = { ...(formValues.value as EditStatusPageForm) };
+  const image = (field: "logo_img" | "favicon_img") =>
+    values[field] === loadedImages[field] ? null : values[field];
+  return {
+    values: { ...values, logo_img: image("logo_img"), favicon_img: image("favicon_img") },
+    usingOrgLogoDefault: usingOrgLogoDefault.value,
+    components: components.value.map(({ id, name, description, check_ids }) => ({
+      id,
+      name,
+      description,
+      check_ids: [...check_ids],
+    })),
+  };
+}
+
+// Images are hashed, so the base stays small to hash on every autosave.
+function serverSnapshot(): StatusPageDraftData {
+  const snapshot = statusPageSnapshot();
+  const values = formValues.value as EditStatusPageForm;
+  return {
+    ...snapshot,
+    values: {
+      ...snapshot.values,
+      logo_img: hashDraftValue(values.logo_img),
+      favicon_img: hashDraftValue(values.favicon_img),
+    },
+  };
+}
+
+function redactLargeImages(data: StatusPageDraftData) {
+  const paths = Object.entries(IMAGE_PATHS).flatMap(([path, field]) => {
+    const value = data.values[field];
+    if (typeof value !== "string" || value.length <= MAX_DRAFT_IMAGE_CHARS) return [];
+    data.values[field] = null;
+    return [path];
+  });
+  return { data, paths, changedPaths: paths };
+}
+
+function flagReentries(paths: string[]) {
+  if (!paths.includes(PASSWORD_PATH)) return;
+  const name = "password" as FormFieldPath<EditStatusPageForm>;
+  const meta = form.getFieldMeta(name);
+  if (!meta) return;
+  form.setFieldMeta(name, {
+    ...meta,
+    errorMap: { ...meta.errorMap, onSubmit: t("common.editorDraft.reenterField") },
+  });
+}
+
+/** A changed password the draft could not keep must be typed again before saving, while the page still uses one. */
+function blockOnPendingReentries(): boolean {
+  const usesPassword = (formValues.value as EditStatusPageForm).visibility === "password";
+  const pending = statusPageDraft
+    .pendingReentries()
+    .filter((path) => usesPassword && path === PASSWORD_PATH);
+  if (!pending.length) return false;
+  flagReentries(pending);
+  toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
+  return true;
+}
+
+const statusPageDraft = useEditorDraft<StatusPageDraftData>({
+  kind: "status_page",
+  entityLabel: () => t("common.editorDraft.entities.status_page"),
+  entityId: () => String(route.params.id ?? "") || null,
+  snapshot: () => statusPageSnapshot(),
+  apply: async (data, { notKeptPaths }) => {
+    form.reset({
+      ...data.values,
+      logo_img: data.values.logo_img ?? loadedImages.logo_img,
+      favicon_img: data.values.favicon_img ?? loadedImages.favicon_img,
+      _passwordSet: !!page.value?.password_set,
+    });
+    // A logo that was too large to draft falls back to the loaded one, and so does its org-default state.
+    usingOrgLogoDefault.value = notKeptPaths.includes("/values/logo_img")
+      ? loadedOrgLogoDefault
+      : data.usingOrgLogoDefault;
+    components.value = data.components.map((c) => ({
+      ...c,
+      _uid: uidSeq++,
+      check_ids: [...c.check_ids],
+    }));
+    // After the form's own error sweep, which runs on the reset values.
+    await nextTick();
+    flagReentries(notKeptPaths);
+  },
+  base: () => serverPage,
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  redact: redactLargeImages,
+  describeRedacted: (paths): I18nText[] => [
+    ...(paths.includes(PASSWORD_PATH) ? [t("statusPages.fields.password")] : []),
+    ...(paths.includes("/values/logo_img") ? [t("statusPages.fields.logo")] : []),
+    ...(paths.includes("/values/favicon_img") ? [t("statusPages.fields.favicon")] : []),
+  ],
+});
 
 watch(orgIdentifier, (org) => {
   if (org && loading.value) load();

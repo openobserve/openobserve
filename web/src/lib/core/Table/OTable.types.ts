@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { I18nText } from "@/types/i18n";
+import type { ForbiddenState } from "@/utils/featureGate";
 
 import type { Component, ComputedRef, InjectionKey, Ref } from "vue";
 import type { Row, Table } from "@tanstack/vue-table";
@@ -71,13 +72,17 @@ export const ROW_TONE_CLASS: Record<RowTone, string> = {
  * cells skip the mouse bookkeeping entirely.
  */
 export interface OTableCellActionsContext {
-  activeCellKey: Ref<string | null>;
+  activeCellKey: Readonly<Ref<string | null>>;
   setActiveCell: (key: string | null) => void;
   enabled: ComputedRef<boolean>;
 }
 
 export const OTableCellActionsKey: InjectionKey<OTableCellActionsContext> =
   Symbol("OTableCellActions");
+
+// ─── Stale rows context ──────────────────────────────────────────
+/** True while kept rows are dimmed during a refetch; controls that act on those rows read it to disable themselves. */
+export const OTableStaleKey: InjectionKey<Readonly<Ref<boolean>>> = Symbol("OTableStale");
 
 // ─── Cut-off cell tooltip context ────────────────────────────────
 /** A body cell reports hover; OTable shows one shared tooltip, only when that cell's text is cut. */
@@ -400,10 +405,18 @@ export interface OTableProps<TData = any> {
    * regardless of virtual scroll (which only bounds DOM nodes), so very large
    * datasets (100k+ rows) freeze or OOM the tab without this. Applies only
    * while no client-side row transform needs the full model: requires
-   * virtualScroll, pagination "none", non-client sorting, expansion "none",
-   * no wrap, no tree, and deactivates while a column/global filter is set.
+   * virtualScroll, pagination "none", non-client sorting, expansion "none"
+   * (or single/multiple with `measureExpandedRows`), no wrap, no tree, and
+   * deactivates while a column/global filter is set.
    */
   windowRowModel?: boolean;
+  /**
+   * Under virtual scroll, measure each rendered row together with its expanded
+   * detail row, so a tall detail never shifts the rows below it. Expansion state
+   * is keyed by `rowKey`, so this also lets `windowRowModel` stay on while rows
+   * expand. Opt-in: it measures every rendered row from the DOM.
+   */
+  measureExpandedRows?: boolean;
   /** Fixed row height for virtual scroll calculations (default 48) */
   virtualScrollItemSize?: number;
   /**
@@ -459,16 +472,29 @@ export interface OTableProps<TData = any> {
   fillHeight?: boolean;
 
   // ── Display ──
+  /** While true, a table that has settled rows keeps them on screen, dimmed once the load is slow; otherwise it shows the skeleton after a delay. */
   loading?: boolean;
+  /** Dim kept rows and disable actions on them during a slow refetch; turn off for live mode and same-window auto-refresh (default: true). */
+  dimOnRefetch?: boolean;
+  /** Show the skeleton on every load instead of keeping the last settled rows. */
+  skeletonOnRefetch?: boolean;
+  /** Skeleton rows while loading, when the caller already knows how many rows will land; keeps the first paint the loaded height. */
+  skeletonRows?: number;
+  /** Changing it drops the kept rows so the next load shows the skeleton; bind the folder or tab whose rows must not show under another. */
+  loadingResetKey?: unknown;
+  /** Draw the table's own progress line under the header while loading; turn off when the page draws one line for the whole region (default: true). */
+  progressLine?: boolean;
   /** Data is arriving incrementally (SSE/WebSocket). Shows a pulsing indicator. */
   streaming?: boolean;
   error?: string | null;
   /**
-   * The data this table lists was denied (403). Shows the no-access state
+   * The data this table lists was denied (403); feature keys mean a license denial. Shows the no-access state
    * instead of the first-run empty state, which would otherwise invite the
    * user to create something they are not allowed to create.
    */
-  forbidden?: boolean;
+  forbidden?: ForbiddenState;
+  /** What the forbidden table lists, as the app's access state names it (an IAM resource key). */
+  forbiddenResource?: string;
   /** Text shown when data is empty and not loading */
   emptyMessage?: I18nText;
   dense?: boolean;
@@ -554,9 +580,10 @@ export interface OTableProps<TData = any> {
   pivotHeaderLevels?: any[];
   /** Pivot row field columns (for sticky headers + row-field cell merge) */
   pivotRowColumns?: any[];
-  /** Grand-total row rendered as a sticky `<tfoot>`, keyed by each column's
-   *  `accessorKey`/`id`; values run through the column's `meta.format`. */
-  stickyTotalRow?: Record<string, any> | null;
+  /** Grand-total row (or rows, one `<tr>` each) rendered as a sticky `<tfoot>`, keyed by each column's
+   *  `accessorKey`/`id`; values run through the column's `meta.format`. A row with `__labelKey` is a
+   *  calculated-totals row: that column's cell shows the calculation's name, muted, and the values bold. */
+  stickyTotalRow?: Record<string, any> | Record<string, any>[] | null;
   /** Show sticky row totals (pins the grand-total `<tfoot>` to the bottom) */
   stickyRowTotals?: boolean;
   /** Show sticky column totals */
@@ -576,6 +603,8 @@ export interface OTableEmits<TData = any> {
   "update:currentPage": [page: number];
   "update:pageSize": [size: number];
   "pagination-change": [params: OTablePaginationParams];
+  /** The error state's Retry; also re-emits `pagination-change` for server data. */
+  retry: [];
 
   // Sorting
   "update:sortBy": [columnId: string];
@@ -596,6 +625,8 @@ export interface OTableEmits<TData = any> {
   // Row events
   "row-click": [row: TData, event: MouseEvent];
   "row-dblclick": [row: TData, event: MouseEvent];
+  /** Middle-button click on a row (not on an interactive child). */
+  "row-auxclick": [row: TData, event: MouseEvent];
   "row-mouseenter": [row: TData, event: MouseEvent];
   "row-mouseleave": [row: TData];
   "cell-click": [params: { columnId: string; row: TData; value: any }];
@@ -687,7 +718,6 @@ export interface OTableSlots<TData = any> {
   "selection-actions"?: () => any;
   /** Footer start-side line for what the pager cannot say (a cap, partial data), yielding to the selection count; like `#selection-actions`, it needs the built-in bar. */
   "footer-note"?: () => any;
-  /** Shown when loading=true AND data exists (thin banner, not overlay) */
   "loading-banner"?: () => any;
   /** Custom loading indicator (overlay when no data) */
   loading?: () => any;
@@ -697,6 +727,8 @@ export interface OTableSlots<TData = any> {
   error?: (props: { message: string }) => any;
   /** One `<tr>` (cells spanning the columns) rendered as the first row of the body, under the column header, before the first data row; not measured by virtual scrolling. */
   "body-start"?: () => any;
+  /** One `<tr>` (cells spanning the columns) rendered as the last row of the body, above the footer; not measured by virtual scrolling. */
+  "body-end"?: () => any;
   /** Expanded row content — scoped to the plain row data (`row.original`) */
   expansion?: (props: { row: TData }) => any;
   /** Tree-mode warning row — rendered between an expanded parent and its children when `getRowWarning(row)` is true. */
@@ -723,6 +755,8 @@ export interface OTableExposed<TData = any> {
   /** True when column resizing is enabled and the user has resized at least one
    *  column. Read this when rendering your own `OTableColumnToggle`. */
   hasResizedColumns: boolean;
+  /** True while a load keeps the settled rows on screen instead of the skeleton. */
+  keepingRows: boolean;
   /** Reset column sizes to default */
   resetColumnSizes: () => void;
   /** Reset column order to default */

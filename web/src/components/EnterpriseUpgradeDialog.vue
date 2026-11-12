@@ -27,7 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Close Button -->
       <div class="text-text-secondary hover:text-text-body absolute top-4 right-4 z-100">
-        <OButton variant="ghost" size="icon" @click="showDialog = false">
+        <OButton
+          :aria-label="t('common.close')"
+          variant="ghost"
+          size="icon"
+          @click="showDialog = false"
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="14"
@@ -209,6 +214,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import EnterpriseOfferFeatureGrid from "@/components/EnterpriseOfferFeatureGrid.vue";
 import { useEnterpriseOfferContent } from "@/composables/useEnterpriseOfferContent";
+import { FREE_LIMIT_GB } from "@/utils/featureGate";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -270,7 +276,10 @@ export default defineComponent({
 
     // Check if ingestion is unlimited
     const isIngestionUnlimited = computed(() => {
-      return licenseData.value?.license?.limits?.Ingestion?.typ === "Unlimited";
+      return (
+        licenseData.value?.license?.limits?.Ingestion?.typ === "Unlimited" &&
+        !licenseData.value?.expired
+      );
     });
 
     // Get ingestion limit value for threshold
@@ -278,6 +287,7 @@ export default defineComponent({
       if (isIngestionUnlimited.value) {
         return null; // No limit for unlimited plans
       }
+      if (licenseData.value?.expired) return FREE_LIMIT_GB;
       return licenseData.value?.license?.limits?.Ingestion?.value || 100;
     });
 

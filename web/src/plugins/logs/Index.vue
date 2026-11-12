@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @extractPatterns="extractPatternsForCurrentQuery"
               @buildModeToggle="onBuildModeToggle"
               @sendToAiChat="sendToAiChat"
+              @filter-builder-growth="filterBuilderGrowth = $event"
             />
           </div>
         </template>
@@ -226,8 +227,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @configure="onConfigureFreeTextStream"
                       />
                     </div>
+                    <!-- A run clears errorMsg as it starts, so the re-run keeps the last shown error until rows or a new error land. -->
                     <div
-                      v-else-if="searchObj.data.errorMsg !== '' && searchObj.loading == false"
+                      v-else-if="
+                        (searchObj.data.errorMsg !== '' && searchObj.loading == false) ||
+                        (searchObj.loading &&
+                          !searchObj.data.queryResults?.hits?.length &&
+                          shownError.msg !== '')
+                      "
                       data-test="logs-search-error-state"
                     >
                       <LogsPermalinkBanner
@@ -237,14 +244,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @go-to-page="onSharedPageGo"
                       />
                       <LogsErrorState
-                        :error-code="parseInt(searchObj.data.errorCode) || 0"
-                        :error-msg="searchObj.data.errorMsg"
-                        :error-detail="searchObj.data.errorDetail"
+                        :error-code="shownError.code"
+                        :error-msg="shownError.msg"
+                        :error-detail="shownError.detail"
                         :ai-enabled="isAiEnabled"
                         :stream-name="searchObj.data.stream.selectedStream[0]"
                         :free-text-candidate="recoveryCards.freeTextCandidate"
                         :run-suggestion="recoveryCards.runSuggestion"
                         :filter-mode="!searchObj.meta.sqlMode"
+                        :query="shownError.query"
                         @ask-ai="onAskAiFixQuery"
                         @fix-query="onFixQuery"
                         @configure-stream="onConfigureStream"
@@ -328,10 +336,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :query-window-us="queryWindowUs"
                         :timezone="store.state.timezone"
                         @jump-to-stream-data="onJumpToStreamData"
-                        @open-history="showSearchHistoryfn"
+                        @open-history="openSearchHistory"
                         @ask-ai="onAskAiFixQuery"
                       />
                     </div>
+                    <SearchResultSkeleton
+                      v-else-if="
+                        streamSwitchPending &&
+                        searchObj.meta.logsVisualizeToggle === 'logs' &&
+                        !searchObj.data.queryResults.hits?.length &&
+                        searchObj.loading == false &&
+                        searchObj.meta.searchApplied == false
+                      "
+                    />
                     <div
                       v-else-if="
                         searchObj.meta.logsVisualizeToggle === 'logs' &&
@@ -467,116 +484,142 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="searchObj.meta.logsVisualizeToggle == 'drilldown'"
-            class="border-border-default h-full overflow-hidden border-t"
+            class="border-border-default flex h-full flex-col overflow-hidden border-t"
             data-test="logs-drill-down-page"
           >
-            <!-- Same no-stream / error / no-events states as the results pane. -->
-            <OEmptyState
-              v-if="searchObj.meta.sqlMode"
-              size="hero"
-              :title="t('search.drillDownUnavailableInSqlMode')"
-              data-test="logs-drill-down-sql-mode-text"
-            />
-            <LogsNoDataState
-              v-else-if="
-                !searchObj.loadingStream &&
-                searchObj.data.stream.streamLists.length == 0 &&
-                searchObj.loading == false
-              "
-              :ai-enabled="isAiEnabled"
-              data-test="logs-drill-down-no-streams-in-org-text"
-              @ask-ai="onAskAiFixQuery"
-            />
-            <LogsNoStreamState
-              v-else-if="
-                searchObj.data.stream.streamLists.length > 0 &&
-                searchObj.data.stream.selectedStream.length == 0 &&
-                searchObj.data.filterErrMsg === ''
-              "
-              :org-id="store.state.selectedOrganization.identifier"
-              :stream-type="searchObj.data.stream.streamType"
-              :auto-run="isAutoRunOn"
-              data-test="logs-drill-down-no-stream-selected-text"
-              @select-stream="onSelectStream"
-              @pick-stream="onPickStream"
-            />
-            <LogsErrorState
-              v-else-if="searchObj.data.filterErrMsg !== '' && searchObj.loading == false"
-              data-test="logs-drill-down-filter-error-message"
-              :error-code="0"
-              :error-msg="searchObj.data.filterErrMsg"
-              :ai-enabled="isAiEnabled"
-              @ask-ai="onAskAiFixQuery"
-              @fix-query="onFixQuery"
-              @configure-stream="onConfigureStream"
-              @widen-range="onWidenRange"
-            />
-            <LogsErrorState
-              v-else-if="searchObj.data.errorMsg !== '' && searchObj.loading == false"
-              data-test="logs-drill-down-error-state"
-              :error-code="parseInt(searchObj.data.errorCode) || 0"
-              :error-msg="searchObj.data.errorMsg"
-              :error-detail="searchObj.data.errorDetail"
-              :ai-enabled="isAiEnabled"
-              :stream-name="searchObj.data.stream.selectedStream[0]"
-              @ask-ai="onAskAiFixQuery"
-              @fix-query="onFixQuery"
-              @configure-stream="onConfigureStream"
-              @widen-range="onWidenRange"
-            />
-            <div v-else-if="searchObj.loading" class="flex h-full items-center justify-center">
-              <OSpinner size="lg" />
+            <div
+              v-if="!drillDownShowsDashboard"
+              class="border-card-glass-border px-page-edge flex shrink-0 items-center border-b py-1.5"
+              data-test="logs-drill-down-stream-row"
+            >
+              <LogsDrillDownStreamSelect
+                ref="drillDownStreamSelectRef"
+                :streams="drillDownPickerStreams"
+                :model-value="searchObj.data.stream.selectedStream[0] ?? null"
+                @update:model-value="onDrillDownStreamChange"
+              />
             </div>
-            <LogsAutoRunGuard
-              v-else-if="searchObj.meta.autoRunBlocked && !searchObj.data.queryResults.hits?.length"
-              :blocked="searchObj.meta.autoRunBlocked"
-              :auto-run-on="isAutoRunOn"
-              :show-search-job="showGuardSearchJob"
-              @run="onGuardRunAnyway"
-              @narrow="onGuardNarrow"
-              @search-job="onGuardSearchJob"
-              @select-stream="onSelectStream"
-            />
-            <!-- Mounted only once a search settles, so each search rebuilds it from the new results. -->
-            <TracesAnalysisDashboard
-              v-else-if="searchObj.data.queryResults.hits?.length > 0"
-              embedded
-              :streamName="searchObj.data.stream.selectedStream[0]"
-              streamType="logs"
-              :timeRange="drillDownTimeRange"
-              :rateFilter="drillDownRateFilter"
-              :baseFilter="drillDownBaseFilter"
-              :streamFields="
-                searchObj.data.stream.userDefinedSchema?.length > 0
-                  ? searchObj.data.stream.userDefinedSchema
-                  : searchObj.data.stream.selectedStreamFields
-              "
-              :logSamples="searchObj.data.queryResults.hits"
-              analysisType="volume"
-            />
-            <LogsNoEventsState
-              v-else-if="searchObj.meta.searchApplied == true"
-              data-test="logs-drill-down-no-events-found-text"
-              :sql-mode="searchObj.meta.sqlMode"
-              :query="searchObj.data.query"
-              :editor-value="searchObj.data.editorValue"
-              :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
-              :date-type="searchObj.data.datetime.type || 'relative'"
-              :ai-enabled="isAiEnabled"
-              :stream-doc-time-range="streamDocTimeRange"
-              :query-window-us="queryWindowUs"
-              :timezone="store.state.timezone"
-              @jump-to-stream-data="onJumpToStreamData"
-              @open-history="showSearchHistoryfn"
-              @ask-ai="onAskAiFixQuery"
-            />
-            <OEmptyState
-              v-else
-              preset="no-query-applied"
-              size="hero"
-              data-test="logs-drill-down-apply-search-text"
-              @action="() => searchBarRef?.handleRunQueryFn?.()"
-            />
+            <div class="min-h-0 flex-1">
+              <!-- Same no-stream / error / no-events states as the results pane. -->
+              <OEmptyState
+                v-if="searchObj.meta.sqlMode"
+                size="hero"
+                :title="t('search.drillDownUnavailableInSqlMode')"
+                data-test="logs-drill-down-sql-mode-text"
+              />
+              <LogsNoDataState
+                v-else-if="
+                  !searchObj.loadingStream &&
+                  searchObj.data.stream.streamLists.length == 0 &&
+                  searchObj.loading == false
+                "
+                :ai-enabled="isAiEnabled"
+                data-test="logs-drill-down-no-streams-in-org-text"
+                @ask-ai="onAskAiFixQuery"
+              />
+              <LogsNoStreamState
+                v-else-if="
+                  searchObj.data.stream.streamLists.length > 0 &&
+                  searchObj.data.stream.selectedStream.length == 0 &&
+                  searchObj.data.filterErrMsg === ''
+                "
+                :org-id="store.state.selectedOrganization.identifier"
+                :stream-type="searchObj.data.stream.streamType"
+                :auto-run="isAutoRunOn"
+                data-test="logs-drill-down-no-stream-selected-text"
+                @select-stream="onSelectStream"
+                @pick-stream="onPickStream"
+              />
+              <LogsErrorState
+                v-else-if="searchObj.data.filterErrMsg !== '' && searchObj.loading == false"
+                data-test="logs-drill-down-filter-error-message"
+                :error-code="0"
+                :error-msg="searchObj.data.filterErrMsg"
+                :ai-enabled="isAiEnabled"
+                @ask-ai="onAskAiFixQuery"
+                @fix-query="onFixQuery"
+                @configure-stream="onConfigureStream"
+                @widen-range="onWidenRange"
+              />
+              <LogsErrorState
+                v-else-if="searchObj.data.errorMsg !== '' && searchObj.loading == false"
+                data-test="logs-drill-down-error-state"
+                :error-code="parseInt(searchObj.data.errorCode) || 0"
+                :error-msg="searchObj.data.errorMsg"
+                :error-detail="searchObj.data.errorDetail"
+                :ai-enabled="isAiEnabled"
+                :stream-name="searchObj.data.stream.selectedStream[0]"
+                @ask-ai="onAskAiFixQuery"
+                @fix-query="onFixQuery"
+                @configure-stream="onConfigureStream"
+                @widen-range="onWidenRange"
+              />
+              <div v-else-if="searchObj.loading" class="flex h-full items-center justify-center">
+                <OSpinner size="lg" />
+              </div>
+              <LogsAutoRunGuard
+                v-else-if="
+                  searchObj.meta.autoRunBlocked && !searchObj.data.queryResults.hits?.length
+                "
+                :blocked="searchObj.meta.autoRunBlocked"
+                :auto-run-on="isAutoRunOn"
+                :show-search-job="showGuardSearchJob"
+                @run="onGuardRunAnyway"
+                @narrow="onGuardNarrow"
+                @search-job="onGuardSearchJob"
+                @select-stream="onSelectStream"
+              />
+              <!-- Mounted only once a search settles, so each search rebuilds it from the new results. -->
+              <TracesAnalysisDashboard
+                v-else-if="drillDownShowsDashboard"
+                embedded
+                :streamName="searchObj.data.stream.selectedStream[0]"
+                streamType="logs"
+                :timeRange="drillDownTimeRange"
+                :rateFilter="drillDownRateFilter"
+                :baseFilter="drillDownBaseFilter"
+                :streamFields="
+                  searchObj.data.stream.userDefinedSchema?.length > 0
+                    ? searchObj.data.stream.userDefinedSchema
+                    : searchObj.data.stream.selectedStreamFields
+                "
+                :logSamples="searchObj.data.queryResults.hits"
+                analysisType="volume"
+              >
+                <template #header-start>
+                  <LogsDrillDownStreamSelect
+                    ref="drillDownStreamSelectRef"
+                    class="me-3"
+                    :streams="drillDownPickerStreams"
+                    :model-value="searchObj.data.stream.selectedStream[0] ?? null"
+                    @update:model-value="onDrillDownStreamChange"
+                  />
+                </template>
+              </TracesAnalysisDashboard>
+              <LogsNoEventsState
+                v-else-if="searchObj.meta.searchApplied == true"
+                data-test="logs-drill-down-no-events-found-text"
+                :sql-mode="searchObj.meta.sqlMode"
+                :query="searchObj.data.query"
+                :editor-value="searchObj.data.editorValue"
+                :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
+                :date-type="searchObj.data.datetime.type || 'relative'"
+                :ai-enabled="isAiEnabled"
+                :stream-doc-time-range="streamDocTimeRange"
+                :query-window-us="queryWindowUs"
+                :timezone="store.state.timezone"
+                @jump-to-stream-data="onJumpToStreamData"
+                @open-history="openSearchHistory"
+                @ask-ai="onAskAiFixQuery"
+              />
+              <OEmptyState
+                v-else
+                preset="no-query-applied"
+                size="hero"
+                data-test="logs-drill-down-apply-search-text"
+                @action="() => searchBarRef?.handleRunQueryFn?.()"
+              />
+            </div>
           </div>
           <div
             v-if="searchObj.meta.logsVisualizeToggle == 'build'"
@@ -656,6 +699,9 @@ import { raw, useI18nTyped } from "@/types/i18n";
 
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
+import { featureState, streamTypeFeature } from "@/utils/featureGate";
+import { inheritedRetentionDays } from "@/utils/dataRetention";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { verifyOrganizationStatus, deepCopy, addSpacesToOperators } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import useLogs from "@/composables/useLogs";
@@ -663,6 +709,7 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { describePeriod } from "@/utils/dashboard/calendarPeriods";
 import { cloneDeep, debounce } from "lodash-es";
 import {
   isSimpleSelectAllQuery,
@@ -690,7 +737,10 @@ import {
   getVisualizationConfig,
   decodeVisualizationConfig,
 } from "@/composables/useLogs/logsVisualization";
-import useSearchBar, { bumpSelectionToken } from "@/composables/useLogs/useSearchBar";
+import useSearchBar, {
+  bumpSelectionToken,
+  streamSwitchPending,
+} from "@/composables/useLogs/useSearchBar";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
@@ -702,6 +752,8 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
+import { logsReapplyRequest } from "@/utils/queryHistory/logs";
+import { takeRecentLanding } from "@/utils/queryHistory/routes";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
@@ -710,8 +762,11 @@ import LogsErrorState from "@/plugins/logs/LogsErrorState.vue";
 import LogsNoFtsPanel from "@/plugins/logs/LogsNoFtsPanel.vue";
 import LogsMissingStreamBanner from "@/plugins/logs/LogsMissingStreamBanner.vue";
 import LogsAutoRunGuard from "@/plugins/logs/LogsAutoRunGuard.vue";
+import LogsDrillDownStreamSelect from "@/plugins/logs/LogsDrillDownStreamSelect.vue";
+import type { PickerStream } from "@/composables/useStreamPickerOptions";
 import LogsPermalinkBanner from "@/plugins/logs/LogsPermalinkBanner.vue";
 import LogsPermalinkDrawer from "@/plugins/logs/LogsPermalinkDrawer.vue";
+import SearchResultSkeleton from "@/plugins/logs/SearchResultSkeleton.vue";
 import {
   activePermalink,
   clearColumnsFromUrl,
@@ -728,6 +783,7 @@ import {
   type ResolveContext,
 } from "@/composables/useLogs/permalinkResolve";
 import {
+  endLogsArrival,
   parseSharedPage,
   resetShownSearch,
   sharedPage,
@@ -757,6 +813,7 @@ import {
   noFtsRecoveryStreams,
   noFtsRecoveryTerm as recoveryTerm,
   planStreamsFilter,
+  loadPendingFreeTextSchemas,
   recoveryCardsFor,
   searchTextReplacement,
 } from "@/composables/useLogs/freeTextSearch";
@@ -767,6 +824,7 @@ import {
   nextJobRequestId,
   notePageLoad,
   notePageRequest,
+  REFRESH_QUERY_ORIGIN,
   resetRowSelection,
 } from "@/composables/useLogs/logsRowNav";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -776,12 +834,17 @@ export default defineComponent({
   components: {
     SearchBar,
     IndexList,
-    SearchResult: defineAsyncComponent(() => import("@/plugins/logs/SearchResult.vue")),
+    SearchResult: defineAsyncComponent({
+      loader: () => import("@/plugins/logs/SearchResult.vue"),
+      loadingComponent: SearchResultSkeleton,
+      delay: 0,
+    }),
     VisualizeLogsQuery: defineAsyncComponent(() => import("@/plugins/logs/VisualizeLogsQuery.vue")),
     BuildQueryPage: defineAsyncComponent(() => import("@/plugins/logs/BuildQueryPage.vue")),
     LogsNoFtsPanel,
     LogsMissingStreamBanner,
     LogsPermalinkBanner,
+    SearchResultSkeleton,
     LogsPermalinkDrawer,
     TracesAnalysisDashboard: defineAsyncComponent(
       () => import("@/plugins/traces/metrics/TracesAnalysisDashboard.vue"),
@@ -794,6 +857,7 @@ export default defineComponent({
     LogsNoDataState,
     FirstDataPanel,
     LogsNoStreamState,
+    LogsDrillDownStreamSelect,
     LogsErrorState,
     LogsAutoRunGuard,
     OBadge,
@@ -808,16 +872,12 @@ export default defineComponent({
     searchData() {
       this.autoRun.engine.requestRun("run");
 
-      analytics.track("Button Click", {
-        button: "Search Data",
-        user_org: this.store.state.selectedOrganization.identifier,
-        user_id: this.store.state.userInfo.email,
+      analytics.track("logs_search_run", {
         stream_name: this.searchObj.data.stream.selectedStream.join(","),
         show_query: this.searchObj.meta.showQuery,
         show_histogram: this.searchObj.meta.showHistogram,
-        sqlMode: this.searchObj.meta.sqlMode,
-        showFields: this.searchObj.meta.showFields,
-        page: "Search Logs",
+        sql_mode: this.searchObj.meta.sqlMode,
+        show_fields: this.searchObj.meta.showFields,
       });
     },
     async getMoreDataRecordsPerPage() {
@@ -838,14 +898,6 @@ export default defineComponent({
           this.searchObj.data.queryResults.aggs = null;
           await this.getJobData(false);
         }
-
-        analytics.track("Button Click", {
-          button: "Get More Data",
-          user_org: this.store.state.selectedOrganization.identifier,
-          user_id: this.store.state.userInfo.email,
-          stream_name: this.searchObj.data.stream.selectedStream.join(","),
-          page: "Search Logs",
-        });
       }
     },
     async getMoreData() {
@@ -871,12 +923,8 @@ export default defineComponent({
           }
         }
 
-        analytics.track("Button Click", {
-          button: "Get More Data",
-          user_org: this.store.state.selectedOrganization.identifier,
-          user_id: this.store.state.userInfo.email,
+        analytics.track("logs_more_rows_loaded", {
           stream_name: this.searchObj.data.stream.selectedStream.join(","),
-          page: "Search Logs",
         });
       }
     },
@@ -901,7 +949,6 @@ export default defineComponent({
         analytics.track("Button Click", {
           button: "Get Less Data",
           user_org: this.store.state.selectedOrganization.identifier,
-          user_id: this.store.state.userInfo.email,
           stream_name: this.searchObj.data.stream.selectedStream.join(","),
           page: "Search Logs",
         });
@@ -912,6 +959,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
+    const signalLocks = useLicenseLocks();
     const {
       searchObj,
       resetSearchObj,
@@ -1128,6 +1176,7 @@ export default defineComponent({
           savedSearchObj.loadingHistogram = false;
           savedSearchObj.loadingCounter = false;
           savedSearchObj.loadingStream = false;
+          savedSearchObj.loadingFieldGroups = false;
           savedSearchObj.loadingSavedView = false;
           await store.dispatch("logs/setLogs", savedSearchObj);
         }
@@ -1143,7 +1192,11 @@ export default defineComponent({
     // Logs has no beforeunload guard; the URL is what restoreUrlQueryParams reads back after the language reload.
     const persistQueryForReload = async (): Promise<void> => {
       const query = generateURLQuery(false);
-      if (query.type === "search_history_re_apply" || query.type === "search_scheduler") {
+      if (
+        query.type === "search_history_re_apply" ||
+        query.type === "search_scheduler" ||
+        query.type === "rca_evidence_query"
+      ) {
         delete query.type;
       }
       await router.replace({ query });
@@ -1194,10 +1247,13 @@ export default defineComponent({
         }
       },
     );
+    // Two primitive sources, so other route changes never re-apply; a recent-searches restore bumps seq to restore one row twice.
     watch(
-      () => router.currentRoute.value.query.type,
-      async (type) => {
-        if (type == "search_history_re_apply" || type == "ai_chat_query") {
+      [() => router.currentRoute.value.query.type, () => logsReapplyRequest.value.seq],
+      async ([type, seq], [, prevSeq]) => {
+        const requested = seq !== prevSeq;
+        const runRequested = requested && logsReapplyRequest.value.run;
+        if (requested || type === "search_history_re_apply" || type === "ai_chat_query") {
           searchObj.meta.jobId = "";
           resetRunStateForReapply();
 
@@ -1207,11 +1263,7 @@ export default defineComponent({
           resetSearchObj();
 
           // Set time range based on source type
-          if (
-            type == "ai_chat_query" &&
-            router.currentRoute.value.query.from &&
-            router.currentRoute.value.query.to
-          ) {
+          if (router.currentRoute.value.query.from && router.currentRoute.value.query.to) {
             searchBarRef.value.dateTimeRef.setAbsoluteTime(
               router.currentRoute.value.query.from,
               router.currentRoute.value.query.to,
@@ -1230,10 +1282,12 @@ export default defineComponent({
           // loadLogsData();
           //instead of loadLogsData so I have used all the functions that are used in that and removed getQuerydata from the list
           //of functions of loadLogsData to stop run query whenever this gets redirecited
-          await getStreamList();
+          await getStreamList(true, { fromUrl: true });
           await getFunctions();
           await extractFields();
           refreshData();
+          // A newer restore started meanwhile; it carries its own run decision.
+          if (runRequested && logsReapplyRequest.value.seq === seq) runQueryFn();
         }
       },
     );
@@ -1293,8 +1347,9 @@ export default defineComponent({
       }
       let mode: "full" | "page" | "page-size" = "full";
       if (ctx.op === "page") mode = ctx.reason === "page-size" ? "page-size" : "page";
+      const origin = ctx.reason === "refresh" ? REFRESH_QUERY_ORIGIN : initOriginForRun(ctx.origin);
       try {
-        await runGridSearch(generationId, mode, initOriginForRun(ctx.origin));
+        await runGridSearch(generationId, mode, origin);
         if (mode === "full") showRanFilter(generationId, ranQuery);
         refreshHistogramChart();
         if (mode === "full") showJobScheduler.value = true;
@@ -1469,9 +1524,14 @@ export default defineComponent({
       return searchObj.meta.logsVisualizeToggle === "logs";
     }
 
-    // Search History and the AI chat only re-apply the query; the scheduler also runs it.
+    // Search History and the AI chat only re-apply the query; the scheduler and RCA
+    // evidence links also run it.
     const RE_APPLY_QUERY_TYPES = ["search_history_re_apply", "ai_chat_query"];
-    const URL_DRIVEN_QUERY_TYPES = [...RE_APPLY_QUERY_TYPES, "search_scheduler"];
+    const URL_DRIVEN_QUERY_TYPES = [
+      ...RE_APPLY_QUERY_TYPES,
+      "search_scheduler",
+      "rca_evidence_query",
+    ];
 
     const isRouteChanged = () => {
       // Not kept alive: this fresh mount never fires the type watchers, so the cached searchObj would bury the URL query (#14283).
@@ -1509,6 +1569,8 @@ export default defineComponent({
       try {
         // restoreUrlQueryParams() deletes a search_history_re_apply `type` off the route, so read it first.
         const arrivalType = router.currentRoute.value.query.type;
+        // Claimed on arrival, so a restore that lands on another tab is not left for a later landing.
+        const landing = takeRecentLanding("logs");
         isRouteChanged();
         if (!store.state.logs.isInitialized) {
           searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
@@ -1521,6 +1583,9 @@ export default defineComponent({
           resetSearchObj();
 
           resetStreamData();
+
+          // extractFields() clears this; until then the field list must not read "no fields found".
+          if (router.currentRoute.value.query.stream) searchObj.loadingStream = true;
 
           searchObj.meta.quickMode = isQuickModeEnabled();
 
@@ -1552,7 +1617,8 @@ export default defineComponent({
             const persistedType = restoreLogsStreamType(
               store.state.selectedOrganization.identifier,
             );
-            if (persistedType) {
+            // The page lock reads the URL type, so a remembered locked type would run unlocked.
+            if (persistedType && !signalLocks.isLocked(streamTypeFeature(persistedType))) {
               searchObj.data.stream.streamType = persistedType;
             }
           }
@@ -1565,6 +1631,8 @@ export default defineComponent({
           if (isLogsTab() || searchObj.meta.logsVisualizeToggle === "drilldown") {
             if (RE_APPLY_QUERY_TYPES.includes(arrivalType)) {
               await applyReAppliedQuery();
+              if (landing?.run) runQueryFn();
+              else endLogsArrival();
             } else {
               searchObj.loading = true;
               loadLogsData("landing", { origin: currentInitOrigin() ?? undefined });
@@ -1614,12 +1682,17 @@ export default defineComponent({
       } catch (error) {
         console.error("Failed to setup logs tab:", error);
         searchObj.loading = false;
+        searchObj.loadingStream = false;
       }
     }
 
     // Helper function to check if the environment is enterprise and super cluster is enabled
     function isEnterpriseClusterEnabled() {
-      return config.isEnterprise === "true" && store.state.zoConfig.super_cluster_enabled;
+      return (
+        config.isEnterprise === "true" &&
+        store.state.zoConfig.super_cluster_enabled &&
+        featureState(store.state.zoConfig.features, "super_cluster") !== "locked"
+      );
     }
 
     // Helper function to check if quick mode is enabled
@@ -1714,12 +1787,19 @@ export default defineComponent({
     // loadLogsData() minus getQueryData(): a re-applied query is loaded for the user to run, not run for them.
     async function applyReAppliedQuery() {
       resetRunStateForReapply();
+      const gridAtStart = autoRun.engine.currentGeneration("grid")?.id;
       searchObj.meta.searchApplied = false;
-      await getStreamList();
+      // The run-query prompt needs a `hits` array; set before the awaits so an Auto Run search that lands meanwhile keeps its hits.
+      searchObj.data.queryResults.hits = [];
+      await getStreamList(true, { fromUrl: true });
       await getFunctions();
       await extractFields();
       refreshData();
-      searchObj.loading = false;
+      const latest = autoRun.engine.currentGeneration("grid");
+      // A search started during the load owns the loading state; its completion or cancel clears it.
+      if (!latest || latest.id === gridAtStart || latest.settled || latest.cancelled) {
+        searchObj.loading = false;
+      }
     }
 
     // Helper function for handling the stream explorer
@@ -1771,6 +1851,14 @@ export default defineComponent({
           searchResultRef.value.reDrawChart();
         }
       });
+    };
+
+    const loadSchemasBeforeSqlToggle = async () => {
+      const query = searchObj.data.query ?? "";
+      if (!query.trim() || isAuthoredStatement(query)) return;
+      await loadPendingFreeTextSchemas(searchObj, (name) =>
+        getStream(name, searchObj.data.stream.streamType || "logs", true),
+      );
     };
 
     const setQuery = (sqlMode: boolean) => {
@@ -1941,6 +2029,15 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
+    let liveRowsShown = false;
+    watch(
+      () => Number(searchObj.meta.refreshInterval) > 0,
+      (live) => {
+        if (live) liveRowsShown = true;
+      },
+      { immediate: true },
+    );
+
     const onChangeInterval = () => {
       if (
         searchObj.meta.refreshInterval > 0 &&
@@ -1952,6 +2049,12 @@ export default defineComponent({
 
       patchUrlViewState();
       refreshData();
+      // Live ticks fetch no count, so leaving live mode runs once to show the real total.
+      if (liveRowsShown && !(Number(searchObj.meta.refreshInterval) > 0)) {
+        liveRowsShown = false;
+        // "run" is explicit and would execute unsaved editor edits.
+        if (!searchObj.meta.editorDirty) autoRun.engine.requestRun("run");
+      }
     };
 
     const onAutoIntervalTrigger = () => {
@@ -1960,6 +2063,11 @@ export default defineComponent({
         handleRunQueryFn();
       }
     };
+    // The usage page stays the fallback when recent searches are turned off.
+    const openSearchHistory = () => {
+      if (!searchBarRef.value?.openRecentSearches?.()) showSearchHistoryfn();
+    };
+
     const showSearchHistoryfn = () => {
       // Search History is now its own route (was an `action=history` overlay).
       // Forward the active stream type/name so the history shown there matches
@@ -1978,7 +2086,47 @@ export default defineComponent({
       });
     };
 
+    const drillDownStreamSelectRef = ref<InstanceType<typeof LogsDrillDownStreamSelect> | null>(
+      null,
+    );
+
+    const drillDownPickerStreams = computed<PickerStream[]>(() =>
+      (searchObj.data.stream.streamLists || []).map(
+        (option: { value: string; internal?: boolean }) => ({
+          name: option.value,
+          is_internal: option.internal === true,
+        }),
+      ),
+    );
+
+    // Mirrors the drill-down template's state chain, so the stream select sits in the dashboard header only while it is mounted.
+    const drillDownShowsDashboard = computed(() => {
+      const stream = searchObj.data.stream;
+      const noStreamsInOrg = !searchObj.loadingStream && stream.streamLists.length == 0;
+      const noStreamSelected = stream.streamLists.length > 0 && stream.selectedStream.length == 0;
+      return (
+        !searchObj.meta.sqlMode &&
+        !searchObj.loading &&
+        !noStreamsInOrg &&
+        !noStreamSelected &&
+        searchObj.data.filterErrMsg === "" &&
+        searchObj.data.errorMsg === "" &&
+        searchObj.data.queryResults.hits?.length > 0
+      );
+    });
+
+    const onDrillDownStreamChange = (stream: string) => {
+      searchObj.data.stream.selectedStream = [stream];
+      searchObj.data.filterErrMsg = "";
+      onStreamChange("", { origin: "selector" });
+    };
+
     const onSelectStream = () => {
+      // The fields panel holding the IndexList selector is hidden in drill down.
+      if (searchObj.meta.logsVisualizeToggle === "drilldown") {
+        drillDownStreamSelectRef.value?.open();
+        return;
+      }
       // < md the stream selector lives in the fields drawer, so it must open before the trigger can focus.
       if (isMobile.value) {
         mobileFieldsOpen.value = true;
@@ -2110,7 +2258,7 @@ export default defineComponent({
       emit(
         "sendToAiChat",
         raw(
-          `${outcome} ${modeContext} Stream: ${searchObj.data.stream.selectedStream?.[0] || "unknown"}. Time range: ${searchObj.data.datetime.relativeTimePeriod || "custom"}. Can you help me adjust the filter to get results?`,
+          `${outcome} ${modeContext} Stream: ${searchObj.data.stream.selectedStream?.[0] || "unknown"}. Time range: ${searchObj.data.datetime.relativeTimePeriod ? describePeriod(searchObj.data.datetime.relativeTimePeriod) : "custom"}. Can you help me adjust the filter to get results?`,
         ),
         false,
       );
@@ -2982,21 +3130,38 @@ export default defineComponent({
       },
     );
 
-    // Auto-expand the splitter when either editor has >2 lines; never overrides a larger user-set value.
+    // Pixels the filter builder has grown past one line; null while the text editor is shown.
+    const filterBuilderGrowth = ref<number | null>(null);
+    let autoSplitterHeight = 0;
+
+    // Auto-expand the splitter when either editor has >2 lines or the filter builder wraps; never overrides a larger user-set value.
     watch(
-      [() => searchObj.data.editorValue, () => searchObj.data.tempFunctionContent, isMobile],
-      ([queryValue, fnValue, mobile]) => {
+      [
+        () => searchObj.data.editorValue,
+        () => searchObj.data.tempFunctionContent,
+        isMobile,
+        filterBuilderGrowth,
+      ],
+      ([queryValue, fnValue, mobile, growth]) => {
         const queryLines = (queryValue || "").split("\n").length;
         const fnLines = (fnValue || "").split("\n").length;
         const hasMoreThanTwoLines = queryLines > 2 || fnLines > 2;
         const baseHeight = mobile ? 165 : 83;
         const expandedHeight = mobile ? 205 : 130;
+        const target =
+          growth === null
+            ? hasMoreThanTwoLines
+              ? expandedHeight
+              : baseHeight
+            : Math.max(baseHeight + growth, fnLines > 2 ? expandedHeight : baseHeight);
 
-        if (hasMoreThanTwoLines && splitterModel.value < expandedHeight) {
-          splitterModel.value = expandedHeight;
-        } else if (!hasMoreThanTwoLines && splitterModel.value <= expandedHeight) {
-          splitterModel.value = baseHeight;
+        if (
+          splitterModel.value < target ||
+          splitterModel.value <= Math.max(expandedHeight, autoSplitterHeight)
+        ) {
+          splitterModel.value = target;
         }
+        autoSplitterHeight = target;
       },
       { immediate: true },
     );
@@ -3824,6 +3989,27 @@ export default defineComponent({
       );
     });
     const showGuardBanner = computed(() => guardBlocksGrid.value && !showGuardEmptyState.value);
+    // A re-run rewrites the error before it fails again, so the kept panel holds the error it last showed.
+    const shownError = ref({ code: 0, msg: "", detail: "", query: "" });
+    watch(
+      () =>
+        [
+          searchObj.data.errorCode,
+          searchObj.data.errorMsg,
+          searchObj.data.errorDetail,
+          searchObj.loading,
+        ] as const,
+      ([code, msg, detail, loading]) => {
+        if (!loading)
+          shownError.value = {
+            code: parseInt(code) || 0,
+            msg,
+            detail,
+            query: searchObj.data.query,
+          };
+      },
+      { immediate: true },
+    );
     const showGuardSearchJob = computed(() => config.isEnterprise === "true");
 
     watch(
@@ -3863,7 +4049,9 @@ export default defineComponent({
     };
 
     const permalinkResolveContext = (): ResolveContext => {
-      const superCluster = !!store.state.zoConfig?.super_cluster_enabled;
+      const superCluster =
+        !!store.state.zoConfig?.super_cluster_enabled &&
+        featureState(store.state.zoConfig?.features, "super_cluster") !== "locked";
       return {
         regions: superCluster ? [...(searchObj.meta.regions ?? [])] : [],
         clusters: superCluster ? [...(searchObj.meta.clusters ?? [])] : [],
@@ -3873,7 +4061,9 @@ export default defineComponent({
           const entry = (searchObj.data.streamResults?.list ?? []).find(
             (item: any) => item?.name === stream,
           );
-          const days = Number(entry?.settings?.data_retention ?? 0);
+          const days =
+            Number(entry?.settings?.data_retention ?? 0) ||
+            inheritedRetentionDays(store.state, searchObj.data.stream.streamType);
           return days > 0 ? days : null;
         },
       };
@@ -4025,6 +4215,8 @@ export default defineComponent({
       showSearchCancelledState,
       showSearchCancelledNotice,
       showGuardEmptyState,
+      streamSwitchPending,
+      shownError,
       showGuardBanner,
       showGuardSearchJob,
       onGuardRunAnyway,
@@ -4047,6 +4239,7 @@ export default defineComponent({
       searchObj,
       searchBarRef,
       splitterModel,
+      filterBuilderGrowth,
       isMobile,
       mobileFieldsOpen,
       // loadPageData,
@@ -4062,6 +4255,7 @@ export default defineComponent({
       onFirstDataDetected,
       refreshData,
       setQuery,
+      loadSchemasBeforeSqlToggle,
       verifyOrganizationStatus,
       collapseFieldList,
       areStreamsPresent,
@@ -4082,9 +4276,14 @@ export default defineComponent({
       onChangeInterval,
       onAutoIntervalTrigger,
       showSearchHistoryfn,
+      openSearchHistory,
       isAiEnabled,
       onSelectStream,
       onPickStream,
+      drillDownStreamSelectRef,
+      drillDownPickerStreams,
+      drillDownShowsDashboard,
+      onDrillDownStreamChange,
       onWidenRange,
       onRemoveFilter,
       onAskAiFixQuery,
@@ -4219,7 +4418,8 @@ export default defineComponent({
       if (this.searchObj.meta.sqlMode) parsedSQL = this.fnParsedSQL();
 
       if (this.searchObj.meta?.showHistogram && !this.searchObj?.shouldIgnoreWatcher) {
-        this.searchObj.data.queryResults.aggs = [];
+        // The page total is summed from aggs, so drop them only when a refetch replaces them.
+        if (this.searchObj.meta.histogramDirtyFlag) this.searchObj.data.queryResults.aggs = [];
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(this.t("search.histogramUnavailableForQueries"), -1);
@@ -4312,7 +4512,8 @@ export default defineComponent({
         if (this.searchObj.meta.sqlModeManualTrigger) {
           this.searchObj.meta.sqlModeManualTrigger = false;
         } else {
-          this.setQuery(newVal);
+          await this.loadSchemasBeforeSqlToggle();
+          if (this.searchObj.meta.sqlMode) this.setQuery(newVal);
         }
       } else {
         this.searchObj.meta.sqlMode = false;

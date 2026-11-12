@@ -36,6 +36,7 @@ import useProductAnalytics, { resetProductAnalytics } from "./useProductAnalytic
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import type { SavedFunnel } from "@/utils/rum/productAnalyticsModel";
 import type { FunnelDef } from "@/utils/rum/productAnalyticsQueries";
+import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
 
 const store = createStore({
   state: { selectedOrganization: { identifier: "org1" }, timezone: "UTC", zoConfig: {} },
@@ -187,6 +188,25 @@ describe("useFunnelDraft", () => {
       });
       expect(router.currentRoute.value.name).toBe(PA_ROUTES.funnelBuilder);
       await router.push("/logs");
+      expect(router.currentRoute.value.name).toBe("logs");
+    });
+
+    it("a forced sign-out offers only Discard, which cannot be dismissed", async () => {
+      await mountAt("/product-analytics/funnels/build?app=web");
+      openEdited();
+      beginDraftSignOut({ forced: true });
+      try {
+        await router.push("/logs");
+      } finally {
+        cancelDraftSignOut();
+      }
+      expect(confirmMock).toHaveBeenCalledTimes(1);
+      expect(confirmMock.mock.calls[0][0]).toMatchObject({
+        message:
+          "Your password changed, so you are being signed out and your unsaved changes here cannot be saved. They will be discarded.",
+        confirmLabel: "Discard",
+        confirmOnly: true,
+      });
       expect(router.currentRoute.value.name).toBe("logs");
     });
 

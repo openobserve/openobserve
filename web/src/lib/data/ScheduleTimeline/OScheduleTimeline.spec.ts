@@ -66,6 +66,7 @@ describe("OScheduleBand", () => {
     [1, "bg-schedule-band-1-bg"],
     [6, "bg-schedule-band-6-bg"],
     ["gap", "bg-schedule-gap-bg"],
+    ["off", "bg-surface-subtle"],
   ] as const)("paints tone %s from its own token", (tone, expected) => {
     const w = mount(OScheduleBand, { props: { band: band({ tone }) } });
     expect(w.classes().join(" ")).toContain(expected);
@@ -128,6 +129,21 @@ describe("OScheduleTimeline", () => {
   ] as const)("renders the now marker for nowOffset=%s → %s", (nowOffset, expected) => {
     const w = mount(OScheduleTimeline, { props: { tracks: [track()], nowOffset } });
     expect(w.find("[data-test='o2-schedule-timeline-now']").exists()).toBe(expected);
+  });
+
+  // A stack of day rows shares one clock time, but "now" is on one day only.
+  it("draws the now marker on the named track only", () => {
+    const w = mount(OScheduleTimeline, {
+      props: {
+        tracks: [track({ key: "mon" }), track({ key: "tue" })],
+        nowOffset: 0.5,
+        nowTrackKey: "tue",
+      },
+    });
+    expect(w.findAll("[data-test='o2-schedule-timeline-now']")).toHaveLength(1);
+    expect(
+      w.find("[data-test='o2-schedule-track-tue'] [data-test='o2-schedule-timeline-now']").exists(),
+    ).toBe(true);
   });
 
   it("lets a caller replace a band through the #band slot", () => {
@@ -236,6 +252,26 @@ describe("OScheduleTimeline", () => {
     expect(w.find("[data-test='o2-schedule-timeline-now-label']").text()).toBe("18 Aug, 09:59");
   });
 
+  /// Lane headers span the plot, so a line over the whole plot crosses the rotation names.
+  it("draws the now line inside each lane, with the stamp kept in the top row", () => {
+    const w = mount(OScheduleTimeline, {
+      props: {
+        tracks: [track(), track({ key: "t2" })],
+        laneHeaders: true,
+        nowOffset: 0.25,
+        nowLabel: raw("18 Aug, 09:59"),
+      },
+    });
+
+    const lanes = w.findAll("[data-test='o2-schedule-timeline-now-lane']");
+    expect(lanes).toHaveLength(2);
+    for (const lane of lanes) expect(lane.classes()).not.toContain("md:hidden");
+    expect(w.find("[data-test='o2-schedule-timeline-now']").classes()).toContain("bg-transparent");
+    expect(w.find("[data-test='o2-schedule-timeline-now-label']").classes()).not.toContain(
+      "max-md:hidden",
+    );
+  });
+
   /// Paging forward must not pin the marker to an edge and imply the present
   /// is inside a window it is not in.
   it("drops the now line, and its stamp, when the window has moved off it", () => {
@@ -277,6 +313,24 @@ describe("OScheduleTimeline", () => {
 
     expect(w.find("[data-test='o2-schedule-timeline-hover']").exists()).toBe(true);
     expect(w.find("[data-test='o2-schedule-timeline-hover-label']").text()).toBe("20 Aug, 14:00");
+    w.unmount();
+  });
+
+  /// A menu open over the plot holds the pointer, so the caller can put the frozen line away.
+  it("hides the hovered instant while the caller asks", async () => {
+    const w = mount(OScheduleTimeline, {
+      props: { tracks: [track()], laneHeaders: true, hoverLabel: raw("20 Aug, 14:00") },
+      attachTo: document.body,
+    });
+    const plot = w.find("[data-test='o2-schedule-timeline'] > div");
+    plot.element.getBoundingClientRect = () => ({ left: 0, right: 200, width: 200 }) as DOMRect;
+    await plot.trigger("mousemove", { clientX: 100 });
+    await w.setProps({ hideHover: true });
+
+    expect(w.find("[data-test='o2-schedule-timeline-hover']").exists()).toBe(false);
+    expect(w.find("[data-test='o2-schedule-timeline-hover-label']").exists()).toBe(false);
+    await w.setProps({ hideHover: false });
+    expect(w.find("[data-test='o2-schedule-timeline-hover']").exists()).toBe(true);
     w.unmount();
   });
 

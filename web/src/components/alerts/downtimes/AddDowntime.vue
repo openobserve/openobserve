@@ -162,7 +162,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="m"
                   :value="m"
                   size="sm"
-                  :icon-left="MODULE_ICONS[m]"
+                  :icon-left="moduleLocks[m].locked.value ? 'lock' : MODULE_ICONS[m]"
+                  :disabled="moduleLocks[m].locked.value"
+                  :focusable-unavailable="moduleLocks[m].locked.value"
+                  :tooltip="
+                    moduleLocks[m].locked.value ? moduleLocks[m].lockedReason.value : undefined
+                  "
                   :data-test="`add-downtime-module-${m}`"
                 >
                   {{ t(MODULE_LABEL_KEYS[m]) }}
@@ -367,17 +372,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p class="text-text-secondary text-xs">{{ t("alerts.downtimes.muteAllDialog.outro") }}</p>
       </div>
     </ODialog>
+    <EditorDraftDialogs :draft="downtimeDraft" />
   </OForm>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
 import { useAutoName } from "@/composables/useAutoName";
-import { useDowntimeItems } from "@/composables/downtimes/useDowntimeItems";
+import { useDowntimeItems, useTargetModuleLocks } from "@/composables/downtimes/useDowntimeItems";
 import { useDefaultDowntimeFolder } from "@/composables/downtimes/useDefaultDowntimeFolder";
 import { foldersQuery, optionalFoldersQuery } from "@/services/common.queries";
 import {
@@ -439,6 +445,8 @@ import DowntimeNotifySection from "./DowntimeNotifySection.vue";
 import DowntimePreviewPane from "./DowntimePreviewPane.vue";
 import DowntimeSummary from "./DowntimeSummary.vue";
 import { browserTimezone } from "@/utils/timezoneAliases";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 
 type DowntimeTab = "targets" | "schedule" | "advanced";
 
@@ -462,7 +470,10 @@ const queryList = (value: unknown): string[] =>
     .filter(Boolean);
 
 const browserZone = browserTimezone();
-const prefillModule = MODULE_ORDER.find((m) => m === route.query.module);
+const moduleLocks = useTargetModuleLocks();
+const prefillModule = MODULE_ORDER.find(
+  (m) => m === route.query.module && !moduleLocks[m].locked.value,
+);
 
 // A new downtime without a folder in the URL is filed where the user may create one.
 const folderDefault = useDefaultDowntimeFolder();
@@ -490,7 +501,9 @@ const alertFolders = useQuery(() =>
   Object.assign(optionalFoldersQuery(orgId.value, "alerts"), { enabled: !!orgId.value }),
 );
 const syntheticFolders = useQuery(() =>
-  Object.assign(optionalFoldersQuery(orgId.value, "synthetics"), { enabled: !!orgId.value }),
+  Object.assign(optionalFoldersQuery(orgId.value, "synthetics"), {
+    enabled: !!orgId.value && !moduleLocks.synthetics.locked.value,
+  }),
 );
 const detailQuery = useQuery(() =>
   Object.assign(downtimeDetailQuery(orgId.value, sourceId.value, sourceFolder), {
@@ -542,6 +555,8 @@ const MATCHED_KEYS = {
 } as const satisfies Record<TargetModule, I18nKey>;
 
 const staleMessage = ref<I18nText | null>(null);
+// Set while the leave dialog's Save runs, so a successful save does not navigate itself.
+let leaveSave: { saved: boolean } | null = null;
 
 const save = async (submitted: DowntimeFormValues) => {
   const body = buildDowntimeRequest(submitted);
@@ -554,6 +569,11 @@ const save = async (submitted: DowntimeFormValues) => {
         ? t("toastMessages.downtimes.updated")
         : t("toastMessages.downtimes.created"),
     });
+    if (leaveSave) {
+      leaveSave.saved = true;
+      return;
+    }
+    downtimeDraft.markSaved();
     await router.push({
       name: "downtimes",
       query: { org_identifier: orgId.value, folder: body.folder_id },
@@ -643,6 +663,16 @@ watch(
   () => values.value.modules,
   (modules) => (listedModules.value = [...modules]),
 );
+// The org config can land after mount; a new downtime then drops a module its license locks.
+watch(
+  () => MODULE_ORDER.filter((m) => moduleLocks[m].locked.value),
+  (locked) => {
+    if (isEdit.value || !locked.length) return;
+    const kept = values.value.modules.filter((m) => !locked.includes(m));
+    if (kept.length !== values.value.modules.length) form.setFieldValue("modules", kept);
+  },
+  { immediate: true },
+);
 const folderId = computed(() => values.value.folder_id);
 const setFolder = (value: string) => form.setFieldValue("folder_id", value || "default");
 
@@ -655,7 +685,7 @@ watch(folderDefault.folderId, (next, prev) => {
 // The permitted folder list answered empty, so a new downtime has nowhere to be filed.
 const noFolder = computed(() => !isEdit.value && folderDefault.folderId.value === null);
 
-// Edit and Duplicate load the saved row once; the condition builder remounts on it.
+// Edit and Duplicate load the saved row once; the condition builder follows the form value.
 const resetToken = ref(0);
 const loadedFrom = ref("");
 const loadRow = (row: DowntimeDetail) => {
@@ -757,27 +787,31 @@ const showSchedule = () => {
   void nextTick(() => schedulePane.value?.scrollIntoView?.({ block: "start" }));
 };
 
-// A failed submit opens the tab that owns the first error, then brings it into view.
-const onSaveClick = (event: MouseEvent) => {
+// A failed submit opens the tab that owns the first error, then brings it into view; false stops the save to show the schedule.
+const prepareSave = (): boolean => {
   const result = schema.safeParse(form.state.values);
   if (result.success) {
-    if (scheduleSeen.value) return;
-    event.preventDefault();
+    if (scheduleSeen.value) return true;
     showSchedule();
-    return;
+    return false;
   }
   activeTab.value = tabForPath((result.error.issues[0]?.path ?? []) as (string | number)[]);
   void nextTick(() => scrollToFirstError());
+  return true;
+};
+
+const onSaveClick = (event: MouseEvent) => {
+  if (!prepareSave()) event.preventDefault();
 };
 
 // ── Preview ─────────────────────────────────────────────────────────────────
 const previewBody = ref<PreviewRequest | null>(null);
 let previewTimer: ReturnType<typeof setTimeout> | undefined;
 
-// A half-typed row keeps the last preview instead of blanking it.
+// A half-typed row, or an open block with no condition yet, keeps the last preview instead of blanking it.
 const conditionIncomplete = computed(() => {
-  const condition = buildCondition(values.value);
-  return !!condition && conditionError(condition) !== null;
+  const open = values.value.condition_open && values.value.modules.some(hasIdentity);
+  return open && conditionError(buildCondition(values.value) ?? null) !== null;
 });
 
 const previewInput = computed((): PreviewRequest | null => {
@@ -840,6 +874,65 @@ const bannerCounts = computed(() =>
 );
 
 const request = computed(() => buildDowntimeRequest(values.value));
+
+// The stored settings only: status and match counts move on their own and must not read as a server edit.
+const storedDowntime = (row: DowntimeDetail | undefined) =>
+  row
+    ? {
+        name: row.name,
+        folder_id: row.folder_id,
+        reason: row.reason ?? "",
+        condition: row.condition ?? null,
+        targets: row.targets,
+        schedule: row.schedule,
+        show_banner: row.show_banner,
+        notifications: row.notifications ?? null,
+        version: row.version ?? null,
+      }
+    : null;
+
+const detailMissing = computed(() => {
+  const err = detailQuery.error.value as { status?: number; response?: { status?: number } } | null;
+  return isEdit.value && (err?.status === 404 || err?.response?.status === 404);
+});
+
+const downtimeDraft = useEditorDraft<DowntimeFormValues>({
+  kind: "downtime",
+  entityLabel: () => t("common.editorDraft.entities.downtime"),
+  entityId: () => editId.value || null,
+  newVariant: () => (duplicateId.value ? `clone:${duplicateId.value}` : null),
+  snapshot: () => ({ ...values.value }),
+  apply: (data) => {
+    // The loaded version is kept, so saving the draft replaces a newer server row as the restore dialog warns.
+    form.reset({ ...data, version: values.value.version });
+    resetToken.value += 1;
+  },
+  base: () => (isEdit.value ? storedDowntime(detailQuery.data.value) : undefined),
+  save: async () => {
+    if (!prepareSave()) return false;
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+});
+
+// Edit and Duplicate start once their row is in the form; a missing row starts so its draft is dropped.
+const draftReady = computed(
+  () => !sourceId.value || loadedFrom.value === sourceId.value || detailMissing.value,
+);
+let draftStarted = false;
+const startDraft = () => {
+  if (draftStarted || !draftReady.value) return;
+  draftStarted = true;
+  void downtimeDraft.start();
+};
+onMounted(startDraft);
+watch(draftReady, startDraft);
 
 // ── Navigation ──────────────────────────────────────────────────────────────
 const goBack = () =>

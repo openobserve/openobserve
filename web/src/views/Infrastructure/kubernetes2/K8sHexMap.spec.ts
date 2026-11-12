@@ -118,7 +118,7 @@ const mountMap = async (
   over: Partial<{
     group: MapGroup;
     selectedKey: string | null;
-    highlight: string[];
+    hidden: string[];
     legend: boolean;
   }> = {},
 ) => {
@@ -132,7 +132,7 @@ const mountMap = async (
       fill: "memLim",
       groups,
       headers: headersOf(groups),
-      highlight: over.highlight ?? [],
+      hidden: over.hidden ?? [],
       selectedKey: over.selectedKey ?? null,
       label: raw("Map of 5 pods grouped by node, filled by Memory % of limit"),
     },
@@ -563,18 +563,19 @@ describe("K8sHexMap dense groupings", () => {
 });
 
 describe("K8sHexMap highlight, selection and hover (AC 86, 88)", () => {
-  it("dims hexes outside the highlighted classes without moving any", async () => {
+  it("fades hexes in the hidden classes, silences them, and moves none", async () => {
     await mountMap();
     const layout = options().series[0].data.map((d: number[]) => [d[0], d[1]]);
-    await wrapper.setProps({ highlight: ["b5"] });
+    await wrapper.setProps({ hidden: ["b5"] });
     const order: PodRow[] = wrapper.props("groups").flatMap((g: RowGroup) => g.rows);
     order.forEach((row, i) => {
       const b5 = (row.memoryPctOfLimit ?? 0) >= 100;
-      expect(hexAt(i).style.opacity).toBe(b5 ? 1 : 0.2);
+      expect(hexAt(i).style.opacity).toBe(b5 ? 0.12 : 1);
+      expect(hexAt(i).silent).toBe(b5);
     });
     expect(order.filter((r) => (r.memoryPctOfLimit ?? 0) >= 100)).toHaveLength(1);
     expect(options().series[0].data.map((d: number[]) => [d[0], d[1]])).toEqual(layout);
-    await wrapper.setProps({ highlight: [] });
+    await wrapper.setProps({ hidden: [] });
     for (let i = 0; i < ROWS.length; i++) expect(hexAt(i).style.opacity).toBe(1);
   });
 

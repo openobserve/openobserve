@@ -1,0 +1,29 @@
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #f6f7f9;
+  color: #1d2129;
+}
+.bar {
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: #1f3a5f;
+  color: #ffffff;
+  font-size: 20px;
+}
+main {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+}
+.panel {
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #d5d9e0;
+  border-radius: 8px;
+}
+button {
+  padding: 8px 16px;
+  font-size: 16px;
+}

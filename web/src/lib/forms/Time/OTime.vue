@@ -3,6 +3,7 @@
 
 import type { TimeProps, TimeEmits, TimeSlots } from "./OTime.types";
 import { computed, ref, useAttrs, useId, watch } from "vue";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 import { PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent } from "reka-ui";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -31,6 +32,7 @@ const props = withDefaults(defineProps<TimeProps>(), {
 
 const emit = defineEmits<TimeEmits>();
 defineSlots<TimeSlots>();
+const isDisabled = useLockedDisabled(() => props.disabled);
 
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
@@ -157,7 +159,7 @@ function isClockNumSelected(num: ClockNum): boolean {
 
 // ── Clock interactions ─────────────────────────────────────────
 function onClockClick(num: ClockNum) {
-  if (props.disabled || props.readonly) return;
+  if (isDisabled.value || props.readonly) return;
 
   if (clockMode.value === "hour") {
     if (props.format24) {
@@ -255,12 +257,14 @@ function handleText24Change(e: Event) {
 
 // ── Native time input handler ───────────────────────────────
 function handleNativeTimeChange(e: Event) {
-  const val = (e.target as HTMLInputElement).value;
-  if (!val) {
+  const typed = (e.target as HTMLInputElement).value;
+  if (!typed) {
     emit("update:modelValue", "");
     emit("change", "");
     return;
   }
+  // A value set without seconds (autofill, scripted input) must still read as HH:MM:SS downstream.
+  const val = props.withSeconds && /^\d{2}:\d{2}$/.test(typed) ? `${typed}:00` : typed;
   const parts = val.split(":").map(Number);
   internalHour.value = parts[0] ?? 0;
   internalMinute.value = parts[1] ?? 0;
@@ -284,7 +288,7 @@ const fieldClasses = computed(() => [
     : "border-datepicker-border hover:border-datepicker-hover-border",
   "focus-within:border-datepicker-focus-border",
   "focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
-  props.disabled
+  isDisabled.value
     ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60 cursor-not-allowed"
     : "",
   heightClasses[props.size ?? "md"],
@@ -315,9 +319,9 @@ const fieldClasses = computed(() => [
         :id="inputId"
         role="group"
         :aria-invalid="hasError || undefined"
-        :aria-disabled="disabled || undefined"
+        :aria-disabled="isDisabled || undefined"
         :class="fieldClasses"
-        :data-disabled="disabled || undefined"
+        :data-disabled="isDisabled || undefined"
         :data-test="parentDataTest"
       >
         <PopoverTrigger
@@ -325,7 +329,7 @@ const fieldClasses = computed(() => [
           type="button"
           tabindex="-1"
           class="text-datepicker-icon flex shrink-0 cursor-pointer items-center ps-3 outline-none select-none focus-visible:opacity-80"
-          :disabled="disabled || undefined"
+          :disabled="isDisabled || undefined"
           :aria-label="t('components.time.openTimePicker')"
         >
           <OIcon name="schedule" size="sm" />
@@ -342,7 +346,7 @@ const fieldClasses = computed(() => [
           :tabindex="inputTabindex"
           :placeholder="placeholder ?? raw('HH:MM')"
           :maxlength="withSeconds ? 8 : 5"
-          :disabled="disabled || undefined"
+          :disabled="isDisabled || undefined"
           :readonly="readonly || undefined"
           :class="[
             'text-datepicker-text min-w-0 flex-1 bg-transparent ps-2 outline-none',
@@ -358,7 +362,7 @@ const fieldClasses = computed(() => [
           :value="modelValue ?? ''"
           :tabindex="inputTabindex"
           :step="withSeconds ? 1 : 60"
-          :disabled="disabled || undefined"
+          :disabled="isDisabled || undefined"
           :readonly="readonly || undefined"
           :class="[
             'text-datepicker-text min-w-0 flex-1 bg-transparent ps-2 outline-none',

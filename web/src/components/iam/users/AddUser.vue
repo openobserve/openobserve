@@ -111,34 +111,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="showLabelOnTop mt-2"
           data-test="user-role-field"
         />
-        <OFormSelect
+        <OTooltip
           v-if="
             (existingUser || beingUpdated) &&
             userRole !== 'member' &&
             store.state.userInfo.email !== formEmail &&
-            (config.isEnterprise == 'true' || config.isCloud == 'true')
+            (config.isEnterprise == 'true' || config.isCloud == 'true') &&
+            rbacState !== 'hidden'
           "
-          name="custom_role"
-          :label="t('user.customRole')"
-          :options="filterdOption"
-          class="showLabelOnTop mt-2"
-          multiple
-          data-test="user-custom-role-field"
-          :disable="
-            isCloud ? filterdOption.length === 0 : filterdOption.length === 0 || !!isExternalUser
-          "
-          :hint="
-            isCloud
-              ? filterdOption.length === 0
-                ? t('user.noCustomRolesHint')
-                : ''
-              : isExternalUser
-                ? t('user.externalUserCustomRoleHint')
-                : filterdOption.length === 0
-                  ? t('user.noCustomRolesHint')
-                  : ''
-          "
-        />
+          :content="rbacLockedReason"
+          :disabled="!rbacLocked"
+        >
+          <OFormSelect
+            name="custom_role"
+            :disabled="rbacLocked"
+            :label="t('user.customRole')"
+            :options="filterdOption"
+            class="showLabelOnTop mt-2"
+            multiple
+            data-test="user-custom-role-field"
+            :disable="
+              isCloud ? filterdOption.length === 0 : filterdOption.length === 0 || !!isExternalUser
+            "
+            :hint="
+              rbacLocked
+                ? ''
+                : isCloud
+                  ? filterdOption.length === 0
+                    ? t('user.noCustomRolesHint')
+                    : ''
+                  : isExternalUser
+                    ? t('user.externalUserCustomRoleHint')
+                    : filterdOption.length === 0
+                      ? t('user.noCustomRolesHint')
+                      : ''
+            "
+          >
+            <template v-if="rbacLocked" #icon-left>
+              <OIcon name="lock" size="sm" class="lock-chip" />
+            </template>
+          </OFormSelect>
+        </OTooltip>
         <div v-if="beingUpdated && !isCloud" class="mt-2">
           <OFormSwitch
             name="change_password"
@@ -256,7 +269,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount, watch, type PropType } from "vue";
+import {
+  computed,
+  defineComponent,
+  ref,
+  onActivated,
+  onBeforeMount,
+  watch,
+  type PropType,
+} from "vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -265,12 +286,8 @@ import { useRouter } from "vue-router";
 import userServiece from "@/services/users";
 import { userKeys } from "@/services/users.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
-import {
-  getImageURL,
-  useLocalCurrentUser,
-  useLocalUserInfo,
-  invalidateLoginData,
-} from "@/utils/zincutils";
+import { getImageURL } from "@/utils/zincutils";
+import { signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
 import config from "@/aws-exports";
 import { useReo } from "@/services/reodotdev_analytics";
 
@@ -290,6 +307,9 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import PasswordRequirementList from "@/components/common/PasswordRequirementList.vue";
 import { durationFormatter } from "@/utils/formatters";
 import { reuseRejection } from "@/utils/passwordComplexity";
+import { featureState } from "@/utils/featureGate";
+import { useLicenseLock } from "@/composables/useFeatureLock";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
@@ -318,6 +338,7 @@ export default defineComponent({
     OFormSelect,
     OFormSwitch,
     OTruncatedText,
+    OTooltip,
     PasswordRequirementList,
   },
   props: {
@@ -411,6 +432,10 @@ export default defineComponent({
     // `custom_role` is an Enterprise/Cloud-only concept — the field is rendered
     // and hydrated (getUserRoles) ONLY under this flag.
     const supportsCustomRole = config.isEnterprise == "true" || config.isCloud == "true";
+    // Custom roles cannot be listed without the rbac license, so the picker would stay empty.
+    const rbacState = computed(() => featureState(store.state.zoConfig?.features, "rbac"));
+    const rbacLocked = computed(() => rbacState.value === "locked");
+    const { lockedReason: rbacLockedReason } = useLicenseLock("rbac");
 
     // Decide whether to send `custom_role`:
     //   • OSS → never (the field is Enterprise/Cloud-only).
@@ -521,7 +546,7 @@ export default defineComponent({
             // without a remount.
             existingUser.value = false;
           } else {
-            if (err.response?.status != 403 || err?.status != 403) {
+            if (err.response?.status !== 403 && err?.status !== 403) {
               toast({
                 variant: "error",
                 message: raw(err.response?.data?.message) || t("toastMessages.iam.userSaveFailed"),
@@ -733,6 +758,9 @@ export default defineComponent({
       existingUser,
       organization,
       isExternalUser,
+      rbacState,
+      rbacLocked,
+      rbacLockedReason,
       changePassword,
       formEmail,
       formRole,
@@ -754,7 +782,6 @@ export default defineComponent({
       logout_confirm,
       loggedInUserEmail,
       filterdOption,
-      invalidateLoginData,
       config,
       filterFn(val: any, update: any) {
         if (val === "") {
@@ -775,15 +802,8 @@ export default defineComponent({
   },
   methods: {
     signout() {
-      // Always call backend logout to clear auth cookies
-      this.invalidateLoginData();
-
-      this.store.dispatch("logout");
-
-      useLocalCurrentUser("", true);
-      useLocalUserInfo("", true);
-
-      this.$router.push("/logout");
+      // The user's own password changed, so the old session is over whatever an open editor answers.
+      void signOutThroughLeaveGuards(this.$router, this.store, { forced: true });
     },
   },
   computed: {

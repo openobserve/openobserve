@@ -172,9 +172,17 @@ export class ReportFoldersPage {
     if (description) {
       await this.fillFolderDescription(description);
     }
+    // The POST can queue ~30s behind a server DB-pool stall while Save stays disabled, so wait on it rather than the dialog.
+    const createResponse = this.page.waitForResponse(
+      (res) => res.request().method() === 'POST' && /\/api\/v2\/[^/]+\/folders\/reports$/.test(new URL(res.url()).pathname),
+      { timeout: 45000 }
+    );
     await this.clickSaveFolder();
-    // Wait for the dialog to close after save
-    await this.folderDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    const res = await createResponse;
+    if (!res.ok()) {
+      throw new Error(`Create folder "${name}" failed: HTTP ${res.status()} ${await res.text().catch(() => '')}`);
+    }
+    await this.folderDialog.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
   }
 
   async expectFolderTabVisible(folderName) {
@@ -183,9 +191,9 @@ export class ReportFoldersPage {
     await expect.poll(async () => {
       const id = await this.resolveFolderIdByName(folderName);
       return id ? 'ready' : 'pending';
-    }, { timeout: 10000 }).toBe('ready');
+    }, { timeout: 30000 }).toBe('ready');
     const tab = await this.getTabByName(folderName);
-    await expect(tab).toBeVisible({ timeout: 10000 });
+    await expect(tab).toBeVisible({ timeout: 15000 });
   }
 
   async expectFolderTabNotVisible(folderName) {

@@ -15,14 +15,8 @@
 
 import { CUSTOM_VALUE, SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { escapeSingleQuotes, splitQuotedString } from "@/utils/zincutils";
-import {
-  conditionToLegacyFilter,
-  getFilterGroupConditions,
-  getVariableFilterGroup,
-  renderFilterGroup,
-  type LegacyVariableFilter,
-  type VariableFilterGroup,
-} from "./variableFilterGroupUtils";
+import type { DashboardFilterGroup } from "@/components/filterBar/codecs/dashboardFilterCodec";
+import { joinConditions } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import {
   normalizeVariableSyntax,
   replaceVariablePlaceholders,
@@ -62,13 +56,20 @@ export const PROMQL_FILTER_OPERATORS: readonly string[] = [
   "Is Not Null",
 ];
 
+/** One `{ name, operator, value }` row of the flat `query_data.filter` array. */
+export interface VariableFilterRow {
+  name?: string;
+  operator?: string;
+  value?: string;
+}
+
 export interface QueryVariableData {
   stream_type?: string;
   stream?: string;
   field?: string;
   max_record_size?: unknown;
-  filter?: LegacyVariableFilter[] | null;
-  filter_group?: VariableFilterGroup | null;
+  filter?: VariableFilterRow[] | null;
+  filter_group?: DashboardFilterGroup | null;
   query_type?: string;
   custom_query?: boolean;
   query?: string;
@@ -174,21 +175,33 @@ const SINGLE_PLACEHOLDER =
   /^'?(?:\$\{\s*([a-zA-Z0-9_-]+)\s*\}|\$([a-zA-Z0-9_-]+)|\{\{\s*([a-zA-Z0-9_-]+)\s*\}\})'?$/;
 
 /** Turns `= $var` / `!= $var` into IN / NOT IN when `$var` currently holds a list, since `= 'a', 'b'` is invalid SQL. */
-export const expandMultiValueFilter = <T extends { operator?: string; value?: string }>(
+export const expandMultiValueFilter = <T extends { operator?: string | null; value?: unknown }>(
   filter: T,
   valueOf: (name: string) => unknown,
 ): T => {
-  if (filter.operator !== "=" && filter.operator !== "!=") return filter;
+  const negated = filter.operator === "!=" || filter.operator === "<>";
+  if (filter.operator !== "=" && !negated) return filter;
   const match = SINGLE_PLACEHOLDER.exec(String(filter.value ?? "").trim());
   const name = match && (match[1] ?? match[2] ?? match[3]);
   if (!name || !Array.isArray(valueOf(name))) return filter;
-  return { ...filter, operator: filter.operator === "=" ? "IN" : "NOT IN" };
+  return { ...filter, operator: negated ? "NOT IN" : "IN" };
 };
 
-/** The `label_values(metric{matchers}, label)` query an auto PromQL variable runs. */
+// Walks the saved JSON: the filter codecs reach the app store, which this module's many importers must not load.
+const groupLeafValues = (node: any): string[] =>
+  node?.filterType === "group"
+    ? (node.conditions ?? []).flatMap(groupLeafValues)
+    : [String(node?.value ?? ""), ...(node?.values ?? []).map(String)];
+
+/** Every filter value of a variable, from both saved shapes, for `$var` dependency scans. */
+export const getVariableFilterValues = (queryData?: QueryVariableData | null): string[] => [
+  ...(queryData?.filter ?? []).map((filter: any) => String(filter?.filter || filter?.value || "")),
+  ...(queryData?.filter_group ? groupLeafValues(queryData.filter_group) : []),
+];
+
+/** The `label_values(metric{matchers}, label)` query an auto PromQL variable runs; a PromQL variable saves only AND rows. */
 export const buildAutoPromqlQuery = (queryData?: QueryVariableData | null): string => {
-  const matchers = getFilterGroupConditions(getVariableFilterGroup(queryData))
-    .map(conditionToLegacyFilter)
+  const matchers = (queryData?.filter ?? [])
     .filter(
       (filter) =>
         (filter?.name ?? "").trim() && PROMQL_FILTER_OPERATORS.includes(filter.operator ?? ""),
@@ -244,23 +257,46 @@ const sqlCondition = (filter: { name?: string; operator?: string; value?: string
   }
 };
 
-const usableSqlFilter = (filter: LegacyVariableFilter): boolean =>
+const usableSqlFilter = (filter: VariableFilterRow): boolean =>
   !!(filter?.name ?? "").trim() || filter?.operator === "match_all";
 
-/** The WHERE expression for a filter group; `mapFilter` rewrites each condition first, e.g. `= $var` to IN. */
-export const buildFilterGroupSql = (
-  group: VariableFilterGroup,
-  mapFilter: (filter: LegacyVariableFilter) => LegacyVariableFilter = (filter) => filter,
+/** The flat rows ANDed as addLabelsToSQlQuery writes them; `mapFilter` rewrites each row first, e.g. `= $var` to IN. */
+export const buildFilterRowsSql = (
+  rows: VariableFilterRow[],
+  mapFilter: (filter: VariableFilterRow) => VariableFilterRow = (filter) => filter,
 ): string =>
-  renderFilterGroup(group, (condition) => {
-    const filter = conditionToLegacyFilter(condition);
-    return usableSqlFilter(filter) ? sqlCondition(mapFilter(filter)) : "";
-  });
+  rows
+    .filter(usableSqlFilter)
+    .map((row) => sqlCondition(mapFilter(row)))
+    .filter(Boolean)
+    .join(" AND ");
+
+// The panel builder only reads joins and stream schemas from it; a variable has neither.
+const VARIABLE_PANEL_CONTEXT = {
+  data: { queries: [{ fields: {}, joins: [] }] },
+  layout: { currentQueryIndex: 0 },
+  meta: {},
+};
+
+const mapGroupLeaves = (group: any, mapLeaf: (leaf: any) => any): any => ({
+  ...group,
+  conditions: (group?.conditions ?? []).map((node: any) =>
+    node?.filterType === "group" ? mapGroupLeaves(node, mapLeaf) : mapLeaf(node),
+  ),
+});
+
+/** The WHERE expression the panel builder writes for a `filter_group`; `mapLeaf` rewrites each leaf first. */
+export const buildFilterGroupSql = (
+  group: DashboardFilterGroup,
+  mapLeaf: (leaf: any) => any = (leaf) => leaf,
+): string => joinConditions(mapGroupLeaves(group, mapLeaf).conditions, VARIABLE_PANEL_CONTEXT);
 
 /** The SQL an auto variable stands for, used to prefill the custom editor. */
 export const buildAutoSqlQuery = (queryData?: QueryVariableData | null): string => {
   const base = `SELECT DISTINCT "${queryData?.field ?? ""}" FROM "${queryData?.stream ?? ""}"`;
-  const where = buildFilterGroupSql(getVariableFilterGroup(queryData));
+  const where = queryData?.filter_group
+    ? buildFilterGroupSql(queryData.filter_group)
+    : buildFilterRowsSql(queryData?.filter ?? []);
   return where ? `${base} WHERE ${where}` : base;
 };
 

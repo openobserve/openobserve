@@ -13,49 +13,58 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Profiles query HTTP APIs (meta / tag_values / series / merge).
+//! Profiles query HTTP APIs (meta / tag_values / series / merge / diff).
 
+pub mod diff;
 pub mod merge;
 pub mod meta;
 pub mod series;
 pub mod tag_values;
 
+use arrow_schema::Schema;
 use axum::{Json, extract::rejection::JsonRejection, http::Method, response::Response};
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
+        alerts::{Operator, condition_ops::validate_condition_value},
         search::{Query, Request, RequestEncoding, Response as SearchResponse, SearchEventType},
         stream::StreamType,
         traces::session::{quote_identifier, quote_sql_string},
     },
     utils::json,
 };
+pub use diff::diff_profiles;
 use hashbrown::HashMap;
 pub use merge::{merge_profiles, merge_profiles_get};
 pub use meta::get_profiles_meta;
 use openobserve_core::profiles::query::{
-    is_filterable_column, is_safe_filter_key, normalize_tag_key,
+    INSTANCE_KEY_COLUMNS, is_filterable_column, is_safe_filter_key, normalize_tag_key,
 };
 use search_service as SearchService;
 use serde::{Deserialize, Serialize};
 pub use series::{profiles_series, profiles_series_get};
 pub use tag_values::get_profiles_tag_values;
-use tracing::{Instrument, Span};
+use tracing::{Instrument, Span, warn};
 use utoipa::ToSchema;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    search::error_utils::map_error_to_http_response,
+    search::{error_utils::map_error_to_http_response, utils::enrich_field_error},
 };
 
-const DEFAULT_RESULT_SIZE: i64 = 50_000;
+const DEFAULT_RESULT_SIZE: i64 = 99_999;
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
 pub struct ProfileFilter {
     pub key: String,
+    /// `=` (default), `!=`, `=~` (regex), `!~` (negated regex), `in` or `not_in`.
     #[serde(default = "default_eq_op")]
     pub op: String,
+    #[serde(default)]
     pub value: String,
+    /// List for `in`/`not_in`; when empty, `value` is split on commas instead.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub values: Vec<String>,
 }
 
 fn default_eq_op() -> String {
@@ -64,7 +73,10 @@ fn default_eq_op() -> String {
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
 pub struct ProfilesQueryBody {
+    /// Missing reads as 0 so `parse_required_time_range` reports it, not the JSON parser.
+    #[serde(default)]
     pub start_time: i64,
+    #[serde(default)]
     pub end_time: i64,
     #[serde(default)]
     pub data_source: Option<String>,
@@ -82,6 +94,12 @@ pub struct ProfilesQueryBody {
     pub max_nodes: Option<usize>,
     #[serde(default)]
     pub timeout: Option<i64>,
+    /// Label column that splits `series` into `groups` (series endpoint only).
+    #[serde(default)]
+    pub group_by: Option<String>,
+    /// Groups returned before the rest fold into one `others` group: 1..=50, default 10.
+    #[serde(default)]
+    pub group_limit: Option<usize>,
 }
 
 pub(crate) async fn check_stream_permissions(
@@ -114,7 +132,9 @@ pub(crate) async fn check_stream_permission(
     user_id: &str,
 ) -> Result<(), Response> {
     #[cfg(feature = "enterprise")]
-    if let Err(e) = search_service::check_search_allowed(org_id, Some(stream_name)) {
+    if let Err(e) =
+        search_service::check_search_allowed(org_id, Some((stream_name, StreamType::Profiles)))
+    {
         return Err(MetaHttpResponse::too_many_requests(e.to_string()));
     }
     if let Some(response) = check_stream_permissions(org_id, stream_name, user_id).await {
@@ -156,16 +176,12 @@ pub(crate) fn parse_time_range_from_params(
     parse_required_time_range(start_time, end_time)
 }
 
-pub(crate) fn query_body_from_params(params: &HashMap<String, String>) -> ProfilesQueryBody {
-    ProfilesQueryBody {
-        start_time: params
-            .get("start_time")
-            .and_then(|v| v.parse().ok())
-            .unwrap_or_default(),
-        end_time: params
-            .get("end_time")
-            .and_then(|v| v.parse().ok())
-            .unwrap_or_default(),
+pub(crate) fn query_body_from_params(
+    params: &HashMap<String, String>,
+) -> Result<ProfilesQueryBody, Response> {
+    Ok(ProfilesQueryBody {
+        start_time: parse_param(params, "start_time")?.unwrap_or_default(),
+        end_time: parse_param(params, "end_time")?.unwrap_or_default(),
         data_source: params.get("data_source").cloned().filter(|s| !s.is_empty()),
         service_name: params
             .get("service_name")
@@ -179,30 +195,46 @@ pub(crate) fn query_body_from_params(params: &HashMap<String, String>) -> Profil
             .get("profile_unit")
             .cloned()
             .filter(|s| !s.is_empty()),
-        filters: parse_filters_param(params.get("filters").map(|s| s.as_str())),
+        filters: parse_filters_param(params.get("filters").map(|s| s.as_str()))?,
         step: params.get("step").cloned().filter(|s| !s.is_empty()),
-        max_nodes: params.get("max_nodes").and_then(|v| v.parse().ok()),
-        timeout: params.get("timeout").and_then(|v| v.parse().ok()),
+        max_nodes: parse_param(params, "max_nodes")?,
+        timeout: parse_param(params, "timeout")?,
+        group_by: params.get("group_by").cloned().filter(|s| !s.is_empty()),
+        group_limit: parse_param(params, "group_limit")?,
+    })
+}
+
+/// An empty value counts as absent; anything else must parse.
+fn parse_param<T: std::str::FromStr>(
+    params: &HashMap<String, String>,
+    key: &str,
+) -> Result<Option<T>, Response> {
+    match params.get(key).filter(|v| !v.is_empty()) {
+        None => Ok(None),
+        Some(v) => v
+            .parse()
+            .map(Some)
+            .map_err(|_| MetaHttpResponse::bad_request(format!("Invalid {key} parameter"))),
     }
 }
 
 /// `filters` query param: `key=value,key2=value2`. Each side is percent-encoded.
-fn parse_filters_param(raw: Option<&str>) -> Vec<ProfileFilter> {
+fn parse_filters_param(raw: Option<&str>) -> Result<Vec<ProfileFilter>, Response> {
     let Some(raw) = raw.filter(|s| !s.is_empty()) else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
     raw.split(',')
-        .filter_map(|pair| {
-            let (key, value) = pair.split_once('=')?;
-            let key = decode_filter_component(key);
-            let value = decode_filter_component(value);
-            if key.is_empty() {
-                return None;
-            }
-            Some(ProfileFilter {
+        .map(|pair| {
+            let (key, value) = pair
+                .split_once('=')
+                .map(|(k, v)| (decode_filter_component(k), decode_filter_component(v)))
+                .filter(|(k, _)| !k.is_empty())
+                .ok_or_else(|| MetaHttpResponse::bad_request(format!("invalid filter: {pair}")))?;
+            Ok(ProfileFilter {
                 key,
                 op: "=".to_string(),
                 value,
+                values: Vec::new(),
             })
         })
         .collect()
@@ -213,6 +245,76 @@ fn decode_filter_component(raw: &str) -> String {
     urlencoding::decode(trimmed)
         .map(|value| value.into_owned())
         .unwrap_or_else(|_| trimmed.to_string())
+}
+
+/// One label filter as SQL on an already validated column.
+fn filter_predicate(col: &str, filter: &ProfileFilter) -> Result<String, String> {
+    let quoted = quote_identifier(col);
+    match filter.op.as_str() {
+        "=" => Ok(format!("{quoted} = {}", quote_sql_string(&filter.value))),
+        "!=" | "<>" => Ok(format!("{quoted} != {}", quote_sql_string(&filter.value))),
+        "=~" | "!~" | "re_match" | "re_not_match" => {
+            let negated = matches!(filter.op.as_str(), "!~" | "re_not_match");
+            let operator = if negated {
+                Operator::ReNotMatch
+            } else {
+                Operator::ReMatch
+            };
+            validate_condition_value(
+                &filter.key,
+                &operator,
+                &serde_json::Value::String(filter.value.clone()),
+                false,
+            )?;
+            // regexp_like, not the re_match UDF, so the pattern runs exactly as validated.
+            let negation = if negated { "NOT " } else { "" };
+            Ok(format!(
+                "{negation}regexp_like({quoted}, {})",
+                quote_sql_string(&filter.value)
+            ))
+        }
+        "in" | "IN" | "not_in" | "NOT IN" => {
+            let negated = matches!(filter.op.as_str(), "not_in" | "NOT IN");
+            let values: Vec<String> = if filter.values.is_empty() {
+                filter
+                    .value
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|v| !v.is_empty())
+                    .map(str::to_string)
+                    .collect()
+            } else {
+                filter.values.clone()
+            };
+            let operator = if negated {
+                Operator::NotIn
+            } else {
+                Operator::In
+            };
+            validate_condition_value(
+                &filter.key,
+                &operator,
+                &serde_json::Value::Array(
+                    values
+                        .iter()
+                        .cloned()
+                        .map(serde_json::Value::String)
+                        .collect(),
+                ),
+                false,
+            )?;
+            let list = values
+                .iter()
+                .map(|v| quote_sql_string(v))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let keyword = if negated { "NOT IN" } else { "IN" };
+            Ok(format!("{quoted} {keyword} ({list})"))
+        }
+        other => Err(format!(
+            "unsupported filter op '{other}'; use =, !=, =~, !~, in or not_in"
+        )),
+    }
 }
 
 pub(crate) fn build_where_clause(body: &ProfilesQueryBody) -> Result<String, Response> {
@@ -248,37 +350,37 @@ pub(crate) fn build_where_clause(body: &ProfilesQueryBody) -> Result<String, Res
     }
 
     for filter in &body.filters {
-        if filter.op != "=" {
-            return Err(MetaHttpResponse::bad_request(
-                "only filter op '=' is supported",
-            ));
-        }
-        if !is_safe_filter_key(&filter.key) {
+        let Some(col) = label_column(&filter.key) else {
             return Err(MetaHttpResponse::bad_request(format!(
                 "invalid filter key: {}",
                 filter.key
             )));
-        }
-        let column_key = normalize_tag_key(&filter.key);
-        if !is_filterable_column(&filter.key) && !is_filterable_column(&column_key) {
-            return Err(MetaHttpResponse::bad_request(format!(
-                "invalid filter key: {}",
-                filter.key
-            )));
-        }
-        let col = if is_filterable_column(&filter.key) && !filter.key.contains('.') {
-            filter.key.as_str()
-        } else {
-            column_key.as_str()
         };
-        parts.push(format!(
-            "{} = {}",
-            quote_identifier(col),
-            quote_sql_string(&filter.value)
-        ));
+        parts.push(filter_predicate(&col, filter).map_err(MetaHttpResponse::bad_request)?);
     }
 
     Ok(parts.join(" AND "))
+}
+
+/// Column behind a user-supplied label key (dotted keys map to snake_case), if filterable.
+pub(crate) fn label_column(key: &str) -> Option<String> {
+    // Check the normalized name so a dotted alias cannot reach a reserved column.
+    let column = normalize_tag_key(key);
+    (is_safe_filter_key(key) && is_filterable_column(&column)).then_some(column)
+}
+
+/// SQL naming one process from the stream's identity columns; `concat` reads NULL as "".
+pub(crate) fn instance_key_expr(schema_fields: &[String]) -> String {
+    let parts: Vec<String> = INSTANCE_KEY_COLUMNS
+        .iter()
+        .filter(|col| schema_fields.iter().any(|f| f == *col))
+        .map(|col| quote_identifier(col))
+        .collect();
+    if parts.is_empty() {
+        "''".to_string()
+    } else {
+        format!("concat({})", parts.join(", '|', "))
+    }
 }
 
 pub(crate) fn require_profile_type(body: &ProfilesQueryBody) -> Result<String, Response> {
@@ -312,13 +414,13 @@ pub(crate) fn resolve_query_body(
 ) -> Result<ProfilesQueryBody, Response> {
     match body {
         Ok(Json(mut body)) => {
-            merge_params_into_body(&mut body, params);
+            merge_params_into_body(&mut body, params)?;
             Ok(body)
         }
         Err(rejection) => {
             // GET (and HEAD) may omit a JSON body; fall back to query params.
             if matches!(*method, Method::GET | Method::HEAD) {
-                Ok(query_body_from_params(params))
+                query_body_from_params(params)
             } else {
                 Err(MetaHttpResponse::bad_request(rejection.body_text()))
             }
@@ -329,14 +431,14 @@ pub(crate) fn resolve_query_body(
 pub(crate) fn merge_params_into_body(
     body: &mut ProfilesQueryBody,
     params: &HashMap<String, String>,
-) {
+) -> Result<(), Response> {
     if body.start_time == 0
-        && let Some(v) = params.get("start_time").and_then(|s| s.parse().ok())
+        && let Some(v) = parse_param(params, "start_time")?
     {
         body.start_time = v;
     }
     if body.end_time == 0
-        && let Some(v) = params.get("end_time").and_then(|s| s.parse().ok())
+        && let Some(v) = parse_param(params, "end_time")?
     {
         body.end_time = v;
     }
@@ -365,11 +467,18 @@ pub(crate) fn merge_params_into_body(
         body.step = params.get("step").cloned().filter(|s| !s.is_empty());
     }
     if body.max_nodes.is_none() {
-        body.max_nodes = params.get("max_nodes").and_then(|s| s.parse().ok());
+        body.max_nodes = parse_param(params, "max_nodes")?;
     }
     if body.filters.is_empty() {
-        body.filters = parse_filters_param(params.get("filters").map(|s| s.as_str()));
+        body.filters = parse_filters_param(params.get("filters").map(|s| s.as_str()))?;
     }
+    if body.group_by.is_none() {
+        body.group_by = params.get("group_by").cloned().filter(|s| !s.is_empty());
+    }
+    if body.group_limit.is_none() {
+        body.group_limit = parse_param(params, "group_limit")?;
+    }
+    Ok(())
 }
 
 pub(crate) fn resolve_timeout(timeout: Option<i64>) -> Result<i64, Response> {
@@ -383,6 +492,7 @@ pub(crate) fn resolve_timeout(timeout: Option<i64>) -> Result<i64, Response> {
 pub(crate) struct ProfilesSqlParams<'a> {
     pub request_trace_id: &'a str,
     pub org_id: &'a str,
+    pub stream_name: &'a str,
     pub user_id: &'a str,
     pub start_time: i64,
     pub end_time: i64,
@@ -398,22 +508,10 @@ pub(crate) async fn run_profiles_sql(
     let request = Request {
         query: Query {
             sql,
-            from: 0,
             size,
             start_time: params.start_time,
             end_time: params.end_time,
-            quick_mode: false,
-            query_type: String::new(),
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
+            ..Default::default()
         },
         encoding: RequestEncoding::Empty,
         regions: vec![],
@@ -422,6 +520,7 @@ pub(crate) async fn run_profiles_sql(
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
         use_cache: true,
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,
@@ -442,10 +541,15 @@ pub(crate) async fn run_profiles_sql(
     .await
     {
         Ok(response) => reject_partial_search_response(response),
-        Err(error) => Err(map_error_to_http_response(
-            &error,
-            Some(params.request_trace_id.to_string()),
-        )),
+        Err(error) => {
+            let streams = [params.stream_name.to_string()];
+            let error =
+                enrich_field_error(error, params.org_id, StreamType::Profiles, &streams).await;
+            Err(map_error_to_http_response(
+                &error,
+                Some(params.request_trace_id.to_string()),
+            ))
+        }
     }
 }
 
@@ -487,13 +591,45 @@ pub(crate) fn default_result_size() -> i64 {
     DEFAULT_RESULT_SIZE
 }
 
+pub(crate) async fn load_schema_field_names(org_id: &str, stream_name: &str) -> Vec<String> {
+    match infra::schema::get(org_id, stream_name, StreamType::Profiles).await {
+        Ok(schema) => queryable_field_names(&schema),
+        Err(e) => {
+            warn!("profiles schema lookup failed: {e}");
+            Vec::new()
+        }
+    }
+}
+
+/// On a UDS stream the other columns are packed into `_all`, so they hold no rows to filter on.
+fn queryable_field_names(schema: &Schema) -> Vec<String> {
+    let defined_schema_fields = infra::schema::unwrap_stream_settings(schema)
+        .map(|settings| settings.defined_schema_fields)
+        .unwrap_or_default();
+    let uds_fields = schema::effective_uds_fields(StreamType::Profiles, &defined_schema_fields);
+    let column_all = &get_config().common.column_all;
+    // `_all` outlives a cleared UDS in the schema, so it is never a filter key
+    schema
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .filter(|name| {
+            *name != column_all
+                && (defined_schema_fields.is_empty()
+                    || *name == TIMESTAMP_COL_NAME
+                    || uds_fields.contains(*name))
+        })
+        .cloned()
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn parse_filters_param_keeps_a_comma_inside_a_value() {
-        let filters = parse_filters_param(Some("k8s_pod_name=a%2Cb,env=prod"));
+        let filters = parse_filters_param(Some("k8s_pod_name=a%2Cb,env=prod")).unwrap();
         assert_eq!(filters.len(), 2);
         assert_eq!(filters[0].key, "k8s_pod_name");
         assert_eq!(filters[0].value, "a,b");
@@ -503,9 +639,40 @@ mod tests {
 
     #[test]
     fn parse_filters_param_reads_plain_pairs() {
-        let filters = parse_filters_param(Some("env=prod,region=us"));
+        let filters = parse_filters_param(Some("env=prod,region=us")).unwrap();
         assert_eq!(filters[0].value, "prod");
         assert_eq!(filters[1].value, "us");
+    }
+
+    async fn bad_request_text(resp: Response) -> String {
+        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        String::from_utf8(bytes.to_vec()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn parse_filters_param_rejects_a_malformed_pair() {
+        for raw in ["foo", "env=prod,foo", "=prod"] {
+            let resp = parse_filters_param(Some(raw)).unwrap_err();
+            assert!(
+                bad_request_text(resp).await.contains("invalid filter: "),
+                "{raw}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn get_params_reject_unparsable_numbers() {
+        for key in ["max_nodes", "timeout", "group_limit", "start_time"] {
+            let params = HashMap::from([(key.to_string(), "abc".to_string())]);
+            let resp = query_body_from_params(&params).unwrap_err();
+            let text = bad_request_text(resp).await;
+            assert!(text.contains(&format!("Invalid {key} parameter")), "{text}");
+        }
+        let params = HashMap::from([("max_nodes".to_string(), String::new())]);
+        assert!(query_body_from_params(&params).unwrap().max_nodes.is_none());
     }
 
     #[test]
@@ -515,6 +682,7 @@ mod tests {
                 key: "env".to_string(),
                 op: "=".to_string(),
                 value: "prod".to_string(),
+                values: Vec::new(),
             }],
             ..Default::default()
         };
@@ -529,11 +697,90 @@ mod tests {
                 key: "k8s.pod.name".to_string(),
                 op: "=".to_string(),
                 value: "pod-a".to_string(),
+                values: Vec::new(),
             }],
             ..Default::default()
         };
         let where_clause = build_where_clause(&body).unwrap();
         assert_eq!(where_clause, r#""k8s_pod_name" = 'pod-a'"#);
+    }
+
+    fn where_for(op: &str, value: &str, values: &[&str]) -> Result<String, Response> {
+        build_where_clause(&ProfilesQueryBody {
+            filters: vec![ProfileFilter {
+                key: "env".to_string(),
+                op: op.to_string(),
+                value: value.to_string(),
+                values: values.iter().map(|v| v.to_string()).collect(),
+            }],
+            ..Default::default()
+        })
+    }
+
+    #[test]
+    fn filter_ops_beyond_equality_build_quoted_sql() {
+        assert_eq!(where_for("!=", "it's", &[]).unwrap(), r#""env" != 'it''s'"#);
+        assert_eq!(where_for("<>", "a", &[]).unwrap(), r#""env" != 'a'"#);
+        assert_eq!(
+            where_for("=~", "^pro.*", &[]).unwrap(),
+            r#"regexp_like("env", '^pro.*')"#
+        );
+        assert_eq!(
+            where_for("!~", "^dev", &[]).unwrap(),
+            r#"NOT regexp_like("env", '^dev')"#
+        );
+        assert_eq!(
+            where_for("in", "prod, stage", &[]).unwrap(),
+            r#""env" IN ('prod', 'stage')"#
+        );
+        assert_eq!(
+            where_for("not_in", "ignored", &["a,b", "o'c"]).unwrap(),
+            r#""env" NOT IN ('a,b', 'o''c')"#
+        );
+    }
+
+    #[test]
+    fn filter_ops_reject_bad_input() {
+        assert!(where_for("=~", "a(", &[]).is_err());
+        assert_eq!(
+            where_for("=~", r"\berror\b", &[]).unwrap(),
+            r#"regexp_like("env", '\berror\b')"#
+        );
+        assert!(where_for("in", " , ", &[]).is_err());
+        assert!(where_for("like", "a", &[]).is_err());
+    }
+
+    #[test]
+    fn filter_without_op_defaults_to_equality() {
+        let filter: ProfileFilter =
+            serde_json::from_str(r#"{"key":"env","value":"prod"}"#).unwrap();
+        assert_eq!(filter.op, "=");
+        assert!(filter.values.is_empty());
+    }
+
+    #[test]
+    fn label_column_normalizes_dots_and_rejects_reserved_or_unsafe_keys() {
+        assert_eq!(
+            label_column("k8s.pod.name").as_deref(),
+            Some("k8s_pod_name")
+        );
+        assert_eq!(label_column("host_name").as_deref(), Some("host_name"));
+        assert_eq!(label_column("stack"), None);
+        assert_eq!(label_column("value"), None);
+        assert_eq!(label_column("event.id"), None);
+        assert_eq!(label_column("profile.duration.nanos"), None);
+        assert_eq!(label_column(r#"a" OR 1=1"#), None);
+        assert_eq!(label_column(""), None);
+    }
+
+    #[test]
+    fn instance_key_expr_uses_only_present_identity_columns() {
+        let fields = |names: &[&str]| names.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(instance_key_expr(&fields(&["value", "stack"])), "''");
+        assert_eq!(
+            instance_key_expr(&fields(&["process_pid", "value", "host_name"])),
+            r#"concat("host_name", '|', "process_pid")"#
+        );
     }
 
     #[test]
@@ -587,5 +834,92 @@ mod tests {
 
         let response = SearchResponse::default();
         assert!(reject_partial_search_response(response).is_ok());
+    }
+
+    #[tokio::test]
+    async fn post_body_without_time_range_gets_the_required_time_range_message() {
+        let body: ProfilesQueryBody =
+            json::from_str(r#"{"profile_type":"cpu","profile_unit":"nanoseconds"}"#).unwrap();
+        let body = resolve_query_body(&Method::POST, Ok(Json(body)), &HashMap::new()).unwrap();
+        let resp = parse_required_time_range(body.start_time, body.end_time).unwrap_err();
+        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let text = String::from_utf8(bytes.to_vec()).unwrap();
+        assert!(
+            text.contains("start_time and end_time are required (microseconds)"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn queryable_field_names_follow_the_user_defined_schema() {
+        use arrow_schema::{DataType, Field};
+        use config::meta::stream::StreamSettings;
+
+        let fields = [
+            TIMESTAMP_COL_NAME,
+            "stack",
+            "value",
+            "service_name",
+            "k8s_pod_name",
+            "k8s_node_name",
+            "_all",
+        ]
+        .map(|name| Field::new(name, DataType::Utf8, true));
+        let settings = StreamSettings {
+            defined_schema_fields: ["k8s_pod_name", "service_name", "stack", "value"]
+                .map(str::to_string)
+                .to_vec(),
+            ..Default::default()
+        };
+        let metadata = std::collections::HashMap::from([(
+            "settings".to_string(),
+            json::to_string(&settings).unwrap(),
+        )]);
+
+        let cleared_uds = queryable_field_names(&Schema::new(fields.to_vec()));
+        assert_eq!(cleared_uds.len(), fields.len() - 1);
+        assert!(!cleared_uds.iter().any(|name| name == "_all"));
+
+        let uds = Schema::new_with_metadata(fields.to_vec(), metadata);
+        let mut names = queryable_field_names(&uds);
+        names.sort();
+        assert_eq!(
+            names,
+            [
+                TIMESTAMP_COL_NAME,
+                "k8s_pod_name",
+                "service_name",
+                "stack",
+                "value"
+            ]
+        );
+    }
+
+    #[test]
+    fn queryable_field_names_include_required_columns_missing_from_saved_list() {
+        use arrow_schema::{DataType, Field};
+        use config::meta::stream::StreamSettings;
+
+        let fields = [TIMESTAMP_COL_NAME, "service_name", "trace_id", "span_id"]
+            .map(|name| Field::new(name, DataType::Utf8, true));
+        let settings = StreamSettings {
+            defined_schema_fields: vec!["service_name".to_string()],
+            ..Default::default()
+        };
+        let metadata = std::collections::HashMap::from([(
+            "settings".to_string(),
+            json::to_string(&settings).unwrap(),
+        )]);
+
+        let mut names =
+            queryable_field_names(&Schema::new_with_metadata(fields.to_vec(), metadata));
+        names.sort();
+        assert_eq!(
+            names,
+            [TIMESTAMP_COL_NAME, "service_name", "span_id", "trace_id"]
+        );
     }
 }

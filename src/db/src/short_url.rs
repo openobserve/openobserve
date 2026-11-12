@@ -191,6 +191,41 @@ pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error
     Ok(())
 }
 
+/// Org teardown: events go out before the rows, so a failed emit leaves the ids for the retry.
+pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let mut short_ids = short_urls::list_ids_by_org(org_id).await?;
+    for short_id in &short_ids {
+        evict_short_url(short_id).await?;
+    }
+    // The delete names any row the listing missed; that row is evicted only after it.
+    for short_id in short_urls::delete_by_org(org_id).await? {
+        if !short_ids.contains(&short_id) {
+            evict_short_url(&short_id).await?;
+            short_ids.push(short_id);
+        }
+    }
+    // A read miss before the delete can refill the caches, and no retry lists a deleted row.
+    for short_id in &short_ids {
+        if let Err(e) = evict_short_url(short_id).await {
+            log::warn!("[SHORT_URL] eviction of {short_id} after the row delete failed: {e}");
+        }
+    }
+    Ok(())
+}
+
+async fn evict_short_url(short_id: &str) -> Result<(), infra::errors::Error> {
+    let local = async {
+        SHORT_URLS.remove(short_id);
+    };
+    let broadcast = async {
+        cluster::emit_delete_event(short_id).await?;
+        #[cfg(feature = "enterprise")]
+        super_cluster::emit_delete_event(short_id).await?;
+        Ok(())
+    };
+    crate::teardown::evict(local, broadcast).await
+}
+
 fn days_to_minutes(days: i64) -> i64 {
     days * 24 * 60
 }

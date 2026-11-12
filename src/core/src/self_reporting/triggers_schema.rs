@@ -71,6 +71,11 @@ pub async fn ensure_triggers_stream_initialized(org_id: &str) -> Result<()> {
     }
 }
 
+/// Forget that the org's triggers stream was set up, so a reused org id is set up again.
+pub(crate) fn forget_org(org_id: &str) {
+    INITIALIZED_ORGS.remove(org_id);
+}
+
 /// Internal function that performs the actual schema initialization.
 /// This should only be called by ensure_triggers_stream_initialized.
 ///
@@ -187,10 +192,29 @@ mod tests {
         // The history filter and the Suppressed tab of a downtime read this column.
         assert!(field_names.contains(&"downtime_id".to_string()));
 
+        // Alert history shows who acked a run and the ack events themselves from these columns.
+        for f in ["acked_by", "ack_action", "ack_source", "taken_over_from"] {
+            assert!(field_names.contains(&f.to_string()), "missing {f}");
+        }
+
         // Verify count matches struct fields
-        // 43: 21 original + 5 dedup + 6 value + 2 synthetics + downtime + delivery + rule_value + 6
-        // report
-        assert_eq!(field_names.len(), 43);
+        // 44: 21 original + 2 grouping + 6 value + 2 synthetics + downtime + delivery + rule_value
+        // + 6 report + 4 ack
+        // `severity` stays out of the sample; history reads it only once a row carried it.
+        let siem_columns = ["siem", "historical", "siem_groups"];
+        let enterprise_only = if cfg!(feature = "enterprise") {
+            siem_columns.len()
+        } else {
+            0
+        };
+        assert_eq!(field_names.len(), 44 + enterprise_only);
+        for f in siem_columns {
+            assert_eq!(
+                field_names.contains(&f.to_string()),
+                cfg!(feature = "enterprise"),
+                "{f} is in the reflection sample exactly when enterprise is on"
+            );
+        }
 
         // Verify no duplicate fields
         let unique_count = field_names
@@ -210,5 +234,12 @@ mod tests {
 
         // Verify it's marked as initialized
         assert!(INITIALIZED_ORGS.contains(test_org));
+    }
+
+    #[test]
+    fn test_forget_org_drops_the_setup_mark() {
+        INITIALIZED_ORGS.insert("forget_org_triggers".to_string());
+        forget_org("forget_org_triggers");
+        assert!(!INITIALIZED_ORGS.contains("forget_org_triggers"));
     }
 }

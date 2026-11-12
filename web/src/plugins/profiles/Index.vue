@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-run-pending="runPending && !queryLoading ? 'true' : undefined"
           :data-test="queryLoading ? 'profiles-cancel-query' : 'profiles-run-query'"
           :class="isAutoRunAvailable ? 'border-y-0! border-s-0! border-e!' : 'border-0!'"
-          @click="queryLoading ? cancelQuery() : runQuery()"
+          @click="queryLoading ? cancelQuery() : runQuery(true)"
         >
           <span class="grid">
             <span
@@ -76,8 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </span>
           <OTooltip
-            v-if="!queryLoading && (runPending || isAutoRunOn)"
-            :content="runPending ? t('search.autoRunPendingDot') : t('search.autoRunEnabled')"
+            v-if="!queryLoading && (!canQuery || runPending || isAutoRunOn)"
+            :content="runButtonTooltip"
           />
         </OButton>
         <ODropdown
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="selectedProfileType"
             :label="t('profiles.profileType')"
             label-position="inside"
-            :options="profileTypeOptions"
+            :options="profileTypeSelectOptions"
             class="w-full"
             data-test="profiles-type-select"
           />
@@ -161,15 +161,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OContent class="border-border-default border-t py-1.5">
         <ProfilesLabelFilters
-          v-model:editing-index="editingFilterIndex"
-          v-model:draft-key="draftTagKey"
-          v-model:draft-value="draftTagValue"
           :filters="appliedFilters"
-          :label-options="tagKeyOptions"
-          :value-options="tagValueOptions"
-          :values-loading="tagValuesLoading"
-          @apply="applyDraftFilter"
-          @remove="removeFilter"
+          :labels="labelNames"
+          :load-values="loadTagValues"
+          @update:filters="setFilters"
         />
       </OContent>
     </template>
@@ -213,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
         data-test="profiles-search-cancelled"
       >
-        <OEmptyState preset="search-cancelled" size="block" @action="runQuery" />
+        <OEmptyState preset="search-cancelled" size="block" @action="runQuery(true)" />
       </div>
 
       <div
@@ -246,18 +241,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="bg-surface-panel border-border-default rounded-default shrink-0 border"
           data-test="profiles-series-card"
         >
-          <header class="border-border-default border-b px-3 py-2 text-sm font-semibold">
-            {{ t("profiles.timeSeriesTitle") }}
+          <header
+            class="border-border-default flex flex-wrap items-center gap-x-2 gap-y-1 border-b px-3 py-1.5 text-sm"
+          >
+            <span class="font-semibold">{{ timeSeriesTitle }}</span>
+            <div
+              v-if="seriesLines.length > 1"
+              class="flex min-w-0 flex-wrap items-center gap-1"
+              data-test="profiles-breakdown-legend"
+            >
+              <OButton
+                v-for="line in seriesLines"
+                :key="line.key"
+                variant="ghost"
+                size="xs"
+                :disabled="line.others"
+                :data-test="`profiles-breakdown-chip-${line.key}`"
+                @click="filterToBreakdownValue(line)"
+              >
+                <span
+                  class="me-1 inline-block size-2 shrink-0 rounded-full"
+                  :style="{ backgroundColor: line.color }"
+                  aria-hidden="true"
+                />{{ line.label }}
+                <OTooltip
+                  v-if="!line.others"
+                  :content="
+                    t('profiles.breakdownFilter', { key: breakdownLabel ?? '', value: line.label })
+                  "
+                />
+              </OButton>
+            </div>
+            <div class="ms-auto flex shrink-0 items-center gap-1.5">
+              <label for="profiles-breakdown" class="text-text-secondary text-xs font-semibold">{{
+                t("profiles.breakdown")
+              }}</label>
+              <OSelect
+                id="profiles-breakdown"
+                :aria-label="t('profiles.breakdown')"
+                :model-value="breakdownLabel ?? BREAKDOWN_NONE"
+                :options="breakdownOptions"
+                size="xs"
+                width="sm"
+                :disabled="!lastRun"
+                data-test="profiles-breakdown-select"
+                @update:model-value="setBreakdown"
+              />
+            </div>
           </header>
           <div class="h-36 p-3">
             <OSkeleton
-              v-if="showSkeleton"
+              v-if="showSkeleton || seriesLoading"
               type="rect"
               class="rounded-default h-full w-full"
               data-test="profiles-series-skeleton"
             />
             <ChartRenderer
-              v-else-if="seriesPoints.length"
+              v-else-if="seriesLines.some((line) => line.points.length)"
               :data="seriesChartData"
               class="h-full w-full"
               @updated:data-zoom="onRangeSelect"
@@ -280,6 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OToggleGroup
               :model-value="activeView"
+              mobile-dropdown
               data-test="profiles-view"
               @update:model-value="setView"
             >
@@ -315,6 +356,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ t("profiles.viewSandwich") }}
               </OToggleGroupItem>
+              <OToggleGroupItem
+                value="compare"
+                size="sm"
+                icon-left="compare-arrows"
+                data-test="profiles-view-compare"
+              >
+                {{ t("profiles.viewCompare") }}
+              </OToggleGroupItem>
             </OToggleGroup>
             <div class="min-w-0 flex-1 max-md:min-w-40">
               <OSearchInput
@@ -324,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <span
-              v-if="searchSummary"
+              v-if="searchSummary && activeView !== 'compare'"
               class="text-text-secondary text-xs whitespace-nowrap tabular-nums"
               data-test="profiles-search-summary"
               >{{ searchSummary }}</span
@@ -352,18 +401,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("profiles.partialResult", { percent: sampledPercent }) }}
           </OBanner>
-          <!-- Views on the left, Function Details beside them (below them on phones). -->
+          <!-- Views on the left, Function details beside them (below them on phones). -->
           <div class="md:flex md:min-h-0 md:flex-1">
             <div class="md:flex md:min-h-0 md:min-w-0 md:flex-1 md:flex-col">
               <OTable
                 v-if="activeView === 'top'"
                 :data="topRows"
                 :loading="showSkeleton"
+                :loading-reset-key="selectedProfileType"
                 :columns="profileColumns"
                 :default-columns="false"
                 row-key="name"
                 sorting="client"
-                sort-by="total"
+                sort-by="self"
                 sort-order="desc"
                 pagination="none"
                 virtual-scroll
@@ -502,11 +552,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </section>
               </div>
 
+              <ProfilesCompare
+                v-else-if="activeView === 'compare' && lastRun && orgIdentifier"
+                v-model:state="compareState"
+                :org-identifier="orgIdentifier"
+                :stream="lastRun.query.stream"
+                :payload="lastRun.payload"
+                :labels="compareLabels"
+                :search-query="searchQuery"
+                :unit-label="tableUnitLabel"
+                :value-formatter="formatTableValue"
+                @search="searchForFunction"
+              />
               <OTable
-                v-else
+                v-else-if="activeView === 'tree'"
                 v-model:expanded-ids="expandedStackIds"
                 :data="stackTree"
                 :loading="showSkeleton"
+                :loading-reset-key="selectedProfileType"
                 :columns="profileColumns"
                 :default-columns="false"
                 row-key="id"
@@ -563,7 +626,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTable>
             </div>
             <ProfilesFunctionDetails
-              v-if="detailsRow"
+              v-if="detailsRow && activeView !== 'compare'"
               :name="detailsRow.name"
               :self="detailsRow.self"
               :total="detailsRow.total"
@@ -590,6 +653,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useThemeRevision } from "@/composables/useTheme";
 import { useRoute, useRouter, type LocationQuery } from "vue-router";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -618,18 +682,24 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 import ProfilesLabelFilters from "./ProfilesLabelFilters.vue";
 import ProfilesFunctionMenu from "./ProfilesFunctionMenu.vue";
 import ProfilesFunctionDetails from "./ProfilesFunctionDetails.vue";
+import ProfilesCompare, { type CompareState } from "./ProfilesCompare.vue";
 import { calleesOf, callersOf } from "./sandwich";
+import { formatPercent } from "./format";
 import { copyToClipboard } from "@/utils/clipboard";
 import streamService from "@/services/stream";
+import analytics from "@/services/product_analytics";
 import profilesService, {
-  encodeProfileFilters,
+  encodeProfileRouteFilters,
   parseProfileFilters,
   type ProfileFilter,
   type ProfilesMergeResponse,
   type ProfilesQueryBody,
+  type ProfilesSeriesPoint,
   type ProfilesSeriesResponse,
+  type ProfileTypeMeta,
   type ProfilesTreeNode,
 } from "@/services/profiles";
+import { cssToken } from "@/utils/theme";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { escapeHtml } from "@/utils/html";
 import { niceStep } from "@/utils/slos/chartScale";
@@ -644,7 +714,7 @@ const ChartRenderer = defineAsyncComponent(
 );
 
 type SelectOption = { label: I18nText; value: string };
-type ProfileView = "top" | "flame" | "tree" | "sandwich";
+type ProfileView = "top" | "flame" | "tree" | "sandwich" | "compare";
 type StackNode = {
   id: string;
   name: string;
@@ -668,13 +738,22 @@ type RouteSeed = {
   search: string;
   focus: string | null;
   details: string | null;
+  breakdown: string | null;
+  compare: CompareState;
 };
 
-const PROFILE_VIEWS: ProfileView[] = ["top", "flame", "tree", "sandwich"];
+const PROFILE_VIEWS: ProfileView[] = ["top", "flame", "tree", "sandwich", "compare"];
+const defaultCompareState = (): CompareState => ({
+  label: null,
+  baseline: null,
+  comparison: null,
+  display: "flame",
+});
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
 const store = useStore();
+const themeRevision = useThemeRevision();
 const route = useRoute();
 const router = useRouter();
 const pageRouteName = route.name;
@@ -694,17 +773,14 @@ const streamOptions = ref<SelectOption[]>([]);
 const selectedStream = ref<string | null>(null);
 const selectedService = ref<string | null>(null);
 const selectedProfileType = ref<string | null>(null);
-const draftTagKey = ref<string | null>(null);
-const draftTagValue = ref<string | null>(null);
-const tagValueOptions = ref<SelectOption[]>([]);
-const tagValuesLoading = ref(false);
 const appliedFilters = ref<ProfileFilter[]>([]);
-const editingFilterIndex = ref<number | null>(null);
 const searchQuery = ref("");
 const activeView = ref<ProfileView>("top");
 const setView = (value: unknown) => {
   const next = PROFILE_VIEWS.find((view) => view === value);
-  if (next) activeView.value = next;
+  if (!next || next === activeView.value) return;
+  activeView.value = next;
+  analytics.track("profiles_view_changed", { view: next });
 };
 const expandedStackIds = ref<string[]>([]);
 // On phones the page body is the one scroller and the Top Table virtualizes against it; from md up each table scrolls itself.
@@ -713,7 +789,7 @@ const resultsExpanded = ref(false);
 const flameGraphRef = ref<{ focus: (path: string) => void } | null>(null);
 // The function the Sandwich view shows; null means the one with the most self samples.
 const sandwichFunction = ref<string | null>(null);
-// The function in the Function Details panel; null hides the panel.
+// The function in the Function details panel; null hides the panel.
 const detailsName = ref<string | null>(null);
 // The focused flame graph frame, kept here so it outlives a view switch and goes into the URL.
 const flameFocus = ref<string | null>(null);
@@ -732,7 +808,7 @@ const searchSummary = computed(() => {
     for (const child of node.children ?? []) walk(child, inMatch || hit);
   };
   for (const child of result.root.children ?? []) walk(child, false);
-  const percent = `${((matched / result.root.total) * 100).toFixed(1)}%`;
+  const percent = formatPercent(matched, result.root.total);
   return t("profiles.searchSummary", { count, percent }, count);
 });
 
@@ -749,6 +825,7 @@ const showInFlameGraph = (name: string) => {
 };
 const showDetails = (name: string) => {
   detailsName.value = name;
+  analytics.track("profiles_function_details_opened");
 };
 const showSandwich = (name: string) => {
   sandwichFunction.value = name;
@@ -775,7 +852,7 @@ const focusInFlameGraph = async (path: string) => {
 
 const metaResponse = ref<{
   services: string[];
-  profile_types: Array<{ type: string; unit: string }>;
+  profile_types: ProfileTypeMeta[];
   label_names: string[];
 } | null>(null);
 const seriesResponse = ref<ProfilesSeriesResponse | null>(null);
@@ -784,7 +861,14 @@ const mergeResult = ref<ProfilesMergeResponse | null>(null);
 const lastRun = ref<{
   query: Record<string, string>;
   range: { startTime: number; endTime: number };
+  payload: ProfilesQueryBody;
 } | null>(null);
+const compareState = ref<CompareState>(defaultCompareState());
+/** The label the chart draws one line per value of; null draws one line. */
+const breakdownLabel = ref<string | null>(null);
+const seriesLoading = ref(false);
+let seriesAbort: AbortController | null = null;
+let seriesRequestSeq = 0;
 
 const queryLoading = ref(false);
 // Auto Run (server ZO_AUTO_QUERY_ENABLED plus the user's switch, shared with Logs and Traces).
@@ -805,10 +889,14 @@ const FLAME_SKELETON_WIDTHS = ["w-full", "w-11/12", "w-3/4", "w-7/12", "w-5/12",
 let metaRequestSeq = 0;
 let queryRequestSeq = 0;
 let tagValuesRequestSeq = 0;
+// The server ignores the typed search, so one full list per label and inputs is fetched and filtered here.
+const tagValuesCache = new Map<string, Promise<string[]>>();
 let initRunSeq = 0;
 // Holds the stream and date watchers off while a route seed is applied or dropped, so they cannot reset it or reload.
 let seeding = false;
 let lastRunSeeded = false;
+// The focus from a link belongs to the first run's tree; any later run draws a tree its index path may not match.
+let keepSeededFocus = false;
 // Set while a watcher reloads meta, which can pick a new service or type: the select watcher must not run a second query.
 let reloadingMeta = false;
 // Set by a drag on the chart: that is a direct action on the results, so it runs even with Auto Run off.
@@ -828,13 +916,32 @@ const serviceOptions = computed<SelectOption[]>(() =>
 );
 const profileTypeOptions = computed<SelectOption[]>(() =>
   (metaResponse.value?.profile_types ?? []).map((item) => ({
-    label: raw(`${item.type} (${seriesUnitLabel(item.type, item.unit)})`),
+    label: profileTypeLabel(item),
     value: `${item.type}\u0000${item.unit}`,
   })),
 );
+const labelNames = computed<string[]>(() => metaResponse.value?.label_names ?? []);
+// A type seeded from the URL is shown by its label, not its raw id, until meta lists it.
+const profileTypeSelectOptions = computed<SelectOption[]>(() => {
+  const selected = selectedProfileType.value;
+  const options = profileTypeOptions.value;
+  if (!selected || options.some((option) => option.value === selected)) return options;
+  const [type, unit = ""] = selected.split("\u0000");
+  return [...options, { label: profileTypeLabel({ type, unit }), value: selected }];
+});
 const tagKeyOptions = computed<SelectOption[]>(() =>
   (metaResponse.value?.label_names ?? []).map((value) => ({ label: raw(value), value })),
 );
+const BREAKDOWN_NONE = "none";
+// Labels that change per request or thread give one line per sample, not a breakdown.
+const PER_REQUEST_LABEL = /(^|_)(trace|span|request|thread)_?id$|^process_pid$/;
+const compareLabels = computed<SelectOption[]>(() =>
+  tagKeyOptions.value.filter((option) => !PER_REQUEST_LABEL.test(String(option.value))),
+);
+const breakdownOptions = computed<SelectOption[]>(() => [
+  { label: t("profiles.breakdownNone"), value: BREAKDOWN_NONE },
+  ...compareLabels.value,
+]);
 const currentProfileType = computed(() => {
   const selected = selectedProfileType.value;
   if (!selected) return null;
@@ -842,15 +949,20 @@ const currentProfileType = computed(() => {
   if (!type) return null;
   return { type, unit };
 });
+
 const canQuery = computed(
   () => !!orgIdentifier.value && !!selectedStream.value && !!currentProfileType.value,
 );
+const runButtonTooltip = computed(() => {
+  if (!canQuery.value) return t("profiles.runNeedsProfileType");
+  return runPending.value ? t("search.autoRunPendingDot") : t("search.autoRunEnabled");
+});
 const hasProfileData = computed(() => (mergeResult.value?.total ?? 0) > 0);
 // The server keeps the most common stacks only; say how much of the data the views show.
 const sampledPercent = computed(() => {
   const result = mergeResult.value;
   if (!result?.truncated || !result.total) return "";
-  return `${((result.merged_total / result.total) * 100).toFixed(1)}%`;
+  return formatPercent(result.merged_total, result.total);
 });
 const seriesPoints = computed(() => seriesResponse.value?.series ?? []);
 const seriesStepSecs = computed(() => Math.max(1, seriesResponse.value?.step_secs ?? 1));
@@ -860,24 +972,92 @@ const currentUnit = computed(
 const currentType = computed(
   () => currentProfileType.value?.type || seriesResponse.value?.profile_type || "",
 );
-const isCpuMetric = computed(
-  () => currentType.value.toLowerCase() === "cpu" && /nano/i.test(currentUnit.value),
-);
+const isNanosecondsUnit = (unit: string) => /^(nanoseconds?|ns|nanos)$/i.test(unit);
+const isCpuTime = (profileType: string, unit: string) =>
+  profileType.toLowerCase() === "cpu" && isNanosecondsUnit(unit);
+const isCpuMetric = computed(() => isCpuTime(currentType.value, currentUnit.value));
+
+// Token values change with the theme, so they are re-read whenever it switches.
+const seriesColors = computed(() => {
+  void themeRevision.value;
+  return {
+    palette: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((step) =>
+      cssToken(`--color-chart-series-${step}`, ""),
+    ),
+    others: cssToken("--color-border-strong", ""),
+  };
+});
+type SeriesDatum = [number, number | null];
+type SeriesLine = {
+  key: string;
+  label: string;
+  value: string;
+  others: boolean;
+  color: string;
+  points: ProfilesSeriesPoint[];
+};
+/** One line per Breakdown value (heaviest first, then Others), or the single total line. */
+const seriesLines = computed<SeriesLine[]>(() => {
+  const groups = seriesResponse.value?.groups;
+  if (!groups?.length) {
+    return [
+      {
+        key: "total",
+        label: currentType.value,
+        value: "",
+        others: false,
+        color: seriesColors.value.palette[0],
+        points: seriesPoints.value,
+      },
+    ];
+  }
+  const { palette, others } = seriesColors.value;
+  let colorIndex = 0;
+  // Values in their own order (v1.4.0, v1.5.0, v1.10.0), so a value keeps its colour; Others last.
+  const ordered = [...groups].sort(
+    (a, b) =>
+      Number(a.others) - Number(b.others) ||
+      a.value.localeCompare(b.value, undefined, { numeric: true }),
+  );
+  return ordered.map((group, index) => ({
+    key: group.others ? "others" : String(index),
+    label: group.others
+      ? t("profiles.breakdownOthers")
+      : group.value || t("profiles.breakdownNoValue"),
+    value: group.value,
+    others: group.others,
+    color: group.others ? others : palette[colorIndex++ % palette.length],
+    points: group.series,
+  }));
+});
 
 const seriesChartData = computed(() => {
-  const seriesData = seriesPoints.value.map((point) => [
-    Math.floor(point.timestamp / 1000),
-    seriesDisplayValue(point.value),
-  ]);
+  const lines = seriesLines.value;
+  // In-use memory is a snapshot, so an empty bucket is missing data, not 0 B.
+  const gapValue = currentType.value.toLowerCase().startsWith("inuse_") ? null : 0;
+  const lineData = lines.map((line) =>
+    withGaps(
+      line.points.map((point): SeriesDatum => [
+        Math.floor(point.timestamp / 1000),
+        seriesDisplayValue(point),
+      ]),
+      (seriesResponse.value?.step_secs ?? 0) * 1000,
+      gapValue,
+    ),
+  );
+  const seriesData = lineData.flat();
+  const runRange = lastRun.value?.range;
   return {
     options: {
+      // In dark mode the ECharts theme draws its own background, which would box the chart in.
+      backgroundColor: "transparent",
       // Tooltip, grid and y axis follow the Logs histogram (utils/logs/convertLogData.ts).
       tooltip: {
         show: true,
         trigger: "axis",
         textStyle: { fontSize: 12 },
         axisPointer: { type: "cross", label: { show: true, fontSize: 12 } },
-        valueFormatter: (v: number) => formatSeriesValue(v as number),
+        valueFormatter: (v: number | null | undefined) => formatSeriesValue(v),
       },
       grid: { containLabel: true, left: 20, right: 20, top: 8, bottom: 5 },
       // Drag across the chart to pick a time range, as on the Logs histogram; the toolbox itself stays hidden.
@@ -892,7 +1072,13 @@ const seriesChartData = computed(() => {
           dataZoom: { brushStyle: dataZoomBrushStyle(), show: true, yAxisIndex: "none" },
         },
       },
-      xAxis: { type: "time" },
+      // The axis spans the run's window, so one bucket is not stretched to fill the chart.
+      xAxis: {
+        type: "time",
+        min: runRange ? Math.floor(runRange.startTime / 1000) : undefined,
+        max: runRange ? Math.floor(runRange.endTime / 1000) : undefined,
+        axisLabel: { hideOverlap: true },
+      },
       yAxis: {
         type: "value",
         axisLine: { show: true },
@@ -907,16 +1093,27 @@ const seriesChartData = computed(() => {
           formatter: (v: number) => formatSeriesAxisLabel(v),
         },
       },
-      series: [
-        {
+      series: lines.map((line, index) => {
+        const isolated = isolatedPoints(lineData[index]);
+        const fewPoints = line.points.length < 3;
+        return {
           type: "line",
-          smooth: true,
-          showSymbol: false,
+          name: line.label,
+          smooth: false,
+          // With symbols off, a lone point (or one cut off by a gap) draws nothing, and two read as a bare segment.
+          showSymbol: fewPoints || isolated.size > 0,
+          symbol:
+            fewPoints || !isolated.size
+              ? undefined
+              : (_value: unknown, params: { dataIndex: number }) =>
+                  isolated.has(params.dataIndex) ? "emptyCircle" : "none",
+          color: line.color || undefined,
           lineStyle: { width: 2 },
-          areaStyle: { opacity: 0.12 },
-          data: seriesData,
-        },
-      ],
+          // An area under one line reads as volume; under several it hides the lines below.
+          areaStyle: lines.length === 1 ? { opacity: 0.12 } : undefined,
+          data: lineData[index],
+        };
+      }),
     },
   };
 });
@@ -953,12 +1150,12 @@ const sandwichCallees = computed(() =>
 const treeCoverage = (name: string | null, drawn: number) => {
   const exact = mergeResult.value?.top.find((row) => row.name === name)?.total ?? 0;
   if (exact <= 0 || drawn / exact >= 0.995) return "";
-  return `${((drawn / exact) * 100).toFixed(1)}%`;
+  return formatPercent(drawn, exact);
 };
 const sandwichCoverage = computed(() =>
   treeCoverage(sandwichName.value, sandwichCallees.value?.total ?? 0),
 );
-// Function Details: exact Self and Total from the Top list, callers and callees from the drawn tree.
+// Function details: exact Self and Total from the Top list, callers and callees from the drawn tree.
 const detailsRow = computed(
   () => mergeResult.value?.top.find((row) => row.name === detailsName.value) ?? null,
 );
@@ -1060,12 +1257,26 @@ const profileColumns = computed<OTableColumnDef[]>(() => {
 });
 
 const seriesUnitLabel = (profileType: string, unit: string) => {
-  if (profileType.toLowerCase() === "cpu" && /nano/i.test(unit)) return "cores";
+  if (isCpuTime(profileType, unit)) return "cores";
   if (/nanosecond|^ns$/i.test(unit)) return "nanoseconds";
   if (/byte|^b$/i.test(unit)) return "bytes";
   if (!unit) return "count";
   return unit;
 };
+
+const profileTypeLabel = (profileType: ProfileTypeMeta) => {
+  const { type, unit } = profileType;
+  if (isCpuTime(type, unit)) return t("profiles.cpuTime", { cpu: raw("CPU") });
+  if (type === "samples" && unit === "count")
+    return t("profiles.cpuSamples", { cpu: raw("CPU"), unit: raw("count") });
+  return raw(`${type} (${seriesUnitLabel(type, unit)})`);
+};
+
+const timeSeriesTitle = computed(() =>
+  isCpuMetric.value
+    ? t("profiles.cpuUsage", { cpu: raw("CPU"), unit: raw("cores") })
+    : t("profiles.timeSeriesTitle"),
+);
 
 const tableUnitLabel = computed(() => {
   if (isCpuMetric.value) return t("profiles.cpuDuration");
@@ -1108,9 +1319,11 @@ const formatTableValue = (value: number) => {
   return formatEventCount(Number(value || 0));
 };
 
-const seriesDisplayValue = (value: number) => {
-  if (!isCpuMetric.value) return value;
-  return value / (seriesStepSecs.value * 1_000_000_000);
+/** CPU as cores: CPU time per second of profiled time when the server knows it, else per second of the step. */
+const seriesDisplayValue = (point: ProfilesSeriesPoint) => {
+  if (!isCpuMetric.value) return point.value;
+  if (point.rate != null) return point.rate / 1_000_000_000;
+  return point.value / (seriesStepSecs.value * 1_000_000_000);
 };
 
 const formatCpuCore = (value: number) => {
@@ -1127,23 +1340,57 @@ const formatCpuCore = (value: number) => {
 
 const isBytesUnit = computed(() => /byte|^b$/i.test(currentUnit.value));
 
-/** Byte ticks on round binary steps (0, 2.5, 5 GB), not decimal steps shown as 3.73 GB. */
-const byteAxisInterval = (points: number[][]) => {
-  const max = Math.max(0, ...points.map(([, value]) => value));
+/** Drops a line to `gapValue` across empty buckets (null breaks it), so a gap is not drawn as a slope. */
+const withGaps = (points: SeriesDatum[], stepMs: number, gapValue: number | null) => {
+  // Without the server's bucket size a gap cannot be told from normal spacing.
+  if (!(stepMs > 0)) return points;
+  const filled: SeriesDatum[] = [];
+  for (const point of points) {
+    const previous = filled.at(-1);
+    if (previous && point[0] - previous[0] > stepMs * 1.5) {
+      const gapStart = previous[0] + stepMs;
+      const gapEnd = point[0] - stepMs;
+      filled.push([gapStart, gapValue]);
+      if (gapValue !== null && gapEnd > gapStart) filled.push([gapEnd, gapValue]);
+    }
+    filled.push(point);
+  }
+  return filled;
+};
+
+/** Indexes of points with no non-null neighbour, which a line cannot draw without a symbol. */
+const isolatedPoints = (points: SeriesDatum[]) => {
+  const isolated = new Set<number>();
+  points.forEach(([, value], index) => {
+    if (value === null) return;
+    const before = points[index - 1]?.[1] ?? null;
+    const after = points[index + 1]?.[1] ?? null;
+    if (before === null && after === null) isolated.add(index);
+  });
+  return isolated;
+};
+
+/** Byte ticks on round binary steps (0, 2.5, 5 GiB), not decimal steps shown as 3.73 GiB. */
+const byteAxisInterval = (points: SeriesDatum[]) => {
+  // A loop, not Math.max(...spread), which overflows the call stack on long multi-line runs.
+  let max = 0;
+  for (const [, value] of points) if (value !== null && value > max) max = value;
   if (!max) return undefined;
   const unitSize = 1024 ** Math.min(4, Math.floor(Math.log(max) / Math.log(1024)));
   return niceStep(max / unitSize / 3) * unitSize;
 };
 
-/** Short axis labels from the shared chart formatter, as on the Logs histogram (1.50K, 2.50GB, 2.00s). */
+/** Short axis labels as on the Logs histogram (1.50K, 2.00s); bytes use the table's binary units (2.5 GiB). */
 const formatSeriesAxisLabel = (value: number) => {
+  if (isBytesUnit.value) return formatBytes(value);
   let unit = "numbers";
-  if (isBytesUnit.value) unit = "bytes";
-  else if (!isCpuMetric.value && /nanosecond|^ns$/i.test(currentUnit.value)) unit = "nanoseconds";
+  if (!isCpuMetric.value && /nanosecond|^ns$/i.test(currentUnit.value)) unit = "nanoseconds";
   return formatUnitValue(getUnitValue(value, unit, "", 2));
 };
 
-const formatSeriesValue = (value: number) => {
+const formatSeriesValue = (value: number | null | undefined) => {
+  // In-use gaps are null so the line breaks; formatting them would read as a real 0 B.
+  if (value === null || value === undefined) return "—";
   if (isCpuMetric.value) return formatCpuCore(value);
   if (/byte|^b$/i.test(currentUnit.value)) return formatBytes(value);
   if (/nanosecond|^ns$/i.test(currentUnit.value)) return formatDurationNanos(value);
@@ -1155,8 +1402,6 @@ const shareOf = (value: number) => {
   const total = mergeResult.value?.total ?? 0;
   return total > 0 ? (value / total) * 100 : 0;
 };
-const formatPercent = (value: number, total: number) =>
-  total > 0 ? `${((value / total) * 100).toFixed(2)}%` : "0.00%";
 
 const highlightName = (name: string) => {
   const query = searchQuery.value.trim();
@@ -1239,15 +1484,7 @@ const buildErrorMessage = (error: unknown): string => {
 
 const invalidateTagValuesRequest = () => {
   tagValuesRequestSeq += 1;
-  tagValuesLoading.value = false;
-};
-
-const clearDraftTag = () => {
-  invalidateTagValuesRequest();
-  editingFilterIndex.value = null;
-  draftTagKey.value = null;
-  draftTagValue.value = null;
-  tagValueOptions.value = [];
+  tagValuesCache.clear();
 };
 
 const resetProfilesState = () => {
@@ -1255,15 +1492,18 @@ const resetProfilesState = () => {
   selectedProfileType.value = null;
   appliedFilters.value = [];
   searchQuery.value = "";
-  clearDraftTag();
+  invalidateTagValuesRequest();
   seriesResponse.value = null;
   mergeResult.value = null;
   lastRun.value = null;
+  breakdownLabel.value = null;
+  compareState.value = defaultCompareState();
   expandedStackIds.value = [];
   activeView.value = "top";
   sandwichFunction.value = null;
   detailsName.value = null;
   flameFocus.value = null;
+  keepSeededFocus = false;
   errorMessage.value = "";
 };
 
@@ -1286,73 +1526,76 @@ const runOrMarkPending = async () => {
   runPending.value = true;
 };
 
-/** Adds the draft filter, or replaces the one being edited, then closes the menu and re-runs. */
-const applyDraftFilter = async () => {
-  const key = draftTagKey.value;
-  const value = draftTagValue.value;
-  if (!key || !value) return;
-  const index = editingFilterIndex.value ?? -1;
-  const next = appliedFilters.value.filter((_, i) => i !== index);
-  if (!next.some((filter) => filter.key === key && filter.value === value)) {
-    next.splice(index >= 0 ? index : next.length, 0, { key, op: "=", value });
-  }
+/** Sets a label filter in place of the one at `index` and of any other filter on the same label. */
+const setLabelFilter = (key: string, value: string, index = -1) => {
+  // One filter per label: the server joins filters with AND, so two values of one label match nothing.
+  const keep = (filter: ProfileFilter, i: number) => i !== index && filter.key !== key;
+  const current = appliedFilters.value;
+  const anchor = index >= 0 ? index : current.findIndex((filter) => filter.key === key);
+  const next = current.filter(keep);
+  const at = anchor < 0 ? next.length : current.slice(0, anchor).filter(keep).length;
+  next.splice(at, 0, { key, op: "=", value });
   appliedFilters.value = next;
-  editingFilterIndex.value = null;
-  draftTagKey.value = null;
+};
+
+/** A click on a Breakdown legend chip filters the page to that value. */
+const filterToBreakdownValue = async (line: SeriesLine) => {
+  if (line.others || !breakdownLabel.value) return;
+  setLabelFilter(breakdownLabel.value, line.value);
   await runOrMarkPending();
 };
 
-const removeFilter = async (filter: ProfileFilter) => {
-  appliedFilters.value = appliedFilters.value.filter(
-    (item) => !(item.key === filter.key && item.value === filter.value),
-  );
+/** Takes the builder's filters, keeping one per label in the slot of its first chip, then re-runs. */
+const setFilters = async (next: ProfileFilter[]) => {
+  const byKey = new Map<string, number>();
+  const kept: ProfileFilter[] = [];
+  for (const filter of next) {
+    const at = byKey.get(filter.key);
+    if (at === undefined) {
+      byKey.set(filter.key, kept.length);
+      kept.push(filter);
+    } else kept[at] = filter;
+  }
+  appliedFilters.value = kept;
   await runOrMarkPending();
 };
 
-const loadTagValues = async () => {
+/** A label's values for the filter builder; a filter on that label must not narrow its own list. */
+const loadTagValues = async (tag: string, search: string): Promise<string[]> => {
   const org = orgIdentifier.value;
   const stream = selectedStream.value;
-  const tag = draftTagKey.value;
   const range = resolveTimeRange();
   const profileType = currentProfileType.value;
-  if (!org || !stream || !tag || !range) {
-    tagValueOptions.value = [];
-    return;
+  if (!org || !stream || !tag || !range) return [];
+  const requestSeq = tagValuesRequestSeq;
+  const body = {
+    service_name: selectedService.value || undefined,
+    profile_type: profileType?.type,
+    profile_unit: profileType?.unit,
+    filters: appliedFilters.value
+      .filter((filter) => filter.key !== tag)
+      .map((filter) => ({ ...filter })),
+    tag,
+  };
+  const { valueType, relativeTimePeriod, startTime, endTime } = dateState.value;
+  const period = valueType === "relative" ? relativeTimePeriod : [startTime, endTime];
+  const key = JSON.stringify([org, stream, period, body]);
+  let request = tagValuesCache.get(key);
+  if (!request) {
+    request = profilesService
+      .tagValues(org, stream, { start_time: range.startTime, end_time: range.endTime, ...body })
+      .then((response) => response.data.values ?? []);
+    tagValuesCache.set(key, request);
+    request.catch(() => tagValuesCache.delete(key));
   }
-  const requestSeq = ++tagValuesRequestSeq;
-  tagValuesLoading.value = true;
   try {
-    const response = await profilesService.tagValues(org, stream, {
-      start_time: range.startTime,
-      end_time: range.endTime,
-      service_name: selectedService.value || undefined,
-      profile_type: profileType?.type,
-      profile_unit: profileType?.unit,
-      // The filter being edited must not narrow its own value list.
-      filters: appliedFilters.value
-        .filter((_, index) => index !== editingFilterIndex.value)
-        .map((filter) => ({ ...filter })),
-      tag,
-    });
-    if (requestSeq !== tagValuesRequestSeq) return;
-    tagValueOptions.value = (response.data.values ?? []).map((value) => ({
-      label: raw(value),
-      value,
-    }));
-    if (
-      draftTagValue.value &&
-      !tagValueOptions.value.some((option) => option.value === draftTagValue.value)
-    ) {
-      draftTagValue.value = null;
-    }
+    const values = await request;
+    if (requestSeq !== tagValuesRequestSeq) return [];
+    const needle = search.trim().toLowerCase();
+    return needle ? values.filter((value) => value.toLowerCase().includes(needle)) : values;
   } catch {
     // As the Metrics label filter does: the value list stays empty, and the results stay.
-    if (requestSeq !== tagValuesRequestSeq) return;
-    tagValueOptions.value = [];
-  } finally {
-    if (requestSeq === tagValuesRequestSeq) {
-      tagValuesLoading.value = false;
-    }
+    return [];
   }
 };
 
@@ -1397,26 +1640,33 @@ const loadMeta = async () => {
   if (!org || !stream || !range) return;
   const requestSeq = ++metaRequestSeq;
   const run = initRunSeq;
-  try {
-    const response = await profilesService.meta(org, stream, {
+  const isStale = () => requestSeq !== metaRequestSeq || isStaleRun(run, org);
+  // The server scopes only profile_types to service_name; services always lists every service.
+  const fetchMeta = (service: string | null) =>
+    profilesService.meta(org, stream, {
       start_time: range.startTime,
       end_time: range.endTime,
+      ...(service ? { service_name: service } : {}),
     });
-    if (requestSeq !== metaRequestSeq || isStaleRun(run, org)) return;
+  try {
+    let service = selectedService.value;
+    let response = await fetchMeta(service);
+    if (isStale()) return;
+    const services: string[] = response.data.services ?? [];
+    // An empty window lists no services; keep the chosen one for when data comes back.
+    if (services.length && (!service || !services.includes(service))) {
+      service = services[0];
+      response = await fetchMeta(service);
+      if (isStale()) return;
+    }
     metaResponse.value = response.data;
-    const firstService = serviceOptions.value[0]?.value ?? null;
     // CPU first, as the Traces "View Profile" link does; the server lists types alphabetically (alloc_objects first).
     const firstProfileType =
       profileTypeOptions.value.find((option) => option.value.startsWith("cpu\u0000"))?.value ??
       profileTypeOptions.value[0]?.value ??
       null;
 
-    if (
-      !selectedService.value ||
-      !serviceOptions.value.some((item) => item.value === selectedService.value)
-    ) {
-      selectedService.value = firstService;
-    }
+    selectedService.value = service;
     if (
       !selectedProfileType.value ||
       !profileTypeOptions.value.some((item) => item.value === selectedProfileType.value)
@@ -1424,27 +1674,67 @@ const loadMeta = async () => {
       selectedProfileType.value = firstProfileType;
     }
     if (
-      draftTagKey.value &&
-      !tagKeyOptions.value.some((item) => item.value === draftTagKey.value)
+      breakdownLabel.value &&
+      !breakdownOptions.value.some((item) => item.value === breakdownLabel.value)
     ) {
-      clearDraftTag();
+      breakdownLabel.value = null;
     }
   } catch (error) {
-    if (requestSeq !== metaRequestSeq || isStaleRun(run, org)) return;
+    if (isStale()) return;
     errorMessage.value = buildErrorMessage(error);
   }
 };
 
-const runQuery = async () => {
+const seriesPayload = (payload: ProfilesQueryBody): ProfilesQueryBody =>
+  breakdownLabel.value ? { ...payload, group_by: breakdownLabel.value, group_limit: 10 } : payload;
+
+/** A new Breakdown redraws the chart for the run on screen; the tables do not change. */
+const setBreakdown = async (value: unknown) => {
+  const label = typeof value === "string" && value !== BREAKDOWN_NONE ? value : null;
+  if (label === breakdownLabel.value) return;
+  breakdownLabel.value = label;
+  const org = orgIdentifier.value;
+  const run = lastRun.value;
+  if (!org || !run) return;
+  const requestSeq = ++seriesRequestSeq;
+  seriesAbort?.abort();
+  const abort = (seriesAbort = new AbortController());
+  seriesLoading.value = true;
+  try {
+    const response = await profilesService.series(
+      org,
+      run.query.stream,
+      seriesPayload(run.payload),
+      { signal: abort.signal },
+    );
+    if (requestSeq !== seriesRequestSeq) return;
+    seriesResponse.value = response.data;
+    analytics.track("profiles_breakdown_changed", { has_breakdown: !!label });
+  } catch (error) {
+    if (requestSeq !== seriesRequestSeq || abort.signal.aborted) return;
+    errorMessage.value = buildErrorMessage(error);
+  } finally {
+    if (requestSeq === seriesRequestSeq) seriesLoading.value = false;
+  }
+};
+
+const runQuery = async (userRun = false) => {
+  tagValuesCache.clear();
   const org = orgIdentifier.value;
   const stream = selectedStream.value;
   const range = resolveTimeRange();
   const payload = queryPayload(range);
   if (!org || !stream || !payload || !range) return;
-  const runState = { query: pageQuery(), range };
+  // Only the run started with the link's inputs may keep its focus, even if it is superseded or fails.
+  const keepFocus = keepSeededFocus;
+  keepSeededFocus = false;
+  const runState = { query: pageQuery(), range, payload };
   const requestSeq = ++queryRequestSeq;
   const run = initRunSeq;
   queryAbort?.abort();
+  seriesAbort?.abort();
+  seriesRequestSeq += 1;
+  seriesLoading.value = false;
   const abort = (queryAbort = new AbortController());
   queryLoading.value = true;
   runPending.value = false;
@@ -1452,15 +1742,22 @@ const runQuery = async () => {
   errorMessage.value = "";
   try {
     const [seriesResult, mergeResponseValue] = await Promise.all([
-      profilesService.series(org, stream, payload, { signal: abort.signal }),
+      profilesService.series(org, stream, seriesPayload(payload), { signal: abort.signal }),
       profilesService.merge(org, stream, { ...payload, max_nodes: 4096 }, { signal: abort.signal }),
     ]);
     if (requestSeq !== queryRequestSeq || isStaleRun(run, org)) return;
     seriesResponse.value = seriesResult.data;
     mergeResult.value = mergeResponseValue.data;
+    if (!keepFocus) flameFocus.value = null;
     lastRun.value = runState;
     resetStackExpansion(mergeResponseValue.data.root);
     syncUrl();
+    if (userRun) {
+      analytics.track("profiles_query_completed", {
+        filter_count: appliedFilters.value.length,
+        has_breakdown: !!breakdownLabel.value,
+      });
+    }
   } catch (error) {
     if (requestSeq !== queryRequestSeq || isStaleRun(run, org)) return;
     errorMessage.value = buildErrorMessage(error);
@@ -1471,7 +1768,20 @@ const runQuery = async () => {
   }
 };
 
+/** Runs the query while meta loads, and again only when meta replaced the service or profile type. */
+const runAlongsideMeta = async (load: () => Promise<void>) => {
+  const run = initRunSeq;
+  const selection = () => `${selectedService.value}\u0000${selectedProfileType.value}`;
+  const before = selection();
+  const query = runQuery();
+  await load();
+  if (run !== initRunSeq) return;
+  if (selection() !== before) await runQuery();
+  else await query;
+};
+
 const queryString = (value: LocationQuery[string]) => (typeof value === "string" ? value : "");
+const COMPARE_DISPLAYS = ["flame", "sides", "table"] as const;
 
 const parseRouteSeed = (query: LocationQuery): RouteSeed | null => {
   const stream = queryString(query.stream);
@@ -1492,6 +1802,14 @@ const parseRouteSeed = (query: LocationQuery): RouteSeed | null => {
     search: queryString(query.search),
     focus: queryString(query.focus) || null,
     details: queryString(query.details) || null,
+    breakdown: queryString(query.breakdown) || null,
+    compare: {
+      label: queryString(query.compare_label) || null,
+      baseline: queryString(query.compare_a) || null,
+      comparison: queryString(query.compare_b) || null,
+      display:
+        COMPARE_DISPLAYS.find((value) => value === queryString(query.compare_display)) ?? "flame",
+    },
   };
 };
 
@@ -1537,7 +1855,7 @@ const pageQuery = (range?: { startTime: number; endTime: number } | null) => {
     query.profile_type = profileType.type;
     query.profile_unit = profileType.unit;
   }
-  const filters = encodeProfileFilters(appliedFilters.value);
+  const filters = encodeProfileRouteFilters(appliedFilters.value);
   if (filters) query.filters = filters;
   query.view = activeView.value;
   return query;
@@ -1551,6 +1869,14 @@ const viewQuery = () => {
   if (searchQuery.value.trim()) query.search = searchQuery.value.trim();
   if (flameFocus.value) query.focus = flameFocus.value;
   if (detailsName.value) query.details = detailsName.value;
+  if (breakdownLabel.value) query.breakdown = breakdownLabel.value;
+  if (activeView.value === "compare") {
+    const compare = compareState.value;
+    query.compare_display = compare.display;
+    if (compare.label) query.compare_label = compare.label;
+    if (compare.baseline) query.compare_a = compare.baseline;
+    if (compare.comparison) query.compare_b = compare.comparison;
+  }
   return query;
 };
 
@@ -1624,8 +1950,6 @@ const initPage = async () => {
     if (seed || unseed) showDateInPicker();
     await loadStreams();
     if (run !== initRunSeq || !selectedStream.value) return;
-    await loadMeta();
-    if (run !== initRunSeq) return;
     if (seed) {
       appliedFilters.value = seed.filters;
       if (seed.view) activeView.value = seed.view;
@@ -1633,8 +1957,11 @@ const initPage = async () => {
       sandwichFunction.value = seed.sandwichFunction;
       detailsName.value = seed.details;
       flameFocus.value = seed.focus;
+      keepSeededFocus = !!seed.focus;
+      breakdownLabel.value = seed.breakdown;
+      compareState.value = seed.compare;
     }
-    await runQuery();
+    await runAlongsideMeta(loadMeta);
   } finally {
     if (run === initRunSeq) {
       seeding = false;
@@ -1642,17 +1969,6 @@ const initPage = async () => {
     }
   }
 };
-
-watch(draftTagKey, async (key, previousKey) => {
-  if (key === previousKey) return;
-  draftTagValue.value = null;
-  tagValueOptions.value = [];
-  if (!key) {
-    invalidateTagValuesRequest();
-    return;
-  }
-  await loadTagValues();
-});
 
 /** Reloads meta for a new stream or window, holding the select watcher so it does not query halfway. */
 const reloadMeta = async () => {
@@ -1665,18 +1981,16 @@ const reloadMeta = async () => {
 };
 
 // A new service or profile type runs the query (Auto Run) or marks Run query pending.
-watch([selectedService, selectedProfileType], async () => {
+watch([selectedService, selectedProfileType], async ([service], [previousService]) => {
   if (seeding || reloadingMeta) return;
-  if (draftTagKey.value) {
-    draftTagValue.value = null;
-    await loadTagValues();
-  }
+  // Profile types are scoped to the service; reloadMeta holds this watcher, so it cannot loop.
+  if (service !== previousService) await reloadMeta();
   await runOrMarkPending();
 });
 
 watch(selectedStream, async (stream, previousStream) => {
   if (seeding || !stream || stream === previousStream) return;
-  clearDraftTag();
+  invalidateTagValuesRequest();
   appliedFilters.value = [];
   selectedService.value = null;
   await reloadMeta();
@@ -1688,12 +2002,12 @@ watch(dateState, async () => {
   if (seeding) return;
   const fromChart = runNextRange;
   runNextRange = false;
-  await reloadMeta();
-  if (draftTagKey.value) {
-    await loadTagValues();
+  if (fromChart || isAutoRunOn.value) {
+    await runAlongsideMeta(reloadMeta);
+  } else {
+    await reloadMeta();
+    runPending.value = true;
   }
-  if (fromChart) await runQuery();
-  else await runOrMarkPending();
 });
 
 /** The org in the URL and the page state it seeds. */
@@ -1724,9 +2038,20 @@ watch(
   },
 );
 
-watch([activeView, sandwichFunction, searchQuery, flameFocus, detailsName], () => {
-  if (!seeding && mergeResult.value) syncUrl();
-});
+watch(
+  [
+    activeView,
+    sandwichFunction,
+    searchQuery,
+    flameFocus,
+    detailsName,
+    breakdownLabel,
+    compareState,
+  ],
+  () => {
+    if (!seeding && mergeResult.value) syncUrl();
+  },
+);
 
 // The graph keeps its own focus, so a graph that mounts again (or from a link) gets the page's focus.
 watch(flameGraphRef, (graph) => {

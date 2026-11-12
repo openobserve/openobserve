@@ -8,6 +8,7 @@ vi.mock("@/utils/date", () => ({
 }));
 
 import {
+  formatMs,
   b64EncodeUnicode,
   b64DecodeUnicode,
   b64DecodeUnicodeSafe,
@@ -17,6 +18,8 @@ import {
   convertToTitleCase,
   truncateText,
   formatLargeNumber,
+  formatCompactCount,
+  formatEventCount,
   formatSizeFromMB,
   addCommasToNumber,
   formatTimeWithSuffix,
@@ -309,6 +312,67 @@ describe("formatLargeNumber", () => {
   it("formats numbers >= 1_000_000_000 with B suffix", () => {
     expect(formatLargeNumber(3_000_000_000)).toBe("3.0B");
   });
+
+  it("moves to the next unit when rounding reaches 1000", () => {
+    expect(formatLargeNumber(999_949)).toBe("999.9K");
+    expect(formatLargeNumber(999_950)).toBe("1.0M");
+    expect(formatLargeNumber(999_999)).toBe("1.0M");
+    expect(formatLargeNumber(999_999_999)).toBe("1.0B");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatEventCount
+// ---------------------------------------------------------------------------
+
+describe("formatEventCount", () => {
+  it("prints counts below 100 000 exactly", () => {
+    expect(formatEventCount(99_999)).toBe("99999");
+  });
+
+  it("formats larger counts with one decimal and drops a trailing .0", () => {
+    expect(formatEventCount(123_456)).toBe("123.5K");
+    expect(formatEventCount(2_000_000)).toBe("2M");
+    expect(formatEventCount(2_900_000_000)).toBe("2.9B");
+  });
+
+  it("moves to the next unit when rounding reaches 1000", () => {
+    expect(formatEventCount(999_949)).toBe("999.9K");
+    expect(formatEventCount(999_950)).toBe("1M");
+    expect(formatEventCount(999_999)).toBe("1M");
+    expect(formatEventCount(999_999_999)).toBe("1B");
+    expect(formatEventCount(999_990_000_000)).toBe("1T");
+  });
+
+  it("stays on T past the largest unit", () => {
+    expect(formatEventCount(1e15)).toBe("1000T");
+  });
+});
+
+describe("formatCompactCount", () => {
+  it("keeps counts below 1000 exact", () => {
+    expect(formatCompactCount(0)).toBe("0");
+    expect(formatCompactCount(999)).toBe("999");
+  });
+
+  it("abbreviates from 1000 and drops a trailing .0", () => {
+    expect(formatCompactCount(1000)).toBe("1K");
+    expect(formatCompactCount(23000)).toBe("23K");
+    expect(formatCompactCount(819525)).toBe("819.5K");
+    expect(formatCompactCount(225552388)).toBe("225.6M");
+    expect(formatCompactCount(25_900_000_000)).toBe("25.9B");
+  });
+
+  it("promotes a value that rounds up to the next unit", () => {
+    expect(formatCompactCount(999_950)).toBe("1M");
+    expect(formatCompactCount(999_999_999)).toBe("1B");
+  });
+
+  it("handles negatives and non-finite input", () => {
+    expect(formatCompactCount(-23000)).toBe("-23K");
+    expect(formatCompactCount(Number.NaN)).toBe("");
+    expect(formatCompactCount(Number.POSITIVE_INFINITY)).toBe("");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -331,6 +395,17 @@ describe("formatSizeFromMB", () => {
   it("rounds very small positive values to 0.01 MB", () => {
     // A very small positive value (e.g. 0.000001 MB) should show 0.01 MB
     expect(formatSizeFromMB("0.000001")).toBe("0.01 MB");
+  });
+
+  it("moves up a unit when rounding would print 1024.00", () => {
+    expect(formatSizeFromMB(1023.994)).toBe("1023.99 MB");
+    expect(formatSizeFromMB(1023.996)).toBe("1.00 GB");
+    expect(formatSizeFromMB(1024 * 1024 - 0.001)).toBe("1.00 TB");
+    expect(formatSizeFromMB(1024 ** 3 - 1)).toBe("1.00 PB");
+  });
+
+  it("stays in PB, its largest unit", () => {
+    expect(formatSizeFromMB(1024 ** 4)).toBe("1024.00 PB");
   });
 });
 
@@ -680,5 +755,19 @@ describe("formatUtcWindowsInTz", () => {
     expect(formatUtcWindowsInTz([], "Asia/Kolkata")).toBe("");
     expect(formatUtcWindowsInTz([{ start_minute: 60, end_minute: 240 }], "")).toBe("");
     expect(formatUtcWindowsInTz([{ start_minute: 60, end_minute: 240 }], "Not/AZone")).toBe("");
+  });
+});
+
+describe("formatMs", () => {
+  it("uses ms under a second and two-decimal seconds from a second up", () => {
+    expect(formatMs(0)).toBe("0 ms");
+    expect(formatMs(85)).toBe("85 ms");
+    expect(formatMs(999)).toBe("999 ms");
+    expect(formatMs(1000)).toBe("1.00 s");
+    expect(formatMs(62579)).toBe("62.58 s");
+  });
+
+  it("shows a dash for no value", () => {
+    expect(formatMs(null)).toBe("—");
   });
 });

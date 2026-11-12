@@ -71,8 +71,12 @@ const reports = {
   },
 
   // v2 — folder-aware, ID-based
-  getReportById: (org_identifier: string, report_id: string) => {
-    return http().get(`/api/v2/${org_identifier}/reports/${report_id}`);
+  getReportById: (
+    org_identifier: string,
+    report_id: string,
+    options?: { silentForbidden?: boolean },
+  ) => {
+    return http().get(`/api/v2/${org_identifier}/reports/${report_id}`, options);
   },
   createReportV2: (org_identifier: string, payload: any, folder_id?: string) => {
     let url = `/api/v2/${org_identifier}/reports`;

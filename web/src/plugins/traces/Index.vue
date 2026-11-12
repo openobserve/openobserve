@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :isLoading="searchObj.loading"
               :activeTab="activeTab"
               class="bg-card-glass-bg"
-              @searchdata="searchData"
+              @searchdata="searchData()"
               @onChangeTimezone="refreshTimezone"
               @update:activeTab="activeTab = $event"
               @error-only-toggled="onErrorOnlyToggled"
@@ -76,8 +76,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
               @apply-saved-view="onApplySavedView"
+              @recent-restore="onRecentRestore"
               @service-graph-refresh="serviceGraphRef?.refresh()"
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
+              @filter-builder-growth="filterBuilderGrowth = $event"
               @drill-down="searchResultRef?.openComparison()"
             />
           </div>
@@ -135,7 +137,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :active-exclude-field-values="activeExcludeFilterValues"
                       data-test="traces-search-index-list"
                       class="h-full"
-                      :key="searchObj.data.stream.streamLists"
                       @update:changeStream="onChangeStream"
                       @update:selectedFields="updateFieldVisibility"
                     />
@@ -167,16 +168,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                       </TracesNoDataState>
                     </FirstDataPanel>
-                    <!-- Stable loading state while streams load / auto-run fires,
-                       so the empties don't flash in between. -->
-                    <div
-                      v-else-if="searchObj.loadingStream"
-                      class="bg-card-glass-bg text-text-secondary flex h-full flex-col items-center justify-center gap-2"
-                      data-test="traces-search-loading"
-                    >
-                      <OSpinner size="lg" />
-                      <span class="text-sm">{{ t("traces.fetchingTraces") }}</span>
-                    </div>
                     <div
                       v-else-if="searchObj.data.errorMsg !== '' && !searchObj.loading"
                       data-test="traces-search-error-message"
@@ -193,7 +184,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @configure-resource="onConfigureTracesStream"
                       />
                     </div>
-                    <div v-else-if="!isStreamSelected" class="max-lg:h-full">
+                    <div
+                      v-else-if="!searchObj.loadingStream && !isStreamSelected"
+                      class="max-lg:h-full"
+                    >
                       <TracesNoStreamState
                         :org-id="store.state.selectedOrganization?.identifier"
                         data-test="traces-no-stream-selected-text"
@@ -203,6 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       v-else-if="
+                        !searchObj.loadingStream &&
                         isStreamSelected &&
                         !searchObj.searchApplied &&
                         !searchObj.data.queryResults?.hits?.length
@@ -215,9 +210,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @action="() => searchData()"
                       />
                     </div>
+                    <div v-else-if="searchCancelled && !searchObj.loading">
+                      <OEmptyState
+                        preset="search-cancelled"
+                        size="hero"
+                        data-test="traces-search-cancelled-state"
+                        @action="() => searchData()"
+                      />
+                    </div>
                     <div v-else data-test="logs-search-search-result" class="h-full!">
                       <SearchResult
                         ref="searchResultRef"
+                        :pending="searchObj.loadingStream"
                         :show-error-only="showErrorOnly"
                         :ai-enabled="isAiEnabled"
                         :stream-doc-time-range="streamDocTimeRange"
@@ -228,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @shareLink="(range: any) => copyTracesUrl(t, range)"
                         @metrics:editor-filter-set="onMetricsEditorFilterSet"
                         @metrics:editor-filter-run="onMetricsEditorFilterRun"
-                        @run-query="searchData"
+                        @run-query="searchData()"
                         @remove-filter="onRemoveTracesFilter"
                         @jump-to-stream-data="onJumpToTracesStreamData"
                         @error-only-toggled="onErrorOnlyToggled"
@@ -258,12 +262,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex h-full flex-col overflow-hidden pt-2.5">
         <IndexList
+          ref="mobileIndexListRef"
           :field-list="searchObj.data.stream.selectedStreamFields"
           :active-include-field-values="activeIncludeFilterValues"
           :active-exclude-field-values="activeExcludeFilterValues"
           data-test="traces-search-index-list-mobile"
           class="h-full"
-          :key="searchObj.data.stream.streamLists"
           @update:changeStream="onChangeStream"
           @update:selectedFields="updateFieldVisibility"
         />
@@ -289,6 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 // @ts-nocheck
+import { unescapeSqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import {
   ref,
@@ -315,6 +320,7 @@ import {
   generateTraceContext,
 } from "@/utils/zincutils";
 import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
+import { tracesRunIsStaged, tracesSearchRunSignature } from "./tracesSearchBar.utils";
 import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import analytics from "@/services/product_analytics";
@@ -323,17 +329,17 @@ import { logsErrorMessage } from "@/utils/common";
 import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { describePeriod } from "@/utils/dashboard/calendarPeriods";
 import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
-import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import { applyFieldGrouping, buildSemanticIndex, type FieldObj } from "@/utils/fieldCategories";
 import {
   useServiceCorrelation,
   type KeyFieldsConfig,
   type FieldGroupingConfig,
 } from "@/composables/useServiceCorrelation";
-import { parseSpanKindWhereClause } from "@/utils/traces/constants";
+import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
@@ -345,7 +351,6 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
 import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
@@ -358,6 +363,17 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { recordPageLoad, recordPageRequest, type PageLoadReason } from "@/utils/pageCrossing";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { useRecentSearches } from "@/composables/queryHistory/useRecentSearches";
+import {
+  runResultFromError,
+  toRunError,
+  type RestoreTime,
+} from "@/utils/queryHistory/recentSearches";
+import { buildTracesRecord, tracesRestore } from "@/utils/queryHistory/traces";
+import { isBareTracesQuery, tracesQueryKey } from "@/plugins/traces/tracesPageReturn";
+import { openRecentOnItsPage, takeRecentLanding } from "@/utils/queryHistory/routes";
+import { isLeavingRoute, trackPendingNavigation } from "@/utils/pendingNavigation";
+import type { HistoryTime, QueryHistoryEntry } from "@/services/query_history";
 
 interface TracesSavedView {
   version?: number;
@@ -370,6 +386,8 @@ interface TracesSavedView {
   selectedFields?: string[];
 }
 
+defineOptions({ name: "AppTraces" });
+
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
 const SearchResult = defineAsyncComponent(() => import("./SearchResult.vue"));
@@ -380,12 +398,14 @@ const supportedTraceSearchMode = (value: unknown): TraceSearchMode =>
   resolveTraceSearchMode(value, config.isEnterprise === "true");
 
 const store = useStore();
+const { record: recordRecent } = useRecentSearches();
 const activeTab = computed(() => {
   if (searchObj.meta.searchMode === "service-graph") return "service-graph";
   if (searchObj.meta.searchMode === "services-catalog") return "services-catalog";
   return "search";
 });
 const router = useRouter();
+trackPendingNavigation(router);
 const { t } = useI18nTyped();
 // Bubbles AI-chat requests up to MainLayout, which opens the O2AIChat panel.
 const emit = defineEmits(["sendToAiChat"]);
@@ -393,6 +413,8 @@ const {
   searchObj,
   resetSearchObj,
   getUrlQueryParams,
+  applyUrlListState,
+  syncUrlViewState,
   copyTracesUrl,
   formatTracesMetaData,
   setServiceColors,
@@ -440,6 +462,18 @@ watch(
   },
   { immediate: true },
 );
+// Pixels the filter builder has grown past one line; null while the text editor is shown.
+const filterBuilderGrowth = ref<number | null>(null);
+let autoSplitterHeight = 0;
+// The query pane grows with the builder and shrinks back, but never overrides a larger user-set height.
+watch([filterBuilderGrowth, isMobile], ([growth, mobile]) => {
+  const base = mobile ? 150 : 90;
+  const target = base + (growth ?? 0);
+  if (splitterModel.value < target || splitterModel.value <= Math.max(base, autoSplitterHeight)) {
+    splitterModel.value = target;
+  }
+  autoSplitterHeight = target;
+});
 // md–lg: the desktop 20% pane is ~140px, too narrow for the stream picker.
 let preTabletSplitter: number | null = null;
 watch(
@@ -459,7 +493,13 @@ watch(
   { immediate: true },
 );
 const { showErrorNotification } = useNotifications();
-const indexListRef = ref(null);
+const indexListRef = ref<{ refreshOpenFieldValues?: () => void } | null>(null);
+const mobileIndexListRef = ref<{ refreshOpenFieldValues?: () => void } | null>(null);
+// Only once the new stream's fields and query are final, or open fields fetch from a half-applied state.
+const refreshOpenFieldValues = () => {
+  indexListRef.value?.refreshOpenFieldValues?.();
+  mobileIndexListRef.value?.refreshOpenFieldValues?.();
+};
 const { getStreams, getStream } = useStreams(t);
 const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 const chartRedrawTimeout = ref(null);
@@ -481,12 +521,31 @@ const { buildColumns } = useTracesTableColumns();
 let currentSearchTraceId: string | null = null;
 // Track the count query stream so it can be cancelled independently
 let currentCountTraceId: string | null = null;
+// Bumped when the page leaves, so a load still awaiting the parser or stream list drops its results.
+let pageGeneration = 0;
+let pageLoaded = false;
+// A landing claimed by a load the page left mid-way, replayed by the next load.
+let pendingLanding: { run: boolean } | null = null;
+let streamListLoaded = false;
+// The view (stream, mode, query) whose results last landed; a failed re-run of the same view keeps them on screen.
+let lastSettledViewKey = "";
+// The page the rows on screen were read with; a failed refresh puts the pager back on it with them.
+let shownPage = 0;
+// The org and stream the rail's fields were read for; only a reload of the same stream may keep them.
+let fieldsOwner = "";
+let fieldsLoadSeq = 0;
+// The parser only shapes the search's filter, so it loads alongside the stream list and the search waits for it.
+let parserReady: Promise<unknown> = Promise.resolve();
 // The processed WHERE clause from the last buildSearch() call — used for the count query
 let builtWhereClause = "";
 // Paging must keep page 1's filter, so later editor edits never mix into it.
 let submittedFilter = "";
+// A link's page applies to the first search after it is read; any later Run starts at page 1.
+let pendingUrlPage: number | null = null;
+let stopUrlSync = syncUrlViewState();
 // A page's stream can open with an empty batch, so only an actual write may end the replace phase.
-const tracesRequestState: Record<string, { hasWritten: boolean }> = {};
+const tracesRequestState: Record<string, { hasWritten: boolean; isPartial?: boolean }> = {};
+const searchCancelled = ref(false);
 
 const selectedStreamName = computed(() => searchObj.data.stream.selectedStream.value);
 
@@ -516,58 +575,56 @@ function getQueryTransform() {
   }
 }
 
-async function getStreamList() {
+/** Loads the stream list and picks the stream; hands back the field load, which the search need not wait for. */
+async function getStreamList(): Promise<{ fieldsReady: Promise<void> } | null> {
+  const generation = pageGeneration;
   try {
-    return getStreams("traces", false)
-      .then(async (res) => {
-        searchObj.data.streamResults = res;
+    const res = await getStreams("traces", false);
+    if (generation !== pageGeneration) return null;
+    streamListLoaded = true;
+    searchObj.data.streamResults = res;
 
-        if (res.list.length > 0) {
-          if (config.isCloud == "true") {
-            getQueryTransform();
-          }
+    if (res.list.length > 0) {
+      if (config.isCloud == "true") {
+        getQueryTransform();
+      }
 
-          //extract stream data from response
-          loadStreamLists();
-        } else {
-          searchObj.loading = false;
-          searchObj.data.errorMsg = "";
-          searchObj.data.stream.streamLists = [];
-          searchObj.data.stream.selectedStream = { label: "", value: "" };
-          searchObj.data.stream.selectedStreamFields = [];
-          searchObj.data.queryResults = {};
-          searchObj.data.sortedQueryResults = [];
-          searchObj.data.histogram = {
-            layout: {},
-            data: [],
-          };
-        }
+      //extract stream data from response
+      loadStreamLists();
+    } else {
+      searchObj.loading = false;
+      searchObj.data.errorMsg = "";
+      searchObj.data.stream.streamLists = [];
+      searchObj.data.stream.selectedStream = { label: "", value: "" };
+      searchObj.data.stream.selectedStreamFields = [];
+      searchObj.data.queryResults = {};
+      searchObj.data.sortedQueryResults = [];
+      searchObj.data.histogram = {
+        layout: {},
+        data: [],
+      };
+    }
+    // It needs only the stream name and may fill an empty editor, so it runs before the search, not after the fields.
+    correlationFilters.restore();
 
-        await extractFields();
-        correlationFilters.restore();
-
-        // Restore filter chips from the editor value. The single mount search is
-        // owned by loadPageData() (after getStreamList resolves), so we do NOT
-        // trigger a search here.
-        if (searchObj.data.editorValue && searchObj.data.stream.selectedStreamFields.length)
-          nextTick(() => {
-            restoreFilters(searchObj.data.editorValue);
-          });
-      })
-      .catch((e) => {
-        searchObj.loadingStream = false;
-        toast({
-          variant: "error",
-          message: t("traces.index.errorPullingIndex", { message: e.message }),
+    // Wrapped, because an async function returning a promise would wait for it.
+    const fieldsReady = extractFields().then(() => {
+      if (generation !== pageGeneration) return;
+      // Restore filter chips from the editor value; the search itself is owned by loadPageData().
+      if (searchObj.data.editorValue && searchObj.data.stream.selectedStreamFields.length)
+        nextTick(() => {
+          restoreFilters(searchObj.data.editorValue);
         });
-      })
-      .finally(() => {
-        searchObj.loadingStream = false;
-      });
-  } catch (e) {
+    });
+    return { fieldsReady };
+  } catch (e: any) {
+    if (generation !== pageGeneration) return null;
     searchObj.loadingStream = false;
-    console.error("Error while getting streams", e);
-    showErrorNotification(t("traces.index.errorGettingStreams"));
+    toast({
+      variant: "error",
+      message: t("traces.index.errorPullingIndex", { message: e?.message }),
+    });
+    return null;
   }
 }
 
@@ -648,6 +705,10 @@ function resolveSearchWindow(reuseLastWindow: boolean) {
   return timestamps;
 }
 
+// A query-only write lands on whichever route is current and supersedes a pending navigation.
+const canWriteTracesUrl = () =>
+  router.currentRoute.value.name === "traces" && !isLeavingRoute("traces");
+
 function buildSearch(reuseLastWindow = false) {
   try {
     let query = searchObj.data.editorValue.trim();
@@ -668,18 +729,7 @@ function buildSearch(reuseLastWindow = false) {
     let whereClause = query.trim();
 
     if (whereClause.trim() != "") {
-      // Convert human-readable duration suffixes (e.g. '1.50ms') to raw µs.
-      const durationParseResult = parseDurationWhereClause(
-        whereClause,
-        tracesParser.value,
-        searchObj.data.stream.selectedStream.value,
-      );
-      if (typeof durationParseResult === "string") {
-        whereClause = durationParseResult;
-      }
-
-      // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
-      whereClause = parseSpanKindWhereClause(
+      whereClause = resolveTracesFilter(
         whereClause,
         tracesParser.value,
         searchObj.data.stream.selectedStream.value,
@@ -714,7 +764,7 @@ function buildSearch(reuseLastWindow = false) {
 
     const queryParams = getUrlQueryParams();
 
-    router.push({ query: queryParams });
+    if (canWriteTracesUrl()) router.push({ query: queryParams });
     return req;
   } catch (e) {
     console.error("Error while constructing the search query", e);
@@ -723,9 +773,24 @@ function buildSearch(reuseLastWindow = false) {
   }
 }
 
+// The stream and view a count was taken over; a run over another dataset must not keep it.
+let countedDataset = "";
+
+// A re-run keeps the last error count and pager on screen until its own count lands.
+function dropKeptCount(results: any) {
+  results.countPending = false;
+  if (searchObj.data.queryResults !== results) return;
+  results.errorCount = undefined;
+  searchObj.meta.resultGrid.showPagination = false;
+}
+
 function fetchTracesCount() {
   const queryReq = searchObj.data.queryPayload;
-  if (!queryReq || !selectedStreamName.value) return;
+  const results = searchObj.data.queryResults;
+  if (!queryReq || !selectedStreamName.value) {
+    dropKeptCount(results);
+    return;
+  }
 
   const streamName = selectedStreamName.value;
   const whereClause = builtWhereClause ? ` WHERE ${builtWhereClause}` : "";
@@ -741,7 +806,15 @@ function fetchTracesCount() {
       org_id: searchObj.organizationIdentifier,
     });
   }
-  currentCountTraceId = generateTraceContext().traceId;
+  const countTraceId = generateTraceContext().traceId;
+  currentCountTraceId = countTraceId;
+  // A newer search replaces queryResults, so a late count must not land on it.
+  let landed = false;
+  const settle = () => {
+    if (currentCountTraceId === countTraceId) currentCountTraceId = null;
+    if (landed) results.countPending = false;
+    else dropKeptCount(results);
+  };
 
   fetchQueryDataWithHttpStream(
     {
@@ -758,25 +831,28 @@ function fetchTracesCount() {
       type: "search",
       pageType: "traces",
       searchType: "ui",
-      traceId: currentCountTraceId,
+      traceId: countTraceId,
       org_id: searchObj.organizationIdentifier,
     },
     {
       data: (_payload: any, response: any) => {
+        if (searchObj.data.queryResults !== results) return;
         const hits: any[] = response.content?.results?.hits || [];
         if (hits.length > 0) {
           const count = isSpansMode ? (hits[0]?.span_count ?? 0) : (hits[0]?.trace_count ?? 0);
-          searchObj.data.queryResults.total = count;
-          searchObj.data.queryResults.errorCount = hits[0]?.error_count ?? 0;
+          results.total = count;
+          results.errorCount = hits[0]?.error_count ?? 0;
           searchObj.meta.resultGrid.showPagination = count > 0;
+          landed = true;
         }
       },
-      error: (_payload: any, _err: any) => {
-        console.error("Failed to fetch traces count");
-        currentCountTraceId = null;
+      error: (_payload: any, err: any) => {
+        // The count is a best-effort badge; the main search reports its own failures.
+        console.warn("Failed to fetch traces count", err);
+        settle();
       },
       complete: (_payload: any) => {
-        currentCountTraceId = null;
+        settle();
       },
       reset: (_payload: any) => {},
     },
@@ -803,15 +879,25 @@ const updateFieldValues = (data) => {
   });
 };
 
+/** What a result set shows: a re-run with the same key is a refresh of the same view. */
+function resultsViewKey() {
+  return [
+    searchObj.data.stream.selectedStream.value,
+    searchObj.meta.searchMode,
+    String(searchObj.data.editorValue ?? "").trim(),
+    // Rows read in another order are another view, so a failed re-sort never shows them under the new order.
+    searchObj.meta.resultGrid.sortBy,
+    searchObj.meta.resultGrid.sortOrder,
+  ].join("\u0000");
+}
+
 // The whole editor value is the where clause; a "|" split is quote-unaware and would cut match_all('a | b').
 function buildEditorFilter() {
-  const streamName = searchObj.data.stream.selectedStream.value;
-  let filter = searchObj.data.editorValue.trim();
-  const filterParseResult = parseDurationWhereClause(filter, tracesParser.value, streamName);
-  if (typeof filterParseResult === "string") {
-    filter = filterParseResult;
-  }
-  return parseSpanKindWhereClause(filter, tracesParser.value, streamName);
+  return resolveTracesFilter(
+    searchObj.data.editorValue,
+    tracesParser.value,
+    searchObj.data.stream.selectedStream.value,
+  );
 }
 
 // Every new search and sort (stream, mode, editor) rebuilds its filter in getQueryData, so the selection is checked there.
@@ -833,7 +919,11 @@ const dropStaleSelection = () => {
   if (dropped) searchResultRef.value?.metricsDashboardRef?.clearOriginalTimeRange();
 };
 
-async function getQueryData(isPagination: boolean = false, isSort: boolean = false) {
+async function getQueryData(
+  isPagination: boolean = false,
+  isSort: boolean = false,
+  recordRun: boolean = false,
+) {
   let boundTraceId: string | null = null;
   try {
     if (searchObj.data.stream.selectedStream.value == "") {
@@ -844,10 +934,20 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     searchObj.data.errorDetail = "";
     searchObj.data.sqlSyntaxErrorRanges = [];
 
+    const dispatchViewKey = resultsViewKey();
+    // A re-run of the same view that fails keeps these rows under the failed-refresh notice, never a blank page.
+    const keptResults =
+      !isPagination &&
+      dispatchViewKey === lastSettledViewKey &&
+      searchObj.data.queryResults?.hits?.length
+        ? searchObj.data.queryResults
+        : null;
+    const keptPayload = keptResults ? searchObj.data.queryPayload : null;
     searchObj.searchApplied = true;
     searchObj.loading = true;
 
     if (!isPagination) {
+      searchCancelled.value = false;
       searchObj.data.sortedQueryResults = [];
       searchObj.data.histogram = {
         layout: {},
@@ -859,16 +959,22 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
 
     if (!isPagination) {
       queryReq = buildSearch(isSort);
+      if (queryReq == null) return false;
       searchObj.data.queryPayload = queryReq;
+      const dataset = `${selectedStreamName.value}|${searchObj.meta.searchMode}`;
+      const sameDataset = dataset === countedDataset;
+      countedDataset = dataset;
+      if (!sameDataset) searchObj.meta.resultGrid.showPagination = false;
       // Reset hits for a fresh search
       searchObj.data.queryResults = {
         hits: [],
-        total: 0,
+        total: null,
+        countPending: true,
+        errorCount: sameDataset ? searchObj.data.queryResults?.errorCount : undefined,
         from: 0,
         size: queryReq.query.size,
         took: 0,
       };
-      searchObj.meta.resultGrid.showPagination = false;
     } else {
       queryReq = searchObj.data.queryPayload;
     }
@@ -882,15 +988,21 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
       searchObj.data.resultGrid.currentPage * searchObj.meta.resultGrid.rowsPerPage;
 
     queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
+    const requestPage = searchObj.data.resultGrid.currentPage;
+    const keptPage = shownPage;
 
     // A search or sort reads the editor and the resolved window; a page fetch keeps page 1's, so its selection still holds.
     if (!isPagination) {
       submittedFilter = buildEditorFilter();
+      searchObj.data.appliedEditorValue = String(searchObj.data.editorValue ?? "");
       dropStaleSelection();
+      searchObj.meta.lastRunSignature = tracesSearchRunSignature(searchObj);
     }
     const combinedFilter = submittedFilter;
+    const historyRun = recordRun && !isPagination ? tracesHistoryRun(queryReq) : null;
 
-    if (!isPagination && !isSort) searchResultRef?.value?.getDashboardData();
+    // The results can mount before their async chunk resolves, so the method may not exist yet.
+    if (!isPagination && !isSort) searchResultRef.value?.getDashboardData?.();
 
     // Cancel any in-flight stream before starting a new one
     if (currentSearchTraceId) {
@@ -984,6 +1096,8 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
             const requestState = tracesRequestState[searchTraceId];
             if (!requestState) return;
 
+            if (response.content?.results?.is_partial === true) requestState.isPartial = true;
+
             const rawHits: any[] = response.content?.results?.hits || [];
             if (rawHits.length === 0) return;
 
@@ -1029,6 +1143,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
               ];
             }
             requestState.hasWritten = true;
+            shownPage = requestPage;
             searchObj.data.queryResults.from = queryReq.query.from;
 
             updateFieldValues(rawHits);
@@ -1047,11 +1162,33 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
           // successful search just cleared (o2-enterprise#2643).
           if (!tracesRequestState[searchTraceId]) return;
 
+          if (keptResults) {
+            searchObj.data.queryResults = keptResults;
+            // Next pages the window these rows came from, not the one that failed.
+            searchObj.data.queryPayload = keptPayload;
+            searchObj.data.resultGrid.currentPage = keptPage;
+            shownPage = keptPage;
+            searchObj.meta.refreshFailedAt = Date.now();
+          }
           searchObj.loading = false;
+          // Restored rows keep the error count and pager they were read with.
+          if (keptResults) keptResults.countPending = false;
+          else if (!isPagination) dropKeptCount(searchObj.data.queryResults);
           if (isPagination) noteTracesPageLoad(searchTraceId, "error");
 
           const errData = err?.content || err;
           const { message, trace_id, code, error_detail } = errData ?? {};
+          if (historyRun) {
+            const result = runResultFromError(
+              toRunError({ code, status: errData?.status, message }),
+            );
+            if (result) recordRecent(buildTracesRecord({ ...historyRun, result }));
+          }
+          if (keptResults) {
+            currentSearchTraceId = null;
+            delete tracesRequestState[searchTraceId];
+            return;
+          }
 
           let errorMsg = message || err?.message || t("traces.index.errorProcessingRequest");
           if (code) {
@@ -1086,6 +1223,22 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
           delete tracesRequestState[searchTraceId];
         },
         complete: (_payload: any) => {
+          if (historyRun && tracesRequestState[searchTraceId]) {
+            const state = tracesRequestState[searchTraceId];
+            // A partial answer is not proof that nothing matched.
+            const noResults = state.hasWritten === false && state.isPartial !== true;
+            recordRecent(
+              buildTracesRecord({
+                ...historyRun,
+                result: { status: "ok", noResults },
+              }),
+            );
+          }
+          // Only a run that did not fail clears the notice and becomes the view a later failure may keep.
+          if (!isPagination && tracesRequestState[searchTraceId]) {
+            if (!searchObj.meta.chartRefreshFailed) searchObj.meta.refreshFailedAt = null;
+            lastSettledViewKey = dispatchViewKey;
+          }
           searchObj.loading = false;
           currentSearchTraceId = null;
           // An exhausted page must not leave the previous page under the new page number.
@@ -1096,7 +1249,9 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
           delete tracesRequestState[searchTraceId];
           if (isPagination) noteTracesPageLoad(searchTraceId, "done");
           if (!isPagination) {
-            analytics.track("traces_search_completed");
+            analytics.track("traces_search_completed", {
+              hits: searchObj.data.queryResults?.hits?.length ?? 0,
+            });
             fetchTracesCount();
           }
           correlationFilters.save().catch((e) => console.error("[correlation:save] error:", e));
@@ -1110,6 +1265,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
   } catch (e: any) {
     console.error("Error while fetching traces", e?.message);
     searchObj.loading = false;
+    if (!isPagination) dropKeptCount(searchObj.data.queryResults);
     searchObj.data.errorMsg = e?.message || t("traces.index.searchRequestFailed");
     searchObj.data.errorDetail = "";
     if (boundTraceId) noteTracesPageLoad(boundTraceId, "error");
@@ -1149,9 +1305,35 @@ const rebuildColumns = () => {
   );
 };
 
+// Rows a cancelled search streamed are a partial answer, so none of them stay on screen.
+const showSearchCancelled = () => {
+  searchObj.data.queryResults = {
+    hits: [],
+    total: 0,
+    countPending: false,
+    from: 0,
+    size: searchObj.meta.resultGrid.rowsPerPage,
+    took: 0,
+  };
+  searchObj.data.sortedQueryResults = [];
+  searchObj.meta.resultGrid.showPagination = false;
+  searchObj.data.resultGrid.currentPage = 0;
+  isLLMSpanPresent.value = false;
+  searchCancelled.value = true;
+};
+
 const cancelSearch = () => {
   // Cancel dashboard panel queries (RenderDashboardCharts via usePanelDataLoader)
   window.dispatchEvent(new Event("cancelQuery"));
+  if (!currentSearchTraceId) return;
+  dropKeptCount(searchObj.data.queryResults);
+  const isPageLoad = searchObj.data.resultGrid.pageRequest?.requestId === currentSearchTraceId;
+  cancelMainSearch();
+  // Only the user's cancel shows the cancelled state; a page left mid-search re-runs it on return.
+  if (!isPageLoad) showSearchCancelled();
+};
+
+function cancelMainSearch() {
   if (!currentSearchTraceId) return;
   cancelStreamQueryBasedOnRequestId({
     trace_id: currentSearchTraceId,
@@ -1164,15 +1346,27 @@ const cancelSearch = () => {
   }
   currentSearchTraceId = null;
   searchObj.loading = false;
-};
+}
 
 async function extractFields() {
+  const generation = pageGeneration;
+  const seq = ++fieldsLoadSeq;
+  // A newer load owns the rail, so an older one that settles later must not write over it.
+  const superseded = () => generation !== pageGeneration || seq !== fieldsLoadSeq;
+  const owner = `${store.state.selectedOrganization?.identifier ?? ""}|${searchObj.data.stream?.selectedStream?.value ?? ""}`;
+  searchObj.meta.loadingFields = true;
   try {
-    searchObj.data.stream.selectedStreamFields = [];
-    // Cleared here so a stream with no stats doesn't inherit the previous one's.
-    selectedStreamStats.value = null;
+    // Another stream's fields would feed this stream's filters and sort, so they go before its schema loads.
+    if (owner !== fieldsOwner) {
+      fieldsOwner = "";
+      searchObj.data.stream.selectedStreamFields = [];
+      selectedStreamStats.value = null;
+    }
 
-    if (!searchObj.data.stream?.selectedStream?.value) return;
+    if (!searchObj.data.stream?.selectedStream?.value) {
+      searchObj.data.stream.selectedStreamFields = [];
+      return;
+    }
 
     if (searchObj.data.streamResults.list.length > 0) {
       const schema = [];
@@ -1182,8 +1376,15 @@ async function extractFields() {
         "_end_time_ns",
       ];
       let ftsKeys;
+      // The rail's grouping config needs no schema, so it loads alongside it; the rail is swapped once, never emptied.
+      const railMetadata = loadRailMetadata().catch((groupErr) => {
+        console.warn("Field grouping failed for traces, using flat list", groupErr);
+        return null;
+      });
+      const fieldList: any[] = [];
 
       const stream = await getStream(searchObj.data.stream.selectedStream.value, "traces", true);
+      if (superseded()) return;
       // Mirror the real stats (doc_time_min/max) into streamResults so that
       // TracesNoEventsState can compute streamDocTimeRange correctly.
       const streamResultEntry = searchObj.data.streamResults.list?.find(
@@ -1246,7 +1447,7 @@ async function extractFields() {
       const schemaTypeMap = new Map(schema.map((row: any) => [row.name, row.type]));
       Object.keys(importantFields).forEach((rowName) => {
         fields[rowName] = {};
-        searchObj.data.stream.selectedStreamFields.push({
+        fieldList.push({
           name: rowName,
           ftsKey: ftsKeys.has(rowName),
           showValues: !idFields[rowName],
@@ -1259,7 +1460,7 @@ async function extractFields() {
         if (!importantFields[row.name] && !ignoreFields.includes(row.name)) {
           if (fields[row.name] == undefined) {
             fields[row.name] = {};
-            searchObj.data.stream.selectedStreamFields.push({
+            fieldList.push({
               name: row.name,
               ftsKey: ftsKeys.has(row.name),
               showValues: !idFields[row.name],
@@ -1271,38 +1472,51 @@ async function extractFields() {
       });
 
       // Apply field grouping
-      try {
-        const isEnterprise = config.isEnterprise === "true" || config.isCloud === "true";
-        const [semanticAliases, keyFieldsConfig, fieldGrouping] = await Promise.all([
-          isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
-          loadKeyFields(),
-          loadFieldGrouping(),
-        ]);
-        const grouping = (fieldGrouping as FieldGroupingConfig).prefix_aliases
-          ? (fieldGrouping as FieldGroupingConfig)
-          : null;
-        const semanticIndex =
-          semanticAliases.length > 0 ? buildSemanticIndex(semanticAliases, grouping) : null;
-        const keySpec = (keyFieldsConfig as KeyFieldsConfig)["traces"] ?? {
-          fields: [],
-          groups: [],
-        };
-        const keyFieldSet = new Set(keySpec.fields.map((f: string) => f.toLowerCase()));
-        const keyGroupSet = new Set(keySpec.groups.map((g: string) => g.toLowerCase()));
-
-        searchObj.data.stream.selectedStreamFields = applyFieldGrouping(
-          searchObj.data.stream.selectedStreamFields as FieldObj[],
-          semanticIndex,
-          keyFieldSet,
-          keyGroupSet,
-        );
-      } catch (groupErr) {
-        console.warn("Field grouping failed for traces, using flat list", groupErr);
-      }
+      const metadata = await railMetadata;
+      if (superseded()) return;
+      searchObj.data.stream.selectedStreamFields = metadata
+        ? groupRailFields(fieldList, metadata)
+        : fieldList;
+      fieldsOwner = owner;
     }
   } catch (e) {
-    searchObj.loading = false;
+    // The search runs alongside this load and owns the loading flag, so a field failure leaves it alone.
     console.error("Error while extracting fields", e);
+  } finally {
+    if (!superseded()) searchObj.meta.loadingFields = false;
+  }
+}
+
+/** The rail's grouping config (semantic groups, key fields, field grouping); cached and de-duplicated per org. */
+function loadRailMetadata() {
+  const isEnterprise = config.isEnterprise === "true" || config.isCloud === "true";
+  return Promise.all([
+    isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
+    loadKeyFields(),
+    loadFieldGrouping(),
+  ]);
+}
+
+function groupRailFields(
+  fieldList: FieldObj[],
+  [semanticAliases, keyFieldsConfig, fieldGrouping]: Awaited<ReturnType<typeof loadRailMetadata>>,
+): FieldObj[] {
+  try {
+    const grouping = (fieldGrouping as FieldGroupingConfig).prefix_aliases
+      ? (fieldGrouping as FieldGroupingConfig)
+      : null;
+    const semanticIndex =
+      semanticAliases.length > 0 ? buildSemanticIndex(semanticAliases, grouping) : null;
+    const keySpec = (keyFieldsConfig as KeyFieldsConfig)["traces"] ?? {
+      fields: [],
+      groups: [],
+    };
+    const keyFieldSet = new Set(keySpec.fields.map((f: string) => f.toLowerCase()));
+    const keyGroupSet = new Set(keySpec.groups.map((g: string) => g.toLowerCase()));
+    return applyFieldGrouping(fieldList, semanticIndex, keyFieldSet, keyGroupSet);
+  } catch (groupErr) {
+    console.warn("Field grouping failed for traces, using flat list", groupErr);
+    return fieldList;
   }
 }
 
@@ -1372,9 +1586,42 @@ function generateHistogramData() {
 
 const isAutoRunOff = () => !!store.state.zoConfig?.auto_query_enabled && !searchObj.meta.liveMode;
 
-async function loadPageData() {
-  const streamFromUrl = typeof router.currentRoute.value.query.stream === "string";
-  searchObj.loadingStream = true;
+// Until this page has the list, an empty one means "not loaded yet"; a loaded list refreshes behind the results.
+const beginStreamLoad = () => {
+  if (!streamListLoaded || !searchObj.data.stream.streamLists.length) {
+    searchObj.loadingStream = true;
+  }
+};
+
+/** The stream a load will most likely open, before the stream list confirms it. */
+const namedStream = () => {
+  const fromUrl = router.currentRoute.value.query.stream;
+  return (
+    (typeof fromUrl === "string" && fromUrl) ||
+    searchObj.data.stream.selectedStream.value ||
+    restoreTracesStream(store.state.selectedOrganization.identifier)
+  );
+};
+
+// Only a non-time sort column is checked against the schema, so only then must the search wait for it.
+const sortNeedsSchema = () => {
+  const sortBy = searchObj.meta.resultGrid.sortBy;
+  return !!sortBy && sortBy !== "start_time" && sortBy !== "duration";
+};
+
+/** `leftOrg`: the org an org switch left; a URL still on that org is the page's own sync, not a shared link. */
+async function loadPageData({ leftOrg = "" } = {}) {
+  const generation = pageGeneration;
+  pageLoaded = false;
+  const query = router.currentRoute.value.query;
+  // The header switch re-keys the page before the router may have left the old org's URL.
+  const urlFromLeftOrg = !!leftOrg && (query.org_identifier ?? leftOrg) === leftOrg;
+  const streamFromUrl = !urlFromLeftOrg && typeof query.stream === "string";
+  // Claimed before any early return, so a restore that finds no stream is not left for a later landing.
+  // A newer restore wins over one a left load never acted on.
+  const landing = takeRecentLanding("traces") ?? pendingLanding;
+  pendingLanding = landing;
+  beginStreamLoad();
   if (!searchObj.data?.queryResults?.hits?.length) searchObj.data.resultGrid.currentPage = 0;
 
   // resetSearchObj();
@@ -1382,40 +1629,138 @@ async function loadPageData() {
 
   searchObj.data.errorMsg = "";
 
-  //get stream list
-  await getStreamList();
-  if (searchObj.data.stream.selectedStream.value && (streamFromUrl || !isAutoRunOff())) {
-    searchData();
+  // Cached per org, so starting it beside the stream list costs no extra request when a stream is named.
+  if (namedStream()) loadRailMetadata().catch(() => {});
+  const fields = await getStreamList();
+  if (generation !== pageGeneration) return;
+  const forcedRun = await consumeRunQueryFlag();
+  if (generation !== pageGeneration) return;
+  await parserReady;
+  if (generation !== pageGeneration) return;
+  if (fields && sortNeedsSchema()) await fields.fieldsReady;
+  if (generation !== pageGeneration) return;
+  pageLoaded = true;
+  pendingLanding = null;
+  if (searchObj.data.stream.selectedStream.value) {
+    // Only a restore from recent searches is a user run; any other landing runs without recording.
+    if (landing) {
+      if (landing.run) searchData();
+    } else if ((streamFromUrl || !isAutoRunOff()) && (forcedRun || !reopensStagedEdit())) {
+      searchData(false);
+    }
+  }
+  // A count cut off by leaving has nothing left to land it once this load runs no search.
+  if (searchObj.data.queryResults?.countPending && !searchObj.loading && !currentCountTraceId) {
+    dropKeptCount(searchObj.data.queryResults);
+  }
+  pendingUrlPage = null;
+  // Lowered only after the search is dispatched, so no empty state paints between the list and the first run.
+  searchObj.loadingStream = false;
+}
+
+// run-query is one-shot; left in the entry, Back to it would run whatever edit was staged there later.
+const consumeRunQueryFlag = async () => {
+  const query = { ...router.currentRoute.value.query };
+  if (!("run-query" in query)) return false;
+  const forced = query["run-query"] === "true";
+  delete query["run-query"];
+  if (canWriteTracesUrl()) await router.replace({ query });
+  return forced;
+};
+
+// Back from a trace remounts this page over the results it left; a staged edit comes back staged, not run.
+const reopensStagedEdit = () =>
+  !!searchObj.data.queryResults?.hits?.length &&
+  tracesRunIsStaged(searchObj, store.state.zoConfig?.auto_query_enabled);
+
+const pageActive = ref(true);
+let activatedBefore = false;
+let shownQueryKey = "";
+let searchInterrupted = false;
+let countInterrupted = false;
+let fieldsInterrupted = false;
+
+let shownQuery: Record<string, any> | null = null;
+
+const routeQueryKey = () => tracesQueryKey(router.currentRoute.value.query);
+
+// The cached page compares this with the URL it returns to, to decide whether its results still apply.
+watch(
+  () => router.currentRoute.value,
+  (route) => {
+    if (!pageActive.value || route?.name !== "traces") return;
+    shownQueryKey = routeQueryKey();
+    shownQuery = { ...route.query };
+  },
+  { immediate: true },
+);
+
+// A page left in the cache must not keep streaming into shared state, or into another org's view.
+function stopInFlightRequests() {
+  pageGeneration++;
+  // The search no longer waits for the fields, so a page left mid-load must fetch them again on return.
+  if (searchObj.meta.loadingFields) fieldsInterrupted = true;
+  if (currentSearchTraceId) {
+    searchInterrupted = true;
+    cancelMainSearch();
+  }
+  if (currentCountTraceId) {
+    countInterrupted = true;
+    cancelStreamQueryBasedOnRequestId({
+      trace_id: currentCountTraceId,
+      org_id: searchObj.organizationIdentifier,
+    });
+    currentCountTraceId = null;
   }
 }
 
-onBeforeMount(async () => {
-  if (
-    searchObj.organizationIdentifier &&
-    searchObj.organizationIdentifier !== store.state.selectedOrganization.identifier
-  ) {
+async function initializePage() {
+  const generation = pageGeneration;
+  pageLoaded = false;
+  const lastOrg = searchObj.organizationIdentifier;
+  const leftOrg = lastOrg && lastOrg !== store.state.selectedOrganization.identifier ? lastOrg : "";
+  if (leftOrg) {
     resetSearchObj();
   }
-  setupContextProvider();
   restoreUrlQueryParams();
   // A handoff URL from Service Graph / Services Catalog (or a bookmark of one)
   // carries a prebuilt filter; apply it before the first query runs.
   applyHandoffFilter();
-  await loadTracesParser();
+  beginStreamLoad();
+  parserReady = loadTracesParser().catch((e) =>
+    console.error("Failed to load the traces parser", e),
+  );
+  if (generation !== pageGeneration) return;
   if (!searchObj.loading) {
-    await loadPageData();
+    await loadPageData({ leftOrg });
+  } else {
+    searchObj.loadingStream = false;
+    pendingUrlPage = null;
+    pageLoaded = true;
   }
+}
+
+onBeforeMount(async () => {
+  setupContextProvider();
+  await initializePage();
 });
 
 onDeactivated(() => {
+  pageActive.value = false;
+  // A cached page's state can still change; a write queued then would land on the URL it returns to.
+  stopUrlSync();
+  stopInFlightRequests();
   cleanupContextProvider();
 });
 
 onUnmounted(() => {
+  stopUrlSync();
+  stopInFlightRequests();
   cleanupContextProvider();
 });
 
 onActivated(async () => {
+  pageActive.value = true;
   setupContextProvider();
 
   const savedAutoRun = localStorage.getItem("oo_toggle_auto_run");
@@ -1423,38 +1768,107 @@ onActivated(async () => {
     searchObj.meta.liveMode = savedAutoRun === "true";
   }
 
+  // Vue also fires this right after the first mount, whose load onBeforeMount owns.
+  if (!activatedBefore) {
+    activatedBefore = true;
+    return;
+  }
+  stopUrlSync = syncUrlViewState();
+
+  // Leaving during an await below bumps the generation; the rest of this activation must not run.
+  const generation = pageGeneration;
+  const left = () => generation !== pageGeneration || !pageActive.value;
+  // The menu link carries no query; it means "show what I had", so the URL gets the shown view back.
+  const menuReturn = !!shownQuery && isBareTracesQuery(router.currentRoute.value.query, shownQuery);
+  if (menuReturn) router.replace({ query: shownQuery });
+  const queryChanged = !menuReturn && routeQueryKey() !== shownQueryKey;
+  if (!menuReturn) shownQueryKey = routeQueryKey();
+  const rerunSearch = searchInterrupted;
+  const rerunCount = countInterrupted;
+  const reloadFields = fieldsInterrupted;
+  searchInterrupted = false;
+  countInterrupted = false;
+  fieldsInterrupted = false;
+  let reloaded = false;
+
+  if (!pageLoaded) {
+    await initializePage();
+    return;
+  }
+
   const params = router.currentRoute.value.query;
-  if (params.reload === "true") {
+  if (queryChanged && params.reload === "true") {
     restoreUrlQueryParams();
     await loadPageData();
+    if (left()) return;
+    reloaded = true;
   }
 
   if (searchObj.organizationIdentifier != store.state.selectedOrganization.identifier) {
+    const leftOrg = searchObj.organizationIdentifier;
     resetSearchObj();
     restoreUrlQueryParams();
-    await loadPageData();
+    await loadPageData({ leftOrg });
+    if (left()) return;
+    reloaded = true;
   }
 
-  // Arriving from Service Graph / Services Catalog: this view is keep-alive, so
-  // a handoff navigation re-activates it without remounting. Apply the incoming
-  // stream/time/filter and run the query.
-  if (typeof params.filter === "string" && params.filter) {
+  // Arriving from Service Graph / Services Catalog / RCA evidence: this view is
+  // keep-alive, so a handoff navigation re-activates it without remounting. Apply
+  // the incoming stream/time/filter and run the query. An empty `filter` is an
+  // unfiltered handoff (stream + range only) and still clears and runs.
+  if (queryChanged && typeof params.filter === "string") {
     restoreUrlQueryParams();
     if (applyHandoffFilter()) {
       await loadPageData();
       await nextTick();
-      runQueryFn();
+      if (left()) return;
+      runQueryFn(false);
+      reloaded = true;
     }
   }
+
+  if (reloaded) return;
+  if (queryChanged) {
+    restoreUrlQueryParams();
+    await loadPageData();
+  } else if (rerunSearch) {
+    // Back must show the page the user left, as a remount would from the URL.
+    pendingUrlPage = searchObj.data.resultGrid.currentPage;
+    runQueryFn(false);
+  } else if (rerunCount) {
+    fetchTracesCount();
+  }
+  // A return keeps what it shows, but the stream's schema may have changed, so the rail refreshes behind it.
+  if ((reloadFields || menuReturn) && !queryChanged) extractFields();
 });
 
-const runQueryFn = () => {
-  searchObj.data.resultGrid.currentPage = 0;
+/** Runs the search; `record` is false for runs no user asked for, such as a page landing. */
+const runQueryFn = (record = true) => {
+  searchObj.data.resultGrid.currentPage = pendingUrlPage ?? 0;
+  pendingUrlPage = null;
   searchObj.runQuery = false;
-  getQueryData();
+  getQueryData(false, false, record);
 };
 
+/** What a run records once it settles, captured when it is dispatched. */
+function tracesHistoryRun(queryReq: { query: { start_time: number; end_time: number } }) {
+  const datetime = searchObj.data.datetime;
+  return {
+    stream: String(selectedStreamName.value ?? ""),
+    searchMode: String(searchObj.meta.searchMode),
+    query: String(searchObj.data.editorValue ?? ""),
+    time: {
+      type: datetime.type === "absolute" ? "absolute" : "relative",
+      ...(datetime.type === "absolute" ? {} : { period: String(datetime.relativeTimePeriod) }),
+      start_time: Number(queryReq.query.start_time),
+      end_time: Number(queryReq.query.end_time),
+    } as HistoryTime,
+  };
+}
+
 const runQueryOnSort = () => {
+  pendingUrlPage = null;
   searchObj.data.resultGrid.currentPage = 0;
   searchObj.runQuery = false;
   getQueryData(false, true);
@@ -1486,6 +1900,8 @@ function restoreUrlQueryParams() {
       value: queryParams.stream,
     };
   }
+
+  pendingUrlPage = applyUrlListState(queryParams).currentPage;
 }
 
 const onSplitterUpdate = () => {
@@ -1505,7 +1921,9 @@ const restoreFiltersFromQuery = (node: any) => {
     if (node.left.column) {
       let values = [];
       if (node.operator === "IN") {
-        values = node.right.value.map((_value: { value: string }) => _value.value);
+        values = node.right.value.map((_value: { value: string }) =>
+          unescapeSqlLiteral(_value.value),
+        );
       }
       if (searchObj.data.stream.fieldValues?.[node?.left?.column]?.selectedValues)
         searchObj.data.stream.fieldValues[node.left.column].selectedValues = values;
@@ -1524,7 +1942,13 @@ const restoreFilters = (query: string) => {
 
   const defaultQuery = `SELECT * FROM "${selectedStreamName.value}" WHERE `;
 
-  const parsedQuery = tracesParser.value.astify(defaultQuery + query);
+  let parsedQuery;
+  try {
+    parsedQuery = tracesParser.value.astify(defaultQuery + query);
+  } catch {
+    // A filter the parser rejects just leaves the field-value selections as they are.
+    return;
+  }
 
   restoreFiltersFromQuery(parsedQuery.where);
 };
@@ -1540,11 +1964,11 @@ const onMetricsEditorFilterSet = (text: string) => {
   if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
-// A comparison filter is an explicit apply from a page the search closes, so it searches in manual mode too.
+// With auto-run off the comparison filter stays staged like any other edit; Run applies it and closes Drill down.
 const onMetricsEditorFilterRun = (text: string) => {
   searchObj.data.editorValue = text;
   searchBarRef.value?.setEditorValue?.(text);
-  searchData();
+  if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
 // Handler for Error Only toggle — only adds/removes span_status condition,
@@ -1577,13 +2001,17 @@ const onSearchModeChange = (mode: TraceSearchMode) => {
     took: 0,
     errorCount: 0,
   };
+  // The table skeleton must show the new mode's columns, not the old mode's until rows land.
+  loadLocalLogFilterField(mode);
+  rebuildColumns();
   getQueryData();
 };
 
 watch(
   () => [router.currentRoute.value.name, router.currentRoute.value.query.tab] as const,
   ([routeName, tab]) => {
-    if (routeName !== "traces") return;
+    // A cached page applies the URL it returns to on activation, not while it sits in the cache.
+    if (routeName !== "traces" || !pageActive.value) return;
     const mode = supportedTraceSearchMode(tab);
     if (mode !== searchObj.meta.searchMode) {
       onSearchModeChange(mode);
@@ -1747,7 +2175,8 @@ const onAskAiTracing = () => {
 
   const mode = searchObj.meta.searchMode === "spans" ? "spans" : "traces";
   const stream = searchObj.data.stream.selectedStream?.value || "unknown";
-  const timeRange = searchObj.data.datetime.relativeTimePeriod || "custom";
+  const period = searchObj.data.datetime.relativeTimePeriod;
+  const timeRange = period ? describePeriod(period) : "custom";
 
   emit(
     "sendToAiChat",
@@ -1839,7 +2268,7 @@ const activeIncludeFilterValues = computed((): Record<string, string[]> => {
         if (node.left?.type === "column_ref") {
           const colName = extractTracesColName(node.left.column);
           if (colName && node.right?.value != null) {
-            const val = String(node.right.value);
+            const val = unescapeSqlLiteral(node.right.value);
             if (!result[colName]) result[colName] = [];
             if (!result[colName].includes(val)) result[colName].push(val);
           }
@@ -1888,7 +2317,7 @@ const activeExcludeFilterValues = computed((): Record<string, string[]> => {
         if (node.left?.type === "column_ref") {
           const colName = extractTracesColName(node.left.column);
           if (colName && node.right?.value != null) {
-            const val = String(node.right.value);
+            const val = unescapeSqlLiteral(node.right.value);
             if (!result[colName]) result[colName] = [];
             if (!result[colName].includes(val)) result[colName].push(val);
           }
@@ -1915,42 +2344,40 @@ const showErrorOnly = computed(
   () => activeIncludeFilterValues.value["span_status"]?.includes("ERROR") ?? false,
 );
 
-const searchData = () => {
+const searchData = (record = true) => {
   if (!(searchObj.data.stream.streamLists.length && searchObj.data.stream.selectedStream?.label)) {
     return;
   }
 
   if (activeTab.value === "service-graph" || activeTab.value === "services-catalog") return;
 
-  runQueryFn();
+  runQueryFn(record);
 
-  analytics.track("Button Click", {
-    button: "Search Data",
-    user_org: store.state.selectedOrganization.identifier,
-    user_id: store.state.userInfo.email,
+  analytics.track("traces_search_run", {
     stream_name: searchObj.data.stream.selectedStream.value,
     show_query: searchObj.meta.showQuery,
     show_histogram: searchObj.meta.showHistogram,
-    sqlMode: searchObj.meta.sqlMode,
-    showFields: searchObj.meta.showFields,
-    page: "Search Logs",
+    sql_mode: searchObj.meta.sqlMode,
+    show_fields: searchObj.meta.showFields,
   });
 };
 
 const getMoreData = () => {
   getQueryData(true);
 
-  analytics.track("Button Click", {
-    button: "Get More Data",
-    user_org: store.state.selectedOrganization.identifier,
-    user_id: store.state.userInfo.email,
+  analytics.track("traces_more_rows_loaded", {
     stream_name: searchObj.data.stream.selectedStream.value,
-    page: "Search Logs",
   });
 };
 
 const onChangeStream = async () => {
   await extractFields();
+  // Swap in the new stream's columns now, or the URL sync writes the old stream's columns into its URL.
+  if (searchObj.meta.searchMode === "spans" || searchObj.meta.searchMode === "traces") {
+    loadLocalLogFilterField(searchObj.meta.searchMode);
+    rebuildColumns();
+  }
+  refreshOpenFieldValues();
   if (!isAutoRunOff()) runQueryFn();
 };
 
@@ -1971,11 +2398,16 @@ const syncSavedViewDateTime = async (datetime: TracesSavedView["datetime"]) => {
 
 let savedViewApplySeq = 0;
 const onApplySavedView = async (view: TracesSavedView) => {
-  const seq = ++savedViewApplySeq;
   if (view.version !== undefined && view.version !== 1) {
     toast({ variant: "error", message: t("search.errorWhileApplyingSavedView") });
     return;
   }
+  await applyTracesView(view, true);
+};
+
+/** Applies a stream, filter, window and mode in place, then runs unless only loading. */
+const applyTracesView = async (view: TracesSavedView, run: boolean) => {
+  const seq = ++savedViewApplySeq;
   const streamName = view.stream?.value;
   const streamChanged = streamName !== searchObj.data.stream.selectedStream.value;
   if (
@@ -2013,13 +2445,42 @@ const onApplySavedView = async (view: TracesSavedView) => {
   const query = { ...router.currentRoute.value.query, tab: view.searchMode };
   delete query.trace_id;
   delete query.span_id;
-  await router.replace({ query });
+  if (canWriteTracesUrl()) await router.replace({ query });
   if (seq !== savedViewApplySeq) return;
 
   if (view.editorValue && searchObj.data.stream.selectedStreamFields.length) {
     restoreFilters(view.editorValue);
   }
-  runQueryFn();
+  if (streamChanged) refreshOpenFieldValues();
+  if (run) runQueryFn();
+};
+
+const onRecentRestore = (entry: QueryHistoryEntry, when: RestoreTime, run: boolean) => {
+  if (entry.source !== "traces") {
+    void openRecentOnItsPage(router, entry, when, store.state.selectedOrganization.identifier, run);
+    return;
+  }
+  const restore = tracesRestore(entry, when);
+  const current = searchObj.data.datetime;
+  const window = restore.window;
+  void applyTracesView(
+    {
+      stream: { label: restore.stream, value: restore.stream },
+      editorValue: restore.query,
+      datetime: {
+        type: window?.type ?? current.type,
+        relativeTimePeriod:
+          window?.type === "relative" ? window.period : current.relativeTimePeriod,
+        startTime: window?.type === "absolute" ? window.startUs : current.startTime,
+        endTime: window?.type === "absolute" ? window.endUs : current.endTime,
+      },
+      searchMode: restore.searchMode === "spans" ? "spans" : "traces",
+      sortBy: searchObj.meta.resultGrid.sortBy,
+      sortOrder: searchObj.meta.resultGrid.sortOrder,
+      selectedFields: [...(searchObj.data.stream.selectedFields ?? [])],
+    },
+    run,
+  );
 };
 
 const streamChangeDialog = ref({ show: false, pendingStream: "" });
@@ -2173,11 +2634,12 @@ const handleServicesCatalogViewTraces = (data: string | Record<string, any>) => 
 
 /**
  * Hydrate a bookmarkable filter handoff. `restoreUrlQueryParams` applies the
- * stream, time range and tab; this restores the prebuilt filter.
+ * stream, time range and tab; this restores the prebuilt filter. A present but
+ * empty `filter` clears the editor, so the handoff shows every span in range.
  */
 const applyHandoffFilter = (): boolean => {
   const filter = router.currentRoute.value.query.filter;
-  if (typeof filter !== "string" || !filter) return false;
+  if (typeof filter !== "string") return false;
 
   searchObj.data.editorValue = filter;
   searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
@@ -2195,6 +2657,7 @@ const applyHandoffFilter = (): boolean => {
 watch(
   () => searchObj.meta.searchMode,
   (mode) => {
+    if (!canWriteTracesUrl()) return;
     if (
       router.currentRoute.value.query.tab === mode &&
       router.currentRoute.value.query.search_mode === undefined
@@ -2209,7 +2672,7 @@ watch(
 );
 
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
-useShortcuts([
+const tracesShortcuts = [
   {
     id: "tracesSearch",
     handler: () => runQueryFn(),
@@ -2247,7 +2710,8 @@ useShortcuts([
       if (activeTab.value === "search") searchResultRef.value?.stepTraceRow?.(-1, !!e?.repeat);
     },
   },
-]);
+];
+useShortcuts(tracesShortcuts, undefined, { active: pageActive });
 </script>
 
 <style scoped>

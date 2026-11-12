@@ -682,19 +682,10 @@ test.describe('Email destinations and distribution lists', () => {
 
   }); // end delivery
 
-  // ══ REGRESSION TESTS FOR OPEN DEFECTS (#2471) ════════════════════════════
-  // These assert the CORRECT behaviour and therefore fail on today's build.
-  // Skipped rather than left failing, since none of the defects is P0/blocking.
-  // Un-skip the matching test as each issue closes — do not soften the assertion.
-  // (#2471 B4, semicolon-separated lists, no longer has a subject: recipients are
-  // picked from accounts, so no separator is ever parsed.)
-
-  test.skip('UI-13 · the email form shows no Skip TLS Verify control [#2471 B5]', {
+  test('UI-13 · the email form shows no Skip TLS Verify control [#2471 B5]', {
     tag: ['@dlEmailDestinations', '@email', '@regression', '@P3', '@all'],
   }, async () => {
-    // BLOCKED BY #2471 (B5): the toggle is rendered on the email form but has no
-    // effect — an email destination carries only recipients, and SMTP transport
-    // security is server configuration (ZO_SMTP_ENCRYPTION).
+    // SMTP transport security is server configuration (ZO_SMTP_ENCRYPTION), so the toggle would do nothing.
     await pm.alertDestinationsPage.clickNewDestination();
     await pm.alertDestinationsPage.selectDestinationType('email');
 
@@ -702,12 +693,9 @@ test.describe('Email destinations and distribution lists', () => {
       'a control with no effect on email must not be shown').toBe(false);
   });
 
-  test.skip('UI-14 · Preview shows the configured sender and the entered recipients [#2471 B7]', {
+  test('UI-14 · Preview shows the entered recipients [#2471 B7]', {
     tag: ['@dlEmailDestinations', '@email', '@regression', '@P3', '@all'],
   }, async () => {
-    // BLOCKED BY #2471 (B7): the dialog renders hardcoded
-    // From: alerts@openobserve.ai / To: admin@example.com, so it answers
-    // "will this reach the right people?" wrongly.
     const destName = `auto_dest_dl_preview_${RUN}`;
     await fillEmailForm(pm, destName, ORG_USER);
     const preview = await pm.alertDestinationsPage.openPreviewAndGetText();
@@ -715,6 +703,13 @@ test.describe('Email destinations and distribution lists', () => {
     expect(preview, 'Preview must show the recipients actually entered').toContain(ORG_USER);
     expect(preview, 'Preview must not show a placeholder recipient').not.toContain('admin@example.com');
   });
+
+  // ══ REGRESSION TESTS FOR OPEN DEFECTS (#2471) ════════════════════════════
+  // These assert the CORRECT behaviour and therefore fail on today's build.
+  // Skipped rather than left failing, since none of the defects is P0/blocking.
+  // Un-skip the matching test as each issue closes — do not soften the assertion.
+  // (#2471 B4, semicolon-separated lists, no longer has a subject: recipients are
+  // picked from accounts, so no separator is ever parsed.)
 
   // BLOCKED BY #2471 (B2): membership is validated in destinations.rs save()
   // and test_email() only; the send path never re-checks, so alerts keep

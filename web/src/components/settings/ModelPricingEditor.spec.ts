@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import ModelPricingEditor from "./ModelPricingEditor.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -35,6 +35,7 @@ vi.mock("@/services/model_pricing", async (importOriginal) => {
       get: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      test: vi.fn(),
     },
   });
 });
@@ -198,6 +199,7 @@ describe("ModelPricingEditor.vue", () => {
     mockService.get.mockResolvedValue({ data: null });
     mockService.create.mockResolvedValue({ data: { id: "new-id" } });
     mockService.update.mockResolvedValue({ data: { id: "existing-id" } });
+    mockService.test.mockResolvedValue({ data: { captured_models: [] } });
     // reset store theme defaults
     mockStore.state.theme = "light";
     mockStore.state.selectedOrganization = { identifier: "test-org" };
@@ -254,6 +256,92 @@ describe("ModelPricingEditor.vue", () => {
       expect(title.text()).toBe("New Model Pricing");
       expect((wrapper.vm as any).model.id).toBeNull();
       expect((wrapper.vm as any).model.name).toContain("(Copy)");
+    });
+
+    it("prefills a new model's name and pattern from the route, as Create price links do", async () => {
+      const wrapper = createWrapper({
+        query: { name: "gpt-5.4-mini", match_pattern: "^gpt-5\\.4-mini$" },
+      });
+      await flushPromises();
+      const form = getForm(wrapper);
+      expect(form.state.values.name).toBe("gpt-5.4-mini");
+      expect(form.state.values.match_pattern).toBe("^gpt-5\\.4-mini$");
+      expect((wrapper.vm as any).model.id).toBeNull();
+    });
+
+    it("ignores prefill parameters when editing an existing model", async () => {
+      mockService.get.mockResolvedValue({
+        data: {
+          id: "abc",
+          name: "Existing",
+          match_pattern: "gpt-.*",
+          enabled: true,
+          tiers: [{ name: "Default", condition: null, prices: { input: 0.001 } }],
+        },
+      });
+      const wrapper = createWrapper({ query: { id: "abc", name: "other", match_pattern: "^x$" } });
+      await flushPromises();
+      const form = getForm(wrapper);
+      expect(form.state.values.name).toBe("Existing");
+      expect(form.state.values.match_pattern).toBe("gpt-.*");
+    });
+  });
+
+  describe("Layout and explanatory copy", () => {
+    it("renders the form in a left-aligned reading column", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const column = wrapper.find('[data-test="constrained-page"] > div');
+      expect(column.classes()).toContain("me-auto");
+      expect(column.classes()).not.toContain("mx-auto");
+    });
+
+    it("opens the pricing tiers explanation from an About popover instead of inline", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const desc = String(i18n.global.t("modelPricing.pricingTiersDesc"));
+      const trigger = wrapper.find('[data-test="model-pricing-tiers-hint-trigger"]');
+      expect(trigger.exists()).toBe(true);
+      expect(trigger.text()).toBe("About pricing tiers");
+      expect(wrapper.text()).not.toContain(desc);
+
+      (wrapper.vm as any).tiersHintOpen = true;
+      await flushPromises();
+      const hint = document.body.querySelector('[data-test="model-pricing-tiers-hint"]');
+      expect(hint?.textContent).toContain(desc);
+      wrapper.unmount();
+    });
+
+    it("opens the priority explanation from an About popover instead of help text", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      (wrapper.vm as any).addTier();
+      await flushPromises();
+      const hintText = String(i18n.global.t("modelPricing.tierPriorityHint"));
+      expect(wrapper.text()).not.toContain(hintText);
+      const trigger = wrapper.find('[data-test="model-pricing-tier-priority-hint-trigger-1"]');
+      expect(trigger.exists()).toBe(true);
+      expect(trigger.attributes("aria-label")).toBe("About priority");
+      const field = wrapper.find('[data-test="model-pricing-tier-priority-input-1"]');
+      const label = field.find("label");
+      expect(label.text()).toBe("Priority");
+      expect(label.attributes("for")).toBe(field.find("input").attributes("id"));
+
+      (wrapper.vm as any).priorityHintOpenIdx = 1;
+      await flushPromises();
+      const hint = document.body.querySelector('[data-test="model-pricing-tier-priority-hint-1"]');
+      expect(hint?.textContent).toContain(hintText);
+      wrapper.unmount();
+    });
+
+    it("does not repeat the prices in a preview table", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper);
+      await flushPromises();
+      expect(wrapper.find('[data-test="model-pricing-price-value-input-0-0"]').exists()).toBe(true);
+      expect(wrapper.find("table").exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("per 1K");
     });
   });
 
@@ -591,7 +679,7 @@ describe("ModelPricingEditor.vue", () => {
       expect(tiers[1].utc_windows).toEqual([]);
     });
 
-    it("addCondition / removeCondition toggle the usage condition", async () => {
+    it("the tier's filter builder writes and clears the usage condition", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       fillValid(wrapper, [
@@ -603,8 +691,15 @@ describe("ModelPricingEditor.vue", () => {
         }),
       ]);
       await nextTick();
+      const builder = wrapper.findComponent(
+        '[data-test="model-pricing-tier-filter-builder-1-root"]',
+      );
+      expect(builder.exists()).toBe(true);
 
-      (wrapper.vm as any).addCondition(1);
+      (wrapper.vm as any).setTierFilter(1, {
+        condition: { usage_key: "input", operator: "gt", value: 200000 },
+        rules: [],
+      });
       await nextTick();
       expect(getForm(wrapper).state.values.tiers[1].condition).toEqual({
         usage_key: "input",
@@ -612,11 +707,10 @@ describe("ModelPricingEditor.vue", () => {
         value: 200000,
       });
 
-      (wrapper.vm as any).removeCondition(1);
+      (wrapper.vm as any).setTierFilter(1, { condition: null, rules: [] });
       await nextTick();
       expect(getForm(wrapper).state.values.tiers[1].condition).toBeNull();
     });
-
     it("hydrates a window-only tier from the API without inventing a condition", async () => {
       mockService.get.mockResolvedValue({
         data: {
@@ -827,7 +921,7 @@ describe("ModelPricingEditor.vue", () => {
       expect("priority" in payload.tiers[0]).toBe(false);
     });
 
-    it("swaps the value field when the operator changes and sends only what the operator reads", async () => {
+    it("sends a rule edited in the builder with only what its operator reads", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       fillValid(wrapper, [
@@ -835,20 +929,28 @@ describe("ModelPricingEditor.vue", () => {
         tier({ name: "Big", rules: [flexRule()], prices: [row("input", 2)] }),
       ]);
       await nextTick();
-      expect(wrapper.find('[data-test="model-pricing-tier-rule-values-input-1-0"]').exists()).toBe(
-        true,
-      );
+      expect((wrapper.vm as any).tierFilter(getForm(wrapper).state.values.tiers[1])).toEqual({
+        condition: null,
+        rules: [
+          {
+            keys: ["openai.response.service_tier", "openai.request.service_tier"],
+            op: "in",
+            values: ["flex"],
+          },
+        ],
+      });
 
-      getForm(wrapper).setFieldValue("tiers[1].rules[0].op", "gte");
-      getForm(wrapper).setFieldValue("tiers[1].rules[0].value", 1000);
+      (wrapper.vm as any).setTierFilter(1, {
+        condition: null,
+        rules: [
+          {
+            keys: ["openai.response.service_tier", "openai.request.service_tier"],
+            op: "gte",
+            value: 1000,
+          },
+        ],
+      });
       await nextTick();
-      expect(wrapper.find('[data-test="model-pricing-tier-rule-values-input-1-0"]').exists()).toBe(
-        false,
-      );
-      expect(wrapper.find('[data-test="model-pricing-tier-rule-value-input-1-0"]').exists()).toBe(
-        true,
-      );
-
       await getForm(wrapper).handleSubmit();
       await flushPromises();
       expect(mockService.create.mock.calls[0][1].tiers[1].rules).toEqual([
@@ -859,8 +961,28 @@ describe("ModelPricingEditor.vue", () => {
         },
       ]);
     });
+    it("keeps the rule chips mounted while other tier fields are typed", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({ name: "Flex", rules: [flexRule()], prices: [row("input", 2)] }),
+      ]);
+      await nextTick();
+      const chip = () =>
+        wrapper.find(
+          '[data-test="model-pricing-tier-filter-builder-1-chip-openai.response.service_tier, openai.request.service_tier"]',
+        ).element;
+      const before = chip();
+      expect(before).toBeTruthy();
+      for (const name of ["F", "Fl", "Fle", "Flex2"]) {
+        getForm(wrapper).setFieldValue("tiers[1].name", name);
+        await nextTick();
+      }
+      expect(chip()).toBe(before);
+    });
 
-    it("removing a middle rule keeps the surrounding rows bound to the right values", async () => {
+    it("removing a middle rule chip keeps the other rules as they were", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       fillValid(wrapper, [
@@ -872,17 +994,16 @@ describe("ModelPricingEditor.vue", () => {
         }),
       ]);
       await nextTick();
-      (wrapper.vm as any).removeRule(1, 1);
-      await nextTick();
-      expect(getForm(wrapper).state.values.tiers[1].rules.map((r: any) => r.values)).toEqual([
-        "a",
-        "c",
-      ]);
-      expect(wrapper.findAll('[data-test^="model-pricing-tier-rule-remove-btn-1-"]')).toHaveLength(
-        2,
-      );
+      const removes = () =>
+        wrapper.findAll(
+          '[data-test="model-pricing-tier-filter-builder-1-chip-openai.response.service_tier, openai.request.service_tier-remove"]',
+        );
+      expect(removes()).toHaveLength(3);
+      await removes()[1].trigger("click");
+      await flushPromises();
+      expect(getForm(wrapper).state.values.tiers[1].rules).toEqual([flexRule("a"), flexRule("c")]);
+      expect(removes()).toHaveLength(2);
     });
-
     it("shows a tie warning for overlapping tiers of equal rank", async () => {
       const wrapper = createWrapper();
       await flushPromises();
@@ -1099,15 +1220,47 @@ describe("ModelPricingEditor.vue", () => {
         values: ["fl.*"],
         value: 3,
       });
-      expect((wrapper.vm as any).ruleOperatorOptions("regex").map((o: any) => o.value)).toContain(
-        "regex",
-      );
-      expect((wrapper.vm as any).ruleOperatorOptions("in").map((o: any) => o.value)).not.toContain(
-        "regex",
-      );
+      expect(
+        wrapper.find('[data-test="model-pricing-tier-filter-builder-1-chip-locked"]').exists(),
+      ).toBe(true);
       await getForm(wrapper).handleSubmit();
       await flushPromises();
       expect(mockService.update).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="model-pricing-tier-filter-errors-1"]').text()).toContain(
+        "regex",
+      );
+    });
+    it("keeps a usage-keyed rule a rule when another rule's values are edited in the builder", async () => {
+      const kept = { keys: ["input"], op: "gt", value: 5 };
+      const wrapper = await loadTiers([
+        { name: "Default", prices: { input: 0.000001 } },
+        {
+          name: "Tagged",
+          rules: [kept, { keys: ["tier"], op: "in", values: ["x"] }],
+          prices: { input: 0.000002 },
+        },
+      ]);
+      const dt = "model-pricing-tier-filter-builder-1";
+      await wrapper.find(`[data-test="${dt}-chip-tier-value"]`).trigger("click");
+      await flushPromises();
+      const search = document.body.querySelector<HTMLInputElement>(`[data-test="${dt}-search"]`)!;
+      search.value = "y";
+      search.dispatchEvent(new Event("input"));
+      await flushPromises();
+      search.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await flushPromises();
+      document.body
+        .querySelector<HTMLElement>(`[data-test="${dt}-apply"]`)!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flushPromises();
+      expect(wrapper.find('[data-test="model-pricing-tier-filter-errors-1"]').exists()).toBe(false);
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+      const call = mockService.update.mock.calls[0];
+      const saved = call[call.length - 1].tiers[1];
+      expect(saved.condition ?? null).toBeNull();
+      expect(saved.rules).toEqual([kept, { keys: ["tier"], op: "in", values: ["x", "y"] }]);
+      wrapper.unmount();
     });
 
     it("round-trips a priority on the default tier", async () => {
@@ -1236,7 +1389,7 @@ describe("ModelPricingEditor.vue", () => {
       expect(payload.tiers[1].condition).toBeNull();
     });
 
-    it("addRule / removeRule mutate the form-owned tier", async () => {
+    it("a rule added in the builder lands in the form-owned tier", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       fillValid(wrapper, [
@@ -1245,7 +1398,16 @@ describe("ModelPricingEditor.vue", () => {
       ]);
       await nextTick();
 
-      (wrapper.vm as any).addRule(1);
+      (wrapper.vm as any).setTierFilter(1, {
+        condition: null,
+        rules: [
+          {
+            keys: ["openai.response.service_tier", "openai.request.service_tier"],
+            op: "in",
+            values: ["flex"],
+          },
+        ],
+      });
       await nextTick();
       let tiers = getForm(wrapper).state.values.tiers;
       expect(tiers[1].rules).toEqual([
@@ -1256,14 +1418,12 @@ describe("ModelPricingEditor.vue", () => {
           value: 0,
         },
       ]);
-      expect(wrapper.find('[data-test="model-pricing-tier-rules-1"]').exists()).toBe(true);
 
-      (wrapper.vm as any).removeRule(1, 0);
+      (wrapper.vm as any).setTierFilter(1, { condition: null, rules: [] });
       await nextTick();
       tiers = getForm(wrapper).state.values.tiers;
       expect(tiers[1].rules).toEqual([]);
     });
-
     it("hydrates a rule-only tier from the API without inventing a condition", async () => {
       mockService.get.mockResolvedValue({
         data: {
@@ -1459,48 +1619,6 @@ describe("ModelPricingEditor.vue", () => {
       expect((wrapper.vm as any).toPerMillion(0)).toBe(0);
       expect((wrapper.vm as any).fromPerMillion(0)).toBe(0);
     });
-
-    it("formatPreviewCost returns '0' for zero cost", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect((wrapper.vm as any).formatPreviewCost(0, 1000)).toBe("0");
-    });
-
-    it("formatPreviewCost uses exponential for very small numbers", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const out = (wrapper.vm as any).formatPreviewCost(0.000000001, 1);
-      expect(out).toMatch(/e-/i);
-    });
-
-    it("formatPreviewCost trims trailing zeros", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const out = (wrapper.vm as any).formatPreviewCost(0.001, 1000);
-      // 0.001 * 1000 = 1 -> trimmed
-      expect(out).toBe("1");
-    });
-  });
-
-  describe("previewEntries (field-array)", () => {
-    it("appends a pending row when the draft has a key", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const t = tier({ prices: [row("input", 1)], draftKey: "output", draftValue: 2 });
-      const preview = (wrapper.vm as any).previewEntries(t);
-      expect(preview).toHaveLength(2);
-      const pending = preview.find((p: any) => p.key === "output");
-      expect(pending.pending).toBe(true);
-    });
-
-    it("does not duplicate when the draft key already exists in the rows", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const t = tier({ prices: [row("input", 1)], draftKey: "input", draftValue: 99 });
-      const preview = (wrapper.vm as any).previewEntries(t);
-      expect(preview).toHaveLength(1);
-      expect(preview[0].key).toBe("input");
-    });
   });
 
   describe("copyPattern", () => {
@@ -1552,6 +1670,18 @@ describe("ModelPricingEditor.vue", () => {
       expect(mockRouterPush).toHaveBeenCalledWith({
         name: "modelPricing",
         query: { org_identifier: "test-org" },
+      });
+    });
+
+    it("returns to Pricing gaps for the same stream when opened from there", async () => {
+      const wrapper = createWrapper({
+        query: { name: "acme-llm", match_pattern: "^acme-llm$", from: "gaps", stream: "llm" },
+      });
+      await flushPromises();
+      (wrapper.vm as any).goBack();
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "modelPricingGaps",
+        query: { org_identifier: "test-org", stream: "llm" },
       });
     });
 
@@ -1803,6 +1933,97 @@ describe("ModelPricingEditor.vue", () => {
           message: expect.stringContaining("Higher Priority"),
         }),
       );
+    });
+  });
+
+  describe("Models the pattern also prices", () => {
+    const captured = (model_name: string, primary: boolean) => ({
+      model_name,
+      match_kind: primary ? "exact" : "approximate",
+      primary,
+      replaces: { name: model_name.toUpperCase(), source: "built_in" },
+    });
+    const confirmDialog = (wrapper: VueWrapper) => {
+      const dialog = wrapper
+        .findAll('[data-test-stub="o-dialog"]')
+        .find((d) => d.attributes("data-title") === "Price other models with this rule?");
+      if (!dialog) throw new Error("other-models confirm dialog is not rendered");
+      return dialog;
+    };
+
+    beforeEach(() => {
+      mockService.test.mockResolvedValue({
+        data: { captured_models: [captured("gpt-4o", true), captured("gpt-4o-mini", false)] },
+      });
+    });
+
+    it("previews the captured models and warns about the extra ones", async () => {
+      vi.useFakeTimers();
+      try {
+        const wrapper = createWrapper();
+        await flushPromises();
+        getForm(wrapper).setFieldValue("match_pattern", "^gpt-4o");
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(400);
+        await flushPromises();
+
+        expect(mockService.test).toHaveBeenCalledWith("test-org", {
+          model_name: "",
+          match_pattern: "^gpt-4o",
+          rule_id: undefined,
+        });
+        expect(wrapper.find('[data-test="model-pricing-captured-gpt-4o-mini"]').exists()).toBe(
+          true,
+        );
+        expect(wrapper.find('[data-test="model-pricing-captured-warning"]').exists()).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not save when the user cancels the other-models confirmation", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper);
+      await nextTick();
+      const submit = getForm(wrapper).handleSubmit();
+      await vi.waitFor(() => expect(confirmDialog(wrapper).attributes("data-open")).toBe("true"));
+
+      const dialog = confirmDialog(wrapper);
+      expect(dialog.text()).toContain("gpt-4o-mini");
+      await dialog.find('[data-test-stub="o-dialog-secondary"]').trigger("click");
+      await submit;
+      await flushPromises();
+
+      expect(mockService.create).not.toHaveBeenCalled();
+    });
+
+    it("saves once the user confirms the other models", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper);
+      await nextTick();
+      const submit = getForm(wrapper).handleSubmit();
+      await vi.waitFor(() => expect(confirmDialog(wrapper).attributes("data-open")).toBe("true"));
+
+      await confirmDialog(wrapper).find('[data-test-stub="o-dialog-primary"]').trigger("click");
+      await submit;
+      await flushPromises();
+
+      expect(mockService.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("saves without asking when the pattern prices only its own model", async () => {
+      mockService.test.mockResolvedValue({ data: { captured_models: [captured("gpt-4o", true)] } });
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      expect(confirmDialog(wrapper).attributes("data-open")).toBe("false");
+      expect(mockService.create).toHaveBeenCalledTimes(1);
     });
   });
 

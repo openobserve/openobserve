@@ -29,11 +29,10 @@ use config::{
         },
         destinations::{
             AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, Template, TemplateKind,
-            TemplateType,
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         search::{SearchEventContext, SearchEventType},
-        sql::resolve_stream_names,
+        sql::{TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
     utils::{
@@ -42,6 +41,7 @@ use config::{
     },
 };
 use cron::Schedule;
+use datafusion::{common::SchemaError, error::DataFusionError};
 #[cfg(feature = "enterprise")]
 use db::workflows::{AssociationDeleteEvent, WorkflowTriggerType};
 use db::{
@@ -55,7 +55,7 @@ use infra::{db::get_orm_client_ro, schema::unwrap_stream_settings, table};
 use itertools::Itertools;
 use lettre::{
     AsyncTransport, Message,
-    message::{Attachment, MultiPart, SinglePart},
+    message::{Attachment, MessageBuilder, MultiPart, SinglePart},
 };
 #[cfg(feature = "enterprise")]
 use o2_openfga::{
@@ -65,26 +65,29 @@ use o2_openfga::{
 use proto::cluster_rpc::SearchQuery;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use search::{
-    datafusion::plan::projections::get_result_schema,
+    datafusion::logical_plan::projections::get_result_schema,
     sql::{RE_ONLY_SELECT, Sql},
 };
 use svix_ksuid::Ksuid;
 
+#[cfg(test)]
+use crate::alerts::notifications::{apply_custom_template, render, resolve_content};
 #[cfg(feature = "enterprise")]
 use crate::auth::{check_folder_write_permissions, check_permissions};
 use crate::{
     alerts::{
-        QueryConditionExt, build_sql, destinations,
+        QueryConditionExt, build_sql,
+        destinations::{self, note_skipped},
         notifications::{
-            NotificationContext, RenderedMessage, apply_custom_template, build_row_columns, chart,
+            NotificationContext, RenderedMessage, build_row_columns, chart,
             custom::{VarValue, process_variable_replace},
             derive_channel_format,
             format::ChannelFormat,
+            jira,
             modifiers::{PreparedTemplate, prepare_modifiers},
             platform::{self, platform_of},
-            render,
             render::slack as slack_render,
-            resolve_content,
+            send::{self, org_member_email},
         },
     },
     auth::is_ofga_unsupported,
@@ -102,6 +105,10 @@ pub const SCHEDULE_FIELD_MAX_SECS: i64 = 365 * 24 * 60 * 60;
 
 /// `tz_offset` values `chrono::FixedOffset` can represent: strictly less than a day either way.
 pub const TZ_OFFSET_RANGE_MINUTES: std::ops::RangeInclusive<i32> = -1439..=1439;
+
+/// What alert history says when the license withheld an alert's workflows.
+pub const WORKFLOWS_UNLICENSED_REASON: &str =
+    "workflow not run: Workflows is not included in your license";
 
 /// Errors that can occur when interacting with alerts.
 #[derive(Debug, thiserror::Error)]
@@ -128,6 +135,9 @@ pub enum AlertError {
 
     #[error("Alerts cannot be defined on the internal stream '{0}'")]
     ProtectedStream(String),
+
+    #[error("Invalid alert condition: {0}")]
+    InvalidCondition(String),
 
     /// The warning/critical pair is invalid for the chosen operator.
     /// "Less severe" is direction-dependent — see `level::validate_thresholds`.
@@ -227,6 +237,10 @@ pub enum AlertError {
     #[error("{error_message}")]
     SendNotificationError { error_message: String },
 
+    /// Holds the feature key; terminal, because no retry helps until the license changes.
+    #[error("{}", WORKFLOWS_UNLICENSED_REASON)]
+    FeatureNotLicensed(String),
+
     #[error(transparent)]
     GetDestinationWithTemplateError(#[from] db::alerts::destinations::DestinationError),
 
@@ -237,6 +251,9 @@ pub enum AlertError {
 
     #[error("Alert template {template} not found")]
     AlertTemplateNotFound { template: String },
+
+    #[error("validation error: template '{template}' does not apply to alert")]
+    AlertTemplateNotForAlert { template: String },
 
     #[error(
         "Alert period is greater than max query range of {max_query_range_hours} hours for stream \"{stream_name}\""
@@ -267,7 +284,7 @@ pub enum AlertError {
 
     /// Not support save destination remote pipeline for alert so far
     #[error("Not support save destination {0} type for alert so far")]
-    NotSupportedAlertDestinationType(Module),
+    NotSupportedAlertDestinationType(Box<Module>),
 
     #[error("Alert workflow {id} not found")]
     AlertWorkflowNotFound { id: String },
@@ -326,6 +343,8 @@ pub enum AlertError {
     CronHasNoFutureOccurrence { cron: String },
     #[error("Realtime alerts cannot notify on recovery or keep firing")]
     RecoveryOnRealtimeAlert,
+    #[error("Realtime alerts cannot suppress repeat notifications")]
+    RepeatSuppressionOnRealtimeAlert,
     #[error("recovery destinations were set without notify_on_recovery, so nothing would use them")]
     RecoveryDestinationsWithoutRecovery,
     #[error(
@@ -335,14 +354,6 @@ pub enum AlertError {
         destination: String,
         platform: String,
     },
-    #[error(
-        "Multi-alerts keep per-group state and open no recovery episode, so notify_on_recovery would never fire"
-    )]
-    RecoveryOnMultiAlert,
-    #[error(
-        "notification grouping batches several alerts into one message, which cannot carry this alert's correlation key — turn off one of grouping or notify_on_recovery"
-    )]
-    RecoveryWithNotificationGrouping,
     #[error(
         "destination '{destination}' is {platform}, which is resolved by updating the alert the firing opened. That needs the firing payload to be a JSON object, and template '{template}' does not render one"
     )]
@@ -357,6 +368,15 @@ pub enum AlertError {
     RecoveryNeedsRoutingKey { destination: String },
     #[error("Error in multi alert grouping: {0}")]
     MultiAlertGroupingError(String),
+    #[error("Group by column {column} not found on stream {stream_name}")]
+    GroupByColumnNotFound { column: String, stream_name: String },
+    /// A SQL multi-alert naming a column its stream has not received.
+    #[error(
+        "Stream {stream_name} has no field {field} yet. Alerts can only use fields that exist in the stream."
+    )]
+    FieldNotFound { field: String, stream_name: String },
+    #[error("{reason}")]
+    JiraDestinationNotSupported { destination: String, reason: String },
 }
 
 /// What a manual trigger did: sent, with its messages, or held by an active downtime.
@@ -379,6 +399,35 @@ impl ManualTrigger {
             }
         }
     }
+
+    /// What the send could not deliver, such as a failed destination or a page the license
+    /// withheld.
+    pub fn warning(&self) -> Option<&str> {
+        match self {
+            Self::Sent { error_message, .. } if !error_message.trim().is_empty() => {
+                Some(error_message)
+            }
+            _ => None,
+        }
+    }
+}
+
+/// Plans `sql` over the last minute, so a query that cannot run is refused with the engine's error.
+pub async fn plan_sql(org_id: &str, stream_type: StreamType, sql: &str) -> Result<(), String> {
+    let end_time = config::utils::time::now_micros();
+    let query = SearchQuery {
+        sql: sql.to_string(),
+        start_time: end_time - 60_000_000,
+        end_time,
+        ..Default::default()
+    };
+    let sql = Sql::new(&query, org_id, stream_type, None)
+        .await
+        .map_err(|e| e.to_string())?;
+    get_result_schema(sql, false, false)
+        .await
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
 
 pub async fn save(
@@ -458,22 +507,45 @@ fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
         &alert.trigger_condition,
         alert.creates_incident,
     )
-    .map_err(AlertError::InvalidMultiAlert)?;
+    .map_err(AlertError::InvalidMultiAlert)
+}
 
-    // Checked here, not in `validate_multi_alert`, because the grouping
-    // config is a sibling of the query condition rather than part of it.
-    // Same shape as MN-11's incidents rule.
-    let notification_grouping = alert
-        .deduplication
-        .as_ref()
-        .and_then(|d| d.grouping.as_ref())
-        .is_some_and(|g| g.enabled);
-    if alert.query_condition.multi_alert_enabled() && notification_grouping {
-        return Err(AlertError::InvalidMultiAlert(
-            config::meta::alerts::grouping::MultiAlertError::NotificationGroupingUnsupported,
-        ));
+/// Refuses, at save time, a custom-aggregation `group_by` entry that is not a column of the stream.
+#[allow(clippy::result_large_err)]
+fn validate_custom_group_by(
+    stream_name: &str,
+    schema: &arrow_schema::Schema,
+    alert: &Alert,
+) -> Result<(), AlertError> {
+    if alert.query_condition.query_type != QueryType::Custom {
+        return Ok(());
     }
-    Ok(())
+    let group_by = alert
+        .query_condition
+        .aggregation
+        .as_ref()
+        .and_then(|agg| agg.group_by.as_deref())
+        .unwrap_or(&[]);
+    super::quoted_group_by(schema, group_by)
+        .map(drop)
+        .map_err(|column| AlertError::GroupByColumnNotFound {
+            column,
+            stream_name: stream_name.to_owned(),
+        })
+}
+
+fn multi_alert_plan_error(stream_name: &str, err: anyhow::Error) -> AlertError {
+    if let Some(DataFusionError::SchemaError(schema_err, _)) = err
+        .downcast_ref::<DataFusionError>()
+        .map(DataFusionError::find_root)
+        && let SchemaError::FieldNotFound { field, .. } = schema_err.as_ref()
+    {
+        return AlertError::FieldNotFound {
+            field: field.name.clone(),
+            stream_name: stream_name.to_owned(),
+        };
+    }
+    AlertError::MultiAlertGroupingError(err.to_string())
 }
 
 /// Structural half only: `{var}` tokens are unresolved until send time, so a body shaped right but
@@ -492,6 +564,9 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
         return Ok(());
     }
 
+    // A recovery message goes only to these when set, so a missing one sends it nowhere.
+    validate_template_and_destinations(org_id, None, &alert.recovery_destinations).await?;
+
     // A resolve carries the key of the trigger that opened the ticket, so it can only be sent where
     // the firing went; a platform here would be selected and then never used.
     for dest_name in alert.recovery_destinations.iter() {
@@ -509,20 +584,6 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
                 platform: format!("{platform:?}"),
             });
         }
-    }
-
-    // Both keep the alert out of the single-row path that owns the episode, so recovery would be
-    // stored and then silently never sent.
-    if alert.query_condition.multi_alert_enabled() {
-        return Err(AlertError::RecoveryOnMultiAlert);
-    }
-    if alert
-        .deduplication
-        .as_ref()
-        .and_then(|d| d.grouping.as_ref())
-        .is_some_and(|g| g.enabled)
-    {
-        return Err(AlertError::RecoveryWithNotificationGrouping);
     }
 
     let alert_template = match alert.template.as_ref().filter(|n| !n.is_empty()) {
@@ -575,6 +636,67 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
     Ok(())
 }
 
+/// The template and destinations a firing needs; a missing one fails every firing later.
+pub(crate) async fn validate_template_and_destinations(
+    org_id: &str,
+    template: Option<&str>,
+    destinations: &[String],
+) -> Result<(), AlertError> {
+    if let Some(template_name) = template.filter(|name| !name.is_empty()) {
+        let template = db::alerts::templates::get(org_id, template_name)
+            .await
+            .map_err(|_| AlertError::AlertTemplateNotFound {
+                template: template_name.to_string(),
+            })?;
+        check_alert_template(template_name, &template)?;
+    }
+
+    for dest in destinations {
+        match db::alerts::destinations::get(org_id, dest).await {
+            Ok(d) => {
+                if !d.is_alert_destinations() {
+                    return Err(AlertError::NotSupportedAlertDestinationType(Box::new(
+                        d.module,
+                    )));
+                }
+            }
+            Err(_) => {
+                return Err(AlertError::AlertDestinationNotFound {
+                    dest: dest.to_string(),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Jira keeps one issue per alert, so it refuses alerts that would send for several at once.
+pub(crate) async fn validate_jira_destinations(
+    org_id: &str,
+    alert: &Alert,
+) -> Result<(), AlertError> {
+    for dest_name in alert
+        .destinations
+        .iter()
+        .chain(&alert.recovery_destinations)
+    {
+        if let Ok(destination) = db::alerts::destinations::get(org_id, dest_name).await
+            && let Module::Alert {
+                destination_type: DestinationType::Http(endpoint),
+                ..
+            } = &destination.module
+            && jira::is_jira(endpoint)
+            && let Some(reason) = jira::save_refusal(alert, dest_name)
+        {
+            return Err(AlertError::JiraDestinationNotSupported {
+                destination: dest_name.clone(),
+                reason,
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Drop the per-group rows of an alert that is no longer a multi-alert (§5.3).
 ///
 /// Runs **after** the row is committed, so the flag is durably off before the
@@ -595,17 +717,88 @@ async fn clean_up_opted_out_groups(alert: &Alert) {
     let Some(alert_id) = alert.id.as_ref().map(|id| id.to_string()) else {
         return;
     };
+    let firing = infra::table::alert_states::firing_groups(&alert_id, None)
+        .await
+        .unwrap_or_default();
+    let groups = infra::table::alert_states::list_groups(&alert_id)
+        .await
+        .unwrap_or_default();
     match db::alerts::alert_states::delete_all_groups(&alert_id).await {
         Ok(0) => {}
-        Ok(n) => log::info!(
-            "alert {alert_id}: per-group alerting turned off, dropped {n} group state row(s) \
-             without transitions"
-        ),
+        Ok(n) => {
+            crate::alerts::recovery::log_orphaned_episodes(
+                &alert_id,
+                &groups,
+                "deleted on opt-out",
+            );
+            log::info!(
+                "alert {alert_id}: per-group alerting turned off, dropped {n} group state row(s) \
+                 without transitions"
+            );
+            let cleared = crate::alerts::lifecycle::deleted_clears(
+                &firing,
+                config::utils::time::now_micros(),
+                crate::alerts::lifecycle::ClearKind::GroupUntracked,
+            );
+            crate::alerts::lifecycle::on_all_cleared(&alert.org_id, &alert_id, &cleared).await;
+        }
         Err(e) => log::error!(
             "alert {alert_id}: could not drop group state rows after opt-out, leaving them to the \
              reaper: {e}"
         ),
     }
+}
+
+/// Whether this save turns a disabled alert back on.
+pub(crate) fn re_enables(was_enabled: Option<bool>, enabled: bool) -> bool {
+    was_enabled == Some(false) && enabled
+}
+
+/// Drops an alert's run-state rows and its scheduler delivery memory, so it starts like a new
+/// alert.
+pub(crate) async fn reset_run_state(
+    org_id: &str,
+    alert_id: &str,
+    module: db::scheduler::TriggerModule,
+) -> Result<(), infra::errors::Error> {
+    use config::meta::alerts::state::ROLLUP_GROUP_KEY;
+
+    let firing = crate::alerts::lifecycle::firing_rows(alert_id).await;
+    let mut rows = infra::table::alert_states::list_groups(alert_id).await?;
+    rows.extend(infra::table::alert_states::get(alert_id, ROLLUP_GROUP_KEY).await?);
+    db::alerts::alert_states::delete_states(alert_id).await?;
+    forget_trigger_delivery(org_id, module, alert_id).await?;
+    crate::alerts::recovery::log_orphaned_episodes(alert_id, &rows, "dropped on re-enable");
+    let cleared = crate::alerts::lifecycle::deleted_clears(
+        &firing,
+        config::utils::time::now_micros(),
+        crate::alerts::lifecycle::ClearKind::AlertReEnabled,
+    );
+    crate::alerts::lifecycle::on_all_cleared(org_id, alert_id, &cleared).await;
+    Ok(())
+}
+
+/// Clears the silence window and notified level the scheduler keeps in the trigger's data.
+async fn forget_trigger_delivery(
+    org_id: &str,
+    module: db::scheduler::TriggerModule,
+    key: &str,
+) -> Result<(), infra::errors::Error> {
+    use config::meta::triggers::ScheduledTriggerData;
+    use infra::errors::{DbError, Error};
+
+    let mut trigger = match db::scheduler::get(org_id, module, key).await {
+        Ok(trigger) => trigger,
+        Err(Error::DbError(DbError::KeyNotExists(_))) => return Ok(()),
+        Err(e) => return Err(e),
+    };
+    // Unparsable data is read as the default by the scheduler, so it remembers no delivery.
+    let Ok(mut data) = ScheduledTriggerData::from_json_string(&trigger.data) else {
+        return Ok(());
+    };
+    data.clear_delivery();
+    trigger.data = data.to_json_string();
+    db::scheduler::update_trigger(trigger, false, "").await
 }
 
 /// What saving this alert does to the SLOs measuring from it: decided before
@@ -637,6 +830,57 @@ impl SloSourceEffect {
 }
 
 /// Validates the alert and prepares it before it is written to the database.
+/// Reserved templates stay allowed so existing alerts keep saving; a user template must apply.
+fn check_alert_template(name: &str, template: &Template) -> Result<(), AlertError> {
+    if crate::alerts::notifications::default_template::is_reserved_template_name(&template.name)
+        || template
+            .applies_to_kind(config::meta::alerts::notification_kind::NotificationKind::Alert)
+    {
+        return Ok(());
+    }
+    Err(AlertError::AlertTemplateNotForAlert {
+        template: name.to_string(),
+    })
+}
+
+#[cfg(test)]
+mod check_alert_template_tests {
+    use config::meta::{alerts::notification_kind::NotificationKind, destinations::Template};
+
+    use super::{AlertError, check_alert_template};
+
+    fn tpl(name: &str, applies_to: Vec<NotificationKind>) -> Template {
+        Template {
+            name: name.to_string(),
+            applies_to,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn a_user_template_that_excludes_alert_is_refused() {
+        let t = tpl("ops-card", vec![NotificationKind::Anomaly]);
+        let err = check_alert_template("ops-card", &t).unwrap_err();
+        assert!(matches!(err, AlertError::AlertTemplateNotForAlert { .. }));
+        assert_eq!(
+            err.to_string(),
+            "validation error: template 'ops-card' does not apply to alert"
+        );
+    }
+
+    #[test]
+    fn a_user_template_for_alert_or_every_kind_is_allowed() {
+        assert!(check_alert_template("a", &tpl("a", vec![NotificationKind::Alert])).is_ok());
+        assert!(check_alert_template("b", &tpl("b", vec![])).is_ok());
+    }
+
+    #[test]
+    fn a_reserved_template_is_allowed_whatever_its_applies_to() {
+        let t = tpl("prebuilt_default", vec![NotificationKind::Anomaly]);
+        assert!(check_alert_template("prebuilt_default", &t).is_ok());
+    }
+}
+
 fn prepared_alert_name(route_name: &str, body_name: &str) -> String {
     let name = if body_name.trim().is_empty() {
         route_name
@@ -736,6 +980,16 @@ async fn prepare_alert(
     if alert.name.contains('/') {
         return Err(AlertError::AlertNameContainsForwardSlash);
     }
+    if let Some(conditions) = alert.query_condition.conditions.as_ref() {
+        conditions
+            .validate_operator_values()
+            .map_err(AlertError::InvalidCondition)?;
+    }
+    alert
+        .trigger_condition
+        .validate_threshold_operator()
+        .and_then(|_| alert.query_condition.validate_threshold_operators())
+        .map_err(AlertError::InvalidCondition)?;
     // A realtime alert sees every ingested row, so one on chat history would exfiltrate it.
     // Case-insensitive, so no spelling of the chat stream slips through.
     if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
@@ -762,32 +1016,8 @@ async fn prepare_alert(
         }
     }
 
-    // Validate alert-level template if specified
-    if let Some(ref template_name) = alert.template
-        && !template_name.is_empty()
-        && db::alerts::templates::get(org_id, template_name)
-            .await
-            .is_err()
-    {
-        return Err(AlertError::AlertTemplateNotFound {
-            template: template_name.clone(),
-        });
-    }
-
-    for dest in alert.destinations.iter() {
-        match db::alerts::destinations::get(org_id, dest).await {
-            Ok(d) => {
-                if !d.is_alert_destinations() {
-                    return Err(AlertError::NotSupportedAlertDestinationType(d.module));
-                }
-            }
-            Err(_) => {
-                return Err(AlertError::AlertDestinationNotFound {
-                    dest: dest.to_string(),
-                });
-            }
-        }
-    }
+    validate_template_and_destinations(org_id, alert.template.as_deref(), &alert.destinations)
+        .await?;
 
     #[cfg(feature = "enterprise")]
     for workflow in alert.workflows.iter() {
@@ -841,6 +1071,7 @@ async fn prepare_alert(
                 stream_name: stream_name.to_owned(),
             });
         }
+        validate_custom_group_by(stream_name, &schema, alert)?;
 
         // Alerts must follow the max_query_range of the stream as set in the schema
         if let Some(settings) = unwrap_stream_settings(&schema) {
@@ -848,7 +1079,7 @@ async fn prepare_alert(
             if max_query_range > 0
                 && !alert.query_condition.promql_rule_mode
                 && !alert.is_real_time
-                && alert.trigger_condition.period > max_query_range * 60
+                && alert.trigger_condition.period > max_query_range.saturating_mul(60)
             {
                 return Err(AlertError::PeriodExceedsMaxQueryRange {
                     max_query_range_hours: max_query_range,
@@ -882,6 +1113,10 @@ async fn prepare_alert(
     // that cannot arrive.
     if alert.is_real_time && (alert.notify_on_recovery || alert.keep_firing_for != 0) {
         return Err(AlertError::RecoveryOnRealtimeAlert);
+    }
+    // A realtime alert keeps no state row, so it has no last delivered state to compare against.
+    if alert.is_real_time && alert.suppress_repeats {
+        return Err(AlertError::RepeatSuppressionOnRealtimeAlert);
     }
 
     // Multi-level thresholds (alerts_2.md Feature 1). Rejected at write time so
@@ -954,7 +1189,7 @@ async fn prepare_alert(
                 .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
             let schema = get_result_schema(sql, false, true)
                 .await
-                .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
+                .map_err(|e| multi_alert_plan_error(stream_name, e))?;
 
             // this is mostly API check, FE already has a restriction
             if !schema.projections.contains(&agg.having.column) {
@@ -998,6 +1233,8 @@ async fn prepare_alert(
 
     validate_recovery_templates(org_id, alert).await?;
 
+    validate_jira_destinations(org_id, alert).await?;
+
     // PromQL carries a third threshold family: the condition value baked into
     // the query. Its warning needs the same §4.5 direction check, measured
     // against `promql_condition.operator`.
@@ -1024,8 +1261,8 @@ async fn prepare_alert(
             }
 
             let sql = alert.query_condition.sql.as_ref().unwrap();
-            let stream_names = match resolve_stream_names(sql) {
-                Ok(stream_names) => stream_names,
+            let stream_refs = match resolve_stream_names_with_type(sql) {
+                Ok(stream_refs) => stream_refs,
                 Err(e) => {
                     return Err(AlertError::ResolveStreamNameError(e));
                 }
@@ -1033,19 +1270,21 @@ async fn prepare_alert(
 
             // SQL may contain multiple stream names, check for each stream
             // if the alert period is greater than the max query range
-            for stream in stream_names.iter() {
-                if !stream.eq(stream_name)
+            for stream_ref in stream_refs.iter() {
+                let stream = stream_ref.stream_name();
+                let ref_type = stream_ref.get_stream_type(stream_type);
+                if !(stream == stream_name && ref_type == stream_type)
                     && let Some(settings) =
-                        infra::schema::get_settings(org_id, stream, stream_type).await
+                        infra::schema::get_settings(org_id, &stream, ref_type).await
                 {
                     let max_query_range = settings.max_query_range;
                     if max_query_range > 0
                         && !alert.is_real_time
-                        && alert.trigger_condition.period > max_query_range * 60
+                        && alert.trigger_condition.period > max_query_range.saturating_mul(60)
                     {
                         return Err(AlertError::PeriodExceedsMaxQueryRange {
                             max_query_range_hours: max_query_range,
-                            stream_name: stream_name.to_owned(),
+                            stream_name: stream,
                         });
                     }
                 }
@@ -1176,6 +1415,18 @@ pub fn record_suppressed_run(
     count_suppressed_run(&data.org, module);
 }
 
+/// A run an ack kept silent: `Suppressed` with who acked it, no delivery attempt, counted.
+pub fn record_ack_suppressed_run(
+    data: &mut config::meta::self_reporting::usage::TriggerData,
+    module: &str,
+    acked_by: String,
+) {
+    data.status = config::meta::self_reporting::usage::RunOutcome::Suppressed;
+    data.acked_by = Some(acked_by);
+    data.delivery_attempted = Some(false);
+    count_suppressed_run(&data.org, module);
+}
+
 /// Runs the checks [`create`] (given a folder) or [`update`] makes on a copy, writing nothing.
 pub async fn validate_save(
     org_id: &str,
@@ -1263,9 +1514,9 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
         return Err(AlertError::PermissionDenied);
     }
 
+    // Every alert is checked before any moves, so one bad id moves nothing.
+    let mut moves = Vec::with_capacity(alert_ids.len());
     for alert_id in alert_ids {
-        let _alert_id_str = alert_id.to_string();
-
         let Some((curr_folder, alert)) =
             db::alerts::alert::get_by_id(conn, org_id, *alert_id).await?
         else {
@@ -1273,10 +1524,9 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
         };
 
         #[cfg(feature = "enterprise")]
-        if get_openfga_config().enabled {
-            // TODO: Try to make a single call for all alerts
-            if !check_permissions(
-                &_alert_id_str,
+        if get_openfga_config().enabled
+            && !check_permissions(
+                &alert_id.to_string(),
                 org_id,
                 _user_id,
                 "alerts",
@@ -1287,11 +1537,13 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
                 false,
             )
             .await
-            {
-                return Err(AlertError::PermissionDenied);
-            }
+        {
+            return Err(AlertError::PermissionDenied);
         }
+        moves.push((alert_id.to_string(), curr_folder, alert));
+    }
 
+    for (_alert_id_str, curr_folder, alert) in moves {
         update(
             conn,
             org_id,
@@ -1351,6 +1603,13 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
 
     let slo_effect =
         prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false, false).await?;
+    let was_enabled = match alert.id {
+        Some(id) => get_by_id(conn, org_id, id)
+            .await
+            .ok()
+            .map(|(_, a)| a.enabled),
+        None => None,
+    };
 
     #[cfg(feature = "enterprise")]
     if let Some(ref id) = alert.id {
@@ -1406,9 +1665,27 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
         }
     }
 
+    // Before the write: once enabled, the scheduler may evaluate against the old state.
+    if let Some(id) = alert.id
+        && re_enables(was_enabled, alert.enabled)
+    {
+        reset_run_state(org_id, &id.to_string(), db::scheduler::TriggerModule::Alert).await?;
+    }
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
     slo_effect.apply().await;
     clean_up_opted_out_groups(&alert).await;
+    if let Some(id) = alert.id
+        && was_enabled.is_some_and(|was| was != alert.enabled)
+    {
+        let by = alert.last_edited_by.as_deref().unwrap_or_default();
+        crate::alerts::lifecycle::on_alert_enabled_changed(
+            org_id,
+            &id.to_string(),
+            by,
+            alert.enabled,
+        )
+        .await;
+    }
     #[cfg(feature = "enterprise")]
     if let Some((curr_folder_id, dst_folder_id)) = _folder_info
         && get_openfga_config().enabled
@@ -1532,10 +1809,42 @@ pub async fn list_v2<C: ConnectionTrait>(
 /// Whether an individual grant in `permissions` covers `alert`, by its old or new OpenFGA id.
 pub(crate) fn is_alert_permitted(folder: &Folder, alert: &Alert, permissions: &[String]) -> bool {
     permissions.contains(&format!("alert:{}", alert.name))
+        || permissions.contains(&format!("afolder:{}", folder.folder_id))
         || alert.id.is_some_and(|id| {
             permissions.contains(&format!("alert:{}/{id}", folder.folder_id))
                 || permissions.contains(&format!("alert:{id}"))
         })
+}
+
+/// The grants a folder adds to a no-folder read: folders the user can both open and read.
+#[cfg(any(feature = "enterprise", test))]
+fn readable_folder_grants(
+    org_id: &str,
+    mut readable: Vec<String>,
+    listable: &[String],
+) -> Vec<String> {
+    let all_folders = format!("afolder:_all_{org_id}");
+    let lists_all = listable.contains(&all_folders);
+    readable.retain(|folder| lists_all || listable.contains(folder));
+    if readable.contains(&all_folders) {
+        readable.push(format!("alert:_all_{org_id}"));
+    }
+    readable
+}
+
+/// Folder ids out of `afolder:` grants; `None` when one of them is the org-wide grant.
+#[cfg(any(feature = "enterprise", test))]
+fn listable_folder_ids(org_id: &str, objects: &[String]) -> Option<Vec<String>> {
+    if objects.contains(&format!("afolder:_all_{org_id}")) {
+        return None;
+    }
+    Some(
+        objects
+            .iter()
+            .filter_map(|object| object.strip_prefix("afolder:"))
+            .map(str::to_string)
+            .collect(),
+    )
 }
 
 /// Deletes an alert by its KSUID primary key, unconditionally.
@@ -1563,12 +1872,30 @@ pub(crate) async fn delete_by_id<C: ConnectionTrait>(
     match db::alerts::alert::delete_by_id(conn, org_id, alert_id).await {
         Ok(_) => {
             remove_ownership(org_id, "alerts", Authz::new(&alert_id_str)).await;
+            let firing = crate::alerts::lifecycle::firing_rows(&alert_id_str).await;
+            let groups = infra::table::alert_states::list_groups(&alert_id_str)
+                .await
+                .unwrap_or_default();
+            crate::alerts::recovery::log_orphaned_episodes(
+                &alert_id_str,
+                &groups,
+                "deleted with its alert",
+            );
             // Alert run state is owned by the alert's lifecycle (Part IV of
             // alerts.md), so it goes when the alert does. Best-effort: a
             // leftover state row must not fail the delete.
             if let Err(e) = db::alerts::alert_states::delete_by_alert(&alert_id_str).await {
                 log::warn!("failed to delete alert state for {alert_id_str}: {e}");
             }
+            if let Err(e) = infra::table::alert_acks::delete_by_alert(org_id, &alert_id_str).await {
+                log::warn!("failed to delete alert acks for {alert_id_str}: {e}");
+            }
+            let cleared = crate::alerts::lifecycle::deleted_clears(
+                &firing,
+                config::utils::time::now_micros(),
+                crate::alerts::lifecycle::ClearKind::AlertDeleted,
+            );
+            crate::alerts::lifecycle::on_all_cleared(org_id, &alert_id_str, &cleared).await;
             // The availability ledger (S-16) is owned by the same lifecycle, so
             // org deletion inherits it through `delete_org_alerts` with no
             // dedicated cleanup step. Written straight to `infra`, unlike its
@@ -1584,6 +1911,29 @@ pub(crate) async fn delete_by_id<C: ConnectionTrait>(
         }
         Err(e) => Err(e.into()),
     }
+}
+
+/// Org teardown: one delete of the org's remaining alerts, then each one's events and owned rows.
+pub(crate) async fn delete_rest_of_org(org_id: &str) -> Result<(), AlertError> {
+    for alert_id in infra::table::alerts::delete_by_org(org_id).await? {
+        #[cfg(feature = "enterprise")]
+        db::workflows::delete_workflow_association(AssociationDeleteEvent::Entity {
+            org_id: org_id.to_string(),
+            entity_id: alert_id.clone(),
+        })
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        infra::coordinator::alerts::emit_delete_event(org_id, &alert_id).await?;
+        // Its trigger goes with every other trigger of the org, at the scheduler step.
+        remove_ownership(org_id, "alerts", Authz::new(&alert_id)).await;
+        if let Err(e) = db::alerts::alert_states::delete_by_alert(&alert_id).await {
+            log::warn!("failed to delete alert state for {alert_id}: {e}");
+        }
+        if let Err(e) = infra::table::alert_eval_intervals::delete_by_alert(&alert_id).await {
+            log::warn!("failed to delete alert eval ledger for {alert_id}: {e}");
+        }
+    }
+    Ok(())
 }
 
 /// Delete an alert **on a user's behalf**, refusing while an SLO measures from
@@ -2196,8 +2546,18 @@ pub async fn enable_by_name(
                 return Err(AlertError::AlertNotFound);
             }
         };
+    let changed = alert.enabled != value;
+    let reset = re_enables(Some(alert.enabled), value);
     alert.enabled = value;
+    let alert_id = alert.id.map(|id| id.to_string());
+    let by = alert.last_edited_by.clone().unwrap_or_default();
+    if reset && let Some(alert_id) = alert_id.as_deref() {
+        reset_run_state(org_id, alert_id, db::scheduler::TriggerModule::Alert).await?;
+    }
     db::alerts::alert::set(org_id, alert, false).await?;
+    if changed && let Some(alert_id) = alert_id {
+        crate::alerts::lifecycle::on_alert_enabled_changed(org_id, &alert_id, &by, value).await;
+    }
     Ok(())
 }
 
@@ -2228,6 +2588,26 @@ pub(crate) fn with_incident_notify_error(
     }
 }
 
+/// A failure, not a skip, so alert history says why on-call stayed silent.
+#[cfg(feature = "enterprise")]
+pub(crate) fn with_unlicensed_page_reason(
+    notify_error: Option<String>,
+    unlicensed: Option<&str>,
+) -> Option<String> {
+    match unlicensed {
+        None => notify_error,
+        Some(reason) => Some(with_incident_notify_error(reason.to_string(), notify_error)),
+    }
+}
+
+/// History's text for a failed send; a license denial is not a send error, so its reason stands.
+pub(crate) fn send_failure_message(error: &AlertError) -> String {
+    match error {
+        AlertError::FeatureNotLicensed(_) => error.to_string(),
+        _ => format!("error sending notification for alert: {error}"),
+    }
+}
+
 /// Whether a send tried any destination or workflow; an `Err` is a failed delivery, so it counts.
 pub(crate) fn send_attempted(result: &Result<NotificationOutcome, AlertError>) -> bool {
     result.as_ref().map_or(true, |outcome| outcome.attempted)
@@ -2255,9 +2635,19 @@ fn incident_path_notified(
     match outcome {
         Outcome::NewIncidentCreated { .. }
         | Outcome::NewAlertTypeJoined { .. }
-        | Outcome::SeverityEscalated { .. } => true,
+        | Outcome::SeverityEscalated { .. }
+        | Outcome::FiredAfterReopen { .. } => true,
         Outcome::ExistingAlertRepeated { .. } => false,
     }
+}
+
+/// `FiredAfterReopen` notifies destinations but pages nobody, so the manual trigger still pages.
+#[cfg(feature = "enterprise")]
+fn incident_path_paged(
+    outcome: &config::meta::alerts::incidents::IncidentCorrelationOutcome,
+) -> bool {
+    use config::meta::alerts::incidents::IncidentCorrelationOutcome as Outcome;
+    !matches!(outcome, Outcome::FiredAfterReopen { .. }) && incident_path_notified(outcome)
 }
 
 pub async fn trigger_by_id<C: ConnectionTrait>(
@@ -2277,10 +2667,8 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // For creates_incident=true alerts the incident correlation path handles
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
-    let (incident_notified, incident_notify_error) = if alert.creates_incident
-        && o2_enterprise::enterprise::common::config::get_config()
-            .incidents
-            .enabled
+    let (incident_notified, incident_paged, incident_notify_error) = if alert.creates_incident
+        && crate::alerts::incidents::incidents_enabled()
     {
         let synthetic_row = manual_trigger_row(&alert);
         let notify = std::slice::from_ref(&synthetic_row);
@@ -2291,6 +2679,8 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             notify,
             now,
             // Manual triggers evaluate nothing; no level to map.
+            None,
+            None,
             None,
             None,
         )
@@ -2305,6 +2695,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
                 );
                 (
                     incident_path_notified(&correlated.outcome),
+                    incident_path_paged(&correlated.outcome),
                     correlated.notify_error,
                 )
             }
@@ -2313,17 +2704,17 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
                     "No incident correlation for manually triggered alert {org_id}/{}",
                     alert.name
                 );
-                (false, None)
+                (false, false, None)
             }
             Err(e) => {
                 log::error!(
                     "Error correlating manual trigger to incident, falling back to direct notification: {e}"
                 );
-                (false, None)
+                (false, false, None)
             }
         }
     } else {
-        (false, None)
+        (false, false, None)
     };
 
     #[cfg(not(feature = "enterprise"))]
@@ -2344,10 +2735,15 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // somebody checks a new on-call alert pages before trusting it, and it only
     // answers that question if it pages.
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::oncall::is_enabled() && !incident_notified {
+    if o2_enterprise::enterprise::oncall::is_enabled() && !incident_paged {
         crate::alerts::scheduler::handlers::page_for_alert_firing(&trace_id, &alert, &rows).await;
     }
-    let outcome = alert
+    #[cfg(feature = "enterprise")]
+    let incident_notify_error = with_unlicensed_page_reason(
+        incident_notify_error,
+        crate::alerts::scheduler::handlers::unlicensed_reason_for_firing(&alert, &rows).await,
+    );
+    let sent = alert
         .send_notification(
             &trace_id,
             &rows,
@@ -2360,13 +2756,44 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             skip_destinations,
             None,
         )
-        .await?;
+        .await;
+    // Not from `opened`: a teamless record woke nobody, and a page already open returns nothing.
+    #[cfg(feature = "enterprise")]
+    let paged = async {
+        o2_enterprise::enterprise::oncall::is_enabled()
+            && o2_enterprise::enterprise::oncall::escalation::routes_to_a_team(
+                &alert.org_id,
+                alert.oncall_team.as_deref(),
+                &crate::alerts::scheduler::handlers::alert_identity(&alert, &rows).await,
+            )
+            .await
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let paged = async { false };
+    let outcome =
+        workflows_denial_as_warning(sent, async { incident_notified || paged.await }).await?;
     let error_message = with_incident_notify_error(outcome.error_message, incident_notify_error);
 
     Ok(ManualTrigger::Sent {
         success_message: outcome.success_message,
         error_message,
     })
+}
+
+/// A locked workflow fails a manual trigger only when it was the alert's one way to reach anyone.
+async fn workflows_denial_as_warning(
+    sent: Result<NotificationOutcome, AlertError>,
+    // Awaited only on a denial: it reads routing per group and logs when that read fails.
+    reached_someone: impl Future<Output = bool>,
+) -> Result<NotificationOutcome, AlertError> {
+    if matches!(sent, Err(AlertError::FeatureNotLicensed(_))) && reached_someone.await {
+        return Ok(NotificationOutcome {
+            attempted: true,
+            error_message: WORKFLOWS_UNLICENSED_REASON.to_string(),
+            ..Default::default()
+        });
+    }
+    sent
 }
 
 /// A manual trigger inside a window is suppressed like a scheduled run: no page, no un-mute.
@@ -2393,6 +2820,7 @@ async fn suppressed_manual_trigger(
         now,
         None,
         &downtime,
+        None,
     )
     .await;
     count_suppressed_run(&alert.org_id, "alerts");
@@ -2544,11 +2972,15 @@ impl AlertExt for Alert {
         let mut workflow_error = 0;
         #[cfg(feature = "enterprise")]
         let mut workflow_err_msg = "".to_string();
+        #[cfg(feature = "enterprise")]
+        let mut workflow_denials = 0;
 
         #[cfg(not(feature = "enterprise"))]
         let workflow_error = 0;
         #[cfg(not(feature = "enterprise"))]
         let workflow_err_msg = "".to_string();
+        #[cfg(not(feature = "enterprise"))]
+        let workflow_denials = 0;
 
         // WHICH SLO this notification is about, resolved ONCE and shared by
         // every surface below (each destination's template, and the workflow
@@ -2579,7 +3011,7 @@ impl AlertExt for Alert {
         //   2. A destination fetch failure becomes a per-destination failure instead of a `?` that
         //      aborts the remaining destinations — which, once an earlier destination had already
         //      sent, made the resulting all-fail return trigger a retry that re-sent it (§6.1).
-        let mut snapshot: Vec<(String, Option<(DestinationType, Option<Template>)>)> =
+        let mut snapshot: Vec<(String, Option<(String, DestinationType, Option<Template>)>)> =
             Vec::with_capacity(self.destinations.len());
         for dest_name in self.destinations.iter() {
             // Ledgered destinations already landed on a prior attempt.
@@ -2596,7 +3028,11 @@ impl AlertExt for Alert {
                         // `dest.name`: the ledger is matched against
                         // `self.destinations` on the next attempt, so the two
                         // must be the same string.
-                        snapshot.push((dest_name.clone(), Some((destination_type, dest_template))))
+                        let dest_id = dest.id.map(|id| id.to_string()).unwrap_or_default();
+                        snapshot.push((
+                            dest_name.clone(),
+                            Some((dest_id, destination_type, dest_template)),
+                        ))
                     }
                     _ => {
                         log::error!(
@@ -2650,7 +3086,7 @@ impl AlertExt for Alert {
         let mut chart_png: Option<Option<std::sync::Arc<Vec<u8>>>> = None;
 
         for (dest_name, resolved) in snapshot.iter() {
-            let Some((destination_type, dest_template)) = resolved else {
+            let Some((dest_id, destination_type, dest_template)) = resolved else {
                 continue; // already recorded as a resolution failure
             };
 
@@ -2665,8 +3101,7 @@ impl AlertExt for Alert {
             let effective = crate::alerts::notifications::org_default::resolve_effective_template(
                 &self.org_id,
                 explicit,
-            )
-            .await;
+            );
             let template = effective.template();
 
             if ctx.is_none() {
@@ -2704,11 +3139,13 @@ impl AlertExt for Alert {
                     // Bytes travel in the send itself only for email (CID
                     // attachment) and Discord (multipart upload); rendered at
                     // most once and shared.
-                    let needs_png = matches!(destination_type, DestinationType::Email(_))
-                        || matches!(
-                            derive_channel_format(destination_type),
-                            ChannelFormat::Discord
-                        );
+                    let needs_png = matches!(
+                        destination_type,
+                        DestinationType::Email(_) | DestinationType::SlackApp(_)
+                    ) || matches!(
+                        derive_channel_format(destination_type),
+                        ChannelFormat::Discord
+                    );
                     ctx.chart_png = if needs_png {
                         if chart_png.is_none() {
                             chart_png =
@@ -2725,7 +3162,7 @@ impl AlertExt for Alert {
                 }
             }
 
-            match send_to_destination(self, destination_type, template, ctx).await {
+            match send_to_destination(self, dest_id, destination_type, template, ctx).await {
                 Ok(resp) => {
                     outcome.succeeded.push(dest_name.clone());
                     success_message = format!("{success_message} destination {dest_name} {resp};");
@@ -2830,16 +3267,24 @@ impl AlertExt for Alert {
                         e
                     );
                     workflow_error += 1;
-                    workflow_err_msg = format!(
-                        "{workflow_err_msg} Error triggering workflow {} err: {e};",
-                        workflow
-                    );
+                    if is_license_denial(&e) {
+                        workflow_denials += 1;
+                    } else {
+                        workflow_err_msg = format!(
+                            "{workflow_err_msg} Error triggering workflow {} err: {e};",
+                            workflow
+                        );
+                    }
                 }
+            }
+            // One line, not one per workflow: the reason names the license, not a workflow.
+            if workflow_denials > 0 {
+                workflow_err_msg = format!("{workflow_err_msg} {WORKFLOWS_UNLICENSED_REASON}");
             }
         }
 
         outcome.success_message = success_message;
-        outcome.error_message = err_message;
+        outcome.error_message = send_error_message(&err_message, &workflow_err_msg);
 
         // Attempted = destinations not skipped by the ledger. An attempt in
         // which every attempted destination failed is still a hard error, so
@@ -2865,12 +3310,37 @@ impl AlertExt for Alert {
                 error_message: outcome.error_message,
             })
         } else if all_workflows_failed(attempted, self.workflows.len(), workflow_error) {
-            Err(AlertError::SendNotificationError {
-                error_message: workflow_err_msg,
-            })
+            Err(all_workflows_failed_error(
+                workflow_denials,
+                workflow_error,
+                outcome.error_message,
+            ))
         } else {
             Ok(outcome)
         }
+    }
+}
+
+/// Whether a workflow send was refused by the license rather than failing to run.
+#[cfg(feature = "enterprise")]
+fn is_license_denial(error: &anyhow::Error) -> bool {
+    matches!(
+        error.downcast_ref::<infra::errors::ErrorCodes>(),
+        Some(infra::errors::ErrorCodes::LicenseFeatureNotEntitled(_))
+    )
+}
+
+pub(crate) fn all_workflows_failed_error(
+    denials: usize,
+    failures: usize,
+    error_message: String,
+) -> AlertError {
+    // The license is read per workflow, so a change mid-loop can mix in a real, retryable failure.
+    if denials > 0 && denials == failures {
+        let feature: &str = config::meta::feature::Feature::Workflows.into();
+        AlertError::FeatureNotLicensed(feature.to_string())
+    } else {
+        AlertError::SendNotificationError { error_message }
     }
 }
 
@@ -2882,10 +3352,17 @@ fn all_workflows_failed(
     attempted_destinations == 0 && workflow_count > 0 && workflow_errors == workflow_count
 }
 
+/// Each part starts with its own separator, so the first one's must not lead the message.
+fn send_error_message(destination_errors: &str, workflow_errors: &str) -> String {
+    format!("{destination_errors}{workflow_errors}")
+        .trim_start()
+        .to_string()
+}
+
 /// Build the notification context for a send, resolving the row template
 /// first. Metadata is left empty — the caller swaps in each destination's.
 #[allow(clippy::too_many_arguments)]
-async fn build_send_context(
+pub(crate) async fn build_send_context(
     alert: &Alert,
     rows: &[Map<String, Value>],
     rows_end_time: i64,
@@ -2950,12 +3427,13 @@ pub async fn send_recovery_notification(
         Some(event.opened_at),
         event.recovered_at,
         Some(config::meta::alerts::level::AlertLevel::Ok),
-        None,
-        None,
+        event.value,
+        event.group_label_set.as_ref(),
         Some(event.episode_id.clone()),
         true,
     )
     .await;
+    ctx.recovery_reason = event.reason.as_str().to_string();
 
     let alert_template = match alert.template.as_ref().filter(|n| !n.is_empty()) {
         Some(name) => db::alerts::templates::get(&alert.org_id, name).await.ok(),
@@ -2974,12 +3452,16 @@ pub async fn send_recovery_notification(
         if !visited.insert(dest_name) {
             continue;
         }
-        let (destination_type, dest_template) =
+        let (dest_id, destination_type, dest_template) =
             match destinations::get_with_template(&alert.org_id, dest_name).await {
                 Ok((dest, tpl)) => match dest.module {
                     Module::Alert {
                         destination_type, ..
-                    } => (destination_type, tpl),
+                    } => (
+                        dest.id.map(|id| id.to_string()).unwrap_or_default(),
+                        destination_type,
+                        tpl,
+                    ),
                     _ => continue,
                 },
                 Err(e) => {
@@ -2987,6 +3469,10 @@ pub async fn send_recovery_notification(
                     continue;
                 }
             };
+        // Its thread reply goes out from `dispatch_recovery`, whatever `notify_on_recovery` says.
+        if matches!(destination_type, DestinationType::SlackApp(_)) {
+            continue;
+        }
         // A platform resolve is protocol, not a message, so the template is never rendered for it.
         if let (Some(platform), DestinationType::Http(endpoint)) =
             (platform_of(&destination_type), &destination_type)
@@ -3028,11 +3514,18 @@ pub async fn send_recovery_notification(
         let effective = crate::alerts::notifications::org_default::resolve_effective_template(
             &alert.org_id,
             explicit,
-        )
-        .await;
+        );
         // Logged because a resolve nobody sees land is the hard one to debug — a vendor can answer
         // 202 to one it drops. Body at debug only: it can carry recipient data.
-        match send_to_destination(alert, &destination_type, effective.template(), &mut ctx).await {
+        match send_to_destination(
+            alert,
+            &dest_id,
+            &destination_type,
+            effective.template(),
+            &mut ctx,
+        )
+        .await
+        {
             Ok(resp) => {
                 log::info!(
                     "[RECOVERY] {}/{} episode {} destination {dest_name} sent",
@@ -3095,154 +3588,40 @@ async fn build_chart_asset(
     Some((url, payload))
 }
 
-/// Carry the episode id into a platform's own correlation field, so the resolve
-/// this module sends later can find what the firing opened.
-///
-/// A body we cannot parse is left alone and logged: saving the alert already
-/// refused this combination, so reaching here means the template changed after
-/// the fact, and dropping the firing would be the worse failure.
-fn stamp_platform_key(
-    dest_type: &DestinationType,
-    ctx: &NotificationContext,
-    msg: String,
-) -> String {
-    let (Some(platform), Some(episode_id)) = (platform_of(dest_type), ctx.episode_id.as_deref())
-    else {
-        return msg;
-    };
-    let empty = hashbrown::HashMap::new();
-    let metadata = match dest_type {
-        DestinationType::Http(endpoint) => &endpoint.metadata,
-        _ => &empty,
-    };
-    match platform::stamp_key(platform, &msg, episode_id, metadata) {
-        Ok(stamped) => stamped,
-        Err(e) => {
-            log::warn!(
-                "[ALERT] {} payload has no place for {}: {e} — it will not be resolvable",
-                ctx.alert_name,
-                platform.key_field()
-            );
-            msg
-        }
-    }
-}
-
 /// `ctx` is the notification-wide context; this function swaps in the
 /// destination's metadata before rendering (§5.1).
 async fn send_to_destination(
     alert: &Alert,
+    destination_id: &str,
     dest_type: &DestinationType,
     template: &Template,
     ctx: &mut NotificationContext,
 ) -> Result<String, anyhow::Error> {
-    let is_email = matches!(dest_type, DestinationType::Email(_));
-    let empty_meta = hashbrown::HashMap::new();
-    let metadata: &hashbrown::HashMap<String, String> = match dest_type {
-        DestinationType::Http(endpoint) => &endpoint.metadata,
-        _ => &empty_meta,
-    };
-    ctx.metadata = metadata
-        .iter()
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect();
-
-    match template.kind {
-        TemplateKind::Custom => {
-            // Unchanged legacy path — byte-identical output.
-            let msg = apply_custom_template(&template.body, ctx, is_email);
-            let msg = stamp_platform_key(dest_type, ctx, msg);
-            let email_subject = if let TemplateType::Email { title } = &template.template_type {
-                apply_custom_template(title, ctx, is_email)
-            } else {
-                template.name.clone()
-            };
-            match dest_type {
-                DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
-                DestinationType::Email(email) => {
-                    // Same string for both parts: identical to the MIME this
-                    // path emitted before the signature took two bodies.
-                    send_email_notification(&email_subject, email, msg.clone(), msg).await
-                }
-                DestinationType::Sns(aws_sns) => {
-                    send_sns_notification(&alert.name, aws_sns, msg).await
-                }
-            }
-        }
-        TemplateKind::Content => {
-            let spec = db::alerts::templates::get_parsed_content(template)
-                .map_err(|e| anyhow::anyhow!("Invalid content template {}: {e}", template.name))?;
-            let format = derive_channel_format(dest_type);
-            let content = resolve_content(&spec, ctx, format.channel_family());
-            let rendered = render(format, &content, ctx)
-                .map_err(|e| anyhow::anyhow!("Renderer failed: {e}"))?;
-
-            match (rendered, dest_type) {
-                (RenderedMessage::Http { body }, DestinationType::Http(endpoint)) => {
-                    // Discord with a rendered chart: upload the PNG in the
-                    // same webhook POST (the embed references it as
-                    // `attachment://`).
-                    if matches!(format, ChannelFormat::Discord)
-                        && let Some(png) = ctx.chart_png.clone()
-                    {
-                        send_discord_with_attachment(endpoint, body, png).await
-                    } else {
-                        let body = stamp_platform_key(dest_type, ctx, body);
-                        send_http_notification(endpoint, body).await
-                    }
-                }
-                (
-                    RenderedMessage::Email {
-                        subject,
-                        html,
-                        text,
-                    },
-                    DestinationType::Email(email),
-                ) => {
-                    send_email_notification_with_inline_png(
-                        &subject,
-                        email,
-                        text,
-                        html,
-                        ctx.chart_png.clone(),
-                    )
-                    .await
-                }
-                (
-                    RenderedMessage::Sns {
-                        subject: _,
-                        message,
-                    },
-                    DestinationType::Sns(aws_sns),
-                ) => send_sns_notification(&alert.name, aws_sns, message).await,
-                (rendered, dest_type) => Err(anyhow::anyhow!(
-                    "Rendered message {rendered:?} does not match destination type {dest_type:?}"
-                )),
-            }
-        }
+    if matches!(dest_type, DestinationType::SlackApp(_)) {
+        ctx.metadata.clear();
+        let alert_id = alert.id.map(|id| id.to_string());
+        let send = crate::alerts::slack_publish::AlertSend {
+            org_id: &alert.org_id,
+            alert_id: alert_id.as_deref(),
+            is_real_time: alert.is_real_time,
+            destination_id,
+            template,
+        };
+        return crate::alerts::slack_publish::send_alert(
+            &crate::alerts::slack_publish::QueueSink,
+            &send,
+            ctx,
+        )
+        .await;
     }
-}
-
-/// Send a pre-built message string to a single destination type.
-///
-/// Used by incident notifications, which build their own payload rather than
-/// going through the alert template system.
-#[cfg(feature = "enterprise")]
-pub(crate) async fn dispatch_notification(
-    dest_type: &DestinationType,
-    subject: &str,
-    msg: String,
-) -> Result<String, anyhow::Error> {
-    match dest_type {
-        DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
-        // Incident notifications build one payload with no HTML/plaintext
-        // split, so both parts carry the same string — byte-identical to the
-        // MIME this path emitted before the signature took two bodies.
-        DestinationType::Email(email) => {
-            send_email_notification(subject, email, msg.clone(), msg).await
-        }
-        DestinationType::Sns(aws_sns) => send_sns_notification(subject, aws_sns, msg).await,
-    }
+    send::send_to_destination(
+        &alert.org_id,
+        send::Subject::Alert(&alert.name),
+        dest_type,
+        template,
+        ctx,
+    )
+    .await
 }
 
 /// Dispatch a rendered test-send message to one destination.
@@ -3255,15 +3634,8 @@ pub(crate) async fn dispatch_notification(
 /// of re-deriving it from `rendered`, or hardcoding a literal) keeps this
 /// function agnostic to the rendered payload's shape and guarantees the SNS
 /// subject is never anything other than the actual marked title.
-///
-/// Unlike [`dispatch_notification`], this is NOT enterprise-gated: test-send
-/// (Task 15) is an OSS-visible feature, and it needs the same private
-/// `send_http_notification` / `send_email_notification` / `send_sns_notification`
-/// transports this module already owns. Kept as a distinct, narrowly-scoped
-/// function rather than removing the `#[cfg]` from `dispatch_notification`
-/// itself, so the enterprise-only incident-notification call sites are
-/// untouched.
 pub(crate) async fn dispatch_test_message(
+    org_id: &str,
     dest_type: &DestinationType,
     title: &str,
     rendered: RenderedMessage,
@@ -3279,12 +3651,20 @@ pub(crate) async fn dispatch_test_message(
                 text,
             },
             DestinationType::Email(email),
-        ) => send_email_notification(&subject, email, text, html).await,
+        ) => {
+            let (email, skipped) = org_member_email(org_id, email).await?;
+            send_email_notification(&subject, &email, Some(text), html)
+                .await
+                .map(|resp| note_skipped(resp, &skipped))
+        }
         (RenderedMessage::Http { body }, DestinationType::Sns(aws_sns)) => {
             send_sns_notification(title, aws_sns, body).await
         }
         (RenderedMessage::Sns { subject, message }, DestinationType::Sns(aws_sns)) => {
             send_sns_notification(&subject, aws_sns, message).await
+        }
+        (RenderedMessage::Http { body }, DestinationType::SlackApp(target)) => {
+            crate::alerts::slack_publish::send_test_now(org_id, target, title, &body).await
         }
         (rendered, dest_type) => Err(anyhow::anyhow!(
             "Rendered message {rendered:?} does not match destination type {dest_type:?}"
@@ -3292,21 +3672,25 @@ pub(crate) async fn dispatch_test_message(
     }
 }
 
-async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
+pub(crate) async fn send_http_notification(
+    endpoint: &Endpoint,
+    msg: String,
+) -> Result<String, anyhow::Error> {
+    // A plain body posted at a Jira site root does nothing, so senders without a Jira branch fail.
+    if jira::is_jira(endpoint) {
+        return Err(send::SendError::Blocked(jira::UNSUPPORTED_SENDER.to_string()).into());
+    }
     // Block SSRF: validate the destination URL (including DNS resolution) before
     // making any outbound request. The client is built through `build_safe_destination_client`
     // so that redirect targets and per-connect DNS resolution are re-validated.
     if let Err(e) = SsrfGuard::validate_destination_url_with_config_async(&endpoint.url).await {
-        return Err(anyhow::anyhow!(
+        return Err(send::SendError::Blocked(format!(
             "Destination URL blocked by SSRF guard: {e}"
-        ));
+        ))
+        .into());
     }
 
-    let builder = if endpoint.skip_tls_verify {
-        reqwest::Client::builder().danger_accept_invalid_certs(true)
-    } else {
-        reqwest::Client::builder()
-    };
+    let builder = send::destination_client_builder(endpoint.skip_tls_verify);
     let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
     let build_req = |body: String| {
@@ -3423,21 +3807,17 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     send_outcome(resp_status, &resp_body, hide_body)
 }
 
-/// Send a multipart/alternative email.
+/// Send an email; with `text_body: None` it carries only the HTML part.
 ///
 /// Parameter order is `(text_body, html_body)` to MATCH
 /// `MultiPart::alternative_plain_html`, whose first argument is the plaintext
 /// part. Keeping the two orderings identical is deliberate: the failure mode of
 /// swapping them — HTML delivered as the plaintext part, so every alert email
 /// shows raw markup — is silent and customer-visible.
-///
-/// The custom-template path passes the SAME string for both, which reproduces
-/// exactly the MIME this function emitted when it took one `msg`. The
-/// Phase-1b renderers pass genuinely distinct parts.
 pub async fn send_email_notification(
     email_subject: &str,
     email: &Email,
-    text_body: String,
+    text_body: Option<String>,
     html_body: String,
 ) -> Result<String, anyhow::Error> {
     send_email_notification_with_inline_png(email_subject, email, text_body, html_body, None).await
@@ -3445,16 +3825,15 @@ pub async fn send_email_notification(
 
 /// [`send_email_notification`] plus an optional inline chart PNG.
 ///
-/// With a PNG the MIME becomes
-/// `alternative(plain, related(html, image))` — the HTML part references the
+/// With a PNG the MIME becomes `alternative(plain, related(html, image))`, or
+/// `related(html, image)` alone when `text_body` is `None` — the HTML part references the
 /// image as `cid:` ([`render::email::CHART_CONTENT_ID`]) and the bytes travel
 /// inside this same email, so the chart renders even in clients that block
-/// remote images and nothing is hosted anywhere. Without a PNG the MIME is
-/// byte-identical to what this function always emitted.
+/// remote images and nothing is hosted anywhere.
 pub async fn send_email_notification_with_inline_png(
     email_subject: &str,
     email: &Email,
-    text_body: String,
+    text_body: Option<String>,
     html_body: String,
     inline_png: Option<std::sync::Arc<Vec<u8>>>,
 ) -> Result<String, anyhow::Error> {
@@ -3476,26 +3855,7 @@ pub async fn send_email_notification_with_inline_png(
         email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
     }
 
-    let multipart = match inline_png {
-        None => MultiPart::alternative_plain_html(text_body, html_body),
-        Some(png) => MultiPart::alternative()
-            .singlepart(SinglePart::plain(text_body))
-            .multipart(
-                MultiPart::related()
-                    .singlepart(SinglePart::html(html_body))
-                    .singlepart(
-                        Attachment::new_inline(
-                            crate::alerts::notifications::render::email::CHART_CONTENT_ID
-                                .to_string(),
-                        )
-                        .body(
-                            png.as_ref().clone(),
-                            "image/png".parse().expect("static mime type"),
-                        ),
-                    ),
-            ),
-    };
-    let email = email.multipart(multipart).unwrap();
+    let email = with_email_body(email, text_body, html_body, inline_png)?;
 
     // Send the email
     match SMTP_CLIENT.as_ref().unwrap().send(email).await {
@@ -3504,26 +3864,53 @@ pub async fn send_email_notification_with_inline_png(
     }
 }
 
+/// Attach `alternative(plain, html)`, or the HTML alone when `text_body` is `None`.
+fn with_email_body(
+    builder: MessageBuilder,
+    text_body: Option<String>,
+    html_body: String,
+    inline_png: Option<std::sync::Arc<Vec<u8>>>,
+) -> Result<Message, lettre::error::Error> {
+    match (text_body, inline_png) {
+        (Some(text), None) => builder.multipart(MultiPart::alternative_plain_html(text, html_body)),
+        (Some(text), Some(png)) => builder.multipart(
+            MultiPart::alternative()
+                .singlepart(SinglePart::plain(text))
+                .multipart(html_with_inline_png(html_body, &png)),
+        ),
+        (None, None) => builder.singlepart(SinglePart::html(html_body)),
+        (None, Some(png)) => builder.multipart(html_with_inline_png(html_body, &png)),
+    }
+}
+
+fn html_with_inline_png(html_body: String, png: &[u8]) -> MultiPart {
+    MultiPart::related()
+        .singlepart(SinglePart::html(html_body))
+        .singlepart(
+            Attachment::new_inline(
+                crate::alerts::notifications::render::email::CHART_CONTENT_ID.to_string(),
+            )
+            .body(png.to_vec(), "image/png".parse().expect("static mime type")),
+        )
+}
+
 /// Discord webhook send with the chart PNG uploaded in the same request
 /// (multipart: `payload_json` + one file part). The embed references the
 /// image as `attachment://` ([`render::discord::CHART_ATTACHMENT_NAME`]), so
 /// no URL fetch is involved anywhere — true zero-storage delivery. Same SSRF
 /// guard discipline as `send_http_notification`.
-async fn send_discord_with_attachment(
+pub(crate) async fn send_discord_with_attachment(
     endpoint: &Endpoint,
     msg: String,
     png: std::sync::Arc<Vec<u8>>,
 ) -> Result<String, anyhow::Error> {
     if let Err(e) = SsrfGuard::validate_destination_url_with_config_async(&endpoint.url).await {
-        return Err(anyhow::anyhow!(
+        return Err(send::SendError::Blocked(format!(
             "Destination URL blocked by SSRF guard: {e}"
-        ));
+        ))
+        .into());
     }
-    let builder = if endpoint.skip_tls_verify {
-        reqwest::Client::builder().danger_accept_invalid_certs(true)
-    } else {
-        reqwest::Client::builder()
-    };
+    let builder = send::destination_client_builder(endpoint.skip_tls_verify);
     let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
 
@@ -3562,12 +3949,15 @@ fn send_outcome(
     match (status.is_success(), hide_body) {
         (true, false) => Ok(format!("sent status: {status}, body: {body}")),
         (true, true) => Ok(format!("sent status: {status}")),
-        (false, false) => Err(anyhow::anyhow!("sent error status: {status}, err: {body}")),
-        (false, true) => Err(anyhow::anyhow!("sent error status: {status}")),
+        (false, hide) => Err(send::SendError::Rejected {
+            status,
+            body: (!hide).then(|| body.to_string()),
+        }
+        .into()),
     }
 }
 
-async fn send_sns_notification(
+pub(crate) async fn send_sns_notification(
     alert_name: &str,
     aws_sns: &AwsSns,
     msg: String,
@@ -3710,22 +4100,8 @@ fn process_row_templates_plain(
                 }
             }
         }
-        let alert_start_time_str = if alert_start_time > 0 {
-            Local
-                .timestamp_nanos(alert_start_time * 1000)
-                .format("%Y-%m-%dT%H:%M:%S")
-                .to_string()
-        } else {
-            String::from("N/A")
-        };
-        let alert_end_time_str = if alert_end_time > 0 {
-            Local
-                .timestamp_nanos(alert_end_time * 1000)
-                .format("%Y-%m-%dT%H:%M:%S")
-                .to_string()
-        } else {
-            String::from("N/A")
-        };
+        let alert_start_time_str = format_alert_time(alert_start_time);
+        let alert_end_time_str = format_alert_time(alert_end_time);
 
         let (stream_type_var, stream_name_var) =
             (alert.stream_type.as_str(), alert.stream_name.as_str());
@@ -3957,6 +4333,13 @@ async fn build_notification_context(
             alert.trigger_condition.warning_threshold.map(|w| w as f64),
         )
     };
+    let family_operator = if let Some(agg) = alert.query_condition.aggregation.as_ref() {
+        agg.having.operator.to_string()
+    } else if let Some(pc) = alert.query_condition.promql_condition.as_ref() {
+        pc.operator.to_string()
+    } else {
+        alert.trigger_condition.operator.to_string()
+    };
     let mut vars = HashMap::with_capacity(rows.len());
     for row in rows.iter() {
         for (key, value) in row.iter() {
@@ -3987,30 +4370,9 @@ async fn build_notification_context(
         use_given_time,
     );
 
-    let alert_start_time_str = if alert_start_time > 0 {
-        Local
-            .timestamp_nanos(alert_start_time * 1000)
-            .format("%Y-%m-%dT%H:%M:%S")
-            .to_string()
-    } else {
-        String::from("N/A")
-    };
-    let alert_end_time_str = if alert_end_time > 0 {
-        Local
-            .timestamp_nanos(alert_end_time * 1000)
-            .format("%Y-%m-%dT%H:%M:%S")
-            .to_string()
-    } else {
-        String::from("N/A")
-    };
-    let evaluation_timestamp_str = if evaluation_timestamp > 0 {
-        Local
-            .timestamp_nanos(evaluation_timestamp * 1000)
-            .format("%Y-%m-%dT%H:%M:%S")
-            .to_string()
-    } else {
-        String::from("N/A")
-    };
+    let alert_start_time_str = format_alert_time(alert_start_time);
+    let alert_end_time_str = format_alert_time(alert_end_time);
+    let evaluation_timestamp_str = format_alert_time(evaluation_timestamp);
 
     let alert_type = if alert.is_real_time {
         "realtime"
@@ -4069,6 +4431,8 @@ async fn build_notification_context(
             // link must not cost a notification either way.
             None => String::new(),
         }
+    } else if alert.stream_type == StreamType::Traces {
+        traces_alert_url(&cfg, alert, alert_start_time, alert_end_time)
     } else {
         match alert.query_condition.query_type {
             QueryType::SQL => {
@@ -4128,6 +4492,8 @@ async fn build_notification_context(
         stream_type: alert.stream_type.as_str().to_string(),
         stream_name: alert.stream_name.clone(),
         alert_name: alert.name.clone(),
+        alert_id: alert.id.map(|id| id.to_string()).unwrap_or_default(),
+        incident_id: String::new(),
         alert_type: alert_type.to_string(),
         alert_period: alert.trigger_condition.period.to_string(),
         alert_operator: alert.trigger_condition.operator.to_string(),
@@ -4153,7 +4519,13 @@ async fn build_notification_context(
             crate::alerts::notifications::STATUS_FIRING
         }
         .to_string(),
+        event: if resolved {
+            config::meta::alerts::notification_kind::NotificationEvent::Resolved
+        } else {
+            config::meta::alerts::notification_kind::NotificationEvent::Firing
+        },
         episode_id,
+        recovery_reason: String::new(),
         alert_priority: alert.priority.map(|p| p.to_string()).unwrap_or_default(),
         alert_tags: alert.tags.join(","),
         alert_threshold_crit: if alert.query_condition.promql_rule_mode {
@@ -4162,6 +4534,7 @@ async fn build_notification_context(
             fmt_observed(family_crit)
         },
         alert_threshold_warn: family_warn.map(fmt_observed).unwrap_or_default(),
+        alert_threshold_operator: family_operator,
         alert_start_time: alert_start_time_str,
         alert_end_time: alert_end_time_str,
         alert_start_time_millis: epoch_millis_or_na(alert_start_time),
@@ -4199,7 +4572,32 @@ async fn build_notification_context(
         level,
         chart_url: None,
         chart_png: None,
+        cluster_name: config::get_cluster_name(),
+        ..Default::default()
     }
+}
+
+fn traces_alert_url(cfg: &config::Config, alert: &Alert, start_time: i64, end_time: i64) -> String {
+    let mut url = format!(
+        "{}{}/web/traces?stream={}&from={}&to={}&org_identifier={}&tab=spans",
+        cfg.common.web_url,
+        cfg.common.base_uri,
+        alert.stream_name,
+        start_time,
+        end_time,
+        alert.org_id
+    );
+    // The traces page takes a filter expression in `query`, not SQL, so only the WHERE is carried.
+    if alert.query_condition.query_type == QueryType::SQL
+        && let Some(sql) = &alert.query_condition.sql
+    {
+        let where_clause = config::meta::sql::extract_where(sql).where_clause;
+        if !where_clause.is_empty() {
+            url.push_str("&query=");
+            url.push_str(&base64::encode_url(&where_clause));
+        }
+    }
+    url
 }
 pub fn get_row_column_map(rows: &[Map<String, Value>]) -> HashMap<String, HashSet<String>> {
     let mut vars = HashMap::with_capacity(rows.len());
@@ -4313,6 +4711,17 @@ pub fn get_alert_start_end_time(
     }
     (alert_start_time, alert_end_time)
 }
+
+pub fn format_alert_time(micros: i64) -> String {
+    if micros > 0 {
+        Local
+            .timestamp_nanos(micros * 1000)
+            .format("%Y-%m-%dT%H:%M:%S")
+            .to_string()
+    } else {
+        String::from("N/A")
+    }
+}
 fn format_agg_value(actual_value: Option<f64>) -> String {
     actual_value.map(|v| v.to_string()).unwrap_or_default()
 }
@@ -4324,6 +4733,22 @@ pub(super) fn to_float(val: &Value) -> f64 {
         val.as_str().unwrap_or_default().parse().unwrap_or_default()
     }
 }
+
+/// Alert folders the user may list, whatever `list_only_permitted` says; `None` is every folder.
+#[cfg(feature = "enterprise")]
+pub async fn listable_alert_folders(
+    org_id: &str,
+    user_id: &str,
+) -> Result<Option<Vec<String>>, AlertError> {
+    let folder_type = o2_openfga::meta::mapping::OFGA_MODELS
+        .get("alert_folders")
+        .map_or("afolder", |model| model.key);
+    let objects = db::authz::list_permitted_objects(org_id, user_id, "LIST", folder_type)
+        .await
+        .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?;
+    Ok(objects.and_then(|objects| listable_folder_ids(org_id, &objects)))
+}
+
 #[cfg(not(feature = "enterprise"))]
 pub async fn permitted_alerts(
     _org_id: &str,
@@ -4381,6 +4806,7 @@ pub async fn permitted_alerts(
                 use_self_context: false,
                 use_self_parent: true,
                 auth: "".to_string(), // We don't need to pass the auth token here.
+                feature: None,
             },
             user_role,
             false,
@@ -4398,7 +4824,7 @@ pub async fn permitted_alerts(
     // to see the dashboard. This is used to check if the user has permission to see a specific
     // dashboard.
 
-    let permitted_objects = crate::authz::list_objects_for_user(
+    let mut permitted_objects = crate::authz::list_objects_for_user(
         org_id,
         user_id,
         "GET_INDIVIDUAL_FROM_ROLE",
@@ -4406,6 +4832,29 @@ pub async fn permitted_alerts(
     )
     .await
     .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?;
+
+    // GET_INDIVIDUAL_FROM_ROLE ignores parents, so a read across folders must add folder grants.
+    if folder_id.is_none()
+        && let Some(objects) = permitted_objects.as_mut()
+    {
+        let folder_objects = |permission| {
+            crate::authz::list_objects_for_user(
+                org_id,
+                user_id,
+                permission,
+                OFGA_MODELS.get("alert_folders").unwrap().key,
+            )
+        };
+        let readable = folder_objects("GET")
+            .await
+            .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?
+            .unwrap_or_default();
+        let listable = folder_objects("LIST")
+            .await
+            .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?
+            .unwrap_or_default();
+        objects.extend(readable_folder_grants(org_id, readable, &listable));
+    }
 
     Ok(permitted_objects)
 }
@@ -4534,6 +4983,7 @@ mod threshold_validation_tests {
                 operator: config::meta::alerts::Operator::GreaterThan,
                 value: json!(90),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: None,
             multi_alert: true,
@@ -4553,6 +5003,7 @@ mod threshold_validation_tests {
             operator: config::meta::alerts::Operator::GreaterThan,
             value: json!(10),
             ignore_case: false,
+            case_insensitive: None,
         });
         alert.query_condition.promql_multi_alert = true;
         alert.trigger_condition.operator = config::meta::alerts::Operator::GreaterThanEquals;
@@ -4681,37 +5132,14 @@ mod threshold_validation_tests {
         assert!(validate_rules(&alert).is_ok());
     }
 
-    /// §5.5: alert-level notification grouping would collapse per-group pages
-    /// back into one batch — rejected at save time, never silently rerouted.
     #[test]
-    fn test_multi_alert_rejects_notification_grouping() {
-        let mut alert = multi_alert_fixture();
-        alert.deduplication = Some(config::meta::alerts::deduplication::DeduplicationConfig {
-            enabled: true,
-            grouping: Some(config::meta::alerts::deduplication::GroupingConfig {
-                enabled: true,
-                ..serde_json::from_str("{}").expect("GroupingConfig defaults")
-            }),
-            ..Default::default()
+    fn test_multi_alert_with_a_stored_grouping_object_loads_and_validates() {
+        let mut stored = serde_json::to_value(multi_alert_fixture()).unwrap();
+        stored["deduplication"] = json!({
+            "enabled": true,
+            "grouping": {"enabled": true, "max_group_size": 10, "group_wait_seconds": 30}
         });
-
-        let err = validate_rules(&alert).unwrap_err();
-        assert!(matches!(
-            err,
-            AlertError::InvalidMultiAlert(
-                config::meta::alerts::grouping::MultiAlertError::NotificationGroupingUnsupported
-            )
-        ));
-
-        // Grouping configured but DISABLED must stay valid.
-        alert
-            .deduplication
-            .as_mut()
-            .unwrap()
-            .grouping
-            .as_mut()
-            .unwrap()
-            .enabled = false;
+        let alert: Alert = serde_json::from_value(stored).expect("legacy grouping must still load");
         assert!(validate_rules(&alert).is_ok());
     }
 
@@ -4767,19 +5195,232 @@ mod threshold_validation_tests {
 }
 
 #[cfg(test)]
+mod group_by_validation_tests {
+    use std::sync::Arc;
+
+    use arrow_schema::{DataType, Field, Schema};
+    use config::{
+        meta::alerts::{AggFunction, Aggregation, Condition, Operator, QueryType, alert::Alert},
+        utils::json::json,
+    };
+    use datafusion::{
+        common::{DFSchema, unqualified_field_not_found},
+        datasource::MemTable,
+        error::DataFusionError,
+        prelude::SessionContext,
+    };
+
+    use super::{AlertError, multi_alert_plan_error, validate_custom_group_by};
+
+    fn schema() -> Schema {
+        Schema::new(vec![
+            Field::new("host", DataType::Utf8, false),
+            Field::new("latency", DataType::Int64, false),
+        ])
+    }
+
+    fn custom_alert(group_by: &[&str]) -> Alert {
+        let mut alert = Alert::default();
+        alert.query_condition.query_type = QueryType::Custom;
+        alert.query_condition.aggregation = Some(Aggregation {
+            group_by: Some(group_by.iter().map(|s| s.to_string()).collect()),
+            function: AggFunction::Avg,
+            having: Condition {
+                column: "latency".into(),
+                operator: Operator::GreaterThan,
+                value: json!(100),
+                ignore_case: false,
+                case_insensitive: None,
+            },
+            warning_value: None,
+            multi_alert: false,
+        });
+        alert
+    }
+
+    #[test]
+    fn test_group_by_columns_in_the_schema_pass() {
+        assert!(validate_custom_group_by("svc", &schema(), &custom_alert(&["host"])).is_ok());
+        assert!(validate_custom_group_by("svc", &schema(), &custom_alert(&[])).is_ok());
+        assert!(validate_custom_group_by("svc", &schema(), &Alert::default()).is_ok());
+    }
+
+    #[test]
+    fn test_group_by_column_outside_the_schema_is_rejected_and_named() {
+        let alert = custom_alert(&["host", "host, (SELECT 1)"]);
+        let err = validate_custom_group_by("svc", &schema(), &alert).unwrap_err();
+        assert!(matches!(
+            &err,
+            AlertError::GroupByColumnNotFound { column, stream_name }
+                if column == "host, (SELECT 1)" && stream_name == "svc"
+        ));
+        assert_eq!(
+            err.to_string(),
+            "Group by column host, (SELECT 1) not found on stream svc"
+        );
+        let response = axum::response::Response::from(err);
+        assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_sql_alerts_derive_group_by_elsewhere_and_are_not_checked_here() {
+        let mut alert = custom_alert(&["nonexistent"]);
+        alert.query_condition.query_type = QueryType::SQL;
+        assert!(validate_custom_group_by("svc", &schema(), &alert).is_ok());
+    }
+
+    fn assert_names_missing_field(err: AlertError) {
+        assert!(matches!(
+            &err,
+            AlertError::FieldNotFound { field, stream_name }
+                if field == "feature_name" && stream_name == "svc"
+        ));
+        assert_eq!(
+            err.to_string(),
+            "Stream svc has no field feature_name yet. Alerts can only use fields that exist in the stream."
+        );
+        let response = axum::response::Response::from(err);
+        assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_a_missing_field_is_named_not_quoted_from_the_planner() {
+        let err = unqualified_field_not_found("feature_name", &DFSchema::empty());
+        assert_names_missing_field(multi_alert_plan_error("svc", err.into()));
+        // Wrapped by the planner, the field is still found.
+        let err = unqualified_field_not_found("feature_name", &DFSchema::empty()).context("plan");
+        assert_names_missing_field(multi_alert_plan_error("svc", err.into()));
+    }
+
+    #[tokio::test]
+    async fn test_a_query_planned_on_a_missing_column_names_the_field() {
+        let ctx = SessionContext::new();
+        let table = MemTable::try_new(Arc::new(schema()), vec![vec![]]).unwrap();
+        ctx.register_table("svc", Arc::new(table)).unwrap();
+        let err = ctx
+            .state()
+            .create_logical_plan(
+                "SELECT feature_name, SUM(latency) AS spent FROM \"svc\" \
+                 WHERE feature_name = 'x' GROUP BY feature_name",
+            )
+            .await
+            .unwrap_err();
+        assert_names_missing_field(multi_alert_plan_error("svc", err.into()));
+    }
+
+    #[test]
+    fn test_other_planner_errors_stay_grouping_errors() {
+        let err = DataFusionError::Plan("bad".into());
+        assert!(matches!(
+            multi_alert_plan_error("svc", err.into()),
+            AlertError::MultiAlertGroupingError(msg) if msg.contains("bad")
+        ));
+    }
+}
+
+#[cfg(test)]
 mod send_path_tests {
     use config::meta::destinations::{Endpoint, HTTPType, Template, TemplateKind};
 
     #[cfg(feature = "enterprise")]
-    use super::incident_path_notified;
+    use super::is_license_denial;
     use super::{
-        Alert, AlertError, AlertExt, NotificationOutcome, all_workflows_failed, choose_template,
-        has_delivery_target, send_attempted, send_discord_with_attachment, send_http_notification,
+        Alert, AlertError, AlertExt, NotificationOutcome, WORKFLOWS_UNLICENSED_REASON,
+        all_workflows_failed, all_workflows_failed_error, choose_template, has_delivery_target,
+        send_attempted, send_discord_with_attachment, send_error_message, send_failure_message,
+        send_http_notification, workflows_denial_as_warning,
     };
+    #[cfg(feature = "enterprise")]
+    use super::{incident_path_notified, incident_path_paged};
     use crate::{
         alerts::notifications::platform::{Platform, send_resolve},
-        ssrf_test_support::{isolated, secret_server, truncated_server},
+        ssrf_test_support::{hanging_server, isolated, secret_server, truncated_server},
     };
+
+    #[test]
+    fn all_failed_workflows_report_the_license_only_when_it_refused_them() {
+        let denied = all_workflows_failed_error(2, 2, "ignored".to_string());
+        assert!(matches!(&denied, AlertError::FeatureNotLicensed(f) if f == "workflows"));
+        assert_eq!(denied.to_string(), WORKFLOWS_UNLICENSED_REASON);
+
+        let failed = all_workflows_failed_error(0, 2, "timed out".to_string());
+        assert!(matches!(failed, AlertError::SendNotificationError { .. }));
+    }
+
+    #[test]
+    fn a_real_workflow_failure_beside_a_denial_is_kept_and_stays_retryable() {
+        let mixed = all_workflows_failed_error(1, 2, "workflow a timed out".to_string());
+        assert!(
+            matches!(&mixed, AlertError::SendNotificationError { error_message } if error_message == "workflow a timed out")
+        );
+    }
+
+    #[test]
+    fn a_send_error_message_never_leads_with_a_separator() {
+        let denial = format!(" {WORKFLOWS_UNLICENSED_REASON}");
+        assert_eq!(send_error_message("", &denial), WORKFLOWS_UNLICENSED_REASON);
+        assert_eq!(
+            send_error_message(" Error a;", &denial),
+            format!("Error a; {WORKFLOWS_UNLICENSED_REASON}")
+        );
+        assert_eq!(send_error_message("", ""), "");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn the_workflow_gate_error_is_classified_as_a_license_denial() {
+        let denied = crate::workflows::require_workflows_license(false).unwrap_err();
+        assert!(is_license_denial(&denied));
+        assert!(!is_license_denial(&anyhow::anyhow!("workflow timed out")));
+    }
+
+    #[tokio::test]
+    async fn a_denial_is_a_warning_only_when_the_trigger_reached_someone() {
+        async fn only_a_denial_asks() -> bool {
+            panic!("reached_someone must not be awaited unless the workflows were denied")
+        }
+        let denial = || Err(all_workflows_failed_error(1, 1, String::new()));
+
+        let warned = workflows_denial_as_warning(denial(), async { true })
+            .await
+            .unwrap();
+        assert_eq!(warned.error_message, WORKFLOWS_UNLICENSED_REASON);
+        assert!(warned.attempted);
+
+        assert!(matches!(
+            workflows_denial_as_warning(denial(), async { false }).await,
+            Err(AlertError::FeatureNotLicensed(_))
+        ));
+
+        let delivery_failure = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        assert!(matches!(
+            workflows_denial_as_warning(delivery_failure, only_a_denial_asks()).await,
+            Err(AlertError::SendNotificationError { .. })
+        ));
+
+        let sent =
+            workflows_denial_as_warning(Ok(NotificationOutcome::default()), only_a_denial_asks())
+                .await
+                .unwrap();
+        assert!(sent.error_message.is_empty());
+    }
+
+    #[test]
+    fn history_quotes_a_license_denial_without_calling_it_a_send_error() {
+        assert_eq!(
+            send_failure_message(&all_workflows_failed_error(1, 1, String::new())),
+            WORKFLOWS_UNLICENSED_REASON
+        );
+        let failed = AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        };
+        assert_eq!(
+            send_failure_message(&failed),
+            "error sending notification for alert: http 500"
+        );
+    }
 
     #[test]
     fn skipped_incident_destinations_do_not_hide_total_workflow_failure() {
@@ -4983,6 +5624,32 @@ mod send_path_tests {
     }
 
     #[test]
+    fn a_destination_that_never_answers_fails_at_the_notification_timeout() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_destination_that_never_answers_fails_at_the_notification_timeout"
+            ),
+            &[
+                ("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32"),
+                ("ZO_ALERT_NOTIFICATION_TIMEOUT", "1"),
+            ],
+            || async {
+                let base = hanging_server().await;
+                let limit = std::time::Duration::from_secs(10);
+                let hanging = endpoint(&base, "/hang");
+                let http = send_http_notification(&hanging, "{}".into());
+                let http = tokio::time::timeout(limit, http).await;
+                assert!(http.expect("the HTTP send has no limit").is_err());
+                let png = std::sync::Arc::new(vec![0u8; 8]);
+                let discord = send_discord_with_attachment(&hanging, "{}".into(), png);
+                let discord = tokio::time::timeout(limit, discord).await;
+                assert!(discord.expect("the multipart send has no limit").is_err());
+            },
+        );
+    }
+
+    #[test]
     fn a_destination_only_the_allowlist_admits_shows_the_caller_its_status_only() {
         isolated(
             concat!(
@@ -5104,6 +5771,23 @@ mod send_path_tests {
 
     #[cfg(feature = "enterprise")]
     #[test]
+    fn a_firing_after_reopen_skips_destinations_but_still_pages() {
+        use config::meta::alerts::incidents::IncidentCorrelationOutcome as Outcome;
+
+        let outcome = Outcome::FiredAfterReopen {
+            incident_id: "i1".to_string(),
+            service_name: "svc".to_string(),
+        };
+        assert!(incident_path_notified(&outcome));
+        assert!(!incident_path_paged(&outcome));
+        assert!(!incident_path_paged(&Outcome::ExistingAlertRepeated {
+            incident_id: "i1".to_string(),
+            service_name: "svc".to_string(),
+        }));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
     fn outcomes_that_really_notify_still_suppress_the_duplicate() {
         use config::meta::alerts::incidents::IncidentCorrelationOutcome as Outcome;
 
@@ -5130,11 +5814,256 @@ mod send_path_tests {
 }
 
 #[cfg(test)]
+mod folder_grant_tests {
+    use super::*;
+
+    fn strings(values: &[&str]) -> Vec<String> {
+        values.iter().map(|v| v.to_string()).collect()
+    }
+
+    #[test]
+    fn test_folder_grant_needs_both_get_and_list() {
+        let granted = readable_folder_grants(
+            "o",
+            strings(&["afolder:a", "afolder:b"]),
+            &strings(&["afolder:b", "afolder:c"]),
+        );
+        assert_eq!(granted, strings(&["afolder:b"]));
+    }
+
+    #[test]
+    fn test_org_wide_folder_grant_becomes_the_all_alerts_grant() {
+        let all = strings(&["afolder:_all_o"]);
+        let granted = readable_folder_grants("o", all.clone(), &all);
+        assert!(granted.contains(&"alert:_all_o".to_string()));
+    }
+
+    #[test]
+    fn test_listable_folders_are_the_granted_folder_ids() {
+        let listable = listable_folder_ids("o", &strings(&["afolder:a", "afolder:b"]));
+        assert_eq!(listable, Some(strings(&["a", "b"])));
+    }
+
+    #[test]
+    fn test_org_wide_list_grant_leaves_folders_unrestricted() {
+        let listable = listable_folder_ids("o", &strings(&["afolder:a", "afolder:_all_o"]));
+        assert_eq!(listable, None);
+    }
+
+    #[test]
+    fn test_no_list_grant_lists_no_folder() {
+        assert_eq!(listable_folder_ids("o", &[]), Some(vec![]));
+        let other_org = listable_folder_ids("o", &strings(&["afolder:_all_other"]));
+        assert_eq!(other_org, Some(strings(&["_all_other"])));
+    }
+
+    #[test]
+    fn test_folder_grant_passes_only_that_folders_alerts() {
+        let folder = |folder_id: &str| Folder {
+            folder_id: folder_id.to_string(),
+            ..Default::default()
+        };
+        let permissions = strings(&["afolder:mine"]);
+        assert!(is_alert_permitted(
+            &folder("mine"),
+            &Alert::default(),
+            &permissions
+        ));
+        assert!(!is_alert_permitted(
+            &folder("other"),
+            &Alert::default(),
+            &permissions
+        ));
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use arrow_schema::DataType;
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn a_failed_send_keeps_its_text_and_hides_the_body_when_asked() {
+        let status = reqwest::StatusCode::INTERNAL_SERVER_ERROR;
+        let shown = send_outcome(status, "boom", false).unwrap_err();
+        assert_eq!(
+            shown.to_string(),
+            "sent error status: 500 Internal Server Error, err: boom"
+        );
+        let hidden = send_outcome(status, "boom", true).unwrap_err();
+        assert_eq!(
+            hidden.to_string(),
+            "sent error status: 500 Internal Server Error"
+        );
+        let Some(send::SendError::Rejected { status: got, body }) =
+            hidden.downcast_ref::<send::SendError>()
+        else {
+            panic!("a rejected send keeps its status");
+        };
+        assert_eq!(*got, status);
+        assert!(body.is_none());
+    }
+
+    #[tokio::test]
+    async fn a_multi_alert_with_recovery_saves() {
+        let mut alert = Alert::default();
+        alert.notify_on_recovery = true;
+        alert.query_condition.query_type = QueryType::PromQL;
+        alert.query_condition.promql_multi_alert = true;
+        assert!(validate_recovery_templates("default", &alert).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn a_recovery_destination_this_org_lacks_is_refused() {
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org = format!("recovery_targets_{}", config::utils::time::now_micros());
+        crate::common::infra::config::DESTINATIONS.insert(
+            format!("{org}/real"),
+            config::meta::destinations::Destination {
+                org_id: org.clone(),
+                name: "real".into(),
+                module: Module::Alert {
+                    template: None,
+                    destination_type: DestinationType::Http(Endpoint::default()),
+                },
+                ..Default::default()
+            },
+        );
+        let recovering_to = |dest: &str| {
+            let mut alert = Alert::default();
+            alert.notify_on_recovery = true;
+            alert.recovery_destinations = vec![dest.to_string()];
+            alert
+        };
+
+        assert_eq!(
+            validate_recovery_templates(&org, &recovering_to("nope"))
+                .await
+                .map_err(|e| e.to_string()),
+            Err("Alert destination nope not found".to_string())
+        );
+        assert!(
+            validate_recovery_templates(&org, &recovering_to("real"))
+                .await
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn only_turning_an_alert_back_on_resets_it() {
+        assert!(re_enables(Some(false), true));
+        assert!(!re_enables(Some(true), false));
+        assert!(!re_enables(Some(true), true));
+        assert!(!re_enables(Some(false), false));
+        assert!(!re_enables(None, true), "a new alert has nothing to reset");
+    }
+
+    #[tokio::test]
+    async fn re_enabling_drops_every_state_row_and_keeps_the_history() {
+        use config::meta::{
+            alerts::{level::AlertLevel, state::ROLLUP_GROUP_KEY},
+            self_reporting::usage::RunOutcome,
+        };
+        use svix_ksuid::KsuidLike;
+
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org = format!("re_enable_reset_{}", config::utils::time::now_micros());
+        let folder = Folder {
+            folder_id: "default".to_string(),
+            name: "default".to_string(),
+            ..Default::default()
+        };
+        infra::table::folders::get_or_create(&org, folder, FolderType::Alerts)
+            .await
+            .unwrap();
+        let mut alert = Alert::default();
+        alert.org_id = org.clone();
+        alert.name = "re_enable_reset".to_string();
+        alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+        let alert = infra::table::alerts::create(
+            infra::db::get_orm_client_rw().await,
+            &org,
+            "default",
+            alert,
+            false,
+        )
+        .await
+        .unwrap();
+        let alert_id = alert.id.unwrap().to_string();
+        for key in [ROLLUP_GROUP_KEY, "host=a"] {
+            let mut update = config::meta::alerts::state::apply_outcome(
+                &alert_id,
+                key,
+                None,
+                RunOutcome::Firing,
+                Some(AlertLevel::Critical),
+                1_000,
+            );
+            if let Some(state) = update.state.as_mut() {
+                state.episode_id = Some(format!("ep-{key}"));
+            }
+            db::alerts::alert_states::persist(&update, None)
+                .await
+                .unwrap();
+        }
+
+        reset_run_state(&org, &alert_id, db::scheduler::TriggerModule::Alert)
+            .await
+            .unwrap();
+
+        assert!(
+            infra::table::alert_states::get(&alert_id, ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            infra::table::alert_states::list_groups(&alert_id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        let history = infra::table::alert_states::list_transitions(&alert_id, 10)
+            .await
+            .unwrap();
+        assert_eq!(history.len(), 2, "the transition log outlives the reset");
+    }
+
+    #[test]
+    fn email_body_is_html_only_without_text() {
+        let builder = || {
+            Message::builder()
+                .from("o2@example.com".parse().unwrap())
+                .to("on-call@example.com".parse().unwrap())
+                .subject("s")
+        };
+        let html = "<p>hi</p>".to_string();
+        let html_only = with_email_body(builder(), None, html.clone(), None).unwrap();
+        let html_only = String::from_utf8(html_only.formatted()).unwrap();
+        assert!(!html_only.contains("text/plain"));
+        assert!(!html_only.contains("multipart/alternative"));
+        assert!(html_only.contains("text/html"));
+
+        let both = with_email_body(builder(), Some("hi".into()), html, None).unwrap();
+        let both = String::from_utf8(both.formatted()).unwrap();
+        assert!(both.contains("multipart/alternative"));
+        assert!(both.contains("text/plain"));
+        assert!(both.contains("text/html"));
+    }
 
     #[test]
     fn test_with_incident_notify_error() {
@@ -5365,6 +6294,7 @@ mod tests {
             operator: Operator::Contains,
             value: json!("enrique"),
             ignore_case: false,
+            case_insensitive: None,
         };
         let sql = build_expr(&condition, "", &DataType::Utf8).unwrap();
         assert_eq!(sql, "str_match(\"auth_username\", 'enrique')");
@@ -7415,6 +8345,7 @@ mod tests {
                 operator: config::meta::alerts::Operator::GreaterThanEquals,
                 value: json!(85.5),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: Some(70.0),
             multi_alert: false,
@@ -7793,6 +8724,7 @@ mod tests {
             operator: config::meta::alerts::Operator::LessThanEquals,
             value: json!(7),
             ignore_case: false,
+            case_insensitive: None,
         });
         alert.query_condition.promql = Some(
             "((disk_used) >= 0.9) * 0 or clamp_min(ceil((0.9 - (disk_used)) / (deriv((disk_used)[2d:15m]) > 0) / 8640 - 1e-6) / 10, 0) or ((disk_used) * 0 + 36500)".into(),
@@ -8284,6 +9216,7 @@ mod tests {
             name: "db upgrade".to_string(),
             ends_at: 0,
             incident_mode: Default::default(),
+            ..Default::default()
         });
         assert_eq!(
             suppressed.response_message(),
@@ -8294,6 +9227,16 @@ mod tests {
             error_message: String::new(),
         };
         assert_eq!(sent.response_message(), "Alert triggered");
+        assert_eq!(sent.warning(), None);
+        assert_eq!(suppressed.warning(), None);
+        let partial = ManualTrigger::Sent {
+            success_message: String::new(),
+            error_message: "not paged: On-Call is not included in your license".to_string(),
+        };
+        assert_eq!(
+            partial.warning(),
+            Some("not paged: On-Call is not included in your license")
+        );
     }
 
     #[test]
@@ -8375,6 +9318,7 @@ mod tests {
                 operator: config::meta::alerts::Operator::GreaterThanEquals,
                 value: json!(85.5),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: None,
             multi_alert: false,
@@ -8434,6 +9378,138 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn prepare_alert_checks_a_joined_stream_range_by_its_own_type() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_alert_save_join_range";
+        let logs_key = format!("{org_id}/{}/app", StreamType::Logs);
+        let traces_key = format!("{org_id}/{}/spans", StreamType::Traces);
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            logs_key.clone(),
+            SchemaCache::new(arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+                "id",
+                DataType::Utf8,
+                true,
+            )])),
+        );
+        let settings = config::meta::stream::StreamSettings {
+            max_query_range: 1,
+            ..Default::default()
+        };
+        infra::schema::put_stream_settings_batch(vec![(
+            traces_key.clone(),
+            std::sync::Arc::new(settings),
+        )])
+        .await;
+
+        let mut alert = Alert::default();
+        alert.trigger_condition.frequency = 60;
+        alert.trigger_condition.period = 120;
+        alert.query_condition.query_type = QueryType::SQL;
+        alert.query_condition.sql = Some(
+            r#"SELECT a.id FROM "app" AS a JOIN "traces"."spans" AS b ON a.id = b.id"#.to_string(),
+        );
+        let res = prepare_alert(org_id, "app", "join", &mut alert, true, false).await;
+
+        STREAM_SCHEMAS_LATEST.write().await.remove(&logs_key);
+        infra::schema::remove_stream_settings(&traces_key).await;
+
+        assert!(
+            matches!(
+                &res,
+                Err(AlertError::PeriodExceedsMaxQueryRange { stream_name, .. }) if stream_name == "spans"
+            ),
+            "{res:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_rejects_an_extended_operator_outside_the_condition_tree() {
+        use config::meta::alerts::{AggFunction, Aggregation, Condition};
+
+        let cond = |operator| Condition {
+            column: "v".to_string(),
+            operator,
+            value: serde_json::json!(1),
+            ignore_case: false,
+            case_insensitive: None,
+        };
+        let err = prepare_schedule(|a| a.trigger_condition.operator = Operator::In).await;
+        assert!(
+            matches!(&err, AlertError::InvalidCondition(m) if m.contains("trigger condition")),
+            "{err:?}"
+        );
+        let err = prepare_schedule(|a| {
+            a.query_condition.promql_condition = Some(cond(Operator::ReMatch));
+        })
+        .await;
+        assert!(
+            matches!(&err, AlertError::InvalidCondition(m) if m.contains("PromQL condition")),
+            "{err:?}"
+        );
+        let err = prepare_schedule(|a| {
+            a.query_condition.aggregation = Some(Aggregation {
+                group_by: None,
+                function: AggFunction::Count,
+                having: cond(Operator::StartsWith),
+                warning_value: None,
+                multi_alert: false,
+            });
+        })
+        .await;
+        assert!(
+            matches!(&err, AlertError::InvalidCondition(m) if m.contains("aggregation having")),
+            "{err:?}"
+        );
+        let err = prepare_schedule(|a| {
+            a.trigger_condition.frequency = 60;
+            a.query_condition.promql_condition = Some(cond(Operator::GreaterThan));
+        })
+        .await;
+        assert!(!matches!(err, AlertError::InvalidCondition(_)), "{err:?}");
+    }
+
+    fn with_condition_operator(alert: &mut Alert, operator: &str) {
+        alert.query_condition.conditions = Some(
+            serde_json::from_value(serde_json::json!({"version": 2, "conditions": {
+                "filterType": "group", "logicalOperator": "AND", "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": operator,
+                     "value": ["error"], "logicalOperator": "AND"}]}}))
+            .unwrap(),
+        );
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_accepts_an_in_condition() {
+        let err = prepare_schedule(|a| {
+            a.trigger_condition.frequency = 60;
+            with_condition_operator(a, "in");
+        })
+        .await;
+        assert!(!matches!(err, AlertError::InvalidCondition(_)), "{err:?}");
+    }
+
+    fn with_case_insensitive_contains(alert: &mut Alert) {
+        alert.query_condition.conditions = Some(
+            serde_json::from_value(serde_json::json!({"version": 2, "conditions": {
+                "filterType": "group", "logicalOperator": "AND", "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": "contains",
+                     "value": "err", "case_insensitive": true, "logicalOperator": "AND"}]}}))
+            .unwrap(),
+        );
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_accepts_a_case_insensitive_condition() {
+        let err = prepare_schedule(|a| {
+            a.trigger_condition.frequency = 60;
+            with_case_insensitive_contains(a);
+        })
+        .await;
+        assert!(!matches!(err, AlertError::InvalidCondition(_)), "{err:?}");
+    }
+
+    #[tokio::test]
     async fn prepare_alert_rejects_an_out_of_range_frequency() {
         let err = prepare_schedule(|a| a.trigger_condition.frequency = i64::MAX).await;
         assert!(matches!(err, AlertError::FrequencyOutOfRange), "{err:?}");
@@ -8465,6 +9541,82 @@ mod tests {
                 "{tz_offset}: {err:?}"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_refuses_repeat_suppression_on_a_realtime_alert() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_alert_save_repeat_realtime";
+        let key = format!("{org_id}/{}/app", StreamType::Logs);
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            key.clone(),
+            SchemaCache::new(arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+                "id",
+                DataType::Utf8,
+                true,
+            )])),
+        );
+        let mut alert = Alert::default();
+        alert.trigger_condition.frequency = 60;
+        alert.is_real_time = true;
+        alert.suppress_repeats = true;
+        let res = prepare_alert(org_id, "app", "realtime", &mut alert, true, false).await;
+        STREAM_SCHEMAS_LATEST.write().await.remove(&key);
+
+        assert!(
+            matches!(res, Err(AlertError::RepeatSuppressionOnRealtimeAlert)),
+            "{res:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_names_a_multi_alert_field_the_stream_lacks() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_alert_save_missing_field";
+        let key = format!("{org_id}/{}/spans", StreamType::Traces);
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            key.clone(),
+            SchemaCache::new(arrow_schema::Schema::new(vec![
+                arrow_schema::Field::new("_timestamp", DataType::Int64, false),
+                arrow_schema::Field::new("trace_id", DataType::Utf8, true),
+                arrow_schema::Field::new("gen_ai_usage_cost", DataType::Float64, true),
+            ])),
+        );
+        let mut alert = Alert::default();
+        alert.stream_type = StreamType::Traces;
+        alert.trigger_condition.frequency = 60;
+        alert.query_condition.query_type = QueryType::SQL;
+        alert.query_condition.sql = Some(
+            "SELECT feature_name, SUM(gen_ai_usage_cost) AS spent FROM \"spans\" \
+             WHERE feature_name = 'x' GROUP BY feature_name"
+                .to_string(),
+        );
+        alert.query_condition.aggregation = Some(config::meta::alerts::Aggregation {
+            group_by: Some(vec![]),
+            function: config::meta::alerts::AggFunction::Count,
+            having: config::meta::alerts::Condition {
+                column: "spent".into(),
+                operator: config::meta::alerts::Operator::GreaterThanEquals,
+                value: json!(10),
+                ignore_case: false,
+                case_insensitive: None,
+            },
+            warning_value: None,
+            multi_alert: true,
+        });
+        let res = prepare_alert(org_id, "spans", "budget", &mut alert, true, false).await;
+        STREAM_SCHEMAS_LATEST.write().await.remove(&key);
+
+        assert!(
+            matches!(
+                &res,
+                Err(AlertError::FieldNotFound { field, stream_name })
+                    if field == "feature_name" && stream_name == "spans"
+            ),
+            "{res:?}"
+        );
     }
 
     #[tokio::test]
@@ -9071,5 +10223,116 @@ mod rule_notification_tests {
             .await
             .unwrap_err();
         assert!(matches!(error, AlertError::PromqlMissingQuery));
+    }
+
+    async fn notification_url_for_traces_alert(query_type: QueryType, sql: Option<&str>) -> String {
+        let mut alert = Alert::default();
+        alert.org_id = "org".into();
+        alert.stream_type = StreamType::Traces;
+        alert.stream_name = "default".into();
+        alert.query_condition.query_type = query_type;
+        alert.query_condition.sql = sql.map(Into::into);
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+            episode_id: None,
+            resolved: false,
+        };
+        let context = build_notification_context("org", &alert, &[], &[], options, None).await;
+        if let Some((_, suffix)) = context.alert_url.split_once("/web/short/") {
+            let id = suffix.split('?').next().unwrap();
+            short_url::retrieve(&alert.org_id, id).await.unwrap()
+        } else {
+            context.alert_url
+        }
+    }
+
+    fn assert_plain_traces_url(url: &str) {
+        assert!(url.contains("/web/traces?stream=default&"));
+        assert!(url.contains("&from=") && url.contains("&to="));
+        assert!(url.contains("&org_identifier=org&"));
+        assert!(url.ends_with("&tab=spans"));
+        assert!(!url.contains("/web/logs"));
+        assert!(!url.contains("sql_mode"));
+        assert!(!url.contains("query="));
+    }
+
+    #[tokio::test]
+    async fn recovered_alert_context_carries_the_resolved_event() {
+        use config::meta::alerts::notification_kind::NotificationEvent;
+
+        let mut alert = Alert::default();
+        alert.org_id = "org".into();
+        alert.stream_name = "default".into();
+        for (resolved, want) in [
+            (false, NotificationEvent::Firing),
+            (true, NotificationEvent::Resolved),
+        ] {
+            let options = ProcessTemplateOptions {
+                rows_end_time: 0,
+                start_time: None,
+                evaluation_timestamp: 0,
+                is_email: false,
+                level: None,
+                actual_value: None,
+                episode_id: None,
+                resolved,
+            };
+            let ctx = build_notification_context("org", &alert, &[], &[], options, None).await;
+            assert_eq!(ctx.event, want);
+        }
+    }
+
+    #[tokio::test]
+    async fn traces_alert_url_without_where_opens_the_traces_page() {
+        let url = notification_url_for_traces_alert(
+            QueryType::SQL,
+            Some("SELECT span_id FROM \"default\""),
+        )
+        .await;
+        assert_plain_traces_url(&url);
+    }
+
+    #[tokio::test]
+    async fn traces_alert_url_keeps_the_where_filter() {
+        let url = notification_url_for_traces_alert(
+            QueryType::SQL,
+            Some("SELECT count(*) AS cnt FROM \"default\" WHERE service_name = 'api' AND duration > 100"),
+        )
+        .await;
+        assert!(url.contains("/web/traces?stream=default&"));
+        assert!(url.contains("&org_identifier=org&"));
+        assert!(url.contains("&tab=spans"));
+        assert!(!url.contains("sql_mode"));
+        let query = url
+            .split_once("&query=")
+            .unwrap()
+            .1
+            .split('&')
+            .next()
+            .unwrap();
+        assert_eq!(
+            base64::decode_url(query).unwrap(),
+            "service_name = 'api' AND duration > 100"
+        );
+    }
+
+    #[tokio::test]
+    async fn traces_alert_url_skips_unparsable_or_non_sql_queries() {
+        assert_plain_traces_url(
+            &notification_url_for_traces_alert(QueryType::SQL, Some("not sql WHERE")).await,
+        );
+        assert_plain_traces_url(&notification_url_for_traces_alert(QueryType::SQL, None).await);
+        assert_plain_traces_url(
+            &notification_url_for_traces_alert(
+                QueryType::Custom,
+                Some("SELECT * FROM \"default\" WHERE service_name = 'api'"),
+            )
+            .await,
+        );
     }
 }

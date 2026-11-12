@@ -44,6 +44,8 @@ export interface ShortcutEntry {
   allowInInput?: boolean;
   /** Never fire while a text input has focus, even as a modifier combo (see `Shortcut.skipInInput`). */
   skipInInput?: boolean;
+  /** Fire even while focus is inside a dialog or drawer (see `Shortcut.allowInDialog`). */
+  allowInDialog?: boolean;
   /** Hide this entry in the cheatsheet unless the edition/config exposes it. */
   visible?: (caps: ShortcutCapabilities) => boolean;
 }
@@ -118,6 +120,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
       "shortcuts.pages.dashboardsList",
       "shortcuts.pages.dashboards",
       "shortcuts.pages.dashboardsPanel",
+      "shortcuts.pages.dashboardTvPlaylist",
       "shortcuts.pages.panelEditor",
     ],
   },
@@ -152,6 +155,11 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
   },
   { titleKey: "shortcuts.modules.reports", pages: ["shortcuts.pages.reports"] },
   { titleKey: "shortcuts.modules.synthetics", pages: ["shortcuts.pages.syntheticsJourney"] },
+  { titleKey: "shortcuts.modules.kubernetes", pages: ["shortcuts.pages.kubernetes"] },
+  {
+    titleKey: "shortcuts.modules.fleet",
+    pages: ["shortcuts.pages.fleetOverview", "shortcuts.pages.fleetConfigEditor"],
+  },
   {
     titleKey: "shortcuts.modules.iam",
     title: "IAM",
@@ -194,6 +202,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
     titleKey: "shortcuts.modules.onlineEvals",
     pages: [
       "shortcuts.pages.evalTemplates",
+      "shortcuts.pages.quality",
       "shortcuts.pages.scorers",
       "shortcuts.pages.evalJobs",
       "shortcuts.pages.scoreConfigs",
@@ -203,9 +212,27 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
     titleKey: "shortcuts.modules.runningQueries",
     pages: ["shortcuts.pages.runningQueries"],
   },
+  { titleKey: "shortcuts.modules.security", pages: ["shortcuts.pages.securityRecord"] },
 ];
 
 export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+  {
+    pageKey: "shortcuts.pages.securityRecord",
+    scope: "security-record",
+    visible: enterprise,
+    shortcuts: [
+      {
+        id: "securityRecordNext",
+        key: "j",
+        descriptionKey: "shortcuts.actions.securityRecordNext",
+      },
+      {
+        id: "securityRecordPrev",
+        key: "k",
+        descriptionKey: "shortcuts.actions.securityRecordPrev",
+      },
+    ],
+  },
   // ── Global ──────────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.global",
@@ -259,8 +286,19 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForMac: "meta+shift+d",
         descriptionKey: "shortcuts.actions.logsExport",
       },
-      { id: "logsNextRow", key: "j", descriptionKey: "shortcuts.actions.logsNextRow" },
-      { id: "logsPrevRow", key: "k", descriptionKey: "shortcuts.actions.logsPrevRow" },
+      // J/K also step through rows while the row-detail drawer is open.
+      {
+        id: "logsNextRow",
+        key: "j",
+        descriptionKey: "shortcuts.actions.logsNextRow",
+        allowInDialog: true,
+      },
+      {
+        id: "logsPrevRow",
+        key: "k",
+        descriptionKey: "shortcuts.actions.logsPrevRow",
+        allowInDialog: true,
+      },
       {
         id: "logsRowFocusMove",
         display: "↑ / ↓",
@@ -343,11 +381,46 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         descriptionKey: "shortcuts.actions.dashboardLayoutExit",
       },
       {
+        id: "dashboardKioskExit",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.dashboardKioskExit",
+      },
+      {
         id: "dashboardFullscreen",
         key: "f",
         descriptionKey: "shortcuts.actions.dashboardFullscreen",
       },
       { id: "dashboardExport", key: "x", descriptionKey: "shortcuts.actions.dashboardExport" },
+    ],
+  },
+
+  // ── Dashboard TV playlist ────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.dashboardTvPlaylist",
+    scope: "dashboard-tv",
+    shortcuts: [
+      {
+        id: "dashboardPlaylistPrev",
+        key: "left",
+        display: "←",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistPrev",
+      },
+      {
+        id: "dashboardPlaylistNext",
+        key: "right",
+        display: "→",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistNext",
+      },
+      {
+        id: "dashboardPlaylistPause",
+        key: "space",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistPause",
+      },
+      {
+        id: "dashboardPlaylistExit",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistExit",
+      },
     ],
   },
 
@@ -448,18 +521,21 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.traceDetail",
     scope: "trace-detail",
+    // Trace details is also embedded in drawers (log detail, service side panel), where these must work.
     shortcuts: [
       {
         id: "traceNextSpan",
         keys: ["j", "down"],
         display: "J / ↓",
         descriptionKey: "shortcuts.actions.traceNextVisibleSpan",
+        allowInDialog: true,
       },
       {
         id: "tracePrevSpan",
         keys: ["k", "up"],
         display: "K / ↑",
         descriptionKey: "shortcuts.actions.tracePrevVisibleSpan",
+        allowInDialog: true,
       },
     ],
   },
@@ -613,6 +689,21 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         id: "pipelinesRowDelete",
         display: "del / ⌫",
         descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
+    ],
+  },
+
+  // ── Kubernetes ──────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.kubernetes",
+    scope: "kubernetes",
+    shortcuts: [
+      {
+        id: "k8sPalette",
+        keyForWindows: "ctrl+k",
+        keyForMac: "meta+k",
+        descriptionKey: "shortcuts.actions.k8sPalette",
+        allowInInput: true,
       },
     ],
   },
@@ -1025,6 +1116,16 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     ],
   },
 
+  // ── Online Evals — Quality ──────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.quality",
+    scope: "quality",
+    visible: onlineEvals,
+    shortcuts: [
+      { id: "qualityBack", key: "escape", descriptionKey: "shortcuts.actions.qualityBack" },
+    ],
+  },
+
   // ── Online Evals — Scorers ──────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.scorers",
@@ -1149,6 +1250,33 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { id: "sourceMapsRefresh", key: "r", descriptionKey: "shortcuts.actions.sourceMapsRefresh" },
     ],
   },
+
+  // ── Fleet — Overview flow map ───────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.fleetOverview",
+    scope: "fleet-overview",
+    shortcuts: [
+      {
+        id: "fleetFlowCloseDetails",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.fleetFlowCloseDetails",
+      },
+    ],
+  },
+
+  // ── Fleet — Configuration editor ────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.fleetConfigEditor",
+    scope: "fleet-config-editor",
+    shortcuts: [
+      {
+        id: "fleetEditorDeleteNode",
+        keys: ["delete", "backspace"],
+        display: "del / ⌫",
+        descriptionKey: "shortcuts.actions.fleetEditorDeleteNode",
+      },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1166,6 +1294,7 @@ export interface ShortcutDef {
   keys?: string[];
   allowInInput?: boolean;
   skipInInput?: boolean;
+  allowInDialog?: boolean;
 }
 
 function isRegisterable(e: ShortcutEntry): boolean {
@@ -1190,6 +1319,7 @@ const DEFS: Map<string, ShortcutDef> = (() => {
         keys: e.keys,
         allowInInput: e.allowInInput,
         skipInInput: e.skipInInput,
+        allowInDialog: e.allowInDialog,
       });
     }
   }

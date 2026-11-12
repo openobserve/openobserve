@@ -21,7 +21,7 @@
  *
  * Two editors, both drawers, both reached from the schedule tab:
  *   - the rotation editor  `oncall-schedule-editor` / `oncall-rotation-drawer`
- *   - Quick start          `oncall-presets-drawer`  (locale: "Quick start")
+ *   - the template drawer   `oncall-presets-drawer`  (locale: "Template for …")
  */
 
 import { expect } from '@playwright/test';
@@ -51,6 +51,11 @@ function part(selector, suffix) {
   return selector.replace(/"\]$/, `-${suffix}"]`);
 }
 
+// The drawer's footer is sticky, so a select near the bottom edge opens under it unless it is centred first.
+async function centre(locator) {
+  await locator.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+}
+
 export class OnCallTeamDetailPage {
   constructor(page) {
     this.page = page;
@@ -66,16 +71,25 @@ export class OnCallTeamDetailPage {
       error: '[data-test="oncall-team-detail-error"]',
       notAvailable: '[data-test="oncall-team-detail-not-available"]',
       coverageTag: '[data-test="oncall-team-coverage"]',
-      configRisks: '[data-test="oncall-team-config-risks"]',
+      configRisks: '[data-test="oncall-attention-expand"]',
       coverageCard: '[data-test="oncall-team-coverage-card"]',
       openSchedule: '[data-test="oncall-team-open-schedule"]',
+      coverageZone: '[data-test="oncall-coverage-zone"]',
+      recentPagesWindow: '[data-test="oncall-recent-pages-window"]',
+      recentPagesViewAll: '[data-test="oncall-recent-pages-view-all"]',
 
       // Schedule tab — the read surface.
       timeline: '[data-test="oncall-schedule-timeline"]',
       timelineChart: '[data-test="oncall-timeline-chart"]',
       timelineEmpty: '[data-test="oncall-timeline-empty"]',
+      timelineEmptyTemplate: '[data-test="oncall-timeline-empty"] [data-test="o2-empty-state-action-presets"]',
       timelineAdd: '[data-test="oncall-timeline-add"]',
-      timelinePresets: '[data-test="oncall-timeline-presets"]',
+      // Add rotation is a menu: a template or from scratch, with or without rotations.
+      timelineAddScratch: '[data-test="oncall-timeline-add-scratch"]',
+      timelineAddTemplate: '[data-test="oncall-timeline-add-template"]',
+      laneMenus: '[data-test^="oncall-lane-menu-"]',
+      // Every lane's ⋮ offers "Replace its rules with a template"; the drawer opens on that lane's rotation.
+      laneStartOver: '[data-test^="oncall-lane-presets-"]',
       timelineGap: '[data-test="oncall-timeline-gap"]',
       timelineFillGap: '[data-test="oncall-timeline-fill-gap"]',
       timelineToday: '[data-test="oncall-timeline-today"]',
@@ -101,12 +115,19 @@ export class OnCallTeamDetailPage {
       scheduleNoMembers: '[data-test="oncall-schedule-no-members"]',
       scheduleEmpty: '[data-test="oncall-schedule-empty"]',
       rotationsTable: '[data-test="oncall-rotations-table"]',
+      previewShift: '[data-test="oncall-schedule-preview-shift"]',
+      previewListToggle: '[data-test="oncall-draft-preview-list"]',
+      previewError: '[data-test="oncall-schedule-preview-error"]',
 
       // Quick start drawer (OnCallSchedulePresets).
       presetsDrawer: '[data-test="oncall-presets-drawer"]',
-      presetsTabs: '[data-test="oncall-presets-tabs"]',
+      presetsTabs: '[data-test="oncall-presets-picker"]',
       presetsApply: '[data-test="oncall-presets-apply"]',
       presetsError: '[data-test="oncall-presets-error"]',
+      presetsBlocked: '[data-test="oncall-presets-blocked"]',
+      presetsTarget: '[data-test="oncall-presets-target"]',
+      presetsNewName: '[data-test="oncall-presets-new-name"]',
+      presetsReplaceNote: '[data-test="oncall-presets-replace-note"]',
       presetDefaults: '[data-test="oncall-preset-defaults"]',
       presetDefaultsToggle: '[data-test="oncall-preset-defaults-toggle"]',
 
@@ -121,14 +142,13 @@ export class OnCallTeamDetailPage {
       policySave: '[data-test="oncall-policy-save"]',
       policyTabs: '[data-test="oncall-policy-tabs"]',
       policySilent: '[data-test="oncall-policy-silent"]',
-      policyNoDefaultWarning: '[data-test="oncall-policy-no-default-warning"]',
       policyDestinations: '[data-test="oncall-policy-destinations"]',
       policyDestinationsWarning: '[data-test="oncall-policy-destinations-warning"]',
-      policyLadderEnd: '[data-test="oncall-policy-ladder-end"]',
 
       // Routing tab (internally "ownership").
       ownership: '[data-test="oncall-ownership"]',
-      ownershipTable: '[data-test="oncall-ownership-table"]',
+      ownershipTitle: '[data-test="oncall-ownership-title"]',
+      ownershipUnclaimed: '[data-test="oncall-ownership-unclaimed"]',
       ownershipRules: '[data-test="oncall-ownership-rules"]',
       ownershipHeader: '[data-test="oncall-ownership-header"]',
       ownershipAddRule: '[data-test="oncall-ownership-add-rule"]',
@@ -137,11 +157,13 @@ export class OnCallTeamDetailPage {
       // Members tab.
       members: '[data-test="oncall-members"]',
       membersTable: '[data-test="oncall-members-table"]',
+      membersAddOpen: '[data-test="oncall-members-add-open"]',
+      membersAddDialog: '[data-test="oncall-members-add-dialog"]',
       membersAddButton: '[data-test="oncall-members-add-btn"]',
       membersEmailInput: '[data-test="oncall-members-email-input"]',
       membersUserSelect: '[data-test="oncall-members-user-select"]',
       membersEmpty: '[data-test="oncall-members-empty"]',
-      membersCoverage: '[data-test="oncall-members-coverage"]',
+      membersTabCount: '[data-test="oncall-team-tab-members-count"]',
       membersAwayDialog: '[data-test="oncall-members-away-dialog"]',
       membersAwaySave: '[data-test="oncall-members-away-save"]',
 
@@ -174,8 +196,10 @@ export class OnCallTeamDetailPage {
   rulePanel(index) { return `[data-test="oncall-schedule-rule-panel-${index}"]`; }
   ruleName(index) { return `[data-test="oncall-schedule-rule-name-${index}"]`; }
   ruleRemove(index) { return `[data-test="oncall-schedule-rule-remove-${index}"]`; }
-  ruleMembers(index) { return `[data-test="oncall-schedule-members-${index}"]`; }
-  rulePriority(index) { return `[data-test="oncall-schedule-priority-${index}"]`; }
+  rulePeopleAdd(index) { return `[data-test="oncall-rule-people-add-${index}"]`; }
+  rulePeopleEdit(index) { return `[data-test="oncall-rule-people-edit-${index}"]`; }
+  ruleCovers(index) { return `[data-test="oncall-schedule-covers-${index}"]`; }
+  ruleTabIcon(index) { return `[data-test="oncall-schedule-rule-tab-icon-${index}"]`; }
   ruleRestriction(ruleIndex, index) {
     return `[data-test="oncall-schedule-restriction-${ruleIndex}-${index}"]`;
   }
@@ -197,7 +221,8 @@ export class OnCallTeamDetailPage {
     return `[data-test="oncall-ladder-rung-problem-${firstMicros}"]`;
   }
 
-  ownershipEditRule(ruleId) { return `[data-test="oncall-ownership-edit-${ruleId}"]`; }
+  ownershipEditRule(ruleId) { return `[data-test="oncall-routing-edit-${ruleId}"]`; }
+  ownershipRuleMore(ruleId) { return `[data-test="oncall-routing-more-${ruleId}"]`; }
   ownershipDeleteRule(ruleId) { return `[data-test="oncall-ownership-delete-${ruleId}"]`; }
   ruleHealth(ruleId) { return `[data-test="oncall-rule-health-${ruleId}"]`; }
   ruleTeam(ruleId) { return `[data-test="oncall-rule-team-${ruleId}"]`; }
@@ -206,14 +231,14 @@ export class OnCallTeamDetailPage {
   memberMarkAway(memberId) { return `[data-test="oncall-members-mark-away-${memberId}"]`; }
   memberShift(memberId) { return `[data-test="oncall-members-shift-${memberId}"]`; }
 
-  /** The handover row's zone label and its time input, both indexed by row position. */
-  handoverTimezone(index) { return `[data-test="oncall-schedule-handover-${index}-timezone"]`; }
+  /** The handover row's time select, indexed by rule position. */
   handoverTime(index) { return `[data-test="oncall-schedule-handover-${index}-time"]`; }
 
   /** An L0 hold band carries the agent id, so it is matched by prefix. */
   anyLadderL0() { return '[data-test^="oncall-ladder-l0-"]'; }
   /** Shift-rule tabs are indexed by POSITION, so a count is the only stable read. */
-  anyRuleTab() { return '[data-test^="oncall-schedule-rule-tab-"]'; }
+  // The tab's status icon shares the prefix, so it is excluded or a flagged rule counts twice.
+  anyRuleTab() { return '[data-test^="oncall-schedule-rule-tab-"]:not([data-test^="oncall-schedule-rule-tab-icon-"])'; }
 
   // ------------------------------------------------------------- element getters
 
@@ -246,10 +271,11 @@ export class OnCallTeamDetailPage {
     return this.page.locator(part(this.locators.scheduleName, 'field')).first();
   }
 
-  getHandoverTimezone(index) { return this.page.locator(this.handoverTimezone(index)).first(); }
-  /** The picker's `<input>`; the wrapper has no value to read. */
-  getHandoverTimeInput(index) {
-    return this.page.locator(`${this.handoverTime(index)} input`).first();
+  /** The drawer states the team's zone once, in the "Who's on call" heading. */
+  getPreviewZone() { return this.page.locator('[data-test="oncall-draft-preview-zone"]').first(); }
+  /** The select's trigger, which shows the chosen time. */
+  getHandoverTimeTrigger(index) {
+    return this.page.locator(part(this.handoverTime(index), 'trigger')).first();
   }
 
   /** How many shift-rule tabs the drawer currently has — the next rule's index. */
@@ -260,10 +286,21 @@ export class OnCallTeamDetailPage {
   getPresetsTabs() { return this.page.locator(this.locators.presetsTabs); }
   /** The catalogue lands on a shape rather than an empty pane; this is that shape. */
   getActivePresetTab() {
-    return this.page.locator(`${this.locators.presetsTabs} [data-state="active"]`);
+    // The radio's inner indicator carries data-state too, so only the radio itself is counted.
+    return this.page.locator(`${this.locators.presetsTabs} [role="radio"][data-state="checked"]`);
   }
   getPresetTab(presetId) { return this.page.locator(this.presetTab(presetId)); }
   getPresetRow(rowKey) { return this.page.locator(this.presetRow(rowKey)); }
+  /** A region's name as its inline edit shows it at rest. */
+  getPresetRowNameTrigger(rowKey) {
+    return this.page.locator(part(this.presetRowName(rowKey), 'trigger')).first();
+  }
+  getPresetsDrawer() { return this.page.locator(this.locators.presetsDrawer); }
+  getPresetsReplaceNote() { return this.page.locator(this.locators.presetsReplaceNote); }
+
+  getQuickStartReplaceConfirm() {
+    return this.page.locator('[data-test="oncall-presets-replace-confirm"]');
+  }
 
   /** Every L0 hold band on the ladder. Count, not visibility — there may be none. */
   getLadderL0Bands() { return this.page.locator(this.anyLadderL0()); }
@@ -351,6 +388,9 @@ export class OnCallTeamDetailPage {
    */
   async openRotationEditor() {
     await this.page.locator(this.locators.timelineAdd).click();
+    const scratch = this.page.locator(this.locators.timelineAddScratch);
+    await scratch.waitFor({ state: 'visible', timeout: 10000 });
+    await scratch.click();
     await expect(this.page.locator(this.locators.rotationDrawer)).toBeVisible({ timeout: 20000 });
   }
 
@@ -376,8 +416,54 @@ export class OnCallTeamDetailPage {
     await expect(tab).toHaveAttribute('data-state', 'active', { timeout: 10000 });
   }
 
+  /** "+" opens the new rule's rename popover; it is closed so the tab body can be used. */
   async addShiftRule() {
+    const before = await this.countShiftRuleTabs();
     await this.page.locator(this.locators.scheduleRuleAdd).click();
+    const rename = this.page.locator(`[data-test="oncall-schedule-rule-rename-popover-${before}"]`);
+    await rename.waitFor({ state: 'visible', timeout: 10000 });
+    await this.page.keyboard.press('Escape');
+    await rename.waitFor({ state: 'hidden', timeout: 10000 });
+  }
+
+  /** Adds people one pick at a time through the rule's "Add person…" search; options match on email. */
+  async setRuleMembers(ruleIndex, emails) {
+    const edit = this.page.locator(this.rulePeopleEdit(ruleIndex));
+    if (await edit.count()) await edit.click();
+    const field = this.rulePeopleAdd(ruleIndex);
+    for (const email of emails) {
+      const trigger = this.page.locator(part(field, 'trigger')).first();
+      await trigger.waitFor({ state: 'visible', timeout: 15000 });
+      await centre(trigger);
+      await trigger.click();
+      const option = this.page.locator(`${part(field, 'option')}[data-test-value="${email}"]`).first();
+      await option.waitFor({ state: 'visible', timeout: 15000 });
+      await option.click();
+    }
+  }
+
+  /** Covers quick pick by its value: all, businessHours, weekdays, weekends or custom. */
+  async setRuleCovers(ruleIndex, pick) {
+    const field = this.ruleCovers(ruleIndex);
+    const trigger = this.page.locator(part(field, 'trigger')).first();
+    await centre(trigger);
+    await trigger.click();
+    await this.page.locator(`${part(field, 'option')}[data-test-value="${pick}"]`).first().click();
+  }
+
+  async showPreviewList() {
+    await this.page.locator(this.locators.previewListToggle).click();
+  }
+
+  /** The Upcoming shifts rows as the server resolved them: `{ from, to, user }`, micros. */
+  async readPreviewRows() {
+    return await this.page.locator(this.locators.previewShift).evaluateAll((rows) =>
+      rows.map((row) => ({
+        from: Number(row.getAttribute('data-from')),
+        to: Number(row.getAttribute('data-to')),
+        user: row.getAttribute('data-user') || null,
+      })),
+    );
   }
 
   async addRestriction(ruleIndex) {
@@ -394,8 +480,10 @@ export class OnCallTeamDetailPage {
   }
 
   /** §8.6: a shift rule with nobody on it is refused, and the drawer says so. */
-  async expectRuleNeedsPeople(ruleIndex) {
-    await expect(this.page.locator(this.ruleNeedsPeople(ruleIndex))).toBeVisible({ timeout: 20000 });
+  /** A fresh rule is flagged on its tab, not with a message nobody has earned yet. */
+  async expectRuleTabFlagged(ruleIndex) {
+    await expect(this.page.locator(this.ruleTabIcon(ruleIndex))).toBeVisible({ timeout: 20000 });
+    await expect(this.page.locator(this.ruleNeedsPeople(ruleIndex))).toHaveCount(0);
   }
 
   async expectRotationNeedsRules() {
@@ -407,13 +495,21 @@ export class OnCallTeamDetailPage {
   /**
    * Open Quick start.
    *
-   * The locale calls it "Quick start" (`oncall.presetsTitle`); the component is
-   * OnCallSchedulePresets and everything inside it is keyed `oncall-preset*`.
-   * Applying one is a FULL REPLACE of the team's rotations, so on a team that
-   * already has a schedule a confirmation stands between Save and the request.
+   * The component is OnCallSchedulePresets and everything inside it is keyed `oncall-preset*`.
+   * From a lane's ⋮ it opens on that lane's rotation, and applying replaces only
+   * that rotation's shift rules, behind a "Replace" confirmation.
    */
   async openQuickStart() {
-    await this.page.locator(this.locators.timelinePresets).click();
+    const empty = this.page.locator(this.locators.timelineEmpty);
+    const laneMenu = this.page.locator(this.locators.laneMenus).first();
+    await expect(empty.or(laneMenu)).toBeVisible({ timeout: 20000 });
+    // An empty schedule offers the template as its main road; once one exists it is the first lane's "Replace its rules".
+    if (await empty.isVisible()) {
+      await this.page.locator(this.locators.timelineEmptyTemplate).click();
+    } else {
+      await laneMenu.click();
+      await this.page.locator(this.locators.laneStartOver).first().click();
+    }
     await expect(this.page.locator(this.locators.presetsDrawer)).toBeVisible({ timeout: 20000 });
   }
 
@@ -421,7 +517,7 @@ export class OnCallTeamDetailPage {
     const tab = this.page.locator(this.presetTab(presetId));
     await tab.waitFor({ state: 'visible', timeout: 15000 });
     await tab.click();
-    await expect(tab).toHaveAttribute('data-state', 'active', { timeout: 10000 });
+    await expect(tab).toHaveAttribute('data-state', 'checked', { timeout: 10000 });
   }
 
   /**
@@ -469,6 +565,16 @@ export class OnCallTeamDetailPage {
     await this.getQuickStartApply().click();
   }
 
+  /** Accept the "Replace …'s shift rules?" confirm and return the preset write it issues. */
+  async confirmQuickStartReplace() {
+    const write = this.page.waitForResponse(
+      (res) => /\/oncall\/teams\/[^/]+\/schedule\/from-preset/.test(res.url()) && res.request().method() === 'POST',
+      { timeout: 30000 },
+    );
+    await this.getQuickStartReplaceConfirm().getByRole('button', { name: 'Replace', exact: true }).click();
+    return await write;
+  }
+
   /**
    * §11.2: Save with regions unnamed and unstaffed must not be a silent no-op.
    *
@@ -480,7 +586,7 @@ export class OnCallTeamDetailPage {
    * `requestSeen` is the part that catches a silent no-op: a Save that fires
    * nothing AND says nothing is the defect, and neither half alone proves it.
    *
-   * @returns {Promise<{disabled: boolean, requestSeen: boolean, error: string|null, invalidFields: number}>}
+   * @returns {Promise<{disabled: boolean, requestSeen: boolean, error: string|null, blocked: string|null, invalidFields: number}>}
    */
   async attemptQuickStartSave({ settleMs = 1500 } = {}) {
     const apply = this.getQuickStartApply();
@@ -501,17 +607,19 @@ export class OnCallTeamDetailPage {
       this.page.off('request', watch);
     }
 
-    const errorNode = this.page.locator(this.locators.presetsError);
-    const error = (await errorNode.count()) > 0
-      ? ((await errorNode.first().textContent()) ?? '').trim()
-      : null;
+    const textOf = async (selector) => {
+      const node = this.page.locator(selector);
+      return (await node.count()) > 0 ? ((await node.first().textContent()) ?? '').trim() : null;
+    };
+    const error = await textOf(this.locators.presetsError);
+    const blocked = await textOf(this.locators.presetsBlocked);
     // Per-field messages are rendered by the inputs themselves, so they are
     // counted rather than read: the point is that SOMETHING named the gap.
     const invalidFields = await this.page
       .locator(`${this.locators.presetsDrawer} [data-test$="-error"]`)
       .count();
 
-    return { disabled, requestSeen, error, invalidFields };
+    return { disabled, requestSeen, error, blocked, invalidFields };
   }
 
   // --------------------------------------------------------- escalation tab
@@ -562,7 +670,10 @@ export class OnCallTeamDetailPage {
   }
 
   async openAddMember() {
-    await this.page.locator(this.locators.membersAddButton).click();
+    const dialog = this.page.locator(this.locators.membersAddDialog);
+    if (await dialog.isVisible().catch(() => false)) return;
+    await this.page.locator(this.locators.membersAddOpen).click();
+    await expect(dialog).toBeVisible({ timeout: 15000 });
   }
 
   async removeMember(memberId) {
@@ -571,16 +682,9 @@ export class OnCallTeamDetailPage {
     if (await confirm.count()) await confirm.click();
   }
 
-  /**
-   * Stage one person for adding.
-   *
-   * The picker is a MULTI-select over org users, not a dialog: the Add button
-   * is the submit and stays disabled until something is staged. When the user
-   * lookup fails the component swaps the picker for a free-text email input,
-   * so both shapes are handled — the fallback is the only path that can add a
-   * NON-org address, which is the one the server must refuse.
-   */
+  /** Stages one person in Add members; handles the free-text fallback shown when the user lookup fails. */
   async pickMemberToAdd(email) {
+    await this.openAddMember();
     const picker = this.page.locator(this.locators.membersUserSelect);
     if (await picker.count()) {
       const trigger = this.page.locator(part(this.locators.membersUserSelect, 'trigger')).first();
@@ -590,7 +694,9 @@ export class OnCallTeamDetailPage {
         .locator(`${part(this.locators.membersUserSelect, 'option')}[data-test-value="${email}"]`).first();
       await option.waitFor({ state: 'visible', timeout: 20000 });
       await option.click();
-      await this.page.keyboard.press('Escape');
+      // Escape closes only the topmost layer, so it is sent only while the listbox is still open over the dialog.
+      if (await option.isVisible().catch(() => false)) await this.page.keyboard.press('Escape');
+      await expect(this.page.locator(this.locators.membersAddDialog)).toBeVisible();
       return;
     }
     await this.page.locator(part(this.locators.membersEmailInput, 'field')).first().fill(email);
@@ -598,25 +704,18 @@ export class OnCallTeamDetailPage {
 
   async submitAddMembers() {
     await this.page.locator(this.locators.membersAddButton).click();
+    await expect(this.page.locator(this.locators.membersAddDialog)).toBeHidden({ timeout: 30000 });
   }
 
-  /** "N of M org members" — the screen's own answer to who is on this team. */
-  async readMembersCoverage() {
-    const node = this.page.locator(this.locators.membersCoverage);
+  /** The Members tab's count chip — the screen's own tally of who is on this team, or null when it shows none. */
+  async readMembersTabCount() {
+    const node = this.page.locator(this.locators.membersTabCount);
     if ((await node.count()) === 0) return null;
-    return ((await node.first().innerText()) ?? '').replace(/\s+/g, ' ').trim();
+    const text = ((await node.first().innerText()) ?? '').trim();
+    return /^\d+$/.test(text) ? Number(text) : null;
   }
 
-
-
-  /**
-   * The config-risk count riding the title.
-   *
-   * It is a COUNT, not a list — the risk texts live on
-   * `GET /teams/{id}/config-risks` and are derived on read, so a spec asserting
-   * that a risk cleared reads the endpoint and asserts the tag disappeared.
-   * Returns null when the tag is absent, which is what "no risks" looks like.
-   */
+  /** The attention banner's finding count (config risks, with folded findings discounted), or null when no banner shows. */
   async readConfigRiskCount() {
     const tag = this.page.locator(this.locators.configRisks);
     if ((await tag.count()) === 0) return null;

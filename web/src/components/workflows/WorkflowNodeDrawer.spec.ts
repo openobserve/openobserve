@@ -32,6 +32,7 @@ vi.mock("@vue-flow/core", () => ({
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: (p: string) => `mock-${p}`,
   getUUID: () => "uuid-1",
+  timestampToTimezoneDate: (ms: number) => String(ms),
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
@@ -110,7 +111,7 @@ vi.mock("@/components/CodeQueryEditor.vue", () => ({
 }));
 
 import { mount, flushPromises } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, watch } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
@@ -120,6 +121,7 @@ import useWorkflowCanvas, {
   clearNodeEditedInput,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
+import { httpEditorState, resetHttpEditorState } from "@/plugins/workflows/httpEndpointUi";
 
 const t = (k: string, v?: any) => i18n.global.t(k, v ?? {});
 
@@ -1597,6 +1599,7 @@ describe("WorkflowNodeDrawer", () => {
 
       const chip = wrapper.find('[data-test="workflow-ndv-run-label"]');
       expect(chip.findComponent({ name: "OTimeCell" }).exists()).toBe(true);
+      expect(chip.findComponent({ name: "OTimeCell" }).props("format")).toBe("MMM d, yyyy HH:mm");
     });
 
     // Opening a run without visiting the Runs page first leaves runsHistory empty, so
@@ -1882,7 +1885,7 @@ describe("WorkflowNodeDrawer — retry from this step", () => {
     workflowObj.readOnly = true;
     workflowObj.currentSelectedWorkflow.id = "wf-1";
     workflowObj.runsHistory = {
-      list: [{ run_id: runId, error: "boom", event_type: eventType }],
+      list: [{ run_id: runId, error: "boom", status: "failed", event_type: eventType }],
       fetchedAt: 0,
       params: { start: 0, end: 0 },
       loading: false,
@@ -1948,5 +1951,242 @@ describe("WorkflowNodeDrawer — retry from this step", () => {
     expect((workflowService as any).retryWorkflow).toHaveBeenCalledWith(
       expect.objectContaining({ run_id: "run-9", from_node: "fn-1" }),
     );
+  });
+});
+
+// ── HTTP request run on the trigger step (AC-UI-11, ui-spec 2.2) ───────────────
+describe("WorkflowNodeDrawer — HTTP request run on the trigger step", () => {
+  let wrapper: any = null;
+  const { resetWorkflowData } = useWorkflowCanvas(t);
+  const event = {
+    meta: {
+      event_type: "webhook",
+      trigger_source: "http",
+      received_at: 1_792_575_542_418_000,
+      headers: { "content-type": "application/json", "user-agent": "deploy-bot/2.4" },
+    },
+    data: [{ service: "checkout" }],
+  };
+  const facts = {
+    credential_prefix: "o2wh_4fK9…oI4k",
+    caller_ip: "203.0.113.24",
+    idempotency_key: "deploy-d-4821",
+    content_type: "application/json",
+    body_bytes: 68,
+    status: "failed",
+    error: "node_errored",
+  };
+
+  const stage = (row: Record<string, any>, result: Record<string, any>) => {
+    workflowObj.readOnly = true;
+    workflowObj.currentSelectedWorkflow.id = "wf-1";
+    workflowObj.currentSelectedWorkflow.nodes = [
+      {
+        id: "trig",
+        type: "input",
+        position: { x: 0, y: 0 },
+        data: { node_type: "workflow_trigger", trigger_kind: "alert_fired" },
+      },
+      {
+        id: "fn-1",
+        type: "default",
+        position: { x: 0, y: 0 },
+        data: { node_type: "function" },
+        meta: { label: "Build rollback request" },
+      },
+    ] as any;
+    workflowObj.currentSelectedWorkflow.edges = [
+      { id: "e1", source: "trig", target: "fn-1" },
+    ] as any;
+    workflowObj.runsHistory.list = [
+      { run_id: "run-h", start_time: 1, end_time: 2, _timestamp: 1, ...row },
+    ] as any;
+    workflowObj.testRun.result = {
+      errors: {},
+      inputs: {},
+      outputs: {},
+      ranNodeIds: ["trig", "fn-1"],
+      blockedNodeIds: [],
+      mode: "history",
+      runId: "run-h",
+      ...result,
+    } as any;
+    const node = workflowObj.currentSelectedWorkflow.nodes[0];
+    workflowObj.currentSelectedNodeData = node;
+    workflowObj.currentSelectedNodeID = "trig";
+    workflowObj.isEditNode = true;
+    workflowObj.dialog.name = "workflow_trigger";
+    workflowObj.dialog.show = true;
+  };
+  const failedHttpRun = () =>
+    stage(
+      {
+        event_type: "Webhook",
+        status: "failed",
+        error: "FunctionNode JS error",
+        http_request: facts,
+      },
+      {
+        inputs: { trig: [event], "fn-1": [event] },
+        errors: { "fn-1": { error_count: 1, errors: [["FunctionNode JS error: TypeError"]] } },
+      },
+    );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetWorkflowData();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    workflowObj.readOnly = false;
+    workflowObj.testRun.result = null;
+    workflowObj.runsHistory.list = [] as any;
+  });
+
+  it("tags the run as an HTTP request beside the run chip", async () => {
+    failedHttpRun();
+    wrapper = mountDrawer();
+    await flushPromises();
+    expect(wrapper.find('[data-test="workflow-run-source"]').text()).toContain("HTTP request");
+  });
+
+  it("shows the request facts from http_request and the headers the run kept", async () => {
+    failedHttpRun();
+    wrapper = mountDrawer();
+    await flushPromises();
+    const facts = wrapper.findComponent({ name: "WorkflowRunRequestFacts" });
+    expect(facts.exists()).toBe(true);
+    expect(facts.props("facts").credential_prefix).toBe("o2wh_4fK9…oI4k");
+    expect(facts.props("receivedAt")).toBe(1_792_575_542_418_000);
+    expect(Object.keys(facts.props("headers"))).toEqual(["content-type", "user-agent"]);
+  });
+
+  it("shows the run's own event as the trigger output, not the alert sample", async () => {
+    failedHttpRun();
+    wrapper = mountDrawer();
+    await flushPromises();
+    const out = wrapper.find('[data-test="workflow-ndv-output"]').text();
+    expect(out).toContain("trigger_source");
+    expect(out).not.toContain("alert_name");
+  });
+
+  it("names the failing step and Open step walks the drawer to it", async () => {
+    failedHttpRun();
+    wrapper = mountDrawer();
+    await flushPromises();
+    const outcome = wrapper.findComponent({ name: "WorkflowRunHttpOutcome" });
+    expect(outcome.props("failedStep")).toEqual({
+      id: "fn-1",
+      label: "Build rollback request",
+      isFunction: true,
+    });
+    expect(String(outcome.props("error"))).toContain("FunctionNode JS error");
+    outcome.vm.$emit("open-step", "fn-1");
+    await flushPromises();
+    expect(workflowObj.currentSelectedNodeData?.id).toBe("fn-1");
+  });
+
+  it("Use as test input seeds the Test dialog with the run's input and closes the drawer", async () => {
+    failedHttpRun();
+    wrapper = mountDrawer();
+    await flushPromises();
+    await wrapper.find('[data-test="workflow-run-use-as-test-input"]').trigger("click");
+    await flushPromises();
+    expect(workflowObj.testRun.show).toBe(true);
+    expect(JSON.parse(workflowObj.testRun.input)).toEqual([event]);
+    expect(workflowObj.testRun.inputSource).toBe("run");
+    expect(workflowObj.testRun.fromNode).toBe("");
+    expect(workflowObj.dialog.show).toBe(false);
+  });
+
+  it("never-executed run shows the banner and no retry", async () => {
+    stage({ event_type: "Webhook", status: "expired", error: null, http_request: facts }, {});
+    wrapper = mountDrawer();
+    await flushPromises();
+    const outcome = wrapper.findComponent({ name: "WorkflowRunHttpOutcome" });
+    expect(outcome.exists()).toBe(true);
+    expect(outcome.props("reason")).toBe("expired");
+    expect(outcome.props("triggerKind")).toBe("alert_fired");
+    expect(wrapper.find('[data-test="workflow-ndv-no-run-data"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="workflow-node-retry-from"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="workflow-run-use-as-test-input"]').exists()).toBe(false);
+  });
+
+  it("non-HTTP runs keep today's view", async () => {
+    stage(
+      { event_type: "AlertFired", status: "failed", error: "boom" },
+      {
+        inputs: { trig: [event], "fn-1": [event] },
+        errors: { "fn-1": { error_count: 1, errors: [["boom"]] } },
+      },
+    );
+    wrapper = mountDrawer();
+    await flushPromises();
+    expect(wrapper.find('[data-test="workflow-run-source"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "WorkflowRunRequestFacts" }).exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "WorkflowRunHttpOutcome" }).exists()).toBe(false);
+    expect(wrapper.find('[data-test="workflow-run-use-as-test-input"]').exists()).toBe(false);
+  });
+});
+
+describe("WorkflowNodeDrawer HTTP endpoint", () => {
+  let wrapper: any = null;
+  beforeEach(() => {
+    resetHttpEditorState();
+    workflowObj.testRun.result = null as any;
+    seedGraph();
+  });
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    resetHttpEditorState();
+    workflowObj.dialog.show = false;
+  });
+
+  it("link row closes the step dialog before opening the panel", async () => {
+    triggerSubmit.mockReturnValue({ trigger_kind: "alert_fired" });
+    openNode("trig", false);
+    wrapper = mountDrawer();
+    await flushPromises();
+    const seen: boolean[] = [];
+    const stop = watch(
+      () => httpEditorState.panelOpen,
+      (open) => {
+        if (open) seen.push(workflowObj.dialog.show);
+      },
+      { flush: "sync" },
+    );
+    wrapper.findComponent({ name: "WorkflowTrigger" }).vm.$emit("open-http-endpoint");
+    await flushPromises();
+    stop();
+    // A trigger body is read-only, so its normal close path commits nothing (commitAndClose).
+    expect(triggerSubmit).not.toHaveBeenCalled();
+    expect(workflowObj.dialog.show).toBe(false);
+    expect(seen).toEqual([false]);
+    expect(httpEditorState.panelOpen).toBe(true);
+  });
+
+  it("the trigger dialog keeps the kind title", async () => {
+    httpEditorState.endpointOn = true;
+    openNode("trig", false);
+    wrapper = mountDrawer();
+    await flushPromises();
+    expect(wrapper.find(".drawer-title").text()).not.toContain(t("workflow.http.panelTitle"));
+  });
+
+  it("the Input pane follows Payload from", async () => {
+    openNode("cond", false);
+    wrapper = mountDrawer();
+    await flushPromises();
+    expect(wrapper.text()).not.toContain('"trigger_source": "http"');
+    wrapper.unmount();
+    httpEditorState.endpointOn = true;
+    httpEditorState.payloadFrom = "http";
+    openNode("cond", false);
+    wrapper = mountDrawer();
+    await flushPromises();
+    expect(wrapper.text()).toContain('"trigger_source": "http"');
   });
 });

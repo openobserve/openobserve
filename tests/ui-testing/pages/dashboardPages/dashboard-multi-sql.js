@@ -2,6 +2,7 @@
 // Encapsulates selectors and actions for multi-query tab management
 
 const testLogger = require("../../playwright-tests/utils/test-logger.js");
+import { settlePanelLeave } from "./panel-leave-dialog.js";
 
 export default class DashboardMultiSQL {
   constructor(page) {
@@ -232,9 +233,8 @@ export default class DashboardMultiSQL {
    * Discard the current panel and return to the dashboard view page.
    * Use this for teardown when the panel intentionally contains an
    * incomplete/invalid query (which cannot pass save validation) or when the
-   * test does not need to persist the panel. Discarding an edited panel fires a
-   * native window.confirm — Playwright auto-dismisses dialogs by default, which
-   * would cancel navigation and leave the page on add_panel — so accept it.
+   * test does not need to persist the panel. Discarding a panel with edits opens
+   * the in-app leave dialog, answered with Discard.
    */
   async discardPanel() {
     const dialogHandler = (dialog) => dialog.accept();
@@ -242,10 +242,7 @@ export default class DashboardMultiSQL {
     try {
       await this.discardBtn.waitFor({ state: "visible", timeout: 15000 });
       await this.discardBtn.click();
-      // Discard navigates to the dashboard view page (/dashboards/view).
-      await this.page.waitForURL((url) => !url.pathname.includes("add_panel"), {
-        timeout: 30000,
-      });
+      await settlePanelLeave(this.page);
     } finally {
       this.page.off("dialog", dialogHandler);
     }

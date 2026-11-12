@@ -304,7 +304,9 @@ async function verifyDomain(d: StatusPageDomain) {
 async function confirmDelete(d: StatusPageDomain) {
   const ok = await confirm({
     title: t("statusPages.domains.deleteTitle"),
-    message: t("statusPages.domains.deleteBody", { domain: d.domain }),
+    messageKeypath: "statusPages.domains.deleteBody",
+    messageName: d.domain,
+    confirmVariant: "destructive",
   });
   if (!ok) return;
   const dismiss = toast({

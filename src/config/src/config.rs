@@ -39,7 +39,7 @@ use crate::{
     meta::{
         cluster,
         meta_store::MetaStore,
-        stream::{QueryPartitionStrategy, StreamType},
+        stream::{DataRetentionDefaults, QueryPartitionStrategy, StreamType},
     },
     utils::{str::redact_dsn, sysinfo},
 };
@@ -108,7 +108,47 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 108: create oncall_phone_verifications and org_telephony.
 // 109: add last_run columns to reports.
 // 110: create rum_pa_app_settings; add rules_hash to rum_pa_funnels.
-pub const DB_SCHEMA_VERSION: u64 = 110;
+// 111: create eval_job_states and eval_job_state_transitions.
+// 112: create the six Slack app tables.
+// 113: create rca_runs and add the run summary columns to alert_incidents.
+// 114: add RCA stage, context, continuation and on-call subject columns.
+// 115: create rca_steering and add the input columns to rca_runs.
+// 116: add favicon_img to status_pages.
+// 117: create the fleet tables.
+// 118: add the lease columns to org_cleanup_tasks.
+// 119: create public_dashboards, public_dashboard_org_settings and public_dashboard_outbox.
+// 120: add search_type to search_queue.
+// 121: point pre-run incidents' run summary at their newest v1 report.
+// 122: add firing_started_at to alert_states.
+// 123: create alert_acks.
+// 124: add alert_groups, end_on_clear and mute_source to downtimes.
+// 125: create slack_alert_messages.
+// 126: add held_action to slack_link_requests.
+// 127: add group_label_set to alert_states.
+// 128: widen alert_dedup_state.fingerprint to varchar(256).
+// 129: add source, query_key, streams, run_count, updated_at and status to query_history.
+// 130: add suppress_repeats to alerts.
+// 131: org domain mapping migrations
+// 132: create oncall_chat_messages; add oncall_teams slack columns.
+// 133: add status page run streaks to synthetics.
+// 134: add write_version to llm_dataset_items, so one write request is one Dataset version.
+// 135: create the three workflow HTTP trigger tables; index workflow_run_data.run_id.
+// 136: add applies_to to templates.
+// 137: rename user templates under the reserved o2_default_ prefix.
+// 138: add template to anomaly_detection_config.
+// 139: add template to synthetics.
+// 140: add template to oncall_policies.
+// 141: add templates to downtime_notifications.
+// 142: add templates to oncall_response_events.
+// 143: fold the retired compiled default templates into prebuilt_default.
+// 144: turn a json templates column from an earlier 141 or 142 into text.
+// 145: add alerts.incident_title_template.
+// 146: rename user folders named default so the built-in default folder can be created.
+// 147: index alert_incidents.last_alert_at over unresolved incidents.
+// 148: add alert_incidents.security_case, backfilled from SIEM detections and case group keys.
+// 149: add alert_incidents.historical, set on a security case only backfilled firings opened.
+// 150: add budget to online_eval_jobs.
+pub const DB_SCHEMA_VERSION: u64 = 150;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -130,18 +170,14 @@ pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 pub const GRPC_HTTP2_STREAM_WINDOW_SIZE: u32 = 8 * 1024 * 1024; // 8 MB
 pub const GRPC_HTTP2_CONNECTION_WINDOW_SIZE: u32 = 16 * 1024 * 1024; // 16 MB
 pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
+const MAX_FILE_SIZE_DEFAULT_CAP: usize = 512 * 1024 * 1024;
+const MAX_FILE_SIZE_DEFAULT_FLOOR: usize = 32 * 1024 * 1024;
 // The current value is recorded in each tantivy index file (puffin `row_group_size`
 // property) so it can be changed safely without breaking row_id → row_group mapping
 // for older files.
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 128 * 1024;
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
-// Uncompressed total per upload; the request body cap only bounds compressed bytes.
-pub const SOURCEMAP_ZIP_MAX_SIZE: u64 = 1024 * 1024 * 100; // 100 MB
-pub const SOURCEMAP_ZIP_MAX_ENTRIES: usize = 1000;
-// max file size for individual sourcemap. We temp cache these in mem,
-// so it will affect spikes in mem at resolving stacktrace
-pub const SOURCEMAP_FILE_MAX_SIZE: u64 = 1024 * 1024 * 5; // 5 MB
 pub const SOURCEMAP_MEM_CACHE_SIZE: usize = 10000;
 
 #[inline]
@@ -412,9 +448,12 @@ pub static COMPACT_OLD_DATA_STREAM_SET: Lazy<HashSet<String>> = Lazy::new(|| {
         .collect()
 });
 
-/// `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES` as a set; `check_compact_config` validated it.
-pub static COMPACT_DYNAMIC_MERGE_STREAM_TYPES: Lazy<HashSet<StreamType>> = Lazy::new(|| {
-    parse_dynamic_merge_stream_types(&get_config().compact.dynamic_merge_stream_types)
+/// The shortest `ZO_DYNAMIC_PARTITION_WINDOW_DAYS`: fewer days are too little to move a stream on.
+pub const DYNAMIC_PARTITION_MIN_WINDOW_DAYS: i64 = 3;
+
+/// `ZO_DYNAMIC_PARTITION_STREAM_TYPES` as a set; `check_compact_config` validated it.
+pub static DYNAMIC_PARTITION_STREAM_TYPES: Lazy<HashSet<StreamType>> = Lazy::new(|| {
+    parse_dynamic_partition_stream_types(&get_config().compact.dynamic_partition_stream_types)
         .expect("validated at startup")
 });
 
@@ -508,6 +547,11 @@ pub const SYNTHETICS_RELOAD_CLASSES: &[(&str, SyntheticsReloadClass)] = &[
         "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
         SyntheticsReloadClass::Hot,
     ),
+    ("ZO_SYNTHETICS_LEASE_BATCH_SIZE", SyntheticsReloadClass::Hot),
+    (
+        "ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK",
+        SyntheticsReloadClass::Hot,
+    ),
     // Were `HotViaLimits` while these lived in `o2_enterprise` and had to be
     // pushed across a seam into this crate. They are declared here now, so the
     // seam and its class are both gone and they are plainly `Hot`.
@@ -562,6 +606,8 @@ pub(crate) fn synthetics_restart_required_changes(
         devices: _,
         scheduler_jitter_enabled: _,
         orphan_detection_enabled: _,
+        lease_batch_size: _,
+        max_inflight_per_tick: _,
     } = new;
 
     let mut changed = Vec::new();
@@ -592,6 +638,16 @@ pub fn get_instance_id() -> String {
         Some(id) => id.clone(),
         None => "".to_string(),
     }
+}
+
+/// Keyed by the instance id, so an unauthenticated caller cannot map it to a public commit.
+pub fn build_fingerprint() -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::new()
+        .chain_update(get_instance_id())
+        .chain_update(COMMIT_HASH)
+        .finalize();
+    hex::encode(&digest[..12])
 }
 
 /// Caches the internal gRPC token stored in the meta db; empty means none is stored.
@@ -658,11 +714,22 @@ pub fn load_config() -> Result<(), anyhow::Error> {
 }
 static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<Option<BrowserConfig>> =
     tokio::sync::OnceCell::const_new();
+static CHROME_SEMAPHORE: std::sync::OnceLock<tokio::sync::Semaphore> = std::sync::OnceLock::new();
 
 pub async fn get_chrome_launch_options() -> &'static Option<BrowserConfig> {
     CHROME_LAUNCHER_OPTIONS
         .get_or_init(init_chrome_launch_options)
         .await
+}
+
+/// Caps concurrent headless Chrome processes at the CPU limit; hold a permit while one runs.
+pub fn chrome_semaphore() -> &'static tokio::sync::Semaphore {
+    CHROME_SEMAPHORE.get_or_init(|| {
+        let cfg = get_config();
+        // cpu_num is floored at 2 and real_cpu_num ignores the memory limit, so take the smaller.
+        let permits = cfg.limit.cpu_num.min(cfg.limit.real_cpu_num);
+        tokio::sync::Semaphore::new(max(1, permits))
+    })
 }
 
 async fn init_chrome_launch_options() -> Option<BrowserConfig> {
@@ -1057,6 +1124,7 @@ pub struct Config {
     pub enrichment_table: EnrichmentTable,
     pub slo: Slo,
     pub synthetics: Synthetics,
+    pub public_dashboards: PublicDashboards,
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
     pub self_profiles: SelfProfiles,
@@ -1096,14 +1164,14 @@ impl PublicAiChat {
     }
 }
 
-/// Background self CPU/memory profile ingest into `_meta.self_profiles`.
-/// Gated at runtime by `enabled`; sampling code is compile-gated on `profiling`.
+/// Background self CPU/memory profile ingest into the `default` profiles stream.
+/// Gated at runtime by `enabled`; CPU needs `cpu-profiling`, memory needs `profiling`.
 #[derive(Debug, Serialize, EnvConfig, Default)]
 pub struct SelfProfiles {
     #[env_config(
         name = "ZO_SELF_PROFILES_ENABLED",
         default = false,
-        help = "Enable background self CPU/memory profile sampling into _meta.self_profiles"
+        help = "Enable background self CPU/memory profile sampling into the default profiles stream"
     )]
     pub enabled: bool,
     #[env_config(
@@ -1172,6 +1240,101 @@ pub struct DatabaseMonitoring {
     pub rollup_interval_secs: u64,
 }
 
+/// Public (unauthenticated) dashboards; clamped in `check_public_dashboards_config`.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct PublicDashboards {
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_ENABLED",
+        default = true,
+        help = "Master switch for public dashboards. The public routes always exist and answer 404 while this is false."
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_RPM",
+        default = 240,
+        help = "Per-IP requests-per-minute limit on the public dashboard routes (0 disables)."
+    )]
+    pub rpm: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_SLUG_RPM",
+        default = 1200,
+        help = "Per-link requests-per-minute limit on public data responses that carry a body (0 disables)."
+    )]
+    pub slug_rpm: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_LINKS_PER_ORG",
+        default = 50,
+        help = "Public links an org may have; the org settings row can lower it (at least 1)."
+    )]
+    pub max_links_per_org: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_PANELS",
+        default = 50,
+        help = "Panels a public link can show, counted across every tab (at least 1)."
+    )]
+    pub max_panels: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_LINKS_PER_DASHBOARD",
+        default = 10,
+        help = "Public links one dashboard may have (at least 1)."
+    )]
+    pub max_links_per_dashboard: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MIN_REFRESH_SECS",
+        default = 60,
+        help = "Shortest effective refresh interval of a public link range, in seconds (at least 60)."
+    )]
+    pub min_refresh_secs: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_PANEL_AGE_HOURS",
+        default = 24,
+        help = "Oldest retained panel data a public link may serve after failed refreshes, in hours (at least 1)."
+    )]
+    pub max_panel_age_hours: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_COLD_WAITERS",
+        default = 200,
+        help = "Requests that may wait on one cold build per querier; later ones get 202 (at least 1)."
+    )]
+    pub max_cold_waiters: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_INFLIGHT_BUILDS",
+        default = 8,
+        help = "Public dashboard builds running at once per querier (at least 1)."
+    )]
+    pub max_inflight_builds: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_INFLIGHT_BUILDS_PER_ORG",
+        default = 1,
+        help = "Public dashboard builds of one org running at once per querier (at least 1)."
+    )]
+    pub max_inflight_builds_per_org: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_PANEL_CONCURRENCY",
+        default = 1,
+        help = "Panel queries one public dashboard build runs at once (at least 1)."
+    )]
+    pub panel_concurrency: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_QUERY_TIMEOUT_SECS",
+        default = 60,
+        help = "Timeout of one public dashboard panel query, in seconds (1 to ZO_QUERY_TIMEOUT)."
+    )]
+    pub query_timeout_secs: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_BUILD_TIMEOUT_SECS",
+        default = 300,
+        help = "Timeout of one whole public dashboard build, in seconds (at least the query timeout)."
+    )]
+    pub build_timeout_secs: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_TIME_SHIFTS",
+        default = true,
+        help = "Run time-shifted panel queries on public links; false shows those panels as unsupported."
+    )]
+    pub time_shifts: bool,
+}
+
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
 /// feature itself is OSS — only the private-VPC-agent path is enterprise.
 ///
@@ -1187,8 +1350,8 @@ pub struct Synthetics {
     /// synthetics_enabled).
     #[env_config(
         name = "ZO_SYNTHETICS_ENABLED",
-        default = false,
-        help = "Master switch for synthetic monitoring. Off by default; the background workers and HTTP routes only exist when this is true."
+        default = true,
+        help = "Master switch for synthetic monitoring background workers and HTTP routes; changes require a restart."
     )]
     pub enabled: bool,
     /// Super-cluster only: how long a parent may reference a child that has not replicated yet.
@@ -1368,6 +1531,23 @@ pub struct Synthetics {
         help = "Kill switch for orphan detection, which reports enabled checks no scheduler is claiming."
     )]
     pub orphan_detection_enabled: bool,
+    /// Jobs leased per pool in one dispatcher lease call. Must be > 0; a
+    /// non-positive value falls back to the default. Read per tick.
+    #[env_config(
+        name = "ZO_SYNTHETICS_LEASE_BATCH_SIZE",
+        default = 10,
+        help = "Jobs the dispatcher leases per pool per lease call. Must be greater than 0."
+    )]
+    pub lease_batch_size: i64,
+    /// Upper bound on jobs the dispatcher leases across all pools in one tick.
+    /// While a pool's batch comes back full the dispatcher keeps leasing, up to
+    /// this cap. Must be > 0; a non-positive value falls back to the default.
+    #[env_config(
+        name = "ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK",
+        default = 100,
+        help = "Cap on jobs the dispatcher leases across all pools in one 2s tick. Must be greater than 0."
+    )]
+    pub max_inflight_per_tick: i64,
 }
 
 /// Feature 5 — SLO measurement (`alerts_2.md` §6b).
@@ -1491,7 +1671,11 @@ pub struct ReportServer {
     pub addr: String,
     #[env_config(name = "ZO_REPORT_SERVER_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
-    #[env_config(name = "ZO_REPORT_SERVER_SECRET", default = "")]
+    #[env_config(
+        name = "ZO_REPORT_SERVER_SECRET",
+        default = "",
+        help = "Shared secret for the report server. The report server refuses to start without it; the main app and every installation that uses the same report server must set the same value."
+    )]
     pub secret: String,
 }
 
@@ -1574,6 +1758,18 @@ pub struct Auth {
         help = "Secret used to sign stateless alert-chart render URLs. When empty (the default), a key is derived from the root user's stored password hash, which every node shares via the meta DB. Set explicitly to control rotation; rotating invalidates in-flight chart URLs (bounded by ZO_ALERT_CHART_URL_TTL)."
     )]
     pub alert_chart_signing_key: String,
+    #[env_config(
+        name = "ZO_DELEGATION_SIGNING_KEY",
+        default = "",
+        help = "Base64 key (32 bytes or more) that signs delegated Slack user tokens. Empty derives the key from O2_MASTER_ENCRYPTION_KEY; set it only to rotate independently of the master key."
+    )]
+    pub delegation_signing_key: String,
+    #[env_config(
+        name = "ZO_DELEGATION_SIGNING_KEY_PREVIOUS",
+        default = "",
+        help = "Previous delegation signing key, accepted for verification only during a rotation. Set to 'derived' to keep accepting the key derived from O2_MASTER_ENCRYPTION_KEY."
+    )]
+    pub delegation_signing_key_previous: String,
     #[env_config(name = "ZO_SERVICE_ACCOUNT_ENABLED", default = true)]
     pub service_account_enabled: bool,
     /// Session cleanup interval in seconds (default: 3600 = 1 hour)
@@ -1765,6 +1961,12 @@ pub struct Search {
         help = "Toggle inverted index count optimizer."
     )]
     pub inverted_index_count_optimizer_enabled: bool,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_LIKE_OPTIMIZER_ENABLED",
+        default = true,
+        help = "Toggle using the inverted index for `col LIKE '%x%'` and `col ILIKE '%x%'`. When off, these predicates are answered by scanning files."
+    )]
+    pub inverted_index_like_optimizer_enabled: bool,
     #[env_config(
         name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
         default = false,
@@ -2295,6 +2497,12 @@ pub struct Common {
     )]
     pub restricted_routes_on_empty_data: bool,
     #[env_config(
+        name = "ZO_SAMPLE_DATA_ONBOARDING_ENABLED",
+        default = false,
+        help = "Greet a new user with the first-run welcome dialog that loads sample data in one click. When off, a new cloud user gets the full-page onboarding instead; other builds show Home as usual."
+    )]
+    pub sample_data_onboarding_enabled: bool,
+    #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
         help = "Toggle search to be trigger based on button click event."
@@ -2401,7 +2609,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_MODEL_PRICING_ENABLED",
         default = true,
-        help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."
+        help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, no cost is computed for spans that do not report one."
     )]
     pub model_pricing_enabled: bool,
     #[env_config(
@@ -2424,6 +2632,12 @@ pub struct Common {
         help = "If true (default true), new org can be automatically created through ingestion for root user. This can be changed in the runtime."
     )]
     pub create_org_through_ingestion: bool,
+    #[env_config(
+        name = "ZO_ORG_CLEANUP_POLL_INTERVAL_SECS",
+        default = 3600,
+        help = "How often (seconds, default 3600) the compactor drains org deletion tasks and promotes orgs whose grace period ended. 0 pauses both jobs."
+    )]
+    pub org_cleanup_poll_interval_secs: u64,
     #[env_config(
         name = "ZO_ORG_INVITE_EXPIRY",
         default = 7,
@@ -2496,8 +2710,8 @@ pub struct Common {
     pub auto_query_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_PROFILING_ENABLED",
-        default = false,
-        help = "Show the Profiles module in the UI. Early-stage feature, hidden by default; ingestion and APIs stay available regardless"
+        default = true,
+        help = "Show the Profiles module in the UI. Ingestion and APIs stay available regardless"
     )]
     pub profiling_enabled: bool,
     #[env_config(
@@ -2535,12 +2749,38 @@ pub struct Limit {
     pub js_function_max_execution_time_secs: u64,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
-    // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 512)]
+    #[env_config(
+        name = "ZO_MAX_FILE_SIZE_ON_DISK",
+        default = 0,
+        help = "MB, per wal file size limit on disk, 0 derives it from the memtable budget: ZO_MEM_TABLE_MAX_SIZE / 4, between 32 MB and 512 MB"
+    )]
     pub max_file_size_on_disk: usize,
-    // MB, per data file size limit in memory
-    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 512)]
+    #[env_config(
+        name = "ZO_MAX_FILE_SIZE_IN_MEMORY",
+        default = 0,
+        help = "MB, per memtable size limit, 0 derives it from the memtable budget: ZO_MEM_TABLE_MAX_SIZE / 4, between 32 MB and 512 MB"
+    )]
     pub max_file_size_in_memory: usize,
+    // MB, every distinct map in a stacktrace is parsed and held in memory for one resolve
+    #[env_config(
+        name = "ZO_SOURCEMAP_FILE_MAX_SIZE",
+        default = 50,
+        help = "Maximum size in MB of one source map file in an upload; 0 means 50"
+    )]
+    pub sourcemap_file_max_size: u64,
+    // MB, uncompressed total per upload; the request body cap only bounds compressed bytes
+    #[env_config(
+        name = "ZO_SOURCEMAP_ZIP_MAX_SIZE",
+        default = 500,
+        help = "Maximum total uncompressed size in MB of one source map upload; 0 means 500"
+    )]
+    pub sourcemap_zip_max_size: u64,
+    #[env_config(
+        name = "ZO_SOURCEMAP_ZIP_MAX_ENTRIES",
+        default = 5000,
+        help = "Maximum number of source map files in one upload; 0 means 5000"
+    )]
+    pub sourcemap_zip_max_entries: usize,
     #[deprecated(
         since = "0.14.1",
         note = "Please use `ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS` instead. This ENV is subject to be removed soon"
@@ -2569,7 +2809,7 @@ pub struct Limit {
     #[env_config(
         name = "ZO_MEM_TABLE_BUCKET_NUM",
         default = 0,
-        help = "MemTable bucket num, 0 derives it from the memtable budget: ZO_MEM_TABLE_MAX_SIZE / ZO_MAX_FILE_SIZE_IN_MEMORY / 2, between 1 and the cpu num"
+        help = "MemTable bucket num, 0 derives it from the memtable budget: ZO_MEM_TABLE_MAX_SIZE / ZO_MAX_FILE_SIZE_IN_MEMORY / 4, between 1 and the cpu num"
     )]
     pub mem_table_bucket_num: usize,
     #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 2)] // seconds
@@ -2685,6 +2925,12 @@ pub struct Limit {
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
     pub node_heartbeat_ttl: i64,
+    #[env_config(
+        name = "ZO_OVERVIEW_CACHE_TTL",
+        default = 30,
+        help = "Seconds the org overview response is cached per caller; 0 disables the cache."
+    )]
+    pub overview_cache_ttl: u64,
     // How long an o2-ai session->owner claim survives. Must exceed the longest
     // expected conversation; mirrors o2-ai's O2_AI_SESSION_OWNER_TTL default.
     #[env_config(name = "ZO_AI_SESSION_OWNER_TTL", default = 86400)] // seconds
@@ -2717,7 +2963,7 @@ pub struct Limit {
         help = "Count-based alerts whose row sentinel exceeds this switch to a COUNT(*) decision query plus a 100-row payload sample (alerts_2.md 4.4c). Clamped up to the 100-row floor."
     )]
     pub alert_hybrid_count_threshold: i64,
-    #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
+    #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 50)]
     pub alert_schedule_concurrency: i64,
     #[env_config(
         name = "ZO_ALERT_MAX_GROUPS",
@@ -2740,9 +2986,15 @@ pub struct Limit {
     #[env_config(
         name = "ZO_ALERT_MAX_GROUP_NOTIFICATIONS_PER_EVAL",
         default = 0,
-        help = "Cap on per-group notifications sent by one multi-alert evaluation (alerts_2.md §5.5 MN-8/D48). 0 = unlimited, which is the default because paging per group is the feature's contract and the group cap already bounds the worst case. Dispatch is worst-first, so a cap always delivers the most severe groups; anything dropped is logged."
+        help = "Cap on per-group notifications sent by one multi-alert evaluation (alerts_2.md §5.5 MN-8/D48). 0 = unlimited, which is the default because paging per group is the feature's contract and the group cap already bounds the worst case. Dispatch is worst-first, so a cap always delivers the most severe groups; anything dropped is logged and noted on the evaluation's history record."
     )]
     pub alert_max_group_notifications_per_eval: usize,
+    #[env_config(
+        name = "ZO_ALERT_NOTIFICATION_TIMEOUT",
+        default = 30,
+        help = "Total time limit in seconds for one notification request to a destination, connection included. 0 uses the default of 30."
+    )]
+    pub alert_notification_timeout: u64,
     #[env_config(
         name = "ZO_ALERT_GROUP_SWEEP_INTERVAL",
         default = 60,
@@ -2764,7 +3016,7 @@ pub struct Limit {
     #[env_config(
         name = "ZO_QUERY_HISTORY_RETENTION_DAYS",
         default = 14,
-        help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less keeps every entry forever; it does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
+        help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less removes the age limit; each user still keeps at most 500 unstarred entries per source (logs, traces, metrics, dbm, profiles), the oldest of that source pruned first. It does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
     )]
     pub query_history_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
@@ -3047,6 +3299,18 @@ pub struct Limit {
     )]
     pub max_dashboard_series: usize,
     #[env_config(
+        name = "ZO_MAX_DASHBOARD_STATE_TIMELINE_SERIES",
+        default = 2000,
+        help = "maximum PromQL series a state timeline panel loads; restarts split one entity into several series"
+    )]
+    pub max_dashboard_state_timeline_series: usize,
+    #[env_config(
+        name = "ZO_MAX_DASHBOARD_HOSTMAP_CELLS",
+        default = 5000,
+        help = "maximum cells a host map panel draws, also the PromQL series it loads; the rest are counted in a notice"
+    )]
+    pub max_dashboard_hostmap_cells: usize,
+    #[env_config(
         name = "ZO_SEARCH_MINI_PARTITION_DURATION_SECS",
         default = 60,
         help = "Duration of each mini search partition in seconds"
@@ -3096,6 +3360,72 @@ pub struct Limit {
         help = "Default is 30 days, how many days in past to retain the errored workflow input files"
     )]
     pub workflow_error_retention_secs: i64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_IP_RPM",
+        default = 6000,
+        help = "Requests per minute one client IP may send to workflow HTTP endpoints"
+    )]
+    pub workflow_hook_ip_rpm: u32,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_PREAUTH_SLOTS",
+        default = 256,
+        help = "Workflow HTTP endpoint requests read at once before authentication"
+    )]
+    pub workflow_hook_preauth_slots: usize,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_UNRESOLVED_IP_SLOTS",
+        default = 16,
+        help = "Pre-authentication slots shared by requests whose client IP is unknown"
+    )]
+    pub workflow_hook_unresolved_ip_slots: usize,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_ORG_RPM",
+        default = 1200,
+        help = "Workflow HTTP endpoint requests per minute per organization"
+    )]
+    pub workflow_hook_org_rpm: u32,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_ORG_BYTES_PER_MIN",
+        default = 16777216,
+        help = "Workflow HTTP endpoint body bytes per minute per organization; run history keeps about 3x this per minute for ZO_WORKFLOW_ERROR_RETAIN_DURATION"
+    )]
+    pub workflow_hook_org_bytes_per_min: u32,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_ORG_QUEUE_MAX",
+        default = 1000,
+        help = "Queued workflow HTTP runs allowed per organization"
+    )]
+    pub workflow_hook_org_queue_max: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_ORG_CONCURRENCY",
+        default = 2,
+        help = "Workflow HTTP runs executing at once per organization, at most ZO_WORKFLOW_HOOK_CONCURRENCY"
+    )]
+    pub workflow_hook_org_concurrency: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_CONCURRENCY",
+        default = 8,
+        help = "Workflow HTTP runs executing at once per region"
+    )]
+    pub workflow_hook_concurrency: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_RUN_TIMEOUT",
+        default = 900,
+        help = "Seconds a workflow HTTP run may take before it is cancelled"
+    )]
+    pub workflow_hook_run_timeout_secs: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_QUEUE_TTL",
+        default = 3600,
+        help = "Seconds a workflow HTTP run may wait in the queue before it expires"
+    )]
+    pub workflow_hook_queue_ttl_secs: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_WORKER_DISABLED",
+        default = false,
+        help = "Never run the workflow HTTP worker on this node"
+    )]
+    pub workflow_hook_worker_disabled: bool,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -3133,12 +3463,26 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_OLD_DATA_STREAMS", default = "")] // use comma to split
     pub old_data_streams: String,
     #[env_config(
-        name = "ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES",
+        name = "ZO_DYNAMIC_PARTITION_STREAM_TYPES",
         default = "",
-        help = "Comma-separated stream types (logs, metrics, traces) whose closed days the compactor merges across hours when the day holds many more files than its size needs. The stream setting `dynamic_merge` overrides it per stream. Empty disables the feature. Queries on an enabled stream select files with a daily max_ts bound; after removing a type here, set ZO_<TYPE>_QUERY_RETENTION=daily so already merged days are still found."
+        help = "Comma-separated stream types (logs, metrics, traces) the compactor classifies by volume: a stream whose last ZO_DYNAMIC_PARTITION_WINDOW_DAYS closed days each hold less than ZO_COMPACT_MAX_FILE_SIZE is merged by day from the next day on, one whose days each hold more goes back to hourly. The stream setting `dynamic_partition` overrides this per stream; while it is off the level can be set by hand. Levels already recorded stay in effect. Before downgrading to a version without this setting, set ZO_<TYPE>_QUERY_RETENTION=daily for these types, or queries miss the days already merged by day."
     )]
-    pub dynamic_merge_stream_types: String,
-    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
+    pub dynamic_partition_stream_types: String,
+    #[env_config(
+        name = "ZO_DYNAMIC_PARTITION_WINDOW_DAYS",
+        default = 7,
+        help = "Closed days that must all agree before the classifier moves a stream, at least 3; a stream younger than this is not classified."
+    )]
+    pub dynamic_partition_window_days: i64,
+    #[env_config(
+        name = "ZO_COMPACT_DATA_RETENTION_DAYS",
+        default = "3650",
+        help = "Default retention in days for streams with no value of their own: a plain number (30), optionally with per-type values (30,logs:21,metrics:180). Types: logs, metrics, traces, profiles. Without a plain number the default is 3650; 0 keeps data forever and <type>:0 inherits the plain number. A positive value must be at least 3."
+    )]
+    pub data_retention_spec: String,
+    // Both parsed from data_retention_spec in check_compact_config.
+    #[env_config(parse, default = "0")]
+    pub data_retention: DataRetentionDefaults,
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
     pub old_data_max_days: i64,
@@ -3542,8 +3886,6 @@ pub struct RUM {
     pub service: String,
     #[env_config(name = "ZO_RUM_ENV", default = "")]
     pub env: String,
-    #[env_config(name = "ZO_RUM_VERSION", default = "")]
-    pub version: String,
     #[env_config(name = "ZO_RUM_ORGANIZATION_IDENTIFIER", default = "")]
     pub organization_identifier: String,
     #[env_config(name = "ZO_RUM_API_VERSION", default = "")]
@@ -3877,6 +4219,8 @@ pub fn init() -> Config {
     // check synthetics config — infallible on purpose, see the function
     check_synthetics_config(&mut cfg);
 
+    check_public_dashboards_config(&mut cfg);
+
     cfg
 }
 
@@ -3939,13 +4283,8 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.file_move_thread_num == 0 {
         cfg.limit.file_move_thread_num = cpu_num;
     }
-    // HACK for file_merge_thread_num equal to CPU core
     if cfg.limit.file_merge_thread_num == 0 {
-        if cfg.common.local_mode {
-            cfg.limit.file_merge_thread_num = std::cmp::max(1, cpu_num / 2);
-        } else {
-            cfg.limit.file_merge_thread_num = cpu_num;
-        }
+        cfg.limit.file_merge_thread_num = std::cmp::max(1, cpu_num / 2);
     }
     // HACK for mem_dump_thread_num equal to CPU core
     if cfg.limit.mem_dump_thread_num == 0 {
@@ -3987,6 +4326,12 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // reset to default if given zero
     if cfg.limit.max_dashboard_series < 1 {
         cfg.limit.max_dashboard_series = 100;
+    }
+    if cfg.limit.max_dashboard_state_timeline_series < 1 {
+        cfg.limit.max_dashboard_state_timeline_series = 2000;
+    }
+    if cfg.limit.max_dashboard_hostmap_cells < 1 {
+        cfg.limit.max_dashboard_hostmap_cells = 5000;
     }
 
     // check query timeout
@@ -4036,6 +4381,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // clamp datafusion_min_partition_num to 1
     cfg.limit.datafusion_min_partition_num = cfg.limit.datafusion_min_partition_num.max(1);
 
+    // a zero limit fails every send, so it means the default
+    if cfg.limit.alert_notification_timeout == 0 {
+        cfg.limit.alert_notification_timeout = 30;
+    }
+
     // retain for atleast 1 hour
     if cfg.limit.workflow_error_retention_secs <= 3600 {
         cfg.limit.workflow_error_retention_secs = 3600;
@@ -4043,7 +4393,45 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     cfg.limit.editor_suggest_mode = normalize_editor_suggest_mode(&cfg.limit.editor_suggest_mode)?;
 
+    check_workflow_hook_limits(&mut cfg.limit);
+
     Ok(())
+}
+
+fn check_workflow_hook_limits(limit: &mut Limit) {
+    if limit.workflow_hook_ip_rpm == 0 {
+        limit.workflow_hook_ip_rpm = 6000;
+    }
+    if limit.workflow_hook_preauth_slots == 0 {
+        limit.workflow_hook_preauth_slots = 256;
+    }
+    if limit.workflow_hook_unresolved_ip_slots == 0 {
+        limit.workflow_hook_unresolved_ip_slots = 16;
+    }
+    if limit.workflow_hook_org_rpm == 0 {
+        limit.workflow_hook_org_rpm = 1200;
+    }
+    if limit.workflow_hook_org_bytes_per_min == 0 {
+        limit.workflow_hook_org_bytes_per_min = 16777216;
+    }
+    if limit.workflow_hook_org_queue_max == 0 {
+        limit.workflow_hook_org_queue_max = 1000;
+    }
+    if limit.workflow_hook_org_concurrency == 0 {
+        limit.workflow_hook_org_concurrency = 2;
+    }
+    if limit.workflow_hook_concurrency == 0 {
+        limit.workflow_hook_concurrency = 8;
+    }
+    if limit.workflow_hook_run_timeout_secs == 0 {
+        limit.workflow_hook_run_timeout_secs = 900;
+    }
+    if limit.workflow_hook_queue_ttl_secs == 0 {
+        limit.workflow_hook_queue_ttl_secs = 3600;
+    }
+    limit.workflow_hook_org_concurrency = limit
+        .workflow_hook_org_concurrency
+        .min(limit.workflow_hook_concurrency);
 }
 
 fn normalize_editor_suggest_mode(raw: &str) -> Result<String, anyhow::Error> {
@@ -4074,17 +4462,18 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.req_cols_per_record_limit = 1000;
     }
 
-    // check max_file_size_on_disk to MB
-    if cfg.limit.max_file_size_on_disk == 0 {
-        cfg.limit.max_file_size_on_disk = 512 * 1024 * 1024; // 512MB
-    } else {
-        cfg.limit.max_file_size_on_disk *= 1024 * 1024;
+    cfg.limit.sourcemap_file_max_size = match cfg.limit.sourcemap_file_max_size {
+        0 => 50,
+        v => v,
     }
-    // check max_file_size_in_memory to MB
-    if cfg.limit.max_file_size_in_memory == 0 {
-        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024; // 512MB
-    } else {
-        cfg.limit.max_file_size_in_memory *= 1024 * 1024;
+    .saturating_mul(1024 * 1024);
+    cfg.limit.sourcemap_zip_max_size = match cfg.limit.sourcemap_zip_max_size {
+        0 => 500,
+        v => v,
+    }
+    .saturating_mul(1024 * 1024);
+    if cfg.limit.sourcemap_zip_max_entries == 0 {
+        cfg.limit.sourcemap_zip_max_entries = 5000;
     }
     cfg.limit.file_download_sync_max_size *= 1024 * 1024;
 
@@ -4493,6 +4882,14 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.limit.mem_table_max_size *= 1024 * 1024;
     }
+    cfg.limit.max_file_size_in_memory = match cfg.limit.max_file_size_in_memory {
+        0 => default_max_file_size(cfg.limit.mem_table_max_size),
+        mb => mb * 1024 * 1024,
+    };
+    cfg.limit.max_file_size_on_disk = match cfg.limit.max_file_size_on_disk {
+        0 => default_max_file_size(cfg.limit.mem_table_max_size),
+        mb => mb * 1024 * 1024,
+    };
     if cfg.limit.mem_table_bucket_num == 0 {
         cfg.limit.mem_table_bucket_num = default_mem_table_bucket_num(
             cfg.limit.mem_table_max_size,
@@ -4603,14 +5000,20 @@ pub fn deverbatim(path: &Path) -> std::borrow::Cow<'_, str> {
     path.to_string_lossy()
 }
 
-/// Half of what the budget holds, so full memtables can rotate out while the next ones fill.
+/// A quarter of what the budget holds, so each bucket can keep two full memtables in memory.
 fn default_mem_table_bucket_num(
     mem_table_max_size: usize,
     max_file_size_in_memory: usize,
     cpu_num: usize,
 ) -> usize {
-    let by_memory = mem_table_max_size / max_file_size_in_memory.max(1) / 2;
+    let by_memory = mem_table_max_size / max_file_size_in_memory.max(1) / 4;
     by_memory.clamp(1, cpu_num.max(1))
+}
+
+/// A quarter of the memtable budget in whole MB, clamped to 32..512 MB.
+fn default_max_file_size(mem_table_max_size: usize) -> usize {
+    let mb = 1024 * 1024;
+    (mem_table_max_size / 4 / mb * mb).clamp(MAX_FILE_SIZE_DEFAULT_FLOOR, MAX_FILE_SIZE_DEFAULT_CAP)
 }
 
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
@@ -4745,12 +5148,21 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
+    cfg.compact.data_retention = cfg
+        .compact
+        .data_retention_spec
+        .parse()
+        .map_err(|e| anyhow::anyhow!("Invalid ZO_COMPACT_DATA_RETENTION_DAYS: {e}"))?;
+    cfg.compact.data_retention_days = cfg.compact.data_retention.default;
+    parse_dynamic_partition_stream_types(&cfg.compact.dynamic_partition_stream_types)?;
+    if cfg.compact.dynamic_partition_window_days == 0 {
+        cfg.compact.dynamic_partition_window_days = 7;
+    }
+    if cfg.compact.dynamic_partition_window_days < DYNAMIC_PARTITION_MIN_WINDOW_DAYS {
         return Err(anyhow::anyhow!(
-            "Data retention is not allowed to be less than 3 days."
+            "ZO_DYNAMIC_PARTITION_WINDOW_DAYS is not allowed to be less than {DYNAMIC_PARTITION_MIN_WINDOW_DAYS} days."
         ));
     }
-    parse_dynamic_merge_stream_types(&cfg.compact.dynamic_merge_stream_types)?;
     if cfg.compact.interval < 1 {
         cfg.compact.interval = 10;
     }
@@ -4804,21 +5216,19 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Parses `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES`; only logs, metrics and traces are merged by day.
-fn parse_dynamic_merge_stream_types(list: &str) -> Result<HashSet<StreamType>, anyhow::Error> {
+/// Parses `ZO_DYNAMIC_PARTITION_STREAM_TYPES`; only logs, metrics and traces are classified.
+fn parse_dynamic_partition_stream_types(list: &str) -> Result<HashSet<StreamType>, anyhow::Error> {
     list.split(',')
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .map(|s| {
-            let stream_type = StreamType::from(s);
-            stream_type
-                .support_dynamic_merge()
-                .then_some(stream_type)
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES accepts logs, metrics, traces; got {s}"
-                    )
-                })
+        // not `StreamType::from`: it turns an unknown name into logs instead of refusing it
+        .map(|s| match s.to_lowercase().as_str() {
+            "logs" => Ok(StreamType::Logs),
+            "metrics" => Ok(StreamType::Metrics),
+            "traces" => Ok(StreamType::Traces),
+            _ => Err(anyhow::anyhow!(
+                "ZO_DYNAMIC_PARTITION_STREAM_TYPES accepts logs, metrics, traces; got {s}"
+            )),
         })
         .collect()
 }
@@ -5053,6 +5463,48 @@ fn validate_synthetics_ceilings(cfg: &Synthetics) -> Result<(), String> {
 /// be the worse outage. On rejection the built-in ceilings stand, so the failure
 /// mode is "stricter than the operator intended", never "accepts checks that get
 /// killed mid-run".
+/// Clamps the public dashboard keys into their valid ranges; runs after the query timeout is set.
+fn check_public_dashboards_config(cfg: &mut Config) {
+    // A querier builds into the disk cache, so without one every link would answer 503.
+    let serves_reads = cfg.common.node_role.split(',').any(|r| {
+        matches!(
+            r.trim().parse::<cluster::Role>(),
+            Ok(cluster::Role::All | cluster::Role::Querier)
+        )
+    });
+    if serves_reads && !cfg.disk_cache.enabled && cfg.public_dashboards.enabled {
+        log::warn!(
+            "ZO_DISK_CACHE_ENABLED is off, so public dashboards are turned off \
+             (ZO_PUBLIC_DASHBOARD_ENABLED=false)"
+        );
+        cfg.public_dashboards.enabled = false;
+    }
+    let query_timeout = u32::try_from(cfg.limit.query_timeout).unwrap_or(u32::MAX);
+    let pd = &mut cfg.public_dashboards;
+    for v in [
+        &mut pd.max_links_per_org,
+        &mut pd.max_panels,
+        &mut pd.max_links_per_dashboard,
+        &mut pd.max_panel_age_hours,
+        &mut pd.max_cold_waiters,
+        &mut pd.max_inflight_builds,
+        &mut pd.max_inflight_builds_per_org,
+        &mut pd.panel_concurrency,
+    ] {
+        *v = (*v).max(1);
+    }
+    pd.min_refresh_secs = pd.min_refresh_secs.max(60);
+    pd.query_timeout_secs = pd.query_timeout_secs.clamp(1, query_timeout.max(1));
+    pd.build_timeout_secs = pd.build_timeout_secs.max(pd.query_timeout_secs);
+    // The Enterprise default Long user cap is 2; more panel queries per build queue behind it.
+    if pd.panel_concurrency > 2 {
+        log::warn!(
+            "ZO_PUBLIC_DASHBOARD_PANEL_CONCURRENCY={} is above the default Enterprise Long user cap of 2",
+            pd.panel_concurrency
+        );
+    }
+}
+
 fn check_synthetics_config(cfg: &mut Config) {
     if let Err(e) = validate_synthetics_ceilings(&cfg.synthetics) {
         log::error!(
@@ -5066,6 +5518,21 @@ fn check_synthetics_config(cfg: &mut Config) {
             crate::meta::synthetics::DEFAULT_MAX_CHECK_BUDGET_SECS;
         cfg.synthetics.job_lease_secs = crate::meta::synthetics::DEFAULT_JOB_LEASE_SECS;
         cfg.synthetics.max_net_timeout_ms = crate::meta::synthetics::DEFAULT_MAX_NET_TIMEOUT_MS;
+    }
+
+    if cfg.synthetics.lease_batch_size <= 0 {
+        log::error!(
+            "ZO_SYNTHETICS_LEASE_BATCH_SIZE ({}) must be greater than 0, using 10",
+            cfg.synthetics.lease_batch_size
+        );
+        cfg.synthetics.lease_batch_size = 10;
+    }
+    if cfg.synthetics.max_inflight_per_tick <= 0 {
+        log::error!(
+            "ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK ({}) must be greater than 0, using 100",
+            cfg.synthetics.max_inflight_per_tick
+        );
+        cfg.synthetics.max_inflight_per_tick = 100;
     }
 
     // Every synthetics var now has exactly one name, in every build — which
@@ -5248,6 +5715,8 @@ mod tests {
         "ZO_SYNTHETICS_DEVICES",
         "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
         "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
+        "ZO_SYNTHETICS_LEASE_BATCH_SIZE",
+        "ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK",
     ];
 
     fn synthetics_names_in_class(class: SyntheticsReloadClass) -> Vec<&'static str> {
@@ -5267,8 +5736,8 @@ mod tests {
     fn synthetics_reload_classification_is_pinned() {
         assert_eq!(
             SYNTHETICS_RELOAD_CLASSES.len(),
-            16,
-            "Synthetics has 16 keys; every one needs a reload class"
+            18,
+            "Synthetics has 18 keys; every one needs a reload class"
         );
 
         let mut classified: Vec<&str> = SYNTHETICS_RELOAD_CLASSES
@@ -5300,7 +5769,9 @@ mod tests {
                 "ZO_SYNTHETICS_JOB_LEASE_SECS",
                 "ZO_SYNTHETICS_LAMBDA_BROWSER",
                 "ZO_SYNTHETICS_LAMBDA_NET",
+                "ZO_SYNTHETICS_LEASE_BATCH_SIZE",
                 "ZO_SYNTHETICS_MAX_CHECK_BUDGET_SECS",
+                "ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK",
                 "ZO_SYNTHETICS_MAX_NET_TIMEOUT_MS",
                 "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
                 "ZO_SYNTHETICS_RECORDER_EXTENSION_URL",
@@ -5363,6 +5834,8 @@ mod tests {
         cfg.devices = "desktop:800:600".to_string();
         cfg.scheduler_jitter_enabled = !cfg.scheduler_jitter_enabled;
         cfg.orphan_detection_enabled = !cfg.orphan_detection_enabled;
+        cfg.lease_batch_size += 1;
+        cfg.max_inflight_per_tick += 1;
     }
 
     #[test]
@@ -5524,13 +5997,12 @@ mod tests {
         cfg.limit.file_push_interval = 0;
         cfg.limit.req_cols_per_record_limit = 0;
         cfg.compact.interval = 0;
-        cfg.compact.data_retention_days = 10;
+        cfg.compact.data_retention_spec = "10".to_string();
         let ret = check_common_config(&mut cfg);
         assert!(ret.is_ok());
-        assert_eq!(cfg.compact.data_retention_days, 10);
         assert_eq!(cfg.limit.req_cols_per_record_limit, 1000);
 
-        cfg.compact.data_retention_days = 2;
+        cfg.compact.data_retention_spec = "2".to_string();
         let ret = check_compact_config(&mut cfg);
         assert!(ret.is_err());
 
@@ -5722,6 +6194,37 @@ mod tests {
             FileFormat::from_extension("/some/path/file.parquet"),
             Some(FileFormat::Parquet)
         );
+    }
+
+    #[test]
+    fn test_sourcemap_limits_default_to_bytes() {
+        let mut cfg = Config::init().unwrap();
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.sourcemap_file_max_size, 50 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_size, 500 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_entries, 5000);
+    }
+
+    #[test]
+    fn test_sourcemap_limits_zero_falls_back_to_default() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.sourcemap_file_max_size = 0;
+        cfg.limit.sourcemap_zip_max_size = 0;
+        cfg.limit.sourcemap_zip_max_entries = 0;
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.sourcemap_file_max_size, 50 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_size, 500 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_entries, 5000);
+    }
+
+    #[test]
+    fn test_sourcemap_limits_mb_converted_to_bytes() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.sourcemap_file_max_size = 7;
+        cfg.limit.sourcemap_zip_max_size = 9;
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.sourcemap_file_max_size, 7 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_size, 9 * 1024 * 1024);
     }
 
     #[test]
@@ -5995,21 +6498,16 @@ mod tests {
     #[test]
     fn test_default_mem_table_bucket_num() {
         let mb = 1024 * 1024;
-        // 32 GB holds 64 memtables of 512 MB; half of that, then the core count caps it
+        // 32 GB holds 64 memtables of 512 MB; a quarter of that, then the core count caps it
         assert_eq!(
             default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 64),
-            32
-        );
-        assert_eq!(
-            default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 28),
-            28
-        );
-        assert_eq!(default_mem_table_bucket_num(4 * 1024 * mb, 512 * mb, 28), 4);
-        assert_eq!(
-            default_mem_table_bucket_num(4 * 1024 * mb, 128 * mb, 28),
             16
         );
-        // a budget of one memtable or less still gets one bucket
+        assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 8), 8);
+        assert_eq!(default_mem_table_bucket_num(4 * 1024 * mb, 512 * mb, 28), 2);
+        assert_eq!(default_mem_table_bucket_num(2 * 1024 * mb, 512 * mb, 28), 1);
+        assert_eq!(default_mem_table_bucket_num(4 * 1024 * mb, 128 * mb, 28), 8);
+        // a budget of under four memtables still gets one bucket
         assert_eq!(default_mem_table_bucket_num(512 * mb, 512 * mb, 28), 1);
         assert_eq!(default_mem_table_bucket_num(0, 512 * mb, 28), 1);
         assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 0, 28), 28);
@@ -6017,34 +6515,44 @@ mod tests {
     }
 
     #[test]
-    fn test_check_memory_config_derives_mem_table_bucket_num() {
-        let mut cfg = Config::default();
-        cfg.common.node_role = "all".to_string();
-        cfg.limit.cpu_num = 8;
-        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024;
-        cfg.limit.mem_table_max_size = 8 * 1024;
-        cfg.limit.mem_table_bucket_num = 0;
-        check_memory_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.mem_table_bucket_num, 8);
+    fn test_default_max_file_size() {
+        let mb = 1024 * 1024;
+        assert_eq!(default_max_file_size(64 * 1024 * mb), 512 * mb);
+        assert_eq!(default_max_file_size(2 * 1024 * mb), 512 * mb);
+        assert_eq!(default_max_file_size(1024 * mb), 256 * mb);
+        assert_eq!(default_max_file_size(512 * mb), 128 * mb);
+        assert_eq!(default_max_file_size(1000 * mb + 123), 250 * mb);
+        assert_eq!(default_max_file_size(64 * mb), 32 * mb);
+        assert_eq!(default_max_file_size(0), 32 * mb);
+    }
 
-        let mut cfg = Config::default();
-        cfg.common.node_role = "all".to_string();
-        cfg.limit.cpu_num = 8;
-        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024;
-        cfg.limit.mem_table_max_size = 2 * 1024;
-        cfg.limit.mem_table_bucket_num = 0;
-        check_memory_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.mem_table_bucket_num, 2);
-
-        // an explicit value is kept as is
-        let mut cfg = Config::default();
-        cfg.common.node_role = "all".to_string();
-        cfg.limit.cpu_num = 8;
-        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024;
-        cfg.limit.mem_table_max_size = 8 * 1024;
-        cfg.limit.mem_table_bucket_num = 3;
-        check_memory_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.mem_table_bucket_num, 3);
+    #[test]
+    fn test_check_memory_config_derives_mem_table_sizes() {
+        let mb = 1024 * 1024;
+        let derive = |mem_table_max_size_mb: usize, file_size_mb: usize, bucket_num: usize| {
+            let mut cfg = Config::default();
+            cfg.common.node_role = "all".to_string();
+            cfg.limit.cpu_num = 8;
+            cfg.limit.mem_table_max_size = mem_table_max_size_mb;
+            cfg.limit.max_file_size_in_memory = file_size_mb;
+            cfg.limit.max_file_size_on_disk = file_size_mb;
+            cfg.limit.mem_table_bucket_num = bucket_num;
+            check_memory_config(&mut cfg).unwrap();
+            (
+                cfg.limit.mem_table_bucket_num,
+                cfg.limit.max_file_size_in_memory,
+                cfg.limit.max_file_size_on_disk,
+            )
+        };
+        // 8 GB local mode: 2 GB budget keeps 512 MB files in one bucket
+        assert_eq!(derive(2 * 1024, 0, 0), (1, 512 * mb, 512 * mb));
+        // 4 GB local mode: 1 GB budget shrinks the files so a bucket still holds four
+        assert_eq!(derive(1024, 0, 0), (1, 256 * mb, 256 * mb));
+        assert_eq!(derive(8 * 1024, 0, 0), (4, 512 * mb, 512 * mb));
+        assert_eq!(derive(32 * 1024, 0, 0), (8, 512 * mb, 512 * mb));
+        // explicit values are kept as is
+        assert_eq!(derive(8 * 1024, 256, 3), (3, 256 * mb, 256 * mb));
+        assert_eq!(derive(1024, 512, 0), (1, 512 * mb, 512 * mb));
     }
 
     #[test]
@@ -6203,7 +6711,7 @@ mod tests {
     #[allow(deprecated)]
     fn test_check_compact_config_defaults() {
         let mut cfg = Config::default();
-        cfg.compact.data_retention_days = 0;
+        cfg.compact.data_retention_spec = "0".to_string();
         cfg.compact.interval = 0;
         cfg.compact.max_file_size = 0;
         cfg.compact.delete_files_delay_hours = 0;
@@ -6234,18 +6742,47 @@ mod tests {
     #[test]
     fn test_check_compact_config_retention_too_short() {
         let mut cfg = Config::default();
-        cfg.compact.data_retention_days = 1;
+        cfg.compact.data_retention_spec = "1".to_string();
         assert!(check_compact_config(&mut cfg).is_err());
-        cfg.compact.data_retention_days = 2;
+        cfg.compact.data_retention_spec = "2".to_string();
         assert!(check_compact_config(&mut cfg).is_err());
+    }
+
+    #[test]
+    fn test_check_compact_config_parses_the_retention_spec() {
+        let mut cfg = Config::default();
+        cfg.compact.data_retention_spec = "30,logs:21,metrics:180".to_string();
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(cfg.compact.data_retention_days, 30);
+        assert_eq!(cfg.compact.data_retention.logs, 21);
+        assert_eq!(cfg.compact.data_retention.metrics, 180);
+
+        cfg.compact.data_retention_spec = "metrics:180".to_string();
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(cfg.compact.data_retention_days, 3650);
+
+        cfg.compact.data_retention_spec = "30,index:7".to_string();
+        let err = check_compact_config(&mut cfg).unwrap_err().to_string();
+        assert!(err.contains("ZO_COMPACT_DATA_RETENTION_DAYS"), "{err}");
+    }
+
+    #[test]
+    fn test_check_compact_config_caps_the_retention_spec() {
+        let mut cfg = Config::default();
+        cfg.compact.data_retention_spec = i64::MAX.to_string();
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(
+            cfg.compact.data_retention_days,
+            crate::meta::stream::MAX_DATA_RETENTION_DAYS
+        );
     }
 
     #[test]
     fn test_check_compact_config_valid_retention() {
         let mut cfg = Config::default();
-        cfg.compact.data_retention_days = 3;
+        cfg.compact.data_retention_spec = "3".to_string();
         assert!(check_compact_config(&mut cfg).is_ok());
-        cfg.compact.data_retention_days = 0; // 0 means disabled
+        cfg.compact.data_retention_spec = "0".to_string(); // 0 means disabled
         assert!(check_compact_config(&mut cfg).is_ok());
     }
 
@@ -6307,6 +6844,37 @@ mod tests {
     }
 
     #[test]
+    fn workflow_hook_limits_replace_zeros_and_cap_org_concurrency() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.workflow_hook_ip_rpm = 0;
+        cfg.limit.workflow_hook_org_bytes_per_min = 0;
+        cfg.limit.workflow_hook_queue_ttl_secs = 0;
+        cfg.limit.workflow_hook_concurrency = 3;
+        cfg.limit.workflow_hook_org_concurrency = 5;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.workflow_hook_ip_rpm, 6000);
+        assert_eq!(cfg.limit.workflow_hook_org_bytes_per_min, 16_777_216);
+        assert_eq!(cfg.limit.workflow_hook_queue_ttl_secs, 3600);
+        assert_eq!(cfg.limit.workflow_hook_org_concurrency, 3);
+
+        let defaults = Config::init().unwrap().limit;
+        assert_eq!(
+            (
+                defaults.workflow_hook_org_rpm,
+                defaults.workflow_hook_org_bytes_per_min,
+                defaults.workflow_hook_org_queue_max,
+                defaults.workflow_hook_concurrency,
+                defaults.workflow_hook_org_concurrency,
+                defaults.workflow_hook_run_timeout_secs,
+                defaults.workflow_hook_preauth_slots,
+                defaults.workflow_hook_unresolved_ip_slots,
+            ),
+            (1200, 16_777_216, 1000, 8, 2, 900, 256, 16)
+        );
+        assert!(!defaults.workflow_hook_worker_disabled);
+    }
+
+    #[test]
     fn test_check_limit_config_batch_size_clamping() {
         let mut cfg = Config::init().unwrap();
         cfg.limit.batch_size = 0;
@@ -6324,6 +6892,32 @@ mod tests {
         cfg.limit.batch_size = 4096; // within range
         check_limit_config(&mut cfg).unwrap();
         assert_eq!(cfg.limit.batch_size, 4096);
+    }
+
+    #[test]
+    fn test_check_limit_config_dashboard_state_timeline_series() {
+        let mut cfg = Config::init().unwrap();
+        assert_eq!(cfg.limit.max_dashboard_state_timeline_series, 2000);
+        cfg.limit.max_dashboard_state_timeline_series = 0;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.max_dashboard_state_timeline_series, 2000);
+
+        cfg.limit.max_dashboard_state_timeline_series = 50;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.max_dashboard_state_timeline_series, 50);
+    }
+
+    #[test]
+    fn test_check_limit_config_dashboard_hostmap_cells() {
+        let mut cfg = Config::init().unwrap();
+        assert_eq!(cfg.limit.max_dashboard_hostmap_cells, 5000);
+        cfg.limit.max_dashboard_hostmap_cells = 0;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.max_dashboard_hostmap_cells, 5000);
+
+        cfg.limit.max_dashboard_hostmap_cells = 300;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.max_dashboard_hostmap_cells, 300);
     }
 
     #[test]
@@ -6542,15 +7136,34 @@ mod tests {
     }
 
     #[test]
-    fn dynamic_merge_stream_types_accept_only_merged_types() {
-        let set = super::parse_dynamic_merge_stream_types(" logs, Metrics ,,traces ").unwrap();
+    fn dynamic_partition_window_days_is_at_least_three() {
+        let check = |days| {
+            let mut cfg = Config::default();
+            cfg.compact.dynamic_partition_window_days = days;
+            super::check_compact_config(&mut cfg).map(|_| cfg.compact.dynamic_partition_window_days)
+        };
+        assert_eq!(check(0).unwrap(), 7);
+        assert_eq!(check(3).unwrap(), 3);
+        assert_eq!(check(30).unwrap(), 30);
+        for days in [1, 2, -1] {
+            assert!(check(days).is_err(), "{days}");
+        }
+    }
+
+    #[test]
+    fn dynamic_partition_stream_types_accept_only_supported_types() {
+        let set = super::parse_dynamic_partition_stream_types(" logs, Metrics ,,traces ").unwrap();
         assert_eq!(set.len(), 3);
         assert!(
-            super::parse_dynamic_merge_stream_types("")
+            super::parse_dynamic_partition_stream_types("")
                 .unwrap()
                 .is_empty()
         );
-        assert!(super::parse_dynamic_merge_stream_types("logs,index").is_err());
+        assert!(super::parse_dynamic_partition_stream_types("logs,index").is_err());
+        // unknown names must not fall back to logs
+        assert!(super::parse_dynamic_partition_stream_types("foo").is_err());
+        assert!(super::parse_dynamic_partition_stream_types("log").is_err());
+        assert!(super::parse_dynamic_partition_stream_types("logs,foo").is_err());
     }
 
     #[test]
@@ -6558,5 +7171,82 @@ mod tests {
         assert_eq!(select_ext_auth_salt("env", "stored"), "env");
         assert_eq!(select_ext_auth_salt("", "stored"), "stored");
         assert_eq!(select_ext_auth_salt("", ""), LEGACY_EXT_AUTH_SALT);
+    }
+
+    #[test]
+    fn test_chrome_semaphore_never_exceeds_cpu_limit() {
+        let cfg = get_config();
+        let permits = chrome_semaphore().available_permits();
+        assert!(permits >= 1);
+        assert!(permits <= cfg.limit.real_cpu_num);
+        assert!(permits <= cfg.limit.cpu_num);
+    }
+
+    #[test]
+    fn public_dashboard_defaults_and_clamps() {
+        let mut cfg = Config::init().expect("config init");
+        let pd = &cfg.public_dashboards;
+        assert!(pd.enabled && pd.time_shifts);
+        assert_eq!(
+            (pd.rpm, pd.slug_rpm, pd.max_links_per_org, pd.max_panels),
+            (240, 1200, 50, 50)
+        );
+        assert_eq!(
+            (
+                pd.max_links_per_dashboard,
+                pd.min_refresh_secs,
+                pd.max_panel_age_hours
+            ),
+            (10, 60, 24)
+        );
+        assert_eq!(
+            (
+                pd.max_cold_waiters,
+                pd.max_inflight_builds,
+                pd.max_inflight_builds_per_org
+            ),
+            (200, 8, 1)
+        );
+        assert_eq!(
+            (
+                pd.panel_concurrency,
+                pd.query_timeout_secs,
+                pd.build_timeout_secs
+            ),
+            (1, 60, 300)
+        );
+
+        cfg.limit.query_timeout = 30;
+        cfg.public_dashboards.min_refresh_secs = 10;
+        cfg.public_dashboards.max_panels = 0;
+        cfg.public_dashboards.query_timeout_secs = 90;
+        cfg.public_dashboards.build_timeout_secs = 5;
+        check_public_dashboards_config(&mut cfg);
+        let pd = &cfg.public_dashboards;
+        assert_eq!(pd.min_refresh_secs, 60);
+        assert_eq!(pd.max_panels, 1);
+        assert_eq!(pd.query_timeout_secs, 30);
+        assert_eq!(pd.build_timeout_secs, 30);
+
+        cfg.public_dashboards.query_timeout_secs = 0;
+        check_public_dashboards_config(&mut cfg);
+        assert_eq!(cfg.public_dashboards.query_timeout_secs, 1);
+    }
+
+    #[test]
+    fn public_dashboards_turn_off_without_the_disk_cache() {
+        let mut cfg = Config::init().expect("config init");
+        check_public_dashboards_config(&mut cfg);
+        assert!(cfg.public_dashboards.enabled);
+
+        // Only a node that serves public reads needs the disk cache.
+        cfg.disk_cache.enabled = false;
+        cfg.common.node_role = "ingester".to_string();
+        check_public_dashboards_config(&mut cfg);
+        assert!(cfg.public_dashboards.enabled);
+
+        cfg.common.node_role = "ingester,querier".to_string();
+        check_public_dashboards_config(&mut cfg);
+        assert!(!cfg.public_dashboards.enabled);
     }
 }

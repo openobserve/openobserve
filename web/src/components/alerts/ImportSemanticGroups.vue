@@ -151,7 +151,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OTruncatedText>
                   </div>
                   <div class="ms-auto flex shrink-0 items-center">
-                    <OButton variant="ghost" size="icon-circle-sm" @click.stop="viewGroup(group)">
+                    <OButton
+                      :aria-label="t('common.view')"
+                      variant="ghost"
+                      size="icon-circle-sm"
+                      @click.stop="viewGroup(group)"
+                    >
                       <OIcon name="visibility" size="sm" />
                     </OButton>
                   </div>
@@ -194,6 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="ms-auto flex shrink-0 items-center">
                     <OButton
+                      :aria-label="t('common.compare')"
                       variant="ghost"
                       size="icon-circle-sm"
                       @click.stop="viewModification(mod)"
@@ -359,6 +365,7 @@ import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 
 interface SemanticGroup {
   id: string;
@@ -541,6 +548,10 @@ const applyChanges = async () => {
     await alertsService.saveSemanticGroups(org, finalGroups);
     // The groups are cached, and dimension analytics is computed from them.
     void queryClient.invalidateQueries({ queryKey: serviceStreamKeys.all(org) });
+    analytics.track("semantic_groups_imported", {
+      added: selectedAdditionGroups.length,
+      modified: selectedModificationGroups.length,
+    });
 
     toast({
       message: t("toastMessages.alerts.successfullyAppliedChanges", {

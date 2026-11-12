@@ -24,6 +24,7 @@ import { orgKey } from "@/composables/query/keys";
  */
 export const anomalyKeys = {
   all: (org: string) => orgKey(org, "anomalyDetection"),
+  detail: (org: string, id: string) => orgKey(org, "anomalyDetection", "detail", id),
   list: (org: string) => orgKey(org, "anomalyDetection", "list"),
   history: (org: string, limit: number) => orgKey(org, "anomalyDetection", "history", limit),
 };

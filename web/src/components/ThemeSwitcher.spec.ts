@@ -174,4 +174,34 @@ describe("ThemeSwitcher", () => {
       expect(localStorageMock.setItem).toHaveBeenCalledWith("theme", "dark");
     });
   });
+
+  describe("kiosk theme override", () => {
+    it("follows a forced theme without saving it as the preference", async () => {
+      localStorageMock.getItem.mockReturnValue("light");
+      const store = createStore({
+        state: { theme: "light", themeOverride: null as string | null },
+        mutations: {
+          appTheme(state, payload) {
+            state.theme = payload;
+          },
+        },
+        actions: {
+          appTheme(context, payload) {
+            context.commit("appTheme", payload);
+          },
+        },
+      });
+      wrapper = mount(ThemeSwitcher, { global: { plugins: [store, i18n] } });
+      await wrapper.vm.$nextTick();
+      localStorageMock.setItem.mockClear();
+
+      store.state.themeOverride = "dark";
+      store.state.theme = "dark";
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.darkMode).toBe(true);
+      expect(localStorageMock.setItem).not.toHaveBeenCalledWith("theme", "dark");
+    });
+  });
 });

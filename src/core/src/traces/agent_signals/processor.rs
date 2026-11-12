@@ -24,7 +24,7 @@
 #[cfg(feature = "enterprise")]
 use {
     crate::{
-        db::agent_signals::{OFFSET_KEY, get_offset, seed_offset_from_v1, set_offset},
+        db::agent_signals::{OFFSET_KEY, get_offset, set_offset},
         traces::service_graph::{
             discover_trace_streams, run_graph_search,
             v4::{
@@ -63,7 +63,6 @@ pub struct PassPlan {
 /// Scheduler tick: one global offset held by a single node, one window per processing interval.
 #[cfg(feature = "enterprise")]
 pub async fn process_agent_signals() -> Result<(), anyhow::Error> {
-    seed_offset_from_v1().await?;
     let (offset, node) = get_offset().await?;
     let offset = match claim_decision(&node, &LOCAL_NODE.uuid, node_alive(&node).await) {
         ClaimDecision::Skip => return Ok(()),

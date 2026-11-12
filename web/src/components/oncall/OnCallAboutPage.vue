@@ -30,22 +30,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCardSection>
 
     <OCardSection role="body" dense>
-      <ODescriptionList dense>
+      <ODescriptionList dense label-width="narrow">
         <!-- The engine records why it picked this team. It was only ever
              readable by scrolling the timeline, which is not where somebody
              asks "why me". The winning rule draws as the same key|value chips
              the routing tab draws it with, not a hand-built equation, so a
              dimension reads the same wherever it appears. -->
         <ODescriptionItem v-if="showRoutingReason" :label="t('oncall.routedBy')">
-          <span class="flex flex-col items-start gap-1">
-            <span data-test="oncall-about-routing-reason">
-              <!-- A sentence parseRoutingReason doesn't recognise ("...as an
-                   impacted caller of the failing service") still opens
-                   "routed to <id>" — the id is the one fact worth trusting;
-                   the prose around it is not, so it is dropped rather than
-                   shown verbatim. -->
+          <span class="flex min-w-0 flex-col items-start gap-1">
+            <span class="max-w-full wrap-anywhere" data-test="oncall-about-routing-reason">
+              <!-- Unrecognised wording: show the record's team, not the server's prose. -->
+              <OTag
+                v-if="fallbackRouted && teamDeleted"
+                variant="default-soft"
+                size="sm"
+                data-test="oncall-about-routing-team-deleted"
+              >
+                {{ t("oncall.deletedTeam") }}
+              </OTag>
               <router-link
-                v-if="fallbackRoutedId"
+                v-else-if="fallbackRouted && teamId"
                 class="text-accent font-medium"
                 :to="{
                   name: 'onCallTeamDetail',
@@ -54,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
                 data-test="oncall-about-routing-id-link"
               >
-                {{ raw(fallbackRoutedId) }}
+                {{ raw(teamName) }}
               </router-link>
               <span
                 v-else-if="routingDimensions.length"
@@ -78,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-for="(note, index) in routingNotes"
               :key="index"
-              class="text-text-secondary text-xs"
+              class="text-text-secondary max-w-full text-xs wrap-anywhere"
               :data-test="`oncall-about-routing-note-${index}`"
             >
               {{ raw(note) }}
@@ -87,7 +91,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODescriptionItem>
 
         <ODescriptionItem :label="t('oncall.team')">
+          <span v-if="!teamId" class="text-status-error-text" data-test="oncall-about-team-none">{{
+            t("oncall.statUnrouted")
+          }}</span>
+          <OTag
+            v-else-if="teamDeleted"
+            variant="default-soft"
+            size="sm"
+            data-test="oncall-about-team-deleted"
+          >
+            {{ t("oncall.deletedTeam") }}
+          </OTag>
+          <OSkeleton v-else-if="!teamName" class="h-4 w-24" data-test="oncall-about-team-pending" />
           <router-link
+            v-else
             class="text-accent"
             :to="{
               name: 'onCallTeamDetail',
@@ -113,33 +130,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </ODescriptionItem>
 
-        <!-- The ids somebody pastes into a channel, boxed with their own copy
-             control — the same shape the Incident Details card uses, so an id
-             reads and copies the same way on both pages. -->
         <ODescriptionItem v-if="incidentId" :label="t('oncall.incident')">
-          <span
-            class="rounded-default border-border-default bg-surface-panel flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
+          <OSkeleton
+            v-if="incidentLoading"
+            class="h-4 w-40"
+            data-test="oncall-about-incident-pending"
+          />
+          <router-link
+            v-else
+            class="text-accent min-w-0"
+            :to="{
+              name: 'incidentDetail',
+              params: { id: incidentId },
+              query: { org_identifier: orgId },
+            }"
+            data-test="oncall-about-incident-link"
           >
-            <router-link
-              class="text-accent min-w-0 flex-1 font-mono"
-              :to="{
-                name: 'incidentDetail',
-                params: { id: incidentId },
-                query: { org_identifier: orgId },
-              }"
-              data-test="oncall-about-incident-link"
-            >
-              <OTruncatedText class="block">{{ raw(incidentId) }}</OTruncatedText>
-            </router-link>
-            <OButton
-              variant="ghost"
-              size="icon-xs"
-              icon-left="content-copy"
-              :aria-label="t('common.copyToClipboard')"
-              data-test="oncall-about-copy-incident"
-              @click="copyIncidentId"
-            />
-          </span>
+            <OTruncatedText class="block">{{ raw(incidentTitle || incidentId) }}</OTruncatedText>
+          </router-link>
         </ODescriptionItem>
 
         <!-- When the subject IS the incident, this row would repeat the
@@ -185,11 +193,13 @@ import { computed } from "vue";
 import type { RouteLocationRaw } from "vue-router";
 
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import type { ResolutionCause, SubjectType } from "@/ts/interfaces/oncall";
@@ -201,21 +211,31 @@ import { copyToClipboard } from "@/utils/clipboard";
 const props = withDefaults(
   defineProps<{
     orgId: string;
-    teamId: string;
+    /** `null` for an unrouted page, which has no team to link to. */
+    teamId: string | null;
     teamName: string;
+    /** The team is gone from the team list, so there is nothing to link to. */
+    teamDeleted?: boolean;
     subjectType: SubjectType;
     sourceId: string;
     /** The engine's sentence for why this team was picked. */
     routingReason?: string | null;
     subjectStream?: string | null;
     incidentId?: string | null;
+    /** The incident's own title; the id stands in only when it could not be read. */
+    incidentTitle?: string | null;
+    /** The title is still on its way, so the row skeletons instead of flashing the id. */
+    incidentLoading?: boolean;
     cause?: ResolutionCause | null;
     causeNote?: string | null;
   }>(),
   {
+    teamDeleted: false,
     routingReason: null,
     subjectStream: null,
     incidentId: null,
+    incidentTitle: null,
+    incidentLoading: false,
     cause: null,
     causeNote: null,
   },
@@ -254,15 +274,11 @@ const routedByPrimary = computed<I18nText>(() => {
   return mechanismLine.value;
 });
 
-/// The id out of a routing sentence `parseRoutingReason` doesn't recognise —
-/// every branch it DOES recognise opens "routed to <id>" too, so an
-/// unrecognised one almost always still yields an id worth linking, without
-/// the guesswork of interpreting prose the server might change at any time.
-const fallbackRoutedId = computed(() => {
-  if (!props.routingReason || routing.value) return null;
+/// An unrecognised "routed to …" sentence links the record's own team, by the record's id.
+const fallbackRouted = computed(() => {
+  if (!props.routingReason || routing.value) return false;
   const decision = props.routingReason.split("; ").pop()?.trim() ?? "";
-  const match = /^routed to (\S+)/.exec(decision);
-  return match ? match[1] : null;
+  return decision.startsWith("routed to ");
 });
 
 /// A page routed `explicit` was not routed at all — the alert names its team,
@@ -301,9 +317,5 @@ const alertEditRoute = computed<RouteLocationRaw | null>(() =>
 
 async function copySubjectId() {
   await copyToClipboard(props.sourceId, t);
-}
-
-async function copyIncidentId() {
-  if (props.incidentId) await copyToClipboard(props.incidentId, t);
 }
 </script>

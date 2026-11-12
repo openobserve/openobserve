@@ -86,38 +86,50 @@ fn create_alerts_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Alerts::FolderId).big_integer().not_null())
         .col(ColumnDef::new(Alerts::Name).string_len(256).not_null())
         .col(ColumnDef::new(Alerts::StreamType).string_len(50).not_null())
-        .col(ColumnDef::new(Alerts::StreamName).string_len(256).not_null())
+        .col(
+            ColumnDef::new(Alerts::StreamName)
+                .string_len(256)
+                .not_null(),
+        )
         .col(ColumnDef::new(Alerts::IsRealTime).boolean().not_null())
         .col(ColumnDef::new(Alerts::Destinations).json().not_null())
         .col(ColumnDef::new(Alerts::ContextAttributes).json().null())
-        .col(ColumnDef::new(Alerts::RowTemplate).custom(Alias::new(text_type)).null())
+        .col(
+            ColumnDef::new(Alerts::RowTemplate)
+                .custom(Alias::new(text_type))
+                .null(),
+        )
         .col(ColumnDef::new(Alerts::Description).text().null())
         .col(ColumnDef::new(Alerts::Enabled).boolean().not_null())
         .col(ColumnDef::new(Alerts::TzOffset).integer().not_null())
         .col(ColumnDef::new(Alerts::LastTriggeredAt).big_integer().null())
         .col(ColumnDef::new(Alerts::LastSatisfiedAt).big_integer().null())
         // Query condition
-        .col(
-            ColumnDef::new(Alerts::QueryType).small_integer().not_null(),
-        )
+        .col(ColumnDef::new(Alerts::QueryType).small_integer().not_null())
         .col(ColumnDef::new(Alerts::QueryConditions).json().null())
-        .col(ColumnDef::new(Alerts::QuerySql).custom(Alias::new(text_type)) .null())
-        .col(ColumnDef::new(Alerts::QueryPromql).custom(Alias::new(text_type)).null())
         .col(
-            ColumnDef::new(Alerts::QueryPromqlCondition)
-                .json()
+            ColumnDef::new(Alerts::QuerySql)
+                .custom(Alias::new(text_type))
                 .null(),
         )
+        .col(
+            ColumnDef::new(Alerts::QueryPromql)
+                .custom(Alias::new(text_type))
+                .null(),
+        )
+        .col(ColumnDef::new(Alerts::QueryPromqlCondition).json().null())
         .col(ColumnDef::new(Alerts::QueryAggregation).json().null())
-        .col(ColumnDef::new(Alerts::QueryVrlFunction).custom(Alias::new(text_type)).null())
         .col(
-            ColumnDef::new(Alerts::QuerySearchEventType).small_integer().null(),
-        )
-        .col(
-            ColumnDef::new(Alerts::QueryMultiTimeRange)
-                .json()
+            ColumnDef::new(Alerts::QueryVrlFunction)
+                .custom(Alias::new(text_type))
                 .null(),
         )
+        .col(
+            ColumnDef::new(Alerts::QuerySearchEventType)
+                .small_integer()
+                .null(),
+        )
+        .col(ColumnDef::new(Alerts::QueryMultiTimeRange).json().null())
         // Trigger condition
         .col(
             ColumnDef::new(Alerts::TriggerThresholdOperator)
@@ -135,7 +147,9 @@ fn create_alerts_table_statement() -> TableCreateStatement {
                 .not_null(),
         )
         .col(
-            ColumnDef::new(Alerts::TriggerFrequencyType).small_integer().not_null(),
+            ColumnDef::new(Alerts::TriggerFrequencyType)
+                .small_integer()
+                .not_null(),
         )
         .col(
             ColumnDef::new(Alerts::TriggerFrequencySeconds)
@@ -164,9 +178,9 @@ fn create_alerts_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Alerts::UpdatedAt).big_integer().null())
         .foreign_key(
             sea_query::ForeignKey::create()
-                    .name(ALERTS_FOLDERS_FK)
-                    .from(Alerts::Table, Alerts::FolderId)
-                    .to(Folders::Table, Folders::Id)
+                .name(ALERTS_FOLDERS_FK)
+                .from(Alerts::Table, Alerts::FolderId)
+                .to(Folders::Table, Folders::Id),
         )
         .to_owned()
 }

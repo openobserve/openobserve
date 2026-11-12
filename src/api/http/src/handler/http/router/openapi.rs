@@ -47,6 +47,7 @@ use crate::{
         openobserve_api_management::request::organization::org::rename_org,
         openobserve_api_management::request::organization::assume_service_account::assume_service_account,
         openobserve_api_management::request::organization::org::org_summary,
+        openobserve_api_management::request::organization::org::org_overview,
         openobserve_api_management::request::organization::org::get_user_passcode,
         openobserve_api_management::request::organization::org::update_user_passcode,
         openobserve_api_management::request::organization::org::get_user_rumtoken,
@@ -89,10 +90,12 @@ use crate::{
         openobserve_api_search::profiles::series::profiles_series,
         openobserve_api_search::profiles::merge::merge_profiles_get,
         openobserve_api_search::profiles::merge::merge_profiles,
+        openobserve_api_search::profiles::diff::diff_profiles,
         metrics::ingest::json,
         openobserve_api_search::promql::remote_write,
         openobserve_api_search::promql::query_get,
         openobserve_api_search::promql::query_range_get,
+        openobserve_api_search::promql::query_exemplars_get,
         openobserve_api_search::promql::metadata,
         openobserve_api_search::promql::series_get,
         openobserve_api_search::promql::labels_get,
@@ -105,6 +108,7 @@ use crate::{
         rum::ingest::data,
         rum::ingest::sessionreplay,
         openobserve_api_management::request::ingest_rejections::recent_rejections,
+        openobserve_api_management::request::security::get_security_access,
         openobserve_api_search::search::search,
         openobserve_api_search::search::search_partition,
         openobserve_api_search::search::query_functions::list,
@@ -119,6 +123,7 @@ use crate::{
         openobserve_api_search::search::saved_view::update_view,
         openobserve_api_management::request::query_history::record,
         openobserve_api_management::request::query_history::list,
+        openobserve_api_management::request::query_history::clear,
         openobserve_api_management::request::query_history::star,
         openobserve_api_management::request::query_history::delete,
         openobserve_api_management::request::folders::delete_folder,
@@ -154,6 +159,9 @@ use crate::{
         openobserve_api_management::request::dashboards::timed_annotations::delete_annotations,
         openobserve_api_management::request::dashboards::timed_annotations::update_annotations,
         openobserve_api_management::request::dashboards::timed_annotations::delete_annotation_panels,
+        openobserve_api_management::request::sample_data::get,
+        openobserve_api_management::request::sample_data::put,
+        openobserve_api_management::request::sample_data::delete,
         openobserve_api_management::request::alerts::create_alert,
         openobserve_api_management::request::alerts::validate_composite_alert,
         openobserve_api_management::request::alerts::get_composite_references,
@@ -164,6 +172,14 @@ use crate::{
         openobserve_api_management::request::alerts::delete_alert,
         openobserve_api_management::request::alerts::list_alerts,
         openobserve_api_management::request::alerts::enable_alert,
+        openobserve_api_management::request::alerts::ack::ack_alert,
+        openobserve_api_management::request::alerts::ack::unack_alert,
+        openobserve_api_management::request::alerts::ack::ack_incident,
+        openobserve_api_management::request::alerts::ack::unack_incident,
+        openobserve_api_management::request::alerts::ack::list_alert_acks,
+        openobserve_api_management::request::alerts::mute::mute_alert,
+        openobserve_api_management::request::alerts::mute::extend_alert_mute,
+        openobserve_api_management::request::alerts::mute::cancel_alert_mute,
         openobserve_api_management::request::alerts::enable_alert_bulk,
         openobserve_api_management::request::alerts::trigger_alert,
         openobserve_api_management::request::alerts::retrain_alert,
@@ -172,13 +188,21 @@ use crate::{
         openobserve_api_management::request::alerts::move_alerts,
         openobserve_api_management::request::alerts::list_alert_tags,
         openobserve_api_management::request::alerts::history::get_alert_history,
+        openobserve_api_management::request::alerts::auto_investigate::list_auto_investigate_decisions,
         openobserve_api_management::request::alerts::incidents::list_incidents,
         openobserve_api_management::request::alerts::incidents::get_incident,
         openobserve_api_management::request::alerts::incidents::update_incident,
         openobserve_api_management::request::alerts::incidents::get_incident_stats,
         openobserve_api_management::request::alerts::incidents::trigger_incident_rca,
         openobserve_api_management::request::alerts::incidents::cancel_incident_rca,
-        openobserve_api_management::request::alerts::incidents::get_incident_rca_history,
+        openobserve_api_management::request::alerts::incidents::list_incident_rca_runs,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_run,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_thread,
+        openobserve_api_management::request::alerts::incidents::steer_incident_rca_run,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_steering,
+        openobserve_api_management::request::alerts::incidents::resume_incident_rca_run,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_summary,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_live_stream,
         openobserve_api_management::request::alerts::templates::list_templates,
         openobserve_api_management::request::alerts::templates::get_template,
         openobserve_api_management::request::alerts::templates::save_template,
@@ -190,6 +214,7 @@ use crate::{
         openobserve_api_management::request::alerts::destinations::save_destination,
         openobserve_api_management::request::alerts::destinations::update_destination,
         openobserve_api_management::request::alerts::destinations::delete_destination,
+        openobserve_api_management::request::alerts::destinations::jira_setup,
         kv::get,
         kv::set,
         kv::delete,
@@ -241,17 +266,21 @@ use crate::{
         openobserve_api_management::request::dashboards::reports_history::get_report_history,
         openobserve_api_management::request::authz::fga::create_role,
         openobserve_api_management::request::authz::fga::delete_role,
+        openobserve_api_management::request::authz::fga::delete_role_bulk,
         openobserve_api_management::request::authz::fga::get_roles,
         openobserve_api_management::request::authz::fga::update_role,
         openobserve_api_management::request::authz::fga::get_role_permissions,
         openobserve_api_management::request::authz::fga::get_all_role_permissions,
+        openobserve_api_management::request::authz::fga::get_roles_for_user,
         openobserve_api_management::request::authz::fga::get_roles_for_all_users,
         openobserve_api_management::request::authz::fga::get_users_with_role,
         openobserve_api_management::request::authz::fga::create_group,
         openobserve_api_management::request::authz::fga::update_group,
+        openobserve_api_management::request::authz::fga::get_groups_for_user,
         openobserve_api_management::request::authz::fga::get_groups,
         openobserve_api_management::request::authz::fga::get_group_details,
         openobserve_api_management::request::authz::fga::delete_group,
+        openobserve_api_management::request::authz::fga::delete_group_bulk,
         keys::save,
         keys::get,
         keys::list,
@@ -287,18 +316,19 @@ use crate::{
         service_streams::correlate_streams,
         service_streams::get_identity_config,
         service_streams::save_identity_config,
+        service_streams::reset_services,
         gen_ai::clear_agent_registry,
         gen_ai::get_agent_mapping,
         gen_ai::list_scored_agents,
         gen_ai::save_agent_mapping,
-        openobserve_api_management::request::alerts::deduplication::get_config,
-        openobserve_api_management::request::alerts::deduplication::set_config,
-        openobserve_api_management::request::alerts::deduplication::delete_config,
+        gen_ai::strip_harness_text,
+        openobserve_api_management::request::gen_ai_health::get_data_health,
+        openobserve_api_management::request::model_pricing::list_unpriced,
         openobserve_api_management::request::alerts::deduplication::get_semantic_groups,
         openobserve_api_management::request::alerts::deduplication::preview_semantic_groups_diff,
         openobserve_api_management::request::alerts::deduplication::save_semantic_groups,
-        openobserve_api_management::request::alerts::dedup_stats::get_dedup_summary,
         openobserve_api_management::request::metrics_usage::get_metric_usage,
+        openobserve_api_management::request::metrics_usage::get_org_metric_usage,
         openobserve_api_management::request::slos::list_slos,
         openobserve_api_management::request::slos::get_slo,
         openobserve_api_management::request::slos::create_slo,
@@ -318,8 +348,81 @@ use crate::{
         openobserve_api_management::request::downtimes::update_downtime,
         openobserve_api_management::request::downtimes::cancel_downtime,
         openobserve_api_management::request::downtimes::extend_downtime,
+        openobserve_api_management::request::downtimes::test_downtime,
         openobserve_api_management::request::downtimes::move_downtimes,
         openobserve_api_management::request::downtimes::delete_downtime,
+        openobserve_api_management::request::fleet::list_collectors,
+        openobserve_api_management::request::fleet::get_collector,
+        openobserve_api_management::request::fleet::rename_collector,
+        openobserve_api_management::request::fleet::delete_collector,
+        openobserve_api_management::request::fleet::restart_collector,
+        openobserve_api_management::request::fleet::redeliver_collector,
+        openobserve_api_management::request::fleet::list_fleets,
+        openobserve_api_management::request::fleet::create_fleet,
+        openobserve_api_management::request::fleet::get_fleet,
+        openobserve_api_management::request::fleet::rename_fleet,
+        openobserve_api_management::request::fleet::delete_fleet,
+        openobserve_api_management::request::fleet::get_fleet_settings,
+        openobserve_api_management::request::fleet::put_fleet_settings,
+        openobserve_api_management::request::fleet::set_desired,
+        openobserve_api_management::request::fleet::preview_desired,
+        openobserve_api_management::request::fleet::list_tokens,
+        openobserve_api_management::request::fleet::create_token,
+        openobserve_api_management::request::fleet::revoke_token,
+        openobserve_api_management::request::fleet::list_configs,
+        openobserve_api_management::request::fleet::create_config,
+        openobserve_api_management::request::fleet::get_config,
+        openobserve_api_management::request::fleet::delete_config,
+        openobserve_api_management::request::fleet::save_config_draft,
+        openobserve_api_management::request::fleet::publish_config_version,
+        openobserve_api_management::request::fleet::get_config_version,
+        openobserve_api_management::request::fleet::validate_config,
+        openobserve_api_management::request::fleet::list_rollouts,
+        openobserve_api_management::request::fleet::get_rollout,
+        openobserve_api_management::request::fleet::resume_rollout,
+        openobserve_api_management::request::fleet::skip_rollout,
+        openobserve_api_management::request::fleet::rollback_rollout,
+        openobserve_api_management::request::fleet::summary,
+        openobserve_api_management::request::fleet::get_pipelines,
+        openobserve_api_management::request::fleet::list_audit,
+        openobserve_api_management::request::fleet::get_settings,
+        openobserve_api_management::request::fleet::update_settings,
+        openobserve_api_management::request::slack::installations::install_start,
+        openobserve_api_management::request::slack::installations::install_exchange,
+        openobserve_api_management::request::slack::installations::prerequisites,
+        openobserve_api_management::request::slack::installations::connectivity,
+        openobserve_api_management::request::slack::installations::manifest,
+        openobserve_api_management::request::slack::installations::create_installation,
+        openobserve_api_management::request::slack::installations::install_url,
+        openobserve_api_management::request::slack::installations::update_credentials,
+        openobserve_api_management::request::slack::installations::list_installations,
+        openobserve_api_management::request::slack::installations::test_installation,
+        openobserve_api_management::request::slack::installations::connection_start,
+        openobserve_api_management::request::slack::installations::connection_confirm,
+        openobserve_api_management::request::slack::installations::connect,
+        openobserve_api_management::request::slack::installations::disconnect,
+        openobserve_api_management::request::slack::installations::uninstall,
+        openobserve_api_management::request::slack::installations::get_org_access,
+        openobserve_api_management::request::slack::installations::put_org_access,
+        openobserve_api_management::request::slack::settings::get_linking,
+        openobserve_api_management::request::slack::settings::put_linking,
+        openobserve_api_management::request::slack::settings::link_matches,
+        openobserve_api_management::request::slack::settings::link_all,
+        openobserve_api_management::request::slack::settings::channels,
+        openobserve_api_management::request::slack::settings::channel_defaults,
+        openobserve_api_management::request::slack::settings::get_channel_default,
+        openobserve_api_management::request::slack::settings::put_channel_default,
+        openobserve_api_management::request::slack::settings::delete_channel_default,
+        openobserve_api_management::request::slack::settings::get_help_contact,
+        openobserve_api_management::request::slack::settings::put_help_contact,
+        openobserve_api_management::request::slack::settings::oncall_unlinked,
+        openobserve_api_management::request::slack::settings::remind_oncall_unlinked,
+        openobserve_api_management::request::slack::links::start,
+        openobserve_api_management::request::slack::links::confirm,
+        openobserve_api_management::request::slack::links::resend,
+        openobserve_api_management::request::slack::links::links_me,
+        openobserve_api_management::request::slack::links::delete_link,
+        openobserve_api_management::request::slack::links::list_links,
         synthetics::list_synthetics,
         synthetics::create_synthetic,
         synthetics::get_synthetic,
@@ -367,6 +470,135 @@ use crate::{
         rum_analytics::delete_funnel,
         rum_analytics::get_app_settings,
         rum_analytics::put_app_settings,
+        openobserve_api_ingest::request::logs::ingest::handle_gcp_request,
+        openobserve_api_ingest::request::logs::ingest::handle_kinesis_request,
+        openobserve_api_ingest::request::logs::ingest::hec,
+        openobserve_api_ingest::request::logs::ingest::otlp_logs_write,
+        openobserve_api_ingest::request::metrics::ingest::otlp_metrics_write,
+        openobserve_api_ingest::request::profiles::ingest::otlp_profiles_write,
+        openobserve_api_management::request::alerts::delete_alert_bulk,
+        openobserve_api_management::request::alerts::destinations::delete_destination_bulk,
+        openobserve_api_management::request::alerts::destinations::list_prebuilt_destinations,
+        openobserve_api_management::request::alerts::destinations::test_destination,
+        openobserve_api_management::request::alerts::destinations::test_send,
+        openobserve_api_management::request::alerts::external_events::ingest_events,
+        openobserve_api_management::request::alerts::external_events::ingest_events_url_token,
+        openobserve_api_management::request::alerts::incident_integrations::create_integration,
+        openobserve_api_management::request::alerts::incident_integrations::delete_integration,
+        openobserve_api_management::request::alerts::incident_integrations::list_integration_senders,
+        openobserve_api_management::request::alerts::incident_integrations::list_integrations,
+        openobserve_api_management::request::alerts::incident_integrations::rotate_integration_token,
+        openobserve_api_management::request::alerts::incident_integrations::set_integration_enabled,
+        openobserve_api_management::request::alerts::incident_integrations::update_integration,
+        openobserve_api_management::request::alerts::incidents::get_external_alert_payload,
+        openobserve_api_management::request::alerts::incidents::get_incident_events,
+        openobserve_api_management::request::alerts::incidents::post_incident_comment,
+        openobserve_api_management::request::alerts::list_alert_group_transitions,
+        openobserve_api_management::request::alerts::list_alert_groups,
+        openobserve_api_management::request::alerts::templates::delete_template_bulk,
+        openobserve_api_management::request::alerts::templates::preview_template,
+        openobserve_api_management::request::authz::fga::get_resources,
+        openobserve_api_management::request::dashboards::delete_dashboard_bulk,
+        openobserve_api_management::request::dashboards::reports::delete_report_bulk,
+        openobserve_api_management::request::model_pricing::create,
+        openobserve_api_management::request::model_pricing::delete,
+        openobserve_api_management::request::model_pricing::get,
+        openobserve_api_management::request::model_pricing::get_built_in,
+        openobserve_api_management::request::model_pricing::list,
+        openobserve_api_management::request::model_pricing::refresh_built_in,
+        openobserve_api_management::request::model_pricing::test_model_match,
+        openobserve_api_management::request::model_pricing::update,
+        openobserve_api_management::request::organization::ingestion_tokens::create_ingestion_token,
+        openobserve_api_management::request::organization::ingestion_tokens::enable_disable_ingestion_token,
+        openobserve_api_management::request::organization::ingestion_tokens::list_ingestion_tokens,
+        openobserve_api_management::request::organization::org::cluster_info,
+        openobserve_api_management::request::organization::org::list_org_cleanup_tasks,
+        openobserve_api_management::request::organization::org::node_list,
+        openobserve_api_management::request::organization::org::resurrect_org_deletion,
+        openobserve_api_management::request::organization::org::retry_org_cleanup,
+        openobserve_api_management::request::organization::settings::delete_logo,
+        openobserve_api_management::request::organization::settings::delete_logo_text,
+        openobserve_api_management::request::organization::settings::set_logo_text,
+        openobserve_api_management::request::organization::settings::upload_logo,
+        openobserve_api_management::request::public_dashboards::admin::create,
+        openobserve_api_management::request::public_dashboards::admin::delete,
+        openobserve_api_management::request::public_dashboards::admin::get,
+        openobserve_api_management::request::public_dashboards::admin::list,
+        openobserve_api_management::request::public_dashboards::admin::list_org,
+        openobserve_api_management::request::public_dashboards::admin::pause,
+        openobserve_api_management::request::public_dashboards::admin::refresh,
+        openobserve_api_management::request::public_dashboards::admin::resume,
+        openobserve_api_management::request::public_dashboards::admin::take_over,
+        openobserve_api_management::request::public_dashboards::admin::update,
+        openobserve_api_management::request::public_dashboards::settings::get,
+        openobserve_api_management::request::public_dashboards::settings::put,
+        openobserve_api_management::request::public_dashboards::status::batch,
+        openobserve_api_management::request::public_dashboards::status::link,
+        openobserve_api_management::request::service_accounts::delete_bulk,
+        openobserve_api_management::request::sourcemaps::delete,
+        openobserve_api_management::request::sourcemaps::list,
+        openobserve_api_management::request::sourcemaps::list_values,
+        openobserve_api_management::request::sourcemaps::translate_stacktrace,
+        openobserve_api_management::request::sourcemaps::upload_maps,
+        openobserve_api_management::request::status::zo_config,
+        openobserve_api_management::request::status_pages::admin::add_notice_update,
+        openobserve_api_management::request::status_pages::admin::create_domain,
+        openobserve_api_management::request::status_pages::admin::create_notice,
+        openobserve_api_management::request::status_pages::admin::create_page,
+        openobserve_api_management::request::status_pages::admin::delete_domain,
+        openobserve_api_management::request::status_pages::admin::delete_notice,
+        openobserve_api_management::request::status_pages::admin::delete_page,
+        openobserve_api_management::request::status_pages::admin::get_page,
+        openobserve_api_management::request::status_pages::admin::list_domains,
+        openobserve_api_management::request::status_pages::admin::list_notice_updates,
+        openobserve_api_management::request::status_pages::admin::list_page_notices,
+        openobserve_api_management::request::status_pages::admin::list_pages,
+        openobserve_api_management::request::status_pages::admin::mark_false_positive,
+        openobserve_api_management::request::status_pages::admin::preview,
+        openobserve_api_management::request::status_pages::admin::rotate_slug,
+        openobserve_api_management::request::status_pages::admin::set_components,
+        openobserve_api_management::request::status_pages::admin::update_notice,
+        openobserve_api_management::request::status_pages::admin::update_page,
+        openobserve_api_management::request::status_pages::admin::verify_domain,
+        openobserve_api_management::request::status_pages::public::badge,
+        openobserve_api_management::request::status_pages::public::feed,
+        openobserve_api_management::request::status_pages::public::snapshot,
+        openobserve_api_management::request::stream::delete_stream_cache,
+        openobserve_api_management::request::stream::delete_stream_data_by_time_range,
+        openobserve_api_management::request::stream::get_delete_stream_data_status,
+        openobserve_api_management::request::stream::update_fields,
+        openobserve_api_management::request::synthetics::create_agent_token,
+        openobserve_api_management::request::synthetics::create_location,
+        openobserve_api_management::request::synthetics::delete_location,
+        openobserve_api_management::request::synthetics::delete_synthetics_bulk,
+        openobserve_api_management::request::synthetics::get_artifact,
+        openobserve_api_management::request::synthetics::get_location,
+        openobserve_api_management::request::synthetics::list_agent_tokens,
+        openobserve_api_management::request::synthetics::presign_artifacts,
+        openobserve_api_management::request::synthetics::rotate_agent_token,
+        openobserve_api_management::request::synthetics::set_agent_token_enabled,
+        openobserve_api_management::request::synthetics::update_location,
+        openobserve_api_management::request::users::authentication,
+        openobserve_api_management::request::users::decline_invitation,
+        openobserve_api_management::request::users::delete_bulk,
+        openobserve_api_management::request::users::get_presigned_url,
+        openobserve_api_management::request::users::list_invitations,
+        openobserve_api_management::request::users::list_roles,
+        openobserve_api_pipelines::request::enrichment_table::get_all_enrichment_table_statuses,
+        openobserve_api_pipelines::request::functions::delete_function_bulk,
+        openobserve_api_pipelines::request::pipeline::delete_pipeline_bulk,
+        openobserve_api_search::promql::format_query_post,
+        openobserve_api_search::promql::labels_post,
+        openobserve_api_search::promql::query_exemplars_post,
+        openobserve_api_search::promql::query_post,
+        openobserve_api_search::promql::query_range_post,
+        openobserve_api_search::promql::series_post,
+        openobserve_api_search::search::multi_streams::_search_partition_multi,
+        openobserve_api_search::search::multi_streams::around_multi,
+        openobserve_api_search::search::multi_streams::search_multi,
+        openobserve_api_search::search::multi_streams::search_multi_stream,
+        openobserve_api_search::search::result_schema,
+        openobserve_api_search::traces::get_latest_traces_stream,
     ),
     components(
         schemas(
@@ -382,9 +614,28 @@ use crate::{
             config::meta::stream::StreamPartitionType,
             config::meta::stream::StreamStats,
             config::meta::stream::UpdateStreamSettings,
+            config::meta::stream::SecuritySourceSetting,
             config::meta::gen_ai::GenAiAgentMappingConfig,
+            config::meta::gen_ai::HarnessStripRequest,
+            config::meta::gen_ai::HarnessStripResponse,
+            config::meta::gen_ai::HarnessStripped,
             gen_ai::GenAiAgentListItem,
             gen_ai::GenAiAgentListResponse,
+            openobserve_core::sample_data::SampleDataStatus,
+            openobserve_core::sample_data::SampleDataState,
+            openobserve_core::sample_data::PutSampleDataRequest,
+            openobserve_api_management::request::gen_ai_health::DataHealthResponse,
+            openobserve_api_management::request::gen_ai_health::HealthCheck,
+            openobserve_api_management::request::gen_ai_health::ModelUsage,
+            openobserve_api_management::request::gen_ai_health::CheckId,
+            openobserve_api_management::request::gen_ai_health::CheckStatus,
+            openobserve_api_management::request::model_pricing::UnpricedModelsResponse,
+            openobserve_api_management::request::model_pricing::UnpricedModel,
+            openobserve_api_management::request::model_pricing::UnpricedModelMatch,
+            openobserve_api_management::request::gen_ai_health::UnpricedModelRow,
+            config::meta::model_pricing::CostStatus,
+            config::meta::model_pricing::PricingSource,
+            config::meta::model_pricing::PricingTierDefinition,
             config::meta::dashboards::Dashboard,
             config::meta::dashboards::v1::AxisItem,
             config::meta::dashboards::v1::Dashboard,
@@ -430,6 +681,10 @@ use crate::{
             openobserve_api_management::models::destinations::Template,
             openobserve_api_management::models::destinations::DestinationUseResponse,
             openobserve_api_management::models::destinations::DestinationConsumerKind,
+            openobserve_api_management::models::destinations::SlackAppFields,
+            config::meta::destinations::SlackAppTarget,
+            config::meta::destinations::MentionRule,
+            config::meta::destinations::AutoInvestigate,
             // Alerts
             openobserve_api_management::models::alerts::requests::CreateAlertRequestBody,
             openobserve_api_management::models::alerts::requests::UpdateAlertRequestBody,
@@ -439,6 +694,32 @@ use crate::{
             openobserve_api_management::models::alerts::responses::ListAlertsResponseBodyItem,
             openobserve_api_management::request::alerts::AlertTagCount,
             openobserve_api_management::models::alerts::responses::EnableAlertResponseBody,
+            config::meta::alerts::ack::AckRequest,
+            config::meta::alerts::auto_investigate::DecisionsResponse,
+            config::meta::alerts::auto_investigate::DecisionRow,
+            config::meta::alerts::auto_investigate::ReasonCode,
+            config::meta::alerts::auto_investigate::MarkLookup,
+            config::meta::alerts::auto_investigate::BudgetCheck,
+            config::meta::alerts::level::AlertLevel,
+            config::meta::alerts::ack::AckResponse,
+            config::meta::alerts::ack::ProblemAckRequest,
+            config::meta::alerts::ack::UnackRequest,
+            config::meta::alerts::ack::UnackResponse,
+            config::meta::alerts::ack::AckListResponse,
+            config::meta::alerts::ack::AckView,
+            config::meta::alerts::ack::AckSource,
+            config::meta::alerts::ack::AckConflict,
+            config::meta::alerts::ack::ActRefusal,
+            config::meta::alerts::ack::AlertAckSummary,
+            config::meta::downtimes::AlertMuteRequest,
+            config::meta::downtimes::AlertMuteResponse,
+            config::meta::downtimes::AlertMuteExtendRequest,
+            config::meta::downtimes::AlertMuteExtendResponse,
+            config::meta::downtimes::AlertMuteConflict,
+            config::meta::downtimes::AlertGroupRef,
+            config::meta::downtimes::EndOnClear,
+            config::meta::downtimes::MuteSource,
+            openobserve_api_management::models::alerts::responses::AlertIncidentLink,
             openobserve_api_management::models::alerts::Alert,
             openobserve_api_management::models::alerts::TriggerCondition,
             openobserve_api_management::models::alerts::CompareHistoricData,
@@ -456,6 +737,41 @@ use crate::{
             openobserve_api_management::request::alerts::incidents::IncidentSeverity,
             openobserve_api_management::request::alerts::incidents::IncidentStatus,
             config::meta::alerts::incidents::Incident,
+            openobserve_api_management::request::alerts::incidents::RcaStartedResponse,
+            openobserve_api_management::request::alerts::incidents::CancelRcaResponse,
+            openobserve_api_management::request::alerts::incidents::ListRcaRunsQuery,
+            openobserve_api_management::request::alerts::incidents::RcaThreadQuery,
+            openobserve_api_management::request::alerts::incidents::TriggerRcaBody,
+            openobserve_api_management::request::alerts::incidents::SteerRequestBody,
+            config::meta::alerts::rca_steering::SteerRecord,
+            config::meta::alerts::rca_steering::SteerKind,
+            config::meta::alerts::rca_steering::SteerStatus,
+            config::meta::alerts::rca_steering::SteerAction,
+            config::meta::alerts::rca_steering::SteerStatusReason,
+            config::meta::alerts::rca_runs::RcaSummary,
+            config::meta::alerts::rca_runs::RcaDetailFields,
+            config::meta::alerts::rca_runs::RunSummaryFields,
+            config::meta::alerts::rca_runs::PreviousResult,
+            config::meta::alerts::rca_runs::RcaRun,
+            config::meta::alerts::rca_runs::RcaRunItem,
+            config::meta::alerts::rca_runs::ListRcaRunsResponse,
+            config::meta::alerts::rca_runs::RunError,
+            config::meta::alerts::rca_runs::RunStats,
+            config::meta::alerts::rca_runs::RunState,
+            config::meta::oncall::rca_run::RcaRunSummary,
+            config::meta::oncall::rca_run::SummaryCard,
+            config::meta::oncall::rca_run::SummaryCause,
+            config::meta::oncall::rca_run::SummaryTimelineEntry,
+            config::meta::oncall::rca_run::SummaryHypothesis,
+            config::meta::oncall::rca_run::EvidenceEntry,
+            config::meta::oncall::rca_run::Citation,
+            config::meta::oncall::rca_run::EvidenceTarget,
+            config::meta::oncall::rca_run::LeadingEntry,
+            config::meta::oncall::rca_run::BlindSpot,
+            config::meta::oncall::confidence::UnverifiedCitation,
+            config::meta::alerts::rca_runs::RunTrigger,
+            config::meta::alerts::rca_runs::RunMode,
+            config::meta::alerts::rca_runs::RunSubjectType,
             config::meta::downtimes::Downtime,
             config::meta::downtimes::DowntimeRequest,
             config::meta::downtimes::DowntimeListItem,
@@ -494,6 +810,7 @@ use crate::{
             config::meta::downtimes::NotificationEvents,
             config::meta::downtimes::NotificationEvent,
             config::meta::downtimes::DowntimeNotificationLogEntry,
+            config::meta::downtimes::DowntimeNotificationTemplate,
             config::meta::alerts::incidents::IncidentWithAlerts,
             config::meta::alerts::incidents::IncidentAlert,
             config::meta::alerts::incidents::IncidentStats,
@@ -551,6 +868,9 @@ use crate::{
             openobserve_api_management::request::query_history::QueryHistoryRequest,
             openobserve_api_management::request::query_history::QueryHistoryStarRequest,
             openobserve_api_management::request::query_history::QueryHistoryEntry,
+            openobserve_api_management::request::query_history::QueryHistoryCountResponse,
+            openobserve_api_management::request::query_history::QueryHistoryListResponse,
+            openobserve_api_management::request::query_history::QueryHistoryClearResponse,
             meta::user::UpdateUser,
             meta::user::UserRoleRequest,
             meta::user::PostUserRequest,
@@ -558,6 +878,7 @@ use crate::{
             meta::user::UserList,
             meta::user::UserResponse,
             meta::user::SignInResponse,
+            meta::user::SignInUser,
             meta::organization::OrgSummary,
             meta::organization::StreamSummary,
             meta::organization::PipelineSummary,
@@ -571,6 +892,7 @@ use crate::{
             meta::organization::OrgRenameBody,
             meta::organization::OrganizationSetting,
             meta::organization::OrganizationSettingResponse,
+            config::meta::stream::DataRetentionDefaults,
             meta::organization::RumIngestionResponse,
             meta::organization::RumIngestionToken,
             openobserve_api_management::request::organization::assume_service_account::AssumeServiceAccountRequest,
@@ -592,13 +914,7 @@ use crate::{
             config::meta::service_streams::StreamInfo,
             config::meta::correlation::IdentitySet,
             config::meta::correlation::ServiceIdentityConfig,
-            // Alert Deduplication (enterprise)
-            config::meta::alerts::deduplication::GlobalDeduplicationConfig,
             config::meta::correlation::FieldAlias,
-            config::meta::alerts::deduplication::DeduplicationConfig,
-            config::meta::alerts::deduplication::GroupingConfig,
-            config::meta::alerts::deduplication::SendStrategy,
-            openobserve_api_management::request::alerts::dedup_stats::DedupSummaryResponse,
             // Backfill
             pipelines::backfill::BackfillRequest,
             pipelines::backfill::BackfillResponse,
@@ -610,6 +926,85 @@ use crate::{
             config::meta::synthetics::SyntheticFrequency,
             config::meta::synthetics::SyntheticFrequencyType,
             config::meta::synthetics::SyntheticAuth,
+            config::meta::fleet::Collector,
+            config::meta::fleet::CollectorList,
+            config::meta::fleet::CollectorDetail,
+            config::meta::fleet::CollectorStatus,
+            config::meta::fleet::CollectorAssignment,
+            config::meta::fleet::DeliveryEvidence,
+            config::meta::fleet::CollectorEvent,
+            config::meta::fleet::RenameCollectorRequest,
+            config::meta::fleet::RestartQueued,
+            config::meta::fleet::Redelivered,
+            config::meta::fleet::CollectorHealth,
+            config::meta::fleet::ComponentHealth,
+            config::meta::fleet::FleetSummary,
+            config::meta::fleet::StatusCounts,
+            config::meta::fleet::VersionCount,
+            config::meta::fleet::EnrollmentToken,
+            config::meta::fleet::TokenList,
+            config::meta::fleet::CreateTokenRequest,
+            config::meta::fleet::CreatedToken,
+            config::meta::fleet::CollectorFleet,
+            config::meta::fleet::Fleet,
+            config::meta::fleet::FleetList,
+            config::meta::fleet::FleetState,
+            config::meta::fleet::FleetVersion,
+            config::meta::fleet::FleetRollout,
+            config::meta::fleet::FleetSettings,
+            config::meta::fleet::GateSettings,
+            config::meta::fleet::Settings,
+            config::meta::fleet::CreateFleetRequest,
+            config::meta::fleet::RenameFleetRequest,
+            config::meta::fleet::References,
+            config::meta::fleet::FleetConfig,
+            config::meta::fleet::FleetConfigList,
+            config::meta::fleet::ConfigDraft,
+            config::meta::fleet::VersionState,
+            config::meta::fleet::ConfigVersionSummary,
+            config::meta::fleet::FleetConfigDetail,
+            config::meta::fleet::CreateConfigRequest,
+            config::meta::fleet::SaveDraftRequest,
+            config::meta::fleet::DraftSaved,
+            config::meta::fleet::PublishRequest,
+            config::meta::fleet::Published,
+            config::meta::fleet::ConfigVersion,
+            config::meta::fleet::ValidateRequest,
+            config::meta::fleet::ValidationResult,
+            config::meta::fleet::IssueSeverity,
+            config::meta::fleet::ConfigIssue,
+            config::meta::fleet::ValidationFailed,
+            config::meta::fleet::AuditEvent,
+            config::meta::fleet::AuditList,
+            config::meta::fleet::AuditModule,
+            config::meta::fleet::DeliveryState,
+            config::meta::fleet::RolloutStart,
+            config::meta::fleet::Batching,
+            config::meta::fleet::SetDesiredRequest,
+            config::meta::fleet::PlanPreview,
+            config::meta::fleet::RolloutStatus,
+            config::meta::fleet::HaltClass,
+            config::meta::fleet::HaltExit,
+            config::meta::fleet::RolloutHalt,
+            config::meta::fleet::PhaseStatus,
+            config::meta::fleet::GateResult,
+            config::meta::fleet::RolloutPhase,
+            config::meta::fleet::MemberState,
+            config::meta::fleet::RolloutMember,
+            config::meta::fleet::RolloutEvent,
+            config::meta::fleet::Rollout,
+            config::meta::fleet::RolloutList,
+            config::meta::fleet::SkipRequest,
+            config::meta::fleet::FlowWindow,
+            config::meta::fleet::FlowSignal,
+            config::meta::fleet::FlowIssueKind,
+            config::meta::fleet::FlowIssue,
+            config::meta::fleet::FlowDestination,
+            config::meta::fleet::PipelineReceiver,
+            config::meta::fleet::PipelineExporter,
+            config::meta::fleet::Pipeline,
+            config::meta::fleet::PipelineFleet,
+            config::meta::fleet::PipelinesResponse,
             config::meta::synthetics::SyntheticVariable,
             config::meta::synthetics::SyntheticListItem,
             config::meta::synthetics::SyntheticListResponse,
@@ -670,10 +1065,54 @@ use crate::{
         (name = "Patterns", description = "Log pattern extraction operations (enterprise)"),
         (name = "Service Streams", description = "Multi-signal correlation across logs, traces, and metrics (enterprise)"),
         (name = "Synthetics", description = "Synthetic monitoring — uptime and browser checks (enterprise)"),
+        (name = "Slack", description = "Slack app install, workspace connections and settings (enterprise)"),
         (name = "Downtimes", description = "Scheduled windows that keep evaluating alerts, anomaly detections, synthetics checks and SLOs but notify nobody (enterprise)"),
+        (name = "Fleet", description = "Fleet Manager: OpAMP collector inventory (enterprise)"),
         (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
         (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
         (name = "Anomaly Detection", description = "Anomaly detection configs, model training and detection history (enterprise)"),
+        (name = "Workflows", description = "Workflow authoring, drafts, runs and run history (enterprise)"),
+        (name = "Security", description = "Security sources, OCSF packs, detections, cases and investigation (enterprise)"),
+        (name = "AWS Marketplace", description = "AWS Marketplace subscription linking (cloud)"),
+        (name = "AnnotationQueues", description = "Annotation queues for human review of LLM traces (enterprise)"),
+        (name = "Annotations", description = "Annotations on traces and spans (enterprise)"),
+        (name = "Azure Marketplace", description = "Azure Marketplace subscription linking (cloud)"),
+        (name = "Billings", description = "Subscriptions, invoices and billing groups (cloud)"),
+        (name = "Datasets", description = "LLM evaluation datasets (enterprise)"),
+        (name = "Discovery", description = "Discovery of LLM evaluation entities (enterprise)"),
+        (name = "Domain Management", description = "Allowed email domains for sign-in (enterprise)"),
+        (name = "EvalJobs", description = "Online evaluation jobs (enterprise)"),
+        (name = "Experiments", description = "LLM evaluation experiments (enterprise)"),
+        (name = "GenAI Settings", description = "GenAI agent mapping, the agent list and AI data health"),
+        (name = "Groups", description = "User group management"),
+        (name = "Keys", description = "Cipher key management (enterprise)"),
+        (name = "LLM", description = "LLM model pricing definitions"),
+        (name = "License", description = "License management (enterprise)"),
+        (name = "MCP", description = "Model Context Protocol server"),
+        (name = "OnCall", description = "On-call teams, schedules, routing and pages (enterprise)"),
+        (name = "Pipelines", description = "Pipeline management"),
+        (name = "Providers", description = "LLM provider configuration (enterprise)"),
+        (name = "Public Dashboards", description = "Public links to dashboards"),
+        (name = "RePattern", description = "Regular expression patterns for sensitive data redaction (enterprise)"),
+        (name = "Reports", description = "Report management"),
+        (name = "Resources", description = "Resources available for role permissions"),
+        (name = "Roles", description = "Role management"),
+        (name = "Sample Data", description = "Sample data state for the onboarding tour"),
+        (name = "ScoreConfigs", description = "Score configurations for LLM evaluation (enterprise)"),
+        (name = "Scorers", description = "LLM evaluation scorers (enterprise)"),
+        (name = "ServiceAccounts", description = "Service account management"),
+        (name = "Sourcemaps", description = "Source map upload and stack trace translation"),
+        (name = "Status Pages", description = "Public status pages, notices and custom domains"),
+        (name = "Templates", description = "Alert notification templates"),
+        (name = "SLOs", description = "Service level objectives and their alert previews"),
+        (name = "Folders", description = "Folders that group dashboards, alerts and other resources"),
+        (name = "GenAI Settings", description = "Gen-AI agent registry and agent mapping settings"),
+        (name = "Ingestion", description = "Ingestion diagnostics such as recently rejected records"),
+        (name = "Search Jobs", description = "Asynchronous search jobs and their results"),
+        (name = "Rum", description = "Real user monitoring data ingestion"),
+        (name = "Playground", description = "LLM playground runs, scores and shared snapshots (enterprise)"),
+        (name = "Prompts", description = "Versioned LLM prompts and their labels (enterprise)"),
+        (name = "RemoteTasks", description = "Remote tasks, their drafts, secrets and signing keys (enterprise)"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
@@ -685,6 +1124,30 @@ pub struct ApiDoc;
 #[cfg(feature = "enterprise")]
 #[derive(OpenApi)]
 #[openapi(paths(
+    openobserve_api_management::request::security::cases::get_case_settings,
+    openobserve_api_management::request::security::cases::update_case_settings,
+    openobserve_api_management::request::security::cases::lookup_cases,
+    openobserve_api_management::request::security::cases::promote_to_case,
+    openobserve_api_management::request::security::audit::list_security_audit,
+    openobserve_api_management::request::security::investigate::list_entities,
+    openobserve_api_management::request::security::investigate::get_entity_graph,
+    openobserve_api_management::request::security::investigate::get_entity_detail,
+    openobserve_api_management::request::security::investigate::score_users,
+    openobserve_api_management::request::security::investigate::search_events,
+    openobserve_api_management::request::security::intel::sweep,
+    openobserve_api_management::request::security::intel::sightings,
+    openobserve_api_management::request::security::intel::validate,
+    openobserve_api_management::request::security::list_ocsf_packs,
+    openobserve_api_management::request::security::sources::list_sources,
+    openobserve_api_management::request::security::sources::list_source_types,
+    openobserve_api_management::request::security::sources::match_source,
+    openobserve_api_management::request::security::sources::classify_sources,
+    openobserve_api_management::request::security::sources::attach_pack,
+    openobserve_api_management::request::security::sources::detach_pack,
+    openobserve_api_management::request::security::sigma::get_catalog,
+    openobserve_api_management::request::security::sigma::compile,
+    openobserve_api_management::request::security::sigma::get_mitre_coverage,
+    openobserve_api_management::request::security::sigma::get_detection_evidence,
     openobserve_api_management::request::prompts::list_prompts,
     openobserve_api_management::request::prompts::create_prompt,
     openobserve_api_management::request::prompts::match_prompts,
@@ -766,19 +1229,279 @@ pub struct ApiDoc;
     openobserve_api_management::request::anomaly_detection::detect_anomalies,
     openobserve_api_management::request::anomaly_detection::get_detection_history,
     openobserve_api_management::request::alerts::history::get_all_anomaly_history,
+    openobserve_api_management::request::alerts::history_summary::get_alert_history_summary,
+    openobserve_api_management::request::workflows::save_workflow,
+    openobserve_api_management::request::workflows::list_workflows,
+    openobserve_api_management::request::workflows::move_workflows,
+    openobserve_api_management::request::workflows::delete_workflows,
+    openobserve_api_management::request::workflows::update_workflows,
+    openobserve_api_management::request::workflows::test_workflow,
+    openobserve_api_management::request::workflows::trigger_workflow,
+    openobserve_api_management::request::workflows::get_workflow_errors,
+    openobserve_api_management::request::workflows::retry_workflow,
+    openobserve_api_management::request::workflows::enable_workflow,
+    openobserve_api_management::request::workflows::get_workflow_history,
+    openobserve_api_management::request::workflows::promote_draft,
+    crate::handler::http::request::ratelimit::api_modules,
+    openobserve_api_management::request::ai::chat::cancel,
+    openobserve_api_management::request::ai::chat::chat,
+    openobserve_api_management::request::ai::chat::chat_stream,
+    openobserve_api_management::request::ai::chat::confirm_action,
+    openobserve_api_management::request::ai::chat::feedback,
+    openobserve_api_management::request::ai::chats::delete,
+    openobserve_api_management::request::ai::chats::delete_all,
+    openobserve_api_management::request::ai::chats::get,
+    openobserve_api_management::request::ai::chats::list,
+    openobserve_api_management::request::ai::chats::rename,
+    openobserve_api_management::request::ai::shares::create,
+    openobserve_api_management::request::ai::shares::fork,
+    openobserve_api_management::request::ai::shares::get_shared,
+    openobserve_api_management::request::ai::shares::list_for_chat,
+    openobserve_api_management::request::ai::shares::list_mine,
+    openobserve_api_management::request::ai::shares::revoke,
+    openobserve_api_management::request::ai::shares::update,
+    openobserve_api_management::request::ai::toolsets::create,
+    openobserve_api_management::request::ai::toolsets::delete,
+    openobserve_api_management::request::ai::toolsets::get,
+    openobserve_api_management::request::ai::toolsets::list,
+    openobserve_api_management::request::ai::toolsets::update,
+    openobserve_api_management::request::annotation_queues::archive_annotation_queue_items,
+    openobserve_api_management::request::annotation_queues::clear_annotation_queue_items,
+    openobserve_api_management::request::annotation_queues::create_annotation_queue,
+    openobserve_api_management::request::annotation_queues::delete_annotation_queue,
+    openobserve_api_management::request::annotation_queues::enqueue_annotation_queue_item,
+    openobserve_api_management::request::annotation_queues::get_annotation_queue,
+    openobserve_api_management::request::annotation_queues::get_annotation_queue_item,
+    openobserve_api_management::request::annotation_queues::list_annotation_queue_item_reviews,
+    openobserve_api_management::request::annotation_queues::list_annotation_queue_items,
+    openobserve_api_management::request::annotation_queues::list_annotation_queues,
+    openobserve_api_management::request::annotation_queues::review_annotation_queue_item,
+    openobserve_api_management::request::annotation_queues::update_annotation_queue,
+    openobserve_api_management::request::annotations::annotate_target,
+    openobserve_api_management::request::datasets::create_dataset,
+    openobserve_api_management::request::datasets::delete_dataset,
+    openobserve_api_management::request::datasets::delete_dataset_item,
+    openobserve_api_management::request::datasets::get_dataset,
+    openobserve_api_management::request::datasets::get_dataset_item_versions,
+    openobserve_api_management::request::datasets::get_dataset_snapshot_rows,
+    openobserve_api_management::request::datasets::import_dataset_items,
+    openobserve_api_management::request::datasets::list_dataset_items,
+    openobserve_api_management::request::datasets::list_datasets,
+    openobserve_api_management::request::datasets::push_annotation_queue_item_to_dataset,
+    openobserve_api_management::request::datasets::push_dataset_item,
+    openobserve_api_management::request::datasets::update_dataset,
+    openobserve_api_management::request::datasets::update_dataset_item,
+    openobserve_api_management::request::datasets::upsert_dataset_items,
+    openobserve_api_management::request::discovery::list_discovery_items,
+    openobserve_api_management::request::domain_management::get_domain_management_config,
+    openobserve_api_management::request::domain_management::set_domain_management_config,
+    openobserve_api_management::request::eval_jobs::activate_eval_job,
+    openobserve_api_management::request::eval_jobs::archive_eval_job,
+    openobserve_api_management::request::eval_jobs::create_eval_job,
+    openobserve_api_management::request::eval_jobs::delete_eval_job,
+    openobserve_api_management::request::eval_jobs::get_eval_job,
+    openobserve_api_management::request::eval_jobs::list_eval_jobs,
+    openobserve_api_management::request::eval_jobs::manual_eval_job,
+    openobserve_api_management::request::eval_jobs::pause_eval_job,
+    openobserve_api_management::request::eval_jobs::resume_eval_job,
+    openobserve_api_management::request::eval_jobs::update_eval_job,
+    openobserve_api_management::request::experiments::finalize_experiment,
+    openobserve_api_management::request::experiments::list_experiment_slots,
+    openobserve_api_management::request::experiments::submit_experiment_records,
+    openobserve_api_management::request::keys::delete_bulk,
+    openobserve_api_management::request::license::get_license_info,
+    openobserve_api_management::request::license::refresh_license_limits,
+    openobserve_api_management::request::license::rotate_license_key,
+    openobserve_api_management::request::license::store_license,
+    openobserve_api_management::request::oncall::acknowledge_response,
+    openobserve_api_management::request::oncall::add_member,
+    openobserve_api_management::request::oncall::add_note,
+    openobserve_api_management::request::oncall::apply_schedule_preset,
+    openobserve_api_management::request::oncall::cause_analytics,
+    openobserve_api_management::request::oncall::confirm_contact_code,
+    openobserve_api_management::request::oncall::confirm_recovery,
+    openobserve_api_management::request::oncall::create_override,
+    openobserve_api_management::request::oncall::create_ownership_rule,
+    openobserve_api_management::request::oncall::create_team,
+    openobserve_api_management::request::oncall::create_unavailability,
+    openobserve_api_management::request::oncall::delete_contact,
+    openobserve_api_management::request::oncall::delete_override,
+    openobserve_api_management::request::oncall::delete_ownership_rule,
+    openobserve_api_management::request::oncall::delete_team,
+    openobserve_api_management::request::oncall::delete_telephony,
+    openobserve_api_management::request::oncall::delete_unavailability,
+    openobserve_api_management::request::oncall::dismiss_unrouted_signal,
+    openobserve_api_management::request::oncall::escalate_response,
+    openobserve_api_management::request::oncall::get_contact,
+    openobserve_api_management::request::oncall::get_escalation_preview,
+    openobserve_api_management::request::oncall::get_escalation_progress,
+    openobserve_api_management::request::oncall::get_policy,
+    openobserve_api_management::request::oncall::get_prior_causes,
+    openobserve_api_management::request::oncall::get_resolved_schedule,
+    openobserve_api_management::request::oncall::get_response,
+    openobserve_api_management::request::oncall::get_response_history,
+    openobserve_api_management::request::oncall::get_response_report,
+    openobserve_api_management::request::oncall::get_routing_config,
+    openobserve_api_management::request::oncall::get_schedule,
+    openobserve_api_management::request::oncall::get_team,
+    openobserve_api_management::request::oncall::get_team_channel,
+    openobserve_api_management::request::oncall::get_team_load,
+    openobserve_api_management::request::oncall::get_team_overview,
+    openobserve_api_management::request::oncall::get_team_reachability,
+    openobserve_api_management::request::oncall::get_telephony,
+    openobserve_api_management::request::oncall::get_telephony_status,
+    openobserve_api_management::request::oncall::handoff_response,
+    openobserve_api_management::request::oncall::list_coverage_gaps,
+    openobserve_api_management::request::oncall::list_deliveries,
+    openobserve_api_management::request::oncall::list_escalation_progress,
+    openobserve_api_management::request::oncall::list_members,
+    openobserve_api_management::request::oncall::list_my_deliveries,
+    openobserve_api_management::request::oncall::list_my_teams,
+    openobserve_api_management::request::oncall::list_overrides,
+    openobserve_api_management::request::oncall::list_ownership_rule_stats,
+    openobserve_api_management::request::oncall::list_ownership_rules,
+    openobserve_api_management::request::oncall::list_responses,
+    openobserve_api_management::request::oncall::list_responses_for_incident,
+    openobserve_api_management::request::oncall::list_schedule_presets,
+    openobserve_api_management::request::oncall::list_team_config_risks,
+    openobserve_api_management::request::oncall::list_team_context,
+    openobserve_api_management::request::oncall::list_teams,
+    openobserve_api_management::request::oncall::list_unavailability,
+    openobserve_api_management::request::oncall::list_unrouted_signals,
+    openobserve_api_management::request::oncall::mark_deliveries_read,
+    openobserve_api_management::request::oncall::preview_resolved_schedule,
+    openobserve_api_management::request::oncall::preview_routing,
+    openobserve_api_management::request::oncall::promote_to_incident,
+    openobserve_api_management::request::oncall::put_telephony,
+    openobserve_api_management::request::oncall::remove_member,
+    openobserve_api_management::request::oncall::resolve_response,
+    openobserve_api_management::request::oncall::send_contact_code,
+    openobserve_api_management::request::oncall::send_test_page,
+    openobserve_api_management::request::oncall::set_contact,
+    openobserve_api_management::request::oncall::set_policy,
+    openobserve_api_management::request::oncall::set_routing_config,
+    openobserve_api_management::request::oncall::set_schedule,
+    openobserve_api_management::request::oncall::set_team_channel,
+    openobserve_api_management::request::oncall::snooze_response,
+    openobserve_api_management::request::oncall::test_team_slack_channel,
+    openobserve_api_management::request::oncall::unacknowledge_response,
+    openobserve_api_management::request::oncall::unsnooze_response,
+    openobserve_api_management::request::oncall::update_ownership_rule,
+    openobserve_api_management::request::oncall::update_team,
+    openobserve_api_management::request::oncall::who_is_on_call,
+    openobserve_api_management::request::organization::storage::get,
+    openobserve_api_management::request::organization::storage::save,
+    openobserve_api_management::request::organization::storage::update,
+    openobserve_api_management::request::providers::create_provider,
+    openobserve_api_management::request::providers::delete_provider,
+    openobserve_api_management::request::providers::get_provider,
+    openobserve_api_management::request::providers::list_providers,
+    openobserve_api_management::request::providers::test_provider_config,
+    openobserve_api_management::request::providers::update_provider,
+    openobserve_api_management::request::quality::get_quality_timeline,
+    openobserve_api_management::request::quality::list_quality_scores,
+    openobserve_api_management::request::quality::list_quality_summaries,
+    openobserve_api_management::request::score_configs::create_score_config,
+    openobserve_api_management::request::score_configs::delete_score_config,
+    openobserve_api_management::request::score_configs::ensure_score_config,
+    openobserve_api_management::request::score_configs::get_score_config,
+    openobserve_api_management::request::score_configs::list_score_config_versions,
+    openobserve_api_management::request::score_configs::list_score_configs,
+    openobserve_api_management::request::score_configs::update_score_config,
+    openobserve_api_management::request::scorers::create_scorer,
+    openobserve_api_management::request::scorers::delete_scorer,
+    openobserve_api_management::request::scorers::get_scorer,
+    openobserve_api_management::request::scorers::list_scorer_versions,
+    openobserve_api_management::request::scorers::list_scorers,
+    openobserve_api_management::request::scorers::preview_llm_judge_output_schema,
+    openobserve_api_management::request::scorers::test_scorer,
+    openobserve_api_management::request::scorers::update_scorer,
+    openobserve_api_management::request::synthetics::agent_setup,
+    openobserve_api_management::request::users::service_accounts::exchange_token,
+    openobserve_api_pipelines::request::re_pattern::delete,
+    openobserve_api_pipelines::request::re_pattern::delete_bulk,
+    openobserve_api_pipelines::request::re_pattern::get,
+    openobserve_api_pipelines::request::re_pattern::get_built_in_patterns,
+    openobserve_api_pipelines::request::re_pattern::list,
+    openobserve_api_pipelines::request::re_pattern::save,
+    openobserve_api_pipelines::request::re_pattern::test,
+    openobserve_api_pipelines::request::re_pattern::update,
+    openobserve_api_search::search::query_manager::cancel_query,
+    openobserve_api_search::search::query_manager::query_status,
+    openobserve_api_search::search::search_inspector::get_search_profile,
+    openobserve_core::traces::agent_signals::api::compare_agent_versions,
+    openobserve_core::traces::agent_signals::api::get_agent_signals,
+    openobserve_core::traces::service_graph::api::get_edge_history,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
     o2_enterprise::enterprise::password_policy::lockout::LockoutState,
     openobserve_api_management::request::users::UserDetailsResponse,
+    openobserve_api_management::request::alerts::incidents::RcaResumedResponse,
+    openobserve_core::alerts::rca_resume::ResumeStep,
 )))]
 struct EnterpriseExperimentApiDoc;
+
+/// Cloud builds never mount the workflow HTTP-trigger routes, so they stay out of its spec.
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+#[derive(OpenApi)]
+#[openapi(paths(
+    openobserve_api_management::request::workflows::http_trigger::get_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::put_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::delete_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::rotate_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::revoke_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::reveal_http_credential_secret,
+    openobserve_api_management::request::workflows::http_trigger::test_http_trigger,
+))]
+struct WorkflowHttpTriggerApiDoc;
 
 #[cfg(feature = "cloud")]
 #[derive(OpenApi)]
 #[openapi(paths(
     openobserve_api_management::request::organization::org::get_paid_overage_status,
     openobserve_api_management::request::organization::org::set_paid_overage_status,
+    openobserve_api_management::request::alerts::slack_oauth::exchange,
+    openobserve_api_management::request::alerts::slack_oauth::start,
+    openobserve_api_management::request::cloud::aws_marketplace::activation_status,
+    openobserve_api_management::request::cloud::aws_marketplace::link_subscription,
+    openobserve_api_management::request::cloud::azure_marketplace::link_subscription,
+    openobserve_api_management::request::cloud::billings::create_billing_portal_session,
+    openobserve_api_management::request::cloud::billings::create_checkout_session,
+    openobserve_api_management::request::cloud::billings::get_ai_usage,
+    openobserve_api_management::request::cloud::billings::list_invoices,
+    openobserve_api_management::request::cloud::billings::list_subscription,
+    openobserve_api_management::request::cloud::billings::process_session_detail,
+    openobserve_api_management::request::cloud::billings::unsubscribe,
+    openobserve_api_management::request::cloud::org_usage::get_org_usage,
+    openobserve_api_management::request::org_domains::approve_request,
+    openobserve_api_management::request::org_domains::delete_linked_domain,
+    openobserve_api_management::request::org_domains::get_linked_domain,
+    openobserve_api_management::request::org_domains::link_domain,
+    openobserve_api_management::request::org_domains::list_requests,
+    openobserve_api_management::request::org_domains::raise_request,
+    openobserve_api_management::request::org_domains::reject_request,
+    openobserve_api_management::request::org_domains::verify_domain,
+    openobserve_api_management::request::organization::billing_group::accept,
+    openobserve_api_management::request::organization::billing_group::check_members,
+    openobserve_api_management::request::organization::billing_group::check_membership,
+    openobserve_api_management::request::organization::billing_group::invite,
+    openobserve_api_management::request::organization::billing_group::leave_group,
+    openobserve_api_management::request::organization::billing_group::list_invites,
+    openobserve_api_management::request::organization::billing_group::reject,
+    openobserve_api_management::request::organization::billing_group::remove_member,
+    openobserve_api_management::request::organization::org::accept_org_invite,
+    openobserve_api_management::request::organization::org::all_organizations,
+    openobserve_api_management::request::organization::org::create_external_contract,
+    openobserve_api_management::request::organization::org::delete_org_invite,
+    openobserve_api_management::request::organization::org::enable_org_storage,
+    openobserve_api_management::request::organization::org::extend_external_contract,
+    openobserve_api_management::request::organization::org::extend_trial_period,
+    openobserve_api_management::request::organization::org::generate_org_invite,
+    openobserve_api_management::request::organization::org::get_org_invites,
+    openobserve_api_management::request::organization::org::initiate_org_deletion,
+    openobserve_api_management::request::organization::org::revoke_external_contract,
+    openobserve_api_management::request::organization::org::set_quota_usage_limit,
 ))]
 struct CloudQuotaApiDoc;
 
@@ -787,26 +1510,21 @@ pub struct SecurityAddon;
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         #[cfg(feature = "enterprise")]
-        {
-            let enterprise = EnterpriseExperimentApiDoc::openapi();
-            openapi.paths.paths.extend(enterprise.paths.paths);
-            if let (Some(components), Some(enterprise_components)) =
-                (openapi.components.as_mut(), enterprise.components)
-            {
-                components.schemas.extend(enterprise_components.schemas);
-                components.responses.extend(enterprise_components.responses);
-            }
-        }
+        overlay_doc(openapi, EnterpriseExperimentApiDoc::openapi());
+        #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+        overlay_doc(openapi, WorkflowHttpTriggerApiDoc::openapi());
         #[cfg(feature = "cloud")]
+        overlay_doc(openapi, CloudQuotaApiDoc::openapi());
+        // The hand-written history params cannot be cfg-gated, and `siem` is enterprise-only.
+        #[cfg(not(feature = "enterprise"))]
+        if let Some(params) = openapi
+            .paths
+            .paths
+            .get_mut("/api/v2/{org_id}/alerts/history")
+            .and_then(|path| path.get.as_mut())
+            .and_then(|op| op.parameters.as_mut())
         {
-            let cloud = CloudQuotaApiDoc::openapi();
-            openapi.paths.paths.extend(cloud.paths.paths);
-            if let (Some(components), Some(cloud_components)) =
-                (openapi.components.as_mut(), cloud.components)
-            {
-                components.schemas.extend(cloud_components.schemas);
-                components.responses.extend(cloud_components.responses);
-            }
+            params.retain(|param| param.name != "siem");
         }
         let cfg = get_config();
         if !cfg.common.base_uri.is_empty() {
@@ -822,6 +1540,24 @@ impl Modify for SecurityAddon {
         components.add_security_scheme(
             "BasicAuth",
             SecurityScheme::Http(Http::new(HttpAuthScheme::Basic)),
+        );
+        components.add_security_scheme(
+            "FirehoseAccessKey",
+            SecurityScheme::ApiKey(utoipa::openapi::security::ApiKey::Header(
+                utoipa::openapi::security::ApiKeyValue::with_description(
+                    "X-Amz-Firehose-Access-Key",
+                    "base64 of user:password",
+                ),
+            )),
+        );
+        components.add_security_scheme(
+            "GcpApiKey",
+            SecurityScheme::ApiKey(utoipa::openapi::security::ApiKey::Query(
+                utoipa::openapi::security::ApiKeyValue::with_description(
+                    "API-Key",
+                    "base64 of user:password",
+                ),
+            )),
         );
     }
 }
@@ -895,6 +1631,28 @@ pub async fn openapi_info() -> OpenapiInfo {
     tag_operations
 }
 
+#[cfg(any(feature = "enterprise", feature = "cloud"))]
+fn overlay_doc(openapi: &mut utoipa::openapi::OpenApi, extra: utoipa::openapi::OpenApi) {
+    overlay_paths(&mut openapi.paths, extra.paths);
+    if let (Some(components), Some(extra_components)) =
+        (openapi.components.as_mut(), extra.components)
+    {
+        components.schemas.extend(extra_components.schemas);
+        components.responses.extend(extra_components.responses);
+    }
+}
+
+/// Lays `extra` over `paths` per method: its operations win, the base keeps methods `extra` lacks.
+#[cfg(any(feature = "enterprise", feature = "cloud"))]
+fn overlay_paths(paths: &mut utoipa::openapi::Paths, extra: utoipa::openapi::Paths) {
+    for (path, mut item) in extra.paths {
+        if let Some(base) = paths.paths.remove(&path) {
+            item.merge_operations(base);
+        }
+        paths.paths.insert(path, item);
+    }
+}
+
 #[cfg(all(test, feature = "enterprise"))]
 mod experiment_tests {
     use super::*;
@@ -907,9 +1665,9 @@ mod experiment_tests {
         let anomaly_cases = [
             (anomaly.to_string(), "get"),
             (anomaly.to_string(), "post"),
-            (format!("{anomaly}/{{anomaly_id}}"), "delete"),
-            (format!("{anomaly}/{{anomaly_id}}/train"), "post"),
-            (format!("{anomaly}/{{anomaly_id}}/detect"), "post"),
+            (format!("{anomaly}/{{config_id}}"), "delete"),
+            (format!("{anomaly}/{{config_id}}/train"), "post"),
+            (format!("{anomaly}/{{config_id}}/detect"), "post"),
             (format!("{anomaly}/history"), "get"),
         ];
         for (path, method) in &anomaly_cases {
@@ -921,13 +1679,13 @@ mod experiment_tests {
             let ext = &paths[path.as_str()]["get"]["x-o2-mcp"];
             assert_eq!(ext["category"], "db_monitoring", "{path}");
         }
-        let delete = &paths[format!("{anomaly}/{{anomaly_id}}").as_str()]["delete"];
+        let delete = &paths[format!("{anomaly}/{{config_id}}").as_str()]["delete"];
         assert_eq!(delete["x-o2-mcp"]["requires_confirmation"], true);
-        let history = &paths[format!("{anomaly}/{{anomaly_id}}/history").as_str()]["get"];
+        let history = &paths[format!("{anomaly}/{{config_id}}/history").as_str()]["get"];
         assert_eq!(history["x-o2-mcp"]["enabled"], false);
         for path in [
             anomaly.to_string(),
-            format!("{anomaly}/{{anomaly_id}}/history"),
+            format!("{anomaly}/{{config_id}}/history"),
         ] {
             let body =
                 &paths[path.as_str()]["get"]["responses"]["200"]["content"]["application/json"];
@@ -988,14 +1746,419 @@ mod experiment_tests {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "enterprise")]
+    use std::collections::BTreeSet;
+
     use utoipa::OpenApi;
 
     use super::ApiDoc;
 
-    // Handlers that gained a folder-destination authorization check must
-    // advertise the 403 it returns, or clients cannot distinguish it from a bug.
-    // The /{org}/anomaly_detection pair is annotated but enterprise-gated, so it
-    // is absent from this ApiDoc and cannot be asserted from an OSS build.
+    #[cfg(feature = "enterprise")]
+    const ROUTER_SOURCE: &str = include_str!("mod.rs");
+
+    #[cfg(feature = "enterprise")]
+    const SERVICE_ROUTES_SIGNATURE: &str = "fn service_route_table(";
+
+    #[cfg(feature = "enterprise")]
+    const SEARCH_ROUTES_SIGNATURE: &str = "fn search_routes_with(";
+
+    #[cfg(feature = "enterprise")]
+    const HTTP_METHODS: &[&str] = &[
+        "get", "post", "put", "delete", "patch", "head", "options", "trace",
+    ];
+
+    #[cfg(feature = "enterprise")]
+    const GATED_MODULE_PREFIXES: &[&str] = &[
+        "/{org_id}/anomaly_detection",
+        "/{org_id}/workflows",
+        "/v2/{org_id}/workflows",
+    ];
+
+    /// Spelled as the merged spec does; the router's own placeholder names differ.
+    #[cfg(feature = "enterprise")]
+    const GATED_MODULE_ROUTES: &[(&str, &str)] = &[
+        ("/api/{org_id}/anomaly_detection", "get"),
+        ("/api/{org_id}/anomaly_detection", "post"),
+        ("/api/{org_id}/anomaly_detection/history", "get"),
+        ("/api/{org_id}/anomaly_detection/{config_id}", "get"),
+        ("/api/{org_id}/anomaly_detection/{config_id}", "put"),
+        ("/api/{org_id}/anomaly_detection/{config_id}", "delete"),
+        ("/api/{org_id}/anomaly_detection/{config_id}/train", "post"),
+        (
+            "/api/{org_id}/anomaly_detection/{config_id}/train",
+            "delete",
+        ),
+        ("/api/{org_id}/anomaly_detection/{config_id}/detect", "post"),
+        ("/api/{org_id}/anomaly_detection/{config_id}/history", "get"),
+        ("/api/{org_id}/workflows", "get"),
+        ("/api/{org_id}/workflows", "post"),
+        ("/api/v2/{org_id}/workflows/move", "patch"),
+        ("/api/{org_id}/workflows/test", "post"),
+        ("/api/{org_id}/workflows/{id}", "put"),
+        ("/api/{org_id}/workflows/{id}", "delete"),
+        ("/api/{org_id}/workflows/{id}/trigger", "post"),
+        ("/api/{org_id}/workflows/{id}/errors/{run_id}", "get"),
+        ("/api/{org_id}/workflows/{id}/retry", "post"),
+        ("/api/{org_id}/workflows/{id}/enable", "put"),
+        ("/api/{org_id}/workflows/{id}/history", "get"),
+        ("/api/{org_id}/workflows/promote/{id}", "post"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "get"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "put"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "delete"),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials",
+            "post",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+            "get",
+        ),
+        ("/api/{org_id}/workflows/{id}/http_trigger/test", "post"),
+    ];
+
+    /// Canonical `ApiGroupOperation` values; anything else is an alias or drops the route.
+    #[cfg(feature = "enterprise")]
+    const RATELIMIT_OPERATIONS: &[&str] = &["list", "get", "create", "update", "delete"];
+
+    /// Runs stay `create` so a flood of triggers cannot throttle ordinary edits in `update`.
+    #[cfg(feature = "enterprise")]
+    const WORKFLOWS_RATELIMIT: &[(&str, &str, &str)] = &[
+        ("/api/{org_id}/workflows", "post", "create"),
+        ("/api/{org_id}/workflows", "get", "list"),
+        ("/api/v2/{org_id}/workflows/move", "patch", "update"),
+        ("/api/{org_id}/workflows/{id}", "delete", "delete"),
+        ("/api/{org_id}/workflows/{id}", "put", "update"),
+        ("/api/{org_id}/workflows/test", "post", "create"),
+        ("/api/{org_id}/workflows/{id}/trigger", "post", "create"),
+        ("/api/{org_id}/workflows/{id}/errors/{run_id}", "get", "get"),
+        ("/api/{org_id}/workflows/{id}/retry", "post", "create"),
+        ("/api/{org_id}/workflows/{id}/enable", "put", "update"),
+        ("/api/{org_id}/workflows/{id}/history", "get", "get"),
+        ("/api/{org_id}/workflows/promote/{id}", "post", "update"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "get", "get"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "put", "update"),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger",
+            "delete",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials",
+            "post",
+            "update",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}",
+            "delete",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+            "get",
+            "get",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/test",
+            "post",
+            "create",
+        ),
+    ];
+
+    const SLACK_OPERATIONS: &[(&str, &str)] = &[
+        ("post", "/api/{org_id}/slack/install/start"),
+        ("post", "/api/{org_id}/slack/install/exchange"),
+        ("get", "/api/{org_id}/slack/prerequisites"),
+        ("post", "/api/{org_id}/slack/connectivity"),
+        ("get", "/api/{org_id}/slack/manifest"),
+        ("get", "/api/{org_id}/slack/installations"),
+        ("post", "/api/{org_id}/slack/installations"),
+        (
+            "post",
+            "/api/{org_id}/slack/installations/{installation_id}/install-url",
+        ),
+        (
+            "put",
+            "/api/{org_id}/slack/installations/{installation_id}/credentials",
+        ),
+        (
+            "post",
+            "/api/{org_id}/slack/installations/{installation_id}/test",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/linking",
+        ),
+        (
+            "put",
+            "/api/{org_id}/slack/installations/{installation_id}/linking",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/links/matches",
+        ),
+        (
+            "post",
+            "/api/{org_id}/slack/installations/{installation_id}/link-all",
+        ),
+        (
+            "post",
+            "/api/{org_id}/slack/installations/{installation_id}/connection/start",
+        ),
+        ("post", "/api/{org_id}/slack/connection/confirm"),
+        (
+            "post",
+            "/api/{org_id}/slack/installations/{installation_id}/connection",
+        ),
+        (
+            "delete",
+            "/api/{org_id}/slack/installations/{installation_id}/connection",
+        ),
+        (
+            "delete",
+            "/api/{org_id}/slack/installations/{installation_id}",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/channels",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/channel-defaults",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}",
+        ),
+        (
+            "put",
+            "/api/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}",
+        ),
+        (
+            "delete",
+            "/api/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/help-contact",
+        ),
+        (
+            "put",
+            "/api/{org_id}/slack/installations/{installation_id}/help-contact",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/oncall-unlinked",
+        ),
+        (
+            "post",
+            "/api/{org_id}/slack/installations/{installation_id}/oncall-unlinked/remind",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/org-access",
+        ),
+        (
+            "put",
+            "/api/{org_id}/slack/installations/{installation_id}/org-access",
+        ),
+        (
+            "post",
+            "/api/{org_id}/slack/link-requests/{request_id}/start",
+        ),
+        ("post", "/api/{org_id}/slack/link-requests/confirm"),
+        (
+            "post",
+            "/api/{org_id}/slack/link-requests/{request_id}/resend",
+        ),
+        ("get", "/api/{org_id}/slack/links/me"),
+        ("delete", "/api/{org_id}/slack/links/{link_id}"),
+        ("get", "/api/{org_id}/slack/links"),
+    ];
+
+    // Ends at the column-0 close brace, so an item after the body is never scraped into it.
+    #[cfg(feature = "enterprise")]
+    fn service_routes_body() -> &'static str {
+        router_fn_body(SERVICE_ROUTES_SIGNATURE)
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn router_fn_body(signature: &str) -> &'static str {
+        let start = ROUTER_SOURCE
+            .find(signature)
+            .unwrap_or_else(|| panic!("the router must define {signature}"));
+        let after_signature = &ROUTER_SOURCE[start + signature.len()..];
+        let end = after_signature
+            .find("\n}\n")
+            .unwrap_or_else(|| panic!("{signature} must end at a column-0 close brace"));
+        &after_signature[..end]
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn strip_comments(source: &str) -> String {
+        let mut without_blocks = String::with_capacity(source.len());
+        let mut rest = source;
+        while let Some(open) = rest.find("/*") {
+            without_blocks.push_str(&rest[..open]);
+            let after_open = &rest[open + 2..];
+            rest = match after_open.find("*/") {
+                Some(close) => &after_open[close + 2..],
+                None => "",
+            };
+        }
+        without_blocks.push_str(rest);
+        without_blocks
+            .lines()
+            .map(|line| line.split_once("//").map_or(line, |(code, _)| code))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn normalize(source: &str) -> String {
+        source.chars().filter(|c| !c.is_whitespace()).collect()
+    }
+
+    /// Placeholder names never reach the wire, so only their positions can be compared.
+    #[cfg(feature = "enterprise")]
+    fn erase_placeholders(path: &str) -> String {
+        let mut erased = String::with_capacity(path.len());
+        let mut rest = path;
+        while let Some(open) = rest.find('{') {
+            erased.push_str(&rest[..open]);
+            erased.push_str("{}");
+            rest = match rest[open..].find('}') {
+                Some(close) => &rest[open + close + 1..],
+                None => "",
+            };
+        }
+        erased.push_str(rest);
+        erased
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn placeholders(path: &str) -> BTreeSet<&str> {
+        path.split('{')
+            .skip(1)
+            .filter_map(|rest| rest.split('}').next())
+            .collect()
+    }
+
+    /// Stops at the `.route(` call's own closing paren, so a chained call is not part of it.
+    #[cfg(feature = "enterprise")]
+    fn balanced_arguments(call: &str) -> Option<&str> {
+        let mut depth = 1usize;
+        for (index, character) in call.char_indices() {
+            match character {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(&call[..index]);
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    /// `get(` inside a handler path such as `workflows::get_workflow_errors` is not a verb binding.
+    #[cfg(feature = "enterprise")]
+    fn binds_method(bindings: &str, method: &str) -> bool {
+        let needle = format!("{method}(");
+        let mut searched = 0;
+        while let Some(at) = bindings[searched..].find(&needle) {
+            let start = searched + at;
+            let preceding = bindings[..start].chars().next_back();
+            if !preceding.is_some_and(|c| c.is_alphanumeric() || c == '_' || c == ':') {
+                return true;
+            }
+            searched = start + needle.len();
+        }
+        false
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn under_gated_prefix(path: &str) -> bool {
+        GATED_MODULE_PREFIXES.iter().any(|prefix| {
+            path.strip_prefix(prefix)
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+        })
+    }
+
+    /// Cloud never mounts the HTTP-trigger routes, so its spec leaves them out.
+    #[cfg(feature = "enterprise")]
+    fn published_in_this_edition(path: &str) -> bool {
+        !(cfg!(feature = "cloud") && path.contains("/http_trigger"))
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn registered_gated_routes() -> BTreeSet<(String, String)> {
+        // The licence-gated search routes are a separate group that service_routes() merges in.
+        let routes = [
+            service_routes_body(),
+            router_fn_body(SEARCH_ROUTES_SIGNATURE),
+        ]
+        .concat();
+        let live = normalize(&strip_comments(&routes));
+        let mut routes = BTreeSet::new();
+        for call in live.split(".route(").skip(1) {
+            let Some(arguments) = balanced_arguments(call) else {
+                continue;
+            };
+            let Some(path) = arguments
+                .strip_prefix('"')
+                .and_then(|rest| rest.split('"').next())
+            else {
+                continue;
+            };
+            if !under_gated_prefix(path) {
+                continue;
+            }
+            let bindings = &arguments[path.len() + 2..];
+            for method in HTTP_METHODS {
+                if binds_method(bindings, method) {
+                    let served = erase_placeholders(&format!("/api{path}"));
+                    routes.insert((served, (*method).to_string()));
+                }
+            }
+        }
+        routes
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn assert_documented_statuses(expected: &[(&str, &str, &[&str])]) {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+        let mut wrong = Vec::new();
+        for (path, method, statuses) in expected {
+            if !published_in_this_edition(path) {
+                continue;
+            }
+            let Some(operation) = paths.get(*path).and_then(|item| item.get(*method)) else {
+                wrong.push(format!("{method} {path}: absent from the spec"));
+                continue;
+            };
+            let documented: BTreeSet<&str> = operation
+                .get("responses")
+                .and_then(|r| r.as_object())
+                .map(|r| r.keys().map(String::as_str).collect())
+                .unwrap_or_default();
+            let returned: BTreeSet<&str> = statuses.iter().copied().collect();
+            if documented != returned {
+                wrong.push(format!(
+                    "{method} {path}: documents {documented:?}, handler returns {returned:?}"
+                ));
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
+    // Folder-destination checks must advertise their 403, or clients cannot tell it from a bug.
     #[test]
     fn folder_scoped_writes_document_forbidden() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
@@ -1037,6 +2200,7 @@ mod tests {
         for (path, method) in [
             ("/api/{org_id}/query_history", "post"),
             ("/api/{org_id}/query_history", "get"),
+            ("/api/{org_id}/query_history", "delete"),
             ("/api/{org_id}/query_history/{id}", "patch"),
             ("/api/{org_id}/query_history/{id}", "delete"),
         ] {
@@ -1046,6 +2210,97 @@ mod tests {
                 .unwrap_or_else(|| panic!("{method} {path} is not documented"));
             assert_eq!(op["x-o2-ratelimit"]["module"], "Query History");
             assert_eq!(op["x-o2-mcp"]["enabled"], false, "{method} {path}");
+        }
+    }
+
+    #[test]
+    fn slack_paths_are_rate_limited_and_hidden_from_mcp() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec["paths"].as_object().unwrap();
+        let mut documented = Vec::new();
+        // Slack destination OAuth and an on-call team's Slack test belong to their own modules.
+        let is_slack_app = |p: &str| {
+            p.contains("/slack/") && !p.contains("/destinations/slack/") && !p.contains("/oncall/")
+        };
+        for (path, item) in paths.iter().filter(|(p, _)| is_slack_app(p)) {
+            for (method, op) in item.as_object().unwrap() {
+                documented.push((method.clone(), path.clone()));
+                assert_eq!(op["x-o2-ratelimit"]["module"], "Slack", "{method} {path}");
+                let want = match method.as_str() {
+                    "get" => &["list", "get"][..],
+                    "post" => &["create"][..],
+                    "put" => &["update"][..],
+                    _ => &["delete"][..],
+                };
+                let operation = op["x-o2-ratelimit"]["operation"].as_str().unwrap_or("");
+                assert!(want.contains(&operation), "{method} {path}: {operation}");
+                assert_eq!(op["x-o2-mcp"]["enabled"], false, "{method} {path}");
+                assert_eq!(op["tags"], serde_json::json!(["Slack"]), "{method} {path}");
+            }
+        }
+        documented.sort();
+        let mut want: Vec<(String, String)> = SLACK_OPERATIONS
+            .iter()
+            .map(|(m, p)| (m.to_string(), p.to_string()))
+            .collect();
+        want.sort();
+        assert_eq!(documented, want);
+    }
+
+    #[test]
+    fn slack_status_codes_are_documented() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = &spec["paths"];
+        for (method, path) in SLACK_OPERATIONS {
+            let responses = &paths[*path][*method]["responses"];
+            for status in ["403", "404"] {
+                assert!(responses.get(status).is_some(), "{method} {path} {status}");
+            }
+        }
+        assert!(
+            paths["/api/{org_id}/slack/installations"]["post"]["responses"]
+                .get("201")
+                .is_some()
+        );
+        assert!(
+            paths["/api/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}"]
+                ["delete"]["responses"]
+                .get("204")
+                .is_some()
+        );
+        assert!(
+            paths["/api/{org_id}/slack/links/{link_id}"]["delete"]["responses"]
+                .get("204")
+                .is_some()
+        );
+        assert!(
+            paths["/api/{org_id}/slack/link-requests/{request_id}/resend"]["post"]["responses"]
+                .get("202")
+                .is_some()
+        );
+        for path in [
+            "/api/{org_id}/slack/link-requests/{request_id}/start",
+            "/api/{org_id}/slack/link-requests/confirm",
+        ] {
+            for status in ["400", "410", "429"] {
+                assert!(
+                    paths[path]["post"]["responses"].get(status).is_some(),
+                    "{path} {status}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn promql_exemplars_is_published_with_its_error_codes() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/prometheus/api/v1/query_exemplars"]["get"];
+        assert_eq!(op["operationId"], "PrometheusQueryExemplars");
+        for status in ["200", "400", "403", "429", "500"] {
+            assert!(
+                op["responses"].get(status).is_some(),
+                "query_exemplars {status}"
+            );
         }
     }
 
@@ -1064,6 +2319,374 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn siem_filters_are_not_advertised_in_oss() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for path in [
+            "/api/v2/{org_id}/alerts/history",
+            "/api/v2/{org_id}/alerts/incidents",
+        ] {
+            let params = spec["paths"][path]["get"]["parameters"].as_array().unwrap();
+            assert!(!params.is_empty(), "{path}");
+            assert!(params.iter().all(|p| p["name"] != "siem"), "{path}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn ocsf_packs_path_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/security/ocsf/packs"]["get"];
+        assert_eq!(op["operationId"], "ListOcsfPacks", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/OcsfPacksResponse"
+        );
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "OcsfPacksResponse",
+            "OcsfPack",
+            "OcsfPackManifest",
+            "OcsfPackKind",
+        ] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_sources_paths_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, method, id) in [
+            (
+                "/api/{org_id}/security/sources",
+                "get",
+                "ListSecuritySources",
+            ),
+            (
+                "/api/{org_id}/security/sources/types",
+                "get",
+                "ListSecuritySourceTypes",
+            ),
+            (
+                "/api/{org_id}/security/sources/match",
+                "post",
+                "MatchSecuritySource",
+            ),
+            (
+                "/api/{org_id}/security/sources/classify",
+                "post",
+                "ClassifySecuritySources",
+            ),
+            (
+                "/api/{org_id}/security/sources/{stream_name}/attach",
+                "post",
+                "AttachSecuritySourcePack",
+            ),
+            (
+                "/api/{org_id}/security/sources/{stream_name}/detach",
+                "post",
+                "DetachSecuritySourcePack",
+            ),
+        ] {
+            assert_eq!(spec["paths"][path][method]["operationId"], id, "{path}");
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "SourceListing",
+            "SourceRow",
+            "SourceType",
+            "MatchResponse",
+            "AttachError",
+            "AttachPlan",
+            "DetachSkip",
+        ] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[test]
+    fn security_access_path_and_schema_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/security/access"]["get"];
+        assert_eq!(op["operationId"], "GetSecurityAccess", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/SecurityAccessResponse"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_investigation_paths_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, id, schema) in [
+            (
+                "/api/{org_id}/security/entities",
+                "ListSecurityEntities",
+                "EntitiesResponse",
+            ),
+            (
+                "/api/{org_id}/security/entities/graph",
+                "GetSecurityEntityGraph",
+                "EntityGraphResponse",
+            ),
+            (
+                "/api/{org_id}/security/entities/detail",
+                "GetSecurityEntityDetail",
+                "EntityDetailResponse",
+            ),
+            (
+                "/api/{org_id}/security/ueba",
+                "ScoreSecurityUsers",
+                "UebaReport",
+            ),
+            (
+                "/api/{org_id}/security/events/search",
+                "SearchSecurityEvents",
+                "EventSearchResponse",
+            ),
+        ] {
+            let op = &spec["paths"][path]["post"];
+            assert_eq!(op["operationId"], id, "{op}");
+            assert_eq!(
+                op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                format!("#/components/schemas/{schema}")
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_audit_path_and_schema_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/security/audit"]["get"];
+        assert_eq!(op["operationId"], "ListSecurityAudit", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/SecurityAuditResponse"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_sigma_paths_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, method, id, schema) in [
+            (
+                "/api/{org_id}/security/sigma/catalog",
+                "get",
+                "GetSigmaCatalog",
+                "SigmaCatalogResponse",
+            ),
+            (
+                "/api/{org_id}/security/sigma/compile",
+                "post",
+                "CompileSigmaRule",
+                "SigmaCompileResponse",
+            ),
+            (
+                "/api/{org_id}/security/mitre/coverage",
+                "get",
+                "GetMitreCoverage",
+                "MitreCoverage",
+            ),
+            (
+                "/api/{org_id}/security/detections/{alert_id}/evidence",
+                "get",
+                "GetDetectionEvidence",
+                "DetectionEvidence",
+            ),
+        ] {
+            let op = &spec["paths"][path][method];
+            assert_eq!(op["operationId"], id, "{op}");
+            assert_eq!(
+                op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                format!("#/components/schemas/{schema}")
+            );
+        }
+    }
+
+    #[test]
+    fn unpriced_models_path_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/llm/models/unpriced"]["get"];
+        assert_eq!(op["operationId"], "ListUnpricedModels", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/UnpricedModelsResponse"
+        );
+        for code in ["403", "429"] {
+            assert!(op["responses"][code].is_object(), "{code}");
+            assert!(
+                spec["paths"]["/api/{org_id}/gen_ai/data_health"]["get"]["responses"][code]
+                    .is_object(),
+                "data_health {code}"
+            );
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "UnpricedModelsResponse",
+            "UnpricedModel",
+            "UnpricedModelMatch",
+            "UnpricedModelRow",
+        ] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[test]
+    fn fleet_reads_are_documented_with_their_403() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for path in [
+            "/api/{org_id}/fleet/collectors",
+            "/api/{org_id}/fleet/collectors/{id}",
+            "/api/{org_id}/fleet/summary",
+            "/api/{org_id}/fleet/settings",
+        ] {
+            let get = &spec["paths"][path]["get"];
+            assert!(get["responses"]["403"].is_object(), "{path}");
+        }
+        assert!(
+            spec["paths"]["/api/{org_id}/fleet/collectors/{id}"]["get"]["responses"]["404"]
+                .is_object()
+        );
+    }
+
+    #[test]
+    fn fga_bulk_deletes_and_per_user_lookups_are_published() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, method) in [
+            ("/api/{org_id}/roles/bulk", "delete"),
+            ("/api/{org_id}/groups/bulk", "delete"),
+            ("/api/{org_id}/users/{user_id}/roles", "get"),
+            ("/api/{org_id}/users/{user_id}/groups", "get"),
+        ] {
+            let op = &spec["paths"][path][method];
+            assert!(op.is_object(), "{method} {path} missing");
+            // OSS stubs answer 403 before any validation, so only enterprise can return 400.
+            assert_eq!(
+                op["responses"]["400"].is_object(),
+                cfg!(feature = "enterprise"),
+                "{method} {path}"
+            );
+        }
+    }
+
+    #[test]
+    fn fleet_endpoints_are_documented_and_the_removed_ones_are_not() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, method, codes) in [
+            ("/api/{org_id}/fleet/tokens", "get", &["200", "403"][..]),
+            (
+                "/api/{org_id}/fleet/tokens",
+                "post",
+                &["201", "400", "403", "404", "409"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/tokens/{id}/revoke",
+                "post",
+                &["200", "403", "404"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/collectors/{id}",
+                "delete",
+                &["204", "403", "404"][..],
+            ),
+            ("/api/{org_id}/fleet/fleets", "get", &["200", "403"][..]),
+            (
+                "/api/{org_id}/fleet/fleets/{fleet_id}/desired",
+                "put",
+                &["200", "400", "403", "404", "409"][..],
+            ),
+            ("/api/{org_id}/fleet/configs", "get", &["200", "403"][..]),
+            (
+                "/api/{org_id}/fleet/configs",
+                "post",
+                &["201", "400", "403", "409"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/{id}",
+                "get",
+                &["200", "403", "404"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/{id}",
+                "delete",
+                &["204", "403", "404", "409"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/{id}/draft",
+                "put",
+                &["200", "403", "404"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/{id}/versions",
+                "post",
+                &["201", "400", "403", "404", "409", "422"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/{id}/versions/{version}",
+                "get",
+                &["200", "400", "403", "404"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/validate",
+                "post",
+                &["200", "403"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/audit",
+                "get",
+                &["200", "400", "403"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/settings",
+                "put",
+                &["200", "400", "403"][..],
+            ),
+            ("/api/{org_id}/fleet/rollouts", "get", &["200", "403"][..]),
+            (
+                "/api/{org_id}/fleet/rollouts/{id}",
+                "get",
+                &["200", "403", "404"][..],
+            ),
+        ] {
+            for code in codes {
+                assert!(
+                    spec["paths"][path][method]["responses"][*code].is_object(),
+                    "{method} {path} {code}"
+                );
+            }
+        }
+        for (path, method) in [
+            ("/api/{org_id}/fleet/rollouts", "post"),
+            ("/api/{org_id}/fleet/rollouts/{id}", "patch"),
+            ("/api/{org_id}/fleet/rollouts/{id}/revert", "post"),
+            ("/api/{org_id}/fleet/rollouts/{id}/pause", "post"),
+            ("/api/{org_id}/fleet/rollouts/{id}/stop", "post"),
+            ("/api/{org_id}/fleet/flow", "get"),
+            ("/api/{org_id}/fleet/fleets/move", "post"),
+        ] {
+            assert!(spec["paths"][path][method].is_null(), "{method} {path}");
+        }
+        for schema in ["SetDesiredRequest", "FleetList", "CollectorFleet"] {
+            assert!(
+                spec["components"]["schemas"][schema].is_object(),
+                "{schema}"
+            );
+        }
+        for gone in [
+            "CreateRolloutRequest",
+            "UpdateRolloutRequest",
+            "UpdateCollectorRequest",
+        ] {
+            assert!(spec["components"]["schemas"][gone].is_null(), "{gone}");
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
     #[test]
     fn prompt_paths_are_absent_from_oss_openapi() {
         let api = ApiDoc::openapi();
@@ -1143,6 +2766,27 @@ mod tests {
     }
 
     #[test]
+    fn rca_resume_path_is_documented() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec["paths"].as_object().unwrap();
+        let resume = "/api/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume";
+        let op = &paths[resume]["post"];
+        assert!(op.is_object(), "post {resume} missing");
+        assert_eq!(op["operationId"], "ResumeIncidentRcaRun");
+        assert_eq!(op["tags"], serde_json::json!(["Incidents"]));
+        assert_eq!(op["x-o2-ratelimit"]["module"], "Alerts");
+        assert_eq!(op["x-o2-ratelimit"]["operation"], "update");
+        #[cfg(feature = "enterprise")]
+        for status in ["202", "404", "409", "410", "503"] {
+            assert!(
+                op["responses"].get(status).is_some(),
+                "post {resume} {status}"
+            );
+        }
+        assert!(paths[resume].get("get").is_none());
+    }
+
+    #[test]
     fn every_schema_ref_resolves() {
         fn collect_refs<'a>(value: &'a serde_json::Value, refs: &mut Vec<&'a str>) {
             match value {
@@ -1171,6 +2815,370 @@ mod tests {
         unresolved.sort_unstable();
         unresolved.dedup();
         assert!(unresolved.is_empty(), "unresolved refs: {unresolved:?}");
+    }
+
+    /// Only `SecurityAddon` merges these modules in, so the merged doc is the real surface.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn gated_module_routes_are_published_in_the_merged_spec() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+        let missing: Vec<_> = GATED_MODULE_ROUTES
+            .iter()
+            .filter(|(path, _)| published_in_this_edition(path))
+            .filter(|(path, method)| paths.get(*path).and_then(|p| p.get(*method)).is_none())
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "absent from the merged spec: {missing:#?}"
+        );
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn http_trigger_routes_are_absent_from_the_cloud_spec() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+        let hidden: Vec<_> = GATED_MODULE_ROUTES
+            .iter()
+            .filter(|(path, _)| !published_in_this_edition(path))
+            .collect();
+        assert_eq!(hidden.len(), 7, "{hidden:#?}");
+        let leaked: Vec<_> = hidden
+            .into_iter()
+            .filter(|(path, method)| paths.get(*path).and_then(|p| p.get(*method)).is_some())
+            .collect();
+        assert!(
+            leaked.is_empty(),
+            "cloud publishes unmounted routes: {leaked:#?}"
+        );
+    }
+
+    /// A handler served over HTTP but absent from the spec is the gap this table closes.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn gated_route_table_matches_what_service_routes_registers() {
+        let registered = registered_gated_routes();
+        assert!(
+            !registered.is_empty(),
+            "the scrape found no gated routes; service_routes() moved or the scrape stopped matching"
+        );
+        let listed: BTreeSet<(String, String)> = GATED_MODULE_ROUTES
+            .iter()
+            .map(|(path, method)| (erase_placeholders(path), (*method).to_string()))
+            .collect();
+        let unlisted: Vec<_> = registered.difference(&listed).collect();
+        let unregistered: Vec<_> = listed.difference(&registered).collect();
+        assert!(
+            unlisted.is_empty() && unregistered.is_empty(),
+            "served but not listed: {unlisted:#?}\nlisted but not served: {unregistered:#?}"
+        );
+    }
+
+    /// A path param with no placeholder makes generated clients demand a phantom value.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn gated_route_path_parameters_match_their_templates() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+        let mut invalid = Vec::new();
+        for (path, method) in GATED_MODULE_ROUTES {
+            if !published_in_this_edition(path) {
+                continue;
+            }
+            let Some(operation) = paths.get(*path).and_then(|p| p.get(*method)) else {
+                invalid.push(format!("{method} {path}: absent from the spec"));
+                continue;
+            };
+            let declared: BTreeSet<&str> = operation
+                .get("parameters")
+                .and_then(|p| p.as_array())
+                .into_iter()
+                .flatten()
+                .filter(|p| p.get("in").and_then(|i| i.as_str()) == Some("path"))
+                .filter_map(|p| p.get("name").and_then(|n| n.as_str()))
+                .collect();
+            let template = placeholders(path);
+            if declared != template {
+                invalid.push(format!(
+                    "{method} {path}: declares {declared:?}, template has {template:?}"
+                ));
+            }
+        }
+        assert!(invalid.is_empty(), "{invalid:#?}");
+    }
+
+    /// Every handler but the bulk history opens with `disabled_response()`, which answers 403.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn anomaly_detection_documents_the_statuses_its_handlers_return() {
+        let base = "/api/{org_id}/anomaly_detection";
+        let by_id = "/api/{org_id}/anomaly_detection/{config_id}";
+        let train = "/api/{org_id}/anomaly_detection/{config_id}/train";
+        let detect = "/api/{org_id}/anomaly_detection/{config_id}/detect";
+        let history = "/api/{org_id}/anomaly_detection/{config_id}/history";
+        let bulk_history = "/api/{org_id}/anomaly_detection/history";
+        assert_documented_statuses(&[
+            (base, "get", &["200", "403", "500"]),
+            (base, "post", &["200", "400", "403", "500"]),
+            (by_id, "get", &["200", "403", "404", "500"]),
+            (by_id, "put", &["200", "400", "403", "404", "500"]),
+            (by_id, "delete", &["200", "403", "404", "500"]),
+            (train, "post", &["200", "403", "404", "500"]),
+            (train, "delete", &["200", "403", "404", "500"]),
+            (detect, "post", &["200", "403", "404", "500"]),
+            (history, "get", &["200", "403", "500"]),
+            (bulk_history, "get", &["200", "400", "403", "500"]),
+        ]);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn workflows_document_the_statuses_their_handlers_return() {
+        let base = "/api/{org_id}/workflows";
+        let by_id = "/api/{org_id}/workflows/{id}";
+        let http_trigger = "/api/{org_id}/workflows/{id}/http_trigger";
+        let credentials = "/api/{org_id}/workflows/{id}/http_trigger/credentials";
+        let credential = "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}";
+        assert_documented_statuses(&[
+            (base, "post", &["200", "400", "403", "500"]),
+            (base, "get", &["200", "403", "404", "500"]),
+            (
+                "/api/v2/{org_id}/workflows/move",
+                "patch",
+                &["200", "400", "403", "404", "500"],
+            ),
+            (by_id, "delete", &["200", "400", "404", "500"]),
+            (by_id, "put", &["200", "400", "500"]),
+            ("/api/{org_id}/workflows/test", "post", &["200", "400"]),
+            (
+                "/api/{org_id}/workflows/{id}/trigger",
+                "post",
+                &["200", "400", "409"],
+            ),
+            (
+                "/api/{org_id}/workflows/{id}/errors/{run_id}",
+                "get",
+                &["200", "400", "500"],
+            ),
+            (
+                "/api/{org_id}/workflows/{id}/retry",
+                "post",
+                &["200", "400"],
+            ),
+            (
+                "/api/{org_id}/workflows/{id}/enable",
+                "put",
+                &["200", "400"],
+            ),
+            (
+                "/api/{org_id}/workflows/{id}/history",
+                "get",
+                &["200", "400", "500"],
+            ),
+            (
+                "/api/{org_id}/workflows/promote/{id}",
+                "post",
+                &["201", "400", "403", "500"],
+            ),
+            (http_trigger, "get", &["200", "404", "500"]),
+            (
+                http_trigger,
+                "put",
+                &["200", "201", "400", "403", "404", "500"],
+            ),
+            (http_trigger, "delete", &["204", "404", "500"]),
+            (
+                credentials,
+                "post",
+                &["201", "400", "403", "404", "409", "500"],
+            ),
+            (credential, "delete", &["204", "404", "500"]),
+            (
+                "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+                "get",
+                &["200", "403", "404", "500"],
+            ),
+            (
+                "/api/{org_id}/workflows/{id}/http_trigger/test",
+                "post",
+                &["200", "400", "404", "500"],
+            ),
+        ]);
+    }
+
+    /// An undeclared query param the handler branches on is unreachable from a generated client.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn workflows_declare_the_query_params_their_handlers_read() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+        let by_id = "/api/{org_id}/workflows/{id}";
+        let expected: &[(&str, &str, &[&str])] = &[
+            ("/api/{org_id}/workflows", "post", &["folder", "draft"]),
+            (
+                "/api/{org_id}/workflows",
+                "get",
+                &["folder", "all_folders", "search_substring"],
+            ),
+            (by_id, "delete", &["draft"]),
+            (by_id, "put", &["draft"]),
+            ("/api/{org_id}/workflows/test", "post", &["draft"]),
+            ("/api/{org_id}/workflows/{id}/enable", "put", &["value"]),
+            (
+                "/api/{org_id}/workflows/{id}/history",
+                "get",
+                &["start_time", "end_time"],
+            ),
+            (
+                "/api/{org_id}/workflows/promote/{id}",
+                "post",
+                &["trigger_type", "folder"],
+            ),
+        ];
+        let mut wrong = Vec::new();
+        for (path, method, names) in expected {
+            let Some(operation) = paths.get(*path).and_then(|p| p.get(*method)) else {
+                wrong.push(format!("{method} {path}: absent from the spec"));
+                continue;
+            };
+            let declared: BTreeSet<&str> = operation
+                .get("parameters")
+                .and_then(|p| p.as_array())
+                .into_iter()
+                .flatten()
+                .filter(|p| p.get("in").and_then(|i| i.as_str()) == Some("query"))
+                .filter_map(|p| p.get("name").and_then(|n| n.as_str()))
+                .collect();
+            let read: BTreeSet<&str> = names.iter().copied().collect();
+            if declared != read {
+                wrong.push(format!(
+                    "{method} {path}: declares {declared:?}, handler reads {read:?}"
+                ));
+            }
+        }
+        let enable = &paths["/api/{org_id}/workflows/{id}/enable"]["put"];
+        if enable.get("requestBody").is_some() {
+            wrong.push("put .../enable: declares a body the handler never reads".to_string());
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
+    /// The handler extracts `Json<Vec<Value>>`, so an object body is rejected before it runs.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn workflow_trigger_body_is_documented_as_an_array() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let body = &spec["paths"]["/api/{org_id}/workflows/{id}/trigger"]["post"]["requestBody"];
+        let schema = &body["content"]["application/json"]["schema"];
+        assert_eq!(schema["type"], "array", "{body}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn workflows_ratelimit_labels_name_their_own_module_and_a_canonical_operation() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+        let mut wrong = Vec::new();
+        for (path, method, operation) in WORKFLOWS_RATELIMIT {
+            if !published_in_this_edition(path) {
+                continue;
+            }
+            let Some(op) = paths.get(*path).and_then(|p| p.get(*method)) else {
+                wrong.push(format!("{method} {path}: absent from the spec"));
+                continue;
+            };
+            let label = &op["x-o2-ratelimit"];
+            if label["module"] != "Workflows" || label["operation"] != *operation {
+                wrong.push(format!(
+                    "{method} {path}: {label}, expected Workflows/{operation}"
+                ));
+            }
+        }
+        // Other modules already use labels outside the five, so only workflows paths are checked.
+        for (path, item) in paths.iter().filter(|(path, _)| path.contains("/workflows")) {
+            for (method, op) in item.as_object().unwrap() {
+                let Some(operation) = op["x-o2-ratelimit"]["operation"].as_str() else {
+                    continue;
+                };
+                if !RATELIMIT_OPERATIONS.contains(&operation) {
+                    wrong.push(format!(
+                        "{method} {path}: operation {operation:?} is not canonical"
+                    ));
+                }
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn workflow_list_and_history_document_an_array_of_objects() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for path in [
+            "/api/{org_id}/workflows",
+            "/api/{org_id}/workflows/{id}/history",
+        ] {
+            let ok = &spec["paths"][path]["get"]["responses"]["200"];
+            let schema = &ok["content"]["application/json"]["schema"];
+            assert_eq!(schema["type"], "array", "{path}: {ok}");
+            let name = schema["items"]["$ref"]
+                .as_str()
+                .and_then(|r| r.strip_prefix("#/components/schemas/"))
+                .unwrap_or_else(|| panic!("{path}: {ok}"));
+            let item = &spec["components"]["schemas"][name];
+            assert!(
+                item["type"] == "object" || item["allOf"].is_array(),
+                "{path}: {item}"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn the_scrape_stops_at_the_end_of_service_routes() {
+        let body = service_routes_body();
+        for item in ["\nfn ", "\npub fn ", "\npub(crate) fn ", "\nasync fn "] {
+            assert!(
+                !body.contains(item),
+                "the scrape ran into a following {item:?} item"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_commented_out_route_is_not_read_as_a_registration() {
+        assert_eq!(strip_comments("a\n// .route(\"/x\", get(h))\nb"), "a\n\nb");
+        assert_eq!(strip_comments("a/* .route(\"/x\") */b"), "ab");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_chained_call_after_a_route_is_not_read_as_one_of_its_verbs() {
+        let call = normalize("\"/{org_id}/workflows\",get(h)).layer(post(x))");
+        let arguments = balanced_arguments(&call).expect("the route call must close");
+        assert!(binds_method(arguments, "get"));
+        assert!(!binds_method(arguments, "post"));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_verb_name_inside_a_handler_path_is_not_read_as_a_verb_binding() {
+        assert!(binds_method("get(routes::post(state))", "get"));
+        assert!(!binds_method("get(routes::post(state))", "post"));
+        assert!(!binds_method(
+            "get(workflows::get_workflow_errors)",
+            "delete"
+        ));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_sibling_module_sharing_a_name_prefix_is_not_gated() {
+        assert!(under_gated_prefix("/{org_id}/workflows"));
+        assert!(under_gated_prefix("/{org_id}/workflows/{id}"));
+        assert!(!under_gated_prefix("/{org_id}/workflows_v3"));
     }
 
     #[test]

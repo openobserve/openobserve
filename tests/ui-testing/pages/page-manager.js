@@ -16,6 +16,7 @@ import DashboardSqlAutocomplete from "./dashboardPages/dashboard-sql-autocomplet
 import DashboardPromQLEditor from "./dashboardPages/dashboard-promql-editor";
 import DashboardMultiSQL from "./dashboardPages/dashboard-multi-sql";
 import DashboardMaxQueryRange from "./dashboardPages/dashboard-max-query-range";
+import DashboardNotices from "./dashboardPages/dashboard-notices.js";
 import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
 import DashboardCellExplorerPage from "./dashboardPages/dashboard-cell-explorer";
 import DashboardLegendsCopy from "./dashboardPages/dashboard-legends-copy";
@@ -23,25 +24,33 @@ import DashboardFilter from "./dashboardPages/dashboard-filter";
 import DashboardImport from "./dashboardPages/dashboard-import.js";
 import DashboardShareExportPage from "./dashboardPages/dashboard-share-export";
 import DashboardPrintPage from "./dashboardPages/dashboard-print";
+import DashboardTvPlaylistPage from "./dashboardPages/dashboard-tv-playlist.js";
 import DashboardTimeRefresh from "./dashboardPages/dashboard-refresh";
 import DateTimeHelper from "./dashboardPages/dashboard-time";
 import DashboardPanelTime from "./dashboardPages/dashboard-panel-time";
+import DashboardTimeRange from "./dashboardPages/dashboard-time-range.js";
 import DashboardZoomDrag from "./dashboardPages/dashboard-zoom-drag";
 import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
+import { DashboardSaveConflictPage } from "./dashboardPages/dashboard-save-conflict.js";
 import { ScheduledReportsDrawerPage } from "./dashboardPages/scheduledReportsDrawer.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
+import CreateAlertFromSourceDialogPage from "./alertsPages/createAlertFromSourceDialogPage.js";
 import { AlertLibraryPage } from "./alertsPages/alertLibraryPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
+import { AlertAckPage } from "./alertsPages/alertAckPage.js";
+import { AlertFiringPage } from "./alertsPages/alertFiringPage.js";
 import { AlertSaveQueryModePage } from "./alertsPages/alertSaveQueryModePage.js";
 import { AlertNoDestinationPage } from "./alertsPages/alertNoDestinationPage.js";
 import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
 import { IncidentsPage } from "./alertsPages/incidentsPage.js";
+import { AlertCalibrationPage } from "./alertsPages/alertCalibrationPage.js";
 import { SloListPage } from "./sloPages/sloListPage.js";
 import { SloFormPage } from "./sloPages/sloFormPage.js";
 import { SloDetailPage } from "./sloPages/sloDetailPage.js";
 import { SloAlertsPage } from "./sloPages/sloAlertsPage.js";
+import { SloImportPage } from "./sloPages/sloImportPage.js";
 import { OnCallTeamsPage } from "./oncallPages/oncallTeamsPage.js";
 import { OnCallTeamDetailPage } from "./oncallPages/oncallTeamDetailPage.js";
 import { OnCallPagesListPage } from "./oncallPages/oncallPagesListPage.js";
@@ -50,6 +59,7 @@ import { OnCallResponseDetailPage } from "./oncallPages/oncallResponseDetailPage
 import { OnCallCoveragePage } from "./oncallPages/oncallCoveragePage.js";
 import { OnCallPolicyEditorPage } from "./oncallPages/oncallPolicyEditorPage.js";
 import { OnCallMinePage } from "./oncallPages/oncallMinePage.js";
+import { TelephonySettingsPage } from "./oncallPages/telephonySettingsPage.js";
 import { SyntheticsListPage } from "./syntheticsPages/syntheticsListPage.js";
 import { SyntheticsCreatePage } from "./syntheticsPages/syntheticsCreatePage.js";
 import { SyntheticsResultsPage } from "./syntheticsPages/syntheticsResultsPage.js";
@@ -66,6 +76,7 @@ import { LoginPage } from "./generalPages/loginPage.js";
 import { IngestionPage } from "./generalPages/ingestionPage.js";
 import { CloudLoginPage } from "./cloudPages/cloudLoginPage.js";
 import { isCloudEnvironment } from "./cloudPages/cloud-env.js";
+import { BillingInvoicesPage } from "./cloudPages/billingInvoicesPage.js";
 import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
 import { RouteGuardPage } from "./generalPages/routeGuardPage.js";
 import { SplunkHecPage } from "./generalPages/splunkHecPage.js";
@@ -79,6 +90,7 @@ import { MetricsExplorerPage } from "./metricsPages/metricsExplorerPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
 import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
 import { ServicesCatalogPage } from "./tracesPages/servicesCatalogPage.js";
+import { ProfilesPage } from "./profilesPages/profilesPage.js";
 import { DatabaseMonitoringPage } from "./dbmPages/databaseMonitoringPage.js";
 import { RumPage } from "./rumPages/rumPage.js";
 import { RumSessionsPage } from "./rumPages/rumSessionsPage.js";
@@ -89,6 +101,7 @@ import { RumProductAnalyticsPage } from "./rumPages/rumProductAnalyticsPage.js";
 import { ReportsPage } from "./reportsPages/reportsPage.js";
 import { ReportFoldersPage } from "./reportsPages/reportFoldersPage.js";
 import { ReportsFormValidationPage } from "./reportsPages/reportsFormValidationPage.js";
+import { ReportHistoryPage } from "./reportsPages/reportHistoryPage.js";
 import { DataPage } from "./generalPages/dataPage.js";
 import { IamPage } from "./iamPages/iamPage.js";
 import { IngestionTokensPage } from "./iamPages/ingestionTokensPage.js";
@@ -113,25 +126,35 @@ import { CorrelationSettingsPage } from "./generalPages/correlationSettingsPage.
 import { CorrelationDrawerPage } from "./generalPages/correlationDrawerPage.js";
 import { CrossLinkPage } from "./generalPages/crossLinkPage.js";
 import { ModelPricingPage } from "./generalPages/modelPricingPage.js";
+import { BillingPlansPage } from "./generalPages/billingPlansPage.js";
 import { QueueWorkbenchPage } from "./generalPages/queueWorkbenchPage.js";
 import { EditionFeaturesPage } from "./generalPages/editionFeaturesPage.js";
 import { OrganizationManagementPage } from "./generalPages/organizationManagementPage.js";
 import { LogoManagementPage } from "./generalPages/logoManagementPage.js";
 import { StatusPagesPage } from "./generalPages/statusPagesPage.js";
 import { QueryManagementPage } from "./generalPages/queryManagementPage.js";
-import { ConnectDataSourcePopupPage } from "./generalPages/connectDataSourcePopupPage.js";
+import { BillingGroupPage } from "./generalPages/billingGroupPage.js";
+import { BillingUsagePage } from "./generalPages/billingUsagePage.js";
 import { RegexPatternsFormValidationPage } from "./generalPages/regexPatternsFormValidationPage.js";
 import { CipherKeysFormValidationPage } from "./generalPages/cipherKeysFormValidationPage.js";
 import { SharedComponentsFormValidationPage } from "./generalPages/sharedComponentsFormValidationPage.js";
 import { SettingsFormValidationPage } from "./generalPages/settingsFormValidationPage.js";
 import { PasswordPolicyPage } from "./generalPages/passwordPolicyPage.js";
 import { AiToolsetsFormValidationPage } from "./generalPages/aiToolsetsFormValidationPage.js";
+import { AiAssistantCreditsPage } from "./generalPages/aiAssistantCreditsPage.js";
 import { RumFormValidationPage } from "./generalPages/rumFormValidationPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
 const WorkflowsPage = require("./workflowsPages/workflowsPage.js");
 const WorkflowFoldersPage = require("./workflowsPages/workflowFoldersPage.js");
+const WorkflowHttpPage = require("./workflowsPages/workflowHttpPage.js");
+const FleetManagerPage = require("./fleetPages/fleetManagerPage.js");
+const FleetFleetsPage = require("./fleetPages/fleetFleetsPage.js");
+const FleetInstallPage = require("./fleetPages/fleetInstallPage.js");
+const FleetConfigPage = require("./fleetPages/fleetConfigPage.js");
+const FleetRolloutPage = require("./fleetPages/fleetRolloutPage.js");
+const FleetSeed = require("./fleetPages/fleetSeed.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
@@ -155,6 +178,9 @@ const PipelineImportExportPage = require("./pipelinesPages/pipelineImportExportP
 
 // ===== ANOMALY DETECTION PAGE OBJECTS =====
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
+
+// ===== DOWNTIMES PAGE OBJECTS =====
+import { DowntimesPage } from "./alertsPages/downtimesPage.js";
 
 // ===== ONLINE EVALS PAGE OBJECTS =====
 import { LlmProvidersPage } from "./onlineEvalsPages/llmProvidersPage.js";
@@ -184,6 +210,7 @@ class PageManager {
     this.dashboardPromQLEditor = new DashboardPromQLEditor(page);
     this.dashboardMultiSQL = new DashboardMultiSQL(page);
     this.dashboardMaxQueryRange = new DashboardMaxQueryRange(page);
+    this.dashboardNotices = new DashboardNotices(page);
     this.dashboardDrilldown = new DashboardDrilldownPage(page);
     this.dashboardCellExplorer = new DashboardCellExplorerPage(page);
     this.dashboardLegendsCopy = new DashboardLegendsCopy(page);
@@ -191,29 +218,37 @@ class PageManager {
     this.dashboardImport = new DashboardImport(page);
     this.dashboardShareExport = new DashboardShareExportPage(page);
     this.dashboardPrint = new DashboardPrintPage(page);
+    this.dashboardTvPlaylist = new DashboardTvPlaylistPage(page);
     this.dashboardTimeRefresh = new DashboardTimeRefresh(page);
     this.dateTimeHelper = new DateTimeHelper(page);
     this.dashboardPanelTime = new DashboardPanelTime(page);
+    this.dashboardTimeRange = new DashboardTimeRange(page);
     this.dashboardZoomDrag = new DashboardZoomDrag(page);
     this.logsVisualise = new LogsVisualise(page);
     this.dashboardPage = new DashboardPage(page);
+    this.dashboardSaveConflict = new DashboardSaveConflictPage(page);
     this.scheduledReportsDrawer = new ScheduledReportsDrawerPage(page);
 
     // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);
+    this.createAlertFromSourceDialog = new CreateAlertFromSourceDialogPage(page);
     this.alertLibraryPage = new AlertLibraryPage(page);
     this.alertHistoryPage = new AlertHistoryPage(page);
     this.alertDetailPage = new AlertDetailPage(page);
+    this.alertAckPage = new AlertAckPage(page);
+    this.alertFiringPage = new AlertFiringPage(page);
     this.alertSaveQueryModePage = new AlertSaveQueryModePage(page);
     this.alertNoDestinationPage = new AlertNoDestinationPage(page);
     this.compositeAlertsPage = new CompositeAlertsPage(page);
     this.incidentsPage = new IncidentsPage(page);
+    this.alertCalibrationPage = new AlertCalibrationPage(page);
 
     // ===== SLO PAGE OBJECTS =====
     this.sloListPage = new SloListPage(page);
     this.sloFormPage = new SloFormPage(page);
     this.sloDetailPage = new SloDetailPage(page);
     this.sloAlertsPage = new SloAlertsPage(page);
+    this.sloImportPage = new SloImportPage(page);
 
     // ===== ON-CALL PAGE OBJECTS (enterprise) =====
     this.oncallTeamsPage = new OnCallTeamsPage(page);
@@ -224,6 +259,7 @@ class PageManager {
     this.oncallCoveragePage = new OnCallCoveragePage(page);
     this.oncallPolicyEditorPage = new OnCallPolicyEditorPage(page);
     this.oncallMinePage = new OnCallMinePage(page);
+    this.telephonySettingsPage = new TelephonySettingsPage(page);
 
     // ===== SYNTHETICS PAGE OBJECTS =====
     this.syntheticsListPage = new SyntheticsListPage(page);
@@ -237,6 +273,15 @@ class PageManager {
     // ===== WORKFLOWS (v1) PAGE OBJECT =====
     this.workflowsPage = new WorkflowsPage(page);
     this.workflowFoldersPage = new WorkflowFoldersPage(page);
+    this.workflowHttpPage = new WorkflowHttpPage(page);
+
+    // ===== FLEET MANAGEMENT PAGE OBJECTS =====
+    this.fleetManagerPage = new FleetManagerPage(page);
+    this.fleetFleetsPage = new FleetFleetsPage(page);
+    this.fleetInstallPage = new FleetInstallPage(page);
+    this.fleetConfigPage = new FleetConfigPage(page);
+    this.fleetRolloutPage = new FleetRolloutPage(page);
+    this.fleetSeed = new FleetSeed(page);
 
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
@@ -248,6 +293,7 @@ class PageManager {
     this.pipelinesPage = new PipelinesPage(page);
     this.pipelinesFormValidation = new PipelinesFormValidationPage(page);
     this.loginPage = isCloudEnvironment() ? new CloudLoginPage(page) : new LoginPage(page);
+    this.billingInvoicesPage = new BillingInvoicesPage(page);
     this.ingestionPage = new IngestionPage(page);
     this.routeGuardPage = new RouteGuardPage(page);
     this.ingestionConfigPage = new IngestionConfigPage(page);
@@ -262,11 +308,13 @@ class PageManager {
     this.tracesPage = new TracesPage(page);
     this.serviceGraphPage = new ServiceGraphPage(page);
     this.servicesCatalogPage = new ServicesCatalogPage(page);
+    this.profilesPage = new ProfilesPage(page);
     this.databaseMonitoringPage = new DatabaseMonitoringPage(page);
     this.rumPage = new RumPage(page);
     this.reportsPage = new ReportsPage(page);
     this.reportFoldersPage = new ReportFoldersPage(page);
     this.reportsFormValidation = new ReportsFormValidationPage(page);
+    this.reportHistoryPage = new ReportHistoryPage(page);
     this.dataPage = new DataPage(page);
     this.iamPage = new IamPage(page);
     this.ingestionTokensPage = new IngestionTokensPage(page);
@@ -291,13 +339,15 @@ class PageManager {
     this.correlationDrawerPage = new CorrelationDrawerPage(page);
     this.crossLinkPage = new CrossLinkPage(page);
     this.modelPricingPage = new ModelPricingPage(page);
+    this.billingPlansPage = new BillingPlansPage(page);
     this.queueWorkbenchPage = new QueueWorkbenchPage(page);
     this.editionFeaturesPage = new EditionFeaturesPage(page);
     this.organizationManagementPage = new OrganizationManagementPage(page);
     this.logoManagementPage = new LogoManagementPage(page);
     this.statusPagesPage = new StatusPagesPage(page);
     this.queryManagementPage = new QueryManagementPage(page);
-    this.connectDataSourcePopupPage = new ConnectDataSourcePopupPage(page);
+    this.billingGroupPage = new BillingGroupPage(page);
+    this.billingUsagePage = new BillingUsagePage(page);
     this.regexPatternsFormValidation = new RegexPatternsFormValidationPage(page);
     this.sharedComponentsFormValidation = new SharedComponentsFormValidationPage(page);
     this.schemaPage = new SchemaPage(page);
@@ -328,7 +378,11 @@ class PageManager {
 
     // ===== ANOMALY DETECTION PAGE OBJECTS =====
     this.anomalyDetectionPage = new AnomalyDetectionPage(page, this.commonActions);
+
+    // ===== DOWNTIMES PAGE OBJECTS =====
+    this.downtimesPage = new DowntimesPage(page);
     this.aiToolsetsFormValidation = new AiToolsetsFormValidationPage(page);
+    this.aiAssistantCreditsPage = new AiAssistantCreditsPage(page);
 
     // ===== ONLINE EVALS PAGE OBJECTS =====
     this.llmProvidersPage = new LlmProvidersPage(page);

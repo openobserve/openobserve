@@ -15,10 +15,9 @@
 
 //! Database Monitoring rollup offsets (design `db-monitoring/dbm-design-doc.md` §5, D3).
 //!
-//! PER-`(org, stream)` offsets — a deliberate deviation from the sibling
-//! `service_graph` store's single global key: combined with the DBM job's
+//! PER-`(org, stream)` offsets, like the service graph rollup's: combined with the DBM job's
 //! never-advance-on-failure rule, one persistently failing stream must block
-//! only itself, never the whole fleet. Value format is shared with the sibling:
+//! only itself, never the whole fleet. Value format:
 //! either `"<offset>"` or `"<offset>;<node_uuid>"` (node = job lock holder).
 
 use infra::{

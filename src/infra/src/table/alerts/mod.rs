@@ -23,7 +23,6 @@ use config::meta::{
             Alert as MetaAlert, AlertSortField as MetaAlertSortField, AlertTypeFilter,
             ListAlertsParams,
         },
-        deduplication::DeduplicationConfig as MetaDeduplicationConfig,
     },
     folder::{Folder as MetaFolder, FolderType},
     stream::StreamType as MetaStreamType,
@@ -31,9 +30,10 @@ use config::meta::{
 use hashbrown::HashMap;
 use itertools::Itertools;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DeriveIden, EntityTrait, ModelTrait,
-    Order, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait, TryIntoModel,
-    prelude::Expr, sea_query::Func,
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DeriveIden, EntityTrait,
+    FromQueryResult, JoinType, ModelTrait, Order, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, RelationTrait, Set, TransactionTrait, TryIntoModel, prelude::Expr,
+    sea_query::Func,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -47,6 +47,17 @@ use crate::{
 };
 
 pub mod intermediate;
+
+/// The alert columns a summary needs, read without parsing the stored alert body.
+#[derive(Clone, Debug, FromQueryResult)]
+pub struct AlertSummaryRow {
+    pub id: String,
+    pub name: String,
+    /// The folder's public id, not its surrogate key.
+    pub folder_id: String,
+    pub stream_name: String,
+    pub enabled: bool,
+}
 
 impl TryFrom<alerts::Model> for MetaAlert {
     type Error = errors::Error;
@@ -80,8 +91,13 @@ impl TryFrom<alerts::Model> for MetaAlert {
         let destinations: Vec<String> = serde_json::from_value(value.destinations)?;
         let recovery_destinations: Vec<String> = value
             .recovery_destinations
-            .map(serde_json::from_value)
-            .transpose()?
+            .map(|raw| serde_json::from_str(&raw))
+            .transpose()
+            .map_err(|e| {
+                errors::Error::Message(format!(
+                    "alert {id} has an invalid recovery_destinations value: {e}"
+                ))
+            })?
             .unwrap_or_default();
         let context_attributes: Option<HashMap<String, String>> = value
             .context_attributes
@@ -195,16 +211,6 @@ impl TryFrom<alerts::Model> for MetaAlert {
         alert.set_last_satisfied_at(value.last_satisfied_at);
         alert.set_last_triggered_at(value.last_triggered_at);
 
-        // Load deduplication configuration if enabled
-        if value.dedup_enabled {
-            let dedup_config_json = value.dedup_config.unwrap_or_else(|| serde_json::json!({}));
-            let mut dedup_config: MetaDeduplicationConfig =
-                serde_json::from_value(dedup_config_json)?;
-            dedup_config.enabled = true;
-            dedup_config.time_window_minutes = value.dedup_time_window_minutes;
-            alert.deduplication = Some(dedup_config);
-        }
-
         alert.creates_incident = value.creates_incident;
         alert.workflows = workflows;
 
@@ -220,12 +226,14 @@ impl TryFrom<alerts::Model> for MetaAlert {
             .unwrap_or_default();
         alert.oncall_team = value.oncall_team;
         alert.runbook_url = value.runbook_url;
+        alert.incident_title_template = value.incident_title_template;
 
         alert.pending_period_sec = value.pending_period_sec;
         // NULL predates the feature, which is the same as off / no hold.
         alert.notify_on_recovery = value.notify_on_recovery.unwrap_or(false);
         alert.recovery_destinations = recovery_destinations;
         alert.keep_firing_for = value.keep_firing_for_seconds.unwrap_or(0);
+        alert.suppress_repeats = value.suppress_repeats.unwrap_or(false);
 
         Ok(alert)
     }
@@ -455,21 +463,54 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Lists alerts.
+/// Lists alerts; a row this version cannot read is logged and skipped.
 pub async fn list<C: ConnectionTrait>(
     conn: &C,
     params: ListAlertsParams,
 ) -> Result<Vec<(MetaFolder, MetaAlert)>, errors::Error> {
-    let alerts = list_models(conn, params)
-        .await?
-        .into_iter()
-        .map(|(f, a)| {
-            let f = MetaFolder::from(f);
-            let a = MetaAlert::try_from(a)?;
-            Ok((f, a))
-        })
-        .collect::<Result<_, errors::Error>>()?;
-    Ok(alerts)
+    let models = list_models(conn, params).await?;
+    Ok(super::convert_skipping_unreadable(
+        "alerts",
+        models,
+        |(_, a)| alert_row_key(a),
+        |(f, a)| MetaAlert::try_from(a).map(|a| (MetaFolder::from(f), a)),
+    ))
+}
+
+/// Lists alerts like `list` but fails on a row this version cannot read, for reference checks.
+pub async fn list_fully_decoded<C: ConnectionTrait>(
+    conn: &C,
+    params: ListAlertsParams,
+) -> Result<Vec<(MetaFolder, MetaAlert)>, errors::Error> {
+    let models = list_models(conn, params).await?;
+    super::convert_failing_on_unreadable(
+        "alerts",
+        models,
+        |(_, a)| alert_row_key(a),
+        |(f, a)| MetaAlert::try_from(a).map(|a| (MetaFolder::from(f), a)),
+    )
+}
+
+/// Lists every alert in the org as [`AlertSummaryRow`], selecting only the columns it needs.
+pub async fn list_summary_rows<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<Vec<AlertSummaryRow>, errors::Error> {
+    Ok(alerts::Entity::find()
+        .select_only()
+        .columns([
+            alerts::Column::Id,
+            alerts::Column::Name,
+            alerts::Column::StreamName,
+            alerts::Column::Enabled,
+        ])
+        .column_as(folders::Column::FolderId, "folder_id")
+        .join(JoinType::InnerJoin, alerts::Relation::Folders.def())
+        .filter(folders::Column::Type.eq::<i16>(folder_type_into_i16(FolderType::Alerts)))
+        .filter(folders::Column::Org.eq(org_id))
+        .into_model::<AlertSummaryRow>()
+        .all(conn)
+        .await?)
 }
 
 /// The `(long, short)` burn-window pairs of every alert pointing at this SLO.
@@ -551,6 +592,23 @@ pub async fn list_alerts_by_slo<C: ConnectionTrait>(
         .collect())
 }
 
+/// Names of every alert in the org that pages `team_id` directly, enabled or not, sorted.
+pub async fn list_names_by_oncall_team<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    team_id: &str,
+) -> Result<Vec<String>, errors::Error> {
+    Ok(alerts::Entity::find()
+        .select_only()
+        .column(alerts::Column::Name)
+        .filter(alerts::Column::Org.eq(org))
+        .filter(alerts::Column::OncallTeam.eq(team_id))
+        .order_by_asc(alerts::Column::Name)
+        .into_tuple::<String>()
+        .all(conn)
+        .await?)
+}
+
 /// When this alert was last written, epoch **microseconds** — the raw stored
 /// column, not `MetaAlert::updated_at`.
 ///
@@ -578,14 +636,15 @@ pub async fn last_written_us<C: ConnectionTrait>(
         .and_then(|m| m.updated_at))
 }
 
-/// Lists all alerts.
+/// Lists all alerts; a row this version cannot read is logged and skipped.
 pub async fn list_all<C: ConnectionTrait>(conn: &C) -> Result<Vec<MetaAlert>, errors::Error> {
-    let alerts = list_all_models(conn)
-        .await?
-        .into_iter()
-        .map(MetaAlert::try_from)
-        .collect::<Result<_, errors::Error>>()?;
-    Ok(alerts)
+    let models = list_all_models(conn).await?;
+    Ok(super::convert_skipping_unreadable(
+        "alerts",
+        models,
+        alert_row_key,
+        MetaAlert::try_from,
+    ))
 }
 
 /// Tries to get an alert ORM entity and its parent folder ORM entity.
@@ -657,6 +716,20 @@ async fn list_models<C: ConnectionTrait>(
         query.filter(folders::Column::FolderId.eq(folder_id))
     } else {
         query
+    };
+    let query = match &params.listable_folder_ids {
+        None => query,
+        // `IN ()` is not portable, and no filter would list every folder.
+        Some(ids) if ids.is_empty() => {
+            query.filter(alerts::Column::Id.eq(TAG_FILTER_NO_MATCH_SENTINEL))
+        }
+        Some(ids) => {
+            let mut cond = Condition::any();
+            for chunk in ids.chunks(TAG_ID_PREDICATE_CHUNK) {
+                cond = cond.add(folders::Column::FolderId.is_in(chunk.to_vec()));
+            }
+            query.filter(cond)
+        }
     };
 
     // Apply the optional alert name substring filter.
@@ -767,6 +840,15 @@ async fn list_models<C: ConnectionTrait>(
             query.filter(cond)
         }
     };
+    let query = if params.excluded_alert_ids.is_empty() {
+        query
+    } else {
+        let mut cond = Condition::all();
+        for chunk in params.excluded_alert_ids.chunks(TAG_ID_PREDICATE_CHUNK) {
+            cond = cond.add(alerts::Column::Id.is_not_in(chunk.to_vec()));
+        }
+        query.filter(cond)
+    };
 
     // Apply ordering (PT-3).
     //
@@ -827,6 +909,10 @@ async fn list_models<C: ConnectionTrait>(
         .filter_map(|(d, maybe_f)| maybe_f.map(|f| (f, d)))
         .collect();
     Ok(folders_and_dashboards)
+}
+
+fn alert_row_key(alert: &alerts::Model) -> String {
+    format!("org={} id={}", alert.org, alert.id)
 }
 
 /// Lists all alert ORM models.
@@ -961,24 +1047,10 @@ fn update_mutable_fields(
     let recovery_destinations = if alert.recovery_destinations.is_empty() {
         None
     } else {
-        Some(serde_json::to_value(alert.recovery_destinations)?)
+        Some(serde_json::to_string(&alert.recovery_destinations)?)
     };
     let keep_firing_for_seconds = alert.keep_firing_for;
-
-    // Handle deduplication configuration
-    // Note: time_window_minutes is stored in a separate column, not in the JSON config
-    let (dedup_enabled, dedup_time_window_minutes, dedup_config) =
-        if let Some(mut dedup) = alert.deduplication {
-            let dedup_enabled = dedup.enabled;
-            let time_window = dedup.time_window_minutes;
-            // Remove time_window_minutes from the config before serializing to avoid redundancy
-            dedup.time_window_minutes = None;
-
-            let dedup_config_json = serde_json::to_value(dedup)?;
-            (dedup_enabled, time_window, Some(dedup_config_json))
-        } else {
-            (false, None, None)
-        };
+    let suppress_repeats = alert.suppress_repeats;
 
     alert_am.name = Set(name);
     alert_am.is_real_time = Set(is_real_time);
@@ -1006,6 +1078,7 @@ fn update_mutable_fields(
     alert_am.slo_id = Set(slo_id);
     alert_am.oncall_team = Set(alert.oncall_team.clone());
     alert_am.runbook_url = Set(alert.runbook_url.clone());
+    alert_am.incident_title_template = Set(alert.incident_title_template.clone());
     alert_am.query_vrl_function = Set(query_vrl_function);
     alert_am.query_search_event_type = Set(query_search_event_type);
     alert_am.query_multi_time_range = Set(query_multi_time_range);
@@ -1031,26 +1104,21 @@ fn update_mutable_fields(
     alert_am.last_edited_by = Set(last_edited_by);
     alert_am.updated_at = Set(Some(updated_at));
     alert_am.align_time = Set(align_time);
-    alert_am.dedup_enabled = Set(dedup_enabled);
-    alert_am.dedup_time_window_minutes = Set(dedup_time_window_minutes);
-    alert_am.dedup_config = Set(dedup_config);
     alert_am.creates_incident = Set(alert.creates_incident);
     alert_am.workflows = Set(workflows);
     alert_am.pending_period_sec = Set(pending_periond_sec);
     alert_am.notify_on_recovery = Set(Some(notify_on_recovery));
     alert_am.recovery_destinations = Set(recovery_destinations);
     alert_am.keep_firing_for_seconds = Set(Some(keep_firing_for_seconds));
+    alert_am.suppress_repeats = Set(Some(suppress_repeats));
     Ok(())
 }
 
-/// Deletes all alerts belonging to the given org.
-pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+/// Deletes all alerts of the org and returns their ids.
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<String>, errors::Error> {
     let client = get_orm_client_rw().await;
-    alerts::Entity::delete_many()
-        .filter(alerts::Column::Org.eq(org_id))
-        .exec(client)
-        .await?;
-    Ok(())
+    let delete = alerts::Entity::delete_many().filter(alerts::Column::Org.eq(org_id));
+    Ok(super::delete_returning(client, delete, &[alerts::Column::Id]).await?)
 }
 
 #[derive(DeriveIden)]
@@ -1061,8 +1129,6 @@ enum Alerts {
 
 #[cfg(test)]
 pub(super) mod tests {
-    use svix_ksuid::KsuidLike as _;
-
     use super::*;
     use crate::table::entity::alerts::Model;
 
@@ -1105,6 +1171,7 @@ pub(super) mod tests {
             slo_id: None,
             oncall_team: None,
             runbook_url: None,
+            incident_title_template: None,
             query_slo_condition: None,
             trigger_frequency_type: 1, // Seconds
             trigger_frequency_seconds: 300,
@@ -1125,6 +1192,7 @@ pub(super) mod tests {
             notify_on_recovery: None,
             recovery_destinations: None,
             keep_firing_for_seconds: None,
+            suppress_repeats: None,
         }
     }
 
@@ -1322,7 +1390,9 @@ pub(super) mod tests {
         // and called from `core` (save validation and the SLO ingest pass).
         use super::make_model;
         use crate::table::{
-            alerts::{intermediate, list_models, list_slo_burn_window_pairs},
+            alerts::{
+                intermediate, list_models, list_names_by_oncall_team, list_slo_burn_window_pairs,
+            },
             entity::{alerts, folders},
             folders::folder_type_into_i16,
         };
@@ -1894,6 +1964,77 @@ pub(super) mod tests {
             assert_eq!(ids_of(&db, only_enabled).await, vec![on]);
         }
 
+        #[tokio::test]
+        async fn list_summary_rows_returns_public_folder_id_and_enabled_flag() {
+            let db = db_with_folder().await;
+            seed_folder(&db, FOLDER_B_PK, ORG, "ops").await;
+            let (on, off) = (alert_id(), alert_id());
+            insert_alert(&db, AlertSpec::plain(&on, "on")).await;
+            insert_alert(
+                &db,
+                AlertSpec::plain(&off, "off")
+                    .disabled()
+                    .in_folder(ORG, FOLDER_B_PK),
+            )
+            .await;
+
+            let mut rows = super::super::list_summary_rows(&db, ORG).await.unwrap();
+            rows.sort_by(|a, b| a.name.cmp(&b.name));
+            let got: Vec<(&str, &str, &str, bool)> = rows
+                .iter()
+                .map(|r| {
+                    (
+                        r.id.as_str(),
+                        r.name.as_str(),
+                        r.folder_id.as_str(),
+                        r.enabled,
+                    )
+                })
+                .collect();
+            assert_eq!(
+                got,
+                vec![
+                    (off.as_str(), "alert-off", "ops", false),
+                    (on.as_str(), "alert-on", "default", true),
+                ]
+            );
+            assert_eq!(rows[0].stream_name, "default");
+        }
+
+        #[tokio::test]
+        async fn list_summary_rows_excludes_other_orgs_and_non_alert_folders() {
+            let db = db_with_folder().await;
+            seed_folder(&db, FOLDER_OTHER_ORG_PK, OTHER_ORG, "default").await;
+            folders::Entity::insert(folders::ActiveModel {
+                id: Set("folder_pk_00000000000000009".to_string()),
+                org: Set(ORG.to_string()),
+                folder_id: Set("dash".to_string()),
+                name: Set("folder-dash".to_string()),
+                description: Set(None),
+                r#type: Set(folder_type_into_i16(FolderType::Dashboards)),
+                icon: Set(None),
+            })
+            .exec(&db)
+            .await
+            .unwrap();
+            let (mine, theirs, dash) = (alert_id(), alert_id(), alert_id());
+            insert_alert(&db, AlertSpec::plain(&mine, "mine")).await;
+            insert_alert(
+                &db,
+                AlertSpec::plain(&theirs, "theirs").in_folder(OTHER_ORG, FOLDER_OTHER_ORG_PK),
+            )
+            .await;
+            insert_alert(
+                &db,
+                AlertSpec::plain(&dash, "dash").in_folder(ORG, "folder_pk_00000000000000009"),
+            )
+            .await;
+
+            let rows = super::super::list_summary_rows(&db, ORG).await.unwrap();
+            let ids: Vec<&str> = rows.iter().map(|r| r.id.as_str()).collect();
+            assert_eq!(ids, vec![mine.as_str()]);
+        }
+
         /// No filter = historical behaviour, including non-SLO alerts.
         #[tokio::test]
         async fn list_models_without_slo_filter_returns_everything() {
@@ -2173,6 +2314,27 @@ pub(super) mod tests {
             );
         }
 
+        #[tokio::test]
+        async fn excluded_ids_are_dropped_and_intersect_the_tag_predicate() {
+            let db = db_with_folder().await;
+            let (a1, a2, p1) = (alert_id(), alert_id(), alert_id());
+            insert_alert(&db, AlertSpec::plain(&a1, "a1")).await;
+            insert_alert(&db, AlertSpec::plain(&a2, "a2")).await;
+            insert_alert(&db, AlertSpec::plain(&p1, "p1")).await;
+
+            let params = ListAlertsParams::new(ORG).without_alert_ids(vec![a2.clone()]);
+            let mut kept = ids_of(&db, params).await;
+            kept.sort();
+            let mut expected = vec![a1.clone(), p1.clone()];
+            expected.sort();
+            assert_eq!(kept, expected);
+
+            let params = ListAlertsParams::new(ORG)
+                .with_tag_alert_ids(vec![a2.clone(), p1.clone()])
+                .without_alert_ids(vec![a2]);
+            assert_eq!(ids_of(&db, params).await, vec![p1]);
+        }
+
         /// An empty resolved tag set means "no alert carries these tags" and
         /// must still match nothing once a SLO filter is also present.
         #[tokio::test]
@@ -2231,6 +2393,34 @@ pub(super) mod tests {
                 2,
                 "the folder filter alone still returns non-SLO alerts"
             );
+        }
+
+        #[tokio::test]
+        async fn listable_folders_scope_a_cross_folder_list() {
+            let db = db_with_folder().await;
+            seed_folder(&db, FOLDER_B_PK, ORG, "team-a").await;
+            let (in_default, in_team) = (alert_id(), alert_id());
+            insert_alert(&db, AlertSpec::plain(&in_default, "p0")).await;
+            insert_alert(
+                &db,
+                AlertSpec::plain(&in_team, "p1").in_folder(ORG, FOLDER_B_PK),
+            )
+            .await;
+
+            let unrestricted = ListAlertsParams::new(ORG);
+            assert_eq!(ids_of(&db, unrestricted).await.len(), 2);
+
+            let one = ListAlertsParams::new(ORG).within_folders(vec!["team-a".to_string()]);
+            assert_eq!(ids_of(&db, one).await, vec![in_team]);
+
+            let none = ListAlertsParams::new(ORG).within_folders(vec![]);
+            assert!(
+                ids_of(&db, none).await.is_empty(),
+                "no listable folder must list nothing, not everything"
+            );
+
+            let other = ListAlertsParams::new(ORG).within_folders(vec!["team-z".to_string()]);
+            assert!(ids_of(&db, other).await.is_empty());
         }
 
         /// Ordering must survive the new predicate — including the deliberate
@@ -2294,6 +2484,149 @@ pub(super) mod tests {
             params.slo_id = Some(SLO_A.to_string());
 
             assert_eq!(ids_of(&db, params).await, vec![a1]);
+        }
+
+        mod unreadable_rows {
+            use std::str::FromStr;
+
+            use super::*;
+            use crate::table::{
+                alerts::{get_by_id, list, list_all, list_fully_decoded},
+                testing::{capture_error_logs, logged_errors_containing},
+            };
+
+            fn new_operator_conditions() -> serde_json::Value {
+                serde_json::json!({"version": 2, "conditions": {
+                    "filterType": "group", "logicalOperator": "AND",
+                    "conditions": [{"filterType": "condition", "column": "level",
+                                    "operator": "future_op", "value": ["error"],
+                                    "logicalOperator": "AND"}]
+                }})
+            }
+
+            async fn insert_with_conditions(
+                db: &DatabaseConnection,
+                id: &str,
+                conditions: serde_json::Value,
+            ) {
+                let mut model = make_model(id);
+                model.org = ORG.to_string();
+                model.folder_id = FOLDER_A_PK.to_string();
+                model.name = format!("alert-{id}");
+                model.query_conditions = Some(conditions);
+                alerts::Entity::insert(alerts::ActiveModel::from(model))
+                    .exec(db)
+                    .await
+                    .unwrap();
+            }
+
+            /// Three rows: one readable, one with an operator this version lacks, one junk.
+            async fn db_with_unreadable_rows() -> (DatabaseConnection, [String; 3]) {
+                let db = db_with_folder().await;
+                let ids = [alert_id(), alert_id(), alert_id()];
+                insert_alert(&db, AlertSpec::plain(&ids[0], "good")).await;
+                insert_with_conditions(&db, &ids[1], new_operator_conditions()).await;
+                insert_with_conditions(&db, &ids[2], serde_json::json!(42)).await;
+                (db, ids)
+            }
+
+            #[tokio::test]
+            async fn list_skips_and_logs_rows_it_cannot_read() {
+                capture_error_logs();
+                let (db, [good, new_op, junk]) = db_with_unreadable_rows().await;
+
+                let listed: Vec<String> = list(&db, ListAlertsParams::new(ORG))
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|(_, a)| a.id.unwrap().to_string())
+                    .collect();
+
+                assert_eq!(listed, vec![good]);
+                let logged = logged_errors_containing(&new_op);
+                assert!(
+                    logged
+                        .iter()
+                        .any(|l| l.contains(ORG) && l.contains("unknown variant `future_op`")),
+                    "{logged:?}"
+                );
+                assert!(!logged_errors_containing(&junk).is_empty());
+            }
+
+            #[tokio::test]
+            async fn list_fully_decoded_fails_on_a_row_it_cannot_read() {
+                let (db, [good, ..]) = db_with_unreadable_rows().await;
+                let err = list_fully_decoded(&db, ListAlertsParams::new(ORG))
+                    .await
+                    .unwrap_err()
+                    .to_string();
+                assert!(err.contains("unreadable"), "{err}");
+
+                let db = db_with_folder().await;
+                insert_alert(&db, AlertSpec::plain(&good, "good")).await;
+                let listed = list_fully_decoded(&db, ListAlertsParams::new(ORG))
+                    .await
+                    .unwrap();
+                assert_eq!(listed.len(), 1);
+            }
+
+            #[tokio::test]
+            async fn list_all_skips_rows_it_cannot_read() {
+                let (db, [good, ..]) = db_with_unreadable_rows().await;
+                let listed: Vec<String> = list_all(&db)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|a| a.id.unwrap().to_string())
+                    .collect();
+                assert_eq!(listed, vec![good]);
+            }
+
+            #[tokio::test]
+            async fn get_by_id_of_an_unreadable_row_is_an_error() {
+                let (db, [good, new_op, _]) = db_with_unreadable_rows().await;
+                let get = |id: &str| get_by_id(&db, ORG, Ksuid::from_str(id).unwrap());
+                assert!(get(&good).await.unwrap().is_some());
+                let err = get(&new_op).await.unwrap_err();
+                assert!(
+                    err.to_string().contains("unknown variant `future_op`"),
+                    "{err}"
+                );
+            }
+        }
+
+        #[tokio::test]
+        async fn names_by_oncall_team_match_only_that_team_in_that_org() {
+            let db = db_with_folder().await;
+            seed_folder(&db, FOLDER_OTHER_ORG_PK, OTHER_ORG, "default").await;
+            for (label, org, folder_pk, team, enabled) in [
+                ("zeta", ORG, FOLDER_A_PK, Some("team-a"), false),
+                ("beta", ORG, FOLDER_A_PK, Some("team-a"), true),
+                ("other-team", ORG, FOLDER_A_PK, Some("team-b"), true),
+                ("unset", ORG, FOLDER_A_PK, None, true),
+                (
+                    "other-org",
+                    OTHER_ORG,
+                    FOLDER_OTHER_ORG_PK,
+                    Some("team-a"),
+                    true,
+                ),
+            ] {
+                let mut model = make_model(&alert_id());
+                model.org = org.to_string();
+                model.folder_id = folder_pk.to_string();
+                model.name = label.to_string();
+                model.enabled = enabled;
+                model.oncall_team = team.map(str::to_string);
+                alerts::Entity::insert(alerts::ActiveModel::from(model))
+                    .exec(&db)
+                    .await
+                    .unwrap_or_else(|e| panic!("seed alert {label}: {e}"));
+            }
+
+            let names = list_names_by_oncall_team(&db, ORG, "team-a").await.unwrap();
+
+            assert_eq!(names, vec!["beta".to_string(), "zeta".to_string()]);
         }
     }
     #[test]

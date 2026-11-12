@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use common::meta::stream::Stream;
 use config::{
-    DEFAULT_ORG, ider,
+    DEFAULT_ORG, META_ORG_ID, ider,
     meta::{
         alerts::alert::ListAlertsParams,
         dashboards::ListDashboardsParams,
@@ -25,6 +26,8 @@ use config::{
     },
     utils::{json, rand::generate_random_string, time},
 };
+#[cfg(feature = "cloud")]
+use db::organization::get_org_setting;
 use db::{self, org_users, user::is_root_user};
 use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
@@ -46,6 +49,8 @@ use {
 
 #[cfg(feature = "cloud")]
 use super::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
+#[cfg(feature = "cloud")]
+use crate::org_domain_ownership::get_cached_org_for_domain;
 use crate::{
     auth::{delete_org_tuples, save_org_tuples},
     common::{
@@ -61,6 +66,8 @@ use crate::{
 };
 
 const MASKED_TOKEN: &str = "NOT_AVAILABLE";
+// API version and public dashboard route prefixes: such an org id makes `/api/<id>/` ambiguous.
+const RESERVED_ORG_IDS: [&str; 4] = ["v1", "v2", "v3", "public_dashboards"];
 
 /// Checks if a service account token should be masked
 /// Returns true if:
@@ -113,8 +120,7 @@ async fn create_and_assign_sre_readonly_role(
     .await
 }
 
-pub async fn get_summary(org_id: &str) -> OrgSummary {
-    let streams = get_streams(org_id, None, false, None).await;
+fn summarize_streams(org_id: &str, streams: &[Stream]) -> (StreamSummary, bool) {
     let mut stream_summary = StreamSummary::default();
     let mut has_trigger_stream = false;
     for stream in streams.iter() {
@@ -125,6 +131,9 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             && !stream.stream_type.eq(&StreamType::Metadata)
         {
             stream_summary.num_streams += 1;
+            if usage::is_user_data_stream(org_id, &stream.name, stream.stream_type) {
+                stream_summary.num_user_streams += 1;
+            }
             stream_summary.total_records += stream.stats.doc_num;
             stream_summary.total_storage_size += stream.stats.storage_size;
             stream_summary.total_compressed_size += stream.stats.compressed_size;
@@ -132,6 +141,12 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             stream_summary.total_mindex_size += stream.stats.mindex_size;
         }
     }
+    (stream_summary, has_trigger_stream)
+}
+
+pub async fn get_summary(org_id: &str) -> OrgSummary {
+    let streams = get_streams(org_id, None, false, None).await;
+    let (stream_summary, has_trigger_stream) = summarize_streams(org_id, &streams);
 
     let trigger_status_results = if !has_trigger_stream {
         vec![]
@@ -389,15 +404,36 @@ pub async fn list_all_orgs(limit: Option<i64>) -> Result<Vec<Organization>, anyh
     db::organization::list(limit).await
 }
 
+/// Same as [`list_all_orgs`], paired with each org's creation time in microseconds.
+pub async fn list_all_orgs_with_created_at(
+    limit: Option<i64>,
+) -> Result<Vec<(Organization, i64)>, anyhow::Error> {
+    db::organization::list_with_created_at(limit).await
+}
+
 pub async fn list_orgs_by_user(user_email: &str) -> Result<Vec<Organization>, anyhow::Error> {
+    Ok(list_orgs_by_user_with_created_at(user_email)
+        .await?
+        .into_iter()
+        .map(|(org, _)| org)
+        .collect())
+}
+
+/// Same as [`list_orgs_by_user`], paired with each org's (not the membership's) creation time.
+pub async fn list_orgs_by_user_with_created_at(
+    user_email: &str,
+) -> Result<Vec<(Organization, i64)>, anyhow::Error> {
     let records = db::org_users::list_orgs_by_user(user_email).await?;
     Ok(records
         .into_iter()
-        .map(|record| Organization {
-            identifier: record.org_id.clone(),
-            name: record.org_name.clone(),
-            org_type: record.org_type.to_string(),
-            service_account: None,
+        .map(|record| {
+            let org = Organization {
+                identifier: record.org_id,
+                name: record.org_name,
+                org_type: record.org_type.to_string(),
+                service_account: None,
+            };
+            (org, record.org_created_at)
         })
         .collect())
 }
@@ -664,20 +700,6 @@ pub async fn create_org(
                 }
                 crate::alerts::alert_calibration::ensure_org_config(&org.identifier).await;
             }
-            // Best-effort — the compiled-in fallback (design §4.4) covers the
-            // race if this fails or the backfill hasn't run yet; never block
-            // org creation on it.
-            if let Err(e) = crate::alerts::notifications::org_default::set_org_default_template(
-                &org.identifier,
-                crate::alerts::notifications::default_template::DEFAULT_CONTENT_TEMPLATE_NAME,
-            )
-            .await
-            {
-                log::warn!(
-                    "Failed to set default_alert_template for org '{}': {e}",
-                    org.identifier
-                );
-            }
             #[cfg(feature = "cloud")]
             enqueue_cloud_event(CloudEvent {
                 org_id: org.identifier.clone(),
@@ -755,6 +777,39 @@ fn validate_auto_created_org_id(org_id: &str) -> Result<(), anyhow::Error> {
             "Organization identifier can only contain alphanumeric characters (A-Z, a-z, 0-9), hyphens, and underscores"
         ));
     }
+    if RESERVED_ORG_IDS
+        .iter()
+        .any(|reserved| org_id.eq_ignore_ascii_case(reserved))
+    {
+        return Err(anyhow::anyhow!(
+            "Organization identifier {org_id} is reserved"
+        ));
+    }
+    if let Some(violation) = infra::file_list::org_id_violation(org_id) {
+        return Err(anyhow::anyhow!(violation));
+    }
+    Ok(())
+}
+
+/// Refuses blocked or tombstoned ids, so auto-provisioning never revives a deleted org.
+async fn refuse_deleted_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let tombstoned = || async {
+        table::organizations::get(org_id)
+            .await
+            .is_ok_and(|org| org.status == "deleted")
+    };
+    if db::org_status::is_blocked(org_id) || tombstoned().await {
+        return Err(anyhow::anyhow!("Organization {org_id} is deleted"));
+    }
+    Ok(())
+}
+
+/// Refuses an invite into a missing org or one that is being deleted or deleted.
+#[cfg(any(feature = "cloud", test))]
+async fn refuse_inactive_invite_org(org_id: &str) -> Result<(), anyhow::Error> {
+    if !db::org_status::is_active(org_id).await {
+        return Err(anyhow::anyhow!("Organization is not active"));
+    }
     Ok(())
 }
 
@@ -762,6 +817,7 @@ fn validate_auto_created_org_id(org_id: &str) -> Result<(), anyhow::Error> {
 /// with the org, only saves the org in the meta and creates org tuples.
 pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::Error> {
     let org_id = org_id.trim();
+    refuse_deleted_org(org_id).await?;
     if let Some(org) = get_org(org_id).await {
         return Ok(org);
     }
@@ -822,6 +878,7 @@ pub async fn check_and_create_org_without_ofga(
     org_id: &str,
 ) -> Result<Organization, anyhow::Error> {
     let org_id = org_id.trim();
+    refuse_deleted_org(org_id).await?;
     if let Some(org) = get_org(org_id).await {
         return Ok(org);
     }
@@ -908,6 +965,9 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
     if org_id.eq(DEFAULT_ORG) {
         return Err(anyhow::anyhow!("Cannot delete default organization"));
     }
+    if org_id.eq(META_ORG_ID) {
+        return Err(anyhow::anyhow!("Cannot delete meta organization"));
+    }
 
     // Snapshot the org BEFORE deleting — the cloud OrgDeleted event needs its
     // name/type, and after delete_org the record is gone. (Previously this was
@@ -918,7 +978,8 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
 
     match db::organization::delete_org(org_id).await {
         Ok(_) => {
-            delete_org_tuples(org_id).await;
+            // Returned after the event: a retry finds no row, so it would never emit it.
+            let tuples = delete_org_tuples(org_id).await;
             crate::ingestion::rejections::clear_rejections(org_id).await;
             #[cfg(feature = "cloud")]
             if let Some(org) = org_snapshot {
@@ -933,13 +994,43 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
                 })
                 .await;
             }
-            Ok(())
+            tuples
         }
         Err(e) => {
             log::error!("Error deleting org: {e}");
             Err(anyhow::anyhow!("Error deleting org: {}", e))
         }
     }
+}
+
+/// Final org-delete step: keeps the row as a `deleted` tombstone; true only on the flipping call.
+pub async fn tombstone_org(org_id: &str) -> Result<bool, anyhow::Error> {
+    if org_id.eq(DEFAULT_ORG) || org_id.eq(META_ORG_ID) {
+        return Err(anyhow::anyhow!("Cannot delete this organization"));
+    }
+
+    #[cfg(feature = "cloud")]
+    let org_snapshot = get_org(org_id).await;
+
+    delete_org_tuples(org_id).await?;
+    // Only the call that flips the row emits OrgDeleted, so a step 900 retry does not repeat it.
+    let flipped = db::organization::tombstone_org(org_id).await?;
+    #[cfg(feature = "cloud")]
+    if flipped && let Some(org) = org_snapshot {
+        enqueue_cloud_event(CloudEvent {
+            org_id: org.identifier.clone(),
+            org_name: org.name.clone(),
+            org_type: org.org_type.clone(),
+            user: None,
+            subscription_type: None,
+            event: EventType::OrgDeleted,
+            stream_name: None,
+        })
+        .await;
+    }
+    db::organization::evict_org(org_id).await?;
+    crate::ingestion::rejections::clear_rejections(org_id).await;
+    Ok(flipped)
 }
 
 #[cfg(feature = "cloud")]
@@ -1009,6 +1100,21 @@ pub async fn generate_invitation(
             .is_err()
         {
             return Err(anyhow::anyhow!("Email Domain not allowed for {invitee}"));
+        }
+
+        let Some((_, domain)) = invitee.split_once('@') else {
+            return Err(anyhow::anyhow!("invalid email id {invitee}"));
+        };
+
+        if let Some(linked_org) = get_cached_org_for_domain(domain).await {
+            let settings = get_org_setting(&linked_org).await?;
+            for mapping in settings.domain_org_mappings {
+                if mapping.domain == domain && mapping.org_id == org_id {
+                    return Err(anyhow::anyhow!(
+                        "invitee '{invitee}' domain is already mapped to org {org_id} so cannot send invite"
+                    ));
+                }
+            }
         }
 
         if get_billing_by_org_id(org_id).await?.is_none() {
@@ -1103,6 +1209,7 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
         return Err(anyhow::anyhow!("Invalid token"));
     }
     let org_id = invite.org_id.clone();
+    refuse_inactive_invite_org(&org_id).await?;
 
     let org = match get_org(&org_id).await {
         Some(org) => org,
@@ -1285,6 +1392,13 @@ fn sre_agent_email(org_id: &str) -> String {
     format!("{O2_SRE_AGENT_EMAIL_PREFIX}{org_id}{O2_SRE_AGENT_EMAIL_SUFFIX}").to_lowercase()
 }
 
+/// Serializes [ensure_sys_rca_agent] on this node. Concurrent first analyses of a new org would
+/// otherwise both take the not-found branch, and one would delete the account the other was
+/// creating, failing its run with "SysRcaAgent SA not found".
+#[cfg(feature = "enterprise")]
+static ENSURE_SYS_RCA_AGENT: std::sync::LazyLock<tokio::sync::Mutex<()>> =
+    std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
+
 /// Ensures the SysRcaAgent service account exists for the given org, creating it if needed.
 /// Idempotent: returns Ok(()) immediately if the account already exists.
 #[cfg(feature = "enterprise")]
@@ -1295,42 +1409,51 @@ pub async fn ensure_sys_rca_agent(org_id: &str) -> Result<(), anyhow::Error> {
     use crate::users::create_service_account_if_not_exists;
 
     let email = sre_agent_email(org_id);
+    // Held only while provisioning: the FGA calls below are idempotent and may be slow.
+    {
+        let _serial = ENSURE_SYS_RCA_AGENT.lock().await;
 
-    // Only create the DB record if the account doesn't exist yet.
-    match db::org_users::get(org_id, &email).await {
-        Ok(_) => {
-            // Account already exists, skip creation
-        }
-        Err(err) => {
-            // Only treat genuine "not found" errors as missing accounts
-            // Other DB errors should bubble up rather than triggering creation
-            if err.to_string().contains("User not found") {
-                // Drop any orphaned mixed-case row in `users` left over from a
-                // pre-fix run. `db::user::delete` is case-insensitive at the
-                // table layer and also fans out a cluster-wide invalidation so
-                // the in-mem user cache (and super_cluster) drop the stale row
-                // — `table::users::remove` would skip both. Safe to call
-                // unconditionally: we only reach this branch when there's no
-                // `org_users` row, meaning any matching `users` row is
-                // unreferenced.
-                db::user::delete(&email).await?;
-                create_service_account_if_not_exists(&email).await?;
+        // Only create the DB record if the account doesn't exist yet.
+        match db::org_users::get(org_id, &email).await {
+            Ok(_) => {
+                // Account already exists, skip creation
+            }
+            Err(err) => {
+                // Only treat genuine "not found" errors as missing accounts
+                // Other DB errors should bubble up rather than triggering creation
+                if err.to_string().contains("User not found") {
+                    // Drop an orphaned mixed-case row in `users` left over from a pre-fix run.
+                    // `db::user::delete` is case-insensitive at the table layer and also fans
+                    // out a cluster-wide invalidation so the in-mem user cache (and
+                    // super_cluster) drop the stale row — `table::users::remove` would skip
+                    // both. Only a row whose stored email differs in case is such an orphan:
+                    // a lowercase row is this account, possibly being created by a concurrent
+                    // call on another node, and deleting it (with its memberships) would break
+                    // that call.
+                    if db::user::get_user_record(&email)
+                        .await
+                        .is_ok_and(|user| user.email != email)
+                    {
+                        db::user::delete(&email).await?;
+                    }
+                    create_service_account_if_not_exists(&email).await?;
 
-                let token = generate_random_string(32);
-                let rum_token = format!("rum{}", generate_random_string(16));
+                    let token = generate_random_string(32);
+                    let rum_token = format!("rum{}", generate_random_string(16));
 
-                db::org_users::add_with_flags(
-                    org_id,
-                    &email,
-                    UserRole::SreAgent,
-                    &token,
-                    Some(rum_token),
-                    true,
-                )
-                .await?;
-            } else {
-                // Return the original error for non-"not found" failures
-                return Err(err);
+                    db::org_users::add_with_flags(
+                        org_id,
+                        &email,
+                        UserRole::SreAgent,
+                        &token,
+                        Some(rum_token),
+                        true,
+                    )
+                    .await?;
+                } else {
+                    // Return the original error for non-"not found" failures
+                    return Err(err);
+                }
             }
         }
     }
@@ -1386,6 +1509,61 @@ mod tests {
 
     use super::*;
     use crate::{common::meta::user::UserRequest, users};
+
+    fn summary_stream(name: &str, stream_type: StreamType) -> Stream {
+        stream::stream_res(
+            "summary_org",
+            name,
+            stream_type,
+            arrow_schema::Schema::empty(),
+            None,
+        )
+    }
+
+    #[test]
+    fn test_summarize_streams_does_not_count_system_streams_as_user_data() {
+        let streams = [summary_stream(
+            "_o2_alert_calibration_digests",
+            StreamType::Logs,
+        )];
+        let (summary, _) = summarize_streams("summary_org", &streams);
+        assert_eq!(summary.num_streams, 1);
+        assert_eq!(summary.num_user_streams, 0);
+    }
+
+    #[test]
+    fn test_summarize_streams_counts_a_customer_stream_named_like_a_meta_stream() {
+        let streams = [summary_stream(usage::ERROR_STREAM, StreamType::Logs)];
+        let (summary, _) = summarize_streams("acme", &streams);
+        assert_eq!(summary.num_user_streams, 1);
+        let (summary, _) = summarize_streams(META_ORG_ID, &streams);
+        assert_eq!(summary.num_user_streams, 0);
+    }
+
+    #[test]
+    fn test_summarize_streams_does_not_count_slo_slices_as_user_data() {
+        let streams = [summary_stream(
+            config::meta::slo::stream::SLO_SLICES_STREAM,
+            StreamType::Logs,
+        )];
+        let (summary, _) = summarize_streams("acme", &streams);
+        assert_eq!(summary.num_streams, 1);
+        assert_eq!(summary.num_user_streams, 0);
+    }
+
+    #[test]
+    fn test_summarize_streams_counts_user_streams() {
+        let streams = [
+            summary_stream("_o2_alert_calibration_digests", StreamType::Logs),
+            summary_stream(usage::TRIGGERS_STREAM, StreamType::Logs),
+            summary_stream("default", StreamType::Logs),
+            summary_stream("cpu_usage", StreamType::Metrics),
+        ];
+        let (summary, has_trigger_stream) = summarize_streams("summary_org", &streams);
+        assert_eq!(summary.num_streams, 4);
+        assert_eq!(summary.num_user_streams, 2);
+        assert!(has_trigger_stream);
+    }
 
     // TODO: move these tests to integration tests,
     // the below test case will fail as is_root_user()
@@ -1507,12 +1685,56 @@ mod tests {
 
     #[test]
     fn test_validate_auto_created_org_id_accepts_identifiers() {
-        for org_id in ["default", "_meta", "acme-corp", "team_1", "Org2"] {
+        for org_id in [
+            "default",
+            "_meta",
+            "acme-corp",
+            "team_1",
+            "Org2",
+            "v4",
+            "v2org",
+            "api_v2",
+        ] {
             assert!(
                 validate_auto_created_org_id(org_id).is_ok(),
                 "expected {org_id} to be accepted"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_remove_org_refuses_meta_org() {
+        let err = remove_org(META_ORG_ID).await.unwrap_err();
+        assert_eq!(err.to_string(), "Cannot delete meta organization");
+    }
+
+    #[tokio::test]
+    async fn test_accept_invitation_rejects_non_active_org() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+
+        let org = "invitegateorg";
+        let _ = infra_db::create_table().await;
+        let _ = infra_table::create_user_tables().await;
+        check_and_create_org_without_ofga(org).await.unwrap();
+        refuse_inactive_invite_org(org).await.unwrap();
+        for status in [
+            OrgStatus::PendingDeletion,
+            OrgStatus::Deleting,
+            OrgStatus::Deleted,
+        ] {
+            ORG_STATUS_CACHE.insert(org.to_string(), status.clone());
+            let refused = refuse_inactive_invite_org(org).await;
+            ORG_STATUS_CACHE.remove(org);
+            assert!(
+                refused.is_err(),
+                "an invite into a {status:?} org was accepted"
+            );
+        }
+        assert!(
+            refuse_inactive_invite_org("invitegate-never-created")
+                .await
+                .is_err()
+        );
     }
 
     #[test]
@@ -1524,6 +1746,31 @@ mod tests {
                 validate_auto_created_org_id(org_id).is_err(),
                 "expected {org_id:?} to be rejected"
             );
+        }
+    }
+
+    #[test]
+    fn test_validate_auto_created_org_id_follows_the_org_column_limit() {
+        let fits = "o".repeat(infra::file_list::ORG_ID_MAX_LEN);
+        assert!(validate_auto_created_org_id(&fits).is_ok());
+        let long_org = format!("{fits}o");
+        let bounded = infra::file_list::org_id_violation(&long_org).is_some();
+        assert_eq!(validate_auto_created_org_id(&long_org).is_err(), bounded);
+    }
+
+    #[test]
+    fn test_validate_auto_created_org_id_rejects_api_version_prefixes() {
+        for org_id in ["v1", "v2", "v3", "V2"] {
+            let err = validate_auto_created_org_id(org_id).unwrap_err();
+            assert!(err.to_string().contains("reserved"), "{org_id}: {err}");
+        }
+    }
+
+    #[test]
+    fn test_validate_auto_created_org_id_rejects_the_public_dashboards_prefix() {
+        for org_id in ["public_dashboards", "Public_Dashboards"] {
+            let err = validate_auto_created_org_id(org_id).unwrap_err();
+            assert!(err.to_string().contains("reserved"), "{org_id}: {err}");
         }
     }
 }

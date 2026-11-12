@@ -23,7 +23,7 @@ import { createStore } from "vuex";
 import ExperimentForm from "./ExperimentForm.vue";
 import { MAX_TRIAL_COUNT } from "./ExperimentForm.schema";
 import llmExperimentsService from "@/services/llm-experiments.service";
-import llmDatasetsService from "@/services/llm-datasets.service";
+import llmDatasetsService, { type LlmDatasetItem } from "@/services/llm-datasets.service";
 import llmPromptsService from "@/services/llm-prompts.service";
 import remoteTasksService from "@/services/remote-tasks.service";
 import onlineEvalsService from "@/services/online-evals.service";
@@ -37,14 +37,24 @@ vi.mock("vue-router", () => ({
   useRoute: () => ({ query: routeQuery }),
   useRouter: () => ({ push }),
   onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 vi.mock("@/services/llm-experiments.service", () => ({
   default: { create: vi.fn(), preview: vi.fn(), get: vi.fn(), clone: vi.fn() },
 }));
-vi.mock("@/services/llm-datasets.service", () => ({ default: { list: vi.fn() } }));
+vi.mock("@/services/llm-datasets.service", async () => ({
+  // The real helpers (commonInputFields, page-size ceiling) stay; only I/O is stubbed.
+  ...(await vi.importActual<typeof import("@/services/llm-datasets.service")>(
+    "@/services/llm-datasets.service",
+  )),
+  default: { list: vi.fn(), listItems: vi.fn() },
+}));
 vi.mock("@/services/online-evals.service", () => ({
-  default: { scorers: { list: vi.fn() }, providers: { list: vi.fn() } },
+  default: {
+    scorers: { list: vi.fn() },
+    providers: { list: vi.fn(), testConfig: vi.fn().mockResolvedValue("ok") },
+  },
 }));
 vi.mock("@/services/llm-prompts.service", () => ({
   default: { list: vi.fn(), resolve: vi.fn() },
@@ -61,7 +71,10 @@ const dataset = {
   id: "ds-1",
   name: "RAG regression set",
   description: null,
+  // 128 single-item writes and one batch: the row counter and the shown
+  // version differ, and only the row counter is a valid pin.
   globalVersion: 12,
+  writeVersion: 4,
   itemCount: 128,
   tags: [],
   sources: { trace: 0, annotation: 0, manual: 0 },
@@ -103,6 +116,8 @@ const previewResult = {
   sampleSlots: [],
 };
 
+const emptyItemPage = { items: [], total: 0, from: 0, size: 0, hasMore: false };
+
 function oform(w: any) {
   return w.findComponent({ name: "OForm" }).vm as any;
 }
@@ -136,6 +151,7 @@ describe("ExperimentForm", () => {
     vi.clearAllMocks();
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     (llmDatasetsService.list as any).mockResolvedValue([dataset]);
+    vi.mocked(llmDatasetsService.listItems).mockResolvedValue(emptyItemPage);
     (onlineEvalsService.scorers.list as any).mockResolvedValue([scorer]);
     (onlineEvalsService.providers.list as any).mockResolvedValue([provider]);
     (llmExperimentsService.preview as any).mockResolvedValue(previewResult);
@@ -213,6 +229,20 @@ describe("ExperimentForm", () => {
     expect(payload).not.toHaveProperty("temperature");
     expect(payload).not.toHaveProperty("sources");
     expect(payload).not.toHaveProperty("userPrompt");
+  });
+
+  it("pins the dataset's row version but shows its write version", async () => {
+    wrapper = await createWrapper();
+    fillValid(wrapper);
+    await flushPromises();
+
+    const meta = wrapper.find('[data-test="ai-experiment-form-dataset-meta"]').text();
+    expect(meta).toContain("v4");
+    expect(meta).not.toContain("v12");
+
+    await submit(wrapper);
+    const [, payload] = vi.mocked(llmExperimentsService.create).mock.calls[0];
+    expect(payload.datasetVersion).toBe(12);
   });
 
   it("omits the system message when it is blank", async () => {
@@ -607,6 +637,70 @@ describe("ExperimentForm", () => {
       expect(oform(wrapper).form.state.values.name).toBe("prompt v4 probe");
     });
   });
+
+  // The backend rejects a variable any row lacks, so only shared fields are chips.
+  it("offers the dataset's shared input fields as chips, but never expected_output", async () => {
+    vi.mocked(llmDatasetsService.listItems).mockResolvedValue({
+      ...emptyItemPage,
+      items: [
+        { rawInput: { question: "a", context: "b" }, source: "manual" },
+        { rawInput: { question: "c" }, source: "manual" },
+      ] as unknown as LlmDatasetItem[],
+    });
+    wrapper = await createWrapper();
+    setField(wrapper, "datasetId", "ds-1");
+    await flushPromises();
+
+    expect(llmDatasetsService.listItems).toHaveBeenCalledWith("test-org", "ds-1", { size: 100 });
+    expect(wrapper.find('[data-test="ai-experiment-form-variable-context"]').exists()).toBe(false);
+    setField(wrapper, "userPrompt", "Q:");
+    await wrapper.get('[data-test="ai-experiment-form-variable-question"]').trigger("click");
+    expect(oform(wrapper).form.state.values.userPrompt).toBe("Q:\n{{ question }}");
+
+    const expectedOutput = wrapper.get('[data-test="ai-experiment-form-variable-expected_output"]');
+    expect(expectedOutput.element.tagName).toBe("SPAN");
+    await expectedOutput.trigger("click");
+    expect(oform(wrapper).form.state.values.userPrompt).toBe("Q:\n{{ question }}");
+    expect(wrapper.find('[data-test="ai-experiment-form-expected-leak-warning"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("derives chips from the rows of the selected sources only", async () => {
+    vi.mocked(llmDatasetsService.listItems).mockResolvedValue({
+      ...emptyItemPage,
+      items: [
+        { rawInput: { question: "a", context: "b" }, source: "trace" },
+        { rawInput: { question: "c" }, source: "manual" },
+      ] as unknown as LlmDatasetItem[],
+    });
+    wrapper = await createWrapper();
+    setField(wrapper, "datasetId", "ds-1");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-experiment-form-variable-context"]').exists()).toBe(false);
+
+    setField(wrapper, "sources", ["trace"]);
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-experiment-form-variable-context"]').exists()).toBe(true);
+  });
+
+  it("warns when the user prompt references expected_output", async () => {
+    wrapper = await createWrapper();
+    setField(wrapper, "userPrompt", "Compare to {{ expected_output }}");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-experiment-form-expected-leak-warning"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("warns when the system prompt references expected_output", async () => {
+    wrapper = await createWrapper();
+    setField(wrapper, "systemPrompt", "Grade against {{ expected_output }}");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-experiment-form-expected-leak-warning"]').exists()).toBe(
+      true,
+    );
+  });
 });
 
 // Cloning opens this same form seeded from the source run, so a copy can be
@@ -638,6 +732,7 @@ describe("ExperimentForm — clone", () => {
     vi.clearAllMocks();
     routeQuery.clone_of = "exp-source";
     (llmDatasetsService.list as any).mockResolvedValue([dataset]);
+    vi.mocked(llmDatasetsService.listItems).mockResolvedValue(emptyItemPage);
     (onlineEvalsService.scorers.list as any).mockResolvedValue([scorer]);
     (onlineEvalsService.providers.list as any).mockResolvedValue([provider]);
     (llmExperimentsService.preview as any).mockResolvedValue(previewResult);

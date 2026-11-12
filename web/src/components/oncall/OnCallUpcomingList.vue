@@ -14,48 +14,47 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  The answer a rotation's shift rules produce, merged into one chronological
-  timeline. A cadence and an anchor are not readable as a rota until you see
-  the dates they generate. Split out of OnCallScheduleEditor so a rotation
-  with several rules can show every rule's upcoming shifts together
-  (comparable at a glance) even when the rest of each rule's configuration is
-  tabbed and only one is visible at a time.
-
-  Rules sharing an anchor and cadence (e.g. a primary and secondary covering
-  the same weeks) land on identical windows, so those collapse into a single
-  row instead of repeating the same date range once per rule.
--->
+<!-- Who holds the draft rotation, as the server will resolve it once saved: covers and absences included. -->
 <template>
   <div>
+    <p
+      v-if="error"
+      class="text-status-error-text text-xs"
+      data-test="oncall-schedule-preview-error"
+    >
+      {{ error }}
+    </p>
+
     <div
-      v-if="combined.length"
+      v-else-if="rows.length"
       class="border-border-default divide-border-default rounded-default flex flex-col divide-y border"
     >
       <div
-        v-for="shift in combined"
-        :key="`${shift.startMicros}-${shift.endMicros}`"
+        v-for="segment in rows"
+        :key="segment.from"
         class="flex flex-wrap items-center gap-3 px-3 py-1.5"
-        :class="isCurrent(shift) ? 'bg-status-success-bg' : ''"
+        :class="isCurrent(segment) ? 'bg-status-success-bg' : ''"
+        :data-from="segment.from"
+        :data-to="segment.to"
+        :data-user="segment.user_email ?? ''"
         data-test="oncall-schedule-preview-shift"
       >
-        <template v-for="(entry, entryIndex) in shift.entries" :key="entry.ruleName + entry.member">
-          <span v-if="entryIndex" class="text-text-secondary text-xs">{{ raw("·") }}</span>
-          <OText v-if="rules.length > 1" variant="label" class="shrink-0">{{
-            raw(entry.ruleName)
-          }}</OText>
-          <OUserCell :value="entry.member" />
-        </template>
-        <OText variant="meta" class="ms-auto">{{ raw(shiftRange(shift)) }}</OText>
-        <OTag v-if="isCurrent(shift)" variant="success-soft" size="xs">
+        <OText v-if="multiRule && segment.rotation" variant="label" class="shrink-0">
+          {{ raw(segment.rotation) }}
+        </OText>
+        <OUserCell v-if="segment.user_email" :value="segment.user_email" />
+        <OText v-else variant="meta" data-test="oncall-schedule-preview-nobody">
+          {{ t("oncall.upcomingNobody") }}
+        </OText>
+        <OText variant="meta" class="ms-auto">{{ segmentRange(segment) }}</OText>
+        <OTag v-if="isCurrent(segment)" variant="success-soft" size="xs">
           {{ t("oncall.onCallNowTag") }}
         </OTag>
       </div>
     </div>
 
-    <!-- An empty preview is the most common state of a NEW rule, and saying
-         why beats showing nothing. -->
-    <OText v-else variant="meta" data-test="oncall-schedule-preview-empty">
+    <!-- A new rule usually previews nothing yet, and saying why beats a blank. -->
+    <OText v-else-if="showEmpty" variant="meta" data-test="oncall-schedule-preview-empty">
       {{ t("oncall.rotationPreviewEmpty") }}
     </OText>
   </div>
@@ -66,32 +65,44 @@ import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
-import type { ShiftRule } from "@/ts/interfaces/oncall";
-import type { CombinedShift } from "@/utils/oncall";
-import { combinedUpcomingShifts } from "@/utils/oncall";
+import type { ResolvedSegment } from "@/ts/interfaces/oncall";
+import { formatStamp } from "@/utils/oncall";
+import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-const PREVIEW_SHIFTS = 5;
+const PREVIEW_ROWS = 10;
 
 const props = defineProps<{
-  rules: ShiftRule[];
-  /** "Now", shared with the caller so every rule's list agrees on when "now" is. */
+  segments: ResolvedSegment[];
+  windowFrom: number;
+  windowTo: number;
   nowMicros: number;
+  /** The team's zone: times are shown in it. */
+  timezone: string;
+  multiRule: boolean;
+  error: I18nText | null;
+  showEmpty: boolean;
 }>();
 
 const { t } = useI18nTyped();
 
-const combined = computed<CombinedShift[]>(() =>
-  combinedUpcomingShifts(props.rules, props.nowMicros, PREVIEW_SHIFTS),
+const rows = computed<ResolvedSegment[]>(() =>
+  props.segments.filter((segment) => segment.to > props.nowMicros).slice(0, PREVIEW_ROWS),
 );
 
-function isCurrent(shift: CombinedShift): boolean {
-  return shift.startMicros <= props.nowMicros && props.nowMicros < shift.endMicros;
+function isCurrent(segment: ResolvedSegment): boolean {
+  return segment.from <= props.nowMicros && props.nowMicros < segment.to;
 }
 
-function shiftRange(shift: CombinedShift): string {
-  const start = new Date(shift.startMicros / 1000);
-  const end = new Date(shift.endMicros / 1000);
-  return `${start.toLocaleString()} — ${end.toLocaleString()}`;
+// The window's edges are where the fetch stopped, not handovers, so a segment touching one is open there.
+function segmentRange(segment: ResolvedSegment): I18nText {
+  const start = raw(formatStamp(segment.from, props.timezone));
+  const end = raw(formatStamp(segment.to, props.timezone));
+  const openStart = segment.from <= props.windowFrom;
+  const openEnd = segment.to >= props.windowTo;
+  if (openStart && openEnd) return t("oncall.upcomingNoChange");
+  if (openStart) return t("oncall.upcomingUntil", { end });
+  if (openEnd) return t("oncall.upcomingFrom", { start });
+  return raw(`${start} — ${end}`);
 }
 </script>

@@ -47,9 +47,12 @@ import {
   type WindowUs,
 } from "@/utils/logs/estimateScanMb";
 import { sqlSources } from "@/utils/logs/sqlSources";
+import { inheritedRetentionDays } from "@/utils/dataRetention";
+import { featureState, type FeatureStates } from "@/utils/featureGate";
 import { freeTextGateFlags } from "@/utils/logs/freeTextScan";
 import { notePageCancelled } from "@/composables/useLogs/logsRowNav";
 import { noteUserScopeChange } from "@/composables/useLogs/useLogPermalink";
+import type { RunError } from "@/utils/queryHistory/recentSearches";
 
 export interface TransportPayload {
   traceId: string;
@@ -57,6 +60,18 @@ export interface TransportPayload {
   isPagination?: boolean;
   queryReq?: unknown;
   generationId?: number;
+}
+
+/** A Logs grid search that finished or failed, for the recent-searches recorder. */
+export interface LogsRunSettled {
+  reasons: RunReason[];
+  signature: LogsSignature;
+  startUs: number;
+  endUs: number;
+  partial: boolean;
+  noResults: boolean;
+  /** Null when the search finished. */
+  error: RunError | null;
 }
 
 export interface PanelConfigReader {
@@ -125,7 +140,11 @@ export function zoConfig(): AutoRunConfig & Record<string, unknown> {
 }
 
 export function isSuperCluster(): boolean {
-  return config.isEnterprise === "true" && !!zoConfig().super_cluster_enabled;
+  return (
+    config.isEnterprise === "true" &&
+    !!zoConfig().super_cluster_enabled &&
+    featureState(zoConfig().features as FeatureStates | undefined, "super_cluster") !== "locked"
+  );
 }
 
 export function setAutoRunTransport(next: AutoRunTransport): void {
@@ -134,6 +153,16 @@ export function setAutoRunTransport(next: AutoRunTransport): void {
 
 function searchModeOf(toggle: string | undefined): SearchMode {
   return MODES[toggle ?? "logs"] ?? "logs";
+}
+
+function requestWindow(queryReq: unknown): WindowUs | null {
+  const query = (queryReq as { query?: { start_time?: unknown; end_time?: unknown } } | null)
+    ?.query;
+  const startUs = Number(query?.start_time);
+  const endUs = Number(query?.end_time);
+  return Number.isFinite(startUs) && Number.isFinite(endUs) && endUs > 0
+    ? { startUs, endUs }
+    : null;
 }
 
 function toList(value: unknown): string[] {
@@ -187,10 +216,10 @@ function signatureWindow(signature: LogsSignature, nowUs: number): WindowUs | nu
   return relativeWindow(signature.time.period, nowUs);
 }
 
-function estimateContext(nowUs: number): EstimateContext {
+function estimateContext(nowUs: number, streamType: string): EstimateContext {
   return {
     nowUs,
-    defaultRetentionDays: Number(zoConfig().data_retention_days ?? 0),
+    defaultRetentionDays: inheritedRetentionDays(appStore?.state ?? {}, streamType),
     superCluster: isSuperCluster(),
   };
 }
@@ -201,7 +230,12 @@ export function estimateSignature(
   nowUs: number,
 ): ScanEstimate {
   const { names } = scopeStreams(signature);
-  return estimateScanMb(names, list, signatureWindow(signature, nowUs), estimateContext(nowUs));
+  return estimateScanMb(
+    names,
+    list,
+    signatureWindow(signature, nowUs),
+    estimateContext(nowUs, signature.streamType),
+  );
 }
 
 function createLogsAutoRun() {
@@ -222,6 +256,8 @@ function createLogsAutoRun() {
   const generationEpoch = new Map<number, number>();
   const pendingLaunches = new Map<number, number>();
   const hitsDone = new Set<number>();
+  const runReasons = new Map<number, RunReason[]>();
+  const runSettledListeners = new Set<(run: LogsRunSettled) => void>();
 
   const nowUs = () => Date.now() * 1000;
   const streamList = () => (searchObj().data.streamResults?.list ?? []) as { name: string }[];
@@ -234,7 +270,13 @@ function createLogsAutoRun() {
     getOrgId: () => searchObj().organizationIdentifier || "",
     estimate: (signature) => estimateSignature(signature, streamList(), nowUs()),
     executors: {
-      logs: (ctx) => executors.logs(ctx),
+      logs: (ctx) => {
+        if (ctx.op === "full") {
+          runReasons.clear();
+          runReasons.set(ctx.generation.id, [...ctx.reasons]);
+        }
+        return executors.logs(ctx);
+      },
       patterns: (ctx) => executors.patterns(ctx),
       histogram: (ctx) => executors.histogram(ctx),
       visualize: (ctx) => executors.visualize(ctx),
@@ -260,7 +302,7 @@ function createLogsAutoRun() {
       return chooseNarrowPreset(
         scopeStreams(signature).names,
         streamList(),
-        estimateContext(now),
+        estimateContext(now, signature.streamType),
         Number(zoConfig().auto_query_max_scan_mb ?? 0),
         window.endUs - window.startUs,
       );
@@ -361,14 +403,55 @@ function createLogsAutoRun() {
   function onPayloadComplete(payload: TransportPayload): void {
     const generationId = generationOf(payload);
     if (generationId === null || generationId === undefined) return;
-    if (payload.type === "search") engine.recordComplete(generationId, payload.traceId);
+    if (payload.type !== "search") return;
+    emitRunSettled(payload, generationId, null);
+    engine.recordComplete(generationId, payload.traceId);
   }
 
-  function onPayloadError(payload: TransportPayload): void {
+  function onPayloadError(payload: TransportPayload, error: RunError | null = null): void {
     const generationId = generationOf(payload);
     if (generationId === null || generationId === undefined) return;
-    if (payload.type === "search") engine.recordFailure(generationId, payload.traceId);
+    if (payload.type === "search") {
+      emitRunSettled(payload, generationId, error ?? {});
+      engine.recordFailure(generationId, payload.traceId);
+    }
     finishPayload(payload);
+  }
+
+  // Only the first page of a full grid search counts; paging and histogram requests never do.
+  function emitRunSettled(
+    payload: TransportPayload,
+    generationId: number,
+    error: RunError | null,
+  ): void {
+    const reasons = runReasons.get(generationId);
+    runReasons.delete(generationId);
+    if (payload.isPagination || !reasons || !runSettledListeners.size) return;
+    const gen = engine.currentGeneration("grid");
+    if (!gen || gen.id !== generationId || gen.surface !== "logs") return;
+    const window = requestWindow(payload.queryReq) ?? signatureWindow(gen.signature, nowUs());
+    if (!window) return;
+    const run: LogsRunSettled = {
+      reasons,
+      signature: gen.signature,
+      startUs: window.startUs,
+      endUs: window.endUs,
+      partial: error === null && searchObj().data.queryResults?.is_partial === true,
+      noResults: error === null && hasNoHits(searchObj().data.queryResults),
+      error,
+    };
+    runSettledListeners.forEach((listener) => {
+      try {
+        listener(run);
+      } catch (err) {
+        console.warn("autoRun: run-settled listener failed", err);
+      }
+    });
+  }
+
+  function onRunSettled(listener: (run: LogsRunSettled) => void): () => void {
+    runSettledListeners.add(listener);
+    return () => runSettledListeners.delete(listener);
   }
 
   function finishPayload(payload: TransportPayload): void {
@@ -546,6 +629,7 @@ function createLogsAutoRun() {
     onPayloadData,
     onPayloadComplete,
     onPayloadError,
+    onRunSettled,
     finishPayload,
     trackLaunch,
     finishDispatch,
@@ -568,6 +652,10 @@ function createLogsAutoRun() {
         : null,
   };
 }
+
+// A run that settled without writing any rows, as opposed to one whose result is still unknown.
+const hasNoHits = (results: { hits?: unknown; total?: unknown } | undefined): boolean =>
+  Array.isArray(results?.hits) && results.hits.length === 0 && !(Number(results?.total) > 0);
 
 export type LogsAutoRun = ReturnType<typeof createLogsAutoRun>;
 

@@ -116,6 +116,7 @@ describe("IngestLogs Index Component", () => {
         "syslogNg",
         "splunkHec",
         "loongcollector",
+        "datadogAgentLogs",
       ];
       expect(wrapper.vm.ingestRoutes).toEqual(expectedRoutes);
     });
@@ -195,7 +196,6 @@ describe("IngestLogs Index Component", () => {
         button: "Copy to Clipboard",
         ingestion: wrapper.vm.router.currentRoute.value.name,
         user_org: "default",
-        user_id: "example@gmail.com",
         page: "Ingestion",
       });
     });
@@ -314,6 +314,7 @@ describe("IngestLogs Index Component", () => {
         "syslogNg",
         "splunkHec",
         "loongcollector",
+        "datadogAgentLogs",
       ];
 
       expect(wrapper.vm.ingestRoutes).toEqual(expectedRoutes);

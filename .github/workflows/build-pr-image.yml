@@ -144,9 +144,9 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
-          toolchain: nightly-2026-05-20
+          toolchain: nightly-2026-10-24
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: openobserve-amd64
           save-if: ${{ inputs.branch == 'main' }}
@@ -184,7 +184,7 @@ jobs:
           registry-type: public
 
       - name: Login to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -251,9 +251,9 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
-          toolchain: nightly-2026-05-20
+          toolchain: nightly-2026-10-24
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: openobserve-arm64
           save-if: ${{ inputs.branch == 'main' }}
@@ -291,7 +291,7 @@ jobs:
           registry-type: public
 
       - name: Login to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -336,13 +336,13 @@ jobs:
           registry-type: public
 
       - name: Login to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: int128/docker-manifest-create-action@a118e9fe12455375d4810aa318c20e6dba77288e # v2.29.0
+      - uses: int128/docker-manifest-create-action@d6ac360314337bbfb870747d9616b83118acb330 # v2.30.0
         with:
           tags: |
             public.ecr.aws/zinclabs/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}
@@ -350,7 +350,7 @@ jobs:
             public.ecr.aws/zinclabs/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-amd64
             public.ecr.aws/zinclabs/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-arm64
 
-      - uses: int128/docker-manifest-create-action@a118e9fe12455375d4810aa318c20e6dba77288e # v2.29.0
+      - uses: int128/docker-manifest-create-action@d6ac360314337bbfb870747d9616b83118acb330 # v2.30.0
         with:
           tags: |
             ghcr.io/openobserve/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}

@@ -62,10 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                as the state facet (the toggle group above facets by pipeline TYPE,
                so the two never overlap). Always rendered so rows never shift. -->
           <template #subheader>
-            <div
-              class="px-page-edge border-table-row-divider border-b py-1.5"
-              data-test="pipeline-list-summary"
-            >
+            <div data-test="pipeline-list-summary">
               <OStatStrip
                 :items="summaryStats"
                 :loading="loading"
@@ -154,6 +151,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
 
+          <template #cell-name="{ row }">
+            <span class="inline-flex min-w-0 items-center gap-2">
+              <OTruncatedText :data-test="`pipeline-list-name-cell-${row.name}`">{{
+                row.name
+              }}</OTruncatedText>
+              <EditorDraftDot
+                v-if="pipelineDrafts.ids.has(row.pipeline_id)"
+                :saved-at="pipelineDrafts.savedAt(row.pipeline_id)"
+                :data-test="`pipeline-list-${row.name}-draft-dot`"
+              />
+            </span>
+          </template>
+
           <template #cell-actions="{ row }">
             <div class="actions-container flex items-center">
               <OButton
@@ -220,6 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown align="end">
                 <template #trigger>
                   <OButton
+                    :aria-label="t('common.moreActions')"
                     variant="ghost"
                     size="icon-sm"
                     @click.stop
@@ -397,6 +408,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
+    :message-keypath="confirmDialogMeta.messageKeypath"
+    :message-name="confirmDialogMeta.messageName"
+    :ok-variant="confirmDialogMeta.okVariant"
     @update:ok="confirmDialogMeta.onConfirm()"
     @update:cancel="resetConfirmDialog"
     v-model="confirmDialogMeta.show"
@@ -550,10 +564,15 @@ import CreateBackfillJobDialog from "@/components/pipelines/CreateBackfillJobDia
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { forbiddenState } from "@/utils/featureGate";
 import { COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18nTyped();
@@ -663,6 +682,11 @@ const resumePipelineDialogMeta: any = ref({
 });
 
 const { pipelineObj } = useDragAndDrop(t);
+const pipelineDrafts = useEditorDraftIds("pipeline");
+const dropPipelineDrafts = (ids: string[]) => {
+  const org = store.state.selectedOrganization.identifier;
+  ids.forEach((entityId) => deleteEditorDraftsFor({ kind: "pipeline", org, entityId }));
+};
 
 const oTableRef: any = ref(null);
 // Plain ref, not URL/store-backed: PipelinesList stays mounted across pipelineEditor/import/history/backfill child-route navigation, so this alone survives the round trip.
@@ -693,6 +717,9 @@ const confirmDialogMeta: any = ref({
   show: false,
   title: "",
   message: "",
+  messageKeypath: undefined,
+  messageName: "",
+  okVariant: undefined,
   data: null,
   onConfirm: () => {},
 });
@@ -1094,7 +1121,7 @@ const fetching = pipelinesList.isFetching;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = pipelinesList.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+  return forbiddenState(e) || e?.status === 403;
 });
 // Epoch ms of the last successful read — drives the button's "1m ago" label.
 const lastUpdatedAt = pipelinesList.dataUpdatedAt;
@@ -1133,7 +1160,10 @@ const editPipeline = (pipeline: any) => {
 const openDeleteDialog = (pipeline: any) => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("pipeline.deletePipeline");
-  confirmDialogMeta.value.message = t("pipeline.deletePipelineConfirm");
+  confirmDialogMeta.value.message = "";
+  confirmDialogMeta.value.messageKeypath = "pipeline.deletePipelineConfirm";
+  confirmDialogMeta.value.messageName = pipeline.name;
+  confirmDialogMeta.value.okVariant = "destructive";
   confirmDialogMeta.value.onConfirm = deletePipeline;
   confirmDialogMeta.value.data = pipeline;
 };
@@ -1184,6 +1214,7 @@ const deletePipeline = async () => {
       org_id,
     })
     .then(async () => {
+      dropPipelineDrafts([pipeline_id]);
       toast({
         message: t("toastMessages.pipeline.pipelineDeletedSuccessfully"),
         variant: "success",
@@ -1216,6 +1247,9 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.show = false;
   confirmDialogMeta.value.title = "";
   confirmDialogMeta.value.message = "";
+  confirmDialogMeta.value.messageKeypath = undefined;
+  confirmDialogMeta.value.messageName = "";
+  confirmDialogMeta.value.okVariant = undefined;
   confirmDialogMeta.value.onConfirm = () => {};
   confirmDialogMeta.value.data = null;
 };
@@ -1437,6 +1471,8 @@ const openBulkDeleteDialog = () => {
   confirmDialogMeta.value.message = t("pipeline.confirmBulkDeleteMsg", {
     count: selectedPipelines.value.length,
   });
+  confirmDialogMeta.value.messageKeypath = undefined;
+  confirmDialogMeta.value.okVariant = "destructive";
   confirmDialogMeta.value.onConfirm = bulkDeletePipelines;
   confirmDialogMeta.value.data = null;
 };
@@ -1474,6 +1510,7 @@ const bulkDeletePipelines = async () => {
     // Handle response based on successful/unsuccessful arrays
     if (response.data) {
       const { successful = [], unsuccessful = [] } = response.data;
+      dropPipelineDrafts(successful.map(String));
       const successCount = successful.length;
       const failCount = unsuccessful.length;
 
@@ -1503,6 +1540,7 @@ const bulkDeletePipelines = async () => {
         });
       }
     } else {
+      dropPipelineDrafts(payload.ids);
       // Fallback success message
       toast({
         variant: "success",
@@ -1520,7 +1558,7 @@ const bulkDeletePipelines = async () => {
     // Show error message from response if available
     const errorMessage =
       error.response?.data?.message || error?.message || t("pipeline.bulkDeletePipelinesError");
-    if (error.response?.status != 403 || error?.status != 403) {
+    if (error.response?.status !== 403 && error?.status !== 403) {
       toast({
         variant: "error",
         message: errorMessage,

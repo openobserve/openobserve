@@ -91,6 +91,11 @@ async function deleteDashboard(dashboardId) {
   }).catch(() => {});
 }
 
+// UI-created dashboards join the same API cleanup, so a failing test still deletes them in afterAll.
+function trackDashboard(dashboardId) {
+  if (dashboardId) createdDashboardIds.push(dashboardId);
+}
+
 async function deleteCreatedDashboards() {
   while (createdDashboardIds.length) await deleteDashboard(createdDashboardIds.pop());
 }
@@ -143,6 +148,7 @@ module.exports = {
   createDashboard,
   deleteDashboard,
   deleteCreatedDashboards,
+  trackDashboard,
   pinAutoQuery,
   trackPanelRuns,
 };

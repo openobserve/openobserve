@@ -20,7 +20,8 @@
 //! - `cache()` loads all entries from DB at startup.
 //! - `watch()` subscribes to coordinator events and updates the cache on every node.
 //! - Write operations emit coordinator events so all nodes stay in sync. User-defined models take
-//!   priority over built-in models during cost calculation.
+//!   priority over built-in models during cost calculation whenever they match (see
+//!   `find_pricing_sync_at`).
 
 use std::{
     collections::HashMap,
@@ -28,7 +29,7 @@ use std::{
 };
 
 use config::meta::model_pricing::{
-    BUILT_IN_ORG, META_ORG, ModelPricingDefinition, PricingContext, PricingSource,
+    BUILT_IN_ORG, META_ORG, MatchKind, ModelPricingDefinition, PricingContext, PricingSource,
     PricingTierDefinition, windows_match,
 };
 use dashmap::DashMap;
@@ -43,6 +44,9 @@ const WATCHER_PREFIX: &str = "/model_pricing/";
 /// accommodating Unicode-aware patterns like `(?i)\d{4}` which expand
 /// significantly due to Unicode digit/case-folding tables.
 pub const REGEX_SIZE_LIMIT: usize = 256 * 1024; // 256 KB
+
+/// One shared source for every org without its own entries, so `Arc::ptr_eq` keeps its merge a hit.
+static NO_ORG_ENTRIES: LazyLock<Arc<Vec<CachedModelPricing>>> = LazyLock::new(Arc::default);
 
 /// Cached model pricing entry with pre-compiled regex.
 #[derive(Clone)]
@@ -113,6 +117,8 @@ fn build_entries(definitions: Vec<ModelPricingDefinition>) -> Vec<CachedModelPri
 /// Reload the cache for a single org from the database.
 async fn reload_org(org_id: &str) {
     match table::model_pricing::list(org_id).await {
+        // Matches `cache()`, which never loads an org without rows, so a deleted org leaves no key.
+        Ok(defs) if defs.is_empty() => evict_org(org_id),
         Ok(defs) => {
             CACHE.insert(org_id.to_string(), Arc::new(build_entries(defs)));
         }
@@ -120,6 +126,11 @@ async fn reload_org(org_id: &str) {
             log::error!("[model_pricing] failed to reload cache for org '{org_id}': {e}");
         }
     }
+}
+
+fn evict_org(org_id: &str) {
+    CACHE.remove(org_id);
+    MERGED.remove(org_id);
 }
 
 // ── Public cache API ──────────────────────────────────────────────────────────
@@ -160,7 +171,7 @@ pub fn get_org_pricing_entries(org_id: &str) -> Arc<Vec<CachedModelPricing>> {
     }
 
     // Multiple sources — check the lazy merged cache.
-    let org_arc = org_arc.unwrap_or_default();
+    let org_arc = org_arc.unwrap_or_else(|| Arc::clone(&NO_ORG_ENTRIES));
 
     if let Some(cached) = MERGED.get(org_id) {
         let org_eq = Arc::ptr_eq(&cached.org_source, &org_arc);
@@ -232,58 +243,63 @@ fn source_priority(source: &PricingSource) -> u8 {
     }
 }
 
+/// A pricing definition selected for a model name, with how its pattern matched.
+#[derive(Clone, Debug)]
+pub struct DefinitionMatch {
+    pub definition: ModelPricingDefinition,
+    pub match_kind: MatchKind,
+}
+
 /// Sync lookup: find the best matching pricing definition from pre-loaded entries.
 ///
 /// When `span_ts_micros` is Some, only definitions where `valid_from <= span_ts` are
 /// considered. Selection priority:
-///   1. Source priority: Org > MetaOrg > BuiltIn  (higher-priority source always wins)
-///   2. Within the same source, the greatest `valid_from` (most recent) wins.
-///   3. Within the same source and `valid_from`, the merge-order position (sort_order then name) is
-///      used as the final tiebreaker — earlier in the list wins.
-///
-/// When `span_ts_micros` is None, the first matching entry is returned.
+///   1. Source priority: Org > MetaOrg > BuiltIn. An org or meta-org definition is an explicit
+///      override, so it wins whenever it matches, even only partly (`(?i)^gpt-4o` on
+///      `gpt-4o-2024-08-06`).
+///   2. Within the same source, match kind: a pattern covering the whole model name (`Exact`) beats
+///      one that matches only part of it (`Approximate`). An approximate match is a substring
+///      accident — `gpt-5\.4` matching `gpt-5.4-mini` — that would bill a different model's price.
+///   3. Then the greatest `valid_from` (most recent) wins.
+///   4. Otherwise the merge-order position (sort_order then name) is the final tiebreaker — earlier
+///      in the list wins.
 pub fn find_pricing_sync_at(
     entries: &[CachedModelPricing],
     model_name: &str,
     span_ts_micros: Option<i64>,
-) -> Option<ModelPricingDefinition> {
-    let mut best: Option<&CachedModelPricing> = None;
+) -> Option<DefinitionMatch> {
+    // Rank: higher is better. Source priority is inverted (lower number = higher precedence),
+    // and a missing valid_from means "valid for all time" — treated as i64::MIN so that an
+    // entry with an explicit valid_from is preferred when available.
+    let rank = |entry: &CachedModelPricing, kind: MatchKind| {
+        (
+            std::cmp::Reverse(source_priority(&entry.definition.source)),
+            kind,
+            entry.definition.valid_from.unwrap_or(i64::MIN),
+        )
+    };
+    let mut best: Option<(&CachedModelPricing, MatchKind)> = None;
 
     for entry in entries {
-        if !entry.compiled_regex.is_match(model_name) {
-            continue;
-        }
         // If valid_from is set, it must be <= span timestamp
         if let (Some(span_ts), Some(valid_from)) = (span_ts_micros, entry.definition.valid_from)
             && valid_from > span_ts
         {
             continue;
         }
-        let is_better = match &best {
-            None => true,
-            Some(b) => {
-                let new_prio = source_priority(&entry.definition.source);
-                let best_prio = source_priority(&b.definition.source);
-                if new_prio != best_prio {
-                    // Lower priority number = higher precedence (Org=0 beats MetaOrg=1 beats
-                    // BuiltIn=2)
-                    new_prio < best_prio
-                } else {
-                    // Same source level: prefer the most recent valid_from.
-                    // None means "valid for all time" — treated as i64::MIN so that
-                    // an entry with an explicit valid_from is preferred when available.
-                    let new_vf = entry.definition.valid_from.unwrap_or(i64::MIN);
-                    let best_vf = b.definition.valid_from.unwrap_or(i64::MIN);
-                    new_vf > best_vf
-                }
-            }
+        let Some(kind) = MatchKind::of(&entry.compiled_regex, model_name) else {
+            continue;
         };
-        if is_better {
-            best = Some(entry);
+        // Strictly better only, so ties keep the earlier entry.
+        if best.is_none_or(|(b, b_kind)| rank(entry, kind) > rank(b, b_kind)) {
+            best = Some((entry, kind));
         }
     }
 
-    best.map(|e| e.definition.clone())
+    best.map(|(entry, match_kind)| DefinitionMatch {
+        definition: entry.definition.clone(),
+        match_kind,
+    })
 }
 
 /// Result of a cost calculation, including the selected tier name for logging.
@@ -458,15 +474,34 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 }
             }
             super::Event::Delete(ev) => {
-                if let Some(org_id) = parse_org_from_key(&ev.key) {
-                    reload_org(org_id).await;
-                    log::debug!("[model_pricing] reloaded cache for org '{org_id}' (delete)");
-                }
+                on_delete_event(&ev.key, |org_id| async move { reload_org(&org_id).await }).await;
             }
             super::Event::Empty => {}
         }
     }
     Ok(())
+}
+
+async fn on_delete_event<R, F>(key: &str, reload: R)
+where
+    R: FnOnce(String) -> F,
+    F: std::future::Future<Output = ()>,
+{
+    // No reload: a lagging read replica could still return the deleted org's rows.
+    if let Some(org_id) = org_deletion_of(key) {
+        evict_org(org_id);
+        log::debug!("[model_pricing] evicted deleted org '{org_id}'");
+    } else if let Some(org_id) = parse_org_from_key(key) {
+        reload(org_id.to_string()).await;
+        log::debug!("[model_pricing] reloaded cache for org '{org_id}' (delete)");
+    }
+}
+
+/// The org of a `delete_by_org` event, whose key has an empty model id.
+fn org_deletion_of(key: &str) -> Option<&str> {
+    key.strip_prefix(WATCHER_PREFIX)
+        .and_then(|rest| rest.strip_suffix('/'))
+        .filter(|org| !org.is_empty() && !org.contains('/'))
 }
 
 fn parse_org_from_key(key: &str) -> Option<&str> {
@@ -499,7 +534,7 @@ pub async fn set(item: ModelPricingDefinition) -> Result<ModelPricingDefinition,
     let saved = table::model_pricing::put(item).await?;
     let id = saved.id.map(|id| id.to_string()).unwrap_or_default();
     let event_key = format!("{WATCHER_PREFIX}{org_id}/{id}");
-    if let Err(e) = infra::coordinator::model_pricing::emit_put_event(&event_key).await {
+    if let Err(e) = infra::coordinator::emit_put(&event_key).await {
         log::error!("[model_pricing] failed to emit put event: {e}");
     }
     Ok(saved)
@@ -513,11 +548,20 @@ pub async fn delete_by_id(org_id: &str, id: &str) -> Result<bool, anyhow::Error>
     let deleted = table::model_pricing::delete_by_id(org_id, id).await?;
     if deleted {
         let event_key = format!("{WATCHER_PREFIX}{org_id}/{id}");
-        if let Err(e) = infra::coordinator::model_pricing::emit_delete_event(&event_key).await {
+        if let Err(e) = infra::coordinator::emit_delete(&event_key).await {
             log::error!("[model_pricing] failed to emit delete event: {e}");
         }
     }
     Ok(deleted)
+}
+
+/// Deletes the org's own definitions and drops its `CACHE` and `MERGED` entries on every node.
+pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    table::model_pricing::delete_by_org(org_id).await?;
+    evict_org(org_id);
+    // The empty model id marks an org deletion, which watchers evict without a reload.
+    infra::coordinator::emit_delete(&format!("{WATCHER_PREFIX}{org_id}/")).await?;
+    Ok(())
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -923,7 +967,7 @@ mod tests {
 
         let result = find_pricing_sync_at(&entries, "gpt-4o-2024-05-13", None);
         assert!(result.is_some());
-        assert_eq!(result.unwrap().name, "custom-gpt4o");
+        assert_eq!(result.unwrap().definition.name, "custom-gpt4o");
     }
 
     #[test]
@@ -1014,11 +1058,11 @@ mod tests {
 
         // Span at ts=6M → both valid, picks newer (valid_from=5M)
         let result = find_pricing_sync_at(&entries, "gpt-4o", Some(6_000_000));
-        assert_eq!(result.unwrap().name, "gpt-4o-new");
+        assert_eq!(result.unwrap().definition.name, "gpt-4o-new");
 
         // Span at ts=3M → only old is valid (valid_from=1M <= 3M, 5M > 3M)
         let result = find_pricing_sync_at(&entries, "gpt-4o", Some(3_000_000));
-        assert_eq!(result.unwrap().name, "gpt-4o-old");
+        assert_eq!(result.unwrap().definition.name, "gpt-4o-old");
 
         // Span at ts=500k → neither valid
         let result = find_pricing_sync_at(&entries, "gpt-4o", Some(500_000));
@@ -1409,10 +1453,20 @@ mod tests {
             "repeated call should return same Arc"
         );
 
+        CACHE.insert(BUILT_IN_ORG.to_string(), Arc::default());
+        let first = get_org_pricing_entries("test_merge_org_none");
+        let second = get_org_pricing_entries("test_merge_org_none");
+        assert!(
+            Arc::ptr_eq(&first, &second),
+            "an org without its own entries must not re-merge on every call"
+        );
+
         // Cleanup
         MERGED.remove("test_merge_org_empty");
         MERGED.remove("test_merge_org_acme");
+        MERGED.remove("test_merge_org_none");
         CACHE.remove(META_ORG);
+        CACHE.remove(BUILT_IN_ORG);
         CACHE.remove("test_merge_org_acme");
     }
 
@@ -1459,7 +1513,7 @@ mod tests {
 
         // Org entry must win even though BuiltIn has a higher valid_from
         let result = find_pricing_sync_at(&entries, "gpt-4o", Some(6_000_000));
-        assert_eq!(result.unwrap().name, "gpt-4o-org");
+        assert_eq!(result.unwrap().definition.name, "gpt-4o-org");
     }
 
     #[test]
@@ -1486,7 +1540,7 @@ mod tests {
         ];
 
         let result = find_pricing_sync_at(&entries, "gpt-4o", Some(6_000_000));
-        assert_eq!(result.unwrap().name, "gpt-4o-org");
+        assert_eq!(result.unwrap().definition.name, "gpt-4o-org");
     }
 
     #[test]
@@ -1515,11 +1569,11 @@ mod tests {
 
         // At ts=6M both valid, picks newer
         let result = find_pricing_sync_at(&entries, "gpt-4o", Some(6_000_000));
-        assert_eq!(result.unwrap().name, "gpt-4o-new-price");
+        assert_eq!(result.unwrap().definition.name, "gpt-4o-new-price");
 
         // At ts=3M only old is valid
         let result = find_pricing_sync_at(&entries, "gpt-4o", Some(3_000_000));
-        assert_eq!(result.unwrap().name, "gpt-4o-old-price");
+        assert_eq!(result.unwrap().definition.name, "gpt-4o-old-price");
     }
 
     #[test]
@@ -1546,7 +1600,7 @@ mod tests {
         ];
 
         let result = find_pricing_sync_at(&entries, "gpt-4o", Some(6_000_000));
-        assert_eq!(result.unwrap().name, "gpt-4o-meta");
+        assert_eq!(result.unwrap().definition.name, "gpt-4o-meta");
     }
 
     #[test]
@@ -1575,11 +1629,163 @@ mod tests {
 
         // At ts=5M, org entry's valid_from (10M) > span_ts → filtered out, builtin wins
         let result = find_pricing_sync_at(&entries, "gpt-4o", Some(5_000_000));
-        assert_eq!(result.unwrap().name, "gpt-4o-builtin");
+        assert_eq!(result.unwrap().definition.name, "gpt-4o-builtin");
 
         // At ts=15M, org entry is now applicable and wins by source priority
         let result = find_pricing_sync_at(&entries, "gpt-4o", Some(15_000_000));
-        assert_eq!(result.unwrap().name, "gpt-4o-org");
+        assert_eq!(result.unwrap().definition.name, "gpt-4o-org");
+    }
+
+    // ── Exact vs approximate match ────────────────────────────────────────
+
+    fn pattern_entry(name: &str, pattern: &str, source: PricingSource) -> CachedModelPricing {
+        CachedModelPricing {
+            definition: ModelPricingDefinition {
+                name: name.to_string(),
+                match_pattern: pattern.to_string(),
+                source,
+                ..Default::default()
+            },
+            compiled_regex: Regex::new(pattern).unwrap(),
+        }
+    }
+
+    fn best(entries: &[CachedModelPricing], model: &str) -> (String, MatchKind) {
+        let m = find_pricing_sync_at(entries, model, None).expect("a definition should match");
+        (m.definition.name, m.match_kind)
+    }
+
+    #[test]
+    fn test_exact_match_beats_approximate_regardless_of_order() {
+        let base = pattern_entry("GPT-5.4", r"(?i)gpt-5\.4", PricingSource::BuiltIn);
+        let mini = pattern_entry("GPT-5.4 mini", r"(?i)gpt-5\.4-mini", PricingSource::BuiltIn);
+
+        for entries in [vec![base.clone(), mini.clone()], vec![mini, base]] {
+            assert_eq!(
+                best(&entries, "gpt-5.4-mini"),
+                ("GPT-5.4 mini".to_string(), MatchKind::Exact)
+            );
+            assert_eq!(
+                best(&entries, "gpt-5.4"),
+                ("GPT-5.4".to_string(), MatchKind::Exact)
+            );
+        }
+    }
+
+    #[test]
+    fn test_only_shorter_pattern_present_is_approximate() {
+        let entries = vec![pattern_entry(
+            "GPT-5.4",
+            r"(?i)gpt-5\.4",
+            PricingSource::BuiltIn,
+        )];
+        assert_eq!(
+            best(&entries, "gpt-5.4-mini"),
+            ("GPT-5.4".to_string(), MatchKind::Approximate)
+        );
+        // A vendor prefix also leaves the model name uncovered.
+        assert_eq!(
+            best(&entries, "openai/gpt-5.4"),
+            ("GPT-5.4".to_string(), MatchKind::Approximate)
+        );
+    }
+
+    #[test]
+    fn test_claude_opus_5_5_does_not_take_opus_5_price() {
+        let opus5 = pattern_entry("Claude Opus 5", "(?i)claude-opus-5", PricingSource::BuiltIn);
+        let opus55 = pattern_entry(
+            "Claude Opus 5.5",
+            "(?i)claude-opus-5-5",
+            PricingSource::BuiltIn,
+        );
+
+        for entries in [
+            vec![opus5.clone(), opus55.clone()],
+            vec![opus55, opus5.clone()],
+        ] {
+            assert_eq!(
+                best(&entries, "claude-opus-5-5"),
+                ("Claude Opus 5.5".to_string(), MatchKind::Exact)
+            );
+            assert_eq!(
+                best(&entries, "claude-opus-5"),
+                ("Claude Opus 5".to_string(), MatchKind::Exact)
+            );
+        }
+        assert_eq!(
+            best(&[opus5], "claude-opus-5-5"),
+            ("Claude Opus 5".to_string(), MatchKind::Approximate)
+        );
+    }
+
+    #[test]
+    fn test_source_priority_applies_among_equal_match_kinds() {
+        // Both exact: org beats built-in.
+        let entries = vec![
+            pattern_entry("builtin", r"(?i)^gpt-5\.4$", PricingSource::BuiltIn),
+            pattern_entry("org", r"(?i)gpt-5\.4", PricingSource::Org),
+        ];
+        assert_eq!(
+            best(&entries, "gpt-5.4"),
+            ("org".to_string(), MatchKind::Exact)
+        );
+
+        // Both approximate: meta beats built-in.
+        let entries = vec![
+            pattern_entry("builtin", r"(?i)gpt-5\.4", PricingSource::BuiltIn),
+            pattern_entry("meta", r"(?i)gpt-5", PricingSource::MetaOrg),
+        ];
+        assert_eq!(
+            best(&entries, "gpt-5.4-mini"),
+            ("meta".to_string(), MatchKind::Approximate)
+        );
+    }
+
+    #[test]
+    fn test_source_priority_beats_match_kind() {
+        // An org pattern that only partly covers the name is an explicit override: it beats an
+        // exact built-in one.
+        let entries = vec![
+            pattern_entry(
+                "builtin-dated",
+                r"(?i)^gpt-4o(-\d{4}-\d{2}-\d{2})?$",
+                PricingSource::BuiltIn,
+            ),
+            pattern_entry("org-gpt-4o", r"(?i)^gpt-4o", PricingSource::Org),
+        ];
+        assert_eq!(
+            best(&entries, "gpt-4o-2024-08-06"),
+            ("org-gpt-4o".to_string(), MatchKind::Approximate)
+        );
+
+        // Same for meta-org over built-in.
+        let entries = vec![
+            pattern_entry(
+                "builtin-mini",
+                r"(?i)^gpt-5\.4-mini$",
+                PricingSource::BuiltIn,
+            ),
+            pattern_entry("meta-gpt-5.4", r"(?i)gpt-5\.4", PricingSource::MetaOrg),
+        ];
+        assert_eq!(
+            best(&entries, "gpt-5.4-mini"),
+            ("meta-gpt-5.4".to_string(), MatchKind::Approximate)
+        );
+
+        // Within the org source, exact still beats approximate.
+        let entries = vec![
+            pattern_entry("org-gpt-5.4", r"(?i)gpt-5\.4", PricingSource::Org),
+            pattern_entry("org-mini", r"(?i)^gpt-5\.4-mini$", PricingSource::Org),
+            pattern_entry(
+                "builtin-mini",
+                r"(?i)^gpt-5\.4-mini$",
+                PricingSource::BuiltIn,
+            ),
+        ];
+        assert_eq!(
+            best(&entries, "gpt-5.4-mini"),
+            ("org-mini".to_string(), MatchKind::Exact)
+        );
     }
 
     // ── Attribute rules (service tier) ────────────────────────────────────
@@ -1893,5 +2099,42 @@ mod tests {
             entries[0].definition.rule_attribute_keys().as_ref(),
             ["openairequestservicetier", "openairesponseservicetier"]
         );
+    }
+
+    #[test]
+    fn test_evict_org_drops_both_caches_of_that_org_only() {
+        let merged = || MergedEntry {
+            org_source: Arc::default(),
+            meta_source: None,
+            built_in_source: None,
+            merged: Arc::default(),
+        };
+        for org in ["test_evict_org_a", "test_evict_org_b"] {
+            CACHE.insert(org.to_string(), Arc::default());
+            MERGED.insert(org.to_string(), merged());
+        }
+        evict_org("test_evict_org_a");
+        assert!(!CACHE.contains_key("test_evict_org_a"));
+        assert!(!MERGED.contains_key("test_evict_org_a"));
+        assert!(CACHE.contains_key("test_evict_org_b"));
+        assert!(MERGED.contains_key("test_evict_org_b"));
+        evict_org("test_evict_org_b");
+    }
+
+    #[tokio::test]
+    async fn test_org_deletion_event_evicts_even_when_the_reload_still_sees_rows() {
+        let org = "test_org_deletion_event";
+        let stale = || async move {
+            CACHE.insert(org.to_string(), Arc::default());
+        };
+        stale().await;
+        on_delete_event(&format!("{WATCHER_PREFIX}{org}/"), |_| stale()).await;
+        assert!(
+            !CACHE.contains_key(org),
+            "a lagging reload revived the deleted org"
+        );
+        on_delete_event(&format!("{WATCHER_PREFIX}{org}/model_1"), |_| stale()).await;
+        assert!(CACHE.contains_key(org), "a definition delete still reloads");
+        evict_org(org);
     }
 }

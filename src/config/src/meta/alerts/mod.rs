@@ -15,7 +15,7 @@
 
 use std::str::FromStr;
 
-use chrono::{Duration, FixedOffset, Offset, Timelike, Utc};
+use chrono::{Duration, FixedOffset, LocalResult, Offset, TimeZone, Timelike, Utc};
 use chrono_tz::Tz;
 use cron::Schedule;
 use serde::{Deserialize, Serialize};
@@ -30,17 +30,22 @@ use crate::{
     },
 };
 
+pub mod ack;
 pub mod aggregation_level;
 pub mod alert;
+pub mod auto_investigate;
 pub mod composite;
+pub mod condition_ops;
 pub mod content_spec;
-pub mod deduplication;
 pub mod dispatch;
 pub mod grouping;
 pub mod incidents;
 pub mod level;
+pub mod notification_kind;
 pub mod priority;
 pub mod prom_rule;
+pub mod rca_runs;
+pub mod rca_steering;
 pub mod recovery;
 pub mod state;
 pub mod state_level;
@@ -50,6 +55,8 @@ pub mod tags;
 /// when the alert's own silence is 0 — without a floor, every matching
 /// ingestion request sends a notification and its db writes.
 const REALTIME_MIN_SILENCE_SECS: i64 = 30;
+// Wider than any zone's clock change, so both copies of a repeated local time are seen.
+const CLOCK_CHANGE_WINDOW_HOURS: i64 = 3;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
 #[serde(default)]
@@ -109,7 +116,7 @@ fn get_timezone_from_string(
     fallback_offset: i32,
 ) -> Result<Tz, FixedOffset> {
     if let Some(tz_str) = timezone_str
-        && let Ok(tz) = tz_str.parse::<Tz>()
+        && let Ok(tz) = unwrap_browser_time(tz_str).parse::<Tz>()
     {
         return Ok(tz);
     }
@@ -122,6 +129,164 @@ fn get_timezone_from_string(
 fn get_offset_minutes_from_tz(tz: &Tz, at_time: chrono::DateTime<Utc>) -> i32 {
     let local_time = at_time.with_timezone(tz);
     local_time.offset().fix().local_minus_utc() / 60
+}
+
+/// Next cron fire strictly after `after`, with the cron matched against `tz` wall-clock time.
+pub(crate) fn next_cron_in_zone(
+    schedule: &Schedule,
+    tz: &Tz,
+    after: chrono::DateTime<Utc>,
+) -> Option<chrono::DateTime<Utc>> {
+    let offset_now = get_offset_minutes_from_tz(tz, after);
+    let fixed = schedule
+        .after(&after.with_timezone(&fixed_offset(offset_now)?))
+        .next()
+        .map(|t| t.with_timezone(&Utc));
+    let window = Duration::hours(CLOCK_CHANGE_WINDOW_HOURS);
+    // Two clock changes never fall within a day, so equal offsets at both ends rule one out.
+    if let Some(t) = fixed
+        && t - after <= Duration::days(1)
+        && get_offset_minutes_from_tz(tz, t) == offset_now
+        && get_offset_minutes_from_tz(tz, after - window) == offset_now
+    {
+        return Some(t);
+    }
+    next_cron_across_clock_change(schedule, tz, after)
+}
+
+/// Next cron fire after `after` in the named zone when it parses, else at `tz_offset` minutes.
+pub fn next_cron_after(
+    schedule: &Schedule,
+    timezone: Option<&str>,
+    tz_offset: i32,
+    after: chrono::DateTime<Utc>,
+) -> Option<chrono::DateTime<Utc>> {
+    match timezone.and_then(|name| unwrap_browser_time(name).parse::<Tz>().ok()) {
+        Some(tz) => next_cron_in_zone(schedule, &tz, after),
+        None => schedule
+            .after(&after.with_timezone(&fixed_offset(tz_offset)?))
+            .next()
+            .map(|t| t.with_timezone(&Utc)),
+    }
+}
+
+/// Fires in `(after, until]` and the first after `until`, in the named zone or at `tz_offset`.
+pub fn cron_fires_between(
+    schedule: &Schedule,
+    timezone: Option<&str>,
+    tz_offset: i32,
+    after: chrono::DateTime<Utc>,
+    until: chrono::DateTime<Utc>,
+) -> Option<(Vec<chrono::DateTime<Utc>>, chrono::DateTime<Utc>)> {
+    match timezone.and_then(|name| unwrap_browser_time(name).parse::<Tz>().ok()) {
+        Some(tz) => {
+            // The on-time case: nothing is due by `until`, so the hours-wide walk is skipped.
+            let first = next_cron_in_zone(schedule, &tz, after)?;
+            if first > until {
+                return Some((vec![], first));
+            }
+            Some((
+                cron_fires_in_zone(schedule, &tz, after, until),
+                next_cron_in_zone(schedule, &tz, until.max(after))?,
+            ))
+        }
+        None => {
+            let mut fires = schedule
+                .after(&after.with_timezone(&fixed_offset(tz_offset)?))
+                .map(|t| t.with_timezone(&Utc));
+            let mut within = Vec::new();
+            loop {
+                let t = fires.next()?;
+                if t > until {
+                    return Some((within, t));
+                }
+                within.push(t);
+            }
+        }
+    }
+}
+
+/// Every fire in `(after, until]` from one walk of the readings, not one rescan per fire.
+fn cron_fires_in_zone(
+    schedule: &Schedule,
+    tz: &Tz,
+    after: chrono::DateTime<Utc>,
+    until: chrono::DateTime<Utc>,
+) -> Vec<chrono::DateTime<Utc>> {
+    let shift = Duration::hours(CLOCK_CHANGE_WINDOW_HOURS);
+    let local_after = after.with_timezone(tz).naive_local();
+    let local_until = until.with_timezone(tz).naive_local();
+    let mut fires: Vec<_> = schedule
+        .after(&Utc.from_utc_datetime(&(local_after - shift)))
+        .map(|reading| reading.naive_utc())
+        .take_while(|local| *local <= local_until + shift)
+        .flat_map(|local| reading_instants(tz, local, shift))
+        .flatten()
+        .filter(|t| *t > after && *t <= until)
+        .collect();
+    // A repeated hour maps later readings to earlier instants, so the walk is not in order.
+    fires.sort_unstable();
+    fires.dedup();
+    fires
+}
+
+/// The zone inside the UI's `Browser Time (<zone>)` option, else `name` unchanged.
+fn unwrap_browser_time(name: &str) -> &str {
+    name.get(..12)
+        .filter(|prefix| prefix.eq_ignore_ascii_case("browser time"))
+        .and_then(|_| name[12..].trim().strip_prefix('('))
+        .and_then(|zone| zone.strip_suffix(')'))
+        .map_or(name, str::trim)
+}
+
+fn next_cron_across_clock_change(
+    schedule: &Schedule,
+    tz: &Tz,
+    after: chrono::DateTime<Utc>,
+) -> Option<chrono::DateTime<Utc>> {
+    let shift = Duration::hours(CLOCK_CHANGE_WINDOW_HOURS);
+    let local_after = after.with_timezone(tz).naive_local();
+    let mut best: Option<chrono::DateTime<Utc>> = None;
+    // The cron walks local wall-clock readings, carried in a `Utc` value as a plain clock.
+    for reading in schedule.after(&Utc.from_utc_datetime(&(local_after - shift))) {
+        let local = reading.naive_utc();
+        if best.is_some_and(|b| local > b.with_timezone(tz).naive_local() + shift) {
+            break;
+        }
+        for t in reading_instants(tz, local, shift).into_iter().flatten() {
+            if t > after && best.is_none_or(|b| t < b) {
+                best = Some(t);
+            }
+        }
+    }
+    best
+}
+
+/// The instants a local wall-clock `reading` names in `tz`: two in a repeated hour, one otherwise.
+fn reading_instants(
+    tz: &Tz,
+    local: chrono::NaiveDateTime,
+    shift: Duration,
+) -> [Option<chrono::DateTime<Utc>>; 2] {
+    match tz.from_local_datetime(&local) {
+        LocalResult::Single(t) => [Some(t.with_timezone(&Utc)), None],
+        LocalResult::Ambiguous(first, second) => [
+            Some(first.with_timezone(&Utc)),
+            Some(second.with_timezone(&Utc)),
+        ],
+        // A skipped reading runs at that reading in the offset in force before the change.
+        LocalResult::None => [skipped_reading_instant(tz, local, shift), None],
+    }
+}
+
+fn skipped_reading_instant(
+    tz: &Tz,
+    local: chrono::NaiveDateTime,
+    shift: Duration,
+) -> Option<chrono::DateTime<Utc>> {
+    let before = tz.from_local_datetime(&(local - shift)).earliest()?;
+    let offset = Duration::seconds(before.offset().fix().local_minus_utc() as i64);
+    Some(Utc.from_utc_datetime(&(local - offset)))
 }
 
 impl TriggerCondition {
@@ -157,53 +322,28 @@ impl TriggerCondition {
 
         if self.frequency_type == FrequencyType::Cron {
             let schedule = Schedule::from_str(&self.cron)?;
-
-            // Try to parse timezone string and get current offset (DST-aware)
-            // If parsing fails, fallback to the provided timezone_offset for backward compatibility
-            let current_offset_minutes =
-                match get_timezone_from_string(self.timezone.as_deref(), timezone_offset) {
-                    Ok(tz) => {
-                        // Using Tz - DST-aware timezone, get the current offset
-                        get_offset_minutes_from_tz(&tz, start_utc)
-                    }
-                    Err(_) => {
-                        // Fallback to provided timezone_offset for backward compatibility
-                        timezone_offset
-                    }
-                };
-
-            // Create FixedOffset with the calculated or provided offset
-            let tz_offset = fixed_offset(current_offset_minutes).ok_or_else(|| {
-                anyhow::anyhow!("timezone offset {current_offset_minutes} minutes is out of range")
-            })?;
-
-            if apply_silence {
-                let silence = Duration::try_minutes(self.silence)
+            let after = if apply_silence {
+                Duration::try_minutes(self.silence)
                     .and_then(|silence| start_utc.checked_add_signed(silence))
-                    .ok_or_else(|| anyhow::anyhow!("silence is out of range"))?;
-                let silence = silence.with_timezone(&tz_offset);
-                // Check for the cron timestamp after the silence period
-                Ok(schedule
-                    .after(&silence)
-                    .next()
-                    .ok_or_else(|| anyhow::anyhow!("cron schedule has no future occurrence"))?
-                    .timestamp_micros()
-                    .checked_add(tolerance)
-                    .ok_or_else(|| anyhow::anyhow!("tolerance is out of range"))?)
+                    .ok_or_else(|| anyhow::anyhow!("silence is out of range"))?
             } else {
-                // This is important, if provided start_utc was `Some`, it should use the next run
-                // after the start_utc. If it was `None`, it should use the next run after the
-                // current time.
-                let start_utc = start_utc.with_timezone(&tz_offset);
-                // Check for the cron timestamp in the future
-                Ok(schedule
-                    .after(&start_utc)
-                    .next()
-                    .ok_or_else(|| anyhow::anyhow!("cron schedule has no future occurrence"))?
-                    .timestamp_micros()
-                    .checked_add(tolerance)
-                    .ok_or_else(|| anyhow::anyhow!("tolerance is out of range"))?)
-            }
+                start_utc
+            };
+            let next = match get_timezone_from_string(self.timezone.as_deref(), timezone_offset) {
+                Ok(tz) => next_cron_in_zone(&schedule, &tz, after).map(|t| t.timestamp_micros()),
+                Err(_) => {
+                    let tz_offset = fixed_offset(timezone_offset).ok_or_else(|| {
+                        anyhow::anyhow!("timezone offset {timezone_offset} minutes is out of range")
+                    })?;
+                    schedule
+                        .after(&after.with_timezone(&tz_offset))
+                        .next()
+                        .map(|t| t.timestamp_micros())
+                }
+            };
+            next.ok_or_else(|| anyhow::anyhow!("cron schedule has no future occurrence"))?
+                .checked_add(tolerance)
+                .ok_or_else(|| anyhow::anyhow!("tolerance is out of range"))
         } else if apply_silence {
             // silence is in minutes, frequency is in seconds
             // When the silence period is less than the frequency, the alert runs after the silence
@@ -375,6 +515,11 @@ impl TriggerCondition {
 }
 
 impl TriggerCondition {
+    /// Rejects the list/pattern operators, which a numeric threshold cannot evaluate.
+    pub fn validate_threshold_operator(&self) -> Result<(), String> {
+        reject_extended_threshold_operator("trigger condition", self.operator)
+    }
+
     /// How long a group of this alert may go unobserved before M-7 resolves it,
     /// in microseconds, measured from `last_seen`.
     ///
@@ -384,7 +529,7 @@ impl TriggerCondition {
     /// gap between consecutive fires is not even constant (weekday-only,
     /// monthly, DST), so its deadline has to be read off the schedule itself —
     /// anchored to this row's `last_seen` so it cannot drift between sweeps.
-    pub fn group_resolve_threshold_micros(&self, last_seen: i64, k: i64) -> i64 {
+    pub fn group_resolve_threshold_micros(&self, last_seen: i64, k: i64, tz_offset: i32) -> i64 {
         use crate::meta::alerts::grouping::{
             cron_resolve_threshold_micros, resolve_threshold_micros,
         };
@@ -404,21 +549,23 @@ impl TriggerCondition {
             return i64::MAX;
         };
 
-        // Same DST-aware offset resolution as `get_next_trigger_time_*`, so the
-        // sweep and the scheduler agree on when this alert actually fires.
-        let offset_minutes = match get_timezone_from_string(self.timezone.as_deref(), 0) {
-            Ok(tz) => get_offset_minutes_from_tz(&tz, anchor),
-            Err(_) => 0,
-        };
-        let Some(tz_offset) = FixedOffset::east_opt(offset_minutes * 60) else {
-            return i64::MAX;
-        };
-
-        let anchored = anchor.with_timezone(&tz_offset);
-        let occurrences = schedule
-            .after(&anchored)
-            .take(k.max(0) as usize)
-            .map(|d| d.timestamp_micros());
+        let take = k.max(0) as usize;
+        let occurrences: Vec<i64> =
+            match get_timezone_from_string(self.timezone.as_deref(), tz_offset) {
+                Ok(tz) => {
+                    std::iter::successors(next_cron_in_zone(&schedule, &tz, anchor), |prev| {
+                        next_cron_in_zone(&schedule, &tz, *prev)
+                    })
+                    .take(take)
+                    .map(|d| d.timestamp_micros())
+                    .collect()
+                }
+                Err(fixed) => schedule
+                    .after(&anchor.with_timezone(&fixed))
+                    .take(take)
+                    .map(|d| d.timestamp_micros())
+                    .collect(),
+            };
         cron_resolve_threshold_micros(last_seen, occurrences, k)
     }
 }
@@ -558,6 +705,17 @@ pub struct QueryCondition {
 }
 
 impl QueryCondition {
+    /// Rejects the list/pattern operators on the aggregation `having` and the PromQL condition.
+    pub fn validate_threshold_operators(&self) -> Result<(), String> {
+        if let Some(agg) = self.aggregation.as_ref() {
+            reject_extended_threshold_operator("aggregation having", agg.having.operator)?;
+        }
+        if let Some(cond) = self.promql_condition.as_ref() {
+            reject_extended_threshold_operator("PromQL condition", cond.operator)?;
+        }
+        Ok(())
+    }
+
     /// Whether this alert evaluates and pages per group.
     ///
     /// The aggregation and PromQL families store the opt-in in different places
@@ -621,6 +779,32 @@ pub enum ConditionList {
     #[serde(serialize_with = "serialize_legacy_conditions")]
     LegacyConditions(Vec<Condition>),
     EndCondition(Condition),
+}
+
+impl ConditionList {
+    /// Save-time value checks for the extended operators; other operators always pass.
+    pub fn validate_operator_values(&self) -> Result<(), String> {
+        match self {
+            ConditionList::OrNode { or: nodes } | ConditionList::AndNode { and: nodes } => nodes
+                .iter()
+                .try_for_each(ConditionList::validate_operator_values),
+            ConditionList::NotNode { not } => not.validate_operator_values(),
+            ConditionList::LegacyConditions(conditions) => conditions.iter().try_for_each(|c| {
+                condition_ops::validate_condition_value(
+                    &c.column,
+                    &c.operator,
+                    &c.value,
+                    c.is_case_insensitive(),
+                )
+            }),
+            ConditionList::EndCondition(c) => condition_ops::validate_condition_value(
+                &c.column,
+                &c.operator,
+                &c.value,
+                c.is_case_insensitive(),
+            ),
+        }
+    }
 }
 
 impl MemorySize for ConditionList {
@@ -835,9 +1019,9 @@ impl std::fmt::Display for AggFunction {
     }
 }
 
-impl TryFrom<&str> for AggFunction {
-    type Error = &'static str;
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
+impl FromStr for AggFunction {
+    type Err = &'static str;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s.to_lowercase().as_str() {
             "avg" => AggFunction::Avg,
             "min" => AggFunction::Min,
@@ -901,8 +1085,19 @@ pub struct Condition {
     pub operator: Operator,
     #[schema(value_type = Object)]
     pub value: Value,
+    /// Legacy flag: honoured only by the V2 in-memory evaluators, never by the extended operators.
     #[serde(default)]
     pub ignore_case: bool,
+    /// Case-insensitive matching for every string operator on every evaluation path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub case_insensitive: Option<bool>,
+}
+
+impl Condition {
+    /// Case folding on every operator; the legacy `ignore_case` never applies here.
+    pub fn is_case_insensitive(&self) -> bool {
+        self.case_insensitive.unwrap_or(false)
+    }
 }
 
 impl MemorySize for Condition {
@@ -919,6 +1114,7 @@ pub enum Operator {
     #[default]
     EqualTo,
     #[serde(rename = "!=")]
+    #[serde(alias = "<>")]
     NotEqualTo,
     #[serde(rename = ">")]
     GreaterThan,
@@ -929,16 +1125,16 @@ pub enum Operator {
     #[serde(rename = "<=")]
     LessThanEquals,
     #[serde(rename = "contains")]
-    #[serde(alias = "Contains")]
+    #[serde(alias = "Contains", alias = "str_match")]
     Contains,
     #[serde(rename = "not_contains")]
-    #[serde(alias = "NotContains")]
+    #[serde(alias = "NotContains", alias = "Not Contains")]
     NotContains,
     #[serde(rename = "is_null")]
-    #[serde(alias = "IsNull")]
+    #[serde(alias = "IsNull", alias = "Is Null")]
     IsNull,
     #[serde(rename = "is_not_null")]
-    #[serde(alias = "IsNotNull")]
+    #[serde(alias = "IsNotNull", alias = "Is Not Null")]
     IsNotNull,
     #[serde(rename = "is_empty")]
     #[serde(alias = "IsEmpty")]
@@ -946,6 +1142,39 @@ pub enum Operator {
     #[serde(rename = "is_not_empty")]
     #[serde(alias = "IsNotEmpty")]
     IsNotEmpty,
+    #[serde(rename = "in")]
+    #[serde(alias = "IN")]
+    In,
+    #[serde(rename = "not_in")]
+    #[serde(alias = "NOT IN")]
+    NotIn,
+    #[serde(rename = "starts_with")]
+    #[serde(alias = "Starts With")]
+    StartsWith,
+    #[serde(rename = "ends_with")]
+    #[serde(alias = "Ends With")]
+    EndsWith,
+    #[serde(rename = "re_match")]
+    #[serde(alias = "regex")]
+    ReMatch,
+    #[serde(rename = "re_not_match")]
+    #[serde(alias = "not_regex")]
+    ReNotMatch,
+}
+
+impl Operator {
+    /// Operators added with the shared filter builder; only these get save-time value checks.
+    pub fn is_extended(&self) -> bool {
+        matches!(
+            self,
+            Operator::In
+                | Operator::NotIn
+                | Operator::StartsWith
+                | Operator::EndsWith
+                | Operator::ReMatch
+                | Operator::ReNotMatch
+        )
+    }
 }
 
 impl std::fmt::Display for Operator {
@@ -963,6 +1192,12 @@ impl std::fmt::Display for Operator {
             Operator::IsNotNull => write!(f, "is not null"),
             Operator::IsEmpty => write!(f, "is empty"),
             Operator::IsNotEmpty => write!(f, "is not empty"),
+            Operator::In => write!(f, "in"),
+            Operator::NotIn => write!(f, "not in"),
+            Operator::StartsWith => write!(f, "starts with"),
+            Operator::EndsWith => write!(f, "ends with"),
+            Operator::ReMatch => write!(f, "matches regex"),
+            Operator::ReNotMatch => write!(f, "does not match regex"),
         }
     }
 }
@@ -1005,10 +1240,25 @@ pub struct ConditionItemCondition {
     pub operator: Operator,
     #[schema(value_type = Object)]
     pub value: Value,
+    /// Legacy flag: honoured only by the V2 in-memory evaluators, never by the extended operators.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ignore_case: Option<bool>,
+    /// Case-insensitive matching for every string operator on every evaluation path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub case_insensitive: Option<bool>,
     #[serde(rename = "logicalOperator")]
     pub logical_operator: LogicalOperator,
+}
+
+impl ConditionItemCondition {
+    /// V2 in-memory case folding; legacy `ignore_case` counts only on the original operators.
+    pub fn in_memory_case_insensitive(&self) -> bool {
+        let explicit = self.case_insensitive.unwrap_or(false);
+        if self.operator.is_extended() {
+            return explicit;
+        }
+        self.ignore_case.unwrap_or(false) || explicit
+    }
 }
 
 impl MemorySize for ConditionItemCondition {
@@ -1068,6 +1318,11 @@ impl ConditionGroup {
         }
         Ok(())
     }
+
+    /// Save-time value checks for the extended operators; other operators always pass.
+    pub fn validate_operator_values(&self) -> Result<(), String> {
+        validate_items_operator_values(&self.conditions)
+    }
 }
 
 /// Versioned condition parameters for alerts
@@ -1078,6 +1333,16 @@ pub enum AlertConditionParams {
     V1(ConditionList),
     /// v2 format: Linear ConditionGroup (version: 2)
     V2(ConditionGroup),
+}
+
+impl AlertConditionParams {
+    /// Save-time value checks for the extended operators; other operators always pass.
+    pub fn validate_operator_values(&self) -> Result<(), String> {
+        match self {
+            AlertConditionParams::V1(conditions) => conditions.validate_operator_values(),
+            AlertConditionParams::V2(conditions) => conditions.validate_operator_values(),
+        }
+    }
 }
 
 impl MemorySize for AlertConditionParams {
@@ -1158,6 +1423,27 @@ pub fn fixed_offset(offset_minutes: i32) -> Option<FixedOffset> {
     offset_minutes
         .checked_mul(60)
         .and_then(FixedOffset::east_opt)
+}
+
+fn reject_extended_threshold_operator(place: &str, operator: Operator) -> Result<(), String> {
+    if operator.is_extended() {
+        return Err(format!(
+            "Operator '{operator}' is not supported in the {place}; use =, !=, >, >=, < or <="
+        ));
+    }
+    Ok(())
+}
+
+fn validate_items_operator_values(items: &[ConditionItem]) -> Result<(), String> {
+    items.iter().try_for_each(|item| match item {
+        ConditionItem::Condition(c) => condition_ops::validate_condition_value(
+            &c.column,
+            &c.operator,
+            &c.value,
+            c.in_memory_case_insensitive(),
+        ),
+        ConditionItem::Group { conditions, .. } => validate_items_operator_values(conditions),
+    })
 }
 
 /// `start_micros + secs + tolerance`, or `None` when any step overflows.
@@ -1416,6 +1702,7 @@ mod test {
                     operator: Operator::EqualTo,
                     value: Value::String("10".into()),
                     ignore_case: false,
+                    case_insensitive: None,
                 }]),
             ),
             (
@@ -1425,6 +1712,7 @@ mod test {
                     operator: Operator::NotContains,
                     value: Value::String("monitor".into()),
                     ignore_case: false,
+                    case_insensitive: None,
                 }]),
             ),
             (
@@ -1434,6 +1722,7 @@ mod test {
                     operator: Operator::Contains,
                     value: Value::String("something".into()),
                     ignore_case: false,
+                    case_insensitive: None,
                 }]),
             ),
             (
@@ -1443,6 +1732,7 @@ mod test {
                     operator: Operator::EqualTo,
                     value: Value::String("error".into()),
                     ignore_case: false,
+                    case_insensitive: None,
                 }]),
             ),
             (r#"[]"#, ConditionList::LegacyConditions(vec![])),
@@ -1490,12 +1780,14 @@ mod test {
                     operator: Operator::EqualTo,
                     value: Value::String("error".into()),
                     ignore_case: false,
+                    case_insensitive: None,
                 },
                 Condition {
                     column: "job".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("something".into()),
                     ignore_case: false,
+                    case_insensitive: None,
                 }
             ])
         );
@@ -1534,12 +1826,14 @@ mod test {
                                 operator: Operator::EqualTo,
                                 value: Value::String("error".into()),
                                 ignore_case: false,
+                                case_insensitive: None,
                             }),
                             ConditionList::EndCondition(Condition {
                                 column: "job".to_string(),
                                 operator: Operator::EqualTo,
                                 value: Value::String("something".into()),
                                 ignore_case: false,
+                                case_insensitive: None,
                             }),
                         ],
                     })
@@ -1576,12 +1870,14 @@ mod test {
                         operator: Operator::EqualTo,
                         value: Value::String("error".into()),
                         ignore_case: false,
+                        case_insensitive: None,
                     }),
                     ConditionList::EndCondition(Condition {
                         column: "job".to_string(),
                         operator: Operator::EqualTo,
                         value: Value::String("something".into()),
                         ignore_case: false,
+                        case_insensitive: None,
                     })
                 ]
             }
@@ -1629,12 +1925,14 @@ mod test {
                                 operator: Operator::EqualTo,
                                 value: Value::String("value1".into()),
                                 ignore_case: true,
+                                case_insensitive: None,
                             }),
                             ConditionList::EndCondition(Condition {
                                 column: "level".to_string(),
                                 operator: Operator::EqualTo,
                                 value: Value::String("error".into()),
                                 ignore_case: false,
+                                case_insensitive: None,
                             })
                         ]
                     },
@@ -1643,6 +1941,7 @@ mod test {
                         operator: Operator::GreaterThan,
                         value: Value::String("value3".into()),
                         ignore_case: false,
+                        case_insensitive: None,
                     })
                 ]
             }
@@ -1658,12 +1957,14 @@ mod test {
                 operator: Operator::EqualTo,
                 value: Value::String("error".into()),
                 ignore_case: false,
+                case_insensitive: None,
             },
             Condition {
                 column: "job".into(),
                 operator: Operator::EqualTo,
                 value: Value::String("something".into()),
                 ignore_case: false,
+                case_insensitive: None,
             },
         ]);
 
@@ -1925,6 +2226,240 @@ mod test {
     }
 
     #[test]
+    fn test_cron_next_run_across_dst_change_keeps_local_time() {
+        use chrono::TimeZone;
+        use chrono_tz::America::Los_Angeles;
+
+        let condition = TriggerCondition {
+            frequency_type: FrequencyType::Cron,
+            cron: "0 0 9 * * *".to_string(),
+            timezone: Some("America/Los_Angeles".to_string()),
+            ..Default::default()
+        };
+        let cases = [
+            (
+                Utc.with_ymd_and_hms(2026, 10, 31, 17, 46, 0).unwrap(),
+                Utc.with_ymd_and_hms(2026, 11, 1, 17, 0, 0).unwrap(),
+            ),
+            (
+                Utc.with_ymd_and_hms(2026, 3, 7, 18, 0, 0).unwrap(),
+                Utc.with_ymd_and_hms(2026, 3, 8, 16, 0, 0).unwrap(),
+            ),
+        ];
+        for (start, expected) in cases {
+            let next = condition
+                .get_next_trigger_time_non_aligned(
+                    true,
+                    -420,
+                    false,
+                    Some(start.timestamp_micros()),
+                )
+                .unwrap();
+            assert_eq!(next, expected.timestamp_micros(), "start {start}");
+            let local = DateTime::from_timestamp_micros(next)
+                .unwrap()
+                .with_timezone(&Los_Angeles);
+            assert_eq!((local.hour(), local.minute()), (9, 0), "start {start}");
+            assert_eq!(
+                condition.group_resolve_threshold_micros(start.timestamp_micros(), 1, -420),
+                next - start.timestamp_micros(),
+                "start {start}"
+            );
+        }
+    }
+
+    #[test]
+    fn group_resolve_threshold_uses_the_offset_of_a_legacy_cron_alert() {
+        use chrono::TimeZone;
+
+        let hour = 3_600_000_000;
+        let legacy = TriggerCondition {
+            frequency_type: FrequencyType::Cron,
+            cron: "0 0 9 * * *".to_string(),
+            timezone: None,
+            ..Default::default()
+        };
+        let ist_run = Utc.with_ymd_and_hms(2026, 6, 15, 3, 30, 0).unwrap();
+        assert_eq!(
+            legacy.group_resolve_threshold_micros(ist_run.timestamp_micros(), 1, 330),
+            24 * hour
+        );
+        let edt_run = Utc.with_ymd_and_hms(2026, 7, 1, 13, 0, 0).unwrap();
+        assert_eq!(
+            legacy.group_resolve_threshold_micros(edt_run.timestamp_micros(), 3, -240),
+            72 * hour
+        );
+        let ny = TriggerCondition {
+            timezone: Some("America/New_York".to_string()),
+            ..legacy
+        };
+        let last_edt_run = Utc.with_ymd_and_hms(2026, 10, 31, 13, 0, 0).unwrap();
+        assert_eq!(
+            ny.group_resolve_threshold_micros(last_edt_run.timestamp_micros(), 1, -240),
+            25 * hour
+        );
+    }
+
+    #[test]
+    fn next_cron_after_reads_the_zone_inside_browser_time() {
+        use chrono::TimeZone;
+
+        let nine_am = Schedule::from_str("0 0 9 * * *").unwrap();
+        let utc = |m, d, h| Utc.with_ymd_and_hms(2026, m, d, h, 0, 0).unwrap();
+        for wrapped in [
+            "Browser Time (America/New_York)",
+            "browser time (America/New_York)",
+        ] {
+            assert_eq!(
+                next_cron_after(&nine_am, Some(wrapped), -240, utc(11, 1, 12)),
+                Some(utc(11, 1, 14)),
+                "{wrapped}"
+            );
+            assert_eq!(
+                next_cron_after(&nine_am, Some(wrapped), -300, utc(3, 8, 12)),
+                Some(utc(3, 8, 13)),
+                "{wrapped}"
+            );
+        }
+        assert_eq!(unwrap_browser_time("Browser Time"), "Browser Time");
+        assert_eq!(unwrap_browser_time("Asia/Kolkata"), "Asia/Kolkata");
+    }
+
+    #[test]
+    fn cron_fires_between_matches_stepping_next_cron_in_zone_across_dst() {
+        use chrono::TimeZone;
+
+        let ny: Tz = "America/New_York".parse().unwrap();
+        let windows = [
+            (
+                Utc.with_ymd_and_hms(2026, 3, 7, 12, 0, 0).unwrap(),
+                Utc.with_ymd_and_hms(2026, 3, 9, 12, 0, 0).unwrap(),
+            ),
+            (
+                Utc.with_ymd_and_hms(2026, 10, 31, 12, 0, 0).unwrap(),
+                Utc.with_ymd_and_hms(2026, 11, 2, 12, 0, 0).unwrap(),
+            ),
+        ];
+        let at = |m, d, h, mi| Utc.with_ymd_and_hms(2026, m, d, h, mi, 0).unwrap();
+        // Stepping a seconds cron rescans hours per fire, so its windows only straddle the change.
+        let seconds_windows = [
+            (at(3, 8, 6, 50), at(3, 8, 7, 10)),
+            (at(11, 1, 5, 50), at(11, 1, 6, 10)),
+        ];
+        let cases = [
+            ("0/5 * * * * *", &seconds_windows),
+            ("0 */5 * * * *", &windows),
+            ("0 0 * * * *", &windows),
+            ("0 30 1 * * *", &windows),
+            ("0 30 2 * * *", &windows),
+        ];
+        for (cron, cron_windows) in cases {
+            let schedule = Schedule::from_str(cron).unwrap();
+            for &(after, until) in cron_windows {
+                let mut stepped = vec![];
+                let mut next = next_cron_in_zone(&schedule, &ny, after).unwrap();
+                while next <= until {
+                    stepped.push(next);
+                    next = next_cron_in_zone(&schedule, &ny, next).unwrap();
+                }
+                let got = cron_fires_between(&schedule, Some("America/New_York"), 0, after, until);
+                assert_eq!(got, Some((stepped, next)), "{cron} {after}");
+            }
+        }
+    }
+
+    #[test]
+    fn cron_fires_between_returns_only_the_next_fire_when_nothing_is_due() {
+        use chrono::TimeZone;
+
+        let schedule = Schedule::from_str("0 0 9 * * *").unwrap();
+        let at = |d, h| Utc.with_ymd_and_hms(2026, 11, d, h, 0, 0).unwrap();
+        for (after, until) in [(at(1, 5), at(1, 6)), (at(1, 13), at(1, 13))] {
+            assert_eq!(
+                cron_fires_between(&schedule, Some("America/New_York"), -240, after, until),
+                Some((vec![], at(1, 14))),
+                "{after}"
+            );
+        }
+        assert_eq!(
+            cron_fires_between(
+                &schedule,
+                Some("America/New_York"),
+                -240,
+                at(1, 13),
+                at(1, 14)
+            ),
+            Some((vec![at(1, 14)], at(2, 14)))
+        );
+    }
+
+    #[test]
+    fn cron_fires_between_counts_every_five_seconds_across_fall_back() {
+        use chrono::TimeZone;
+
+        let schedule = Schedule::from_str("0/5 * * * * *").unwrap();
+        let after = Utc.with_ymd_and_hms(2026, 11, 1, 5, 0, 0).unwrap();
+        let until = Utc.with_ymd_and_hms(2026, 11, 1, 8, 0, 0).unwrap();
+        let (fires, next) =
+            cron_fires_between(&schedule, Some("America/New_York"), -240, after, until).unwrap();
+        assert_eq!(fires.len(), 2160);
+        assert!(
+            fires
+                .windows(2)
+                .all(|w| w[1] - w[0] == Duration::seconds(5))
+        );
+        assert_eq!(next, until + Duration::seconds(5));
+    }
+
+    #[test]
+    fn cron_fires_between_uses_the_offset_without_a_zone_name() {
+        use chrono::TimeZone;
+
+        let schedule = Schedule::from_str("0 0 9 * * *").unwrap();
+        let at = |d, h, m| Utc.with_ymd_and_hms(2026, 6, d, h, m, 0).unwrap();
+        assert_eq!(
+            cron_fires_between(&schedule, None, 330, at(15, 3, 30), at(16, 3, 30)),
+            Some((vec![at(16, 3, 30)], at(17, 3, 30)))
+        );
+        assert_eq!(
+            cron_fires_between(&schedule, None, 1440, at(15, 0, 0), at(16, 0, 0)),
+            None
+        );
+    }
+
+    #[test]
+    fn test_cron_next_run_inside_dst_change_hours() {
+        use chrono::TimeZone;
+
+        let la: Tz = "America/Los_Angeles".parse().unwrap();
+        let at = |h, m| Utc.with_ymd_and_hms(2026, 11, 1, h, m, 0).unwrap();
+        let spring = |h, m| Utc.with_ymd_and_hms(2026, 3, 8, h, m, 0).unwrap();
+        let next =
+            |cron: &str, after| next_cron_in_zone(&Schedule::from_str(cron).unwrap(), &la, after);
+        let cases = [
+            ("0 */5 * * * *", at(9, 10), at(9, 15)),
+            ("0 */5 * * * *", at(8, 55), at(9, 0)),
+            ("0 0 * * * *", at(8, 0), at(9, 0)),
+            // 02:30 does not exist on the spring-forward day, so it runs at 03:30 PDT.
+            ("0 30 2 * * *", spring(9, 0), spring(10, 30)),
+            ("0 30 2 * * *", spring(9, 30), spring(10, 30)),
+            ("0 30 2 * * *", spring(10, 10), spring(10, 30)),
+            ("0 30 1 1 11 * 2026", at(8, 30), at(9, 30)),
+        ];
+        for (cron, after, expected) in cases {
+            assert_eq!(next(cron, after), Some(expected), "{cron} after {after}");
+        }
+
+        let london: Tz = "Europe/London".parse().unwrap();
+        let sparse = Schedule::from_str("0 30 1 25 10 * 2026,2028").unwrap();
+        let first_copy = Utc.with_ymd_and_hms(2026, 10, 25, 0, 30, 0).unwrap();
+        assert_eq!(
+            next_cron_in_zone(&sparse, &london, first_copy),
+            Some(Utc.with_ymd_and_hms(2026, 10, 25, 1, 30, 0).unwrap())
+        );
+    }
+
+    #[test]
     fn test_condition_group_serialization() {
         // Test simple ConditionGroup serialization
         let condition_json = r#"{
@@ -2013,6 +2548,7 @@ mod test {
             operator: Operator::EqualTo,
             value: Value::String("error".to_string()),
             ignore_case: None,
+            case_insensitive: None,
             logical_operator: LogicalOperator::And,
         });
 
@@ -2038,6 +2574,7 @@ mod test {
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
                 ConditionItem::Condition(ConditionItemCondition {
@@ -2045,6 +2582,7 @@ mod test {
                     operator: Operator::EqualTo,
                     value: Value::String("critical".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
             ],
@@ -2061,6 +2599,7 @@ mod test {
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
                 ConditionItem::Condition(ConditionItemCondition {
@@ -2068,6 +2607,7 @@ mod test {
                     operator: Operator::EqualTo,
                     value: Value::String("critical".to_string()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
             ],
@@ -2454,22 +2994,22 @@ mod test {
 
     #[test]
     fn test_agg_function_try_from_str() {
-        assert_eq!(AggFunction::try_from("avg").unwrap(), AggFunction::Avg);
-        assert_eq!(AggFunction::try_from("AVG").unwrap(), AggFunction::Avg);
-        assert_eq!(AggFunction::try_from("min").unwrap(), AggFunction::Min);
-        assert_eq!(AggFunction::try_from("max").unwrap(), AggFunction::Max);
-        assert_eq!(AggFunction::try_from("sum").unwrap(), AggFunction::Sum);
-        assert_eq!(AggFunction::try_from("count").unwrap(), AggFunction::Count);
+        assert_eq!("avg".parse::<AggFunction>().unwrap(), AggFunction::Avg);
+        assert_eq!("AVG".parse::<AggFunction>().unwrap(), AggFunction::Avg);
+        assert_eq!("min".parse::<AggFunction>().unwrap(), AggFunction::Min);
+        assert_eq!("max".parse::<AggFunction>().unwrap(), AggFunction::Max);
+        assert_eq!("sum".parse::<AggFunction>().unwrap(), AggFunction::Sum);
+        assert_eq!("count".parse::<AggFunction>().unwrap(), AggFunction::Count);
         assert_eq!(
-            AggFunction::try_from("median").unwrap(),
+            "median".parse::<AggFunction>().unwrap(),
             AggFunction::Median
         );
-        assert_eq!(AggFunction::try_from("p50").unwrap(), AggFunction::P50);
-        assert_eq!(AggFunction::try_from("p75").unwrap(), AggFunction::P75);
-        assert_eq!(AggFunction::try_from("p90").unwrap(), AggFunction::P90);
-        assert_eq!(AggFunction::try_from("p95").unwrap(), AggFunction::P95);
-        assert_eq!(AggFunction::try_from("p99").unwrap(), AggFunction::P99);
-        assert!(AggFunction::try_from("unknown").is_err());
+        assert_eq!("p50".parse::<AggFunction>().unwrap(), AggFunction::P50);
+        assert_eq!("p75".parse::<AggFunction>().unwrap(), AggFunction::P75);
+        assert_eq!("p90".parse::<AggFunction>().unwrap(), AggFunction::P90);
+        assert_eq!("p95".parse::<AggFunction>().unwrap(), AggFunction::P95);
+        assert_eq!("p99".parse::<AggFunction>().unwrap(), AggFunction::P99);
+        assert!("unknown".parse::<AggFunction>().is_err());
     }
 
     // ── multi_alert_enabled: one question, two storage locations ────────────
@@ -2483,6 +3023,7 @@ mod test {
                 operator: Operator::GreaterThan,
                 value: serde_json::json!(90),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: None,
             multi_alert: multi,
@@ -2669,6 +3210,7 @@ mod test {
                 operator: Operator::EqualTo,
                 value: serde_json::Value::String("error".to_string()),
                 ignore_case: Some(false),
+                case_insensitive: None,
                 logical_operator: LogicalOperator::And,
             })],
         };
@@ -2696,6 +3238,7 @@ mod test {
                 operator: Operator::EqualTo,
                 value: serde_json::Value::String("error".to_string()),
                 ignore_case: None,
+                case_insensitive: None,
                 logical_operator: LogicalOperator::And,
             })],
         };
@@ -2712,6 +3255,7 @@ mod test {
                 operator: Operator::GreaterThan,
                 value: serde_json::Value::Number(serde_json::Number::from(400)),
                 ignore_case: None,
+                case_insensitive: None,
                 logical_operator: LogicalOperator::And,
             })],
         };
@@ -2750,6 +3294,7 @@ mod test {
                 operator: Operator::EqualTo,
                 value: serde_json::Value::String("error".to_string()),
                 ignore_case: false,
+                case_insensitive: None,
             })],
         };
         let params = AlertConditionParams::V1(conditions);
@@ -2860,6 +3405,7 @@ mod test {
             operator: Operator::EqualTo,
             value: serde_json::json!("error"),
             ignore_case: None,
+            case_insensitive: None,
             logical_operator: LogicalOperator::And,
         };
         let json = serde_json::to_value(&cic).unwrap();
@@ -2873,6 +3419,7 @@ mod test {
             operator: Operator::EqualTo,
             value: serde_json::json!("error"),
             ignore_case: Some(true),
+            case_insensitive: None,
             logical_operator: LogicalOperator::Or,
         };
         let json = serde_json::to_value(&cic).unwrap();
@@ -2887,6 +3434,7 @@ mod test {
             operator: Operator::EqualTo,
             value: serde_json::json!("value"),
             ignore_case: false,
+            case_insensitive: None,
         })
     }
 
@@ -2902,6 +3450,7 @@ mod test {
             operator: Operator::EqualTo,
             value: serde_json::json!(1),
             ignore_case: false,
+            case_insensitive: None,
         }]);
         assert_eq!(cond.depth(), 1);
     }
@@ -3015,6 +3564,7 @@ mod test {
             operator: Operator::GreaterThan,
             value: serde_json::json!(5),
             ignore_case: false,
+            case_insensitive: None,
         };
         let node = ConditionList::LegacyConditions(vec![cond]);
         let items: Vec<_> = node.into_iter().collect();
@@ -3111,6 +3661,38 @@ mod test {
     }
 
     #[test]
+    fn a_browser_time_label_schedules_in_its_zone_like_the_catch_up() {
+        use chrono::TimeZone;
+
+        let label = "Browser Time (America/New_York)";
+        assert_eq!(
+            get_timezone_from_string(Some(label), -240),
+            Ok(chrono_tz::America::New_York)
+        );
+        let condition = TriggerCondition {
+            frequency_type: FrequencyType::Cron,
+            cron: "0 0 9 * * *".to_string(),
+            timezone: Some(label.to_string()),
+            ..Default::default()
+        };
+        let start = Utc.with_ymd_and_hms(2026, 11, 1, 12, 0, 0).unwrap();
+        let next = condition
+            .get_next_trigger_time_non_aligned(true, -240, false, Some(start.timestamp_micros()))
+            .unwrap();
+        let schedule = Schedule::from_str(&condition.cron).unwrap();
+        assert_eq!(
+            Some(next),
+            next_cron_after(&schedule, Some(label), -240, start).map(|t| t.timestamp_micros())
+        );
+        assert_eq!(
+            next,
+            Utc.with_ymd_and_hms(2026, 11, 1, 14, 0, 0)
+                .unwrap()
+                .timestamp_micros()
+        );
+    }
+
+    #[test]
     fn get_timezone_from_string_falls_back_to_utc_for_a_full_day_offset() {
         assert_eq!(get_timezone_from_string(None, 1440), Err(Utc.fix()));
         assert_eq!(get_timezone_from_string(None, i32::MAX), Err(Utc.fix()));
@@ -3136,5 +3718,202 @@ mod test {
         let round_trip: QueryCondition = serde_json::from_value(serialized).unwrap();
         assert!(round_trip.promql_rule_mode);
         assert!(round_trip.promql_multi_alert);
+    }
+
+    #[test]
+    fn test_operator_aliases_deserialize_and_serialize_canonically() {
+        let cases = [
+            ("=", Operator::EqualTo, "="),
+            ("<>", Operator::NotEqualTo, "!="),
+            ("Contains", Operator::Contains, "contains"),
+            ("str_match", Operator::Contains, "contains"),
+            ("Not Contains", Operator::NotContains, "not_contains"),
+            ("NotContains", Operator::NotContains, "not_contains"),
+            ("Is Null", Operator::IsNull, "is_null"),
+            ("Is Not Null", Operator::IsNotNull, "is_not_null"),
+            ("in", Operator::In, "in"),
+            ("IN", Operator::In, "in"),
+            ("not_in", Operator::NotIn, "not_in"),
+            ("NOT IN", Operator::NotIn, "not_in"),
+            ("starts_with", Operator::StartsWith, "starts_with"),
+            ("Starts With", Operator::StartsWith, "starts_with"),
+            ("ends_with", Operator::EndsWith, "ends_with"),
+            ("Ends With", Operator::EndsWith, "ends_with"),
+            ("re_match", Operator::ReMatch, "re_match"),
+            ("regex", Operator::ReMatch, "re_match"),
+            ("re_not_match", Operator::ReNotMatch, "re_not_match"),
+            ("not_regex", Operator::ReNotMatch, "re_not_match"),
+        ];
+        for (input, expected, canonical) in cases {
+            let op: Operator = serde_json::from_value(Value::String(input.to_string())).unwrap();
+            assert_eq!(op, expected, "{input}");
+            assert_eq!(
+                serde_json::to_value(op).unwrap(),
+                Value::String(canonical.to_string())
+            );
+        }
+        assert!(serde_json::from_value::<Operator>(Value::String("like".to_string())).is_err());
+    }
+
+    #[test]
+    fn test_saved_v2_group_round_trips_byte_identically() {
+        let json = r#"{"filterType":"group","logicalOperator":"AND","conditions":[{"filterType":"condition","column":"level","operator":"=","value":"error","logicalOperator":"AND"},{"filterType":"group","logicalOperator":"OR","conditions":[{"filterType":"condition","column":"msg","operator":"contains","value":"x","ignore_case":true,"logicalOperator":"OR"}]}]}"#;
+        let group: ConditionGroup = serde_json::from_str(json).unwrap();
+        assert_eq!(serde_json::to_string(&group).unwrap(), json);
+        assert!(group.validate_operator_values().is_ok());
+    }
+
+    #[test]
+    fn test_validate_operator_values_only_checks_extended_operators() {
+        let group = |op: &str, value: serde_json::Value| -> ConditionGroup {
+            serde_json::from_value(serde_json::json!({
+                "filterType": "group",
+                "logicalOperator": "AND",
+                "conditions": [{
+                    "filterType": "group",
+                    "logicalOperator": "AND",
+                    "conditions": [{
+                        "filterType": "condition", "column": "c", "operator": op,
+                        "value": value, "logicalOperator": "AND"
+                    }]
+                }]
+            }))
+            .unwrap()
+        };
+        assert!(
+            group("=", serde_json::json!([]))
+                .validate_operator_values()
+                .is_ok()
+        );
+        assert!(
+            group("contains", serde_json::json!("("))
+                .validate_operator_values()
+                .is_ok()
+        );
+        assert!(
+            group("in", serde_json::json!(["a"]))
+                .validate_operator_values()
+                .is_ok()
+        );
+        assert!(
+            group("in", serde_json::json!([]))
+                .validate_operator_values()
+                .is_err()
+        );
+        assert!(
+            group("re_match", serde_json::json!("("))
+                .validate_operator_values()
+                .is_err()
+        );
+
+        let list: ConditionList = serde_json::from_value(serde_json::json!({
+            "not": {"or": [
+                {"column": "c", "operator": "=", "value": "a", "ignore_case": false},
+                {"column": "c", "operator": "not_regex", "value": "[", "ignore_case": false}
+            ]}
+        }))
+        .unwrap();
+        assert!(list.validate_operator_values().is_err());
+        let legacy: ConditionList = serde_json::from_value(serde_json::json!([
+            {"column": "c", "operator": "NotContains", "value": "", "ignore_case": false}
+        ]))
+        .unwrap();
+        assert!(legacy.validate_operator_values().is_ok());
+    }
+
+    #[test]
+    fn test_legacy_ignore_case_folds_only_original_operators() {
+        let leaf = |op: &str, flag: &str| -> ConditionItemCondition {
+            let mut v = serde_json::json!({
+                "column": "c", "operator": op, "value": "a", "logicalOperator": "AND"
+            });
+            v[flag] = serde_json::json!(true);
+            serde_json::from_value(v).unwrap()
+        };
+        for op in ["=", "!=", "contains", "not_contains"] {
+            assert!(leaf(op, "ignore_case").in_memory_case_insensitive(), "{op}");
+        }
+        for op in [
+            "in",
+            "not_in",
+            "starts_with",
+            "ends_with",
+            "re_match",
+            "re_not_match",
+        ] {
+            assert!(
+                !leaf(op, "ignore_case").in_memory_case_insensitive(),
+                "{op}"
+            );
+            assert!(
+                leaf(op, "case_insensitive").in_memory_case_insensitive(),
+                "{op}"
+            );
+        }
+        let v1: Condition = serde_json::from_value(serde_json::json!({
+            "column": "c", "operator": "in", "value": ["a"], "ignore_case": true
+        }))
+        .unwrap();
+        assert!(!v1.is_case_insensitive());
+    }
+
+    #[test]
+    fn test_threshold_operators_reject_only_extended_operators() {
+        for op in [
+            Operator::GreaterThanEquals,
+            Operator::EqualTo,
+            Operator::Contains,
+        ] {
+            let tc = TriggerCondition {
+                operator: op,
+                ..Default::default()
+            };
+            assert!(tc.validate_threshold_operator().is_ok(), "{op:?}");
+        }
+        for op in [
+            Operator::In,
+            Operator::NotIn,
+            Operator::StartsWith,
+            Operator::EndsWith,
+            Operator::ReMatch,
+            Operator::ReNotMatch,
+        ] {
+            let tc = TriggerCondition {
+                operator: op,
+                ..Default::default()
+            };
+            let err = tc.validate_threshold_operator().unwrap_err();
+            assert!(err.contains("trigger condition"), "{err}");
+        }
+    }
+
+    #[test]
+    fn test_query_condition_rejects_extended_having_and_promql_operators() {
+        let cond = |operator| Condition {
+            column: "v".to_string(),
+            operator,
+            value: Value::from(1),
+            ignore_case: false,
+            case_insensitive: None,
+        };
+        let mut qc = QueryCondition::default();
+        assert!(qc.validate_threshold_operators().is_ok());
+
+        qc.promql_condition = Some(cond(Operator::GreaterThan));
+        assert!(qc.validate_threshold_operators().is_ok());
+        qc.promql_condition = Some(cond(Operator::ReMatch));
+        let err = qc.validate_threshold_operators().unwrap_err();
+        assert!(err.contains("PromQL condition"), "{err}");
+
+        qc.promql_condition = None;
+        qc.aggregation = Some(Aggregation {
+            group_by: None,
+            function: AggFunction::Count,
+            having: cond(Operator::In),
+            warning_value: None,
+            multi_alert: false,
+        });
+        let err = qc.validate_threshold_operators().unwrap_err();
+        assert!(err.contains("aggregation having"), "{err}");
     }
 }

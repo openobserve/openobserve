@@ -15,6 +15,9 @@
 
 //! On-call teams, schedules and escalation policies.
 
+#[cfg(any(feature = "enterprise", test))]
+mod ack_page;
+
 use axum::{
     extract::{Path, Query},
     response::Response,
@@ -23,7 +26,11 @@ use axum::{
 #[cfg(feature = "enterprise")]
 use axum::{http::StatusCode, response::IntoResponse};
 use common::meta::http::HttpResponse as MetaHttpResponse;
+#[cfg(feature = "enterprise")]
+use config::meta::feature::Feature;
 use config::meta::oncall::{PriorityRung, Rotation};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::license::check_features;
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 use openobserve_api_common::extractors::ValidatedJson;
@@ -45,6 +52,35 @@ const RESPONSES: &str = "oncall_responses";
 /// The org's own phone provider account is an org setting, so it takes the settings lock.
 #[cfg(feature = "enterprise")]
 const SETTINGS: &str = "settings";
+
+/// Bounds one batch read, as `list_responses` bounds a page at 200 rows.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+const MAX_BATCH_IDS: usize = 200;
+
+/// Ids a batch route works on at once; a team-context id runs three reads, so 48 at most.
+#[cfg(feature = "enterprise")]
+const BATCH_READ_CONCURRENCY: usize = 16;
+
+#[cfg(feature = "enterprise")]
+const HANDOFF_NEEDS_A_TARGET: &str =
+    "a handoff needs either `to` (a person) or `to_team_id` (another team)";
+
+#[cfg(feature = "enterprise")]
+const VOICE_ORG_INACTIVE: &str = "<Response><Say>This organization is no longer active. \
+     The page was not acknowledged.</Say><Hangup/></Response>";
+
+#[cfg(feature = "enterprise")]
+const VOICE_ORG_UNREADABLE: &str = "<Response><Say>The organization could not be checked. \
+     The page was not acknowledged.</Say><Hangup/></Response>";
+
+#[cfg(feature = "enterprise")]
+const VOICE_UNLICENSED: &str = "<Response><Say>On-Call is not included in this installation's \
+     license. The page was not acknowledged and stays open. No further calls will be \
+     made.</Say><Hangup/></Response>";
+
+#[cfg(feature = "enterprise")]
+const ACK_UNLICENSED: &str =
+    "On-Call is not included in this installation's license. This page was not acknowledged.";
 
 /// A second lock behind `route_permissions`, which is first-match-wins and silently shadowable.
 #[cfg(feature = "enterprise")]
@@ -142,18 +178,24 @@ pub struct SetScheduleRequest {
     pub rotations: Vec<Rotation>,
 }
 
-/// A full replace; which fields a preset takes is the catalogue's job to say, not this struct's.
+/// Replaces one rotation's shift rules or adds one; the catalogue says which fields apply.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct FromPresetRequest {
     /// Absent means the team's own zone; there is no per-user timezone to fall back on.
     #[serde(default)]
     pub timezone: Option<String>,
-    /// How long one shift lasts, on every layer the preset builds. Absent is a week.
+    /// How long one shift lasts, on every shift rule the preset builds. Absent is a week.
     #[serde(default)]
     pub handover_micros: Option<i64>,
     /// Absent is now, snapped to the last local Monday 00:00 so handovers land on a week boundary.
     #[serde(default)]
     pub anchor_micros: Option<i64>,
+    /// Replaces this rotation's shift rules; its id and name stay.
+    #[serde(default)]
+    pub rotation_id: Option<String>,
+    /// Adds a rotation with this name; setting both fields is a 400.
+    #[serde(default)]
+    pub new_rotation_name: Option<String>,
     #[serde(flatten)]
     pub spec: config::meta::oncall::PresetSpec,
 }
@@ -168,6 +210,10 @@ pub struct SetPolicyRequest {
     /// Absent leaves it unchanged, so editing rungs cannot silently un-configure L0.
     #[serde(default)]
     pub l0: Option<config::meta::oncall::L0Policy>,
+    /// Template override for on-call messages; absent leaves it, null or "" clears it.
+    #[serde(default, deserialize_with = "double_option")]
+    #[schema(value_type = Option<String>)]
+    pub template: Option<Option<String>>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -266,6 +312,21 @@ pub struct PromoteRequest {
 pub struct OnCallQuery {
     /// Resolve at this instant (micros), so the UI shows a future week without a second endpoint.
     pub at: Option<i64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct TeamContextQuery {
+    /// Comma-separated team ids.
+    pub team_ids: Option<String>,
+    /// Also answer for the caller's own teams.
+    #[serde(default)]
+    pub include_mine: bool,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct EscalationBatchQuery {
+    /// Comma-separated response record ids.
+    pub response_ids: Option<String>,
 }
 
 /// Points one identity-dimension path at the team that gets woken for it.
@@ -407,6 +468,14 @@ pub struct ResolvedScheduleQuery {
     pub rotation_id: Option<String>,
 }
 
+/// An unsaved rotation and the window to resolve it over, in micros.
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct PreviewResolvedScheduleRequest {
+    pub rotation: Rotation,
+    pub from: i64,
+    pub to: i64,
+}
+
 /// A person, a window, or both; listing every absence an org ever recorded is not a question.
 #[derive(Debug, Default, Deserialize)]
 pub struct UnavailabilityQuery {
@@ -513,6 +582,18 @@ pub struct OwnershipStatsQuery {
     pub offset: Option<u64>,
 }
 
+// Only documents the stats body, which the handler extends with the paging it applied.
+#[cfg(feature = "enterprise")]
+#[derive(serde::Serialize, utoipa::ToSchema)]
+#[allow(dead_code)]
+struct OwnershipStatsBody {
+    #[serde(flatten)]
+    stats: o2_enterprise::enterprise::oncall::insight::OwnershipStats,
+    days: i64,
+    limit: usize,
+    offset: usize,
+}
+
 /// A missing or blank `auth_token` keeps the stored one; no `Debug`, since it carries the token.
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct PutTelephonyRequest {
@@ -541,15 +622,16 @@ fn internal_error(context: &str, e: &impl std::fmt::Display) -> Response {
 fn to_response(e: anyhow::Error) -> Response {
     use o2_enterprise::enterprise::oncall::service::OncallError;
     let status = match e.downcast_ref::<OncallError>() {
-        Some(OncallError::TeamNotFound(_)) | Some(OncallError::ResponseNotFound(_)) => {
-            StatusCode::NOT_FOUND
-        }
+        Some(OncallError::TeamNotFound(_))
+        | Some(OncallError::MemberNotFound { .. })
+        | Some(OncallError::ResponseNotFound(_)) => StatusCode::NOT_FOUND,
         // Not 404: the record exists, and the honest answer is that working it is not theirs.
         Some(OncallError::NotOnThisTeam { .. }) => StatusCode::FORBIDDEN,
         // A conflict, not a 400: the caller fixes it by changing the org's state, not the request.
-        Some(OncallError::NameTaken(_)) | Some(OncallError::IsDefaultTeam(_)) => {
-            StatusCode::CONFLICT
-        }
+        Some(OncallError::NameTaken(_))
+        | Some(OncallError::IsDefaultTeam(_))
+        | Some(OncallError::TeamNamedByAlerts { .. })
+        | Some(OncallError::PathTaken(_)) => StatusCode::CONFLICT,
         Some(OncallError::Invalid(_)) => StatusCode::BAD_REQUEST,
         Some(OncallError::Verification(refusal)) => return refusal_response(refusal),
         Some(OncallError::Telephony(refusal)) => {
@@ -564,6 +646,23 @@ fn to_response(e: anyhow::Error) -> Response {
     }
     // Every remaining status is an `OncallError` whose message is written for the caller.
     MetaHttpResponse::error(status.as_u16(), e.to_string()).into_response()
+}
+
+/// A rule write's refusal; only an untyped error can be the unique index on (org_id, path).
+#[cfg(feature = "enterprise")]
+fn rule_write_response(e: anyhow::Error) -> Response {
+    if e.is::<o2_enterprise::enterprise::oncall::service::OncallError>() {
+        return to_response(e);
+    }
+    let text = e.to_string().to_lowercase();
+    if text.contains("unique") || text.contains("duplicate") {
+        return MetaHttpResponse::error(
+            StatusCode::CONFLICT.as_u16(),
+            "a rule already claims this path",
+        )
+        .into_response();
+    }
+    to_response(e)
 }
 
 /// The reason travels as a code so a client can word it, and the numbers so it need not parse.
@@ -581,7 +680,8 @@ fn refusal_response(
         | R::NoCode
         | R::NoProvider
         | R::NoPhone
-        | R::NumberRejected => StatusCode::BAD_REQUEST,
+        | R::NumberRejected
+        | R::NumberNotAllowed => StatusCode::BAD_REQUEST,
     };
     let mut body = serde_json::json!({ "message": refusal.to_string(), "reason": refusal.reason });
     if let Some(n) = refusal.tries_left {
@@ -591,6 +691,160 @@ fn refusal_response(
         body["retry_after_secs"] = n.into();
     }
     (status, axum::Json(body)).into_response()
+}
+
+/// The one rule on a page action (D26); the page alone once its alert is gone.
+#[cfg(feature = "enterprise")]
+async fn page_problem(
+    org_id: &str,
+    response_id: &str,
+    actor: &str,
+) -> Result<Option<openobserve_core::alerts::ack::Problem>, Response> {
+    page_problem_for(
+        org_id,
+        response_id,
+        actor,
+        openobserve_core::alerts::ack::Act::Ack,
+    )
+    .await
+}
+
+/// [`page_problem`] for an ack verb, so that a refusal names the verb refused.
+#[cfg(feature = "enterprise")]
+async fn page_problem_for(
+    org_id: &str,
+    response_id: &str,
+    actor: &str,
+    act: openobserve_core::alerts::ack::Act,
+) -> Result<Option<openobserve_core::alerts::ack::Problem>, Response> {
+    use openobserve_core::alerts::ack::AckError;
+
+    page_problem_of(org_id, response_id, actor, act)
+        .await
+        .map_err(|e| match e {
+            AckError::NotFound => MetaHttpResponse::not_found("Response not found"),
+            e => crate::request::alerts::ack::error_response(e),
+        })
+}
+
+/// [`page_problem`] with a typed error: `Refused`, `NotFound` (no such page) or `Internal`.
+#[cfg(feature = "enterprise")]
+async fn page_problem_of(
+    org_id: &str,
+    response_id: &str,
+    actor: &str,
+    act: openobserve_core::alerts::ack::Act,
+) -> Result<Option<openobserve_core::alerts::ack::Problem>, openobserve_core::alerts::ack::AckError>
+{
+    use openobserve_core::alerts::ack::{self, AckError};
+
+    match ack::problem_of_page(org_id, response_id).await {
+        Ok(problem) => ack::authorize_problem(&problem, actor, act)
+            .await
+            .map(|_| Some(problem)),
+        Err(AckError::NotFound) => {
+            match infra::table::oncall_responses::get(org_id, response_id).await? {
+                Some(page) => ack::authorize_orphan_page(&page, actor, act)
+                    .await
+                    .map(|_| None)
+                    .map_err(AckError::Refused),
+                None => Err(AckError::NotFound),
+            }
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// Whether the page is closed: after the rule, a press on it answers from the record (N1, R3-1).
+#[cfg(feature = "enterprise")]
+async fn page_is_closed(
+    org_id: &str,
+    response_id: &str,
+) -> Result<bool, openobserve_core::alerts::ack::AckError> {
+    Ok(infra::table::oncall_responses::get(org_id, response_id)
+        .await?
+        .is_some_and(|r| r.closed_at.is_some() || r.state.is_terminal()))
+}
+
+/// A refusal is heard on the call; a failure to run the rule is an error the call logs.
+#[cfg(feature = "enterprise")]
+fn phone_answer_to(
+    e: openobserve_core::alerts::ack::AckError,
+) -> Result<o2_enterprise::enterprise::oncall::notify::PressOutcome, anyhow::Error> {
+    use o2_enterprise::enterprise::oncall::notify::PressOutcome;
+    use openobserve_core::alerts::ack::AckError;
+
+    match e {
+        AckError::Refused(_) | AckError::NotFound => Ok(PressOutcome::Refused),
+        e @ (AckError::Conflict(_) | AckError::Internal(_)) => {
+            Err(anyhow::anyhow!("the rule could not be run: {e:?}"))
+        }
+    }
+}
+
+/// The answer of a press that changed nothing, such as one on a closed page (N1).
+#[cfg(feature = "enterprise")]
+fn unchanged() -> serde_json::Value {
+    serde_json::json!({ "changed": false })
+}
+
+/// The page record with the verb's answer beside it under `ack`.
+#[cfg(feature = "enterprise")]
+async fn page_with_ack(org_id: &str, response_id: &str, ack: serde_json::Value) -> Response {
+    match infra::table::oncall_responses::get(org_id, response_id).await {
+        Ok(Some(record)) => {
+            let mut body = serde_json::to_value(record).unwrap_or_default();
+            body["ack"] = ack;
+            MetaHttpResponse::json(body)
+        }
+        Ok(None) => MetaHttpResponse::not_found("Response not found"),
+        Err(e) => internal_error("page read", &e),
+    }
+}
+
+/// Acknowledges a page's problem as `actor`; a page whose alert is gone is stopped on its own.
+#[cfg(feature = "enterprise")]
+async fn acknowledge_page(
+    org_id: &str,
+    response_id: &str,
+    problem: Option<&openobserve_core::alerts::ack::Problem>,
+    actor: &str,
+    verb: openobserve_core::alerts::ack::Verb,
+    source: config::meta::alerts::ack::AckSource,
+) -> Result<serde_json::Value, Response> {
+    use crate::request::alerts::ack::{act, error_response};
+
+    let Some(problem) = problem else {
+        use o2_enterprise::enterprise::oncall::escalation;
+
+        let before = infra::table::oncall_responses::get(org_id, response_id)
+            .await
+            .map_err(|e| internal_error("page read", &e))?;
+        let holder = before
+            .as_ref()
+            .and_then(|b| b.acked_by.as_deref())
+            .filter(|h| !h.eq_ignore_ascii_case(actor));
+        let after = match (verb, holder) {
+            (openobserve_core::alerts::ack::Verb::TakeOver, Some(holder)) => {
+                escalation::take_over_as(org_id, response_id, holder, actor)
+                    .await
+                    .map_err(to_response)?;
+                infra::table::oncall_responses::get(org_id, response_id)
+                    .await
+                    .map_err(|e| internal_error("page read", &e))?
+                    .ok_or_else(|| MetaHttpResponse::not_found("Response not found"))?
+            }
+            _ => escalation::acknowledge_as(org_id, response_id, actor)
+                .await
+                .map_err(to_response)?,
+        };
+        let changed =
+            before.is_some_and(|b| (b.acked_by, b.acked_at) != (after.acked_by, after.acked_at));
+        return Ok(serde_json::json!({ "changed": changed }));
+    };
+    act(problem, actor, verb, source)
+        .await
+        .map_err(error_response)
 }
 
 #[utoipa::path(
@@ -604,10 +858,14 @@ fn refusal_response(
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = CreateTeamRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Team),
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
         (status = 409, description = "Conflict", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn create_team(
     Path(org_id): Path<String>,
@@ -647,7 +905,11 @@ pub async fn create_team(
     summary = "List on-call teams",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::Team>)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_teams(
     Path(org_id): Path<String>,
@@ -682,7 +944,11 @@ pub async fn list_teams(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = String, Path, description = "Team ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Team)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_team(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -718,7 +984,11 @@ pub async fn get_team(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     request_body(content = UpdateTeamRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Team)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn update_team(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -762,7 +1032,15 @@ pub async fn update_team(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = String, Path, description = "Team ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
+        (status = 404, description = "Not found", content_type = "application/json", body = Object),
+        (status = 409, description = "Conflict: the org's default team, or named by alerts", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn delete_team(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -797,7 +1075,11 @@ pub async fn delete_team(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = String, Path, description = "Team ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::TeamMember>)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_members(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -833,7 +1115,11 @@ pub async fn list_members(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     request_body(content = AddMembersRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::TeamMember>)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn add_member(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -879,7 +1165,11 @@ pub async fn add_member(
         ("team_id" = String, Path, description = "Team ID"),
         ("user_email" = String, Query, description = "Member email"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn remove_member(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -898,10 +1188,14 @@ pub async fn remove_member(
         )
         .await
         {
-            Ok(true) => MetaHttpResponse::ok("Member removed"),
-            Ok(false) => {
-                MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Member not found")
-                    .into_response()
+            Ok(released_pages) => {
+                openobserve_core::alerts::ack::release_leaver_pages(
+                    &org_id,
+                    &released_pages,
+                    &q.user_email,
+                )
+                .await;
+                MetaHttpResponse::ok("Member removed")
             }
             Err(e) => to_response(e),
         }
@@ -925,7 +1219,11 @@ pub async fn remove_member(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = String, Path, description = "Team ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Option<Object>))),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_schedule(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -961,7 +1259,11 @@ pub async fn get_schedule(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     request_body(content = SetScheduleRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Schedule)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn set_schedule(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1001,7 +1303,11 @@ pub async fn set_schedule(
     summary = "The catalogue of schedule presets",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::PresetDescriptor>)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_schedule_presets(
     Path(org_id): Path<String>,
@@ -1028,7 +1334,7 @@ pub async fn list_schedule_presets(
     context_path = "/api",
     tag = "OnCall",
     operation_id = "ApplyOnCallSchedulePreset",
-    summary = "Replace a team's schedule with one built from a preset",
+    summary = "Build shift rules from a template, replacing a chosen rotation's or adding a rotation",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -1036,10 +1342,14 @@ pub async fn list_schedule_presets(
     ),
     request_body(content = FromPresetRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Schedule),
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
         (status = 404, description = "No such team", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn apply_schedule_preset(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1048,7 +1358,7 @@ pub async fn apply_schedule_preset(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        // A full replace of the rotations, so the same authority as `PUT /schedule`.
+        // It writes the schedule via `PUT /schedule`'s path, so the same authority.
         if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
@@ -1059,6 +1369,8 @@ pub async fn apply_schedule_preset(
             body.spec,
             body.handover_micros,
             body.anchor_micros,
+            body.rotation_id,
+            body.new_rotation_name,
             config::utils::time::now_micros(),
         )
         .await
@@ -1088,7 +1400,11 @@ pub async fn apply_schedule_preset(
         ("team_id" = String, Path, description = "Team ID"),
         ("at" = Option<i64>, Query, description = "Resolve at this instant (microseconds) instead of now"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::OnCallPosition>)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn who_is_on_call(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1130,10 +1446,14 @@ pub async fn who_is_on_call(
     ),
     request_body(content = CreateOverrideRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::ScheduleOverride),
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
         (status = 404, description = "No such team", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn create_override(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1186,7 +1506,11 @@ pub async fn create_override(
         ("from" = Option<i64>, Query, description = "Window start (microseconds); requires `to`"),
         ("to" = Option<i64>, Query, description = "Window end (microseconds); requires `from`"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::ScheduleOverride>)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_overrides(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1231,6 +1555,10 @@ pub async fn list_overrides(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "No such override", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn delete_override(
     Path((org_id, team_id, override_id)): Path<(String, String, String)>,
@@ -1274,9 +1602,13 @@ pub async fn delete_override(
         ("rotation_id" = Option<String>, Query, description = "Rotation id or name; defaults to the team's primary"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::CoverageSegment>),
         (status = 400, description = "Window inverted or too long", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_resolved_schedule(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1309,6 +1641,59 @@ pub async fn get_resolved_schedule(
 }
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/teams/{team_id}/resolved-schedule/preview",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "PreviewResolvedOnCallSchedule",
+    summary = "The resolved schedule an unsaved rotation would produce, without saving it",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+    ),
+    request_body(content = PreviewResolvedScheduleRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::CoverageSegment>),
+        (status = 400, description = "Window inverted or too long", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn preview_resolved_schedule(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    ValidatedJson(body): ValidatedJson<PreviewResolvedScheduleRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        // A read: nothing is written, so it costs what the GET costs.
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match o2_enterprise::enterprise::oncall::service::preview_resolved_schedule(
+            &org_id,
+            &team_id,
+            body.rotation,
+            body.from,
+            body.to,
+        )
+        .await
+        {
+            Ok(segments) => MetaHttpResponse::json(segments),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/oncall/teams/{team_id}/policy",
     context_path = "/api",
@@ -1320,8 +1705,12 @@ pub async fn get_resolved_schedule(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = String, Path, description = "Team ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
-)]
+    responses((status = 200, description = "Success", content_type = "application/json", body = o2_enterprise::enterprise::oncall::service::PolicyView)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+))]
 pub async fn get_policy(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -1331,7 +1720,7 @@ pub async fn get_policy(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id).await {
+        match o2_enterprise::enterprise::oncall::service::get_policy_view(&org_id, &team_id).await {
             Ok(policy) => MetaHttpResponse::json(policy),
             Err(e) => to_response(e),
         }
@@ -1356,7 +1745,11 @@ pub async fn get_policy(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     request_body(content = SetPolicyRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::EscalationPolicy)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn set_policy(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1368,12 +1761,42 @@ pub async fn set_policy(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "PUT").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
+        let nodes = infra::cluster::get_cached_online_nodes()
+            .await
+            .unwrap_or_default();
+        if let Err(e) =
+            openobserve_core::alerts::slack_destination::slack_step_guard(&body.rungs, &nodes)
+        {
+            return match e {
+                db::alerts::destinations::DestinationError::SlackApp(r) => {
+                    MetaHttpResponse::error(r.status, r.message).into_response()
+                }
+                other => internal_error("set_policy node versions", &other),
+            };
+        }
+        // Checked before any write, written after the policy, so a refused policy leaves no half.
+        let template = body
+            .template
+            .clone()
+            .map(|t| t.map(|t| t.trim().to_string()).filter(|t| !t.is_empty()));
+        if let Some(Some(name)) = template.as_ref()
+            && let Err(e) = openobserve_core::alerts::templates::check_binding(
+                &org_id,
+                name,
+                config::meta::alerts::notification_kind::NotificationKind::OnCall,
+            )
+            .await
+        {
+            return MetaHttpResponse::bad_request(e.as_str());
+        }
+        // One write and one replication carry the rungs and the template together.
         match o2_enterprise::enterprise::oncall::service::set_policy(
             &org_id,
             &team_id,
             body.rungs,
             body.destinations,
             body.l0,
+            template,
         )
         .await
         {
@@ -1393,6 +1816,12 @@ pub async fn set_policy(
 pub struct SetTeamChannelRequest {
     #[serde(default)]
     pub destinations: Option<Vec<String>>,
+    /// RO-1: the team's webhook that posts to its Slack room; omitted keeps it, `""` unticks it.
+    #[serde(default)]
+    pub slack_same_room_destination: Option<String>,
+    /// Empties the team's Slack channel and its same-room destination.
+    #[serde(default)]
+    pub clear_slack: bool,
 }
 
 /// A team's channel and where the answer came from.
@@ -1402,6 +1831,49 @@ pub struct TeamChannelResponse {
     pub destinations: Vec<String>,
     /// `team` or `policy`, or "pages still go to the old room" is unanswerable from the API.
     pub source: &'static str,
+    #[serde(flatten)]
+    pub slack: config::meta::oncall::TeamSlackView,
+}
+
+/// The team's channel read, its Slack part included (RO-2).
+#[cfg(feature = "enterprise")]
+async fn team_channel_response(team: config::meta::oncall::Team) -> Response {
+    let policy = match o2_enterprise::enterprise::oncall::service::get_policy(
+        &team.org_id,
+        &team.id,
+    )
+    .await
+    {
+        Ok(p) => p.destinations,
+        Err(e) => return to_response(e),
+    };
+    // An empty list while pages go to the policy's room would be a lie of omission.
+    let destinations =
+        config::meta::oncall::policy::team_channel(team.channel_destinations.as_deref(), &policy)
+            .to_vec();
+    let source = if team.channel_destinations.is_some() {
+        "team"
+    } else {
+        "policy"
+    };
+    let off_text = openobserve_core::alerts::slack_publish::unavailable_reason(&team.org_id)
+        .unwrap_or_default();
+    let slack = match o2_enterprise::enterprise::oncall::chat::room::team_slack_view(
+        &team,
+        &destinations,
+        &off_text,
+    )
+    .await
+    {
+        Ok(view) => view,
+        Err(e) => return internal_error("team channel Slack view", &e),
+    };
+    MetaHttpResponse::json(TeamChannelResponse {
+        team_id: team.id,
+        destinations,
+        source,
+        slack,
+    })
 }
 
 #[utoipa::path(
@@ -1417,6 +1889,10 @@ pub struct TeamChannelResponse {
         ("team_id" = String, Path, description = "Team ID"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = TeamChannelResponse)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_team_channel(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1427,23 +1903,11 @@ pub async fn get_team_channel(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        let team = match infra::table::oncall_teams::get_channel(&org_id, &team_id).await {
-            Ok(t) => t,
-            Err(e) => return internal_error("get_team_channel", &e),
-        };
-        // An empty list while pages go to the policy's room would be a lie of omission.
-        let policy =
-            match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id).await {
-                Ok(p) => p.destinations,
-                Err(e) => return to_response(e),
-            };
-        let source = if team.is_some() { "team" } else { "policy" };
-        MetaHttpResponse::json(TeamChannelResponse {
-            team_id,
-            destinations: config::meta::oncall::policy::team_channel(team.as_deref(), &policy)
-                .to_vec(),
-            source,
-        })
+        match infra::table::oncall_teams::get(&org_id, &team_id).await {
+            Ok(Some(team)) => team_channel_response(team).await,
+            Ok(None) => MetaHttpResponse::not_found(format!("team `{team_id}` not found")),
+            Err(e) => internal_error("get_team_channel", &e),
+        }
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1465,7 +1929,15 @@ pub async fn get_team_channel(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     request_body(content = SetTeamChannelRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = TeamChannelResponse)),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = TeamChannelResponse),
+        (status = 400, description = "Not one of the team's webhook destinations", content_type = "application/json", body = Object),
+        (status = 404, description = "Team not found", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn set_team_channel(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1483,32 +1955,25 @@ pub async fn set_team_channel(
                 .filter(|n| !n.is_empty())
                 .collect::<Vec<_>>()
         });
-        match infra::table::oncall_teams::set_channel(&org_id, &team_id, requested.clone()).await {
-            Ok(false) => MetaHttpResponse::not_found(format!("team `{team_id}` not found")),
-            Err(e) => internal_error("set_team_channel", &e),
-            Ok(true) => {
-                let policy =
-                    match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id)
-                        .await
-                    {
-                        Ok(p) => p.destinations,
-                        Err(e) => return to_response(e),
-                    };
-                let source = if requested.is_some() {
-                    "team"
-                } else {
-                    "policy"
-                };
-                MetaHttpResponse::json(TeamChannelResponse {
-                    team_id,
-                    destinations: config::meta::oncall::policy::team_channel(
-                        requested.as_deref(),
-                        &policy,
-                    )
-                    .to_vec(),
-                    source,
-                })
-            }
+        if let Err(e) = o2_enterprise::enterprise::oncall::service::refuse_slack_app_destinations(
+            &org_id,
+            requested.as_deref().unwrap_or_default(),
+        )
+        .await
+        {
+            return to_response(e);
+        }
+        let saved = o2_enterprise::enterprise::oncall::chat::room::save_channel(
+            &org_id,
+            &team_id,
+            requested,
+            body.slack_same_room_destination,
+            body.clear_slack,
+        )
+        .await;
+        match saved {
+            Ok(team) => team_channel_response(team).await,
+            Err(e) => to_response(e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -1518,51 +1983,166 @@ pub async fn set_team_channel(
     }
 }
 
-/// Plain HTML, no JavaScript: it is opened on a phone at night from a mail client.
+/// RO-6: what a test post to the team's Slack channel found.
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct TeamSlackTestResponse {
+    pub ok: bool,
+    /// `ok`, `channel_problem`, `not_connected` or `no_channel`.
+    pub class: String,
+    pub advice: String,
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/teams/{team_id}/slack/test",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "TestOnCallTeamSlackChannel",
+    summary = "Post a test message to a team's Slack channel",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = TeamSlackTestResponse),
+        (status = 404, description = "Team not found", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn test_team_slack_channel(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::{oncall::chat::room, slack};
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "PUT").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let team = match infra::table::oncall_teams::get(&org_id, &team_id).await {
+            Ok(Some(team)) => team,
+            Ok(None) => return MetaHttpResponse::not_found(format!("team `{team_id}` not found")),
+            Err(e) => return internal_error("test_team_slack_channel", &e),
+        };
+        let repo = slack::repo::LiveRepo;
+        let (plan, installation) = match room::team_room(&repo, &org_id, Some(&team), &[]).await {
+            Ok(read) => read,
+            Err(e) => return internal_error("test_team_slack_channel", &e.message),
+        };
+        let api = match slack::client::live() {
+            Ok(api) => api,
+            Err(e) => return internal_error("test_team_slack_channel", &e.message),
+        };
+        let off_text = openobserve_core::alerts::slack_publish::unavailable_reason(&org_id)
+            .unwrap_or_default();
+        let test = room::test_room(
+            api.as_ref(),
+            installation,
+            plan.native.as_ref(),
+            &team,
+            &off_text,
+        )
+        .await;
+        let class = serde_json::to_value(test.class)
+            .ok()
+            .and_then(|v| v.as_str().map(str::to_string))
+            .unwrap_or_default();
+        MetaHttpResponse::json(TeamSlackTestResponse {
+            ok: test.ok,
+            class,
+            advice: test.advice,
+        })
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// A server-rendered ack page; plain HTML because it opens on a phone from a mail client.
 #[cfg(feature = "enterprise")]
-fn ack_confirm_page(org_id: &str, token: &str, title: &str) -> Response {
-    let esc = |v: &str| {
-        v.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('"', "&quot;")
-    };
-    let body = format!(
-        r#"<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Acknowledge</title></head>
-<body style="font-family:system-ui,sans-serif;margin:0;padding:2rem;text-align:center">
-<h1 style="font-size:1.25rem">{title}</h1>
-<p style="color:#555">Acknowledging tells the others you have this. The
-escalation stops.</p>
-<form method="post" action="/api/v2/{org}/oncall/ack">
-<input type="hidden" name="token" value="{token}">
-<button type="submit" style="font-size:1rem;padding:0.75rem 1.5rem;border-radius:0.25rem;
-border:0;background:#4f46e5;color:#fff">Acknowledge</button>
-</form>
-</body></html>"#,
-        title = esc(title),
-        org = esc(org_id),
-        token = esc(token),
-    );
+fn html_page(status: StatusCode, body: String) -> Response {
     axum::response::Response::builder()
-        .status(StatusCode::OK)
+        .status(status)
         .header(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")
         .body(axum::body::Body::from(body))
         .unwrap()
         .into_response()
 }
 
+/// One page in the app; the URL carries the org so the app opens the right one.
+#[cfg(feature = "enterprise")]
+fn page_url(org_id: &str, response_id: &str) -> String {
+    let base = config::get_config().common.web_url.clone();
+    format!("{base}/web/oncall/responses/{response_id}?org_identifier={org_id}")
+}
+
+/// The refusal for a link that cannot be trusted or points at nothing; it names no record.
+#[cfg(feature = "enterprise")]
+fn broken_link(status: StatusCode, reason: &str) -> Response {
+    // No org in the link: the one in the path is unverified, and naming it would tell orgs apart.
+    let pages = format!(
+        "{}/web/oncall/responses",
+        config::get_config().common.web_url
+    );
+    html_page(status, ack_page::broken_link_html(reason, &pages))
+}
+
+/// The ack link's refusal for a locked license or a bad org: the same HTML page, never JSON.
+#[cfg(feature = "enterprise")]
+fn ack_status_refusal(
+    org_id: &str,
+    licensed: bool,
+    active: Result<bool, impl std::fmt::Display>,
+) -> Option<Response> {
+    if !licensed {
+        return Some(broken_link(StatusCode::FORBIDDEN, ACK_UNLICENSED));
+    }
+    match active {
+        Ok(true) => None,
+        Ok(false) => Some(broken_link(
+            StatusCode::FORBIDDEN,
+            "the organization it belongs to is no longer active",
+        )),
+        Err(e) => {
+            log::error!("cannot read the status of org {org_id}: {e}");
+            Some(broken_link(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "the organization could not be checked; try the link again shortly",
+            ))
+        }
+    }
+}
+
+/// The team a linked record belongs to, for its name and zone; unreadable is only logged.
+#[cfg(feature = "enterprise")]
+async fn team_of(record: &config::meta::oncall::Response) -> Option<config::meta::oncall::Team> {
+    let team_id = record.team_id.as_deref()?;
+    infra::table::oncall_teams::get(&record.org_id, team_id)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::error!("[oncall] ack page team {team_id}: {e}");
+            None
+        })
+}
+
 #[utoipa::path(
     post,
     path = "/{org_id}/oncall/ack",
-    context_path = "/api",
+    context_path = "/api/v2",
     tag = "OnCall",
     operation_id = "AcknowledgeOnCallPage",
     summary = "Acknowledge a page from its emailed link",
     params(("org_id" = String, Path, description = "Organization name")),
-    responses((status = 303, description = "Acknowledged, redirects to the page")),
+    responses(
+        (status = 200, description = "Where the page now stands", content_type = "text/html"),
+        (status = 401, description = "The link no longer works", content_type = "text/html"),
+    ),
 )]
 pub async fn acknowledge(
     Path(org_id): Path<String>,
@@ -1570,7 +2150,7 @@ pub async fn acknowledge(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::oncall::{escalation, service, token};
+        use o2_enterprise::enterprise::oncall::{service, token};
 
         // Through the service, not `token::verify`: membership is read once for both entry points.
         let claims = match service::ack_claims(
@@ -1582,28 +2162,70 @@ pub async fn acknowledge(
         .await
         {
             Ok(c) => c,
-            Err(e) => {
-                return MetaHttpResponse::error(StatusCode::UNAUTHORIZED.as_u16(), e.to_string())
-                    .into_response();
-            }
+            Err(e) => return broken_link(StatusCode::UNAUTHORIZED, &e.to_string()),
         };
+        // After the signature, so an unsigned caller cannot probe the license or the org.
+        if let Some(refusal) = ack_status_refusal(
+            &org_id,
+            check_features(&[Feature::Oncall]),
+            db::org_status::read_active(&org_id).await,
+        ) {
+            return refusal;
+        }
         // Spent before the ack: expiry does not stop a replay, and a losing token must not act.
-        if !token::spend(
+        let this_click = token::spend(
             &form.token,
             claims.expires_at,
             config::utils::time::now_micros(),
         )
-        .await
-        {
-            // Not an error page: acking is idempotent, so a second click lands where the first did.
-            return ack_redirect(&claims.org_id, &claims.response_id);
-        }
-        if let Err(e) =
-            escalation::acknowledge(&claims.org_id, &claims.response_id, &claims.user_email).await
-        {
-            return to_response(e);
-        }
-        ack_redirect(&claims.org_id, &claims.response_id)
+        .await;
+        // The one rule, then the core; a second click only shows the page as it stands.
+        let just_acked = if this_click {
+            let problem =
+                match page_problem(&claims.org_id, &claims.response_id, &claims.user_email).await {
+                    Ok(p) => p,
+                    Err(resp) => return resp,
+                };
+            match page_is_closed(&claims.org_id, &claims.response_id).await {
+                Ok(true) => false,
+                Ok(false) => match acknowledge_page(
+                    &claims.org_id,
+                    &claims.response_id,
+                    problem.as_ref(),
+                    &claims.user_email,
+                    openobserve_core::alerts::ack::Verb::Acknowledge,
+                    config::meta::alerts::ack::AckSource::Oncall,
+                )
+                .await
+                {
+                    Ok(ack) => ack["changed"].as_bool() == Some(true),
+                    Err(resp) => return resp,
+                },
+                Err(e) => return crate::request::alerts::ack::error_response(e),
+            }
+        } else {
+            false
+        };
+        let record =
+            match infra::table::oncall_responses::get(&claims.org_id, &claims.response_id).await {
+                Ok(Some(r)) => r,
+                Ok(None) => {
+                    return broken_link(
+                        StatusCode::NOT_FOUND,
+                        "the page this link points at no longer exists",
+                    );
+                }
+                Err(e) => return internal_error("acknowledge", &e),
+            };
+        let team = team_of(&record).await;
+        html_page(
+            StatusCode::OK,
+            ack_page::outcome_html(
+                &ack_page::PageFacts::of(&record, team.as_ref()),
+                &ack_page::AckOutcome::of(&record, &claims.user_email, just_acked),
+                &page_url(&claims.org_id, &claims.response_id),
+            ),
+        )
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1612,23 +2234,10 @@ pub async fn acknowledge(
     }
 }
 
-/// The org must be in the URL, or the app resolves whichever one was last selected.
-#[cfg(feature = "enterprise")]
-fn ack_redirect(org_id: &str, response_id: &str) -> Response {
-    let base = config::get_config().common.web_url.clone();
-    let location = format!("{base}/web/oncall/responses/{response_id}?org_identifier={org_id}");
-    axum::response::Response::builder()
-        .status(StatusCode::SEE_OTHER)
-        .header(axum::http::header::LOCATION, location)
-        .body(axum::body::Body::empty())
-        .unwrap()
-        .into_response()
-}
-
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/ack",
-    context_path = "/api",
+    context_path = "/api/v2",
     tag = "OnCall",
     operation_id = "OnCallAckConfirmPage",
     summary = "Confirmation page for an emailed acknowledgement link",
@@ -1636,7 +2245,10 @@ fn ack_redirect(org_id: &str, response_id: &str) -> Response {
         ("org_id" = String, Path, description = "Organization name"),
         ("token" = String, Query, description = "Signed acknowledgement token"),
     ),
-    responses((status = 200, description = "Success", content_type = "text/html")),
+    responses(
+        (status = 200, description = "Success", content_type = "text/html"),
+        (status = 401, description = "The link no longer works", content_type = "text/html"),
+    ),
 )]
 /// GET must only look: mail gateways fetch URLs, so a scanner would take the page first.
 pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> Response {
@@ -1654,18 +2266,38 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
         .await
         {
             Ok(c) => c,
-            Err(e) => {
-                return MetaHttpResponse::error(StatusCode::UNAUTHORIZED.as_u16(), e.to_string())
-                    .into_response();
-            }
+            Err(e) => return broken_link(StatusCode::UNAUTHORIZED, &e.to_string()),
         };
-        let title = infra::table::oncall_responses::get(&claims.org_id, &claims.response_id)
-            .await
-            .ok()
-            .flatten()
-            .and_then(|r| r.title)
-            .unwrap_or_else(|| "Acknowledge this page?".to_string());
-        ack_confirm_page(&claims.org_id, &q.token, &title)
+        if let Some(refusal) = ack_status_refusal(
+            &org_id,
+            check_features(&[Feature::Oncall]),
+            db::org_status::read_active(&org_id).await,
+        ) {
+            return refusal;
+        }
+        let record =
+            match infra::table::oncall_responses::get(&claims.org_id, &claims.response_id).await {
+                Ok(Some(r)) => r,
+                Ok(None) => {
+                    return broken_link(
+                        StatusCode::NOT_FOUND,
+                        "the page this link points at no longer exists",
+                    );
+                }
+                Err(e) => return internal_error("ack_page", &e),
+            };
+        let team = team_of(&record).await;
+        html_page(
+            StatusCode::OK,
+            ack_page::get_html(
+                &claims.org_id,
+                &q.token,
+                &ack_page::PageFacts::of(&record, team.as_ref()),
+                &record,
+                &claims.user_email,
+                &page_url(&claims.org_id, &claims.response_id),
+            ),
+        )
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1677,7 +2309,7 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
 #[utoipa::path(
     post,
     path = "/{org_id}/oncall/ack/voice/{token}",
-    context_path = "/api",
+    context_path = "/api/v2",
     tag = "OnCall",
     operation_id = "AcknowledgeOnCallPageByVoice",
     summary = "Acknowledge a page from a key pressed on its phone call",
@@ -1694,24 +2326,183 @@ pub async fn voice_ack(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let twiml = o2_enterprise::enterprise::oncall::service::voice_acknowledge(
-            &org_id,
-            &token,
-            form.digits.as_deref().unwrap_or_default(),
-            config::utils::time::now_micros(),
-        )
-        .await;
-        axum::response::Response::builder()
-            .status(StatusCode::OK)
-            .header(axum::http::header::CONTENT_TYPE, "text/xml")
-            .body(axum::body::Body::from(twiml))
-            .unwrap()
-            .into_response()
+        voice_ack_entitled(&org_id, &token, form, check_features(&[Feature::Oncall])).await
     }
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, token, form);
         MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// An unsigned token learns neither the org's status nor the license; the ack path refuses it.
+#[cfg(feature = "enterprise")]
+async fn voice_ack_entitled(
+    org_id: &str,
+    token: &str,
+    form: VoiceAckForm,
+    entitled: bool,
+) -> Response {
+    let (active, licensed) = if voice_token_is_signed_for(org_id, token).await {
+        (db::org_status::read_active(org_id).await, entitled)
+    } else {
+        (Ok(true), true)
+    };
+    voice_ack_if_active(org_id, token, form, active, licensed).await
+}
+
+/// Signature and org only; membership is left to the ack path, which reads it anyway.
+#[cfg(feature = "enterprise")]
+async fn voice_token_is_signed_for(org_id: &str, token: &str) -> bool {
+    use o2_enterprise::enterprise::oncall::token::{TokenPurpose, verify};
+    verify(
+        token,
+        TokenPurpose::Voice,
+        config::utils::time::now_micros(),
+    )
+    .await
+    .is_ok_and(|claims| claims.org_id == org_id)
+}
+
+/// The route sits outside the blocked-org gate, so a page call out before the block must not ack.
+#[cfg(feature = "enterprise")]
+async fn voice_ack_if_active(
+    org_id: &str,
+    token: &str,
+    form: VoiceAckForm,
+    active: Result<bool, impl std::fmt::Display>,
+    licensed: bool,
+) -> Response {
+    let twiml = match voice_status_refusal(org_id, licensed, active) {
+        Some(refusal) => refusal.to_string(),
+        None => {
+            o2_enterprise::enterprise::oncall::service::voice_acknowledge(
+                org_id,
+                token,
+                form.digits.as_deref().unwrap_or_default(),
+                config::utils::time::now_micros(),
+                act_by_phone,
+            )
+            .await
+        }
+    };
+    axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header(axum::http::header::CONTENT_TYPE, "text/xml")
+        .body(axum::body::Body::from(twiml))
+        .unwrap()
+        .into_response()
+}
+
+/// A phone key acts under the one rule, as the page's buttons do; a refusal is heard, not thrown.
+#[cfg(feature = "enterprise")]
+async fn act_by_phone(
+    org_id: String,
+    response_id: String,
+    actor: String,
+    action: o2_enterprise::enterprise::oncall::notify::PhoneAction,
+) -> Result<o2_enterprise::enterprise::oncall::notify::PressOutcome, anyhow::Error> {
+    use o2_enterprise::enterprise::oncall::{notify::PhoneAction, service};
+    use openobserve_core::alerts::ack::{self, AckError};
+
+    let problem = match page_problem_of(&org_id, &response_id, &actor, ack::Act::Ack).await {
+        Ok(problem) => problem,
+        Err(e) => return phone_answer_to(e),
+    };
+    if page_is_closed(&org_id, &response_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e:?}"))?
+    {
+        return match action {
+            PhoneAction::Acknowledge => {
+                service::phone_ack_outcome(&org_id, &response_id, &actor).await
+            }
+            PhoneAction::Resolve => {
+                // A retried press 6 finishes a clear the first press could not.
+                end_ack_by_phone(&org_id, &response_id, problem.as_ref(), &actor).await?;
+                Ok(o2_enterprise::enterprise::oncall::notify::PressOutcome::Closed)
+            }
+            PhoneAction::Escalate => {
+                Ok(o2_enterprise::enterprise::oncall::notify::PressOutcome::Closed)
+            }
+        };
+    }
+    match action {
+        PhoneAction::Acknowledge => {
+            let source = config::meta::alerts::ack::AckSource::Oncall;
+            let acked = match problem.as_ref() {
+                Some(p) => ack::acknowledge(p, &actor, source).await.map(|_| ()),
+                None => o2_enterprise::enterprise::oncall::escalation::acknowledge_as(
+                    &org_id,
+                    &response_id,
+                    &actor,
+                )
+                .await
+                .map(|_| ())
+                .map_err(|e| AckError::Internal(e.to_string())),
+            };
+            if let Err(e) = acked {
+                anyhow::bail!("acknowledge by phone: {e:?}");
+            }
+            service::phone_ack_outcome(&org_id, &response_id, &actor).await
+        }
+        PhoneAction::Resolve => {
+            let outcome = service::phone_resolve(&org_id, &response_id, &actor).await?;
+            end_ack_by_phone(&org_id, &response_id, problem.as_ref(), &actor).await?;
+            Ok(outcome)
+        }
+        PhoneAction::Escalate => service::phone_escalate(&org_id, &response_id, &actor).await,
+    }
+}
+
+/// Press 6 ends the problem's ack once the page is closed; a page whose alert is gone has none.
+#[cfg(feature = "enterprise")]
+async fn end_ack_by_phone(
+    org_id: &str,
+    response_id: &str,
+    problem: Option<&openobserve_core::alerts::ack::Problem>,
+    actor: &str,
+) -> Result<(), anyhow::Error> {
+    use openobserve_core::alerts::ack;
+
+    let Some(p) = problem else {
+        return Ok(());
+    };
+    let Some(page) = infra::table::oncall_responses::get(org_id, response_id).await? else {
+        return Ok(());
+    };
+    let closed_at = page
+        .closed_at
+        .unwrap_or_else(config::utils::time::now_micros);
+    let cover = ack::page_cover(&page.subject, closed_at);
+    ack::resolve(
+        p,
+        actor,
+        config::meta::alerts::ack::AckSource::Oncall,
+        cover,
+    )
+    .await
+    .map(|_| ())
+    .map_err(|e| anyhow::anyhow!("end the ack after a resolve by phone: {e:?}"))
+}
+
+/// TwiML refusal for a locked license or a bad org, as `ack_status_refusal` refuses email acks.
+#[cfg(feature = "enterprise")]
+fn voice_status_refusal(
+    org_id: &str,
+    licensed: bool,
+    active: Result<bool, impl std::fmt::Display>,
+) -> Option<&'static str> {
+    if !licensed {
+        return Some(VOICE_UNLICENSED);
+    }
+    match active {
+        Ok(true) => None,
+        Ok(false) => Some(VOICE_ORG_INACTIVE),
+        Err(e) => {
+            log::error!("cannot read the status of org {org_id}: {e}");
+            Some(VOICE_ORG_UNREADABLE)
+        }
     }
 }
 
@@ -1726,6 +2517,28 @@ const SUBJECT_TYPES: [config::meta::oncall::SubjectType; 2] = {
 fn parse_subject_type(s: &str) -> Option<config::meta::oncall::SubjectType> {
     let s = s.trim();
     SUBJECT_TYPES.into_iter().find(|t| t.as_str() == s)
+}
+
+/// Listed then `extra` ids, de-duplicated in order; only the listed count to the cap. [pure]
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn batch_ids(listed: Option<&str>, extra: Vec<String>) -> Result<Vec<String>, String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut ids: Vec<String> = listed
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .map(str::to_string)
+        .filter(|id| seen.insert(id.clone()))
+        .collect();
+    if ids.len() > MAX_BATCH_IDS {
+        return Err(format!(
+            "at most {MAX_BATCH_IDS} ids per request, got {}",
+            ids.len()
+        ));
+    }
+    ids.extend(extra.into_iter().filter(|id| seen.insert(id.clone())));
+    Ok(ids)
 }
 
 #[utoipa::path(
@@ -1748,9 +2561,13 @@ fn parse_subject_type(s: &str) -> Option<config::meta::oncall::SubjectType> {
         ("offset" = Option<u64>, Query, description = "Rows to skip"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
         (status = 400, description = "Unknown filter value", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_responses(
     Path(org_id): Path<String>,
@@ -1838,13 +2655,25 @@ pub async fn list_responses(
     }
 }
 
-/// Two queries for the whole page, never one per row, which is the N+1 this exists to avoid.
+/// Three queries for the whole page, never one per row, which is the N+1 this exists to avoid.
 #[cfg(feature = "enterprise")]
 async fn with_page_details(
     org_id: &str,
     rows: Vec<config::meta::oncall::Response>,
 ) -> Vec<serde_json::Value> {
     let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
+    let incident_ids: Vec<String> = rows
+        .iter()
+        .filter_map(|r| r.incident_id.clone())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let titles = infra::table::alert_incidents::titles(org_id, &incident_ids)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::error!("[oncall] incident title lookup: {e}");
+            Default::default()
+        });
     let runbooks = infra::table::oncall_responses::runbook_urls(org_id, &ids)
         .await
         .unwrap_or_else(|e| {
@@ -1852,34 +2681,50 @@ async fn with_page_details(
             tracing::error!("[oncall] runbook lookup: {e}");
             Default::default()
         });
-    let rungs = infra::table::oncall_responses::deepest_rungs(&ids)
+    let runs: Vec<(String, i32)> = rows
+        .iter()
+        .map(|r| (r.id.clone(), r.current_run()))
+        .collect();
+    let rungs = infra::table::oncall_responses::deepest_rungs(&runs)
         .await
         .unwrap_or_else(|e| {
             tracing::error!("[oncall] rung lookup: {e}");
             Default::default()
         });
     rows.into_iter()
-        .map(|r| {
-            let mut value = serde_json::json!(r);
-            if let Some(obj) = value.as_object_mut() {
-                if let Some(url) = runbooks.get(&r.id) {
-                    obj.insert("runbook_url".to_string(), url.clone().into());
-                }
-                // The rung's `after_micros`: an index would not survive a reordered ladder.
-                if let Some(rung) = rungs.get(&r.id) {
-                    obj.insert("reached_rung_micros".to_string(), (*rung).into());
-                }
-                // Only when answered: a null is indistinguishable from "answered instantly".
-                if let Some(acked_at) = r.acked_at {
-                    obj.insert(
-                        "time_to_ack_micros".to_string(),
-                        (acked_at - r.opened_at).max(0).into(),
-                    );
-                }
-            }
-            value
-        })
+        .map(|r| page_row(r, &runbooks, &rungs, &titles))
         .collect()
+}
+
+/// One list row with the page-wide lookups, keyed by record or incident id, folded in. [pure]
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn page_row(
+    r: config::meta::oncall::Response,
+    runbooks: &std::collections::HashMap<String, String>,
+    rungs: &std::collections::HashMap<String, i64>,
+    titles: &std::collections::HashMap<String, String>,
+) -> serde_json::Value {
+    let mut value = serde_json::json!(r);
+    if let Some(obj) = value.as_object_mut() {
+        if let Some(url) = runbooks.get(&r.id) {
+            obj.insert("runbook_url".to_string(), url.clone().into());
+        }
+        // The rung's `after_micros`: an index would not survive a reordered ladder.
+        if let Some(rung) = rungs.get(&r.id) {
+            obj.insert("reached_rung_micros".to_string(), (*rung).into());
+        }
+        // Only when answered: a null is indistinguishable from "answered instantly".
+        if let Some(acked_at) = r.acked_at {
+            obj.insert(
+                "time_to_ack_micros".to_string(),
+                (acked_at - r.opened_at).max(0).into(),
+            );
+        }
+        if let Some(title) = r.incident_id.as_ref().and_then(|id| titles.get(id)) {
+            obj.insert("incident_title".to_string(), title.clone().into());
+        }
+    }
+    value
 }
 
 #[utoipa::path(
@@ -1895,6 +2740,10 @@ async fn with_page_details(
         ("response_id" = String, Path, description = "Response record ID"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_response(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -1947,20 +2796,41 @@ pub async fn get_response(
         ("response_id" = String, Path, description = "Response record ID"),
     ),
     request_body(content = ResolveRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Response)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn resolve_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] delegated: Option<
+        axum::Extension<openobserve_api_common::auth::delegation::DelegatedCaller>,
+    >,
+    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
     ValidatedJson(body): ValidatedJson<Option<ResolveRequest>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        use crate::request::alerts::ack::{ack_source, error_response};
+
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
+        let problem = match page_problem_for(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            openobserve_core::alerts::ack::Act::Resolve,
+        )
+        .await
+        {
+            Ok(p) => p,
+            Err(resp) => return resp,
+        };
         let body = body.unwrap_or_default();
-        match o2_enterprise::enterprise::oncall::escalation::resolve(
+        let record = match o2_enterprise::enterprise::oncall::escalation::resolve(
             &org_id,
             &response_id,
             &user_email.user_id,
@@ -1969,9 +2839,23 @@ pub async fn resolve_response(
         )
         .await
         {
-            Ok(record) => MetaHttpResponse::json(record),
-            Err(e) => to_response(e),
+            Ok(record) => record,
+            Err(e) => return to_response(e),
+        };
+        // Closed first, so a failed clear is retried by resolving the closed page again.
+        if let Some(p) = problem.as_ref() {
+            let source = ack_source(delegated.as_deref(), &headers);
+            let closed_at = record
+                .closed_at
+                .unwrap_or_else(config::utils::time::now_micros);
+            let cover = openobserve_core::alerts::ack::page_cover(&record.subject, closed_at);
+            if let Err(e) =
+                openobserve_core::alerts::ack::resolve(p, &user_email.user_id, source, cover).await
+            {
+                return error_response(e);
+            }
         }
+        MetaHttpResponse::json(record)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1993,7 +2877,11 @@ pub async fn resolve_response(
         ("response_id" = String, Path, description = "Response record ID"),
     ),
     request_body(content = AddNoteRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn add_note(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -2004,6 +2892,9 @@ pub async fn add_note(
     {
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
+        }
+        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+            return resp;
         }
         match o2_enterprise::enterprise::oncall::escalation::add_note(
             &org_id,
@@ -2036,7 +2927,11 @@ pub async fn add_note(
         ("org_id" = String, Path, description = "Organization name"),
         ("incident_id" = String, Path, description = "Incident ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::Response>)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_responses_for_incident(
     Path((org_id, incident_id)): Path<(String, String)>,
@@ -2059,7 +2954,7 @@ pub async fn list_responses_for_incident(
     }
 }
 
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/oncall/responses/{response_id}/escalation",
     context_path = "/api",
@@ -2071,8 +2966,12 @@ pub async fn list_responses_for_incident(
         ("org_id" = String, Path, description = "Organization name"),
         ("response_id" = String, Path, description = "Response record ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
-)]
+    responses((status = 200, description = "Success", content_type = "application/json", body = o2_enterprise::enterprise::oncall::escalation::EscalationProgress)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+))]
 pub async fn get_escalation_progress(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -2094,7 +2993,86 @@ pub async fn get_escalation_progress(
     }
 }
 
+/// One read for a page of open records; the per-id route stays for the screens that show one.
 #[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/responses/escalation",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "OnCallEscalationProgressBatch",
+    summary = "Where the escalation ladder has got to, for many records",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_ids" = Option<String>, Query, description = "Comma-separated response record IDs (at most 200)"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "More than 200 ids", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn list_escalation_progress(
+    Path(org_id): Path<String>,
+    Query(q): Query<EscalationBatchQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use futures::StreamExt;
+
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let ids = match batch_ids(q.response_ids.as_deref(), Vec::new()) {
+            Ok(ids) => ids,
+            Err(msg) => return MetaHttpResponse::bad_request(msg),
+        };
+        // Owned per read: a borrowing closure in the stream fails axum's `Handler` lifetime bound.
+        let reads: Vec<_> =
+            ids.iter()
+                .map(|id| {
+                    let (org, id) = (org_id.clone(), id.clone());
+                    async move {
+                        o2_enterprise::enterprise::oncall::escalation::progress(&org, &id).await
+                    }
+                })
+                .collect();
+        // `buffered` keeps the input order, so each answer stays beside its id.
+        let reads: Vec<_> = futures::stream::iter(reads)
+            .buffered(BATCH_READ_CONCURRENCY)
+            .collect()
+            .await;
+        let progress: Vec<serde_json::Value> = ids
+            .into_iter()
+            .zip(reads)
+            .filter_map(|(id, read)| match read {
+                Ok(p) => {
+                    let mut value = serde_json::json!(p);
+                    if let Some(obj) = value.as_object_mut() {
+                        obj.insert("response_id".to_string(), id.into());
+                    }
+                    Some(value)
+                }
+                Err(e) => {
+                    tracing::warn!("[oncall] escalation progress for {id}: {e}");
+                    None
+                }
+            })
+            .collect();
+        MetaHttpResponse::json(serde_json::json!({ "progress": progress }))
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/oncall/responses/{response_id}/prior-causes",
     context_path = "/api",
@@ -2106,8 +3084,12 @@ pub async fn get_escalation_progress(
         ("org_id" = String, Path, description = "Organization name"),
         ("response_id" = String, Path, description = "Response record ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
-)]
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<o2_enterprise::enterprise::oncall::escalation::CauseGroup>)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+))]
 pub async fn get_prior_causes(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -2145,6 +3127,10 @@ pub async fn get_prior_causes(
         ("response_id" = String, Path, description = "Response record ID"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_response_report(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -2180,33 +3166,144 @@ pub async fn get_response_report(
     context_path = "/api",
     tag = "OnCall",
     operation_id = "AcknowledgeOnCallResponse",
-    summary = "Acknowledge a response record",
+    summary = "Acknowledge a page's problem",
+    description = "Acknowledges the problem the page is for (its incident, else every firing group of its alert), which stops every page of it. `take_over` moves an acknowledgement held by someone else to the caller. Returns the page record with the acknowledgement under `ack`.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("response_id" = String, Path, description = "Response record ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    request_body(content = config::meta::alerts::ack::ProblemAckRequest, description = "Optional", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Refused, with who is on call and who can act", content_type = "application/json", body = config::meta::alerts::ack::ActRefusal),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn acknowledge_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] delegated: Option<
+        axum::Extension<openobserve_api_common::auth::delegation::DelegatedCaller>,
+    >,
+    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
+    body: axum::body::Bytes,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        use openobserve_core::alerts::ack::Verb;
+
+        use crate::request::alerts::ack::{ack_source, take_over_of};
+
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::oncall::escalation::acknowledge(
+        let verb = match take_over_of(&body) {
+            Ok(true) => Verb::TakeOver,
+            Ok(false) => Verb::Acknowledge,
+            Err(resp) => return resp,
+        };
+        let problem =
+            match page_problem_for(&org_id, &response_id, &user_email.user_id, verb.into()).await {
+                Ok(p) => p,
+                Err(resp) => return resp,
+            };
+        match page_is_closed(&org_id, &response_id).await {
+            Ok(true) => return page_with_ack(&org_id, &response_id, unchanged()).await,
+            Ok(false) => {}
+            Err(e) => return crate::request::alerts::ack::error_response(e),
+        }
+        let source = ack_source(delegated.as_deref(), &headers);
+        match acknowledge_page(
             &org_id,
             &response_id,
+            problem.as_ref(),
             &user_email.user_id,
+            verb,
+            source,
         )
         .await
         {
-            Ok(r) => MetaHttpResponse::json(r),
-            Err(e) => to_response(e),
+            Ok(ack) => page_with_ack(&org_id, &response_id, ack).await,
+            Err(resp) => resp,
         }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/responses/{response_id}/unacknowledge",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "UnacknowledgeOnCallResponse",
+    summary = "Remove the acknowledgement of a page's problem",
+    description = "Clears the acknowledgement of the problem the page is for, on every record, and restarts the pages it stopped at step 1. Returns the page record with the unacknowledgement under `ack`.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Refused, with who is on call and who can act", content_type = "application/json", body = config::meta::alerts::ack::ActRefusal),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn unacknowledge_response(
+    Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] delegated: Option<
+        axum::Extension<openobserve_api_common::auth::delegation::DelegatedCaller>,
+    >,
+    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use openobserve_core::alerts::ack::Verb;
+
+        use crate::request::alerts::ack::{ack_source, act, error_response};
+
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let problem = match page_problem_for(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            openobserve_core::alerts::ack::Act::Unack,
+        )
+        .await
+        {
+            Ok(p) => p,
+            Err(resp) => return resp,
+        };
+        match page_is_closed(&org_id, &response_id).await {
+            Ok(true) => return page_with_ack(&org_id, &response_id, unchanged()).await,
+            Ok(false) => {}
+            Err(e) => return error_response(e),
+        }
+        let source = ack_source(delegated.as_deref(), &headers);
+        // A page whose alert is gone holds no acknowledgement but its own, so there is nothing to
+        // clear.
+        let ack = match problem.as_ref() {
+            Some(p) => match act(p, &user_email.user_id, Verb::Unack, source).await {
+                Ok(body) => body,
+                Err(e) => return error_response(e),
+            },
+            None => unchanged(),
+        };
+        page_with_ack(&org_id, &response_id, ack).await
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -2228,7 +3325,11 @@ pub async fn acknowledge_response(
         ("response_id" = String, Path, description = "Response record ID"),
     ),
     request_body(content = SnoozeRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Response)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn snooze_response(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -2239,6 +3340,9 @@ pub async fn snooze_response(
     {
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
+        }
+        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+            return resp;
         }
         match o2_enterprise::enterprise::oncall::escalation::snooze(
             &org_id,
@@ -2263,6 +3367,56 @@ pub async fn snooze_response(
 
 #[utoipa::path(
     post,
+    path = "/{org_id}/oncall/responses/{response_id}/unsnooze",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "UnsnoozeOnCallResponse",
+    summary = "End a snooze now, so paging continues from the current step",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Response)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn unsnooze_response(
+    Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+            return resp;
+        }
+        match o2_enterprise::enterprise::oncall::escalation::unsnooze(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            config::utils::time::now_micros(),
+        )
+        .await
+        {
+            Ok(Some(r)) => MetaHttpResponse::json(r),
+            Ok(None) => MetaHttpResponse::not_found("Response record not found"),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
     path = "/{org_id}/oncall/responses/{response_id}/handoff",
     context_path = "/api",
     tag = "OnCall",
@@ -2274,7 +3428,11 @@ pub async fn snooze_response(
         ("response_id" = String, Path, description = "Response record ID"),
     ),
     request_body(content = HandoffRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Response)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn handoff_response(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -2287,6 +3445,37 @@ pub async fn handoff_response(
 
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let problem = match page_problem(&org_id, &response_id, &user_email.user_id).await {
+            Ok(p) => p,
+            Err(resp) => return resp,
+        };
+        if body.to_team_id.is_none() && body.to.is_none() {
+            return MetaHttpResponse::bad_request(HANDOFF_NEEDS_A_TARGET);
+        }
+        // Checked before the release, so a refused hand-off leaves the ack and the page alone.
+        let checked = match (body.to_team_id.as_deref(), body.to.as_deref()) {
+            (Some(team), _) => escalation::check_handoff_to_team(&org_id, &response_id, team)
+                .await
+                .map(|_| ()),
+            (None, Some(person)) => escalation::check_handoff(&org_id, &response_id, person)
+                .await
+                .map(|_| ()),
+            (None, None) => return MetaHttpResponse::bad_request(HANDOFF_NEEDS_A_TARGET),
+        };
+        if let Err(e) = checked {
+            return to_response(e);
+        }
+        // D27: the ack clears everywhere first; only the hand-off restarts a page.
+        if let Some(problem) = problem.as_ref()
+            && let Err(e) = openobserve_core::alerts::ack::release_for_hand_off(
+                problem,
+                &user_email.user_id,
+                config::meta::alerts::ack::AckSource::Oncall,
+            )
+            .await
+        {
+            return crate::request::alerts::ack::error_response(e);
         }
         let result = match (body.to_team_id.as_deref(), body.to.as_deref()) {
             (Some(team), _) => {
@@ -2309,13 +3498,7 @@ pub async fn handoff_response(
                 )
                 .await
             }
-            (None, None) => {
-                return MetaHttpResponse::error(
-                    StatusCode::BAD_REQUEST.as_u16(),
-                    "a handoff needs either `to` (a person) or `to_team_id` (another team)",
-                )
-                .into_response();
-            }
+            (None, None) => return MetaHttpResponse::bad_request(HANDOFF_NEEDS_A_TARGET),
         };
         match result {
             Ok(record) => MetaHttpResponse::json(record),
@@ -2344,7 +3527,11 @@ pub async fn handoff_response(
         ("response_id" = String, Path, description = "Response record ID"),
     ),
     request_body(content = ConfirmRecoveryRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Response)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn confirm_recovery(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -2356,6 +3543,9 @@ pub async fn confirm_recovery(
     {
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
+        }
+        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+            return resp;
         }
         // Looked up here so "no such record" stays a 404 and the wrong kind stays a 400.
         match infra::table::oncall_responses::get(&org_id, &response_id).await {
@@ -2409,6 +3599,10 @@ pub async fn confirm_recovery(
     ),
     request_body(content = EscalateRequest, content_type = "application/json"),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn escalate_response(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -2422,6 +3616,9 @@ pub async fn escalate_response(
 
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
+        }
+        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+            return resp;
         }
         if infra::table::oncall_responses::get(&org_id, &response_id)
             .await
@@ -2487,6 +3684,10 @@ pub async fn escalate_response(
     ),
     request_body(content = TestPageRequest, content_type = "application/json"),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn send_test_page(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -2539,7 +3740,11 @@ pub async fn send_test_page(
         ("response_id" = String, Path, description = "Response record ID"),
         ("limit" = Option<u64>, Query, description = "Max records (default 10)"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::Response>)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_response_history(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -2593,7 +3798,11 @@ pub async fn get_response_history(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = Option<String>, Query, description = "Restrict to one team"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::OwnershipRule>)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_ownership_rules(
     Path(org_id): Path<String>,
@@ -2634,10 +3843,14 @@ pub async fn list_ownership_rules(
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = CreateOwnershipRuleRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = Object),
+        (status = 200, description = "Success",  content_type = "application/json", body = config::meta::oncall::OwnershipRule),
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
         (status = 409, description = "Conflict", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn create_ownership_rule(
     Path(org_id): Path<String>,
@@ -2649,27 +3862,18 @@ pub async fn create_ownership_rule(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
+        // The firing path's own source, so a rule can name only what extraction produces.
+        let semantic_groups = db::system_settings::get_semantic_field_groups(&org_id).await;
         match o2_enterprise::enterprise::oncall::routing::create_rule(
             &org_id,
             &body.team_id,
             body.dimensions,
+            &semantic_groups,
         )
         .await
         {
             Ok(rule) => MetaHttpResponse::json(rule),
-            Err(e) => {
-                // The unique index on (org_id, path) refuses it, so it is a conflict, not a fault.
-                if e.to_string().to_lowercase().contains("unique")
-                    || e.to_string().to_lowercase().contains("duplicate")
-                {
-                    return MetaHttpResponse::error(
-                        StatusCode::CONFLICT.as_u16(),
-                        "another team already owns this path",
-                    )
-                    .into_response();
-                }
-                to_response(e)
-            }
+            Err(e) => rule_write_response(e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -2693,11 +3897,15 @@ pub async fn create_ownership_rule(
     ),
     request_body(content = CreateOwnershipRuleRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = Object),
+        (status = 200, description = "Success",  content_type = "application/json", body = config::meta::oncall::OwnershipRule),
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Conflict", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn update_ownership_rule(
     Path((org_id, rule_id)): Path<(String, String)>,
@@ -2709,30 +3917,20 @@ pub async fn update_ownership_rule(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "PUT").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
+        let semantic_groups = db::system_settings::get_semantic_field_groups(&org_id).await;
         match o2_enterprise::enterprise::oncall::routing::update_rule(
             &org_id,
             &rule_id,
             &body.team_id,
             body.dimensions,
+            &semantic_groups,
         )
         .await
         {
             Ok(Some(rule)) => MetaHttpResponse::json(rule),
             Ok(None) => MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Rule not found")
                 .into_response(),
-            Err(e) => {
-                // Same unique-index shape as create: a claimed path is a conflict, not a fault.
-                if e.to_string().to_lowercase().contains("unique")
-                    || e.to_string().to_lowercase().contains("duplicate")
-                {
-                    return MetaHttpResponse::error(
-                        StatusCode::CONFLICT.as_u16(),
-                        "another team already owns this path",
-                    )
-                    .into_response();
-                }
-                to_response(e)
-            }
+            Err(e) => rule_write_response(e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -2754,7 +3952,11 @@ pub async fn update_ownership_rule(
         ("org_id" = String, Path, description = "Organization name"),
         ("rule_id" = String, Path, description = "Rule ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn delete_ownership_rule(
     Path((org_id, rule_id)): Path<(String, String)>,
@@ -2810,6 +4012,10 @@ async fn routing_config_body(config: &config::meta::oncall::RoutingConfig) -> se
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_routing_config(
     Path(org_id): Path<String>,
@@ -2847,6 +4053,10 @@ pub async fn get_routing_config(
         (status = 200, description = "Success",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn set_routing_config(
     Path(org_id): Path<String>,
@@ -2887,6 +4097,10 @@ pub async fn set_routing_config(
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = PreviewRoutingRequest, content_type = "application/json"),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn preview_routing(
     Path(org_id): Path<String>,
@@ -2928,11 +4142,21 @@ pub async fn preview_routing(
         .await
         .map_err(|e| tracing::error!("[oncall] routing preview context: {e}"))
         .ok();
+        let team_name = match routed.team_id() {
+            Some(id) => infra::table::oncall_teams::get(&org_id, id)
+                .await
+                .unwrap_or_else(|e| {
+                    tracing::error!("[oncall] routing preview team name: {e}");
+                    None
+                })
+                .map(|t| t.name),
+            None => None,
+        };
 
         MetaHttpResponse::json(serde_json::json!({
             "decision": routed.decision,
             "team_id": routed.team_id(),
-            "reason": routed.reason(),
+            "reason": routed.reason(team_name.as_deref()),
             // Hoisted out of the tagged decision, so no caller needs the variant names.
             "landed_on_default": routed.landed_on_default(),
             "notes": routed.notes,
@@ -2950,7 +4174,7 @@ pub async fn preview_routing(
 }
 
 /// A native user can hold any string as an email, so an unreachable person can sit on a rota.
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/oncall/teams/{team_id}/reachability",
     context_path = "/api",
@@ -2963,10 +4187,14 @@ pub async fn preview_routing(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 200, description = "Success",   content_type = "application/json", body = o2_enterprise::enterprise::oncall::reachability::TeamReachability),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
-)]
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+))]
 pub async fn get_team_reachability(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -3009,6 +4237,10 @@ pub async fn get_team_reachability(
         (status = 200, description = "Success",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_team_config_risks(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -3055,7 +4287,7 @@ pub async fn list_team_config_risks(
 }
 
 /// Counted in the database: the team most in need of the summary has the most rows.
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/oncall/teams/{team_id}/overview",
     context_path = "/api",
@@ -3069,10 +4301,14 @@ pub async fn list_team_config_risks(
         ("days" = Option<i64>, Query, description = "Window for the summary (default 7, max 366)"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 200, description = "Success",   content_type = "application/json", body = o2_enterprise::enterprise::oncall::insight::TeamOverview),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
-)]
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+))]
 pub async fn get_team_overview(
     Path((org_id, team_id)): Path<(String, String)>,
     Query(q): Query<LookbackQuery>,
@@ -3101,7 +4337,7 @@ pub async fn get_team_overview(
 }
 
 /// Two bounded windows: what was carried is history, only the shifts ahead can change.
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/oncall/teams/{team_id}/load",
     context_path = "/api",
@@ -3115,10 +4351,14 @@ pub async fn get_team_overview(
         ("days" = Option<i64>, Query, description = "Window, backwards and forwards (default 30, max 366; the forward half is capped at 31 days by the schedule resolver)"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 200, description = "Success",   content_type = "application/json", body = o2_enterprise::enterprise::oncall::insight::TeamLoad),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
-)]
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+))]
 pub async fn get_team_load(
     Path((org_id, team_id)): Path<(String, String)>,
     Query(q): Query<LookbackQuery>,
@@ -3145,7 +4385,7 @@ pub async fn get_team_load(
 }
 
 /// A dry run: no record, page, timer or token; `POST …/test-page` is what delivers.
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/oncall/teams/{team_id}/escalation-preview",
     context_path = "/api",
@@ -3160,11 +4400,15 @@ pub async fn get_team_load(
         ("at" = Option<i64>, Query, description = "Resolve at this instant (micros) instead of now"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 200, description = "Success",   content_type = "application/json", body = o2_enterprise::enterprise::oncall::insight::EscalationPreview),
         (status = 400, description = "Invalid",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
-)]
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+))]
 pub async fn get_escalation_preview(
     Path((org_id, team_id)): Path<(String, String)>,
     Query(q): Query<EscalationPreviewQuery>,
@@ -3195,7 +4439,7 @@ pub async fn get_escalation_preview(
 }
 
 /// A sibling, not a widening: the counts cost a grouped read the routing path must not pay.
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/oncall/ownership/stats",
     context_path = "/api",
@@ -3210,8 +4454,12 @@ pub async fn get_escalation_preview(
         ("limit" = Option<u64>, Query, description = "Page size (default 50, max 200)"),
         ("offset" = Option<u64>, Query, description = "Rules to skip"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
-)]
+    responses((status = 200, description = "Success", content_type = "application/json", body = OwnershipStatsBody)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+))]
 pub async fn list_ownership_rule_stats(
     Path(org_id): Path<String>,
     Query(q): Query<OwnershipStatsQuery>,
@@ -3277,7 +4525,11 @@ fn with_description(signal: &config::meta::oncall::UnroutedSignal) -> serde_json
         ("landing" = Option<String>, Query, description = "`default_team` for gaps the default team is absorbing, `nobody` for gaps that paged no one; omit for both"),
         ("limit" = Option<u64>, Query, description = "Page size (default 100, max 200)"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_unrouted_signals(
     Path(org_id): Path<String>,
@@ -3331,6 +4583,10 @@ pub async fn list_unrouted_signals(
         (status = 200, description = "Success",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn dismiss_unrouted_signal(
     Path((org_id, signal_id)): Path<(String, String)>,
@@ -3371,6 +4627,10 @@ pub async fn dismiss_unrouted_signal(
         ("limit" = Option<u64>, Query, description = "Max teams returned (default 100, max 200); `total` is never truncated"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_coverage_gaps(
     Path(org_id): Path<String>,
@@ -3429,6 +4689,10 @@ pub async fn list_coverage_gaps(
         (status = 200, description = "Success",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_deliveries(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -3497,7 +4761,11 @@ async fn may_touch_unavailability(org_id: &str, caller: &str, subject: &str, ver
         ("from" = Option<i64>, Query, description = "Window start (microseconds); requires `to`"),
         ("to" = Option<i64>, Query, description = "Window end (microseconds); requires `from`"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::oncall::Unavailability>)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_unavailability(
     Path(org_id): Path<String>,
@@ -3555,9 +4823,13 @@ pub async fn list_unavailability(
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = CreateUnavailabilityRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::oncall::Unavailability),
         (status = 400, description = "Invalid", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn create_unavailability(
     Path(org_id): Path<String>,
@@ -3614,6 +4886,10 @@ pub async fn create_unavailability(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "No such absence", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn delete_unavailability(
     Path((org_id, unavailability_id)): Path<(String, String)>,
@@ -3711,6 +4987,10 @@ fn contact_body(
         ("user_email" = String, Path, description = "The person's email"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_contact(
     Path((org_id, subject_email)): Path<(String, String)>,
@@ -3769,6 +5049,10 @@ pub async fn get_contact(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Not a dialable number", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn set_contact(
     Path((org_id, subject_email)): Path<(String, String)>,
@@ -3858,6 +5142,10 @@ pub async fn set_contact(
         (status = 429, description = "Too many codes; carries retry_after_secs", content_type = "application/json", body = Object),
         (status = 503, description = "The provider could not send now", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn send_contact_code(
     Path((org_id, subject_email)): Path<(String, String)>,
@@ -3903,6 +5191,10 @@ pub async fn send_contact_code(
         (status = 200, description = "Verified; carries phone_verified_at", content_type = "application/json", body = Object),
         (status = 400, description = "Wrong, expired or missing code", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn confirm_contact_code(
     Path((org_id, subject_email)): Path<(String, String)>,
@@ -3945,6 +5237,10 @@ pub async fn confirm_contact_code(
         ("user_email" = String, Path, description = "The person's email"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn delete_contact(
     Path((org_id, subject_email)): Path<(String, String)>,
@@ -3999,6 +5295,10 @@ pub async fn delete_contact(
         ("offset" = Option<u64>, Query, description = "Rows to skip"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_my_deliveries(
     Path(org_id): Path<String>,
@@ -4064,6 +5364,10 @@ pub async fn list_my_deliveries(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Too many ids", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn mark_deliveries_read(
     Path(org_id): Path<String>,
@@ -4132,6 +5436,10 @@ pub async fn mark_deliveries_read(
         ("at" = Option<i64>, Query, description = "Answer for this instant (microseconds) instead of now"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_my_teams(
     Path(org_id): Path<String>,
@@ -4198,6 +5506,114 @@ pub async fn list_my_teams(
     }
 }
 
+// ── Team context for the pages list ───────────────────────────────────────────
+
+/// One read for the pages list, answering each team as its three per-team routes would.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/teams/context",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ListOnCallTeamContext",
+    summary = "Policy, who is on call and schedule for many teams",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_ids" = Option<String>, Query, description = "Comma-separated team IDs (at most 200; `include_mine` teams are not counted)"),
+        ("include_mine" = Option<bool>, Query, description = "Also answer for the caller's own teams (default false)"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "More than 200 listed teams", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn list_team_context(
+    Path(org_id): Path<String>,
+    Query(q): Query<TeamContextQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use futures::StreamExt;
+
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let mine = if q.include_mine {
+            match infra::table::oncall_teams::list_for_user(&org_id, &user_email.user_id).await {
+                Ok(teams) => teams.into_iter().map(|t| t.id).collect(),
+                Err(e) => {
+                    // The listed teams still answer; without the caller's, the page shows no shift.
+                    tracing::warn!("[oncall] team context: the caller's teams: {e}");
+                    Vec::new()
+                }
+            }
+        } else {
+            Vec::new()
+        };
+        let ids = match batch_ids(q.team_ids.as_deref(), mine) {
+            Ok(ids) => ids,
+            Err(msg) => return MetaHttpResponse::bad_request(msg),
+        };
+        let known: std::collections::HashSet<String> =
+            match infra::table::oncall_teams::list(&org_id).await {
+                Ok(teams) => teams.into_iter().map(|t| t.id).collect(),
+                Err(e) => return internal_error("list_team_context", &e),
+            };
+        // Owned per read: a borrowing closure in the stream fails axum's `Handler` lifetime bound.
+        let reads: Vec<_> = ids
+            .into_iter()
+            .filter(|id| known.contains(id))
+            .map(|id| {
+                let org = org_id.clone();
+                async move { team_context(&org, &id).await }
+            })
+            .collect();
+        let teams: Vec<serde_json::Value> = futures::stream::iter(reads)
+            .buffered(BATCH_READ_CONCURRENCY)
+            .collect()
+            .await;
+        MetaHttpResponse::json(serde_json::json!({ "teams": teams }))
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// One team's policy, rotation and schedule; a field whose read fails is left out and logged.
+#[cfg(feature = "enterprise")]
+async fn team_context(org_id: &str, team_id: &str) -> serde_json::Value {
+    use o2_enterprise::enterprise::oncall::service;
+
+    let (policy, on_call, schedule) = futures::join!(
+        service::get_policy_view(org_id, team_id),
+        service::who_is_on_call(org_id, team_id, None),
+        service::get_schedule(org_id, team_id),
+    );
+    let mut out = serde_json::Map::new();
+    out.insert("team_id".to_string(), team_id.into());
+    let fields = [
+        ("policy", policy.map(|p| serde_json::json!(p))),
+        ("on_call", on_call.map(|s| serde_json::json!(s))),
+        ("schedule", schedule.map(|s| serde_json::json!(s))),
+    ];
+    for (field, read) in fields {
+        match read {
+            Ok(value) => {
+                out.insert(field.to_string(), value);
+            }
+            Err(e) => tracing::warn!("[oncall] team context {field} for {team_id}: {e}"),
+        }
+    }
+    serde_json::Value::Object(out)
+}
+
 // ── Cause analytics (U26) ─────────────────────────────────────────────────────
 
 /// Counted in the database: the org with most to learn from this has the most rows.
@@ -4219,6 +5635,10 @@ pub async fn list_my_teams(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Window inverted or too long", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn cause_analytics(
     Path(org_id): Path<String>,
@@ -4281,25 +5701,6 @@ fn analytics_window(from: Option<i64>, to: Option<i64>) -> Result<(i64, i64), St
 // ── Promote a firing to an incident ───────────────────────────────────────────
 
 /// Idempotent by refusal: an attached record is a conflict, so two clicks give one incident.
-#[utoipa::path(
-    post,
-    path = "/{org_id}/oncall/responses/{response_id}/promote",
-    context_path = "/api",
-    tag = "OnCall",
-    operation_id = "PromoteOnCallResponseToIncident",
-    summary = "Promote a response record to an incident",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("response_id" = String, Path, description = "Response record ID"),
-    ),
-    request_body(content = PromoteRequest, content_type = "application/json"),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 404, description = "No such record", content_type = "application/json", body = Object),
-        (status = 409, description = "Already an incident", content_type = "application/json", body = Object),
-    ),
-)]
 /// Best effort: a thin history beats rolling the incident back over a timeline write.
 #[cfg(feature = "enterprise")]
 async fn carry_page_history_into_incident(
@@ -4397,6 +5798,29 @@ fn promoted_severity(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/responses/{response_id}/promote",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "PromoteOnCallResponseToIncident",
+    summary = "Promote a response record to an incident",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    request_body(content = PromoteRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "No such record", content_type = "application/json", body = Object),
+        (status = 409, description = "Already an incident", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn promote_to_incident(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -4418,15 +5842,9 @@ pub async fn promote_to_incident(
                 return internal_error("promote lookup", &e);
             }
         };
-        // Checked before the incident opens: `add_note`'s check comes too late for a stranger.
-        if let Err(e) = o2_enterprise::enterprise::oncall::service::refuse_if_not_on_the_paged_team(
-            &org_id,
-            record.team(),
-            &user_email.user_id,
-        )
-        .await
-        {
-            return to_response(e);
+        // Before the incident opens (D26): the same rule as every other page action.
+        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+            return resp;
         }
         if let Some(existing) = record.incident_id.as_deref() {
             return MetaHttpResponse::error(
@@ -4528,7 +5946,7 @@ pub async fn promote_to_incident(
 }
 
 /// Never carries a token or the deployment's Account SID.
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/telephony",
     context_path = "/api",
@@ -4538,10 +5956,14 @@ pub async fn promote_to_incident(
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 200, description = "Success",   content_type = "application/json", body = o2_enterprise::enterprise::oncall::telephony_settings::TelephonyView),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
-)]
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+))]
 pub async fn get_telephony(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -4570,8 +5992,55 @@ pub async fn get_telephony(
     }
 }
 
+/// Asks Twilio live about the account the org would page with; never carries a SID or token.
+#[cfg_attr(feature = "enterprise", utoipa::path(
+    get,
+    path = "/{org_id}/telephony/status",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "GetTelephonyStatus",
+    summary = "Check the phone provider account the org would page with",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = o2_enterprise::enterprise::oncall::telephony_settings::TelephonyStatus),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+))]
+pub async fn get_telephony_status(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(
+            &org_id,
+            &user_email.user_id,
+            SETTINGS,
+            telephony_permission(&axum::http::Method::GET),
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        MetaHttpResponse::json(
+            o2_enterprise::enterprise::oncall::telephony_settings::get_telephony_status(&org_id)
+                .await,
+        )
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = org_id;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
 /// Saved only once Twilio reports the account active, and never without a master key.
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     put,
     path = "/{org_id}/telephony",
     context_path = "/api",
@@ -4582,11 +6051,15 @@ pub async fn get_telephony(
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = PutTelephonyRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 200, description = "Success",   content_type = "application/json", body = o2_enterprise::enterprise::oncall::telephony_settings::OrgTelephonyView),
         (status = 400, description = "Invalid, refused by Twilio, or no master key", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
-)]
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+))]
 pub async fn put_telephony(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -4638,6 +6111,10 @@ pub async fn put_telephony(
         (status = 200, description = "Success",   content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn delete_telephony(
     Path(org_id): Path<String>,
@@ -4671,6 +6148,231 @@ pub async fn delete_telephony(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A typed refusal keeps its own status even when its text says "unique".
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_rule_refusal_is_read_by_type_before_text() {
+        use o2_enterprise::enterprise::oncall::service::OncallError;
+        let invalid = OncallError::Invalid(
+            "`unique_id` is not a correlation field group in this org (field groups are ids \
+             like `service`, `k8s-cluster`)"
+                .into(),
+        );
+        let cases = [
+            (anyhow::Error::from(invalid), StatusCode::BAD_REQUEST),
+            (
+                anyhow::anyhow!("UNIQUE constraint failed: oncall_ownership_rules.path"),
+                StatusCode::CONFLICT,
+            ),
+        ];
+        for (e, want) in cases {
+            assert_eq!(rule_write_response(e).status(), want);
+        }
+    }
+
+    async fn ack_replies(org: &str) -> Vec<(axum::http::StatusCode, Vec<u8>)> {
+        let token = || AckQuery {
+            token: "leaked".to_string(),
+        };
+        let posted = acknowledge(Path(org.to_string()), axum::Form(token())).await;
+        let fetched = ack_page(Path(org.to_string()), Query(token())).await;
+        let mut replies = Vec::new();
+        for resp in [posted, fetched] {
+            let status = resp.status();
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            replies.push((status, body.to_vec()));
+        }
+        replies
+    }
+
+    #[tokio::test]
+    async fn test_ack_routes_do_not_reveal_a_blocked_org_to_an_unsigned_token() {
+        let org = "oncall-ack-blocked-org";
+        common::infra::config::ORG_STATUS_CACHE
+            .insert(org.into(), common::meta::organization::OrgStatus::Deleting);
+        let blocked = ack_replies(org).await;
+        common::infra::config::ORG_STATUS_CACHE.remove(org);
+        let unknown = ack_replies("oncall-ack-unknown-org").await;
+        assert_eq!(blocked, unknown);
+        for (_, body) in &blocked {
+            assert!(
+                !String::from_utf8_lossy(body).contains("organization is not active"),
+                "{body:?}"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn voice_reply(resp: Response) -> String {
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        assert_eq!(
+            resp.headers()[axum::http::header::CONTENT_TYPE],
+            "text/xml",
+            "Twilio needs TwiML"
+        );
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        String::from_utf8_lossy(&body).to_string()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_voice_ack_does_not_reveal_a_blocked_org_to_an_unsigned_token() {
+        let press = |org: &str| {
+            voice_ack(
+                Path((org.to_string(), "leaked".to_string())),
+                axum::Form(VoiceAckForm {
+                    digits: Some("1".to_string()),
+                }),
+            )
+        };
+        let org = "oncall-voice-ack-blocked-org";
+        common::infra::config::ORG_STATUS_CACHE.insert(
+            org.into(),
+            common::meta::organization::OrgStatus::PendingDeletion,
+        );
+        let blocked = voice_reply(press(org).await).await;
+        common::infra::config::ORG_STATUS_CACHE.remove(org);
+        let unknown = voice_reply(press("oncall-voice-ack-unknown-org").await).await;
+        assert_eq!(blocked, unknown);
+        assert_ne!(blocked, VOICE_ORG_INACTIVE);
+    }
+
+    /// A signed link whose org is blocked or unreadable gets the HTML page, not a JSON body.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_an_ack_link_of_an_inactive_org_is_refused_with_html() {
+        for (active, status) in [
+            (Ok(false), StatusCode::FORBIDDEN),
+            (
+                Err("db down".to_string()),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ),
+        ] {
+            let resp = ack_status_refusal("ack-org", true, active).expect("refused");
+            assert_eq!(resp.status(), status);
+            assert_eq!(
+                resp.headers()[axum::http::header::CONTENT_TYPE],
+                "text/html; charset=utf-8"
+            );
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert!(String::from_utf8_lossy(&body).contains("This link no longer works"));
+        }
+        assert!(ack_status_refusal("ack-org", true, Ok::<_, String>(true)).is_none());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_an_ack_link_on_a_locked_license_is_refused_with_html() {
+        let resp = ack_status_refusal("ack-org", false, Ok::<_, String>(true)).expect("refused");
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        assert_eq!(
+            resp.headers()[axum::http::header::CONTENT_TYPE],
+            "text/html; charset=utf-8"
+        );
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(String::from_utf8_lossy(&body).contains(ACK_UNLICENSED));
+    }
+
+    /// No test can lock a license, so the source pins that a bad signature is answered first.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_ack_links_read_the_license_only_after_the_signature() {
+        let source = include_str!("mod.rs");
+        for handler in ["pub async fn acknowledge(", "pub async fn ack_page("] {
+            let start = source.find(handler).unwrap();
+            let body = &source[start..start + source[start..].find("\n}\n").unwrap()];
+            let signature = body.find("service::ack_claims(").unwrap();
+            let license = body.find("check_features(&[Feature::Oncall])").unwrap();
+            assert!(signature < license, "{handler}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_voice_ack_of_a_blocked_org_is_refused_with_twiml() {
+        let form = VoiceAckForm {
+            digits: Some("1".to_string()),
+        };
+        let resp =
+            voice_ack_if_active("voice-org", "tok", form, Ok::<_, String>(false), true).await;
+        assert_eq!(voice_reply(resp).await, VOICE_ORG_INACTIVE);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_voice_ack_of_a_signed_token_on_a_locked_license_is_refused_with_twiml() {
+        let form = VoiceAckForm {
+            digits: Some("1".to_string()),
+        };
+        let resp =
+            voice_ack_if_active("voice-org", "tok", form, Ok::<_, String>(true), false).await;
+        assert_eq!(voice_reply(resp).await, VOICE_UNLICENSED);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_voice_ack_of_an_unsigned_token_does_not_reveal_a_locked_license() {
+        let form = VoiceAckForm {
+            digits: Some("1".to_string()),
+        };
+        let resp = voice_ack_entitled("voice-org", "leaked", form, false).await;
+        assert_ne!(voice_reply(resp).await, VOICE_UNLICENSED);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_voice_ack_refuses_an_unreadable_org_with_twiml() {
+        let form = VoiceAckForm {
+            digits: Some("1".to_string()),
+        };
+        let resp = voice_ack_if_active("voice-org", "tok", form, Err("db down"), true).await;
+        assert_eq!(voice_reply(resp).await, VOICE_ORG_UNREADABLE);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_voice_ack_of_an_active_org_reaches_the_ack_path() {
+        let form = VoiceAckForm { digits: None };
+        let resp = voice_ack_if_active("voice-org", "tok", form, Ok::<_, String>(true), true).await;
+        let twiml = voice_reply(resp).await;
+        let expected = o2_enterprise::enterprise::oncall::service::voice_acknowledge(
+            "voice-org",
+            "tok",
+            "",
+            config::utils::time::now_micros(),
+            act_by_phone,
+        )
+        .await;
+        assert_eq!(twiml, expected);
+        assert_ne!(twiml, VOICE_ORG_INACTIVE);
+        assert_ne!(twiml, VOICE_ORG_UNREADABLE);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_phone_key_hears_a_refusal_and_logs_a_failure() {
+        use o2_enterprise::enterprise::oncall::notify::PressOutcome;
+        use openobserve_core::alerts::ack::AckError;
+
+        assert_eq!(
+            phone_answer_to(AckError::Refused(Default::default())).unwrap(),
+            PressOutcome::Refused
+        );
+        assert_eq!(
+            phone_answer_to(AckError::NotFound).unwrap(),
+            PressOutcome::Refused
+        );
+        assert!(phone_answer_to(AckError::Internal("db down".into())).is_err());
+    }
 
     #[test]
     fn test_create_team_defaults_to_utc() {
@@ -4734,6 +6436,21 @@ mod tests {
         assert_eq!(body.anchor_micros, None);
         assert_eq!(body.spec.id(), config::meta::oncall::PresetId::FollowTheSun);
         assert_eq!(body.spec.members(), vec!["naoto@o2.ai", "lars@o2.ai"]);
+    }
+
+    /// The target fields are read beside the flattened preset, not swallowed by it.
+    #[test]
+    fn test_from_preset_body_reads_the_target_rotation() {
+        let body: FromPresetRequest = serde_json::from_str(
+            r#"{"preset":"weekday_weekend",
+                "rotation_id":"rot_b",
+                "new_rotation_name":"Tertiary",
+                "weekdays":{"members":["ana@o2.ai"]},
+                "weekend":{"members":["sam@o2.ai"]}}"#,
+        )
+        .unwrap();
+        assert_eq!(body.rotation_id.as_deref(), Some("rot_b"));
+        assert_eq!(body.new_rotation_name.as_deref(), Some("Tertiary"));
     }
 
     /// Everything but the preset and its groups is optional.
@@ -5107,6 +6824,13 @@ mod tests {
                 None,
             ),
             (
+                V::new(R::NumberNotAllowed),
+                bad,
+                "number_not_allowed",
+                None,
+                None,
+            ),
+            (
                 V::new(R::ProviderUnavailable),
                 StatusCode::SERVICE_UNAVAILABLE,
                 "provider_unavailable",
@@ -5149,6 +6873,8 @@ mod tests {
             (R::TokenRequired, "token_required"),
             (R::NoMasterKey, "no_master_key"),
             (R::AccountRejected, "account_rejected"),
+            (R::FromNotOnAccount, "from_not_on_account"),
+            (R::Unavailable, "unavailable"),
             (R::Unreadable, "unreadable"),
         ];
         for (reason, wire) in cases {
@@ -5602,6 +7328,77 @@ mod tests {
         assert_not_supported(voice_ack(path, form).await).await;
     }
 
+    #[test]
+    fn test_batch_ids_trim_dedupe_in_order_and_cap_only_the_listed() {
+        // `None` as the answer means refused.
+        type Case = (Option<String>, Vec<String>, Option<Vec<String>>);
+        let ids = |n: usize| (0..n).map(|i| format!("t{i}")).collect::<Vec<_>>();
+        let cases: Vec<Case> = vec![
+            (None, vec![], Some(vec![])),
+            (Some(" ,, ".into()), vec![], Some(vec![])),
+            (
+                Some(" a, b,,a ".into()),
+                vec![],
+                Some(vec!["a".into(), "b".into()]),
+            ),
+            (
+                Some("a".into()),
+                vec!["b".into(), "a".into()],
+                Some(vec!["a".into(), "b".into()]),
+            ),
+            (Some(ids(200).join(",")), ids(200), Some(ids(200))),
+            (Some(ids(201).join(",")), vec![], None),
+            (
+                Some(ids(150).join(",")),
+                ids(201)[150..].to_vec(),
+                Some(ids(201)),
+            ),
+            (Some(ids(200).join(",")), ids(230), Some(ids(230))),
+            (
+                Some(format!("{},t0", ids(200).join(","))),
+                vec![],
+                Some(ids(200)),
+            ),
+        ];
+        for (listed, extra, want) in cases {
+            let got = batch_ids(listed.as_deref(), extra.clone()).ok();
+            assert_eq!(got, want, "{listed:?} + {extra:?}");
+        }
+    }
+
+    #[test]
+    fn test_page_row_titles_only_rows_whose_incident_is_known() {
+        let record = |id: &str, incident_id: Option<&str>| {
+            serde_json::from_value::<config::meta::oncall::Response>(serde_json::json!({
+                "id": id,
+                "org_id": "acme",
+                "subject": {"subject_type": "alert", "source_id": "a1", "firing": 1},
+                "priority": 2,
+                "state": "triggered",
+                "opened_at": 1,
+                "incident_id": incident_id,
+            }))
+            .unwrap()
+        };
+        let titles =
+            std::collections::HashMap::from([("inc-1".to_string(), "DB down".to_string())]);
+        let cases = [
+            (record("r1", Some("inc-1")), Some("DB down")),
+            (record("r2", Some("inc-gone")), None),
+            (record("r3", None), None),
+        ];
+        for (r, want) in cases {
+            let id = r.id.clone();
+            let row = page_row(r, &Default::default(), &Default::default(), &titles);
+            assert_eq!(
+                row.get("incident_title").and_then(|t| t.as_str()),
+                want,
+                "{id}"
+            );
+            assert_eq!(row["id"], id.as_str());
+        }
+    }
+
     /// Disconnecting stops the org's own phone pages, so it needs the same write as connecting.
     #[test]
     fn test_telephony_permission_is_get_put_put() {
@@ -5624,6 +7421,12 @@ mod tests {
 
     #[cfg(not(feature = "enterprise"))]
     #[tokio::test]
+    async fn test_get_telephony_status_is_not_supported_without_enterprise() {
+        assert_not_supported(get_telephony_status(Path("default".to_string())).await).await;
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
     async fn test_put_telephony_is_not_supported_without_enterprise() {
         let body: PutTelephonyRequest = serde_json::from_str(
             r#"{"provider":"twilio","account_sid":"AC1","auth_token":"t","from_number":"+14155550100"}"#,
@@ -5637,5 +7440,77 @@ mod tests {
     #[tokio::test]
     async fn test_delete_telephony_is_not_supported_without_enterprise() {
         assert_not_supported(delete_telephony(Path("default".to_string())).await).await;
+    }
+
+    /// DM-8: a policy ticking Slack is refused with 409 while a node runs another version,
+    /// before anything is saved.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_slack_policy_is_refused_while_a_node_is_on_another_version() {
+        use config::meta::{
+            alerts::priority::AlertPriority,
+            cluster::{Node, NodeStatus},
+            oncall::Channel,
+        };
+        let root = "root-dm8@example.com";
+        common::infra::config::ORG_USERS.insert(
+            format!("{}/{root}", config::DEFAULT_ORG),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: String::new(),
+                rum_token: None,
+                org_id: config::DEFAULT_ORG.to_string(),
+                email: root.to_string(),
+                created_at: 0,
+                allow_static_token: false,
+            },
+        );
+        infra::cluster::add_node_to_cache(Node {
+            uuid: "dm8-old".into(),
+            name: "dm8-old".into(),
+            version: "v0.80.0-fake".into(),
+            status: NodeStatus::Online,
+            ..Default::default()
+        })
+        .await;
+        let body = SetPolicyRequest {
+            rungs: vec![PriorityRung {
+                priority: AlertPriority::P2,
+                steps: vec![],
+                channels: vec![Channel::Email, Channel::Slack],
+            }],
+            destinations: None,
+            l0: None,
+            template: None,
+        };
+        let response = set_policy(
+            Path(("acme".to_string(), "t_dm8".to_string())),
+            Headers(UserEmail {
+                user_id: root.to_string(),
+            }),
+            ValidatedJson(body),
+        )
+        .await;
+        // The guard returns before the save; a save here would answer 200 or 500.
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(
+            String::from_utf8_lossy(&body).contains("Upgrade every node first"),
+            "{body:?}"
+        );
+    }
+
+    /// RB-3: an OSS build answers the Slack channel test with 403 "Not Supported".
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_rb3_the_slack_test_is_not_supported_without_enterprise() {
+        let response = test_team_slack_channel(Path(("acme".to_string(), "t1".to_string()))).await;
+        assert_eq!(response.status(), axum::http::StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(String::from_utf8_lossy(&body).contains("Not Supported"));
     }
 }

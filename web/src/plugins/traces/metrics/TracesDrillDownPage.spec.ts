@@ -15,6 +15,7 @@
 
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
+import { defineComponent, h, KeepAlive, nextTick, ref } from "vue";
 import i18n from "@/locales";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import TracesDrillDownPage from "./TracesDrillDownPage.vue";
@@ -22,9 +23,8 @@ import TracesDrillDownPage from "./TracesDrillDownPage.vue";
 function mountPage(props: Record<string, unknown> = {}): VueWrapper<any> {
   return mount(TracesDrillDownPage, {
     attachTo: document.body,
-    props: { open: true, title: "Volume Insights", ...props },
+    props: { open: true, title: "Drill down", ...props },
     slots: {
-      actions: '<span data-test="header-actions-content" />',
       default: '<div data-test="body-content"><input data-test="inner-input" /></div>',
     },
     global: { plugins: [i18n] },
@@ -38,14 +38,14 @@ describe("TracesDrillDownPage", () => {
     wrapper?.unmount();
   });
 
-  it("should render the standard page header with the title, the actions and the body", () => {
+  it("should render the standard page header with the title and the body", () => {
     wrapper = mountPage();
 
     const header = wrapper.findComponent(OPageHeader);
     expect(header.exists()).toBe(true);
-    expect(header.props("title")).toBe("Volume Insights");
-    expect(wrapper.find('[data-test="header-actions-content"]').exists()).toBe(true);
+    expect(header.props("title")).toBe("Drill down");
     expect(wrapper.find('[data-test="body-content"]').exists()).toBe(true);
+    expect(wrapper.attributes("data-test")).toBe("traces-drill-down-page");
   });
 
   it("should label the back button Back to results", () => {
@@ -101,7 +101,7 @@ describe("TracesDrillDownPage", () => {
 
     wrapper = mount(TracesDrillDownPage, {
       attachTo: container,
-      props: { open: true, title: "Volume Insights" },
+      props: { open: true, title: "Drill down" },
     });
 
     expect(covered.hasAttribute("inert")).toBe(true);
@@ -162,5 +162,40 @@ describe("TracesDrillDownPage", () => {
 
     document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(emitted["update:open"]).toBeUndefined();
+  });
+
+  it("should ignore Escape while its page is cached by keep-alive, and listen again on return", async () => {
+    const onUpdate = vi.fn();
+    const shown = ref<"page" | "other">("page");
+    const Other = defineComponent({ render: () => h("div") });
+    wrapper = mount(
+      defineComponent({
+        setup: () => () =>
+          h(KeepAlive, null, {
+            default: () =>
+              shown.value === "page"
+                ? h(TracesDrillDownPage, {
+                    open: true,
+                    title: "Volume Insights",
+                    "onUpdate:open": onUpdate,
+                  })
+                : h(Other),
+          }),
+      }),
+      { attachTo: document.body, global: { plugins: [i18n] } },
+    );
+    const escape = () =>
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+
+    shown.value = "other";
+    await nextTick();
+    escape();
+    expect(onUpdate).not.toHaveBeenCalled();
+
+    shown.value = "page";
+    await nextTick();
+    escape();
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith(false);
   });
 });

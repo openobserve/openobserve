@@ -10,8 +10,10 @@
       <OButton
         variant="ghost"
         size="icon-xs-circle"
+        data-test="logs-cell-actions-copy-btn"
         @click.prevent.stop="copyLogToClipboard(cellValue)"
         :title="t('logs.cellActions.copy')"
+        :aria-label="t('logs.cellActions.copy')"
       >
         <OIcon name="content-copy" size="xs" />
       </OButton>
@@ -64,6 +66,7 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const props = defineProps({
   column: {
@@ -87,6 +90,11 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  /** Copy here and confirm on the button instead of emitting `copy` to the parent. */
+  copyInPlace: {
+    type: Boolean,
+    default: false,
+  },
   /** Rendered cell value, for columns with nothing under `row[column.id]` (logs' `source`). */
   value: {
     type: null as unknown as PropType<unknown>,
@@ -103,6 +111,10 @@ const { t } = useI18nTyped();
 const emit = defineEmits(["copy", "addSearchTerm", "addFieldToTable", "sendToAiChat"]);
 
 const copyLogToClipboard = (value: any) => {
+  if (props.copyInPlace) {
+    copyToClipboard(JSON.stringify(value), t);
+    return;
+  }
   emit("copy", value);
 };
 const addSearchTerm = (field: string, field_value: string | number | boolean, action: string) => {

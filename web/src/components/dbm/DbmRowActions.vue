@@ -29,22 +29,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex items-center justify-end gap-0.5" :data-test="dataTest">
-    <OButton
-      v-for="action in actions"
-      :key="action.id"
-      variant="ghost"
-      size="icon-xs-sq"
-      :icon-left="action.icon"
-      class="max-md:hidden"
-      :data-test="`${dataTest}-${action.id}`"
-      @click.stop="emit('action', action.id)"
-    >
-      <!-- Icon-only actions carry no label, so the tooltip names them; `left` opens it into the row, not over the row above. -->
-      <OTooltip side="left" :content="action.label" />
-    </OButton>
+    <template v-for="action in actions" :key="action.id">
+      <OTooltip v-if="action.lockedReason" side="left" :content="action.lockedReason">
+        <span class="inline-flex max-md:hidden">
+          <OButton
+            variant="ghost"
+            size="icon-xs-sq"
+            icon-left="lock"
+            disabled
+            :aria-label="action.label"
+            :data-test="`${dataTest}-${action.id}`"
+          />
+        </span>
+      </OTooltip>
+      <OButton
+        v-else
+        variant="ghost"
+        size="icon-xs-sq"
+        :icon-left="action.icon"
+        class="max-md:hidden"
+        :data-test="`${dataTest}-${action.id}`"
+        @click.stop="emit('action', action.id)"
+      >
+        <!-- Icon-only actions carry no label, so the tooltip names them; `left` opens it into the row, not over the row above. -->
+        <OTooltip side="left" :content="action.label" />
+      </OButton>
+    </template>
     <ODropdown side="bottom" align="end">
       <template #trigger>
         <OButton
+          :aria-label="t('common.moreActions')"
           icon-left="more-vert"
           variant="ghost"
           size="icon-xs-sq"
@@ -56,7 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODropdownItem
         v-for="action in actions"
         :key="action.id"
-        :icon-left="action.icon"
+        :icon-left="action.lockedReason ? 'lock' : action.icon"
+        :disabled="!!action.lockedReason"
+        :focusable-unavailable="!!action.lockedReason"
+        :description="action.lockedReason"
         class="md:hidden"
         :data-test="`${dataTest}-${action.id}-menu`"
         @select="emit('action', action.id)"
@@ -75,13 +92,15 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import type { I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 /** One row action. `id` is what the row emits back to the page. */
 export interface DbmRowAction {
   id: string;
   icon: IconName;
   label: I18nText;
+  /** License-lock reason; the action then renders disabled with a lock. */
+  lockedReason?: I18nText;
 }
 
 const props = withDefaults(
@@ -91,6 +110,8 @@ const props = withDefaults(
   }>(),
   { actions: () => [], dataTest: "dbm-row-actions" },
 );
+
+const { t } = useI18nTyped();
 
 const moreTest = computed(() => `${props.dataTest.replace(/-row-actions$/, "")}-row-more-actions`);
 

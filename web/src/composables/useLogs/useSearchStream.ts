@@ -35,11 +35,17 @@ import type { TranslateFn } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { flushEditorSuggestSummary } from "@/utils/query/editorSuggestStats";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import { toRunError, type RunError } from "@/utils/queryHistory/recentSearches";
 import {
   failPendingPageNavigation,
   notePageLoad,
   notifyHitsComplete,
 } from "@/composables/useLogs/logsRowNav";
+
+const runErrorOf = (error: unknown): RunError =>
+  toRunError(
+    (error as { content?: { code?: unknown; message?: unknown; status?: unknown } })?.content ?? {},
+  );
 
 export const useSearchStream = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
@@ -66,7 +72,7 @@ export const useSearchStream = (t: TranslateFn) => {
       autoRun.finishPayload(payload);
       return;
     }
-    autoRun.onPayloadError(payload);
+    autoRun.onPayloadError(payload, runErrorOf(error));
     responseProcessor.handleSearchError(payload, error);
   };
 
@@ -136,7 +142,8 @@ export const useSearchStream = (t: TranslateFn) => {
     autoRun.onPayloadComplete(payload);
 
     if (payload.type === "search" && !payload.isPagination && searchObj.meta.refreshInterval == 0) {
-      analytics.track("logs_search_completed");
+      const hits = searchObj.data.queryResults?.hits?.length ?? 0;
+      analytics.track("logs_search_completed", { hits, empty: hits === 0 });
       flushEditorSuggestSummary();
     }
 

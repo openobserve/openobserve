@@ -396,6 +396,15 @@ pub async fn get_by_ids(
     Ok(records.into_iter().map(ExternalAlertRecord::from).collect())
 }
 
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(get_orm_client_rw().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::alerts::incidents::ExternalAlertStatus as S;

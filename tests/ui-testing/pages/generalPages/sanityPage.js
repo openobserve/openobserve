@@ -4,6 +4,7 @@ const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 import { openNavFlyoutChild, gotoStreamsViaNav } from '../commonActions.js';
+import { ingestBase } from '../../playwright-tests/utils/ingest-url.js';
 
 export class SanityPage {
     constructor(page) {
@@ -333,7 +334,7 @@ export class SanityPage {
     async _clickSqlModeToggle() {
         await expect(this.queryEditor).toBeVisible({ timeout: 10000 });
         const monacoHelper = new MonacoEditorHelper(this.page);
-        await monacoHelper.setContent(this.queryEditor, 'SELECT * FROM "e2e_automate"');
+        await monacoHelper.setContentVerified(this.queryEditor, 'SELECT * FROM "e2e_automate"');
         await this.page.waitForTimeout(200);
     }
 
@@ -353,7 +354,7 @@ export class SanityPage {
         // .fill() on Monaco's .inputarea appends instead of replacing, producing an
         // invalid concatenated query that causes the server to abort the stream.
         const monacoHelper = new MonacoEditorHelper(this.page);
-        await monacoHelper.setContent(this.queryEditor, 'SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+        await monacoHelper.setContentVerified(this.queryEditor, 'SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
 
         const limitSearchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
         await this.refreshButton.click({ force: true });
@@ -491,13 +492,13 @@ export class SanityPage {
                 && window.monaco
                 && window.monaco.editor
                 && window.monaco.editor.getEditors().length > 0;
-        }, { timeout: 15000 });
+        }, undefined, { timeout: 15000 });
         await this.page.waitForFunction(() => {
             const vrlContainer = document.querySelector('[data-test="logs-vrl-function-editor"]');
             if (!vrlContainer) return false;
             const editors = window.monaco.editor.getEditors();
             return editors.some(ed => vrlContainer.contains(ed.getDomNode()));
-        }, { timeout: 15000 });
+        }, undefined, { timeout: 15000 });
         // Drive the VRL editor via real keyboard input — this dispatches the same
         // DOM input events the user generates, which Monaco's input handler routes
         // through onDidChangeModelContent → debounced emit("update:query") in the
@@ -509,7 +510,7 @@ export class SanityPage {
             const editors = window.monaco.editor.getEditors();
             const targetEditor = editors.find(ed => vrlContainer && vrlContainer.contains(ed.getDomNode()));
             return targetEditor && targetEditor.hasTextFocus && targetEditor.hasTextFocus();
-        }, { timeout: 5000 }).catch(() => {});
+        }, undefined, { timeout: 5000 }).catch(() => {});
         await this.page.keyboard.type('.sanity=1');
         // Wait for the editor model to actually contain the typed text.
         await this.page.waitForFunction(() => {
@@ -517,7 +518,7 @@ export class SanityPage {
             const vrlContainer = document.querySelector('[data-test="logs-vrl-function-editor"]');
             const targetEditor = editors.find(ed => vrlContainer && vrlContainer.contains(ed.getDomNode())) || editors[0];
             return targetEditor && targetEditor.getValue().includes('.sanity=1');
-        }, { timeout: 5000 });
+        }, undefined, { timeout: 5000 });
         // The CodeQueryEditor debounces `update:query` by 500ms. The keyboard.type call
         // queues per-char events; the debounced emit fires 500ms after the LAST char.
         // To make this deterministic, poll the time-since-last-mutation against the
@@ -536,7 +537,7 @@ export class SanityPage {
                 return false;
             }
             return Date.now() - w.__vrlLastChangedAt > 600;
-        }, { timeout: 5000 });
+        }, undefined, { timeout: 5000 });
 
         // Use the specific data-test selector for the save button to avoid
         // ambiguity with other "Save" labelled buttons on the page.
@@ -595,6 +596,8 @@ export class SanityPage {
         await this.folderAddNameField.waitFor({ state: 'visible', timeout: 10000 });
         await this.folderAddNameField.fill(folderName);
         await this.folderAddSave.click();
+        // The dialog closes only once the folder is created; its overlay would otherwise swallow the tab click below.
+        await expect(this.page.locator('[data-test="dashboard-folder-dialog"]')).toBeHidden({ timeout: 30000 });
 
         // Confirm the folder tab appears with the given name.
         const folderTabName = this.getDashboardFolderTabByName(folderName);
@@ -774,7 +777,7 @@ export class SanityPage {
         };
 
         const response = await fetch(
-            `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+            `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`,
             {
                 method: "POST",
                 headers: headers,
@@ -1073,7 +1076,7 @@ export class SanityPage {
         // Wait for query editor to be ready, then drive content via MonacoEditorHelper.
         await expect(this.queryEditor).toBeVisible({ timeout: 15000 });
         const monacoHelper = new MonacoEditorHelper(this.page);
-        await monacoHelper.setContent(this.queryEditor, 'SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+        await monacoHelper.setContentVerified(this.queryEditor, 'SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
         await this.page.waitForLoadState('domcontentloaded');
 
         // Click refresh button with robust waits

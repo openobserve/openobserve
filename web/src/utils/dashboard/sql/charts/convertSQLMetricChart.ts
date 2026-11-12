@@ -16,7 +16,9 @@
 import { calculateOptimalFontSize } from "../../chartDimensionUtils";
 import { getContrastColor } from "../../chartColorUtils";
 import { getFieldLabel } from "../../fieldLabel";
-import { resolveMetricValueStyle } from "../../tableConfigUtils";
+import { resolveMetricValueStyle, showsMissingValue } from "../../tableConfigUtils";
+import { getSeriesThresholds } from "../../thresholds";
+import { createSeriesOverrideLookup } from "../../seriesOverrides";
 import { type SQLContext } from "../shared/types";
 import { chartColor, chartNumber } from "../../../chartTheme";
 
@@ -268,12 +270,27 @@ export function applyMetricChart(ctx: SQLContext): void {
   const key1 = yAxisKeys?.[0];
   const yAxisValue = getAxisDataFromKey(key1);
   const rawValue = yAxisValue?.length > 0 ? yAxisValue[yAxisValue.length - 1] : 0;
-  const metricStyle = resolveMetricValueStyle(rawValue, {
+  const metricFieldLabel =
+    getFieldLabel(
+      panelSchema?.queries?.[0]?.fields?.y?.[0],
+      panelSchema?.config,
+      panelSchema?.queries?.[0]?.customQuery,
+    ) || key1;
+  const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
+  const metricOverride = seriesOverrides.get(metricFieldLabel);
+  const metricUnit = seriesOverrides.unitArgs(metricFieldLabel);
+  // A row without a value is dropped from the axis data; it reads as 0 unless the panel names what a missing value shows.
+  const metricValue =
+    yAxisValue?.length > 0 || !showsMissingValue(panelSchema?.config) ? rawValue : null;
+  const metricStyle = resolveMetricValueStyle(metricValue, {
     mappings: panelSchema?.config?.mappings,
-    unit: panelSchema?.config?.unit,
-    customUnit: panelSchema?.config?.unit_custom,
-    decimals: panelSchema?.config?.decimals,
-    panelBackground: panelSchema?.config?.background?.value?.color ?? "",
+    unit: metricUnit.unit,
+    customUnit: metricUnit.unitCustom,
+    decimals: metricUnit.decimals,
+    // An override colour stands in for the panel Background of this value; mappings and steps still win.
+    panelBackground: metricOverride?.color ?? panelSchema?.config?.background?.value?.color ?? "",
+    thresholds: getSeriesThresholds(panelSchema?.config, String(metricFieldLabel ?? "")),
+    missingValue: panelSchema?.config?.no_value_replacement,
   });
   const metricText = metricStyle.text;
   options.backgroundColor = metricStyle.bgColor;
@@ -324,19 +341,16 @@ export function applyMetricChart(ctx: SQLContext): void {
       chartColor("--color-chart-metric-text"),
       chartNumber("--chart-metric-contrast-threshold", 0.5),
     );
-  const metricFieldLabel =
-    getFieldLabel(
-      panelSchema?.queries?.[0]?.fields?.y?.[0],
-      panelSchema?.config,
-      panelSchema?.queries?.[0]?.customQuery,
-    ) || key1;
-
   const textSeries: any = {
     ...defaultSeriesProps,
     _metricText: metricText,
+    _metricRawValue: yAxisValue?.length > 0 ? rawValue : null,
     _metricFillColor: metricFillColor,
     _metricBgColor: metricStyle.bgColor,
-    _metricLabel: metricFieldLabel,
+    _metricLabel: metricOverride?.displayName ?? metricFieldLabel,
+    // Overrides match the original name; the label above is only drawn.
+    _metricName: metricFieldLabel,
+    _metricRaw: rawValue,
     // Raw trend + config so the multi-query grid can draw a per-cell sparkline.
     _metricSparkData: sparkline?.data ?? null,
     _metricSparkConfig: sparkline?.resolved ?? null,

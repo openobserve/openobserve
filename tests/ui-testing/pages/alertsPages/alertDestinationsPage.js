@@ -94,6 +94,20 @@ export class AlertDestinationsPage {
         this.servicenowInstanceUrlInputField = '[data-test="servicenow-instance-url-input-field"]';
         this.servicenowUsernameInputField = '[data-test="servicenow-username-input-field"]';
         this.servicenowPasswordInputField = '[data-test="servicenow-password-input-field"]';
+        // Jira: connect first, then the project and issue type lists load from Jira
+        this.jiraDeploymentCloud = '[data-test="jira-deployment-cloud"]';
+        this.jiraDeploymentDataCenter = '[data-test="jira-deployment-data-center"]';
+        this.jiraUrlInputField = '[data-test="jira-url-input-field"]';
+        this.jiraEmailInputField = '[data-test="jira-email-input-field"]';
+        this.jiraTokenInputField = '[data-test="jira-token-input-field"]';
+        this.jiraConnectButton = '[data-test="jira-connect-button"]';
+        this.jiraConnectedAs = '[data-test="jira-connected-as"]';
+        this.jiraSetupError = '[data-test="jira-setup-error"]';
+        this.jiraProjectSelect = '[data-test="jira-project-select"]';
+        this.jiraIssueTypeSelect = '[data-test="jira-issue-type-select"]';
+        this.jiraPrioritySelect = '[data-test="jira-priority-select"]';
+        this.jiraLabelsMissing = '[data-test="jira-labels-missing"]';
+        this.testSuccessIssueLink = '[data-test="test-success-issue-link"]';
         this.severitySelect = '[data-test="pagerduty-severity-select"]';
         this.severitySelectPopover = '[data-test="pagerduty-severity-select-popover"]';
         this.prioritySelect = '[data-test="opsgenie-priority-select"]';
@@ -110,6 +124,9 @@ export class AlertDestinationsPage {
         this.testResultIdle = '[data-test="test-result-idle"]';
         this.saveButton = '[data-test="add-destination-submit-btn"]';
         this.cancelButton = '[data-test="add-destination-cancel-btn"]';
+        // Editor drafts: Cancel with unsaved changes opens the shared leave dialog
+        this.draftLeaveDialog = '[data-test="editor-draft-leave-dialog"]';
+        this.draftLeaveDiscardBtn = '[data-test="editor-draft-leave-dialog"] [data-test="o-dialog-neutral-btn"]';
         this.backButton = '[data-test="add-destination-back-btn"]';
         this.successNotification = '[data-test-variant="success"]';
         this.toastSuccess = '[data-test-variant="success"]';
@@ -390,7 +407,7 @@ export class AlertDestinationsPage {
     // FACTORY HELPERS
     // ============================================================================
 
-    /** @param {string} type Type id (slack/discord/msteams/email/pagerduty/opsgenie/servicenow/custom) */
+    /** @param {string} type Type id (slack/discord/msteams/email/pagerduty/opsgenie/servicenow/jira/custom) */
     getDestinationTypeCard(type) {
         return this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
     }
@@ -616,7 +633,7 @@ export class AlertDestinationsPage {
         // so paginating one-by-one is unreliable. The per-row delete button uses the
         // destination name as part of its data-test, giving us a row anchor without
         // relying on getByRole / getByText.
-        const listSkeleton = this.page.locator('[data-test="o2-table-skeleton-body"]');
+        const listSkeleton = this.page.locator('[data-test="o2-table"][data-test-loading="true"]');
         const searchField = this.page.locator(this.destinationListSearchInputField);
         if (await searchField.isVisible({ timeout: 5000 }).catch(() => false)) {
             await searchField.fill('');
@@ -797,7 +814,12 @@ export class AlertDestinationsPage {
         await this.page.locator(this.importJsonUrlTab).click();
         await this.page.locator(this.destinationImportUrlInputField).click();
         await this.page.locator(this.destinationImportUrlInputField).fill(url);
-        await this.page.waitForTimeout(2000); // Wait for JSON to load
+        // BaseImport fetches the URL only after a debounce, so wait for the editor to fill.
+        await this.page.waitForFunction(() => {
+            const eds = window.monaco?.editor?.getEditors?.() || [];
+            return eds.some(e => e.getDomNode()?.closest('[data-test$="-import-sql-editor"]')
+                && (e.getValue?.() || '').trim().length > 0);
+        }, null, { timeout: 15000, polling: 100 });
         await this.page.locator(this.destinationImportJsonBtn).click();
         await expect(this.page.locator(this.destinationImportNameError)).toBeVisible();
         // Resolve the template via the OSelect search-input convention — the legacy
@@ -1369,7 +1391,7 @@ export class AlertDestinationsPage {
 
     /**
      * Select a prebuilt destination type
-     * @param {string} type - Type ID (slack, discord, msteams, email, pagerduty, opsgenie, servicenow, custom)
+     * @param {string} type - Type ID (slack, discord, msteams, email, pagerduty, opsgenie, servicenow, jira, custom)
      */
     async selectDestinationType(type) {
         // Wait for the TYPE-SPECIFIC credential field (proof the type's form rendered) plus the
@@ -1382,6 +1404,7 @@ export class AlertDestinationsPage {
             pagerduty: '[data-test="pagerduty-integration-key-input-field"]',
             opsgenie: '[data-test="opsgenie-api-key-input-field"]',
             servicenow: '[data-test="servicenow-instance-url-input-field"]',
+            jira: '[data-test="jira-url-input-field"]',
             email: this.recipientsSelectTrigger,
             custom: this.urlInput,
         }[type] || this.destinationNameInput;
@@ -1561,6 +1584,15 @@ export class AlertDestinationsPage {
                 await this.page.keyboard.press('Escape');
             }
         }
+        // Unsaved changes are discarded through the leave dialog so no draft is left behind.
+        const asked = await this.page.locator(this.draftLeaveDialog)
+            .waitFor({ state: 'visible', timeout: 2000 })
+            .then(() => true)
+            .catch(() => false);
+        if (asked) {
+            await this.page.locator(this.draftLeaveDiscardBtn).click();
+            await this.page.locator(this.draftLeaveDialog).waitFor({ state: 'hidden', timeout: 10000 });
+        }
         // Wait for the cancel button (and form) to detach so subsequent navigation sees a clean state.
         await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         testLogger.debug('Clicked Cancel button');
@@ -1618,18 +1650,13 @@ export class AlertDestinationsPage {
     }
 
     /**
-     * Verify destination type cards are visible
-     * @param {number} minCount - Minimum expected count
+     * Verify the picker shows exactly this many destination type cards
+     * @param {number} count - Expected card count
      */
-    async expectDestinationCardsVisible(minCount = 6) {
-        // Wait for cards to load
+    async expectDestinationCardsVisible(count) {
         await this.page.waitForSelector(this.destinationTypeCard, { state: 'visible', timeout: 10000 });
-        await this.page.waitForTimeout(1000);
-
-        const cards = this.page.locator(this.destinationTypeCard);
-        const count = await cards.count();
-        expect(count).toBeGreaterThanOrEqual(minCount);
-        testLogger.debug('Destination cards visible', { count, minCount });
+        await expect(this.page.locator(this.destinationTypeCard)).toHaveCount(count, { timeout: 10000 });
+        testLogger.debug('Destination cards visible', { count });
     }
 
     /**
@@ -1822,7 +1849,7 @@ export class AlertDestinationsPage {
         // so a transient empty list ("0 of 0") re-fetches and renders the row.
         const searchField = this.page.locator(this.destinationListSearchInputField);
         const rowAnchor = this.getDeleteDestinationBtn(name);
-        const skeleton = this.page.locator('[data-test="o2-table-skeleton-body"]');
+        const skeleton = this.page.locator('[data-test="o2-table"][data-test-loading="true"]');
         for (let attempt = 1; attempt <= 5; attempt++) {
             await this.navigateToDestinations();
             await this.page.locator(this.destinationsListTable).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});

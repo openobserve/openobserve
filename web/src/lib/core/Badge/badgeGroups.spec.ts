@@ -2,6 +2,7 @@
 
 import { describe, it, expect } from "vitest";
 import { resolveBadge, normalizeKey, BADGE_GROUPS } from "./badgeGroups";
+import enUS from "@/locales/languages/en-US.json";
 
 describe("badgeGroups", () => {
   it("normalizes separators and case", () => {
@@ -19,12 +20,39 @@ describe("badgeGroups", () => {
     expect(r.labelKey).toBe("components.badge.alertType.realtime");
   });
 
+  it("resolves oncallResponseState exhausted to Nobody answered", () => {
+    const r = resolveBadge("oncallResponseState", "exhausted");
+    expect(r.variant).toBe("error-soft");
+    expect(r.labelKey).toBe("oncall.state_exhausted");
+  });
+
+  it("resolves the on-call routing groups as pills", () => {
+    expect(resolveBadge("oncallRuleHealth", "shadowed").variant).toBe("warning-soft");
+    expect(resolveBadge("oncallUnroutedOutcome", "nobody").labelKey).toBe(
+      "oncall.unroutedPagedNobody",
+    );
+    for (const group of ["oncallRuleHealth", "oncallUnroutedOutcome"] as const) {
+      expect(BADGE_GROUPS[group].shape).toBe("pill");
+    }
+  });
+
   it("resolves alertStatus to dot mode (no icon)", () => {
     const r = resolveBadge("alertStatus", "active");
     expect(r.mode).toBe("dot");
     expect(r.variant).toBe("success-soft");
     expect(r.dot).toBe(true);
     expect(r.icon).toBeUndefined();
+  });
+
+  it("resolves licenseWaiverStatus", () => {
+    expect(resolveBadge("licenseWaiverStatus", "active").variant).toBe("success-soft");
+    expect(resolveBadge("licenseWaiverStatus", "scheduled").variant).toBe("blue-soft");
+    const past = resolveBadge("licenseWaiverStatus", "past");
+    expect(past.variant).toBe("default-soft");
+    expect(past.labelKey).toBe("components.badge.licenseWaiverStatus.past");
+    const ended = resolveBadge("licenseWaiverStatus", "ended");
+    expect(ended.variant).toBe("default-soft");
+    expect(ended.labelKey).toBe("components.badge.licenseWaiverStatus.ended");
   });
 
   it("resolves downtimeStatus to dot mode with an amber active state", () => {
@@ -222,6 +250,20 @@ describe("badgeGroups", () => {
     expect(r.labelKey).toBe("components.badge.alertState.notifyfailed");
   });
 
+  it("alert 'acknowledged' is blue with a person, apart from firing red and muted amber", () => {
+    const r = resolveBadge("alertState", "acknowledged");
+    expect(r.variant).toBe("blue-soft");
+    expect(r.icon).toBe("person");
+    expect(r.labelKey).toBe("components.badge.alertState.acknowledged");
+  });
+
+  it("an ack event history row is a quiet person badge", () => {
+    const r = resolveBadge("alertState", "ack_event");
+    expect(r.variant).toBe("default-soft");
+    expect(r.icon).toBe("person");
+    expect(r.labelKey).toBe("components.badge.alertState.ackevent");
+  });
+
   it("alert 'firing' and 'normal' resolve to opposite tones", () => {
     expect(resolveBadge("alertState", "firing").variant).toBe("error-soft");
     expect(resolveBadge("alertState", "normal").variant).toBe("success-soft");
@@ -248,6 +290,14 @@ describe("badgeGroups", () => {
     for (const value of ["skipped", "warning"]) {
       expect(resolveBadge("pipelineRunOutcome", value).variant, value).toBe("warning-soft");
     }
+  });
+
+  it("pipeline run outcome firing is labelled Succeeded", () => {
+    const firing = resolveBadge("pipelineRunOutcome", "firing");
+    expect(firing.labelKey).toBe("components.badge.pipelineRunOutcome.succeeded");
+    expect(enUS.components.badge.pipelineRunOutcome.succeeded).toBe("Succeeded");
+    expect(resolveBadge("pipelineRunOutcome", "succeeded").labelKey).toBe(firing.labelKey);
+    expect(resolveBadge("alertState", "firing").labelKey).not.toBe(firing.labelKey);
   });
 
   it("resolves the groups added in the OTag type/value sweep", () => {
@@ -320,5 +370,40 @@ describe("alertStatus: waiting", () => {
     const r = resolveBadge("alertStatus", "waiting");
     expect(r.labelKey).toBe("components.badge.alertStatus.waiting");
     expect(r.variant).toBe("default-soft");
+  });
+});
+
+describe("slackInstallStatus", () => {
+  it("AC-12.4 maps every installation status to a coloured, translated badge", () => {
+    const expected = {
+      healthy: "success-soft",
+      degraded: "warning-soft",
+      pending: "blue-soft",
+      revoked: "error-soft",
+    };
+    for (const [status, variant] of Object.entries(expected)) {
+      const r = resolveBadge("slackInstallStatus", status);
+      expect(r.variant).toBe(variant);
+      expect(r.labelKey).toBe(`components.badge.slackInstallStatus.${status}`);
+    }
+  });
+});
+
+describe("hookRunStatus", () => {
+  it("maps every stored run status to a coloured, translated dot pill", () => {
+    const expected = {
+      queued: ["warning-soft", "workflow.history.statusQueued"],
+      running: ["blue-soft", "workflow.history.statusRunning"],
+      succeeded: ["success-soft", "workflow.history.success"],
+      failed: ["error-soft", "workflow.history.failed"],
+      expired: ["default-soft", "workflow.history.statusExpired"],
+    };
+    for (const [status, [variant, labelKey]] of Object.entries(expected)) {
+      const r = resolveBadge("hookRunStatus", status);
+      expect(r.variant).toBe(variant);
+      expect(r.labelKey).toBe(labelKey);
+      expect(r.mode).toBe("dot");
+      expect(r.shape).toBe("pill");
+    }
   });
 });

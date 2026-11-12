@@ -53,11 +53,11 @@ use crate::{
     QueryTracker, SearchResult,
     datafusion::{
         context::{SearchContextBuilder, register_table},
-        optimizer::{
-            context::{PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext},
-            create_physical_plan,
+        memory_pool::get_peak_memory_from_ctx,
+        optimizer::create_physical_plan,
+        physical_optimizer::context::{
+            PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext,
         },
-        plan_metrics::get_peak_memory_from_ctx,
     },
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     sql::Sql,
@@ -147,11 +147,7 @@ pub async fn search(
     } else {
         req.search_event_type
             .as_ref()
-            .map(|v| {
-                SearchEventType::try_from(v.as_str())
-                    .ok()
-                    .map(RoleGroup::from)
-            })
+            .map(|v| v.parse::<SearchEventType>().ok().map(RoleGroup::from))
             .unwrap_or(Some(RoleGroup::Interactive))
     };
     let mut nodes =
@@ -401,10 +397,12 @@ pub async fn run_datafusion(
     register_table(&ctx, &sql).await?;
 
     // create physical plan
-    let physical_plan = create_physical_plan(&ctx, &sql.sql).await.map_err(|e| {
-        log::error!("[trace_id {trace_id}] flight->search: create physical plan error: {e}");
-        e
-    })?;
+    let physical_plan = create_physical_plan(&ctx, &sql.sql, req.analyze_profile)
+        .await
+        .map_err(|e| {
+            log::error!("[trace_id {trace_id}] flight->search: create physical plan error: {e}");
+            e
+        })?;
 
     if cfg.common.print_key_sql {
         log::info!("[trace_id {trace_id}] leader physical plan");

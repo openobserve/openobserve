@@ -12,6 +12,8 @@
 // selectors live here (one place) rather than in pages/ page objects, which
 // model the product UI.
 
+const testLogger = require('./test-logger.js');
+
 /**
  * Count RUM ingestion beacons by endpoint. Attach BEFORE any navigation.
  * Counts request INITIATIONS, not deliveries — in-flight fetches can be
@@ -82,6 +84,7 @@ async function waitForRumSdkReady(page, timeoutMs = 30000) {
       typeof window.O2_RUM.getInternalContext === 'function' &&
       window.O2_LOGS &&
       typeof window.O2_LOGS.logger === 'object',
+    undefined,
     { timeout: timeoutMs },
   );
 }
@@ -103,6 +106,19 @@ async function isRumSdkReady(page, timeoutMs = 30000) {
     () => true,
     () => false,
   );
+}
+
+/** Records a live-CDN failure on the test as a `cdn-outage` annotation, so the report says why its checks did not run. */
+function annotateCdnOutage(testInfo, reason) {
+  testInfo.annotations.push({ type: 'cdn-outage', description: reason });
+  testLogger.warn('Live CDN outage', { test: testInfo.title, reason });
+}
+
+/** Skips the test after a live-CDN failure; the CDN is outside OpenObserve, but the skip must stay visible in the report. */
+function skipOnCdnOutage(testInfo, outage, reason) {
+  if (!outage) return;
+  annotateCdnOutage(testInfo, reason);
+  testInfo.skip(true, reason);
 }
 
 /**
@@ -134,4 +150,6 @@ module.exports = {
   attachCdnAssetTracker,
   waitForRumSdkReady,
   isRumSdkReady,
+  annotateCdnOutage,
+  skipOnCdnOutage,
 };

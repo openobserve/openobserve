@@ -57,7 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         clearable
         class="w-72 max-md:w-full"
         :placeholder="
-          listsModules ? t('iam.editRole.filterModules') : t('iam.editRole.searchModuleResources')
+          listsModules
+            ? t('iam.editRole.filterModulesTasks')
+            : t('iam.editRole.searchModuleResources')
         "
         data-test="edit-role-module-pane-search"
         @update:model-value="(value) => setFilter(String(value ?? ''), scope)"
@@ -181,8 +183,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-border-default text-text-secondary flex shrink-0 items-center gap-2 border-t px-3 py-2 text-xs"
       data-test="edit-role-module-pane-no-match"
     >
-      <span>{{
-        listsModules ? t("iam.editRole.noModuleMatch") : t("iam.editRole.noMatchingResources")
+      <template v-if="listsModules && query.trim()">
+        <span>{{ t("iam.editRole.noModuleMatchQuery", { query: raw(query.trim()) }) }}</span>
+        <span>{{ t("iam.editRole.noModuleMatchHint") }}</span>
+      </template>
+      <span v-else>{{
+        listsModules ? t("iam.editRole.noGrantedModule") : t("iam.editRole.noMatchingResources")
       }}</span>
       <OButton
         variant="ghost-primary"
@@ -204,6 +210,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ModulePaneBulkHeader from "@/components/iam/roles/ModulePaneBulkHeader.vue";
+import { GROUP_LABEL_KEYS, matchModule, moduleGroup } from "@/components/iam/roles/roleModules";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -214,6 +221,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
+import type { Resource } from "@/ts/interfaces";
 
 export type ScopeRow = {
   key: string;
@@ -364,10 +372,21 @@ const setFilter = (nextQuery: string, nextScope: string) => {
   page.value = 1;
 };
 
+// Module rows carry no group, so it is read from the same map the rail uses.
+const groupLabelOf = (row: Resource) => t(GROUP_LABEL_KEYS[moduleGroup(row.name, row.parent)]);
+
+const moduleMatch = (row: Resource) =>
+  matchModule(
+    { key: row.name, label: String(row.display_name ?? row.name), groupLabel: groupLabelOf(row) },
+    query.value,
+  );
+
 const filteredEntities = computed(() => {
   const term = query.value.trim().toLowerCase();
   return orderedEntities.value.filter((row) => {
     if (scope.value === "granted" && !hasEffectiveGrant(row) && !insideOf(row).count) return false;
+    // Inside a module the search stays on resource names; groups and task words describe modules.
+    if (props.listsModules) return !!moduleMatch(row);
     return (
       !term ||
       String(row.display_name ?? row.name)

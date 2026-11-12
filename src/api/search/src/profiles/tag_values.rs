@@ -77,6 +77,10 @@ pub struct ProfilesTagValuesResponse {
         (status = 400, description = "Invalid request"),
         (status = 403, description = "Forbidden"),
         (status = 500, description = "Failure")
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Profiles", "operation": "list"}))
     )
 )]
 pub async fn get_profiles_tag_values(
@@ -113,7 +117,10 @@ pub async fn get_profiles_tag_values(
         Ok(range) => range,
         Err(response) => return response,
     };
-    let mut body = query_body_from_params(&params);
+    let mut body = match query_body_from_params(&params) {
+        Ok(body) => body,
+        Err(response) => return response,
+    };
     body.start_time = start_time;
     body.end_time = end_time;
     // Drop filters that target the tag whose values we are listing.
@@ -136,6 +143,7 @@ pub async fn get_profiles_tag_values(
     let sql_params = ProfilesSqlParams {
         request_trace_id: &request_trace_id,
         org_id: &org_id,
+        stream_name: &stream_name,
         user_id: &user_email.user_id,
         start_time,
         end_time,

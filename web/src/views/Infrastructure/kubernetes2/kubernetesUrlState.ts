@@ -23,6 +23,7 @@ import {
   type MapGroup,
   type View,
 } from "./kubernetesQueries";
+import { hasStatusChip, type StatusChipId } from "./kubernetesStatusChips";
 
 export type MapFill =
   "cpuReq" | "cpuLim" | "memReq" | "memLim" | "restarts" | "cpu" | "memory" | "status";
@@ -41,10 +42,15 @@ export interface K8sUrlState {
   search: string;
   sort: string | null;
   desc: boolean;
+  status: StatusChipId;
   entity: MapEntity;
   fill: MapFill;
   group: MapGroup;
   filter: string[];
+  // Dependencies: draw system namespaces, node-to-node traffic, and connections below the low-traffic threshold.
+  system: boolean;
+  nodeTraffic: boolean;
+  lowTraffic: boolean;
   details: DetailsRef | null;
 }
 
@@ -58,10 +64,14 @@ const PAGE_PARAMS = [
   "search",
   "sort",
   "desc",
+  "status",
   "entity",
   "fill",
   "group",
   "filter",
+  "system",
+  "nodeTraffic",
+  "lowTraffic",
   "details",
   "kind",
   "name",
@@ -138,6 +148,9 @@ const parseGroup = (entity: MapEntity, value: string | null): MapGroup => {
     : DEFAULT_GROUP[entity];
 };
 
+const parseStatus = (view: View, value: string | null): StatusChipId =>
+  value && hasStatusChip(view, value as StatusChipId) ? (value as StatusChipId) : "all";
+
 export const parseUrlState = (query: Query): K8sUrlState => {
   const viewParam = first(query.view);
   const view: View = VIEWS.includes(viewParam as View) ? (viewParam as View) : "cluster";
@@ -153,11 +166,15 @@ export const parseUrlState = (query: Query): K8sUrlState => {
     search: first(query.search) ?? "",
     sort: first(query.sort),
     desc: first(query.sort) != null && first(query.desc) === "true",
+    status: parseStatus(view, first(query.status)),
     entity,
     fill:
       fillParam && ENTITY_FILLS[entity].includes(fillParam) ? fillParam : ENTITY_FILLS[entity][0],
     group: parseGroup(entity, first(query.group)),
     filter: parseFilter(first(query.filter)),
+    system: view === "dependencies" && first(query.system) === "true",
+    nodeTraffic: view === "dependencies" && first(query.nodeTraffic) === "true",
+    lowTraffic: view === "dependencies" && first(query.lowTraffic) === "true",
     details,
   };
 };
@@ -178,11 +195,17 @@ export const toQuery = (state: K8sUrlState, base: Query): LocationQueryRaw => {
     out.sort = state.sort;
     if (state.desc) out.desc = "true";
   }
+  if (state.status !== "all" && hasStatusChip(state.view, state.status)) out.status = state.status;
   if (state.view === "map") {
     if (state.entity !== "pods") out.entity = state.entity;
     if (state.fill !== ENTITY_FILLS[state.entity][0]) out.fill = state.fill;
     if (state.group !== DEFAULT_GROUP[state.entity]) out.group = state.group;
     if (state.filter.length) out.filter = state.filter.join(",");
+  }
+  if (state.view === "dependencies") {
+    if (state.system) out.system = "true";
+    if (state.nodeTraffic) out.nodeTraffic = "true";
+    if (state.lowTraffic) out.lowTraffic = "true";
   }
   if (state.details) out.details = encodeDetails(state.details);
   return out;
@@ -200,10 +223,14 @@ export const withView = (state: K8sUrlState, view: View): K8sUrlState => ({
   search: "",
   sort: null,
   desc: false,
+  status: "all",
   entity: "pods",
   fill: ENTITY_FILLS.pods[0],
   group: DEFAULT_GROUP.pods,
   filter: [],
+  system: false,
+  nodeTraffic: false,
+  lowTraffic: false,
   details: null,
 });
 

@@ -8,35 +8,49 @@ publish = false
 [features]
 default = []
 enterprise = [
+    "dep:anyhow",
+    "dep:arrow",
+    "dep:async-recursion",
+    "dep:bytes",
+    "dep:common",
+    "dep:config",
+    "dep:db",
+    "dep:infra",
+    "dep:log",
     "dep:o2_enterprise",
+    "dep:sea-orm",
+    "dep:serde",
+    "dep:serde_json",
+    "dep:svix-ksuid",
+    "dep:tokio",
     "compaction/enterprise",
     "enrichment-data/enterprise",
     "openobserve-core/enterprise",
     "stream/enterprise",
 ]
 vectorscan = [
-    "enrichment-data/vectorscan",
+    "enrichment-data?/vectorscan",
     "o2_enterprise/vectorscan",
-    "stream/vectorscan",
+    "stream?/vectorscan",
 ]
 
 [dependencies]
-anyhow.workspace = true
-arrow.workspace = true
-async-recursion.workspace = true
-bytes.workspace = true
-common.workspace = true
-config.workspace = true
-db.workspace = true
-infra.workspace = true
-log.workspace = true
+anyhow = { workspace = true, optional = true }
+arrow = { workspace = true, optional = true }
+async-recursion = { workspace = true, optional = true }
+bytes = { workspace = true, optional = true }
+common = { workspace = true, optional = true }
+config = { workspace = true, optional = true }
+db = { workspace = true, optional = true }
+infra = { workspace = true, optional = true }
+log = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
-openobserve-core.workspace = true
-compaction.workspace = true
-sea-orm.workspace = true
-stream.workspace = true
-enrichment-data.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-svix-ksuid.workspace = true
-tokio.workspace = true
+openobserve-core = { workspace = true, optional = true }
+compaction = { workspace = true, optional = true }
+sea-orm = { workspace = true, optional = true }
+stream = { workspace = true, optional = true }
+enrichment-data = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+svix-ksuid = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }

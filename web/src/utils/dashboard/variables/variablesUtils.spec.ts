@@ -15,15 +15,21 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  DATE_VARIABLE_FORMATS,
+  formatDateVariable,
+  formatDateVariableValue,
   formatInterval,
   getTimeInSecondsBasedOnUnit,
   formatRateInterval,
   processVariableContent,
+  escapeHtmlValue,
   normalizeVariableSyntax,
   replaceVariablePlaceholders,
   getReferencedVariableNames,
   getVariablesReferencedInQueries,
+  withTimeRangeVariables,
 } from "./variablesUtils";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 describe("Variables Utils", () => {
   describe("formatInterval", () => {
@@ -338,6 +344,24 @@ describe("Variables Utils", () => {
       const specialCharContent = "test ${region} test";
       const result = processVariableContent(specialCharContent, mockVariablesData);
       expect(result).toBe("test us-east-1 test");
+    });
+
+    it("passes each formatted value through escapeValue", () => {
+      const data = {
+        values: [
+          { name: "x", value: '<b a="1">\'&' },
+          { name: "list", value: ["<a>", "b"] },
+          { name: "none", value: null },
+        ],
+      };
+
+      expect(
+        processVariableContent("$x ${list:doublequote} $none", data, undefined, {
+          escapeValue: escapeHtmlValue,
+        }),
+      ).toBe(
+        "&lt;b&#32;a&#61;&quot;1&quot;&gt;&#39;&amp; &quot;&lt;a&gt;&quot;,&quot;b&quot; _o2_all_",
+      );
     });
   });
 
@@ -787,6 +811,336 @@ describe("Variables Utils", () => {
       expect(processVariableContent("$traceid | $traceid_sql", variablesData)).toBe(
         "abc123 | xyz789",
       );
+    });
+  });
+
+  describe("processVariableContent URL formats", () => {
+    const data = {
+      values: [
+        { name: "q", value: "a b&c#d" },
+        { name: "hosts", value: ["web 1", "db/2"] },
+        { name: "all", value: [SELECT_ALL_VALUE] },
+        { name: "single_all", value: SELECT_ALL_VALUE },
+        { name: "cleared", value: [] },
+      ],
+    };
+
+    it("percent-encodes scalar and multi values", () => {
+      expect(processVariableContent("?q=${q:percentencode}", data)).toBe("?q=a%20b%26c%23d");
+      expect(processVariableContent("?h={{hosts:percentencode}}", data)).toBe(
+        "?h=web%201%2Cdb%2F2",
+      );
+    });
+
+    it("renders queryparam as one var- pair per value", () => {
+      expect(processVariableContent("?${q:queryparam}", data)).toBe("?var-q=a%20b%26c%23d");
+      expect(processVariableContent("?${hosts:queryparam}", data)).toBe(
+        "?var-hosts=web%201&var-hosts=db%2F2",
+      );
+    });
+
+    it("keeps the All sentinel in URL formats so dashboard links round-trip", () => {
+      const options = { allLabel: "All" };
+      expect(processVariableContent("${all:queryparam}", data, undefined, options)).toBe(
+        `var-all=${SELECT_ALL_VALUE}`,
+      );
+      expect(processVariableContent("${single_all:percentencode}", data, undefined, options)).toBe(
+        SELECT_ALL_VALUE,
+      );
+      expect(processVariableContent("${cleared:queryparam}", data, undefined, options)).toBe(
+        `var-cleared=${SELECT_ALL_VALUE}`,
+      );
+    });
+
+    it("does not parse the content-only formats in query substitution", () => {
+      const resolve = () => "X";
+      expect(replaceVariablePlaceholders("${q:percentencode}", ["q"], resolve)).toBe(
+        "${q:percentencode}",
+      );
+    });
+  });
+
+  describe("processVariableContent listSeparator", () => {
+    const data = { values: [{ name: "h", value: ["a", "b"] }] };
+
+    it("joins an unformatted multi-value with the given separator", () => {
+      expect(processVariableContent("$h", data, undefined, { listSeparator: ", " })).toBe("a, b");
+    });
+
+    it("leaves explicit formats and the default join alone", () => {
+      const options = { listSeparator: ", " };
+      expect(processVariableContent("${h:csv}", data, undefined, options)).toBe("a,b");
+      expect(processVariableContent("${h:pipe}", data, undefined, options)).toBe("a|b");
+      expect(processVariableContent("$h", data)).toBe("a,b");
+    });
+  });
+
+  describe("processVariableContent All and cleared values", () => {
+    const data = {
+      values: [
+        { name: "multi_all", value: [SELECT_ALL_VALUE] },
+        { name: "single_all", value: SELECT_ALL_VALUE },
+        { name: "cleared", value: [] },
+        { name: "unset", value: null },
+      ],
+    };
+
+    it("prints the All label and an empty string with allLabel", () => {
+      const options = { allLabel: "All" };
+      expect(
+        processVariableContent(
+          "$multi_all|${single_all}|${multi_all:doublequote}|$cleared|$unset",
+          data,
+          undefined,
+          options,
+        ),
+      ).toBe('All|All|"All"||');
+    });
+
+    it("keeps the sentinel in a link query value so saved links round-trip", () => {
+      expect(
+        processVariableContent(
+          "[d](/web/dashboards?var-a=$multi_all&var-b={{single_all}}&var-c=${cleared}) $multi_all",
+          data,
+          undefined,
+          { allLabel: "All" },
+        ),
+      ).toBe(
+        `[d](/web/dashboards?var-a=${SELECT_ALL_VALUE}&var-b=${SELECT_ALL_VALUE}&var-c=${SELECT_ALL_VALUE}) All`,
+      );
+    });
+
+    it("keeps the sentinel after an HTML-escaped query separator", () => {
+      expect(
+        processVariableContent("[d](/d?var-a=x&amp;var-b=$multi_all)", data, undefined, {
+          allLabel: "All",
+        }),
+      ).toBe(`[d](/d?var-a=x&amp;var-b=${SELECT_ALL_VALUE})`);
+    });
+
+    it("prints a scalar All unformatted and a multi-select All formatted", () => {
+      expect(
+        processVariableContent(
+          "${single_all:doublequote} ${multi_all:doublequote}",
+          data,
+          undefined,
+          {
+            allLabel: "All",
+          },
+        ),
+      ).toBe('All "All"');
+    });
+
+    it("prints the All label after an = that is not a URL query value", () => {
+      expect(processVariableContent("env=$multi_all", data, undefined, { allLabel: "All" })).toBe(
+        "env=All",
+      );
+    });
+
+    it("prints the All label for the sentinel inside a mixed selection", () => {
+      const mixed = { values: [{ name: "m", value: ["web", SELECT_ALL_VALUE] }] };
+      expect(processVariableContent("$m", mixed, undefined, { allLabel: "All" })).toBe("web,All");
+    });
+
+    it("keeps the sentinel without allLabel", () => {
+      expect(processVariableContent("$multi_all|$single_all|$cleared|$unset", data)).toBe(
+        [SELECT_ALL_VALUE, SELECT_ALL_VALUE, SELECT_ALL_VALUE, SELECT_ALL_VALUE].join("|"),
+      );
+    });
+  });
+
+  describe("withTimeRangeVariables", () => {
+    const time = {
+      start_time: new Date(1_700_000_000_000_000),
+      end_time: new Date(1_700_000_360_000_000),
+    };
+
+    it("appends start_time and end_time in the selected time's unit", () => {
+      const result = withTimeRangeVariables({ values: [{ name: "env", value: "prod" }] }, time);
+      expect(processVariableContent("${start_time}-{{end_time}}", result)).toBe(
+        "1700000000000000-1700000360000000",
+      );
+      expect(result.values[0]).toEqual({ name: "env", value: "prod" });
+    });
+
+    it("keeps an unset scoped variable of the same name unset", () => {
+      const result = withTimeRangeVariables(
+        { values: [{ name: "start_time", scope: "panels", panelId: "p1", value: null }] },
+        time,
+      );
+      expect(result.values).toHaveLength(2);
+      expect(processVariableContent("${start_time}", result, { panelId: "p1" })).toBe(
+        SELECT_ALL_VALUE,
+      );
+    });
+
+    it("lets a dashboard variable of the same name win", () => {
+      const result = withTimeRangeVariables(
+        { values: [{ name: "start_time", value: "mine" }] },
+        time,
+      );
+      expect(processVariableContent("${start_time}", result, { panelId: "p1" })).toBe("mine");
+    });
+
+    it("leaves the placeholder untouched while the range is unset", () => {
+      const data = { values: [] };
+      expect(withTimeRangeVariables(data, undefined)).toBe(data);
+      expect(
+        withTimeRangeVariables(data, { start_time: new Date(NaN), end_time: new Date() }),
+      ).toBe(data);
+      expect(processVariableContent("${start_time}", withTimeRangeVariables(data, undefined))).toBe(
+        "${start_time}",
+      );
+    });
+  });
+
+  describe("formatDateVariableValue", () => {
+    it("formats the six named formats", () => {
+      expect(formatDateVariableValue("2026-03-08", "iso")).toBe("2026-03-08");
+      expect(formatDateVariableValue("2026-03-08", "dmy")).toBe("08/03/2026");
+      expect(formatDateVariableValue("2026-03-08", "mdy")).toBe("03/08/2026");
+      expect(formatDateVariableValue("2026-03-08", "epoch")).toBe("1772928000");
+      expect(formatDateVariableValue("2026-03-08", "epochms")).toBe("1772928000000");
+      expect(formatDateVariableValue("2026-03-08", "epochus")).toBe("1772928000000000");
+    });
+
+    it("lists every format and tries the longer epoch names first", () => {
+      expect([...DATE_VARIABLE_FORMATS]).toEqual([
+        "iso",
+        "dmy",
+        "mdy",
+        "epochms",
+        "epochus",
+        "epoch",
+      ]);
+    });
+
+    it("gives 00:00 UTC of the date for every epoch format", () => {
+      expect(formatDateVariableValue("2026-07-01", "epoch")).toBe("1782864000");
+      expect(formatDateVariableValue("2026-07-01", "epochms")).toBe("1782864000000");
+      expect(formatDateVariableValue("2026-07-01", "epochus")).toBe("1782864000000000");
+      expect(formatDateVariableValue("1969-12-31", "epoch")).toBe("-86400");
+    });
+
+    it("returns undefined for empty, malformed or impossible dates", () => {
+      for (const bad of [
+        "",
+        null,
+        undefined,
+        5,
+        "2026-3-8",
+        "2026-02-30",
+        "2026-13-01",
+        " 2026-03-08",
+        "2026-03-08T00:00",
+      ]) {
+        expect(formatDateVariableValue(bad, "iso")).toBeUndefined();
+      }
+      expect(formatDateVariableValue("2028-02-29", "iso")).toBe("2028-02-29");
+      expect(formatDateVariableValue("2026-02-29", "iso")).toBeUndefined();
+    });
+  });
+
+  describe("formatDateVariable", () => {
+    const date = { type: "date", value: "2026-03-08", dateFormat: "dmy" };
+
+    it("uses the variable's dateFormat, defaulting to iso", () => {
+      expect(formatDateVariable(date)).toBe("08/03/2026");
+      expect(formatDateVariable({ ...date, dateFormat: undefined })).toBe("2026-03-08");
+      expect(formatDateVariable({ ...date, dateFormat: "bogus" })).toBe("2026-03-08");
+    });
+
+    it("lets a date format on the placeholder override the default", () => {
+      expect(formatDateVariable(date, "epochus")).toBe("1772928000000000");
+      expect(formatDateVariable(date, "mdy")).toBe("03/08/2026");
+    });
+
+    it("formats with the default for any other placeholder format", () => {
+      expect(formatDateVariable(date, "csv")).toBe("08/03/2026");
+      expect(formatDateVariable(date, "percentencode")).toBe("08/03/2026");
+    });
+
+    it("returns undefined for a non-date variable or an unusable value", () => {
+      expect(formatDateVariable({ type: "textbox", value: "2026-03-08" }, "dmy")).toBeUndefined();
+      expect(formatDateVariable({ ...date, value: "" })).toBeUndefined();
+      expect(formatDateVariable({ ...date, value: "nope" })).toBeUndefined();
+      expect(formatDateVariable(null)).toBeUndefined();
+    });
+  });
+
+  describe("date formats in placeholders", () => {
+    it("parses date formats in all three placeholder styles", () => {
+      const resolve = (p: { name: string; format?: string }) => `${p.name}/${p.format ?? "-"}`;
+      expect(
+        replaceVariablePlaceholders("$d ${d:epochus} {{d:dmy}} ${ d : epoch }", ["d"], resolve),
+      ).toBe("d/- d/epochus d/dmy d/epoch");
+      expect(
+        replaceVariablePlaceholders(normalizeVariableSyntax("${ d : epochms }"), ["d"], resolve),
+      ).toBe("d/epochms");
+    });
+
+    it("matches format names case-sensitively", () => {
+      expect(replaceVariablePlaceholders("${d:EPOCH}", ["d"], () => "x")).toBe("${d:EPOCH}");
+    });
+
+    it("counts a placeholder with a date format as a reference", () => {
+      expect([...getReferencedVariableNames(["x ${d:epochus}"], ["d", "e"])]).toEqual(["d"]);
+    });
+  });
+
+  describe("processVariableContent with date variables", () => {
+    const data = (extra: Record<string, unknown> = {}) => ({
+      values: [
+        { name: "d", type: "date", value: "2026-03-08", scope: "global", ...extra },
+        { name: "t", type: "textbox", value: "2026-03-08", scope: "global" },
+      ],
+    });
+
+    it("prints the variable's default format", () => {
+      expect(processVariableContent("$d", data({ dateFormat: "dmy" }))).toBe("08/03/2026");
+      expect(processVariableContent("$d", data())).toBe("2026-03-08");
+    });
+
+    it("lets the placeholder override the default", () => {
+      expect(processVariableContent("${d:epoch}", data({ dateFormat: "dmy" }))).toBe("1772928000");
+      expect(processVariableContent("{{d:epochms}}", data())).toBe("1772928000000");
+    });
+
+    it("applies the formatted text to the other placeholder formats", () => {
+      expect(processVariableContent("?q=${d:percentencode}", data({ dateFormat: "dmy" }))).toBe(
+        "?q=08%2F03%2F2026",
+      );
+      expect(processVariableContent("${d:csv}", data({ dateFormat: "mdy" }))).toBe("03/08/2026");
+    });
+
+    it("ignores a date format on a non-date variable", () => {
+      expect(processVariableContent("${t:epochus} $t", data())).toBe("2026-03-08 2026-03-08");
+    });
+
+    it("renders an empty or malformed date as before", () => {
+      expect(
+        processVariableContent("$d", { values: [{ name: "d", type: "date", value: "" }] }),
+      ).toBe("");
+      expect(
+        processVariableContent("${d:dmy}", { values: [{ name: "d", type: "date", value: "x" }] }),
+      ).toBe("x");
+    });
+
+    it("uses the scope-resolved value", () => {
+      const scoped = {
+        values: [
+          { name: "d", type: "date", scope: "global", value: "2026-03-08", dateFormat: "dmy" },
+          {
+            name: "d",
+            type: "date",
+            scope: "tabs",
+            tabId: "t1",
+            value: "2026-04-01",
+            dateFormat: "dmy",
+          },
+        ],
+      };
+      expect(processVariableContent("$d", scoped, { tabId: "t1" })).toBe("01/04/2026");
     });
   });
 });

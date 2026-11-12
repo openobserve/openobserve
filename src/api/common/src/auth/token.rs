@@ -60,6 +60,22 @@ fn is_top_level_org_list(path_columns: &[&str], method: &str) -> bool {
     matches!(path_columns, ["organizations"]) && method == "LIST"
 }
 
+/// GHSA-29xv-5rx7-5q7v: only these org-less routes may resolve the caller from any membership.
+#[cfg(any(feature = "enterprise", test))]
+fn is_top_level_cross_org_route(path_columns: &[&str]) -> bool {
+    matches!(path_columns, ["organizations"] | ["clusters"])
+}
+
+/// A license path names no org, and like the other license writes it needs a `_meta` member.
+#[cfg(any(feature = "enterprise", test))]
+fn user_lookup_org<'a>(path_columns: &[&'a str]) -> &'a str {
+    if openobserve_core::auth::is_license_path_without_org(path_columns) {
+        config::META_ORG_ID
+    } else {
+        openobserve_core::auth::org_from_path(path_columns)
+    }
+}
+
 /// Foreign-`aud` MCP tokens pass only on /{org}/mcp or our own loopback calls.
 #[cfg(any(feature = "enterprise", test))]
 fn relaxes_audience_check(path_columns: &[&str], mcp_marker: Option<&[u8]>) -> bool {
@@ -75,10 +91,7 @@ pub async fn token_validator(
     req_data: &RequestData,
     auth_info: &AuthExtractor,
 ) -> Result<AuthValidationResult, AuthError> {
-    use openobserve_core::{
-        auth::{org_from_path, routed_path},
-        authz::check_permissions,
-    };
+    use openobserve_core::{auth::routed_path, authz::check_permissions};
 
     let user;
     let keys = get_dex_jwks().await;
@@ -134,9 +147,7 @@ pub async fn token_validator(
                     && path_columns.first().is_some_and(|p| p.eq(&"invites"))
                     && auth_info.method.eq("DELETE");
 
-                let path_suffix = path_columns.last().unwrap_or(&"");
-                if path_suffix.eq(&"organizations")
-                    || path_suffix.eq(&"clusters")
+                if is_top_level_cross_org_route(&path_columns)
                     || is_member_subscription
                     || is_list_invite_call
                     || is_reject_invite_call
@@ -164,7 +175,7 @@ pub async fn token_validator(
                 } else {
                     user = match path.find('/') {
                         Some(_) => {
-                            users::get_user(Some(org_from_path(&path_columns)), user_id).await
+                            users::get_user(Some(user_lookup_org(&path_columns)), user_id).await
                         }
                         None => {
                             if path_columns.len() == 1 && path_columns[0] == "license" {
@@ -221,6 +232,7 @@ pub async fn token_validator(
                             user_role: None,
                             is_internal_user: false,
                             token_name: None,
+                            delegation: None,
                         })
                     }
                     Some(user) => {
@@ -242,9 +254,10 @@ pub async fn token_validator(
                                 user_role: Some(user_role),
                                 is_internal_user: !is_external,
                                 token_name: None,
+                                delegation: None,
                             })
                         } else {
-                            Err(AuthError::Forbidden("Forbidden".to_string()))
+                            Err(AuthError::RoleRefused("Forbidden".to_string()))
                         }
                     }
                     _ => Err(AuthError::Unauthorized("Unauthorized Access".to_string())),
@@ -336,6 +349,21 @@ mod tests {
     }
 
     #[test]
+    fn an_org_scoped_object_named_organizations_does_not_skip_the_org() {
+        assert!(is_top_level_cross_org_route(&["organizations"]));
+        assert!(is_top_level_cross_org_route(&["clusters"]));
+        for path in [
+            &["acme", "kv", "organizations"][..],
+            &["acme", "functions", "organizations"],
+            &["acme", "streams", "clusters"],
+            &["_meta", "organizations"],
+            &["acme", "organizations"],
+        ] {
+            assert!(!is_top_level_cross_org_route(path), "{path:?}");
+        }
+    }
+
+    #[test]
     fn mcp_endpoint_relaxes_audience_check() {
         assert!(relaxes_audience_check(&["default", "mcp"], None));
     }
@@ -360,6 +388,15 @@ mod tests {
                 Some(forged)
             ));
         }
+    }
+
+    #[test]
+    fn license_refresh_looks_the_user_up_in_meta() {
+        assert_eq!(user_lookup_org(&["license", "refresh"]), "_meta");
+        assert_eq!(user_lookup_org(&["acme", "license", "refresh"]), "acme");
+        assert_eq!(user_lookup_org(&["license", "refresh", ""]), "license");
+        assert_eq!(user_lookup_org(&["acme", "streams"]), "acme");
+        assert_eq!(user_lookup_org(&["v2", "acme", "downtimes"]), "acme");
     }
 
     #[test]

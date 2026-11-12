@@ -42,6 +42,20 @@ describe("kubernetesUrlState", () => {
     expect(roundTrip({ view })).toEqual({ view });
   });
 
+  it("keeps the Dependencies switches only on that view", () => {
+    const query = {
+      view: "dependencies",
+      system: "true",
+      nodeTraffic: "true",
+      lowTraffic: "true",
+    };
+    expect(roundTrip(query)).toEqual(query);
+    expect(roundTrip({ view: "dependencies", system: "false" })).toEqual({ view: "dependencies" });
+    expect(roundTrip({ view: "pods", system: "true" })).toEqual({ view: "pods" });
+    const state = parseUrlState(query);
+    expect(toQuery(withView(state, "dependencies"), {})).toEqual({ view: "dependencies" });
+  });
+
   it("rewrites an unknown view to the Cluster overview", () => {
     expect(parseUrlState({ view: "configmaps" }).view).toBe("cluster");
     expect(isCanonical({ view: "configmaps" })).toBe(false);
@@ -66,6 +80,39 @@ describe("kubernetesUrlState", () => {
       desc: "true",
     });
     expect(roundTrip({ view: "pods", desc: "true" })).toEqual({ view: "pods" });
+  });
+
+  describe("status chip", () => {
+    it("keeps a chip the view offers", () => {
+      expect(roundTrip({ view: "pods", status: "failing" })).toEqual({
+        view: "pods",
+        status: "failing",
+      });
+      expect(roundTrip({ view: "nodes", status: "notReady" })).toEqual({
+        view: "nodes",
+        status: "notReady",
+      });
+      expect(isCanonical({ view: "jobs", status: "succeeded" })).toBe(true);
+    });
+
+    it("falls back to all for an unknown or other-view chip and rewrites the URL", () => {
+      expect(parseUrlState({ view: "pods", status: "lost" }).status).toBe("all");
+      expect(parseUrlState({ view: "namespaces", status: "running" }).status).toBe("all");
+      expect(parseUrlState({ view: "pods", status: "bogus" }).status).toBe("all");
+      expect(isCanonical({ view: "pods", status: "lost" })).toBe(false);
+      expect(roundTrip({ view: "pods", status: "lost" })).toEqual({ view: "pods" });
+    });
+
+    it("treats status=all as non-canonical", () => {
+      expect(isCanonical({ view: "pods", status: "all" })).toBe(false);
+      expect(roundTrip({ view: "pods", status: "all" })).toEqual({ view: "pods" });
+    });
+
+    it("is cleared by a view change", () => {
+      const state = parseUrlState({ view: "pods", status: "failing" });
+      expect(withView(state, "events").status).toBe("all");
+      expect(toQuery(withView(state, "events"), {})).toEqual({ view: "events" });
+    });
   });
 
   it("drops the removed MVP params", () => {
@@ -281,6 +328,7 @@ describe("kubernetesUrlState", () => {
         search: "s",
         sort: "x",
         desc: "true",
+        status: "running",
         entity: "nodes",
         fill: "cpu",
         group: "none",

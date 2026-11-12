@@ -16,10 +16,16 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    SIZE_IN_MB, get_config,
+    META_ORG_ID, SIZE_IN_MB, get_config,
     meta::{
+        alerts::{
+            ack::{AckAction, AckSource},
+            auto_investigate::AUTO_INVESTIGATE_DECISIONS_STREAM,
+        },
         dashboards::usage_report::DashboardInfo,
+        db_monitoring::DBM_SERVER_STREAM,
         search::{SearchEventContext, SearchEventType},
+        slo::stream::SLO_SLICES_STREAM,
         stream::{FileMeta, StreamType},
     },
 };
@@ -31,7 +37,7 @@ pub const STATS_STREAM: &str = "stats";
 pub const TRIGGERS_STREAM: &str = "triggers";
 pub const ERROR_STREAM: &str = "errors";
 pub const DATA_RETENTION_USAGE_STREAM: &str = "data_retention_usage";
-/// Every stream name O2 writes itself; web/src/utils/internalStreams.ts must list the same names.
+/// Every stream name O2 writes itself.
 pub const INTERNAL_STREAM_NAMES: [&str; 13] = [
     USAGE_STREAM,
     AUDIT_STREAM,
@@ -46,6 +52,16 @@ pub const INTERNAL_STREAM_NAMES: [&str; 13] = [
     super::llm_scores::LLM_SCORES_STREAM,
     super::llm_experiments::LLM_EXPERIMENT_STREAM,
     "_anomalies",
+];
+
+/// Streams `is_system_stream` matches that hold customer data; internalStreams.ts lists them.
+pub const USER_SOURCED_STREAM_NAMES: [&str; 6] = [
+    DBM_SERVER_STREAM,
+    "_rumdata",
+    "_rumlog",
+    "_sessionreplay",
+    "synthetics_results",
+    "synthetics_step_results",
 ];
 
 /// The `_o2_` rollup streams and `_agent_signals` are written only by internal jobs, so user writes
@@ -111,6 +127,9 @@ pub enum RunOutcome {
     /// Condition matched inside a downtime window; nothing was delivered.
     #[serde(rename = "suppressed")]
     Suppressed,
+    /// Not a run: an ack, unack or take over of the alert, written by the ack service.
+    #[serde(rename = "ack_event")]
+    AckEvent,
 }
 
 impl RunOutcome {
@@ -133,6 +152,7 @@ impl RunOutcome {
             Self::NotifyFailed => 5,
             Self::Pending => 6,
             Self::Suppressed => 7,
+            Self::AckEvent => 8,
         }
     }
 
@@ -146,6 +166,7 @@ impl RunOutcome {
             5 => Some(Self::NotifyFailed),
             6 => Some(Self::Pending),
             7 => Some(Self::Suppressed),
+            8 => Some(Self::AckEvent),
             _ => None,
         }
     }
@@ -160,6 +181,7 @@ impl RunOutcome {
             Self::NotifyFailed => "notify_failed",
             Self::Pending => "pending",
             Self::Suppressed => "suppressed",
+            Self::AckEvent => "ack_event",
         }
     }
 }
@@ -203,6 +225,7 @@ pub fn normalize_outcome(
         "notify_failed" => Some(RunOutcome::NotifyFailed),
         "pending" => Some(RunOutcome::Pending),
         "suppressed" => Some(RunOutcome::Suppressed),
+        "ack_event" => Some(RunOutcome::AckEvent),
 
         // ── legacy vocabulary ──
         "condition_not_satisfied" => Some(RunOutcome::Normal),
@@ -291,13 +314,6 @@ pub struct TriggerData {
     pub query_took: Option<i64>,
     pub scheduler_trace_id: Option<String>,
     pub time_in_queue_ms: Option<i64>,
-    // Deduplication tracking fields
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dedup_enabled: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dedup_suppressed: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dedup_count: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grouped: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -325,6 +341,22 @@ pub struct TriggerData {
     /// error/skipped runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub level: Option<i32>,
+    /// SIEM detections only: the rule's Sigma level, since `level` is the threshold axis.
+    #[cfg(feature = "enterprise")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub severity: Option<String>,
+    /// SIEM detections only: hides the row from users without Security after the rule is deleted.
+    #[cfg(feature = "enterprise")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub siem: Option<bool>,
+    /// SIEM detections only: a backfill firing on evidence older than the run's own window.
+    #[cfg(feature = "enterprise")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub historical: Option<bool>,
+    /// SIEM detections only: the groups this run fired on, as JSON, so evidence shows those rows.
+    #[cfg(feature = "enterprise")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub siem_groups: Option<String>,
     /// Which group produced `actual_value` (worst group; D8).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group_label: Option<String>,
@@ -341,9 +373,21 @@ pub struct TriggerData {
     pub synthetics_location: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub downtime_id: Option<String>,
+    /// Whose ack withheld this run's send, or who acted on an `ack_event` row.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acked_by: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ack_action: Option<AckAction>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ack_source: Option<AckSource>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub taken_over_from: Option<String>,
     /// Whether a firing tried a destination, workflow or incident notification; None on old rows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delivery_attempted: Option<bool>,
+    /// Set when `suppress_repeats` withheld a notification that repeated the last delivered state.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repeat_suppressed: Option<bool>,
     /// "scheduled" or "manual"; None on older rows, which read as scheduled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trigger_source: Option<String>,
@@ -386,9 +430,6 @@ impl Default for TriggerData {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             actual_value: None,
@@ -396,12 +437,25 @@ impl Default for TriggerData {
             threshold_value: None,
             threshold_operator: None,
             level: None,
+            #[cfg(feature = "enterprise")]
+            severity: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
+            #[cfg(feature = "enterprise")]
+            historical: None,
+            #[cfg(feature = "enterprise")]
+            siem_groups: None,
             group_label: None,
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
             delivery_attempted: None,
+            repeat_suppressed: None,
             trigger_source: None,
             triggered_by: None,
             recipient_count: None,
@@ -445,9 +499,6 @@ impl TriggerData {
             query_took: Some(0),
             scheduler_trace_id: Some(String::new()),
             time_in_queue_ms: Some(0),
-            dedup_enabled: Some(false),
-            dedup_suppressed: Some(false),
-            dedup_count: Some(0),
             grouped: Some(false),
             group_size: Some(0),
             actual_value: Some(0.0),
@@ -455,12 +506,25 @@ impl TriggerData {
             threshold_value: Some(0.0),
             threshold_operator: Some(String::new()),
             level: Some(0),
+            #[cfg(feature = "enterprise")]
+            severity: None,
+            #[cfg(feature = "enterprise")]
+            siem: Some(false),
+            #[cfg(feature = "enterprise")]
+            historical: Some(false),
+            #[cfg(feature = "enterprise")]
+            siem_groups: Some(String::new()),
             group_label: Some(String::new()),
             value_is_lower_bound: Some(false),
             synthetics_error_source: Some(String::new()),
             synthetics_location: Some(String::new()),
             downtime_id: Some(String::new()),
+            acked_by: Some(String::new()),
+            ack_action: Some(AckAction::Ack),
+            ack_source: Some(AckSource::Api),
+            taken_over_from: Some(String::new()),
             delivery_attempted: Some(true),
+            repeat_suppressed: None,
             trigger_source: Some(String::new()),
             triggered_by: Some(String::new()),
             recipient_count: Some(0),
@@ -1000,6 +1064,39 @@ impl From<FileMeta> for RequestStats {
     }
 }
 
+/// Streams O2 writes itself, matched by name for picker ordering; never use it for access control.
+pub fn is_system_stream(org_id: &str, stream_name: &str) -> bool {
+    if stream_name.starts_with("_o2_") {
+        return true;
+    }
+    // Other non-underscore names are written only to `_meta`; users may reuse them.
+    if INTERNAL_STREAM_NAMES.contains(&stream_name) {
+        return stream_name.starts_with('_')
+            || stream_name == TRIGGERS_STREAM
+            || stream_name == USAGE_STREAM
+            || org_id == META_ORG_ID;
+    }
+    match stream_name {
+        "_rumdata"
+        | "_rumlog"
+        | "_sessionreplay"
+        | "synthetics_results"
+        | "synthetics_step_results"
+        | SLO_SLICES_STREAM => true,
+        "self_profiles" | AUTO_INVESTIGATE_DECISIONS_STREAM => org_id == META_ORG_ID,
+        _ => false,
+    }
+}
+
+/// Whether a stream holds the customer's own data; web isUserDataStream mirrors it.
+pub fn is_user_data_stream(org_id: &str, stream_name: &str, stream_type: StreamType) -> bool {
+    matches!(
+        stream_type,
+        StreamType::Logs | StreamType::Metrics | StreamType::Traces | StreamType::Profiles
+    ) && (USER_SOURCED_STREAM_NAMES.contains(&stream_name)
+        || !is_system_stream(org_id, stream_name))
+}
+
 #[cfg(test)]
 mod run_outcome_tests {
     use super::*;
@@ -1232,6 +1329,44 @@ mod run_outcome_tests {
         let bare = serde_json::to_value(TriggerData::default()).unwrap();
         assert!(bare.get("downtime_id").is_none());
         assert!(TriggerData::get_field_names().contains(&"downtime_id".to_string()));
+    }
+
+    #[test]
+    fn ack_rows_use_the_history_contract_strings_and_older_rows_decode() {
+        assert_eq!(RunOutcome::AckEvent.as_str(), "ack_event");
+        assert_eq!(RunOutcome::from_i32(8), Some(RunOutcome::AckEvent));
+        assert!(!RunOutcome::AckEvent.is_firing());
+        assert_eq!(
+            normalize_outcome("ack_event", &TriggerDataType::Alert, None),
+            Some(RunOutcome::AckEvent)
+        );
+        let event = TriggerData {
+            status: RunOutcome::AckEvent,
+            acked_by: Some("bob@acme.com".to_string()),
+            ack_action: Some(AckAction::TakeOver),
+            ack_source: Some(AckSource::Slack),
+            taken_over_from: Some("dana@acme.com".to_string()),
+            ..TriggerData::default()
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["status"], "ack_event");
+        assert_eq!(json["ack_action"], "take_over");
+        assert_eq!(json["ack_source"], "slack");
+        assert_eq!(json["taken_over_from"], "dana@acme.com");
+        assert_eq!(serde_json::from_value::<TriggerData>(json).unwrap(), event);
+        let suppressed = TriggerData {
+            status: RunOutcome::Suppressed,
+            acked_by: Some("bob@acme.com".to_string()),
+            ..TriggerData::default()
+        };
+        let json = serde_json::to_value(&suppressed).unwrap();
+        assert_eq!(json["status"], "suppressed");
+        assert!(json.get("ack_action").is_none());
+        let bare = serde_json::to_value(TriggerData::default()).unwrap();
+        assert!(bare.get("acked_by").is_none());
+        for field in ["acked_by", "ack_action", "ack_source", "taken_over_from"] {
+            assert!(TriggerData::get_field_names().contains(&field.to_string()));
+        }
     }
 
     #[test]
@@ -1558,18 +1693,18 @@ mod tests {
         assert_eq!(format!("{}", UsageEvent::Other), "Other");
     }
 
-    /// Quoted names inside the `INTERNAL_STREAM_NAMES` array literal of a TypeScript source.
-    fn ts_internal_stream_names(source: &str) -> Vec<String> {
+    /// Quoted names inside the `const_name` array literal of a TypeScript source.
+    fn ts_stream_names(source: &str, const_name: &str) -> Vec<String> {
         let start = source
-            .find("INTERNAL_STREAM_NAMES")
-            .expect("INTERNAL_STREAM_NAMES missing from internalStreams.ts");
+            .find(&format!("const {const_name}"))
+            .unwrap_or_else(|| panic!("{const_name} missing from internalStreams.ts"));
         let rest = &source[start..];
         let assign = rest
             .find('=')
-            .expect("INTERNAL_STREAM_NAMES is not assigned");
+            .unwrap_or_else(|| panic!("{const_name} is not assigned"));
         let open = rest[assign..]
             .find('[')
-            .expect("INTERNAL_STREAM_NAMES has no array literal")
+            .unwrap_or_else(|| panic!("{const_name} has no array literal"))
             + assign;
         let close = rest[open..].find(']').expect("unterminated array literal") + open;
         rest[open + 1..close]
@@ -1585,15 +1720,17 @@ mod tests {
             .collect()
     }
 
-    #[test]
-    fn test_internal_stream_names_match_web_list() {
+    fn web_internal_streams_source() -> String {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../web/src/utils/internalStreams.ts");
-        let source = std::fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-        let mut web = ts_internal_stream_names(&source);
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
+    }
+
+    #[test]
+    fn test_user_sourced_stream_names_match_web_list() {
+        let mut web = ts_stream_names(&web_internal_streams_source(), "USER_SOURCED_STREAM_NAMES");
         web.sort();
-        let mut rust = INTERNAL_STREAM_NAMES.map(str::to_string).to_vec();
+        let mut rust = USER_SOURCED_STREAM_NAMES.map(str::to_string).to_vec();
         rust.sort();
         assert_eq!(web, rust);
     }
@@ -1601,7 +1738,91 @@ mod tests {
     #[test]
     fn test_ts_internal_stream_names_parses_quotes_and_comments() {
         let source = "export const INTERNAL_STREAM_NAMES: readonly string[] = [\n  \"usage\", // billing\n  'audit',\n] as const;\nconst OTHER = [\"x\"];";
-        assert_eq!(ts_internal_stream_names(source), vec!["usage", "audit"]);
+        assert_eq!(
+            ts_stream_names(source, "INTERNAL_STREAM_NAMES"),
+            vec!["usage", "audit"]
+        );
+    }
+
+    #[test]
+    fn test_is_user_data_stream_ignores_streams_o2_writes_itself() {
+        for name in [
+            "_o2_alert_calibration_digests",
+            "_o2_ai_chat_events",
+            SLO_SLICES_STREAM,
+            TRIGGERS_STREAM,
+            USAGE_STREAM,
+            "_anomalies",
+        ] {
+            assert!(
+                !is_user_data_stream("acme", name, StreamType::Logs),
+                "{name}"
+            );
+        }
+        for name in INTERNAL_STREAM_NAMES {
+            assert!(
+                !is_user_data_stream(META_ORG_ID, name, StreamType::Logs),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_user_data_stream_counts_meta_only_names_in_customer_orgs() {
+        for name in [
+            ERROR_STREAM,
+            AUDIT_STREAM,
+            STATS_STREAM,
+            DATA_RETENTION_USAGE_STREAM,
+            "cloud_events",
+            "self_profiles",
+        ] {
+            assert!(
+                is_user_data_stream("acme", name, StreamType::Logs),
+                "{name} in acme"
+            );
+            assert!(
+                !is_user_data_stream(META_ORG_ID, name, StreamType::Logs),
+                "{name} in _meta"
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_user_data_stream_counts_streams_users_send() {
+        for (name, stream_type) in [
+            ("default", StreamType::Logs),
+            ("cpu_usage", StreamType::Metrics),
+            ("default", StreamType::Traces),
+            ("default", StreamType::Profiles),
+            ("_rumdata", StreamType::Logs),
+            ("_rumlog", StreamType::Logs),
+            ("_sessionreplay", StreamType::Logs),
+            ("synthetics_results", StreamType::Logs),
+            (DBM_SERVER_STREAM, StreamType::Logs),
+        ] {
+            assert!(is_user_data_stream("acme", name, stream_type), "{name}");
+            assert!(
+                is_user_data_stream(META_ORG_ID, name, stream_type),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_user_data_stream_ignores_non_ingest_stream_types() {
+        for stream_type in [
+            StreamType::EnrichmentTables,
+            StreamType::Metadata,
+            StreamType::Index,
+            StreamType::Filelist,
+            StreamType::ServiceGraph,
+        ] {
+            assert!(
+                !is_user_data_stream("acme", "default", stream_type),
+                "{stream_type:?}"
+            );
+        }
     }
 
     #[test]
@@ -1662,6 +1883,80 @@ mod tests {
         assert!(!is_internal_rollup_stream("_o2"));
         assert!(!is_internal_rollup_stream("_agent_signals_backup"));
         assert!(!is_internal_rollup_stream(""));
+    }
+
+    #[test]
+    fn test_is_system_stream_matches_every_internal_name_in_meta() {
+        for name in INTERNAL_STREAM_NAMES {
+            assert!(is_system_stream(META_ORG_ID, name), "{name}");
+        }
+    }
+
+    #[test]
+    fn test_is_system_stream_scopes_meta_only_names_to_meta() {
+        for name in [
+            AUDIT_STREAM,
+            STATS_STREAM,
+            ERROR_STREAM,
+            DATA_RETENTION_USAGE_STREAM,
+            "cloud_events",
+            "self_profiles",
+            AUTO_INVESTIGATE_DECISIONS_STREAM,
+        ] {
+            assert!(is_system_stream(META_ORG_ID, name), "{name} in _meta");
+            assert!(!is_system_stream("acme", name), "{name} in acme");
+        }
+    }
+
+    #[test]
+    fn test_is_system_stream_matches_in_any_org() {
+        for name in [
+            "_o2_dbm_server",
+            "_o2_service_graph",
+            "_agent_signals",
+            "_redaction_evidence",
+            "_evaluator",
+            "_llm_scores",
+            "_llm_experiment",
+            "_anomalies",
+            TRIGGERS_STREAM,
+            USAGE_STREAM,
+            "_rumdata",
+            "_rumlog",
+            "_sessionreplay",
+            "synthetics_results",
+            "synthetics_step_results",
+            SLO_SLICES_STREAM,
+        ] {
+            assert!(is_system_stream("acme", name), "{name} in acme");
+            assert!(is_system_stream(META_ORG_ID, name), "{name} in _meta");
+        }
+    }
+
+    #[test]
+    fn test_is_system_stream_rejects_user_streams() {
+        for name in [
+            "default",
+            "usage_report",
+            "_foo",
+            "_o2",
+            "o2_stuff",
+            "_rumdata_v2",
+            "traces_service_graph_request_total",
+            "traces_service_graph_request_failed_total",
+            "",
+        ] {
+            assert!(!is_system_stream("acme", name), "{name} in acme");
+            assert!(!is_system_stream(META_ORG_ID, name), "{name} in _meta");
+        }
+    }
+
+    #[test]
+    fn test_is_system_stream_covers_is_internal_stream() {
+        for name in ["_o2_db_stats", "_agent_signals", "_anomalies", "_evaluator"] {
+            assert!(is_internal_stream(name));
+            assert!(is_system_stream("acme", name), "{name}");
+        }
     }
 
     #[test]
@@ -1848,9 +2143,6 @@ mod tests {
             query_took: Some(500),
             scheduler_trace_id: Some("trace123".to_string()),
             time_in_queue_ms: Some(100),
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             actual_value: None,
@@ -1858,12 +2150,25 @@ mod tests {
             threshold_value: None,
             threshold_operator: None,
             level: None,
+            #[cfg(feature = "enterprise")]
+            severity: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
+            #[cfg(feature = "enterprise")]
+            historical: None,
+            #[cfg(feature = "enterprise")]
+            siem_groups: None,
             group_label: None,
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
             delivery_attempted: None,
+            repeat_suppressed: None,
             trigger_source: None,
             triggered_by: None,
             recipient_count: None,
@@ -2431,11 +2736,8 @@ mod tests {
         let data = TriggerData::default();
         let json = serde_json::to_value(&data).unwrap();
         let obj = json.as_object().unwrap();
-        // These 6 fields have skip_serializing_if = "Option::is_none"
+        // These 3 fields have skip_serializing_if = "Option::is_none"
         assert!(!obj.contains_key("skipped_alerts_count"));
-        assert!(!obj.contains_key("dedup_enabled"));
-        assert!(!obj.contains_key("dedup_suppressed"));
-        assert!(!obj.contains_key("dedup_count"));
         assert!(!obj.contains_key("grouped"));
         assert!(!obj.contains_key("group_size"));
     }
@@ -2444,9 +2746,6 @@ mod tests {
     fn test_trigger_data_skip_serializing_if_some_fields() {
         let data = TriggerData {
             skipped_alerts_count: Some(3),
-            dedup_enabled: Some(true),
-            dedup_suppressed: Some(false),
-            dedup_count: Some(5),
             grouped: Some(true),
             group_size: Some(10),
             ..TriggerData::default()
@@ -2455,9 +2754,6 @@ mod tests {
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("skipped_alerts_count"));
         assert_eq!(obj["skipped_alerts_count"], serde_json::json!(3_i64));
-        assert!(obj.contains_key("dedup_enabled"));
-        assert!(obj.contains_key("dedup_suppressed"));
-        assert!(obj.contains_key("dedup_count"));
         assert!(obj.contains_key("grouped"));
         assert!(obj.contains_key("group_size"));
     }

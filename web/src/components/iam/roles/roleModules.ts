@@ -22,7 +22,9 @@ export type ModuleGroupId =
   | "alerting"
   | "pipelines"
   | "monitoring"
+  | "security"
   | "ai"
+  | "fleet"
   | "access"
   | "platform"
   | "other";
@@ -63,7 +65,9 @@ export const GROUP_ORDER: ModuleGroupId[] = [
   "alerting",
   "pipelines",
   "monitoring",
+  "security",
   "ai",
+  "fleet",
   "access",
   "platform",
   "other",
@@ -75,7 +79,9 @@ export const GROUP_LABEL_KEYS: Record<ModuleGroupId, I18nKey> = {
   alerting: "iam.editRole.moduleGroupAlerting",
   pipelines: "iam.editRole.moduleGroupPipelines",
   monitoring: "iam.editRole.moduleGroupMonitoring",
+  security: "iam.editRole.moduleGroupSecurity",
   ai: "iam.editRole.moduleGroupAi",
+  fleet: "iam.editRole.moduleGroupFleet",
   access: "iam.editRole.moduleGroupAccess",
   platform: "iam.editRole.moduleGroupPlatform",
   other: "iam.editRole.moduleGroupOther",
@@ -87,6 +93,7 @@ const GROUP_OF: Record<string, ModuleGroupId> = {
   logs: "data",
   metrics: "data",
   traces: "data",
+  profiles: "data",
   index: "data",
   metadata: "data",
   enrichment_table: "data",
@@ -108,6 +115,7 @@ const GROUP_OF: Record<string, ModuleGroupId> = {
   template: "alerting",
   destination: "alerting",
   incidents: "alerting",
+  incident_integrations: "alerting",
   oncall: "alerting",
   oncall_response: "alerting",
   pipeline: "pipelines",
@@ -123,6 +131,7 @@ const GROUP_OF: Record<string, ModuleGroupId> = {
   db_monitoring: "monitoring",
   rumtoken: "monitoring",
   sourcemaps: "monitoring",
+  security: "security",
   provider: "ai",
   score_config: "ai",
   scorer: "ai",
@@ -139,6 +148,9 @@ const GROUP_OF: Record<string, ModuleGroupId> = {
   ai_chat_share: "ai",
   mcp: "ai",
   model_pricing: "ai",
+  fleets: "fleet",
+  fleet_configs: "fleet",
+  fleet_management: "fleet",
   role: "access",
   group: "access",
   service_accounts: "access",
@@ -152,6 +164,98 @@ const GROUP_OF: Record<string, ModuleGroupId> = {
   ratelimit: "platform",
   billing_group: "platform",
   remote_task: "platform",
+};
+
+/** A child listed without its parent still belongs where that parent would have been; the API sends `parent: ""` at top level. */
+export const moduleGroup = (key: string, parent?: string): ModuleGroupId =>
+  GROUP_OF[key] || GROUP_OF[parent ?? ""] || "other";
+
+// English on purpose: code compares them with what the user types; a child's words sit on its parent, the rail row.
+export const TASK_WORDS: Record<string, string[]> = {
+  stream: ["logs", "metrics", "traces", "indices", "index", "query", "search"],
+  enrichment_table: ["lookup", "csv", "enrich"],
+  savedviews: ["saved search", "view"],
+  metadata: ["fields", "schema"],
+  search_jobs: ["background search", "async query"],
+  cipher_keys: ["encryption", "decrypt", "secret"],
+  re_patterns: ["regex", "redact", "mask", "pii"],
+  service_streams: ["service", "correlation"],
+  search_inspector: ["query profile", "slow query"],
+  dfolder: ["dashboard", "panel", "chart", "graph", "visualization"],
+  rfolder: ["report", "pdf", "scheduled report"],
+  template: ["message", "format", "notification template"],
+  destination: [
+    "slack",
+    "email",
+    "webhook",
+    "pagerduty",
+    "teams",
+    "opsgenie",
+    "notification",
+    "channel",
+  ],
+  afolder: ["alert", "alert rule", "trigger", "monitor"],
+  incidents: ["incident", "outage"],
+  oncall: ["rotation", "schedule", "pager"],
+  oncall_response: ["acknowledge", "escalation"],
+  downtime_folder: ["downtime", "mute", "silence", "maintenance"],
+  function: ["vrl", "transform", "parse"],
+  pipeline: ["pipeline", "ingest", "route", "transform"],
+  workflow_folder: ["workflow", "automation"],
+  rumtoken: ["rum", "browser", "frontend", "token"],
+  sourcemaps: ["sourcemap", "javascript", "stack trace"],
+  synthetic_folder: ["synthetics", "uptime", "probe", "http test"],
+  db_monitoring: ["database", "dbm", "sql", "postgres", "mysql"],
+  security: ["siem", "soc", "detection", "triage", "case", "threat"],
+  status_page: ["status page", "uptime"],
+  synthetic_environment: ["environment", "location"],
+  ai: ["assistant", "chat", "llm"],
+  ai_toolsets: ["tools", "toolset"],
+  mcp: ["model context protocol"],
+  model_pricing: ["cost", "price", "token cost"],
+  provider: ["openai", "anthropic", "provider", "model"],
+  score_config: ["score", "eval", "evaluation"],
+  scorer: ["score", "eval", "judge"],
+  eval_job: ["eval", "evaluation"],
+  annotation_queue: ["annotation", "review"],
+  dataset: ["dataset", "eval data"],
+  experiment: ["experiment", "ab test", "compare"],
+  playground: ["prompt", "test prompt"],
+  prompt_label: ["prompt", "protected label"],
+  pfolder: ["prompt", "prompt template"],
+  ai_chat_share: ["share chat"],
+  user: ["user", "member", "people", "invite"],
+  role: ["role", "permission", "rbac"],
+  group: ["group", "team"],
+  passcode: ["token", "api key", "ingest", "passcode"],
+  service_accounts: ["service account", "bot", "machine"],
+  settings: ["configuration", "org settings"],
+  kv: ["key value", "kv"],
+  summary: ["usage"],
+  ratelimit: ["rate limit", "quota", "throttle"],
+  license: ["license", "plan"],
+  billing_group: ["billing", "invoice", "cost"],
+  remote_task: ["remote", "task"],
+  rum_analytics: ["product analytics", "funnel", "rum"],
+  query_history: ["past queries"],
+  alert_calibration: ["alert", "calibration", "threshold"],
+};
+
+/** Which part of the module fit the filter. */
+export type ModuleMatch = { via: "label" | "group" | "word" };
+
+/** Tries the module's label, then its group, then its task words; an empty query keeps every module. */
+export const matchModule = (
+  module: { key: string; label: string; groupLabel: string },
+  query: string,
+): ModuleMatch | null => {
+  const term = query.trim().toLowerCase();
+  if (!term || module.label.toLowerCase().includes(term)) return { via: "label" };
+  if (module.groupLabel.toLowerCase().includes(term)) return { via: "group" };
+  // One letter is inside nearly every task word, so it would keep almost every module.
+  const byWord =
+    term.length > 1 && !!TASK_WORDS[module.key]?.some((candidate) => candidate.includes(term));
+  return byWord ? { via: "word" } : null;
 };
 
 // Mirrors the main navigation's glyphs where a module has a counterpart there.
@@ -174,6 +278,7 @@ const ICON_OF: Record<string, IconName> = {
   template: "article",
   destination: "webhook",
   incidents: "shield-alert-outline",
+  incident_integrations: "webhook",
   oncall: "person-pin-circle",
   oncall_response: "forum",
   pipeline: "lan",
@@ -187,6 +292,7 @@ const ICON_OF: Record<string, IconName> = {
   synthetic_environment: "layers",
   status_page: "monitor-heart",
   db_monitoring: "database",
+  security: "verified-user",
   rumtoken: "devices",
   sourcemaps: "code",
   provider: "hub",
@@ -198,6 +304,9 @@ const ICON_OF: Record<string, IconName> = {
   experiment: "science",
   playground: "psychology",
   pfolder: "folder",
+  fleets: "workspaces",
+  fleet_configs: "tune",
+  fleet_management: "admin-panel-settings",
   prompt: "edit-note",
   prompt_label: "label",
   ai: "smart-toy",
@@ -239,8 +348,7 @@ export const buildRoleModules = (resources: CatalogResource[]): RoleModule[] => 
     .filter((resource) => !(resource.parent && keys.has(resource.parent)))
     .map((resource) => ({
       key: resource.key,
-      // A child listed without its parent still belongs where that parent would have been; the API sends `parent: ""` at top level.
-      group: GROUP_OF[resource.key] || GROUP_OF[resource.parent ?? ""] || "other",
+      group: moduleGroup(resource.key, resource.parent),
       icon: ICON_OF[resource.key] || ICON_OF[resource.parent ?? ""] || FALLBACK_ICON,
       hasEntities: resource.has_entities !== false,
       scopeKeys: [resource.key],

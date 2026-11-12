@@ -15,6 +15,7 @@
 
 import type { NavigationAction } from "@/ts/interfaces/chat";
 import { raw, type TranslateFn } from "@/types/i18n";
+import { streamTypeFeature } from "@/utils/featureGate";
 
 export interface NavigationRoute {
   path: string;
@@ -175,6 +176,15 @@ export function generateNavigationFromToolResult(
   };
 }
 
+const RESOURCE_FEATURES: Record<string, string> = { alert: "alerts", dashboard: "dashboards" };
+
+/** License key of the page a navigation action opens; null when that page has no key. */
+export function navigationFeature(action: NavigationAction): string | null {
+  return action.action === "load_query"
+    ? streamTypeFeature(action.resource_type)
+    : (RESOURCE_FEATURES[action.resource_type] ?? null);
+}
+
 export function navigationPageName(action: NavigationAction): string {
   return (
     action.label ||
@@ -224,7 +234,9 @@ export function buildNavigationRoute(
       queryParams.fn_editor = "false";
     }
 
-    return { path: `/${action.resource_type}`, query: queryParams };
+    // Only Logs runs SQL for every signal; the traces filter box and the metrics editor expect a filter or PromQL.
+    const runsSql = target.sql_mode && ["traces", "metrics"].includes(action.resource_type);
+    return { path: runsSql ? "/logs" : `/${action.resource_type}`, query: queryParams };
   }
 
   if (action.action === "navigate_direct") {

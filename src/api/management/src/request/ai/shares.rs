@@ -47,14 +47,18 @@ use o2_enterprise::enterprise::ai::chat::{
     batcher::DurableEvent,
     lease::{self, LeaseError},
 };
-use openobserve_core::ai_chat::{ReadError, projection};
+use openobserve_core::ai_chat::{
+    ReadError,
+    admission::{normalize_uuid, resolve_owner},
+    projection,
+};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use tokio::sync::{Semaphore, SemaphorePermit};
 use utoipa::ToSchema;
 
 use super::chats::{
-    MAX_TITLE_CHARS, attach_turn_status_at, load_turns, normalize_uuid, owned_chat, resolve_owner,
+    MAX_TITLE_CHARS, admit_error_response, attach_turn_status_at, load_turns, owned_chat,
     running_since, user_email,
 };
 use crate::{
@@ -505,7 +509,7 @@ impl ReadCounter {
         (status = 404, description = "Unknown conversation", body = Object),
         (status = 415, description = "The body is not JSON", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "create"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn create(
     Path((org_id, session_id)): Path<(String, String)>,
@@ -525,7 +529,7 @@ pub async fn create(
     };
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
-        Err(resp) => return resp,
+        Err(e) => return admit_error_response(e),
     };
     let chat = match owned_chat(&org_id, &session_id, &owner).await {
         Ok(chat) if req.mode == MODE_SNAPSHOT => settled_chat(&chat, &owner).await,
@@ -587,7 +591,7 @@ pub async fn create(
         (status = 200, description = "Active shares", body = inline(ShareListResponse)),
         (status = 404, description = "Unknown conversation", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "list"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn list_for_chat(
     Path((org_id, session_id)): Path<(String, String)>,
@@ -599,7 +603,7 @@ pub async fn list_for_chat(
     };
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
-        Err(resp) => return resp,
+        Err(e) => return admit_error_response(e),
     };
     let chat = match owned_chat(&org_id, &session_id, &owner).await {
         Ok(chat) => chat,
@@ -640,7 +644,7 @@ pub async fn list_for_chat(
         (status = 200, description = "Active shares", body = inline(ShareListResponse)),
         (status = 403, description = "`all=true` from a non-admin", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "list"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn list_mine(
     Path(org_id): Path<String>,
@@ -665,7 +669,7 @@ pub async fn list_mine(
     } else {
         let owner = match resolve_owner(&user_email).await {
             Ok(owner) => owner,
-            Err(resp) => return resp,
+            Err(e) => return admit_error_response(e),
         };
         let shares = ai_chat_shares::list_live_for_creator(&org_id, &owner, now).await;
         (shares, format!("{org_id}/{owner}"), Some(owner))
@@ -705,7 +709,7 @@ pub async fn list_mine(
         (status = 404, description = "Unknown share", body = Object),
         (status = 415, description = "The body is not JSON", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "update"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn update(
     Path((org_id, share_id)): Path<(String, String)>,
@@ -721,7 +725,7 @@ pub async fn update(
     };
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
-        Err(resp) => return resp,
+        Err(e) => return admit_error_response(e),
     };
     let now = now_micros();
     let Served { share, chat } = match owned_share(&org_id, &share_id, &owner, now).await {
@@ -785,7 +789,7 @@ pub async fn update(
         (status = 200, description = "Revoked", body = Object),
         (status = 404, description = "Unknown share", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "delete"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn revoke(
     Path((org_id, share_id)): Path<(String, String)>,
@@ -797,7 +801,7 @@ pub async fn revoke(
     };
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
-        Err(resp) => return resp,
+        Err(e) => return admit_error_response(e),
     };
     let share = match ai_chat_shares::get(&org_id, &share_id).await {
         Ok(Some(share)) => share,
@@ -847,7 +851,7 @@ pub async fn revoke(
         (status = 429, description = "Too many shared reads in flight; retry", body = Object),
         (status = 503, description = "History temporarily unreadable", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "get"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn get_shared(
     Path((org_id, token)): Path<(String, String)>,
@@ -882,13 +886,14 @@ pub async fn get_shared(
         ("org_id" = String, Path, description = "Organization name"),
         ("token" = String, Path, description = "Share token"),
     ),
+    request_body(content = Object, description = "Send {}: the handler requires a JSON content type and ignores the body", content_type = "application/json"),
     responses(
         (status = 201, description = "The new conversation", body = inline(ForkResponse)),
         (status = 403, description = "Not allowed to start conversations", body = Object),
         (status = 404, description = "Unknown, revoked or expired share", body = Object),
         (status = 415, description = "The body is not JSON", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "create"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn fork(
     Path((org_id, token)): Path<(String, String)>,
@@ -916,7 +921,7 @@ pub async fn fork(
     }
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
-        Err(resp) => return resp,
+        Err(e) => return admit_error_response(e),
     };
     let Served { share, chat } = match resolve(&token, Some(&org_id), false).await {
         Ok(Some(served)) => served,

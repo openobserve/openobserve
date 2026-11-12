@@ -5,14 +5,14 @@
       :org-id="orgId"
       :mode="formPage.mode"
       :row="formPage.row"
-      @saved="handleSaved"
-      @cancel="closeForm"
+      @saved="leaveForm"
+      @cancel="leaveForm"
     />
 
     <OPageLayout
       v-else
       icon="smart-toy"
-      :subtitle="t('settings.llmProvidersSettings.subtitle')"
+      :subtitle="t('llmProviders.subtitle')"
       bleed
       :scroll="false"
     >
@@ -30,7 +30,12 @@
       </div>
 
       <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
-        <OEmptyState size="hero" preset="no-access" data-test="llm-providers-forbidden" />
+        <LicenseDeniedState
+          v-if="Array.isArray(forbidden)"
+          :features="forbidden"
+          data-test="llm-providers-license-denied"
+        />
+        <OEmptyState v-else size="hero" preset="no-access" data-test="llm-providers-forbidden" />
       </div>
 
       <div v-else-if="!providers.length" class="flex flex-1 items-center justify-center">
@@ -142,6 +147,7 @@
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    :aria-label="t('common.moreActions')"
                     icon-left="more-vert"
                     variant="ghost"
                     size="icon-xs-sq"
@@ -177,7 +183,9 @@
     <ConfirmDialog
       v-model="confirmDeleteOpen"
       :title="t('onlineEvals.deleteTitle', { label: t('onlineEvals.singular.providers') })"
-      :message="t('onlineEvals.deleteConfirmMessage', { name: pendingDeleteRow?.name ?? '' })"
+      message-keypath="onlineEvals.deleteConfirmMessage"
+      :message-name="pendingDeleteRow?.name ?? ''"
+      ok-variant="destructive"
       @update:ok="performDelete"
       @update:cancel="cancelDelete"
     />
@@ -200,6 +208,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { type Provider } from "@/services/online-evals.service";
 import { deleteProviderMutation, providersQuery } from "@/services/online-evals.service.queries";
+import analytics from "@/services/product_analytics";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import {
   defaultModelOf,
@@ -209,12 +218,15 @@ import {
 import { showError } from "@/enterprise/components/onlineEvals/utils/evalFormat";
 import ProviderFormPage from "@/enterprise/components/onlineEvals/forms/ProviderFormPage.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { forbiddenState } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
+import { isSameOriginRedirect } from "@/utils/safeUrl";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -270,10 +282,9 @@ const isFetching = providersList.isFetching;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = providersList.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+  return forbiddenState(e) || e?.status === 403;
 });
 const lastUpdatedAt = providersList.dataUpdatedAt;
-// The grouped access toast already reports a 403; a second red toast adds nothing.
 watch(providersList.error, (err: any) => {
   if (err && !forbidden.value) showError(err, t("llmProviders.loadError"));
 });
@@ -387,15 +398,17 @@ function openEdit(row: Provider) {
   pushRouteAction({ action: "update", id: String(row.id) });
 }
 
-function closeForm() {
-  formPage.value = null;
-  clearRouteAction();
+// Only an in-app `return_to` path is followed.
+function returnTarget(): string | null {
+  const to = route.query.return_to;
+  return typeof to === "string" && to.startsWith("/") && isSameOriginRedirect(to) ? to : null;
 }
 
-// The save mutation's `invalidates` already refetches the list.
-function handleSaved() {
+function leaveForm() {
   formPage.value = null;
-  clearRouteAction();
+  const to = returnTarget();
+  if (to) router.push(to).catch(() => {});
+  else clearRouteAction();
 }
 
 function syncFromRoute() {
@@ -430,6 +443,7 @@ async function performDelete() {
   if (!row) return;
   try {
     await deleteProvider.mutateAsync(row.id);
+    analytics.track("llm_provider_deleted");
     toast({
       variant: "success",
       message: t("onlineEvals.deleted", { label: t("onlineEvals.singular.providers") }),

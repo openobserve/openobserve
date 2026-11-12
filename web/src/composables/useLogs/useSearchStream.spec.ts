@@ -64,11 +64,33 @@ describe("useSearchStream — logs_search_completed", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     searchObj.meta.refreshInterval = 0;
+    searchObj.data.queryResults = { hits: [{ a: 1 }, { a: 2 }, { a: 3 }], total: 500 };
   });
 
-  it("tracks a completed search", () => {
+  it("tracks a completed search with the rows it returned", () => {
     completeSearch({ type: "search", isPagination: false });
-    expect(analytics.track).toHaveBeenCalledWith("logs_search_completed");
+    expect(analytics.track).toHaveBeenCalledWith("logs_search_completed", {
+      hits: 3,
+      empty: false,
+    });
+  });
+
+  it("marks a search that returned no rows as empty", () => {
+    searchObj.data.queryResults = { hits: [] };
+    completeSearch({ type: "search", isPagination: false });
+    expect(analytics.track).toHaveBeenCalledWith("logs_search_completed", {
+      hits: 0,
+      empty: true,
+    });
+  });
+
+  it("treats missing hits as an empty search", () => {
+    searchObj.data.queryResults = {};
+    completeSearch({ type: "search", isPagination: false });
+    expect(analytics.track).toHaveBeenCalledWith("logs_search_completed", {
+      hits: 0,
+      empty: true,
+    });
   });
 
   it("does not track live-mode auto-refresh ticks", () => {

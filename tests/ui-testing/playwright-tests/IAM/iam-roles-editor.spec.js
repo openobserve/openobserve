@@ -16,6 +16,7 @@
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
+const { openNavFlyoutChild } = require('../../pages/commonActions.js');
 const testLogger = require('../utils/test-logger.js');
 const {
     ns, req, listRoles, createRole, setRolePerms, makeTracker, uniq, org, rbacEnabled,
@@ -93,7 +94,7 @@ test.describe('IAM · Edit Role · navigation and filtering', { tag: '@enterpris
         pm = new PageManager(page);
         // Capability is decided by the API, not by how fast a tab paints.
         test.skip(!(await rbacEnabled(page)), 'RBAC is off (OSS build)');
-        await page.locator('[data-test="menu-link-\\/iam-item"]').click();
+        await openNavFlyoutChild(page, 'iam');
         await pm.rolesPage.rolesTab.waitFor({ state: 'visible', timeout: 30000 });
 
         await pm.rolesPage.rolesTab.click();
@@ -272,7 +273,7 @@ test.describe('IAM · Edit Role · navigation and filtering', { tag: '@enterpris
 
     // ---------------- empty role, presets, loading ----------------
 
-    test('U-13 · an empty role offers the three presets', {
+    test('U-13 · the Role Overview Presets panel offers the built-in and job presets', {
         tag: ['@iam', '@iamRolesEditor', '@P1', '@all']
     }, async () => {
         await pm.rolesPage.gotoRoles();
@@ -280,9 +281,21 @@ test.describe('IAM · Edit Role · navigation and filtering', { tag: '@enterpris
         await pm.rolesPage.waitForGrantsSettled(0);
 
         await expect(pm.rolesPage.summaryEmpty).toBeVisible({ timeout: 15000 });
-        await expect(pm.rolesPage.presetCard('Read-Only')).toBeVisible();
-        await expect(pm.rolesPage.presetCard('Database Monitoring Viewer')).toBeVisible();
-        await expect(pm.rolesPage.presetCard('Kubernetes Viewer')).toBeVisible();
+        await expect(pm.rolesPage.presetsPanel).toBeVisible({ timeout: 15000 });
+        // Job presets hide only when a module they grant is missing; an enterprise org has all of them.
+        for (const id of [
+            'readonly', 'dbm', 'k8s', 'rum_viewer', 'rum_editor',
+            'alert_manager', 'alert_viewer', 'dashboard_editor', 'dashboard_viewer', 'pipeline_editor',
+        ]) {
+            await expect(pm.rolesPage.presetRow(id), `preset ${id} missing from the panel`).toBeVisible();
+        }
+
+        // A row opens its detail in place; Back returns to the list.
+        await pm.rolesPage.openPreset('readonly');
+        await expect(pm.rolesPage.presetRow('alert_manager')).toBeHidden();
+        await pm.rolesPage.presetBack.click();
+        await expect(pm.rolesPage.presetDetail).toBeHidden();
+        await expect(pm.rolesPage.presetRow('alert_manager')).toBeVisible();
     });
 
     // Guards o2-enterprise#2697: a populated role once read "0 Permissions" before its grants loaded.
@@ -360,5 +373,20 @@ test.describe('IAM · Edit Role · navigation and filtering', { tag: '@enterpris
             .sort();
         expect(pairs.length, 'JSON view rendered no grants').toBeGreaterThan(0);
         expect(pairs).toEqual(stored.map((p) => `${p.object}|${p.permission}`).sort());
+    });
+
+    // FL-RBAC-01 · guards openobserve#15949: the no-op "Fleet Manager" permission must not return.
+    test('U-23 · the Fleet group lists Fleets, Fleet configurations and Fleet management, and no Fleet Manager', {
+        tag: ['@iam', '@iamRolesEditor', '@fleet', '@regression', '@P0', '@all']
+    }, async () => {
+        await pm.fleetManagerPage.assertEnabled();
+        const labels = await pm.rolesPage.railModuleLabels();
+        expect(labels).toMatchObject({
+            fleets: 'Fleets',
+            fleet_configs: 'Fleet configurations',
+            fleet_management: 'Fleet management',
+        });
+        expect(Object.keys(labels)).not.toContain('fleet');
+        expect(Object.values(labels)).not.toContain('Fleet Manager');
     });
 });

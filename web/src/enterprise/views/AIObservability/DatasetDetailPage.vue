@@ -46,6 +46,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm"
+          icon-left="play-arrow"
+          :disabled="!dataset"
+          data-test="ai-dataset-detail-try-playground"
+          @click="openPlayground"
+        >
+          {{ t("aiObservability.datasets.detail.tryInPlayground") }}
+        </OButton>
+        <OButton
+          variant="outline"
+          size="sm"
           :disabled="!dataset"
           data-test="ai-dataset-detail-upload-csv"
           @click="openCsvImport"
@@ -183,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-version="{ row }">
-              <span class="tabular-nums">{{ versionLabel(row.version) }}</span>
+              <span class="tabular-nums">{{ versionLabel(row.writeVersion) }}</span>
             </template>
 
             <template #cell-actions="{ row }">
@@ -211,6 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
                     <OButton
+                      :aria-label="t('common.moreActions')"
                       icon-left="more-vert"
                       variant="ghost"
                       size="icon-xs-sq"
@@ -433,6 +444,7 @@ import {
 import { useMutation } from "@tanstack/vue-query";
 import { aiExperimentCreateRoute, aiExperimentsRoute } from "./experimentRoutes";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { aiPlaygroundRoute } from "./playgroundRoutes";
 
 defineOptions({ name: "AIDatasetDetailPage" });
 
@@ -524,7 +536,7 @@ const columns = computed(() => [
   {
     id: "version",
     header: t("aiObservability.datasets.detail.columns.version"),
-    accessorKey: "version",
+    accessorKey: "writeVersion",
     hideable: true,
     sortable: false,
     size: 140,
@@ -605,6 +617,10 @@ function openExperiments() {
 
 function openCreateExperiment() {
   router.push(aiExperimentCreateRoute(orgId.value, { datasetId: datasetId.value }));
+}
+
+function openPlayground() {
+  router.push(aiPlaygroundRoute(orgId.value, { datasetId: datasetId.value }));
 }
 
 function onPageChange(page: number) {
@@ -752,6 +768,7 @@ async function removeItem(row: LlmDatasetItem): Promise<boolean> {
     message: t("aiObservability.datasets.detail.deleteItemMessage"),
     confirmLabel: t("common.delete"),
     cancelLabel: t("common.cancel"),
+    confirmVariant: "destructive",
   });
   if (!ok) return false;
   try {

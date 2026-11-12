@@ -7,13 +7,21 @@ publish = false
 
 [features]
 default = []
-enterprise = ["dep:o2_enterprise"]
+enterprise = [
+    "dep:anyhow",
+    "dep:async-trait",
+    "dep:config",
+    "dep:log",
+    "dep:o2_enterprise",
+    "dep:proto",
+    "dep:tokio",
+]
 
 [dependencies]
-anyhow.workspace = true
-async-trait.workspace = true
-config.workspace = true
-log.workspace = true
+anyhow = { workspace = true, optional = true }
+async-trait = { workspace = true, optional = true }
+config = { workspace = true, optional = true }
+log = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
-proto.workspace = true
-tokio.workspace = true
+proto = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }

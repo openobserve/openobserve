@@ -126,6 +126,25 @@ impl StorageClientFactory {
         drop(lock);
     }
 
+    /// Drops the account; the default account is never removed.
+    pub async fn remove_account(&self, key: &str) {
+        if key == DEFAULT_ACCOUNT {
+            return;
+        }
+        let lock = ADD_ACCOUNT_LOCK.clone();
+        let lock = lock.lock().await;
+        let r = self.accounts.load_full();
+        if r.contains_key(key) {
+            let temp: HashMap<String, Arc<Account>> = r
+                .iter()
+                .filter(|(k, _)| k.as_str() != key)
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            self.accounts.swap(Arc::new(temp));
+        }
+        drop(lock);
+    }
+
     /// Get the account name for the path by the given strategy.
     pub fn get_name_by_path(&self, org_id: &str, path: &Path) -> Option<String> {
         // org level storage will override any other strategy, so check that first
@@ -219,6 +238,15 @@ impl Account {
             suffix_unsupported: AtomicBool::new(false),
         }
     }
+}
+
+/// Forgets an org's own storage account on this node, so its paths fall back to the default.
+pub async fn remove_account(org_id: &str) {
+    // The provider cache goes first: while it holds the org, paths route to the org's account.
+    crate::table::org_storage_providers::remove_from_cache(org_id);
+    super::MULTI_ACCOUNTS
+        .remove_account(&super::get_org_storage_key(org_id))
+        .await;
 }
 
 pub fn parse_storage_config(
@@ -356,6 +384,14 @@ impl ObjectStoreExt for StorageClientFactory {
 
     async fn add_account(&self, key: String, acc: Box<dyn ObjectStore>) {
         self.add_account(key, acc).await;
+    }
+
+    async fn remove_account(&self, key: &str) {
+        self.remove_account(key).await;
+    }
+
+    fn has_account(&self, name: &str) -> bool {
+        name.is_empty() || self.accounts.load().contains_key(name)
     }
 
     async fn put(&self, account: &str, location: &Path, payload: PutPayload) -> Result<PutResult> {
@@ -809,5 +845,41 @@ mod tests {
             1,
             "re-adding an account must retry suffix ranges on the new store"
         );
+    }
+
+    #[tokio::test]
+    async fn test_remove_account_drops_only_that_account() {
+        let factory = StorageClientFactory::new_with_config(&base_s3_config(), true);
+        factory
+            .add_account("acme:default".to_string(), Box::new(InMemory::new()))
+            .await;
+        factory
+            .add_account("acme_prod:default".to_string(), Box::new(InMemory::new()))
+            .await;
+
+        factory.remove_account("acme:default").await;
+        factory.remove_account(DEFAULT_ACCOUNT).await;
+
+        let accounts = factory.accounts.load();
+        assert!(!accounts.contains_key("acme:default"));
+        assert!(accounts.contains_key("acme_prod:default"));
+        assert!(
+            accounts.contains_key(DEFAULT_ACCOUNT),
+            "default must survive"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_has_account_knows_only_loaded_accounts() {
+        let factory = StorageClientFactory::new_with_config(&base_s3_config(), true);
+        factory
+            .add_account("acme:default".to_string(), Box::new(InMemory::new()))
+            .await;
+
+        assert!(ObjectStoreExt::has_account(&factory, ""));
+        assert!(ObjectStoreExt::has_account(&factory, DEFAULT_ACCOUNT));
+        assert!(ObjectStoreExt::has_account(&factory, "acme:default"));
+        factory.remove_account("acme:default").await;
+        assert!(!ObjectStoreExt::has_account(&factory, "acme:default"));
     }
 }

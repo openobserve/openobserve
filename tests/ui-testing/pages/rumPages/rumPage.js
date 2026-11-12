@@ -33,6 +33,10 @@ export class RumPage {
         this.prettyUnavailableText = page.getByText('Source Maps Not Available');
         this.prettyTranslateFailedText = page.getByText(/Unable to translate stack trace/i);
 
+        this.traceCard = page.locator('[data-test="error-viewer-trace-correlation"]');
+        this.traceCardViewDetailsBtn = page.locator('[data-test="trace-correlation-card-view-details-btn"]');
+        this.traceCardNotAvailable = page.locator('[data-test="trace-correlation-card-not-available"]');
+
         // Store first error data from query response
         this.firstErrorId = null;
         this.firstErrorTimestamp = null;
@@ -87,6 +91,17 @@ export class RumPage {
         // date-time-relative-{value}-{unit}-btn) — label text is not stable.
         await this.page.locator('[data-test="date-time-relative-1-h-btn"]').click();
         await this.page.waitForTimeout(1000);
+        await this.closeDateTimePickerIfOpen();
+    }
+
+    /** The auto-apply picker stays open after a pick, and its popover covers the run-query button beside it. */
+    async closeDateTimePickerIfOpen() {
+        const panel = this.page.locator('#date-time-menu');
+        if (!(await panel.isVisible().catch(() => false))) return;
+        await this.page.keyboard.press('Escape');
+        const closed = await panel.waitFor({ state: 'hidden', timeout: 2000 }).then(() => true).catch(() => false);
+        if (!closed) await this.page.locator(this.dateTimeDropdown).click();
+        await expect(panel).toBeHidden({ timeout: 5000 });
     }
 
     async clickRunQuery() {
@@ -251,6 +266,47 @@ export class RumPage {
         await expect(this.page).toHaveURL(/\/rum\/errors\/view\//, { timeout: 15000 });
         // Detail view readiness: the viewer container is rendered.
         await this.page.waitForSelector(this.errorViewerContainer, { timeout: 15000 });
+    }
+
+    /** Opens one error's detail view directly; `timestampUs` is the error row's _timestamp. */
+    async gotoErrorViewer(errorId, timestampUs, org = process.env.ORGNAME || 'default') {
+        const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        await this.page.goto(`${base}/web/rum/errors/view/${errorId}?timestamp=${timestampUs}&org_identifier=${org}`);
+        await this.page.waitForSelector(this.errorViewerContainer, { timeout: 30000 });
+    }
+
+    /** Records the status of every backend-trace search the Distributed Trace card sends; returns the live list. */
+    watchTraceSearches() {
+        const statuses = [];
+        this.page.on('response', (res) => {
+            if (/\/_search\?/.test(res.url()) && res.url().includes('type=traces')) statuses.push(res.status());
+        });
+        return statuses;
+    }
+
+    /** The card found the trace's backend spans: View Trace Details is enabled and the "not yet available" notice is gone. */
+    async expectBackendTraceFound(timeoutMs = 60000) {
+        await expect(this.traceCard).toBeVisible({ timeout: timeoutMs });
+        await expect(this.traceCardViewDetailsBtn).toBeEnabled({ timeout: timeoutMs });
+        await expect(this.traceCardNotAvailable).toHaveCount(0);
+    }
+
+    async openTraceDetailsFromCard() {
+        await this.traceCardViewDetailsBtn.click();
+    }
+
+    /** View Trace Details lands on that trace's own page, in its traces stream and a real time window, in the current org. */
+    async expectTraceDetailsOpenFor(traceId, stream, org = process.env.ORGNAME || 'default', timeoutMs = 30000) {
+        await expect(this.page).toHaveURL(/\/traces\/trace-details\?/, { timeout: timeoutMs });
+        const query = new URL(this.page.url()).searchParams;
+        expect(query.get('trace_id')).toBe(traceId);
+        expect(query.get('stream')).toBe(stream);
+        expect(query.get('org_identifier')).toBe(org);
+        const from = Number(query.get('from'));
+        const to = Number(query.get('to'));
+        expect(from, 'the trace window needs a start').toBeGreaterThan(0);
+        expect(to, 'the trace window must end after it starts').toBeGreaterThan(from);
+        await expect(this.page.locator('[data-test="trace-details-trace-id"]').first()).toContainText(traceId, { timeout: timeoutMs });
     }
 
     // ===== ERROR DETAIL — RAW / PRETTY STACK TRACE TABS =====

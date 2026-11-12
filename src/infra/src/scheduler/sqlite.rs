@@ -15,8 +15,8 @@
 
 use async_trait::async_trait;
 use chrono::Duration;
-use config::utils::time::now_micros;
-use sqlx::Row;
+use config::{meta::triggers::SlackSyncFinish, utils::time::now_micros};
+use sqlx::{Pool, Row, Sqlite};
 
 use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus};
 use crate::{
@@ -58,6 +58,112 @@ SET status = $1, retries = $2, next_run_at = $3,
     is_realtime = $4, is_silenced = $5, end_time = $6, data = $7
 WHERE id = $8 AND claim_epoch = $9 AND status = $10;"#;
 
+/// The scheduler table; `armed_for` is only written by the `OncallSlackSync` statements (SY-2).
+const CREATE_TABLE_QUERY: &str = r#"
+CREATE TABLE IF NOT EXISTS scheduled_jobs
+(
+    id           INTEGER not null primary key autoincrement,
+    org          VARCHAR(100) not null,
+    module       INT not null,
+    module_key   VARCHAR(256) not null,
+    is_realtime  BOOLEAN default false not null,
+    is_silenced  BOOLEAN default false not null,
+    status       INT not null,
+    start_time   BIGINT,
+    end_time     BIGINT,
+    retries      INT not null,
+    next_run_at  BIGINT not null,
+    data         TEXT not null,
+    claim_epoch  BIGINT default 0 not null,
+    armed_for    BIGINT
+);"#;
+
+/// Moves only a Waiting row: `$5` is Waiting, so a running job keeps its key until it ends.
+const RENAME_KEY_QUERY: &str = r#"UPDATE scheduled_jobs SET module_key = $1
+    WHERE org = $2 AND module = $3 AND module_key = $4 AND status = $5
+    RETURNING *;"#;
+
+/// SY-2.2 arm: insert at `$5`; a Waiting row moves no later, a Completed one waits again, and a
+/// row a pass holds only notes the earliest asked-for time. `$4` Waiting, `$6` Processing.
+const ARM_SLACK_SYNC_QUERY: &str = r#"INSERT INTO scheduled_jobs
+    (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, data)
+VALUES ($1, $2, $3, false, false, $4, 0, $5, '')
+ON CONFLICT (org, module, module_key) DO UPDATE SET
+    status = CASE WHEN scheduled_jobs.status = $6 THEN scheduled_jobs.status ELSE $4 END,
+    next_run_at = CASE
+        WHEN scheduled_jobs.status = $6 THEN scheduled_jobs.next_run_at
+        WHEN scheduled_jobs.status = $4 THEN MIN(scheduled_jobs.next_run_at, $5)
+        ELSE $5 END,
+    armed_for = CASE
+        WHEN scheduled_jobs.status = $6 THEN MIN(COALESCE(scheduled_jobs.armed_for, $5), $5)
+        ELSE scheduled_jobs.armed_for END;"#;
+
+/// SY-2.3 finish: the pass's `$1`/`$3`, or Waiting (`$2`) at the arm's time but not before the
+/// pass's new backoff `$4`; fenced on id, claim epoch and Processing (`$8`).
+const FINISH_SLACK_SYNC_QUERY: &str = r#"UPDATE scheduled_jobs SET
+    status = CASE WHEN armed_for IS NULL THEN $1 ELSE $2 END,
+    next_run_at = CASE WHEN armed_for IS NULL THEN $3 ELSE MAX(armed_for, $4) END,
+    data = $5,
+    armed_for = NULL
+WHERE id = $6 AND claim_epoch = $7 AND status = $8;"#;
+
+/// [`super::Scheduler::rename_key`] on `pool`.
+async fn rename_key_in(
+    pool: &Pool<Sqlite>,
+    org: &str,
+    module: TriggerModule,
+    key: &str,
+    new_key: &str,
+) -> Result<Option<Trigger>> {
+    Ok(sqlx::query_as::<_, Trigger>(RENAME_KEY_QUERY)
+        .bind(new_key)
+        .bind(org)
+        .bind(module)
+        .bind(key)
+        .bind(TriggerStatus::Waiting)
+        .fetch_optional(pool)
+        .await?)
+}
+
+/// [`super::Scheduler::arm_slack_sync`] on `pool`.
+async fn arm_slack_sync_in(
+    pool: &Pool<Sqlite>,
+    org: &str,
+    response_id: &str,
+    t: i64,
+) -> Result<()> {
+    sqlx::query(ARM_SLACK_SYNC_QUERY)
+        .bind(org)
+        .bind(TriggerModule::OncallSlackSync)
+        .bind(response_id)
+        .bind(TriggerStatus::Waiting)
+        .bind(t)
+        .bind(TriggerStatus::Processing)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// [`super::Scheduler::finish_slack_sync`] on `pool`.
+async fn finish_slack_sync_in(
+    pool: &Pool<Sqlite>,
+    claim: &Trigger,
+    finish: &SlackSyncFinish,
+) -> Result<bool> {
+    let result = sqlx::query(FINISH_SLACK_SYNC_QUERY)
+        .bind(&finish.status)
+        .bind(TriggerStatus::Waiting)
+        .bind(finish.next_run_at)
+        .bind(finish.data.not_before)
+        .bind(config::utils::json::to_string(&finish.data)?)
+        .bind(claim.id)
+        .bind(claim.claim_epoch)
+        .bind(TriggerStatus::Processing)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() == 1)
+}
+
 pub struct SqliteScheduler {}
 
 impl SqliteScheduler {
@@ -77,28 +183,7 @@ impl super::Scheduler for SqliteScheduler {
     /// Creates the Scheduled Jobs table
     async fn create_table(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
-        sqlx::query(
-            r#"
-CREATE TABLE IF NOT EXISTS scheduled_jobs
-(
-    id           INTEGER not null primary key autoincrement,
-    org          VARCHAR(100) not null,
-    module       INT not null,
-    module_key   VARCHAR(256) not null,
-    is_realtime  BOOLEAN default false not null,
-    is_silenced  BOOLEAN default false not null,
-    status       INT not null,
-    start_time   BIGINT,
-    end_time     BIGINT,
-    retries      INT not null,
-    next_run_at  BIGINT not null,
-    data         TEXT not null,
-    claim_epoch  BIGINT default 0 not null
-);
-            "#,
-        )
-        .execute(&client)
-        .await?;
+        sqlx::query(CREATE_TABLE_QUERY).execute(&client).await?;
 
         // create data column for old version <= 0.10.9
         add_column(
@@ -115,6 +200,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
             "BIGINT NOT NULL DEFAULT 0",
         )
         .await?;
+        add_column(&client, "scheduled_jobs", "armed_for", "BIGINT").await?;
 
         // drop created_at column for old version <= 0.40.0
         drop_column(&client, "scheduled_jobs", "created_at").await?;
@@ -416,6 +502,24 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         Ok(result.rows_affected() == 1)
     }
 
+    async fn rename_key(
+        &self,
+        org: &str,
+        module: TriggerModule,
+        key: &str,
+        new_key: &str,
+    ) -> Result<Option<Trigger>> {
+        rename_key_in(&CLIENT_RW.clone(), org, module, key, new_key).await
+    }
+
+    async fn arm_slack_sync(&self, org: &str, response_id: &str, t: i64) -> Result<()> {
+        arm_slack_sync_in(&CLIENT_RW.clone(), org, response_id, t).await
+    }
+
+    async fn finish_slack_sync(&self, claim: &Trigger, finish: &SlackSyncFinish) -> Result<bool> {
+        finish_slack_sync_in(&CLIENT_RW.clone(), claim, finish).await
+    }
+
     async fn complete_claim(&self, trigger: Trigger) -> Result<bool> {
         let client = CLIENT_RW.clone();
         let result = sqlx::query(COMPLETE_CLAIM_QUERY)
@@ -550,6 +654,57 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
         Ok(jobs)
     }
 
+    async fn delete_by_org(&self, org: &str) -> Result<Vec<(TriggerModule, String)>> {
+        let client = CLIENT_RW.clone();
+        let deleted: Vec<(TriggerModule, String)> = sqlx::query_as(
+            r#"DELETE FROM scheduled_jobs WHERE org = $1 RETURNING module, module_key;"#,
+        )
+        .bind(org)
+        .fetch_all(&client)
+        .await?;
+        let cluster_coordinator = db::get_coordinator().await;
+        for (module, key) in &deleted {
+            if *module == TriggerModule::Alert {
+                let key = format!("{TRIGGERS_KEY}{module}/{org}/{key}");
+                cluster_coordinator.delete(&key, false, true, None).await?;
+            }
+        }
+        Ok(deleted)
+    }
+
+    async fn release_parked(&self, org: &str, deleted_at: i64, park: i64, now: i64) -> Result<u64> {
+        let client = CLIENT_RW.clone();
+        let released = sqlx::query(
+            r#"UPDATE scheduled_jobs SET next_run_at = $4
+WHERE org = $1 AND next_run_at > $4 AND next_run_at > $2 AND (next_run_at - $2) % $3 = 0;"#,
+        )
+        .bind(org)
+        .bind(deleted_at)
+        .bind(park)
+        .bind(now)
+        .execute(&client)
+        .await?;
+        Ok(released.rows_affected())
+    }
+
+    async fn release_if_org_active(&self, parked: &Trigger, now: i64) -> Result<bool> {
+        let client = CLIENT_RW.clone();
+        let released = sqlx::query(
+            r#"UPDATE scheduled_jobs SET next_run_at = $5
+WHERE org = $1 AND module = $2 AND module_key = $3 AND next_run_at = $4
+AND EXISTS (SELECT 1 FROM organizations WHERE identifier = $1 AND status = 'active');"#,
+        )
+        .bind(&parked.org)
+        .bind(&parked.module)
+        .bind(&parked.module_key)
+        .bind(parked.next_run_at)
+        .bind(now)
+        .execute(&client)
+        .await?;
+        let emit = |due: Trigger| async move { super::emit_realtime_trigger_event(&due).await };
+        Ok(super::finish_release(parked, now, released.rows_affected(), emit).await)
+    }
+
     /// Background job that watches for timeout of a job
     /// Steps:
     /// - Select all the records with status = "Processing"
@@ -614,6 +769,183 @@ SELECT COUNT(*) as num FROM scheduled_jobs;"#,
 
 #[cfg(test)]
 mod tests {
+
+    use sqlx::{Pool, Sqlite};
+
+    use super::{
+        ARM_SLACK_SYNC_QUERY, CREATE_TABLE_QUERY, FINISH_SLACK_SYNC_QUERY, PULL_QUERY_BY_MODULE,
+        SlackSyncFinish, Trigger, TriggerModule, TriggerStatus, arm_slack_sync_in,
+        finish_slack_sync_in, rename_key_in,
+    };
+    use crate::scheduler::slack_sync_tests::{self as cases, KEY, ORG, SyncDb};
+
+    struct SqliteDb(Pool<Sqlite>);
+
+    /// The production table plus its unique key, which the arm's upsert needs.
+    async fn with_table(pool: Pool<Sqlite>) -> Pool<Sqlite> {
+        sqlx::query(CREATE_TABLE_QUERY)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "CREATE UNIQUE INDEX scheduled_jobs_org_module_key_idx \
+             ON scheduled_jobs (org, module, module_key)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        pool
+    }
+
+    impl SyncDb for SqliteDb {
+        async fn rename(&self, module: TriggerModule, key: &str, new_key: &str) -> bool {
+            rename_key_in(&self.0, ORG, module, key, new_key)
+                .await
+                .unwrap()
+                .is_some()
+        }
+
+        async fn row_at(&self, module: TriggerModule, key: &str) -> Option<Trigger> {
+            sqlx::query_as::<_, Trigger>(
+                "SELECT * FROM scheduled_jobs WHERE module_key = $1 AND module = $2",
+            )
+            .bind(key)
+            .bind(module)
+            .fetch_optional(&self.0)
+            .await
+            .unwrap()
+        }
+
+        async fn set_data(&self, data: &str) {
+            sqlx::query("UPDATE scheduled_jobs SET data = $1")
+                .bind(data)
+                .execute(&self.0)
+                .await
+                .unwrap();
+        }
+
+        async fn fresh() -> Option<Self> {
+            let pool = sqlx::sqlite::SqlitePoolOptions::new()
+                .max_connections(1)
+                .connect("sqlite::memory:")
+                .await
+                .unwrap();
+            Some(Self(with_table(pool).await))
+        }
+
+        async fn arm(&self, t: i64) {
+            arm_slack_sync_in(&self.0, ORG, KEY, t).await.unwrap();
+        }
+
+        async fn finish(&self, claim: &Trigger, finish: &SlackSyncFinish) -> bool {
+            finish_slack_sync_in(&self.0, claim, finish).await.unwrap()
+        }
+
+        async fn claim(&self, now: i64) -> Vec<Trigger> {
+            sqlx::query_as::<_, Trigger>(PULL_QUERY_BY_MODULE)
+                .bind(TriggerStatus::Processing)
+                .bind(now)
+                .bind(TriggerModule::Report)
+                .bind(now + 90_000_000)
+                .bind(now + 90_000_000)
+                .bind(TriggerStatus::Waiting)
+                .bind(now)
+                .bind(true)
+                .bind(false)
+                .bind(TriggerModule::OncallSlackSync)
+                .bind(10_i64)
+                .fetch_all(&self.0)
+                .await
+                .unwrap()
+        }
+
+        async fn set(&self, status: TriggerStatus, next_run_at: i64) {
+            sqlx::query(
+                "UPDATE scheduled_jobs SET status = $1, next_run_at = $2 WHERE module = $3",
+            )
+            .bind(status)
+            .bind(next_run_at)
+            .bind(TriggerModule::OncallSlackSync)
+            .execute(&self.0)
+            .await
+            .unwrap();
+        }
+
+        async fn row_of(&self, module: TriggerModule) -> (Trigger, Option<i64>) {
+            let row = sqlx::query_as::<_, Trigger>(
+                "SELECT * FROM scheduled_jobs WHERE module_key = $1 AND module = $2",
+            )
+            .bind(KEY)
+            .bind(module.clone())
+            .fetch_one(&self.0)
+            .await
+            .unwrap();
+            let armed: (Option<i64>,) = sqlx::query_as(
+                "SELECT armed_for FROM scheduled_jobs WHERE module_key = $1 AND module = $2",
+            )
+            .bind(KEY)
+            .bind(module)
+            .fetch_one(&self.0)
+            .await
+            .unwrap();
+            (row, armed.0)
+        }
+
+        async fn insert(&self, module: TriggerModule, next_run_at: i64) {
+            sqlx::query(
+                "INSERT INTO scheduled_jobs (org, module, module_key, status, retries, next_run_at, data) \
+                 VALUES ($1, $2, $3, $4, 0, $5, '')",
+            )
+            .bind(ORG)
+            .bind(module)
+            .bind(KEY)
+            .bind(TriggerStatus::Waiting)
+            .bind(next_run_at)
+            .execute(&self.0)
+            .await
+            .unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn a_rename_moves_only_a_waiting_row() {
+        cases::a_rename_moves_only_a_waiting_row::<SqliteDb>().await;
+    }
+
+    #[tokio::test]
+    async fn an_arm_follows_sy2_on_every_row_state() {
+        cases::an_arm_follows_sy2_on_every_row_state::<SqliteDb>().await;
+    }
+
+    #[tokio::test]
+    async fn arms_during_a_pass_keep_the_earliest() {
+        cases::arms_during_a_pass_keep_the_earliest::<SqliteDb>().await;
+    }
+
+    #[tokio::test]
+    async fn a_finish_applies_the_pass_unless_an_arm_came_in() {
+        cases::a_finish_applies_the_pass_unless_an_arm_came_in::<SqliteDb>().await;
+    }
+
+    #[tokio::test]
+    async fn a_finish_of_a_reclaimed_row_changes_nothing() {
+        cases::a_finish_of_a_reclaimed_row_changes_nothing::<SqliteDb>().await;
+    }
+
+    #[tokio::test]
+    async fn another_modules_row_is_untouched() {
+        cases::another_modules_row_is_untouched::<SqliteDb>().await;
+    }
+
+    /// SY-2: no JSON operator in the sync statements (openobserve AGENTS.md).
+    #[test]
+    fn the_sync_statements_read_no_json() {
+        for q in [ARM_SLACK_SYNC_QUERY, FINISH_SLACK_SYNC_QUERY] {
+            for op in ["->", "json", "jsonb"] {
+                assert!(!q.contains(op), "{op} in {q}");
+            }
+        }
+    }
     use super::{COMPLETE_CLAIM_QUERY, KEEP_ALIVE_CLAIM_QUERY, PULL_QUERY, SqliteScheduler};
 
     #[test]

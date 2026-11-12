@@ -20,8 +20,8 @@
 //! org's per-org DEK via [`cipher::get_dek`].
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set,
-    SqlErr,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder,
+    QuerySelect, Set, SqlErr,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -193,9 +193,17 @@ pub async fn get_by_name(org: &str, name: &str) -> Result<Option<OrgToolset>, er
 pub async fn list(
     org: &str,
     filter: ListFilter,
-    limit: Option<i64>,
+    limit: Option<u64>,
 ) -> Result<Vec<OrgToolset>, errors::Error> {
-    let client = get_orm_client_ro().await;
+    list_with(get_orm_client_ro().await, org, filter, limit).await
+}
+
+pub async fn list_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    filter: ListFilter,
+    limit: Option<u64>,
+) -> Result<Vec<OrgToolset>, errors::Error> {
     let mut query = Entity::find()
         .filter(Column::Org.eq(org))
         .order_by(Column::CreatedAt, Order::Desc);
@@ -207,10 +215,11 @@ pub async fn list(
         query = query.filter(Column::Kind.eq(kind));
     }
     if let Some(n) = limit {
-        query = query.limit(n as u64);
+        // sqlx binds LIMIT as i64 and panics on anything larger.
+        query = query.limit(n.min(i64::MAX as u64));
     }
 
-    let rows = query.all(client).await?;
+    let rows = query.all(conn).await?;
 
     if rows.is_empty() {
         return Ok(vec![]);
@@ -260,6 +269,15 @@ pub async fn remove(org: &str, id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
+/// Credentials are ciphertext under the org DEK, so they must go before the DEK does.
+pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .exec(get_orm_client_rw().await)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use base64::{Engine, prelude::BASE64_STANDARD};
@@ -270,6 +288,19 @@ mod tests {
     // -----------------------------------------------------------------------
     // ListFilter
     // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn list_with_an_out_of_range_limit_does_not_panic() {
+        use sea_orm::{Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+
+        let rows = list_with(&db, "org", ListFilter::default(), Some(u64::MAX)).await;
+        assert!(rows.unwrap().is_empty());
+    }
 
     #[test]
     fn test_list_filter_default() {

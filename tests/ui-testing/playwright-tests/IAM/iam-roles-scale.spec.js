@@ -14,6 +14,7 @@
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
+const { openNavFlyoutChild } = require('../../pages/commonActions.js');
 const testLogger = require('../utils/test-logger.js');
 const {
     ns, req, listRoles, createRole, setRolePerms, getPerms, makeTracker, uniq, org, rbacEnabled,
@@ -82,7 +83,7 @@ test.describe('IAM · Edit Role · scale and layout', { tag: '@enterprise' }, ()
         await navigateToBase(page);
         pm = new PageManager(page);
         test.skip(!(await rbacEnabled(page)), 'RBAC is off (OSS build)');
-        await page.locator('[data-test="menu-link-\\/iam-item"]').click();
+        await openNavFlyoutChild(page, 'iam');
         await pm.rolesPage.rolesTab.waitFor({ state: 'visible', timeout: 30000 });
     });
 
@@ -151,8 +152,9 @@ test.describe('IAM · Edit Role · scale and layout', { tag: '@enterprise' }, ()
 
         // Looking at the JSON is not editing it — a round trip that stages changes
         // would let an untouched role be rewritten by a stray Save.
-        await expect(pm.rolesPage.reviewChangesButton,
-            'the Table -> JSON -> Table round trip staged changes').toHaveCount(0);
+        // Review Changes always renders in table view; List-only grants raise no companion gap, so it stays disabled.
+        await expect(pm.rolesPage.unsavedCount, 'the Table -> JSON -> Table round trip staged changes').toHaveCount(0);
+        await expect(pm.rolesPage.reviewChangesButton).toBeDisabled();
 
         const payload = await pm.rolesPage.saveAndCapture({ expectRequest: false });
         if (payload) {

@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     TriggerCondition,
-    grouping::{GroupClassification, group_key},
+    grouping::{GroupClassification, group_key, render_labels},
     level::{AlertLevel, DeliveryDecision, delivery_decision},
     state::{AlertState, StateTransition, StateUpdate},
 };
@@ -41,6 +41,12 @@ use crate::{
     meta::self_reporting::usage::RunOutcome,
     utils::json::{Map, Value},
 };
+
+/// How long after its claim an evaluation may start a group send; each send can take its timeout.
+pub const GROUP_FIRING_DEADLINE_SECS: i64 = 1_800;
+
+/// Named per cause in a trigger record, which every group past the cap would otherwise bloat.
+const MAX_UNDELIVERED_GROUPS_NAMED: usize = 5;
 
 /// The version a delayed delivery carries — the group's **level-episode** at
 /// enqueue time (§5.5 round-6): `level_since` advances only when the level
@@ -103,15 +109,47 @@ pub struct DispatchPlan {
     /// Groups in pending state
     pub pending: usize,
     /// Qualifying groups dropped by the MN-8 knob — reported so the caller
-    /// can log them; silent truncation is not acceptable here either.
+    /// can log and record them; silent truncation is not acceptable here either.
     pub dropped_by_knob: Vec<String>,
     /// Retained firing groups with **no state row** after the plan committed,
-    /// and duplicate group keys within one evaluation. Both are consistency
-    /// failures rather than routine outcomes: reported for logging, and
-    /// deliberately NOT dispatched — see [`plan_dispatch`].
+    /// or whose key is duplicated within one evaluation. Both are consistency
+    /// failures rather than routine outcomes: reported for logging and the
+    /// trigger record, and deliberately NOT dispatched — see [`plan_dispatch`].
     pub inconsistent: Vec<String>,
     /// Groups that would deliver but a downtime mutes; also counted in `suppressed`.
     pub muted: Vec<String>,
+    /// Groups withheld because they repeat their last delivery; also counted in `suppressed`.
+    pub repeats: usize,
+}
+
+impl DispatchPlan {
+    /// Firing groups nothing chose to withhold, whether or not a send went out.
+    pub fn not_withheld(&self) -> usize {
+        self.items.len() + self.dropped_by_knob.len() + self.inconsistent.len()
+    }
+
+    /// One line per cause of a firing group getting no send, named by labels as keys are hashes.
+    pub fn undelivered_notes(
+        &self,
+        classification: &GroupClassification,
+        max_sends: usize,
+    ) -> Vec<String> {
+        let over_cap = format!(
+            "over the limit of {max_sends} per evaluation \
+             (ZO_ALERT_MAX_GROUP_NOTIFICATIONS_PER_EVAL)"
+        );
+        [
+            undelivered_note(&self.dropped_by_knob, &over_cap, classification),
+            undelivered_note(
+                &self.inconsistent,
+                "missing state or payload row or a duplicate key",
+                classification,
+            ),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
 }
 
 /// Decide which groups this evaluation notifies (MN-1, MN-8).
@@ -134,7 +172,8 @@ pub struct DispatchPlan {
 ///   key twice would otherwise notify the group twice and consume two slots of the MN-8 budget.
 /// * `max_sends` is the MN-8 knob: `0` = unlimited; otherwise it counts **qualifying** sends
 ///   (applied after `delivery_decision`), worst-first.
-/// * A deliverable group for which `muted` is true goes to `muted` instead, before the knob.
+/// * A deliverable group `muted(key, decision, last_notified_level)` holds goes to `muted`, first.
+#[allow(clippy::too_many_arguments)]
 pub fn plan_dispatch(
     classification: &GroupClassification,
     states: &HashMap<String, AlertState>,
@@ -142,7 +181,8 @@ pub fn plan_dispatch(
     tc: &TriggerCondition,
     now: i64,
     max_sends: usize,
-    muted: impl Fn(&str) -> bool,
+    suppress_repeats: bool,
+    muted: impl Fn(&str, &DeliveryDecision, Option<AlertLevel>) -> bool,
 ) -> DispatchPlan {
     let mut items = Vec::new();
     let mut suppressed = 0usize;
@@ -150,6 +190,7 @@ pub fn plan_dispatch(
     let mut dropped_by_knob = Vec::new();
     let mut inconsistent = Vec::new();
     let mut muted_keys = Vec::new();
+    let mut repeats = 0usize;
 
     // A key appearing twice in one classification is an invariant violation
     // (validation rejects the known source, MN-12). Counting first means both
@@ -168,18 +209,18 @@ pub fn plan_dispatch(
     // iterating it IS worst-first — the knob therefore always keeps the most
     // severe groups, and ties break deterministically.
     for (group, key) in classification.groups.iter().zip(&keys) {
+        // Healthy groups are not candidates, and are not "suppressed" either —
+        // nothing was withheld from them.
+        let Some(level) = group.level.filter(|l| l.is_firing()) else {
+            continue;
+        };
+
         if occurrences[key.as_str()] > 1 {
             if !inconsistent.contains(key) {
                 inconsistent.push(key.clone());
             }
             continue;
         }
-
-        // Healthy groups are not candidates, and are not "suppressed" either —
-        // nothing was withheld from them.
-        let Some(level) = group.level.filter(|l| l.is_firing()) else {
-            continue;
-        };
 
         // Both of these are consistency failures, not routine outcomes: the
         // plan committed a row for every retained group before dispatch ran,
@@ -212,10 +253,21 @@ pub fn plan_dispatch(
         };
         match decision {
             DeliveryDecision::Deliver | DeliveryDecision::DeliverEscalation => {
-                // A muted group is suppressed by its downtime before the knob, so it fills no slot.
-                if muted(key) {
+                // Held by a downtime or an ack before the knob, so it fills no slot.
+                if muted(key, &decision, state.last_notified_level) {
                     suppressed += 1;
                     muted_keys.push(key.clone());
+                    continue;
+                }
+                if suppress_repeats
+                    && repeats_last_notification(
+                        level,
+                        state.episode_id.is_some(),
+                        state.last_notified_level,
+                    )
+                {
+                    suppressed += 1;
+                    repeats += 1;
                     continue;
                 }
                 // The knob counts QUALIFYING sends, so a silenced group never
@@ -236,7 +288,9 @@ pub fn plan_dispatch(
             }
             DeliveryDecision::SuppressedBySilence
             | DeliveryDecision::SuppressedByWarningPolicy
-            | DeliveryDecision::SuppressedByDowntime(_) => suppressed += 1,
+            | DeliveryDecision::SuppressedByDowntime(_)
+            | DeliveryDecision::SuppressedByAck(_)
+            | DeliveryDecision::SuppressedAsRepeat => suppressed += 1,
             DeliveryDecision::SuppressedByPending => pending += 1,
             DeliveryDecision::NotFiring => {}
         }
@@ -249,7 +303,17 @@ pub fn plan_dispatch(
         dropped_by_knob,
         inconsistent,
         muted: muted_keys,
+        repeats,
     }
+}
+
+/// The open recovery episode was already notified at `level`, so this firing tells nothing new.
+pub fn repeats_last_notification(
+    level: AlertLevel,
+    episode_open: bool,
+    last_notified: Option<AlertLevel>,
+) -> bool {
+    episode_open && last_notified == Some(level)
 }
 
 /// The write that records one group's **successful** delivery (MN-6).
@@ -514,6 +578,41 @@ impl DeliveryEpisode {
     }
 }
 
+/// Whether a firing claimed at `started_at` must stop sending; a claim with no start never does.
+pub fn group_firing_deadline_passed(started_at: i64, now: i64) -> bool {
+    started_at > 0 && now.saturating_sub(started_at) > GROUP_FIRING_DEADLINE_SECS * 1_000_000
+}
+
+fn undelivered_note(
+    keys: &[String],
+    cause: &str,
+    classification: &GroupClassification,
+) -> Option<String> {
+    if keys.is_empty() {
+        return None;
+    }
+    let named = keys
+        .iter()
+        .take(MAX_UNDELIVERED_GROUPS_NAMED)
+        .filter_map(|key| {
+            classification
+                .groups
+                .iter()
+                .find(|group| group_key(&group.labels) == *key)
+        })
+        .map(|group| render_labels(&group.labels))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let rest = match keys.len().saturating_sub(MAX_UNDELIVERED_GROUPS_NAMED) {
+        0 => String::new(),
+        rest => format!(" and {rest} more"),
+    };
+    Some(format!(
+        "{} firing group(s) not notified, {cause}: {named}{rest}",
+        keys.len()
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -549,6 +648,14 @@ mod tests {
     }
 
     // ===================== PromQL series identity =========================
+
+    #[test]
+    fn the_group_firing_deadline_stops_sends_only_after_its_limit() {
+        let limit = GROUP_FIRING_DEADLINE_SECS * 1_000_000;
+        assert!(!group_firing_deadline_passed(1_000, 1_000 + limit));
+        assert!(group_firing_deadline_passed(1_000, 1_001 + limit));
+        assert!(!group_firing_deadline_passed(0, i64::MAX));
+    }
 
     #[test]
     fn promql_series_labels_take_every_label_and_drop_the_measurements() {
@@ -673,6 +780,8 @@ mod tests {
             episode_opened_at: None,
             episode_incident_id: None,
             recovering_since: None,
+            firing_started_at: None,
+            group_label_set: None,
         }
     }
 
@@ -741,7 +850,8 @@ mod tests {
             &tc(None),
             1_000 * SEC,
             0,
-            |_| false,
+            false,
+            |_, _, _| false,
         );
 
         assert_eq!(
@@ -766,7 +876,16 @@ mod tests {
         let c = classified(&[("crit", 150.0), ("ok1", 1.0), ("ok2", 2.0)], 500);
         let states = states_for(&c, now, None, None);
 
-        let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 0, |_| false);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            0,
+            false,
+            |_, _, _| false,
+        );
 
         assert_eq!(plan.items.len(), 1);
         assert_eq!(
@@ -786,7 +905,16 @@ mod tests {
         let c = classified(&[("a", 150.0)], 500);
         let states = states_for(&c, now, None, None);
 
-        let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 0, |_| false);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            0,
+            false,
+            |_, _, _| false,
+        );
 
         assert!(
             plan.items[0].escalation,
@@ -809,7 +937,8 @@ mod tests {
             &tc(None),
             1_000 * SEC,
             0,
-            |_| false,
+            false,
+            |_, _, _| false,
         );
         let b = plan
             .items
@@ -834,7 +963,8 @@ mod tests {
             &tc(None),
             1_000 * SEC,
             0,
-            |_| false,
+            false,
+            |_, _, _| false,
         );
         let keys: Vec<_> = plan.items.iter().map(|i| i.group_key.clone()).collect();
 
@@ -856,7 +986,16 @@ mod tests {
         let c = classified(&[("a", 150.0)], 500);
         let states = states_for(&c, now, Some(AlertLevel::Critical), Some(now + 10 * MIN));
 
-        let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 0, |_| false);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            0,
+            false,
+            |_, _, _| false,
+        );
 
         assert!(plan.items.is_empty());
         assert_eq!(plan.suppressed, 1);
@@ -870,7 +1009,16 @@ mod tests {
         let c = classified(&[("a", 150.0)], 500);
         let states = states_for(&c, now, Some(AlertLevel::Critical), Some(now - 1));
 
-        let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 0, |_| false);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            0,
+            false,
+            |_, _, _| false,
+        );
 
         assert_eq!(plan.items.len(), 1);
         assert!(
@@ -887,7 +1035,16 @@ mod tests {
         let c = classified(&[("a", 150.0)], 500);
         let states = states_for(&c, now, Some(AlertLevel::Warning), Some(now + 10 * MIN));
 
-        let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 0, |_| false);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            0,
+            false,
+            |_, _, _| false,
+        );
 
         assert_eq!(plan.items.len(), 1);
         assert!(plan.items[0].escalation);
@@ -920,7 +1077,16 @@ mod tests {
         assert!(row.is_firing(), "NotifyFailed is still a firing state");
 
         let states = HashMap::from([(key.clone(), row)]);
-        let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 0, |_| false);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            0,
+            false,
+            |_, _, _| false,
+        );
 
         assert_eq!(
             plan.items.len(),
@@ -943,7 +1109,8 @@ mod tests {
             &tc(Some(false)),
             1_000 * SEC,
             0,
-            |_| false,
+            false,
+            |_, _, _| false,
         );
 
         assert_eq!(plan.items.len(), 1);
@@ -984,7 +1151,9 @@ mod tests {
             ]),
         );
 
-        let plan = plan_dispatch(&c, &states, &rows, &tc(None), now, 0, |_| false);
+        let plan = plan_dispatch(&c, &states, &rows, &tc(None), now, 0, false, |_, _, _| {
+            false
+        });
 
         assert_eq!(plan.items.len(), 2, "only retained groups dispatch");
         assert!(
@@ -1015,7 +1184,16 @@ mod tests {
             state(ROLLUP_GROUP_KEY, AlertLevel::Critical, now, None, None),
         );
 
-        let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 0, |_| false);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            0,
+            false,
+            |_, _, _| false,
+        );
 
         assert_eq!(plan.items.len(), 1, "one group fired, so one page");
         assert_eq!(plan.items[0].group_key, key_of("a"));
@@ -1043,7 +1221,16 @@ mod tests {
             state(&gone, AlertLevel::Critical, now - 5 * MIN, None, None),
         );
 
-        let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 0, |_| false);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            0,
+            false,
+            |_, _, _| false,
+        );
 
         assert!(!plan.items.iter().any(|i| i.group_key == gone));
     }
@@ -1065,7 +1252,8 @@ mod tests {
             &tc(None),
             now,
             0,
-            |_| false,
+            false,
+            |_, _, _| false,
         );
 
         assert!(plan.items.is_empty(), "no durable row, no page");
@@ -1085,7 +1273,16 @@ mod tests {
         let c = classified(&[("a", 150.0)], 500);
         let states = states_for(&c, now, None, None);
 
-        let plan = plan_dispatch(&c, &states, &HashMap::new(), &tc(None), now, 0, |_| false);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &HashMap::new(),
+            &tc(None),
+            now,
+            0,
+            false,
+            |_, _, _| false,
+        );
 
         assert!(plan.items.is_empty());
         assert_eq!(plan.inconsistent, vec![key_of("a")]);
@@ -1112,7 +1309,16 @@ mod tests {
         assert_eq!(c.groups.len(), 3, "fixture: `a` is observed twice");
 
         let states = states_for(&c, now, None, None);
-        let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 0, |_| false);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            0,
+            false,
+            |_, _, _| false,
+        );
 
         assert!(
             !plan.items.iter().any(|i| i.group_key == key_of("a")),
@@ -1141,7 +1347,16 @@ mod tests {
         assert_eq!(c.groups.len(), 3, "fixture: `a` observed at two levels");
 
         let states = states_for(&c, now, None, None);
-        let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 0, |_| false);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            0,
+            false,
+            |_, _, _| false,
+        );
 
         for item in &plan.items {
             assert_ne!(
@@ -1171,7 +1386,16 @@ mod tests {
         );
         let states = states_for(&c, now, None, None);
 
-        let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 2, |_| false);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            2,
+            false,
+            |_, _, _| false,
+        );
 
         assert_eq!(plan.items.len(), 2, "`b` and `c` both page");
         assert!(plan.dropped_by_knob.is_empty());
@@ -1186,7 +1410,9 @@ mod tests {
         let states = states_for(&c, now, None, None);
         let rows = rows_for(&c);
 
-        let plan = plan_dispatch(&c, &states, &rows, &tc(None), now, 0, |_| false);
+        let plan = plan_dispatch(&c, &states, &rows, &tc(None), now, 0, false, |_, _, _| {
+            false
+        });
 
         assert_eq!(
             &plan.items[0].row,
@@ -1210,7 +1436,16 @@ mod tests {
         row.level_at = Some(now); // freshness advanced by a later same-level run
         let states = HashMap::from([(key.clone(), row)]);
 
-        let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 0, |_| false);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            0,
+            false,
+            |_, _, _| false,
+        );
 
         assert_eq!(
             plan.items[0].episode,
@@ -1235,10 +1470,110 @@ mod tests {
             &tc(None),
             1_000 * SEC,
             0,
-            |_| false,
+            false,
+            |_, _, _| false,
         );
         assert_eq!(plan.items.len(), 3);
         assert!(plan.dropped_by_knob.is_empty());
+    }
+
+    #[test]
+    fn capped_groups_are_noted_by_their_labels_and_still_count_as_not_withheld() {
+        let c = classified(&[("crit", 150.0), ("warn", 75.0)], 500);
+        let now = 1_000 * SEC;
+        let states = states_for(&c, now, None, None);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            1,
+            false,
+            |_, _, _| false,
+        );
+
+        assert_eq!(plan.not_withheld(), 2);
+        assert_eq!(
+            plan.undelivered_notes(&c, 1),
+            vec![
+                "1 firing group(s) not notified, over the limit of 1 per evaluation \
+                 (ZO_ALERT_MAX_GROUP_NOTIFICATIONS_PER_EVAL): host=warn"
+            ]
+        );
+    }
+
+    #[test]
+    fn inconsistent_groups_are_noted_and_still_count_as_not_withheld() {
+        let c = classified(&[("a", 150.0)], 500);
+        let now = 1_000 * SEC;
+        let states = states_for(&c, now, None, None);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &HashMap::new(),
+            &tc(None),
+            now,
+            0,
+            false,
+            |_, _, _| false,
+        );
+
+        assert_eq!(plan.not_withheld(), 1);
+        assert_eq!(
+            plan.undelivered_notes(&c, 0),
+            vec![
+                "1 firing group(s) not notified, missing state or payload row or a duplicate \
+                 key: host=a"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_note_names_a_few_groups_and_counts_the_rest() {
+        let c = classified(
+            &["a", "b", "c", "d", "e", "f", "g", "h"].map(|h| (h, 150.0)),
+            500,
+        );
+        let now = 1_000 * SEC;
+        let states = states_for(&c, now, None, None);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            1,
+            false,
+            |_, _, _| false,
+        );
+
+        let notes = plan.undelivered_notes(&c, 1);
+        assert_eq!(notes.len(), 1);
+        assert!(notes[0].starts_with("7 firing group(s) not notified, over the limit of 1"));
+        assert_eq!(notes[0].matches("host=").count(), 5);
+        assert!(notes[0].ends_with(" and 2 more"));
+    }
+
+    #[test]
+    fn a_healthy_duplicate_is_not_a_group_that_went_unpaged() {
+        let c = classified(&[("ok", 1.0), ("ok", 1.0)], 500);
+        let now = 1_000 * SEC;
+        let states = states_for(&c, now, None, None);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            0,
+            false,
+            |_, _, _| false,
+        );
+
+        assert!(plan.inconsistent.is_empty());
+        assert_eq!(plan.not_withheld(), 0);
+        assert!(plan.undelivered_notes(&c, 0).is_empty());
     }
 
     #[test]
@@ -1255,7 +1590,8 @@ mod tests {
             &tc(None),
             1_000 * SEC,
             2,
-            |_| false,
+            false,
+            |_, _, _| false,
         );
 
         assert_eq!(plan.items.len(), 2);
@@ -1289,10 +1625,26 @@ mod tests {
         let c = build();
         let states = states_for(&c, now, None, None);
 
-        let first = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 2, |_| false);
-        let second = plan_dispatch(&build(), &states, &rows_for(&c), &tc(None), now, 2, |_| {
-            false
-        });
+        let first = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            2,
+            false,
+            |_, _, _| false,
+        );
+        let second = plan_dispatch(
+            &build(),
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            2,
+            false,
+            |_, _, _| false,
+        );
 
         assert_eq!(first.items, second.items);
         assert_eq!(first.dropped_by_knob, second.dropped_by_knob);
@@ -1324,7 +1676,16 @@ mod tests {
             ),
         ]);
 
-        let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 1, |_| false);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            1,
+            false,
+            |_, _, _| false,
+        );
 
         assert_eq!(plan.items.len(), 1);
         assert_eq!(plan.items[0].group_key, key_b);
@@ -1342,9 +1703,16 @@ mod tests {
         let (key_a, key_b) = (key_of("a"), key_of("b"));
         let states = states_for(&c, now, None, None);
         for _ in 0..2 {
-            let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 1, |k| {
-                k == key_a
-            });
+            let plan = plan_dispatch(
+                &c,
+                &states,
+                &rows_for(&c),
+                &tc(None),
+                now,
+                1,
+                false,
+                |k, _, _| k == key_a,
+            );
             assert_eq!(plan.items.len(), 1);
             assert_eq!(plan.items[0].group_key, key_b);
             assert_eq!(plan.suppressed, 1);
@@ -1354,14 +1722,45 @@ mod tests {
     }
 
     #[test]
+    fn test_an_acked_group_whose_first_send_failed_is_muted_and_a_level_up_is_not() {
+        let now = 1_000 * SEC;
+        let c = classified(&[("a", 150.0), ("b", 150.0)], 500);
+        let (key_a, key_b) = (key_of("a"), key_of("b"));
+        let mut states = states_for(&c, now, None, None);
+        states.get_mut(&key_b).unwrap().last_notified_level = Some(AlertLevel::Warning);
+        let acked = |k: &str, d: &DeliveryDecision, last: Option<AlertLevel>| {
+            (k == key_a || k == key_b) && d.ack_withholds(last)
+        };
+        let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 0, false, acked);
+        assert_eq!(
+            plan.muted,
+            vec![key_a],
+            "V-24: the never-delivered group stays quiet"
+        );
+        assert_eq!(plan.items.len(), 1);
+        assert_eq!(
+            plan.items[0].group_key, key_b,
+            "a real level increase still notifies"
+        );
+        assert!(plan.items[0].escalation);
+    }
+
+    #[test]
     fn test_a_muted_group_with_knob_zero_is_suppressed_and_the_rest_deliver() {
         let now = 1_000 * SEC;
         let c = classified(&[("a", 150.0), ("b", 75.0)], 500);
         let (key_a, key_b) = (key_of("a"), key_of("b"));
         let states = states_for(&c, now, None, None);
-        let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 0, |k| {
-            k == key_a
-        });
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            0,
+            false,
+            |k, _, _| k == key_a,
+        );
         assert_eq!(plan.items.len(), 1);
         assert_eq!(plan.items[0].group_key, key_b);
         assert_eq!(plan.muted, vec![key_a]);
@@ -2115,5 +2514,110 @@ mod tests {
         let back: DeliveryEpisode = crate::utils::json::from_slice(&bytes).unwrap();
         assert_eq!(back, episode);
         assert_eq!(back.notified_at_enqueue, (None, None));
+    }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // suppress_repeats — notify once per state change
+    // ═════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn only_the_notified_level_inside_an_open_episode_is_a_repeat() {
+        use AlertLevel::{Critical, Warning};
+        // Still firing at the delivered level, or back at it inside a keep_firing_for hold.
+        assert!(repeats_last_notification(Critical, true, Some(Critical)));
+        // Escalated or de-escalated since the last delivery.
+        assert!(!repeats_last_notification(Critical, true, Some(Warning)));
+        assert!(!repeats_last_notification(Warning, true, Some(Critical)));
+        // The episode closed on a recovery: a new incident.
+        assert!(!repeats_last_notification(Critical, false, Some(Critical)));
+        // Nothing was ever delivered.
+        assert!(!repeats_last_notification(Critical, false, None));
+    }
+
+    #[test]
+    fn a_repeat_is_withheld_like_a_downtime_or_an_ack() {
+        assert!(DeliveryDecision::SuppressedAsRepeat.withheld());
+        assert!(DeliveryDecision::SuppressedByAck("u".into()).withheld());
+        assert!(!DeliveryDecision::SuppressedBySilence.withheld());
+        assert!(!DeliveryDecision::Deliver.withheld());
+    }
+
+    /// Every group of `c` delivered at Critical, inside an open recovery episode.
+    fn notified_states(c: &GroupClassification) -> HashMap<String, AlertState> {
+        let mut states = states_for(c, MIN, Some(AlertLevel::Critical), None);
+        for row in states.values_mut() {
+            row.episode_id = Some("ep-1".to_string());
+        }
+        states
+    }
+
+    #[test]
+    fn plan_dispatch_withholds_a_repeat_only_when_the_switch_is_on() {
+        let c = classified(&[("a", 150.0)], 500);
+        let states = notified_states(&c);
+        let plan = |on| {
+            plan_dispatch(
+                &c,
+                &states,
+                &rows_for(&c),
+                &tc(None),
+                10 * MIN,
+                0,
+                on,
+                |_, _, _| false,
+            )
+        };
+
+        assert_eq!(
+            plan(false).items.len(),
+            1,
+            "silence 0 and the switch off page again"
+        );
+        let on = plan(true);
+        assert!(on.items.is_empty());
+        assert_eq!((on.suppressed, on.repeats), (1, 1));
+    }
+
+    #[test]
+    fn a_repeat_does_not_spend_the_send_budget() {
+        // `a` repeats; `b` fires for the first time and must get the single slot.
+        let c = classified(&[("a", 150.0), ("b", 150.0)], 500);
+        let mut states = states_for(&c, MIN, None, None);
+        let a = states.get_mut(&key_of("a")).unwrap();
+        a.last_notified_level = Some(AlertLevel::Critical);
+        a.episode_id = Some("ep-1".to_string());
+
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            10 * MIN,
+            1,
+            true,
+            |_, _, _| false,
+        );
+        assert_eq!(plan.items.len(), 1);
+        assert_eq!(plan.items[0].group_key, key_of("b"));
+        assert!(plan.dropped_by_knob.is_empty());
+        assert_eq!(plan.repeats, 1);
+    }
+
+    #[test]
+    fn a_muted_group_is_reported_muted_not_repeated() {
+        let c = classified(&[("a", 150.0)], 500);
+        let states = notified_states(&c);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            10 * MIN,
+            0,
+            true,
+            |_, _, _| true,
+        );
+        assert_eq!(plan.muted, vec![key_of("a")]);
+        assert_eq!(plan.repeats, 0);
     }
 }

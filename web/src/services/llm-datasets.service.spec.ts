@@ -33,7 +33,7 @@ vi.mock("@/services/http", () => ({
   }),
 }));
 
-import llmDatasetsService from "./llm-datasets.service";
+import llmDatasetsService, { commonInputFields, inputFieldVariables } from "./llm-datasets.service";
 import analytics from "./product_analytics";
 
 beforeEach(() => {
@@ -62,6 +62,50 @@ function itemRow(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+describe("inputFieldVariables", () => {
+  it("binds each templatable top-level field, rendered as the runner renders it", () => {
+    expect(
+      inputFieldVariables({
+        question: "q",
+        n: 2,
+        meta: { a: 1 },
+        input: "x",
+        expected_output: "y",
+        "bad-key": 1,
+      }),
+    ).toEqual({ question: "q", n: "2", meta: '{"a":1}' });
+  });
+
+  it("renders null as the literal the runner sends, not empty", () => {
+    expect(inputFieldVariables({ context: null })).toEqual({ context: "null" });
+  });
+
+  it("binds no fields for a string, a messages array or null", () => {
+    expect(inputFieldVariables("text")).toEqual({});
+    expect(inputFieldVariables([{ role: "user", content: "x" }])).toEqual({});
+    expect(inputFieldVariables(null)).toEqual({});
+  });
+});
+
+describe("commonInputFields", () => {
+  const rows = [{ rawInput: { question: "a", context: "b" } }, { rawInput: { question: "c" } }];
+
+  it("offers only the fields every row has", () => {
+    expect(commonInputFields(rows)).toEqual(["question"]);
+  });
+
+  it("offers nothing once any row's input is not an object, or with no rows", () => {
+    expect(commonInputFields([...rows, { rawInput: "plain text" }])).toEqual([]);
+    expect(commonInputFields([])).toEqual([]);
+  });
+
+  it("does not mistake an inherited property for a field a row lacks", () => {
+    expect(
+      commonInputFields([{ rawInput: { constructor: "a" } }, { rawInput: { other: "b" } }]),
+    ).toEqual([]);
+  });
+});
 
 describe("llmDatasetsService.listItems", () => {
   it("pages server-side and caps size at the API ceiling", async () => {

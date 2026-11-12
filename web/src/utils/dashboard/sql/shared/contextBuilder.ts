@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
+import { formatAxisTickValue } from "../../axisTickFormat";
 import {
   calculateWidthText,
   calculateDynamicNameGap,
@@ -30,7 +31,12 @@ import {
   calculateChartDimensions,
   calculatePieChartRadius,
 } from "../../legendConfiguration";
-import { chartColor, dataZoomBrushStyle } from "@/utils/chartTheme";
+import {
+  chartAxisLine,
+  chartAxisTextColor,
+  chartColor,
+  dataZoomBrushStyle,
+} from "@/utils/chartTheme";
 import { getPropsByChartTypeForSeries } from "../../sqlChartSeriesProps";
 import { processData } from "../../sqlProcessData";
 import { fillMissingValues } from "../../sqlMissingValueFiller";
@@ -38,6 +44,10 @@ import { buildDataLookupMap, createSeriesBuilders } from "./seriesBuilder";
 import { createTrellisHelpers } from "./trellisConfig";
 import { type SQLContext } from "./types";
 import { escapeHtml } from "@/utils/html";
+import { createSeriesOverrideLookup } from "../../seriesOverrides";
+import { sortTooltipParams } from "../../tooltipSort";
+import { tooltipPointValue } from "../../cartesianOptions";
+import { stackTotalRows } from "../../stackTotals";
 
 /**
  * Finds the largest label in the given data array.
@@ -72,7 +82,6 @@ export function buildSQLContext(
   // Set gridlines visibility based on config.show_gridlines (default: true)
   const showGridlines =
     panelSchema?.config?.show_gridlines !== undefined ? panelSchema.config.show_gridlines : true;
-  // Subtle dashed grid lines so they recede behind the data
   const gridLineStyle = getGridLineStyle(store.state.theme);
   const extras: any = {};
 
@@ -137,7 +146,7 @@ export function buildSQLContext(
             // The alert preview passes show_label:false — its lines are
             // colour-coded, and a text label clips at the chart top.
             show: markLine.show_label !== false,
-            formatter: markLine.name ? "{b}:{c}" : "{c}",
+            formatter: markLine.label_formatter ?? (markLine.name ? "{b}:{c}" : "{c}"),
             position: "insideEndTop",
           },
           ...(markLine.color ? { lineStyle: { color: markLine.color } } : {}),
@@ -232,6 +241,8 @@ export function buildSQLContext(
 
   const legendConfig = createBaseLegendConfig(panelSchema, hoveredSeriesState);
 
+  const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
+
   const isHorizontalChart = panelSchema.type === "h-bar" || panelSchema.type === "h-stacked";
 
   const defaultGrid = {
@@ -279,7 +290,13 @@ export function buildSQLContext(
       const lo = hasCfgMin ? Math.min(cfgMin, dataMin) : Math.min(0, dataMin);
       hi = hasCfgMax ? Math.max(cfgMax, hi) : Math.max(0, hi);
 
-      const ticks = calculateNiceTickValues(lo, hi);
+      const minInterval = Number(panelSchema?.config?.y_axis_min_interval);
+      const ticks = calculateNiceTickValues(
+        lo,
+        hi,
+        5,
+        Number.isFinite(minInterval) && !isHorizontalChart ? minInterval : 0,
+      );
       if (!ticks?.length) throw new Error("no ticks");
 
       let decimals = configured;
@@ -545,10 +562,7 @@ export function buildSQLContext(
             return "";
           if (name?.length == 0) return "";
 
-          // sort tooltip array based on value
-          name?.sort((a: any, b: any) => {
-            return (b.value ?? 0) - (a.value ?? 0);
-          });
+          sortTooltipParams(name, panelSchema?.config, (it: any) => tooltipPointValue(it.value));
 
           // if hovered series name is not null then move it to first position
           if (hoveredSeriesState?.value?.hoveredSeriesName) {
@@ -576,35 +590,28 @@ export function buildSQLContext(
               // if have than bold it
               if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
                 hoverText.push(
-                  `<strong>${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
-                    formatUnitValue(
-                      getUnitValue(
-                        it.value,
-                        panelSchema.config?.unit,
-                        panelSchema.config?.unit_custom,
-                        panelSchema.config?.decimals,
-                      ),
-                    ),
+                  `<strong>${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
+                    seriesOverrides.formatValue(tooltipPointValue(it.value), it.seriesName),
                   )} </strong>`,
                 );
               // else normal text
               else
                 hoverText.push(
-                  `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
-                    formatUnitValue(
-                      getUnitValue(
-                        it.value,
-                        panelSchema.config?.unit,
-                        panelSchema.config?.unit_custom,
-                        panelSchema.config?.decimals,
-                      ),
-                    ),
+                  `${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
+                    seriesOverrides.formatValue(tooltipPointValue(it.value), it.seriesName),
                   )}`,
                 );
             }
           });
 
-          return `${escapeHtml(name?.[0]?.name)} <br/> ${hoverText.join("<br/>")}`;
+          const totals = stackTotalRows(
+            panelSchema.type,
+            name,
+            options.series,
+            seriesOverrides,
+            (it: any) => it.value,
+          );
+          return `${escapeHtml(name?.[0]?.name)} <br/> ${[...totals, ...hoverText].join("<br/>")}`;
         } catch (error) {
           return "";
         }
@@ -656,10 +663,13 @@ export function buildSQLContext(
         nameLocation: "middle",
         nameGap: dynamicXAxisNameGap,
         nameTextStyle: {
+          color: chartAxisTextColor(),
           fontWeight: "bold",
           fontSize: 14,
         },
         axisLabel: {
+          color: chartAxisTextColor(),
+          fontSize: 12,
           interval:
             panelSchema.type == "h-stacked"
               ? "auto"
@@ -676,13 +686,14 @@ export function buildSQLContext(
           rotate: labelRotation,
         },
         splitLine: {
-          show: showGridlines,
+          show: false,
           lineStyle: gridLineStyle,
         },
         axisLine: {
           show: searchQueryData?.every((it: any) => it.length == 0)
             ? true
-            : (panelSchema.config?.axis_border_show ?? false),
+            : (panelSchema.config?.axis_border_show ?? true),
+          lineStyle: { color: chartAxisLine() },
         },
         axisTick: {
           show: xAxisKeys.length + breakDownKeys.length == 1 ? false : true,
@@ -707,6 +718,7 @@ export function buildSQLContext(
       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
       nameGap: (isHorizontalChart ? horizontalCategoryLabelWidth : widestYAxisTickLabel) + 10,
       nameTextStyle: {
+        color: chartAxisTextColor(),
         fontWeight: "bold",
         fontSize: 14,
       },
@@ -717,16 +729,16 @@ export function buildSQLContext(
         ellipsis: "..",
       },
       axisLabel: {
+        color: chartAxisTextColor(),
+        fontSize: 12,
         hideOverlap: true,
         formatter: function (value: any) {
           try {
-            return formatUnitValue(
-              getUnitValue(
-                value,
-                panelSchema?.config?.unit,
-                panelSchema?.config?.unit_custom,
-                yAxisTickDecimals,
-              ),
+            return formatAxisTickValue(
+              value,
+              panelSchema?.config?.unit,
+              panelSchema?.config?.unit_custom,
+              yAxisTickDecimals,
             );
           } catch (error) {
             return "";
@@ -772,7 +784,8 @@ export function buildSQLContext(
   if (options.xAxis) {
     (Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]).forEach(
       (axis: { splitLine: { show: boolean; lineStyle: unknown } }) => {
-        axis.splitLine.show = showGridlines;
+        // Gridlines run along the value axis only; the category axis draws none.
+        axis.splitLine.show = false;
         axis.splitLine.lineStyle = gridLineStyle;
       },
     );

@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
-                  class="span-count-box text-2xs border-card-glass-border! hover:bg-interactive-hover-bg relative me-1 flex h-5 min-w-5 cursor-pointer items-center justify-center rounded-full border px-1 py-0 font-semibold transition-colors duration-200"
+                  class="span-count-box text-2xs border-card-glass-border! hover:bg-interactive-hover-bg relative me-1 flex h-5 min-w-5 shrink-0 cursor-pointer items-center justify-center rounded-full border px-1 py-0 font-semibold transition-colors duration-200"
                   :style="{
                     color: (spans as any[])[virtualRow.index].style.color,
                   }"
@@ -142,16 +142,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                 ></div>
 
-                <div
-                  class="flex justify-between"
-                  :class="
-                    (spans as any[])[virtualRow.index].hasChildSpans
-                      ? 'w-full'
-                      : 'w-[calc(100%-0.6rem)]!'
-                  "
-                >
+                <div class="flex min-w-0 flex-1 justify-between">
                   <div
-                    class="w-[calc(100%-2rem)]! cursor-pointer truncate ps-1"
+                    class="min-w-0 flex-1 cursor-pointer truncate ps-1"
                     :class="
                       isLLMTrace((spans as any[])[virtualRow.index])
                         ? 'flex-col items-start'
@@ -170,6 +163,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-status-error-text! me-1"
                         :title="t('traces.traceTree.errorSpan')"
                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
+                      />
+                      <!-- The chip on a rule issue's last evidence span. -->
+                      <OIcon
+                        v-if="issueSpans[(spans as any[])[virtualRow.index].spanId]"
+                        name="report-problem"
+                        size="sm"
+                        class="text-status-warning-text! me-1 cursor-pointer"
+                        :title="issueSpans[(spans as any[])[virtualRow.index].spanId]"
+                        :data-test="`trace-tree-span-issue-chip-${(spans as any[])[virtualRow.index].spanId}`"
+                        @click.stop="$emit('open-issue', (spans as any[])[virtualRow.index].spanId)"
                       />
                       <!-- shrink-0 + a cap, not plain shrink: flex shrinks in proportion to width, so a long operation name would eat a short service name first. -->
                       <OTruncatedText
@@ -224,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
 
-                  <div class="sticky right-0 flex items-center gap-1">
+                  <div class="sticky end-0 flex shrink-0 items-center gap-1">
                     <!-- Hidden at rest, not merely invisible: `invisible` would keep
                          the box in layout and reserve a permanent gutter to the left
                          of the badges, which is the thing this arrangement exists to
@@ -244,7 +247,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="view-span-logs hidden"
                       :data-test="`trace-tree-span-view-logs-container-${(spans as any[])[virtualRow.index].spanId}`"
                     >
+                      <span v-if="logsLocked" class="inline-flex">
+                        <OButton
+                          variant="outline"
+                          size="icon"
+                          disabled
+                          :aria-label="t('traces.viewLogs')"
+                          :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
+                        >
+                          <OIcon name="lock" class="text-icon-locked" size="sm" />
+                        </OButton>
+                        <OTooltip :content="logsLockedReason" />
+                      </span>
                       <OButton
+                        v-else
                         variant="outline"
                         size="icon"
                         :title="t('traces.viewLogs')"
@@ -382,6 +398,8 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import config from "@/aws-exports";
 
 export default defineComponent({
@@ -452,6 +470,11 @@ export default defineComponent({
       // DOM Element ref from parent — no runtime type check needed
       default: null,
     },
+    /** Span id → rule label, for spans that carry an issue chip. */
+    issueSpans: {
+      type: Object as PropType<Record<string, I18nText>>,
+      default: () => ({}),
+    },
   },
   emits: [
     "toggleCollapse",
@@ -462,9 +485,11 @@ export default defineComponent({
     "update-current-index",
     "search-result",
     "view-correlated-logs",
+    "open-issue",
   ],
   setup(props, { emit }) {
     const { buildQueryDetails, navigateToLogs, searchObj } = useTraces();
+    const { locked: logsLocked, lockedReason: logsLockedReason } = useLicenseLock("logs");
     const store = useStore();
     const { isDark } = useTheme();
 
@@ -898,6 +923,8 @@ export default defineComponent({
       highlightedSpanId,
       store,
       viewSpanLogs,
+      logsLocked,
+      logsLockedReason,
       t,
       searchResults,
       getVirtualRowKey,
@@ -932,7 +959,7 @@ export default defineComponent({
       ancestorSiblingMap,
     };
   },
-  components: { SpanBlock, SpanKindBadge, OBadge, OButton, OIcon, OTruncatedText },
+  components: { SpanBlock, SpanKindBadge, OBadge, OButton, OIcon, OTruncatedText, OTooltip },
 });
 </script>
 

@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive, computed, nextTick, shallowRef } from "vue";
+import { reactive, computed, nextTick, shallowRef, watch } from "vue";
+import { debounce } from "lodash-es";
 import { b64EncodeStandard, b64EncodeUnicode, useLocalTraceFilterField } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, type LocationQueryRaw } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { TranslateFn } from "@/types/i18n";
 import { getOrSetServiceColor as registryGetOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
@@ -25,15 +26,18 @@ import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { buildFieldToGroupIdMap, quoteSqlLiteral } from "@/utils/telemetryCorrelation";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { isLeavingRoute } from "@/utils/pendingNavigation";
 import {
   DEFAULT_TRACE_SEARCH_MODE,
   type MetricsRangeFilter,
 } from "@/ts/interfaces/traces/trace.types";
 import searchService from "@/services/search";
-import useNotifications from "@/composables/useNotifications";
-import { gt } from "@/types/i18n";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import type { PageLoad, PageRequest, PendingPageSelection } from "@/utils/pageCrossing";
+import {
+  decodeTracesListState,
+  encodeTracesListState,
+  TRACES_LIST_URL_KEYS,
+} from "@/plugins/traces/tracesUrlState";
 
 // Mirrors the backend's is_internal_stream(); other `_`-prefixed streams are user data.
 const INTERNAL_LOG_STREAMS = new Set([
@@ -47,6 +51,15 @@ const INTERNAL_LOG_STREAMS = new Set([
 const VIEW_LOGS_COUNT_TIMEOUT_MS = 5000;
 // Count queries share the search work-group queue; too many at once come back as 429s.
 const VIEW_LOGS_COUNT_CONCURRENCY = 4;
+
+/** What View logs did: opened Logs, found no stream holding the trace, could not check every stream, or the user moved to another span. */
+export type CorrelatedLogsOutcome = "opened" | "none" | "moved" | CorrelatedLogsFailure;
+
+/** No stream was found to hold the trace and at least one probe failed for a server reason; `error` is the first, for `valueErrorCause`. */
+export interface CorrelatedLogsFailure {
+  failed: true;
+  error: unknown;
+}
 
 const settleLimited = async <T, R>(
   items: T[],
@@ -70,6 +83,37 @@ const settleLimited = async <T, R>(
 };
 const isInternalLogStream = (name: string) =>
   name.startsWith("_o2_") || INTERNAL_LOG_STREAMS.has(name);
+// A partial count still proves the stream holds the trace when it is above zero.
+const holdsLogs = (count: PromiseSettledResult<any> | undefined): boolean => {
+  if (count?.status !== "fulfilled") return false;
+  const data = count.value?.data;
+  if (!data || data.function_error) return false;
+  const n = Number(data.hits?.[0]?.zo_count);
+  return Number.isFinite(n) && n > 0;
+};
+// A 4xx means the stream cannot hold the trace (no trace_id field); a denial, 5xx, throttle, timeout, lost connection, partial scan or function error means it was never fully checked.
+const probeServerError = (
+  count: PromiseSettledResult<any> | undefined,
+  timedOut: boolean,
+): unknown => {
+  if (count?.status === "fulfilled") {
+    const data = count.value?.data;
+    return data?.is_partial || data?.function_error ? data : null;
+  }
+  if (count?.status !== "rejected") return null;
+  const reason = count.reason as { status?: number; response?: { status?: number } } | null;
+  const status = reason?.response?.status ?? reason?.status;
+  if (
+    status === 401 ||
+    status === 403 ||
+    status === 408 ||
+    status === 429 ||
+    (typeof status === "number" && status >= 500)
+  )
+    return reason;
+  if (typeof status === "number") return null;
+  return timedOut ? { code: "ETIMEDOUT" } : (reason ?? {});
+};
 const defaultObject = {
   organizationIdentifier: "",
   runQuery: false,
@@ -110,6 +154,15 @@ const defaultObject = {
     redirectedFromLogs: false,
     searchApplied: false,
     lastRunAt: undefined as number | undefined,
+    lastRunSignature: null as string | null,
+    /** Epoch ms of a re-run that failed while the previous results stay on screen. */
+    refreshFailedAt: null as number | null,
+    /** A chart of the latest chart load failed its refresh and kept its older result. */
+    chartRefreshFailed: false,
+    /** The data age of the charts on screen while a chart load runs. */
+    chartsDataFrom: undefined as number | undefined,
+    /** The selected stream's fields are loading; the rail shows its skeleton only while it has none to keep. */
+    loadingFields: false,
     metricsRangeFilters: new Map<string, MetricsRangeFilter>(),
     queryEditorPlaceholderFlag: true,
     liveMode: localStorage.getItem("oo_toggle_auto_run") === "true",
@@ -170,6 +223,7 @@ const defaultObject = {
     streamResults: <any>[],
     histogram: <any>{},
     editorValue: "",
+    appliedEditorValue: null as string | null,
     datetime: {
       startTime: 0,
       endTime: 0,
@@ -206,6 +260,9 @@ const defaultObject = {
 
 const searchObj = reactive(Object.assign({}, defaultObject));
 
+// A link's columns win over the local ones until the user changes columns or stream; never persisted for them.
+let urlColumns: { mode: string; stream: string; fields: string[] } | null = null;
+
 /** Default ordered column ID lists used when no localStorage entry exists. */
 export const DEFAULT_TRACE_COLUMNS: Record<"traces" | "spans", string[]> = {
   spans: ["service_name", "operation_name", "duration", "span_status"],
@@ -238,7 +295,6 @@ const useTraces = () => {
   const router = useRouter();
 
   const { loadSemanticGroups } = useServiceCorrelation();
-  const { showInfoNotification } = useNotifications();
 
   const resetSearchObj = () => {
     // delete searchObj.data;
@@ -262,7 +318,13 @@ const useTraces = () => {
     searchObj.data.query = "";
     searchObj.data.editorValue = "";
     searchObj.meta.sqlMode = false;
+    searchObj.meta.lastRunSignature = null;
+    searchObj.meta.refreshFailedAt = null;
+    searchObj.meta.chartRefreshFailed = false;
+    urlColumns = null;
     searchObj.runQuery = false;
+    // Only a run sets it again; left true, a new org mounts the Rate/Duration panels and they query without a run.
+    searchObj.searchApplied = false;
     searchObj.data.traceDetails.isLoadingTraceDetails = false;
     searchObj.data.traceDetails.isLoadingTraceMeta = false;
   };
@@ -272,6 +334,7 @@ const useTraces = () => {
    * Stored as traceFilterField[orgId_stream][mode] = string[].
    */
   const updatedLocalLogFilterField = (searchMode: "traces" | "spans" = "traces"): void => {
+    urlColumns = null;
     const identifier: string = searchObj.organizationIdentifier || "default";
     const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
     const all: any = useLocalTraceFilterField()?.value ?? {};
@@ -287,6 +350,13 @@ const useTraces = () => {
    * Falls back to the default ordered column list when no saved value exists.
    */
   const loadLocalLogFilterField = (searchMode: "traces" | "spans" = "traces"): void => {
+    if (urlColumns && urlColumns.stream !== searchObj.data.stream.selectedStream.value) {
+      urlColumns = null;
+    }
+    if (urlColumns?.mode === searchMode) {
+      searchObj.data.stream.selectedFields = [...urlColumns.fields];
+      return;
+    }
     const identifier: string = searchObj.organizationIdentifier || "default";
     const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
     // storage ref .value is typed {} at this boundary; narrow to the stored map shape
@@ -325,8 +395,79 @@ const useTraces = () => {
     if (router.currentRoute.value.query.span_id)
       query["span_id"] = router.currentRoute.value.query.span_id;
 
+    Object.assign(query, listUrlState());
+
     return query;
   }
+
+  function listUrlState() {
+    const mode = searchObj.meta.searchMode;
+    const isList = mode === "traces" || mode === "spans";
+    return encodeTracesListState({
+      columns: isList ? searchObj.data.stream.selectedFields : [],
+      defaultColumns: isList ? DEFAULT_TRACE_COLUMNS[mode] : [],
+      rowsPerPage: Number(searchObj.meta.resultGrid.rowsPerPage),
+      currentPage: searchObj.data.resultGrid.currentPage,
+      showHistogram: searchObj.meta.showHistogram,
+    });
+  }
+
+  /** Applies a link's list-view keys; the page is returned for the first search to use. */
+  const applyUrlListState = (query: Record<string, unknown>) => {
+    const decoded = decodeTracesListState(query);
+    if (decoded.rowsPerPage !== null) searchObj.meta.resultGrid.rowsPerPage = decoded.rowsPerPage;
+    if (decoded.showHistogram !== null) searchObj.meta.showHistogram = decoded.showHistogram;
+    urlColumns = decoded.columns
+      ? {
+          mode: searchObj.meta.searchMode,
+          stream: searchObj.data.stream.selectedStream.value,
+          fields: decoded.columns,
+        }
+      : null;
+    if (decoded.columns) searchObj.data.stream.selectedFields = [...decoded.columns];
+    return { currentPage: decoded.currentPage };
+  };
+
+  /** Keeps the list view and the staged editor text in the URL without adding a history entry. */
+  const patchUrlViewState = () => {
+    const route = router.currentRoute.value;
+    if (route.name !== "traces" || isLeavingRoute("traces")) return;
+    const query: Record<string, unknown> = { ...route.query };
+    // run-query is one-shot; kept in the entry, Back to it would run whatever edit was staged there.
+    delete query["run-query"];
+    for (const key of TRACES_LIST_URL_KEYS) delete query[key];
+    Object.assign(query, listUrlState(), { query: b64EncodeUnicode(searchObj.data.editorValue) });
+    // Columns belong to the URL's stream, which only a run moves to the selected one.
+    if (route.query.stream !== searchObj.data.stream.selectedStream.value) {
+      if (route.query.columns === undefined) delete query.columns;
+      else query.columns = route.query.columns;
+    }
+    const current = route.query as Record<string, unknown>;
+    const keys = new Set([...Object.keys(current), ...Object.keys(query)]);
+    if ([...keys].every((key) => String(current[key] ?? "") === String(query[key] ?? ""))) return;
+    return router.replace({ query: query as LocationQueryRaw });
+  };
+
+  /** Starts mirroring list-view changes into the URL; call the returned function to stop. */
+  const syncUrlViewState = () => {
+    // Debounced so typing does not hit the browser's history-update rate limit.
+    const write = debounce(() => void patchUrlViewState(), 300);
+    const stop = watch(
+      () => [
+        searchObj.data.editorValue,
+        searchObj.meta.resultGrid.rowsPerPage,
+        searchObj.data.resultGrid.currentPage,
+        searchObj.meta.showHistogram,
+        searchObj.meta.searchMode,
+        searchObj.data.stream.selectedFields.join("\u0000"),
+      ],
+      write,
+    );
+    return () => {
+      stop();
+      write.flush();
+    };
+  };
 
   const copyTracesUrl = (
     t: TranslateFn,
@@ -488,6 +629,9 @@ const useTraces = () => {
         gen_ai_usage_total_tokens: trace.gen_ai_usage_total_tokens,
         gen_ai_usage_cost: trace.gen_ai_usage_cost,
         gen_ai_input_messages: trace.gen_ai_input_messages,
+        // Unpriced tokens/models (AIO-16) — drive the partial-cost badge.
+        gen_ai_unpriced_tokens: trace.gen_ai_unpriced_tokens,
+        gen_ai_unpriced_models: trace.gen_ai_unpriced_models,
       };
 
       // Build per-trace service span count and duration map
@@ -507,17 +651,17 @@ const useTraces = () => {
     });
   };
 
-  const navigateToCorrelatedLogs = async (correlationProps: any) => {
+  /** Opens Logs on the correlated streams that hold this trace; "none" when no stream does, so the caller stays put. */
+  const navigateToCorrelatedLogs = async (
+    correlationProps: any,
+  ): Promise<CorrelatedLogsOutcome> => {
     const spanId = searchObj.data.traceDetails.selectedSpanId;
     const traceId = searchObj.data.traceDetails.selectedTrace?.trace_id;
 
     const streamList: string[] = correlationProps.logStreams
       .map((s: any) => s.stream_name)
       .filter((name: string) => !isInternalLogStream(name));
-    if (!streamList.length) {
-      toast({ variant: "warning", message: gt("traces.noCorrelatedLogsFound") });
-      return;
-    }
+    if (!streamList.length) return "none";
 
     // Conditions are keyed by semantic group, not by field name, so that two
     // streams aliasing one dimension (k8s_namespace_name vs
@@ -534,8 +678,10 @@ const useTraces = () => {
         `${quoteSqlIdentifierIfNeeded(field)} = ${quoteSqlLiteral(value)}`,
       );
 
-    // A trace id already pins the logs; dimension filters would drop rows lacking them.
-    if (!traceId) {
+    // A trace id alone pins the logs; dimension or span filters would drop rows lacking them.
+    if (traceId) {
+      setCondition(getTraceIdField(), traceId);
+    } else {
       for (const streamInfo of correlationProps.logStreams) {
         const filters = streamInfo.filters ?? {};
         for (const [field, value] of Object.entries(filters)) {
@@ -545,24 +691,25 @@ const useTraces = () => {
           setCondition(field, String(value));
         }
       }
+      if (spanId) setCondition(getSpanIdField(), spanId);
     }
 
-    // Narrow the correlated logs down to the span the user clicked "View Logs"
-    // on. Field names come from org settings and values from the current
-    // selection, same as buildQueryDetails().
-    if (spanId) setCondition(getSpanIdField(), spanId);
-    if (traceId) setCondition(getTraceIdField(), traceId);
+    const queryString = Array.from(conditions.values()).join(" and ");
+    // A trace-wide lookup counts and opens on the trace's window, so Logs shows the logs the count found.
+    const timeRange = traceId
+      ? (correlationProps.traceTimeRange ?? correlationProps.timeRange)
+      : correlationProps.timeRange;
 
-    let queryString = Array.from(conditions.values()).join(" and ");
-    let timeRange = correlationProps.timeRange;
-
-    // Count per stream so one failing stream stays unknown; only a complete numeric count is evidence.
     let navStreams = streamList;
-    let showTraceFallback = false;
-    if (spanId && traceId) {
-      // A stream that has not answered in time counts as unknown, so a hung one cannot stall the click.
+    let probeFailure: CorrelatedLogsFailure | null = null;
+    if (traceId) {
+      // A stream that has not answered in time counts as having none, so a hung one cannot stall the click.
       const countTimeout = new AbortController();
-      const timer = setTimeout(() => countTimeout.abort(), VIEW_LOGS_COUNT_TIMEOUT_MS);
+      let timedOut = false;
+      const timer = setTimeout(() => {
+        timedOut = true;
+        countTimeout.abort();
+      }, VIEW_LOGS_COUNT_TIMEOUT_MS);
       const counts = await settleLimited(streamList, VIEW_LOGS_COUNT_CONCURRENCY, (name) =>
         searchService.search({
           org_identifier: store.state.selectedOrganization.identifier,
@@ -580,36 +727,18 @@ const useTraces = () => {
         }),
       );
       clearTimeout(timer);
-      const countOf = (c: PromiseSettledResult<any>): number | null => {
-        if (c.status !== "fulfilled") return null;
-        const data = c.value?.data;
-        if (!data || data.is_partial || data.function_error) return null;
-        const raw = data.hits?.[0]?.zo_count;
-        const n = typeof raw === "number" || typeof raw === "string" ? Number(raw) : NaN;
-        return raw !== "" && Number.isFinite(n) ? n : null;
-      };
-      const known = counts.map(countOf);
-      const counted = streamList.filter((_, i) => known[i] !== null);
-
-      // Unknown (null) streams don't count against the fallback.
-      // With no stream known to hold span logs (even all throttled), only trace_id is a safe query.
-      if (known.every((n) => !n)) {
-        // trace_id alone is tolerated on streams lacking it, so every eligible stream stays in.
-        conditions.delete(groupIdFor(getSpanIdField()));
-        queryString = Array.from(conditions.values()).join(" and ");
-        // Trace-level logs span the whole trace, not the clicked span's window.
-        timeRange = correlationProps.traceTimeRange ?? timeRange;
-        showTraceFallback = counted.length > 0;
-      } else {
-        // A stream without span_id would fail the logs query, so keep only streams whose count ran.
-        navStreams = counted;
-      }
+      // Only a positive count proves a stream holds the trace; a stream lacking trace_id answers 4xx.
+      navStreams = streamList.filter((_, i) => holdsLogs(counts[i]));
+      // A stream never checked may hold the trace, so with none found its failure is the answer, not "none".
+      const serverError = counts
+        .map((count) => probeServerError(count, timedOut))
+        .find((error) => error !== null);
+      if (serverError !== undefined) probeFailure = { failed: true, error: serverError };
     }
 
     // The user selected another span while this ran: do not navigate.
-    if (searchObj.data.traceDetails.selectedSpanId !== spanId) return;
-
-    if (showTraceFallback) showInfoNotification(gt("traces.spanHasNoLogsShowingTrace"));
+    if (searchObj.data.traceDetails.selectedSpanId !== spanId) return "moved";
+    if (!navStreams.length) return probeFailure ?? "none";
 
     const encodedQuery = b64EncodeUnicode(queryString);
     const streamNames = navStreams.join(",");
@@ -632,6 +761,7 @@ const useTraces = () => {
         show_histogram: "true",
       },
     });
+    return "opened";
   };
 
   return {
@@ -640,6 +770,9 @@ const useTraces = () => {
     updatedLocalLogFilterField,
     loadLocalLogFilterField,
     getUrlQueryParams,
+    applyUrlListState,
+    patchUrlViewState,
+    syncUrlViewState,
     copyTracesUrl,
     buildQueryDetails,
     navigateToLogs,

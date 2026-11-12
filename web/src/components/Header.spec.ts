@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, shallowMount } from "@vue/test-utils";
 import { computed, nextTick } from "vue";
 import i18n from "@/locales";
+import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import Header from "@/components/Header.vue";
 import * as cookies from "@/utils/cookies";
 import { chartColor } from "@/utils/chartTheme";
@@ -31,6 +32,17 @@ vi.mock("@/composables/useBreakpoint", () => ({
     lgUp: computed(() => breakpoint.lgUp),
   }),
 }));
+
+const securityAccess = vi.hoisted(() => ({ canOpen: true, licenseLocked: false }));
+vi.mock("@/composables/security/useSecurityAccess", async () => {
+  const { computed } = await import("vue");
+  return {
+    useSecurityAccess: () => ({
+      canOpen: computed(() => securityAccess.canOpen),
+      licenseLocked: computed(() => securityAccess.licenseLocked),
+    }),
+  };
+});
 
 // Mock the cookies module
 vi.mock("@/utils/cookies", () => ({
@@ -441,7 +453,57 @@ describe("Header Component", () => {
     });
   });
 
+  describe("Focus-mode route", () => {
+    it("drops the menu and AI buttons", async () => {
+      const focusWrapper = createWrapper({
+        mountType: "mount",
+        storeOverrides: { state: { zoConfig: { ai_enabled: true } } },
+        configOverrides: { isEnterprise: "true" },
+        propsOverrides: {
+          router: { ...mockRouter, currentRoute: { value: { meta: { focusMode: true } } } },
+        },
+        stubsOverrides: {},
+      });
+      await focusWrapper.vm.$nextTick();
+
+      expect(focusWrapper.find('[data-test="header-mobile-nav-toggle"]').exists()).toBe(false);
+      expect(focusWrapper.find('[data-test="menu-link-ai-item"]').exists()).toBe(false);
+      // nothing teleports into the old header slot any more
+      expect(focusWrapper.find("#o2-header-actions").exists()).toBe(false);
+
+      focusWrapper.unmount();
+    });
+  });
+
   describe("AI Chat Button", () => {
+    it("holds the AI button's place until the config says whether it shows", async () => {
+      const aiWrapper = createWrapper({
+        mountType: "mount",
+        storeOverrides: { state: { zoConfig: { version: "" } } },
+        configOverrides: { isEnterprise: "true" },
+        stubsOverrides: {},
+      });
+      await aiWrapper.vm.$nextTick();
+
+      expect(aiWrapper.find('[data-test="header-ai-slot-placeholder"]').exists()).toBe(true);
+      expect(aiWrapper.find('[data-test="menu-link-ai-item"]').exists()).toBe(false);
+      aiWrapper.unmount();
+    });
+
+    it("drops the held place once the config has loaded", async () => {
+      const aiWrapper = createWrapper({
+        mountType: "mount",
+        storeOverrides: { state: { zoConfig: { version: "v1", ai_enabled: true } } },
+        configOverrides: { isEnterprise: "true" },
+        stubsOverrides: {},
+      });
+      await aiWrapper.vm.$nextTick();
+
+      expect(aiWrapper.find('[data-test="header-ai-slot-placeholder"]').exists()).toBe(false);
+      expect(aiWrapper.find('[data-test="menu-link-ai-item"]').exists()).toBe(true);
+      aiWrapper.unmount();
+    });
+
     it("should display AI chat button in enterprise mode with ai_enabled", async () => {
       const aiWrapper = createWrapper({
         mountType: "mount",
@@ -490,6 +552,25 @@ describe("Header Component", () => {
       expect(aiButton.exists()).toBe(true);
       expect(aiButton.attributes("disabled")).toBeUndefined();
 
+      aiWrapper.unmount();
+    });
+
+    it("keeps the AI logo with a lock badge and under a locked license", async () => {
+      const aiWrapper = createWrapper({
+        mountType: "mount",
+        storeOverrides: {
+          state: { zoConfig: { ai_enabled: true, features: { ai_assistant: "locked" } } },
+        },
+        configOverrides: { isEnterprise: "true" },
+        stubsOverrides: {},
+      });
+      await aiWrapper.vm.$nextTick();
+
+      const aiButton = aiWrapper.find('[data-test="menu-link-ai-locked"]');
+      expect(aiButton.exists()).toBe(true);
+      expect(aiButton.find("img").exists()).toBe(true);
+      expect(aiButton.findComponent(OLockBadge).exists()).toBe(true);
+      expect(aiButton.attributes("aria-label")).toContain("Locked: needs");
       aiWrapper.unmount();
     });
 
@@ -1092,6 +1173,68 @@ describe("Header Component", () => {
     });
   });
 
+  describe("Linked accounts (AC-1.4 Header part)", () => {
+    const menuOpen = {
+      ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+      LinkedAccountsDialog: {
+        name: "LinkedAccountsDialog",
+        props: ["open"],
+        template: '<div data-test-stub="linked-accounts-dialog" :data-open="open" />',
+      },
+    };
+    const linkedItem = '[data-test="menu-link-linked-accounts-item"]';
+
+    it.each([
+      ["enterprise", { isEnterprise: "true", isCloud: "false" }],
+      ["Cloud", { isEnterprise: "true", isCloud: "true" }],
+    ])("shows Linked accounts on %s when the org has Slack enabled", (_label, edition) => {
+      const w = createWrapper({
+        configOverrides: edition,
+        storeOverrides: { state: { zoConfig: { slack_enabled: true } } },
+        stubsOverrides: menuOpen,
+      });
+      expect(w.find(linkedItem).exists()).toBe(true);
+      expect(w.find('[data-test-stub="linked-accounts-dialog"]').exists()).toBe(true);
+    });
+
+    it.each([
+      ["Cloud with Slack disabled", { isEnterprise: "true", isCloud: "true" }, false],
+      [
+        "enterprise without the Slack fields",
+        { isEnterprise: "true", isCloud: "false" },
+        undefined,
+      ],
+      ["OSS even when the config says enabled", { isEnterprise: "false", isCloud: "false" }, true],
+    ])("hides Linked accounts on %s", (_label, edition, enabled) => {
+      const w = createWrapper({
+        configOverrides: edition,
+        storeOverrides: { state: { zoConfig: { slack_enabled: enabled } } },
+        stubsOverrides: menuOpen,
+      });
+      expect(w.find(linkedItem).exists()).toBe(false);
+      expect(w.find('[data-test-stub="linked-accounts-dialog"]').exists()).toBe(false);
+    });
+
+    it("opens the Linked accounts dialog from the user menu", async () => {
+      const w = createWrapper({
+        configOverrides: { isEnterprise: "true", isCloud: "false" },
+        storeOverrides: { state: { zoConfig: { slack_enabled: true } } },
+        stubsOverrides: menuOpen,
+      });
+      const item = w
+        .findAllComponents({ name: "ODropdownItem" })
+        .find((c: any) => c.attributes("data-test") === "menu-link-linked-accounts-item");
+      expect(w.find('[data-test-stub="linked-accounts-dialog"]').attributes("data-open")).toBe(
+        "false",
+      );
+      item!.vm.$emit("select");
+      await nextTick();
+      expect(w.find('[data-test-stub="linked-accounts-dialog"]').attributes("data-open")).toBe(
+        "true",
+      );
+    });
+  });
+
   describe("Props Validation", () => {
     it("should accept all required props", () => {
       // Migration: filteredOrganizations/searchQuery/rowsPerPage merged into
@@ -1250,6 +1393,32 @@ describe("Header Component", () => {
       expect(wrapper.props("userClickedOrg").identifier).toBe(
         wrapper.props("selectedOrg").identifier,
       );
+    });
+  });
+
+  describe("Solution switcher", () => {
+    afterEach(() => {
+      securityAccess.canOpen = true;
+      securityAccess.licenseLocked = false;
+    });
+
+    it("shows the switcher to a user who may open Security", () => {
+      const switcherWrapper = createWrapper();
+      expect(switcherWrapper.findComponent({ name: "SolutionSwitcher" }).exists()).toBe(true);
+    });
+
+    it("hides the switcher from a user without Security access", () => {
+      securityAccess.canOpen = false;
+      const switcherWrapper = createWrapper();
+      expect(switcherWrapper.findComponent({ name: "SolutionSwitcher" }).exists()).toBe(false);
+    });
+
+    it("marks Security locked when the license locks it", () => {
+      securityAccess.licenseLocked = true;
+      const switcherWrapper = createWrapper();
+      expect(
+        switcherWrapper.findComponent({ name: "SolutionSwitcher" }).props("securityLocked"),
+      ).toBe(true);
     });
   });
 
@@ -1461,13 +1630,16 @@ describe("Header Component", () => {
     });
   });
 
-  describe("My on-call item (U1)", () => {
-    const mountMenu = (oncall_enabled: boolean, hasRoute: boolean) => {
+  describe("My on-call item (U1, removed)", () => {
+    const mountMenu = () => {
       const store = {
         ...mockStore,
-        state: { ...mockStore.state, zoConfig: { ...mockStore.state.zoConfig, oncall_enabled } },
+        state: {
+          ...mockStore.state,
+          zoConfig: { ...mockStore.state.zoConfig, oncall_enabled: true },
+        },
       };
-      const router = { ...mockRouter, hasRoute: vi.fn(() => hasRoute) };
+      const router = { ...mockRouter, hasRoute: vi.fn(() => true) };
       return mount(Header, {
         props: { ...defaultProps, store, router },
         global: {
@@ -1488,29 +1660,10 @@ describe("Header Component", () => {
       });
     };
 
-    it("renders before Language when on-call is on and routes to My on-call in the current org", async () => {
-      const w = mountMenu(true, true);
-      const item = w.find('[data-test="header-my-oncall"]');
-      expect(item.exists()).toBe(true);
-      expect(item.text()).toBe("My on-call");
-      const tests = w.findAll("[data-test]").map((el: any) => el.attributes("data-test"));
-      expect(tests.indexOf("header-my-oncall")).toBeLessThan(
-        tests.indexOf("header-language-submenu-trigger"),
-      );
-      await item.trigger("click");
-      expect(w.props("router").push).toHaveBeenCalledWith({
-        name: "onCallMine",
-        query: { org_identifier: "test-org" },
-      });
-      w.unmount();
-    });
-
-    it.each([
-      ["on-call is off", false, true],
-      ["the build has no on-call routes", true, false],
-    ])("is absent when %s", (_case, oncallEnabled, hasRoute) => {
-      const w = mountMenu(oncallEnabled, hasRoute);
+    it("is gone from the profile menu even with on-call on and its route present", () => {
+      const w = mountMenu();
       expect(w.find('[data-test="header-my-oncall"]').exists()).toBe(false);
+      expect(w.text()).not.toContain("My on-call");
       w.unmount();
     });
   });

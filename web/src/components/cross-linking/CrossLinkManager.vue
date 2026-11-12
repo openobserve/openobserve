@@ -64,6 +64,7 @@
           <!-- Actions -->
           <div v-if="!readonly" class="ms-2 flex shrink-0 items-center gap-1">
             <OButton
+              :aria-label="t('common.edit')"
               variant="ghost"
               size="icon-sm"
               icon-left="edit"
@@ -71,6 +72,7 @@
               :data-test="`cross-link-edit-${idx}`"
             />
             <OButton
+              :aria-label="t('common.delete')"
               variant="ghost-destructive"
               size="icon-sm"
               icon-left="delete"

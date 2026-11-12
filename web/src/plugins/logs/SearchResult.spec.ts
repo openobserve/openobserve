@@ -20,6 +20,7 @@ import SearchResult from "@/plugins/logs/SearchResult.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { resetLogsAutoRunForTests } from "@/composables/useLogs/logsAutoRun";
+import { STALE_DIM, STALE_DIM_DELAY_MS } from "@/lib/styles/motion";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -141,15 +142,42 @@ describe("SearchResult Component", () => {
     vi.clearAllMocks();
   });
 
-  describe("Table Functionality", () => {
-    it("should calculate table width correctly", () => {
-      window.innerWidth = 1000;
-      wrapper.vm.searchObj.config.splitterModel = 30;
+  describe("Quick mode hint in the expanded row (issue 16022)", () => {
+    const setQuickModeState = (quickMode: boolean) => {
+      const { meta, data } = wrapper.vm.searchObj;
+      meta.quickMode = quickMode;
+      meta.sqlMode = false;
+      data.stream.selectedStream = ["app"];
+      data.stream.interestingFieldList = ["level"];
+      data.stream.selectedStreamFields = [
+        { name: "_timestamp", isSchemaField: true },
+        { name: "level", isSchemaField: true },
+        { name: "message", isSchemaField: true },
+      ];
+    };
 
-      const width = wrapper.vm.getTableWidth;
-      expect(width).toBe(1000 - 56 - (1000 - 56) * 0.3 - 5);
+    it("reports hidden fields for a quick-mode row", () => {
+      setQuickModeState(true);
+      expect(wrapper.vm.quickModeHiddenFields({ _timestamp: 1, level: "info" })).toEqual({
+        shown: 2,
+        total: 3,
+      });
     });
 
+    it("reports nothing when quick mode is off", () => {
+      setQuickModeState(false);
+      expect(wrapper.vm.quickModeHiddenFields({ _timestamp: 1, level: "info" })).toBeNull();
+    });
+
+    it("turns off quick mode and runs the query again", () => {
+      setQuickModeState(true);
+      wrapper.vm.turnOffQuickMode();
+      expect(wrapper.vm.searchObj.meta.quickMode).toBe(false);
+      expect(wrapper.emitted("run-query")).toHaveLength(1);
+    });
+  });
+
+  describe("Table Functionality", () => {
     it("should scroll table to top", async () => {
       const scrollToSpy = vi.fn();
       wrapper.vm.scrollContainerRef = {
@@ -158,11 +186,6 @@ describe("SearchResult Component", () => {
 
       await wrapper.vm.scrollTableToTop(0);
       expect(scrollToSpy).toHaveBeenCalledWith({ top: 0 });
-    });
-
-    it("should handle missing scrollContainerRef in scrollTableToTop", () => {
-      wrapper.vm.scrollContainerRef = null;
-      expect(() => wrapper.vm.scrollTableToTop(0)).not.toThrow();
     });
 
     // Regression: the skeleton clamped the shared scroller mid-list, so a fresh patterns result mounted half-way down instead of at the top
@@ -486,28 +509,6 @@ describe("SearchResult Component", () => {
   });
 
   describe("Computed Properties", () => {
-    it("should compute toggleWrapFlag", () => {
-      wrapper.vm.searchObj.meta.toggleSourceWrap = true;
-      expect(wrapper.vm.toggleWrapFlag).toBe(true);
-    });
-
-    it("should compute findFTSFields", () => {
-      const fields = [{ name: "field1" }];
-      wrapper.vm.searchObj.data.stream.selectedStreamFields = fields;
-      expect(wrapper.vm.findFTSFields).toEqual(fields);
-    });
-
-    it("should compute updateTitle", () => {
-      const title = "Test Title";
-      wrapper.vm.searchObj.data.histogram.chartParams.title = title;
-      expect(wrapper.vm.noOfRecordsTitle).toBe(title);
-    });
-
-    it("should compute resetPlotChart", () => {
-      wrapper.vm.searchObj.meta.resetPlotChart = true;
-      expect(wrapper.vm.resetPlotChart).toBe(true);
-    });
-
     it("should compute getColumns correctly", () => {
       wrapper.vm.searchObj.data.resultGrid.columns = [
         { id: "col1", name: "field1" },
@@ -557,11 +558,6 @@ describe("SearchResult Component", () => {
       const paginations = wrapper.vm.getPaginations;
 
       expect(paginations).toEqual([1, 2, 3]);
-    });
-
-    it("should compute getWidth", () => {
-      const width = wrapper.vm.getWidth;
-      expect(width).toBe("");
     });
 
     it("should compute getTableWidth correctly", () => {
@@ -684,6 +680,71 @@ describe("SearchResult Component", () => {
       expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(true);
     });
 
+    it("resolves the FTS default once the fields land after the search finished", async () => {
+      // A search finishing inside the window where extractFields() has emptied the list leaves the table on _source for good.
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
+      wrapper.vm.searchObj.data.queryResults = {
+        hits: [{ message: "hello", kubernetes_pod_id: "pod-1" }],
+      };
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+
+      wrapper.vm.searchObj.loading = true;
+      await wrapper.vm.$nextTick();
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(false);
+
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "kubernetes_pod_id", ftsKey: false },
+      ];
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["message"]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(true);
+    });
+
+    it("does not resolve on late fields when the user chose the columns", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = ["kubernetes_pod_id"];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ message: "hello" }] };
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "kubernetes_pod_id", ftsKey: false },
+      ];
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["kubernetes_pod_id"]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(false);
+    });
+
+    it("does not resolve on late fields in SQL mode", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ message: "hello" }] };
+      wrapper.vm.searchObj.meta.sqlMode = true;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "message", ftsKey: true }];
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
+    });
+
     it("loading watcher leaves columns alone in SQL mode (custom queries are authoritative)", async () => {
       // A hand-written SQL query (CTE / aggregate) with no pinned fields renders
       // the generic "source" column. The FTS feature must not override a custom
@@ -707,42 +768,61 @@ describe("SearchResult Component", () => {
       expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
     });
 
-    it("should handle updateTitle changes", async () => {
-      const title = "New Title";
-      wrapper.vm.searchObj.data.histogram.chartParams.title = title;
+    it("gives the first rows of a search their FTS default columns before they render", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "kubernetes_pod_id", ftsKey: false },
+      ];
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.data.queryResults = {};
+      wrapper.vm.searchObj.loading = true;
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.noOfRecordsTitle).toBe(title);
+
+      wrapper.vm.searchObj.data.queryResults.hits = [{ message: "hello", kubernetes_pod_id: "p" }];
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["message"]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(true);
+      expect(wrapper.vm.searchObj.data.resultGrid.columns.map((c: any) => c.id)).toContain(
+        "message",
+      );
     });
 
-    it("should handle resetPlotChart changes", async () => {
-      wrapper.vm.searchObj.meta.resetPlotChart = true;
+    it("leaves a prior system pick to the end of the search", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = ["log"];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = true;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "log", ftsKey: true },
+      ];
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.data.queryResults = {};
+      wrapper.vm.searchObj.loading = true;
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.plotChart).toEqual({});
-      expect(wrapper.vm.searchObj.meta.resetPlotChart).toBe(false);
+
+      wrapper.vm.searchObj.data.queryResults.hits = [{ message: "hello", log: "" }];
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["log"]);
     });
 
-    it("should handle toggleWrapFlag changes", async () => {
-      // This test covers the watch functionality for toggleWrapFlag
-      wrapper.vm.searchObj.meta.toggleSourceWrap = true;
+    it("does not pick FTS columns for the first rows in SQL mode", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "message", ftsKey: true }];
+      wrapper.vm.searchObj.meta.sqlMode = true;
+      wrapper.vm.searchObj.data.queryResults = {};
+      wrapper.vm.searchObj.loading = true;
       await wrapper.vm.$nextTick();
 
-      // Verify the computed property works
-      expect(wrapper.vm.toggleWrapFlag).toBe(true);
+      wrapper.vm.searchObj.data.queryResults.hits = [{ message: "hello" }];
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
+      wrapper.vm.searchObj.meta.sqlMode = false;
     });
   });
 
   describe("Error Handling and Edge Cases", () => {
-    it("should handle function error", async () => {
-      wrapper.vm.searchObj.data.functionError = "Function error";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.searchObj.data.functionError).toBe("Function error");
-    });
-
-    it("should handle changeMaxRecordToReturn", () => {
-      const result = wrapper.vm.changeMaxRecordToReturn(50);
-      expect(result).toBeUndefined();
-    });
-
     it("should handle undefined queryResults in pagination", () => {
       const originalQueryResults = wrapper.vm.searchObj.data.queryResults;
       wrapper.vm.searchObj.data.queryResults = undefined;
@@ -780,38 +860,7 @@ describe("SearchResult Component", () => {
     });
   });
 
-  describe("Component Props and Lifecycle", () => {
-    it("should accept expandedLogs prop", () => {
-      expect(wrapper.props("expandedLogs")).toEqual([]);
-    });
-
-    it("should have correct default prop values", () => {
-      expect(wrapper.props("expandedLogs")).toEqual([]);
-    });
-
-    it("should handle mounted lifecycle", () => {
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle updated lifecycle", async () => {
-      wrapper.vm.searchObj.data.resultGrid.currentPage = 1;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.pageNumberInput).toBe(1);
-    });
-  });
-
   describe("Additional Methods Coverage", () => {
-    it("should handle scroll table to top with valid ref", async () => {
-      const scrollToSpy = vi.fn();
-      wrapper.vm.scrollContainerRef = {
-        scrollTo: scrollToSpy,
-      };
-
-      await wrapper.vm.scrollTableToTop(100);
-      expect(scrollToSpy).toHaveBeenCalledWith({ top: 100 });
-    });
-
     it("should handle recordsPerPage with streaming and jobId", async () => {
       wrapper.vm.searchObj.communicationMethod = "streaming";
       wrapper.vm.searchObj.meta.jobId = "job123";
@@ -907,33 +956,6 @@ describe("SearchResult Component", () => {
     });
   });
 
-  describe("Component Emits and Events", () => {
-    it("should emit update:columnSizes when handleColumnSizesUpdate is called", async () => {
-      const newSizes = { col1: 150 };
-
-      wrapper.vm.$emit("update:columnSizes", newSizes);
-
-      expect(wrapper.emitted()["update:columnSizes"]).toEqual([[newSizes]]);
-    });
-
-    it("should emit update:datetime on chart update", async () => {
-      const chartData = { start: 1000, end: 2000 };
-
-      await wrapper.vm.onChartUpdate(chartData);
-
-      expect(wrapper.emitted()["update:datetime"]).toEqual([[chartData]]);
-    });
-
-    it("should emit search:timeboxed on time boxed event", async () => {
-      const timeboxData = { key: "2023-01-01T00:00:00Z" };
-
-      await wrapper.vm.onTimeBoxed(timeboxData);
-
-      expect(wrapper.vm.searchObj.data.searchAround.indexTimestamp).toBe("2023-01-01T00:00:00Z");
-      expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
-    });
-  });
-
   describe("Reactive Data Updates", () => {
     it("should handle reDrawChartData changes with deep watching", async () => {
       const reDrawChartSpy = vi.spyOn(wrapper.vm, "reDrawChart");
@@ -944,14 +966,6 @@ describe("SearchResult Component", () => {
       await wrapper.vm.$nextTick();
 
       expect(reDrawChartSpy).toHaveBeenCalled();
-    });
-
-    it("should update pageNumberInput on component update", async () => {
-      wrapper.vm.searchObj.data.resultGrid.currentPage = 7;
-
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.pageNumberInput).toBe(7);
     });
   });
 
@@ -1040,41 +1054,6 @@ describe("SearchResult Component", () => {
     });
   });
 
-  describe("Correlation Panel", () => {
-    it("should have showCorrelation initialized to false", () => {
-      expect(wrapper.vm.showCorrelation).toBe(false);
-    });
-
-    it("should have correlationContext initialized to null", () => {
-      expect(wrapper.vm.correlationContext).toBeNull();
-    });
-
-    it("should have correlationDashboardProps initialized to null", () => {
-      expect(wrapper.vm.correlationDashboardProps).toBeNull();
-    });
-
-    it("should have correlationLoading initialized to false", () => {
-      expect(wrapper.vm.correlationLoading).toBe(false);
-    });
-
-    it("openLogDetailsWithCorrelation function exists", () => {
-      expect(typeof wrapper.vm.openLogDetailsWithCorrelation).toBe("function");
-    });
-  });
-
-  describe("Histogram Selection", () => {
-    it("should have hasHistogramSelection initialized to false", () => {
-      expect(wrapper.vm.hasHistogramSelection).toBe(false);
-    });
-
-    it("should have histogramSelectionRange initialized with zero values", () => {
-      expect(wrapper.vm.histogramSelectionRange).toMatchObject({
-        start: 0,
-        end: 0,
-      });
-    });
-  });
-
   // ───────────────────────────────────────────────────────────────────────────
   // ODrawer migration coverage
   //
@@ -1122,17 +1101,6 @@ describe("SearchResult Component", () => {
 
       expect(reDrawSpy).not.toHaveBeenCalled();
     });
-
-    it("closes the Detail ODrawer when update:open=false is emitted a second time", async () => {
-      wrapper.vm.searchObj.meta.showDetailTab = true;
-      await flushPromises();
-
-      const drawer = wrapper.findComponent(oDrawerStub);
-      drawer.vm.$emit("update:open", false);
-      await flushPromises();
-
-      expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
-    });
   });
   describe("streaming results grid (#14303)", () => {
     const hits = (n: number) =>
@@ -1148,6 +1116,7 @@ describe("SearchResult Component", () => {
     const table = () => wrapper.findComponent({ name: "OTable" });
 
     it("shows the skeleton on first paint: loading with no rows", async () => {
+      await setState(false, []);
       await setState(true, []);
       expect(table().props("loading")).toBe(true);
       expect(table().props("streaming")).toBe(false);
@@ -1191,10 +1160,13 @@ describe("SearchResult Component", () => {
       expect(table().vm.$.uid).toBe(uid);
     });
 
-    it("returns streaming to false when the hits are emptied mid-search", async () => {
+    it("keeps the emptied rows up as stale until the search settles", async () => {
       await setState(true, hits(3));
-      expect(table().props("streaming")).toBe(true);
       await setState(true, []);
+      expect(table().props("data").length).toBe(3);
+      expect(table().attributes("data-stale-rows")).toBe("true");
+      await setState(false, []);
+      expect(table().props("data").length).toBe(0);
       expect(table().props("streaming")).toBe(false);
     });
 
@@ -1269,10 +1241,249 @@ describe("SearchResult Component", () => {
     });
   });
 
-  describe("results progress bar (#14303)", () => {
-    const progressBars = () => wrapper.findAllComponents({ name: "LoadingProgress" });
-    const barsLoading = () => progressBars().filter((bar: any) => bar.props("loading") === true);
+  describe("status row settles with the chart's first paint", () => {
+    const parts = { start: 1, end: 50, total: "3.8M", took: 120 };
+    const landed = () => ({
+      xData: [1, 2, 3],
+      yData: [10, 20, 30],
+      chartParams: { title: "", timezone: "UTC", titleParts: parts },
+      errorMsg: "",
+      errorCode: 0,
+      errorDetail: "",
+    });
+    const chart = () => wrapper.findComponent('[data-test="logs-search-result-bar-chart"]');
+    let saved: any;
 
+    const runUntilHistogramLands = async (histogram: any) => {
+      wrapper.vm.searchObj.loading = true;
+      wrapper.vm.searchObj.loadingHistogram = true;
+      await flushPromises();
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ _timestamp: 1 }] };
+      wrapper.vm.searchObj.loading = false;
+      await flushPromises();
+      wrapper.vm.searchObj.data.histogram = histogram;
+      wrapper.vm.searchObj.loadingHistogram = false;
+      await flushPromises();
+    };
+
+    beforeEach(() => {
+      saved = {
+        histogram: wrapper.vm.searchObj.data.histogram,
+        showHistogram: wrapper.vm.searchObj.meta.showHistogram,
+        toggle: wrapper.vm.searchObj.meta.logsVisualizeToggle,
+        queryResults: wrapper.vm.searchObj.data.queryResults,
+      };
+      wrapper.vm.searchObj.meta.searchApplied = true;
+      wrapper.vm.searchObj.meta.showHistogram = true;
+      wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+      wrapper.vm.searchObj.meta.refreshInterval = 0;
+      wrapper.vm.searchObj.meta.lastRunAt = 1;
+    });
+
+    afterEach(async () => {
+      vi.useRealTimers();
+      wrapper.vm.searchObj.data.histogram = saved.histogram;
+      wrapper.vm.searchObj.meta.showHistogram = saved.showHistogram;
+      wrapper.vm.searchObj.meta.logsVisualizeToggle = saved.toggle;
+      wrapper.vm.searchObj.data.queryResults = saved.queryResults;
+      wrapper.vm.searchObj.data.searchAround.indexTimestamp = -1;
+      await flushPromises();
+    });
+
+    it("keeps the chips, refresh stamp and bar busy until the new chart has painted", async () => {
+      await runUntilHistogramLands(landed());
+      expect(chart().exists()).toBe(true);
+      expect(wrapper.vm.summaryView.updating).toBe(true);
+      expect(wrapper.vm.searchObj.meta.lastRunAt).toBe(1);
+
+      chart().vm.$emit("finished");
+      await flushPromises();
+      expect(wrapper.vm.summaryView.updating).toBe(false);
+      expect(wrapper.vm.summaryView.parts).toEqual(parts);
+      expect(wrapper.vm.searchObj.meta.lastRunAt).toBeGreaterThan(1);
+    });
+
+    it("keeps the previous chart dimmed until the re-run's chart has painted", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      await runUntilHistogramLands(landed());
+      chart().vm.$emit("finished");
+      await flushPromises();
+
+      await runUntilHistogramLands(landed());
+      expect(wrapper.find(".histogram-chart").classes()).not.toContain(STALE_DIM);
+      vi.advanceTimersByTime(STALE_DIM_DELAY_MS);
+      await nextTick();
+      expect(wrapper.find(".histogram-chart").classes()).toContain(STALE_DIM);
+      expect(wrapper.vm.summaryView.updating).toBe(true);
+
+      chart().vm.$emit("finished");
+      await flushPromises();
+      expect(wrapper.find(".histogram-chart").classes()).not.toContain(STALE_DIM);
+      expect(wrapper.vm.summaryView.updating).toBe(false);
+    });
+
+    it("settles at once when the histogram is hidden or failed", async () => {
+      wrapper.vm.searchObj.meta.showHistogram = false;
+      await runUntilHistogramLands(landed());
+      expect(wrapper.vm.summaryView.updating).toBe(false);
+
+      wrapper.vm.searchObj.meta.showHistogram = true;
+      await runUntilHistogramLands({ ...landed(), errorMsg: "Internal Server Error" });
+      expect(chart().exists()).toBe(false);
+      expect(wrapper.vm.summaryView.updating).toBe(false);
+    });
+
+    it("settles without chips after search-around instead of staying dimmed", async () => {
+      await runUntilHistogramLands(landed());
+      chart().vm.$emit("finished");
+      await flushPromises();
+
+      wrapper.vm.searchObj.data.searchAround.indexTimestamp = 1_700_000_000_000_000;
+      wrapper.vm.searchObj.loading = true;
+      await flushPromises();
+      wrapper.vm.searchObj.data.histogram.chartParams.titleParts = null;
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ _timestamp: 1 }, { _timestamp: 2 }] };
+      wrapper.vm.searchObj.meta.showHistogram = false;
+      wrapper.vm.searchObj.loading = false;
+      await flushPromises();
+
+      expect(wrapper.vm.summaryView).toMatchObject({ parts: null, updating: false });
+    });
+
+    it("settles after a bounded wait when the chart never reports a paint", async () => {
+      vi.useFakeTimers();
+      await runUntilHistogramLands(landed());
+      expect(wrapper.vm.summaryView.updating).toBe(true);
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(wrapper.vm.summaryView.updating).toBe(false);
+    });
+  });
+
+  describe("results progress line (#14303)", () => {
+    const line = () => wrapper.find('[data-test="logs-results-progress"] [role="progressbar"]');
+
+    const startQuery = async (percentage: number | undefined) => {
+      wrapper.vm.searchObj.loading = false;
+      await nextTick();
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      wrapper.vm.searchObj.loadingHistogram = false;
+      wrapper.vm.searchObj.loadingHistogramProgressPercentage = 0;
+      wrapper.vm.searchObj.loadingProgressPercentage = percentage;
+      wrapper.vm.searchObj.loading = true;
+      await nextTick();
+    };
+
+    const passDelay = async () => {
+      vi.advanceTimersByTime(300);
+      await nextTick();
+    };
+
+    afterEach(() => {
+      // A histogram left loading arms the chart-paint fallback, which fake timers would never fire.
+      wrapper.vm.searchObj.loadingHistogram = false;
+      if (vi.isFakeTimers()) vi.runOnlyPendingTimers();
+      vi.useRealTimers();
+    });
+
+    it("waits 300ms so a fast query never flashes the line", async () => {
+      await startQuery(42);
+      vi.advanceTimersByTime(299);
+      await nextTick();
+      expect(line().exists()).toBe(false);
+      vi.advanceTimersByTime(1);
+      await nextTick();
+      expect(line().exists()).toBe(true);
+    });
+
+    it("binds the streaming results percentage to the line", async () => {
+      await startQuery(42);
+      await passDelay();
+      expect(line().attributes("style")).toContain("width: 42%");
+      expect(line().attributes("aria-valuenow")).toBe("42");
+    });
+
+    it("keeps a 5% floor when no progress has been reported yet", async () => {
+      await startQuery(undefined);
+      await passDelay();
+      expect(line().attributes("style")).toContain("width: 5%");
+    });
+
+    it("removes the line at once when the query settles", async () => {
+      await startQuery(42);
+      await passDelay();
+      wrapper.vm.searchObj.loading = false;
+      await nextTick();
+      expect(line().exists()).toBe(false);
+      expect(wrapper.find('[data-test="logs-results-progress"]').classes()).toContain("opacity-0");
+    });
+
+    it("does not let the histogram progress drive the results line", async () => {
+      await startQuery(42);
+      wrapper.vm.searchObj.loadingHistogram = true;
+      wrapper.vm.searchObj.loadingHistogramProgressPercentage = 90;
+      await passDelay();
+      expect(line().attributes("style")).toContain("width: 42%");
+    });
+
+    it("keeps the scan chip and shows the size scanned so far on the line until the row settles", async () => {
+      const showHistogram = wrapper.vm.searchObj.meta.showHistogram;
+      wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+      wrapper.vm.searchObj.meta.refreshInterval = 0;
+      wrapper.vm.searchObj.meta.showHistogram = true;
+      wrapper.vm.searchObj.data.histogram.chartParams.titleParts = {
+        start: 1,
+        end: 10,
+        total: "10",
+        took: 5,
+        scanLabel: "Scan Size",
+        scanSize: "300.00 MB",
+      };
+      await startQuery(10);
+      wrapper.vm.searchObj.loadingHistogram = true;
+      wrapper.vm.searchObj.data.queryResults = { hits: [], scan_size: 1536 };
+      await passDelay();
+      const progress = () =>
+        wrapper.find('[data-test="logs-results-progress"] [data-test="logs-result-scan-progress"]');
+      const chip = () => wrapper.find('[data-test="logs-result-scan-chip"]');
+      const title = () => wrapper.find('[data-test="logs-search-result-title"]');
+      expect(progress().text()).toBe("Scanned 1.50 GB");
+      expect(title().find('[data-test="logs-result-scan-progress"]').exists()).toBe(false);
+      expect(chip().text()).toBe("Scan Size: 300.00 MB");
+
+      wrapper.vm.searchObj.loading = false;
+      await nextTick();
+      expect(progress().text()).toBe("Scanned 1.50 GB");
+      expect(chip().text()).toBe("Scan Size: 300.00 MB");
+
+      wrapper.vm.searchObj.loadingHistogram = false;
+      vi.advanceTimersByTime(1500);
+      await nextTick();
+      expect(progress().exists()).toBe(false);
+      expect(chip().exists()).toBe(true);
+      wrapper.vm.searchObj.meta.showHistogram = showHistogram;
+    });
+
+    it("runs one line from the rows through the histogram, held full in between", async () => {
+      wrapper.vm.searchObj.loading = false;
+      await nextTick();
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      wrapper.vm.searchObj.loadingProgressPercentage = 40;
+      wrapper.vm.searchObj.loading = true;
+      wrapper.vm.searchObj.loadingHistogram = true;
+      wrapper.vm.searchObj.loadingHistogramProgressPercentage = 20;
+      await nextTick();
+      vi.advanceTimersByTime(300);
+      await nextTick();
+      wrapper.vm.searchObj.loading = false;
+      await nextTick();
+      expect(line().attributes("style")).toContain("width: 100%");
+      wrapper.vm.searchObj.loadingHistogram = false;
+      wrapper.vm.searchObj.meta.showHistogram = false;
+      await nextTick();
+    });
+  });
+
+  describe("status row and pager once the rows land", () => {
     const setProgress = async (loading: boolean, percentage: number | undefined) => {
       wrapper.vm.searchObj.loading = loading;
       wrapper.vm.searchObj.loadingProgressPercentage = percentage;
@@ -1282,32 +1493,198 @@ describe("SearchResult Component", () => {
       await flushPromises();
     };
 
-    it("binds the streaming results percentage to its own progress bar", async () => {
-      await setProgress(true, 42);
-      expect(barsLoading()).toHaveLength(1);
-      expect(barsLoading()[0].props("loadingProgressPercentage")).toBe(42);
+    it("stamps the refresh time and enables the pager only once the histogram has landed", async () => {
+      wrapper.vm.searchObj.meta.searchApplied = true;
+      wrapper.vm.searchObj.meta.lastRunAt = 1;
+      await setProgress(true, 40);
+      wrapper.vm.searchObj.loadingHistogram = true;
+      await flushPromises();
+      wrapper.vm.searchObj.loading = false;
+      await flushPromises();
+      expect(wrapper.vm.searchObj.meta.lastRunAt).toBe(1);
+      expect(wrapper.vm.summaryView.updating).toBe(true);
+
+      wrapper.vm.searchObj.loadingHistogram = false;
+      await flushPromises();
+      wrapper.vm.onHistogramFinished();
+      await flushPromises();
+      expect(wrapper.vm.searchObj.meta.lastRunAt).toBeGreaterThan(1);
     });
 
-    it("falls back to 0 when no progress has been reported yet", async () => {
-      await setProgress(true, undefined);
-      expect(barsLoading()).toHaveLength(1);
-      expect(barsLoading()[0].props("loadingProgressPercentage")).toBe(0);
+    it("enables page size with the rows, without waiting for the histogram", async () => {
+      wrapper.vm.searchObj.meta.resultGrid.showPagination = true;
+      wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+      await setProgress(true, 40);
+      const pageSize = () =>
+        wrapper.findComponent('[data-test="logs-search-result-records-per-page"]');
+      expect(pageSize().props("disabled")).toBe(true);
+      wrapper.vm.searchObj.loadingHistogram = true;
+      wrapper.vm.searchObj.loading = false;
+      await flushPromises();
+      expect(pageSize().props("disabled")).toBe(false);
     });
+  });
 
-    it("stays mounted with loading=false so it can run its own fade-out", async () => {
-      await setProgress(false, 37);
-      const settled = progressBars().filter(
-        (bar: any) => bar.props("loadingProgressPercentage") === 37,
-      );
-      expect(settled).toHaveLength(1);
-      expect(settled[0].props("loading")).toBe(false);
+  describe("results bar layout", () => {
+    it("lets the header bar grow when its chips wrap instead of clipping them", () => {
+      const bar = wrapper.find('[data-test="logs-search-field-list-collapse-btn"]').element
+        .parentElement as HTMLElement;
+      expect(bar.classList.contains("min-h-9")).toBe(true);
+      expect(bar.classList.contains("h-9")).toBe(false);
     });
+  });
 
-    it("does not let the histogram bar stand in for the results bar", async () => {
-      await setProgress(true, 42);
-      expect(barsLoading()).toHaveLength(1);
-      expect(barsLoading()[0].props("loadingProgressPercentage")).toBe(42);
-      expect(wrapper.vm.searchObj.loadingHistogram).toBe(false);
+  describe("correlation under a license lock", () => {
+    it("starts no correlation lookup while the license locks correlation", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, features: { correlation: "locked" } };
+      await wrapper.vm.openCorrelationFromLog({ _timestamp: 1, service: "checkout" });
+      expect(wrapper.vm.correlationLoading).toBe(false);
+      expect(wrapper.vm.correlationContext).toBeNull();
     });
+  });
+});
+
+describe("SearchResult rows while a search re-runs", () => {
+  let wrapper: any;
+  const table = () => wrapper.findComponent({ name: "OTable" });
+  const rows = [
+    { _timestamp: 2, message: "b" },
+    { _timestamp: 1, message: "a" },
+  ];
+
+  beforeEach(async () => {
+    resetLogsAutoRunForTests();
+    HTMLElement.prototype.scrollTo = vi.fn();
+    store.state.zoConfig = { ...store.state.zoConfig, timestamp_column: "_timestamp" };
+    store.state.selectedOrganization = { identifier: "test-org" };
+    wrapper = mount(SearchResult, {
+      attachTo: document.body,
+      global: {
+        provide: { store },
+        plugins: [i18n],
+        stubs: {
+          DetailTable: true,
+          ChartRenderer: true,
+          SanitizedHtmlRenderer: true,
+          CellActions: true,
+          O2AIContextAddBtn: true,
+          PatternDetailsDialog: true,
+          ODrawer: oDrawerStub,
+        },
+      },
+      props: { expandedLogs: [] },
+    });
+    await flushPromises();
+    wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+    wrapper.vm.searchObj.data.stream.streamType = "logs";
+    wrapper.vm.searchObj.data.stream.selectedStream = ["app"];
+    wrapper.vm.searchObj.loading = false;
+    wrapper.vm.searchObj.data.queryResults = { hits: [...rows] };
+    await nextTick();
+  });
+
+  afterEach(() => {
+    wrapper.vm.searchObj.loading = false;
+    wrapper.unmount();
+  });
+
+  const rerun = async () => {
+    wrapper.vm.searchObj.loading = true;
+    wrapper.vm.searchObj.data.queryResults = {};
+    await nextTick();
+  };
+
+  it("dims the kept rows to the shared 60% only after the shared 150 ms, and never in live mode", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      await rerun();
+      expect(table().attributes("data-stale-rows")).toBe("true");
+      expect(table().classes()).not.toContain(STALE_DIM);
+      vi.advanceTimersByTime(STALE_DIM_DELAY_MS - 1);
+      await nextTick();
+      expect(table().classes()).not.toContain(STALE_DIM);
+      vi.advanceTimersByTime(1);
+      await nextTick();
+      expect(table().classes()).toContain(STALE_DIM);
+
+      wrapper.vm.searchObj.loading = false;
+      wrapper.vm.searchObj.data.queryResults = { hits: [...rows] };
+      wrapper.vm.searchObj.meta.refreshInterval = 10;
+      await nextTick();
+      await rerun();
+      vi.advanceTimersByTime(STALE_DIM_DELAY_MS);
+      await nextTick();
+      expect(table().attributes("data-stale-rows")).toBe("true");
+      expect(table().classes()).not.toContain(STALE_DIM);
+    } finally {
+      wrapper.vm.searchObj.meta.refreshInterval = 0;
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the previous rows on screen, marked as refreshing, until new rows arrive", async () => {
+    await rerun();
+
+    expect(table().props("data")).toHaveLength(2);
+    expect(table().props("loading")).toBe(false);
+    expect(table().attributes("data-stale-rows")).toBe("true");
+
+    wrapper.vm.searchObj.data.queryResults.hits = [{ _timestamp: 3, message: "c" }];
+    await nextTick();
+
+    expect(table().props("data")).toEqual([{ _timestamp: 3, message: "c" }]);
+    expect(table().attributes("data-stale-rows")).toBeUndefined();
+  });
+
+  it("keeps the columns the previous rows were drawn with", async () => {
+    const drawn = [{ id: "_timestamp" }, { id: "message" }];
+    wrapper.vm.searchObj.data.resultGrid.columns = drawn;
+    await nextTick();
+    await rerun();
+    wrapper.vm.searchObj.data.resultGrid.columns = [{ id: "_timestamp" }];
+    await nextTick();
+
+    expect(
+      table()
+        .props("columns")
+        .map((c: any) => c.id),
+    ).toEqual(["_timestamp", "message"]);
+  });
+
+  it("draws stale rows from their own values, not the highlight cache of the new search", async () => {
+    await rerun();
+    expect(wrapper.vm.logsCellHtml("message", rows[0])).toBeNull();
+  });
+
+  it("drops the previous rows when the new search finds nothing", async () => {
+    await rerun();
+    wrapper.vm.searchObj.loading = false;
+    await nextTick();
+
+    expect(table().props("data")).toHaveLength(0);
+    wrapper.vm.searchObj.loading = true;
+    await nextTick();
+    expect(table().props("data")).toHaveLength(0);
+  });
+
+  it("draws skeleton rows while a first search has no columns yet", async () => {
+    wrapper.vm.searchObj.data.resultGrid.columns = [];
+    wrapper.vm.searchObj.data.stream.selectedStream = ["fresh"];
+    await rerun();
+    expect(wrapper.find('[data-test="logs-search-result-table-skeleton"]').exists()).toBe(true);
+    expect(table().isVisible()).toBe(false);
+
+    wrapper.vm.searchObj.data.queryResults.hits = [{ _timestamp: 3, message: "c" }];
+    await nextTick();
+    expect(wrapper.find('[data-test="logs-search-result-table-skeleton"]').exists()).toBe(false);
+    expect(table().isVisible()).toBe(true);
+  });
+
+  it("does not carry rows over to another stream", async () => {
+    wrapper.vm.searchObj.data.stream.selectedStream = ["other"];
+    await rerun();
+
+    expect(table().props("data")).toHaveLength(0);
+    expect(table().props("loading")).toBe(true);
   });
 });

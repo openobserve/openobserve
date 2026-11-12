@@ -16,6 +16,8 @@
 // Mirrors `config::meta::oncall`. Every wire form here is the snake_case the
 // API emits — nothing is renamed on the way in.
 
+import type { SentTemplate } from "@/utils/alerts/notificationKinds";
+
 /**
  * Who a level of the ladder pages.
  *
@@ -74,6 +76,8 @@ export type AlertPriorityValue = 1 | 2 | 3 | 4 | 5;
 
 export type Channel =
   | "email"
+  /** A DM from the org's Slack app to the person's linked Slack account. */
+  | "slack"
   | "sms"
   | "voice"
   /** An existing alert Destination — Slack, Teams, or any HTTP endpoint. */
@@ -349,6 +353,34 @@ export interface TeamChannel {
   team_id: string;
   destinations: string[];
   source: "team" | "policy";
+  /** RO-1: only `/o2 oncall here` in Slack sets a team's Slack channel. */
+  slack_channel_set: boolean;
+  slack_channel_name: string | null;
+  /** Only while it is still one of the team's destinations (RO-1). */
+  slack_same_room_destination: string | null;
+  /** RO-2: the channel is in a workspace the Slack app serves for this org, so pages post there. */
+  slack_native: boolean;
+  /** The org has an active Slack app installation. */
+  slack_connected: boolean;
+  /** SA-8 / RO-2 text, written by the server. */
+  slack_unavailable_reason: string | null;
+  /** RO-2's "Pages can't post to #{channel}: {reason}", written by the server. */
+  slack_post_problem: string | null;
+}
+
+/** `PUT /oncall/teams/{id}/channel`. Same-room: "" unticks, omitted keeps the stored one. */
+export interface SetTeamChannelBody {
+  destinations: string[] | null;
+  slack_same_room_destination?: string;
+  /** Empties the Slack channel and the same-room destination. */
+  clear_slack?: boolean;
+}
+
+/** `POST /oncall/teams/{id}/slack/test` (RO-6): `advice` is the server's words. */
+export interface TeamSlackTestResult {
+  ok: boolean;
+  class: "ok" | "channel_problem" | "not_connected" | "no_channel";
+  advice: string;
 }
 
 export interface Unavailability {
@@ -444,9 +476,6 @@ export interface PriorityRung {
   channels: Channel[];
 }
 
-/** What happens when the ladder runs out and nobody has acknowledged. */
-export type PolicyFinalAction = "notify_default_team" | "stop";
-
 /** How the L0 agent relates to paging at one severity. */
 export type L0Mode =
   /** The agent runs alongside a page that has already gone out. */
@@ -511,11 +540,12 @@ export interface OnCallPolicy {
   p1_parallel?: boolean;
   /** Off by default — a P4 that wakes somebody is a severity bug. */
   p4_pages?: boolean;
-  /** How many full passes the ladder runs before `final_action`. 1 = once; there is no zero. */
-  repeat_count?: number;
-  final_action?: PolicyFinalAction;
   /** Absent on a PUT means UNCHANGED — only send when the user touched it. */
   l0?: L0Policy;
+  /** Template override for this team's on-call messages; null uses each destination's. */
+  template?: string | null;
+  /** Read-only. The ladder still has the shape the server generated, so removing a rotation rewrites it rather than being refused. */
+  ladder_is_generated?: boolean;
 }
 
 export interface SubjectRef {
@@ -529,7 +559,8 @@ export interface OnCallResponse {
   id: string;
   org_id: string;
   subject: SubjectRef;
-  team_id: string;
+  /** `null` for a page nothing routed to a team (04-responses R6.1). */
+  team_id: string | null;
   priority: number;
   state: ResponseState;
   opened_at: number;
@@ -543,6 +574,8 @@ export interface OnCallResponse {
   /** Quiet until this instant (micros). Not an acknowledgement. */
   snoozed_until?: number | null;
   ladder_anchor?: number | null;
+  /** When the ladder ran out with nobody answering; the state stays triggered. */
+  exhausted_at?: number | null;
   /** Which run of the ladder this record is on. Absent means the first run. */
   ladder_run?: number | null;
   /** Always on the wire — the server defaults it to `owner`. */
@@ -559,6 +592,8 @@ export interface OnCallResponse {
   reached_rung_micros?: number | null;
   /** Server-computed, and only present on a record somebody answered. */
   time_to_ack_micros?: number | null;
+  /** The linked incident's title; absent when the incident is gone, untitled or unreadable. */
+  incident_title?: string;
 }
 
 /**
@@ -753,8 +788,6 @@ export interface EscalationPreview {
   pages_anyone: boolean;
   channels: Channel[];
   rungs: PreviewRung[];
-  repeat_count?: number | null;
-  final_action?: PolicyFinalAction | null;
   /** What happens when the ladder runs out. A finished sentence. */
   ends_with: string;
   /** How a page can leave this team, automatically or by hand. Sentences. */
@@ -786,6 +819,8 @@ export interface TeamRungSummary {
   nobody_after_micros?: number | null;
   /** A ladder that stops short of the whole team runs out of people. */
   ends_with_whole_team: boolean;
+  /** The channels this priority pages on. */
+  channels: Channel[];
 }
 
 export interface TeamPageStats {
@@ -809,8 +844,6 @@ export interface TeamOverview {
   covered_now: boolean;
   on_call_now: string[];
   rungs: TeamRungSummary[];
-  repeat_count?: number | null;
-  final_action?: PolicyFinalAction | null;
   /** Micros. */
   from: number;
   /** Micros. */
@@ -850,11 +883,13 @@ export interface ResolvedSegment {
    * by layer. Not the rotation: that is `rotation_id`, and every segment in one
    * response shares it.
    *
-   * Null on a gap, where no rule won and therefore none named anybody.
+   * Null on a gap no rule covers; a gap left by an away rostered member keeps its rule.
    */
   rotation?: string | null;
   /** Present when a cover took this span from the rotation. */
   override_id?: string | null;
+  /** Whom the roster puts on here before absences and covers; present only when it differs from `user_email`. */
+  scheduled_email?: string | null;
 }
 
 /** `GET /oncall/teams/{id}/load`. Who has been carrying the pager. */
@@ -953,6 +988,10 @@ export interface FiredRung {
   /** Absolute instant it fired. */
   at: number;
   targets: string[];
+  /** The people it actually reached, from the delivery ledger. */
+  reached?: string[];
+  /** The step fired and the ledger has nobody for it: an unstaffed rotation, say. */
+  reached_nobody?: boolean;
 }
 
 /// Where the ladder has got to. The question mid-incident is "when does this
@@ -962,9 +1001,14 @@ export interface EscalationProgress {
   next_targets: string[];
   next_at?: number | null;
   exhausted: boolean;
-  /** Set when the ladder is not climbing: acknowledged, snoozed, resolved. */
+  /** Set when the ladder is not climbing: acknowledged, snoozed, resolved, unrouted, team deleted, or exhausted (check `exhausted`). */
   stopped_because?: string | null;
+  /** While the first page is held for AI triage, when the hold ends (micros). */
+  held_until_micros?: number | null;
 }
+
+/** `GET /oncall/responses/escalation` answers each record it could read, by id. */
+export type EscalationProgressEntry = EscalationProgress & { response_id: string };
 
 export interface OnCallResponseEvent {
   kind: ResponseEventKind;
@@ -1024,8 +1068,6 @@ export interface RoutingPreview {
   notes?: string[];
   /** Every priority's shape on the team this resolves to, silent ones included. */
   ladder?: TeamRungSummary[];
-  repeat_count?: number;
-  final_action?: string;
   /** Who holds it this instant, and whether a page to them would land. */
   current_responder?: PreviewRecipient | null;
   /** False when the winning team has nobody on call right now. */
@@ -1105,6 +1147,8 @@ export interface DeliveryRecord {
   channel?: Channel | null;
   /** `false` is a RECORDED failure — not the same as the field being absent. */
   delivered?: boolean | null;
+  /** The template each destination rendered with; absent on rows written before it was recorded. */
+  templates?: SentTemplate[];
 }
 
 /** `GET /oncall/responses/{id}/deliveries`. `total` is exact; `deliveries` is a page. */
@@ -1183,6 +1227,14 @@ export interface MyOnCall {
   teams: MyOnCallTeam[];
 }
 
+/** One team in `GET /oncall/teams/context`; a field the server could not read is absent, not empty. */
+export interface OnCallTeamContext {
+  team_id: string;
+  policy?: OnCallPolicy;
+  on_call?: OnCallPosition[];
+  schedule?: OnCallSchedule | null;
+}
+
 /** `GET /oncall/contacts/{email}` — the caller's own phone and whether a code can be sent to it. */
 export interface Contact {
   /** E.164; absent when none is saved. */
@@ -1207,6 +1259,7 @@ export type RefusalReason =
   | "no_provider"
   | "no_phone"
   | "number_rejected"
+  | "number_not_allowed"
   | "provider_unavailable";
 
 /** The 400/429/503 body of a refused send or confirm; `message` is the English API text. */
@@ -1248,7 +1301,21 @@ export type TelephonyReason =
   | "token_required"
   | "no_master_key"
   | "account_rejected"
+  | "from_not_on_account"
+  | "unavailable"
   | "unreadable";
+
+/** `GET /telephony/status`: `none` means no account would page, so nothing was checked. */
+export type TelephonyState =
+  "ok" | "account_rejected" | "from_not_on_account" | "unavailable" | "unreadable" | "none";
+
+/** A live check of the account the org would page with; the capabilities are false unless `state` is `ok`. */
+export interface TelephonyStatus {
+  state: TelephonyState;
+  trial: boolean;
+  can_text: boolean;
+  can_call: boolean;
+}
 
 /** The 400 body of a refused telephony call; `message` is the English API text. */
 export interface TelephonyRefusalBody {

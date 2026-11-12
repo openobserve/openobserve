@@ -1887,6 +1887,20 @@ describe("pure helpers", () => {
     expect(isScopeCovered(at(dispatchUs, nowUs + 1), consented, nowUs, dispatchUs)).toBe(false);
   });
 
+  it("isScopeCovered compares calendar periods by their dates, not their lengths", () => {
+    localStorage.setItem("timezone", "UTC");
+    const nowUs = Date.parse("2026-10-08T03:00:00Z") * 1000;
+    const base = { streamType: "logs", streams: ["a"], regions: [], clusters: [] };
+    const rel = (period: string) => ({ ...base, time: { type: "relative" as const, period } });
+
+    expect(isScopeCovered(rel("calendar:day:0"), rel("calendar:day:-1"), nowUs)).toBe(false);
+    expect(isScopeCovered(rel("calendar:day:-5"), rel("calendar:day:-1"), nowUs)).toBe(false);
+    expect(isScopeCovered(rel("calendar:day:-1"), rel("calendar:week:0"), nowUs)).toBe(true);
+    expect(isScopeCovered(rel("calendar:day:-1"), rel("calendar:day:-1"), nowUs)).toBe(true);
+    expect(isScopeCovered(rel("15m"), rel("1h"), nowUs)).toBe(true);
+    localStorage.removeItem("timezone");
+  });
+
   it("isScopeCovered handles relative and absolute windows, streams, type and regions", () => {
     const nowUs = 1_000_000 * MINUTE_US;
     const consented = scopeOf(

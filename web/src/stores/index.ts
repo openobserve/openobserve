@@ -23,7 +23,11 @@ import logs from "./logs";
 import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
 import { purgeAllQueries } from "@/composables/query/queryClient";
+import { clearPanelDraftsFor } from "@/composables/dashboard/usePanelDraft";
+import { editorDraftSessionEnded, resumeEditorDraftSession } from "@/utils/drafts/editorDraftStore";
 import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
+import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
+import config from "@/aws-exports";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -51,6 +55,8 @@ const organizationObj = {
   rumToken: {
     rum_token: "",
   },
+  // the RUM token read returned 403: the setup card withholds its snippet and the header its actions
+  rumTokenForbidden: false,
   // Which traces stream contains a given (canonical 32-char) trace id, and the
   // range it ran in when the time index knew — see useCorrelatedTracesStream.
   // knownStreams is the org-level fact ("streams that have ever contained a
@@ -73,6 +79,7 @@ const organizationObj = {
     cross_links: [],
     usage_stream_enabled: false,
     red_insights_enabled: false,
+    ai_rca_thread_tool_output: false,
   },
   isDataIngested: false,
   regexPatterns: [],
@@ -89,7 +96,7 @@ const organizationObj = {
   }>,
 };
 
-export default createStore({
+const store = createStore({
   state: {
     API_ENDPOINT: API_ENDPOINT,
     userInfo: {},
@@ -102,6 +109,9 @@ export default createStore({
     searchCollapsibleSection: 20,
     theme: localStorage.getItem("theme") === "dark" ? "dark" : "light",
     printMode: false,
+    kioskMode: false,
+    // A per-screen theme forced by a kiosk URL; never persisted as the user's preference.
+    themeOverride: null,
     organizationData: JSON.parse(JSON.stringify(organizationObj)),
     zoConfig: <{ [key: string]: any }>{},
     timezone: useLocalTimezone()
@@ -164,6 +174,8 @@ export default createStore({
     // Share URL state for Safari-compatible clipboard copy
     // Polling mechanism checks this value and copies when available
     pendingShortURL: null,
+    solutionMode: ((config.isEnterprise == "true" && localStorage.getItem("solutionMode")) ||
+      "observability") as "observability" | "security",
   },
   mutations: {
     login(state, payload) {
@@ -189,7 +201,9 @@ export default createStore({
       state.selectedOrganization = payload;
     },
     setOrganizations(state, payload) {
-      state.organizations = payload;
+      // Callers read .length unguarded; a failed org fetch must not store undefined.
+      const organizations: any = Array.isArray(payload) ? payload : [];
+      state.organizations = organizations;
     },
     setCurrentUser(state, payload) {
       state.currentuser = payload;
@@ -211,6 +225,9 @@ export default createStore({
     },
     setRUMToken(state, payload) {
       state.organizationData.rumToken = payload;
+    },
+    setRUMTokenForbidden(state, payload) {
+      state.organizationData.rumTokenForbidden = payload;
     },
     setCorrelatedTracesStream(
       state,
@@ -293,6 +310,16 @@ export default createStore({
     },
     setPrintMode(state, payload) {
       state.printMode = payload;
+    },
+    setSolutionMode(state, payload: "observability" | "security") {
+      state.solutionMode = payload;
+      localStorage.setItem("solutionMode", payload);
+    },
+    setKioskMode(state, payload) {
+      state.kioskMode = payload;
+    },
+    setThemeOverride(state, payload) {
+      state.themeOverride = payload;
     },
     setTimezone(state, payload) {
       state.timezone = payload;
@@ -434,13 +461,20 @@ export default createStore({
   },
   actions: {
     login(context, payload) {
+      const current = context.state.userInfo as { email?: string } | null;
+      const sameSession = context.state.loggedIn && current?.email === payload?.userInfo?.email;
       context.commit("login", payload);
+      // A token refresh re-dispatches login, and a sign-out here always reloads, so a login after one in this tab is a refresh too.
+      const refresh = sameSession || editorDraftSessionEnded.value;
+      if (payload?.loginState && !refresh) resumeEditorDraftSession(payload.userInfo?.email);
     },
-    logout(context) {
+    logout(context, payload?: { draftsOf?: string }) {
       context.commit("logout");
       // Nothing from the previous session may survive — including anything the
       // query layer persisted to localStorage/IndexedDB.
       purgeAllQueries();
+      // Only an explicit sign-out names a user to clear; an expired session keeps every draft for the next login.
+      if (payload?.draftsOf !== undefined) clearPanelDraftsFor(payload.draftsOf);
     },
     endpoint(context, payload) {
       context.commit("endpoint", payload);
@@ -471,6 +505,9 @@ export default createStore({
     },
     setOrganizationPasscodeForbidden(context, payload) {
       context.commit("setOrganizationPasscodeForbidden", payload);
+    },
+    setRUMTokenForbidden(context, payload) {
+      context.commit("setRUMTokenForbidden", payload);
     },
     resetOrganizationData(context, payload) {
       context.commit("resetOrganizationData", payload);
@@ -541,6 +578,9 @@ export default createStore({
     setPrintMode(context, payload) {
       context.commit("setPrintMode", payload);
     },
+    setKioskMode(context, payload) {
+      context.commit("setKioskMode", payload);
+    },
     setTimezone(context, payload) {
       context.commit("setTimezone", payload);
     },
@@ -599,3 +639,8 @@ export default createStore({
     incidents,
   },
 });
+
+// Zone-less calendar resolves (query builders, guards) must use the zone the picker shows.
+setPickerTimezoneSource(() => store.state.timezone);
+
+export default store;

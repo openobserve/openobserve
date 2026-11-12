@@ -10,7 +10,6 @@ path = "src/lib.rs"
 
 [dependencies]
 bytes.workspace = true
-common.workspace = true
 config.workspace = true
 serde.workspace = true
 utoipa.workspace = true

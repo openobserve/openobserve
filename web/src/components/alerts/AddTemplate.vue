@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     title-data-test="add-template-title"
     :back="{
       label: t('alert_templates.header'),
-      onClick: () => emit('cancel:hideform'),
+      onClick: closeEditor,
     }"
     bleed
   >
@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="name"
                 data-test="add-template-name-input"
                 :label="t('alerts.name')"
+                :maxlength="256"
                 :placeholder="t('alert_templates.namePlaceholder')"
                 required
                 :readonly="isUpdatingTemplate"
@@ -78,10 +79,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </div>
 
+            <div class="w-full pb-3" data-test="add-template-applies-to">
+              <OSelect
+                :model-value="appliesToSelection"
+                :options="appliesToOptions"
+                labelKey="label"
+                valueKey="value"
+                multiple
+                :searchable="false"
+                :label="t('alert_templates.appliesTo')"
+                :placeholder="t('alert_templates.appliesToAll')"
+                :disabled="isPrebuiltTemplate"
+                :error="!!appliesToError"
+                :error-message="appliesToError ? raw(appliesToError) : undefined"
+                class="max-w-120"
+                data-test="add-template-applies-to-select"
+                @update:model-value="onAppliesToChange"
+              />
+              <div class="flex items-center gap-2 pt-1 text-xs">
+                <span class="text-text-secondary" data-test="add-template-applies-to-mode">{{
+                  appliesToMode === "inferred"
+                    ? t("alert_templates.appliesToInferred")
+                    : t("alert_templates.appliesToManual")
+                }}</span>
+                <OButton
+                  v-if="appliesToMode === 'manual' && !isPrebuiltTemplate"
+                  variant="ghost-primary"
+                  size="xs"
+                  data-test="add-template-applies-to-reset"
+                  @click="resetAppliesTo"
+                  >{{ t("alert_templates.appliesToReset") }}</OButton
+                >
+              </div>
+              <div
+                v-if="appliesToMode === 'manual' && !appliesTo.length && !isPrebuiltTemplate"
+                class="text-text-secondary pt-1 text-xs"
+                data-test="add-template-applies-to-all-hint"
+              >
+                {{ t("alert_templates.appliesToAllHint") }}
+              </div>
+            </div>
+
             <template v-if="editorMode === 'content'">
               <ContentTemplateForm
                 v-model="contentSpec"
                 :is-seeded="isSeededTemplate"
+                :variables="guideVariables"
                 data-test="add-template-content-form"
               />
             </template>
@@ -182,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm-action"
               :disabled="isSubmitting"
-              @click="$emit('cancel:hideform')"
+              @click="closeEditor"
               data-test="add-template-cancel-btn"
               >{{ t("alerts.cancel") }}</OButton
             >
@@ -190,6 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="primary"
               size="sm-action"
               :loading="isSubmitting"
+              :disabled="isPrebuiltTemplate"
               data-test="add-template-submit-btn"
               @click="handleSave"
               >{{ t("alerts.save") }}</OButton
@@ -214,7 +258,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               this panel's toolbar. Sizing to content (the default) lets the
               column's own `overflow-auto` do the scrolling instead.
             -->
-            <TemplatePreviewPanel :spec="contentSpec" data-test="add-template-preview-panel" />
+            <TemplatePreviewPanel
+              :spec="contentSpec"
+              :kinds="appliesTo"
+              data-test="add-template-preview-panel"
+              @variable-groups="(groups) => (variableGroups = groups)"
+              @kind-change="(kind) => (previewKind = kind)"
+            />
             <OSeparator class="-ms-2 me-2 mt-2" />
           </template>
 
@@ -223,31 +273,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="variableGuideOpen"
             data-test="add-template-variable-guide-collapsible"
           >
+            <div v-if="editorMode === 'custom'" class="px-1 pt-3">
+              <OSelect
+                v-model="guideKind"
+                :label="t('alert_templates.previewKind')"
+                :options="guideKindOptions"
+                width="sm"
+                :searchable="false"
+                data-test="add-template-variable-guide-kind-select"
+              />
+            </div>
+            <div
+              v-for="group in shownVariableGroups"
+              :key="group.name"
+              class="px-1 pt-3"
+              :data-test="`add-template-variable-group-${group.name}`"
+            >
+              <div class="font-bold">{{ variableGroupLabel(group.name) }}</div>
+              <div class="break-words">{{ raw(group.variables.join(", ")) }}</div>
+            </div>
             <div class="px-1 py-3">
-              <div>{{ raw("org_name, stream_type, stream_name") }}</div>
-              <div>{{ raw("alert_name, alert_type, alert_status") }}</div>
-              <div>
+              <template v-if="!shownVariableGroups.length">
+                <div>{{ raw("org_name, stream_type, stream_name") }}</div>
+                <div>{{ raw("alert_name, alert_type, alert_status") }}</div>
+                <div>{{ raw("alert_period, alert_operator, alert_threshold") }}</div>
+                <div>{{ raw("alert_count, alert_agg_value") }}</div>
+                <div>{{ raw("alert_description") }}</div>
+                <div>
+                  {{
+                    raw(
+                      "alert_start_time, alert_end_time, alert_start_time_millis, alert_end_time_millis, alert_url",
+                    )
+                  }}
+                </div>
+                <div>
+                  {{
+                    raw(
+                      "alert_trigger_time, alert_trigger_time_millis, alert_trigger_time_seconds, alert_trigger_time_str",
+                    )
+                  }}
+                </div>
+              </template>
+              <div data-test="add-template-variable-episode-id">
                 <b>{{ raw("episode_id") }}</b>
                 {{ t("alert_templates.variableEpisodeIdDescription") }}
               </div>
-              <div>{{ raw("alert_period, alert_operator, alert_threshold") }}</div>
-              <div>{{ raw("alert_count, alert_agg_value") }}</div>
-              <div>{{ raw("alert_description") }}</div>
-              <div>
-                {{
-                  raw(
-                    "alert_start_time, alert_end_time, alert_start_time_millis, alert_end_time_millis, alert_url",
-                  )
-                }}
-              </div>
-              <div>
-                {{
-                  raw(
-                    "alert_trigger_time, alert_trigger_time_millis, alert_trigger_time_seconds, alert_trigger_time_str",
-                  )
-                }}
-              </div>
-              <div>
+              <div data-test="add-template-variable-rows">
                 <b>{{ raw("rows") }}</b> {{ t("alert_templates.variableRowsDescription") }}
               </div>
               <div>
@@ -290,13 +361,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </OSplitter>
+    <EditorDraftDialogs :draft="templateDraft" />
   </OPageLayout>
 </template>
 <script lang="ts" setup>
 import { saveTemplateMutation } from "@/services/alert_templates.queries";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
-import { ref, onActivated, computed, watch, defineAsyncComponent } from "vue";
+import { ref, onActivated, onMounted, computed, watch, defineAsyncComponent } from "vue";
 import type { Ref } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 
@@ -319,6 +391,16 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import TemplatePreviewPanel from "./template-content/TemplatePreviewPanel.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import templateService from "@/services/alert_templates";
+import { useStore } from "vuex";
+import {
+  NOTIFICATION_KINDS,
+  inferAppliesTo,
+  kindLabelKey,
+  type NotificationKind,
+  type VariableGroup,
+} from "@/utils/alerts/notificationKinds";
 import {
   makeAddTemplateSchema,
   addTemplateDefaults,
@@ -335,6 +417,17 @@ import {
   serializeContentSpec,
   type ContentSpec,
 } from "./template-content/contentSpec";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+
+interface TemplateDraftData {
+  values: AddTemplateForm;
+  contentSpec: ContentSpec;
+  customBodyStash: string | null;
+  // Optional because drafts saved before Applies to existed lack them.
+  appliesTo?: NotificationKind[];
+  appliesToMode?: "inferred" | "manual";
+}
 
 const props = withDefaults(
   defineProps<{
@@ -345,8 +438,10 @@ const props = withDefaults(
      * "Copy of X" is created instead of overwriting X).
      */
     isClone?: boolean;
+    /** The template a clone was copied from; keys the clone's own draft slot. */
+    cloneSource?: string | null;
   }>(),
-  { isClone: false },
+  { isClone: false, cloneSource: null },
 );
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
 
@@ -403,6 +498,114 @@ const onTypeChange = (value: unknown) => {
 // as UI copy (design §7) — the tab labels come from kindContent/kindCustom.
 const editorMode = form.useStore((s: any) => s.values.kind as "content" | "custom");
 
+// "Applies to": inferred from the body until the author changes it, then manual.
+const appliesTo = ref<NotificationKind[]>([]);
+const appliesToMode = ref<"inferred" | "manual">("inferred");
+const appliesToError = ref<string | null>(null);
+const isPrebuiltTemplate = computed(() => !!props.template?.isPrebuilt && !props.isClone);
+// An empty list is stored for every kind; the select shows it as the ticked "All kinds" item.
+const ALL_KINDS = "all_kinds";
+const appliesToOptions = computed(() => [
+  { label: t("alert_templates.appliesToAll"), value: ALL_KINDS },
+  ...NOTIFICATION_KINDS.map((kind) => ({ label: t(kindLabelKey(kind)), value: kind })),
+]);
+const appliesToSelection = computed<string[]>(() =>
+  appliesTo.value.length ? appliesTo.value : [ALL_KINDS],
+);
+const isKind = (k: unknown): k is NotificationKind =>
+  NOTIFICATION_KINDS.includes(k as NotificationKind);
+
+// The text inference reads: the serialized spec in content mode, the raw body otherwise.
+const inferenceSource = computed(() =>
+  editorMode.value === "content" ? serializeContentSpec(contentSpec.value) : body.value,
+);
+
+const onAppliesToChange = (value: unknown) => {
+  const picked = Array.isArray(value) ? value : [];
+  const allKindsJustTicked = picked.includes(ALL_KINDS) && appliesTo.value.length > 0;
+  const next = allKindsJustTicked ? [] : NOTIFICATION_KINDS.filter((k) => picked.includes(k));
+  // Clicking the ticked "All kinds" item changes nothing, so it keeps inference on.
+  if (!next.length && !appliesTo.value.length) return;
+  appliesTo.value = next;
+  appliesToMode.value = "manual";
+  appliesToError.value = null;
+};
+
+const resetAppliesTo = () => {
+  appliesToMode.value = "inferred";
+  appliesTo.value = inferAppliesTo(inferenceSource.value);
+  appliesToError.value = null;
+};
+
+// Filled from the preview response, which carries every group.
+const variableGroups = ref<VariableGroup[]>([]);
+// The playground's Kind; the panel only offers kinds inside Applies to, so it narrows that list.
+const previewKind = ref<NotificationKind>("alert");
+// Custom mode has no playground, so the guide has its own Kind; ALL_KINDS shows every kind applied to.
+const guideKind = ref<NotificationKind | typeof ALL_KINDS>(ALL_KINDS);
+const guideKinds = computed<NotificationKind[]>(() =>
+  appliesTo.value.length ? appliesTo.value : [...NOTIFICATION_KINDS],
+);
+const guideKindOptions = computed(() => [
+  { label: t("alert_templates.appliesToAll"), value: ALL_KINDS },
+  ...guideKinds.value.map((kind) => ({ label: t(kindLabelKey(kind)), value: kind })),
+]);
+watch(guideKinds, (kinds) => {
+  if (guideKind.value !== ALL_KINDS && !kinds.includes(guideKind.value))
+    guideKind.value = ALL_KINDS;
+});
+const shownVariableGroups = computed(() => {
+  const kinds: string[] =
+    editorMode.value === "content"
+      ? [previewKind.value]
+      : guideKind.value === ALL_KINDS
+        ? guideKinds.value
+        : [guideKind.value];
+  return variableGroups.value.filter(
+    (g) => g.name === "common" || (kinds.includes(g.name) && g.variables.length > 0),
+  );
+});
+// Kind groups lead so they are not behind "+N more"; `group.<label>` is a pattern, not a variable.
+const guideVariables = computed(() => [
+  ...new Set(
+    [
+      ...shownVariableGroups.value.filter((g) => g.name !== "common"),
+      ...shownVariableGroups.value.filter((g) => g.name === "common"),
+    ]
+      .flatMap((g) => g.variables)
+      .filter((v) => !v.startsWith("group.")),
+  ),
+]);
+const variableGroupLabel = (name: string) =>
+  isKind(name) ? t(kindLabelKey(name)) : t("alert_templates.variableGroupCommon");
+
+// Custom mode has no preview panel, so the guide's groups come from one preview call.
+const store = useStore();
+// Mount and a later switch to custom mode can both ask, so one call serves both.
+let variableGroupsLoad: Promise<void> | null = null;
+const loadVariableGroups = () => {
+  if (variableGroups.value.length) return Promise.resolve();
+  variableGroupsLoad ??= fetchVariableGroups().finally(() => {
+    variableGroupsLoad = null;
+  });
+  return variableGroupsLoad;
+};
+const fetchVariableGroups = async () => {
+  try {
+    const res = await templateService.preview({
+      org_identifier: store.state.selectedOrganization?.identifier,
+      data: {
+        definition: starterContentSpec(),
+        channel: "slack",
+        kind: appliesTo.value[0] ?? "alert",
+      },
+    });
+    variableGroups.value = res.data?.variable_groups ?? [];
+  } catch {
+    // The static guide below still lists the alert variables.
+  }
+};
+
 const modeTabs = computed(() => [
   { label: t("alert_templates.kindContent"), value: "content", style: {} },
   { label: t("alert_templates.kindCustom"), value: "custom", style: {} },
@@ -413,6 +616,10 @@ const modeTabs = computed(() => [
 // — the same bridging pattern already used for the bare Monaco `body` field
 // below. Kept as a local ref; ContentTemplateForm owns no state of its own.
 const contentSpec = ref<ContentSpec>(emptyContentSpec());
+// Registered after contentSpec: the watch reads it at once.
+watch(inferenceSource, (text) => {
+  if (appliesToMode.value === "inferred") appliesTo.value = inferAppliesTo(text);
+});
 /**
  * True only while showing a brand-new template still carrying the untouched
  * starter seed. The seed has optional content by design (rows on, three
@@ -447,6 +654,7 @@ watch(
 const variableGuideOpen = ref(editorMode.value !== "content");
 watch(editorMode, (mode) => {
   variableGuideOpen.value = mode !== "content";
+  if (mode === "custom") loadVariableGroups();
 });
 
 // Starter body for raw-payload mode on a PRISTINE new template. Without
@@ -545,6 +753,8 @@ const startContentVersion = () => {
 // it's a bare Monaco bridged in via setFieldValue with no name= binding, so it has
 // no field to highlight either. Restore the toast on a rejected submit.
 const handleSave = async () => {
+  // A prebuilt row is read-only; the leave dialog's Save also comes through here.
+  if (isPrebuiltTemplate.value) return;
   await form.handleSubmit();
   if (!form.state.isValid) {
     toast({
@@ -652,6 +862,26 @@ const applyTemplateData = () => {
     next.kind = "content";
   }
 
+  appliesToError.value = null;
+  if (props.template) {
+    appliesTo.value = NOTIFICATION_KINDS.filter((k) => props.template?.applies_to?.includes(k));
+    const stored =
+      next.kind === "content" ? serializeContentSpec(contentSpec.value) : props.template.body;
+    // A saved list is the author's choice, so editing the body must never narrow a stored "All kinds".
+    appliesToMode.value =
+      !isUpdatingTemplate.value &&
+      appliesTo.value.length === 0 &&
+      inferAppliesTo(stored ?? "").length === 0
+        ? "inferred"
+        : "manual";
+  } else if (isKind(params.applies_to)) {
+    appliesTo.value = [params.applies_to];
+    appliesToMode.value = "manual";
+  } else {
+    appliesToMode.value = "inferred";
+    appliesTo.value = inferAppliesTo(serializeContentSpec(contentSpec.value));
+  }
+
   // A ?type= query param (e.g. deep link) preselects the tab. Guard the cast so
   // an unexpected value can never enter the enum-typed form.
   if (params.type === "email" || params.type === "http") {
@@ -663,6 +893,83 @@ const applyTemplateData = () => {
 
 watch(() => props.template, applyTemplateData, { immediate: true });
 onActivated(() => applyTemplateData());
+
+// Drafts belong to the templates page; any other host keeps the plain editor.
+const draftsActive = router.currentRoute.value.name === "alertTemplates";
+const formValues = form.useStore((s: { values: AddTemplateForm }) => s.values);
+// Set while the leave dialog's Save runs, so a successful save neither closes the editor nor reloads the list.
+let leaveSave: { saved: boolean } | null = null;
+
+const serverTemplate = () =>
+  isUpdatingTemplate.value && props.template
+    ? {
+        name: props.template.name,
+        body: String(props.template.body ?? ""),
+        type: props.template.type ?? "",
+        title: String(props.template.title ?? ""),
+        kind: props.template.kind ?? "",
+        appliesTo: NOTIFICATION_KINDS.filter((k) => props.template?.applies_to?.includes(k)),
+        appliesToMode: "manual",
+      }
+    : null;
+
+const templateDraft = useEditorDraft<TemplateDraftData>({
+  kind: "alert_template",
+  entityLabel: () => t("common.editorDraft.entities.alert_template"),
+  entityId: () => (isUpdatingTemplate.value ? (props.template?.name ?? null) : null),
+  newVariant: () =>
+    props.isClone && props.template ? `clone:${props.cloneSource ?? props.template.name}` : null,
+  snapshot: () => ({
+    values: { ...formValues.value },
+    contentSpec: contentSpec.value,
+    customBodyStash: customBodyStash.value,
+    appliesTo: [...appliesTo.value],
+    appliesToMode: appliesToMode.value,
+  }),
+  apply: (data) => {
+    contentSpec.value = data.contentSpec;
+    customBodyStash.value = data.customBodyStash;
+    if (Array.isArray(data.appliesTo)) appliesTo.value = data.appliesTo.filter(isKind);
+    if (data.appliesToMode === "inferred" || data.appliesToMode === "manual") {
+      appliesToMode.value = data.appliesToMode;
+    }
+    appliesToError.value = null;
+    isSeededTemplate.value =
+      isSeededTemplate.value &&
+      serializeContentSpec(data.contentSpec) === serializeContentSpec(starterContentSpec());
+    // A saved template's name is locked, so the draft can never rename it.
+    form.reset({
+      ...data.values,
+      name: isUpdatingTemplate.value ? form.state.values.name : data.values.name,
+    });
+  },
+  base: serverTemplate,
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await handleSave();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  leaveOnRouteUpdate: (to, from) =>
+    to.path !== from.path ||
+    to.query.action !== from.query.action ||
+    to.query.name !== from.query.name ||
+    to.query.clone !== from.query.clone,
+});
+
+onMounted(async () => {
+  // A clone or an edit can reach custom mode after mount, so the guide's groups load either way.
+  loadVariableGroups();
+  if (draftsActive) await templateDraft.start();
+});
+
+const closeEditor = async () => {
+  if (await templateDraft.confirmLeave()) emit("cancel:hideform");
+};
 
 // http bodies must be valid JSON (with template placeholders). This stays a
 // submit-time toast side-effect — NOT a schema rule — to preserve the exact
@@ -684,6 +991,7 @@ const isTemplateBodyValid = (bodyValue: string) => {
 // @submit(value) is the source of truth. OForm awaits this, so the inline Save
 // button's spinner (v-slot isSubmitting) spans the whole request.
 async function saveTemplate(value: AddTemplateForm) {
+  if (isPrebuiltTemplate.value) return;
   const isContentMode = value.kind === "content";
 
   // Custom mode keeps the pre-migration JSON-validity check (http only);
@@ -735,6 +1043,7 @@ async function saveTemplate(value: AddTemplateForm) {
         type: "http" as const,
         title: contentSpec.value.title,
         kind: "content" as const,
+        applies_to: [...appliesTo.value],
       }
     : {
         name: value.name.trim(),
@@ -742,12 +1051,18 @@ async function saveTemplate(value: AddTemplateForm) {
         type: value.type,
         title: value.title,
         kind: "custom" as const,
+        applies_to: [...appliesTo.value],
       };
 
   const onSuccess = () => {
     dismiss();
-    emit("get:templates");
-    emit("cancel:hideform");
+    if (leaveSave) {
+      leaveSave.saved = true;
+    } else {
+      templateDraft.markSaved();
+      emit("get:templates");
+      emit("cancel:hideform");
+    }
     toast({
       variant: "success",
       message: t("alert_templates.savedSuccessfully"),
@@ -755,10 +1070,19 @@ async function saveTemplate(value: AddTemplateForm) {
   };
 
   const onError = (err: any) => {
+    dismiss();
     if (err.response?.status == 403) {
       return;
     }
-    dismiss();
+    const message: string = err.response?.data?.message ?? err.response?.data?.error ?? "";
+    // The applies_to rules answer 400 with a message that names the field or the binding.
+    if (
+      err.response?.status == 400 &&
+      (message.startsWith("applies_to:") || message.startsWith("template is used for"))
+    ) {
+      appliesToError.value = message;
+      return;
+    }
     toast({
       variant: "error",
       message: err.response?.data?.error || err.response?.data?.message,

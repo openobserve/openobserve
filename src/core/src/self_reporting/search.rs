@@ -51,22 +51,10 @@ pub async fn get_usage(
     let req = SearchRequest {
         query: Query {
             sql,
-            from: 0,
             size: -1,
             start_time,
             end_time,
-            quick_mode: false,
-            query_type: "".to_string(),
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
+            ..Default::default()
         },
         encoding: RequestEncoding::Empty,
         regions,
@@ -75,6 +63,7 @@ pub async fn get_usage(
         search_type: Some(SearchEventType::Other),
         search_event_context: None,
         use_cache: default_use_cache(),
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,
@@ -107,25 +96,22 @@ pub async fn get_license_usage_data_from_node(node_id: String) -> Result<GetLice
         .ok_or_else(|| anyhow::anyhow!("node {node_id} not found"))?;
     let node = std::sync::Arc::new(node) as std::sync::Arc<dyn NodeInfo>;
 
-    let task = tokio::task::spawn(async move {
-        let mut request = tonic::Request::new(proto::cluster_rpc::GetLicenseUsageRequest {});
-        let mut client =
-            make_grpc_search_client("license-usage-grpc-request", &mut request, &node, 0).await?;
-        match client.get_license_usage_info(request).await {
-            Ok(res) => {
-                let response = res.into_inner();
-                Ok(response)
-            }
-            Err(err) => {
-                log::error!(
-                    "[trace_id: license-usage-grpc-request] error getting license usage info node {} : {err:?}",
-                    node.get_grpc_addr(),
-                );
-                let err = ErrorCodes::from_json(err.message())?;
-                Err(anyhow::anyhow!("error getting license usage info : {err}"))
-            }
+    // Keep the request inside the check future so refresh cancellation drops the RPC.
+    let mut request = tonic::Request::new(proto::cluster_rpc::GetLicenseUsageRequest {});
+    let mut client =
+        make_grpc_search_client("license-usage-grpc-request", &mut request, &node, 0).await?;
+    match client.get_license_usage_info(request).await {
+        Ok(res) => {
+            let response = res.into_inner();
+            Ok(response)
         }
-    });
-    task.await
-        .map_err(|e| anyhow::anyhow!("internal error : {e}"))?
+        Err(err) => {
+            log::error!(
+                "[trace_id: license-usage-grpc-request] error getting license usage info node {} : {err:?}",
+                node.get_grpc_addr(),
+            );
+            let err = ErrorCodes::from_json(err.message())?;
+            Err(anyhow::anyhow!("error getting license usage info : {err}"))
+        }
+    }
 }

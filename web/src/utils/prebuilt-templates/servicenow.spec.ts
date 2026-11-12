@@ -58,22 +58,6 @@ describe("servicenow template", () => {
       expect(servicenowConfig.method).toBe("post");
     });
 
-    it("has URL validator", () => {
-      expect(typeof servicenowConfig.urlValidator).toBe("function");
-    });
-
-    it("validates ServiceNow URLs", () => {
-      expect(
-        servicenowConfig.urlValidator("https://dev.service-now.com/api/now/table/incident"),
-      ).toBe(true);
-      expect(servicenowConfig.urlValidator("https://example.com")).toBe(false);
-      expect(
-        servicenowConfig.urlValidator(
-          "https://evil.service-now.com.attacker.com/api/now/table/incident",
-        ),
-      ).toBe(false);
-    });
-
     it("validates instanceUrl credential field", () => {
       const instanceField = servicenowConfig.credentialFields.find((f) => f.key === "instanceUrl");
       expect(instanceField?.validator).toBeDefined();

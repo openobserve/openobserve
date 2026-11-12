@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout
+    ref="layoutRef"
     :key="org"
     data-test="rum-analytics-page"
     :subtitle="t('rum.analytics.subtitle')"
@@ -48,116 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </template>
     <template #actions>
-      <OSelect
-        v-if="appOptions.length > 1"
-        :model-value="[state.app, ...(pa.scope.value.apps ?? [])]"
-        :options="appOptions"
-        size="sm"
-        searchable
-        multiple
-        row-click-single-select
-        class="w-48 max-md:w-36"
-        data-test="rum-analytics-app-select"
-        @update:model-value="onAppsChange"
-      />
-      <OTag
-        v-else-if="state.app"
-        :label="raw(state.app)"
-        variant="default-outline"
-        size="md"
-        data-test="rum-analytics-app-label"
-      />
-      <OSelect
-        v-if="envOptions.length"
-        :model-value="state.env"
-        :options="envSelectOptions"
-        :placeholder="t('rum.analytics.allEnvs')"
-        multiple
-        size="sm"
-        class="w-36 max-md:hidden"
-        data-test="rum-analytics-env-select"
-        @update:model-value="onEnvChange"
-      />
-      <OSelect
-        v-if="versionOptions.length"
-        :model-value="state.version"
-        :options="versionSelectOptions"
-        :placeholder="t('rum.analytics.allVersions')"
-        multiple
-        size="sm"
-        class="w-36 max-md:hidden"
-        data-test="rum-analytics-version-select"
-        @update:model-value="onVersionChange"
-      />
-      <OPopover
-        v-if="identityNote"
-        v-model:open="identityOpen"
-        side="bottom"
-        align="end"
-        content-class="p-3 w-80"
-      >
-        <template #trigger>
-          <OTag
-            :label="
-              state.includeAllIdentities
-                ? t('rum.analytics.identityIncluded')
-                : t(
-                    'rum.analytics.identityExcluded',
-                    { count: identityNote.count, pct: sharePct },
-                    identityNote.count,
-                  )
-            "
-            variant="warning-soft"
-            size="md"
-            clickable
-            data-test="rum-analytics-identity-note"
-          />
-        </template>
-        <div class="flex flex-col gap-2 text-sm">
-          <p class="text-text-body" data-test="rum-analytics-identity-help">
-            {{ identityHelp }}
-          </p>
-          <OButton
-            variant="outline"
-            size="sm"
-            data-test="rum-analytics-identity-include-btn"
-            @click="toggleIncludeAll"
-            >{{
-              state.includeAllIdentities
-                ? t("rum.analytics.excludeAgain")
-                : t("rum.analytics.includeIt")
-            }}</OButton
-          >
-        </div>
-      </OPopover>
-      <OButton
-        v-if="exclusionCount !== null"
-        variant="outline"
-        size="sm"
-        :icon-left="likelyBot ? 'warning' : 'filter-alt'"
-        data-test="rum-analytics-exclusions-chip"
-        @click="exclusionsOpen = true"
-        >{{
-          likelyBot
-            ? t("rum.analytics.exclusions.chipLikelyBot", { count: exclusionCount })
-            : t("rum.analytics.exclusions.chip", { count: exclusionCount })
-        }}</OButton
-      >
-      <OButton
-        v-if="showNewUsers"
-        variant="outline"
-        size="sm"
-        :active="state.newUsers"
-        :aria-pressed="state.newUsers"
-        :disabled="newUsersDisabled"
-        focusable-unavailable
-        data-test="rum-analytics-new-users-chip"
-        @click="toggleNewUsers"
-        >{{ t("rum.analytics.exclusions.newUsersOnly")
-        }}<OTooltip
-          v-if="newUsersDisabled"
-          :content="t('rum.analytics.exclusions.newUsersSessionsTip')"
-      /></OButton>
+      <span id="rum-analytics-filters-host" class="contents" />
       <DateTimePickerDashboard
         ref="dateTimePickerRef"
         :model-value="state.datetime"
@@ -192,12 +84,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="primary"
         size="sm"
         :disabled="eventsFull"
+        :aria-label="
+          hasNewEventDraft
+            ? t('common.editorDraft.newDot', { label: t('rum.analytics.events.newEvent') })
+            : undefined
+        "
         data-test="rum-analytics-named-events-new-btn"
         @click="openNewEvent"
         >{{ t("rum.analytics.events.newEvent")
         }}<OTooltip
           v-if="eventsFull"
-          :content="t('rum.analytics.events.capReached', { max: MAX_EVENTS_PER_APP })"
+          :content="
+            t('rum.analytics.events.capReached', { max: MAX_EVENTS_PER_APP })
+          " /><EditorDraftDot
+          v-if="hasNewEventDraft"
+          :saved-at="newEventDraftSavedAt"
+          corner
+          :tooltip="!eventsFull"
+          data-test="rum-analytics-named-events-new-draft-dot"
       /></OButton>
       <OButton
         v-if="showNewFunnel"
@@ -209,112 +113,242 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
     </template>
 
-    <div v-if="noRumData" class="flex h-full min-h-0 flex-col" data-test="rum-analytics-no-data">
-      <RumNoDataState />
-    </div>
-    <div v-else class="flex h-full min-h-0 flex-col">
-      <OBanner
-        v-if="invalidParams.length && !invalidDismissed"
-        variant="warning"
-        dense
-        class="mx-page-edge mt-2"
-        :content="t('rum.analytics.invalidLink')"
-        data-test="rum-analytics-invalid-link"
-      >
-        <template #actions>
-          <OButton
-            variant="ghost"
-            size="sm"
-            data-test="rum-analytics-invalid-link-dismiss"
-            @click="invalidDismissed = true"
-            >{{ t("rum.analytics.dismiss") }}</OButton
-          >
-        </template>
-      </OBanner>
-
-      <OBanner
-        v-if="deletedEventLink"
-        variant="info"
-        dense
-        class="mx-page-edge mt-2"
-        :content="t('rum.analytics.events.deletedNotice')"
-        data-test="rum-analytics-deleted-event-link"
-      />
-
-      <OBanner
-        v-if="state.includeExcluded"
-        variant="warning"
-        dense
-        class="mx-page-edge mt-2"
-        :content="includedBanner"
-        data-test="rum-analytics-included-banner"
-      >
-        <template #actions>
-          <OButton
-            v-if="appFilters.hiddenFailed.value"
-            variant="ghost"
-            size="sm"
-            data-test="rum-analytics-hidden-count-retry-btn"
-            @click="appFilters.retryHidden()"
-            >{{ t("common.retry") }}</OButton
-          >
-          <OButton
-            variant="ghost"
-            size="sm"
-            data-test="rum-analytics-hide-hidden-btn"
-            @click="appFilters.setIncludeHidden(router, false)"
-            >{{ t("rum.analytics.appFilters.hideHidden") }}</OButton
-          >
-        </template>
-      </OBanner>
-
-      <div class="border-border-default pe-page-edge flex shrink-0 items-center gap-2 border-b">
-        <OTabs
-          :model-value="activeSubTab"
-          align="left"
-          dense
-          class="min-w-0 flex-1"
-          @update:model-value="onSubTabChange"
+    <div class="flex h-full min-h-0 flex-col">
+      <!-- Teleport moves the same filter instances between the header and the sub-nav, so they never remount. -->
+      <Teleport to="#rum-analytics-filters-host" defer :disabled="narrow">
+        <div
+          :class="
+            narrow
+              ? 'px-page-edge border-border-default flex flex-wrap items-center gap-2 border-b py-2 empty:hidden'
+              : 'contents'
+          "
+          data-test="rum-analytics-filters"
         >
-          <OTab
-            v-for="tab in subTabs"
-            :key="tab.value"
-            :name="tab.value"
-            :label="tab.label"
-            :data-test="`rum-analytics-subtab-${tab.value}`"
+          <OSelect
+            v-if="appOptions.length > 1"
+            :model-value="[state.app, ...(pa.scope.value.apps ?? [])]"
+            :options="appOptions"
+            size="sm"
+            searchable
+            :width="narrow ? 'sm' : undefined"
+            multiple
+            row-click-single-select
+            class="w-48 max-md:w-36"
+            data-test="rum-analytics-app-select"
+            @update:model-value="onAppsChange"
           />
-        </OTabs>
-        <SampledTag
-          v-if="showSampledTag"
-          :ratio="sampleRatio"
-          :va-rows="summary?.vaRows ?? 0"
-          :exact="state.exact"
-          @update:exact="onExactChange"
-        />
+          <OTag
+            v-else-if="state.app"
+            :label="raw(state.app)"
+            variant="default-outline"
+            size="md"
+            data-test="rum-analytics-app-label"
+          />
+          <OSelect
+            v-if="envOptions.length"
+            :model-value="state.env"
+            :options="envSelectOptions"
+            :placeholder="t('rum.analytics.allEnvs')"
+            multiple
+            size="sm"
+            :width="narrow ? 'sm' : undefined"
+            class="w-36 max-md:hidden"
+            data-test="rum-analytics-env-select"
+            @update:model-value="onEnvChange"
+          />
+          <OSelect
+            v-if="versionOptions.length"
+            :model-value="state.version"
+            :options="versionSelectOptions"
+            :placeholder="t('rum.analytics.allVersions')"
+            multiple
+            size="sm"
+            :width="narrow ? 'sm' : undefined"
+            class="w-36 max-md:hidden"
+            data-test="rum-analytics-version-select"
+            @update:model-value="onVersionChange"
+          />
+          <OPopover
+            v-if="identityNote"
+            v-model:open="identityOpen"
+            side="bottom"
+            :align="narrow ? 'start' : 'end'"
+            content-class="p-3 w-80"
+          >
+            <template #trigger>
+              <OTag
+                :label="
+                  state.includeAllIdentities
+                    ? t('rum.analytics.identityIncluded')
+                    : t(
+                        'rum.analytics.identityExcluded',
+                        { count: identityNote.count, pct: sharePct },
+                        identityNote.count,
+                      )
+                "
+                variant="warning-soft"
+                size="md"
+                clickable
+                data-test="rum-analytics-identity-note"
+              />
+            </template>
+            <div class="flex flex-col gap-2 text-sm">
+              <p class="text-text-body" data-test="rum-analytics-identity-help">
+                {{ identityHelp }}
+              </p>
+              <OButton
+                variant="outline"
+                size="sm"
+                data-test="rum-analytics-identity-include-btn"
+                @click="toggleIncludeAll"
+                >{{
+                  state.includeAllIdentities
+                    ? t("rum.analytics.excludeAgain")
+                    : t("rum.analytics.includeIt")
+                }}</OButton
+              >
+            </div>
+          </OPopover>
+          <OButton
+            v-if="exclusionCount !== null"
+            variant="outline"
+            size="sm"
+            :icon-left="likelyBot ? 'warning' : 'filter-alt'"
+            data-test="rum-analytics-exclusions-chip"
+            @click="exclusionsOpen = true"
+            >{{
+              likelyBot
+                ? t("rum.analytics.exclusions.chipLikelyBot", { count: exclusionCount })
+                : t("rum.analytics.exclusions.chip", { count: exclusionCount })
+            }}</OButton
+          >
+          <OButton
+            v-if="showNewUsers"
+            variant="outline"
+            size="sm"
+            :active="state.newUsers"
+            :aria-pressed="state.newUsers"
+            :disabled="newUsersDisabled"
+            focusable-unavailable
+            data-test="rum-analytics-new-users-chip"
+            @click="toggleNewUsers"
+            >{{ t("rum.analytics.exclusions.newUsersOnly")
+            }}<OTooltip
+              v-if="newUsersDisabled"
+              :content="t('rum.analytics.exclusions.newUsersSessionsTip')"
+          /></OButton>
+        </div>
+      </Teleport>
+      <div v-if="noRumData" class="flex min-h-0 flex-1 flex-col" data-test="rum-analytics-no-data">
+        <RumNoDataState />
       </div>
+      <div v-else class="flex min-h-0 flex-1 flex-col">
+        <OBanner
+          v-if="invalidParams.length && !invalidDismissed"
+          variant="warning"
+          dense
+          class="mx-page-edge mt-2"
+          :content="t('rum.analytics.invalidLink')"
+          data-test="rum-analytics-invalid-link"
+        >
+          <template #actions>
+            <OButton
+              variant="ghost"
+              size="sm"
+              data-test="rum-analytics-invalid-link-dismiss"
+              @click="invalidDismissed = true"
+              >{{ t("rum.analytics.dismiss") }}</OButton
+            >
+          </template>
+        </OBanner>
 
-      <OEmptyState
-        v-if="scopeStatus === 'forbidden'"
-        preset="no-access"
-        data-test="rum-analytics-no-access"
-      />
-      <AnalyticsPanelState
-        v-else-if="scopeStatus === 'error'"
-        :state="scopePanel"
-        data-test="rum-analytics-scope"
-        class="px-page-edge py-4"
-        @retry="refresh"
-      />
-      <div v-else class="min-h-0 flex-1 overflow-auto">
-        <router-view v-slot="{ Component }">
-          <keep-alive :include="SUBTAB_VIEWS">
-            <component
-              :is="Component"
-              @open-exclusions="exclusionsOpen = true"
-              @likely-bot="(v: boolean) => (likelyBot = v)"
-            />
-          </keep-alive>
-        </router-view>
+        <OBanner
+          v-if="deletedEventLink"
+          variant="info"
+          dense
+          class="mx-page-edge mt-2"
+          :content="t('rum.analytics.events.deletedNotice')"
+          data-test="rum-analytics-deleted-event-link"
+        />
+
+        <OBanner
+          v-if="state.includeExcluded"
+          variant="warning"
+          dense
+          class="mx-page-edge mt-2"
+          :content="includedBanner"
+          data-test="rum-analytics-included-banner"
+        >
+          <template #actions>
+            <OButton
+              v-if="appFilters.hiddenFailed.value"
+              variant="ghost"
+              size="sm"
+              data-test="rum-analytics-hidden-count-retry-btn"
+              @click="appFilters.retryHidden()"
+              >{{ t("common.retry") }}</OButton
+            >
+            <OButton
+              variant="ghost"
+              size="sm"
+              data-test="rum-analytics-hide-hidden-btn"
+              @click="appFilters.setIncludeHidden(router, false)"
+              >{{ t("rum.analytics.appFilters.hideHidden") }}</OButton
+            >
+          </template>
+        </OBanner>
+
+        <div class="border-border-default pe-page-edge flex shrink-0 items-center gap-2 border-b">
+          <!-- Sub-tab navigation stays live on a license-locked page. -->
+          <FeatureLockExempt class="contents">
+            <OTabs
+              :model-value="activeSubTab"
+              align="left"
+              dense
+              class="min-w-0 flex-1"
+              @update:model-value="onSubTabChange"
+            >
+              <OTab
+                v-for="tab in subTabs"
+                :key="tab.value"
+                :name="tab.value"
+                :label="tab.label"
+                :data-test="`rum-analytics-subtab-${tab.value}`"
+              />
+            </OTabs>
+          </FeatureLockExempt>
+          <SampledTag
+            v-if="showSampledTag"
+            :ratio="sampleRatio"
+            :va-rows="summary?.vaRows ?? 0"
+            :exact="state.exact"
+            @update:exact="onExactChange"
+          />
+        </div>
+
+        <OEmptyState
+          v-if="scopeStatus === 'forbidden'"
+          preset="no-access"
+          data-test="rum-analytics-no-access"
+        />
+        <AnalyticsPanelState
+          v-else-if="scopeStatus === 'error'"
+          :state="scopePanel"
+          data-test="rum-analytics-scope"
+          class="px-page-edge py-4"
+          @retry="refresh"
+        />
+        <div v-else class="min-h-0 flex-1 overflow-auto">
+          <router-view v-slot="{ Component }">
+            <keep-alive :include="SUBTAB_VIEWS">
+              <component
+                :is="Component"
+                @open-exclusions="exclusionsOpen = true"
+                @likely-bot="(v: boolean) => (likelyBot = v)"
+              />
+            </keep-alive>
+          </router-view>
+        </div>
       </div>
     </div>
     <ExclusionsDrawer v-model:open="exclusionsOpen" />
@@ -327,7 +361,7 @@ let enteredOrg = "";
 </script>
 
 <script setup lang="ts">
-import { computed, onActivated, onDeactivated, onMounted, ref, watch } from "vue";
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { formatInTimeZone } from "date-fns-tz";
@@ -341,6 +375,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -350,7 +385,11 @@ import SampledTag from "@/components/rum/productAnalytics/SampledTag.vue";
 import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
 import RumNoDataState from "@/components/rum/RumNoDataState.vue";
 import ExclusionsDrawer from "@/components/rum/productAnalytics/ExclusionsDrawer.vue";
-import useNamedEvents from "@/composables/rum/useNamedEvents";
+import useNamedEvents, {
+  namedEventDraftVariant,
+  useNewEventDraftTimes,
+} from "@/composables/rum/useNamedEvents";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import useSavedFunnels from "@/composables/rum/useSavedFunnels";
 import useFunnelDraft from "@/composables/rum/useFunnelDraft";
 import useRum from "@/composables/rum/useRum";
@@ -417,12 +456,36 @@ const dateTimePickerRef = ref<any>(null);
 const exclusionsOpen = ref(false);
 const likelyBot = ref(false);
 
+// Page container width below which the filters no longer fit beside the title and actions.
+const WIDE_PAGE_REM = 75;
+const layoutRef = ref<{ $el: HTMLElement } | null>(null);
+const pageWidth = ref(window.innerWidth);
+let pageObserver: ResizeObserver | null = null;
+onMounted(() => {
+  const page = layoutRef.value?.$el?.closest<HTMLElement>('[class~="@container/page"]');
+  if (!page || typeof ResizeObserver === "undefined") return;
+  const measure = () => {
+    // A zero width means the page is hidden (kept alive), not narrow.
+    if (page.clientWidth) pageWidth.value = page.clientWidth;
+  };
+  measure();
+  pageObserver = new ResizeObserver(measure);
+  pageObserver.observe(page);
+});
+onBeforeUnmount(() => pageObserver?.disconnect());
+const narrow = computed(
+  () =>
+    pageWidth.value <
+    WIDE_PAGE_REM * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16),
+);
+
 const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
 const subTabs = computed(() => [
   { value: "overview", label: t("rum.analytics.subtabs.overview") },
   { value: "funnels", label: t("rum.analytics.subtabs.funnels") },
   { value: "paths", label: t("rum.analytics.subtabs.paths") },
+  { value: "heatmaps", label: t("rum.analytics.subtabs.heatmaps") },
   { value: "retention", label: t("rum.analytics.subtabs.retention") },
   { value: "events", label: t("rum.analytics.subtabs.events") },
 ]);
@@ -608,6 +671,12 @@ const onExactChange = (value: boolean) => {
 const refresh = () => {
   void pa.refresh().then(() => syncUrl());
 };
+
+const newEventDrafts = useNewEventDraftTimes();
+const newEventDraftSavedAt = computed(() =>
+  newEventDrafts.savedAt(namedEventDraftVariant(pa.state.app)),
+);
+const hasNewEventDraft = computed(() => newEventDraftSavedAt.value !== null);
 
 const openNewEvent = () => {
   void router.push({ name: PA_ROUTES.eventNew, query: pa.toQuery() });

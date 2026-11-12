@@ -102,7 +102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormInput>
                 </div>
                 <OSelect
-                  :aria-label="t('common.timeUnit')"
+                  :aria-label="
+                    t('common.unitFor', { label: t('alerts.queryConfig.pendingPeriod') })
+                  "
                   class="max-w-25 min-w-20"
                   :model-value="pendingPeriodUnit"
                   :options="pendingPeriodUnitOptions"
@@ -134,6 +136,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :destination-options="formattedDestinations"
             :error="destinationsError"
             :notifies-nobody="notifiesNobody"
+            :oncall-team="formData?.oncall_team"
+            :locked-target-names="formData?._ui?.lockedTargetNames"
             show-status
             :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
@@ -259,7 +263,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormInput>
                 </div>
                 <OSelect
-                  :aria-label="t('common.timeUnit')"
+                  :aria-label="
+                    t('common.unitFor', { label: t('alerts.queryConfig.pendingPeriod') })
+                  "
                   class="max-w-25 min-w-20"
                   :model-value="pendingPeriodUnit"
                   :options="pendingPeriodUnitOptions"
@@ -301,6 +307,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :destination-options="formattedDestinations"
             :error="destinationsError"
             :notifies-nobody="notifiesNobody"
+            :oncall-team="formData?.oncall_team"
+            :locked-target-names="formData?._ui?.lockedTargetNames"
             show-status
             :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
@@ -321,6 +329,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aria-label="t('alerts.alertSettings.createsIncident')"
             data-test="alert-creates-incident-toggle"
           />
+        </div>
+
+        <div
+          v-if="incidentsEnabled && formData?.creates_incident"
+          class="mb-4! flex items-start max-md:gap-3"
+        >
+          <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
+            {{ t("alerts.alertSettings.incidentTitleTemplate") }}
+            <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+            <OTooltip
+              :content="t('alerts.alertSettings.incidentTitleTemplateTooltip')"
+              side="right"
+            />
+          </div>
+          <div class="flex w-100 flex-col gap-1 max-md:w-full">
+            <OFormInput
+              name="incident_title_template"
+              :placeholder="t('alerts.alertSettings.incidentTitleTemplatePlaceholder')"
+              :debounce="300"
+              data-test="alert-incident-title-template-input"
+            />
+            <div
+              v-if="incidentTitlePreview.length"
+              class="text-xs break-words"
+              data-test="alert-incident-title-preview"
+            >
+              <span class="text-text-secondary me-1"
+                >{{ t("alerts.alertSettings.incidentTitlePreview") }}:</span
+              ><template v-for="(s, i) in incidentTitlePreview" :key="i"
+                ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
+              >
+            </div>
+            <div v-if="incidentTitlePreview.length" class="text-text-secondary text-xs">
+              {{ t("alerts.alertSettings.incidentTitlePreviewHint") }}
+            </div>
+          </div>
         </div>
 
         <!-- Scheduled only: realtime, composite and anomaly alerts keep no episode, so neither field can act. -->
@@ -405,6 +449,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
+
+          <div v-if="repeatSuppressionAvailable" class="mb-4! flex items-start max-md:gap-3">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
+              {{ t("alerts.alertSettings.suppressRepeats") }}
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+              <OTooltip :content="t('alerts.alertSettings.suppressRepeatsTooltip')" side="right" />
+            </div>
+            <OFormSwitch
+              name="suppress_repeats"
+              :aria-label="t('alerts.alertSettings.suppressRepeats')"
+              data-test="alert-suppress-repeats-toggle"
+            />
+          </div>
         </template>
       </div>
     </div>
@@ -425,6 +482,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
+import { renderTemplate, segmentClass } from "@/composables/alerts/useTemplatePreview";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { convertMinutesToCron, getCronIntervalDifferenceInSeconds } from "@/utils/zincutils";
@@ -506,6 +564,8 @@ export default defineComponent({
         (config.isEnterprise === "true" || config.isCloud === "true") &&
         store.state.zoConfig?.incidents_enabled === true,
     );
+    // The backend honours the switch only in enterprise builds.
+    const repeatSuppressionAvailable = config.isEnterprise === "true" || config.isCloud === "true";
 
     // Field refs consumed by the parent's AlertFocusManager (registered off the
     // step ref). Scheduled-only.
@@ -698,18 +758,23 @@ export default defineComponent({
       servicenow: "alerts.alertSettings.recoveryResolvesIncident",
     };
 
-    // `destination_type_name` first, because that is the field the server reads
-    // (`derive_channel_format`) when it decides to send a protocol resolve. A
-    // destination pointed at PagerDuty without going through the prebuilt
-    // wizard has no `prebuilt_type`, and saying "new Resolved message" for one
-    // would promise something the server does not do.
-    const platformOf = (destination: any): string =>
-      destination?.destination_type_name || detectPrebuiltType(destination) || "";
+    const platformOf = (destination: any): string => detectPrebuiltType(destination) ?? "";
 
     const platformKeyFor = (name: any): string | undefined => {
       const destination = props.destinationObjects.find((d: any) => d?.name === name);
       return destination ? platformRecoveryKeys[platformOf(destination)] : undefined;
     };
+
+    const isJira = (name: any): boolean => {
+      const destination = props.destinationObjects.find((d: any) => d?.name === name);
+      return !!destination && platformOf(destination) === "jira";
+    };
+
+    // Jira keeps one ticket per alert, so its recovery is a comment there, not a new message.
+    const messageKeyFor = (name: any): I18nKey =>
+      isJira(name)
+        ? "alerts.alertSettings.recoveryJiraComment"
+        : "alerts.alertSettings.recoveryChatMessage";
 
     // Ticket closes always go to the firing's own destinations; only the message can be
     // redirected, so an override lists both halves rather than replacing the first.
@@ -721,27 +786,57 @@ export default defineComponent({
           const platformKey = platformKeyFor(name);
           return {
             name: String(name),
-            isPlatform: !!platformKey,
-            action: t(platformKey ?? "alerts.alertSettings.recoveryChatMessage"),
+            isPlatform: !!platformKey || isJira(name),
+            action: t(platformKey ?? messageKeyFor(name)),
           };
         });
       if (!redirected) return rows;
       return rows.concat(
         props.recoveryDestinations.map((name: any) => ({
           name: String(name),
-          isPlatform: false,
-          action: t("alerts.alertSettings.recoveryChatMessage"),
+          isPlatform: isJira(name),
+          action: t(messageKeyFor(name)),
         })),
       );
     });
     const hasChatRecovery = computed(() => recoveryPlan.value.some((row) => !row.isPlatform));
 
+    // Row and group-by values exist only at fire time, so their placeholders stay as chips.
+    const incidentTitlePreview = computed(() => {
+      const template = props.formData?.incident_title_template?.trim();
+      if (!template) return [];
+      const live: Record<string, string> = {};
+      for (const attr of props.formData?.context_attributes ?? []) {
+        if (attr?.key) live[attr.key] = String(attr.value ?? "");
+      }
+      const alertFields: Record<string, unknown> = {
+        alert_name: props.formData?.name,
+        stream_name: props.formData?.stream_name,
+        stream_type: props.formData?.stream_type,
+        org_name: store.state.selectedOrganization?.label,
+      };
+      for (const [key, value] of Object.entries(alertFields)) {
+        if (value) live[key] = String(value);
+      }
+      const now = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+      const sample = {
+        alert_time: now,
+        alert_trigger_time_str: now,
+        alert_start_time: now,
+        alert_end_time: now,
+      };
+      return renderTemplate(template, { live, sample });
+    });
+
     return {
+      incidentTitlePreview,
+      segmentClass,
       recoveryPlan,
       hasChatRecovery,
       t,
       store,
       incidentsEnabled,
+      repeatSuppressionAvailable,
       handlePeriodChange,
       // Field refs for the parent focus manager
       periodFieldRef,

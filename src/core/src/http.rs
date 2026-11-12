@@ -67,7 +67,9 @@ impl From<AlertError> for Response {
             | AlertError::AlertNameOfgaUnsupported
             | AlertError::AlertNameContainsForwardSlash
             | AlertError::ProtectedStream(_)
+            | AlertError::InvalidCondition(_)
             | AlertError::TemplateNotConfigured { .. }
+            | AlertError::AlertTemplateNotForAlert { .. }
             | AlertError::RealtimeMissingCustomQuery
             // Both are user input errors -> 400, same as the other
             // trigger-condition validations.
@@ -99,13 +101,15 @@ impl From<AlertError> for Response {
             | AlertError::TzOffsetOutOfRange
             | AlertError::CronHasNoFutureOccurrence { .. }
             | AlertError::RecoveryOnRealtimeAlert
+            | AlertError::RepeatSuppressionOnRealtimeAlert
             | AlertError::RecoveryDestinationsWithoutRecovery
             | AlertError::RecoveryDestinationIsPlatform { .. }
-            | AlertError::RecoveryOnMultiAlert
-            | AlertError::RecoveryWithNotificationGrouping
             | AlertError::RecoveryNeedsJsonPayload { .. }
             | AlertError::RecoveryNeedsRoutingKey { .. }
-            | AlertError::MultiAlertGroupingError(_) => MetaHttpResponse::bad_request(value),
+            | AlertError::MultiAlertGroupingError(_)
+            | AlertError::GroupByColumnNotFound { .. }
+            | AlertError::FieldNotFound { .. }
+            | AlertError::JiraDestinationNotSupported { .. } => MetaHttpResponse::bad_request(value),
             // S-16 PR 4. A conflict, not a bad request: the alert being sent is
             // fine on its own terms — it is the SLOs that already exist and
             // measure from it that the request collides with. Both messages
@@ -134,6 +138,13 @@ impl From<AlertError> for Response {
             AlertError::GetDestinationWithTemplateError(err) => {
                 MetaHttpResponse::internal_error(err)
             }
+            AlertError::FeatureNotLicensed(feature) => (
+                StatusCode::FORBIDDEN,
+                Json(MetaHttpResponse::error_code(
+                    infra::errors::ErrorCodes::LicenseFeatureNotEntitled(feature.clone()),
+                )),
+            )
+                .into_response(),
             AlertError::PermittedAlertsMissingUser => MetaHttpResponse::forbidden(""),
             AlertError::PermittedAlertsValidator(err) => MetaHttpResponse::forbidden(err),
             AlertError::NotSupportedAlertDestinationType(err) => MetaHttpResponse::forbidden(err),
@@ -149,6 +160,13 @@ pub fn destination_error_response(value: DestinationError) -> Response {
         DestinationError::InUse(_) => MetaHttpResponse::conflict(value),
         DestinationError::InfraError(err) => MetaHttpResponse::internal_error(err),
         DestinationError::NotFound => MetaHttpResponse::not_found(value),
+        DestinationError::SlackAppNeedsEnterprise => MetaHttpResponse::forbidden(value),
+        DestinationError::SlackApp(refusal) => {
+            use axum::response::IntoResponse;
+            let status = axum::http::StatusCode::from_u16(refusal.status)
+                .unwrap_or(axum::http::StatusCode::BAD_REQUEST);
+            (status, axum::Json(refusal.clone())).into_response()
+        }
         other_err => MetaHttpResponse::bad_request(other_err),
     }
 }
@@ -161,6 +179,9 @@ pub fn template_error_response(value: TemplateError) -> Response {
         TemplateError::NotFound => MetaHttpResponse::not_found(TemplateError::NotFound),
         TemplateError::DeleteWithDestination(destination) => {
             MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(destination))
+        }
+        TemplateError::DeleteWithBinding(by) => {
+            MetaHttpResponse::conflict(TemplateError::DeleteWithBinding(by))
         }
         TemplateError::PrebuiltReadOnly(name) => {
             MetaHttpResponse::forbidden(TemplateError::PrebuiltReadOnly(name))
@@ -216,6 +237,12 @@ impl From<DashboardError> for Response {
             DashboardError::PanelAlreadyExists(panel_id, tab_id) => MetaHttpResponse::conflict(
                 format!("Panel with id {panel_id} already exists in tab {tab_id}"),
             ),
+            DashboardError::TooManyAnnotationSources(max) => MetaHttpResponse::bad_request(
+                format!("A dashboard can have at most {max} annotation sources"),
+            ),
+            DashboardError::InvalidAnnotationSource(reason) => {
+                MetaHttpResponse::bad_request(reason)
+            }
         }
     }
 }
@@ -255,7 +282,9 @@ impl From<PipelineError> for Response {
         match value {
             PipelineError::InfraError(err) => MetaHttpResponse::internal_error(err),
             PipelineError::NotFound(_) => MetaHttpResponse::not_found(value),
-            PipelineError::Modified(_) => MetaHttpResponse::conflict(value),
+            PipelineError::Modified(_) | PipelineError::RunInProgress(_) => {
+                MetaHttpResponse::conflict(value)
+            }
             PipelineError::Refused(refusal) => refusal.into_response(),
             error => MetaHttpResponse::bad_request(error),
         }

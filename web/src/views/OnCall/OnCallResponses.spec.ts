@@ -19,11 +19,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import destinationService from "@/services/alert_destination";
-import incidentsService from "@/services/incidents";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
+import { resetOnCallPolicyReviewed } from "@/composables/useOnCallPolicyReviewed";
+import { resetOnCallSetupDismissed } from "@/composables/useOnCallSetupDismissed";
 import OnCallResponses from "@/views/OnCall/OnCallResponses.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+
+// A pass-through spy: every other test keeps the real toast.
+vi.mock("@/lib/feedback/Toast/useToast", async (original) => {
+  const real = await original<typeof import("@/lib/feedback/Toast/useToast")>();
+  return { ...real, toast: vi.fn((...args: Parameters<typeof real.toast>) => real.toast(...args)) };
+});
 
 vi.mock("@/services/oncall", () => ({
   RESPONSE_PAGE_LIMIT: 200,
@@ -36,10 +44,12 @@ vi.mock("@/services/oncall", () => ({
     acknowledgeResponse: vi.fn(),
     resolveResponse: vi.fn(),
     snoozeResponse: vi.fn(),
+    unsnoozeResponse: vi.fn(),
+    teamContext: vi.fn(),
     getPolicy: vi.fn(),
-    getSchedule: vi.fn(),
-    escalationProgress: vi.fn(),
+    escalationProgressBatch: vi.fn(),
     getResponse: vi.fn(),
+    myOnCall: vi.fn(),
   },
 }));
 
@@ -47,6 +57,17 @@ vi.mock("@/services/oncall", () => ({
 // a real request from every test in this file.
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 import analytics from "@/services/product_analytics";
+import { axiosReply, deferredReply } from "@/test/unit/helpers/mockService";
+
+/// What the view hands OTable as a row and a column; only the fields these tests read are typed.
+type TableRow = { latest: { id: string }; firings: unknown[]; [key: string]: unknown };
+type TableColumn = {
+  id: string;
+  header?: unknown;
+  sortable?: boolean;
+  hideable?: boolean;
+  accessorFn: (row: TableRow | undefined) => unknown;
+};
 
 vi.mock("@/services/users", () => ({
   default: { orgUsers: vi.fn().mockResolvedValue({ data: { data: [] } }) },
@@ -54,10 +75,6 @@ vi.mock("@/services/users", () => ({
 
 vi.mock("@/services/alert_destination", () => ({
   default: { list: vi.fn() },
-}));
-
-vi.mock("@/services/incidents", () => ({
-  default: { get: vi.fn() },
 }));
 
 const push = vi.fn();
@@ -84,7 +101,6 @@ vi.mock("@/composables/useBreakpoint", async () => {
 
 const service = vi.mocked(oncallService);
 const destinations = vi.mocked(destinationService);
-const incidents = vi.mocked(incidentsService);
 
 // Every `mount()` in this file — across all three top-level `describe`s —
 // stays alive as a real, reactive component instance unless something
@@ -125,6 +141,7 @@ const stubs = {
       "sectionOrder",
       "currentPage",
       "pageSize",
+      "expandedIds",
     ],
     emits: [
       "update:selectedIds",
@@ -167,11 +184,12 @@ const stubs = {
     props: [
       "hasTeam",
       "hasStaffedRotation",
+      "hasPolicy",
       "hasRouting",
-      "hasDestinations",
       "compact",
       "canConfigure",
       "firstTeamId",
+      "firstTeamName",
     ],
     // The two shapes the real component takes, so the page's layout decision is
     // visible from the outside rather than only in a prop.
@@ -234,9 +252,13 @@ const stubs = {
     props: ["preset", "filtered"],
     template: "<div :data-preset='preset' />",
   },
-  OSelect: { name: "OSelect", props: ["options", "disabled", "width"], template: "<select />" },
+  OSelect: {
+    name: "OSelect",
+    props: ["options", "disabled", "width", "modelValue", "searchable"],
+    template: "<select />",
+  },
   OSearchInput: { name: "OSearchInput", template: "<input />" },
-  OTooltip: { name: "OTooltip", template: "<span />" },
+  OTooltip: { name: "OTooltip", props: ["content"], template: "<span />" },
   // Mirrors the real OButton: `emits` declared (without it the listener also
   // falls through and every handler runs twice), and the event is passed on,
   // which row actions need in order to stop the row-click navigating.
@@ -263,6 +285,42 @@ function render() {
   return mountTracked(OnCallResponses, { global: { plugins: [i18n, store], stubs } });
 }
 
+/// Picks "all" explicitly, so a test does not lean on the default tab.
+async function showAllTab(wrapper: VueWrapper) {
+  wrapper
+    .findAllComponents({ name: "OSelect" })
+    .find((c) => c.attributes("data-test") === "oncall-responses-filter-tabs")
+    .vm.$emit("update:modelValue", "all");
+  await flushPromises();
+}
+
+/// What a team answers by default: "answered, with nothing in it".
+const emptyTeam = { policy: { rungs: [] }, on_call: [], schedule: null };
+
+/// The team-context read answers `facts(id)` for each asked team, plus `mine` when `include_mine` is set; `undefined` is a team the server left out.
+function answerTeams(facts: (teamId: string) => object | undefined, mine: string[] = []) {
+  service.teamContext.mockImplementation(async ({ team_ids, include_mine }) => {
+    const ids = [...new Set([...team_ids, ...(include_mine ? mine : [])])];
+    const teams = ids.flatMap((id) => {
+      const answer = facts(id);
+      return answer ? [{ team_id: id, ...answer }] : [];
+    });
+    return axiosReply({ teams });
+  });
+}
+
+/// The batch ladder read answers `progress(id)` for each asked id; `undefined` is an id the server left out.
+function answerProgress(progress: (responseId: string) => object | undefined) {
+  service.escalationProgressBatch.mockImplementation(async ({ response_ids }) =>
+    axiosReply({
+      progress: response_ids.flatMap((id: string) => {
+        const answer = progress(id);
+        return answer ? [{ response_id: id, ...answer }] : [];
+      }),
+    }),
+  );
+}
+
 describe("OnCallResponses", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -271,23 +329,31 @@ describe("OnCallResponses", () => {
     // be served that entry instead of the mock it had just declared.
     queryClient.clear();
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
-    service.listResponses.mockResolvedValue({ data: [] } as any);
-    service.listTeams.mockResolvedValue({ data: [] } as any);
+    service.listResponses.mockResolvedValue(axiosReply([]));
+    service.listTeams.mockResolvedValue(axiosReply([]));
     // A fully configured org by default, so only the tests that care about the
     // checklist have to say anything about it.
-    service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 0, teams: [] } } as any);
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
-    service.listOwnershipRules.mockResolvedValue({ data: [{ id: "rule_1" }] } as any);
-    destinations.list.mockResolvedValue({ data: [{ name: "dest_1" }] } as any);
+    service.coverageGaps.mockResolvedValue(axiosReply({ at: 0, total: 0, teams: [] }));
+    service.whoIsOnCall.mockResolvedValue(axiosReply([]));
+    service.listOwnershipRules.mockResolvedValue(axiosReply([{ id: "rule_1" }]));
+    destinations.list.mockResolvedValue(axiosReply([{ name: "dest_1" }]));
     // The ladder, the policy behind its denominator, and the expanded row's
     // events. Every one of them degrades a single cell rather than the page,
     // so the default is "answered, with nothing in it".
-    service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
-    service.getSchedule.mockResolvedValue({ data: null } as any);
-    service.escalationProgress.mockResolvedValue({
-      data: { fired: [], next_targets: [], next_at: null, exhausted: false },
-    } as any);
-    service.getResponse.mockResolvedValue({ data: { events: [] } } as any);
+    answerTeams(() => emptyTeam);
+    answerProgress(() => ({ fired: [], next_targets: [], next_at: null, exhausted: false }));
+    service.getResponse.mockResolvedValue(axiosReply({ events: [] }));
+  });
+
+  /// Mounts the real page layout so the tag is proven to reach the rendered header.
+  it("tags the page title as Beta", async () => {
+    const wrapper = mountTracked(OnCallResponses, {
+      global: { plugins: [i18n, store], stubs: { ...stubs, OPageLayout: false } },
+    });
+    await flushPromises();
+    const badge = wrapper.find('[data-test="beta-badge"]');
+    expect(badge.exists()).toBe(true);
+    expect(badge.text()).toBe(String(i18n.global.t("common.beta")));
   });
 
   function page(over: Record<string, unknown> = {}, source = "al_ckt") {
@@ -309,16 +375,52 @@ describe("OnCallResponses", () => {
   }
 
   async function withPages(rows: Record<string, unknown>[]) {
-    service.listTeams.mockResolvedValue({ data: [team] } as any);
-    service.listResponses.mockResolvedValue({ data: rows } as any);
+    service.listTeams.mockResolvedValue(axiosReply([team]));
+    service.listResponses.mockResolvedValue(axiosReply(rows));
     const wrapper = render();
     await flushPromises();
     return wrapper;
   }
 
+  /// The rows are the screen; team context and the checklist only fill cells and a bar around them.
+  it("renders the rows before the team context and checklist reads answer", async () => {
+    const teams = deferredReply();
+    const context = deferredReply();
+    const gaps = deferredReply();
+    service.listTeams.mockImplementation(() => teams.promise);
+    service.teamContext.mockImplementation(() => context.promise);
+    service.coverageGaps.mockImplementation(() => gaps.promise);
+    service.listResponses.mockResolvedValue(axiosReply([page()]));
+    const wrapper = render();
+    await flushPromises();
+
+    const table = wrapper.findComponent({ name: "OTable" });
+    expect(table.props("loading")).toBe(false);
+    expect(table.props("data")).toHaveLength(1);
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(1);
+
+    teams.answer([team]);
+    context.answer({ teams: [] });
+    gaps.answer({ at: 0, total: 0, teams: [] });
+    await flushPromises();
+    expect(table.props("data")).toHaveLength(1);
+  });
+
+  it("keeps the skeleton on an empty list until setup answers", async () => {
+    const teams = deferredReply();
+    service.listTeams.mockImplementation(() => teams.promise);
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "OTable" }).props("loading")).toBe(true);
+
+    teams.answer([team]);
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "OTable" }).props("loading")).toBe(false);
+  });
+
   /// The state counts the section headings carry — the only counts on the
   /// screen now that the P1/Mine/Unrouted tiles are gone.
-  const sections = (w: any) =>
+  const sections = (w: VueWrapper) =>
     Object.fromEntries(
       ["ringing", "snoozed", "handled"]
         .filter((key) => w.find(`[data-test='oncall-section-header-${key}']`).exists())
@@ -360,13 +462,43 @@ describe("OnCallResponses", () => {
     ]);
   });
 
+  // C13: the table pages only the visible tab, so a later page cannot hide its rows.
+  it("hands the table only the rows of the visible tab", async () => {
+    const wrapper = await withPages([
+      page({ id: "a", acked_by: "engineer@example.com", state: "acknowledged" }),
+      page({ id: "c" }, "al_ord"),
+    ]);
+    const table = () => wrapper.findComponent({ name: "OTable" });
+    expect(table().props("data")).toHaveLength(2);
+
+    wrapper
+      .findAllComponents({ name: "OSelect" })
+      .find((c) => c.attributes("data-test") === "oncall-responses-filter-tabs")!
+      .vm.$emit("update:modelValue", "ringing");
+    await flushPromises();
+
+    expect(
+      table()
+        .props("data")
+        .map((row: TableRow) => row.latest.id),
+    ).toEqual(["c"]);
+    expect(sections(wrapper)).toEqual({ ringing: 1 });
+  });
+
   /// Snoozed rows recede rather than shouting; the loud treatment is reserved
   /// for something you must act on now.
   it("mutes a snoozed row", async () => {
     const wrapper = await withPages([page()]);
-    const rowTone = wrapper.findComponent({ name: "OTable" }).props("rowTone") as any;
+    const rowTone = wrapper.findComponent({ name: "OTable" }).props("rowTone") as (
+      row: TableRow,
+    ) => string | null;
 
-    const asRow = (p: any) => ({ latest: p, firings: [p], escalating: [], rowKey: p.id });
+    const asRow = (p: { id: string }): TableRow => ({
+      latest: p,
+      firings: [p],
+      escalating: [],
+      rowKey: p.id,
+    });
     expect(rowTone(asRow(page()))).toBeNull();
     expect(rowTone(asRow(page({ snoozed_until: Date.now() * 1000 + 60_000_000 })))).toBe("muted");
   });
@@ -383,10 +515,9 @@ describe("OnCallResponses", () => {
     expect(table.props("sortOrder")).toBe("desc");
     expect(table.props("columnVisibility")).toEqual({
       firings: false,
-      state: false,
       channels: false,
     });
-    const ids = (table.props("columns") as any[]).map((c) => c.id);
+    const ids = (table.props("columns") as TableColumn[]).map((c) => c.id);
     expect(ids).toContain("escalation");
     expect(ids).toContain("responder");
     expect(ids).toContain("team");
@@ -404,8 +535,8 @@ describe("OnCallResponses", () => {
   /// relative time there — so a reader carried the conversion between them.
   it("renders the time column the way the incident list renders Last Alert", async () => {
     const wrapper = await withPages([page()]);
-    const time = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
-    const col = time.find((c) => c.id === "last_alert_at");
+    const time = wrapper.findComponent({ name: "OTable" }).props("columns") as TableColumn[];
+    const col = time.find((c) => c.id === "last_alert_at")!;
 
     expect(col.header).toBe("Created");
     expect(col.sortable).toBe(true);
@@ -439,10 +570,8 @@ describe("OnCallResponses", () => {
       service.listTeams.mock.calls.length +
       service.coverageGaps.mock.calls.length +
       service.listOwnershipRules.mock.calls.length +
-      service.getPolicy.mock.calls.length +
-      service.whoIsOnCall.mock.calls.length +
-      service.getSchedule.mock.calls.length +
-      service.escalationProgress.mock.calls.length;
+      service.teamContext.mock.calls.length +
+      service.escalationProgressBatch.mock.calls.length;
 
     const first = await withPages([page()]);
     const afterFirst = cachedCalls();
@@ -464,24 +593,10 @@ describe("OnCallResponses", () => {
     expect(service.listTeams).toHaveBeenCalledTimes(2);
   });
 
-  // Incident titles and the destination check are other modules' cache entries; only Refresh forces them.
-  it("serves incident titles and the destination check from the cache, and forces both on refresh", async () => {
-    incidents.get.mockResolvedValue({ data: { title: "Checkout down" } } as any);
-
-    const first = await withPages([page({ incident_id: "inc_1" })]);
-    expect(incidents.get).toHaveBeenCalledTimes(1);
-    expect(destinations.list).toHaveBeenCalledTimes(1);
-    first.unmount();
-
-    const second = await withPages([page({ incident_id: "inc_1" })]);
-    expect(incidents.get).toHaveBeenCalledTimes(1);
-    expect(destinations.list).toHaveBeenCalledTimes(1);
-    expect(second.text()).toContain("Checkout down");
-
-    await second.find('[data-test="oncall-responses-refresh"]').trigger("click");
-    await flushPromises();
-    expect(incidents.get).toHaveBeenCalledTimes(2);
-    expect(destinations.list).toHaveBeenCalledTimes(2);
+  // Alert destinations do not wake anybody, so setup does not ask for them.
+  it("does not read alert destinations for the setup checklist", async () => {
+    await withPages([page()]);
+    expect(destinations.list).not.toHaveBeenCalled();
   });
 
   describe("the ringing run", () => {
@@ -500,51 +615,170 @@ describe("OnCallResponses", () => {
     /// case a responder most needs to see, not one to bury under "handled"
     /// next to pages that already have an owner — "Nobody yet" under a
     /// heading that says a human owns each of these was the bug.
+    it("hints that a row's Acknowledge stops paging its team and shows on the alert", async () => {
+      const wrapper = await withPages([page({ id: "resp_1" })]);
+      const ack = wrapper.find('[data-test^="oncall-row-ack-"]');
+      expect(ack.findComponent({ name: "OTooltip" }).props("content")).toBe(
+        `Stops paging ${team.name}. Shows as acknowledged on the alert.`,
+      );
+    });
+
+    it("says incident in an incident row's hint", async () => {
+      const wrapper = await withPages([
+        page({
+          id: "resp_1",
+          subject: { subject_type: "incident", source_id: "inc_1", firing: 1 },
+        }),
+      ]);
+      const ack = wrapper.find('[data-test^="oncall-row-ack-"]');
+      expect(ack.findComponent({ name: "OTooltip" }).props("content")).toBe(
+        `Stops paging ${team.name}. Shows as acknowledged on the incident.`,
+      );
+    });
+
     it("keeps an exhausted-ladder page in the ringing run until somebody claims it", async () => {
-      service.escalationProgress.mockResolvedValue({
-        data: {
-          fired: [{ after_micros: 0, at: 1, targets: [] }],
-          next_targets: [],
-          next_at: null,
-          exhausted: true,
-          stopped_because: "the ladder is exhausted — nobody acknowledged",
-        },
-      } as any);
+      answerProgress(() => ({
+        fired: [{ after_micros: 0, at: 1, targets: [] }],
+        next_targets: [],
+        next_at: null,
+        exhausted: true,
+        stopped_because: "the ladder is exhausted — nobody acknowledged",
+      }));
       const wrapper = await withPages([page({ id: "resp_1" })]);
 
       expect(sections(wrapper)).toEqual({ ringing: 1 });
       expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(true);
+      const header = wrapper.find("[data-test='oncall-section-header-ringing']").text();
+      expect(header).not.toContain("not being paged");
+      expect(wrapper.find("[data-test='oncall-section-hint-stopped']").exists()).toBe(false);
     });
 
     /// A priority with no rungs configured (P4, by design) never starts a
     /// ladder at all, so `exhausted` never even gets a chance to be true.
     /// Same fix has to cover this path too, or the bug just moves.
     it("keeps a zero-rung priority in the ringing run until somebody claims it", async () => {
-      service.getPolicy.mockResolvedValue({
-        data: { rungs: [{ priority: 1, steps: [], channels: [] }] },
-      } as any);
+      answerTeams(() => ({
+        ...emptyTeam,
+        policy: { rungs: [{ priority: 1, steps: [], channels: [] }] },
+      }));
       const wrapper = await withPages([page({ id: "resp_1" })]);
 
       expect(sections(wrapper)).toEqual({ ringing: 1 });
       expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(true);
     });
+
+    const ringingHeader = "[data-test='oncall-section-header-ringing']";
+
+    it("says unrouted pages are not paging, apart from the ones that are", async () => {
+      const wrapper = await withPages([
+        page({ id: "a" }),
+        page({ id: "b", team_id: null }, "al_pay"),
+        page({ id: "c", team_id: null }, "al_disk"),
+      ]);
+
+      const text = wrapper.find(ringingHeader).text();
+      expect(text).not.toContain("nobody has acknowledged — these are still paging");
+      expect(text).toContain(
+        "nobody has acknowledged — 1 of these is still paging·2 have no team, so they are not paging",
+      );
+    });
+
+    /// R11: a page whose ladder stopped has a team but pages nobody, so it is not counted as paging.
+    it("does not count a page whose ladder stopped as still paging", async () => {
+      answerProgress((id) => ({
+        fired: [{ after_micros: 0, at: 1, targets: [], reached: ["ana@o2.ai"] }],
+        next_targets: [],
+        next_at: null,
+        exhausted: false,
+        stopped_because: id === "b" ? "the owning team was deleted" : undefined,
+      }));
+      const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
+
+      const text = wrapper.find(ringingHeader).text();
+      expect(text).toContain(
+        "nobody has acknowledged — 1 of these is still paging·1 is not being paged",
+      );
+      expect(wrapper.find('[data-test="oncall-escalation-cell-b"]').text()).toContain(
+        "Nobody is being paged",
+      );
+    });
+
+    /// F4: a deleted team pages nobody, so a page past the progress cap is counted and phrased as such.
+    it("counts and phrases a page whose team was deleted as not paged, without its progress", async () => {
+      service.escalationProgressBatch.mockRejectedValue({ response: { status: 500, data: {} } });
+      const wrapper = await withPages([
+        page({ id: "a" }),
+        page({ id: "b", team_id: "team_gone" }, "al_pay"),
+      ]);
+
+      expect(wrapper.find(ringingHeader).text()).toContain(
+        "nobody has acknowledged — 1 of these is still paging·1 is not being paged",
+      );
+      expect(wrapper.find('[data-test="oncall-escalation-cell-b"]').text()).toContain(
+        "Nobody is being paged",
+      );
+    });
+
+    it("adds no caption when every ringing page has a team", async () => {
+      const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
+
+      const text = wrapper.find(ringingHeader).text();
+      expect(text).not.toContain("nobody has acknowledged");
+      expect(wrapper.find("[data-test='oncall-section-hint-unrouted']").exists()).toBe(false);
+    });
+
+    it("counts a grouped alert as paging when an earlier firing of it has a team", async () => {
+      const wrapper = await withPages([
+        page({ id: "new", team_id: null, opened_at: 1_700_000_100_000_000 }),
+        page({ id: "old", opened_at: 1_700_000_000_000_000 }),
+        page({ id: "c", team_id: null }, "al_disk"),
+      ]);
+
+      expect(sections(wrapper)).toEqual({ ringing: 2 });
+      const text = wrapper.find(ringingHeader).text();
+      expect(text).toContain("1 of these is still paging");
+      expect(text).toContain("1 has no team, so it is not paging");
+    });
+
+    it("counts a grouped alert as not paging when only its snoozed firing has a team", async () => {
+      const wrapper = await withPages([
+        page({ id: "new", team_id: null, opened_at: 1_700_000_100_000_000 }),
+        page({
+          id: "old",
+          opened_at: 1_700_000_000_000_000,
+          snoozed_until: (Date.now() + 60_000) * 1000,
+        }),
+      ]);
+
+      expect(sections(wrapper)).toEqual({ ringing: 1 });
+      const text = wrapper.find(ringingHeader).text();
+      expect(text).not.toContain("still paging");
+      expect(text).toContain("1 has no team, so it is not paging");
+    });
+
+    it("drops the still-paging hint when no ringing page has a team", async () => {
+      const wrapper = await withPages([page({ id: "b", team_id: null }, "al_pay")]);
+
+      const text = wrapper.find(ringingHeader).text();
+      expect(text).not.toContain("still paging");
+      expect(text).toContain("1 has no team, so it is not paging");
+    });
   });
 
   describe("the escalation ladder", () => {
-    it("loads the ladder for open pages and passes it to the cell", async () => {
-      service.escalationProgress.mockResolvedValue({
-        data: {
-          fired: [{ after_micros: 0, at: 1, targets: ["the on-call"] }],
-          next_targets: ["the next on-call"],
-          next_at: (Date.now() + 60_000) * 1000,
-          exhausted: false,
-        },
-      } as any);
-      const wrapper = await withPages([page()]);
+    it("loads the ladder for open pages in one read and passes it to the cell", async () => {
+      answerProgress(() => ({
+        fired: [{ after_micros: 0, at: 1, targets: ["the on-call"] }],
+        next_targets: ["the next on-call"],
+        next_at: (Date.now() + 60_000) * 1000,
+        exhausted: false,
+      }));
+      const wrapper = await withPages([page(), page({ id: "resp_2" }, "al_pay")]);
 
-      expect(service.escalationProgress).toHaveBeenCalledWith({
+      expect(service.escalationProgressBatch).toHaveBeenCalledTimes(1);
+      expect(service.escalationProgressBatch).toHaveBeenCalledWith({
         org_identifier: "default",
-        response_id: "resp_1",
+        response_ids: ["resp_1", "resp_2"],
       });
       expect(wrapper.findComponent({ name: "OnCallEscalationCell" }).props("progress")).toEqual(
         expect.objectContaining({ next_targets: ["the next on-call"] }),
@@ -555,30 +789,89 @@ describe("OnCallResponses", () => {
     /// request per row spent on an answer nobody reads.
     it("does not ask for the ladder of a page that is already closed", async () => {
       await withPages([page({ state: "resolved", closed_at: Date.now() * 1000 })]);
-      expect(service.escalationProgress).not.toHaveBeenCalled();
+      expect(service.escalationProgressBatch).not.toHaveBeenCalled();
     });
 
-    /// One request per page and no bulk endpoint: past the cap the list says so
-    /// rather than leaving a blank cell that reads as "nothing has fired".
-    it("caps how many ladders it loads, and says that it did", async () => {
-      const many = Array.from({ length: 30 }, (_, i) =>
+    /// Past the route's cap a row speaks for itself, so the footer stays quiet.
+    it("caps how many ladders it loads without a footer note about it", async () => {
+      // Mounting 205 rows takes over 2s on a fast CI runner and can pass the 5s default on a slow one.
+      const many = Array.from({ length: 205 }, (_, i) =>
         page({ id: `resp_${i}`, opened_at: 1_700_000_000_000_000 + i }, `al_${i}`),
       );
       const wrapper = await withPages(many);
 
-      expect(service.escalationProgress).toHaveBeenCalledTimes(25);
-      expect(wrapper.find('[data-test="oncall-escalation-capped"]').exists()).toBe(true);
+      expect(service.escalationProgressBatch).toHaveBeenCalledTimes(1);
+      const asked = service.escalationProgressBatch.mock.calls[0][0].response_ids;
+      expect(asked).toHaveLength(200);
+      expect(asked).not.toContain("resp_200");
+      expect(wrapper.find('[data-test="oncall-escalation-capped"]').exists()).toBe(false);
+    }, 20000);
+
+    /// Rows the server left out have no progress: the record's own step, or no claim, never "Not paged yet".
+    it("says what it can for rows without an answer, without claiming they were not paged", async () => {
+      answerTeams(() => ({
+        ...emptyTeam,
+        policy: {
+          rungs: [
+            {
+              priority: 1,
+              channels: [],
+              steps: [
+                { after_micros: 0 },
+                { after_micros: 300_000_000 },
+                { after_micros: 900_000_000 },
+              ],
+            },
+          ],
+        },
+      }));
+      answerProgress((id) =>
+        id === "resp_0"
+          ? { fired: [], next_targets: [], next_at: null, exhausted: false }
+          : undefined,
+      );
+      const wrapper = await withPages([
+        page({ id: "resp_0", opened_at: 1_700_000_000_000_000 }, "al_0"),
+        page({ id: "resp_1", opened_at: 1_700_000_000_000_001 }, "al_1"),
+        page(
+          { id: "resp_2", opened_at: 1_700_000_000_000_002, reached_rung_micros: 300_000_000 },
+          "al_2",
+        ),
+      ]);
+      const cell = (id: string) =>
+        wrapper.find(`[data-test="oncall-escalation-cell-${id}"]`).text();
+
+      expect(cell("resp_0")).toBe("Not paged yet");
+      expect(cell("resp_2")).toBe("Paging step 2 of 3");
+      expect(cell("resp_1")).toBe("");
+
+      const table = wrapper.findComponent({ name: "OTable" });
+      const escalation = (table.props("columns") as TableColumn[]).find(
+        (c) => c.id === "escalation",
+      )!;
+      const rowFor = (id: string) =>
+        (table.props("data") as TableRow[]).find((r) => r.latest.id === id);
+      expect(escalation.accessorFn(rowFor("resp_2"))).toBe(2);
+    });
+
+    /// A failed ladder read is not an answer: the row makes no claim rather than "Not paged yet".
+    it("makes no claim for a row when the ladder read fails", async () => {
+      service.escalationProgressBatch.mockRejectedValue(new Error("down"));
+      const wrapper = await withPages([page()]);
+
+      expect(wrapper.find('[data-test="oncall-escalation-cell-resp_1"]').text()).toBe("");
     });
 
     it("takes the rung total for the row's priority from the team's policy", async () => {
-      service.getPolicy.mockResolvedValue({
-        data: {
+      answerTeams(() => ({
+        ...emptyTeam,
+        policy: {
           rungs: [
             { priority: 1, steps: [{}, {}, {}], channels: [] },
             { priority: 2, steps: [{}], channels: [] },
           ],
         },
-      } as any);
+      }));
       const wrapper = await withPages([page({ priority: 1 })]);
 
       expect(wrapper.findComponent({ name: "OnCallEscalationCell" }).props("totalRungs")).toBe(3);
@@ -596,13 +889,13 @@ describe("OnCallResponses", () => {
           .find((s) => s.attributes("data-test") === test);
 
       expect(byTest("oncall-responses-team-filter")?.props("width")).toBe("sm");
-      expect(byTest("oncall-responses-priority-filter")?.props("width")).toBe("xs");
+      expect(byTest("oncall-responses-priority-filter")?.props("width")).toBe("sm");
     });
 
     /// Claiming is only offered while something is still escalating; a page
     /// nobody owns is a routing fix rather than a triage.
     it("offers a team assignment instead of triage when nothing owns the page", async () => {
-      const wrapper = await withPages([page({ team_id: "" })]);
+      const wrapper = await withPages([page({ team_id: null })]);
 
       expect(wrapper.find('[data-test^="oncall-row-assign-"]').exists()).toBe(true);
       expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(false);
@@ -615,17 +908,24 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(true);
     });
 
-    /// A resolved row has nothing left to do to it, so the action becomes a
-    /// way to read what happened — and it is the LABELLED one, not a menu item.
-    it("drops triage on a resolved row and offers the timeline", async () => {
+    /// Pages are forward-only, so a resolved row has no Acknowledge or Resolve; the row click opens it, so ⋯ only expands and links it.
+    it("gives a resolved row only the ⋯ menu: timeline, copy link", async () => {
       const wrapper = await withPages([
         page({ state: "resolved", closed_at: Date.now() * 1000, acked_by: "ana@o2.ai" }),
       ]);
 
+      expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(false);
       expect(wrapper.find('[data-test^="oncall-row-resolve-"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test^="oncall-row-timeline-"]').exists()).toBe(true);
-      // Nothing is left to put behind it, so the menu is not rendered at all.
-      expect(wrapper.find('[data-test^="oncall-row-more-"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-row-more-alert:al_ckt"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-row-open-alert:al_ckt"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-row-copy-link-alert:al_ckt"]').exists()).toBe(true);
+      const timeline = wrapper.findComponent('[data-test="oncall-row-show-timeline-alert:al_ckt"]');
+      expect(timeline.text()).toBe("Show timeline");
+      timeline.vm.$emit("select");
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "OTable" }).props("expandedIds")).toEqual([
+        "alert:al_ckt",
+      ]);
     });
 
     /// Every row shows the step it is actually on. "Acknowledge or nothing" left
@@ -637,28 +937,64 @@ describe("OnCallResponses", () => {
       ]);
 
       expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test^="oncall-row-resolve-"]').exists()).toBe(true);
-      // Timeline is what is left for the menu.
-      expect(wrapper.find('[data-test^="oncall-row-more-"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test^="oncall-row-timeline-"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-row-resolve-alert:al_ckt"]').exists()).toBe(true);
     });
 
     /// The labelled action and the menu must never offer the same thing twice.
     /// One row state per test: two mounts in one test would share the cached
     /// list and the second would render the first's rows.
-    it("keeps the labelled action out of a ringing row's menu", async () => {
+    it("gives a ringing row both icons, with the phone menu mirroring them", async () => {
       const ringing = await withPages([page()]);
-      // Acknowledge is labelled, so resolve and timeline are the menu's.
-      expect(ringing.findAll('[data-test^="oncall-row-resolve-"]')).toHaveLength(1);
-      expect(ringing.findAll('[data-test^="oncall-row-timeline-"]')).toHaveLength(1);
+      expect(ringing.find('[data-test="oncall-row-ack-alert:al_ckt"]').exists()).toBe(true);
+      expect(ringing.find('[data-test="oncall-row-resolve-alert:al_ckt"]').exists()).toBe(true);
+      expect(ringing.find('[data-test="oncall-row-ack-alert:al_ckt-menu"]').exists()).toBe(true);
+      expect(ringing.find('[data-test="oncall-row-resolve-alert:al_ckt-menu"]').exists()).toBe(
+        true,
+      );
+      expect(ringing.find('[data-test^="oncall-row-timeline-"]').exists()).toBe(false);
     });
 
-    it("keeps the labelled action out of a handled row's menu", async () => {
+    it("keeps an empty slot where a row has no Acknowledge, so the icons line up", async () => {
       const handled = await withPages([
         page({ state: "acknowledged", acked_by: "engineer@example.com" }),
       ]);
-      // Resolve is labelled now — it must not also appear as an item.
-      expect(handled.findAll('[data-test^="oncall-row-resolve-"]')).toHaveLength(1);
+      const cell = handled.find('[data-test="oncall-row-resolve-alert:al_ckt"]').element
+        .parentElement!;
+      expect(cell.querySelectorAll('[aria-hidden="true"]').length).toBeGreaterThan(0);
+    });
+
+    it("offers unsnooze instead of snooze on a snoozed row", async () => {
+      const wrapper = await withPages([page({ snoozed_until: (Date.now() + 60_000) * 1000 })]);
+      service.unsnoozeResponse.mockResolvedValue(axiosReply({}));
+
+      expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(false);
+      await wrapper.find('[data-test^="oncall-row-unsnooze-"]').trigger("click");
+      await flushPromises();
+
+      expect(service.unsnoozeResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ response_id: "resp_1" }),
+      );
+    });
+
+    it("keeps snooze for the awake firing of a row whose other firing is snoozed", async () => {
+      const wrapper = await withPages([
+        page({ id: "a", snoozed_until: (Date.now() + 60_000) * 1000 }),
+        page({ id: "b" }),
+      ]);
+
+      expect(wrapper.find('[data-test^="oncall-row-unsnooze-"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(true);
+    });
+
+    it("centres a resolved row's lone ⋯ with no empty slots beside it", async () => {
+      const resolved = await withPages([
+        page({ state: "resolved", closed_at: Date.now() * 1000, acked_by: "ana@o2.ai" }),
+      ]);
+      const cell = resolved
+        .find('[data-test="oncall-row-more-alert:al_ckt"]')
+        .element.closest(".justify-center")!;
+      expect(cell).not.toBeNull();
+      expect(cell.querySelectorAll(":scope > span.size-8[aria-hidden='true']").length).toBe(0);
     });
 
     /// Snoozing only makes sense while the ladder is still climbing, so a
@@ -673,9 +1009,10 @@ describe("OnCallResponses", () => {
 
     /// The channels shown are the policy's — what WOULD be used, not what happened.
     it("shows the channels the page would go out on", async () => {
-      service.getPolicy.mockResolvedValue({
-        data: { rungs: [{ priority: 1, steps: [{}, {}], channels: ["email", "webhook"] }] },
-      } as any);
+      answerTeams(() => ({
+        ...emptyTeam,
+        policy: { rungs: [{ priority: 1, steps: [{}, {}], channels: ["email", "webhook"] }] },
+      }));
       const wrapper = await withPages([page({ priority: 1 })]);
 
       expect(wrapper.find('[data-test$="-email"]').exists()).toBe(true);
@@ -696,10 +1033,8 @@ describe("OnCallResponses", () => {
     /// The bug this closes: a team with an unstaffed rotation pages nobody,
     /// and the old guide vanished the moment the first team existed.
     it("still shows when a team exists but nobody is on call", async () => {
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
-      service.coverageGaps.mockResolvedValue({
-        data: { at: 0, total: 1, teams: [team] },
-      } as any);
+      service.listTeams.mockResolvedValue(axiosReply([team]));
+      service.coverageGaps.mockResolvedValue(axiosReply({ at: 0, total: 1, teams: [team] }));
       const wrapper = render();
       await flushPromises();
 
@@ -709,13 +1044,10 @@ describe("OnCallResponses", () => {
       expect(checklist.props("hasStaffedRotation")).toBe(false);
     });
 
-    /// A team, a staffed rotation and a routing rule can all exist while the
-    /// org has configured zero notification destinations — paging is still
-    /// structurally impossible, so the checklist must stay up rather than
-    /// declare setup finished.
-    it("still shows when everything but a destination is configured", async () => {
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
-      destinations.list.mockResolvedValue({ data: [] } as any);
+    /// The policy step is answered by the team's own policy read, not by alert destinations.
+    it("still shows while no team's escalation policy can be read", async () => {
+      service.listTeams.mockResolvedValue(axiosReply([team]));
+      answerTeams(() => ({ on_call: [], schedule: null }));
       const wrapper = render();
       await flushPromises();
 
@@ -723,16 +1055,165 @@ describe("OnCallResponses", () => {
       expect(checklist.exists()).toBe(true);
       expect(checklist.props("hasTeam")).toBe(true);
       expect(checklist.props("hasRouting")).toBe(true);
-      expect(checklist.props("hasDestinations")).toBe(false);
+      expect(checklist.props("hasPolicy")).toBe(false);
+    });
+
+    /// The row teams are only some of the org's, so a policy on a team with no page still counts.
+    it("counts a policy on a team that has no page, from one read of every team", async () => {
+      service.listTeams.mockResolvedValue(
+        axiosReply([team, { ...team, id: "team_2", name: "Payments" }]),
+      );
+      answerTeams((id) =>
+        id === "team_2" ? emptyTeam : { on_call: [{ user_email: "a@o2.ai" }], schedule: null },
+      );
+      service.listResponses.mockResolvedValue(axiosReply([page()]));
+      const wrapper = render();
+      await flushPromises();
+
+      expect(service.teamContext).toHaveBeenLastCalledWith({
+        org_identifier: "default",
+        team_ids: ["team_1", "team_2"],
+        include_mine: false,
+      });
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+    });
+
+    describe("when the bulk team read is missing", () => {
+      const notFound = Object.assign(new Error("404"), { response: { status: 404 } });
+
+      beforeEach(() => {
+        resetOnCallPolicyReviewed();
+        window.localStorage.clear();
+        service.listTeams.mockResolvedValue(axiosReply([team]));
+        service.teamContext.mockRejectedValue(notFound);
+      });
+      afterEach(() => window.localStorage.clear());
+
+      it("asks the missing bulk read once per load, not again for the checklist", async () => {
+        service.getPolicy.mockResolvedValue(axiosReply({ rungs: [] }));
+        service.listResponses.mockResolvedValue(axiosReply([page()]));
+        render();
+        await flushPromises();
+
+        expect(service.teamContext).toHaveBeenCalledTimes(1);
+        expect(service.getPolicy).toHaveBeenCalledTimes(1);
+      });
+
+      it("falls back to the team's own policy read", async () => {
+        service.getPolicy.mockResolvedValue(axiosReply({ rungs: [] }));
+        const wrapper = render();
+        await flushPromises();
+
+        expect(service.getPolicy).toHaveBeenCalledWith({
+          org_identifier: "default",
+          team_id: "team_1",
+        });
+        expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+      });
+
+      /// Neither read answered, so the step is unknown rather than owed.
+      it("leaves the step unknown when the fallback fails too", async () => {
+        service.getPolicy.mockRejectedValue(notFound);
+        service.coverageGaps.mockResolvedValue(axiosReply({ at: 0, total: 1, teams: [team] }));
+        const wrapper = render();
+        await flushPromises();
+
+        const checklist = wrapper.findComponent({ name: "OnCallSetupChecklist" });
+        expect(checklist.props("hasPolicy")).toBeNull();
+        expect(wrapper.find('[data-test="oncall-setup-step-policy"]').exists()).toBe(false);
+      });
+
+      it("hides the checklist when the unknown step is all that is left", async () => {
+        service.getPolicy.mockRejectedValue(notFound);
+        const wrapper = render();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+      });
+    });
+
+    /// Reviewing the escalation from the checklist is the step, whatever the server says.
+    it("counts a reviewed escalation as done", async () => {
+      window.localStorage.setItem(`oncall-setup-policy-reviewed:default:${team.id}`, "1");
+      resetOnCallPolicyReviewed();
+      service.listTeams.mockResolvedValue(axiosReply([team]));
+      answerTeams(() => ({ on_call: [], schedule: null }));
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+      window.localStorage.clear();
+      resetOnCallPolicyReviewed();
+    });
+
+    /// Being on call is a fact about the reader, so an unfinished setup never hides it.
+    it("shows the shift chip while setup is unfinished", async () => {
+      const viewer = store.state.userInfo.email;
+      service.listTeams.mockResolvedValue(axiosReply([team]));
+      answerTeams(
+        () => ({
+          on_call: [{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: viewer }],
+          schedule: null,
+        }),
+        [team.id],
+      );
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OnCallSetupChecklist" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallShiftBanner" }).exists()).toBe(true);
+    });
+
+    it("keeps the shift chip after the setup bar is dismissed", async () => {
+      resetOnCallSetupDismissed();
+      const viewer = store.state.userInfo.email;
+      service.listTeams.mockResolvedValue(axiosReply([team]));
+      service.listOwnershipRules.mockResolvedValue(axiosReply([]));
+      service.listResponses.mockResolvedValue(
+        axiosReply([
+          {
+            id: "resp_1",
+            org_id: "default",
+            subject: { subject_type: "alert", source_id: "al_ckt", firing: 1 },
+            team_id: null,
+            priority: 1,
+            state: "triggered",
+            responder_role: "owner",
+            title: "checkout_failing",
+            opened_at: 1_700_000_000_000_000,
+            acked_by: null,
+            acked_at: null,
+            closed_at: null,
+          },
+        ]),
+      );
+      answerTeams(
+        () => ({
+          on_call: [{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: viewer }],
+          schedule: null,
+        }),
+        [team.id],
+      );
+      const wrapper = mountTracked(OnCallResponses, {
+        global: { plugins: [i18n, store], stubs: { ...stubs, OnCallSetupChecklist: false } },
+      });
+      await flushPromises();
+
+      await wrapper.find('[data-test="oncall-setup-dismiss"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-setup-banner"]').exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OnCallShiftBanner" }).exists()).toBe(true);
+      resetOnCallSetupDismissed();
     });
 
     /// A server without the coverage-gap endpoint used to read as "zero gaps",
     /// which ticked the rotation step and hid the checklist on an org whose
     /// team had no rotation at all.
     it("asks each team directly when the coverage endpoint is unavailable", async () => {
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      service.listTeams.mockResolvedValue(axiosReply([team]));
       service.coverageGaps.mockRejectedValue({ response: { status: 404 } });
-      service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+      service.whoIsOnCall.mockResolvedValue(axiosReply([]));
       const wrapper = render();
       await flushPromises();
 
@@ -745,11 +1226,11 @@ describe("OnCallResponses", () => {
     });
 
     it("counts the rotation staffed when that fallback finds somebody on call", async () => {
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      service.listTeams.mockResolvedValue(axiosReply([team]));
       service.coverageGaps.mockRejectedValue({ response: { status: 404 } });
-      service.whoIsOnCall.mockResolvedValue({
-        data: [{ rotation: "Weekdays", user_email: "ana@corp.com" }],
-      } as any);
+      service.whoIsOnCall.mockResolvedValue(
+        axiosReply([{ rotation: "Weekdays", user_email: "ana@corp.com" }]),
+      );
       const wrapper = render();
       await flushPromises();
 
@@ -757,7 +1238,7 @@ describe("OnCallResponses", () => {
     });
 
     it("disappears once a team is staffed and routed", async () => {
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      service.listTeams.mockResolvedValue(axiosReply([team]));
       const wrapper = render();
       await flushPromises();
 
@@ -767,7 +1248,7 @@ describe("OnCallResponses", () => {
 
     // A checklist that flashes on every load would read as "your setup vanished".
     it("does not show before the first fetch resolves", () => {
-      service.listResponses.mockReturnValue(new Promise(() => {}) as any);
+      service.listResponses.mockReturnValue(new Promise<never>(() => {}));
       const wrapper = render();
       expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
     });
@@ -777,7 +1258,7 @@ describe("OnCallResponses", () => {
     /// landed, a configured org was told to create a team — and on an org with
     /// no pages yet, setup took the whole screen before the table appeared.
     it("does not show while the setup fetch is still outstanding", async () => {
-      service.listTeams.mockReturnValue(new Promise(() => {}) as any);
+      service.listTeams.mockReturnValue(new Promise<never>(() => {}));
       const wrapper = render();
       await flushPromises();
 
@@ -789,7 +1270,7 @@ describe("OnCallResponses", () => {
     /// "no pages yet" is the wrong answer to show while we still cannot tell
     /// whether setup owns the screen.
     it("holds the list in its loading state until setup has answered", async () => {
-      service.listTeams.mockReturnValue(new Promise(() => {}) as any);
+      service.listTeams.mockReturnValue(new Promise<never>(() => {}));
       const wrapper = render();
       await flushPromises();
 
@@ -846,16 +1327,41 @@ describe("OnCallResponses", () => {
     /// The other half of the same rule: pages exist, so the list is the work and
     /// setup shrinks to one line above it.
     it("collapses to a bar over the list once pages exist", async () => {
-      service.listOwnershipRules.mockResolvedValue({ data: [] } as any);
-      service.coverageGaps.mockResolvedValue({
-        data: { at: 0, total: 1, teams: [team] },
-      } as any);
+      service.listOwnershipRules.mockResolvedValue(axiosReply([]));
+      service.coverageGaps.mockResolvedValue(axiosReply({ at: 0, total: 1, teams: [team] }));
       const wrapper = await withPages([page({ team_id: null })]);
 
       const checklist = wrapper.findComponent({ name: "OnCallSetupChecklist" });
       expect(checklist.exists()).toBe(true);
       expect(checklist.props("compact")).toBe(true);
       expect(wrapper.find('[data-test="oncall-responses-table"]').exists()).toBe(true);
+    });
+
+    // C4: a server-side filter that matches nothing is a filtered empty list, not an unpaged org.
+    it.each([
+      ["team", "oncall-responses-team-filter", "team_1"],
+      ["cause", "oncall-responses-cause-filter", "genuine_defect"],
+    ])("keeps the list when the %s filter matches nothing", async (_, test, value) => {
+      service.listResponses.mockImplementation((params) =>
+        Promise.resolve(axiosReply(params.team_id || params.cause ? [] : [page()])),
+      );
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-setup-banner"]').exists()).toBe(true);
+
+      wrapper
+        .findAllComponents({ name: "OSelect" })
+        .find((c) => c.attributes("data-test") === test)!
+        .vm.$emit("update:modelValue", value);
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-responses-table"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OEmptyState" }).props("filtered")).toBe(true);
+
+      wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action", "clear-filters");
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(1);
     });
   });
 
@@ -909,7 +1415,7 @@ describe("OnCallResponses", () => {
       await flushPromises();
       expect(wrapper.findComponent({ name: "OTable" }).props("error")).toBeTruthy();
 
-      service.listResponses.mockResolvedValue({ data: [page()] } as any);
+      service.listResponses.mockResolvedValue(axiosReply([page()]));
       await wrapper.find('[data-test="oncall-responses-refresh"]').trigger("click");
       await flushPromises();
 
@@ -921,7 +1427,7 @@ describe("OnCallResponses", () => {
   /// list somebody was paged about.
   it("disables the team filter when teams cannot be listed, and still lists pages", async () => {
     service.listTeams.mockRejectedValue({ response: { status: 403 } });
-    service.listResponses.mockResolvedValue({ data: [page()] } as any);
+    service.listResponses.mockResolvedValue(axiosReply([page()]));
     const wrapper = render();
     await flushPromises();
 
@@ -938,7 +1444,9 @@ describe("OnCallResponses", () => {
     /// The health card issues its OWN `listResponses` (closed pages included,
     /// no offset), so paging is counted by the offset-bearing calls only.
     const pagingCalls = () =>
-      service.listResponses.mock.calls.filter(([args]) => (args as any)?.offset !== undefined);
+      service.listResponses.mock.calls.filter(
+        ([args]) => (args as { offset?: number } | undefined)?.offset !== undefined,
+      );
 
     it("asks for one page and stops when it comes back short", async () => {
       await withPages([page()]);
@@ -957,8 +1465,8 @@ describe("OnCallResponses", () => {
     /// rather than a re-run every time somebody sees it red.
     it("walks on while pages come back full, and says so when it stops early", async () => {
       const full = Array.from({ length: 200 }, (_, i) => page({ id: `r${i}` }, `al_${i}`));
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
-      service.listResponses.mockResolvedValue({ data: full } as any);
+      service.listTeams.mockResolvedValue(axiosReply([team]));
+      service.listResponses.mockResolvedValue(axiosReply(full));
 
       const wrapper = render();
       await flushPromises();
@@ -983,8 +1491,8 @@ describe("OnCallResponses", () => {
     /// every load and the total was always unknown anyway.
     it("says how many it loaded without claiming that is all of them", async () => {
       const full = Array.from({ length: 200 }, (_, i) => page({ id: `r${i}` }, `al_${i}`));
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
-      service.listResponses.mockResolvedValue({ data: full } as any);
+      service.listTeams.mockResolvedValue(axiosReply([team]));
+      service.listResponses.mockResolvedValue(axiosReply(full));
 
       const wrapper = render();
       await flushPromises();
@@ -1014,6 +1522,72 @@ describe("OnCallResponses", () => {
     );
   });
 
+  /// The section headers already say ringing/handled/resolved, so a Status column only repeated them.
+  it("has no Status column, and the always-shown Escalation column says what is happening", async () => {
+    const wrapper = await withPages([page()]);
+    const table = wrapper.findComponent({ name: "OTable" });
+    const columns = table.props("columns") as TableColumn[];
+
+    expect(columns.some((c) => c.id === "state")).toBe(false);
+    expect(Object.keys(table.props("columnVisibility"))).not.toContain("state");
+    expect(columns.find((c) => c.id === "escalation")!.hideable).not.toBe(true);
+  });
+
+  /// One signal: the ladder's own progress, which the "nobody answered" tag and the ladder text both read.
+  it("tags nobody answered from the ladder's progress, before the record's flag lands", async () => {
+    answerProgress((id) => ({
+      fired: [{ after_micros: 0, at: 1, targets: [], reached: ["ana@o2.ai"] }],
+      next_targets: [],
+      next_at: null,
+      exhausted: id === "resp_done",
+    }));
+    const wrapper = await withPages([
+      page({ id: "resp_done", exhausted_at: null }, "al_done"),
+      page({ id: "resp_live" }, "al_live"),
+    ]);
+
+    expect(wrapper.find('[data-test="oncall-escalation-cell-exhausted"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-test="oncall-escalation-cell-exhausted"]')).toHaveLength(1);
+    expect(wrapper.text()).not.toContain("Ladder finished");
+    expect(wrapper.text()).not.toContain("Triggered");
+  });
+
+  it("names a team missing from the loaded list as deleted, without a link", async () => {
+    const wrapper = await withPages([page({ team_id: "team_gone" })]);
+
+    expect(wrapper.findAll('a[data-test^="oncall-row-team-"]')).toHaveLength(0);
+    const tag = wrapper.find('[data-test="oncall-row-team-deleted"]');
+    expect(tag.text()).toBe("Deleted team");
+  });
+
+  it("says an unrouted page is unrouted, never a deleted team", async () => {
+    const wrapper = await withPages([page({ team_id: null })]);
+
+    expect(wrapper.find('[data-test="oncall-row-team-deleted"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Unrouted");
+  });
+
+  it("keeps the id when the team list could not be loaded", async () => {
+    service.listTeams.mockRejectedValue(new Error("down"));
+    service.listResponses.mockResolvedValue(axiosReply([page({ team_id: "team_gone" })]));
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-row-team-deleted"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test^="oncall-row-team-"]').text()).toContain("team_gone");
+  });
+
+  it("names every filter for a screen reader", async () => {
+    const wrapper = await withPages([page()]);
+    await showAllTab(wrapper);
+
+    for (const control of ["team-filter", "priority-filter", "cause-filter"]) {
+      expect(
+        wrapper.find(`[data-test="oncall-responses-${control}"]`).attributes("aria-label"),
+      ).toBeTruthy();
+    }
+  });
+
   describe("list view state", () => {
     const seed = () =>
       useListViewState("oncall-responses", {
@@ -1032,8 +1606,57 @@ describe("OnCallResponses", () => {
 
     const tabs = (w: VueWrapper) =>
       w
-        .findAllComponents({ name: "OToggleGroup" })
+        .findAllComponents({ name: "OSelect" })
         .find((c) => c.attributes("data-test") === "oncall-responses-filter-tabs")!;
+
+    /// An open-only tab fetches without resolved pages, so an empty answer must not take away the tabs that widen it.
+    it("keeps the filter bar when an open-only tab fetches nothing", async () => {
+      Object.assign(seed(), { activeFilter: "ringing" });
+      const wrapper = await withPages([]);
+
+      expect(tabs(wrapper)?.exists()).toBe(true);
+    });
+
+    /// An open-only tab never fetched resolved pages, so their count is unknown rather than zero.
+    it.each(["ringing", "snoozed", "handled"])(
+      "leaves the resolved and all counts off after a saved %s tab",
+      async (tab) => {
+        Object.assign(seed(), { activeFilter: tab });
+        const wrapper = await withPages([page({ id: "a" })]);
+
+        const labels = Object.fromEntries(
+          (tabs(wrapper).props("options") as { value: string; label: string }[]).map((o) => [
+            o.value,
+            o.label,
+          ]),
+        );
+        expect(labels.resolved).toBe("Resolved");
+        expect(labels.all).toBe("All");
+        expect(labels.ringing).toBe("Ringing · 1");
+        expect(tabs(wrapper).props("modelValue")).toBe(tab);
+      },
+    );
+
+    it("counts resolved pages once a resolved-showing tab has fetched them", async () => {
+      Object.assign(seed(), { activeFilter: "ringing" });
+      const wrapper = await withPages([page({ id: "a" })]);
+
+      tabs(wrapper).vm.$emit("update:modelValue", "resolved");
+      await flushPromises();
+
+      const resolved = (tabs(wrapper).props("options") as { value: string; label: string }[]).find(
+        (o) => o.value === "resolved",
+      );
+      expect(resolved?.label).toBe("Resolved · 0");
+    });
+
+    /// The Status column is gone, and a view saved while sorted by it must still load.
+    it("falls back to the default sort when the saved view sorted by Status", async () => {
+      Object.assign(seed(), { sortBy: "state" });
+      const wrapper = await withPages([page()]);
+
+      expect(wrapper.findComponent({ name: "OTable" }).props("sortBy")).toBe("last_alert_at");
+    });
 
     it("restores the filter tab, page, page size and sort", async () => {
       Object.assign(seed(), {
@@ -1083,15 +1706,13 @@ describe("OnCallResponses", () => {
   /// every other filter the reader had set and answered the question from a
   /// different dataset on a different screen.
   describe("my on-call", () => {
-    const mineBtn = '[data-test="oncall-responses-mine-btn"]';
+    const scopeToggle = '[data-test="oncall-responses-scope"]';
 
     async function withMyShift(rows: Record<string, unknown>[]) {
-      service.whoIsOnCall.mockImplementation(({ team_id }: any) =>
-        Promise.resolve({
-          data:
-            team_id === "team_1" ? [{ rotation: "Primary", user_email: "example@gmail.com" }] : [],
-        } as any),
-      );
+      answerTeams((id) => ({
+        ...emptyTeam,
+        on_call: id === "team_1" ? [{ rotation: "Primary", user_email: "example@gmail.com" }] : [],
+      }));
       return withPages(rows);
     }
 
@@ -1105,47 +1726,83 @@ describe("OnCallResponses", () => {
         page({ id: "b", team_id: "team_other" }, "al_pay"),
       ]);
 
-      const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+      const data = wrapper.findComponent({ name: "OTable" }).props("data") as TableRow[];
       expect(data.map((row) => row.latest.id)).toEqual(["a"]);
     });
 
-    /// The profile menu's "My on-call" opens a page; this button only narrows the list, so it must not share that name.
-    it("is named as a filter, apart from the My on-call page", async () => {
-      const wrapper = await withMyShift([page({ id: "a" })]);
+    const ids = (wrapper: VueWrapper) =>
+      (wrapper.findComponent({ name: "OTable" }).props("data") as TableRow[]).map(
+        (row) => row.latest.id,
+      );
+    async function pick(wrapper: VueWrapper, value: "mine" | "everyone") {
+      wrapper
+        .findComponent('[data-test="oncall-responses-scope"]')
+        .vm.$emit("update:modelValue", value);
+      await flushPromises();
+    }
 
-      expect(wrapper.find(mineBtn).text()).toBe("Only mine");
+    it("leads the filter bar with Mine and Everyone", async () => {
+      const wrapper = await withMyShift([page({ id: "a" })]);
+      const scope = wrapper.find(scopeToggle);
+      expect(scope.text()).toContain("Mine");
+      expect(scope.text()).toContain("Everyone");
+      expect(wrapper.find('[data-test="oncall-responses-mine-btn"]').exists()).toBe(false);
     });
 
-    it("filters in place instead of navigating", async () => {
+    /// Everyone is the default even while on call; Mine filters in place and never navigates.
+    it("starts on Everyone for someone on call, and filters in place on Mine", async () => {
       const wrapper = await withMyShift([
         page({ id: "a" }),
         page({ id: "b", team_id: "team_other" }, "al_pay"),
       ]);
+      expect(ids(wrapper)).toEqual(["a", "b"]);
 
-      await wrapper.find(mineBtn).trigger("click");
-      await flushPromises();
-
+      await pick(wrapper, "mine");
       expect(push).not.toHaveBeenCalled();
-      const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
-      expect(data.map((row) => row.latest.id)).toEqual(["a"]);
+      expect(ids(wrapper)).toEqual(["a"]);
     });
 
-    /// The strip sits above the rows and claims to describe them, so the scope
-    /// has to apply before the counts are taken.
+    it("starts on Everyone for someone not on call", async () => {
+      const wrapper = await withPages([
+        page({ id: "a" }),
+        page({ id: "b", team_id: "team_other" }, "al_pay"),
+      ]);
+      expect(ids(wrapper)).toEqual(["a", "b"]);
+    });
+
+    it("starts on every page, resolved included", async () => {
+      const wrapper = await withPages([
+        page({ id: "a" }),
+        page({ id: "r", state: "resolved", closed_at: 1_700_000_100_000_000 }, "al_old"),
+      ]);
+      const status = wrapper.findComponent('[data-test="oncall-responses-filter-tabs"]');
+      expect(status.props("modelValue")).toBe("all");
+      expect(status.props("searchable")).toBe(false);
+      expect(ids(wrapper).sort()).toEqual(["a", "r"]);
+    });
+
+    it("keeps Mine once the reader picked it", async () => {
+      useListViewState("oncall-responses", {}).mineOnly = true;
+      const wrapper = await withMyShift([
+        page({ id: "a" }),
+        page({ id: "b", team_id: "team_other" }, "al_pay"),
+      ]);
+      expect(ids(wrapper)).toEqual(["a"]);
+    });
+
+    /// The section headings claim to describe the rows, so the scope applies before the counts.
     it("counts the narrowed list, not the whole one", async () => {
       const wrapper = await withMyShift([
         page({ id: "a" }),
         page({ id: "b", team_id: "team_other" }, "al_pay"),
       ]);
-
-      expect(sections(wrapper)).toEqual({ ringing: 2 });
-      await wrapper.find(mineBtn).trigger("click");
-      await flushPromises();
+      await pick(wrapper, "mine");
       expect(sections(wrapper)).toEqual({ ringing: 1 });
+      await pick(wrapper, "everyone");
+      expect(sections(wrapper)).toEqual({ ringing: 2 });
     });
 
-    /// The acknowledgement outlives the shift: whoever claimed a page still
-    /// owns it after handover, even on a team they are no longer on.
+    /// The acknowledgement outlives the shift: whoever claimed a page still owns it after handover.
     it("keeps a page the viewer acknowledged on another team", async () => {
       const wrapper = await withMyShift([
         page(
@@ -1153,16 +1810,10 @@ describe("OnCallResponses", () => {
           "al_pay",
         ),
       ]);
-
-      await wrapper.find(mineBtn).trigger("click");
-      await flushPromises();
-
-      const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
-      expect(data.map((row) => row.latest.id)).toEqual(["b"]);
+      expect(ids(wrapper)).toEqual(["b"]);
     });
 
-    // The server lowercases an email on handoff but not on a self-ack, so the
-    // owner comparison cannot be case-sensitive.
+    // The server lowercases an email on handoff but not on a self-ack.
     it("matches the owner regardless of case", async () => {
       const wrapper = await withMyShift([
         page(
@@ -1170,31 +1821,18 @@ describe("OnCallResponses", () => {
           "al_pay",
         ),
       ]);
-
-      await wrapper.find(mineBtn).trigger("click");
-      await flushPromises();
-
-      const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
-      expect(data.map((row) => row.latest.id)).toEqual(["b"]);
+      expect(ids(wrapper)).toEqual(["b"]);
     });
 
-    it("is a toggle, so the second click gives the full list back", async () => {
+    it("switches both ways", async () => {
       const wrapper = await withMyShift([
         page({ id: "a" }),
         page({ id: "b", team_id: "team_other" }, "al_pay"),
       ]);
-      const rowIds = () =>
-        (wrapper.findComponent({ name: "OTable" }).props("data") as any[]).map(
-          (row) => row.latest.id,
-        );
-
-      await wrapper.find(mineBtn).trigger("click");
-      await flushPromises();
-      expect(rowIds()).toEqual(["a"]);
-
-      await wrapper.find(mineBtn).trigger("click");
-      await flushPromises();
-      expect(rowIds()).toEqual(["a", "b"]);
+      await pick(wrapper, "everyone");
+      expect(ids(wrapper)).toEqual(["a", "b"]);
+      await pick(wrapper, "mine");
+      expect(ids(wrapper)).toEqual(["a"]);
     });
 
     /// A toggle that can only ever empty the table is worse than no toggle.
@@ -1203,23 +1841,215 @@ describe("OnCallResponses", () => {
       store.state.userInfo = {};
       try {
         const wrapper = await withPages([page()]);
-        expect(wrapper.find(mineBtn).exists()).toBe(false);
+        expect(wrapper.find(scopeToggle).exists()).toBe(false);
       } finally {
         store.state.userInfo = original;
       }
     });
 
+    /// No filters before anything has paged: they could only narrow an empty list.
+    it("shows no filter bar while there are no pages", async () => {
+      const wrapper = await withMyShift([]);
+      expect(wrapper.find(scopeToggle).exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-responses-filter-tabs"]').exists()).toBe(false);
+    });
+
     /// Nothing of yours open is a real answer; "no pages at all" is not.
     it("offers to clear itself when it empties the list", async () => {
       const wrapper = await withMyShift([page({ id: "b", team_id: "team_other" }, "al_pay")]);
-
-      await wrapper.find(mineBtn).trigger("click");
-      await flushPromises();
+      await pick(wrapper, "mine");
 
       const empty = wrapper
         .findAllComponents({ name: "OEmptyState" })
         .find((node) => node.props("preset") === "no-oncall-responses");
       expect(empty?.props("filtered")).toBe(true);
+    });
+
+    it("counts down the handover of the rotation the viewer holds, not the first one", async () => {
+      const nowMs = 1_786_000_000_000;
+      const now = vi.spyOn(Date, "now").mockReturnValue(nowMs);
+      const rule = (members: string[], shift_micros: number) => ({
+        name: "Base",
+        members,
+        shift_micros,
+        anchor_micros: 0,
+      });
+      // The viewer's team has no row on screen: only `include_mine` brings it into the answer.
+      answerTeams(
+        (id) =>
+          id === "team_1"
+            ? {
+                ...emptyTeam,
+                schedule: {
+                  id: "sch_1",
+                  org_id: "default",
+                  team_id: "team_1",
+                  timezone: "UTC",
+                  created_at: 0,
+                  updated_at: 0,
+                  rotations: [
+                    {
+                      id: "rot_weekly",
+                      name: "Primary",
+                      shift_rules: [rule(["ana@o2.ai"], 604_800_000_000)],
+                    },
+                    {
+                      id: "rot_hourly",
+                      name: "Secondary",
+                      shift_rules: [rule(["example@gmail.com"], 3_600_000_000)],
+                    },
+                  ],
+                },
+                on_call: [
+                  {
+                    rotation_id: "rot_weekly",
+                    rotation_name: "Primary",
+                    rule: "Base",
+                    user_email: "ana@o2.ai",
+                  },
+                  {
+                    rotation_id: "rot_hourly",
+                    rotation_name: "Secondary",
+                    rule: "Base",
+                    user_email: "example@gmail.com",
+                  },
+                ],
+              }
+            : emptyTeam,
+        ["team_1"],
+      );
+      try {
+        const wrapper = await withPages([page({ team_id: "team_other" })]);
+
+        const banner = wrapper.findComponent({ name: "OnCallShiftBanner" });
+        expect(banner.props("rotation")).toBe("Secondary");
+        // The next hour boundary, where the first rotation would have given the next week's.
+        expect(banner.props("endsAt")).toBe(1_786_003_200_000_000);
+      } finally {
+        now.mockRestore();
+      }
+    });
+  });
+
+  describe("request fan-out", () => {
+    const position = (email: string) => ({
+      rotation_id: "r",
+      rotation_name: "Primary",
+      rule: "Base",
+      user_email: email,
+    });
+    const shownOnCall = (wrapper: VueWrapper) =>
+      wrapper
+        .findAll('[data-test^="oncall-oncallnow-"]:not([data-test="oncall-oncallnow-gap"])')
+        .map((node) => node.text().trim());
+    const pickTeam = (wrapper: VueWrapper, teamId: string) =>
+      wrapper
+        .findAllComponents({ name: "OSelect" })
+        .find((node) => node.attributes("data-test") === "oncall-responses-team-filter")!
+        .vm.$emit("update:modelValue", teamId);
+
+    it("names an incident from the row's title, and the id when the row has none", async () => {
+      const wrapper = await withPages([
+        page({ id: "a", incident_id: "inc_1", incident_title: "Checkout down" }),
+        page({ id: "b", incident_id: "inc_2" }, "al_b"),
+      ]);
+
+      const chips = wrapper.findAll('[data-test^="oncall-row-incident-"]').map((c) => c.text());
+      expect(chips.sort()).toEqual(["Checkout down", "inc_2"]);
+    });
+
+    it("reads every team's context in one request, for the row teams and the viewer's", async () => {
+      service.listTeams.mockResolvedValue(
+        axiosReply([team, { ...team, id: "team_2", name: "Payments" }]),
+      );
+      service.listResponses.mockResolvedValue(
+        axiosReply([
+          page(),
+          page({ id: "b", team_id: "team_2" }, "al_b"),
+          page({ id: "c" }, "al_c"),
+        ]),
+      );
+      render();
+      await flushPromises();
+
+      expect(service.teamContext).toHaveBeenCalledTimes(1);
+      expect(service.teamContext).toHaveBeenCalledWith({
+        org_identifier: "default",
+        team_ids: ["team_1", "team_2"],
+        include_mine: true,
+      });
+      expect(service.whoIsOnCall).not.toHaveBeenCalled();
+    });
+
+    it("splits row teams past the route's cap across context reads, asking for the viewer's once", async () => {
+      // Mounting 205 rows takes over 2s on a fast CI runner and can pass the 5s default on a slow one.
+      answerTeams((id) => ({ ...emptyTeam, on_call: [position(`${id}@o2.ai`)] }));
+      const many = Array.from({ length: 205 }, (_, i) =>
+        page({ id: `resp_${i}`, team_id: `team_${i}` }, `al_${i}`),
+      );
+      const wrapper = await withPages(many);
+
+      const calls = service.teamContext.mock.calls.map(([args]) => args);
+      expect(calls.map((c) => [c.team_ids.length, c.include_mine])).toEqual([
+        [200, true],
+        [5, false],
+      ]);
+      expect(shownOnCall(wrapper)).toContain("team_204@o2.ai");
+    }, 20000);
+
+    it("shows the on-call cell from the context answer", async () => {
+      answerTeams(() => ({ ...emptyTeam, on_call: [position("ana@o2.ai")] }));
+      const wrapper = await withPages([page()]);
+
+      expect(shownOnCall(wrapper)).toEqual(["ana@o2.ai"]);
+    });
+
+    it("forces the context and ladder reads on refresh", async () => {
+      const wrapper = await withPages([page()]);
+      expect(service.teamContext).toHaveBeenCalledTimes(1);
+      expect(service.escalationProgressBatch).toHaveBeenCalledTimes(1);
+
+      await wrapper.find('[data-test="oncall-responses-refresh"]').trigger("click");
+      await flushPromises();
+
+      expect(service.teamContext).toHaveBeenCalledTimes(2);
+      expect(service.escalationProgressBatch).toHaveBeenCalledTimes(2);
+    });
+
+    it("sends the context and ladder reads together, without waiting for the teams list", async () => {
+      service.listTeams.mockReturnValue(new Promise<never>(() => {}));
+      service.listResponses.mockResolvedValue(axiosReply([page()]));
+      render();
+      await flushPromises();
+
+      expect(service.teamContext).toHaveBeenCalledTimes(1);
+      expect(service.escalationProgressBatch).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the newer context read when an older one answers last", async () => {
+      const answerOld = deferredReply();
+      service.teamContext.mockImplementation(({ team_ids }) =>
+        team_ids.includes("team_1")
+          ? answerOld.promise
+          : Promise.resolve(
+              axiosReply({
+                teams: [{ team_id: "team_new", ...emptyTeam, on_call: [position("new@o2.ai")] }],
+              }),
+            ),
+      );
+      const wrapper = await withPages([page()]);
+      service.listResponses.mockResolvedValue(
+        axiosReply([page({ id: "n", team_id: "team_new" }, "al_new")]),
+      );
+      pickTeam(wrapper, "team_new");
+      await flushPromises();
+
+      answerOld.answer({
+        teams: [{ team_id: "team_new", ...emptyTeam, on_call: [position("old@o2.ai")] }],
+      });
+      await flushPromises();
+
+      expect(shownOnCall(wrapper)).toEqual(["new@o2.ai"]);
     });
   });
 
@@ -1227,7 +2057,7 @@ describe("OnCallResponses", () => {
   /// a time to claim them is not triage.
   describe("acting from the list", () => {
     it("acknowledges a single page without opening it", async () => {
-      service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+      service.acknowledgeResponse.mockResolvedValue(axiosReply({}));
       const wrapper = await withPages([page()]);
 
       await wrapper.find('[data-test="oncall-row-ack-alert:al_ckt"]').trigger("click");
@@ -1262,7 +2092,7 @@ describe("OnCallResponses", () => {
     /// ninety-five and leaving ninety-four escalating would be worse than
     /// showing all ninety-five rows.
     it("acknowledges every escalating firing the row stands for", async () => {
-      service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+      service.acknowledgeResponse.mockResolvedValue(axiosReply({}));
       const wrapper = await withPages([
         page({ id: "f3", opened_at: 300 }),
         page({ id: "f2", opened_at: 200 }),
@@ -1276,7 +2106,7 @@ describe("OnCallResponses", () => {
     });
 
     it("bulk acknowledges the selection", async () => {
-      service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+      service.acknowledgeResponse.mockResolvedValue(axiosReply({}));
       const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
 
       wrapper
@@ -1291,7 +2121,7 @@ describe("OnCallResponses", () => {
 
     /// S11: the selection UI existed and three quarters of its value did not.
     it("bulk snoozes every escalating record in the selection", async () => {
-      service.snoozeResponse.mockResolvedValue({ data: {} } as any);
+      service.snoozeResponse.mockResolvedValue(axiosReply({}));
       const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
 
       wrapper
@@ -1305,9 +2135,48 @@ describe("OnCallResponses", () => {
       expect(service.snoozeResponse).toHaveBeenCalledWith(expect.objectContaining({ minutes: 30 }));
     });
 
+    /// The server refuses Snooze on a page with no team (one-ack AK-4), so bulk leaves it out and says why.
+    it("leaves a teamless page out of a bulk snooze, and says so", async () => {
+      service.snoozeResponse.mockResolvedValue(axiosReply({}));
+      const wrapper = await withPages([
+        page({ id: "a" }),
+        page({ id: "b", team_id: null }, "al_pay"),
+      ]);
+
+      wrapper
+        .findComponent({ name: "OTable" })
+        .vm.$emit("update:selectedIds", ["alert:al_ckt", "alert:al_pay"]);
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-bulk-snooze-30"]').trigger("click");
+      await flushPromises();
+
+      expect(service.snoozeResponse).toHaveBeenCalledTimes(1);
+      expect(service.snoozeResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ response_id: "a" }),
+      );
+      expect(vi.mocked(toast)).toHaveBeenCalledWith({
+        variant: "warning",
+        message: "1 page has no team, so it was not snoozed. Hand it off to a team first.",
+      });
+    });
+
+    it("snoozes nothing when every selected page has no team", async () => {
+      const wrapper = await withPages([page({ id: "b", team_id: null }, "al_pay")]);
+
+      wrapper.findComponent({ name: "OTable" }).vm.$emit("update:selectedIds", ["alert:al_pay"]);
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-bulk-snooze-30"]').trigger("click");
+      await flushPromises();
+
+      expect(service.snoozeResponse).not.toHaveBeenCalled();
+      expect(vi.mocked(toast)).not.toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success" }),
+      );
+    });
+
     /// Closing records in bulk is irreversible, so it asks first.
     it("confirms before bulk resolving, and resolves every unresolved firing", async () => {
-      service.resolveResponse.mockResolvedValue({ data: {} } as any);
+      service.resolveResponse.mockResolvedValue(axiosReply({}));
       const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
 
       wrapper
@@ -1329,7 +2198,7 @@ describe("OnCallResponses", () => {
     /// One page failing must not silently abandon the other ninety-nine.
     it("reports partial failure and still acknowledges the rest", async () => {
       service.acknowledgeResponse
-        .mockResolvedValueOnce({ data: {} } as any)
+        .mockResolvedValueOnce(axiosReply({}))
         .mockRejectedValueOnce(new Error("boom"));
       const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
 
@@ -1351,7 +2220,7 @@ describe("OnCallResponses", () => {
       beforeEach(() => vi.mocked(analytics.track).mockClear());
 
       it("tracks one acknowledge per row action, counting every firing acknowledged", async () => {
-        service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+        service.acknowledgeResponse.mockResolvedValue(axiosReply({}));
         const wrapper = await withPages([
           page({ id: "f3", opened_at: 300 }),
           page({ id: "f2", opened_at: 200 }),
@@ -1367,7 +2236,7 @@ describe("OnCallResponses", () => {
 
       it("counts only the acknowledgements that succeeded in a bulk action", async () => {
         service.acknowledgeResponse
-          .mockResolvedValueOnce({ data: {} } as any)
+          .mockResolvedValueOnce(axiosReply({}))
           .mockRejectedValueOnce(new Error("boom"));
         const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
         wrapper
@@ -1398,7 +2267,7 @@ describe("OnCallResponses", () => {
       });
 
       it("tracks one resolve per bulk action with its cause and count", async () => {
-        service.resolveResponse.mockResolvedValue({ data: {} } as any);
+        service.resolveResponse.mockResolvedValue(axiosReply({}));
         const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
         wrapper
           .findComponent({ name: "OTable" })
@@ -1416,7 +2285,7 @@ describe("OnCallResponses", () => {
       });
 
       it("tracks one resolve per row action", async () => {
-        service.resolveResponse.mockResolvedValue({ data: {} } as any);
+        service.resolveResponse.mockResolvedValue(axiosReply({}));
         const wrapper = await withPages([
           page({ state: "acknowledged", acked_by: "engineer@example.com" }),
         ]);
@@ -1434,9 +2303,14 @@ describe("OnCallResponses", () => {
     /// ksuid.
     it("shows the alert name, not the ksuid, and searches it", async () => {
       const wrapper = await withPages([page({ title: "checkout_failing" })]);
-      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
-      const subject = columns.find((c) => c.id === "subject");
-      const asRow = (p: any) => ({ latest: p, firings: [p], escalating: [], rowKey: p.id });
+      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as TableColumn[];
+      const subject = columns.find((c) => c.id === "subject")!;
+      const asRow = (p: { id: string }): TableRow => ({
+        latest: p,
+        firings: [p],
+        escalating: [],
+        rowKey: p.id,
+      });
       expect(subject.accessorFn(asRow(page({ title: "checkout_failing" })))).toBe(
         "checkout_failing",
       );
@@ -1452,10 +2326,10 @@ describe("OnCallResponses", () => {
       page({ id: "b", priority: 3 }, "al_pay"),
     ]);
 
-    (wrapper.vm as any).priorityFilter = "3";
+    (wrapper.vm as unknown as { priorityFilter: string }).priorityFilter = "3";
     await flushPromises();
 
-    const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+    const data = wrapper.findComponent({ name: "OTable" }).props("data") as TableRow[];
     expect(data).toHaveLength(1);
     expect(data[0].latest.id).toBe("b");
   });
@@ -1470,7 +2344,7 @@ describe("OnCallResponses", () => {
         page({ id: "other" }, "al_pay"),
       ]);
 
-      const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+      const data = wrapper.findComponent({ name: "OTable" }).props("data") as TableRow[];
       expect(data).toHaveLength(2);
       expect(data[0].firings).toHaveLength(3);
       // The row stands for the newest firing.
@@ -1503,6 +2377,7 @@ describe("OnCallResponses", () => {
 
     it("moves the team, priority and cause filters behind one button", async () => {
       const wrapper = await withPages([page()]);
+      await showAllTab(wrapper);
 
       expect(wrapper.find('[data-test="oncall-responses-filters-btn"]').exists()).toBe(true);
       const panel = wrapper.find('[data-test="oncall-responses-filters-panel"]');
@@ -1513,9 +2388,20 @@ describe("OnCallResponses", () => {
       }
     });
 
+    it("names the folded filters for a screen reader", async () => {
+      const wrapper = await withPages([page()]);
+      await showAllTab(wrapper);
+
+      for (const control of ["team-filter", "priority-filter", "cause-filter"]) {
+        expect(
+          wrapper.find(`[data-test="oncall-responses-${control}"]`).attributes("aria-label"),
+        ).toBeTruthy();
+      }
+    });
+
     /// The labelled button does not fit the one-control column, so the menu leads with the row's next step.
     it("leads the row menu with acknowledge while the page is ringing", async () => {
-      service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+      service.acknowledgeResponse.mockResolvedValue(axiosReply({}));
       const wrapper = await withPages([page()]);
 
       await wrapper.find('[data-test="oncall-row-ack-alert:al_ckt-menu"]').trigger("click");
@@ -1537,16 +2423,46 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test="oncall-row-ack-alert:al_ckt-menu"]').exists()).toBe(false);
     });
 
-    /// A closed row has no menu on a laptop; on a phone its button is gone, so the menu is the only way in.
-    it("keeps a menu on a closed row so its timeline stays reachable", async () => {
+    /// A phone hides the inline icons, so a closed row still needs its ⋯ there.
+    it("keeps the ⋯ menu on a closed row", async () => {
       const wrapper = await withPages([
         page({ state: "resolved", closed_at: Date.now() * 1000, acked_by: "ana@o2.ai" }),
       ]);
 
-      expect(wrapper.find('[data-test^="oncall-row-more-"]').exists()).toBe(true);
-      await wrapper.find('[data-test="oncall-row-timeline-alert:al_ckt-menu"]').trigger("click");
+      const more = wrapper.find('[data-test="oncall-row-more-alert:al_ckt"]');
+      expect(more.exists()).toBe(true);
+      expect(more.classes()).not.toContain("md:hidden");
+    });
 
-      expect(push).toHaveBeenCalled();
+    /// An open tooltip is the top layer, so leaving it on the trigger made Escape close the tooltip and not the menu.
+    it("drops the ⋯ tooltip while its menu is open", async () => {
+      const wrapper = await withPages([page({ state: "resolved", closed_at: Date.now() * 1000 })]);
+      const menu = wrapper
+        .findAllComponents({ name: "ODropdown" })
+        .find((d) => d.find('[data-test="oncall-row-more-alert:al_ckt"]').exists())!;
+      const tooltips = () =>
+        menu
+          .find('[data-test="oncall-row-more-alert:al_ckt"]')
+          .findAllComponents({ name: "OTooltip" });
+      expect(tooltips()).toHaveLength(1);
+
+      menu.vm.$emit("update:open", true);
+      await wrapper.vm.$nextTick();
+      expect(tooltips()).toHaveLength(0);
+
+      menu.vm.$emit("update:open", false);
+      await wrapper.vm.$nextTick();
+      expect(tooltips()).toHaveLength(1);
+    });
+
+    /// With no name on file the whole email is the only thing that tells two people apart.
+    it("names a responder with no display name by the full email", async () => {
+      const wrapper = await withPages([
+        page({ state: "acknowledged", acked_by: "tl-eve-mvt9nu9l1842@maxxspace.com" }),
+      ]);
+      expect(wrapper.find('[data-test="oncall-responder-alert:al_ckt"]').text()).toBe(
+        "tl-eve-mvt9nu9l1842@maxxspace.com",
+      );
     });
   });
 });
@@ -1562,18 +2478,15 @@ describe("OnCallResponses — the rows' own fields", () => {
     // be served that entry instead of the mock it had just declared.
     queryClient.clear();
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
-    service.listResponses.mockResolvedValue({ data: [] } as any);
-    service.listTeams.mockResolvedValue({ data: [] } as any);
-    service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 0, teams: [] } } as any);
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
-    service.listOwnershipRules.mockResolvedValue({ data: [{ id: "rule_1" }] } as any);
-    destinations.list.mockResolvedValue({ data: [{ name: "dest_1" }] } as any);
-    service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
-    service.getSchedule.mockResolvedValue({ data: null } as any);
-    service.escalationProgress.mockResolvedValue({
-      data: { fired: [], next_targets: [], next_at: null, exhausted: false },
-    } as any);
-    service.getResponse.mockResolvedValue({ data: { events: [] } } as any);
+    service.listResponses.mockResolvedValue(axiosReply([]));
+    service.listTeams.mockResolvedValue(axiosReply([]));
+    service.coverageGaps.mockResolvedValue(axiosReply({ at: 0, total: 0, teams: [] }));
+    service.whoIsOnCall.mockResolvedValue(axiosReply([]));
+    service.listOwnershipRules.mockResolvedValue(axiosReply([{ id: "rule_1" }]));
+    destinations.list.mockResolvedValue(axiosReply([{ name: "dest_1" }]));
+    answerTeams(() => emptyTeam);
+    answerProgress(() => ({ fired: [], next_targets: [], next_at: null, exhausted: false }));
+    service.getResponse.mockResolvedValue(axiosReply({ events: [] }));
   });
 
   function row(over: Record<string, unknown> = {}) {
@@ -1594,7 +2507,7 @@ describe("OnCallResponses — the rows' own fields", () => {
   }
 
   async function withRows(rows: Record<string, unknown>[]) {
-    service.listResponses.mockResolvedValue({ data: rows } as any);
+    service.listResponses.mockResolvedValue(axiosReply(rows));
     const wrapper = mountTracked(OnCallResponses, {
       global: { plugins: [i18n, store], stubs: stubsForList },
     });
@@ -1634,9 +2547,7 @@ describe("OnCallResponses — the rows' own fields", () => {
   /// screen reported that by showing nothing rather than by saying so.
   describe("the team filter", () => {
     it("asks the server rather than filtering what it already loaded", async () => {
-      service.listTeams.mockResolvedValue({
-        data: [{ id: "team_1", name: "Platform" }],
-      } as any);
+      service.listTeams.mockResolvedValue(axiosReply([{ id: "team_1", name: "Platform" }]));
       const wrapper = await withRows([row()]);
 
       service.listResponses.mockClear();
@@ -1654,9 +2565,7 @@ describe("OnCallResponses — the rows' own fields", () => {
     /// rather than off the wire. A filter that sent `team_id: "all"` would key
     /// itself differently and show up here as a round trip.
     it("sends no team_id when the filter is cleared, re-using the walk it already made", async () => {
-      service.listTeams.mockResolvedValue({
-        data: [{ id: "team_1", name: "Platform" }],
-      } as any);
+      service.listTeams.mockResolvedValue(axiosReply([{ id: "team_1", name: "Platform" }]));
       const wrapper = await withRows([row()]);
       const filter = wrapper.findComponent('[data-test="oncall-responses-team-filter"]');
 
@@ -1676,21 +2585,17 @@ describe("OnCallResponses — the rows' own fields", () => {
     /// so the cold answer lands LAST — and must not paint its rows under a
     /// filter the reader has already left.
     it("ignores a slower answer for a filter the reader has already left", async () => {
-      service.listTeams.mockResolvedValue({
-        data: [{ id: "team_1", name: "Platform" }],
-      } as any);
+      service.listTeams.mockResolvedValue(axiosReply([{ id: "team_1", name: "Platform" }]));
       const wrapper = await withRows([row()]);
-      let answerTeam: (value: unknown) => void = () => {};
-      service.listResponses.mockImplementationOnce(
-        () => new Promise((resolve) => (answerTeam = resolve)),
-      );
+      const answerTeam = deferredReply();
+      service.listResponses.mockImplementationOnce(() => answerTeam.promise);
       const filter = wrapper.findComponent('[data-test="oncall-responses-team-filter"]');
 
       filter.vm.$emit("update:modelValue", "team_1");
       await flushPromises();
       filter.vm.$emit("update:modelValue", "all");
       await flushPromises();
-      answerTeam({ data: [row({ id: "resp_t1" }), row({ id: "resp_t2" })] });
+      answerTeam.answer([row({ id: "resp_t1" }), row({ id: "resp_t2" })]);
       await flushPromises();
 
       expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(1);
@@ -1703,7 +2608,7 @@ describe("OnCallResponses — the rows' own fields", () => {
     const ROW_KEY = "alert:al_ckt";
 
     async function withExpandedRow() {
-      service.getResponse.mockResolvedValue({ data: { response: row(), events: [] } } as any);
+      service.getResponse.mockResolvedValue(axiosReply({ response: row(), events: [] }));
       const wrapper = await withRows([row()]);
       wrapper.findComponent({ name: "OTable" }).vm.$emit("update:expandedIds", [ROW_KEY]);
       await flushPromises();
@@ -1746,36 +2651,34 @@ describe("OnCallResponses — filtering by cause", () => {
     // be served that entry instead of the mock it had just declared.
     queryClient.clear();
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
-    service.listResponses.mockResolvedValue({ data: [] } as any);
-    service.listTeams.mockResolvedValue({ data: [] } as any);
-    service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 0, teams: [] } } as any);
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
-    service.listOwnershipRules.mockResolvedValue({ data: [{ id: "rule_1" }] } as any);
-    destinations.list.mockResolvedValue({ data: [{ name: "dest_1" }] } as any);
-    service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
-    service.getSchedule.mockResolvedValue({ data: null } as any);
-    service.escalationProgress.mockResolvedValue({
-      data: { fired: [], next_targets: [], next_at: null, exhausted: false },
-    } as any);
-    service.getResponse.mockResolvedValue({ data: { events: [] } } as any);
+    service.listResponses.mockResolvedValue(axiosReply([]));
+    service.listTeams.mockResolvedValue(axiosReply([]));
+    service.coverageGaps.mockResolvedValue(axiosReply({ at: 0, total: 0, teams: [] }));
+    service.whoIsOnCall.mockResolvedValue(axiosReply([]));
+    service.listOwnershipRules.mockResolvedValue(axiosReply([{ id: "rule_1" }]));
+    destinations.list.mockResolvedValue(axiosReply([{ name: "dest_1" }]));
+    answerTeams(() => emptyTeam);
+    answerProgress(() => ({ fired: [], next_targets: [], next_at: null, exhausted: false }));
+    service.getResponse.mockResolvedValue(axiosReply({ events: [] }));
   });
 
   /// The `data-test` lands as an ATTRIBUTE on the rendered root rather than on
   /// the component, which a CSS selector passed to `findComponent` does not
   /// match.
-  const byTest = (wrapper: any, name: string, test: string) =>
-    wrapper.findAllComponents({ name }).find((c: any) => c.attributes("data-test") === test);
+  const byTest = (wrapper: VueWrapper, name: string, test: string) =>
+    wrapper.findAllComponents({ name }).find((c) => c.attributes("data-test") === test);
 
-  const cause = (wrapper: any) => byTest(wrapper, "OSelect", "oncall-responses-cause-filter");
-  const filterTabs = (wrapper: any) =>
-    byTest(wrapper, "OToggleGroup", "oncall-responses-filter-tabs");
+  const cause = (wrapper: VueWrapper) =>
+    byTest(wrapper, "OSelect", "oncall-responses-cause-filter");
+  const filterTabs = (wrapper: VueWrapper) =>
+    byTest(wrapper, "OSelect", "oncall-responses-filter-tabs");
 
   /// With no pages the setup checklist owns the screen and the toolbar is not
   /// rendered at all, so these tests need something in the list before there
   /// is a filter to drive.
   async function open() {
-    service.listResponses.mockResolvedValue({
-      data: [
+    service.listResponses.mockResolvedValue(
+      axiosReply([
         {
           id: "resp_1",
           org_id: "default",
@@ -1787,8 +2690,8 @@ describe("OnCallResponses — filtering by cause", () => {
           title: "checkout_failing",
           opened_at: 1_700_000_000_000_000,
         },
-      ],
-    } as any);
+      ]),
+    );
     const wrapper = mountTracked(OnCallResponses, {
       global: { plugins: [i18n, store], stubs },
     });
@@ -1796,18 +2699,13 @@ describe("OnCallResponses — filtering by cause", () => {
     return wrapper;
   }
 
-  /// `"all"` (the default tab) includes resolved pages; every other tab but
-  /// `"resolved"` itself excludes them.
-  async function showResolved(wrapper: any, on = true) {
+  /// `"all"` includes resolved pages; every other tab but `"resolved"` itself excludes them.
+  async function showResolved(wrapper: VueWrapper, on = true) {
     filterTabs(wrapper)!.vm.$emit("update:modelValue", on ? "all" : "ringing");
     await flushPromises();
   }
 
-  /// A cause is written at resolve, so filtering an OPEN list by one can only
-  /// ever empty it — the control would read as "there is nothing here" rather
-  /// than "this filter cannot apply". `"all"` is the default tab and already
-  /// includes resolved pages, so the filter starts out offered and disappears
-  /// only once a tab that excludes them is picked.
+  // A cause is written at resolve, so filtering an open-only list by one could only ever empty it.
   it("is offered only while the tab includes resolved pages", async () => {
     const wrapper = await open();
     expect(cause(wrapper)).toBeDefined();
@@ -1845,11 +2743,11 @@ describe("OnCallResponses — filtering by cause", () => {
     expect(service.listResponses.mock.calls.at(-1)![0]).toMatchObject({ cause: "genuine_defect" });
 
     service.listResponses.mockClear();
-    cause(wrapper)!.vm.$emit("update:modelValue", "");
+    cause(wrapper)!.vm.$emit("update:modelValue", "any");
     await flushPromises();
 
     expect(service.listResponses).not.toHaveBeenCalled();
-    expect(cause(wrapper)!.attributes("model-value")).toBe("");
+    expect(cause(wrapper)!.props("modelValue")).toBe("any");
   });
 
   /// Left behind when resolved pages go, it would narrow an open list to
@@ -1872,8 +2770,102 @@ describe("OnCallResponses — filtering by cause", () => {
     expect(cause(wrapper)).toBeUndefined();
 
     await showResolved(wrapper, true);
-    // `model-value` is not a declared prop on the OSelect stub, so it lands
-    // as a plain attribute rather than something `.props()` can see.
-    expect(cause(wrapper)!.attributes("model-value")).toBe("");
+    expect(cause(wrapper)!.props("modelValue")).toBe("any");
+  });
+
+  describe("inside the real Filters popover", () => {
+    const panel = () => document.body.querySelector('[data-test="oncall-responses-filters-panel"]');
+    const causeTrigger = () =>
+      document.body.querySelector<HTMLElement>(
+        '[data-test="oncall-responses-filters-panel"] [data-test="oncall-responses-cause-filter"] button[role="combobox"]',
+      );
+
+    async function openReal() {
+      service.listResponses.mockResolvedValue(
+        axiosReply([
+          {
+            id: "resp_1",
+            org_id: "default",
+            subject: { subject_type: "alert", source_id: "al_ckt", firing: 1 },
+            team_id: "team_1",
+            priority: 1,
+            state: "triggered",
+            responder_role: "owner",
+            title: "checkout_failing",
+            opened_at: 1_700_000_000_000_000,
+          },
+        ]),
+      );
+      const wrapper = mountTracked(OnCallResponses, {
+        attachTo: document.body,
+        global: {
+          plugins: [i18n, store],
+          stubs: { ...stubs, OPopover: false, OSelect: false, OButton: false },
+        },
+      });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-responses-filters-btn"]').trigger("click");
+      await flushPromises();
+      return wrapper;
+    }
+
+    async function pickCause(label: string) {
+      causeTrigger()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await flushPromises();
+      const option = Array.from(
+        document.body.querySelectorAll<HTMLElement>('[role="option"]'),
+      ).find((el) => el.textContent?.trim() === label);
+      expect(option).toBeDefined();
+      option!.focus();
+      option!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await flushPromises();
+    }
+
+    it("commits a picked cause, keeps the popover open, and offers no search box", async () => {
+      await openReal();
+      expect(panel()).not.toBeNull();
+
+      service.listResponses.mockClear();
+      causeTrigger()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await flushPromises();
+      expect(document.body.querySelector('[role="listbox"] input')).toBeNull();
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await flushPromises();
+
+      await pickCause("Dependency failure");
+
+      expect(service.listResponses.mock.calls.at(-1)![0]).toMatchObject({
+        cause: "dependency_failure",
+      });
+      expect(panel()).not.toBeNull();
+      expect(causeTrigger()!.textContent).toContain("Dependency failure");
+    });
+
+    /// The narrowed answer is empty, so reading it as "no pages" dropped the toolbar and the popover with it.
+    it("clears back to any cause from an empty narrowed list without losing the popover", async () => {
+      await openReal();
+      service.listResponses.mockResolvedValue(axiosReply([]));
+      await pickCause("Genuine defect");
+      expect(panel()).not.toBeNull();
+
+      await pickCause("Any cause");
+
+      expect(panel()).not.toBeNull();
+      expect(causeTrigger()!.textContent).toContain("Any cause");
+      expect(document.body.querySelectorAll('[data-test="row"]')).toHaveLength(1);
+    });
+
+    it("toggles group by alert from inside the popover", async () => {
+      await openReal();
+      const box = document.body.querySelector<HTMLElement>(
+        '[data-test="oncall-responses-group-toggle"] button[role="checkbox"], [data-test="oncall-responses-group-toggle"][role="checkbox"]',
+      );
+      expect(box).not.toBeNull();
+      const before = box!.getAttribute("aria-checked");
+      box!.click();
+      await flushPromises();
+      expect(box!.getAttribute("aria-checked")).not.toBe(before);
+      expect(panel()).not.toBeNull();
+    });
   });
 });

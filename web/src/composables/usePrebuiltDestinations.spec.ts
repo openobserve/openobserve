@@ -72,6 +72,7 @@ const {
   mockDestUpdate,
   mockDestTest,
   mockDestGetByName,
+  mockJiraSetup,
 } = vi.hoisted(() => ({
   mockGetSystemTemplates: vi.fn(),
   mockGetByName: vi.fn(),
@@ -80,6 +81,7 @@ const {
   mockDestUpdate: vi.fn(),
   mockDestTest: vi.fn(),
   mockDestGetByName: vi.fn(),
+  mockJiraSetup: vi.fn(),
 }));
 
 vi.mock("@/services/alert_templates", async (importOriginal) => {
@@ -101,6 +103,7 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
       update: mockDestUpdate,
       test: mockDestTest,
       get_by_name: mockDestGetByName,
+      jiraSetup: mockJiraSetup,
     },
   });
 });
@@ -113,13 +116,17 @@ vi.mock("@/utils/prebuilt-templates", async (importOriginal) => {
   return {
     ...actual,
     generateDestinationUrl: vi.fn((type: string, credentials: Record<string, unknown>) =>
-      type === "servicenow"
-        ? String(credentials.instanceUrl ?? "")
-        : String(credentials.webhookUrl ?? "https://generated.example.com"),
+      type === "jira"
+        ? actual.generateDestinationUrl(type, credentials)
+        : type === "servicenow"
+          ? String(credentials.instanceUrl ?? "")
+          : String(credentials.webhookUrl ?? "https://generated.example.com"),
     ),
-    generateDestinationHeaders: vi.fn(() => ({
-      "Content-Type": "application/json",
-    })),
+    generateDestinationHeaders: vi.fn((type: string, credentials: Record<string, unknown>) =>
+      type === "jira"
+        ? actual.generateDestinationHeaders(type, credentials)
+        : { "Content-Type": "application/json" },
+    ),
   };
 });
 
@@ -309,6 +316,77 @@ describe("usePrebuiltDestinations", () => {
 
       expect(result.success).toBe(true);
       expect(lastTestResult.value?.success).toBe(true);
+    });
+
+    describe("with a picked template", () => {
+      const contentTemplate = () =>
+        mockGetByName.mockResolvedValue({
+          data: { name: "prebuilt_default", kind: "content", body: "{}" },
+        });
+
+      it("slack: sends the template rendered for the slack channel", async () => {
+        contentTemplate();
+        mockTemplatePreview.mockResolvedValue({ data: { payload: { text: "unified" } } });
+        mockDestTest.mockResolvedValue({ data: { success: true } });
+
+        const { testDestination } = usePrebuiltDestinations();
+        await testDestination("slack", makeSlackCredentials(), "prebuilt_default");
+
+        expect(mockTemplatePreview.mock.calls[0][0].data.channel).toBe("slack");
+        expect(JSON.parse(mockDestTest.mock.calls[0][0].data.body)).toEqual({ text: "unified" });
+      });
+
+      it("pagerduty: adds the integration key the server renderer leaves out", async () => {
+        contentTemplate();
+        mockTemplatePreview.mockResolvedValue({ data: { payload: { event_action: "trigger" } } });
+        mockDestTest.mockResolvedValue({ data: { success: true } });
+
+        const { testDestination } = usePrebuiltDestinations();
+        await testDestination(
+          "pagerduty",
+          { integrationKey: "a".repeat(32), severity: "error" },
+          "prebuilt_default",
+        );
+
+        expect(mockTemplatePreview.mock.calls[0][0].data.channel).toBe("pagerduty");
+        expect(JSON.parse(mockDestTest.mock.calls[0][0].data.body)).toEqual({
+          event_action: "trigger",
+          routing_key: "a".repeat(32),
+        });
+      });
+
+      it("email: sends the rendered HTML as the body", async () => {
+        contentTemplate();
+        mockTemplatePreview.mockResolvedValue({
+          data: { payload: { subject: "s", html: "<p>unified</p>", text: "unified" } },
+        });
+        mockDestTest.mockResolvedValue({ data: { success: true } });
+
+        const { testDestination } = usePrebuiltDestinations();
+        await testDestination("email", { recipients: ["a@acme.io"] }, "prebuilt_default");
+
+        expect(mockTemplatePreview.mock.calls[0][0].data.channel).toBe("email");
+        expect(mockDestTest.mock.calls[0][0].data.body).toBe("<p>unified</p>");
+      });
+
+      it("a user template with a raw body gets the credentials as sample values", async () => {
+        mockGetByName.mockResolvedValue({
+          data: { name: "mine", kind: "custom", body: '{"key": "{routing_key}"}' },
+        });
+        mockDestTest.mockResolvedValue({ data: { success: true } });
+
+        const { testDestination } = usePrebuiltDestinations();
+        await testDestination(
+          "pagerduty",
+          { integrationKey: "b".repeat(32), severity: "error" },
+          "mine",
+        );
+
+        expect(mockTemplatePreview).not.toHaveBeenCalled();
+        expect(JSON.parse(mockDestTest.mock.calls[0][0].data.body)).toEqual({
+          key: "b".repeat(32),
+        });
+      });
     });
 
     it("returns failure when credentials are invalid (validation short-circuit)", async () => {
@@ -820,36 +898,188 @@ describe("usePrebuiltDestinations", () => {
     });
   });
 
+  describe("jira", () => {
+    const jiraCloud = {
+      deployment: "cloud",
+      url: "https://acme.atlassian.net/",
+      email: "alerts-bot@example.com",
+      token: "secret-token",
+      projectKey: "OPS",
+      issueTypeId: "10004",
+      priorityId: "",
+      fields: '{"customfield_10020":{"id":"10101"}}',
+    };
+    const jiraHeaders = (authorization: string) => ({
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: authorization,
+    });
+    const jiraMetadata = {
+      prebuilt_type: "jira",
+      jira_deployment: "cloud",
+      jira_email: "alerts-bot@example.com",
+      jira_project_key: "OPS",
+      jira_issue_type_id: "10004",
+      jira_priority_id: "",
+      jira_fields: '{"customfield_10020":{"id":"10101"}}',
+    };
+
+    it("creates an Http destination with the Jira URL, headers and metadata", async () => {
+      mockDestCreate.mockResolvedValue({ data: {} });
+      const { createDestination } = usePrebuiltDestinations();
+      await createDestination("jira", "jira-ops", jiraCloud);
+
+      const { data } = mockDestCreate.mock.calls[0][0];
+      expect(data).toMatchObject({
+        name: "jira-ops",
+        type: "http",
+        url: "https://acme.atlassian.net",
+        method: "post",
+        template: "prebuilt_jira",
+        destination_type_name: "jira",
+      });
+      expect(data.headers).toEqual(
+        jiraHeaders(`Basic ${btoa("alerts-bot@example.com:secret-token")}`),
+      );
+      expect(data.metadata).toEqual(jiraMetadata);
+    });
+
+    it("updates with a Bearer token for Data Center and keeps custom headers", async () => {
+      mockDestUpdate.mockResolvedValue({ data: {} });
+      const { updateDestination } = usePrebuiltDestinations();
+      await updateDestination(
+        "jira",
+        "jira-ops",
+        "jira-ops-dc",
+        { ...jiraCloud, deployment: "data_center", email: "", priorityId: "3" },
+        { "X-Team": "sre" },
+      );
+
+      const call = mockDestUpdate.mock.calls[0][0];
+      expect(call.destination_name).toBe("jira-ops");
+      expect(call.data.headers).toEqual({
+        ...jiraHeaders("Bearer secret-token"),
+        "X-Team": "sre",
+      });
+      expect(call.data.metadata).toEqual({
+        ...jiraMetadata,
+        jira_deployment: "data_center",
+        jira_email: "",
+        jira_priority_id: "3",
+      });
+    });
+
+    it("sends no Authorization header on edit when the token is empty", async () => {
+      mockDestUpdate.mockResolvedValue({ data: {} });
+      const { updateDestination } = usePrebuiltDestinations();
+      await updateDestination("jira", "jira-ops", "jira-ops", { ...jiraCloud, token: "" }, {});
+
+      const { headers } = mockDestUpdate.mock.calls[0][0].data;
+      expect(headers).not.toHaveProperty("Authorization");
+    });
+
+    it("tests through the setup route and returns the created issue", async () => {
+      mockJiraSetup.mockResolvedValue({
+        data: { key: "OPS-141", url: "https://acme.atlassian.net/browse/OPS-141" },
+      });
+      const { testDestination, lastTestResult } = usePrebuiltDestinations();
+      const result = await testDestination("jira", jiraCloud);
+
+      expect(mockJiraSetup).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({
+          action: "test_issue",
+          url: "https://acme.atlassian.net",
+          project_key: "OPS",
+          issue_type_id: "10004",
+          fields: { customfield_10020: { id: "10101" } },
+        }),
+      );
+      expect(mockDestTest).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        success: true,
+        issue: { key: "OPS-141", url: "https://acme.atlassian.net/browse/OPS-141" },
+      });
+      expect(lastTestResult.value).toEqual(result);
+    });
+
+    it("tests a saved destination with an empty token and sends its name", async () => {
+      mockJiraSetup.mockResolvedValue({
+        data: { key: "OPS-142", url: "https://acme.atlassian.net/browse/OPS-142" },
+      });
+      const { testDestination } = usePrebuiltDestinations();
+      const saved = { ...jiraCloud, token: "", savedDestination: "jira-ops" };
+      const result = await testDestination("jira", saved);
+
+      expect(result).toMatchObject({ success: true });
+      expect(mockJiraSetup).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({ action: "test_issue", token: "", destination: "jira-ops" }),
+      );
+    });
+
+    it("still requires the token for a new account or after Change", async () => {
+      mockJiraSetup.mockClear();
+      const { testDestination } = usePrebuiltDestinations();
+      const fresh = await testDestination("jira", { ...jiraCloud, token: "" });
+      const changed = await testDestination("jira", {
+        ...jiraCloud,
+        token: "",
+        savedDestination: "jira-ops",
+        changing: true,
+      });
+
+      expect(fresh.success).toBe(false);
+      expect(changed.success).toBe(false);
+      expect(mockJiraSetup).not.toHaveBeenCalled();
+    });
+
+    it("shows the setup route's error message when the test fails", async () => {
+      mockJiraSetup.mockRejectedValue({
+        message: "Request failed with status code 400",
+        response: { status: 400, data: { message: "Jira: Field 'Team' is required." } },
+      });
+      const { testDestination } = usePrebuiltDestinations();
+      const result = await testDestination("jira", jiraCloud);
+
+      expect(result).toMatchObject({
+        success: false,
+        error: "Jira: Field 'Team' is required.",
+      });
+    });
+  });
+
   // -------------------------------------------------------------------------
   // detectPrebuiltType
   // -------------------------------------------------------------------------
   describe("detectPrebuiltType", () => {
-    it("returns type from metadata.prebuilt_type when present", () => {
+    it.each([
+      ["slack", { type: "http", destination_type_name: "slack" }],
+      ["pagerduty", { type: "http", destination_type_name: "pagerduty", metadata: {} }],
+      ["email", { type: "email", template: "prebuilt_email", metadata: {} }],
+    ])("returns %s for a destination the server treats as prebuilt", (expected, destination) => {
       const { detectPrebuiltType } = usePrebuiltDestinations();
-      const result = detectPrebuiltType({
-        metadata: { prebuilt_type: "slack" },
-      });
-      expect(result).toBe("slack");
+      expect(detectPrebuiltType(destination)).toBe(expected);
     });
 
-    it("returns type from system-prebuilt- template prefix", () => {
+    it.each([
+      ["no indicators", { name: "custom-destination" }],
+      ["a system-prebuilt- template", { type: "http", template: "system-prebuilt-discord" }],
+      ["a prebuilt_ template", { type: "http", template: "prebuilt_msteams" }],
+      ["only prebuilt_type metadata", { type: "http", metadata: { prebuilt_type: "slack" } }],
+      ["an unknown destination_type_name", { type: "http", destination_type_name: "custom" }],
+      ["a custom email template", { type: "email", template: "ops_mail" }],
+      [
+        "a prebuilt service URL",
+        {
+          type: "http",
+          url: "https://acme.service-now.com/api/now/table/incident",
+          metadata: {},
+        },
+      ],
+    ])("returns null for a custom destination with %s", (_, destination) => {
       const { detectPrebuiltType } = usePrebuiltDestinations();
-      const result = detectPrebuiltType({
-        template: "system-prebuilt-discord",
-      });
-      expect(result).toBe("discord");
-    });
-
-    it("returns type from prebuilt_ template prefix", () => {
-      const { detectPrebuiltType } = usePrebuiltDestinations();
-      const result = detectPrebuiltType({ template: "prebuilt_msteams" });
-      expect(result).toBe("msteams");
-    });
-
-    it("returns null when no indicators are present", () => {
-      const { detectPrebuiltType } = usePrebuiltDestinations();
-      const result = detectPrebuiltType({ name: "custom-destination" });
-      expect(result).toBeNull();
+      expect(detectPrebuiltType(destination)).toBeNull();
     });
   });
 
@@ -901,6 +1131,53 @@ describe("usePrebuiltDestinations", () => {
       const { convertToPrebuilt, isLoading } = usePrebuiltDestinations();
       await convertToPrebuilt("dest", "slack");
       expect(isLoading.value).toBe(false);
+    });
+  });
+
+  // The http interceptor already shows "Access Required" on a 403.
+  describe("save on 403", () => {
+    const forbidden = { response: { status: 403, data: { message: "Forbidden" } } };
+
+    it.each([
+      [
+        "createDestination",
+        (inst: any) => inst.createDestination("slack", "s", makeSlackCredentials()),
+      ],
+      [
+        "updateDestination",
+        (inst: any) => inst.updateDestination("slack", "s", "s", makeSlackCredentials()),
+      ],
+      ["convertToPrebuilt", (inst: any) => inst.convertToPrebuilt("s", "slack")],
+    ])("%s rethrows without its own error toast", async (_name, save) => {
+      mockDestCreate.mockRejectedValue(forbidden);
+      mockDestUpdate.mockRejectedValue(forbidden);
+      mockDestGetByName.mockResolvedValue({
+        data: { name: "s", url: "", headers: {}, metadata: {} },
+      });
+
+      await expect(save(usePrebuiltDestinations())).rejects.toBe(forbidden);
+
+      expect(vi.mocked(toast)).not.toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error" }),
+      );
+    });
+
+    it.each([
+      [
+        "createDestination",
+        (inst: any) => inst.createDestination("slack", "s", makeSlackCredentials()),
+      ],
+      [
+        "updateDestination",
+        (inst: any) => inst.updateDestination("slack", "s", "s", makeSlackCredentials()),
+      ],
+    ])("%s still toasts and rethrows a non-object rejection", async (_name, save) => {
+      mockDestCreate.mockRejectedValue(undefined);
+      mockDestUpdate.mockRejectedValue(undefined);
+
+      await expect(save(usePrebuiltDestinations())).rejects.toBeUndefined();
+
+      expect(vi.mocked(toast)).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
   });
 

@@ -257,7 +257,7 @@ export async function hasRefreshIndicator(page, level = 'global') {
       const refreshBtn = page.locator('[data-test="dashboard-refresh-btn"]');
       // OButton exposes variant via data-o2-variant attribute
       const variant = await refreshBtn.getAttribute('data-o2-variant');
-      return variant === 'warning';
+      return variant === 'pending';
     } else {
       const panelRefreshBtn = page.locator('[data-test="dashboard-panel-refresh-panel-btn"]');
       const variant = await panelRefreshBtn.getAttribute('data-o2-variant');

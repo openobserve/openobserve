@@ -33,7 +33,7 @@ use {
     o2_enterprise::enterprise::search::{WorkGroup, admission::ledger::NODE_LEDGER},
     proto::cluster_rpc::{
         ReleaseQueryRequest, ReleaseQueryResponse, StartQueryRequest, StartQueryResponse,
-        TryAcquireRequest, TryAcquireResponse, UsageResult,
+        TryAcquireRequest, TryAcquireResponse,
     },
     std::str::FromStr,
 };
@@ -162,7 +162,7 @@ impl Search for Searcher {
         req: Request<GetTableRequest>,
     ) -> Result<Response<GetTableResponse>, Status> {
         let path = req.into_inner().path;
-        if !::search::datafusion::distributed_plan::codec::is_join_result_path(&path) {
+        if !::search::datafusion::distributed::codec::is_join_result_path(&path) {
             return Err(Status::invalid_argument("invalid table path"));
         }
         let res = infra::storage::get_bytes("", &path)
@@ -336,35 +336,11 @@ impl Search for Searcher {
             days_since_last_report: 0,
             last_usage_response: "".into(),
             ingestion_history: Vec::new(),
+            license_status_json: String::new(),
         };
 
         #[cfg(feature = "enterprise")]
-        let res = {
-            let ingestion_history =
-                o2_enterprise::enterprise::license::get_ingestion_history().await;
-            let ingestion_history = ingestion_history
-                .into_iter()
-                .map(|v| UsageResult {
-                    ts: v.ts,
-                    value: v.value,
-                })
-                .collect();
-            GetLicenseUsageResponse {
-                search_allowed: o2_enterprise::enterprise::license::search_allowed(),
-                ingestion_used: o2_enterprise::enterprise::license::ingestion_used(),
-                ingestion_limit_exceeded_count:
-                    o2_enterprise::enterprise::license::ingestion_limit_exceeded_count() as u32,
-                last_reporting_successful:
-                    o2_enterprise::enterprise::license::last_reporting_successful().await,
-                last_reporting_timestamp:
-                    o2_enterprise::enterprise::license::last_reported_timestamp().await,
-                days_since_last_report: o2_enterprise::enterprise::license::days_since_last_report()
-                    .await as u32,
-                last_usage_response: o2_enterprise::enterprise::license::get_usage_resp_string()
-                    .await,
-                ingestion_history,
-            }
-        };
+        let res = o2_enterprise::enterprise::license::license_usage_snapshot().await;
         Ok(Response::new(res))
     }
     // --- Slot-based admission RPCs ---
@@ -512,6 +488,34 @@ impl Search for Searcher {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_license_usage_info_sends_no_status_json_in_oss() {
+        let res = Searcher::new()
+            .get_license_usage_info(Request::new(GetLicenseUsageRequest {}))
+            .await
+            .unwrap()
+            .into_inner();
+        assert!(res.search_allowed);
+        assert!(res.license_status_json.is_empty());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_license_usage_info_carries_the_license_status() {
+        let res = Searcher::new()
+            .get_license_usage_info(Request::new(GetLicenseUsageRequest {}))
+            .await
+            .unwrap()
+            .into_inner();
+        let status: o2_enterprise::enterprise::license::LicenseStatus =
+            config::utils::json::from_str(&res.license_status_json).unwrap();
+        assert_eq!(
+            status.decision.search_allowed,
+            o2_enterprise::enterprise::license::search_allowed()
+        );
+    }
 
     #[cfg(feature = "enterprise")]
     async fn cancel_in(searcher: &Searcher, trace_id: &str, org_id: &str) -> bool {

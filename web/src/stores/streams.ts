@@ -7,6 +7,7 @@ export default {
     enrichment_tables: null,
     index: null,
     metadata: null,
+    profiles: null,
     streamsIndexMapping: {},
     areAllStreamsFetched: false,
     evalTemplatesByOrg: {} as Record<string, any[]>,
@@ -20,6 +21,7 @@ export default {
         enrichment_tables: state.enrichment_tables,
         index: state.index,
         metadata: state.metadata,
+        profiles: state.profiles,
       };
     },
     getStream(state: any, streamType: string) {
@@ -50,6 +52,9 @@ export default {
     },
     updateMetadata(state: any, metadata: any) {
       state.metadata = metadata;
+    },
+    updateProfiles(state: any, profiles: any) {
+      state.profiles = profiles;
     },
     updateStreams(state: any, streams: any) {
       state.streams = streams;
@@ -96,6 +101,8 @@ export default {
         context.commit("updateIndex", payload.streams);
       } else if (payload.streamType === "metadata") {
         context.commit("updateMetadata", payload.streams);
+      } else if (payload.streamType === "profiles") {
+        context.commit("updateProfiles", payload.streams);
       }
     },
     setStreamIndexMapping(context: any, streamIndexMapping: any) {

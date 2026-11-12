@@ -29,12 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
+import { useRoute } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
 import { getIngestionURL, maskText } from "@/utils/zincutils";
 import SetupCardRenderer from "@/components/ingestion/setupCard/SetupCardRenderer.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { CardSubstitutions, RichCardContent } from "@/components/ingestion/setupCard/types";
@@ -53,6 +55,7 @@ const store = useStore();
 const { t } = useI18nTyped();
 
 const rumToken = computed<string>(() => store.state.organizationData?.rumToken?.rum_token ?? "");
+const rumTokenForbidden = computed(() => !!store.state.organizationData?.rumTokenForbidden);
 
 // Full origin (preconnect/CSP hints) and the protocol-less `site` SDK option.
 const endpoint = computed(() => (getIngestionURL() as string).replace(/\/$/, ""));
@@ -138,8 +141,10 @@ const PLATFORMS: {
   },
 ];
 
+// A link may name the platform: onboarding's React Native, Android and iOS rows do.
+const linked = String(useRoute()?.query.platform ?? "");
 /** Which platform's setup guide is shown. */
-const platform = ref<string>(PLATFORMS[0].id);
+const platform = ref<string>(PLATFORMS.some((p) => p.id === linked) ? linked : PLATFORMS[0].id);
 
 const content = computed<RichCardContent>(() =>
   (PLATFORMS.find((p) => p.id === platform.value) ?? PLATFORMS[0]).build(),
@@ -187,6 +192,12 @@ const subs = computed<CardSubstitutions>(() => ({
         </OToggleGroup>
       </template>
     </SetupCardRenderer>
+    <OBanner
+      v-else-if="rumTokenForbidden"
+      variant="warning"
+      data-test="rum-web-token-forbidden"
+      :content="t('ingestion.rumTokenForbiddenMessage')"
+    />
     <p v-else class="mt-1" data-test="rum-web-no-token-message">
       {{ t("ingestion.generateRUMTokenMessage") }}
     </p>

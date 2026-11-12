@@ -36,11 +36,14 @@ export class ServiceGraphPage {
     // Close button: ODrawer renders it as [data-test="o-drawer-close-btn"] inside the panel.
     // Title: Reka UI DialogTitle renders as an <h2> (sr-only) — accessible via locator('h2').
     this.sidePanel = '[data-test="service-graph-side-panel"]';
+    this.sidePanelHealthBadge = '[data-test="service-graph-side-panel"] [data-test="service-health-badge"]';
     this.sidePanelHeader = '[data-test="service-graph-side-panel"]';
     this.sidePanelViewRelatedBtn = '[data-test="service-graph-node-panel-view-related-btn"]';
     this.sidePanelViewRelatedLogsBtn = '[data-test="service-graph-node-panel-view-related-logs-btn"]';
     this.sidePanelViewRelatedTracesBtn = '[data-test="service-graph-node-panel-view-related-traces-btn"]';
     this.sidePanelCloseBtn = '[data-test="service-graph-side-panel"] [data-test="o-drawer-close-btn"]';
+    // reka-ui renders this scrim only for a modal drawer, so a non-modal panel has none.
+    this.overlay = '[data-test="o-drawer-overlay"]';
 
     // RED charts section (Rate/Errors/Duration dashboards)
     this.sidePanelRedCharts = '[data-test="service-graph-side-panel-red-charts"]';
@@ -363,6 +366,12 @@ export class ServiceGraphPage {
     await expect(this.page.locator(this.sidePanel)).not.toBeVisible({ timeout: 5000 });
   }
 
+  /** Modal mode renders a scrim and sets `pointer-events: none` on <body>; a non-modal drawer does neither. */
+  async expectSidePanelNonModal() {
+    await expect(this.page.locator(this.overlay)).toHaveCount(0);
+    await expect(this.page.locator('body')).not.toHaveCSS('pointer-events', 'none');
+  }
+
   async expectRedChartsSectionVisible() {
     await expect(this.page.locator(this.sidePanelRedCharts)).toBeVisible({ timeout: 10000 });
   }
@@ -381,17 +390,94 @@ export class ServiceGraphPage {
     return await this.page.locator(this.sidePanel).locator('h2').first().textContent();
   }
 
+  async expectSidePanelServiceName(name) {
+    await expect
+      .poll(async () => ((await this.getSidePanelServiceName()) || '').trim(), { timeout: 10000 })
+      .toBe(name);
+  }
+
+  /** Tags the open panel node, so a close-and-reopen (which mounts a fresh node) can be told apart from an in-place update. */
+  async markSidePanelNode() {
+    await this.page.locator(this.sidePanel).evaluate((el) => {
+      el.dataset.e2eOriginalNode = 'true';
+    });
+  }
+
+  async expectSidePanelNodeUnchanged() {
+    await expect(this.page.locator(`${this.sidePanel}[data-e2e-original-node="true"]`)).toBeVisible();
+  }
+
   async getHealthStatus() {
     // The health badge is an OTag with data-test="service-health-badge" whose visible
-    // text is the status label (Healthy / Degraded / Critical). The old `.health-badge`
+    // text is the status label (Healthy / Degraded / Warning / Critical). The old `.health-badge`
     // class + status modifier classes were dropped when it moved to the OTag component.
-    const badge = this.page.locator(`${this.sidePanel} [data-test="service-health-badge"]`);
+    const badge = this.page.locator(this.sidePanelHealthBadge);
     if (await badge.count() === 0) return 'unknown';
     const label = ((await badge.first().textContent()) || '').trim().toLowerCase();
     if (label.includes('critical')) return 'critical';
+    if (label.includes('warning')) return 'warning';
     if (label.includes('degraded')) return 'degraded';
     if (label.includes('healthy')) return 'healthy';
     return 'unknown';
+  }
+
+  async expectSidePanelHealthBadge(label) {
+    await expect(this.page.locator(this.sidePanelHealthBadge)).toHaveText(label, { timeout: 15000 });
+  }
+
+  /** Open the in-page Service Graph tab for one stream; the `stream` param decides which topology loads. */
+  async navigateToServiceGraphTab(streamName, period = '1h') {
+    const org = process.env['ORGNAME'] || 'default';
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    await this.page.goto(
+      `${baseUrl}/web/traces?org_identifier=${org}&stream=${encodeURIComponent(streamName)}&period=${period}&tab=service-graph`,
+    );
+    await expect(this.page.locator(this.chartContainer)).toBeVisible({ timeout: 30000 });
+  }
+
+  /** Page coordinates of a Graph View node, from the chart's own layout; null until the node is laid out. */
+  async getGraphViewNodePoint(nodeName) {
+    return await this.page.evaluate((name) => {
+      function findServiceGraph(vnode, depth) {
+        if (!vnode || depth > 60) return null;
+        const inst = vnode.component;
+        if (inst) {
+          if (inst.setupState && typeof inst.setupState.handleNodeClick === 'function') return inst;
+          const found = findServiceGraph(inst.subTree, depth + 1);
+          if (found) return found;
+        }
+        for (const child of [...(Array.isArray(vnode.children) ? vnode.children : []), ...(vnode.dynamicChildren || [])]) {
+          if (child && typeof child === 'object') {
+            const found = findServiceGraph(child, depth + 1);
+            if (found) return found;
+          }
+        }
+        return null;
+      }
+      const appVnode = document.querySelector('#app')?._vnode;
+      const chart = findServiceGraph(appVnode, 0)?.setupState?.chartRendererRef?.chart;
+      const data = chart?.getModel?.()?.getSeriesByIndex(0)?.getData();
+      if (!data) return null;
+      for (let i = 0; i < data.count(); i++) {
+        if (data.getName(i) !== name) continue;
+        const layout = data.getItemLayout(i);
+        if (!layout) return null;
+        const [x, y] = chart.convertToPixel({ seriesIndex: 0 }, [layout[0], layout[1]]);
+        const rect = chart.getDom().getBoundingClientRect();
+        return { x: rect.left + x, y: rect.top + y };
+      }
+      return null;
+    }, nodeName);
+  }
+
+  /** A real mouse click on the node's canvas pixel, so ECharts emits the Graph View node event (not the tree branch). */
+  async clickGraphViewNode(nodeName) {
+    await expect
+      .poll(() => this.getGraphViewNodePoint(nodeName), { timeout: 30000, message: `${nodeName} must be laid out` })
+      .not.toBeNull();
+    const point = await this.getGraphViewNodePoint(nodeName);
+    await this.page.mouse.click(point.x, point.y);
+    await this.expectSidePanelServiceName(nodeName);
   }
 
   // ===== TABS (Operations / Nodes / Pods) =====
@@ -474,6 +560,20 @@ export class ServiceGraphPage {
       .isVisible({ timeout: 3000 }).catch(() => false);
   }
 
+  /** Terminal state of the Metrics tab: 'correlation', 'error', 'empty', or 'unknown' when none rendered. */
+  async getMetricsTerminalState() {
+    if (await this.page.locator(this.metricsCorrelationHeader).first().isVisible().catch(() => false)) {
+      return 'correlation';
+    }
+    if (await this.page.locator(this.metricsError).first().isVisible().catch(() => false)) {
+      return 'error';
+    }
+    if (await this.page.locator(this.metricsEmpty).first().isVisible().catch(() => false)) {
+      return 'empty';
+    }
+    return 'unknown';
+  }
+
   async getSearchInputValue() {
     return await this.page.locator(this.searchInput).inputValue();
   }
@@ -487,6 +587,12 @@ export class ServiceGraphPage {
     await this.page.waitForTimeout(300);
     const selector = type === 'logs' ? this.sidePanelViewRelatedLogsBtn : this.sidePanelViewRelatedTracesBtn;
     await this.page.locator(selector).click();
+  }
+
+  /** The traces page keeps its filter base64-encoded in ?query=, with '.' standing in for '=' padding. */
+  async getTracesUrlQuery() {
+    const encoded = new URL(this.page.url()).searchParams.get('query') || '';
+    return Buffer.from(encoded.replace(/\./g, '='), 'base64').toString('utf8');
   }
 
   async expectCorrelationDialogVisible() {

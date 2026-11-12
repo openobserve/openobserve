@@ -15,14 +15,10 @@
 
 //! Ownership rules, and the queue of signals that fell through them — one question, twice.
 
-use std::{
-    collections::HashMap,
-    sync::LazyLock,
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, time::Duration};
 
 use config::{
-    RwHashMap, ider,
+    ider,
     meta::oncall::{OwnershipRule, SubjectType, UnroutedSignal, canonical_path},
     utils::time::now_micros,
 };
@@ -31,7 +27,10 @@ use sea_orm::{
     QuerySelect, Set,
 };
 
-use super::entity::{oncall_ownership_rules, oncall_unrouted_signals};
+use super::{
+    entity::{oncall_ownership_rules, oncall_unrouted_signals},
+    ttl_cache::TtlCache,
+};
 use crate::{db::get_orm_client_rw, errors};
 
 /// An org's ownership rules, for the paging path (`06` §3).
@@ -50,8 +49,7 @@ use crate::{db::get_orm_client_rw, errors};
 ///
 /// Keyed by org, not by rule: the value is the whole set, which is what
 /// resolution needs. Backs [`list_cached`] only; the screens read [`list`].
-static RULES_CACHE: LazyLock<RwHashMap<String, (Vec<OwnershipRule>, Instant)>> =
-    LazyLock::new(Default::default);
+static RULES_CACHE: TtlCache<Vec<OwnershipRule>> = TtlCache::new(RULES_CACHE_TTL);
 
 const RULES_CACHE_TTL: Duration = Duration::from_secs(60);
 
@@ -187,13 +185,11 @@ pub async fn list(org_id: &str) -> Result<Vec<OwnershipRule>, errors::Error> {
 /// anything here" is a stable answer and the common one for a young org, and it
 /// is exactly the read that would otherwise run on every firing.
 pub async fn list_cached(org_id: &str) -> Result<Vec<OwnershipRule>, errors::Error> {
-    if let Some(entry) = RULES_CACHE.get(org_id)
-        && entry.1.elapsed() < RULES_CACHE_TTL
-    {
-        return Ok(entry.0.clone());
+    if let Some(cached) = RULES_CACHE.get(org_id) {
+        return Ok(cached);
     }
     let rules = list(org_id).await?;
-    RULES_CACHE.insert(org_id.to_string(), (rules.clone(), Instant::now()));
+    RULES_CACHE.insert(org_id.to_string(), rules.clone());
     Ok(rules)
 }
 

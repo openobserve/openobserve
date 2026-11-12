@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t("traces.threadView.duration") }}</span
         >
         <span class="thread-chip__value text-text-body text-xs font-semibold">
-          {{ formatDuration(summary.totalDurationNs) }}
+          {{ formatTimeWithSuffix(summary.totalDurationNs / 1000) }}
         </span>
       </OTag>
 
@@ -254,6 +254,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-html="renderMarkdown(msg.content)"
               />
 
+              <BehindThisStep
+                v-if="explain(turn.span.span_id)"
+                :step="explain(turn.span.span_id)!"
+              />
+
               <!-- Footer. -->
               <div
                 class="thread-turn__footer border-border-default text-text-secondary mt-2 flex flex-wrap items-center gap-[0.35rem] border-t border-dashed pt-2 text-xs"
@@ -280,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('traces.threadView.duration')"
                 >
                   <OIcon name="timer" size="xs" />
-                  {{ formatDuration(turn.span.duration) }}
+                  {{ formatTimeWithSuffix(Number(turn.span.duration)) }}
                 </span>
                 <span
                   class="thread-metric rounded-default bg-surface-subtle border-border-default text-text-secondary text-2xs inline-flex shrink-0 items-center gap-1 border px-2 py-[0.18rem] leading-none whitespace-nowrap"
@@ -320,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, inject, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -354,7 +359,6 @@ import {
   getModel,
   getCost,
   getTokens,
-  classify,
   buildTraceGroup,
   spanTimeBounds,
   type Message,
@@ -364,9 +368,16 @@ import {
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ThreadToolCalls from "./ThreadToolCalls.vue";
+import BehindThisStep from "./BehindThisStep.vue";
+import { REQUEST_TIMELINE_KEY, stepToExplain } from "./timeAttribution";
 import { renderMarkdown } from "./markdown";
+import { formatTimeWithSuffix } from "@/utils/zincutils";
 
 const { t } = useI18nTyped();
+
+// Provided by TraceDetails only: a turn that failed or ran slow shows what was behind it.
+const timeline = inject(REQUEST_TIMELINE_KEY, null);
+const explain = (spanId: string) => stepToExplain(timeline, spanId);
 
 interface ThreadHead {
   systemPrompt: string;
@@ -425,7 +436,8 @@ const displayGroups = computed<TraceGroup[]>(() => {
     const mergedSpan = {
       ...last,
       start_time: first.start_time,
-      duration: g.totalDurationNs,
+      // `duration` is in microseconds, like every span's (the waterfall unit).
+      duration: g.totalDurationNs / 1000,
       gen_ai_usage_cost: g.totalCost,
       gen_ai_usage_total_tokens: totalTokens,
       span_status: anyError ? "ERROR" : last.span_status,
@@ -456,7 +468,11 @@ const showSystemFull = ref(false);
 const summary = computed(() => {
   const all = props.spans || [];
   const allTurnSpans = traceGroups.value.flatMap((g) => g.turns.map((t) => t.span));
-  const toolCount = all.filter((s) => classify(s) === "tool_call").length;
+  // The cards shown: attached tool spans plus calls the SDK recorded without a span.
+  const toolCount = traceGroups.value.reduce(
+    (n, g) => n + g.turns.reduce((m, t) => m + t.toolCalls.length, 0),
+    0,
+  );
 
   let totalCost = 0;
   for (const t of allTurnSpans) totalCost += getCost(t);
@@ -489,15 +505,6 @@ const summary = computed(() => {
 });
 
 /* ─── formatters ──────────────────────────────────────────────────────── */
-function formatDuration(ns: number): string {
-  if (!ns || !isFinite(ns)) return "0ms";
-  const ms = ns / 1_000_000;
-  if (ms < 1) return ms.toFixed(2) + "ms";
-  if (ms < 1000) return Math.round(ms) + "ms";
-  if (ms < 60_000) return (ms / 1000).toFixed(2) + "s";
-  return (ms / 60_000).toFixed(2) + "m";
-}
-
 function formatCost(usd: number): string {
   if (!usd || usd <= 0) return "$0";
   if (usd >= 1) return `$${usd.toFixed(2)}`;

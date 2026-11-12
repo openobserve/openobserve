@@ -18,6 +18,7 @@ import {
   closeDrawerForQuery,
   drawerCloseExemptions,
   failPendingPageNavigation,
+  keepsDetailOnRefresh,
   nextJobRequestId,
   notePageCancelled,
   notePageLoad,
@@ -25,8 +26,10 @@ import {
   notePageRetry,
   notifyHitsComplete,
   onHitsComplete,
+  REFRESH_QUERY_ORIGIN,
   resetRowSelection,
   setPageNavFailureHandler,
+  withQueryOrigin,
   type RowNavSearchObj,
 } from "@/composables/useLogs/logsRowNav";
 
@@ -58,6 +61,32 @@ describe("logsRowNav drawer-close rule and crossing signals (4a §3.2.2, §3.2.7
     expect(obj.meta.showDetailTab).toBe(true);
     closeDrawerForQuery(obj, false);
     expect(obj.meta.showDetailTab).toBe(false);
+  });
+
+  it("an auto-refresh query keeps the open drawer; any other full query closes it", () => {
+    const obj = makeSearchObj();
+    closeDrawerForQuery(obj, false, REFRESH_QUERY_ORIGIN);
+    expect(obj.meta.showDetailTab).toBe(true);
+    withQueryOrigin(REFRESH_QUERY_ORIGIN, () => closeDrawerForQuery(obj, false));
+    expect(obj.meta.showDetailTab).toBe(true);
+    closeDrawerForQuery(obj, false);
+    expect(obj.meta.showDetailTab).toBe(false);
+  });
+
+  it("the refresh exemption never covers a page query", () => {
+    const obj = makeSearchObj();
+    closeDrawerForQuery(obj, true, REFRESH_QUERY_ORIGIN);
+    expect(obj.meta.showDetailTab).toBe(false);
+  });
+
+  it("keepsDetailOnRefresh holds only for a refresh origin with the drawer open", () => {
+    const obj = makeSearchObj();
+    expect(keepsDetailOnRefresh(obj, REFRESH_QUERY_ORIGIN)).toBe(true);
+    expect(keepsDetailOnRefresh(obj, undefined)).toBe(false);
+    expect(keepsDetailOnRefresh(obj, "permalink-init:1")).toBe(false);
+    expect(withQueryOrigin(REFRESH_QUERY_ORIGIN, () => keepsDetailOnRefresh(obj))).toBe(true);
+    obj.meta.showDetailTab = false;
+    expect(keepsDetailOnRefresh(obj, REFRESH_QUERY_ORIGIN)).toBe(false);
   });
 
   it("another origin can exempt itself without touching the 4a entry", () => {

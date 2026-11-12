@@ -44,7 +44,7 @@ pub enum EvalJobError {
     #[error("Job not found")]
     NotFound,
 
-    #[error("Invalid status '{0}'. Must be one of: draft, active, paused, degraded, archived")]
+    #[error("Invalid status '{0}'. Must be one of: draft, active, paused, archived")]
     InvalidStatus(String),
 
     #[error("Invalid status transition from '{from}' to '{to}'")]
@@ -167,6 +167,18 @@ async fn validate_online_scorers(
     org_id: &str,
     scorer_refs: &[config::meta::pipeline::components::ScorerRef],
 ) -> Result<(), EvalJobError> {
+    for scorer in scorer_definitions(org_id, scorer_refs).await? {
+        ensure_scorer_is_online_compatible(&scorer)?;
+    }
+    Ok(())
+}
+
+/// The scorer versions a job's references resolve to, in reference order.
+pub async fn scorer_definitions(
+    org_id: &str,
+    scorer_refs: &[config::meta::pipeline::components::ScorerRef],
+) -> Result<Vec<table::scorers::Scorer>, EvalJobError> {
+    let mut definitions = Vec::with_capacity(scorer_refs.len());
     for scorer_ref in scorer_refs {
         let scorer = match scorer_ref.version {
             Some(version) => {
@@ -178,9 +190,9 @@ async fn validate_online_scorers(
         .ok_or_else(|| {
             EvalJobError::InvalidJob(format!("Scorer '{}' was not found", scorer_ref.id))
         })?;
-        ensure_scorer_is_online_compatible(&scorer)?;
+        definitions.push(scorer);
     }
-    Ok(())
+    Ok(definitions)
 }
 
 #[tracing::instrument(skip(job))]
@@ -213,6 +225,8 @@ pub async fn prepare_new_job(
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
     job.validate()
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    job.validate_operator_values()
+        .map_err(EvalJobError::InvalidJob)?;
     validate_online_scorers(org_id, &job.scorers).await?;
     validate_source_stream(org_id, &job).await?;
     Ok(job)
@@ -239,40 +253,63 @@ pub async fn update_job(
     org_id: &str,
     job_id: &str,
     job: table::online_eval_jobs::OnlineEvalJob,
+    budget: table::online_eval_jobs::BudgetPatch,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
-    let job = prepare_job_update(org_id, job_id, job).await?;
+    let job = prepare_job_update(org_id, job_id, job, budget).await?;
     store_job_update(job).await
 }
 
-/// Runs every check [`update_job`] makes, so a caller can refuse the edit before it is stored.
+/// Runs every check [`update_job`] makes; `budget` is the request's, `job.budget` is ignored.
 #[tracing::instrument(skip(job))]
 pub async fn prepare_job_update(
     org_id: &str,
     job_id: &str,
     mut job: table::online_eval_jobs::OnlineEvalJob,
+    budget: table::online_eval_jobs::BudgetPatch,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
     let existing = table::online_eval_jobs::get_by_org(job_id, org_id)
         .await?
         .ok_or(EvalJobError::NotFound)?;
 
     job.input_mapping = merge_input_mapping(existing.input_mapping.clone(), job.input_mapping);
+    job.budget = budget.apply(existing.budget.as_ref());
+    // Only a budget pause records `paused_at`, so removing the budget resumes just that pause.
+    let resumes = existing.status == "paused"
+        && match &job.budget {
+            Some(budget) => budget.allows_resume(),
+            None => existing
+                .budget
+                .as_ref()
+                .is_some_and(|b| b.paused_at.is_some()),
+        };
+    let status = if resumes {
+        let now_us = config::utils::time::now_micros();
+        job.budget = job
+            .budget
+            .map(|budget| budget.after_transition("active", None, now_us));
+        "active"
+    } else {
+        existing.status.as_str()
+    };
 
     job.apply_target_scope_defaults();
     job.normalize_sampling()
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
     job.validate()
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    job.validate_operator_values()
+        .map_err(EvalJobError::InvalidJob)?;
     validate_online_scorers(org_id, &job.scorers).await?;
     validate_source_stream(org_id, &job).await?;
-    if existing.status == "active" {
+    if status == "active" {
         job.validate_for_activation()
             .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
     }
 
     // Preserve identity & lifecycle fields from the existing row.
+    job.status = status.to_string();
     job.id = existing.id;
     job.org_id = existing.org_id;
-    job.status = existing.status.clone();
     job.pipeline_id = existing.pipeline_id.clone();
     job.created_at = existing.created_at;
     job.version = existing.version + 1;
@@ -285,10 +322,10 @@ pub async fn prepare_job_update(
 pub async fn store_job_update(
     mut job: table::online_eval_jobs::OnlineEvalJob,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
-    // If the job is currently bound to a pipeline (active/paused/degraded),
+    // If the job is currently bound to a pipeline (active/paused),
     // re-reconcile so span pipelines pick up changes, or are torn down when
     // switching to trace/session scope.
-    if matches!(job.status.as_str(), "active" | "paused" | "degraded") {
+    if matches!(job.status.as_str(), "active" | "paused") {
         job.pipeline_id = reconciler::reconcile(&job)
             .await
             .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
@@ -344,6 +381,10 @@ pub async fn delete_job(org_id: &str, job_id: &str) -> Result<(), EvalJobError> 
         .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
 
     table::online_eval_jobs::delete(job_id).await?;
+    // A leftover health row is never listed, so its cleanup must not fail the delete.
+    if let Err(e) = table::eval_job_states::delete_by_job(job_id).await {
+        log::warn!("[EvalJobHealth] failed to delete health state for job {job_id}: {e}");
+    }
     remove_ownership(org_id, "eval_jobs", Authz::new(job_id)).await;
     publish_eval_job_delete(org_id, job_id).await;
     Ok(())
@@ -358,19 +399,67 @@ pub async fn transition_status(
     new_status: &str,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
     let job = get_job(org_id, job_id).await?;
+    transition(org_id, job, new_status, None).await
+}
+
+/// Returns `None` unchanged when a user paused or kept paused after the pass read its job list.
+#[tracing::instrument()]
+pub async fn transition_for_budget(
+    org_id: &str,
+    job_id: &str,
+    pause_at_spend: Option<f64>,
+) -> Result<Option<table::online_eval_jobs::OnlineEvalJob>, EvalJobError> {
+    let job = get_job(org_id, job_id).await?;
+    let (new_status, still_applies) = match pause_at_spend {
+        Some(_) => ("paused", job.status == "active"),
+        None => (
+            "active",
+            job.status == "paused"
+                && job
+                    .budget
+                    .as_ref()
+                    .is_some_and(|budget| budget.paused_at.is_some()),
+        ),
+    };
+    if !still_applies {
+        return Ok(None);
+    }
+    transition(org_id, job, new_status, pause_at_spend)
+        .await
+        .map(Some)
+}
+
+async fn transition(
+    org_id: &str,
+    job: table::online_eval_jobs::OnlineEvalJob,
+    new_status: &str,
+    budget_spend: Option<f64>,
+) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
+    let job_id = job.id.clone();
     let target = check_transition(org_id, &job, new_status).await?;
     let pipeline_id = reconciler::reconcile(&target)
         .await
         .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
+    let budget = job.budget.clone().map(|budget| {
+        budget.after_transition(new_status, budget_spend, config::utils::time::now_micros())
+    });
 
     // Persist the new status (and any pipeline_id allocated by reconcile).
     let now = Utc::now().timestamp_millis();
-    table::online_eval_jobs::update_status(job_id, new_status, pipeline_id.as_deref(), now).await?;
+    table::online_eval_jobs::update_status(
+        &job_id,
+        new_status,
+        pipeline_id.as_deref(),
+        budget.as_ref(),
+        now,
+    )
+    .await?;
 
     let mut updated = job;
     updated.status = new_status.to_string();
     updated.updated_at = now;
     updated.pipeline_id = pipeline_id;
+    updated.budget = budget;
     publish_eval_job_put(&updated).await;
     Ok(updated)
 }

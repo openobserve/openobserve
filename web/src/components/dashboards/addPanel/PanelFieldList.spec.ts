@@ -297,6 +297,23 @@ describe("FieldList", () => {
       expect(fields.stream).toBe("");
       expect(fields.stream_type).toBe("metrics");
     });
+
+    const streamTypeValues = (w: VueWrapper) =>
+      (
+        w.findComponent('[data-test="index-dropdown-stream_type"]').props("options") as {
+          value: string;
+        }[]
+      ).map((o) => o.value);
+
+    it("offers enrichment tables on the dashboard page", () => {
+      wrapper = mountComponent({ pageKey: "dashboard" });
+      expect(streamTypeValues(wrapper)).toEqual(["logs", "metrics", "traces", "enrichment_tables"]);
+    });
+
+    it.each(["logs", "build"])("does not offer enrichment tables on the %s page", (pageKey) => {
+      wrapper = mountComponent({ pageKey });
+      expect(streamTypeValues(wrapper)).toEqual(["logs", "metrics", "traces"]);
+    });
   });
 
   // ── Stream List Loading ─────────────────────────────────────────────
@@ -323,6 +340,18 @@ describe("FieldList", () => {
 
       expect(mockGetStreams).toHaveBeenCalledWith("metrics", false);
       expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe("metrics");
+    });
+
+    it("loads enrichment tables when that stream type is picked", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      mockGetStreams.mockClear();
+
+      currentFields().stream_type = "enrichment_tables";
+      await flushPromises();
+
+      expect(mockGetStreams).toHaveBeenCalledWith("enrichment_tables", false);
+      expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe("enrichment_tables");
     });
 
     it("does not refetch the stream list when only the selected stream changes", async () => {
@@ -363,6 +392,43 @@ describe("FieldList", () => {
       expect(
         mockReturn.dashboardPanelData.meta.stream.streamResults.map((s: any) => s.name),
       ).toEqual(["system_metrics"]);
+    });
+  });
+
+  describe("Field list loading", () => {
+    const NO_FIELDS = "No fields found for the selected stream";
+    const fieldList = () => wrapper.findComponent({ name: "OFieldList" });
+
+    it("shows the loading rows, not the empty message, while the stream's fields load", async () => {
+      mockReturn.updateGroupedFields = vi.fn(() => new Promise<void>(() => {}));
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(fieldList().props("loading")).toBe(true);
+      expect(wrapper.text()).not.toContain(NO_FIELDS);
+    });
+
+    it("shows the loading rows while the stream list loads", async () => {
+      mockGetStreams.mockReturnValue(new Promise(() => {}));
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(fieldList().props("loading")).toBe(true);
+      expect(wrapper.text()).not.toContain(NO_FIELDS);
+    });
+
+    it("shows the empty message once both loads settle with no fields", async () => {
+      mockReturn.updateGroupedFields = vi.fn(() => Promise.resolve());
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(fieldList().props("loading")).toBe(false);
+      expect(wrapper.text()).toContain(NO_FIELDS);
+    });
+
+    it("settles to the empty message when the fields load fails", async () => {
+      mockReturn.updateGroupedFields = vi.fn(() => Promise.reject(new Error("schema")));
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(fieldList().props("loading")).toBe(false);
+      expect(wrapper.text()).toContain(NO_FIELDS);
     });
   });
 

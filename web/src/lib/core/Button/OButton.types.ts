@@ -40,6 +40,8 @@ export type ButtonVariant =
   | "on-dark-ghost"
   // Solid warning (yellow) background — use to draw attention to a required action
   | "warning"
+  // Solid amber for a Run/Apply button whose result is behind unapplied edits; never the theme accent (light amber-400, dark amber-500)
+  | "pending"
   // Destination preview buttons — brand-colored CTAs inside alert destination preview cards
   | "preview-slack"
   | "preview-teams"
@@ -57,7 +59,18 @@ export type ButtonVariant =
   | "outline-primary"
   // Dashed outline "add tile" — transparent bg, dashed muted border + muted icon.
   // For the small "+" add-affordance buttons in the query builder (add join / filter / condition).
-  | "dashed";
+  | "dashed"
+  // Soft categorical badge fill (bg + text) for colour-coded identity tiles, e.g. a cluster code in a hot bar
+  | "tint-teal"
+  | "tint-purple"
+  | "tint-blue"
+  | "tint-orange"
+  // Table-cell content that is itself the action: no chrome, full cell width, stacked lines.
+  | "cell"
+  // Borderless list row whose whole content is the action.
+  | "row"
+  // Outlined prompt whose message is the action, e.g. a locked section.
+  | "locked-body";
 
 /** Size controls height, padding, font-size, and border-radius */
 export type ButtonSize =
@@ -66,6 +79,7 @@ export type ButtonSize =
   | "sm"
   | "sm-action"
   | "md"
+  | "cta"
   | "lg"
   | "icon"
   | "icon-xs"
@@ -102,6 +116,8 @@ export interface ButtonProps extends PrimitiveProps {
   descriptionId?: string;
   /** Shows loading state and disables interaction */
   loading?: boolean;
+  /** `false` keeps the busy state but never spins, for a control whose region already shows one spinner. */
+  spinner?: boolean;
   /** Applies active/selected state styling (overrides variant to primary appearance) */
   active?: boolean;
   /** Native button type attribute — only meaningful when as="button" */

@@ -78,6 +78,17 @@ pub fn snoozed_ladder_anchor(
     existing_anchor.unwrap_or(opened_at) + (until - quiet_reaches).max(0)
 }
 
+/// Where the ladder's clock sits when a snooze ends early at `now`: as if it had been that short.
+pub fn unsnoozed_ladder_anchor(
+    existing_anchor: Option<i64>,
+    opened_at: i64,
+    snoozed_until: Option<i64>,
+    now: i64,
+) -> i64 {
+    let unused = snoozed_until.map_or(0, |until| (until - now).max(0));
+    existing_anchor.unwrap_or(opened_at) - unused
+}
+
 /// Lifecycle of a response record: `triggered → triaged → acknowledged →
 /// resolved`. `triaged` comes from the L0 agent and is skipped entirely when
 /// the agent is absent or disabled.
@@ -332,6 +343,19 @@ pub struct ResponseEvent {
     /// the answer to "did the page reach them" — not the absence of one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delivered: Option<bool>,
+    /// Per destination, the template a shared-path send rendered with; empty for other sends.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub templates: Vec<SentTemplate>,
+}
+
+/// One destination's template on a delivery, as the send log line names it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SentTemplate {
+    pub destination: String,
+    /// Empty when the send carried no rendered template (a platform resolve or a legacy body).
+    pub template_name: String,
+    /// `explicit`, `destination`, `org_default`, `compiled`, `platform_resolve` or `legacy`.
+    pub template_source: String,
 }
 
 impl ResponseEvent {
@@ -351,6 +375,7 @@ impl ResponseEvent {
             recipient: None,
             channel: None,
             delivered: None,
+            templates: Vec::new(),
         }
     }
 
@@ -374,6 +399,12 @@ impl ResponseEvent {
         self.recipient = Some(recipient.into());
         self.channel = Some(channel);
         self.delivered = Some(delivered);
+        self
+    }
+
+    /// Records the templates the shared path rendered this delivery with.
+    pub fn with_templates(mut self, templates: Vec<SentTemplate>) -> Self {
+        self.templates = templates;
         self
     }
 
@@ -485,6 +516,7 @@ impl std::fmt::Display for ResolutionCause {
 
 /// The record itself, as the API and the UI see it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[schema(as = OnCallResponse)]
 pub struct Response {
     pub id: String,
     pub org_id: String,
@@ -515,8 +547,7 @@ pub struct Response {
     /// it expires — which is what makes it safe to offer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snoozed_until: Option<i64>,
-    /// What the ladder measures its step delays from; `opened_at` until a
-    /// snooze pushes it forward.
+    /// Where step delays count from: `opened_at`, moved by a snooze or a triage-held first page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ladder_anchor: Option<i64>,
     /// Which run of the ladder the record is on.
@@ -642,6 +673,48 @@ impl Response {
     pub fn is_exhausted(&self) -> bool {
         self.exhausted_at.is_some() && !self.state.is_terminal()
     }
+
+    /// The timeline line a joining alert leaves, in the run it belongs to. [pure] [no-fail]
+    pub fn new_alert_note(&self, repaged: bool, actor: &str, now: i64) -> ResponseEvent {
+        let (body, run) = if repaged {
+            (
+                "A new alert joined after nobody answered; paging again.",
+                next_ladder_run(self.ladder_run),
+            )
+        } else {
+            ("A new alert joined this page.", self.current_run())
+        };
+        ResponseEvent::new(ResponseEventKind::Sys, now, actor, body).in_run(run)
+    }
+
+    /// What a new alert joining this page's incident does to it at `now`. [pure] [no-fail]
+    pub fn on_new_alert(&self, now: i64) -> NewAlertEffect {
+        if !self.is_exhausted() {
+            return NewAlertEffect::Nothing;
+        }
+        let quiet = self.state == ResponseState::Acknowledged
+            || self.is_snoozed(now)
+            || now - self.ladder_start() < NEW_ALERT_REPAGE_COOLDOWN_MICROS;
+        if quiet {
+            NewAlertEffect::NoteOnly
+        } else {
+            NewAlertEffect::PageAgain
+        }
+    }
+}
+
+/// How long a page's current run must have been going before a joining alert may page again.
+pub const NEW_ALERT_REPAGE_COOLDOWN_MICROS: i64 = 30 * 60 * 1_000_000;
+
+/// What a new alert joining an incident does to the incident's page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NewAlertEffect {
+    /// The ladder ran out unanswered a while ago: run it again.
+    PageAgain,
+    /// Exhausted but owned, quieted or freshly re-run: say so on the timeline only.
+    NoteOnly,
+    /// The ladder is still climbing or the page is closed.
+    Nothing,
 }
 
 // G16 dampens on the re-fire, not the close, and from `closed_at`: a bug delays, never sticks.
@@ -816,9 +889,12 @@ pub fn dependents_all_clear(impacted: &[Response], confirmed_id: &str) -> bool {
 /// Three stages and no more: the room needs "somebody was woken", "somebody has
 /// it" and "it is over, and why". Every rung in between is the ladder's
 /// business, and posting them turns a flapping alert into channel noise.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ChannelPostStage {
+    // Variant order is the page's order; `is_behind` compares by it, so never reorder.
     Paged,
     Acknowledged,
     Resolved,
@@ -844,6 +920,16 @@ impl ChannelPostStage {
             ResponseState::Resolved => Some(Self::Resolved),
             ResponseState::Triaged => None,
         }
+    }
+
+    /// The stage to render for a page in this state, `Triaged` showing as paged (RO-5). [pure]
+    pub fn current(state: ResponseState) -> Self {
+        Self::of(state).unwrap_or(Self::Paged)
+    }
+
+    /// Whether the page has moved past this stage, so a post of it would be stale (RO-5). [pure]
+    pub fn is_behind(self, state: ResponseState) -> bool {
+        self < Self::current(state)
     }
 }
 
@@ -1004,6 +1090,90 @@ mod tests {
         ResponseEventKind::SeverityPromoted,
         ResponseEventKind::Flapped,
     ];
+
+    /// The note sits in the run it belongs to: the new run when it re-paged, else the current.
+    #[test]
+    fn test_a_new_alert_note_is_tagged_with_its_run() {
+        let page = Response {
+            ladder_run: Some(3),
+            ..sample(None, None)
+        };
+        let repaged = page.new_alert_note(true, "o2-engine", 5);
+        let noted = page.new_alert_note(false, "o2-engine", 5);
+        assert_eq!(repaged.ladder_run, Some(4));
+        assert!(repaged.body.contains("paging again"));
+        assert_eq!(noted.ladder_run, Some(3));
+        assert_eq!(noted.body, "A new alert joined this page.");
+    }
+
+    /// A new alert re-pages an exhausted page only if unowned and its run is 30 minutes old.
+    #[test]
+    fn test_a_new_alert_pages_again_only_after_the_cooldown() {
+        let opened = 1_700_000_000_000_000;
+        let later = opened + NEW_ALERT_REPAGE_COOLDOWN_MICROS;
+        let open = Response {
+            opened_at: opened,
+            ..sample(None, None)
+        };
+        let exhausted = |state: ResponseState| Response {
+            state,
+            exhausted_at: Some(opened + 1),
+            ..open.clone()
+        };
+        let cases = [
+            (
+                "exhausted, quiet for 30 minutes",
+                exhausted(ResponseState::Triggered),
+                later,
+                NewAlertEffect::PageAgain,
+            ),
+            (
+                "within 30 minutes",
+                exhausted(ResponseState::Triggered),
+                later - 1,
+                NewAlertEffect::NoteOnly,
+            ),
+            (
+                "acknowledged",
+                exhausted(ResponseState::Acknowledged),
+                later,
+                NewAlertEffect::NoteOnly,
+            ),
+            (
+                "snoozed",
+                Response {
+                    snoozed_until: Some(later + 1),
+                    ..exhausted(ResponseState::Triggered)
+                },
+                later,
+                NewAlertEffect::NoteOnly,
+            ),
+            (
+                "re-run less than 30 minutes ago",
+                Response {
+                    ladder_anchor: Some(later - 1),
+                    ..exhausted(ResponseState::Triggered)
+                },
+                later,
+                NewAlertEffect::NoteOnly,
+            ),
+            (
+                "still climbing",
+                open.clone(),
+                later,
+                NewAlertEffect::Nothing,
+            ),
+            (
+                "resolved",
+                exhausted(ResponseState::Resolved),
+                later,
+                NewAlertEffect::Nothing,
+            ),
+        ];
+        for (case, record, now, want) in cases {
+            assert_eq!(record.on_new_alert(now), want, "{case}");
+        }
+    }
 
     #[test]
     fn test_responder_role_ids_are_pinned() {
@@ -1573,6 +1743,27 @@ mod tests {
                 17 * MIN
             );
         }
+
+        /// Ending a snooze early gives back the unused quiet, so the rungs keep their gaps from
+        /// where the ladder paused instead of waiting out the rest of the snooze.
+        #[test]
+        fn test_unsnoozing_leaves_the_clock_where_a_snooze_that_short_would() {
+            let snoozed = snoozed_ladder_anchor(None, 0, None, MIN, 61 * MIN);
+            assert_eq!(
+                unsnoozed_ladder_anchor(Some(snoozed), 0, Some(61 * MIN), 3 * MIN),
+                snoozed_ladder_anchor(None, 0, None, MIN, 3 * MIN),
+            );
+        }
+
+        /// A snooze that has already lapsed has no quiet left to give back.
+        #[test]
+        fn test_unsnoozing_a_lapsed_snooze_leaves_the_clock() {
+            let snoozed = snoozed_ladder_anchor(None, 0, None, MIN, 61 * MIN);
+            assert_eq!(
+                unsnoozed_ladder_anchor(Some(snoozed), 0, Some(61 * MIN), 90 * MIN),
+                snoozed
+            );
+        }
     }
 
     #[test]
@@ -1741,6 +1932,30 @@ mod tests {
             Some(ChannelPostStage::Resolved)
         );
         assert_eq!(ChannelPostStage::of(ResponseState::Triaged), None);
+    }
+
+    /// RO-5: a pass renders the page's current stage; a stage the page moved past is not posted.
+    #[test]
+    fn test_the_current_stage_and_whether_a_requested_stage_is_behind_it() {
+        use ChannelPostStage::{Acknowledged as A, Paged as P, Resolved as R};
+        use ResponseState::{Acknowledged, Resolved, Triaged, Triggered};
+        // (page state, its current stage, which of P, A, R are behind it)
+        let table = [
+            (Triggered, P, [false, false, false]),
+            (Triaged, P, [false, false, false]),
+            (Acknowledged, A, [true, false, false]),
+            (Resolved, R, [true, true, false]),
+        ];
+        for (state, current, behind) in table {
+            assert_eq!(ChannelPostStage::current(state), current, "{state:?}");
+            for (requested, want) in [P, A, R].into_iter().zip(behind) {
+                assert_eq!(
+                    requested.is_behind(state),
+                    want,
+                    "{requested} on a {state:?} page"
+                );
+            }
+        }
     }
 
     /// The whole point of the change: the room learns what fired and who has

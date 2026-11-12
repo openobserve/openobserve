@@ -70,6 +70,7 @@ where
 
 pub mod grpc;
 pub mod index;
+pub mod response_schema;
 pub mod value;
 
 pub use index::MetricsBlockScan;
@@ -249,7 +250,7 @@ pub enum Status {
 }
 
 /// Instant query.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RequestQuery {
     /// PromQL expression.
     pub query: Option<String>,
@@ -258,11 +259,12 @@ pub struct RequestQuery {
     /// Evaluation timeout.
     pub timeout: Option<String>,
     #[serde(flatten)]
+    #[schema(ignore)]
     pub search_event_context: SearchEventContext,
 }
 
 /// Range query.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct RequestRangeQuery {
     /// PromQL expression.
     pub query: Option<String>,
@@ -280,20 +282,24 @@ pub struct RequestRangeQuery {
     /// Use streaming output.
     pub use_streaming: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[schema(value_type = Option<String>)]
     pub search_type: Option<SearchEventType>,
     #[serde(
         default,
         skip_serializing_if = "Vec::is_empty",
         deserialize_with = "deserialize_string_or_vec"
     )]
+    #[schema(value_type = Option<String>)]
     pub regions: Vec<String>, // default query all regions, local: only query local region clusters
     #[serde(
         default,
         skip_serializing_if = "Vec::is_empty",
         deserialize_with = "deserialize_string_or_vec"
     )]
+    #[schema(value_type = Option<String>)]
     pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
     #[serde(flatten)]
+    #[schema(ignore)]
     pub search_event_context: SearchEventContext,
 }
 
@@ -309,7 +315,7 @@ pub struct RequestMetadata {
 // key - metric name
 pub type ResponseMetadata = HashMap<String, Vec<MetadataObject>>;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct MetadataObject {
     #[serde(rename = "type")]
     typ: String, // counter, gauge, histogram, summary
@@ -328,7 +334,7 @@ impl From<Metadata> for MetadataObject {
 }
 
 /// Request a list of time series that match a certain label set.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RequestSeries {
     /// Series selector argument that selects the series to return.
     ///
@@ -343,7 +349,7 @@ pub struct RequestSeries {
 }
 
 /// Request a list of label names.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RequestLabels {
     /// Series selector argument that selects the series from which to read
     /// the label names.
@@ -374,7 +380,7 @@ pub struct RequestLabelValues {
     pub end: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RequestFormatQuery {
     pub query: String,
 }
@@ -454,7 +460,7 @@ pub struct QueryResult {
     pub result: value::Value,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(tag = "status", rename_all = "lowercase")]
 pub enum ApiFuncResponse<T: Serialize> {
     Success {
@@ -505,7 +511,7 @@ impl<T: Serialize> ApiFuncResponse<T> {
 }
 
 // cf. https://github.com/prometheus/prometheus/blob/5c5fa5c319fca713506fa144ec6768fddf00d466/web/api/v1/api.go#L73-L82
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ApiErrorType {
     Timeout,

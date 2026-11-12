@@ -92,7 +92,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onFilterChange"
         data-test="failed-only-toggle"
       >
-        <OTooltip :content="t('alerts.insights.filters.failedOnlyTooltip')"> </OTooltip>
+        <template #tooltip>
+          <OTooltip :content="t('alerts.insights.filters.failedOnlyTooltip')" />
+        </template>
       </OSwitch>
 
       <!-- Silenced Only Toggle -->
@@ -103,7 +105,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onFilterChange"
         data-test="silenced-only-toggle"
       >
-        <OTooltip :content="t('alerts.insights.filters.silencedTooltip')"> </OTooltip>
+        <template #tooltip>
+          <OTooltip :content="t('alerts.insights.filters.silencedTooltip')" />
+        </template>
       </OSwitch>
 
       <!-- Range Filter Chips -->
@@ -155,17 +159,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t("alerts.insights.actions.actionsFor") }}
         <strong>{{ selectedAlertForAction }}</strong></span
       >
-
-      <OButton
-        variant="ghost-primary"
-        size="sm"
-        @click="openDedupConfig"
-        data-test="configure-dedup-btn"
-        icon-left="settings"
-      >
-        {{ t("alerts.insights.actions.configureDedup") }}
-        <OTooltip :content="t('alerts.insights.actions.configureDedupTooltip')" />
-      </OButton>
 
       <OButton
         variant="ghost-primary"
@@ -245,7 +238,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :panel-id="contextMenu.panelId"
       @close="contextMenu.show = false"
       @filter="handleContextMenuFilter"
-      @configure-dedup="handleConfigureDedup"
       @edit-alert="handleEditAlert"
       @view-history="handleViewHistory"
     />
@@ -261,6 +253,7 @@ import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vu
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import dateTime from "@/components/DateTimePickerDashboard.vue";
 import AlertInsightsContextMenu from "./AlertInsightsContextMenu.vue";
@@ -318,6 +311,7 @@ function onTabsChange(name: string | number) {
     return;
   }
   currentTab.value = String(name);
+  analytics.track("alert_insights_tab_switched", { tab: currentTab.value });
 }
 const selectedAlertForAction = ref<string | null>(null);
 const dashboardData = ref<any>(null); // Store dashboard config as ref instead of computed
@@ -441,6 +435,7 @@ const fetchAlerts = async () => {
     );
     alertsList.value = res.data.list || [];
   } catch (error) {
+    if ((error as { response?: { status?: number } })?.response?.status === 403) return;
     toast({
       variant: "error",
       message: t("toastMessages.alerts.failedToLoadAlerts"),
@@ -457,6 +452,11 @@ const goBack = () => {
 };
 
 const updateDateTime = (value: any) => {
+  if (value.userChangedValue) {
+    analytics.track("alert_insights_time_range_changed", {
+      type: value.relativeTimePeriod ? "relative" : "absolute",
+    });
+  }
   timeRange.value = {
     __global: {
       start_time: new Date(value.startTime),
@@ -509,6 +509,7 @@ const onDataZoom = (data: any) => {
     start,
     end,
   });
+  analytics.track("alert_insights_filter_applied", { source: "zoom" });
 
   refreshDashboard();
 };
@@ -590,43 +591,8 @@ const handleContextMenuFilter = (filter: any) => {
   });
 
   contextMenu.show = false;
+  analytics.track("alert_insights_filter_applied", { source: "context_menu" });
   refreshDashboard();
-};
-
-const handleConfigureDedup = async (alertName: string) => {
-  try {
-    // Use cached alerts list
-    const alert = alertsList.value.find((a: any) => a.name === alertName);
-
-    if (!alert) {
-      toast({
-        variant: "error",
-        message: t("toastMessages.alerts.alertNotFoundInAlerts", {
-          name: alertName,
-          count: alertsList.value.length,
-        }),
-      });
-      return;
-    }
-
-    // Navigate to alert edit page with dedup section
-    await router.push({
-      name: "alertList",
-      query: {
-        action: "update",
-        alert_id: alert.alert_id, // Use alert_id instead of id
-        name: alert.name,
-        org_identifier: store.state.selectedOrganization.identifier,
-        folder: alert.folder_id || "default",
-        section: "dedup",
-      },
-    });
-  } catch (error) {
-    toast({
-      variant: "error",
-      message: t("toastMessages.alerts.failedToNavigateToAlert"),
-    });
-  }
 };
 
 const handleEditAlert = async (alertName: string) => {
@@ -678,22 +644,6 @@ const formatFilterValue = (value: number): string => {
 };
 
 // Action button methods
-const openDedupConfig = () => {
-  // `caption` predates OToast and is not rendered; cast keeps the object untouched.
-  toast({
-    variant: "info",
-    message: t("toastMessages.alerts.openingDedupConfig", { name: selectedAlertForAction.value }),
-    caption: "This would navigate to alert edit page with dedup section focused",
-  } as unknown as ToastOptions);
-
-  // TODO: Navigate to alert edit page with dedup section
-  // router.push({
-  //   name: 'alertEdit',
-  //   params: { alertName: selectedAlertForAction.value },
-  //   query: { section: 'dedup' }
-  // });
-};
-
 const editAlert = () => {
   toast({
     variant: "info",

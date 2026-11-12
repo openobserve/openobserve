@@ -351,14 +351,25 @@ pub async fn list() -> Result<Vec<(String, String)>, errors::Error> {
         .collect())
 }
 
-/// Deletes all enrichment table entries belonging to the given org.
-pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
-    let client = get_orm_client_rw().await;
-    Entity::delete_many()
+/// Table names of the org.
+pub async fn list_names_by_org(org: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    let names = Entity::find()
+        .select_only()
+        .column(Column::Name)
         .filter(Column::Org.eq(org))
-        .exec(client)
+        .distinct()
+        .into_tuple::<String>()
+        .all(client)
         .await?;
-    Ok(())
+    Ok(names)
+}
+
+/// Deletes all enrichment table entries belonging to the given org and returns their names.
+pub async fn delete_by_org(org: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let delete = Entity::delete_many().filter(Column::Org.eq(org));
+    Ok(super::delete_returning(client, delete, &[Column::Name]).await?)
 }
 
 #[cfg(test)]
@@ -390,5 +401,27 @@ mod tests {
         let data: Vec<u8> = (0u8..=255).collect();
         let record = EnrichmentTableRecord::new("org", "table", data.clone());
         assert_eq!(record.data, data);
+    }
+
+    #[tokio::test]
+    async fn test_org_delete_returns_the_names_it_removed() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_enrich");
+        let other = format!("{org}_other");
+        for (org, name) in [(&org, "a"), (&org, "b"), (&other, "a")] {
+            add(org, name, b"x".to_vec(), 1).await.unwrap();
+        }
+
+        let mut removed = delete_by_org(&org).await.unwrap();
+        removed.sort();
+        let left = list_names_by_org(&org).await.unwrap();
+        let kept = list_names_by_org(&other).await.unwrap();
+        delete_by_org(&other).await.unwrap();
+
+        assert_eq!(removed, ["a", "b"]);
+        assert!(left.is_empty());
+        assert_eq!(kept, ["a"]);
     }
 }

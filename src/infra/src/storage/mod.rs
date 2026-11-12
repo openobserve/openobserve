@@ -44,6 +44,8 @@ pub const CONCURRENT_REQUESTS: usize = 1000;
 
 // Preserve object_store's existing coalesced-read concurrency bound.
 const COALESCED_RANGE_CONCURRENCY: usize = 10;
+// Objects per bulk delete in a strict prefix delete; S3 caps one request at 1000 keys.
+const DEL_PREFIX_CHUNK: usize = 1000;
 
 static MULTI_ACCOUNTS: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(accounts::default);
 
@@ -61,6 +63,8 @@ pub enum StorageTier {
 pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
     fn get_account(&self, org_id: &str, file: &str) -> Option<String>;
     async fn add_account(&self, key: String, acc: Box<dyn ObjectStore>);
+    async fn remove_account(&self, key: &str);
+    fn has_account(&self, name: &str) -> bool;
     async fn put(&self, account: &str, location: &Path, payload: PutPayload) -> Result<PutResult>;
     async fn put_opts(
         &self,
@@ -150,6 +154,15 @@ pub async fn list_dirs(account: &str, prefix: &str) -> Result<Vec<String>> {
 
 pub fn get_account(org_id: &str, file: &str) -> Option<String> {
     MULTI_ACCOUNTS.get_account(org_id, file)
+}
+
+/// The account name an org's own storage provider is loaded under.
+pub fn org_account(org_id: &str) -> String {
+    get_org_storage_key(org_id)
+}
+
+pub fn has_account(name: &str) -> bool {
+    MULTI_ACCOUNTS.has_account(name)
 }
 
 pub async fn add_account(org_id: &str, acc: Box<dyn ObjectStore>) {
@@ -498,6 +511,39 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
     Ok(())
 }
 
+/// Deletes every object or fails; only a missing object counts as deleted.
+pub async fn del_strict(files: Vec<(&str, &str)>) -> Result<()> {
+    // An unknown account would resolve to the default store and delete nothing of the org's.
+    if let Some((account, _)) = files.iter().find(|(account, _)| !has_account(account)) {
+        return Err(account_not_loaded(account));
+    }
+    let files: Vec<(String, Path)> = files
+        .into_iter()
+        .map(|(account, file)| (account.to_string(), Path::from(file)))
+        .collect();
+    futures::stream::iter(files)
+        .map(|(account, file)| async move {
+            match MULTI_ACCOUNTS.delete(&account, &file).await {
+                Ok(()) | Err(object_store::Error::NotFound { .. }) => Ok(()),
+                Err(e) => Err(e),
+            }
+        })
+        .buffer_unordered(get_config().limit.cpu_num.max(1))
+        .try_collect::<Vec<()>>()
+        .await?;
+    Ok(())
+}
+
+/// Strictly deletes `prefix` from the default store and from a loaded account named `org_id`.
+pub async fn del_org_prefix_strict(org_id: &str, prefix: &str) -> Result<usize> {
+    let mut deleted = del_prefix_strict("", prefix).await?;
+    // `put(org_id, ..)` resolves to an account only when one is configured under that bare name.
+    if !org_id.is_empty() && has_account(org_id) {
+        deleted += del_prefix_strict(org_id, prefix).await?;
+    }
+    Ok(deleted)
+}
+
 pub async fn get_file_meta(account: &str, file: &str) -> Result<FileMeta, anyhow::Error> {
     let mut file_meta = FileMeta::default();
     let (file_size, parquet_meta) = get_parquet_metadata(account, file).await?;
@@ -621,6 +667,50 @@ impl From<Error> for object_store::Error {
             )),
         }
     }
+}
+
+// A failed listing must be an error here: `list` panics on one.
+async fn del_prefix_strict(account: &str, prefix: &str) -> Result<usize> {
+    del_prefix_strict_in_chunks(account, prefix, DEL_PREFIX_CHUNK).await
+}
+
+/// Deletes the listing chunk by chunk as it streams in, so memory holds one chunk at a time.
+async fn del_prefix_strict_in_chunks(account: &str, prefix: &str, chunk: usize) -> Result<usize> {
+    let mut listing = MULTI_ACCOUNTS
+        .list(account, Some(&prefix.into()))
+        .map_ok(|meta| meta.location)
+        .try_chunks(chunk.max(1));
+    let mut deleted = 0;
+    while let Some(paths) = listing.try_next().await.map_err(|e| e.1)? {
+        deleted += paths.len();
+        del_paths_strict(account, paths).await?;
+    }
+    Ok(deleted)
+}
+
+/// The error for a strict delete aimed at an account this node has not loaded.
+fn account_not_loaded(account: &str) -> object_store::Error {
+    object_store::Error::Generic {
+        store: "storage",
+        source: format!("storage account {account} is not loaded on this node").into(),
+    }
+}
+
+/// One bulk request where the store supports it; a "not found" there falls back to `del_strict`.
+async fn del_paths_strict(account: &str, paths: Vec<Path>) -> Result<()> {
+    if !is_local_disk_storage() && get_config().s3.feature_bulk_delete {
+        if !has_account(account) {
+            return Err(account_not_loaded(account));
+        }
+        let stream = futures::stream::iter(paths.clone().into_iter().map(Ok)).boxed();
+        match MULTI_ACCOUNTS.delete_stream(account, stream).await {
+            Ok(_) => return Ok(()),
+            Err(object_store::Error::NotFound { .. }) => {}
+            Err(e) => return Err(e),
+        }
+    }
+    let files: Vec<String> = paths.iter().map(|p| p.to_string()).collect();
+    del_strict(files.iter().map(|f| (account, f.as_str())).collect()).await
 }
 
 #[cfg(test)]
@@ -811,6 +901,59 @@ mod tests {
     fn test_bytes_size_in_mb_empty() {
         let b = bytes::Bytes::new();
         assert_eq!(bytes_size_in_mb(&b), 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_del_strict_refuses_an_unloaded_account() {
+        let err = del_strict(vec![(
+            "orgdel_unloaded:default",
+            "files/o/logs/s/a.parquet",
+        )])
+        .await
+        .unwrap_err();
+        assert!(err.to_string().contains("orgdel_unloaded:default"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn test_del_org_prefix_strict_covers_the_org_named_account() {
+        let (org, kept) = ("delorgpfx_t1", "delorgpfx_t9");
+        for name in [org, kept] {
+            MULTI_ACCOUNTS
+                .add_account(
+                    name.to_string(),
+                    Box::new(object_store::memory::InMemory::new()),
+                )
+                .await;
+        }
+        let key = |o: &str| format!("synthetics/{o}/c1/run1/shot.png");
+        for o in [org, kept] {
+            put("", &key(o), Bytes::from_static(b"d")).await.unwrap();
+            put(o, &key(o), Bytes::from_static(b"n")).await.unwrap();
+        }
+        assert_eq!(
+            get_bytes(org, &key(org)).await.unwrap(),
+            Bytes::from_static(b"n")
+        );
+
+        del_org_prefix_strict(org, &format!("synthetics/{org}/"))
+            .await
+            .unwrap();
+        assert!(
+            head("", &key(org)).await.is_err(),
+            "the default store kept the org's object"
+        );
+        assert!(
+            head(org, &key(org)).await.is_err(),
+            "the org-named account kept the object"
+        );
+        assert!(head("", &key(kept)).await.is_ok());
+        assert!(head(kept, &key(kept)).await.is_ok());
+        del_org_prefix_strict(org, &format!("synthetics/{org}/"))
+            .await
+            .unwrap();
+        del_org_prefix_strict(kept, &format!("synthetics/{kept}/"))
+            .await
+            .unwrap();
     }
 
     #[test]

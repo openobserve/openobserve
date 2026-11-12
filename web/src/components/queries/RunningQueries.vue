@@ -145,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import SearchService from "@/services/search";
+import analytics from "@/services/product_analytics";
 import { onBeforeMount, ref, defineComponent, computed, toRaw, watch } from "vue";
 
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -159,6 +160,7 @@ import { durationFormatter, getDuration } from "@/utils/zincutils";
 import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -305,7 +307,7 @@ export default defineComponent({
     };
 
     const loadingState = ref(false);
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
     const queries = ref([]);
 
     const deleteDialog = ref({
@@ -322,6 +324,7 @@ export default defineComponent({
       schemaData.value = row;
 
       showListSchemaDialog.value = true;
+      analytics.track("query_management_query_details_opened");
     };
 
     const perPageOptions: any = [
@@ -608,8 +611,7 @@ export default defineComponent({
           runningQueriesSummary.value = getRunningQueriesSummary();
         })
         .catch((error: any) => {
-          forbidden.value = error?.response?.status === 403;
-          // The grouped access toast already reports a 403; a second red toast adds nothing.
+          forbidden.value = forbiddenState(error);
           if (!forbidden.value) {
             toast({
               message: error.response?.data?.message || t("queries.fetchRunningQueriesFailed"),
@@ -625,6 +627,10 @@ export default defineComponent({
     const deleteQuery = () => {
       SearchService.cancel_running_queries(store.state.zoConfig.meta_org, deleteDialog.value.data)
         .then(() => {
+          analytics.track("query_management_queries_cancelled", {
+            count: deleteDialog.value.data.length,
+            view: selectedQueryTypeTab.value,
+          });
           selectedRow.value[selectedQueryTypeTab.value] = [];
 
           getRunningQueries();
@@ -737,6 +743,7 @@ export default defineComponent({
 
     const onChangeQueryTab = (tab: "summary" | "all") => {
       selectedQueryTypeTab.value = tab;
+      analytics.track("query_management_tab_switched", { tab });
     };
 
     const onChangeSearchType = (value: string) => {
@@ -744,6 +751,7 @@ export default defineComponent({
     };
 
     const filterUserQueries = (row: any) => {
+      analytics.track("query_management_user_drilled_down");
       selectedQueryTypeTab.value = "all";
       selectedSearchField.value = "all";
       selectedSearchType.value = row.search_type_label;

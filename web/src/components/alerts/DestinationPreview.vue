@@ -24,7 +24,7 @@ limitations under the License.
       <!-- Mock preview of the server-rendered alert, which is not localised: every string here is deliberately raw. -->
       <!-- Slack Preview -->
       <div
-        v-if="type === 'slack'"
+        v-if="mockupType === 'slack'"
         data-test="slack-preview"
         class="slack-message border-brand-msg-divider rounded-default mx-auto max-w-150 border bg-white p-4 shadow-sm"
       >
@@ -111,7 +111,7 @@ limitations under the License.
 
       <!-- MS Teams Preview -->
       <div
-        v-else-if="type === 'msteams'"
+        v-else-if="mockupType === 'msteams'"
         data-test="msteams-preview"
         class="teams-card rounded-default border-brand-msg-border-2 mx-auto max-w-150 overflow-hidden border bg-white shadow-sm"
       >
@@ -180,7 +180,7 @@ limitations under the License.
 
       <!-- Email Preview -->
       <div
-        v-else-if="type === 'email'"
+        v-else-if="mockupType === 'email'"
         data-test="email-preview"
         class="email-client rounded-default border-brand-msg-divider mx-auto max-w-150 overflow-hidden border bg-white shadow-sm"
       >
@@ -191,11 +191,12 @@ limitations under the License.
           >
             {{ raw("Subject: 🚨 OpenObserve Alert Notification") }}
           </div>
-          <div data-test="email-from" class="email-from text-brand-msg-meta mb-1 text-sm">
-            {{ raw("From: alerts@openobserve.ai") }}
-          </div>
-          <div class="email-to text-brand-msg-meta mb-1 text-sm">
-            {{ raw("To: admin@example.com") }}
+          <div
+            v-if="recipients.length"
+            data-test="email-to"
+            class="email-to text-brand-msg-meta mb-1 text-sm"
+          >
+            {{ raw(`To: ${recipients.join(", ")}`) }}
           </div>
           <div class="email-time text-brand-msg-meta mb-1 text-sm">
             {{ getCurrentTime() }}
@@ -271,7 +272,7 @@ limitations under the License.
 
       <!-- PagerDuty Preview -->
       <div
-        v-else-if="type === 'pagerduty'"
+        v-else-if="mockupType === 'pagerduty'"
         data-test="pagerduty-preview"
         class="pagerduty-incident rounded-default border-brand-msg-divider mx-auto max-w-150 overflow-hidden border bg-white shadow-sm"
       >
@@ -313,7 +314,7 @@ limitations under the License.
 
       <!-- ServiceNow Preview -->
       <div
-        v-else-if="type === 'servicenow'"
+        v-else-if="mockupType === 'servicenow'"
         data-test="servicenow-preview"
         class="servicenow-incident rounded-default border-brand-msg-divider mx-auto max-w-150 overflow-hidden border bg-white shadow-sm"
       >
@@ -355,7 +356,7 @@ limitations under the License.
 
       <!-- Opsgenie Preview -->
       <div
-        v-else-if="type === 'opsgenie'"
+        v-else-if="mockupType === 'opsgenie'"
         data-test="opsgenie-preview"
         class="opsgenie-alert rounded-default border-brand-msg-divider mx-auto max-w-150 overflow-hidden border bg-white shadow-sm"
       >
@@ -405,7 +406,11 @@ limitations under the License.
           :copyable="false"
           data-test="raw-preview"
         />
-        <p data-test="raw-preview-note" class="text-text-secondary m-0 mt-3 text-xs">
+        <p
+          v-if="!showBody"
+          data-test="raw-preview-note"
+          class="text-text-secondary m-0 mt-3 text-xs"
+        >
           {{ t("alert_destinations.webhookPreviewNote") }}
         </p>
       </template>
@@ -443,12 +448,19 @@ interface Props {
   modelValue?: boolean;
   type: string;
   templateContent?: string;
+  recipients?: string[];
+  showBody?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   modelValue: false,
   templateContent: "",
+  recipients: () => [],
+  showBody: false,
 });
+
+// The mockups show fixed sample content, so a picked template shows its own body instead.
+const mockupType = computed(() => (props.showBody ? "" : props.type));
 
 const emit = defineEmits(["update:modelValue"]);
 const { t } = useI18nTyped();
@@ -485,6 +497,7 @@ const getDestinationTypeName = (type: string): string => {
     pagerduty: raw("PagerDuty"),
     servicenow: raw("ServiceNow"),
     opsgenie: raw("Opsgenie"),
+    jira: raw("Jira"),
   };
   return typeNames[type] || type;
 };

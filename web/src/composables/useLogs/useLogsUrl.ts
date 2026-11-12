@@ -14,9 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive, ref } from "vue";
-import type { LocationQuery, LocationQueryRaw, RouteLocationNormalized, Router } from "vue-router";
+import type { LocationQuery, LocationQueryRaw, Router } from "vue-router";
 import { b64DecodeUnicodeSafe, b64EncodeUnicode } from "@/utils/formatters";
 import { decodeFtScan } from "@/utils/logs/freeTextScan";
+import {
+  isLeavingRoute,
+  resetPendingNavigationForTests,
+  trackPendingNavigation,
+} from "@/utils/pendingNavigation";
 import type {
   ExecutedRecordedEvent,
   PersistSurface,
@@ -64,7 +69,7 @@ let boundRouter: Router | null = null;
 
 const guardedRouters = new WeakSet<Router>();
 
-let pendingNavigation: RouteLocationNormalized | null = null;
+let arrivalPending = false;
 
 let historyStateProvider: () => LogsHistoryState = () => ({
   zoomStack: [],
@@ -112,7 +117,7 @@ interface LogsHistoryState {
 export function bindLogsUrlRouter(router: Router | null | undefined): void {
   if (!router) return;
   boundRouter = router;
-  trackPendingNavigation(router);
+  trackLogsArrival(router);
 }
 
 export function resetShownSearch(): void {
@@ -252,16 +257,26 @@ export function urlWriteMode(
   current: LocationQuery | Record<string, unknown>,
   next: LocationQueryRaw | Record<string, unknown>,
 ): LogsUrlMode {
+  // The first search write after entering Logs only normalizes the link it arrived on; pushing it would trap Back on Logs.
+  if (arrivalPending) {
+    arrivalPending = false;
+    return "replace";
+  }
   return changedParams(current, next).every((key) => VIEW_STATE_PARAMS.has(key))
     ? "replace"
     : "push";
+}
+
+/** Called when the Logs landing runs no search, so the user's first deliberate search keeps its own history entry. */
+export function endLogsArrival(): void {
+  arrivalPending = false;
 }
 
 export function writeLogsUrl(mode: LogsUrlMode, query: LocationQueryRaw): Promise<unknown> {
   const router = boundRouter;
   if (!router) return Promise.resolve();
   // A relative write while leaving Logs supersedes that navigation and keeps the user on Logs.
-  if (pendingNavigation && pendingNavigation.name !== "logs") return Promise.resolve();
+  if (isLeavingRoute("logs")) return Promise.resolve();
   if (changedParams(currentQuery(), query).length === 0) return Promise.resolve();
   const target = { query, state: { ...historyStateProvider() } as Record<string, any> };
   return mode === "replace" ? router.replace(target) : router.push(target);
@@ -285,25 +300,21 @@ export function routeHasLineLink(query: LocationQuery | Record<string, unknown>)
 
 export function resetLogsUrlForTests(): void {
   boundRouter = null;
-  pendingNavigation = null;
+  resetPendingNavigationForTests();
+  arrivalPending = false;
   resetShownSearch();
   sharedPage.value = null;
   sharedPageNotice.value = null;
   historyStateProvider = () => ({ zoomStack: [], returnPreset: null, stackId: null, level: 0 });
 }
 
-function trackPendingNavigation(router: Router): void {
+function trackLogsArrival(router: Router): void {
+  trackPendingNavigation(router);
   if (guardedRouters.has(router) || typeof router.beforeEach !== "function") return;
   guardedRouters.add(router);
-  router.beforeEach((to) => {
-    pendingNavigation = to;
-  });
-  router.afterEach((to) => {
-    if (pendingNavigation === to) pendingNavigation = null;
-  });
-  // A guard that throws skips afterEach, so clear here or Logs URL writes stay blocked.
-  router.onError(() => {
-    pendingNavigation = null;
+  arrivalPending = router.currentRoute.value?.name === "logs";
+  router.afterEach((to, from, failure) => {
+    if (!failure && to.name !== from.name) arrivalPending = to.name === "logs";
   });
 }
 

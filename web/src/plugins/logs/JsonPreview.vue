@@ -11,17 +11,36 @@
       />
 
       <OButton
-        :label="t('common.copyToClipboard')"
         size="xs"
         variant="outline"
         class="me-2 mb-1.5"
+        data-test="logs-json-preview-copy-btn"
         @click="copyLogToClipboard"
         ><OIcon name="content-copy" size="xs" class="me-1" />{{
           t("common.copyToClipboard")
         }}</OButton
       >
+      <OTooltip
+        v-if="showViewRelatedBtn && correlationAccess.allowed && correlationLicense.locked.value"
+        :content="correlationLicense.lockedReason.value"
+      >
+        <span class="inline-flex">
+          <OButton
+            size="xs"
+            variant="outline"
+            class="me-2 mb-1.5"
+            disabled
+            data-test="log-correlation-btn"
+          >
+            <template #icon-left>
+              <OIcon name="lock" class="lock-chip" size="sm" data-test="log-correlation-btn-lock" />
+            </template>
+            {{ t("search.viewRelated") }}
+          </OButton>
+        </span>
+      </OTooltip>
       <OButton
-        v-if="showViewRelatedBtn"
+        v-else-if="showViewRelatedBtn"
         size="xs"
         variant="outline"
         class="me-2 mb-1.5"
@@ -29,40 +48,51 @@
         data-test="log-correlation-btn"
       >
         <OIcon name="link" size="xs" class="me-1" />{{ t("search.viewRelated") }}
-        <OIcon
-          v-if="!correlationAccess.allowed"
-          name="lock"
-          size="xs"
-          class="text-warning-600 ms-1"
-        />
+        <OIcon v-if="!correlationAccess.allowed" name="lock" size="xs" class="lock-chip ms-1" />
         <OTooltip v-if="correlationAccess.allowed" :content="t('search.viewRelatedTooltip')" />
       </OButton>
       <!-- Stream picker and its action read as one control, sized to sit level
            with the toolbar buttons above rather than towering over them. -->
       <div
         v-if="
-          !hideViewTrace && showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
+          !hideViewTrace &&
+          showViewTraceBtn &&
+          (tracesLocked || tracesStreams.length || isTracesStreamsLoading)
         "
         class="mb-1.5 flex items-center gap-2"
       >
-        <OSelect
-          :aria-label="t('search.selectStream')"
-          data-test="log-search-index-list-select-stream"
-          v-model="searchObj.meta.selectedTraceStream"
-          :options="tracesStreams"
-          class="w-auto shrink-0"
-          :loading="isTracesStreamsLoading"
-          :disabled="isTracesStreamsLoading"
-          size="sm"
-        />
-        <OButton
-          data-test="trace-view-logs-btn"
-          size="xs"
-          variant="outline"
-          icon-left="account-tree"
-          @click="redirectToTraces"
-          >{{ t("search.viewTrace") }}</OButton
-        >
+        <OTooltip v-if="tracesLocked" :content="tracesLockedReason">
+          <span class="inline-flex">
+            <OButton
+              data-test="trace-view-logs-btn"
+              size="xs"
+              variant="outline"
+              icon-left="lock"
+              disabled
+              >{{ t("search.viewTrace") }}</OButton
+            >
+          </span>
+        </OTooltip>
+        <template v-else>
+          <OSelect
+            :aria-label="t('search.selectStream')"
+            data-test="log-search-index-list-select-stream"
+            v-model="searchObj.meta.selectedTraceStream"
+            :options="tracesStreams"
+            class="w-auto shrink-0"
+            :loading="isTracesStreamsLoading"
+            :disabled="isTracesStreamsLoading"
+            size="sm"
+          />
+          <OButton
+            data-test="trace-view-logs-btn"
+            size="xs"
+            variant="outline"
+            icon-left="account-tree"
+            @click="redirectToTraces"
+            >{{ t("search.viewTrace") }}</OButton
+          >
+        </template>
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="ps-3">
@@ -155,7 +185,7 @@
             </template>
             {{ t("logs.jsonPreview.sendToAiChat") }}
             <template v-if="!aiAssistantAccess.allowed" #icon-right>
-              <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
+              <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
             </template>
           </ODropdownItem>
           <ODropdownItem
@@ -167,12 +197,12 @@
             </template>
             {{ t("regex_patterns.create_regex_pattern_field") }}
             <template v-if="!regexPatternsAccess.allowed" #icon-right>
-              <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
+              <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
             </template>
           </ODropdownItem>
         </ODropdown>
 
-        <span class="ps-1" :data-test="`log-expand-detail-key-${key}`">
+        <span class="min-w-0 ps-1" :data-test="`log-expand-detail-key-${key}`">
           <span class="log-key">{{ key }}</span
           ><span class="log-separator">: </span
           ><span
@@ -202,6 +232,7 @@
       >
         <div
           class="hover:bg-dropdown-item-hover-bg flex cursor-pointer items-center px-3 py-1.5 [transition:background-color_0.2s]"
+          data-test="logs-json-preview-copy-selection-btn"
           @click="copySelectedText"
         >
           <OIcon name="content-copy" size="sm" class="me-2" />
@@ -267,6 +298,7 @@ import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
 import config from "@/aws-exports";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
@@ -284,6 +316,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { copyToClipboard } from "@/utils/clipboard";
+import { COPY_CONFIRM_MS } from "@/lib/feedback/Toast/copyConfirm";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
@@ -300,6 +333,11 @@ export default {
     showCopyButton: {
       type: Boolean,
       default: true,
+    },
+    /** Copy here and confirm on the clicked control instead of emitting `copy` to the parent. */
+    copyInPlace: {
+      type: Boolean,
+      default: false,
     },
     mode: {
       type: String,
@@ -408,10 +446,13 @@ export default {
     ];
 
     const copyLogToClipboard = () => {
-      emit(
-        "copy",
-        activeTab.value === "unflattened" ? JSON.parse(unflattendData.value) : props.value,
-      );
+      const log =
+        activeTab.value === "unflattened" ? JSON.parse(unflattendData.value) : props.value;
+      if (props.copyInPlace) {
+        copyToClipboard(JSON.stringify(log), t);
+        return;
+      }
+      emit("copy", log);
     };
     const addSearchTerm = (
       field: string,
@@ -432,6 +473,8 @@ export default {
       filteredTracesStreamOptions,
       isTracesStreamsLoading,
       showViewTraceBtn,
+      tracesLocked,
+      tracesLockedReason,
       getTracesStreams,
       setViewTraceBtn: setViewTraceBtnFor,
       filterStreamFn,
@@ -539,6 +582,7 @@ export default {
       checkFeatureAccess("regexPatterns", buildFeatureGateContext(store.state.zoConfig)),
     );
     const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+    const correlationLicense = useLicenseLock("correlation");
 
     // Initialize service correlation composable
     const { isCorrelationAvailable } = useServiceCorrelation();
@@ -560,7 +604,7 @@ export default {
           return;
         }
 
-        if (!correlationAccess.value.allowed) {
+        if (!correlationAccess.value.allowed || correlationLicense.locked.value) {
           // Locked — show it locked, but skip the correlation-availability
           // probe entirely: that call hits a backend route an OSS build 403s
           // on, so there's nothing useful to check before unlocking.
@@ -747,6 +791,7 @@ export default {
         openUpgradeDialog();
         return;
       }
+      if (correlationLicense.locked.value) return;
       emit("show-correlation", props.value);
     };
 
@@ -856,7 +901,16 @@ export default {
       emit("sendToAiChat", PromptToBeAdded);
     };
 
-    const copySelectedText = () => {
+    const copySelectedText = (event?: MouseEvent) => {
+      if (selectedText.value && props.copyInPlace) {
+        // The menu item is not a button, so it is named as the anchor; the menu stays open briefly so the bubble is seen there.
+        copyToClipboard(selectedText.value, t, {
+          anchor: event?.currentTarget as HTMLElement | null,
+        }).then((success) => {
+          if (success) setTimeout(() => (showMenu.value = false), COPY_CONFIRM_MS / 2);
+        });
+        return;
+      }
       if (selectedText.value) {
         copyToClipboard(selectedText.value, t, {
           successMessage: t("logs.jsonPreview.textCopiedToClipboard"),
@@ -923,7 +977,10 @@ export default {
       streamSearchValue,
       activeTab,
       showViewTraceBtn,
+      tracesLocked,
+      tracesLockedReason,
       showViewRelatedBtn,
+      correlationLicense,
       correlationAccess,
       aiAssistantAccess,
       regexPatternsAccess,

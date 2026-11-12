@@ -23,6 +23,7 @@ import config from "@/aws-exports";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import { resetLogsAutoRunForTests } from "@/composables/useLogs/logsAutoRun";
 import searchService from "@/services/search";
+import analytics from "@/services/product_analytics";
 
 const { scheduleSearch, toastMock, getViewDetail } = vi.hoisted(() => ({
   scheduleSearch: vi.fn(),
@@ -340,6 +341,12 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       ] as [string, string[]][]) {
         await wrapper!.get(`[data-test="${trigger}"]`).trigger("click");
         await flushPromises();
+        if (trigger === "logs-search-bar-utilities-menu-btn") {
+          document
+            .querySelector<HTMLElement>('[data-test="logs-search-bar-menu-list-saved-views-btn"]')!
+            .click();
+          await flushPromises();
+        }
         for (const testId of ids) {
           const element = document.querySelector<HTMLElement>(`[data-test="${testId}"]`)!;
           expect(element).not.toBeNull();
@@ -423,7 +430,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       expect(vm.searchSchedulerJob).toBe(true);
     });
 
-    it("submits the guard's frozen snapshot and says why a 403 failed", async () => {
+    it("submits the guard's frozen snapshot and leaves a 403 to the access card alone", async () => {
       (config as any).isEnterprise = "true";
       await setup();
       const vm = wrapper!.vm;
@@ -431,14 +438,10 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       vm.searchObj.meta.jobRecords = 100;
       scheduleSearch.mockRejectedValueOnce({ response: { status: 403, data: {} } });
       vm.openGuardSearchJob({ query: { sql: 'select * from "frozen"', size: 10 } });
+      toastMock.mockClear();
       await vm.addJobScheduler();
       expect(scheduleSearch.mock.calls[0][0].query.query.sql).toBe('select * from "frozen"');
-      expect(toastMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "error",
-          message: "You do not have permission to create search jobs",
-        }),
-      );
+      expect(toastMock).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
     it("shows the server's message for any other job failure", async () => {
@@ -552,6 +555,24 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       await vi.advanceTimersByTimeAsync(10);
       expect(logs).toHaveBeenCalledTimes(1);
       expect(logs.mock.calls[0][0]).toMatchObject({ reason: "time" });
+    });
+
+    it("tracks a user time change as logs_time_range_changed without the raw value", async () => {
+      await setup({ liveMode: false });
+      const track = vi.spyOn(analytics, "track");
+      await wrapper!.vm.updateDateTime({
+        valueType: "relative",
+        relativeTimePeriod: "1h",
+        startTime: 1,
+        endTime: 2,
+        userChangedValue: true,
+      });
+      expect(track).toHaveBeenCalledWith("logs_time_range_changed", {
+        stream_name: "app_logs",
+        value_type: "relative",
+        relative_period: "1h",
+      });
+      expect(track).not.toHaveBeenCalledWith("Button Click", expect.anything());
     });
 
     it("runs a histogram zoom as explicit even with Auto Run off (J4, #4295)", async () => {

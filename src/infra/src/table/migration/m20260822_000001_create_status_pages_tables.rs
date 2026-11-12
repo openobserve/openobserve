@@ -130,7 +130,11 @@ fn create_pages_stmt() -> TableCreateStatement {
                 .not_null()
                 .primary_key(),
         )
-        .col(ColumnDef::new(StatusPages::OrgId).string_len(100).not_null())
+        .col(
+            ColumnDef::new(StatusPages::OrgId)
+                .string_len(100)
+                .not_null(),
+        )
         .col(ColumnDef::new(StatusPages::Name).string_len(256).not_null())
         .col(ColumnDef::new(StatusPages::Slug).string_len(32).not_null())
         .col(ColumnDef::new(StatusPages::Description).text().null())
@@ -141,7 +145,11 @@ fn create_pages_stmt() -> TableCreateStatement {
                 .not_null()
                 .default(0),
         )
-        .col(ColumnDef::new(StatusPages::PasswordHash).string_len(256).null())
+        .col(
+            ColumnDef::new(StatusPages::PasswordHash)
+                .string_len(256)
+                .null(),
+        )
         .col(
             ColumnDef::new(StatusPages::Noindex)
                 .boolean()
@@ -179,17 +187,41 @@ fn create_pages_stmt() -> TableCreateStatement {
                 .not_null()
                 .default(2),
         )
-        .col(ColumnDef::new(StatusPages::ConfirmAfterSecs).integer().null())
-        .col(ColumnDef::new(StatusPages::BrandName).string_len(256).null())
-        .col(ColumnDef::new(StatusPages::AccentColor).string_len(7).null())
+        .col(
+            ColumnDef::new(StatusPages::ConfirmAfterSecs)
+                .integer()
+                .null(),
+        )
+        .col(
+            ColumnDef::new(StatusPages::BrandName)
+                .string_len(256)
+                .null(),
+        )
+        .col(
+            ColumnDef::new(StatusPages::AccentColor)
+                .string_len(7)
+                .null(),
+        )
         // Base64-encoded image, same encoding as the org-level `custom_logo_img`
         // KV entry; unlike that one this is a per-page column. Enterprise-gated
         // on write only (see `apply_logo_field`).
         .col(ColumnDef::new(StatusPages::LogoImg).text().null())
-        .col(ColumnDef::new(StatusPages::TrackingSince).big_integer().null())
+        .col(
+            ColumnDef::new(StatusPages::TrackingSince)
+                .big_integer()
+                .null(),
+        )
         .col(ColumnDef::new(StatusPages::Owner).string_len(256).null())
-        .col(ColumnDef::new(StatusPages::CreatedAt).big_integer().not_null())
-        .col(ColumnDef::new(StatusPages::UpdatedAt).big_integer().not_null())
+        .col(
+            ColumnDef::new(StatusPages::CreatedAt)
+                .big_integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(StatusPages::UpdatedAt)
+                .big_integer()
+                .not_null(),
+        )
         .to_owned()
 }
 
@@ -239,7 +271,11 @@ fn create_components_stmt() -> TableCreateStatement {
                 .string_len(256)
                 .not_null(),
         )
-        .col(ColumnDef::new(StatusPageComponents::Description).text().null())
+        .col(
+            ColumnDef::new(StatusPageComponents::Description)
+                .text()
+                .null(),
+        )
         .col(
             ColumnDef::new(StatusPageComponents::SortOrder)
                 .integer()
@@ -247,7 +283,11 @@ fn create_components_stmt() -> TableCreateStatement {
                 .default(0),
         )
         // One-time publish backfill; immutable; janitor-nulled once aged out.
-        .col(ColumnDef::new(StatusPageComponents::BackfillDays).text().null())
+        .col(
+            ColumnDef::new(StatusPageComponents::BackfillDays)
+                .text()
+                .null(),
+        )
         .col(
             ColumnDef::new(StatusPageComponents::CreatedAt)
                 .big_integer()
@@ -328,20 +368,48 @@ fn create_notices_stmt() -> TableCreateStatement {
                 .not_null()
                 .primary_key(),
         )
-        .col(ColumnDef::new(StatusPageNotices::OrgId).string_len(100).not_null())
+        .col(
+            ColumnDef::new(StatusPageNotices::OrgId)
+                .string_len(100)
+                .not_null(),
+        )
         // 0 incident, 1 maintenance, 2 info.
         .col(ColumnDef::new(StatusPageNotices::Kind).integer().not_null())
         // 0 none, 1 degraded, 2 partial_outage, 3 major_outage.
-        .col(ColumnDef::new(StatusPageNotices::Impact).integer().not_null())
+        .col(
+            ColumnDef::new(StatusPageNotices::Impact)
+                .integer()
+                .not_null(),
+        )
         // 0 auto, 1 manual.
-        .col(ColumnDef::new(StatusPageNotices::Source).integer().not_null())
-        .col(ColumnDef::new(StatusPageNotices::Title).string_len(512).not_null())
+        .col(
+            ColumnDef::new(StatusPageNotices::Source)
+                .integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(StatusPageNotices::Title)
+                .string_len(512)
+                .not_null(),
+        )
         .col(ColumnDef::new(StatusPageNotices::Body).text().not_null())
         // 0 scheduled, 1 active, 2 resolved.
-        .col(ColumnDef::new(StatusPageNotices::State).integer().not_null())
+        .col(
+            ColumnDef::new(StatusPageNotices::State)
+                .integer()
+                .not_null(),
+        )
         // Backdated to the first failing run of the confirming streak.
-        .col(ColumnDef::new(StatusPageNotices::StartsAt).big_integer().not_null())
-        .col(ColumnDef::new(StatusPageNotices::ResolvedAt).big_integer().null())
+        .col(
+            ColumnDef::new(StatusPageNotices::StartsAt)
+                .big_integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(StatusPageNotices::ResolvedAt)
+                .big_integer()
+                .null(),
+        )
         // JSON [{from,to}] downtime intervals; merge-window re-opens append.
         .col(
             ColumnDef::new(StatusPageNotices::Segments)
@@ -357,17 +425,37 @@ fn create_notices_stmt() -> TableCreateStatement {
                 .default(false),
         )
         // Soft-delete only; there is deliberately no hard delete.
-        .col(ColumnDef::new(StatusPageNotices::DeletedAt).big_integer().null())
-        .col(ColumnDef::new(StatusPageNotices::AutoCheckId).string_len(27).null())
+        .col(
+            ColumnDef::new(StatusPageNotices::DeletedAt)
+                .big_integer()
+                .null(),
+        )
+        .col(
+            ColumnDef::new(StatusPageNotices::AutoCheckId)
+                .string_len(27)
+                .null(),
+        )
         .col(
             ColumnDef::new(StatusPageNotices::AutoRecoveryStreak)
                 .integer()
                 .not_null()
                 .default(0),
         )
-        .col(ColumnDef::new(StatusPageNotices::Owner).string_len(256).null())
-        .col(ColumnDef::new(StatusPageNotices::CreatedAt).big_integer().not_null())
-        .col(ColumnDef::new(StatusPageNotices::UpdatedAt).big_integer().not_null())
+        .col(
+            ColumnDef::new(StatusPageNotices::Owner)
+                .string_len(256)
+                .null(),
+        )
+        .col(
+            ColumnDef::new(StatusPageNotices::CreatedAt)
+                .big_integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(StatusPageNotices::UpdatedAt)
+                .big_integer()
+                .not_null(),
+        )
         .to_owned()
 }
 

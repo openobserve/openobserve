@@ -16,6 +16,7 @@
 use std::{
     future::Future,
     pin::Pin,
+    sync::LazyLock,
     task::{Context, Poll},
     time::Instant,
 };
@@ -30,13 +31,23 @@ use tower::{Layer, Service};
 const SHARE_TOKEN_PREFIX: usize = 6;
 
 /// Request headers whose value is a credential and is never written to the log.
-const REDACTED_REQUEST_HEADERS: [&str; 5] = [
+const REDACTED_REQUEST_HEADERS: [&str; 7] = [
     "authorization",
     "proxy-authorization",
     "cookie",
     "x-api-key",
     "x-o2-mcp",
+    "webhook-signature",
+    "dd-api-key",
 ];
+/// Workflow hook credentials; a URL value starting with one, in any case or encoding, is cut.
+const HOOK_CREDENTIAL_PREFIXES: [&str; 2] = ["o2wh_", "whsec_"];
+
+// Handle generic %{Header}i patterns for request headers
+static RE_REQ_HEADER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"%\{([^}]+)\}i").unwrap());
+
+// Handle generic %{Header}o patterns for response headers
+static RE_RES_HEADER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"%\{([^}]+)\}o").unwrap());
 
 /// The access log format: `common`, `json`, or a custom one (%a %t %r %s %b %U %T %D %{Header}i/o).
 pub fn get_http_access_log_format() -> String {
@@ -109,7 +120,7 @@ where
 
         let method = req.method().to_string();
         let path_and_query =
-            mask_share_tokens(req.uri().path_and_query().map(|x| x.as_str()).unwrap_or(""));
+            mask_log_url(req.uri().path_and_query().map(|x| x.as_str()).unwrap_or(""));
         let uri_path = mask_share_tokens(req.uri().path());
         let version = format!("{:?}", req.version());
 
@@ -121,7 +132,7 @@ where
             .unwrap_or("-")
             .to_string();
 
-        let referer = mask_share_tokens(
+        let referer = mask_log_url(
             req.headers()
                 .get("Referer")
                 .and_then(|v| v.to_str().ok())
@@ -141,7 +152,7 @@ where
                 .iter()
                 .map(|(name, value)| {
                     let value = value.to_str().unwrap_or("-");
-                    (name.as_str().to_string(), mask_share_tokens(value))
+                    (name.as_str().to_string(), mask_log_url(value))
                 })
                 .collect()
         } else {
@@ -248,9 +259,7 @@ where
 
                 // Generic header patterns are parsed only when the format has one (regex work).
                 if this.format.contains("}i") {
-                    // Handle generic %{Header}i patterns for request headers
-                    let request_header_regex = Regex::new(r"%\{([^}]+)\}i").unwrap();
-                    for cap in request_header_regex.captures_iter(&this.format.clone()) {
+                    for cap in RE_REQ_HEADER.captures_iter(&this.format.clone()) {
                         let header_name = &cap[1];
                         // Skip already-handled headers to avoid redundant work
                         if header_name == "Content-Length"
@@ -278,9 +287,7 @@ where
                 }
 
                 if this.format.contains("}o") {
-                    // Handle generic %{Header}o patterns for response headers
-                    let response_header_regex = Regex::new(r"%\{([^}]+)\}o").unwrap();
-                    for cap in response_header_regex.captures_iter(&this.format.clone()) {
+                    for cap in RE_RES_HEADER.captures_iter(&this.format.clone()) {
                         let header_name = &cap[1];
                         let header_value = response_headers
                             .iter()
@@ -301,15 +308,33 @@ where
     }
 }
 
-/// `path` (or a URL) with every chat share token, a bearer credential, cut to a short prefix.
+/// `url` as the access log may write it, with every known credential in it cut.
+pub fn mask_log_url(url: &str) -> String {
+    let masked = mask_slack_callback_query(&mask_share_tokens(url));
+    if !masked.contains("api_key=") {
+        return masked;
+    }
+    // A Datadog Agent sends its API key as `?api_key=` on validate calls.
+    mask_query_values(&masked, &["api_key"])
+}
+
+/// `path` (or a URL) with every share token, dashboard slug or hook credential cut short.
 pub fn mask_share_tokens(path: &str) -> String {
+    mask_hook_credentials(&mask_chat_share_tokens(path))
+}
+
+fn mask_chat_share_tokens(path: &str) -> String {
     let segments: Vec<&str> = path.split('/').collect();
     let mut masked = Vec::with_capacity(segments.len());
     for (i, segment) in segments.iter().enumerate() {
         let shares_token = i >= 2
             && matches!(
                 (segments[i - 2], segments[i - 1]),
-                ("ai", "shared") | ("ai", "public") | ("public", "ai_chats")
+                ("ai", "shared")
+                    | ("ai", "public")
+                    | ("public", "ai_chats")
+                    | ("api", "public_dashboards")
+                    | ("public", "dashboards")
             );
         if !shares_token {
             masked.push((*segment).to_string());
@@ -323,9 +348,115 @@ pub fn mask_share_tokens(path: &str) -> String {
     masked.join("/")
 }
 
+/// Cuts a hook credential that starts a path segment or a query value, up to its delimiter.
+fn mask_hook_credentials(url: &str) -> String {
+    let mut masked = String::with_capacity(url.len());
+    let mut rest = url;
+    let mut at_boundary = true;
+    while let Some(c) = rest.chars().next() {
+        if let Some(len) = at_boundary.then(|| credential_prefix_len(rest)).flatten() {
+            masked.push_str(&rest[..len]);
+            masked.push('…');
+            let end = rest.find(['/', '?', '&', '#']).unwrap_or(rest.len());
+            rest = &rest[end..];
+            at_boundary = false;
+            continue;
+        }
+        masked.push(c);
+        at_boundary = matches!(c, '/' | '?' | '&' | '=');
+        rest = &rest[c.len_utf8()..];
+    }
+    masked
+}
+
+/// Raw length of the start of `value` that decodes to a hook credential prefix, if it does.
+fn credential_prefix_len(value: &str) -> Option<usize> {
+    let raw = value.as_bytes();
+    let mut decoded = Vec::new();
+    let mut used = 0;
+    while used < raw.len() {
+        let escaped = (raw[used] == b'%')
+            .then(|| Some((hex_digit(*raw.get(used + 1)?)? << 4) | hex_digit(*raw.get(used + 2)?)?))
+            .flatten();
+        let (byte, width) = escaped.map_or((raw[used], 1), |byte| (byte, 3));
+        decoded.push(byte.to_ascii_lowercase());
+        used += width;
+        if HOOK_CREDENTIAL_PREFIXES
+            .iter()
+            .any(|p| p.as_bytes() == decoded)
+        {
+            return Some(used);
+        }
+        if !HOOK_CREDENTIAL_PREFIXES
+            .iter()
+            .any(|p| p.as_bytes().starts_with(&decoded))
+        {
+            return None;
+        }
+    }
+    None
+}
+
+fn hex_digit(byte: u8) -> Option<u8> {
+    char::from(byte)
+        .to_digit(16)
+        .and_then(|digit| u8::try_from(digit).ok())
+}
+
+/// A Slack callback's `code` and `state` are one-time OAuth secrets the SPA sends as Referer.
+fn mask_slack_callback_query(url: &str) -> String {
+    let route = url.split_once('?').map_or(url, |(path, _)| path);
+    let route = route.trim_end_matches('/');
+    if !(route.contains("/slack/") && route.ends_with("/callback")) {
+        return url.to_string();
+    }
+    mask_query_values(url, &["code", "state"])
+}
+
+/// `url` with the value of every query parameter named in `keys` replaced by `…`.
+fn mask_query_values(url: &str, keys: &[&str]) -> String {
+    let Some((path, rest)) = url.split_once('?') else {
+        return url.to_string();
+    };
+    let (query, fragment) = match rest.split_once('#') {
+        Some((q, f)) => (q, Some(f)),
+        None => (rest, None),
+    };
+    let pairs: Vec<String> = query
+        .split('&')
+        .map(|pair| match pair.split_once('=') {
+            Some((key, _)) if keys.contains(&key) => format!("{key}=…"),
+            _ => pair.to_string(),
+        })
+        .collect();
+    let mut masked = format!("{path}?{}", pairs.join("&"));
+    if let Some(f) = fragment {
+        masked.push('#');
+        masked.push_str(f);
+    }
+    masked
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    static LOG_LINES: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+    static CAPTURE_LOGGER: CaptureLogger = CaptureLogger;
+
+    struct CaptureLogger;
+
+    impl log::Log for CaptureLogger {
+        fn enabled(&self, _: &log::Metadata) -> bool {
+            true
+        }
+
+        fn log(&self, record: &log::Record) {
+            LOG_LINES.lock().unwrap().push(record.args().to_string());
+        }
+
+        fn flush(&self) {}
+    }
 
     #[test]
     fn share_tokens_never_reach_the_access_log() {
@@ -359,6 +490,194 @@ mod tests {
         ] {
             assert_eq!(mask_share_tokens(untouched), untouched);
         }
+    }
+
+    #[test]
+    fn public_dashboard_slugs_never_reach_the_access_log() {
+        let slug = "k8Zt2mR7aB3cD4eF5gH6Qx";
+        for (url, masked) in [
+            (
+                format!("/api/public_dashboards/{slug}"),
+                "/api/public_dashboards/k8Zt2m…",
+            ),
+            (
+                format!("/api/public_dashboards/{slug}/data?range=r3600"),
+                "/api/public_dashboards/k8Zt2m…/data?range=r3600",
+            ),
+            (
+                format!("/web/public/dashboards/{slug}"),
+                "/web/public/dashboards/k8Zt2m…",
+            ),
+            (
+                format!("https://o2.test/base/web/public/dashboards/{slug}?range=r3600#p1"),
+                "https://o2.test/base/web/public/dashboards/k8Zt2m…?range=r3600#p1",
+            ),
+        ] {
+            assert_eq!(mask_log_url(&url), masked);
+            assert!(!mask_log_url(&url).contains(slug));
+        }
+        // Admin routes name links by id under the org, which is no credential.
+        let admin = "/api/default/public_dashboards/status?ids=a,b";
+        assert_eq!(mask_log_url(admin), admin);
+    }
+
+    #[test]
+    fn hook_tokens_in_path_and_query_are_masked() {
+        let token = "o2wh_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcde";
+        let secret = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw";
+        for (url, masked) in [
+            (
+                format!("/api/v2/acme/workflows/hooks/{token}"),
+                "/api/v2/acme/workflows/hooks/o2wh_…".to_string(),
+            ),
+            (
+                format!("/api/v2/acme/workflows/hooks/t1?token={token}&k=v"),
+                "/api/v2/acme/workflows/hooks/t1?token=o2wh_…&k=v".to_string(),
+            ),
+            (
+                format!("/api/v2/acme/workflows/hooks/t1/runs/r1?s={secret}#x"),
+                "/api/v2/acme/workflows/hooks/t1/runs/r1?s=whsec_…#x".to_string(),
+            ),
+            (format!("/x/{secret}/y"), "/x/whsec_…/y".to_string()),
+        ] {
+            assert_eq!(mask_log_url(&url), masked);
+            assert_eq!(mask_share_tokens(&url), masked);
+            assert!(!mask_share_tokens(&url).contains(&token[5..]));
+            assert!(!mask_share_tokens(&url).contains(&secret[6..]));
+        }
+        for untouched in [
+            "/api/v2/acme/workflows/hooks/t1?key=o2wh",
+            "/api/v2/acme/workflows/hooks/xo2wh_abc",
+            "/api/v2/acme/workflows/hooks/t1?v=awhsec_x",
+        ] {
+            assert_eq!(mask_share_tokens(untouched), untouched);
+        }
+    }
+
+    #[test]
+    fn encoded_or_uppercase_hook_credentials_are_masked() {
+        let tail = "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcde";
+        for (url, masked) in [
+            (
+                format!("/api/v2/acme/workflows/hooks/t1?token=o2wh%5F{tail}&k=v"),
+                "/api/v2/acme/workflows/hooks/t1?token=o2wh%5F…&k=v",
+            ),
+            (
+                format!("/api/v2/acme/workflows/hooks/t1?s=WHSEC%5f{tail}"),
+                "/api/v2/acme/workflows/hooks/t1?s=WHSEC%5f…",
+            ),
+            (
+                format!("/api/v2/acme/workflows/hooks/O2WH_{tail}"),
+                "/api/v2/acme/workflows/hooks/O2WH_…",
+            ),
+            (
+                format!("/api/v2/acme/workflows/hooks/t1?v=%6F2wh_{tail}"),
+                "/api/v2/acme/workflows/hooks/t1?v=%6F2wh_…",
+            ),
+        ] {
+            assert_eq!(mask_log_url(&url), masked);
+            assert!(!mask_share_tokens(&url).contains(tail), "{url}");
+        }
+        assert_eq!(
+            mask_share_tokens("/api/v2/acme/workflows/hooks/t1?v=o2wh%5"),
+            "/api/v2/acme/workflows/hooks/t1?v=o2wh%5"
+        );
+    }
+
+    #[test]
+    fn webhook_signature_header_is_redacted() {
+        assert!(REDACTED_REQUEST_HEADERS.contains(&"webhook-signature"));
+        assert!(REDACTED_REQUEST_HEADERS.contains(&"authorization"));
+    }
+
+    #[test]
+    fn datadog_api_keys_never_reach_the_access_log() {
+        assert!(REDACTED_REQUEST_HEADERS.contains(&"dd-api-key"));
+        for (url, masked) in [
+            (
+                "/datadog/default/api/v1/validate?api_key=o2oi_s3cr3t",
+                "/datadog/default/api/v1/validate?api_key=…",
+            ),
+            (
+                "/o2/datadog/default/api/v1/validate?x=1&api_key=o2oi_s3cr3t#f",
+                "/o2/datadog/default/api/v1/validate?x=1&api_key=…#f",
+            ),
+        ] {
+            assert_eq!(mask_log_url(url), masked);
+        }
+        for untouched in [
+            "/datadog/default/api/v2/series",
+            "/datadog/default/api/v1/validate?xapi_key=1",
+        ] {
+            assert_eq!(mask_log_url(untouched), untouched);
+        }
+    }
+
+    #[tokio::test]
+    async fn a_custom_format_printing_the_datadog_key_header_logs_it_redacted() {
+        let _ = log::set_logger(&CAPTURE_LOGGER);
+        log::set_max_level(log::LevelFilter::Trace);
+        let secret = "o2oi_accessLogSecret9";
+        let mut svc = AccessLogLayer::new("dd=%{DD-API-KEY}i req=%r".to_string()).layer(
+            tower::service_fn(|_req: Request<Body>| async {
+                Ok::<_, std::convert::Infallible>(Response::new(Body::empty()))
+            }),
+        );
+        let req = Request::builder()
+            .uri(format!("/datadog/default/api/v1/validate?api_key={secret}"))
+            .header("DD-API-KEY", secret)
+            .body(Body::empty())
+            .unwrap();
+        svc.call(req).await.unwrap();
+        let lines = LOG_LINES.lock().unwrap().clone();
+        let line = lines
+            .iter()
+            .find(|l| l.starts_with("dd="))
+            .expect("access line");
+        assert!(line.contains("dd=[REDACTED]"), "{line}");
+        assert!(!line.contains(secret), "{line}");
+    }
+
+    #[test]
+    fn slack_callback_secrets_never_reach_the_access_log() {
+        for (url, masked) in [
+            (
+                "https://o2.test/web/slack/oauth/callback?code=c0de-123&state=s7at3",
+                "https://o2.test/web/slack/oauth/callback?code=…&state=…",
+            ),
+            (
+                "/web/slack/link/callback?state=st&code=cd#top",
+                "/web/slack/link/callback?state=…&code=…#top",
+            ),
+            (
+                "/web/slack/connect/callback?code=cd&org_identifier=default",
+                "/web/slack/connect/callback?code=…&org_identifier=default",
+            ),
+            (
+                "/web/slack/oauth/callback/?code=FAKECD2&state=FAKEST2",
+                "/web/slack/oauth/callback/?code=…&state=…",
+            ),
+            (
+                "https://o2.test/web/slack/link/callback//?state=st&code=cd#top",
+                "https://o2.test/web/slack/link/callback//?state=…&code=…#top",
+            ),
+        ] {
+            assert_eq!(mask_log_url(url), masked);
+        }
+        for untouched in [
+            "/web/logs?code=x",
+            "/api/default/slack/settings?state=on",
+            "/web/slack/oauth/callback",
+            "/web/slack/oauth/callbacks/?code=x",
+            "/web/slack/callback-info/?state=x",
+            "-",
+        ] {
+            assert_eq!(mask_log_url(untouched), untouched);
+        }
+        assert_eq!(
+            mask_log_url("/api/default/ai/shared/AbCdEfGhIjKl"),
+            "/api/default/ai/shared/AbCdEf…"
+        );
     }
 
     #[test]

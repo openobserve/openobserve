@@ -271,7 +271,7 @@ describe("every list page re-reads its scope when the reader returns", () => {
       const source = read(file);
       // Prettier splits the call across lines once the model map grows, so
       // match the call and its live-query argument rather than one spelling.
-      expect(source).toMatch(/useDbmOwnFilterSync\(\s*\(\) => route\.query/);
+      expect(source).toMatch(/useDbmOwnFilterSync\(\s*\(\) =>[^;]*?route\.query/);
       // ...and it must RELOAD, or the chip moves while the rows do not.
       expect(source, `${file} must refetch when it adopts a new scope`).toContain(
         "() => void load()",

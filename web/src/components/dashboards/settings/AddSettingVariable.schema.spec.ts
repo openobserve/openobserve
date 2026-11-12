@@ -15,11 +15,6 @@
 
 import { describe, expect, it } from "vitest";
 import { makeAddSettingVariableSchema } from "./AddSettingVariable.schema";
-import {
-  createFilterCondition,
-  createFilterGroup,
-  legacyFiltersToGroup,
-} from "@/utils/dashboard/variables/variableFilterGroupUtils";
 
 const schema = makeAddSettingVariableSchema((key: string) => key);
 
@@ -80,7 +75,7 @@ describe("AddSettingVariable schema — query_values modes", () => {
           custom_query: true,
           stream_type: "logs",
           query: "SELECT 1",
-          filter_group: legacyFiltersToGroup([{ name: "", operator: "", value: "" }]),
+          filter: [{ name: "", operator: "", value: "" }],
         },
       }),
     ).toEqual([]);
@@ -96,84 +91,61 @@ describe("AddSettingVariable schema — query_values modes", () => {
           stream: "up",
           field: "job",
           query_type: "promql",
-          filter_group: legacyFiltersToGroup([{ name: "env", operator, value: "prod" }]),
+          filter: [{ name: "env", operator, value: "prod" }],
         },
       });
     expect(promql("=")).toEqual([]);
     expect(promql("re_match")).toEqual([]);
-    expect(promql(">")).toEqual(["query_data.filter_group.conditions.0.operator"]);
-    expect(promql("str_match")).toEqual(["query_data.filter_group.conditions.0.operator"]);
+    expect(promql(">")).toEqual(["query_data.filter.0.operator"]);
+    expect(promql("str_match")).toEqual(["query_data.filter.0.operator"]);
     expect(
       issuesFor({
         name: "svc",
         type: "query_values",
-        query_data: {
-          ...autoSql,
-          filter_group: legacyFiltersToGroup([{ name: "env", operator: ">", value: "1" }]),
-        },
+        query_data: { ...autoSql, filter: [{ name: "env", operator: ">", value: "1" }] },
       }),
     ).toEqual([]);
   });
 
-  const condition = (field: string, operator: string, value: string, logic: "AND" | "OR") => ({
-    ...createFilterCondition(logic),
+  const condition = (field: string, value: string, logicalOperator: string) => ({
+    type: "condition",
     column: { field },
-    operator,
+    filterType: "condition",
+    operator: "=",
     value,
+    logicalOperator,
+    values: [],
+  });
+  const group = (logicalOperator: string, conditions: unknown[]) => ({
+    filterType: "group",
+    logicalOperator,
+    conditions,
   });
 
-  const orGroup = createFilterGroup("AND", [
-    condition("env", "=", "prod", "AND"),
-    createFilterGroup("OR", [
-      condition("level", "=", "error", "AND"),
-      condition("", "=", "", "OR"),
-    ]),
-  ]);
-
-  it("validates conditions inside nested groups by their full path", () => {
-    expect(
-      issuesFor({
-        name: "svc",
-        type: "query_values",
-        query_data: { ...autoSql, filter_group: orGroup },
-      }),
-    ).toEqual([
-      "query_data.filter_group.conditions.1.conditions.1.column.field",
-      "query_data.filter_group.conditions.1.conditions.1.value",
-    ]);
-  });
-
-  it("allows OR and nesting for SQL but blocks them for PromQL with a clear message", () => {
-    const sqlOr = createFilterGroup("AND", [
-      condition("env", "=", "prod", "AND"),
-      condition("env", "=", "dev", "OR"),
+  it("accepts a complete OR group and flags an unfinished condition at any depth", () => {
+    const complete = group("AND", [
+      condition("env", "prod", "AND"),
+      group("OR", [condition("level", "error", "AND"), condition("level", "warn", "OR")]),
     ]);
     expect(
       issuesFor({
         name: "svc",
         type: "query_values",
-        query_data: { ...autoSql, filter_group: sqlOr },
+        query_data: { ...autoSql, filter_group: complete },
       }),
     ).toEqual([]);
-    const promqlData = { stream_type: "metrics", stream: "up", field: "job", query_type: "promql" };
-    const orResult = schema.safeParse({
+    const unfinished = group("AND", [
+      condition("env", "prod", "AND"),
+      group("OR", [condition("level", "error", "AND"), condition("", "", "OR")]),
+    ]);
+    const result = schema.safeParse({
       name: "svc",
       type: "query_values",
-      query_data: { ...promqlData, filter_group: sqlOr },
+      query_data: { ...autoSql, filter_group: unfinished },
     });
-    expect(orResult.error?.issues.map((issue) => [issue.path.join("."), issue.message])).toEqual([
-      ["query_data.filter_group", "dashboard.queryVariable.promqlFiltersAndOnly"],
+    expect(result.error?.issues.map((issue) => [issue.path.join("."), issue.message])).toEqual([
+      ["query_data.filter_group", "filterBar.validation.incomplete"],
     ]);
-    const nested = createFilterGroup("AND", [
-      createFilterGroup("AND", [condition("env", "=", "prod", "AND")]),
-    ]);
-    expect(
-      issuesFor({
-        name: "svc",
-        type: "query_values",
-        query_data: { ...promqlData, filter_group: nested },
-      }),
-    ).toEqual(["query_data.filter_group"]);
   });
 
   it("defaults to auto SQL and keeps the custom fields it is given", () => {

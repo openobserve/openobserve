@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import GeoMapRenderer from "./GeoMapRenderer.vue";
+import { fakeCanvasPainter, fakeDevicePixelRatio } from "@/test/unit/helpers/devicePixelRatioFake";
 
 // Mock Leaflet
 const mockLeafletMap = {
@@ -51,6 +52,7 @@ const mockChart = {
   dispose: vi.fn(),
   on: vi.fn(),
   off: vi.fn(),
+  getZr: vi.fn((): any => ({})),
   getModel: vi.fn(() => ({
     getComponent: vi.fn((name) => {
       if (name === "lmap") {
@@ -81,6 +83,11 @@ vi.mock("echarts/charts", () => ({
   SankeyChart: vi.fn(),
   TreeChart: vi.fn(),
   GraphChart: vi.fn(),
+  TreemapChart: vi.fn(),
+  SunburstChart: vi.fn(),
+  PictorialBarChart: vi.fn(),
+  FunnelChart: vi.fn(),
+  BoxplotChart: vi.fn(),
 }));
 
 // Mock ECharts components
@@ -267,6 +274,107 @@ describe("GeoMapRenderer", () => {
       await waitForChartInit(wrapper);
 
       expect(echarts.init).toHaveBeenCalled();
+    });
+
+    it("inits at the live device pixel ratio, not the one zrender cached at import", async () => {
+      const echarts = await import("echarts/core");
+      const display = fakeDevicePixelRatio(2);
+      try {
+        wrapper = createWrapper();
+        await waitForChartInit(wrapper);
+
+        expect(echarts.init).toHaveBeenCalledWith(expect.any(HTMLElement), undefined, {
+          devicePixelRatio: 2,
+        });
+        expect(wrapper.find("#chart-map").classes()).not.toContain("chart-canvas-pixelated");
+      } finally {
+        display.restore();
+      }
+    });
+
+    it("pixel-snaps its canvases only while the ratio is fractional", async () => {
+      const display = fakeDevicePixelRatio(1.25);
+      const painter = fakeCanvasPainter(1.25);
+      mockChart.getZr.mockImplementation(() => ({ painter }));
+      try {
+        wrapper = createWrapper();
+        await waitForChartInit(wrapper);
+        const pixelated = () =>
+          wrapper.find("#chart-map").classes().includes("chart-canvas-pixelated");
+        expect(pixelated()).toBe(true);
+
+        display.setRatio(2);
+        await flushPromises();
+        expect(pixelated()).toBe(false);
+        display.setRatio(1);
+        await flushPromises();
+        expect(pixelated()).toBe(false);
+        display.setRatio(1.5);
+        await flushPromises();
+        expect(pixelated()).toBe(true);
+      } finally {
+        display.restore();
+        mockChart.getZr.mockImplementation(() => ({}));
+      }
+    });
+
+    it("stays smooth at a fractional ratio its canvas could not be re-rasterized at", async () => {
+      const display = fakeDevicePixelRatio(1);
+      const painter = fakeCanvasPainter(1);
+      painter.getLayers.mockReturnValue({ ...painter.layers, gl: { dpr: 1, resize: vi.fn() } });
+      mockChart.getZr.mockImplementation(() => ({ painter }));
+      try {
+        wrapper = createWrapper();
+        await waitForChartInit(wrapper);
+
+        display.setRatio(1.5);
+        await flushPromises();
+
+        expect(painter.dpr).toBe(1);
+        expect(wrapper.find("#chart-map").classes()).not.toContain("chart-canvas-pixelated");
+      } finally {
+        display.restore();
+      }
+    });
+
+    it("re-rasterizes in place, keeping the map's pan and zoom, when the window changes display", async () => {
+      const echarts = await import("echarts/core");
+      const display = fakeDevicePixelRatio(1);
+      const painter = fakeCanvasPainter(1);
+      try {
+        wrapper = createWrapper();
+        await waitForChartInit(wrapper);
+        mockChart.getZr.mockImplementation(() => ({ painter }));
+        mockChart.setOption.mockClear();
+        mockLeafletMap.setView.mockClear();
+
+        display.setRatio(2);
+
+        expect(echarts.init).toHaveBeenCalledTimes(1);
+        expect(mockChart.dispose).not.toHaveBeenCalled();
+        expect(mockChart.setOption).not.toHaveBeenCalled();
+        expect(mockLeafletMap.setView).not.toHaveBeenCalled();
+        expect(painter.dpr).toBe(2);
+        expect(painter.refresh).toHaveBeenCalledWith({ paintAll: true });
+      } finally {
+        display.restore();
+        mockChart.getZr.mockImplementation(() => ({}));
+      }
+    });
+
+    it("stops listening for ratio changes on unmount", async () => {
+      const display = fakeDevicePixelRatio(1);
+      try {
+        wrapper = createWrapper();
+        await waitForChartInit(wrapper);
+        expect(display.listenerCount()).toBe(1);
+
+        wrapper.unmount();
+        wrapper = undefined as any;
+        expect(display.listenerCount()).toBe(0);
+      } finally {
+        display.restore();
+      }
     });
 
     it("should set chart options", async () => {
@@ -892,6 +1000,154 @@ describe("GeoMapRenderer", () => {
       // Component should exist and handle coordinate data
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.props("data").options.lmap.center).toEqual([-74.006, 40.7128]);
+    });
+  });
+
+  describe("point clusters", () => {
+    it("reclusters the clustered layers when the map zoom ends", async () => {
+      (mockLeafletMap as any).getZoom = vi.fn(() => 16);
+      const clustered = {
+        options: {
+          lmap: { center: [0, 51.5], zoom: 2 },
+          series: [
+            {
+              type: "scatter",
+              data: [[-0.125, 51.505, 20, 2]],
+              _clusterSource: [
+                [-0.12, 51.5, 10],
+                [-0.13, 51.51, 30],
+              ],
+              _clusterRadius: 40,
+            },
+          ],
+        },
+      };
+      wrapper = createWrapper({ data: clustered });
+      await waitForChartInit(wrapper);
+      const zoomEnd = mockLeafletMap.on.mock.calls.find((call: any[]) => call[0] === "zoomend");
+      expect(zoomEnd).toBeTruthy();
+      mockChart.setOption.mockClear();
+      zoomEnd![1]();
+      expect(mockChart.setOption).toHaveBeenCalledWith({
+        series: [
+          {
+            data: [
+              [-0.12, 51.5, 10, 1],
+              [-0.13, 51.51, 30, 1],
+            ],
+          },
+        ],
+      });
+    });
+
+    it("does nothing on zoom for a map without clusters", async () => {
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      const zoomEnd = mockLeafletMap.on.mock.calls.find((call: any[]) => call[0] === "zoomend");
+      mockChart.setOption.mockClear();
+      zoomEnd?.[1]();
+      expect(mockChart.setOption).not.toHaveBeenCalled();
+    });
+  });
+  describe("Map lifecycle across refreshes", () => {
+    const defaultGetModel = mockChart.getModel.getMockImplementation();
+    const useLeaflet = (getMap: () => any) =>
+      mockChart.getModel.mockImplementation(() => ({
+        getComponent: vi.fn(() => ({ getLeaflet: vi.fn(getMap) })),
+      }));
+    const refreshWith = async (lmap: any) => {
+      await wrapper.setProps({
+        data: { options: { lmap, series: [{ type: "scatter", data: [[1, 2, 3]] }] } },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    };
+
+    afterEach(() => {
+      mockChart.getModel.mockImplementation(defaultGetModel!);
+      mockChart.setOption.mockImplementation(() => {});
+    });
+
+    it("keeps the user's view and tile layer when only the data changes", async () => {
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      const L: any = await import("leaflet");
+      mockChart.setOption.mockClear();
+      mockLeafletMap.setView.mockClear();
+      L.default.tileLayer.mockClear();
+
+      await refreshWith({ center: [116.46, 39.92], zoom: 10, roam: true });
+
+      const [options, opts] = mockChart.setOption.mock.calls.at(-1)!;
+      expect(options.lmap).toEqual({ roam: true });
+      expect(opts).toEqual({ replaceMerge: ["series", "visualMap"] });
+      expect(mockLeafletMap.setView).not.toHaveBeenCalled();
+      expect(L.default.tileLayer).not.toHaveBeenCalled();
+    });
+
+    it("moves the map when the configured view changes", async () => {
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      mockLeafletMap.setView.mockClear();
+
+      await refreshWith({ center: [10, 20], zoom: 4 });
+
+      expect(mockChart.setOption.mock.calls.at(-1)![0].lmap.center).toEqual([10, 20]);
+      expect(mockLeafletMap.setView).toHaveBeenCalledWith([20, 10], 4);
+    });
+
+    it("builds the map from scratch and adds tiles once when none exists yet", async () => {
+      let map: any;
+      useLeaflet(() => map);
+      mockChart.setOption.mockImplementation(() => {
+        map = mockLeafletMap;
+      });
+      const L: any = await import("leaflet");
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      expect(mockChart.setOption.mock.calls[0][1]).toBe(true);
+      expect(L.default.tileLayer).toHaveBeenCalledTimes(1);
+      expect(mockLeafletMap.setView).toHaveBeenCalledWith([39.92, 116.46], 10);
+    });
+
+    it("rebuilds the map after a no-data placeholder", async () => {
+      let map: any = mockLeafletMap;
+      useLeaflet(() => map);
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      mockChart.setOption.mockImplementation((_options: any, notMerge: any) => {
+        if (notMerge === true)
+          map = _options.lmap ? { ...mockLeafletMap, setView: vi.fn() } : undefined;
+      });
+      mockTileLayer.addTo.mockClear();
+
+      await wrapper.setProps({ data: { options: { backgroundColor: "transparent" } } });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(mockChart.setOption.mock.calls.at(-1)![1]).toBe(true);
+      expect(map).toBeUndefined();
+
+      await refreshWith({ center: [116.46, 39.92], zoom: 10 });
+
+      expect(mockChart.setOption.mock.calls.at(-1)![1]).toBe(true);
+      expect(mockTileLayer.addTo).toHaveBeenCalledWith(map);
+      expect(map.setView).toHaveBeenCalledWith([39.92, 116.46], 10);
+    });
+
+    it("adds a tile layer to a replaced map", async () => {
+      let map: any = mockLeafletMap;
+      useLeaflet(() => map);
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      const L: any = await import("leaflet");
+      L.default.tileLayer.mockClear();
+      const replacement = { ...mockLeafletMap, setView: vi.fn() };
+      mockTileLayer.addTo.mockClear();
+      map = replacement;
+
+      await refreshWith({ center: [116.46, 39.92], zoom: 10 });
+
+      expect(mockTileLayer.addTo).toHaveBeenCalledWith(replacement);
+      expect(replacement.setView).toHaveBeenCalledWith([39.92, 116.46], 10);
     });
   });
 });

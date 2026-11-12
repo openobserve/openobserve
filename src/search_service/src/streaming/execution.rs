@@ -15,14 +15,17 @@
 
 use std::time::Instant;
 
-use ::search::{QueryDelta, SearchResultType, datafusion::distributed_plan::streaming_aggs_exec};
-use config::meta::{
-    search::{
-        PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
-        SearchPartitionResponse, StreamResponses, TimeOffset, ValuesEventContext,
+use ::search::{QueryDelta, SearchResultType, datafusion::physical_plan::streaming_aggs_exec};
+use config::{
+    meta::{
+        search::{
+            PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
+            SearchPartitionResponse, StreamResponses, TimeOffset, ValuesEventContext,
+        },
+        sql::OrderBy,
+        stream::StreamType,
     },
-    sql::OrderBy,
-    stream::StreamType,
+    utils::sql::is_explain_query,
 };
 use log;
 use tokio::sync::mpsc;
@@ -81,15 +84,29 @@ pub async fn do_partitioned_search(
     // instead of returning the newest-first page this function otherwise builds.
     extract_patterns: bool,
 ) -> Result<(), infra::errors::Error> {
+    // EXPLAIN hits are plan rows, which the requested result size must not cap.
+    let req_size = if is_explain_query(&req.query.sql) {
+        -1
+    } else {
+        req_size
+    };
+    crate::sql::histogram::pin_histogram_timezone(
+        &mut req.query.sql,
+        &mut req.query.timezone,
+        req.query.end_time,
+    )?;
     // limit the search by max_query_range
     // Enrichment tables have no retention and must be searched in full (the request spans
     // [creation_time .. now]); clamping the range would drop older enrichment data, so skip it.
     let mut range_error = String::new();
     if stream_type != StreamType::EnrichmentTables
-        && max_query_range > 0
-        && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
+        && let Some(clamped) = config::utils::query_range::clamp_start_time(
+            req.query.start_time,
+            req.query.end_time,
+            max_query_range,
+        )
     {
-        req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
+        req.query.start_time = clamped;
         log::info!(
             "[HTTP2_STREAM trace_id {trace_id}] Query duration is modified due to query range restriction of {max_query_range} hours, new start_time: {}",
             req.query.start_time
@@ -471,7 +488,7 @@ pub async fn do_partitioned_search(
 
     // Remove the streaming_aggs cache
     if is_streaming_aggs && let Some(streaming_id) = &partition_resp.streaming_id {
-        streaming_aggs_exec::remove_cache(streaming_id)
+        streaming_aggs_exec::registry::remove_cache(streaming_id)
     }
 
     Ok(())
@@ -669,6 +686,7 @@ pub async fn get_partitions(
         histogram_interval: req.query.histogram_interval,
         sampling_ratio: req.query.sampling_ratio,
         search_type: req.search_type,
+        timezone: req.query.timezone.clone(),
     };
 
     let res = SearchService::search_partition(
@@ -995,7 +1013,7 @@ pub async fn process_delta(
 
     // Remove the streaming_aggs cache
     if is_streaming_aggs && let Some(streaming_id) = partition_resp.streaming_id {
-        streaming_aggs_exec::remove_cache(&streaming_id)
+        streaming_aggs_exec::registry::remove_cache(&streaming_id)
     }
 
     Ok(())

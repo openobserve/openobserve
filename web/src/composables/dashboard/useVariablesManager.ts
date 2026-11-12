@@ -24,18 +24,20 @@ import {
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { isCustomQueryVariable } from "@/utils/dashboard/variables/queryVariableUtils";
-import type { VariableFilterGroup } from "@/utils/dashboard/variables/variableFilterGroupUtils";
+import type { DashboardFilterGroup } from "@/components/filterBar/codecs";
 
 export const LIVE_COMMIT_DEBOUNCE_MS = 300;
 
 export interface VariableConfig {
   name: string;
   label?: I18nText;
-  type: "query_values" | "custom" | "constant" | "textbox" | "dynamic_filters";
+  type: "query_values" | "custom" | "constant" | "textbox" | "date" | "dynamic_filters";
   scope: "global" | "tabs" | "panels";
   tabs?: string[];
   panels?: string[];
   value: any;
+  /** Date variables only: the default output format. */
+  dateFormat?: string;
   multiSelect?: boolean;
   query_data?: {
     stream_type?: string;
@@ -53,7 +55,7 @@ export interface VariableConfig {
       value?: string;
       filter?: string;
     }>;
-    filter_group?: VariableFilterGroup | null;
+    filter_group?: DashboardFilterGroup | null;
   };
   options?: Array<{
     label: I18nText;
@@ -578,9 +580,14 @@ export const useVariablesManager = (t: TranslateFn) => {
 
     independentGlobalVars.forEach((v) => {
       // Mark as pending so selector will load them
-      // Non-API types (custom, constant, textbox) need to load to notify manager
+      // Non-API types (custom, constant, textbox, date) need to load to notify manager
       // query_values types without custom/all need API calls
-      if (v.type === "custom" || v.type === "constant" || v.type === "textbox") {
+      if (
+        v.type === "custom" ||
+        v.type === "constant" ||
+        v.type === "textbox" ||
+        v.type === "date"
+      ) {
         // Non-API types still need to load to set values and notify manager
         v.isVariableLoadingPending = true;
       } else if (v.type === "query_values") {
@@ -612,7 +619,7 @@ export const useVariablesManager = (t: TranslateFn) => {
 
         // Check if all parents are non-API types (don't require API calls to load)
         // These variables are treated the same: they load synchronously without API calls
-        // 1. Custom type variables: custom, constant, textbox, dynamic_filters
+        // 1. Custom type variables: custom, constant, textbox, date, dynamic_filters
         // 2. Query_values with custom/all defaults (values set from config, not API)
         const allParentsAreNonAPITypes = parentKeys.every((parentKey) => {
           const parentVar = globalVars.find((gv) => {
@@ -623,7 +630,7 @@ export const useVariablesManager = (t: TranslateFn) => {
           if (!parentVar) return false;
 
           // Parent is non-API type if:
-          // - It's a custom type variable (custom, constant, textbox, dynamic_filters)
+          // - It's a custom type variable (custom, constant, textbox, date, dynamic_filters)
           // - OR it's a query_values with custom/all default (no API call needed)
           // loadOptionsWithAllDefault makes an "all" parent genuinely fetch, so it
           // is NOT synchronous: pre-marking its child races the parent's response
@@ -632,6 +639,7 @@ export const useVariablesManager = (t: TranslateFn) => {
             parentVar.type === "custom" ||
             parentVar.type === "constant" ||
             parentVar.type === "textbox" ||
+            parentVar.type === "date" ||
             parentVar.type === "dynamic_filters" ||
             (parentVar.type === "query_values" &&
               !fetchesForDefault(parentVar) &&
@@ -1166,6 +1174,24 @@ export const useVariablesManager = (t: TranslateFn) => {
     });
   };
 
+  /** Takes global values another view already loaded, so they are not fetched again, and starts their children's loads. */
+  const adoptLoadedValues = (passed: Partial<VariableRuntimeState>[]) => {
+    const adopted = passed.flatMap((p) => {
+      // A query value mid-fetch or due to reload after its parent changed is not a value to keep.
+      if (p.type === "query_values" && (!p.isVariablePartialLoaded || p.isVariableLoadingPending))
+        return [];
+      const v = variablesData.global.find((g) => g.name === p.name);
+      if (!v) return [];
+      v.value = p.value;
+      v.isVariablePartialLoaded = true;
+      v.isLoading = false;
+      v.isVariableLoadingPending = false;
+      return [v];
+    });
+    recordLoadedAgainst(adopted);
+    scheduleChildrenOfRestored(adopted.map((v) => getVariableKey(v.name, v.scope)));
+  };
+
   interface ParsedUrlKey {
     name: string;
     scope: "global" | "tabs" | "panels";
@@ -1316,6 +1342,7 @@ export const useVariablesManager = (t: TranslateFn) => {
     isVariableReady,
     getDependentVariables,
     loadFromUrl,
+    adoptLoadedValues,
     getUrlParams,
   };
 };

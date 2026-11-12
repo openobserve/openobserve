@@ -93,7 +93,7 @@ test.describe("Pre-Test Cleanup", () => {
 
     // The logs coverage specs for #15086 each seed their own log stream, suffixed per run
     // so parallel workers cannot collide — which also means nothing ever reuses them.
-    // logs-highlighting, logs-default-columns and logs-search-around-multistream.
+    // logs-highlighting, logs-default-columns, logs-search-around-multistream and logs-explain-analyze.
     await pm.apiCleanup.cleanupStreams(
       [
         /^e2e_hl_filters_/,
@@ -101,6 +101,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_svc_none_/,
         /^e2e_sa_one_/,
         /^e2e_sa_two_/,
+        /^explain_e2e_/,
       ],
       ['default'],
     );
@@ -331,6 +332,7 @@ test.describe("Pre-Test Cleanup", () => {
     await pm.apiCleanup.cleanupStreams(
       [
         /^e2e_slo_14269_/,             // slo-error-messages.spec.js (#14269) seeded stream
+        /^cloud_api_smoke$/,           // Cloud/cloudApiSmoke.spec.js seed stream (re-seeded each run)
         /^e2e_13354_/,                 // logs-field-value-rendering.spec.js (#13354)
         /^e2e_13896_/,                 // logs-result-display.spec.js (#13896)
         /^e2e_13990_other_/,           // logs-bugs.spec.js (#13990)
@@ -394,7 +396,8 @@ test.describe("Pre-Test Cleanup", () => {
         /^backfill_dest_\d+$/,                         // Backfill dest streams (backfill_dest_<number>)
         /^e2e_backfill_dest_\d+$/,                     // e2e_backfill_dest_<timestamp> (pipeline-backfill.spec.js)
         /^e2e_time_test_\d+$/,                      // e2e_time_test_<timestamp>
-        /^pw_lib_(ready|absent)_/                   // alert-library.spec.js (Alert Library e2e readiness streams)
+        /^pw_lib_(ready|absent)_/,                  // alert-library.spec.js (Alert Library e2e readiness streams)
+        /^e2e_panel_notices_/                       // panelNotices.spec.js (high-cardinality series-cap streams)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json']
@@ -407,10 +410,14 @@ test.describe("Pre-Test Cleanup", () => {
       [
         /^sdr_traces_/,                // sdr_traces_* (traces SDR test streams: redact/drop/hash × ingestion/query)
         /^trace_genai_parts_/,         // trace_genai_parts_* (GenAI v5 parts rendering test streams)
+        /^e2e_prof_trace_/,            // Profiles/profiles-navigation-entry.spec.js linked-span traces stream
       ],
       ['default'],                     // protect the default traces stream
       { streamType: 'traces' }
     );
+
+    // Profiles specs delete their e2e_prof_* streams in afterAll; this sweeps what a crashed run left behind.
+    await pm.apiCleanup.cleanupStreams([/^e2e_prof_/], ['default'], { streamType: 'profiles' });
 
     // Note: Pipeline regression test streams (e2e_test_cpu_usage for metrics, e2e_test_traces for traces)
     // are created by pipeline-regression.spec.js for Issue #9901 regression tests.
@@ -456,11 +463,6 @@ test.describe("Pre-Test Cleanup", () => {
     // This avoids conflicts both within a test run (parallelIndex) and across test runs (testRunId)
     // The cleanup patterns above will clean up old test streams via regex matching
 
-    // Clean up test semantic groups created by correlation settings tests
-    // Groups: k8s-cluster, k8s-namespace, k8s-deployment, service
-    // These are created by ensureSemanticGroupsExist() in correlationSettingsPage.js
-    await pm.apiCleanup.cleanupCorrelationSettings();
-
     // Clean up service graph test screenshots
     const path = require('path');
     const screenshotDir = path.join(__dirname, '..', 'test-results', 'screenshots');
@@ -492,6 +494,9 @@ test.describe("Pre-Test Cleanup", () => {
     // Enterprise-only (rbac_enabled): on an OSS build /roles answers 4xx, so this skips
     // quietly rather than failing the cleanup every other suite depends on.
     await pm.apiCleanup.cleanupIamArtifacts('ui_auto');
+
+    // Fleet management leftovers (Fleet/*.spec.js); enterprise-only, quiet on OSS.
+    await pm.apiCleanup.cleanupFleetArtifacts(['fl_auto_'], ['fl-auto-']);
 
     testLogger.info('Pre-test cleanup completed successfully');
   });

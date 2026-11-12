@@ -67,6 +67,7 @@ export async function waitForChartRepaint(page, pm) {
   await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartRepaint: waitForChartToRender failed", e.message));
   await page.waitForFunction(
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    undefined,
     { timeout: 5000 }
   ).catch((e) => testLogger.warn("waitForChartRepaint: rAF timeout", e.message));
   // Wait for ECharts to have painted actual pixels before pixel-level color assertions
@@ -78,7 +79,7 @@ export async function waitForChartRepaint(page, pm) {
       const d = ctx.getImageData(0, 0, Math.min(c.width, 50), Math.min(c.height, 50));
       return d.data.some(v => v > 0);
     });
-  }, { timeout: 15000 }).catch((e) => testLogger.warn("waitForChartRepaint: canvas pixel wait timed out", e.message));
+  }, undefined, { timeout: 15000 }).catch((e) => testLogger.warn("waitForChartRepaint: canvas pixel wait timed out", e.message));
 }
 
 /**

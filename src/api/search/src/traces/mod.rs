@@ -40,7 +40,7 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::ingestion::check_ingestion_allowed;
 pub use openobserve_core::traces::{
     agent_signals::{compare_agent_versions, get_agent_signals},
-    service_graph::{self, get_current_topology, get_edge_history},
+    service_graph,
 };
 use openobserve_core::{auth::UserEmail, traces};
 use tracing::{Instrument, Span};
@@ -55,6 +55,17 @@ use crate::{
     },
     search::error_utils::map_error_to_http_response,
 };
+
+// Only documents get_latest_traces' answer: an empty search response until traces are found.
+#[derive(serde::Serialize, utoipa::ToSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+enum LatestTracesVariants {
+    Empty(Box<config::meta::search::Response>),
+    Page(PaginatedResponse),
+}
+
+config::any_of_schema!(LatestTracesAnswer, LatestTracesVariants);
 
 pub(crate) async fn check_stream_permissions(
     org_id: &str,
@@ -80,6 +91,33 @@ pub(crate) async fn check_stream_permissions(
     }
 }
 
+/// Requires search permission on every stream `sql` reads, not only the path stream.
+pub(crate) async fn check_sql_permissions(
+    org_id: &str,
+    user_id: &str,
+    sql: &str,
+    trace_id: &str,
+) -> Option<Response> {
+    #[cfg(feature = "enterprise")]
+    {
+        return crate::search::check_sql_stream_permissions(
+            sql,
+            org_id,
+            user_id,
+            StreamType::Traces,
+            openobserve_core::authz::StreamPermissionResourceType::Search,
+            trace_id,
+        )
+        .await;
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, user_id, sql, trace_id);
+        None
+    }
+}
+
 #[utoipa::path(
     post,
     path = "/{org_id}/v1/traces",
@@ -96,8 +134,8 @@ pub(crate) async fn check_stream_permissions(
     ),
     request_body(description = "ExportTraceServiceRequest", content(("application/x-protobuf"), (Object = "application/json"))),
     responses(
-        (status = 200, description = "ExportTraceServiceResponse", content(("application/x-protobuf"), (Object = "application/json"))),
-        (status = 206, description = "ExportTraceServiceResponse with a partial success (JSON requests only)", content((Object = "application/json"))),
+        (status = 200, description = "ExportTraceServiceResponse", content((common::meta::otlp::OtlpProtobufBody = "application/x-protobuf"), (common::meta::otlp::OtlpTracesExportJson = "application/json"))),
+        (status = 206, description = "ExportTraceServiceResponse with a partial success (JSON requests only)", content((common::meta::otlp::OtlpTracesExportJson = "application/json"))),
         (status = 400, description = "google.rpc.Status: invalid body, unsupported Content-Type, or write rejected (e.g. columns limit)", content(("application/x-protobuf"), (Object = "application/json"))),
         (status = 429, description = "google.rpc.Status: trial period expired", content(("application/x-protobuf"), (Object = "application/json"))),
         (status = 500, description = "google.rpc.Status: internal write error", content(("application/x-protobuf"), (Object = "application/json"))),
@@ -186,7 +224,7 @@ pub async fn traces_write(
         ("stream_name" = String, Path, description = "Stream name"),
         ("filter" = Option<String>, Query, description = "filter, eg: a=b AND c=d"),
         ("from" = i64, Query, description = "from"),
-        ("size" = i64, Query, description = "size"),
+        ("size" = i64, Query, description = "page size; 0, negative, invalid or omitted uses ZO_QUERY_DEFAULT_LIMIT"),
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
@@ -194,7 +232,7 @@ pub async fn traces_write(
         ("sort_order" = Option<String>, Query, description = "sort order: asc, desc (default: desc)"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = LatestTracesAnswer, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -212,7 +250,8 @@ pub async fn traces_write(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "List recent traces with summaries (trace_id, span count, service names, duration). Supports filter and sort by start_time/duration.", "category": "traces", "pinned": true}))
+        ("x-o2-mcp" = json!({"description": "List recent traces with summaries (trace_id, span count, service names, duration). Supports filter and sort by start_time/duration.", "category": "traces", "pinned": true})),
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"}))
     )
 )]
 pub async fn get_latest_traces(
@@ -226,7 +265,8 @@ pub async fn get_latest_traces(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -257,6 +297,7 @@ pub async fn get_latest_traces(
         user_id,
         &query,
         list::TraceListMode::Complete,
+        &trace_id,
     )
     .await
     {
@@ -305,7 +346,7 @@ pub async fn get_latest_traces(
     tag = "Traces",
     operation_id = "GetLatestTracesStream",
     summary = "Stream recent trace data",
-    description = "Streams the most recent trace data from a specific stream within a time range using HTTP/2 server-sent events. Results are returned progressively as each time partition is processed, reducing time-to-first-result for large time ranges.",
+    description = "Streams the most recent trace data from a specific stream within a time range using HTTP/2 server-sent events. Results are returned progressively as each time partition is processed, reducing time-to-first-result for large time ranges. With sort_by=duration, ranking across partitions is approximate; each page is sorted by full trace duration.",
     security(
         ("Authorization"= [])
     ),
@@ -313,18 +354,22 @@ pub async fn get_latest_traces(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("filter" = Option<String>, Query, description = "filter, eg: a=b AND c=d"),
-        ("from" = i64, Query, description = "from"),
-        ("size" = i64, Query, description = "size"),
+        ("from" = Option<i64>, Query, description = "from"),
+        ("size" = Option<i64>, Query, description = "page size; 0, negative, invalid or omitted uses ZO_QUERY_DEFAULT_LIMIT"),
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
-        ("sort_by" = Option<String>, Query, description = "sort by field: start_time, duration (default: start_time)"),
+        ("sort_by" = Option<String>, Query, description = "sort by field: start_time, duration (default: start_time); see the endpoint description for the limits of the streamed duration sort"),
         ("sort_order" = Option<String>, Query, description = "sort order: asc, desc (default: desc)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "text/event-stream"),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn get_latest_traces_stream(
@@ -337,7 +382,8 @@ pub async fn get_latest_traces_stream(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -367,6 +413,7 @@ pub async fn get_latest_traces_stream(
         user_id,
         &query,
         list::TraceListMode::Streaming,
+        &trace_id,
     )
     .await
     {
@@ -375,6 +422,24 @@ pub async fn get_latest_traces_stream(
     };
     let context = list::TraceSearchContext::new(org_id, stream_name, user_id.to_string(), trace_id);
     list::stream_response(context, plan, http_span)
+}
+
+/// Documented on [`service_graph::api::get_current_topology`]; the graph is scoped to the user.
+pub async fn get_current_topology(
+    Path(org_id): Path<String>,
+    axum::extract::Query(query): axum::extract::Query<service_graph::api::ServiceGraphQuery>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    service_graph::get_current_topology(&org_id, &user_email.user_id, query).await
+}
+
+/// Documented on [`service_graph::api::get_edge_history`]; the trend is scoped to the user.
+pub async fn get_edge_history(
+    Path(org_id): Path<String>,
+    axum::extract::Query(query): axum::extract::Query<service_graph::api::EdgeHistoryQuery>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    service_graph::get_edge_history(&org_id, &user_email.user_id, query).await
 }
 
 fn record_latest_traces_metrics(org_id: &str, status: &str, elapsed: f64) {
@@ -397,6 +462,38 @@ fn record_latest_traces_metrics(org_id: &str, status: &str, elapsed: f64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_filter_handlers_authorize_the_sql_they_run() {
+        let handlers = [
+            (include_str!("list/mod.rs"), "pub async fn prepare(", "&sql"),
+            (
+                include_str!("user.rs"),
+                "pub async fn get_latest_users(",
+                "&query_sql",
+            ),
+            (
+                include_str!("session.rs"),
+                "pub async fn get_latest_sessions(",
+                "&query_sql",
+            ),
+        ];
+        for (text, handler, sql) in handlers {
+            let body = &text[text.find(handler).expect(handler)..];
+            let body = &body[..body.find("\n}\n").expect("handler end")];
+            let check = body
+                .find("check_sql_permissions(")
+                .unwrap_or_else(|| panic!("{handler} must authorize every stream its SQL reads"));
+            let call = &body[check..check + body[check..].find(')').expect("call end")];
+            assert!(
+                call.contains(sql),
+                "{handler} must authorize the SQL it runs"
+            );
+            if let Some(search) = body.find("cache::search(") {
+                assert!(check < search, "{handler} must authorize before searching");
+            }
+        }
+    }
 
     #[cfg(not(feature = "cloud"))]
     async fn call_traces_write(

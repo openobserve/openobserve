@@ -27,8 +27,10 @@ vi.mock("@/services/settings", async (importOriginal) => {
   });
 });
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 import settings from "@/services/settings";
+import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { queryClient } from "@/composables/query/queryClient";
@@ -84,6 +86,7 @@ describe("useHomeDashboard", () => {
     expect(homeDashboard.value).toEqual(D); // optimistic — set before await resolves
     await p;
     expect(settings.setOrgSetting).toHaveBeenCalledWith("org1", "home_dashboard", D, "ui");
+    expect(analytics.track).toHaveBeenCalledWith("home_dashboard_pinned");
   });
 
   it("setHomeDashboard reverts the ref and toasts on failure", async () => {
@@ -94,6 +97,7 @@ describe("useHomeDashboard", () => {
     await setHomeDashboard("org1", D);
     expect(homeDashboard.value).toEqual(prev); // reverted
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 
   it("setHomeDashboard shows a permission message on 403", async () => {
@@ -169,11 +173,14 @@ describe("useHomeDashboard", () => {
     updateLabel("org1", "abc", "Renamed");
     expect(homeDashboard.value?.label).toBe("Renamed");
     // Persisted so the fresh label survives the next load().
+    // Background sync the user never asked for, so its 403 must not reach the access boundary.
     expect(settings.setOrgSetting).toHaveBeenCalledWith(
       "org1",
       "home_dashboard",
       { ...D, label: "Renamed" },
       "ui",
+      undefined,
+      { silentForbidden: true },
     );
   });
 
@@ -182,5 +189,59 @@ describe("useHomeDashboard", () => {
     homeDashboard.value = { ...D };
     updateLabel("org1", "abc", D.label);
     expect(settings.setOrgSetting).not.toHaveBeenCalled();
+  });
+
+  describe("per-org scoping", () => {
+    const deferred = () => {
+      let resolve: (v: unknown) => void = () => {};
+      const promise = new Promise((r) => (resolve = r));
+      return { promise, resolve };
+    };
+
+    beforeEach(() => queryClient.clear());
+
+    it("an org switch drops the previous org's pin before the new one loads", async () => {
+      const { load, homeDashboard, isLoadedFor } = useHomeDashboard(gt);
+      (settings.getSetting as any).mockResolvedValueOnce({ data: { setting_value: D } });
+      await load("switch-a");
+      expect(homeDashboard.value).toEqual(D);
+      expect(isLoadedFor("switch-a")).toBe(true);
+
+      const b = deferred();
+      (settings.getSetting as any).mockReturnValueOnce(b.promise);
+      const pending = load("switch-b");
+      expect(homeDashboard.value).toBeNull();
+      expect(isLoadedFor("switch-b")).toBe(false);
+      b.resolve({ data: null });
+      await pending;
+      expect(isLoadedFor("switch-b")).toBe(true);
+    });
+
+    it("a pin saved while the boot read is pending survives that read's late answer", async () => {
+      const { load, setHomeDashboard, homeDashboard } = useHomeDashboard(gt);
+      const read = deferred();
+      (settings.getSetting as any).mockReturnValueOnce(read.promise);
+      const loading = load("pin-race");
+      (settings.setOrgSetting as any).mockResolvedValueOnce({});
+      await setHomeDashboard("pin-race", D);
+      read.resolve({ data: null });
+      await loading;
+      expect(homeDashboard.value).toEqual(D);
+      expect(queryClient.getQueryData(settingKeys.one("pin-race", "home_dashboard"))).toEqual(D);
+    });
+
+    it("a late answer for an earlier org never lands on the current one", async () => {
+      const { load, homeDashboard, isLoadedFor } = useHomeDashboard(gt);
+      const a = deferred();
+      (settings.getSetting as any).mockReturnValueOnce(a.promise);
+      const first = load("late-a");
+      (settings.getSetting as any).mockResolvedValueOnce({ data: null });
+      await load("late-b");
+      a.resolve({ data: { setting_value: D } });
+      await first;
+      expect(homeDashboard.value).toBeNull();
+      expect(isLoadedFor("late-a")).toBe(false);
+      expect(isLoadedFor("late-b")).toBe(true);
+    });
   });
 });

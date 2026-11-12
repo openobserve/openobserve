@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :columns="columns"
       row-key="id"
       :loading="loading"
+      :forbidden="forbidden"
       pagination="client"
       :page-size="pageSize"
       :page-size-options="[10, 20, 50]"
@@ -172,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
+                :aria-label="t('common.moreActions')"
                 icon-left="more-vert"
                 variant="ghost"
                 size="icon-xs-sq"
@@ -229,6 +231,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import type { ForbiddenState } from "@/utils/featureGate";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -248,6 +251,7 @@ import { syntheticsPrivateLocationRoute } from "@/utils/synthetics/routes";
 const props = defineProps<{
   locations: SyntheticLocation[];
   loading: boolean;
+  forbidden?: ForbiddenState;
 }>();
 const emit = defineEmits<{
   (e: "refresh"): void;

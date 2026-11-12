@@ -17,17 +17,27 @@ import store from "../stores";
 import type { AxiosInstance } from "axios";
 import axios from "axios";
 import config from "../aws-exports";
-import { useLocalUserInfo, useLocalCurrentUser } from "@/utils/zincutils";
-import { addUnauthorizedError } from "@/composables/useUnauthorizedErrorGrouper";
+import { expireSession } from "@/utils/sessionServices";
+import {
+  currentAccessRouteKey,
+  noteAccessSuccess,
+  recordForbidden,
+} from "@/composables/useAccessStore";
 import { usePasswordReset } from "@/composables/usePasswordReset";
 import { isPasswordResetError } from "@/utils/passwordResetErrors";
+import { receiveLicenseDenial } from "@/services/licenseDenialReceiver";
 
 declare module "axios" {
   interface AxiosRequestConfig {
-    /** The caller renders a 403 itself, so it is left out of the grouped "Access Required" toast. */
+    /** The caller renders a 403 itself, so the access boundary does not record it. */
     skipAccessToast?: boolean;
-    /** Skip the global Unauthorized toast on a 403; the caller handles the refusal itself. */
+    /** The caller handles the refusal itself, so the access boundary does not record the 403. */
     silentForbidden?: boolean;
+    /** Route the request started on, so a late 403 is not pinned on the page the user moved to. */
+    accessRouteKey?: string;
+    startedAt?: number;
+    /** Set on the retry after a token refresh, so a second 401 is not refreshed again. */
+    _afterRefresh?: boolean;
   }
 }
 
@@ -49,11 +59,7 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
   }
 
   if (config.isCloud == "true") {
-    store.dispatch("logout");
-    useLocalCurrentUser("", true);
-    useLocalUserInfo("", true);
-    sessionStorage.clear();
-    window.location.reload();
+    expireSession(store);
     return Promise.reject(new Error("Cloud environment: direct logout"));
   }
 
@@ -74,13 +80,7 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
         .catch(() => {
           return refreshInstance
             .get("/config/logout")
-            .finally(() => {
-              store.dispatch("logout");
-              useLocalCurrentUser("", true);
-              useLocalUserInfo("", true);
-              sessionStorage.clear();
-              window.location.reload();
-            })
+            .finally(() => expireSession(store))
             .then(() => Promise.reject(new Error("Refresh failed")));
         })
         .finally(() => {
@@ -91,13 +91,43 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
   }
 
   // Not enterprise SSO — standard logout
-  store.dispatch("logout");
-  useLocalCurrentUser("", true);
-  useLocalUserInfo("", true);
-  sessionStorage.clear();
-  window.location.reload();
+  expireSession(store);
   return Promise.reject(new Error("Not SSO: cannot refresh"));
 };
+
+// `/security/access` answers any signed-in member, so it is the probe and never probed itself.
+const SECURITY_ROUTE = /\/api\/([^/?#]+)\/security\/(?!access(?:[/?#]|$))/;
+
+// One probe per org at a time: a page fires several Security requests that 401 together.
+const sessionProbes = new Map<string, Promise<boolean>>();
+
+/** Org of a Security request other than the access probe, or null. */
+export const securityRequestOrg = (url: string): string | null =>
+  SECURITY_ROUTE.exec(url)?.[1] ?? null;
+
+/** Whether the session still answers `/security/access`; only a 401 there means it really expired. */
+export const sessionStillAlive = (org: string): Promise<boolean> => {
+  let probe = sessionProbes.get(org);
+  if (!probe) {
+    probe = axios
+      .create({ withCredentials: true, baseURL: store.state.API_ENDPOINT })
+      .get(`/api/${org}/security/access`)
+      .then(
+        () => true,
+        (err) => err?.response?.status !== 401,
+      )
+      .finally(() => sessionProbes.delete(org));
+    sessionProbes.set(org, probe);
+  }
+  return probe;
+};
+
+const recordRefusal = (error: any) =>
+  recordForbidden({
+    url: error.request?.responseURL || error.config?.url || "",
+    method: error.config?.method,
+    routeKey: error.config?.accessRouteKey,
+  });
 
 const http = ({ headers } = {} as any) => {
   let instance: AxiosInstance;
@@ -113,8 +143,20 @@ const http = ({ headers } = {} as any) => {
     headers,
   });
 
+  instance.interceptors.request.use((requestConfig) => {
+    // A retry after a token refresh reuses its config, so it keeps the page that first asked.
+    requestConfig.accessRouteKey ??= currentAccessRouteKey();
+    requestConfig.startedAt = Date.now();
+    return requestConfig;
+  });
+
   instance.interceptors.response.use(
     function (response) {
+      noteAccessSuccess({
+        url: response.request?.responseURL || response.config?.url,
+        method: response.config?.method,
+        routeKey: response.config?.accessRouteKey,
+      });
       return response;
     },
     function (error) {
@@ -124,43 +166,55 @@ const http = ({ headers } = {} as any) => {
         // A blocked page fires many requests behind an undismissable dialog; one toast per rejection would stack.
         return new Promise(() => {});
       }
+      // Ahead of the status switch: a license denial must not read as a missing RBAC permission.
+      if (receiveLicenseDenial(error, error?.config?.startedAt)) return Promise.reject(error);
       if (error && error.response && error.response.status) {
         switch (error.response.status) {
           case 400:
             break;
-          case 401:
-            if (config.isCloud == "true" && !error.request.responseURL.includes("/auth/login")) {
-              store.dispatch("logout");
-              useLocalCurrentUser("", true);
-              useLocalUserInfo("", true);
-              sessionStorage.clear();
-              window.location.reload();
+          case 401: {
+            const responseUrl: string = error.request?.responseURL || error.config?.url || "";
+            // A fresh token that still gets 401 is a refusal, not an expiry: refreshing again would loop.
+            if (error.config?._afterRefresh) {
+              recordRefusal(error);
+              return Promise.reject(error);
+            }
+            const sso =
+              config.isCloud != "true" &&
+              config.isEnterprise == "true" &&
+              (store.state as any).zoConfig.sso_enabled;
+            const securityOrg = sso ? null : securityRequestOrg(responseUrl);
+            if (securityOrg) {
+              return sessionStillAlive(securityOrg).then((alive) => {
+                if (alive) recordRefusal(error);
+                else expireSession(store);
+                return Promise.reject(error);
+              });
+            }
+            if (config.isCloud == "true" && !responseUrl.includes("/auth/login")) {
+              expireSession(store);
             }
             // Delegate to the shared refresh helper — it owns the URL exclusion
             // checks and the logout-on-failure path. Retry the original request
             // once the token is refreshed.
-            else if (config.isEnterprise == "true" && (store.state as any).zoConfig.sso_enabled) {
+            else if (sso) {
               return attemptTokenRefresh(error.config.url)
-                .then(() => instance.request(error.config))
-                .catch(() => Promise.reject(error));
+                .then(() => instance.request({ ...error.config, _afterRefresh: true }))
+                .catch((retryError) =>
+                  Promise.reject(retryError?.config?._afterRefresh ? retryError : error),
+                );
             } else {
-              if (!error.request.responseURL.includes("/login")) {
-                store.dispatch("logout");
-                useLocalCurrentUser("", true);
-                useLocalUserInfo("", true);
-                sessionStorage.clear();
-                window.location.reload();
-              }
+              if (!responseUrl.includes("/login")) expireSession(store);
             }
             break;
+          }
           case 403:
             if (
               (config.isEnterprise == "true" || config.isCloud == "true") &&
               !error.config?.skipAccessToast &&
               !error.config?.silentForbidden
             ) {
-              const responseUrl = error.request?.responseURL || error.config?.url || "";
-              addUnauthorizedError(responseUrl);
+              recordRefusal(error);
             }
             break;
           case 404:

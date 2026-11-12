@@ -14,17 +14,23 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref, computed, watch, nextTick, onBeforeMount, onUnmounted } from "vue";
-import type { TranslateFn } from "@/types/i18n";
+import { toZonedTime } from "date-fns-tz";
+import type { I18nText, TranslateFn } from "@/types/i18n";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
+import { streamTypeFeature } from "@/utils/featureGate";
 import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/utils/commons";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
 import { getFieldLabel } from "@/utils/dashboard/fieldLabel";
 import {
+  formatDateVariable,
   normalizeVariableSyntax,
   replaceVariablePlaceholders,
 } from "@/utils/dashboard/variables/variablesUtils";
 import searchService from "@/services/search";
-import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
+import { isCrossLinkingEnabledForStream, supportsResultSchema } from "@/utils/crossLinking";
+import useStreams from "@/composables/useStreams";
+import { getEnrichmentTableRange } from "@/utils/dashboard/streamLifetime";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
 import { extractFields } from "@/utils/query/sqlUtils";
 import {
@@ -32,7 +38,19 @@ import {
   SQL_PARSE_MAX_DEPTH,
   stripWherePredicate,
 } from "@/utils/query/sqlComplexity";
-import { EXEMPLAR_SERIES_ID } from "@/utils/dashboard/exemplars/applyExemplarSeries";
+import { isExemplarSeriesId } from "@/utils/dashboard/exemplars/applyExemplarSeries";
+import {
+  stateTimelineBreakdownColumn,
+  stateTimelineDrilldownSeries,
+  stateTimelineSourceRecord,
+} from "@/utils/dashboard/convertStateTimelineData";
+import { isFlowChart, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
+import { boxplotDrilldownSeries, boxplotDrilldownTime } from "@/utils/dashboard/convertBoxplotData";
+import { barGaugeDrilldownSeries } from "@/utils/dashboard/convertBarGaugeData";
+import { hostmapDrilldownSeries, hostmapEntityColumn } from "@/utils/dashboard/convertHostmapData";
+
+// A click on these lands on a named item (slice, bar, tile), not on a named series.
+const NAMED_ITEM_TYPES = ["pie", "donut", "bar-gauge", "treemap", "sunburst", "funnel"];
 
 export function usePanelDrilldown({
   panelSchema,
@@ -58,6 +76,7 @@ export function usePanelDrilldown({
   showErrorNotification,
   t,
   onExemplarClick,
+  hideChartTooltip,
 }: {
   panelSchema: any;
   variablesData: any;
@@ -83,8 +102,10 @@ export function usePanelDrilldown({
   showErrorNotification: any;
   t: TranslateFn;
   onExemplarClick?: (params: any) => void | Promise<void>;
+  hideChartTooltip?: () => void;
 }) {
   // Cross-linking: store cross-links from result_schema response
+  const { getStream } = useStreams(t);
   const crossLinksData: any = ref({ stream_links: [], org_links: [] });
 
   // Panel query's WHERE, parsed by the backend (result_schema); "" falls back to client extraction.
@@ -94,6 +115,21 @@ export function usePanelDrilldown({
   const panelWhereByStream = ref<Record<string, string>>({});
 
   const drilldownArray: any = ref([]);
+
+  const licenseLocks = useLicenseLocks();
+
+  /** Why a drilldown item cannot open: its in-app logs, metrics or traces target is not licensed. */
+  const drilldownLockedReason = (item: any): I18nText | null => {
+    let feature: string | null = null;
+    if (item?._isCrossLink) {
+      feature = inAppSignalFeature(item?.data?._rawUrl);
+    } else if (item?.type === "logs") {
+      feature = streamTypeFeature(panelSchema.value?.queries?.[0]?.fields?.stream_type);
+    } else if (item?.type === "byUrl") {
+      feature = inAppSignalFeature(item?.data?.url);
+    }
+    return feature && licenseLocks.isLocked(feature) ? licenseLocks.lockedReason(feature) : null;
+  };
 
   // need to save click event params, to open drilldown
   let drilldownParams: any = [];
@@ -195,6 +231,53 @@ export function usePanelDrilldown({
     );
   };
 
+  // A heatmap's value[0] is a column index, so its time range is that column's bounds on the heatmap time axis.
+  const heatmapColumnRange = (params: any) => {
+    const column = panelData?.value?.extras?.heatmapTimeAxis?.columns?.[params?.value?.[0]];
+    if (!column) return null;
+    const startTime = getUTCTimestampFromZonedTimestamp(column.start, store.state.timezone);
+    const endTime = getUTCTimestampFromZonedTimestamp(column.end, store.state.timezone);
+    return startTime && endTime ? { startTime, endTime } : null;
+  };
+
+  // A heatmap cell's value is [column index, row index, z]; its labels live on the axes of the grid its series is drawn in, its raw row values in extras.
+  const heatmapCellValues = (params: any): { column: any; row: any } => {
+    const options = panelData?.value?.options;
+    const series = options?.series?.[params?.seriesIndex];
+    const axisOf = (axes: any, index: number) => (Array.isArray(axes) ? axes[index] : axes);
+    const [column, row] = Array.isArray(params?.value) ? params.value : [];
+    const yAxisIndex = series?.yAxisIndex ?? 0;
+    const rawRow = panelData?.value?.extras?.heatmapRowValues?.[yAxisIndex]?.[row];
+    // A time column is its start in epoch ms, as state timelines give it: a formatted time has a space a URL cannot carry.
+    const columnRange = heatmapColumnRange(params);
+    return {
+      column: columnRange
+        ? columnRange.startTime / 1000
+        : (axisOf(options?.xAxis, series?.xAxisIndex ?? 0)?.data?.[column] ?? params?.name),
+      row: rawRow !== undefined ? rawRow : axisOf(options?.yAxis, yAxisIndex)?.data?.[row],
+    };
+  };
+
+  const seriesDrilldownVariables = (params: any) => {
+    const value = Array.isArray(params?.value)
+      ? params.value[params.value.length - 1]
+      : params?.value;
+    if (panelSchema.value.type === "heatmap") {
+      const { column, row } = heatmapCellValues(params);
+      return { __name: row ?? params?.name, __value: value, __axisValue: column };
+    }
+    if (panelSchema.value.type === "boxplot") {
+      return boxplotDrilldownSeries(panelData?.value?.options, params);
+    }
+    if (panelSchema.value.type === "bar-gauge") return barGaugeDrilldownSeries(params);
+    return {
+      __name: NAMED_ITEM_TYPES.includes(panelSchema.value.type) ? params?.name : params?.seriesName,
+      __value: value,
+      // A gauge dial named "(empty)" stands in for a blank label; drilldowns filter on the blank.
+      __axisValue: params?.value?.[0] ?? params?.data?.rawName ?? params?.name,
+    };
+  };
+
   // get offset from parent
   function getOffsetFromParent(parent: any, child: any) {
     const parentRect = parent.getBoundingClientRect();
@@ -233,7 +316,10 @@ export function usePanelDrilldown({
     return { originalQuery, streamName };
   };
 
-  const calculateTimeRange = (hoveredTimestamp: number | null, interval: number | undefined) => {
+  const calculateTimeRange = async (
+    hoveredTimestamp: number | null,
+    interval: number | undefined,
+  ) => {
     if (interval && hoveredTimestamp) {
       const startTime = hoveredTimestamp; // hovertedTimestamp is in microseconds
       return {
@@ -241,6 +327,9 @@ export function usePanelDrilldown({
         endTime: startTime + interval,
       };
     }
+    // The panel read the whole enrichment table, so the logs page opens on that same span.
+    const tableRange = await getEnrichmentTableRange(getStream, panelSchema.value);
+    if (tableRange) return { startTime: tableRange.from, endTime: tableRange.to };
     return {
       startTime: selectedTimeObj.value.start_time.getTime(),
       endTime: selectedTimeObj.value.end_time.getTime(),
@@ -395,7 +484,12 @@ export function usePanelDrilldown({
       const escape = (value: any) => escapeSingleQuotes(String(value));
 
       if (!Array.isArray(variable.value)) {
-        return variable.value === null ? "" : `${escape(variable.value)}`;
+        const dateText = formatDateVariable(variable, format);
+        return dateText !== undefined
+          ? escape(dateText)
+          : variable.value === null
+            ? ""
+            : `${escape(variable.value)}`;
       }
 
       const singleQuoted = variable.value.map((value: any) => `'${escape(value)}'`).join(",");
@@ -515,35 +609,67 @@ export function usePanelDrilldown({
     isCursorOverPanel.value = false;
   };
 
+  // Mirrors getAnnotationsData's own xAxis computation, so the manual annotation lands exactly on the band.
+  const queryMarkerStart = (marker: { start_time?: number } | null | undefined) =>
+    marker?.start_time
+      ? toZonedTime(new Date(marker.start_time / 1000), store.state.timezone)
+      : null;
+
+  // A metric value is drawn by renderItem, so the click carries no value; the clicked cell holds it.
+  const metricSeriesVariables = (params: { seriesIndex?: number } | undefined) => {
+    if (panelSchema.value.type !== "metric" || params?.seriesIndex === undefined) return {};
+    const cell = panelData.value?.options?.series?.[params.seriesIndex];
+    return cell ? { __name: cell._metricName ?? "", __value: cell._metricRaw ?? "" } : {};
+  };
+
   const onChartClick = async (params: any, ...args: any) => {
     // An exemplar marker opens its trace, never the drilldown menu or an annotation.
-    if (params?.seriesId === EXEMPLAR_SERIES_ID) {
+    if (isExemplarSeriesId(params?.seriesId)) {
       await onExemplarClick?.(params);
       return;
     }
-    // Check if we have both drilldown and annotation at the same point
-    const hasAnnotation =
-      params?.componentType === "markLine" || params?.componentType === "markArea";
+    // A host map group header has a tooltip but is no cell to drill into.
+    if (panelSchema.value.type === "hostmap" && params?.seriesIndex !== 0) return;
+    // A treemap breadcrumb navigates the tiles and carries no series name or value.
+    if (params?.selfType === "breadcrumb") return;
+    const isMarker = params?.componentType === "markLine" || params?.componentType === "markArea";
+    // Query-source markers are read-only and explain themselves on hover.
+    const isQueryMarker = isMarker && !!params?.data?.annotationDetails?.source;
+    const hasAnnotation = isMarker && !isQueryMarker;
     const hasDrilldown = panelSchema.value.config.drilldown?.length > 0;
 
-    // If in annotation add mode, handle that first
+    // Checked before the query-band early return below, so add-mode still places an annotation on a band.
     if (allowAnnotationsAdd.value) {
       if (isAddAnnotationMode.value) {
         if (hasAnnotation) {
           editAnnotation(params?.data?.annotationDetails);
+        } else if (isQueryMarker) {
+          handleAddAnnotation(queryMarkerStart(params?.data?.annotationDetails), null);
         } else {
-          handleAddAnnotation(params?.data?.[0] || params?.data?.time || params?.data?.name, null);
+          // A segment's start is its zoned x value, the same unit the other charts pass.
+          const segmentStart = isRowTimeline(panelSchema.value.type)
+            ? params?.value?.[0]
+            : undefined;
+          handleAddAnnotation(
+            segmentStart ?? (params?.data?.[0] || params?.data?.time || params?.data?.name),
+            null,
+          );
         }
         return;
       }
     }
+
+    // A query band lies over the bars, so its click must not drill down with the band's data.
+    if (isQueryMarker) return;
 
     // Cross-links are fetched lazily (not on panel render) — resolve them now, before use.
     await ensureDrilldownSchema();
 
     // Store click parameters for drilldown (including cross-links)
     const crossLinkItems = getCrossLinkDrilldownItems();
-    const shouldShowDrilldown = hasDrilldown || crossLinkItems.length > 0;
+    // A state timeline's drilldown reads a segment, so an annotation click only opens the annotation.
+    const annotationOnly = hasAnnotation && isRowTimeline(panelSchema.value.type);
+    const shouldShowDrilldown = !annotationOnly && (hasDrilldown || crossLinkItems.length > 0);
 
     if (shouldShowDrilldown) {
       drilldownParams = [params, args];
@@ -564,6 +690,8 @@ export function usePanelDrilldown({
 
     // Handle popup displays with priority
     if (shouldShowDrilldown) {
+      // An item tooltip sits at the cursor, right where the menu opens, and would cover it.
+      hideChartTooltip?.();
       // Show drilldown popup first
       drilldownPopUpRef.value.style.display = "block";
       await nextTick();
@@ -604,12 +732,38 @@ export function usePanelDrilldown({
     }
   };
 
+  // The `row` drilldown variable of the clicked table row (args are [row, index]).
+  const getTableRowVariable = () => {
+    const [row, index] = drilldownParams[1] ?? [];
+    if (panelSchema.value.queryType === "promql") {
+      // PromQL columns come from the series labels; `__legend__` and the table's synthetic `id` are not labels.
+      const { __legend__: _legend, id: _id, ...rowFields } = row ?? {};
+      return { field: rowFields, index };
+    }
+    const fields: any = {};
+    panelSchema.value.queries.forEach((query: any) => {
+      const panelFields: any = [
+        ...(query.fields.x || []),
+        ...(query.fields.y || []),
+        ...(query.fields.z || []),
+      ];
+      // Both the label and the alias resolve, so either works in a drilldown template.
+      panelFields.forEach((field: any) => {
+        fields[getFieldLabel(field, panelSchema.value.config, query.customQuery)] =
+          row?.[field.alias];
+        fields[field.alias] = row?.[field.alias];
+      });
+    });
+    return { field: fields, index };
+  };
+
   const openDrilldown = async (index: any) => {
     // hide the drilldown pop up
     hidePopupsAndOverlays();
 
     // Handle cross-link items (they exist in drilldownArray but not in panelSchema.config.drilldown)
     const drilldownItem = drilldownArray.value[index];
+    if (drilldownLockedReason(drilldownItem)) return;
     if (drilldownItem?._isCrossLink) {
       try {
         const rawUrl = drilldownItem.data._rawUrl;
@@ -634,7 +788,7 @@ export function usePanelDrilldown({
         } else {
           // Non-table: find value from raw query data or chart click
           const chartType = panelSchema.value?.type;
-          const isPieOrDonut = ["pie", "donut"].includes(chartType);
+          const isPieOrDonut = NAMED_ITEM_TYPES.includes(chartType);
           const dataIndex = drilldownParams[0]?.dataIndex;
           const xAxisData = panelData.value?.options?.xAxis?.[0]?.data;
 
@@ -656,7 +810,14 @@ export function usePanelDrilldown({
             ? drilldownParams[0]?.name
             : drilldownParams[0]?.seriesName;
 
-          if (queryResult?.length > 0) {
+          if (isRowTimeline(chartType)) {
+            Object.assign(
+              record,
+              stateTimelineSourceRecord(panelSchema.value, data.value, drilldownParams[0]),
+            );
+          } else if (chartType === "hostmap") {
+            Object.assign(record, hostmapDrilldownSeries(drilldownParams[0]).labels);
+          } else if (queryResult?.length > 0) {
             for (const row of queryResult) {
               let matches = true;
               if (xFields.length > 0 && xAxisValue !== undefined) {
@@ -714,7 +875,9 @@ export function usePanelDrilldown({
             b64EncodeUnicode(currentQuery),
           );
 
-        window.open(resolvedUrl, "_blank");
+        // The stream settings API stores cross-link URLs unvalidated, so guard the resolved value here.
+        if (!isSafeNavigableUrl(resolvedUrl)) return;
+        window.open(resolvedUrl, "_blank", "noopener,noreferrer");
       } catch (error) {
         console.error("Failed to open cross-link:", error);
       }
@@ -741,13 +904,27 @@ export function usePanelDrilldown({
           getOriginalQueryAndStream(queryDetails, metadata) || {};
         if (!originalQuery || !streamName) return;
 
-        const hoveredTime = drilldownParams[0]?.value?.[0];
+        const isHeatmap = panelSchema.value.type === "heatmap";
+        // A host map cell spans the whole panel range; its value[0] is a cell index, not a time.
+        const hoveredTime =
+          isHeatmap || queryDetails.type === "hostmap"
+            ? null
+            : queryDetails.type === "boxplot"
+              ? boxplotDrilldownTime(queryDetails, panelData?.value?.options, drilldownParams[0])
+              : drilldownParams[0]?.value?.[0];
         const hoveredTimestamp = hoveredTime
           ? getUTCTimestampFromZonedTimestamp(hoveredTime, store.state.timezone)
           : null;
         const breakdown = queryDetails.queries[0].fields?.breakdown || [];
 
-        const calculatedTimeRange = calculateTimeRange(hoveredTimestamp, intervalMicro.value);
+        const isStateTimeline = isRowTimeline(queryDetails.type);
+        const cell =
+          queryDetails.type === "hostmap" ? hostmapDrilldownSeries(drilldownParams[0]) : null;
+        const segment = isStateTimeline ? stateTimelineDrilldownSeries(drilldownParams[0]) : null;
+        const calculatedTimeRange = segment
+          ? { startTime: segment.__start * 1000, endTime: segment.__end * 1000 }
+          : ((isHeatmap ? heatmapColumnRange(drilldownParams[0]) : null) ??
+            (await calculateTimeRange(hoveredTimestamp, intervalMicro.value)));
 
         let modifiedQuery = originalQuery;
 
@@ -768,14 +945,23 @@ export function usePanelDrilldown({
 
           const aliasClause = tableAliases?.length ? ` AS ${tableAliases.join(", ")}` : "";
 
-          const breakdownColumn = breakdown[0]?.column;
+          // A host map cell is one entity, so the logs are filtered to it by its entity column.
+          const breakdownColumn = cell
+            ? hostmapEntityColumn(queryDetails)
+            : segment && breakdown[0]
+              ? stateTimelineBreakdownColumn(breakdown[0])
+              : breakdown[0]?.column;
 
           const seriesIndex = drilldownParams[0]?.seriesIndex;
           const breakdownSeriesName =
             seriesIndex !== undefined ? panelData.value.options.series[seriesIndex] : undefined;
-          const uniqueSeriesName = breakdownSeriesName
-            ? breakdownSeriesName.originalSeriesName
-            : drilldownParams[0]?.seriesName;
+          const uniqueSeriesName = cell
+            ? cell.__name
+            : segment
+              ? segment.__name
+              : breakdownSeriesName
+                ? breakdownSeriesName.originalSeriesName
+                : drilldownParams[0]?.seriesName;
           const breakdownValue = uniqueSeriesName;
 
           const whereClause = buildWhereClause(ast, breakdownColumn, breakdownValue);
@@ -814,45 +1000,30 @@ export function usePanelDrilldown({
 
           // Handle different chart types
           if (panelSchema.value.type == "table") {
-            const fields: any = {};
-            panelSchema.value.queries.forEach((query: any) => {
-              const panelFields: any = [
-                ...(query.fields.x || []),
-                ...(query.fields.y || []),
-                ...(query.fields.z || []),
-              ];
-              panelFields.forEach((field: any) => {
-                fields[getFieldLabel(field, panelSchema.value.config, query.customQuery)] =
-                  drilldownParams[1][0][field.alias];
-                fields[field.alias] = drilldownParams[1][0][field.alias];
-              });
-            });
-            drilldownVariables.row = {
-              field: fields,
-              index: drilldownParams[1][1],
-            };
-          } else if (panelSchema.value.type == "sankey") {
+            drilldownVariables.row = getTableRowVariable();
+          } else if (isFlowChart(panelSchema.value.type)) {
             if (drilldownParams[0].dataType == "node") {
               drilldownVariables.node = {
-                __name: drilldownParams[0]?.name ?? "",
+                __name: drilldownParams[0]?.data?.rawName ?? drilldownParams[0]?.name ?? "",
                 __value: drilldownParams[0]?.value ?? "",
               };
             } else {
               drilldownVariables.edge = {
-                __source: drilldownParams[0]?.data?.source ?? "",
-                __target: drilldownParams[0]?.data?.target ?? "",
+                __source:
+                  drilldownParams[0]?.data?.rawSource ?? drilldownParams[0]?.data?.source ?? "",
+                __target:
+                  drilldownParams[0]?.data?.rawTarget ?? drilldownParams[0]?.data?.target ?? "",
                 __value: drilldownParams[0]?.data?.value ?? "",
               };
             }
+          } else if (isStateTimeline) {
+            drilldownVariables.series = segment;
+          } else if (cell) {
+            drilldownVariables.series = cell;
           } else {
             drilldownVariables.series = {
-              __name: ["pie", "donut", "heatmap"].includes(panelSchema.value.type)
-                ? drilldownParams[0].name
-                : drilldownParams[0].seriesName,
-              __value: Array.isArray(drilldownParams[0].value)
-                ? drilldownParams[0].value[drilldownParams[0].value.length - 1]
-                : drilldownParams[0].value,
-              __axisValue: drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
+              ...seriesDrilldownVariables(drilldownParams[0]),
+              ...metricSeriesVariables(drilldownParams[0]),
             };
           }
 
@@ -941,48 +1112,32 @@ export function usePanelDrilldown({
 
       // if chart type is 'table' then we need to pass the table name
       if (panelSchema.value.type == "table") {
-        const fields: any = {};
-        panelSchema.value.queries.forEach((query: any) => {
-          // take all field from x, y and z
-          const panelFields: any = [...query.fields.x, ...query.fields.y, ...query.fields.z];
-          panelFields.forEach((field: any) => {
-            // we have label and alias, use both in dynamic values
-            fields[getFieldLabel(field, panelSchema.value.config, query.customQuery)] =
-              drilldownParams[1][0][field.alias];
-            fields[field.alias] = drilldownParams[1][0][field.alias];
-          });
-        });
-        drilldownVariables.row = {
-          field: fields,
-          index: drilldownParams[1][1],
-        };
-      } else if (panelSchema.value.type == "sankey") {
+        drilldownVariables.row = getTableRowVariable();
+      } else if (isFlowChart(panelSchema.value.type)) {
         // if dataType is node then set node data
         // else set edge data
         if (drilldownParams[0].dataType == "node") {
           // set node data
           drilldownVariables.node = {
-            __name: drilldownParams[0]?.name ?? "",
+            __name: drilldownParams[0]?.data?.rawName ?? drilldownParams[0]?.name ?? "",
             __value: drilldownParams[0]?.value ?? "",
           };
         } else {
           // set edge data
           drilldownVariables.edge = {
-            __source: drilldownParams[0]?.data?.source ?? "",
-            __target: drilldownParams[0]?.data?.target ?? "",
+            __source: drilldownParams[0]?.data?.rawSource ?? drilldownParams[0]?.data?.source ?? "",
+            __target: drilldownParams[0]?.data?.rawTarget ?? drilldownParams[0]?.data?.target ?? "",
             __value: drilldownParams[0]?.data?.value ?? "",
           };
         }
+      } else if (isRowTimeline(panelSchema.value.type)) {
+        drilldownVariables.series = stateTimelineDrilldownSeries(drilldownParams[0]);
+      } else if (panelSchema.value.type == "hostmap") {
+        drilldownVariables.series = hostmapDrilldownSeries(drilldownParams[0]);
       } else {
-        // we have an series object
         drilldownVariables.series = {
-          __name: ["pie", "donut", "heatmap"].includes(panelSchema.value.type)
-            ? drilldownParams[0].name
-            : drilldownParams[0].seriesName,
-          __value: Array.isArray(drilldownParams[0].value)
-            ? drilldownParams[0].value[drilldownParams[0].value.length - 1]
-            : drilldownParams[0].value,
-          __axisValue: drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
+          ...seriesDrilldownVariables(drilldownParams[0]),
+          ...metricSeriesVariables(drilldownParams[0]),
         };
       }
 
@@ -1155,28 +1310,32 @@ export function usePanelDrilldown({
   // Fetch cross-links + WHERE for the clicked query, once, on demand, and apply them to the
   // shared refs. Concurrent callers of the same query share the in-flight promise; a repeat
   // click on a query already fetched hits the cache. `queryIndex` selects the multi-query cell.
-  const ensureDrilldownSchema = async (queryIndex = 0): Promise<void> => {
+  // `needWhere` fetches the panel WHERE even with cross-linking off; chart clicks need only links.
+  const ensureDrilldownSchema = async (queryIndex = 0, needWhere = false): Promise<void> => {
     const query =
       metadata.value?.queries?.[queryIndex]?.query ||
       panelSchema.value?.queries?.[queryIndex]?.query ||
       "";
-    // Cross-linking is only supported for logs streams; skip the result_schema call for panels
-    // backed by other stream types (metrics, traces, enrichment_tables) to avoid failing requests.
-    const crossLinkStreamType = panelSchema.value?.queries?.[queryIndex]?.fields?.stream_type;
+    // result_schema errors for non-logs streams (metrics, traces, enrichment_tables).
+    const streamType = panelSchema.value?.queries?.[queryIndex]?.fields?.stream_type;
+    const crossLinking = isCrossLinkingEnabledForStream(store.state.zoConfig, streamType);
     if (
-      !isCrossLinkingEnabledForStream(store.state.zoConfig, crossLinkStreamType) ||
+      !supportsResultSchema(streamType) ||
+      !(crossLinking || needWhere) ||
       !query ||
       panelSchema.value?.queryType === "promql"
     ) {
       applyDrilldownSchema(EMPTY_SCHEMA);
       return;
     }
-    const cached = schemaCache.get(query);
+    // Keyed by the cross-linking flag too, so a WHERE-only result never hides links later.
+    const cacheKey = `${crossLinking}:${query}`;
+    const cached = schemaCache.get(cacheKey);
     if (cached) {
       applyDrilldownSchema(cached);
       return;
     }
-    const inFlight = schemaInFlight.get(query);
+    const inFlight = schemaInFlight.get(cacheKey);
     if (inFlight) return inFlight;
     const fetchPromise = (async () => {
       try {
@@ -1197,24 +1356,27 @@ export function usePanelDrilldown({
             },
             page_type: "dashboards",
             is_streaming: false,
-            cross_linking: true,
+            cross_linking: crossLinking,
           },
           "dashboards",
         );
         const schema: DrilldownSchema = {
-          crossLinks: response.data?.cross_links || { stream_links: [], org_links: [] },
+          crossLinks: (crossLinking && response.data?.cross_links) || {
+            stream_links: [],
+            org_links: [],
+          },
           baseWhere: response.data?.where_clause ?? "",
           whereByStream: response.data?.where_by_stream ?? {},
         };
-        schemaCache.set(query, schema);
+        schemaCache.set(cacheKey, schema);
         applyDrilldownSchema(schema);
       } catch {
         applyDrilldownSchema(EMPTY_SCHEMA);
       } finally {
-        schemaInFlight.delete(query);
+        schemaInFlight.delete(cacheKey);
       }
     })();
-    schemaInFlight.set(query, fetchPromise);
+    schemaInFlight.set(cacheKey, fetchPromise);
     return fetchPromise;
   };
 
@@ -1233,6 +1395,7 @@ export function usePanelDrilldown({
     crossLinksData,
     onChartClick,
     openDrilldown,
+    drilldownLockedReason,
     hidePopupsAndOverlays,
     parser,
     interval,
@@ -1247,4 +1410,21 @@ export function usePanelDrilldown({
     panelWhereByStream,
     ensureDrilldownSchema,
   };
+}
+
+const SIGNAL_PAGES = new Set(["logs", "metrics", "traces"]);
+
+/** License key of a drilldown URL that opens this app's logs, metrics or traces page; null for any other URL. */
+function inAppSignalFeature(url: unknown): string | null {
+  if (typeof url !== "string" || !url) return null;
+  let target: URL;
+  try {
+    target = new URL(url, window.location.origin);
+  } catch {
+    return null;
+  }
+  if (target.origin !== window.location.origin) return null;
+  const page = target.pathname.split("/").find((segment) => SIGNAL_PAGES.has(segment));
+  if (!page) return null;
+  return streamTypeFeature(page === "logs" ? target.searchParams.get("stream_type") : page);
 }

@@ -17,13 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="h-full max-h-full overflow-hidden">
     <AddAlert
-      v-if="!isLoadingAlert"
+      v-if="!isLoadingAlert && !loadFailed"
       :modelValue="editedAlert"
       :isUpdated="isUpdated"
       :destinations="destinations"
+      :templates="templates"
       @update:list="handleUpdateList"
       @cancel:hideform="handleCancel"
       @refresh:destinations="refreshDestinations"
+      @refresh:templates="refreshTemplates"
     />
   </div>
 </template>
@@ -33,6 +35,8 @@ import { alertDetailQuery } from "@/services/alerts.queries";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { destinationKeys } from "@/services/alert_destination.querykeys";
 import { destinationsQuery } from "@/services/alert_destination.queries";
+import { templatesQuery } from "@/services/alert_templates.queries";
+import { templateKeys } from "@/services/alert_templates.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onBeforeMount, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
@@ -41,6 +45,11 @@ import AddAlert from "@/components/alerts/AddAlert.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 import { clearAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
+import {
+  dropDraftOfMissingAlert,
+  isNotFoundError,
+  type AlertSavedOptions,
+} from "@/utils/alerts/alertEditorDraft";
 
 export default defineComponent({
   name: "AddAlertView",
@@ -53,6 +62,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const destinations = ref([]);
+    const templates = ref<any[]>([]);
     const isUpdated = ref(false);
 
     /**
@@ -65,6 +75,8 @@ export default defineComponent({
     // handed over by the list, so editing no longer has to route through it.
     const editedAlert = ref<Record<string, any> | undefined>(undefined);
     const isLoadingAlert = ref(false);
+    // Kept off screen while the view redirects, so an empty form never offers the new-alert draft.
+    const loadFailed = ref(false);
 
     /**
      * Fetch the alert being edited. The form takes its edit prefill from
@@ -82,10 +94,24 @@ export default defineComponent({
         );
         isUpdated.value = true;
       } catch (error) {
-        toast({
-          variant: "error",
-          message: t("toastMessages.views.errorWhileLoadingAlert"),
-        });
+        loadFailed.value = true;
+        const draftDropped =
+          isNotFoundError(error) &&
+          dropDraftOfMissingAlert({
+            org: String(store.state.selectedOrganization?.identifier ?? ""),
+            entityId: alertId,
+            userEmail: String(store.state.userInfo?.email ?? ""),
+          });
+        toast(
+          draftDropped
+            ? {
+                variant: "info",
+                message: t("common.editorDraft.itemDeleted", {
+                  entity: t("common.editorDraft.entities.alert"),
+                }),
+              }
+            : { variant: "error", message: t("toastMessages.views.errorWhileLoadingAlert") },
+        );
         // Nothing to edit — send them somewhere that works rather than leaving
         // an empty form that would save as a NEW alert. Unless the user has
         // already moved on, in which case this page has no say in where they are.
@@ -124,7 +150,30 @@ export default defineComponent({
       await getDestinations();
     };
 
-    const handleUpdateList = (folderId?: string) => {
+    // The Advanced tab lists these as the template override options.
+    const getTemplates = async () => {
+      try {
+        templates.value = await queryClient.fetchQuery(
+          templatesQuery(store.state.selectedOrganization.identifier),
+        );
+      } catch (error: any) {
+        if (error?.response?.status === 403) return;
+        toast({
+          variant: "error",
+          message: t("toastMessages.alerts.errorWhileFetchingTemplates"),
+        });
+      }
+    };
+
+    const refreshTemplates = async () => {
+      await queryClient.invalidateQueries({
+        queryKey: templateKeys.list(store.state.selectedOrganization.identifier),
+        exact: true,
+      });
+      await getTemplates();
+    };
+
+    const handleUpdateList = (folderId?: string, options?: AlertSavedOptions) => {
       const resolvedFolder = folderId || (route.query.folder as string) || "default";
 
       // The prefill has been consumed into a saved alert — retiring it here
@@ -145,6 +194,9 @@ export default defineComponent({
         store.dispatch("setAllAlertsListByFolderId", rest);
       }
 
+      // The leave dialog's Save is already on its way somewhere else.
+      if (options?.navigate === false) return;
+
       // Navigate back to alert list after successful save
       router.push({
         name: "alertList",
@@ -162,10 +214,10 @@ export default defineComponent({
     };
 
     onBeforeMount(() => {
-      // In parallel: the form needs destinations either way, and edit mode
+      // In parallel: the form needs destinations and templates either way, and edit mode
       // needs the alert. Sequencing them would make editing feel slower than
       // the list-hosted editor it replaces.
-      void Promise.all([getDestinations(), loadAlertForEdit()]);
+      void Promise.all([getDestinations(), getTemplates(), loadAlertForEdit()]);
     });
 
     // Leaving without saving retires the prefill too — otherwise re-opening the
@@ -177,11 +229,14 @@ export default defineComponent({
 
     return {
       destinations,
+      templates,
       isUpdated,
       editedAlert,
       isLoadingAlert,
+      loadFailed,
       getDestinations,
       refreshDestinations,
+      refreshTemplates,
       handleUpdateList,
       handleCancel,
     };

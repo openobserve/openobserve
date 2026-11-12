@@ -17,6 +17,7 @@ import PageManager from "../../pages/page-manager";
 import testLogger from "../utils/test-logger.js";
 import { verifyColorOnCanvas, applyAndWaitForRender } from "./utils/canvasHelpers.js";
 import logsdata from "../../../test-data/logs_data.json";
+import { ingestBase } from '../utils/ingest-url.js';
 const { getAuthHeaders, getOrgIdentifier } = require("../utils/cloud-auth.js");
 
 // The comparison series label the 15m time shift produces. convertSQLData builds
@@ -57,7 +58,7 @@ async function seedAgedRows(streamName = "e2e_automate") {
   }));
 
   const response = await fetch(
-    `${process.env.INGESTION_URL}/api/${getOrgIdentifier()}/${streamName}/_json`,
+    `${ingestBase(process.env.INGESTION_URL)}/api/${getOrgIdentifier()}/${streamName}/_json`,
     { method: "POST", headers: getAuthHeaders(), body: JSON.stringify(rows) }
   );
   if (!response.ok) {

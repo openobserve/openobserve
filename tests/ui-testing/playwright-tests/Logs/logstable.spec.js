@@ -2,6 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const logData = require("../../fixtures/log.json");
+const { ingestBase } = require('../utils/ingest-url.js');
 const {
   ingestTestData: ingestion,
   waitForStreamData,
@@ -611,11 +612,11 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
       emergency: '#e53935', // severity 0 → level field
       alert:     '#ea580c', // severity 1
       critical:  '#f4511e', // severity 2
-      error:     '#ef5350', // severity 3
-      warning:   '#dd7b00', // severity 4
+      error:     '#e53935', // severity 3
+      warning:   '#c46a00', // severity 4
       notice:    '#16a34a', // severity 5
-      info:      '#1e88e5', // severity 6
-      debug:     '#00a3b7', // severity 7
+      info:      '#1b80d9', // severity 6
+      debug:     '#008a9b', // severity 7
     };
 
     // Wait for the results table to actually render its per-row status color bars
@@ -713,7 +714,7 @@ test.describe("Severity inference journeys (4c Part A)", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     journeyStream = `severity_journeys_${Date.now()}`;
-    const url = `${process.env.INGESTION_URL}/api/${getOrgIdentifier()}/${journeyStream}/_json`;
+    const url = `${ingestBase(process.env.INGESTION_URL)}/api/${getOrgIdentifier()}/${journeyStream}/_json`;
     const response = await page.request.post(url, { headers: getAuthHeaders(), data: JOURNEY_ROWS });
     expect(response.ok()).toBe(true);
     // A single search runs in beforeEach, so every journey row must already be queryable.

@@ -78,20 +78,6 @@ vi.mock("@/components/shared/grid/NoData.vue", () => ({
   },
 }));
 
-vi.mock("@/components/ConfirmDialog.vue", () => ({
-  default: {
-    name: "ConfirmDialog",
-    template: `<div data-test='confirm-dialog' v-if='modelValue'>
-      <div data-test='confirm-title'>{{ title }}</div>
-      <div data-test='confirm-message'>{{ message }}</div>
-      <button data-test='confirm-ok' @click='$emit("update:ok")'>OK</button>
-      <button data-test='confirm-cancel' @click='$emit("update:cancel")'>Cancel</button>
-    </div>`,
-    props: ["title", "message", "modelValue"],
-    emits: ["update:ok", "update:cancel", "update:modelValue"],
-  },
-}));
-
 // Import mocked service
 import CipherKeysService from "@/services/cipher_keys";
 const mockCipherKeysService = CipherKeysService as any;
@@ -431,6 +417,39 @@ describe("CipherKeys", () => {
 
       expect(wrapper.vm.confirmDelete.visible).toBe(true);
       expect(wrapper.vm.confirmDelete.data).toEqual(testRow);
+    });
+
+    it("names the key in bold in the real ConfirmDialog with a destructive OK", async () => {
+      const ODialogStub = {
+        name: "ODialog",
+        props: ["open", "title", "primaryButtonVariant"],
+        template: "<div data-test='o-dialog-stub'><slot /></div>",
+      };
+      const wrapper = mount(CipherKeys, {
+        global: {
+          plugins: [i18n, router],
+          mocks: { $store: mockStore, $router: router },
+          provide: { store: mockStore },
+          stubs: { AddCipherKey: true, ODialog: ODialogStub },
+        },
+      });
+      await wrapper.vm.confirmDeleteCipherKey({ name: "test-key-1" });
+      await nextTick();
+
+      const dialog = wrapper.findAllComponents({ name: "ConfirmDialog" })[0];
+      expect(dialog.props("okVariant")).toBe("destructive");
+      const name = dialog.find('[data-test="confirm-dialog-name"]');
+      expect(name.text()).toBe("test-key-1");
+      expect(name.classes()).toContain("font-semibold");
+      expect(dialog.text()).toContain("delete the test-key-1 cipher key?");
+      const bulkDialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find(
+          (c: any) =>
+            c.props("title") === i18n.global.t("settings.cipherKeysPage.deleteCipherKeysTitle"),
+        );
+      expect(bulkDialog!.props("okVariant")).toBe("destructive");
+      wrapper.unmount();
     });
 
     it("should hide confirmation dialog when cancel is clicked", async () => {

@@ -1,6 +1,6 @@
 import { gt } from "@/types/i18n";
-import { isCustomQueryVariable } from "./queryVariableUtils";
-import { getVariableFilterValues, type VariableFilterGroup } from "./variableFilterGroupUtils";
+import type { DashboardFilterGroup } from "@/components/filterBar/codecs";
+import { getVariableFilterValues, isCustomQueryVariable } from "./queryVariableUtils";
 
 /**
  * Extract variable names from a string
@@ -208,7 +208,7 @@ interface VariableRuntimeState {
       filter?: string;
       value?: string;
     }>;
-    filter_group?: VariableFilterGroup | null;
+    filter_group?: DashboardFilterGroup | null;
   };
 }
 

@@ -22,8 +22,11 @@ import type { I18nText } from "@/types/i18n";
  * on this span" but "how much cover does it have". The ramp is deliberately
  * pale because its job is only to separate neighbours; a coverage bar needs
  * solid status colour, so these two are status-toned rather than decorative.
+ * `unreachable` is cover in name only: somebody holds the span and no page would reach them.
+ * `off` is an empty span nobody needs covered, so it is neutral rather than alarming.
  */
-export type ScheduleBandTone = 1 | 2 | 3 | 4 | 5 | 6 | "gap" | "covered" | "partial";
+export type ScheduleBandTone =
+  1 | 2 | 3 | 4 | 5 | 6 | "gap" | "off" | "covered" | "partial" | "unreachable";
 
 /** Number of distinct decorative band tones, for callers hashing into the ramp. */
 export const SCHEDULE_BAND_TONE_COUNT = 6;
@@ -104,6 +107,8 @@ export interface ScheduleTimelineProps {
    * pages forward through a calendar.
    */
   nowOffset?: number | null;
+  /** In gutter mode, the key of the only track that draws the now marker; omitted, every track draws it. */
+  nowTrackKey?: string;
   /**
    * The now marker's label. Drawn as a pill on the axis in lane mode, and used
    * as the marker's accessible name in both modes.
@@ -117,6 +122,8 @@ export interface ScheduleTimelineProps {
    * the share goes out on `hover` and the sentence comes back here.
    */
   hoverLabel?: I18nText;
+  /** Hide the pointer marker, for a caller whose open menu would otherwise sit under a frozen line. */
+  hideHover?: boolean;
   /** Width of the left track-label gutter. Default `md`. */
   labelWidth?: "sm" | "md";
   /**

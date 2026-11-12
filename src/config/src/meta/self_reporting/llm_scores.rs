@@ -25,7 +25,7 @@ use super::llm_experiments::ExperimentSkipReason;
 
 pub const LLM_SCORES_STREAM: &str = "_llm_scores";
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmScoreDataSourceType {
     LlmJudge,
@@ -36,7 +36,7 @@ pub enum LlmScoreDataSourceType {
     Experiment,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmScoreDataLevel {
     Span,
@@ -45,7 +45,7 @@ pub enum LlmScoreDataLevel {
     Experiment,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmScoreDataType {
     Numeric,
@@ -57,7 +57,7 @@ pub enum LlmScoreDataType {
 ///
 /// Older score records predate this field, so successful scoring remains the
 /// deserialization default.
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmScoreStatus {
     #[default]
@@ -67,7 +67,7 @@ pub enum LlmScoreStatus {
     Error,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmScoreTargetScope {
     Span,
@@ -104,7 +104,7 @@ impl From<LlmScoreTargetScope> for LlmScoreDataLevel {
 /// The mirror of `skip_reason`: that explains a `Skipped` status, this explains
 /// an `Error` one. Terminality is a scalar comparison on this column, so
 /// deciding whether a scorer is finished never depends on parsing a JSON blob.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmScoreErrorReason {
     /// The bounded attempt sequence continues. Not terminal.
@@ -118,7 +118,7 @@ pub enum LlmScoreErrorReason {
 /// The distinction is whether a review submission governed it, not which page
 /// it was typed on: Discovery is where a target is found and queued, so an
 /// annotation made there is a direct one, the same as any other.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmScoreAnnotationSource {
     /// Submitted as part of an annotation queue review.
@@ -133,7 +133,7 @@ pub enum LlmScoreAnnotationSource {
 /// stores it and `config` cannot reference the enterprise crate. Enterprise
 /// re-exports it from `eval_jobs::tasks`, so the task message and the Score it
 /// produces carry one type rather than two that have to be kept in step.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EvaluationTaskProducer {
     SpanPipeline,
@@ -243,7 +243,7 @@ pub fn evaluation_key(
 /// `String`. Any field added here that holds open-ended JSON needs the same
 /// `serde_as` attribute.
 #[serde_as]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct LlmScoreRecord {
     pub id: String,
     pub task_id: String,
@@ -352,6 +352,18 @@ pub struct LlmScoreRecord {
     /// Justification for this individual Score dimension.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<String>,
+    /// Bounded excerpt of the target input the scorer evaluated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_preview: Option<String>,
+    /// Bounded excerpt of the target output the scorer evaluated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_preview: Option<String>,
+    /// Span the scorer read the target input from, when it came from one span.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_span_id: Option<String>,
+    /// Span the scorer read the target output from, when it came from one span.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_span_id: Option<String>,
     /// Attempts this scorer dimension has consumed, 1-based. Resuming the
     /// bounded sequence after a restart reads this and nothing else.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -436,6 +448,10 @@ impl Default for LlmScoreRecord {
             job_id: None,
             job_version: None,
             reasoning: None,
+            input_preview: None,
+            output_preview: None,
+            input_span_id: None,
+            output_span_id: None,
             attempt_count: None,
             error_reason: None,
             annotation_id: None,
@@ -484,6 +500,10 @@ impl LlmScoreRecord {
             job_id: Some(String::new()),
             job_version: Some(0),
             reasoning: Some(String::new()),
+            input_preview: Some(String::new()),
+            output_preview: Some(String::new()),
+            input_span_id: Some(String::new()),
+            output_span_id: Some(String::new()),
             skip_reason: Some(ExperimentSkipReason::NoReference),
             attempt_count: Some(0),
             error_reason: Some(LlmScoreErrorReason::AttemptFailed),
@@ -629,6 +649,10 @@ mod tests {
             job_id: Some("job-1".to_string()),
             job_version: Some(1),
             reasoning: None,
+            input_preview: None,
+            output_preview: None,
+            input_span_id: None,
+            output_span_id: None,
             attempt_count: None,
             error_reason: None,
             annotation_id: None,
@@ -771,6 +795,8 @@ mod tests {
         assert!(!obj.contains_key("target_agent_id"));
         assert!(obj.contains_key("job_id"));
         assert!(obj.contains_key("reasoning"));
+        assert!(obj.contains_key("input_span_id"));
+        assert!(obj.contains_key("output_span_id"));
         assert!(obj.contains_key("review_submission_comments"));
         assert!(obj.contains_key("scorer_metadata"));
         assert!(obj.contains_key("author"));

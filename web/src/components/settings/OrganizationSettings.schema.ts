@@ -32,6 +32,7 @@ export const makeOrganizationSettingsSchema = (t: (_key: string) => string) => {
     toggleIngestionLogs: z.boolean().optional().default(false),
     usageStreamEnabled: z.boolean().optional().default(false),
     redInsightsEnabled: z.boolean().optional().default(false),
+    aiRcaThreadToolOutput: z.boolean().optional().default(false),
     // CrossLinkManager is a composite custom control — kept bare and merged at
     // submit; optional so it never blocks.
     crossLinks: z.array(z.any()).optional(),

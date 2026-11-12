@@ -64,7 +64,7 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: (d: unknown) => d,
 }));
 
-import useRumPerformanceTab, { type RumTabDateTime } from "./useRumPerformanceTab";
+import useRumPerformanceTab, { rangeFromPage, type RumTabDateTime } from "./useRumPerformanceTab";
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 
@@ -277,10 +277,37 @@ describe("useRumPerformanceTab", () => {
       // Act
       await tab.ensureRumSchema();
 
-      // Assert — inconclusive schema renders the full dashboard rather than an empty tab
+      // Assert — the failure is surfaced so the tab can show an error state, not swallowed
       expect(tab.schemaResolved.value).toBe(true);
+      expect(tab.schemaError.value).toBe(true);
       expect(tab.showEmptyState.value).toBe(false);
       expect(titlesOf(tab)).toHaveLength(3);
+    });
+  });
+
+  describe("schema forbidden", () => {
+    it("flags a 403 as forbidden rather than a retryable error", async () => {
+      mockGetStream.mockRejectedValue(
+        Object.assign(new Error("no"), { response: { status: 403 } }),
+      );
+      const { tab } = mountTab();
+      await tab.ensureRumSchema();
+      expect(tab.schemaForbidden.value).toBe(true);
+      expect(tab.schemaError.value).toBe(false);
+    });
+  });
+
+  describe("schema error", () => {
+    it("clears the error flag when a retry succeeds", async () => {
+      mockGetStream.mockRejectedValueOnce(new Error("boom"));
+      const { tab } = mountTab();
+      await tab.ensureRumSchema();
+      expect(tab.schemaError.value).toBe(true);
+
+      mockGetStream.mockResolvedValue({ schema: [{ name: "service" }] });
+      await tab.ensureRumSchema();
+
+      expect(tab.schemaError.value).toBe(false);
     });
   });
 
@@ -327,5 +354,27 @@ describe("useRumPerformanceTab", () => {
       // Assert
       expect(tab.showEmptyState.value).toBe(false);
     });
+  });
+});
+
+describe("rangeFromPage", () => {
+  it("converts the page's microsecond-in-Date wrapper to real millisecond Dates", () => {
+    const startUs = 1_700_000_000_000_000;
+    const endUs = startUs + 3_600_000_000;
+    const r = rangeFromPage({
+      __global: { start_time: new Date(startUs), end_time: new Date(endUs) },
+    });
+    expect((r?.start_time as Date).getTime()).toBe(1_700_000_000_000);
+    expect((r?.end_time as Date).getTime()).toBe(1_700_003_600_000);
+  });
+
+  it("passes a flat range of real Dates through", () => {
+    const flat = { start_time: new Date(1000), end_time: new Date(2000) };
+    expect(rangeFromPage(flat)).toBe(flat);
+  });
+
+  it("is undefined for an empty or unset range", () => {
+    expect(rangeFromPage({})).toBeUndefined();
+    expect(rangeFromPage(undefined)).toBeUndefined();
   });
 });

@@ -8,15 +8,38 @@
     size="sm"
     :title="currentDialog.title"
     :primary-button-label="currentDialog.confirmLabel || t('common.ok')"
-    :secondary-button-label="currentDialog.cancelLabel || t('common.cancel')"
-    :persistent="currentDialog.persistent ?? true"
+    :secondary-button-label="
+      currentDialog.confirmOnly ? undefined : currentDialog.cancelLabel || t('common.cancel')
+    "
+    :persistent="currentDialog.confirmOnly || (currentDialog.persistent ?? true)"
+    :show-close="!currentDialog.confirmOnly"
     :primary-button-variant="currentDialog.confirmVariant ?? 'primary'"
     :initial-focus="currentDialog.focusCancel ? 'secondary' : 'primary'"
     @click:primary="handleConfirm"
     @click:secondary="handleCancel"
     @update:open="handleUpdateOpen"
   >
-    <div class="text-center">{{ currentDialog.message }}</div>
+    <i18n-t
+      v-if="currentDialog.messageKeypath"
+      :keypath="currentDialog.messageKeypath"
+      tag="div"
+      class="text-center"
+    >
+      <template #name>
+        <span
+          data-test="confirm-dialog-provider-name"
+          class="text-text-heading font-semibold break-all"
+          >{{ currentDialog.messageName }}</span
+        >
+      </template>
+    </i18n-t>
+    <div v-else-if="currentDialog.lines" class="flex flex-col gap-2">
+      <div>{{ currentDialog.message }}</div>
+      <ul :data-test="currentDialog.linesDataTest" class="flex list-disc flex-col gap-1.5 ps-5">
+        <li v-for="line in currentDialog.lines" :key="line">{{ line }}</li>
+      </ul>
+    </div>
+    <div v-else class="text-center">{{ currentDialog.message }}</div>
   </ODialog>
 </template>
 

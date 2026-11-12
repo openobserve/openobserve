@@ -21,7 +21,8 @@ import { useSanitizedHtml } from "../composables/useSanitizedHtml";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
-import { OTableCellActionsKey, OTableOverflowTooltipKey } from "../OTable.types";
+import { OTableCellActionsKey, OTableOverflowTooltipKey, OTableStaleKey } from "../OTable.types";
+import { injectContextMenuRootContext } from "reka-ui";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useI18nTyped } from "@/types/i18n";
@@ -52,6 +53,9 @@ const props = defineProps<{
   cell: Cell<any, any>;
   row: Row<any>;
   rowSelected?: boolean;
+  rowActive?: boolean;
+  rowStriped?: boolean;
+  rowFocusable?: boolean;
   highlightText?: string;
   shouldHighlight?: boolean;
   getHighlightedHtml?: (columnId: string, cellValue: any) => string | null;
@@ -95,13 +99,24 @@ const slotAlignClass = computed(() => {
   return "flex items-center w-full min-w-0";
 });
 
-// Slotted content truncates to one line unless `wrap` is on, mirroring the
-// default (non-slot) behaviour.
+// Truncates like `truncate`, but clip with a margin lets a focused control's outline in the slot still paint.
 const slotContentClass = computed(() =>
-  props.wrap ? "min-w-0 flex-1 wrap-anywhere whitespace-normal" : "truncate min-w-0 flex-1",
+  props.wrap
+    ? "min-w-0 flex-1 wrap-anywhere whitespace-normal"
+    : "min-w-0 flex-1 overflow-clip text-ellipsis whitespace-nowrap [overflow-clip-margin:0.25rem]",
 );
 
 const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
+
+// A sticky cell paints its own opaque background over the row's, so it must repeat every row state.
+const pinnedBgClass = computed(() => {
+  if (props.rowSelected || props.rowActive) return "bg-table-row-selected-bg";
+  return [
+    props.rowStriped ? "bg-table-row-striped-bg" : "bg-table-cell-bg",
+    "group-hover/row:bg-table-row-hover-bg",
+    props.rowFocusable ? "group-focus-visible/row:bg-table-row-hover-bg" : "",
+  ];
+});
 
 const pinOffset = computed(() => {
   if (!isPinned.value) return 0;
@@ -289,11 +304,16 @@ function handleClick() {
 
 const { t } = useI18nTyped();
 
+const stale = inject(OTableStaleKey, null);
+const rowContextMenu = injectContextMenuRootContext(null);
+
 // Right-click. Emitted as plain values (not the TanStack cell) so a consumer's
 // context menu keeps rendering correctly even after the virtualizer recycles
-// the row underneath it. The event is NOT prevented — the consumer decides
+// the row underneath it. Outside a refetch the event is NOT prevented — the consumer decides
 // whether to open a menu or leave the native one alone.
-function handleContextMenu() {
+function handleContextMenu(event: MouseEvent) {
+  // The menu would act on a row about to be replaced; reka-ui skips opening a prevented event.
+  if (stale?.value && rowContextMenu) event.preventDefault();
   emit("cell-contextmenu", {
     columnId: props.cell.column.id,
     row: props.row.original,
@@ -443,6 +463,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
   <td
     ref="cellEl"
     :data-test="`o2-table-cell-${cell.column.id}`"
+    :inert="stale && isAction ? true : undefined"
     :class="[
       // Base text color for the whole cell so custom `#cell-*` slots (which skip
       // the default text wrapper) still inherit the theme-aware primary color
@@ -457,11 +478,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
       bordered && !pivotMerge?.hideBorder ? 'border-table-row-divider border-b' : '',
       alignClass,
       isAction ? 'w-0 whitespace-nowrap' : '',
-      isPinned
-        ? rowSelected
-          ? 'bg-table-row-selected-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
-          : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
-        : '',
+      isPinned ? pinnedBgClass : '',
       wrap
         ? 'wrap-anywhere whitespace-normal'
         : horizontalScroll?.value
@@ -469,7 +486,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
             ? 'overflow-hidden text-ellipsis whitespace-nowrap'
             : 'whitespace-nowrap'
           : isAction
-            ? 'overflow-hidden whitespace-nowrap'
+            ? 'overflow-clip whitespace-nowrap [overflow-clip-margin:0.25rem] has-[:focus-visible]:z-2!'
             : 'overflow-hidden text-ellipsis whitespace-nowrap',
       meta?.cellClass ?? '',
       isTreeColumn ? 'relative' : '',
@@ -510,6 +527,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
           type="button"
           class="rounded-default text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body inline-flex h-4.5 w-4.5 cursor-pointer items-center justify-center border-0 bg-transparent p-0"
           :data-test="`o2-table-tree-toggle-${cell.column.id}`"
+          :aria-label="treeMeta?.isExpanded ? t('common.collapse') : t('common.expand')"
           :aria-expanded="treeMeta?.isExpanded ? 'true' : 'false'"
           @click="onTreeToggle"
         >
@@ -571,7 +589,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
           size="icon-xs-sq"
           :data-test="`o2-table-cell-copy-${cell.column.id}`"
           :data-copied="copied ? 'true' : undefined"
-          class="h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100 max-md:opacity-100"
+          class="h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
           :class="align === 'right' ? 'order-first me-1' : 'ms-1'"
           :title="copied ? t('common.copiedExclaim') : t('common.copy')"
           @click="handleCopy"
@@ -619,7 +637,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
           <!-- empty:hidden covers what the vnode walk can't see: slot content that IS a
                component but renders nothing, e.g. the AI button on a non-AI build. -->
           <div
-            class="peer bg-surface-overlay border-border-default rounded-default flex items-center gap-1 border border-solid px-1 py-0.5 shadow-lg empty:hidden"
+            class="peer bg-surface-overlay rounded-default shadow-overlay flex items-center gap-1 border border-solid border-transparent px-1 py-0.5 empty:hidden"
           >
             <slot
               name="cell-hover-actions"

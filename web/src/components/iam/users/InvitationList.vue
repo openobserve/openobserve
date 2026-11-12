@@ -114,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    :aria-label="t('common.moreActions')"
                     icon-left="more-vert"
                     variant="ghost"
                     size="icon-xs-sq"
@@ -163,10 +164,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('invitation.confirmRejectHead')"
       :secondary-button-label="t('invitation.cancel')"
       :primary-button-label="t('invitation.reject')"
+      primary-button-variant="destructive"
       @click:secondary="confirmReject = false"
       @click:primary="confirmRejectInvitation"
     >
-      <p>{{ t("invitation.confirmRejectMsg", { org: selectedInvitation?.org_name }) }}</p>
+      <i18n-t
+        keypath="invitation.confirmRejectMsg"
+        tag="p"
+        data-test="invitation-list-reject-message"
+      >
+        <template #org
+          ><span class="text-text-heading font-semibold break-all">{{
+            selectedInvitation?.org_name
+          }}</span></template
+        >
+      </i18n-t>
     </ODialog>
   </OPageLayout>
 </template>
@@ -190,7 +202,9 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
+import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -294,7 +308,7 @@ export default defineComponent({
       },
     ];
     const loading = ref(false);
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
 
     onMounted(() => {
       fetchPendingInvitations();
@@ -320,8 +334,7 @@ export default defineComponent({
       } catch (error) {
         const e = error as { response?: { status?: number; data?: { message?: string } } };
         dismiss();
-        forbidden.value = e.response?.status === 403;
-        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        forbidden.value = forbiddenState(e);
         if (!forbidden.value) {
           toast({
             message: raw(e.response?.data?.message || t("iam.invitationList.failedLoadPending")),
@@ -375,6 +388,7 @@ export default defineComponent({
 
       try {
         await organizationsService.process_subscription(selected.token, "confirm", selected.org_id);
+        analytics.track("invitation_accepted", { source: "invitation_list" });
 
         // Refresh the organizations list in the store
         const orgResponse = await organizationsService.list(0, 1000000, "name", false, "");
@@ -420,6 +434,7 @@ export default defineComponent({
 
       try {
         await organizationsService.decline_subscription(selected.token);
+        analytics.track("invitation_declined");
         dismiss();
         toast({
           message: t("iam.invitationList.rejectedSuccess"),

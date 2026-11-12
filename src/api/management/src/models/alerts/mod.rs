@@ -17,7 +17,7 @@ pub mod requests;
 pub mod responses;
 
 use config::meta::{
-    alerts::{self as meta_alerts, deduplication::DeduplicationConfig, default_align_time},
+    alerts::{self as meta_alerts, default_align_time},
     search as meta_search, stream as meta_stream,
     triggers::Trigger,
 };
@@ -159,10 +159,6 @@ pub struct Alert {
     #[schema(read_only)]
     pub last_edited_by: Option<String>,
 
-    /// Optional deduplication configuration to prevent alert spam.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub deduplication: Option<DeduplicationConfig>,
-
     /// When true, this alert routes notifications through the incident system
     /// instead of sending direct alert notifications.
     #[serde(default)]
@@ -220,6 +216,11 @@ pub struct Alert {
     #[schema(example = "https://wiki.example.com/runbooks/checkout")]
     pub runbook_url: Option<String>,
 
+    /// Incident title template; the generated title is used when no variable resolves.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(example = "{service_name} errors on {host}")]
+    pub incident_title_template: Option<String>,
+
     /// Whether a scheduler job exists for this alert (runtime status, not a
     /// stored field). Populated on the composite detail path; omitted otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -230,7 +231,8 @@ pub struct Alert {
     #[schema(example = 10)]
     pub pending_period_sec: i64,
 
-    /// Send one notification when this alert recovers.
+    /// Send one notification when this alert recovers; a multi-alert sends one per recovered
+    /// group.
     #[serde(default)]
     pub notify_on_recovery: bool,
 
@@ -244,6 +246,10 @@ pub struct Alert {
     #[serde(default)]
     #[schema(example = 0)]
     pub keep_firing_for: i64,
+
+    /// Notify once per state change instead of on every firing evaluation. Enterprise only.
+    #[serde(default)]
+    pub suppress_repeats: bool,
 }
 
 /// Configuration for when and how an alert should be triggered.
@@ -539,8 +545,11 @@ pub struct Condition {
     pub value: JsonValue,
     #[serde(default)]
     pub ignore_case: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub case_insensitive: Option<bool>,
 }
 
+/// Comparison operator; `In` to `ReNotMatch` are only valid in condition trees, not thresholds.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, Default)]
 pub enum Operator {
     #[serde(rename = "=")]
@@ -562,6 +571,12 @@ pub enum Operator {
     IsNotNull,
     IsEmpty,
     IsNotEmpty,
+    In,
+    NotIn,
+    StartsWith,
+    EndsWith,
+    ReMatch,
+    ReNotMatch,
 }
 
 #[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
@@ -578,6 +593,8 @@ pub enum SearchEventType {
     SearchJob,
     Download,
     Insights,
+    #[serde(rename = "public_dashboard")]
+    PublicDashboard,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
@@ -629,17 +646,18 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             owner: alert.owner,
             updated_at: alert.updated_at.map(|t| t.timestamp()),
             last_edited_by: alert.last_edited_by,
-            deduplication: alert.deduplication,
             creates_incident: alert.creates_incident,
             workflows: alert.workflows,
             priority: alert.priority,
             tags: alert.tags,
             oncall_team: alert.oncall_team,
             runbook_url: alert.runbook_url,
+            incident_title_template: alert.incident_title_template,
             scheduler_job_present: None,
             pending_period_sec: alert.pending_period_sec,
             notify_on_recovery: alert.notify_on_recovery,
             keep_firing_for: alert.keep_firing_for,
+            suppress_repeats: alert.suppress_repeats,
         }
     }
 }
@@ -751,6 +769,7 @@ impl From<meta_alerts::Condition> for Condition {
             operator: value.operator.into(),
             value: value.value,
             ignore_case: value.ignore_case,
+            case_insensitive: value.case_insensitive,
         }
     }
 }
@@ -770,6 +789,12 @@ impl From<meta_alerts::Operator> for Operator {
             meta_alerts::Operator::IsNotNull => Self::IsNotNull,
             meta_alerts::Operator::IsEmpty => Self::IsEmpty,
             meta_alerts::Operator::IsNotEmpty => Self::IsNotEmpty,
+            meta_alerts::Operator::In => Self::In,
+            meta_alerts::Operator::NotIn => Self::NotIn,
+            meta_alerts::Operator::StartsWith => Self::StartsWith,
+            meta_alerts::Operator::EndsWith => Self::EndsWith,
+            meta_alerts::Operator::ReMatch => Self::ReMatch,
+            meta_alerts::Operator::ReNotMatch => Self::ReNotMatch,
         }
     }
 }
@@ -788,6 +813,7 @@ impl From<meta_search::SearchEventType> for SearchEventType {
             meta_search::SearchEventType::SearchJob => Self::SearchJob,
             meta_search::SearchEventType::Download => Self::Download,
             meta_search::SearchEventType::Insights => Self::Insights,
+            meta_search::SearchEventType::PublicDashboard => Self::PublicDashboard,
         }
     }
 }
@@ -833,7 +859,6 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.enabled = value.enabled;
         alert.tz_offset = value.tz_offset;
         alert.owner = value.owner;
-        alert.deduplication = value.deduplication;
         alert.creates_incident = value.creates_incident;
         alert.workflows = value.workflows;
         alert.priority = value.priority;
@@ -845,10 +870,14 @@ impl From<Alert> for meta_alerts::alert::Alert {
         // Same empty-string-is-absent rule: a form clears a text input by
         // sending "", and a stored "" would render as a link to nowhere.
         alert.runbook_url = value.runbook_url.filter(|u| !u.trim().is_empty());
+        alert.incident_title_template = value
+            .incident_title_template
+            .filter(|t| !t.trim().is_empty());
         alert.pending_period_sec = value.pending_period_sec;
         alert.notify_on_recovery = value.notify_on_recovery;
         alert.recovery_destinations = value.recovery_destinations;
         alert.keep_firing_for = value.keep_firing_for.max(0);
+        alert.suppress_repeats = value.suppress_repeats;
         alert.normalize_promql_rule_mode();
 
         alert
@@ -963,6 +992,7 @@ impl From<Condition> for meta_alerts::Condition {
             operator: value.operator.into(),
             value: value.value,
             ignore_case: value.ignore_case,
+            case_insensitive: value.case_insensitive,
         }
     }
 }
@@ -982,6 +1012,12 @@ impl From<Operator> for meta_alerts::Operator {
             Operator::IsNotNull => Self::IsNotNull,
             Operator::IsEmpty => Self::IsEmpty,
             Operator::IsNotEmpty => Self::IsNotEmpty,
+            Operator::In => Self::In,
+            Operator::NotIn => Self::NotIn,
+            Operator::StartsWith => Self::StartsWith,
+            Operator::EndsWith => Self::EndsWith,
+            Operator::ReMatch => Self::ReMatch,
+            Operator::ReNotMatch => Self::ReNotMatch,
         }
     }
 }
@@ -1000,6 +1036,7 @@ impl From<SearchEventType> for meta_search::SearchEventType {
             SearchEventType::SearchJob => Self::SearchJob,
             SearchEventType::Download => Self::Download,
             SearchEventType::Insights => Self::Insights,
+            SearchEventType::PublicDashboard => Self::PublicDashboard,
         }
     }
 }
@@ -1291,6 +1328,10 @@ mod tests {
         assert!(matches!(M::from(SearchEventType::SearchJob), M::SearchJob));
         assert!(matches!(M::from(SearchEventType::Download), M::Download));
         assert!(matches!(M::from(SearchEventType::Insights), M::Insights));
+        assert!(matches!(
+            M::from(SearchEventType::PublicDashboard),
+            M::PublicDashboard
+        ));
     }
 
     #[test]
@@ -1354,7 +1395,6 @@ mod tests {
         assert!(!obj.contains_key("template"));
         assert!(!obj.contains_key("context_attributes"));
         assert!(!obj.contains_key("updated_at"));
-        assert!(!obj.contains_key("deduplication"));
     }
 
     #[test]
@@ -1368,6 +1408,24 @@ mod tests {
         assert!(obj.contains_key("template"));
         assert!(obj.contains_key("context_attributes"));
         assert!(obj.contains_key("updated_at"));
+    }
+
+    #[test]
+    fn test_request_with_deduplication_still_saves_without_it() {
+        let alert: Alert = serde_json::from_value(serde_json::json!({
+            "name": "a",
+            "deduplication": {
+                "enabled": true,
+                "fingerprint_fields": ["host"],
+                "time_window_minutes": 30,
+                "grouping": {"enabled": true, "group_wait_seconds": 30}
+            }
+        }))
+        .unwrap();
+        let saved: meta_alerts::alert::Alert = alert.into();
+        let json = serde_json::to_value(&saved).unwrap();
+        assert_eq!(json["name"], "a");
+        assert!(!json.as_object().unwrap().contains_key("deduplication"));
     }
 
     #[test]
@@ -1407,6 +1465,7 @@ mod tests {
             operator: meta_alerts::Operator::EqualTo,
             value: serde_json::Value::String("error".to_string()),
             ignore_case: false,
+            case_insensitive: None,
         };
         let local = Condition::from(meta);
         assert_eq!(local.column, "level");
@@ -1483,6 +1542,7 @@ mod tests {
                 operator: meta_alerts::Operator::GreaterThanEquals,
                 value: serde_json::json!(100),
                 ignore_case: false,
+                case_insensitive: None,
             },
         };
         let agg = Aggregation::from(meta);
@@ -1506,6 +1566,7 @@ mod tests {
                 operator: Operator::GreaterThan,
                 value: serde_json::json!(42),
                 ignore_case: false,
+                case_insensitive: None,
             },
         };
         let meta = meta_alerts::Aggregation::from(agg);

@@ -21,6 +21,15 @@ describe("splitControlAttrs", () => {
   });
 });
 
+describe("splitControlAttrs role forwarding", () => {
+  it("keeps role on the wrapper unless forwardRole is set", () => {
+    expect(splitControlAttrs({ role: "combobox" }).wrapperAttrs).toEqual({ role: "combobox" });
+    const forwarded = splitControlAttrs({ role: "combobox" }, { forwardRole: true });
+    expect(forwarded.controlAttrs).toEqual({ role: "combobox" });
+    expect(forwarded.wrapperAttrs).toEqual({});
+  });
+});
+
 describe("aria attribute forwarding", () => {
   let wrapper: VueWrapper;
   afterEach(() => wrapper?.unmount());
@@ -35,6 +44,23 @@ describe("aria attribute forwarding", () => {
     wrapper = mount(OInput, { props: { label: "Name", labelPosition: "inside" } });
     const label = wrapper.find("label");
     expect(label.attributes("for")).toBe(wrapper.find("input").attributes("id"));
+  });
+
+  it("OSearchInput puts the combobox role and its aria state on the input", () => {
+    wrapper = mount(OSearchInput, {
+      attrs: {
+        role: "combobox",
+        "aria-expanded": "true",
+        "aria-haspopup": "listbox",
+        "aria-controls": "list",
+        "aria-activedescendant": "opt-1",
+      },
+    });
+    const input = wrapper.find("input");
+    expect(input.attributes("role")).toBe("combobox");
+    expect(input.attributes("aria-controls")).toBe("list");
+    expect(input.attributes("aria-activedescendant")).toBe("opt-1");
+    expect(wrapper.attributes("role")).toBeUndefined();
   });
 
   it("OSwitch puts aria-label on the switch button", () => {

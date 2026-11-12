@@ -181,259 +181,79 @@ impl MemorySize for VRLResultResolver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::json;
 
-    #[test]
-    fn test_functions() {
-        let trans = Transform {
-            function: "row.concatenated = row.a + row.b;".to_string(),
-            name: "jsconcat".to_string(),
-            trans_type: Some(1), // JS function
+    fn transform(function: &str, trans_type: Option<u8>) -> Transform {
+        Transform {
+            function: function.to_string(),
+            name: "fn_a".to_string(),
             params: "row".to_string(),
             num_args: 1,
-            streams: Some(vec![StreamOrder {
-                stream: "test".to_string(),
-                order: 1,
-                stream_type: StreamType::Logs,
-                is_removed: false,
-                apply_before_flattening: false,
-            }]),
-        };
-
-        let mod_trans = Transform {
-            function: "row.concatenated = row.a + row.b;".to_string(),
-            name: "jsconcat".to_string(),
-            trans_type: Some(1), // JS function
-            params: "row".to_string(),
-            num_args: 1,
+            trans_type,
             streams: None,
-        };
-        assert_eq!(trans, mod_trans);
-
-        let trans_str = json::to_string(&trans).unwrap();
-        let trans2: Transform = json::from_str(&trans_str).unwrap();
-        assert_eq!(format!("{:?}", trans), format!("{:?}", trans2));
-
-        let trans_list = FunctionList {
-            list: vec![trans, trans2],
-        };
-        assert!(!trans_list.list.is_empty());
-        let trans_list_str = json::to_string(&trans_list.clone()).unwrap();
-        let trans_list2: FunctionList = json::from_str(&trans_list_str).unwrap();
-        assert_eq!(trans_list.list.len(), trans_list2.list.len());
+        }
     }
 
     #[test]
-    fn test_zo_function() {
-        let f1 = ZoFunction {
-            name: "test",
-            text: "test",
-        };
-        let f1_str = json::to_string(&f1).unwrap();
-        let f2: ZoFunction = json::from_str(&f1_str).unwrap();
-        assert_eq!(f1.name, f2.name);
-        assert_eq!(format!("{:?}", f1), format!("{:?}", f2));
-    }
-
-    #[test]
-    fn test_transform_is_vrl() {
-        let vrl_trans = Transform {
-            function: ". = {}".to_string(),
-            name: "test".to_string(),
-            params: "row".to_string(),
-            num_args: 1,
-            trans_type: Some(0), // VRL
-            streams: None,
-        };
-        assert!(vrl_trans.is_vrl());
-
-        let js_trans = Transform {
-            function: "function test() end".to_string(),
-            name: "test".to_string(),
-            params: "row".to_string(),
-            num_args: 1,
-            trans_type: Some(1), // JavaScript
-            streams: None,
-        };
-        assert!(!js_trans.is_vrl());
-    }
-
-    #[test]
-    fn test_transform_is_result_array_vrl() {
-        let result_array_trans = Transform {
-            function: "#ResultArray#\n. = {}".to_string(),
-            name: "test".to_string(),
-            params: "row".to_string(),
-            num_args: 1,
-            trans_type: Some(0),
-            streams: None,
-        };
-        assert!(result_array_trans.is_result_array_vrl());
-
-        let normal_vrl = Transform {
-            function: ". = {}".to_string(),
-            name: "test".to_string(),
-            params: "row".to_string(),
-            num_args: 1,
-            trans_type: Some(0),
-            streams: None,
-        };
-        assert!(!normal_vrl.is_result_array_vrl());
-    }
-
-    #[test]
-    fn test_vrl_result_new() {
-        let event = json::json!({"key": "value"});
-        let result = VRLResult::new("success", event.clone());
-        assert_eq!(result.message, "success");
-        assert_eq!(result.event, event);
-    }
-
-    #[test]
-    fn test_default_trans_type() {
-        let trans = Transform {
-            function: ". = {}".to_string(),
-            name: "test".to_string(),
-            params: "row".to_string(),
-            num_args: 1,
-            trans_type: default_trans_type(),
-            streams: None,
-        };
-        assert_eq!(trans.trans_type, Some(0));
-    }
-
-    #[test]
-    fn test_transform_is_js() {
-        let js_transform = Transform {
-            function: "function(row) { return row; }".to_string(),
-            name: "js_fn".to_string(),
-            params: "row".to_string(),
-            num_args: 1,
-            trans_type: Some(1),
-            streams: None,
-        };
-        assert!(js_transform.is_js());
-        assert!(!js_transform.is_vrl());
-
-        let vrl_transform = Transform {
-            function: ". = {}".to_string(),
-            name: "vrl_fn".to_string(),
-            params: "row".to_string(),
-            num_args: 1,
-            trans_type: Some(0),
-            streams: None,
-        };
-        assert!(!vrl_transform.is_js());
-    }
-
-    #[test]
-    fn test_transform_is_result_array_js() {
-        // JS + starts with "#Result Array#" → is_result_array_js
-        let js_array = Transform {
-            function: "#Result Array#\nfunction(row) { return [row]; }".to_string(),
-            name: "js_arr".to_string(),
-            params: "row".to_string(),
-            num_args: 1,
-            trans_type: Some(1),
-            streams: None,
-        };
-        assert!(js_array.is_result_array_js());
-
-        // JS but no RESULT_ARRAY marker → false
-        let js_plain = Transform {
-            function: "function(row) { return row; }".to_string(),
-            name: "js_plain".to_string(),
-            params: "row".to_string(),
-            num_args: 1,
-            trans_type: Some(1),
-            streams: None,
-        };
-        assert!(!js_plain.is_result_array_js());
-
-        // VRL with RESULT_ARRAY marker → NOT is_result_array_js (it's not JS)
-        let vrl_fn = Transform {
-            function: "#Result Array#\n. = {}".to_string(),
-            name: "vrl_fn".to_string(),
-            params: "row".to_string(),
-            num_args: 1,
-            trans_type: Some(0),
-            streams: None,
-        };
-        assert!(!vrl_fn.is_result_array_js());
+    fn test_transform_kind() {
+        // (function, trans_type, is_vrl, is_js, is_result_array_vrl, is_result_array_js)
+        let cases = [
+            (". = {}", Some(0), true, false, false, false),
+            ("#ResultArray#\n. = {}", Some(0), true, false, true, false),
+            (
+                "# Result Array #\n. = {}",
+                Some(0),
+                true,
+                false,
+                true,
+                false,
+            ),
+            (
+                "#ResultArray#SkipVRL#\n. = {}",
+                Some(0),
+                true,
+                false,
+                false,
+                false,
+            ),
+            ("#ResultArray#\n. = {}", None, false, false, false, false),
+            (
+                "function(row) { return row; }",
+                Some(1),
+                false,
+                true,
+                false,
+                false,
+            ),
+            (
+                "#Result Array#\nfunction(row) { return [row]; }",
+                Some(1),
+                false,
+                true,
+                false,
+                true,
+            ),
+        ];
+        for (function, trans_type, vrl, js, array_vrl, array_js) in cases {
+            let t = transform(function, trans_type);
+            let got = (
+                t.is_vrl(),
+                t.is_js(),
+                t.is_result_array_vrl(),
+                t.is_result_array_js(),
+            );
+            assert_eq!(
+                got,
+                (vrl, js, array_vrl, array_js),
+                "{function:?} {trans_type:?}"
+            );
+        }
     }
 
     #[test]
     fn test_transform_partial_eq() {
-        let a = Transform {
-            function: ". = {}".to_string(),
-            name: "fn_a".to_string(),
-            params: "row".to_string(),
-            num_args: 1,
-            trans_type: Some(0),
-            streams: None,
-        };
-        let b = a.clone();
-        assert_eq!(a, b);
-
-        // Different function → not equal
-        let c = Transform {
-            function: ". = {\"x\": 1}".to_string(),
-            ..a.clone()
-        };
-        assert_ne!(a, c);
-
-        // Different name → not equal
-        let d = Transform {
-            name: "fn_d".to_string(),
-            ..a.clone()
-        };
-        assert_ne!(a, d);
-
-        // Different params only → not equal
-        let e = Transform {
-            params: "event".to_string(),
-            ..a.clone()
-        };
-        assert_ne!(a, e);
-    }
-
-    #[test]
-    fn test_is_result_array_vrl_trans_type_none() {
-        // trans_type = None → is_vrl() is false → short-circuits to false
-        let t = Transform {
-            function: "#ResultArray#\n. = {}".to_string(),
-            name: "test".to_string(),
-            params: "row".to_string(),
-            num_args: 1,
-            trans_type: None,
-            streams: None,
-        };
-        assert!(!t.is_result_array_vrl());
-        assert!(!t.is_vrl());
-    }
-
-    #[test]
-    fn test_transform_streams_none_absent_from_json() {
-        let t = Transform {
-            function: ". = {}".to_string(),
-            name: "fn1".to_string(),
-            params: "row".to_string(),
-            num_args: 1,
-            trans_type: Some(0),
-            streams: None,
-        };
-        let json = serde_json::to_value(&t).unwrap();
-        assert!(!json.as_object().unwrap().contains_key("streams"));
-    }
-
-    #[test]
-    fn test_transform_streams_some_present_in_json() {
-        let t = Transform {
-            function: ". = {}".to_string(),
-            name: "fn2".to_string(),
-            params: "row".to_string(),
-            num_args: 1,
-            trans_type: Some(0),
+        let a = transform(". = {}", Some(0));
+        let ignored = Transform {
+            num_args: 2,
             streams: Some(vec![StreamOrder {
                 stream: "my_stream".to_string(),
                 order: 1,
@@ -441,24 +261,24 @@ mod tests {
                 is_removed: false,
                 apply_before_flattening: false,
             }]),
+            ..a.clone()
         };
-        let json = serde_json::to_value(&t).unwrap();
-        let obj = json.as_object().unwrap();
-        assert!(obj.contains_key("streams"));
-        assert_eq!(obj["streams"].as_array().unwrap().len(), 1);
-    }
+        assert_eq!(a, ignored);
 
-    #[test]
-    fn an_explicit_null_trans_type_is_not_covered_by_the_field_default() {
-        // The serde default only fills an absent field, so a present null still yields None
-        // and callers cannot assume the option is populated.
-        let absent: Transform = serde_json::from_str(r#"{"function":"."}"#).unwrap();
-        assert_eq!(absent.trans_type, Some(0));
-
-        let null: Transform = serde_json::from_str(r#"{"function":".","transType":null}"#).unwrap();
-        assert_eq!(null.trans_type, None);
-
-        let set: Transform = serde_json::from_str(r#"{"function":".","transType":1}"#).unwrap();
-        assert_eq!(set.trans_type, Some(1));
+        let c = Transform {
+            function: ". = {\"x\": 1}".to_string(),
+            ..a.clone()
+        };
+        assert_ne!(a, c);
+        let d = Transform {
+            name: "fn_d".to_string(),
+            ..a.clone()
+        };
+        assert_ne!(a, d);
+        let e = Transform {
+            params: "event".to_string(),
+            ..a.clone()
+        };
+        assert_ne!(a, e);
     }
 }

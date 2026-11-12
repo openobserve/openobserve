@@ -51,15 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="openRun"
     >
       <template #subheader>
-        <div
-          class="px-page-edge border-table-row-divider border-b py-1.5"
-          data-test="reports-reportrunhistory-summary"
-        >
+        <div data-test="reports-reportrunhistory-summary">
           <OStatStrip
             :items="tiles"
             :loading="history.isLoading.value"
             selectable
             compact
+            default-key="all"
             :selected-key="tile"
             @select="onTileSelect"
           />
@@ -231,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ReportRunDrawer
       :open="!!selectedRun"
       :run="selectedRun"
-      :report="report"
+      :report="drawerReport"
       :can-trigger="canTrigger"
       :running="running"
       @update:open="(open) => !open && closeRun()"
@@ -261,7 +259,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useOrgId } from "@/composables/query/useOrgId";
-import { reportHistoryQuery, reportRunQuery } from "@/services/reports.queries";
+import { reportByIdQuery, reportHistoryQuery, reportRunQuery } from "@/services/reports.queries";
 import type {
   ReportHistoryQuery,
   ReportRunHit,
@@ -272,6 +270,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { formatTimestampInTimezone } from "@/utils/date";
 import {
   REPORT_HISTORY_RANGES,
+  RUN_TIME_FORMAT,
   pendingManualRuns,
   runChip,
   runKey,
@@ -302,6 +301,8 @@ const props = withDefaults(
     showCachedTile?: boolean;
     canTrigger?: boolean;
     running?: boolean;
+    /** Folder of each report by id, for the org-wide view; the route's folder is used otherwise. */
+    reportFolders?: Record<string, string>;
   }>(),
   {
     reportId: undefined,
@@ -310,6 +311,7 @@ const props = withDefaults(
     showCachedTile: false,
     canTrigger: true,
     running: false,
+    reportFolders: () => ({}),
   },
 );
 
@@ -589,7 +591,7 @@ const noRunsDescription = computed(() => {
   if (!next) return t("reports.history.emptyNoRunsUnscheduled");
   const tz = props.report?.timezone || "UTC";
   return t("reports.history.emptyNoRunsFirst", {
-    time: raw(`${formatTimestampInTimezone(next, "ddd D MMM, HH:mm", tz)} (${tz})`),
+    time: raw(`${formatTimestampInTimezone(next, RUN_TIME_FORMAT, tz)} (${tz})`),
   });
 });
 
@@ -652,6 +654,15 @@ const selectedRun = computed<ReportRunHit | null>(() => {
     ) ?? null
   );
 });
+/** A denied or deleted report is not an error here: the drawer falls back to UTC and no dashboards. */
+const runReport = useQuery(() =>
+  Object.assign(
+    reportByIdQuery(orgId.value, selectedRun.value?.report_id ?? "", { silentForbidden: true }),
+    { enabled: !!orgId.value && !props.report && !!selectedRun.value },
+  ),
+);
+const drawerReport = computed(() => props.report ?? runReport.data.value ?? null);
+
 const linkedRunMessage = computed(() => {
   if (!route.query.run) return null;
   if (!linkedIdentity.value) return t("reports.history.linkedRunInvalid");
@@ -680,18 +691,19 @@ const closeRun = () => {
 const editRecipients = () => {
   const run = selectedRun.value;
   if (!run) return;
+  const folder = props.reportFolders[run.report_id] || (route.query.folder as string) || "default";
   router.push({
     name: "createReport",
     query: {
       report_id: run.report_id,
       name: run.report_name,
       org_identifier: orgId.value,
-      folder: (route.query.folder as string) || "default",
+      folder,
       step: "destinations",
       returnTo: router.resolve({
         name: "reportDetail",
         params: { report_id: run.report_id },
-        query: { org_identifier: orgId.value, tab: "history" },
+        query: { org_identifier: orgId.value, tab: "history", folder },
       }).fullPath,
     },
   });

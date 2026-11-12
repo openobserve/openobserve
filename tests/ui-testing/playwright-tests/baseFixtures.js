@@ -5,6 +5,8 @@ import { test as baseTest } from '@playwright/test';
 const testLogger = require('./utils/test-logger.js');
 
 const istanbulCLIOutput = path.join(process.cwd(), '.nyc_output');
+// Only an istanbul build (VITE_COVERAGE=true) exposes window.__coverage__; otherwise the hooks only cost time.
+const coverageEnabled = process.env.VITE_COVERAGE === 'true';
 
 export function generateUUID() {
   return crypto.randomBytes(16).toString('hex');
@@ -13,6 +15,18 @@ export function generateUUID() {
 
 export const test = baseTest.extend({
   context: async ({ context }, use) => {
+    // Logs and traces open the filter builder by default; specs on this fixture drive the code editor.
+    await context.addInitScript(() => {
+      try {
+        for (const key of ['o2.logs.queryInput', 'o2.traces.queryInput']) {
+          if (!localStorage.getItem(key)) localStorage.setItem(key, 'query');
+        }
+      } catch (_) {}
+    });
+    if (!coverageEnabled) {
+      await use(context);
+      return;
+    }
     await context.addInitScript(() =>
       window.addEventListener('beforeunload', () => {
         try {

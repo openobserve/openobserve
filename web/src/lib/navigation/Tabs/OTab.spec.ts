@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { defineComponent, provide, computed } from "vue";
 import { TabsRoot, TabsList } from "reka-ui";
@@ -25,6 +25,9 @@ function mountTab(
     dense?: boolean;
     reorderable?: boolean;
     disableDrag?: boolean;
+    suffixIcon?: string;
+    suffixLabel?: string;
+    tooltip?: string;
     slots?: Record<string, string>;
   } = {},
 ) {
@@ -38,6 +41,9 @@ function mountTab(
     dense = false,
     reorderable = false,
     disableDrag = false,
+    suffixIcon,
+    suffixLabel,
+    tooltip,
     slots = {},
   } = options;
 
@@ -59,7 +65,7 @@ function mountTab(
         })),
       );
       return {
-        tabProps: { name, label, icon, disable, disableDrag },
+        tabProps: { name, label, icon, disable, disableDrag, suffixIcon, suffixLabel, tooltip },
         modelValue: activeTab,
         orientation: isVertical ? "vertical" : "horizontal",
       };
@@ -112,6 +118,14 @@ describe("OTab", () => {
     expect(wrapper.find('[role="tab"]').attributes("data-state")).toBe("inactive");
   });
 
+  it("keeps the active styling on a disabled active tab, and the disabled one elsewhere", () => {
+    const active = mountTab({ name: "tab1", activeTab: "tab1", disable: true });
+    expect(active.find('[role="tab"]').classes()).toContain("text-tabs-active-text");
+    expect(active.find('[role="tab"]').classes()).not.toContain("text-tabs-disabled-text");
+    const inactive = mountTab({ name: "tab2", activeTab: "tab1", disable: true });
+    expect(inactive.find('[role="tab"]').classes()).toContain("text-tabs-disabled-text");
+  });
+
   it("sets aria-disabled when disable is true", () => {
     const wrapper = mountTab({ disable: true });
     expect(wrapper.find('[role="tab"]').attributes("aria-disabled")).toBe("true");
@@ -136,6 +150,30 @@ describe("OTab", () => {
     expect(wrapper.find(".o-tab__icon").exists()).toBe(true);
     // 'home' is a registered OIcon — rendered as SVG inside the span, not as text
     expect(wrapper.find(".o-tab__icon").html()).not.toBe("");
+  });
+
+  // --- Lock suffix ---
+
+  it("paints a lock suffix with the locked-icon token", () => {
+    const wrapper = mountTab({ label: "Alerts", suffixIcon: "lock" });
+    expect(wrapper.find(".lock-chip").exists()).toBe(true);
+  });
+
+  it("does not paint other suffix icons", () => {
+    const wrapper = mountTab({ label: "Alerts", suffixIcon: "add" });
+    expect(wrapper.find(".lock-chip").exists()).toBe(false);
+  });
+
+  it("gives a lock suffix screen-reader text from suffixLabel, else the tooltip", () => {
+    const explicit = mountTab({
+      label: "Alerts",
+      suffixIcon: "lock",
+      suffixLabel: "Locked: needs Alerts",
+      tooltip: "tip",
+    });
+    expect(explicit.get(".sr-only").text()).toBe("Locked: needs Alerts");
+    const fallback = mountTab({ label: "Alerts", suffixIcon: "lock", tooltip: "Locked: needs X" });
+    expect(fallback.get(".sr-only").text()).toBe("Locked: needs X");
   });
 
   // --- Default slot (custom content) ---
@@ -195,51 +233,48 @@ describe("OTab", () => {
     expect(wrapper.find('[role="tab"]').attributes("disabled")).toBeUndefined();
   });
 
-  // --- Transition & focus ring (post-migration tweaks) ---
+  // --- Transition & focus outline ---
 
-  it("applies the multi-property transition utility for smooth state changes", () => {
-    const wrapper = mountTab();
-    const classes = wrapper.find('[role="tab"]').classes();
-    // The migration replaced `transition-colors` with an explicit
-    // multi-property transition that also animates border-color and box-shadow.
+  it("puts the hover-in and hover-out motion tokens on the colour transition", () => {
+    const classes = mountTab().find('[role="tab"]').classes();
     expect(classes).toContain(
-      "transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow]",
+      "transition-[color,background-color,border-color,text-decoration-color,fill,stroke]",
     );
-    expect(classes).toContain("duration-150");
-    // Sanity: the old narrow utility should NOT be present anymore.
+    expect(classes).toContain("duration-(--duration-hover-out)");
+    expect(classes).toContain("hover:duration-(--duration-hover-in)");
     expect(classes).not.toContain("transition-colors");
   });
 
-  it("renders ring offset utilities so the focus ring is visually separated from the tab edge", () => {
-    const wrapper = mountTab();
-    const classes = wrapper.find('[role="tab"]').classes();
-    expect(classes).toContain("ring-offset-1");
-    expect(classes).toContain("ring-offset-surface-base");
+  it("uses an accent outline, not a box-shadow ring, for focus", () => {
+    const classes = mountTab().find('[role="tab"]').classes();
+    expect(classes).toEqual(
+      expect.arrayContaining([
+        "focus-visible:outline-solid",
+        "focus-visible:outline-2",
+        "focus-visible:outline-focus-ring-accent",
+      ]),
+    );
+    expect(classes.some((c) => /(^|:)ring-/.test(c))).toBe(false);
   });
 
-  it("applies a focus-visible ring using the tabs indicator color", () => {
-    const wrapper = mountTab();
-    const classes = wrapper.find('[role="tab"]').classes();
-    expect(classes).toContain("focus-visible:outline-none");
-    expect(classes).toContain("focus-visible:ring-2");
-    expect(classes).toContain("focus-visible:ring-tabs-indicator");
+  it("uses a negative focus outline offset on a horizontal tab", () => {
+    const classes = mountTab().find('[role="tab"]').classes();
+    expect(classes).toContain("focus-visible:-outline-offset-2");
+    expect(classes).not.toContain("focus-visible:outline-offset-2");
   });
 
-  it("keeps the focus ring utilities on disabled tabs (keyboard navigation still highlights them)", () => {
-    const wrapper = mountTab({ disable: true });
-    const classes = wrapper.find('[role="tab"]').classes();
-    // Focus ring classes belong to baseClasses and must remain regardless of state.
-    expect(classes).toContain("focus-visible:ring-2");
-    expect(classes).toContain("focus-visible:ring-tabs-indicator");
-    expect(classes).toContain("ring-offset-1");
+  it("uses a positive focus outline offset on a vertical tab", () => {
+    const classes = mountTab({ isVertical: true }).find('[role="tab"]').classes();
+    expect(classes).toContain("focus-visible:outline-offset-2");
+    expect(classes).not.toContain("focus-visible:-outline-offset-2");
   });
 
-  it("keeps the focus ring utilities on the active tab", () => {
-    const wrapper = mountTab({ name: "tab1", activeTab: "tab1" });
-    const classes = wrapper.find('[role="tab"]').classes();
-    expect(classes).toContain("focus-visible:ring-2");
-    expect(classes).toContain("focus-visible:ring-tabs-indicator");
-    expect(classes).toContain("ring-offset-surface-base");
+  it("keeps the focus outline classes on disabled and active tabs", () => {
+    for (const opts of [{ disable: true }, { name: "tab1", activeTab: "tab1" }]) {
+      const classes = mountTab(opts).find('[role="tab"]').classes();
+      expect(classes).toContain("focus-visible:outline-2");
+      expect(classes).toContain("focus-visible:outline-focus-ring-accent");
+    }
   });
 
   // --- Grip-gated drag (reorderable) ---
@@ -264,6 +299,14 @@ describe("OTab", () => {
     it("should not be draggable until the grip is pressed", () => {
       const wrapper = mountTab({ reorderable: true });
       expect(wrapper.find('[role="tab"]').attributes("draggable")).toBeUndefined();
+    });
+
+    it("should keep a grip press from reaching the trigger, which selects on press", async () => {
+      const wrapper = mountTab({ reorderable: true });
+      const pressed = vi.fn();
+      wrapper.find('[role="tab"]').element.addEventListener("mousedown", pressed);
+      await wrapper.find("[data-otab-grip]").trigger("mousedown");
+      expect(pressed).not.toHaveBeenCalled();
     });
 
     it("should arm dragging on grip mousedown and disarm on mouseup", async () => {

@@ -16,6 +16,7 @@
 import { computed, onScopeDispose, ref, toRaw, watch } from "vue";
 import type { Ref } from "vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { isPanelStarterQuery } from "@/composables/dashboard/usePanelAggregation";
 
 export const LIVE_PREVIEW_DEBOUNCE_MS = 600;
 export const LIVE_PREVIEW_SLOW_RUN_MS = 10_000;
@@ -50,9 +51,15 @@ const queryPayload = (query: any) => ({
   vrl: query?.vrlFunctionQuery ?? "",
   streamType: query?.fields?.stream_type ?? "",
   step: query?.config?.step_value ?? null,
+  queryType: query?.config?.query_type ?? null,
+  timeShift: query?.config?.time_shift ?? [],
+  formula: query?.config?.formula ?? null,
+  hide: query?.config?.hide ?? false,
+  // The chart renders the last-run snapshot, so a new legend format shows only after a run.
+  legend: query?.config?.promql_legend ?? "",
 });
 
-/** What the backend would receive for this panel, minus time range and variables. */
+/** What the backend would receive for this panel (minus time range and variables), plus the legend format applied on run. */
 export const panelPayloadSignature = (panel: any): string =>
   JSON.stringify({
     queryType: panel?.queryType ?? "",
@@ -77,7 +84,9 @@ export const hasTypedChanges = (panel: any, applied: any): boolean => {
   return (panel?.queries ?? []).some((query: any, index: number) => {
     const ran = applied.queries[index];
     const vrlChanged = (query?.vrlFunctionQuery ?? "") !== (ran?.vrlFunctionQuery ?? "");
-    const typedText = query?.customQuery && (query?.query ?? "").trim() !== "";
+    // A starter seeded by a type switch was not typed, so it runs like any builder edit.
+    const typedText =
+      query?.customQuery && (query?.query ?? "").trim() !== "" && !isPanelStarterQuery(query);
     return vrlChanged || (typedText && query.query !== ran?.query);
   });
 };
@@ -89,10 +98,10 @@ const withoutEditorMode = (panel: any) =>
     queries: (panel.queries ?? []).map((query: any) => ({ ...query, customQuery: false })),
   };
 
-/** An open select list (field or function picker), but not menus, popovers or tooltips. */
+/** An open select list mid-pick (field or function picker), but not a resting list, menus, popovers or tooltips. */
 export const isPopupOpen = (): boolean =>
   Array.from(document.querySelectorAll("[data-reka-popper-content-wrapper]")).some((wrapper) =>
-    wrapper.querySelector('[role="listbox"]'),
+    wrapper.querySelector('[role="listbox"]:not([data-list-resting])'),
   );
 
 /**

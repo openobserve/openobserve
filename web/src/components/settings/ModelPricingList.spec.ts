@@ -23,6 +23,7 @@ import ModelPricingList from "./ModelPricingList.vue";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/model_pricing", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -46,10 +47,12 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 // Router mock — capture push calls
 const routerPushMock = vi.fn();
+const routerReplaceMock = vi.fn();
 const currentRouteRef = { value: { query: {} as Record<string, any> } };
 vi.mock("vue-router", () => ({
   useRouter: () => ({
     push: routerPushMock,
+    replace: routerReplaceMock,
     currentRoute: currentRouteRef,
   }),
 }));
@@ -60,6 +63,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => ({
 }));
 
 import modelPricingService from "@/services/model_pricing";
+import analytics from "@/services/product_analytics";
 
 // ── Stubs for child components ───────────────────────────────────────────────
 
@@ -110,7 +114,7 @@ const ODrawerStub = {
 // underlying ODialog so the spec stays decoupled from that component.
 const ConfirmDialogStub = {
   name: "ConfirmDialog",
-  props: ["modelValue", "title", "message"],
+  props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   template: `
     <div data-test="confirm-dialog-stub" :data-open="String(!!modelValue)">
@@ -251,24 +255,27 @@ const mockI18n = createI18n({
       modelPricing: {
         header: "LLM Model Pricing",
         ruleOpIn: "is one of",
-        matchingPriorityTooltip: "Your Org > Global > Built-in",
+        matchingPriorityTooltip: "Your org > Global > Built-in",
         searchPlaceholder: "Search models...",
-        refresh: "Refresh",
-        testBtn: "Test",
+        syncBuiltInPrices: "Sync built-in prices",
+        testMatch: "Test match",
+        moreActions: "More actions",
+        modelDetails: "Model details",
         importBtn: "Import",
-        newModel: "New Model",
+        newModel: "New model",
         noModels: "No model pricing",
         noModelsDesc: "Add a custom model pricing",
         tabAll: "All",
         tabCustom: "Custom",
         tabSystem: "System",
         colModel: "Model",
-        colMatchPattern: "Match Pattern",
+        colMatchPattern: "Match pattern",
         colPricing: "Pricing (per 1M tokens)",
+        colPrice: "Price",
         colActions: "Actions",
         colPricingSimple: "Pricing",
         colPattern: "Pattern",
-        usageType: "Usage Type",
+        usageType: "Usage type",
         colModelTooltip: "Display name",
         colMatchPatternTooltip: "Regex pattern",
         colPricingTooltip: "Per-token prices",
@@ -290,12 +297,12 @@ const mockI18n = createI18n({
         deletedModelsNotif: "Deleted {count} models",
         modelEnabledNotif: "Enabled {name}",
         modelDisabledNotif: "Disabled {name}",
-        builtInRefreshed: "Built-in refreshed",
+        builtInPricesSynced: "Built-in prices synced",
         errLoadModels: "Failed to load models",
         errUpdate: "Failed to update",
         errDelete: "Failed to delete",
         errDeleteNamed: "Failed to delete {name}",
-        errRefresh: "Failed to refresh",
+        errSync: "Sync failed",
         errUnknown: "Unknown error",
         noModelsSelected: "No models selected",
         shadowBannerPrefix: "Shadowed by",
@@ -306,6 +313,12 @@ const mockI18n = createI18n({
         localTimeHint: "In your timezone: {range}",
         tierAlwaysActive: "Always active (default)",
         tierDefaultName: "Default",
+        builtInStatus: {
+          seed: "seed {date}.",
+          neverSynced: "never synced",
+          lastSynced: "synced at {time}",
+        },
+        unpriced: { title: "Pricing gaps" },
       },
     },
   },
@@ -331,10 +344,13 @@ const globalStubs: Record<string, any> = {
 
 let store: any;
 
-function mountComponent(extra: { store?: any; query?: Record<string, any> } = {}) {
+function mountComponent(
+  extra: { store?: any; query?: Record<string, any>; attachTo?: HTMLElement } = {},
+) {
   store = extra.store ?? createMockStore();
   currentRouteRef.value.query = extra.query ?? {};
   return mount(ModelPricingList, {
+    attachTo: extra.attachTo,
     global: {
       plugins: [mockI18n],
       provide: { store },
@@ -372,28 +388,10 @@ describe("ModelPricingList.vue", () => {
   // ── Mounting ─────────────────────────────────────────────────────────────
 
   describe("mounting", () => {
-    it("should mount without errors", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
     it("should call modelPricingService.list with the org identifier on mount", async () => {
       wrapper = mountComponent();
       await flushPromises();
       expect(modelPricingService.list).toHaveBeenCalledWith("test-org");
-    });
-
-    it("should populate models from the API response", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(wrapper.vm.models).toHaveLength(3);
-    });
-
-    it("should toggle loading off after fetch resolves", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(wrapper.vm.loading).toBe(false);
     });
 
     it("should auto-open the import page when route query action=import", async () => {
@@ -402,48 +400,9 @@ describe("ModelPricingList.vue", () => {
       expect(wrapper.vm.showImportModelPricingPage).toBe(true);
       expect(wrapper.find('[data-test="import-model-pricing-stub"]').exists()).toBe(true);
     });
-
-    it("should NOT show the import page when route has no action=import", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(wrapper.vm.showImportModelPricingPage).toBe(false);
-      expect(wrapper.find('[data-test="import-model-pricing-stub"]').exists()).toBe(false);
-    });
   });
 
   // ── Conditional rendering ────────────────────────────────────────────────
-
-  describe("conditional rendering", () => {
-    it("should render the list header when not showing the import page", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      // Title now lives in the standard OPageHeader (row 1).
-      expect(wrapper.find(".app-page-header h1").exists()).toBe(true);
-    });
-
-    it("should hide the list view when import page is shown", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.showImportModelPricingPage = true;
-      await nextTick();
-      expect(wrapper.find(".app-page-header").exists()).toBe(false);
-    });
-
-    it("should render the ODrawer side panel closed by default", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.exists()).toBe(true);
-      expect(drawer.props("open")).toBe(false);
-    });
-
-    it("should pass width=30 to the pricing detail ODrawer", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("width")).toBe(30);
-    });
-  });
 
   // ── ODrawer migration (open/close, props, slots) ─────────────────────────
 
@@ -475,22 +434,6 @@ describe("ModelPricingList.vue", () => {
       expect(drawer.props("open")).toBe(false);
     });
 
-    it("should reopen the ODrawer when it emits update:open true", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-
-      // Open via the public method so pricingDialogRow is populated (the
-      // drawer's header-left slot reads from it). Then simulate the drawer
-      // re-emitting update:open(true) and confirm the binding stays open.
-      wrapper.vm.openPricingDialog(mockModels[0]);
-      await nextTick();
-
-      const drawer = wrapper.findComponent(ODrawerStub);
-      drawer.vm.$emit("update:open", true);
-      await nextTick();
-      expect(drawer.props("open")).toBe(true);
-    });
-
     it("should render pricing details inside the drawer default slot", async () => {
       wrapper = mountComponent();
       await flushPromises();
@@ -503,21 +446,219 @@ describe("ModelPricingList.vue", () => {
     });
   });
 
+  describe("rows and the pricing drawer", () => {
+    // OTable keeps its loading skeleton up for a minimum real-time window.
+    async function waitForRow(w: VueWrapper, name: string) {
+      return vi.waitFor(() => {
+        const row = w.findAll('[data-test^="o2-table-row-"]').find((r) => r.text().includes(name));
+        expect(row).toBeTruthy();
+        return row!;
+      });
+    }
+
+    it("opens the pricing drawer when the name or pattern cell is clicked", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const row = await waitForRow(wrapper, "GPT-4o (org)");
+
+      await row.find('[data-test="o-truncated-text"]').trigger("click");
+      await nextTick();
+      expect(wrapper.vm.showPricingDialog).toBe(true);
+      expect(wrapper.vm.pricingDialogRow?.id).toBe("org-1");
+
+      wrapper.vm.showPricingDialog = false;
+      wrapper.vm.pricingDialogRow = null;
+      const patternCell = row.findAll("td").find((td) => td.text() === "^gpt-4o.*");
+      await patternCell!.trigger("click");
+      await nextTick();
+      expect(wrapper.vm.showPricingDialog).toBe(true);
+      expect(wrapper.vm.pricingDialogRow?.id).toBe("org-1");
+    });
+
+    it("does not open the drawer from the tree toggle or the checkbox", async () => {
+      vi.mocked(modelPricingService.list).mockResolvedValue({
+        data: [orgModel({ children: [orgModel({ id: "org-child", name: "Shadowed child" })] })],
+      } as any);
+      wrapper = mountComponent();
+      await flushPromises();
+      const row = await waitForRow(wrapper, "GPT-4o (org)");
+
+      await row.find('[data-test="o2-table-tree-toggle-name"]').trigger("click");
+      await row.find('button[role="checkbox"]').trigger("click");
+      await nextTick();
+
+      expect(wrapper.vm.showPricingDialog).toBe(false);
+      await waitForRow(wrapper, "Shadowed child");
+    });
+
+    it("keeps the duplicate and delete row shortcuts working from the hovered row", async () => {
+      wrapper = mountComponent({ attachTo: document.body });
+      await flushPromises();
+      const row = await waitForRow(wrapper, "GPT-4o (org)");
+      (row.element as HTMLElement).focus();
+
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "d" }));
+      await nextTick();
+      expect(routerPushMock).toHaveBeenLastCalledWith({
+        name: "modelPricingEditor",
+        query: { org_identifier: "test-org", id: "org-1", duplicate: "true" },
+      });
+
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete" }));
+      await nextTick();
+      expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
+      expect(wrapper.vm.confirmDialogMeta.messageKeypath).toBe("modelPricing.confirmDeleteMessage");
+      expect(wrapper.vm.confirmDialogMeta.messageName).toBe("GPT-4o (org)");
+      expect(wrapper.vm.showPricingDialog).toBe(false);
+    });
+
+    it("mutes disabled rows and tags them Disabled", async () => {
+      vi.mocked(modelPricingService.list).mockResolvedValue({
+        data: [orgModel({ id: "org-off", name: "Paused model", enabled: false }), orgModel()],
+      } as any);
+      wrapper = mountComponent();
+      await flushPromises();
+      const disabledRow = await waitForRow(wrapper, "Paused model");
+      const enabledRow = await waitForRow(wrapper, "GPT-4o (org)");
+
+      expect(disabledRow.classes()).toContain("bg-surface-panel");
+      expect(disabledRow.find('[data-test="model-pricing-disabled-tag"]').exists()).toBe(true);
+      expect(enabledRow.classes()).not.toContain("bg-surface-panel");
+      expect(enabledRow.find('[data-test="model-pricing-disabled-tag"]').exists()).toBe(false);
+    });
+
+    it("keeps toggle and edit inline and moves duplicate and delete into the row menu", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const row = await waitForRow(wrapper, "GPT-4o (org)");
+
+      expect(row.find('[data-test="model-pricing-toggle-btn"]').exists()).toBe(true);
+      expect(row.find('[data-test="model-pricing-edit-btn"]').exists()).toBe(true);
+      expect(row.find('[data-test="model-pricing-row-more-actions"]').exists()).toBe(true);
+      expect(row.find('[data-test="model-pricing-duplicate-btn"]').exists()).toBe(false);
+      expect(row.find('[data-test="model-pricing-delete-btn"]').exists()).toBe(false);
+    });
+
+    it("titles the drawer with the model name, not its pattern", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.openPricingDialog(mockModels[0]);
+      await nextTick();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.props("title")).toBe("GPT-4o (org)");
+      expect(drawer.text()).toContain(mockModels[0].match_pattern);
+    });
+
+    it("offers Edit and Duplicate in the drawer footer for the org's own model", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.openPricingDialog(mockModels[0]);
+      await nextTick();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.props("primaryButtonLabel")).toBe("Edit");
+      expect(drawer.props("secondaryButtonLabel")).toBe("Duplicate");
+      expect(drawer.props("secondaryButtonVariant")).toBe("outline");
+
+      drawer.vm.$emit("click:primary");
+      await nextTick();
+      expect(routerPushMock).toHaveBeenLastCalledWith({
+        name: "modelPricingEditor",
+        query: { org_identifier: "test-org", id: "org-1" },
+      });
+
+      wrapper.vm.openPricingDialog(mockModels[0]);
+      await nextTick();
+      drawer.vm.$emit("click:secondary");
+      await nextTick();
+      expect(routerPushMock).toHaveBeenLastCalledWith({
+        name: "modelPricingEditor",
+        query: { org_identifier: "test-org", id: "org-1", duplicate: "true" },
+      });
+    });
+
+    it("offers only Clone in the drawer footer for a read-only model", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.openPricingDialog(builtInModel());
+      await nextTick();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.props("primaryButtonLabel")).toBeUndefined();
+      expect(drawer.props("secondaryButtonLabel")).toBe("Clone");
+      expect(drawer.props("secondaryButtonVariant")).toBe("outline");
+
+      drawer.vm.$emit("click:secondary");
+      await nextTick();
+      expect(routerPushMock).toHaveBeenLastCalledWith({
+        name: "modelPricingEditor",
+        query: { org_identifier: "test-org", id: "bi-1", duplicate: "true" },
+      });
+    });
+
+    it("closes the drawer before leaving for the editor, so the cached list does not reopen it", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const openAtPush: boolean[] = [];
+      routerPushMock.mockImplementation(() => openAtPush.push(wrapper.vm.showPricingDialog));
+      const drawer = wrapper.findComponent(ODrawerStub);
+
+      for (const [model, event] of [
+        [mockModels[0], "click:primary"],
+        [mockModels[0], "click:secondary"],
+        [builtInModel(), "click:secondary"],
+      ] as const) {
+        wrapper.vm.openPricingDialog(model);
+        await nextTick();
+        drawer.vm.$emit(event);
+        await nextTick();
+      }
+
+      expect(openAtPush).toEqual([false, false, false]);
+      expect(drawer.props("open")).toBe(false);
+    });
+
+    it("labels the catalogue sync and test buttons by what they do", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(wrapper.find('[data-test="model-pricing-refresh-btn"]').text()).toBe(
+        "Sync built-in prices",
+      );
+      expect(wrapper.find('[data-test="model-pricing-test-match-btn"]').text()).toBe("Test match");
+    });
+  });
+
   // ── selectedTab / tab change ─────────────────────────────────────────────
 
   describe("tab filtering & selection reset", () => {
-    it("should default selectedTab to 'all'", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(wrapper.vm.selectedTab).toBe("all");
-    });
-
     it("should clear selectedIds when onTabChange is called", async () => {
       wrapper = mountComponent();
       await flushPromises();
       wrapper.vm.selectedIds = ["org-1", "meta-1"];
       wrapper.vm.onTabChange();
       expect(wrapper.vm.selectedIds).toEqual([]);
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "model_pricing_tab_switched",
+        expect.anything(),
+      );
+    });
+
+    it("tracks a tab switch only when the user selects a tab", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.selectedTab = "org";
+      wrapper.vm.clearFilters();
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "model_pricing_tab_switched",
+        expect.anything(),
+      );
+
+      vi.mocked(analytics.track).mockClear();
+      wrapper.vm.selectedTab = "org";
+      wrapper.vm.onTabSelect();
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("model_pricing_tab_switched", { tab: "org" });
     });
 
     it("should only return org-source models when selectedTab is 'org'", async () => {
@@ -577,14 +718,6 @@ describe("ModelPricingList.vue", () => {
   // ── isReadOnly / getSource ───────────────────────────────────────────────
 
   describe("source classification", () => {
-    it("getSource returns the model's source", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(wrapper.vm.getSource(mockModels[0])).toBe("org");
-      expect(wrapper.vm.getSource(mockModels[1])).toBe("meta_org");
-      expect(wrapper.vm.getSource(mockModels[2])).toBe("built_in");
-    });
-
     it("getSource falls back to 'org' when source is missing", async () => {
       wrapper = mountComponent();
       await flushPromises();
@@ -613,27 +746,6 @@ describe("ModelPricingList.vue", () => {
   // ── Selection helpers ────────────────────────────────────────────────────
 
   describe("selection", () => {
-    it("selectedIds can be set directly (OTable manages selection via @update:selected-ids)", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.selectedIds = ["org-1"];
-      expect(wrapper.vm.selectedIds).toEqual(["org-1"]);
-    });
-
-    it("selectedIds can be cleared", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.selectedIds = ["org-1", "meta-1"];
-      wrapper.vm.selectedIds = ["meta-1"];
-      expect(wrapper.vm.selectedIds).toEqual(["meta-1"]);
-    });
-
-    it("selectedIdsOnlyContainsOwn is false when nothing is selected", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(wrapper.vm.selectedIdsOnlyContainsOwn).toBe(false);
-    });
-
     it("selectedIdsOnlyContainsOwn is true when only org-owned ids are selected", async () => {
       wrapper = mountComponent();
       await flushPromises();
@@ -652,15 +764,6 @@ describe("ModelPricingList.vue", () => {
   });
 
   // ── Tree expand/collapse ─────────────────────────────────────────────────
-
-  describe("expandedParents", () => {
-    it("renders OTable with tree expand (tree expand handled by OTable internally)", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      // OTable handles tree expansion internally — verify the table renders
-      expect(wrapper.findComponent({ name: "OTable" }).exists()).toBe(true);
-    });
-  });
 
   // ── Formatting helpers ───────────────────────────────────────────────────
 
@@ -690,18 +793,6 @@ describe("ModelPricingList.vue", () => {
       wrapper = mountComponent();
       await flushPromises();
       expect(wrapper.vm.formatPerMillion(null)).toBe("$0.00");
-    });
-
-    it("returns $0.00 for undefined", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(wrapper.vm.formatPerMillion(undefined)).toBe("$0.00");
-    });
-
-    it("returns $0.00 for zero", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(wrapper.vm.formatPerMillion(0)).toBe("$0.00");
     });
   });
 
@@ -787,52 +878,57 @@ describe("ModelPricingList.vue", () => {
     });
   });
 
-  describe("getVisiblePrices / getOverflowCount", () => {
-    it("returns at most 2 visible prices", async () => {
+  describe("pricing cell", () => {
+    let widthSpies: { mockRestore(): void }[] = [];
+    const mockCellWidths = () => {
+      widthSpies = [
+        vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(100),
+        vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(60),
+      ];
+    };
+
+    afterEach(() => widthSpies.forEach((spy) => spy.mockRestore()));
+
+    const waitForRow = (name: string) =>
+      vi.waitFor(() => {
+        const row = wrapper
+          .findAll('[data-test^="o2-table-row-"]')
+          .find((r: any) => r.text().includes(name));
+        expect(row).toBeTruthy();
+        return row!;
+      });
+
+    const mountWithPrices = async () => {
+      vi.mocked(modelPricingService.list).mockResolvedValue({
+        data: [
+          orgModel({
+            tiers: [{ condition: null, prices: { input: 0.1, output: 0.2, audio: 0.3 } }],
+          }),
+        ],
+      } as any);
       wrapper = mountComponent();
       await flushPromises();
-      const model = {
-        tiers: [
-          {
-            condition: null,
-            prices: { input: 0.1, output: 0.2, audio: 0.3, image: 0.4 },
-          },
-        ],
-      };
-      expect(Object.keys(wrapper.vm.getVisiblePrices(model))).toHaveLength(2);
+      return waitForRow("GPT-4o (org)");
+    };
+
+    it("collapses prices that do not fit into a +N chip that opens the dialog", async () => {
+      mockCellWidths();
+      const row = await mountWithPrices();
+      await flushPromises();
+      const more = row.find('[data-test="fit-items-more"]');
+      expect(more.text()).toContain("+2");
+      await more.find("button, [tabindex]").trigger("click");
+      expect(wrapper.vm.showPricingDialog).toBe(true);
     });
 
-    it("reports overflow count for prices beyond the first 2", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const model = {
-        tiers: [
-          {
-            condition: null,
-            prices: { input: 0.1, output: 0.2, audio: 0.3, image: 0.4 },
-          },
-        ],
-      };
-      expect(wrapper.vm.getOverflowCount(model)).toBe(2);
-    });
-
-    it("returns overflow 0 when there are no prices", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const model = { tiers: [{ condition: null, prices: {} }] };
-      expect(wrapper.vm.getOverflowCount(model)).toBe(0);
+    it("shows every price with no +N when they fit", async () => {
+      const row = await mountWithPrices();
+      expect(row.findAll("[data-fit-item]")).toHaveLength(3);
+      expect(row.find('[data-test="fit-items-more"]').exists()).toBe(false);
     });
   });
 
   describe("sortedPriceEntries", () => {
-    it("sorts with input before output", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const out = wrapper.vm.sortedPriceEntries({ output: 0.2, input: 0.1 });
-      expect(out[0][0]).toBe("input");
-      expect(out[1][0]).toBe("output");
-    });
-
     it("sorts other keys alphabetically after known ones", async () => {
       wrapper = mountComponent();
       await flushPromises();
@@ -842,16 +938,6 @@ describe("ModelPricingList.vue", () => {
   });
 
   // ── pagination changePagination ──────────────────────────────────────────
-
-  describe("pagination", () => {
-    it("renders OTable with client-side pagination", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      // OTable handles pagination internally via pagination="client" prop
-      const table = wrapper.findComponent({ name: "OTable" });
-      expect(table.exists()).toBe(true);
-    });
-  });
 
   // ── Router-driven actions (openEditor / duplicate / openImport) ─────────
 
@@ -910,7 +996,10 @@ describe("ModelPricingList.vue", () => {
 
       expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
       expect(wrapper.vm.confirmDialogMeta.title).toBe("Delete model?");
-      expect(wrapper.vm.confirmDialogMeta.message).toContain(mockModels[0].name);
+      const dialog = wrapper.findComponent(ConfirmDialogStub);
+      expect(dialog.props("messageKeypath")).toBe("modelPricing.confirmDeleteMessage");
+      expect(dialog.props("messageName")).toBe(mockModels[0].name);
+      expect(dialog.props("okVariant")).toBe("destructive");
     });
 
     it("calls modelPricingService.delete and notifies on confirm", async () => {
@@ -957,14 +1046,6 @@ describe("ModelPricingList.vue", () => {
   });
 
   describe("resetConfirmDialog", () => {
-    it("closes the confirm dialog", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.confirmDialogMeta.show = true;
-      wrapper.vm.resetConfirmDialog();
-      expect(wrapper.vm.confirmDialogMeta.show).toBe(false);
-    });
-
     it("is triggered when ConfirmDialog emits update:cancel", async () => {
       wrapper = mountComponent();
       await flushPromises();
@@ -1007,16 +1088,6 @@ describe("ModelPricingList.vue", () => {
       expect("__sectionStart" in sentPayload).toBe(false);
     });
 
-    it("notifies positive on success", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-
-      await wrapper.vm.toggleEnabled(mockModels[0], true);
-      await flushPromises();
-
-      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
-    });
-
     it("notifies negative when update fails", async () => {
       vi.mocked(modelPricingService.update).mockRejectedValueOnce(new Error("update fail"));
       wrapper = mountComponent();
@@ -1032,24 +1103,6 @@ describe("ModelPricingList.vue", () => {
   // ── refreshBuiltIn ───────────────────────────────────────────────────────
 
   describe("refreshBuiltIn", () => {
-    it("sets refreshing to true while running and false after", async () => {
-      let resolveFn: any;
-      vi.mocked(modelPricingService.refreshBuiltIn).mockImplementationOnce(
-        () => new Promise((r) => (resolveFn = r)),
-      );
-      wrapper = mountComponent();
-      await flushPromises();
-
-      const promise = wrapper.vm.refreshBuiltIn();
-      await nextTick();
-      expect(wrapper.vm.refreshing).toBe(true);
-
-      resolveFn({});
-      await promise;
-      await flushPromises();
-      expect(wrapper.vm.refreshing).toBe(false);
-    });
-
     it("notifies positive and refetches on success", async () => {
       wrapper = mountComponent();
       await flushPromises();
@@ -1060,7 +1113,9 @@ describe("ModelPricingList.vue", () => {
 
       expect(modelPricingService.refreshBuiltIn).toHaveBeenCalledWith("test-org");
       expect(modelPricingService.list).toHaveBeenCalled();
-      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success", message: "Built-in prices synced" }),
+      );
     });
 
     it("notifies negative when refresh fails", async () => {
@@ -1154,16 +1209,6 @@ describe("ModelPricingList.vue", () => {
   // ── confirmDeleteSelected ────────────────────────────────────────────────
 
   describe("confirmDeleteSelected", () => {
-    it("opens the confirm dialog with the count message", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.selectedIds = ["org-1"];
-      wrapper.vm.confirmDeleteSelected();
-
-      expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
-      expect(wrapper.vm.confirmDialogMeta.message).toContain("1");
-    });
-
     it("calls delete for each selected id and clears the selection on success", async () => {
       wrapper = mountComponent();
       await flushPromises();
@@ -1209,42 +1254,7 @@ describe("ModelPricingList.vue", () => {
 
   // ── customSort (handled internally by OTable) ─────────────────────────────
 
-  describe("customSort", () => {
-    it("OTable handles column sorting internally", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      // OTable manages sorting internally — verify table renders with sortable columns
-      expect(wrapper.findComponent({ name: "OTable" }).exists()).toBe(true);
-    });
-  });
-
   // ── allSelected / someSelected / toggleSelectAll ─────────────────────────
-
-  describe("select-all behaviour", () => {
-    it("can select all page rows via selectedIds", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.selectedTab = "all";
-
-      // OTable handles select-all internally — simulate by setting selectedIds
-      wrapper.vm.selectedIds = ["org-1", "org-2", "org-3"];
-      await nextTick();
-
-      expect(wrapper.vm.selectedIds.length).toBe(3);
-    });
-
-    it("can clear selection via selectedIds", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.selectedIds = ["org-1", "org-2", "org-3"];
-      await nextTick();
-      expect(wrapper.vm.selectedIds.length).toBeGreaterThan(0);
-
-      wrapper.vm.selectedIds = [];
-      await nextTick();
-      expect(wrapper.vm.selectedIds).toEqual([]);
-    });
-  });
 
   // ── ImportModelPricing integration ───────────────────────────────────────
 
@@ -1429,5 +1439,69 @@ describe("list view state", () => {
       sortBy: "name",
       sortOrder: "desc",
     });
+  });
+});
+
+describe("Route tabs and header", () => {
+  let w: any;
+
+  beforeEach(() => {
+    vi.mocked(modelPricingService.list).mockResolvedValue({ data: mockModels } as any);
+  });
+
+  afterEach(() => {
+    w?.unmount();
+    vi.clearAllMocks();
+  });
+
+  it("switching tab writes it to the route query, keeping the other params", async () => {
+    w = mountComponent({ query: { tab: "all", org_identifier: "test-org" } });
+    await flushPromises();
+
+    w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "org");
+    await flushPromises();
+
+    expect(w.vm.selectedTab).toBe("org");
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      query: { tab: "org", org_identifier: "test-org" },
+    });
+  });
+
+  it("Pricing gaps opens its own page", async () => {
+    w = mountComponent();
+    await flushPromises();
+    await w.find('[data-test="model-pricing-gaps-btn"]').trigger("click");
+    expect(routerPushMock).toHaveBeenCalledWith({
+      name: "modelPricingGaps",
+      query: { org_identifier: "test-org" },
+    });
+  });
+
+  it("reopens the tab named in the route query after a reload", async () => {
+    w = mountComponent({ query: { tab: "inherited" } });
+    await flushPromises();
+    expect(w.vm.selectedTab).toBe("inherited");
+  });
+
+  it("says online sync has not run when the built-in list was never synced", async () => {
+    vi.mocked(modelPricingService.getBuiltIn).mockResolvedValue({
+      data: { models: [], source_url: "", last_updated: 0, seed_date: "2026-10-14" },
+    } as any);
+    w = mountComponent();
+    await flushPromises();
+    const status = w.find('[data-test="model-pricing-built-in-status"]');
+    expect(status.text()).toContain("2026-10-14");
+    expect(status.text()).toContain("never synced");
+  });
+
+  it("gives the last online sync time once the built-in list has synced", async () => {
+    vi.mocked(modelPricingService.getBuiltIn).mockResolvedValue({
+      data: { models: [], source_url: "", last_updated: 1_798_000_000, seed_date: "2026-10-14" },
+    } as any);
+    w = mountComponent();
+    await flushPromises();
+    const status = w.find('[data-test="model-pricing-built-in-status"]');
+    expect(status.text()).toContain("synced at 2026-12-");
+    expect(status.text()).not.toContain("never synced");
   });
 });

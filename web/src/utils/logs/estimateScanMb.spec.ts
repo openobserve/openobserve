@@ -377,6 +377,21 @@ describe("periods", () => {
     expect(relativeWindow("1h", NOW)).toEqual({ startUs: NOW - MICROS_PER_HOUR, endUs: NOW });
     expect(relativeWindow("x", NOW)).toBeNull();
   });
+
+  it("reads a calendar period as its resolved window, not a rolling one", () => {
+    localStorage.setItem("timezone", "UTC");
+    const now = Date.parse("2026-10-08T03:00:00Z") * 1000;
+    expect(relativeWindow("calendar:day:-1", now)).toEqual({
+      startUs: Date.parse("2026-10-07T00:00:00Z") * 1000,
+      endUs: Date.parse("2026-10-08T00:00:00.000Z") * 1000,
+    });
+    expect(relativeWindow("calendar:day:0", now)).toEqual({
+      startUs: Date.parse("2026-10-08T00:00:00Z") * 1000,
+      endUs: now,
+    });
+    expect(periodToMicros("calendar:week:-1")).toBe(7 * MICROS_PER_DAY);
+    localStorage.removeItem("timezone");
+  });
 });
 
 describe("shared tie comparator", () => {
@@ -397,5 +412,30 @@ describe("shared tie comparator", () => {
   it("preselects nothing when every stream has doc_time_max 0", () => {
     expect(pickLatestStream([s("a", 0), s("b", 0)])).toBeNull();
     expect(pickLatestStream([])).toBeNull();
+  });
+
+  describe("internal streams", () => {
+    const internal = (name: string, max: number): StreamStatsEntry => ({
+      ...s(name, max),
+      is_internal: true,
+    });
+
+    it("prefers a user stream even when an internal one has newer data", () => {
+      expect(pickLatestStream([internal("_rumdata", 99), s("app", 5), s("web", 3)])).toBe("app");
+    });
+
+    it("ignores a user stream that has no data when picking the user stream", () => {
+      expect(pickLatestStream([internal("_rumdata", 99), s("empty", 0), s("app", 5)])).toBe("app");
+    });
+
+    it("falls back to the newest internal stream when no user stream has data", () => {
+      expect(pickLatestStream([internal("_rumlog", 4), internal("_rumdata", 9), s("app", 0)])).toBe(
+        "_rumdata",
+      );
+    });
+
+    it("keeps the previous order when no stream is flagged internal", () => {
+      expect(pickLatestStream([s("old", 2), s("new", 8)])).toBe("new");
+    });
   });
 });

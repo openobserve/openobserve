@@ -60,19 +60,69 @@ fn create_enrichment_table_urls_statement() -> TableCreateStatement {
                 .auto_increment()
                 .primary_key(),
         )
-        .col(ColumnDef::new(EnrichmentTableUrls::Org).string_len(256).not_null())
-        .col(ColumnDef::new(EnrichmentTableUrls::Name).string_len(256).not_null())
-        .col(ColumnDef::new(EnrichmentTableUrls::Url).string_len(2048).not_null())
-        .col(ColumnDef::new(EnrichmentTableUrls::Status).small_integer().not_null())
+        .col(
+            ColumnDef::new(EnrichmentTableUrls::Org)
+                .string_len(256)
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(EnrichmentTableUrls::Name)
+                .string_len(256)
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(EnrichmentTableUrls::Url)
+                .string_len(2048)
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(EnrichmentTableUrls::Status)
+                .small_integer()
+                .not_null(),
+        )
         .col(ColumnDef::new(EnrichmentTableUrls::ErrorMessage).text())
-        .col(ColumnDef::new(EnrichmentTableUrls::CreatedAt).big_integer().not_null())
-        .col(ColumnDef::new(EnrichmentTableUrls::UpdatedAt).big_integer().not_null())
-        .col(ColumnDef::new(EnrichmentTableUrls::TotalBytesFetched).big_integer().not_null())
-        .col(ColumnDef::new(EnrichmentTableUrls::TotalRecordsProcessed).big_integer().not_null())
-        .col(ColumnDef::new(EnrichmentTableUrls::RetryCount).integer().not_null())
-        .col(ColumnDef::new(EnrichmentTableUrls::AppendData).boolean().not_null())
-        .col(ColumnDef::new(EnrichmentTableUrls::LastBytePosition).big_integer().not_null().default(0))
-        .col(ColumnDef::new(EnrichmentTableUrls::SupportsRange).boolean().not_null().default(false))
+        .col(
+            ColumnDef::new(EnrichmentTableUrls::CreatedAt)
+                .big_integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(EnrichmentTableUrls::UpdatedAt)
+                .big_integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(EnrichmentTableUrls::TotalBytesFetched)
+                .big_integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(EnrichmentTableUrls::TotalRecordsProcessed)
+                .big_integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(EnrichmentTableUrls::RetryCount)
+                .integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(EnrichmentTableUrls::AppendData)
+                .boolean()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(EnrichmentTableUrls::LastBytePosition)
+                .big_integer()
+                .not_null()
+                .default(0),
+        )
+        .col(
+            ColumnDef::new(EnrichmentTableUrls::SupportsRange)
+                .boolean()
+                .not_null()
+                .default(false),
+        )
         .to_owned()
 }
 

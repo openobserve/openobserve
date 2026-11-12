@@ -23,7 +23,11 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
       class="info-icon-btn group absolute top-4 right-4 z-10"
     >
-      <OButton variant="ghost" size="icon-circle-sm">
+      <OButton
+        :aria-label="t('alerts.serviceGraphLegendTitle')"
+        variant="ghost"
+        size="icon-circle-sm"
+      >
         <OIcon name="info-outline" size="sm" />
       </OButton>
       <div

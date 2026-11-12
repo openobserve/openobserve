@@ -43,14 +43,16 @@ use crate::{
     QueryTracker,
     cluster::flight::{get_online_querier_nodes, partition_file_list},
     datafusion::{
-        distributed_plan::{
-            NewEmptyExecVisitor,
+        distributed::{
             codec::get_physical_extension_codec,
-            node::{RemoteScanNode, SearchInfos},
-            remote_scan_exec::RemoteScanExec,
+            remote_scan::{
+                node::{RemoteScanNode, SearchInfos},
+                remote_scan_exec::RemoteScanExec,
+            },
         },
         exec::{DataFusionContextBuilder, register_udf},
-        optimizer::physical_optimizer::remote_scan::wrap_partial_reduce_for_aggregate,
+        physical_optimizer::remote_scan::wrap_partial_reduce_for_aggregate,
+        physical_plan::empty_exec::NewEmptyExecVisitor,
     },
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     work_group::DeferredLock,
@@ -156,11 +158,7 @@ pub async fn search(
     let role_group = req
         .search_event_type
         .as_ref()
-        .map(|v| {
-            SearchEventType::try_from(v.as_str())
-                .ok()
-                .map(RoleGroup::from)
-        })
+        .map(|v| v.parse::<SearchEventType>().ok().map(RoleGroup::from))
         .unwrap_or(Some(RoleGroup::Interactive));
     let mut nodes =
         get_online_querier_nodes(&trace_id, &req.org_id, &stream_key, role_group).await?;

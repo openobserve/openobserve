@@ -33,7 +33,7 @@ use o2_enterprise::enterprise::{
 use o2_openfga::{
     authorizer::authz::{
         add_tuple_for_pipeline, get_add_user_to_org_tuples, get_org_creation_tuples,
-        get_ownership_all_org_tuple, get_ownership_tuple, update_tuples,
+        get_ownership_all_org_tuple, get_ownership_tuple, get_parent_tuple, update_tuples,
     },
     meta::mapping::{
         LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY, NON_OWNING_ORG, OFGA_MODELS, OFGAModel,
@@ -77,6 +77,65 @@ struct PendingMigrations {
     query_history: bool,
     downtimes: bool,
     ai_chat_shares: bool,
+    fleet: bool,
+    ownership_repair: bool,
+    public_dashboards: bool,
+    incident_integrations: bool,
+    missing_ownership: bool,
+    profiles: bool,
+}
+
+impl PendingMigrations {
+    /// Every flag `all_org_ownership_keys` reads, so the repair re-writes each `_all_` key.
+    fn every_ownership_back_fill() -> Self {
+        Self {
+            cipher_keys: true,
+            ratelimit: true,
+            service_accounts: true,
+            ai_chat_permissions: true,
+            re_pattern_permission: true,
+            license_permission: true,
+            sourcemap_permission: true,
+            service_streams: true,
+            logs_pattern_insights: true,
+            ai_toolsets: true,
+            incidents: true,
+            model_pricing: true,
+            online_eval: true,
+            llm_workbench: true,
+            billing_group: true,
+            synthetics: true,
+            workflows: true,
+            oncall: true,
+            annotation_queues_datasets: true,
+            workflow_folders: true,
+            synthetic_environments: true,
+            prompts: true,
+            prompt_folders: true,
+            query_history: true,
+            downtimes: true,
+            ai_chat_shares: true,
+            fleet: true,
+            missing_ownership: true,
+            public_dashboards: true,
+            profiles: true,
+            incident_integrations: true,
+            ..Default::default()
+        }
+    }
+
+    // The rejected 0.0.59 batch carried these for installs from before 0.0.30; sweeps ran apart.
+    fn writes_pipeline_tuples(&self) -> bool {
+        self.pipeline || self.ownership_repair
+    }
+
+    fn writes_alert_folder_tuples(&self) -> bool {
+        self.alert_folders || self.ownership_repair
+    }
+
+    fn writes_report_folder_tuples(&self) -> bool {
+        self.report_folders || self.ownership_repair
+    }
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -312,7 +371,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     for key in &all_org_keys {
                         get_ownership_all_org_tuple(org_name, key, &mut tuples);
                     }
-                    if pending.pipeline {
+                    if pending.writes_pipeline_tuples() {
                         get_ownership_all_org_tuple(org_name, "pipelines", &mut tuples);
                         match infra::pipeline::list_by_org(org_name).await {
                             Ok(pipelines) => {
@@ -327,16 +386,24 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             }
                         }
                     }
-                    if pending.alert_folders {
+                    if pending.writes_alert_folder_tuples() {
                         get_ownership_all_org_tuple(org_name, "alert_folders", &mut tuples);
                         get_ownership_tuple(org_name, "alert_folders", DEFAULT_FOLDER, &mut tuples);
                     }
-                    if pending.report_folders {
+                    if pending.writes_report_folder_tuples() {
                         get_ownership_all_org_tuple(org_name, "report_folders", &mut tuples);
                         get_ownership_tuple(
                             org_name,
                             "report_folders",
                             DEFAULT_FOLDER,
+                            &mut tuples,
+                        );
+                    }
+                    if pending.profiles {
+                        get_parent_tuple(
+                            &format!("_all_{org_name}"),
+                            "stream",
+                            &format!("profiles:_all_{org_name}"),
                             &mut tuples,
                         );
                     }
@@ -443,12 +510,17 @@ async fn run_folder_and_data_migrations(pending: &PendingMigrations) {
     }
 }
 
-/// The resources a pending back-fill needs nothing but an `_all_` org tuple for.
+/// The `_all_` org keys a pending back-fill needs; the ownership repair asks for every one.
 ///
 /// Data rather than control flow. The three that also need a per-object tuple or
 /// a database sweep — pipelines, alert folders, report folders — stay as explicit
 /// branches at the call site.
 fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
+    if pending.ownership_repair {
+        let mut keys = all_org_ownership_keys(&PendingMigrations::every_ownership_back_fill());
+        keys.extend(["pipelines", "alert_folders", "report_folders"]);
+        return keys;
+    }
     let mut keys = vec![];
     if pending.cipher_keys {
         keys.push("cipher_keys");
@@ -490,10 +562,7 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
         keys.extend(["providers", "score_configs", "scorers", "eval_jobs"]);
     }
     if pending.llm_workbench {
-        // The Playground is new at 0.0.41. The four beside it shipped earlier
-        // without a migration branch, so orgs that predate their release never
-        // received an `_all_` tuple and custom roles could not be granted those
-        // resources at all. Emitting them here is idempotent.
+        // Playground shipped at 0.0.43, after this gate; the 0.0.58 back-fill covers it.
         keys.extend([
             "playground",
             "annotation_queues",
@@ -542,6 +611,33 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.ai_chat_shares {
         keys.push("ai_chat_shares");
     }
+    if pending.fleet {
+        keys.extend(["fleets", "fleet_configs", "fleet_management"]);
+    }
+    if pending.missing_ownership {
+        keys.extend([
+            "db_monitoring",
+            "search_inspector",
+            "status_page",
+            "mcp",
+            "playground",
+            "model_pricing",
+            LOGS_INSIGHTS_KEY,
+            LOGS_PATTERN_KEY,
+            RESULT_LOGS_CACHE_KEY,
+            "alert_calibration",
+            "slack",
+        ]);
+    }
+    if pending.public_dashboards {
+        keys.push("public_dashboards");
+    }
+    if pending.profiles {
+        keys.push("profiles");
+    }
+    if pending.incident_integrations {
+        keys.push("incident_integrations");
+    }
     keys
 }
 
@@ -584,6 +680,8 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_53 = version_compare::Version::from("0.0.53").unwrap();
     let v0_0_54 = version_compare::Version::from("0.0.54").unwrap();
     let v0_0_55 = version_compare::Version::from("0.0.55").unwrap();
+    let v0_0_58 = version_compare::Version::from("0.0.58").unwrap();
+    let v0_0_59 = version_compare::Version::from("0.0.59").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -712,6 +810,41 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] AI chat share permissions migration needed");
         pending.ai_chat_shares = true;
     }
+    if meta_version >= v0_0_59 && existing_model_version < v0_0_59 {
+        log::info!("[OFGA:Local] fleet permissions migration needed");
+        pending.fleet = true;
+    }
+    // Earlier arms were gated below the version these eleven types shipped at, or missing.
+    if meta_version >= v0_0_58 && existing_model_version < v0_0_58 {
+        log::info!("[OFGA:Local] missing org-ownership back-fill needed");
+        pending.missing_ownership = true;
+    }
+    let v0_0_60 = version_compare::Version::from("0.0.60").unwrap();
+    if meta_version >= v0_0_60 && existing_model_version < v0_0_60 {
+        log::info!("[OFGA:Local] public dashboards permissions migration needed");
+        pending.public_dashboards = true;
+    }
+    let v0_0_61 = version_compare::Version::from("0.0.61").unwrap();
+    if meta_version >= v0_0_61 && existing_model_version < v0_0_61 {
+        log::info!("[OFGA:Local] profiles stream permissions migration needed");
+        pending.profiles = true;
+    }
+    let v0_0_62 = version_compare::Version::from("0.0.62").unwrap();
+    if meta_version >= v0_0_62 && existing_model_version < v0_0_62 {
+        log::info!("[OFGA:Local] incident integrations permissions migration needed");
+        pending.incident_integrations = true;
+    }
+    // The 0.0.59 arm's unknown `fleet` type got its batch, and every later one, rejected.
+    let v0_0_63 = version_compare::Version::from("0.0.63").unwrap();
+    if meta_version >= v0_0_63
+        && existing_model_version >= v0_0_59
+        && existing_model_version < v0_0_63
+    {
+        log::info!("[OFGA:Local] org-ownership repair back-fill needed");
+        pending.ownership_repair = true;
+        pending.profiles = true;
+    }
+    // 0.0.64 (`security`) relies on explicit grants only, so it needs no back-fill.
 
     pending
 }
@@ -764,5 +897,171 @@ mod tests {
 
         assert!(!pending_migrations("0.0.54", "0.0.53").ai_chat_shares);
         assert!(all_org_ownership_keys(&pending_migrations("0.0.55", "0.0.55")).is_empty());
+    }
+
+    #[test]
+    fn fleet_ownership_backfill_keys_on_the_version_fleet_ships_at() {
+        assert!(
+            pending_migrations("0.0.59", "0.0.58").fleet,
+            "the Slack grant shipped 0.0.58 without fleet"
+        );
+        assert!(!pending_migrations("0.0.58", "0.0.57").fleet);
+        assert!(!pending_migrations("0.0.59", "0.0.59").fleet);
+        assert!(all_org_ownership_keys(&pending_migrations("0.0.59", "0.0.59")).is_empty());
+        let keys = all_org_ownership_keys(&pending_migrations("0.0.59", "0.0.58"));
+        assert_eq!(keys, vec!["fleets", "fleet_configs", "fleet_management"]);
+        // OpenFGA rejects a batch naming an unknown type, which drops every later batch.
+        assert!(keys.iter().all(|key| OFGA_MODELS.contains_key(*key)));
+    }
+
+    #[test]
+    fn ownership_repair_rewrites_every_org_key_for_installs_past_0_0_59() {
+        let mut expected = vec![
+            "cipher_keys",
+            "ratelimit",
+            "service_accounts",
+            "ai",
+            "re_patterns",
+            "license",
+            "sourcemaps",
+            "service_streams",
+            LOGS_INSIGHTS_KEY,
+            LOGS_PATTERN_KEY,
+            RESULT_LOGS_CACHE_KEY,
+            "ai_toolsets",
+            "incidents",
+            "model_pricing",
+            "providers",
+            "score_configs",
+            "scorers",
+            "eval_jobs",
+            "playground",
+            "annotation_queues",
+            "datasets",
+            "experiments",
+            "remote_tasks",
+            "billing_group",
+            "synthetic_folder",
+            "synthetics",
+            "workflows",
+            "oncall",
+            "oncall_responses",
+            "workflow_folder",
+            "synthetic_environment",
+            "prompts",
+            "prompt_labels",
+            "prompt_folders",
+            "query_history",
+            "downtime_folders",
+            "downtimes",
+            "ai_chat_shares",
+            "fleets",
+            "fleet_configs",
+            "fleet_management",
+            "db_monitoring",
+            "search_inspector",
+            "status_page",
+            "mcp",
+            "alert_calibration",
+            "slack",
+            "public_dashboards",
+            "profiles",
+            "incident_integrations",
+            "pipelines",
+            "alert_folders",
+            "report_folders",
+        ];
+        expected.sort_unstable();
+        for existing in ["0.0.59", "0.0.60", "0.0.61", "0.0.62"] {
+            let pending = pending_migrations("0.0.63", existing);
+            assert!(pending.ownership_repair && pending.profiles, "{existing}");
+            let mut keys = all_org_ownership_keys(&pending);
+            keys.sort_unstable();
+            keys.dedup();
+            assert_eq!(keys, expected, "{existing}");
+        }
+        // `get_ownership_all_org_tuple` also takes a model type name, e.g. `status_page`.
+        let model_types: HashSet<&str> = OFGA_MODELS.values().map(|model| model.key).collect();
+        let unknown: Vec<_> = expected
+            .iter()
+            .filter(|key| !OFGA_MODELS.contains_key(**key) && !model_types.contains(**key))
+            .collect();
+        assert!(unknown.is_empty(), "{unknown:?}");
+        // No DB sweep may ride along: only the ownership tuples are re-written.
+        let pending = pending_migrations("0.0.63", "0.0.62");
+        assert!(!pending.alert_folders && !pending.report_folders && !pending.pipeline);
+        assert!(!pending.prompt_folders && !pending.workflow_folders && !pending.stream_names);
+        assert!(!pending.anomaly_detection);
+        assert!(pending.writes_pipeline_tuples());
+        assert!(pending.writes_alert_folder_tuples() && pending.writes_report_folder_tuples());
+        let current = pending_migrations("0.0.63", "0.0.63");
+        assert!(!current.writes_pipeline_tuples() && !current.writes_alert_folder_tuples());
+        assert!(!current.writes_report_folder_tuples());
+        assert!(pending_migrations("0.0.30", "0.0.29").writes_report_folder_tuples());
+        assert!(!pending_migrations("0.0.63", "0.0.58").ownership_repair);
+        assert!(!pending_migrations("0.0.63", "0.0.63").ownership_repair);
+        assert!(!pending_migrations("0.0.62", "0.0.59").ownership_repair);
+        assert!(all_org_ownership_keys(&pending_migrations("0.0.63", "0.0.63")).is_empty());
+    }
+
+    #[test]
+    fn test_missing_ownership_back_fill_below_0_0_58() {
+        let pending = pending_migrations("0.0.58", "0.0.57");
+        assert!(pending.missing_ownership && !pending.ai_chat_shares);
+        assert_eq!(
+            all_org_ownership_keys(&pending),
+            vec![
+                "db_monitoring",
+                "search_inspector",
+                "status_page",
+                "mcp",
+                "playground",
+                "model_pricing",
+                LOGS_INSIGHTS_KEY,
+                LOGS_PATTERN_KEY,
+                RESULT_LOGS_CACHE_KEY,
+                "alert_calibration",
+                "slack",
+            ]
+        );
+
+        assert!(all_org_ownership_keys(&pending_migrations("0.0.58", "0.0.58")).is_empty());
+        assert!(!pending_migrations("0.0.57", "0.0.57").missing_ownership);
+    }
+
+    #[test]
+    fn public_dashboards_back_fill_runs_once_across_0_0_60() {
+        assert!(pending_migrations("0.0.60", "0.0.59").public_dashboards);
+        assert!(!pending_migrations("0.0.60", "0.0.60").public_dashboards);
+        assert!(!pending_migrations("0.0.59", "0.0.58").public_dashboards);
+        let pending = PendingMigrations {
+            public_dashboards: true,
+            ..Default::default()
+        };
+        assert_eq!(all_org_ownership_keys(&pending), vec!["public_dashboards"]);
+    }
+
+    #[test]
+    fn profiles_back_fill_runs_once_across_0_0_61() {
+        assert!(pending_migrations("0.0.61", "0.0.60").profiles);
+        assert!(!pending_migrations("0.0.61", "0.0.61").profiles);
+        assert!(!pending_migrations("0.0.60", "0.0.59").profiles);
+        assert_eq!(
+            all_org_ownership_keys(&pending_migrations("0.0.61", "0.0.60")),
+            vec!["profiles"]
+        );
+        assert!(OFGA_MODELS.contains_key("profiles"));
+    }
+
+    #[test]
+    fn incident_integrations_back_fill_runs_once_across_0_0_62() {
+        let pending = pending_migrations("0.0.62", "0.0.61");
+        assert!(pending.incident_integrations && !pending.profiles);
+        assert_eq!(
+            all_org_ownership_keys(&pending),
+            vec!["incident_integrations"]
+        );
+        assert!(!pending_migrations("0.0.62", "0.0.62").incident_integrations);
+        assert!(!pending_migrations("0.0.61", "0.0.60").incident_integrations);
     }
 }

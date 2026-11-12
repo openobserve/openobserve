@@ -24,7 +24,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import IngestionTokens from "@/components/iam/IngestionTokens.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/organizations", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -41,6 +44,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: mockToast }));
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn() }));
 
 import organizationsService from "@/services/organizations";
+import analytics from "@/services/product_analytics";
 
 // ODialog stub: renders the default slot so the REAL OForm mounts; exposes the
 // form-id (the footer Save submits via it in the app).
@@ -234,5 +238,52 @@ describe("IngestionTokens — Create Token form", () => {
       );
       expect(wrapper.vm.showRevealedDialog).toBe(false);
     });
+  });
+});
+
+describe("IngestionTokens — revoke Splunk HEC token confirm", () => {
+  it("names the token in bold in the real provider with a destructive button", async () => {
+    vi.mocked(organizationsService.list_org_ingestion_tokens).mockResolvedValue({
+      data: { data: [] },
+    } as any);
+    const wrapper = mountComp();
+    const ProviderDialogStub = {
+      name: "ODialog",
+      props: ["open", "title", "primaryButtonVariant"],
+      template: `<div data-test-stub="provider-dialog"><slot /></div>`,
+    };
+    const provider = mount(ConfirmDialogProvider, {
+      global: { plugins: [i18n], stubs: { ODialog: ProviderDialogStub } },
+    });
+    await flushPromises();
+
+    const pending = (wrapper.vm as any).setSplunkToken("edge-forwarder", false);
+    await flushPromises();
+    const name = provider.find('[data-test="confirm-dialog-provider-name"]');
+    expect(name.text()).toBe("edge-forwarder");
+    expect(name.classes()).toContain("font-semibold");
+    expect(provider.findComponent(ProviderDialogStub).props("primaryButtonVariant")).toBe(
+      "destructive",
+    );
+
+    useConfirmDialog().handleCancel();
+    await pending;
+    provider.unmount();
+    wrapper.unmount();
+  });
+});
+
+describe("IngestionTokens — analytics", () => {
+  it("tracks disabling a token once the server accepts it", async () => {
+    vi.mocked(organizationsService.enable_disable_org_ingestion_token).mockResolvedValue({
+      data: {},
+    } as any);
+    const wrapper = mountComp();
+    await flushPromises();
+
+    await (wrapper.vm as any).toggleEnabled("edge-forwarder", false);
+
+    expect(analytics.track).toHaveBeenCalledWith("ingestion_token_disabled");
+    wrapper.unmount();
   });
 });

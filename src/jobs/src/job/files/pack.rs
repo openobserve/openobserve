@@ -42,7 +42,7 @@ use infra::{
 };
 use ingester::{PackSegment, PendingStreamStats};
 use schema::generate_schema_for_defined_schema_fields;
-use search::datafusion::merge::{self, MergeMode, MergeOutput, MergedFile};
+use search::merge::{self, MergeMode, MergeOutput, MergedFile};
 use tantivy_utils::index_builder::{TantivyIndexOptions, create_tantivy_index};
 use tokio::sync::{Mutex, RwLock};
 
@@ -209,12 +209,13 @@ async fn move_stream_segments(
 
     // check data retention
     let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
-    let mut stream_data_retention_days = cfg.compact.data_retention_days;
-    if let Some(settings) = &stream_settings
-        && settings.data_retention > 0
-    {
-        stream_data_retention_days = settings.data_retention;
-    }
+    let stream_data_retention_days = db::organization::stream_retention_days(
+        &org_id,
+        stream_type,
+        &stream_name,
+        stream_settings.as_ref().map_or(0, |s| s.data_retention),
+    )
+    .await?;
     let mut segments = segments;
     if stream_data_retention_days > 0 {
         let date =

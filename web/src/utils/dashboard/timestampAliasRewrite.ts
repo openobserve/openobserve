@@ -386,7 +386,9 @@ function renameReservedAliasInPanelConfig(config: any, tsCol: string, newAlias: 
 
   if (Array.isArray(config.override_config)) {
     for (const override of config.override_config) {
-      if (override?.field && override.field.value === tsCol) {
+      // Chart series entries (series / series_regex) match legend names, not field aliases.
+      const isSeries = String(override?.field?.matchBy ?? "").startsWith("series");
+      if (override?.field && override.field.value === tsCol && !isSeries) {
         override.field.value = newAlias;
       }
     }

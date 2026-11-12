@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:selected-ids="selectedIds = $event"
         @update:current-page="onPageChange"
         @update:page-size="onPageSizeChange"
-        @row-click="openTarget"
+        v-on="rowClickListeners"
       >
         <!-- Search stretches so the queue filter and the column toggle OTable
              injects after this slot both sit at the right edge. -->
@@ -123,39 +123,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-span="{ row }">
-          <div class="flex min-w-0 flex-col">
-            <OTruncatedText class="font-mono text-xs">{{
-              textOrDash(row.operationName)
-            }}</OTruncatedText>
-            <OTruncatedText v-if="row.traceId" class="text-text-secondary text-2xs">
-              {{ t("aiObservability.discovery.spanParent", { trace: row.traceId }) }}
-            </OTruncatedText>
+          <div class="flex min-w-0 items-center">
+            <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
+              <span class="me-1.5 inline-flex shrink-0">
+                <OIcon
+                  name="lock"
+                  class="text-icon-locked"
+                  size="sm"
+                  data-test="ai-discovery-row-lock"
+                />
+              </span>
+            </OTooltip>
+            <div class="flex min-w-0 flex-col">
+              <OTruncatedText class="font-mono text-xs">{{
+                textOrDash(row.operationName)
+              }}</OTruncatedText>
+              <OTruncatedText v-if="row.traceId" class="text-text-secondary text-2xs">
+                {{ t("aiObservability.discovery.spanParent", { trace: row.traceId }) }}
+              </OTruncatedText>
+            </div>
           </div>
         </template>
 
         <template #cell-trace="{ row }">
-          <div class="flex min-w-0 flex-col">
-            <OTruncatedText class="font-mono text-xs">{{
-              textOrDash(row.operationName)
-            }}</OTruncatedText>
-            <!-- Annotation-only traces have no trace_id on their scores; a trace row's targetId is the trace id. -->
-            <OTruncatedText
-              v-if="row.traceId || row.targetId"
-              class="text-text-secondary text-2xs font-mono"
-            >
-              {{ raw(row.traceId || row.targetId) }}
-            </OTruncatedText>
+          <div class="flex min-w-0 items-center">
+            <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
+              <span class="me-1.5 inline-flex shrink-0">
+                <OIcon
+                  name="lock"
+                  class="text-icon-locked"
+                  size="sm"
+                  data-test="ai-discovery-row-lock"
+                />
+              </span>
+            </OTooltip>
+            <div class="flex min-w-0 flex-col">
+              <OTruncatedText class="font-mono text-xs">{{
+                textOrDash(row.operationName)
+              }}</OTruncatedText>
+              <!-- Annotation-only traces have no trace_id on their scores; a trace row's targetId is the trace id. -->
+              <OTruncatedText
+                v-if="row.traceId || row.targetId"
+                class="text-text-secondary text-2xs font-mono"
+              >
+                {{ raw(row.traceId || row.targetId) }}
+              </OTruncatedText>
+            </div>
           </div>
         </template>
 
         <template #cell-session="{ row }">
-          <div class="flex min-w-0 flex-col">
-            <OTruncatedText class="font-mono text-xs">{{
-              textOrDash(row.sessionId)
-            }}</OTruncatedText>
-            <OTruncatedText v-if="row.userEmail" class="text-text-secondary text-2xs">
-              {{ raw(row.userEmail) }}
-            </OTruncatedText>
+          <div class="flex min-w-0 items-center">
+            <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
+              <span class="me-1.5 inline-flex shrink-0">
+                <OIcon
+                  name="lock"
+                  class="text-icon-locked"
+                  size="sm"
+                  data-test="ai-discovery-row-lock"
+                />
+              </span>
+            </OTooltip>
+            <div class="flex min-w-0 flex-col">
+              <OTruncatedText class="font-mono text-xs">{{
+                textOrDash(row.sessionId)
+              }}</OTruncatedText>
+              <OTruncatedText v-if="row.userEmail" class="text-text-secondary text-2xs">
+                {{ raw(row.userEmail) }}
+              </OTruncatedText>
+            </div>
           </div>
         </template>
 
@@ -243,11 +279,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
     </div>
+    <!-- Rows open in a drawer here, keeping the agent, version and time range. -->
+    <AiTraceDrawer v-model:open="traceDrawerOpen" :trace="drawerTrace" />
   </AiPageShell>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -276,12 +315,20 @@ import llmDiscoveryService, {
 import llmQueuesService, { type LlmQueue } from "@/services/llm-queues.service";
 import { formatTimeWithSuffix } from "@/utils/formatters";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import AiTraceDrawer from "@/plugins/traces/AiTraceDrawer.vue";
+import type { AiDrawerTrace } from "@/plugins/traces/AiTraceDrawer.types";
 
 defineOptions({ name: "AIDiscoveryPage" });
 
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+const tracesLock = useLicenseLock("traces");
+// Without a row-click listener OTable drops the pointer cursor, so locked rows stop looking clickable.
+const rowClickListeners = computed(() => (tracesLock.locked.value ? {} : { rowClick: openTarget }));
 
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const orgQuery = computed(() => ({ org_identifier: orgId.value }));
@@ -289,8 +336,9 @@ const orgQuery = computed(() => ({ org_identifier: orgId.value }));
 const {
   dateState,
   timeRange,
+  applyRelative,
+  DEFAULT_RELATIVE,
   onDateChange: onDateStateChange,
-  mountResolve,
 } = useAiDateController();
 
 // The scope tab survives a revisit — same shape the trace detail view uses for
@@ -563,8 +611,12 @@ function durationLabel(row: LlmDiscoveryItem) {
   return row.durationUs == null ? DASH : raw(formatTimeWithSuffix(row.durationUs));
 }
 
+// Only the latest request may fill the table, or a slower earlier range overwrites it.
+let seq = 0;
+
 async function fetchItems() {
   if (!orgId.value) return;
+  const mine = ++seq;
   loading.value = true;
   try {
     const res = await llmDiscoveryService.search(orgId.value, {
@@ -575,18 +627,24 @@ async function fetchItems() {
       size: pageSize.value,
       queueStatus: queueStatus.value,
     });
+    if (mine !== seq) return;
     items.value = res.items;
     total.value = res.total;
     selectedIds.value = [];
     lastRunAt.value = Date.now();
   } catch {
+    if (mine !== seq) return;
     toast({ variant: "error", message: t("aiObservability.discovery.loadError") });
   } finally {
-    loading.value = false;
+    if (mine === seq) loading.value = false;
   }
 }
 
+/** Refresh re-anchors a relative window to now, as the other AI pages do. */
 function refresh() {
+  if (dateState.value.valueType === "relative") {
+    applyRelative(dateState.value.relativeTimePeriod ?? DEFAULT_RELATIVE);
+  }
   fetchItems();
 }
 
@@ -607,11 +665,16 @@ function onScopeChange(value: unknown) {
   // Each scope shows different fields, so a term typed against the old columns
   // shouldn't silently hide rows in the new ones.
   search.value = "";
+  analytics.track("llm_discovery_filter_applied", { filter: "scope", value: scope.value });
   reload();
 }
 
 function onQueueStatusChange(value: unknown) {
   queueStatus.value = value as DiscoveryQueueStatus;
+  analytics.track("llm_discovery_filter_applied", {
+    filter: "queue_status",
+    value: queueStatus.value,
+  });
   reload();
 }
 
@@ -626,10 +689,8 @@ function onPageSizeChange(size: number) {
 }
 
 function onDateChange(value: any) {
-  onDateStateChange(value);
-  // The DateTime picker fires a programmatic date-change on mount (window replay);
-  // only a genuine user pick should re-fetch, else we double-load with onMounted.
-  if (value?.userChangedValue === true) reload();
+  // Skip the picker's mount replay of the seeded range; onMounted already loads it.
+  if (onDateStateChange(value) || value?.userChangedValue === true) reload();
 }
 
 /** Row click drills into the object itself, reusing the Traces views. */
@@ -639,6 +700,7 @@ function onDateChange(value: any) {
 const TRACE_WINDOW_US = 3_600_000_000;
 
 function openTarget(row: LlmDiscoveryItem) {
+  if (tracesLock.locked.value) return;
   // The detail views read stream + from/to straight off the URL — without them
   // the search has no stream and a NaN window, which renders as "trace not
   // found". `sourceStream` is the stream the row was discovered in.
@@ -651,12 +713,24 @@ function openTarget(row: LlmDiscoveryItem) {
 
   if (row.scope === "session") {
     if (row.sessionId) {
+      analytics.track("llm_discovery_target_opened", { scope: row.scope });
       router.push({ name: "sessionDetails", query: { ...query, session_id: row.sessionId } });
     }
     return;
   }
   const traceId = row.scope === "trace" ? row.targetId : row.traceId;
-  if (traceId) {
+  if (traceId) analytics.track("llm_discovery_target_opened", { scope: row.scope });
+  if (traceId && row.sourceStream) {
+    drawerTrace.value = {
+      traceId,
+      stream: row.sourceStream,
+      startTime: row.refTimestamp - TRACE_WINDOW_US,
+      endTime: row.refTimestamp + TRACE_WINDOW_US,
+      // A span row opens its parent trace with that span selected.
+      spanId: row.scope === "span" ? row.targetId : undefined,
+    };
+    traceDrawerOpen.value = true;
+  } else if (traceId) {
     router.push({
       name: "traceDetails",
       query: {
@@ -668,6 +742,9 @@ function openTarget(row: LlmDiscoveryItem) {
     });
   }
 }
+
+const traceDrawerOpen = ref(false);
+const drawerTrace = ref<AiDrawerTrace | null>(null);
 
 // ── Add to queue (row action and bulk share this path) ──
 const BULK = "__bulk__";
@@ -713,8 +790,5 @@ async function addToQueue(queue: LlmQueue, rows: LlmDiscoveryItem[]) {
   }
 }
 
-onMounted(() => {
-  mountResolve();
-  fetchItems();
-});
+onMounted(fetchItems);
 </script>

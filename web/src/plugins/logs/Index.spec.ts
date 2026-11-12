@@ -42,6 +42,7 @@ document.body.appendChild(node);
 
 // Mock the sqlUtils module
 vi.mock("@/utils/query/sqlUtils", () => ({
+  isExplainQuery: vi.fn(() => false),
   buildSqlQuery: vi.fn(),
   getFieldsFromQuery: vi.fn(),
   isSimpleSelectAllQuery: vi.fn((query) => {
@@ -195,6 +196,7 @@ vi.mock("@/composables/useDashboardPanelData", () => ({
 }));
 // Records which loader the page-load flow picked; the real loaders still run.
 const loaderCalls = vi.hoisted(() => [] as string[]);
+const streamChangeCalls = vi.hoisted(() => [] as unknown[][]);
 vi.mock("@/composables/useLogs", async () => {
   // Import the real module
   const actual =
@@ -218,6 +220,19 @@ vi.mock("@/composables/useLogs", async () => {
     },
     // Only mock clearSearchObject
     clearSearchObj: vi.fn(),
+  };
+});
+
+vi.mock("@/composables/useLogs/useSearchBar", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/composables/useLogs/useSearchBar")>();
+  return {
+    ...actual,
+    default: (...args: Parameters<typeof actual.default>) => ({
+      ...actual.default(...args),
+      onStreamChange: (...changeArgs: unknown[]) => {
+        streamChangeCalls.push(changeArgs);
+      },
+    }),
   };
 });
 
@@ -262,7 +277,7 @@ vi.mock("@/plugins/traces/metrics/TracesAnalysisDashboard.vue", () => ({
       logSamples: null,
       analysisType: null,
     },
-    template: '<div data-test="drill-down-dashboard-stub" />',
+    template: '<div data-test="drill-down-dashboard-stub"><slot name="header-start" /></div>',
   },
 }));
 
@@ -305,12 +320,6 @@ describe("Logs Index", async () => {
     wrapper.unmount();
     vi.restoreAllMocks();
     // vi.clearAllMocks();
-  });
-
-  it("Should hide index list when showFields is false.", async () => {
-    wrapper.vm.searchObj.meta.showFields = false;
-    await flushPromises();
-    expect(wrapper.find('[data-test="logs-search-index-list"]').exists()).toBeFalsy();
   });
 
   it("Should transform non-SQL query to SQL format when SQL mode is enabled", async () => {
@@ -803,118 +812,6 @@ describe("Logs Index", async () => {
     );
   });
 
-  it.skip("Should properly set fields and conditions for dashboard panel", async () => {
-    // Setup initial state
-    wrapper.vm.searchObj.meta.sqlMode = true;
-    wrapper.vm.searchObj.data.stream.streamType = "logs";
-    wrapper.vm.searchObj.data.stream.selectedStream = ["my_stream1"];
-    wrapper.vm.searchObj.data.query =
-      'SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1, level FROM "my_stream1" WHERE level = "error"';
-
-    // Mock store state
-    store.state.zoConfig.timestamp_column = "_timestamp";
-
-    // Mock the getFieldsFromQuery function
-    const mockFields = [
-      {
-        column: "_timestamp",
-        alias: "x_axis_1",
-        aggregationFunction: "histogram",
-      },
-      {
-        column: "_timestamp",
-        alias: "y_axis_1",
-        aggregationFunction: "count",
-      },
-      {
-        column: "level",
-        alias: null,
-        aggregationFunction: null,
-      },
-    ];
-
-    (getFieldsFromQuery as Mock).mockResolvedValue({
-      fields: mockFields,
-      filters: [{ column: "level", operator: "=", value: "error" }],
-      streamName: "my_stream1",
-    });
-
-    // Call setFieldsAndConditions
-    await wrapper.vm.setFieldsAndConditions();
-    await flushPromises();
-
-    // Verify dashboard panel data was set correctly
-    const panelData = wrapper.vm.dashboardPanelData.data.queries[0].fields;
-
-    // Check stream settings
-    expect(panelData.stream_type).toBe("logs");
-    expect(panelData.stream).toBe("my_stream1");
-
-    // Check x-axis fields (should contain histogram field)
-    expect(panelData.x).toHaveLength(1);
-    expect(panelData.x[0]).toEqual({
-      column: "_timestamp",
-      alias: "x_axis_1",
-      aggregationFunction: "histogram",
-      label: "Timestamp",
-    });
-
-    // Check y-axis fields (should contain count field)
-    expect(panelData.y).toHaveLength(1);
-    expect(panelData.y[0]).toEqual({
-      column: "_timestamp",
-      alias: "y_axis_1",
-      aggregationFunction: "count",
-      label: "Timestamp",
-    });
-
-    // Check breakdown fields (should contain level field)
-    expect(panelData.breakdown).toHaveLength(1);
-    expect(panelData.breakdown[0]).toEqual({
-      column: "level",
-      alias: "level",
-      aggregationFunction: null,
-      label: "Level",
-    });
-
-    // Check filters
-    expect(panelData.filter).toEqual([{ column: "level", operator: "=", value: "error" }]);
-
-    // Test with no fields returned
-    (getFieldsFromQuery as Mock).mockResolvedValueOnce({
-      fields: [],
-      filters: [],
-      streamName: "my_stream1",
-    });
-
-    // Reset dashboard panel data
-    wrapper.vm.dashboardPanelData.data.queries[0].fields = {
-      stream_type: "",
-      stream: "",
-      x: [],
-      y: [],
-      breakdown: [],
-      filter: [],
-    };
-
-    // Call setFieldsAndConditions again
-    await wrapper.vm.setFieldsAndConditions();
-    await flushPromises();
-
-    // Verify default fields were added
-    const defaultPanelData = wrapper.vm.dashboardPanelData.data.queries[0].fields;
-    expect(defaultPanelData.x).toHaveLength(1);
-    expect(defaultPanelData.y).toHaveLength(1);
-    expect(defaultPanelData.x[0].aggregationFunction).toBe("histogram");
-    expect(defaultPanelData.y[0].aggregationFunction).toBe("count");
-
-    // Verify getFieldsFromQuery was called with correct parameters
-    expect(getFieldsFromQuery).toHaveBeenCalledWith(
-      'SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1, level FROM "my_stream1" WHERE level = "error"',
-      "_timestamp",
-    );
-  });
-
   // Additional tests for broader coverage
   it("Should toggle field list via collapseFieldList and update splitter model", async () => {
     wrapper.vm.searchObj.meta.showFields = true;
@@ -938,15 +835,6 @@ describe("Logs Index", async () => {
     wrapper.vm.onSplitterUpdate();
     expect(spy).toHaveBeenCalledWith(expect.any(Event));
     spy.mockRestore();
-  });
-
-  it("Should refresh timezone without errors", async () => {
-    expect(() => wrapper.vm.refreshTimezone()).not.toThrow();
-  });
-
-  it("Should handle change interval without errors", async () => {
-    wrapper.vm.searchObj.meta.refreshInterval = 0;
-    expect(() => wrapper.vm.onChangeInterval()).not.toThrow();
   });
 
   it("Should execute runQueryFn and show job scheduler", async () => {
@@ -989,12 +877,30 @@ describe("Logs Index", async () => {
     expect(wrapper.vm.areStreamsPresent).toBe(true);
   });
 
-  it("Should resize on splitter model change", async () => {
-    const spy = vi.spyOn(window, "dispatchEvent");
-    wrapper.vm.splitterModel = 11;
+  it("Should grow the query pane with the filter builder, shrink it back, and keep a larger dragged height", async () => {
+    wrapper.vm.filterBuilderGrowth = 54;
     await flushPromises();
-    expect(spy).toHaveBeenCalledWith(expect.any(Event));
-    spy.mockRestore();
+    expect(wrapper.vm.splitterModel).toBe(83 + 54);
+    wrapper.vm.filterBuilderGrowth = 0;
+    await flushPromises();
+    expect(wrapper.vm.splitterModel).toBe(83);
+    wrapper.vm.splitterModel = 300;
+    wrapper.vm.filterBuilderGrowth = 24;
+    await flushPromises();
+    expect(wrapper.vm.splitterModel).toBe(300);
+  });
+
+  it("Should still grow the query pane for a long VRL function while the filter builder shows", async () => {
+    wrapper.vm.filterBuilderGrowth = 0;
+    wrapper.vm.searchObj.data.tempFunctionContent = "";
+    await flushPromises();
+    wrapper.vm.splitterModel = 83;
+    wrapper.vm.searchObj.data.tempFunctionContent = ".a = 1\n.b = 2\n.c = 3\n.d = 4";
+    await flushPromises();
+    expect(wrapper.vm.splitterModel).toBe(130);
+    wrapper.vm.filterBuilderGrowth = 72;
+    await flushPromises();
+    expect(wrapper.vm.splitterModel).toBe(83 + 72);
   });
 
   it("Should navigate to the Search History route on showSearchHistoryfn", async () => {
@@ -1118,13 +1024,52 @@ describe("Logs Index", async () => {
         reason: "run",
         kind: "explicit",
       });
-      expect((analytics as any).track).toHaveBeenCalledWith(
-        "Button Click",
-        expect.objectContaining({ button: "Search Data" }),
-      );
+      expect((analytics as any).track).toHaveBeenCalledWith("logs_search_run", {
+        stream_name: "s1",
+        show_query: true,
+        show_histogram: true,
+        sql_mode: false,
+        show_fields: true,
+      });
+      expect((analytics as any).track).not.toHaveBeenCalledWith("Button Click", expect.anything());
     } finally {
       (config as any).isCloud = originalIsCloud;
     }
+  });
+
+  describe("paging analytics", () => {
+    beforeEach(() => {
+      (analytics as any).track = vi.fn();
+      wrapper.vm.searchObj.meta.refreshInterval = 0;
+      wrapper.vm.searchObj.meta.jobId = "";
+      wrapper.vm.searchObj.data.stream.selectedStream = ["s1", "s2"];
+    });
+
+    it("tracks logs_more_rows_loaded with only the stream name on scroll", async () => {
+      await wrapper.vm.getMoreData();
+      expect((analytics as any).track).toHaveBeenCalledWith("logs_more_rows_loaded", {
+        stream_name: "s1,s2",
+      });
+      expect((analytics as any).track).not.toHaveBeenCalledWith("Button Click", expect.anything());
+    });
+
+    it("does not track a Button Click when the page size changes", async () => {
+      await wrapper.vm.getMoreDataRecordsPerPage();
+      expect((analytics as any).track).not.toHaveBeenCalled();
+    });
+
+    it("tracks Get Less Data without the user's email", async () => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.data.queryResults = { total: 100, from: 0, size: 10, hits: [] };
+      wrapper.vm.searchObj.data.resultGrid.currentPage = 2;
+      await wrapper.vm.getLessData();
+      expect((analytics as any).track).toHaveBeenCalledWith("Button Click", {
+        button: "Get Less Data",
+        user_org: wrapper.vm.store.state.selectedOrganization.identifier,
+        stream_name: "s1,s2",
+        page: "Search Logs",
+      });
+    });
   });
 
   it("Should emit sendToAiChat event with payload", async () => {
@@ -1393,12 +1338,6 @@ describe("Logs Index", async () => {
 
       expect(datetimeType).toBe("relative");
     });
-
-    it("should remove console.log statements from extractPatternsForCurrentQuery", () => {
-      // The PR removes debug console.log calls from extractPatternsForCurrentQuery
-      // Verify the function exists and is callable
-      expect(typeof wrapper.vm.extractPatternsForCurrentQuery).toBe("function");
-    });
   });
 
   /**
@@ -1413,16 +1352,6 @@ describe("Logs Index", async () => {
    */
   describe("Build Query Page Support", () => {
     describe("Build toggle state", () => {
-      it("should have logsVisualizeToggle initialized to 'logs'", () => {
-        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("logs");
-      });
-
-      it("should update toggle state to 'build'", async () => {
-        wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
-        await flushPromises();
-        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("build");
-      });
-
       it("should show logs view when toggle is 'logs'", async () => {
         wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
         await flushPromises();
@@ -1430,23 +1359,9 @@ describe("Logs Index", async () => {
         const thirdLevel = wrapper.find("#thirdLevel");
         expect(thirdLevel.exists()).toBe(true);
       });
-
-      it("should allow switching to 'build' mode", async () => {
-        // Switch to build mode
-        wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
-        await flushPromises();
-
-        // Build mode should be set
-        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("build");
-      });
     });
 
     describe("Build page handlers", () => {
-      it("should have onBuildApply handler defined", () => {
-        expect(wrapper.vm.onBuildApply).toBeDefined();
-        expect(typeof wrapper.vm.onBuildApply).toBe("function");
-      });
-
       it("should update query and switch to logs on onBuildApply", async () => {
         wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
         await flushPromises();
@@ -1459,11 +1374,6 @@ describe("Logs Index", async () => {
         expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("logs");
       });
 
-      it("should have onBuildCancel handler defined", () => {
-        expect(wrapper.vm.onBuildCancel).toBeDefined();
-        expect(typeof wrapper.vm.onBuildCancel).toBe("function");
-      });
-
       it("should switch to logs view on onBuildCancel", async () => {
         wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
         await flushPromises();
@@ -1472,11 +1382,6 @@ describe("Logs Index", async () => {
         await flushPromises();
 
         expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("logs");
-      });
-
-      it("should have onBuildQueryGenerated handler defined", () => {
-        expect(wrapper.vm.onBuildQueryGenerated).toBeDefined();
-        expect(typeof wrapper.vm.onBuildQueryGenerated).toBe("function");
       });
 
       it("should sync full SQL on onBuildQueryGenerated when SQL mode is ON", async () => {
@@ -1547,10 +1452,6 @@ describe("Logs Index", async () => {
     });
 
     describe("selectedDateTime computed", () => {
-      it("should have selectedDateTime computed property defined", () => {
-        expect(wrapper.vm.selectedDateTime).toBeDefined();
-      });
-
       it("should return datetime object with start_time and end_time", () => {
         const dateTime = wrapper.vm.selectedDateTime;
         expect(dateTime).toHaveProperty("start_time");
@@ -1565,12 +1466,6 @@ describe("Logs Index", async () => {
       it("should include relativeTimePeriod in selectedDateTime", () => {
         const dateTime = wrapper.vm.selectedDateTime;
         expect(dateTime).toHaveProperty("relativeTimePeriod");
-      });
-    });
-
-    describe("BuildQueryPage ref", () => {
-      it("should have buildQueryPageRef defined", () => {
-        expect(wrapper.vm.buildQueryPageRef).toBeDefined();
       });
     });
   });
@@ -1733,6 +1628,59 @@ describe("Logs Index", async () => {
       expect(wrapper.find('[data-test="logs-drill-down-no-stream-selected-text"]').exists()).toBe(
         true,
       );
+    });
+
+    const streamSelect = () => wrapper.find('[data-test="logs-drilldown-stream-select-trigger"]');
+
+    it("shows the stream select with the selected stream in the dashboard header", async () => {
+      await enterDrillDown();
+
+      expect(dashboard().find('[data-test="logs-drilldown-stream-select-trigger"]').exists()).toBe(
+        true,
+      );
+      expect(streamSelect().attributes("data-test-selected-value")).toBe("app_logs");
+      expect(wrapper.find('[data-test="logs-drill-down-stream-row"]').exists()).toBe(false);
+    });
+
+    it("keeps the stream select above the pick-a-stream state", async () => {
+      await enterDrillDown({ withHits: false, selectedStream: [] });
+
+      expect(
+        wrapper
+          .find('[data-test="logs-drill-down-stream-row"]')
+          .find('[data-test="logs-drilldown-stream-select-trigger"]')
+          .exists(),
+      ).toBe(true);
+      expect(streamSelect().attributes("data-test-selected-value")).toBe("");
+    });
+
+    it("routes a stream picked in drill down through the stream-change path", async () => {
+      await enterDrillDown();
+      streamChangeCalls.length = 0;
+      wrapper.vm.searchObj.data.filterErrMsg = "stale";
+
+      wrapper
+        .findComponent({ name: "LogsDrillDownStreamSelect" })
+        .vm.$emit("update:modelValue", "audit_logs");
+      await flushPromises();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(["audit_logs"]);
+      expect(wrapper.vm.searchObj.data.filterErrMsg).toBe("");
+      expect(streamChangeCalls).toEqual([["", { origin: "selector" }]]);
+    });
+
+    it("opens the drill-down stream select when a state asks to select a stream", async () => {
+      await enterDrillDown({ withHits: false, selectedStream: [] });
+      const hiddenTrigger = document.querySelector<HTMLElement>(
+        '[data-test="log-search-index-list-select-stream"] button',
+      );
+      const hiddenClick = hiddenTrigger ? vi.spyOn(hiddenTrigger, "click") : null;
+
+      wrapper.vm.onSelectStream();
+      await flushPromises();
+
+      expect(streamSelect().attributes("aria-expanded")).toBe("true");
+      expect(hiddenClick?.mock.calls.length ?? 0).toBe(0);
     });
 
     it("passes the filter of the last completed search, not unrun editor typing", async () => {

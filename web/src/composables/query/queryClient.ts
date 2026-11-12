@@ -16,6 +16,8 @@
 import { MutationCache, QueryClient } from "@tanstack/vue-query";
 import { purgeAllPersisted, purgePersistedExceptOrg, purgePersistedOrg } from "./persisters";
 import { GC_TIME, LIVE_STALE_TIME } from "./cachePolicy";
+// Static on purpose: the bump must be synchronous, and the module imports only vue, so the eager test load stays harmless.
+import { clearHeldTokenSecrets } from "@/components/fleet/fleetTokenSecrets";
 // Type-only: erased at build time. This module must not pull UI or i18n into its
 // runtime graph — the unit-test setup imports it eagerly, so a runtime edge here
 // evaluates that module before a spec's `vi.mock` can replace it.
@@ -49,6 +51,10 @@ declare module "@tanstack/query-core" {
     mutationMeta: {
       /** Scopes to refetch. Prefer a domain's `all` key over a precise one. */
       invalidates?: readonly (readonly unknown[])[];
+      /** Resolve `mutateAsync` only once the `invalidates` refetches land, so the caller reads fresh data next. */
+      awaitInvalidation?: boolean;
+      /** Scopes marked stale without a refetch: each refetches the next time a reader mounts it. */
+      stales?: readonly (readonly unknown[])[];
       /**
        * Scopes whose *inactive* entries are dropped outright. Use after a
        * delete: invalidation alone leaves the deleted entity's detail query
@@ -79,18 +85,23 @@ export const queryClient = new QueryClient({
    * makes the migration to this incremental.
    */
   mutationCache: new MutationCache({
-    onSuccess: (_data, _vars, _onMutateResult, mutation) => {
+    onSuccess: (_data, _vars, _onMutateResult, mutation): Promise<void> | void => {
       const meta = mutation.meta;
       if (!meta) return;
       for (const key of meta.removes ?? []) {
         queryClient.removeQueries({ queryKey: key, type: "inactive" });
       }
-      for (const key of meta.invalidates ?? []) {
-        void queryClient.invalidateQueries({ queryKey: key });
+      const refetches: Promise<void>[] = (meta.invalidates ?? []).map((key) =>
+        queryClient.invalidateQueries({ queryKey: key }),
+      );
+      for (const key of meta.stales ?? []) {
+        void queryClient.invalidateQueries({ queryKey: key, refetchType: "none" });
       }
       if (meta.successMessage) {
         notifyMutation("success", meta.successMessage);
       }
+      // TanStack awaits this callback before mutateAsync resolves.
+      if (meta.awaitInvalidation) return Promise.all(refetches).then(() => undefined);
     },
     onError: (err: any, _vars, _onMutateResult, mutation) => {
       const meta = mutation.meta;
@@ -137,7 +148,8 @@ export const queryClient = new QueryClient({
 // static edge to fieldValueStore would load its real dependency graph before
 // spec-level mocks can attach.
 const clearFieldValueReadCache = (): void => {
-  void import("@/composables/fieldValueStore").then((m) => m.clearReadCache());
+  // Best-effort: a chunk deleted by a deploy must not surface as an unhandled rejection.
+  void import("@/composables/fieldValueStore").then((m) => m.clearReadCache()).catch(() => {});
 };
 
 export const purgeOrgQueries = (org: string, nextOrg?: string): void => {
@@ -147,6 +159,7 @@ export const purgeOrgQueries = (org: string, nextOrg?: string): void => {
   // disk until the 24 h max age.
   if (nextOrg) void purgePersistedExceptOrg(nextOrg);
   clearFieldValueReadCache();
+  clearHeldTokenSecrets();
 };
 
 /** Called on logout: nothing from the previous session may survive. */
@@ -154,6 +167,7 @@ export const purgeAllQueries = (): void => {
   queryClient.clear();
   void purgeAllPersisted();
   clearFieldValueReadCache();
+  clearHeldTokenSecrets();
 };
 
 // ── Key helpers ─────────────────────────────────────────────────────────────

@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   match: vi.fn(),
   create: vi.fn(),
   get: vi.fn(),
-  getVersion: vi.fn(),
   createVersion: vi.fn(),
   confirm: vi.fn(),
 }));
@@ -23,6 +22,7 @@ vi.mock("@/composables/useConfirmDialog", () => ({
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 import SaveAsPromptDialog from "./SaveAsPromptDialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import enUS from "@/locales/languages/en-US.json";
 
 const config = { model: null, params: null, tools: null, responseFormat: null };
 const prompt = {
@@ -47,11 +47,16 @@ beforeEach(() => {
   mocks.match.mockResolvedValue([]);
   mocks.create.mockResolvedValue({ prompt });
   mocks.get.mockResolvedValue(prompt);
-  mocks.getVersion.mockResolvedValue({ version: 3, contentHash: "head-3" });
   mocks.createVersion.mockResolvedValue({ prompt: { ...prompt, latestVersion: 4 } });
 });
 
 describe("save as prompt", () => {
+  it("asks to discard with copy that exists in the locale file", () => {
+    const copy = enUS.aiObservability.promptManagement;
+    expect(copy.discardChangesTitle).toBe("Discard unsaved changes?");
+    expect(copy.discardChangesMessage).toBe("Your changes have not been saved.");
+  });
+
   it("requires a second submission after showing duplicate content and resets confirmation for a new destination", async () => {
     mocks.match.mockResolvedValue([{ id: "version-1", name: "existing", version: 1 }]);
     const wrapper = mountSave();
@@ -72,7 +77,7 @@ describe("save as prompt", () => {
     expect(wrapper.emitted("saved")).toHaveLength(1);
   });
 
-  it("appends to the freshly read head rather than the cached selector version", async () => {
+  it("appends to the freshly read head with baseVersion and ifHead, never baseHash", async () => {
     const wrapper = mountSave();
     const form = wrapper.findComponent(OForm).props("form");
     form.setFieldValue("mode", "append");
@@ -80,16 +85,19 @@ describe("save as prompt", () => {
     form.setFieldValue("commitMessage", "Updated content");
     await flushPromises();
     await form.handleSubmit();
-    expect(mocks.createVersion).toHaveBeenCalledWith(
-      "org",
-      "prompt-1",
-      expect.objectContaining({
-        baseVersion: 3,
-        baseHash: "head-3",
-        commitMessage: "Updated content",
-      }),
-      expect.objectContaining({ ifHead: 3 }),
-    );
+    expect(mocks.createVersion).toHaveBeenCalledTimes(1);
+    const [orgId, entityId, input, options] = mocks.createVersion.mock.calls[0];
+    expect([orgId, entityId]).toEqual(["org", "prompt-1"]);
+    // The server rejects baseVersion and baseHash together.
+    expect(input).toEqual({
+      payload: "Summarize this",
+      config,
+      commitMessage: "Updated content",
+      source: "ui",
+      baseVersion: 3,
+    });
+    expect(input).not.toHaveProperty("baseHash");
+    expect(options).toEqual(expect.objectContaining({ ifHead: 3 }));
   });
 
   it("keeps the form open when the selected prompt was archived", async () => {

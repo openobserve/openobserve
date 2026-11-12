@@ -65,14 +65,7 @@ impl SchemaExt for Schema {
         Schema::new(fields)
     }
 
-    #[cfg(feature = "gxhash")]
-    fn hash_key(&self) -> String {
-        let mut hasher = gxhash::GxHasher::with_seed(0);
-        self.hash(&mut hasher);
-        format!("{:x}", hasher.finish())
-    }
-
-    #[cfg(not(feature = "gxhash"))]
+    // Not GxHasher: its streaming x86 path aborts debug-assertion builds on an unsafe precondition.
     fn hash_key(&self) -> String {
         let mut hasher = std::hash::DefaultHasher::new();
         self.hash(&mut hasher);

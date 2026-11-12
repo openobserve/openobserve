@@ -154,6 +154,31 @@ function mountUsageTab() {
 describe("UsageTab", () => {
   let wrapper: VueWrapper;
 
+  it("switches to the meta org before Renew license opens the license page", async () => {
+    const { zoConfig, organizations } = store.state;
+    store.state.zoConfig = { ...zoConfig, meta_org: "_meta" };
+    store.state.organizations = [{ id: 7, identifier: "_meta", name: "_meta" }];
+    const dispatch = vi.spyOn(store, "dispatch").mockResolvedValue(undefined);
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+    wrapper = mountUsageTab();
+    await flushPromises();
+
+    wrapper.findComponent({ name: "LicensePeriod" }).vm.$emit("renew");
+
+    expect(dispatch).toHaveBeenCalledWith(
+      "setSelectedOrganization",
+      expect.objectContaining({ identifier: "_meta" }),
+    );
+    expect(push).toHaveBeenCalledWith({
+      name: "license",
+      query: { org_identifier: "_meta" },
+    });
+    dispatch.mockRestore();
+    push.mockRestore();
+    store.state.zoConfig = zoConfig;
+    store.state.organizations = organizations;
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     // Re-apply mocks that vi.clearAllMocks() strips
@@ -240,6 +265,34 @@ describe("UsageTab", () => {
       expect(panel.exists()).toBe(true);
       expect(panel.text()).toContain("No data ingested yet");
       expect(panel.text()).toContain("This organization hasn't received any data");
+    });
+
+    it("should show the no-data panel when the org's only streams are ones O2 writes itself", async () => {
+      vi.mocked(orgService.get_organization_summary).mockResolvedValueOnce({
+        data: {
+          ...mockEmptySummaryData,
+          streams: { ...mockEmptySummaryData.streams, num_streams: 1, num_user_streams: 0 },
+        },
+      });
+
+      wrapper = mountUsageTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="home-usage-tab-no-data"]').exists()).toBe(true);
+    });
+
+    it("should show the summary once the org has a user data stream", async () => {
+      vi.mocked(orgService.get_organization_summary).mockResolvedValueOnce({
+        data: {
+          ...mockEmptySummaryData,
+          streams: { ...mockEmptySummaryData.streams, num_streams: 2, num_user_streams: 1 },
+        },
+      });
+
+      wrapper = mountUsageTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="home-usage-tab-no-data"]').exists()).toBe(false);
     });
   });
 
@@ -459,6 +512,56 @@ describe("UsageTab", () => {
       expect(wrapper.exists()).toBe(true);
     });
   });
+  describe("explore links under a license lock", () => {
+    let originalZoConfig: Record<string, unknown>;
+
+    beforeEach(() => {
+      originalZoConfig = { ...store.state.zoConfig };
+    });
+
+    afterEach(() => {
+      store.commit("setConfig", originalZoConfig);
+    });
+
+    const link = (signal: string) => wrapper.find(`[data-test="home-usage-tab-explore-${signal}"]`);
+
+    it("keeps a locked row a link and swaps its chevron for a gold lock", async () => {
+      wrapper = mountUsageTab();
+      await flushPromises();
+      // the tab refreshes /config on mount, so the license state lands after it
+      store.commit("setConfig", { ...store.state.zoConfig, features: { metrics: "locked" } });
+      await flushPromises();
+
+      expect(link("metrics").element.tagName).toBe("A");
+      expect(link("metrics").attributes("aria-disabled")).toBeUndefined();
+      expect(wrapper.find('[data-test="home-usage-tab-explore-metrics-lock"]').exists()).toBe(true);
+      expect(link("metrics").find(".sr-only").text()).toContain("Locked: needs");
+      expect(link("logs").element.tagName).toBe("A");
+      expect(wrapper.find('[data-test="home-usage-tab-explore-logs-lock"]').exists()).toBe(false);
+    });
+
+    it("locks the Alerts view button with the reason as its label", async () => {
+      wrapper = mountUsageTab();
+      await flushPromises();
+      store.commit("setConfig", { ...store.state.zoConfig, features: { alerts: "locked" } });
+      await flushPromises();
+
+      const btn = wrapper.findComponent('[data-test="home-usage-tab-view-alerts-btn"]');
+      expect(String(btn.props("ariaLabel"))).toContain("Locked: needs");
+    });
+
+    it("renders every signal as a link when none is locked", async () => {
+      wrapper = mountUsageTab();
+      await flushPromises();
+
+      for (const signal of ["logs", "traces", "metrics"]) {
+        expect(link(signal).element.tagName).toBe("A");
+      }
+      const icons = wrapper.findAllComponents(".OIcon-stub").map((i) => i.props("name"));
+      expect(icons).not.toContain("lock");
+    });
+  });
+
   describe("summary failure with the empty-data flag on", () => {
     let originalZoConfig: Record<string, unknown>;
 

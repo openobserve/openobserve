@@ -209,6 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :frame="false"
         :toolbar-bordered="false"
         :error="error"
+        :forbidden="forbidden"
         sorting="server"
         :sort-by="sortBy"
         sort-order="desc"
@@ -238,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <DbmSubheaderBand data-test="dbm-queries-summary">
+          <div data-test="dbm-queries-summary">
             <OStatStrip
               :items="visibleSummaryStats"
               :loading="loading"
@@ -247,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               default-key="queries"
               @select="onStatSelect"
             />
-          </DbmSubheaderBand>
+          </div>
           <DbmInsightStrip
             v-if="!insightsHidden && stripInsights.length"
             :insights="stripInsights"
@@ -630,11 +631,13 @@ import dbMonitoringService, {
   type ServerQueryRow,
 } from "@/services/db_monitoring";
 import config from "@/aws-exports";
+import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { hasDbmTraceVantage } from "@/composables/dbm/useDbmTraceVantage";
 import { useDbmQueryDetailHop } from "@/composables/dbm/useDbmQueryDetailHop";
 import { useDbmTracePresence } from "@/composables/dbm/useDbmTracePresence";
 import useStreams from "@/composables/useStreams";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
 import { useDbmOwnFilterSync } from "@/composables/dbm/useDbmScopeFilters";
@@ -695,6 +698,7 @@ const emit = defineEmits<{
   (e: "sendToAiChat", value: { query: string; autoSend: boolean }): void;
 }>();
 
+const aiLock = useLicenseLock("ai_assistant");
 const aiEnabled = computed(
   () => config.isEnterprise == "true" && Boolean(store.state.zoConfig?.ai_enabled),
 );
@@ -710,6 +714,7 @@ const {
   tabCountsContext,
   loading,
   error,
+  forbidden,
   search,
   lastRunAt,
   org,
@@ -1978,14 +1983,23 @@ const rowActions = computed<DbmRowAction[]>(() => [
   { id: "traces", icon: "account-tree", label: t("dbm.queries.actions.traces") },
   { id: "copy", icon: "content-copy", label: t("dbm.queries.actions.copy") },
   { id: "alert", icon: "shield", label: t("dbm.queries.actions.alert") },
-  // Absent, not disabled, when AI is off — a row of buttons must not carry a
-  // permanent dead one.
-  ...(aiEnabled.value
-    ? [{ id: "ai", icon: "brain-circuit", label: t("dbm.ai.rowSuggestFix") } as DbmRowAction]
-    : []),
+  // Absent when AI is off, locked when the license lacks it.
+  ...(aiLock.locked.value
+    ? [
+        {
+          id: "ai",
+          icon: "brain-circuit",
+          label: t("dbm.ai.rowSuggestFix"),
+          lockedReason: aiLock.lockedReason.value,
+        } as DbmRowAction,
+      ]
+    : aiEnabled.value
+      ? [{ id: "ai", icon: "brain-circuit", label: t("dbm.ai.rowSuggestFix") } as DbmRowAction]
+      : []),
 ]);
 
 const onRowAction = async (id: string, row: QueryRow) => {
+  analytics.track("dbm_row_action_clicked", { page: "queries", action: id });
   if (id === "open" || id === "traces") {
     openQueryDetail(row, id === "traces" ? "samples" : undefined);
     return;

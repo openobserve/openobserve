@@ -167,15 +167,13 @@ fn router_with_secret(secret: String) -> Router {
         .route("/api/healthz", get(healthz))
 }
 
-/// A blank secret skips the check, since standalone `o2_report_server` doesn't send it yet.
 async fn require_shared_secret(secret: &str, request: Request, next: Next) -> Response {
-    if secret.is_empty() {
-        return next.run(request).await;
-    }
-    let matches = request
-        .headers()
-        .get(REPORT_SECRET_HEADER)
-        .is_some_and(|v| constant_time_eq(v.as_bytes(), secret.as_bytes()));
+    // An empty secret would equal an empty header, so it must reject rather than compare
+    let matches = !secret.is_empty()
+        && request
+            .headers()
+            .get(REPORT_SECRET_HEADER)
+            .is_some_and(|v| constant_time_eq(v.as_bytes(), secret.as_bytes()));
     if matches {
         next.run(request).await
     } else {
@@ -236,12 +234,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_no_configured_secret_skips_check() {
+    async fn test_no_configured_secret_rejects_every_send() {
         let app = router_with_secret(String::new());
         let resp = app.clone().oneshot(healthz_request()).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        let resp = app.oneshot(send_request(None)).await.unwrap();
-        assert_ne!(resp.status(), StatusCode::UNAUTHORIZED);
+        let resp = app.clone().oneshot(send_request(None)).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        let resp = app.oneshot(send_request(Some(""))).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[test]

@@ -307,7 +307,7 @@ describe("GaugeConverter", () => {
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].progress.show).toBe(true);
-      expect(result.series[0].detail.valueAnimation).toBe(true);
+      expect(result.series[0].detail.valueAnimation).toBe(false);
       expect(result.series[0].title.fontSize).toBe(10);
     });
 

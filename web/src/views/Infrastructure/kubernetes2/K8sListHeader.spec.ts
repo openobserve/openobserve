@@ -60,3 +60,25 @@ describe("K8sListHeader count suffix and filtered flag (AC 80)", () => {
     expect(count()).toBe("41 pods");
   });
 });
+
+describe("K8sListHeader status chips", () => {
+  const chips = [
+    { id: "all", label: "infra.k8s2.chipAll", count: 4 },
+    { id: "scalingLimited", label: "infra.k8s2.chipScalingLimited", count: 1 },
+    { id: "healthy", label: "infra.k8s2.chipHealthy", count: 3 },
+  ];
+
+  it("renders each chip with its label and count, and emits the picked id", async () => {
+    mountHeader({ statusChips: chips, statusFilter: "all" });
+    const limited = wrapper.find('[data-test="k8s2-status-chip-scalingLimited"]');
+    expect(limited.text()).toContain("Scaling limited");
+    expect(limited.text()).toContain("1");
+    await limited.trigger("click");
+    expect(wrapper.emitted("update:statusFilter")).toEqual([["scalingLimited"]]);
+  });
+
+  it("renders no chip group without chips", () => {
+    mountHeader({});
+    expect(wrapper.find('[data-test="k8s2-status-chips"]').exists()).toBe(false);
+  });
+});

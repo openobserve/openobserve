@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  alertConditionIsQuery,
   alertConditionText,
   alertPeriodMinutes,
   alertWarningConditionText,
@@ -62,6 +63,39 @@ describe("alertConditionText", () => {
     expect(alertConditionText({ query_condition: { sql: "SELECT 1" } })).toBe("SELECT 1");
   });
 
+  /// R12, L1: every stored shape of a Builder rule reads as its conditions and its row-count threshold.
+  it("renders a custom alert's stored conditions and its count threshold", () => {
+    const leaf = { column: "body", operator: "contains", value: "ERROR" };
+    const group = {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [{ filterType: "condition", ...leaf, logicalOperator: "AND" }],
+    };
+    const trigger_condition = { operator: ">=", threshold: 1, period: 5, frequency: 1 };
+    const cases: [string, unknown][] = [
+      [
+        "v2 wrapper, as GET /api/v2/{org}/alerts/{id} returns it",
+        { version: 2, conditions: group },
+      ],
+      ["v2 wrapper with a string version", { version: "2", conditions: group }],
+      ["bare v2 group", group],
+      ["v1 tree", { and: [leaf] }],
+      ["v0 flat list", [leaf]],
+    ];
+    for (const [name, conditions] of cases) {
+      expect(
+        alertConditionText({
+          query_condition: { type: "custom", aggregation: null, conditions },
+          trigger_condition,
+        }),
+        name,
+      ).toBe("body contains 'ERROR' · count >= 1");
+    }
+    expect(alertConditionText({ query_condition: { type: "custom" }, trigger_condition })).toBe(
+      "count >= 1",
+    );
+  });
+
   /// A page outlives the rule it came from, so "no alert" is a real input.
   it("says nothing rather than throwing on a missing alert", () => {
     expect(alertConditionText(null)).toBe("—");
@@ -84,6 +118,61 @@ describe("alertConditionText", () => {
       expect(alertConditionText({ query_condition: { type: "sql", sql } })).toBe(sql);
       expect(alertConditionText({ query_condition: { sql } })).toBe(sql);
     });
+  });
+});
+
+describe("alertConditionIsQuery", () => {
+  it("is true for the raw SQL of a SQL alert and of an alert with no type", () => {
+    expect(alertConditionIsQuery({ query_condition: { type: "sql", sql: "SELECT 1" } })).toBe(true);
+    expect(alertConditionIsQuery({ condition: { sql: "SELECT 1" } })).toBe(true);
+  });
+
+  it("is false for an aggregation threshold, even with SQL stored beside it", () => {
+    expect(
+      alertConditionIsQuery({
+        query_condition: {
+          type: "sql",
+          sql: "SELECT 1",
+          aggregation: { function: "avg", having: { column: "x", operator: ">", value: 1 } },
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("is false for a Builder alert, whose stored SQL never runs", () => {
+    expect(alertConditionIsQuery({ query_condition: { type: "custom", sql: "SELECT 1" } })).toBe(
+      false,
+    );
+  });
+
+  it("is true for a PromQL rule and false for a PromQL threshold", () => {
+    expect(
+      alertConditionIsQuery({
+        query_condition: { type: "promql", promql_rule_mode: true, promql: "up == 0" },
+      }),
+    ).toBe(true);
+    expect(
+      alertConditionIsQuery({
+        query_condition: { type: "promql", promql_condition: { operator: ">", value: 1 } },
+      }),
+    ).toBe(false);
+  });
+
+  it("is true for an anomaly config in custom SQL and in filters mode", () => {
+    expect(
+      alertConditionIsQuery({ alert_type: "anomaly_detection", query_mode: "custom_sql" }),
+    ).toBe(true);
+    expect(alertConditionIsQuery({ alert_type: "anomaly_detection", query_mode: "filters" })).toBe(
+      true,
+    );
+  });
+
+  it("is false when there is no query to show", () => {
+    expect(alertConditionIsQuery(null)).toBe(false);
+    expect(alertConditionIsQuery({ query_condition: { type: "sql", sql: "" } })).toBe(false);
+    expect(alertConditionIsQuery({ query_condition: { type: "slo", slo_condition: {} } })).toBe(
+      false,
+    );
   });
 });
 

@@ -17,6 +17,7 @@ import { describe, it, expect } from "vitest";
 import {
   getFieldFromExpression,
   hasFieldCondition,
+  removeFieldCondition,
   replaceExistingFieldCondition,
 } from "./filterUtils";
 
@@ -351,5 +352,120 @@ describe("include/exclude filter deduplication (watcher behavior)", () => {
       expect(query).toBe("status is null");
       expect(query).not.toContain("status is null and status is null");
     });
+  });
+});
+
+describe("values with embedded quotes and replacement tokens (issue 11966)", () => {
+  const jsonValue = `{"sql":"where http_body = ''x'' and a = ''y''"}`;
+
+  it("replaces a whole condition whose value has doubled quotes, leaving no residue", () => {
+    const query = `http_body = '${jsonValue}'`;
+    expect(replaceExistingFieldCondition(query, "http_body", "http_body = 'z'")).toBe(
+      "http_body = 'z'",
+    );
+  });
+
+  it("replaces a multi-value group whose values have doubled quotes", () => {
+    const query = `(http_body = '${jsonValue}' OR http_body = 'b''c')`;
+    expect(replaceExistingFieldCondition(query, "http_body", "http_body = 'z'")).toBe(
+      "http_body = 'z'",
+    );
+  });
+
+  it("inserts the new expression literally when it contains $ replacement tokens", () => {
+    const expr = "http_body = 'cost $& and $` and $'' and $1'";
+    expect(replaceExistingFieldCondition("http_body = 'a'", "http_body", expr)).toBe(expr);
+  });
+});
+
+describe("removeFieldCondition with AND inside a quoted value (issue 11966)", () => {
+  it("removes only the target condition and keeps a quoted ' and ' intact", () => {
+    expect(removeFieldCondition("a = 'x and y' AND b = '1'", "b")).toBe("a = 'x and y'");
+    expect(removeFieldCondition("a = 'x and y' AND b = '1'", "a")).toBe("b = '1'");
+  });
+});
+
+describe("a field whose name ends another field's name", () => {
+  it("does not see a condition on db_operation_name as one on operation_name", () => {
+    expect(hasFieldCondition("db_operation_name = 'SELECT'", "operation_name")).toBe(false);
+    expect(hasFieldCondition(`"qa".db_operation_name = 'SELECT'`, "operation_name")).toBe(false);
+  });
+
+  it("adds an include next to the longer field's condition", () => {
+    expect(applyFilterToQuery("db_operation_name = 'SELECT'", "operation_name = 'GET /'")).toBe(
+      "db_operation_name = 'SELECT' and operation_name = 'GET /'",
+    );
+  });
+
+  it("adds an exclude next to the longer field's condition", () => {
+    expect(applyFilterToQuery("db_operation_name = 'SELECT'", "operation_name != 'GET /'")).toBe(
+      "db_operation_name = 'SELECT' and operation_name != 'GET /'",
+    );
+  });
+
+  it("adds a multi-value include and exclude group next to the longer field's condition", () => {
+    const include = "(operation_name = 'GET /' OR operation_name = 'POST /')";
+    const exclude = "(operation_name != 'GET /' AND operation_name != 'POST /')";
+    expect(applyFilterToQuery("db_operation_name = 'SELECT'", include)).toBe(
+      `db_operation_name = 'SELECT' and ${include}`,
+    );
+    expect(applyFilterToQuery("db_operation_name = 'SELECT'", exclude)).toBe(
+      `db_operation_name = 'SELECT' and ${exclude}`,
+    );
+  });
+
+  it("leaves the longer field's multi-value group intact", () => {
+    const group = "(db_operation_name = 'SELECT' OR db_operation_name = 'INSERT')";
+    expect(applyFilterToQuery(group, "operation_name = 'GET /'")).toBe(
+      `${group} and operation_name = 'GET /'`,
+    );
+  });
+
+  it("still replaces the exact field's condition and keeps the longer field's", () => {
+    expect(
+      applyFilterToQuery(
+        "db_operation_name = 'SELECT' and operation_name = 'POST /'",
+        "operation_name = 'GET /'",
+      ),
+    ).toBe("db_operation_name = 'SELECT' and operation_name = 'GET /'");
+    expect(
+      applyFilterToQuery(
+        "(db_operation_name = 'SELECT' OR db_operation_name = 'INSERT') and operation_name = 'POST /'",
+        "(operation_name = 'GET /' OR operation_name = 'PUT /')",
+      ),
+    ).toBe(
+      "(db_operation_name = 'SELECT' OR db_operation_name = 'INSERT') and (operation_name = 'GET /' OR operation_name = 'PUT /')",
+    );
+  });
+
+  it("handles stream-qualified fields", () => {
+    expect(
+      applyFilterToQuery(`"qa".db_operation_name = 'SELECT'`, `"qa".operation_name = 'GET /'`),
+    ).toBe(`"qa".db_operation_name = 'SELECT' and "qa".operation_name = 'GET /'`);
+    expect(
+      applyFilterToQuery(
+        `"qa".db_operation_name = 'SELECT' and "qa".operation_name = 'POST /'`,
+        `"qa".operation_name = 'GET /'`,
+      ),
+    ).toBe(`"qa".db_operation_name = 'SELECT' and "qa".operation_name = 'GET /'`);
+  });
+
+  it("keeps null, number and boolean conditions on the longer field", () => {
+    expect(applyFilterToQuery("http_status = 500 and status is null", "status = 'ok'")).toBe(
+      "http_status = 500 and status = 'ok'",
+    );
+    expect(applyFilterToQuery("is_enabled = true and enabled = true", "enabled = false")).toBe(
+      "is_enabled = true and enabled = false",
+    );
+  });
+
+  it("replaces only the exact field when called directly", () => {
+    expect(
+      replaceExistingFieldCondition(
+        "username = 'bob' and name = 'al'",
+        "name",
+        "(name = 'al' OR name = 'eve')",
+      ),
+    ).toBe("username = 'bob' and (name = 'al' OR name = 'eve')");
   });
 });

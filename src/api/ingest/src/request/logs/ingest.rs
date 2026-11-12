@@ -27,7 +27,7 @@ use config::{
     meta::otlp::OtlpRequestType,
 };
 use ingestion_common::{
-    GCPIngestionRequest, HecResponse, HecStatus, IngestUser, IngestionRequest,
+    GCPIngestionRequest, HecResponse, HecStatus, IngestUser, IngestionRequest, IngestionResponse,
     KinesisFHIngestionResponse, KinesisFHRequest,
 };
 use openobserve_api_common::extractors::Headers;
@@ -70,6 +70,40 @@ fn kinesis_error_status(e: &infra::errors::Error) -> StatusCode {
     }
 }
 
+/// Firehose and Pub/Sub push ack on a 200, so rows lost to a rejection or a failed write get none.
+fn undelivered_status(resp: &IngestionResponse) -> Option<(StatusCode, String)> {
+    if resp.write_failed {
+        return Some((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "write to storage failed".to_string(),
+        ));
+    }
+    if resp.stream_skipped {
+        return Some((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "stream is being deleted".to_string(),
+        ));
+    }
+    // a partial write stays 200: a retry resends the whole batch and duplicates the stored rows
+    if resp.status.iter().any(|s| s.status.successful > 0) {
+        return None;
+    }
+    // records outside the ingestion window are dropped by policy, not failed
+    let rejected = resp
+        .status
+        .iter()
+        .find(|s| s.status.failed > s.status.policy_dropped)?;
+    let reason = if rejected.status.error.is_empty() {
+        "records could not be ingested"
+    } else {
+        &rejected.status.error
+    };
+    Some((
+        StatusCode::BAD_REQUEST,
+        format!("stream {}: {reason}", rejected.name),
+    ))
+}
+
 /// _bulk ES compatible ingestion API
 #[utoipa::path(
     post,
@@ -89,7 +123,7 @@ fn kinesis_error_status(e: &infra::errors::Error) -> StatusCode {
     ),
     request_body(content = String, description = "Ingest data (ndjson)", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"took":2,"errors":true,"items":[{"index":{"_index":"olympics","_id":1,"status":200,"error":{"type":"Too old data, only last 5 hours data can be ingested. Data discarded.","reason":"Too old data, only last 5 hours data can be ingested. Data discarded.","index_uuid":"1","shard":"1","index":"olympics"},"original_record":{"athlete":"CHASAPIS, Spiridon","city":"BER","country":"USA","discipline":"Swimming","event":"100M Freestyle For Sailors","gender":"Men","medal":"Silver","onemore":1,"season":"summer","sport":"Aquatics","year":1986}}}]})),
+        (status = 200, description = "Success", content_type = "application/json", body = ingestion_common::BulkResponse, example = json!({"took":2,"errors":true,"items":[{"index":{"_index":"olympics","_id":1,"status":200,"error":{"type":"Too old data, only last 5 hours data can be ingested. Data discarded.","reason":"Too old data, only last 5 hours data can be ingested. Data discarded.","index_uuid":"1","shard":"1","index":"olympics"},"original_record":{"athlete":"CHASAPIS, Spiridon","city":"BER","country":"USA","discipline":"Swimming","event":"100M Freestyle For Sailors","gender":"Men","medal":"Silver","onemore":1,"season":"summer","sport":"Aquatics","year":1986}}}]})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -167,7 +201,7 @@ pub async fn bulk(
     ),
     request_body(content = String, description = "Ingest data (multiple line json)", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
+        (status = 200, description = "Success", content_type = "application/json", body = ingestion_common::IngestionResponse, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -251,7 +285,7 @@ pub async fn multi(
     ),
     request_body(content = String, description = "Ingest data (json array)", content_type = "application/json", example = json!([{"Year": 1896, "City": "Athens", "Sport": "Aquatics", "Discipline": "Swimming", "Athlete": "Alfred", "Country": "HUN"},{"Year": 1896, "City": "Athens", "Sport": "Aquatics", "Discipline": "Swimming", "Athlete": "HERSCHMANN", "Country":"CHN"}])),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
+        (status = 200, description = "Success", content_type = "application/json", body = ingestion_common::IngestionResponse, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -315,7 +349,7 @@ pub async fn json(
 #[utoipa::path(
     post,
     path = "/{org_id}/{stream_name}/_kinesis_firehose",
-    context_path = "/api",
+    context_path = "/aws",
     tag = "Logs",
     operation_id = "AWSLogsIngestion",
     summary = "Ingest logs from AWS Kinesis Firehose",
@@ -323,7 +357,7 @@ pub async fn json(
                    the specific request/response structure expected by Kinesis Firehose, making it seamless to \
                    stream AWS CloudWatch logs and other AWS services directly into OpenObserve.",
     security(
-        ("Authorization"= [])
+        ("FirehoseAccessKey"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -332,7 +366,8 @@ pub async fn json(
     request_body(content = inline(KinesisFHRequest), description = "Ingest data (json array)", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(KinesisFHIngestionResponse), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f","timestamp": 1578090903599_i64})),
-        (status = 500, description = "Failure", content_type = "application/json", body = (), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "errorMessage": "error processing request"})),
+        (status = 400, description = "Request rejected, or no record stored because every record was rejected", content_type = "application/json", body = inline(KinesisFHIngestionResponse), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "errorMessage": "stream logs: Stream name too long"})),
+        (status = 500, description = "Write to storage failed, or the stream started deleting mid-write", content_type = "application/json", body = inline(KinesisFHIngestionResponse), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "errorMessage": "write to storage failed"})),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -367,11 +402,22 @@ pub async fn handle_kinesis_request(
     )
     .await
     {
-        Ok(_) => MetaHttpResponse::json(KinesisFHIngestionResponse {
-            request_id,
-            timestamp: request_time,
-            error_message: None,
-        }),
+        Ok(v) => match undelivered_status(&v) {
+            Some((status, reason)) => (
+                status,
+                Json(KinesisFHIngestionResponse {
+                    request_id,
+                    timestamp: request_time,
+                    error_message: Some(reason),
+                }),
+            )
+                .into_response(),
+            None => MetaHttpResponse::json(KinesisFHIngestionResponse {
+                request_id,
+                timestamp: request_time,
+                error_message: None,
+            }),
+        },
         Err(e) => {
             // we do not want to log trial period expired errors
             if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
@@ -390,6 +436,27 @@ pub async fn handle_kinesis_request(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/gcp/{org_id}/{stream_name}/_sub",
+    tag = "Logs",
+    operation_id = "GCPSubscription",
+    summary = "Ingest logs from a GCP Pub/Sub push subscription",
+    security(("GcpApiKey" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+    ),
+    request_body(content = inline(GCPIngestionRequest), description = "Pub/Sub push envelope", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = IngestionResponse),
+        (status = 400, description = "Request rejected, or no record stored because the message was rejected", content_type = "application/json", body = Object, example = json!({"code": 400, "message": "stream logs: Stream name too long"})),
+        (status = 500, description = "Write to storage failed, or the stream started deleting mid-write", content_type = "application/json", body = Object, example = json!({"code": 500, "message": "write to storage failed"})),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn handle_gcp_request(
     Path((org_id, stream_name)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
@@ -414,7 +481,12 @@ pub async fn handle_gcp_request(
     )
     .await
     {
-        Ok(v) => MetaHttpResponse::json(v),
+        Ok(v) => match undelivered_status(&v) {
+            Some((status, reason)) => {
+                (status, Json(MetaHttpResponse::error(status, reason))).into_response()
+            }
+            None => MetaHttpResponse::json(v),
+        },
         Err(e) => {
             // we do not want to log trial period expired errors
             if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
@@ -444,13 +516,17 @@ pub async fn handle_gcp_request(
     context_path = "/api",
     tag = "Logs",
     operation_id = "PostLogs",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Ingest logs via OTLP",
     description = "Ingests log data using OpenTelemetry Protocol (OTLP) format. Supports both Protocol Buffers and JSON \
                    content types for OTLP log ingestion. This is the standard endpoint for OpenTelemetry SDK and \
                    collector integrations to send structured log data with trace correlation.",
     request_body(description = "ExportLogsServiceRequest", content(("application/x-protobuf"), (Object = "application/json"))),
+    security(("Authorization" = [])),
     responses(
-        (status = 200, description = "ExportLogsServiceResponse, encoded like the request", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 200, description = "ExportLogsServiceResponse, encoded like the request", content((common::meta::otlp::OtlpProtobufBody = "application/x-protobuf"), (common::meta::otlp::OtlpLogsExportJson = "application/json"))),
         (status = 400, description = "google.rpc.Status: invalid body, unsupported Content-Type, ingestion refused (e.g. stream being deleted), or write rejected (e.g. columns limit)", content(("application/x-protobuf"), (Object = "application/json"))),
         (status = 429, description = "google.rpc.Status: trial period expired", content(("application/x-protobuf"), (Object = "application/json"))),
         (status = 500, description = "google.rpc.Status: internal write error", content(("application/x-protobuf"), (Object = "application/json"))),
@@ -522,7 +598,7 @@ pub async fn otlp_logs_write(
             }
         }
         Some(OtlpRequestType::HttpJson) => {
-            match config::utils::json::from_slice_lenient_floats::<ExportLogsServiceRequest>(
+            match config::utils::json::from_slice_lenient_otlp::<ExportLogsServiceRequest>(
                 body.as_ref(),
             ) {
                 Ok(req) => (req, OtlpRequestType::HttpJson),
@@ -649,6 +725,7 @@ pub async fn hec(
 mod tests {
     use axum::http::header::CONTENT_TYPE;
     use config::utils::json;
+    use ingestion_common::{RecordStatus, StreamStatus};
 
     use super::*;
 
@@ -690,6 +767,46 @@ mod tests {
             status(infra::errors::Error::IngestionError("x".into())),
             StatusCode::BAD_REQUEST
         );
+    }
+
+    fn written(successful: u32, failed: u32, policy_dropped: u32) -> IngestionResponse {
+        let mut stream = StreamStatus::new("s");
+        stream.status = RecordStatus {
+            successful,
+            failed,
+            error: if failed > 0 {
+                "too long".into()
+            } else {
+                String::new()
+            },
+            policy_dropped,
+        };
+        IngestionResponse::new(200, vec![stream])
+    }
+
+    #[test]
+    fn undelivered_status_fails_only_a_write_that_kept_nothing() {
+        let status = |resp: IngestionResponse| undelivered_status(&resp).map(|(s, _)| s);
+        assert_eq!(status(written(10, 0, 0)), None);
+        assert_eq!(status(written(0, 0, 0)), None);
+        assert_eq!(status(written(5, 5, 0)), None);
+        assert_eq!(status(written(0, 5, 5)), None);
+        assert_eq!(status(written(0, 5, 0)), Some(StatusCode::BAD_REQUEST));
+        assert_eq!(status(written(0, 5, 2)), Some(StatusCode::BAD_REQUEST));
+        assert_eq!(
+            status(written(10, 0, 0).with_write_failed(true)),
+            Some(StatusCode::INTERNAL_SERVER_ERROR)
+        );
+        assert_eq!(
+            status(written(0, 0, 0).with_stream_skipped(true)),
+            Some(StatusCode::INTERNAL_SERVER_ERROR)
+        );
+    }
+
+    #[test]
+    fn undelivered_status_names_the_stream_and_its_error() {
+        let (_, reason) = undelivered_status(&written(0, 3, 0)).unwrap();
+        assert_eq!(reason, "stream s: too long");
     }
 
     #[tokio::test]

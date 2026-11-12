@@ -37,6 +37,7 @@ vi.mock("@/utils/dashboard/chartColorUtils", () => ({
 }));
 
 vi.mock("@/utils/dashboard/colorPalette", () => ({
+  createDistinctSeriesColor: vi.fn(() => () => undefined),
   getSeriesColor: vi.fn(() => "#FF5733"),
   getSQLMinMaxValue: vi.fn(() => ({ min: 0, max: 100 })),
 }));

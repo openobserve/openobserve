@@ -7,7 +7,8 @@
  *   TS-04.02 a member on no rotation is named out loud, not silently stranded
  *   TS-04.04 a member payload that adds nobody is refused (the W-02 guard)
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * WHAT IS DELIBERATELY *NOT* ASSERTED HERE:
  *   - The exact default ladder DELAYS. The plan quotes the book's 5/15/30/60m;
@@ -57,6 +58,7 @@ const {
 const {
   createOrgUser,
   createOrgUsers,
+  loginAs,
   oncallUserEmail,
   getConfigRisks,
 } = require('../utils/oncall-seed-ext.js');
@@ -211,10 +213,11 @@ test.describe('On-call team staffing', {
     expect(primaryMembers.slice(0, seeded.length), 'the people already in the rotation keep their turns')
       .toEqual(seeded);
 
-    // Coverage recomputes on the same render — it is derived, not remembered.
-    const coverage = await pm.oncallTeamDetailPage.readMembersCoverage();
-    testLogger.info('TS-04.01 members coverage line', { coverage });
-    expect(coverage, 'the members tab states how many of the org are on this team').toMatch(/\d+/);
+    // The tab's count chip recomputes from the roster — derived, not remembered.
+    await expect.poll(
+      () => pm.oncallTeamDetailPage.readMembersTabCount(),
+      { timeout: 30000, intervals: [1000], message: 'the Members tab counts the joiner' },
+    ).toBe(members.length);
   });
 
   // ------------------------------------------------------------------ TS-04.02
@@ -235,7 +238,7 @@ test.describe('On-call team staffing', {
    * green the moment the risk is derived, and weakening it to assert the gap
    * would pin the gap as correct.
    */
-  test.fixme('a member on no rotation is named as a config risk rather than silently stranded — not wired: config-risks derives no such kind, verified 15 Sep on :5090. o2-enterprise#2481.', {
+  test.fixme('a member on no rotation is named as a config risk rather than silently stranded — config-risks derives no such kind. o2-enterprise#2481.', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
     const prefix = uniqueName(`${workerPrefix(testInfo)}_strand`);
@@ -353,11 +356,11 @@ test.describe('On-call team staffing', {
     const name = uniqueName(`${workerPrefix(testInfo)}_holder`);
     const users = await createOrgUsers(page, name, 3);
     const team = await createTeam(page, { name, timezone: 'UTC' });
+    await addTeamMembers(page, team.id, users);
     await setTeamSchedule(page, team.id, {
       timezone: 'UTC',
       rotations: [rotation({ id: 'Primary', members: users })],
     });
-    await addTeamMembers(page, team.id, users);
 
     const before = (await whoIsOnCall(page, team.id)) ?? [];
     expect(before.length, 'somebody must be on call before this test removes them')
@@ -383,8 +386,8 @@ test.describe('On-call team staffing', {
     //
     // NOTE, and it is a gap worth recording rather than failing on: the copy is
     // the SAME whether or not this person is holding the pager at this instant
-    // ("They will no longer be paged for this team. Any rotation position they
-    // hold goes with them."). Removing the person currently on call reads
+    // ("They will no longer be paged for it. Any rotation position they hold
+    // goes with them."). Removing the person currently on call reads
     // exactly like removing somebody on the bench. Asserted here as the
     // consequence being stated at all; the missing distinction is in the
     // generation report.
@@ -412,4 +415,30 @@ test.describe('On-call team staffing', {
       .toBeTruthy();
   });
 
+  test('UN-04 with no provider the chips give the reason, my own row adds where to fix it, and nothing is red', {
+    tag: ['@P1'],
+  }, async ({ page, browser }, testInfo) => {
+    const prefix = uniqueName(`${workerPrefix(testInfo)}_tel_chips`);
+    const [me, mate] = await createOrgUsers(page, prefix, 2);
+    const team = await createTeam(page, { name: `${prefix}_team` });
+    await addTeamMembers(page, team.id, [me, mate]);
+
+    // A seeded person rather than root, whose reserved-domain address would rightly read red.
+    const session = await loginAs(browser, { email: me });
+    try {
+      const screens = new PageManager(session.page);
+      await screens.oncallTeamDetailPage.goto(ORG, team.id, 'members');
+      testLogger.info('Expect a phone reason on every chip, and the fix on my own row (S1, U5, guide 6.1)');
+      // o2-enterprise#3420 UN-04: S1 lists both sentences with no order, so either passes and the exact wording is pytest L-02's.
+      await screens.oncallMinePage.expectChipLinksToMine(
+        me, 'sms', /^(no phone on file|no phone provider for this organisation)\. Add your phone on My on-call$/,
+      );
+      // reka repeats the tooltip's text in a hidden node, so the words can legitimately appear twice.
+      await screens.oncallMinePage.expectChipDoesNotLink(mate, 'sms', /^(no phone on file|no phone provider for this organisation)\1?$/);
+      await screens.oncallMinePage.expectReachableByEmailAndNotRed(me);
+      await screens.oncallMinePage.expectReachableByEmailAndNotRed(mate);
+    } finally {
+      await session.context.close();
+    }
+  });
 });

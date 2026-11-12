@@ -28,7 +28,7 @@ use dashmap::DashSet;
 static INITIALIZED_ORGS: Lazy<DashSet<String>> = Lazy::new(DashSet::new);
 
 fn expected_llm_experiment_schema() -> Result<arrow_schema::Schema> {
-    let sample = config::utils::json::to_value(ExperimentExecutionRecord::init_for_reflection())?;
+    let sample = ExperimentExecutionRecord::stream_reflection_value()?;
     let sample = config::utils::flatten::flatten(sample)?;
     let sample = sample.as_object().ok_or_else(|| {
         anyhow::anyhow!("Failed to convert ExperimentExecutionRecord to JSON object")
@@ -144,6 +144,7 @@ mod tests {
             "trial_index",
             "status",
             "output",
+            config::meta::self_reporting::llm_experiments::STRUCTURED_OUTPUT_COLUMN,
             "error_message",
             "error_attempt_count",
             "latency_ms",

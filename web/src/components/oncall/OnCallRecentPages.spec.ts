@@ -18,6 +18,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import OnCallRecentPages from "@/components/oncall/OnCallRecentPages.vue";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 import type { OnCallPolicy, OnCallResponse } from "@/ts/interfaces/oncall";
 
 const MINUTE = 60_000_000;
@@ -94,8 +95,8 @@ const stubs = {
 
 function render(pages: OnCallResponse[], props: Record<string, unknown> = {}) {
   return mount(OnCallRecentPages, {
-    props: { pages, policy, windowDays: 7, ...props },
-    global: { plugins: [i18n], stubs },
+    props: { pages, policy, ...props },
+    global: { plugins: [i18n, store], stubs },
   });
 }
 
@@ -120,9 +121,7 @@ describe("OnCallRecentPages", () => {
     expect(subject(render([page()])).size).toBe(200);
   });
 
-  /// The list is a sample, and a sample that does not say so reads as the whole
-  /// history of the team.
-  it("says how many of the window's pages it is showing", () => {
+  it("says how many of the window's pages the capped list shows", () => {
     const wrapper = render(
       Array.from({ length: 6 }, (_, i) => page({ id: `p${i}`, opened_at: OPENED - i * MINUTE })),
     );
@@ -133,14 +132,13 @@ describe("OnCallRecentPages", () => {
     );
   });
 
-  /// With nothing truncated there is no "of", because "3 of 3" invites a reader
-  /// to look for the other zero.
-  it("states a plain count when nothing is truncated", () => {
-    const wrapper = render([page({ id: "a" }), page({ id: "b", opened_at: OPENED - MINUTE })]);
-
+  it("states the plain count when nothing is cut, and nothing while loading", async () => {
+    const wrapper = render([page({ id: "only" })], { windowDays: 14 });
     expect(wrapper.find('[data-test="oncall-recent-pages-window"]').text()).toBe(
-      "2 in the last 7 days",
+      "1 in the last 14 days",
     );
+    await wrapper.setProps({ loading: true });
+    expect(wrapper.find('[data-test="oncall-recent-pages-window"]').exists()).toBe(false);
   });
 
   it("orders newest first regardless of the order it was handed", () => {
@@ -178,6 +176,8 @@ describe("OnCallRecentPages", () => {
     const wrapper = render([page({ acked_by: "mei@o2.ai", acked_at: OPENED + 7 * MINUTE })]);
 
     expect(rows(wrapper)[0].text()).toContain("acked by mei@o2.ai");
+    const name = rows(wrapper)[0].findComponent({ name: "OnCallPersonName" });
+    expect(name.props("email")).toBe("mei@o2.ai");
   });
 
   it("emits the record on a row click and asks for the full list on view-all", async () => {
@@ -188,6 +188,47 @@ describe("OnCallRecentPages", () => {
 
     await wrapper.find('[data-test="oncall-recent-pages-view-all"]').trigger("click");
     expect(wrapper.emitted("view-all")).toHaveLength(1);
+  });
+
+  /// The same one phrase the Pages list's Escalation column says, and never the bare word "Triggered".
+  it("says what happened to each page in one phrase", () => {
+    const wrapper = render(
+      [
+        page({ id: "out", state: "triggered", exhausted_at: OPENED + 20 * MINUTE }),
+        page({ id: "ringing", state: "triggered", reached_rung_micros: 5 * MINUTE }),
+        page({
+          id: "owned",
+          state: "acknowledged",
+          acked_by: "ana@o2.ai",
+          acked_at: OPENED + MINUTE,
+        }),
+        page({ id: "closed", state: "resolved", closed_at: OPENED + 42 * MINUTE }),
+      ],
+      { limit: 4 },
+    );
+
+    const state = (id: string) => wrapper.find(`[data-test="oncall-recent-pages-state-${id}"]`);
+    expect(state("out").text()).toBe("Nobody answered");
+    expect(state("ringing").text()).toBe("Paging step 2 of 2");
+    expect(state("owned").text()).toBe("Acknowledged by ana@o2.ai");
+    expect(state("closed").text()).toBe("Resolved after 42m");
+    expect(wrapper.text()).not.toContain("Triggered");
+  });
+
+  /// Recent pages never fetches the ladder's progress, so a page with no recorded step is not known to be unpaged.
+  it("makes no claim for an open page with no recorded step", () => {
+    const wrapper = render([page({ id: "quiet", state: "triggered" })]);
+
+    expect(wrapper.find('[data-test="oncall-recent-pages-state-quiet"]').text()).toBe("");
+  });
+
+  /// A rung the edited policy no longer has still paged; the row makes no claim rather than "Not paged yet".
+  it("makes no claim for a recorded step the policy no longer has", () => {
+    const wrapper = render([
+      page({ id: "moved", state: "triggered", reached_rung_micros: 7 * MINUTE }),
+    ]);
+
+    expect(wrapper.find('[data-test="oncall-recent-pages-state-moved"]').text()).toBe("");
   });
 
   it("shows the empty state rather than a bare card when nothing fired", () => {

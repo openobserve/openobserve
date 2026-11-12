@@ -5,6 +5,7 @@ const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const { ingestTestData } = require('../utils/data-ingestion.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { ingestBase } = require('../utils/ingest-url.js');
 
 // Utility Functions
 
@@ -275,7 +276,7 @@ test.describe("Compare SQL query execution times", () => {
       });
       return await fetchResponse.json();
     }, {
-      url: process.env.INGESTION_URL,
+      url: ingestBase(process.env.INGESTION_URL),
       headers: headers,
       orgId: orgId,
       streamName: streamName,

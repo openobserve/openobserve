@@ -21,8 +21,9 @@ use db::{
     self,
     alerts::{destinations::DestinationError, templates::TemplateError},
     authz::{remove_ownership, set_ownership},
-    user,
+    org_users, user,
 };
+use infra::table::templates::NAME_MAX_CHARS;
 
 use crate::{auth::is_ofga_unsupported, common::meta::authz::Authz};
 
@@ -123,10 +124,102 @@ async fn ensure_prebuilt_template(
     }
 }
 
+/// Rejects a recipient list naming any non-member of the org. [strong]
+async fn ensure_org_members(org_id: &str, recipients: &[String]) -> Result<(), DestinationError> {
+    reject_non_members(org_member_split(org_id, recipients).await)
+}
+
+/// Passes a split with nobody skipped; a lookup error stays an error, not a non-member. [pure]
+fn reject_non_members(
+    split: Result<(Vec<String>, Vec<String>), anyhow::Error>,
+) -> Result<(), DestinationError> {
+    let (_, skipped) = split
+        .map_err(|e| DestinationError::InfraError(infra::errors::Error::Message(e.to_string())))?;
+    if skipped.is_empty() {
+        Ok(())
+    } else {
+        Err(DestinationError::UserNotPermitted(skipped.join(", ")))
+    }
+}
+
+/// The stored row of a save, read so a row this node cannot decode is never overwritten.
+async fn existing(
+    org_id: &str,
+    name: &str,
+    create: bool,
+) -> Result<Option<Destination>, DestinationError> {
+    match db::alerts::destinations::get(org_id, name).await {
+        Ok(_) if create => Err(DestinationError::AlreadyExists),
+        Ok(found) => Ok(Some(found)),
+        Err(DestinationError::NotFound) => {
+            if infra::table::destinations::exists_row(org_id, name).await? {
+                return Err(super::slack_destination::newer_row(name));
+            }
+            if create {
+                Ok(None)
+            } else {
+                Err(DestinationError::NotFound)
+            }
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// An alert saved against a webhook skipped the Jira checks, so a turn into Jira runs them now.
+async fn check_jira_conversion(
+    destination: &Destination,
+    previous: Option<&Destination>,
+) -> Result<(), DestinationError> {
+    if !super::notifications::jira::becomes_jira(destination, previous) {
+        return Ok(());
+    }
+    let conn = infra::db::get_orm_client_ro().await;
+    let alerts = db::alerts::alert::list_with_folders_fully_decoded(
+        conn,
+        config::meta::alerts::alert::ListAlertsParams::new(&destination.org_id),
+    )
+    .await?;
+    match super::notifications::jira::conversion_refusal(
+        &destination.name,
+        alerts.iter().map(|(_, alert)| alert),
+    ) {
+        Some(refusal) => Err(DestinationError::JiraAlertsUnsupported(refusal)),
+        None => Ok(()),
+    }
+}
+
 pub async fn save(
+    name: &str,
+    destination: Destination,
+    create: bool,
+) -> Result<Destination, DestinationError> {
+    save_by(name, destination, create, "").await
+}
+
+/// [`save`] by `by`, who becomes the `updated_by` of a channel default a Slack app save fills.
+pub async fn save_by(
+    name: &str,
+    destination: Destination,
+    create: bool,
+    by: &str,
+) -> Result<Destination, DestinationError> {
+    save_in(
+        &super::slack_destination::LiveEnv,
+        name,
+        destination,
+        create,
+        by,
+    )
+    .await
+}
+
+/// [`save_by`] with the Slack and cluster reads a test can replace.
+pub async fn save_in(
+    env: &dyn super::slack_destination::SaveEnv,
     name: &str,
     mut destination: Destination,
     create: bool,
+    by: &str,
 ) -> Result<Destination, DestinationError> {
     // First validate the `destination` according to its `destination_type`
     match &mut destination.module {
@@ -140,16 +233,12 @@ pub async fn save(
                 if !config::get_config().smtp.smtp_enabled {
                     return Err(DestinationError::SMTPUnavailable);
                 }
-                let mut lowercase_emails = vec![];
-                for email in email.recipients.iter() {
-                    let email = email.trim().to_lowercase();
-                    // Check if the email is part of the org
-                    let res = user::get(Some(&destination.org_id), &email).await;
-                    if res.is_err() || res.is_ok_and(|usr| usr.is_none()) {
-                        return Err(DestinationError::UserNotPermitted);
-                    }
-                    lowercase_emails.push(email);
-                }
+                let lowercase_emails: Vec<String> = email
+                    .recipients
+                    .iter()
+                    .map(|email| email.trim().to_lowercase())
+                    .collect();
+                ensure_org_members(&destination.org_id, &lowercase_emails).await?;
                 email.recipients = lowercase_emails;
             }
             DestinationType::Http(endpoint) => {
@@ -172,6 +261,9 @@ pub async fn save(
                 if aws_sns.sns_topic_arn.is_empty() || aws_sns.aws_region.is_empty() {
                     return Err(DestinationError::InvalidSns);
                 }
+            }
+            DestinationType::SlackApp(target) => {
+                super::slack_destination::validate_fields(target)?;
             }
         },
         Module::Pipeline { endpoint, .. } => {
@@ -199,19 +291,17 @@ pub async fn save(
     if destination.name.contains('/') || is_ofga_unsupported(&destination.name) {
         return Err(DestinationError::InvalidName);
     }
-
-    match db::alerts::destinations::get(&destination.org_id, &destination.name).await {
-        Ok(_) => {
-            if create {
-                return Err(DestinationError::AlreadyExists);
-            }
-        }
-        Err(_) => {
-            if !create {
-                return Err(DestinationError::NotFound);
-            }
-        }
+    // Create only: older rows over the limit (SQLite does not enforce it) stay editable.
+    if create && destination.name.chars().count() > NAME_MAX_CHARS {
+        return Err(DestinationError::NameTooLong(NAME_MAX_CHARS));
     }
+
+    let previous = existing(&destination.org_id, &destination.name, create).await?;
+    if let Some(target) = super::slack_destination::slack_app_target(&destination) {
+        super::slack_destination::check_save(env, &destination, target, previous.as_ref()).await?;
+    }
+    super::notifications::jira::keep_saved_token(&mut destination, previous.as_ref())?;
+    check_jira_conversion(&destination, previous.as_ref()).await?;
 
     // For prebuilt destinations, ensure template exists before saving destination
     // This implements template reuse: multiple destinations can share the same prebuilt template
@@ -238,6 +328,7 @@ pub async fn save(
                 }
             }
             DestinationType::Sns(_) => None, // SNS doesn't have prebuilt templates yet
+            DestinationType::SlackApp(_) => template.is_none().then_some("slack"),
         };
 
         // If it's a prebuilt type and doesn't have a custom template, ensure prebuilt template
@@ -261,9 +352,30 @@ pub async fn save(
         }
     }
 
+    // The write stores null for a name it finds no row for, so refuse it here. The lookup falls
+    // back to the default org and follows renames; the canonical name is what the write resolves.
+    if let Module::Alert {
+        template: Some(template_name),
+        ..
+    } = &mut destination.module
+        && !template_name.is_empty()
+    {
+        match db::alerts::templates::get(&destination.org_id, template_name).await {
+            Ok(found) => *template_name = found.name,
+            Err(TemplateError::NotFound) => {
+                return Err(DestinationError::UnknownTemplate(template_name.clone()));
+            }
+            Err(TemplateError::InfraError(e)) => return Err(DestinationError::InfraError(e)),
+            Err(e) => return Err(DestinationError::TemplateRetrievalFailed(e.to_string())),
+        }
+    }
+
     let saved = db::alerts::destinations::set(destination).await?;
     if name.is_empty() {
         set_ownership(&saved.org_id, "destinations", Authz::new(&saved.name)).await;
+    }
+    if let Some(target) = super::slack_destination::slack_app_target(&saved) {
+        super::slack_destination::fill_channel_default(&saved.org_id, target, by).await;
     }
     Ok(saved)
 }
@@ -287,16 +399,11 @@ pub async fn test_email(
         return Err(DestinationError::EmptyEmail);
     }
 
-    // Validate each recipient is part of the org (same as save())
-    let mut validated_recipients = Vec::with_capacity(recipients.len());
-    for email in recipients {
-        let email = email.trim().to_lowercase();
-        let res = user::get(Some(org_id), &email).await;
-        if res.is_err() || res.is_ok_and(|usr| usr.is_none()) {
-            return Err(DestinationError::UserNotPermitted);
-        }
-        validated_recipients.push(email);
-    }
+    let validated_recipients: Vec<String> = recipients
+        .iter()
+        .map(|email| email.trim().to_lowercase())
+        .collect();
+    ensure_org_members(org_id, &validated_recipients).await?;
 
     let default_body = "<html><body><h2>OpenObserve Test Email</h2>\
          <p>This is a test email from OpenObserve to verify your email destination \
@@ -311,11 +418,58 @@ pub async fn test_email(
     super::alert::send_email_notification(
         "OpenObserve - Test Email Destination",
         &email,
-        email_body.clone(),
+        None,
         email_body,
     )
     .await
     .map_err(|e| DestinationError::EmailSendFailed(e.to_string()))
+}
+
+/// Appends the skipped addresses to a send response; unchanged when none were skipped. [pure]
+pub fn note_skipped(response: String, skipped: &[String]) -> String {
+    if skipped.is_empty() {
+        return response;
+    }
+    format!(
+        "{response} (skipped recipients not part of this org: {})",
+        skipped.join(", ")
+    )
+}
+
+/// Splits recipients into org members and non-members; a failed lookup fails the split. [pure]
+pub fn split_org_members(
+    checked: Vec<(String, Result<bool, anyhow::Error>)>,
+) -> Result<(Vec<String>, Vec<String>), anyhow::Error> {
+    let mut kept = vec![];
+    let mut skipped = vec![];
+    for (recipient, member) in checked {
+        if member? {
+            kept.push(recipient);
+        } else {
+            skipped.push(recipient);
+        }
+    }
+    Ok((kept, skipped))
+}
+
+/// Looks up each recipient's org membership and splits kept from skipped. [strong]
+pub async fn org_member_split(
+    org_id: &str,
+    recipients: &[String],
+) -> Result<(Vec<String>, Vec<String>), anyhow::Error> {
+    let mut checked = Vec::with_capacity(recipients.len());
+    for recipient in recipients {
+        let email = recipient.trim().to_lowercase();
+        let member = if user::is_root_user(&email) {
+            Ok(true)
+        } else {
+            org_users::get_optional(org_id, &email)
+                .await
+                .map(|found| found.is_some())
+        };
+        checked.push((recipient.clone(), member));
+    }
+    split_org_members(checked)
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {
@@ -399,6 +553,92 @@ mod tests {
     use config::meta::destinations::{DestinationType, Endpoint, HTTPType, Module};
 
     use super::*;
+
+    fn addrs(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// Nothing else in this binary migrates the meta store `save` writes to.
+    async fn meta_store() {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        ONCE.get_or_init(|| async {
+            std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+    }
+
+    #[test]
+    fn test_split_org_members() {
+        type Checked<'a> = &'a [(&'a str, Option<bool>)];
+        type Split = (Vec<String>, Vec<String>);
+        let cases: Vec<(Checked, Option<Split>)> = vec![
+            (
+                &[("a@x.com", Some(true)), ("b@x.com", Some(true))],
+                Some((addrs(&["a@x.com", "b@x.com"]), vec![])),
+            ),
+            (
+                &[("a@x.com", Some(true)), ("gone@x.com", Some(false))],
+                Some((addrs(&["a@x.com"]), addrs(&["gone@x.com"]))),
+            ),
+            (
+                &[("gone@x.com", Some(false)), ("left@x.com", Some(false))],
+                Some((vec![], addrs(&["gone@x.com", "left@x.com"]))),
+            ),
+            (&[], Some((vec![], vec![]))),
+            (&[("a@x.com", Some(true)), ("db@x.com", None)], None),
+            (&[("gone@x.com", Some(false)), ("db@x.com", None)], None),
+        ];
+        for (checked, expected) in cases {
+            let input = checked
+                .iter()
+                .map(|(r, m)| (r.to_string(), m.ok_or_else(|| anyhow::anyhow!("db down"))))
+                .collect();
+            let got = split_org_members(input);
+            assert_eq!(got.ok(), expected, "split for {checked:?}");
+        }
+    }
+
+    #[test]
+    fn test_reject_non_members() {
+        type Split = Result<(Vec<String>, Vec<String>), anyhow::Error>;
+        let cases: Vec<(Split, Result<(), String>)> = vec![
+            (Ok((addrs(&["a@x.com"]), vec![])), Ok(())),
+            (Ok((vec![], vec![])), Ok(())),
+            (
+                Ok((addrs(&["a@x.com"]), addrs(&["gone@x.com"]))),
+                Err("UserNotPermitted(\"gone@x.com\")".to_string()),
+            ),
+            (
+                Ok((vec![], addrs(&["gone@x.com", "left@x.com"]))),
+                Err("UserNotPermitted(\"gone@x.com, left@x.com\")".to_string()),
+            ),
+            (
+                Err(anyhow::anyhow!("db down")),
+                Err("InfraError(Message(\"db down\"))".to_string()),
+            ),
+        ];
+        for (split, expected) in cases {
+            let got = reject_non_members(split).map_err(|e| format!("{e:?}"));
+            assert_eq!(got, expected);
+        }
+    }
+
+    #[test]
+    fn test_note_skipped() {
+        assert_eq!(note_skipped("sent".to_string(), &[]), "sent");
+        assert_eq!(
+            note_skipped("sent".to_string(), &addrs(&["gone@x.com", "left@x.com"])),
+            "sent (skipped recipients not part of this org: gone@x.com, left@x.com)"
+        );
+    }
+
+    #[test]
+    fn test_user_not_permitted_names_the_address() {
+        let msg = DestinationError::UserNotPermitted("gone@x.com".to_string()).to_string();
+        assert!(msg.contains("gone@x.com"), "{msg}");
+    }
 
     /// Test that ensure_prebuilt_template creates a new template when it doesn't exist
     #[tokio::test]
@@ -702,6 +942,7 @@ mod tests {
     /// instead. Supersedes the old `test_alert_destination_requires_template`.
     #[tokio::test]
     async fn test_alert_destination_template_is_optional() {
+        meta_store().await;
         let org_id = "test_org_no_template";
 
         // Clean up any leftover state
@@ -760,6 +1001,97 @@ mod tests {
         // Clean up
         let _ = db::alerts::destinations::delete(org_id, "test_no_template").await;
         let _ = db::alerts::destinations::delete(org_id, "test_empty_template").await;
+    }
+
+    fn sns_destination(org_id: &str, name: &str, template: Option<&str>) -> Destination {
+        Destination {
+            id: None,
+            org_id: org_id.to_string(),
+            name: name.to_string(),
+            module: Module::Alert {
+                template: template.map(str::to_string),
+                destination_type: DestinationType::Sns(config::meta::destinations::AwsSns {
+                    sns_topic_arn: "arn:aws:sns:us-east-1:000000000000:t".to_string(),
+                    aws_region: "us-east-1".to_string(),
+                }),
+            },
+        }
+    }
+
+    /// An unknown name is refused; a name only the default org holds still saves.
+    #[tokio::test]
+    async fn test_save_refuses_an_unknown_template_and_keeps_the_default_org_fallback() {
+        meta_store().await;
+        let org_id = "test_org_unknown_template";
+        let shared = "b22_shared_template";
+        let _ = db::alerts::destinations::delete(org_id, "b22_typo").await;
+        let _ = db::alerts::destinations::delete(org_id, "b22_shared").await;
+
+        let err = save(
+            "b22_typo",
+            sns_destination(org_id, "", Some("no_such_t")),
+            true,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, DestinationError::UnknownTemplate(ref n) if n == "no_such_t"),
+            "{err:?}"
+        );
+        assert_eq!(err.to_string(), "template 'no_such_t' does not exist");
+
+        infra::table::templates::put(Template {
+            org_id: config::DEFAULT_ORG.to_string(),
+            name: shared.to_string(),
+            body: "{}".to_string(),
+            template_type: config::meta::destinations::TemplateType::Http,
+            ..Default::default()
+        })
+        .await
+        .expect("default org template");
+        let saved = save(
+            "b22_shared",
+            sns_destination(org_id, "", Some(shared)),
+            true,
+        )
+        .await
+        .expect("default org fallback saves");
+        assert!(
+            matches!(&saved.module, Module::Alert { template: Some(t), .. } if t == shared),
+            "{saved:?}"
+        );
+        // Read the row back: the write stored the default org template's id, not null.
+        let stored = infra::table::destinations::get(org_id, "b22_shared")
+            .await
+            .expect("read back")
+            .expect("row");
+        assert!(
+            matches!(&stored.module, Module::Alert { template: Some(t), .. } if t == shared),
+            "{stored:?}"
+        );
+
+        let _ = db::alerts::destinations::delete(org_id, "b22_shared").await;
+        let _ = infra::table::templates::delete(config::DEFAULT_ORG, shared).await;
+    }
+
+    /// A create over the 256-character column refuses with a 400 error, not the raw DB error.
+    #[tokio::test]
+    async fn test_save_refuses_a_name_over_256_chars_on_create() {
+        meta_store().await;
+        let org_id = "test_org_long_name";
+        let over = "é".repeat(257);
+        let err = save(&over, sns_destination(org_id, "", None), true)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, DestinationError::NameTooLong(256)), "{err:?}");
+
+        // 256 multi-byte characters still fit the varchar(256) column.
+        let fits = "é".repeat(256);
+        let _ = db::alerts::destinations::delete(org_id, &fits).await;
+        save(&fits, sns_destination(org_id, "", None), true)
+            .await
+            .expect("256 characters save");
+        let _ = db::alerts::destinations::delete(org_id, &fits).await;
     }
 
     /// A delete blocked by three kinds names all three, not just the one `first_use` stopped at.

@@ -42,6 +42,8 @@ local-ip-address.workspace = true
 gxhash = { version = "3.5", optional = true }
 hashbrown.workspace = true
 hex.workspace = true
+hkdf.workspace = true
+hmac.workspace = true
 itoa = "1.0"
 ryu = "1.0"
 indexmap.workspace = true
@@ -65,6 +67,7 @@ sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_with = { version = "3", features = ["macros", "json"] }
+sha2.workspace = true
 sha256.workspace = true
 snap.workspace = true
 sqlparser.workspace = true

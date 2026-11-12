@@ -21,9 +21,7 @@ const testLogger = require('../utils/test-logger.js');
 const { TIME_SHIFT_METRIC, seedTimeShiftMetric } = require('../utils/metrics-explore-seed.js');
 
 test.describe.configure({ mode: "parallel" });
-// No file-level `retries` override: it used to pin this file to 1 retry, which both
-// added a retry locally (project default 0, hiding flakes during development) and
-// *cut* CI's 3 retries down to 1. The project-level policy is the right one.
+// No file-level `retries` override: it would add retries locally (project default 0) and hide flakes during development.
 
 test.describe("ConfigPanel — Advanced Settings", () => {
   test.beforeEach(async ({ page }) => {
@@ -194,7 +192,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await setupTablePanelWithConfig(page, pm, dashboardName);
 
     // Open popup, pick first column, select Bytes unit, save
-    await pm.dashboardPanelConfigs.configureOverrideWithUnit({ unitName: "Bytes" });
+    await pm.dashboardPanelConfigs.configureOverrideWithUnit({ unitName: "Bytes (1024)" });
     testLogger.info("Override config: field + Bytes unit saved");
 
     // Wait for the query to finish before asserting on the table: the pre-existing

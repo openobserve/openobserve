@@ -16,6 +16,7 @@
 mod base;
 pub mod oncall;
 pub mod promql;
+pub mod slack;
 
 use std::collections::HashMap;
 
@@ -31,6 +32,7 @@ pub fn init() {
     base::register(registry);
     promql::register(registry);
     oncall::register(registry);
+    slack::register(registry);
 }
 
 pub fn create_const_labels() -> HashMap<String, String> {

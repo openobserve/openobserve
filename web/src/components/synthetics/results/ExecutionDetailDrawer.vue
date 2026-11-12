@@ -124,6 +124,7 @@ function fmtDuration(ms: number) {
                 trace.zip
               </a>
               <OButton
+                :aria-label="t('common.close')"
                 variant="ghost"
                 size="icon-sm"
                 icon-left="close"

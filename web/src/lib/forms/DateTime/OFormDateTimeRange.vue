@@ -13,13 +13,15 @@
 //     the new value — but NOT on the user's own changes (DateTime already
 //     reflects those), which would otherwise cause a remount loop.
 //
-// Errors aren't rendered here: DateTime has no label/required affordance and the
-// timerange is validated cross-field in the form schema (surfaced via the step
-// jump), mirroring how the other documented composite controls behave.
+// Errors are rendered only with `show-error`: DateTime has no label/required
+// affordance and most callers validate the timerange cross-field in the form
+// schema (surfaced via the step jump), mirroring the other composite controls.
 
 import { inject, ref, watch } from "vue";
 import DateTime from "@/components/DateTime.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import { raw } from "@/types/i18n";
 import type { FormDateTimeRangeProps, DateTimeRangeValue } from "./OFormDateTimeRange.types";
 
 defineOptions({ inheritAttrs: false });
@@ -85,13 +87,24 @@ const onDateChange = (field: any, dt: any) => {
   <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <div v-if="props.label || props.description" class="mb-2">
-        <div v-if="props.label" class="text-input-label-text text-sm font-bold">
+        <div
+          v-if="props.label && $slots['label-append']"
+          class="text-input-label-text flex items-center gap-1 text-sm font-bold"
+        >
+          <span
+            >{{ props.label
+            }}<span v-if="props.required" class="text-input-error-text"> *</span></span
+          >
+          <slot name="label-append" />
+        </div>
+        <div v-else-if="props.label" class="text-input-label-text text-sm font-bold">
           {{ props.label }}<span v-if="props.required" class="text-input-error-text"> *</span>
         </div>
         <div v-if="props.description" class="text-xs">
           {{ props.description }}
         </div>
       </div>
+      <div v-if="$slots.above" class="mb-2"><slot name="above" /></div>
       <DateTime
         :key="renderKey"
         v-bind="$attrs"
@@ -103,6 +116,13 @@ const onDateChange = (field: any, dt: any) => {
         :default-relative-time="field.state.value?.period ?? '30m'"
         @on:date-change="(d: any) => onDateChange(field, d)"
       />
+      <p
+        v-if="props.showError && field.state.meta.errors.length > 0"
+        class="text-input-error-text mt-1 text-xs leading-snug"
+        :data-test="$attrs['data-test'] ? `${$attrs['data-test']}-error` : undefined"
+      >
+        {{ raw(firstFieldError(field.state.meta.errors)) }}
+      </p>
     </template>
   </component>
 </template>

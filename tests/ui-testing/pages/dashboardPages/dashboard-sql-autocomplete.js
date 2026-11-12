@@ -5,6 +5,7 @@
 // page.evaluate — they never touch the .suggest-widget DOM.
 
 const testLogger = require("../../playwright-tests/utils/test-logger.js");
+import { settlePanelLeave } from "./panel-leave-dialog.js";
 
 export default class DashboardSqlAutocomplete {
   constructor(page) {
@@ -240,20 +241,13 @@ export default class DashboardSqlAutocomplete {
       .catch(() => false);
     if (!visible) return;
 
-    // Discarding an EDITED panel fires a native confirm(). Playwright
-    // auto-DISMISSES dialogs unless a handler says otherwise, so the discard was
-    // being cancelled and the page stayed on /add_panel. Cleanup then sat waiting
-    // 20s for [data-test="dashboard-table"] — which only exists on the dashboards
-    // LIST — before the caller swallowed the timeout, so every test in this file
-    // silently leaked its dashboard (8 of them confirmed on alpha) and burned 20s
-    // doing it. Same handling as dashboard-panel-actions.js discardPanel().
+    // A panel with edits opens the in-app leave dialog; unanswered, the page stays on
+    // /add_panel and cleanup leaks the dashboard. Same handling as discardPanel().
     const dialogHandler = (dialog) => dialog.accept();
     this.page.on("dialog", dialogHandler);
     try {
       await this.discardPanelBtn.click();
-      await this.page.waitForURL((url) => !url.pathname.includes("add_panel"), {
-        timeout: 30000,
-      });
+      await settlePanelLeave(this.page);
     } finally {
       this.page.off("dialog", dialogHandler);
     }

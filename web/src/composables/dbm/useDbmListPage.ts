@@ -45,7 +45,9 @@ import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import { useDbmScopeSyncScope } from "@/composables/dbm/useDbmScopeSync";
 import { useDbmTabCountsContext, type DbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
 import type { BadgeCount, DbmTabCountKey } from "@/composables/dbm/useDbmTabCounts";
+import analytics from "@/services/product_analytics";
 import { claimedCount, dbmHttpError } from "@/utils/dbm/format";
+import { forbiddenState, licenseDeniedFeatures, type ForbiddenState } from "@/utils/featureGate";
 
 export interface DbmListPageOptions {
   /**
@@ -147,7 +149,7 @@ export function useDbmListPage(options: DbmListPageOptions) {
   const loading = ref(false);
   const error = ref<string | null>(null);
   // A 403 on a page without its own permission diagnosis: the table shows "no access", not the raw error.
-  const forbidden = ref(false);
+  const forbidden = ref<ForbiddenState>(false);
   const search = ref("");
 
   /**
@@ -204,10 +206,10 @@ export function useDbmListPage(options: DbmListPageOptions) {
       const { status, serverMessage, message } = dbmHttpError(err);
       if ((status === 404 || status === 501) && runOptions.onNotCollecting) {
         runOptions.onNotCollecting();
-      } else if (status === 403 && runOptions.onForbidden) {
+      } else if (status === 403 && runOptions.onForbidden && !licenseDeniedFeatures(err)) {
         runOptions.onForbidden();
       } else if (status === 403) {
-        forbidden.value = true;
+        forbidden.value = forbiddenState(err) || true;
       } else if (runOptions.onError) {
         runOptions.onError(serverMessage, err);
       } else {
@@ -246,7 +248,13 @@ export function useDbmListPage(options: DbmListPageOptions) {
     // Fetch only on a genuine pick — `onMounted` already loads, and the
     // picker's mount replay would otherwise double every request. See
     // `DbmDateChange.userChangedValue`.
-    if (value?.userChangedValue !== false) void options.load();
+    if (value?.userChangedValue !== false) {
+      void options.load();
+      analytics.track("dbm_time_range_changed", {
+        page: String(route.name ?? ""),
+        type: value?.relativeTimePeriod ? "relative" : "absolute",
+      });
+    }
   };
 
   onMounted(() => {

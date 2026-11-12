@@ -16,8 +16,7 @@
 //! Agent Signals Aggregator
 //!
 //! Self-ingests `AgentSignalRecord`s into the `_agent_signals` stream via the
-//! existing `IngestionRequest` gRPC path, mirroring
-//! `traces::service_graph::aggregator::write_sql_aggregated_edges`. The
+//! existing `IngestionRequest` gRPC path. The
 //! record→JSON transform (`records_to_json`) is a pure helper that lives in the
 //! enterprise crate; this OSS layer owns only the self-ingest I/O.
 
@@ -26,8 +25,7 @@ use config::meta::agent_signals::AgentSignalRecord;
 /// Write agent-signal records to the `_agent_signals` stream.
 ///
 /// Forwards to an ingester via gRPC using the internal token — no root
-/// credentials required. Mirrors
-/// `service_graph::aggregator::write_sql_aggregated_edges`.
+/// credentials required.
 #[cfg(feature = "enterprise")]
 pub async fn write_agent_signals(
     org_id: &str,

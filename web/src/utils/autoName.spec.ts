@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect } from "vitest";
-import { buildPanelAutoName, buildAlertAutoName } from "./autoName";
+import { buildPanelAutoName, buildAlertAutoName, NO_AUTO_NAME_TYPES } from "./autoName";
 
 /** Stand-in for vue-i18n's `t`, using the real en-US templates. */
 const templates: Record<string, string> = {
@@ -119,6 +119,10 @@ describe("buildPanelAutoName", () => {
     const markdown = panel({ stream: "", y: [] }, { type: "markdown" });
 
     expect(buildPanelAutoName(markdown, t)).toBe("");
+  });
+
+  it.each([...NO_AUTO_NAME_TYPES])("gives a %s panel no name, even with a stream", (type) => {
+    expect(buildPanelAutoName(panel({ y: [] }, { type }), t)).toBe("");
   });
 
   it("returns an empty name rather than throwing on an unbuilt panel", () => {

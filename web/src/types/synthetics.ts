@@ -652,6 +652,19 @@ export interface BrowserCheck {
   tz_offset?: number;
   start?: number; // microseconds, top-level — matches reports pattern
   browserDevices?: { browser: string; device: string }[];
+  /**
+   * Supported browser config fields the form has no control for. Loaded from the
+   * stored config and written back on edit so an unrelated edit cannot reset
+   * them to defaults. Explicit allowlist, never a spread of the stored config
+   * (which may hold secrets/headers). Absent on create: defaults apply there.
+   */
+  browserConfigExtras?: {
+    journey_budget_ms?: number;
+    test_id_attr?: string;
+    runtime?: string;
+    timeout_ms?: number;
+    video?: string;
+  };
   // Alert / retry settings (top-level in API payload)
   retries?: number;
   waitBeforeRetrySecs?: number;
@@ -660,6 +673,8 @@ export interface BrowserCheck {
   notifications: {
     destinations: string[];
   };
+  // Template override for this check's messages; null uses each destination's template.
+  template?: string | null;
   rum: { collect: boolean; sessionReplay: boolean };
   capture: {
     screenshot: "always" | "on-fail" | "off";

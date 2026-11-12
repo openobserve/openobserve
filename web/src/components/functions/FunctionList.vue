@@ -43,9 +43,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm"
           data-test="function-list-add-function-btn"
+          :aria-label="
+            functionDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('function.add') })
+              : undefined
+          "
           @click="showAddUpdateFn({})"
         >
           {{ t(`function.add`) }}
+          <EditorDraftDot
+            v-if="functionDrafts.hasNew"
+            :saved-at="functionDrafts.savedAt(null)"
+            corner
+            data-test="function-list-add-function-draft-dot"
+          />
         </OButton>
       </template>
       <div class="min-h-0 w-full flex-1 overflow-hidden">
@@ -58,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="name"
             :loading="loading"
             :forbidden="forbidden"
+            forbidden-resource="functions"
             pagination="client"
             :current-page="currentPage"
             @update:current-page="onPageChange"
@@ -109,11 +121,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-name="{ row, value }">
-              <span
-                class="text-text-body"
-                :data-test="`function-list-name-cell-${row?.name ?? value}`"
-                >{{ value }}</span
-              >
+              <span class="inline-flex items-center gap-2">
+                <span
+                  class="text-text-body"
+                  :data-test="`function-list-name-cell-${row?.name ?? value}`"
+                  >{{ value }}</span
+                >
+                <EditorDraftDot
+                  v-if="functionDrafts.ids.has(row?.name)"
+                  :saved-at="functionDrafts.savedAt(row?.name)"
+                  :data-test="`function-list-${row?.name}-draft-dot`"
+                />
+              </span>
             </template>
 
             <!-- Language of the transform. Its own column (sortable + hideable)
@@ -172,6 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
                     <OButton
+                      :aria-label="t('common.moreActions')"
                       icon-left="more-vert"
                       variant="ghost"
                       size="icon-xs-sq"
@@ -255,7 +275,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <ConfirmDialog
       :title="t('function.deleteTransformDialogTitle')"
-      :message="t('function.deleteTransformConfirmMessage')"
+      message-keypath="function.deleteTransformConfirmMessage"
+      :message-name="selectedDelete?.name"
+      ok-variant="destructive"
       @update:ok="deleteFn"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -264,6 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('function.deleteFunctionsDialogTitle')"
       :message="t('functions.confirmDeleteFunctions', { count: selectedFunctions.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteFunctions"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -281,11 +304,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <li
             v-for="(pipeline, index) in transformedPipelineList"
             :key="pipeline.value"
-            @click="onPipelineSelect(pipeline)"
-            class="hover:bg-muted/50 flex cursor-pointer items-center px-3 py-2"
+            :class="
+              pipelinesLocked
+                ? 'flex items-center gap-1.5 px-3 py-2'
+                : 'hover:bg-muted/50 flex cursor-pointer items-center px-3 py-2'
+            "
             :data-test="`function-list-pipeline-item-${pipeline.value}`"
+            @click="!pipelinesLocked && onPipelineSelect(pipeline)"
           >
             <span class="text-sm">{{ index + 1 }}. {{ pipeline.label }}</span>
+            <OTooltip v-if="pipelinesLocked" :content="pipelinesLockedReason">
+              <span
+                class="inline-flex"
+                :data-test="`function-list-pipeline-lock-${pipeline.value}`"
+              >
+                <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
+              </span>
+            </OTooltip>
           </li>
         </ul>
       </div>
@@ -316,6 +351,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -327,6 +364,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { downloadFile } from "@/utils/dom";
+import { forbiddenState } from "@/utils/featureGate";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import {
   bulkDeleteFunctionsMutation,
@@ -334,6 +372,10 @@ import {
   functionsQuery,
 } from "@/services/jstransform.queries";
 import { useOrgId } from "@/composables/query/useOrgId";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 export default defineComponent({
   name: "functionList",
@@ -346,11 +388,14 @@ export default defineComponent({
     ConfirmDialog,
     OButton,
     OBadge,
+    OIcon,
+    OTooltip,
     ODialog,
     ODropdown,
     ODropdownItem,
     OSearchInput,
     ORefreshButton,
+    EditorDraftDot,
   },
   emits: [
     "updated:fields",
@@ -362,6 +407,8 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18nTyped();
     const router = useRouter();
+    const { locked: pipelinesLocked, lockedReason: pipelinesLockedReason } =
+      useLicenseLock("pipelines");
     const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
     const selectedDelete: any = ref(null);
@@ -382,6 +429,11 @@ export default defineComponent({
     });
     const filterQuery = ref(viewState.filterQuery);
     const { track } = useReo();
+    const functionDrafts = useEditorDraftIds("function");
+    const dropFunctionDrafts = (names: string[]) => {
+      const org = store.state.selectedOrganization.identifier;
+      names.forEach((name) => deleteEditorDraftsFor({ kind: "function", org, entityId: name }));
+    };
     const columns: OTableColumnDef[] = [
       {
         id: "name",
@@ -451,7 +503,7 @@ export default defineComponent({
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = functions.error.value;
-      return e?.status === 403 || e?.response?.status === 403;
+      return forbiddenState(e) || e?.status === 403;
     });
     const fetching = functions.isFetching;
     // Epoch ms of the last successful read — drives the button's "1m ago" label.
@@ -594,7 +646,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: action,
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Functions",
       });
     };
@@ -624,10 +675,12 @@ export default defineComponent({
     const deleteFunction = useMutation(() => deleteFunctionMutation(orgId.value));
 
     const deleteFn = () => {
+      const name = selectedDelete.value.name;
       deleteFunction
-        .mutateAsync(selectedDelete.value.name)
+        .mutateAsync(name)
         .then((res: any) => {
           if (res.data.code == 200) {
+            dropFunctionDrafts([name]);
             toast({
               variant: "success",
               message: res.data.message,
@@ -667,7 +720,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Delete Function",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         function_name: selectedDelete.value.name,
         is_ingest_func: selectedDelete.value.ingest,
         page: "Functions",
@@ -857,6 +909,7 @@ export default defineComponent({
         // Handle response based on successful/unsuccessful arrays
         if (response.data) {
           const { successful = [], unsuccessful = [] } = response.data;
+          dropFunctionDrafts(successful.map(String));
           const successCount = successful.length;
           const failCount = unsuccessful.length;
 
@@ -886,6 +939,7 @@ export default defineComponent({
             });
           }
         } else {
+          dropFunctionDrafts(payload.ids);
           // Fallback success message
           toast({
             variant: "success",
@@ -905,7 +959,7 @@ export default defineComponent({
           error.response?.data?.message ||
           error?.message ||
           t("functions.bulkDeleteFunctionsFailed");
-        if (error.response?.status != 403 || error?.status != 403) {
+        if (error.response?.status !== 403 && error?.status !== 403) {
           toast({
             variant: "error",
             message: errorMessage,
@@ -950,6 +1004,7 @@ export default defineComponent({
       raw,
       store,
       router,
+      functionDrafts,
       jsTransforms,
       columns,
       formData,
@@ -978,6 +1033,8 @@ export default defineComponent({
       selectedPipeline,
       closeDialog,
       onPipelineSelect,
+      pipelinesLocked,
+      pipelinesLockedReason,
       transformedPipelineList,
       getAssociatedPipelines,
       filterQuery,

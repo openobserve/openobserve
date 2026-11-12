@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-globalVersion="{ row }">
-          <span class="tabular-nums">{{ versionLabel(row.globalVersion) }}</span>
+          <span class="tabular-nums">{{ versionLabel(row.writeVersion) }}</span>
         </template>
 
         <template #cell-updatedAt="{ row }">
@@ -168,6 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
+                  :aria-label="t('common.moreActions')"
                   icon-left="more-vert"
                   variant="ghost"
                   size="icon-xs-sq"
@@ -293,6 +294,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState } from "@/utils/featureGate";
 import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
@@ -347,7 +349,7 @@ const lastUpdatedAt = datasetsList.dataUpdatedAt;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = datasetsList.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+  return forbiddenState(e) || e?.status === 403;
 });
 const search = ref("");
 
@@ -408,9 +410,10 @@ const columns = computed<OTableColumnDef[]>(() => [
     meta: { align: "left" },
   },
   {
+    // The id predates write versions; persisted column preferences key on it.
     id: "globalVersion",
     header: t("aiObservability.datasets.columns.version"),
-    accessorKey: "globalVersion",
+    accessorKey: "writeVersion",
     hideable: true,
     sortable: true,
     size: 100,
@@ -447,7 +450,6 @@ async function refresh(force = true) {
     // refresh control. A plain mount passes false and keeps the cached rows.
     if (force) await datasetsList.refetch();
   } catch {
-    // The grouped access toast already reports a 403; a second red toast adds nothing.
     if (!forbidden.value) {
       toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
     }
@@ -513,9 +515,11 @@ async function save(values: DatasetForm) {
 async function removeDataset(row: LlmDataset) {
   const ok = await confirm({
     title: t("aiObservability.datasets.deleteTitle"),
-    message: t("aiObservability.datasets.deleteMessage", { name: row.name }),
+    messageKeypath: "aiObservability.datasets.deleteMessage",
+    messageName: row.name,
     confirmLabel: t("common.delete"),
     cancelLabel: t("common.cancel"),
+    confirmVariant: "destructive",
   });
   if (!ok) return;
   try {

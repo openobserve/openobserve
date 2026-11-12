@@ -15,11 +15,8 @@
 use axum::body::Bytes;
 use config::{
     get_config,
-    meta::{
-        self_reporting::usage::is_internal_rollup_stream,
-        stream::{StreamParams, StreamType},
-    },
-    utils::{json, schema::format_stream_name},
+    meta::{self_reporting::usage::is_internal_rollup_stream, stream::StreamType},
+    utils::json,
 };
 use hashbrown::HashMap;
 use infra::{
@@ -34,7 +31,6 @@ use serde::{Deserialize, Deserializer};
 use crate::{
     ingestion::check_ingestion_allowed,
     logs::ingest::{PrepareRecordError, prepare_record},
-    service::get_formatted_stream_name,
 };
 
 /// Cap on events in one request: each is held decoded and flattened in memory,
@@ -200,6 +196,9 @@ pub async fn preflight_streams(
         if let Some(reason) = stream_rejection(stream, user) {
             return Err(Error::IngestionError(reason));
         }
+        // the write loop rejects it too, but only after the groups before it are committed
+        schema::check_stream_key_len(org_id, StreamType::Logs, stream)
+            .map_err(|e| Error::IngestionError(e.to_string()))?;
         check_ingestion_allowed(org_id, StreamType::Logs, Some(stream)).await?;
     }
     // Every group at once, so a collector batch is refused before its first group is written.
@@ -481,23 +480,14 @@ fn parse_hec_time(value: &json::Value) -> std::result::Result<i64, HecParseError
     Ok(micros.round() as i64)
 }
 
-/// Resolve an index to the stream name the writer will actually use.
-///
-/// Note the branch reads inverted against its own name: `skip_formatting_stream_name`
-/// selects `get_formatted_stream_name`. This mirrors `logs::ingest::ingest` so the
-/// grouping key matches what is written.
+/// Resolve an index to the stream name the writer will actually use, so grouping matches it.
 async fn resolve_stream_name(
     org_id: &str,
     index: &str,
 ) -> std::result::Result<String, HecParseError> {
-    let cfg = get_config();
-    let name = if cfg.common.skip_formatting_stream_name {
-        get_formatted_stream_name(StreamParams::new(org_id, index, StreamType::Logs))
-            .await
-            .map_err(|e| HecParseError::InvalidFormat(e.to_string()))?
-    } else {
-        format_stream_name(index.to_string())
-    };
+    let name = super::ingest::resolve_stream_name(org_id, index)
+        .await
+        .map_err(|e| HecParseError::InvalidFormat(e.to_string()))?;
     if name.is_empty() {
         return Err(HecParseError::InvalidIndex);
     }
@@ -535,6 +525,34 @@ mod tests {
             ("group_two".to_string(), vec![good]),
         ];
         assert!(preflight_records("preflight_org", all_good).await.is_ok());
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn preflight_rejects_a_batch_holding_a_too_long_stream() {
+        let long_name = "h".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let streams = vec![
+            (
+                "hec_key_len_ok".to_string(),
+                vec![json::json!({"log": "a"})],
+            ),
+            (long_name.clone(), vec![json::json!({"log": "b"})]),
+        ];
+        let user = IngestUser::from_user_email("a@a.com");
+        let result = preflight_streams("preflight_org", &streams, &user).await;
+
+        let bounded =
+            infra::file_list::stream_key_violation("preflight_org", StreamType::Logs, &long_name)
+                .is_some();
+        if bounded {
+            assert!(
+                matches!(&result, Err(Error::IngestionError(msg)) if msg.contains("Stream name too long")),
+                "{result:?}"
+            );
+        } else {
+            assert!(result.is_ok(), "{result:?}");
+        }
     }
 
     #[tokio::test]

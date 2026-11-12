@@ -13,25 +13,41 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod decompression;
+pub mod middlewares;
+#[cfg(all(test, feature = "enterprise"))]
+mod one_ack_oncall_off_tests;
+#[cfg(all(test, feature = "enterprise"))]
+mod one_ack_tests;
+pub mod openapi;
+#[cfg(test)]
+mod openapi_coverage;
+#[cfg(test)]
+mod search_gate_tests;
+
 use std::time::Duration;
 
 use axum::{
     Router,
-    extract::{DefaultBodyLimit, FromRequestParts, Path, RawPathParams, Request},
+    extract::{DefaultBodyLimit, FromRequestParts, MatchedPath, Path, RawPathParams, Request},
     http::{Method, StatusCode, Uri, header, request::Parts},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
-    routing::{delete, get, patch, post, put},
+    routing::{any, delete, get, patch, post, put},
 };
-use config::get_config;
-use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
-use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
-#[cfg(feature = "profiling")]
+use common::meta::http::ERROR_HEADER;
+use config::{get_config, meta::feature::Feature};
+use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
+use openobserve_api_ingest::request::{clusters, datadog, logs, metrics, profiles, rum};
+#[cfg(feature = "cloud")]
+use openobserve_api_management::request::org_domains;
+#[cfg(feature = "cpu-profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
-    kv, metrics_usage, model_pricing, organization, query_history, rum_analytics, service_accounts,
-    short_url, slos, sourcemaps, status, status_pages, stream, synthetics, users,
+    alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
+    ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
+    query_history, rum_analytics, sample_data, security, service_accounts, service_streams,
+    short_url, slack, slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -50,16 +66,21 @@ use utoipa_swagger_ui::SwaggerUi;
 use {
     audit::audit,
     axum::body::{Body, to_bytes},
+    common::meta::http::HttpResponse as MetaHttpResponse,
     config::utils::time::now_micros,
-    o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, Protocol, ResponseMeta},
-        config::get_config as get_o2_config,
+    o2_enterprise::enterprise::{
+        common::{
+            auditor::{AuditMessage, AuditTarget, DelegatedAudit, Protocol, ResponseMeta},
+            config::get_config as get_o2_config,
+        },
+        fleet::opamp,
+        license::check_features,
     },
+    openobserve_api_common::auth::delegation::DelegatedCaller,
     openobserve_api_management::request::{
         ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
-        discovery, domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall,
-        playground, prompts, providers, remote_tasks, score_configs, scorers, service_streams,
-        workflows,
+        discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys, license, oncall,
+        playground, prompts, providers, quality, remote_tasks, score_configs, scorers, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -68,6 +89,8 @@ use {
 use super::request::mcp;
 #[cfg(feature = "enterprise")]
 use super::request::ratelimit;
+#[cfg(feature = "enterprise")]
+use crate::handler::http::router::middlewares::search_license_middleware;
 use crate::{
     common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
     handler::http::{
@@ -76,17 +99,15 @@ use crate::{
             validator_proxy_url, validator_rum,
         },
         router::middlewares::{
-            blocked_orgs_middleware, ingest_rejections_middleware, password_policy_middleware,
-            root_only_middleware,
+            blocked_org_param, blocked_orgs_middleware, ingest_rejections_middleware,
+            password_policy_middleware, root_only_middleware,
         },
     },
 };
 
-pub mod decompression;
-pub mod middlewares;
-pub mod openapi;
-
-use common::meta::http::ERROR_HEADER;
+/// How long a refused agent waits before reconnecting while fleet management is off.
+#[cfg(feature = "enterprise")]
+const FLEET_RETRY_AFTER_SECS: &str = "60";
 
 /// Create CORS layer for axum
 pub fn cors_layer() -> CorsLayer {
@@ -119,7 +140,12 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-parent-id"),
             header::HeaderName::from_static("x-openobserve-sampling-priority"),
             X_O2_ASSISTANT_SESSION_ID,
+            X_O2_ASSISTANT_TURN_ID,
+            // The public dashboard viewer polls conditionally.
+            header::IF_NONE_MATCH,
         ])
+        // Its validator, poll hint and clock source, unreadable cross-origin unless exposed.
+        .expose_headers([header::ETAG, header::RETRY_AFTER, header::DATE])
         // Restrict CORS to the configured web_url origin, plus any extra origins in
         // ZO_CORS_ALLOWED_ORIGINS (comma-separated).  mirror_request() + allow_credentials(true)
         // allows any origin to make credentialed requests — effectively disabling same-origin
@@ -256,21 +282,66 @@ fn attach_mcp_www_authenticate(_org_id: &str, resp: Response) -> Response {
     resp
 }
 
-/// Whether the router bound `{org_id}` to a segment other than the one the auth layers check.
-async fn routed_org_differs(parts: &mut Parts) -> bool {
+/// Rejects missing organizations and disagreements between routing and auth.
+async fn validate_routed_org(parts: &mut Parts) -> Result<(), AuthError> {
     let Ok(params) = RawPathParams::from_request_parts(parts, &()).await else {
-        return false;
+        return Ok(());
     };
     let Some((_, routed_org)) = params.iter().find(|(name, _)| *name == "org_id") else {
-        return false;
+        return Ok(());
     };
-    // The nest strip drops an empty `{org_id}` segment from the URI: nothing to compare.
+    // The nest strip drops an empty `{org_id}` segment from the URI, so auth checks the next one.
     if routed_org.is_empty() {
-        return false;
+        return Err(AuthError::NotFound("Organization not found".to_string()));
     }
     let path_columns: Vec<&str> = routed_path(parts.uri.path()).split('/').collect();
     // The router hands over the decoded param, so compare it with the decoded segment.
-    !urlencoding::decode(org_from_path(&path_columns)).is_ok_and(|org| org == routed_org)
+    if !urlencoding::decode(org_from_path(&path_columns)).is_ok_and(|org| org == routed_org) {
+        return Err(AuthError::Forbidden("Unauthorized Access".to_string()));
+    }
+    Ok(())
+}
+
+/// 403 naming the required features the license does not entitle.
+#[cfg(feature = "enterprise")]
+fn license_denial(required: &[Feature]) -> Option<Response> {
+    if check_features(required) {
+        return None;
+    }
+    let missing: Vec<&str> = required
+        .iter()
+        .filter(|f| !check_features(std::slice::from_ref(f)))
+        .map(|f| (*f).into())
+        .collect();
+    let err = infra::errors::ErrorCodes::LicenseFeatureNotEntitled(missing.join(", "));
+    Some(
+        (
+            StatusCode::FORBIDDEN,
+            axum::Json(MetaHttpResponse::error_code(err)),
+        )
+            .into_response(),
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn license_denial(_required: &[Feature]) -> Option<Response> {
+    None
+}
+
+/// Only a refused role learns what is locked; a failed credential must not read the license state.
+fn refusal_response(error: AuthError, denial: Option<Response>) -> Response {
+    match (error, denial) {
+        (AuthError::RoleRefused(_), Some(denied)) => denied,
+        (error, _) => error.into_response(),
+    }
+}
+
+/// The route template axum matched, which a caller cannot shape the way it shapes the path.
+pub(crate) fn matched_route(request: &Request) -> Option<String> {
+    request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(|route| route.as_str().to_owned())
 }
 
 /// Authentication middleware for API routes.
@@ -284,14 +355,15 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     // Extract auth info from request (synchronous now, no await)
     let (mut parts, body) = request.into_parts();
     let uri = req_data.uri.clone();
     // The auth layers check one org, so the handler must serve that same org.
-    if routed_org_differs(&mut parts).await {
-        return AuthError::Forbidden("Unauthorized Access".to_string()).into_response();
+    if let Err(error) = validate_routed_org(&mut parts).await {
+        return error.into_response();
     }
     let auth_info = match AuthExtractor::from_request_parts(&mut parts, &()).await {
         Ok(info) => info,
@@ -299,32 +371,56 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     };
 
     // Validate authentication using extracted data
-    match oo_validator(&req_data, &auth_info).await {
-        Ok(result) => {
-            // Insert user_id into request headers for downstream handlers
-            parts.headers.insert(
-                header::HeaderName::from_static("user_id"),
-                header::HeaderValue::from_str(&result.user_email)
-                    .unwrap_or_else(|_| header::HeaderValue::from_static("")),
-            );
-
-            // Handle Prometheus POST hack - add content-type if missing
-            if parts.method.eq(&Method::POST) && !parts.headers.contains_key(header::CONTENT_TYPE) {
-                parts.headers.insert(
-                    header::CONTENT_TYPE,
-                    header::HeaderValue::from_static("application/x-www-form-urlencoded"),
-                );
-            }
-
-            let mut response = next.run(Request::from_parts(parts, body)).await;
-            if let Some(token_name) = result.token_name {
-                response.extensions_mut().insert(
-                    openobserve_core::ingestion::rejections::RejectionTokenName(token_name),
-                );
-            }
-            response
+    let result = match oo_validator(&req_data, &auth_info).await {
+        Ok(result) => result,
+        Err(e) => {
+            let denial = auth_info.feature.and_then(license_denial);
+            return maybe_add_mcp_www_authenticate(&uri, refusal_response(e, denial));
         }
-        Err(e) => maybe_add_mcp_www_authenticate(&uri, e.into_response()),
+    };
+
+    // Outside oo_validator so the license gate holds with OpenFGA off and on bypass routes.
+    if let Some(denied) = auth_info.feature.and_then(license_denial) {
+        return denied;
+    }
+
+    // Insert user_id into request headers for downstream handlers
+    parts.headers.insert(
+        header::HeaderName::from_static("user_id"),
+        header::HeaderValue::from_str(&result.user_email)
+            .unwrap_or_else(|_| header::HeaderValue::from_static("")),
+    );
+
+    // Handle Prometheus POST hack - add content-type if missing
+    if parts.method.eq(&Method::POST) && !parts.headers.contains_key(header::CONTENT_TYPE) {
+        parts.headers.insert(
+            header::CONTENT_TYPE,
+            header::HeaderValue::from_static("application/x-www-form-urlencoded"),
+        );
+    }
+
+    if let Some(caller) = result.delegation {
+        parts.extensions.insert(caller);
+    }
+
+    let mut response = next.run(Request::from_parts(parts, body)).await;
+    if let Some(token_name) = result.token_name {
+        response.extensions_mut().insert(
+            openobserve_core::ingestion::rejections::RejectionTokenName(token_name),
+        );
+    }
+    response
+}
+
+/// License gate for routes that authenticate outside `auth_middleware`; layer it inside the auth.
+pub async fn require_features(
+    required: &'static [Feature],
+    request: Request,
+    next: Next,
+) -> Response {
+    match license_denial(required) {
+        Some(denied) => denied,
+        None => next.run(request).await,
     }
 }
 
@@ -335,6 +431,7 @@ pub async fn aws_auth_middleware(mut request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     match validator_aws(&req_data).await {
@@ -357,6 +454,7 @@ pub async fn gcp_auth_middleware(mut request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     match validator_gcp(&req_data).await {
@@ -379,6 +477,7 @@ pub async fn rum_auth_middleware(mut request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     match validator_rum(&req_data).await {
@@ -401,6 +500,7 @@ pub async fn proxy_auth_middleware(request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     let (mut parts, body) = request.into_parts();
@@ -435,6 +535,13 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
     if method == Method::PUT && segments.ends_with(&["prompts", "settings", "secret"]) {
         return true;
     }
+    // Sample data for an endpoint test is often a pasted real call, credentials included.
+    if method == Method::POST && segments.ends_with(&["http_trigger", "test"]) {
+        return true;
+    }
+    if let Some(slack) = slack_path(&segments) {
+        return is_slack_secret_write(method, slack);
+    }
     let Some(tasks) = segments.iter().position(|segment| *segment == "tasks") else {
         return false;
     };
@@ -445,12 +552,82 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
             .any(|segment| matches!(*segment, "auth" | "headers" | "signing"))
 }
 
+/// The segments after `{org}/slack/`: the audit layer runs below `/api` and the base URI.
+#[cfg(any(feature = "enterprise", test))]
+fn slack_path<'a>(segments: &'a [&'a str]) -> Option<&'a [&'a str]> {
+    let segments = match segments {
+        ["api", rest @ ..] if rest.get(1) == Some(&"slack") => rest,
+        _ => segments,
+    };
+    (segments.get(1) == Some(&"slack")).then(|| &segments[2..])
+}
+
+/// Slack bodies that carry an OAuth code, a connect ticket or app credentials.
+#[cfg(any(feature = "enterprise", test))]
+fn is_slack_secret_write(method: &Method, slack: &[&str]) -> bool {
+    matches!(
+        (method, slack),
+        (
+            &Method::POST,
+            ["install", "exchange"]
+                | ["installations"]
+                | ["connection", "confirm"]
+                | ["link-requests", "confirm"]
+                | ["installations", _, "connection"]
+        ) | (&Method::PUT, ["installations", _, "credentials"])
+    )
+}
+
+/// The path as `audit_middleware` sees it, already below `/api` and the base URI.
+#[cfg(any(feature = "enterprise", test))]
+fn audited_path(uri: &Uri) -> String {
+    let path = uri.path();
+    path.strip_prefix('/').unwrap_or(path).to_string()
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn audit_org_and_next<'a>(path_columns: &[&'a str]) -> (&'a str, &'a str) {
+    let org = org_from_path(path_columns);
+    // Pointer equality finds the org's own slot even when an earlier segment has the same text.
+    let next = path_columns
+        .iter()
+        .position(|column| std::ptr::eq(*column, org))
+        .and_then(|at| path_columns.get(at + 1))
+        .copied()
+        .unwrap_or("");
+    (org, next)
+}
+
+/// A delegated `/ai/chat` is audited like a Slack `chat_stream` turn: no question text.
+#[cfg(feature = "enterprise")]
+fn delegated_chat_audit_body(
+    method: &Method,
+    path: &str,
+    delegated: bool,
+    slack_event: Option<&str>,
+    body: &[u8],
+) -> Option<String> {
+    let is_chat = method == Method::POST && path.split('/').skip(1).eq(["ai", "chat"]);
+    (delegated && is_chat).then(|| {
+        openobserve_api_management::request::ai::chat::slack_audit_body(
+            serde_json::from_slice(body).unwrap_or_default(),
+            slack_event,
+        )
+    })
+}
+
 /// The request body as the audit trail may store it.
 #[cfg(any(feature = "enterprise", test))]
 fn audit_body(method: &Method, path: &str, content_type: Option<&str>, body: Vec<u8>) -> String {
     use base64::Engine as _;
     if is_secret_write(method, path) {
         return "[REDACTED: secret write]".to_string();
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(body) =
+        o2_enterprise::enterprise::fleet::audit::redact_config_write(method, path, &body)
+    {
+        return body;
     }
     if path.ends_with("/settings/logo") {
         return base64::engine::general_purpose::STANDARD.encode(&body);
@@ -532,39 +709,41 @@ fn is_secret_field(name: &str) -> bool {
             .any(|word| name.contains(word))
 }
 
+/// A fleet change is published at once, so the Audit tab shows it before the periodic publish.
+#[cfg(feature = "enterprise")]
+fn fleet_mutation(method: &Method, path: &str) -> bool {
+    if matches!(*method, Method::GET | Method::HEAD | Method::OPTIONS) {
+        return false;
+    }
+    let segments: Vec<&str> = path.split('/').collect();
+    let org_at = usize::from(segments.first() == Some(&"api"));
+    let module = segments.get(org_at + 1).copied();
+    module == Some("fleet") || (segments.get(org_at) == Some(&"v2") && module == Some("fleets"))
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let http_method = request.method().clone();
     let method = http_method.to_string();
-    let path = request.uri().path();
-    let path = path.strip_prefix("/").unwrap_or(path).to_string();
+    let path = audited_path(request.uri());
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
-    let ingestion_path = if path.starts_with("api/") {
-        path.split_once("api/")
-            .map(|(_, rest)| rest)
-            .unwrap_or(&path)
-    } else {
-        &path
-    };
+    let (audit_org, after_org) = audit_org_and_next(&path_columns);
 
     if get_o2_config().common.audit_enabled
-        && !(path_columns
-            .get(1)
-            .unwrap_or(&"")
-            .to_string()
-            .ends_with("_stream")
+        && !(after_org.ends_with("_stream")
             || path.ends_with("ai/chat_stream")
-            || common::meta::ingestion_routes::is_ingestion_write(&http_method, ingestion_path))
+            || common::meta::ingestion_routes::is_ingestion_write(
+                &http_method,
+                &path,
+                matched_route(&request).as_deref(),
+            ))
     {
         let query_params = request.uri().query().unwrap_or("").to_string();
-        let org_id = {
-            let org = path_columns.first().unwrap_or(&"");
-            if org.eq(&"organizations") {
-                "".to_string()
-            } else {
-                org.to_string()
-            }
+        let org_id = if audit_org == "organizations" {
+            String::new()
+        } else {
+            audit_org.to_string()
         };
 
         let user_email = request
@@ -579,6 +758,20 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             .get(header::CONTENT_TYPE)
             .and_then(|v| v.to_str().ok())
             .map(str::to_string);
+        let slack_event = request
+            .headers()
+            .get(openobserve_api_management::request::ai::chat::SLACK_EVENT_HEADER)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
+
+        let delegated =
+            request
+                .extensions()
+                .get::<DelegatedCaller>()
+                .map(|caller| DelegatedAudit {
+                    link_id: caller.link_id.clone(),
+                    jti: caller.jti.clone(),
+                });
 
         // Extract body
         let (parts, body) = request.into_parts();
@@ -594,7 +787,8 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         let request = axum::http::Request::from_parts(parts, Body::from(bytes));
 
         // Call next
-        let mut response = next.run(request).await;
+        let (mut response, touched_security) =
+            o2_enterprise::enterprise::security::audit::tracked(next.run(request)).await;
 
         let error_msg = response
             .headers()
@@ -604,15 +798,32 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
 
         // ERROR_HEADER is an internal detail channel for the auditor and must never reach a client.
         response.headers_mut().remove(ERROR_HEADER);
+        let named = response.extensions_mut().remove::<AuditTarget>();
 
         if response.status().is_success() || response.status().is_redirection() {
-            let body = audit_body(&http_method, &path, content_type.as_deref(), request_body);
+            let slack_chat = delegated_chat_audit_body(
+                &http_method,
+                &path,
+                delegated.is_some(),
+                slack_event.as_deref(),
+                &request_body,
+            );
+            let protocol = if slack_chat.is_some() {
+                Protocol::Slack
+            } else {
+                Protocol::Http
+            };
+            let body = slack_chat.unwrap_or_else(|| {
+                audit_body(&http_method, &path, content_type.as_deref(), request_body)
+            });
 
             audit(AuditMessage {
+                login_ip: None,
+                user_agent: None,
                 user_email,
                 org_id,
                 _timestamp: now_micros(),
-                protocol: Protocol::Http,
+                protocol,
                 response_meta: ResponseMeta {
                     http_method: method,
                     http_path: config::axum::middlewares::mask_share_tokens(&path),
@@ -622,8 +833,18 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                     error_msg,
                     trace_id: None,
                 },
+                delegated,
+                fleet_id: named.as_ref().and_then(|n| n.fleet_id.clone()),
+                target: named.map(|n| n.target).or_else(|| {
+                    touched_security.then(|| {
+                        o2_enterprise::enterprise::security::audit::SECURITY_TARGET.to_string()
+                    })
+                }),
             })
             .await;
+            if fleet_mutation(&http_method, &path) {
+                tokio::spawn(audit::flush());
+            }
         }
         response
     } else {
@@ -702,6 +923,53 @@ pub async fn proxy(Path(params): Path<PathParamProxyURL>) -> impl IntoResponse {
 }
 
 /// Create proxy routes
+/// Public dashboard links admin CRUD; handlers 404 when the feature is off.
+fn public_dashboard_admin_routes(router: Router) -> Router {
+    router
+        .route(
+            "/{org_id}/public_dashboards",
+            get(public_dashboards::admin::list_org),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links",
+            get(public_dashboards::admin::list).post(public_dashboards::admin::create),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}",
+            get(public_dashboards::admin::get)
+                .put(public_dashboards::admin::update)
+                .delete(public_dashboards::admin::delete),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/pause",
+            post(public_dashboards::admin::pause),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/resume",
+            post(public_dashboards::admin::resume),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/take_over",
+            post(public_dashboards::admin::take_over),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/refresh",
+            post(public_dashboards::admin::refresh),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/status",
+            get(public_dashboards::status::link),
+        )
+        .route(
+            "/{org_id}/public_dashboards/status",
+            get(public_dashboards::status::batch),
+        )
+        .route(
+            "/{org_id}/settings/public_dashboards",
+            get(public_dashboards::settings::get).put(public_dashboards::settings::put),
+        )
+}
+
 pub fn proxy_routes(enable_auth: bool) -> Router {
     let mut router = Router::new().route("/proxy/{org_id}/{*target_url}", get(proxy));
 
@@ -760,9 +1028,7 @@ pub fn basic_routes() -> Router {
     // Auth routes (no authentication required)
     let auth_routes = Router::new()
         .route("/login", post(users::authentication).get(users::get_auth))
-        .route("/presigned-url", get(users::get_presigned_url))
-        .route("/invites", get(users::list_invitations))
-        .route("/invites/{token}", delete(users::decline_invitation));
+        .route("/presigned-url", get(users::get_presigned_url));
     router = router.nest("/auth", auth_routes);
 
     let node_routes = node_routes()
@@ -773,12 +1039,14 @@ pub fn basic_routes() -> Router {
     router = router.nest("/node", node_routes);
 
     // Debug/profiling routes with auth
-    #[cfg(feature = "profiling")]
+    #[cfg(feature = "cpu-profiling")]
     {
-        let debug_routes = Router::new()
+        let debug_routes = Router::new().route("/profile/cpu", get(profiling::cpu_profile));
+        #[cfg(feature = "profiling")]
+        let debug_routes = debug_routes
             .route("/profile/memory", get(profiling::memory_profile))
-            .route("/profile/stats", get(profiling::jemalloc_stats))
-            .route("/profile/cpu", get(profiling::cpu_profile))
+            .route("/profile/stats", get(profiling::jemalloc_stats));
+        let debug_routes = debug_routes
             .layer(middleware::from_fn(password_policy_middleware))
             .layer(middleware::from_fn(auth_middleware));
 
@@ -803,6 +1071,7 @@ pub fn basic_routes() -> Router {
     );
 
     // Static `/api/v2`: a param beside the router's `/api/{*path}` panics axum at startup.
+    // Registered on the operator's flag, not the license's, so a new license needs no restart.
     #[cfg(feature = "enterprise")]
     if get_o2_config().oncall.enabled {
         // Unauthenticated HMAC link; GET only renders, so a gateway prefetch cannot ack a page.
@@ -824,22 +1093,52 @@ pub fn basic_routes() -> Router {
     router = router
         .route(
             "/api/v2/{org_id}/incidents/events",
-            post(alerts::external_events::ingest_events),
+            post(alerts::external_events::ingest_events).route_layer(middleware::from_fn(
+                |req, next| require_features(&[Feature::Incidents], req, next),
+            )),
         )
         .route(
             "/api/v2/{org_id}/incidents/events/{token}",
-            post(alerts::external_events::ingest_events_url_token),
+            post(alerts::external_events::ingest_events_url_token).route_layer(
+                middleware::from_fn(|req, next| require_features(&[Feature::Incidents], req, next)),
+            ),
         )
         .route_layer(DefaultBodyLimit::max(
             alerts::external_events::MAX_BODY_BYTES,
         ));
+
+    // Merged after the route_layer above, so the incident body limit does not wrap these routes.
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().common.workflows_enabled
+        && openobserve_core::workflows::http_trigger::hooks_enabled()
+    {
+        router = router.merge(workflow_hook_routes());
+    }
+
+    // Slack signs these requests; ENT verifies the signature, so they stay out of auth_middleware.
+    router = router
+        .route(
+            "/api/slack/events",
+            post(slack::inbound::events)
+                .layer(DefaultBodyLimit::max(slack::inbound::MAX_BODY_BYTES)),
+        )
+        .route(
+            "/api/slack/commands",
+            post(slack::inbound::commands)
+                .layer(DefaultBodyLimit::max(slack::inbound::MAX_BODY_BYTES)),
+        )
+        .route(
+            "/api/slack/interactions",
+            post(slack::inbound::interactions)
+                .layer(DefaultBodyLimit::max(slack::inbound::MAX_BODY_BYTES)),
+        );
 
     // Public status pages — unauthenticated by design, like chart_render
     // above: existence and visibility are checked inside the handler, and the
     // handlers are pure meta-store point-reads (no search, storage, or
     // cross-node calls on this plane).
     if get_config().synthetics.enabled {
-        router = router
+        let public = Router::new()
             .route(
                 "/api/status_pages_public/{slug}",
                 get(status_pages::public::snapshot),
@@ -858,7 +1157,28 @@ pub fn basic_routes() -> Router {
                 "/api/status_pages_public/{slug}/feed.xml",
                 get(status_pages::public::feed),
             )
-            .route("/status/{slug}", get(status_pages::public::page));
+            .route("/status/{slug}", get(status_pages::public::page))
+            .route_layer(middleware::from_fn(|req, next| {
+                require_features(&[Feature::Synthetics], req, next)
+            }));
+        router = router.merge(public);
+    }
+
+    // Not on routers: they have no result files, so these paths fall to the slug-keyed proxy.
+    if !config::cluster::LOCAL_NODE.is_router() {
+        let public = Router::new()
+            .route(
+                "/api/public_dashboards/{slug}",
+                get(public_dashboards::public::config),
+            )
+            .route(
+                "/api/public_dashboards/{slug}/data",
+                get(public_dashboards::public::data),
+            )
+            .route_layer(middleware::from_fn(|req, next| {
+                require_features(&[Feature::Dashboards], req, next)
+            }));
+        router = router.merge(public);
     }
 
     // Unauthenticated like status pages: the share token is checked in the handler.
@@ -866,11 +1186,32 @@ pub fn basic_routes() -> Router {
     if get_config().public_ai_chat.enabled {
         router = router.route(
             "/api/public/ai_chats/{token}",
-            get(openobserve_api_management::request::ai::shares::get_public),
+            get(openobserve_api_management::request::ai::shares::get_public).route_layer(
+                middleware::from_fn(|req, next| {
+                    require_features(&[Feature::AiAssistant], req, next)
+                }),
+            ),
         );
     }
 
     router
+}
+
+/// Public workflow hooks; the handler reads the body itself, this limit is only defence in depth.
+#[cfg(feature = "enterprise")]
+fn workflow_hook_routes() -> Router {
+    Router::new()
+        .route(
+            "/api/v2/{org_id}/workflows/hooks/{trigger_id}",
+            post(workflows::hooks::invoke),
+        )
+        .route(
+            "/api/v2/{org_id}/workflows/hooks/{trigger_id}/runs/{run_id}",
+            get(workflows::hooks::run_status),
+        )
+        .layer(DefaultBodyLimit::max(
+            openobserve_core::workflows::http_trigger::HARD_BODY_CAP,
+        ))
 }
 
 /// Create config routes. `/` is served WITHOUT auth (the login page bootstraps
@@ -952,21 +1293,15 @@ fn alert_calibration_routes(router: Router) -> Router {
         .route("/v2/{org_id}/alert_calibration/digests/run", post(alert_calibration::digests::run_alert_calibration))
 }
 
-pub fn service_routes() -> Router {
-    let cfg = get_config();
-
-    // Set server header
-    #[cfg(feature = "enterprise")]
-    let server = format!(
-        "{}-{}",
-        get_o2_config().super_cluster.region,
-        cfg.common.instance_name_short
-    );
-    #[cfg(not(feature = "enterprise"))]
-    let server = cfg.common.instance_name_short.to_string();
-
-    // Downtimes live in their own table to keep this function under the line limit.
-    let mut router = Router::new().merge(downtime_routes());
+#[rustfmt::skip]
+fn service_route_table() -> Router {
+    // Downtimes, Slack, search and service streams live in their own tables to keep this function under the line limit.
+    let mut router = Router::new()
+        .merge(downtime_routes())
+        .merge(slack_routes())
+        .merge(search_routes());
+    router = public_dashboard_admin_routes(router);
+    router = router.merge(service_streams_routes());
     // Full UI configuration — authenticated counterpart of the unauthenticated
     // `/config` bootstrap in config_routes()
     router = router.route("/{org_id}/config", get(status::zo_config));
@@ -1003,6 +1338,7 @@ pub fn service_routes() -> Router {
         .route("/organizations", get(organization::org::organizations).post(organization::org::create_org))
         .route("/{org_id}/organizations/assume_service_account", post(organization::assume_service_account::assume_service_account))
         .route("/{org_id}/org_cleanup_tasks/{target_org_id}", get(organization::org::list_org_cleanup_tasks))
+        .route("/{org_id}/org_cleanup_tasks/{target_org_id}/retry", post(organization::org::retry_org_cleanup))
         .route(
             "/{org_id}/organizations/{target_org_id}/resurrect",
             post(organization::org::resurrect_org_deletion),
@@ -1021,8 +1357,11 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/announcements", get(announcements::get_announcements))
         .route("/{org_id}/announcements/config", get(announcements::get_announcements_config).put(announcements::set_announcements_config))
 
+        .route("/{org_id}/security/access", get(security::get_security_access))
+
         // Org info
         .route("/{org_id}/summary", get(organization::org::org_summary))
+        .route("/{org_id}/overview", get(organization::org::org_overview))
         .route("/{org_id}/ingest/recent_rejections", get(ingest_rejections::recent_rejections))
         .route("/{org_id}/passcode", get(organization::org::get_user_passcode).put(organization::org::update_user_passcode))
         .route("/{org_id}/rumtoken", get(organization::org::get_user_rumtoken).post(organization::org::create_user_rumtoken).put(organization::org::update_user_rumtoken))
@@ -1046,6 +1385,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/streams/{stream_name}/data_by_time_range", delete(stream::delete_stream_data_by_time_range))
         .route("/{org_id}/streams/{stream_name}/data_by_time_range/status/{id}", get(stream::get_delete_stream_data_status))
         .route("/{org_id}/metrics/{metric_name}/usage", get(metrics_usage::get_metric_usage))
+        .route("/{org_id}/metrics/usage", get(metrics_usage::get_org_metric_usage))
 
         // Logs ingestion
         .route("/{org_id}/_bulk", post(logs::ingest::bulk))
@@ -1070,7 +1410,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/traces/session/details", get(traces::session::get_session_details))
         .route("/{org_id}/{stream_name}/traces/user", get(traces::user::get_latest_users))
         .route("/{org_id}/{stream_name}/traces/time_range", get(traces::time_index::get_trace_time_range))
-        .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
         // Profiles query (ingest remains under /v1/profiles)
@@ -1078,49 +1417,18 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/profiles/tag_values", get(profiles_query::get_profiles_tag_values))
         .route("/{org_id}/{stream_name}/profiles/series", get(profiles_query::profiles_series_get).post(profiles_query::profiles_series))
         .route("/{org_id}/{stream_name}/profiles/merge", get(profiles_query::merge_profiles_get).post(profiles_query::merge_profiles))
-
-        // Database Monitoring — its own top-level module, not under /traces.
-        // The path segment must stay `db_monitoring` to match the OFGA resource
-        // these routes authorize against (`db_monitoring:{org}`, see o2_openfga
-        // ROUTE_PERMISSIONS).
-        //
-        // Every route below is registered in both builds; the build-type gate
-        // lives in the handlers, three of which (deadlocks/blocking/
-        // table_health) are dual-implemented and answer 403 on OSS. Registering
-        // them in the enterprise-gated block instead would 404 them, losing the
-        // distinction between "not licensed" and "no such endpoint". Runtime
-        // off-switch is ZO_DB_MONITORING_ENABLED.
-        .route("/{org_id}/db_monitoring/databases", get(db_monitoring::handler::get_dbm_databases))
-        .route("/{org_id}/db_monitoring/queries", get(db_monitoring::handler::get_dbm_queries))
-        .route("/{org_id}/db_monitoring/query/history", get(db_monitoring::handler::get_dbm_query_history))
-        .route("/{org_id}/db_monitoring/query/endpoints", get(db_monitoring::handler::get_dbm_query_endpoints))
-        .route("/{org_id}/db_monitoring/samples", get(db_monitoring::handler::get_dbm_samples))
-        // Server-vantage events (read the canonical o2_dbm_* columns)
-        .route("/{org_id}/db_monitoring/deadlocks", get(db_monitoring::handler::get_dbm_deadlocks))
-        .route("/{org_id}/db_monitoring/blocking", get(db_monitoring::handler::get_dbm_blocking))
-        .route("/{org_id}/db_monitoring/activity", get(db_monitoring::handler::get_dbm_activity))
-        // `query/insights` returns the query-detail page's Logs-side pair in one
-        // round trip; `query/plans` and `query/server_metrics` are superseded by
-        // it (same sections, same envelopes) and stay registered for
-        // compatibility.
-        .route("/{org_id}/db_monitoring/query/insights", get(db_monitoring::handler::get_dbm_query_insights))
-        .route("/{org_id}/db_monitoring/query/plans", get(db_monitoring::handler::get_dbm_query_plans))
-        .route("/{org_id}/db_monitoring/query/server_metrics", get(db_monitoring::handler::get_dbm_query_server_metrics))
-        .route("/{org_id}/db_monitoring/server_queries", get(db_monitoring::handler::get_dbm_server_queries))
-        .route("/{org_id}/db_monitoring/server_samples", get(db_monitoring::handler::get_dbm_server_samples))
-        .route("/{org_id}/db_monitoring/table_health", get(db_monitoring::handler::get_dbm_table_health))
-        .route("/{org_id}/db_monitoring/instances", get(db_monitoring::handler::get_dbm_instances))
-        .route(
-            "/{org_id}/db_monitoring/instance_metrics",
-            get(db_monitoring::handler::get_dbm_instance_metrics),
-        )
-        .route("/{org_id}/db_monitoring/badges", get(db_monitoring::handler::get_dbm_badges))
+        .route("/{org_id}/{stream_name}/profiles/diff", post(profiles_query::diff_profiles))
 
         // LLM Model Pricing
         .route("/{org_id}/llm/models", get(model_pricing::list).post(model_pricing::create))
         // NOTE: named routes MUST be registered before {model_id} or they match as a model ID
         .route("/{org_id}/llm/models/built-in", get(model_pricing::get_built_in))
         .route("/{org_id}/llm/models/refresh-built-in", post(model_pricing::refresh_built_in))
+        .route("/{org_id}/llm/models/unpriced", get(model_pricing::list_unpriced))
+        // AI data health checks (LLM Insights strip, instrument skill)
+        .route("/{org_id}/gen_ai/data_health", get(gen_ai_health::get_data_health))
+        // Harness text hidden server side for Session Detail and the settings test
+        .route("/{org_id}/settings/gen_ai/harness_strip", post(openobserve_api_management::request::gen_ai::strip_harness_text))
         .route("/{org_id}/llm/models/test", post(model_pricing::test_model_match))
         .route("/{org_id}/llm/models/{model_id}", get(model_pricing::get).put(model_pricing::update).delete(model_pricing::delete))
 
@@ -1135,7 +1443,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/prometheus/api/v1/metadata", get(promql::metadata))
         .route("/{org_id}/prometheus/api/v1/series", get(promql::series_get).post(promql::series_post))
         .route("/{org_id}/prometheus/api/v1/labels", get(promql::labels_get).post(promql::labels_post))
-        .route("/{org_id}/prometheus/api/v1/label/{label_name}/values", get(promql::label_values))
         .route("/{org_id}/prometheus/api/v1/format_query", get(promql::format_query_get).post(promql::format_query_post))
         .route("/{org_id}/prometheus/api/v1/parse_tree", post(promql::parse_tree))
 
@@ -1148,12 +1455,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/_search_history", post(search::search_history))
         .route("/{org_id}/result_schema", post(search::result_schema))
 
-        // Multi-stream search
-        .route("/{org_id}/_search_multi", post(search::multi_streams::search_multi))
-        .route("/{org_id}/_search_multi_stream", post(search::multi_streams::search_multi_stream))
-        .route("/{org_id}/_search_partition_multi", post(search::multi_streams::_search_partition_multi))
-        .route("/{org_id}/{stream_names}/_around_multi", get(search::multi_streams::around_multi))
-
         // HTTP/2 streaming
         .route("/{org_id}/_search_stream", post(search::search_stream::search_http2_stream))
         .route("/{org_id}/_values_stream", post(search::search_stream::values_http2_stream))
@@ -1162,7 +1463,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/savedviews", get(search::saved_view::get_views).post(search::saved_view::create_view))
         .route("/{org_id}/savedviews/{view_id}", get(search::saved_view::get_view).put(search::saved_view::update_view).delete(search::saved_view::delete_view))
 
-        .route("/{org_id}/query_history", get(query_history::list).post(query_history::record).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
+        .route("/{org_id}/query_history", get(query_history::list).post(query_history::record).delete(query_history::clear).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
         .route("/{org_id}/query_history/{id}", patch(query_history::star).delete(query_history::delete).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
 
         // Functions
@@ -1211,6 +1512,9 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/folders/{folder_type}/{folder_id}", get(folders::get_folder).put(folders::update_folder).delete(folders::delete_folder))
         .route("/v2/{org_id}/folders/{folder_type}/name/{folder_name}", get(folders::get_folder_by_name))
 
+        // Sample data
+        .route("/{org_id}/sample_data", get(sample_data::get).put(sample_data::put).delete(sample_data::delete))
+
         // Alerts (v2)
         .route("/v2/{org_id}/alerts", get(alerts::list_alerts).post(alerts::create_alert))
         .route("/v2/{org_id}/alerts/composites/validate", post(alerts::validate_composite_alert))
@@ -1225,15 +1529,25 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/{alert_id}/export", post(alerts::export_alert))
         .route("/v2/{org_id}/alerts/bulk", delete(alerts::delete_alert_bulk))
         .route("/v2/{org_id}/alerts/{alert_id}/enable", patch(alerts::enable_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/ack", post(alerts::ack::ack_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/unack", post(alerts::ack::unack_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/acks", get(alerts::ack::list_alert_acks))
+        .route("/v2/{org_id}/alerts/{alert_id}/mute", post(alerts::mute::mute_alert))
+        .route(
+            "/v2/{org_id}/alerts/{alert_id}/mute/{downtime_id}/extend",
+            post(alerts::mute::extend_alert_mute),
+        )
+        .route(
+            "/v2/{org_id}/alerts/{alert_id}/mute/{downtime_id}/cancel",
+            post(alerts::mute::cancel_alert_mute),
+        )
         .route("/v2/{org_id}/alerts/bulk/enable", post(alerts::enable_alert_bulk))
-        .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
-        .route("/v2/{org_id}/alerts/{alert_id}/retrain", patch(alerts::retrain_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/clone", post(alerts::clone_alert))
         .route("/v2/{org_id}/alerts/generate_sql", post(alerts::generate_sql))
         .route("/v2/{org_id}/alerts/move", patch(alerts::move_alerts))
         .route("/v2/{org_id}/alerts/tags", get(alerts::list_alert_tags))
         .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
-        .route("/v2/{org_id}/alerts/dedup/summary", get(alerts::dedup_stats::get_dedup_summary))
+        .route("/v2/{org_id}/alerts/auto_investigate/decisions", get(alerts::auto_investigate::list_auto_investigate_decisions))
 
         // Alerts - incidents must be before alerts to avoid route conflicts
         .route("/v2/{org_id}/alerts/incidents", get(alerts::incidents::list_incidents))
@@ -1241,8 +1555,17 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/external-alerts/{external_alert_id}/payload", get(alerts::incidents::get_external_alert_payload))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca).delete(alerts::incidents::cancel_incident_rca))
-        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/history", get(alerts::incidents::get_incident_rca_history))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs", get(alerts::incidents::list_incident_rca_runs))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/live_stream", get(alerts::incidents::get_incident_rca_live_stream))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}", get(alerts::incidents::get_incident_rca_run))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/thread", get(alerts::incidents::get_incident_rca_thread))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steer", post(alerts::incidents::steer_incident_rca_run))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steering", get(alerts::incidents::get_incident_rca_steering))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume", post(alerts::incidents::resume_incident_rca_run))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/summary", get(alerts::incidents::get_incident_rca_summary))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/acknowledge", post(alerts::ack::ack_incident))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/unacknowledge", post(alerts::ack::unack_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events", get(alerts::incidents::get_incident_events))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events/comment", post(alerts::incidents::post_incident_comment))
         .route("/v2/{org_id}/incidents/integrations", get(alerts::incident_integrations::list_integrations).post(alerts::incident_integrations::create_integration))
@@ -1266,17 +1589,51 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/alerts/destinations/prebuilt", get(alerts::destinations::list_prebuilt_destinations))
         .route("/{org_id}/alerts/destinations/{destination_name}", get(alerts::destinations::get_destination).put(alerts::destinations::update_destination).delete(alerts::destinations::delete_destination))
         .route("/{org_id}/alerts/destinations/test", post(alerts::destinations::test_destination))
+        .route("/{org_id}/alerts/destinations/jira/setup", post(alerts::destinations::jira_setup))
         .route("/{org_id}/alerts/destinations/{destination_name}/test_send", post(alerts::destinations::test_send))
         .route("/{org_id}/alerts/destinations/bulk", delete(alerts::destinations::delete_destination_bulk))
 
-        // Deduplication
-        .route("/{org_id}/alerts/deduplication/config", get(alerts::deduplication::get_config).post(alerts::deduplication::set_config).delete(alerts::deduplication::delete_config))
+        // Semantic field groups, under their historical path
         .route("/{org_id}/alerts/deduplication/semantic-groups", get(alerts::deduplication::get_semantic_groups).put(alerts::deduplication::save_semantic_groups))
         .route("/{org_id}/alerts/deduplication/semantic-groups/preview-diff", post(alerts::deduplication::preview_semantic_groups_diff));
 
     #[cfg(feature = "enterprise")]
     {
         router = router
+            .route("/{org_id}/security/cases", post(security::cases::promote_to_case))
+            .route("/{org_id}/security/cases/by_alert", get(security::cases::lookup_cases))
+            .route("/{org_id}/security/cases/settings", get(security::cases::get_case_settings).put(security::cases::update_case_settings));
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        router = router
+            // Org-visible trail of Security config changes; Security is enterprise-only
+            .route("/{org_id}/security/audit", get(security::audit::list_security_audit))
+            // Threat-intel sweep, drawer timeline and list checks: reads, POST only for the body
+            .route("/{org_id}/security/intel/sweep", post(security::intel::sweep))
+            .route("/{org_id}/security/intel/sightings", post(security::intel::sightings))
+            .route("/{org_id}/security/intel/validate", post(security::intel::validate))
+            // Investigation reads (Security GET); every search runs with the caller's own permissions
+            .route("/{org_id}/security/entities", post(security::investigate::list_entities))
+            .route("/{org_id}/security/entities/graph", post(security::investigate::get_entity_graph))
+            .route("/{org_id}/security/entities/detail", post(security::investigate::get_entity_detail))
+            .route("/{org_id}/security/ueba", post(security::investigate::score_users))
+            .route("/{org_id}/security/events/search", post(security::investigate::search_events))
+            // Built-in OCSF packs: read-only, no org data
+            .route("/{org_id}/security/ocsf/packs", get(security::list_ocsf_packs))
+            // Security sources: the classifier, the source list and OCSF pack attach/detach
+            .route("/{org_id}/security/sources", get(security::sources::list_sources))
+            .route("/{org_id}/security/sources/types", get(security::sources::list_source_types))
+            .route("/{org_id}/security/sources/match", post(security::sources::match_source))
+            .route("/{org_id}/security/sources/classify", post(security::sources::classify_sources))
+            .route("/{org_id}/security/sources/{stream_name}/attach", post(security::sources::attach_pack))
+            .route("/{org_id}/security/sources/{stream_name}/detach", post(security::sources::detach_pack))
+            // Sigma catalog, compiler and ATT&CK coverage: reads, compile is POST only for the body
+            .route("/{org_id}/security/sigma/catalog", get(security::sigma::get_catalog))
+            .route("/{org_id}/security/sigma/compile", post(security::sigma::compile))
+            .route("/{org_id}/security/mitre/coverage", get(security::sigma::get_mitre_coverage))
+            .route("/{org_id}/security/detections/{alert_id}/evidence", get(security::sigma::get_detection_evidence))
             // Instance-wide native-user auth policy: authored on the meta org, enforced everywhere
             .route("/{org_id}/settings/password_policy", get(organization::password_policy::get_policy).put(organization::password_policy::set_policy))
             // Complexity requirements only: readable by any authenticated user, including one the
@@ -1286,10 +1643,11 @@ pub fn service_routes() -> Router {
             // Anomaly Detection
             .route("/{org_id}/anomaly_detection", get(anomaly_detection::list_configs).post(anomaly_detection::create_config))
             .route("/{org_id}/anomaly_detection/{config_id}", get(anomaly_detection::get_config).put(anomaly_detection::update_config).delete(anomaly_detection::delete_config))
-            .route("/{org_id}/anomaly_detection/{config_id}/train", post(anomaly_detection::train_model).delete(anomaly_detection::cancel_training))
-            .route("/{org_id}/anomaly_detection/{config_id}/detect", post(anomaly_detection::detect_anomalies))
+            .route("/{org_id}/anomaly_detection/{config_id}/train", delete(anomaly_detection::cancel_training))
             .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history))
-            .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history));
+            .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history))
+
+            .route("/v2/{org_id}/alerts/history/summary", get(alerts::history_summary::get_alert_history_summary));
         router = alert_calibration_routes(router);
     }
 
@@ -1398,21 +1756,11 @@ pub fn service_routes() -> Router {
                 )
                 .route(
                     "/{org_id}/annotation_queues/{queue_id}/items",
-                    post(annotation_queues::enqueue_annotation_queue_item)
-                        .delete(annotation_queues::clear_annotation_queue_items),
-                )
-                .route(
-                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}",
-                    get(annotation_queues::get_annotation_queue_item),
+                    delete(annotation_queues::clear_annotation_queue_items),
                 )
                 .route(
                     "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/reviews",
-                    get(annotation_queues::list_annotation_queue_item_reviews)
-                        .post(annotation_queues::review_annotation_queue_item),
-                )
-                .route(
-                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/push_to_dataset",
-                    post(datasets::push_annotation_queue_item_to_dataset),
+                    post(annotation_queues::review_annotation_queue_item),
                 )
                 .route(
                     "/{org_id}/annotation_queues/{queue_id}/items/archive",
@@ -1434,9 +1782,7 @@ pub fn service_routes() -> Router {
                 )
                 .route(
                     "/{org_id}/datasets/{dataset_id}/items",
-                    get(datasets::list_dataset_items)
-                        .post(datasets::push_dataset_item)
-                        .put(datasets::upsert_dataset_items),
+                    get(datasets::list_dataset_items).put(datasets::upsert_dataset_items),
                 )
                 .route(
                     "/{org_id}/datasets/{dataset_id}/rows",
@@ -1463,25 +1809,13 @@ pub fn service_routes() -> Router {
                     get(experiments::list_experiments).post(experiments::create_experiment),
                 )
                 .route(
-                    "/{org_id}/experiments/compare",
-                    get(experiments::compare_experiments),
-                )
-                .route(
                     "/{org_id}/experiments/{experiment_id}",
-                    get(experiments::get_experiment).delete(experiments::delete_experiment),
+                    delete(experiments::delete_experiment),
                 )
                 .route(
                     "/{org_id}/experiments/{experiment_id}/baseline",
                     put(experiments::set_experiment_baseline)
                         .delete(experiments::clear_experiment_baseline),
-                )
-                .route(
-                    "/{org_id}/experiments/{experiment_id}/rows",
-                    get(experiments::list_experiment_result_rows),
-                )
-                .route(
-                    "/{org_id}/experiments/{experiment_id}/rows/{row_id}",
-                    get(experiments::get_experiment_row),
                 )
                 .route(
                     "/{org_id}/experiments/{experiment_id}/rows/{row_id}/trials/{trial_index}/retry",
@@ -1515,9 +1849,6 @@ pub fn service_routes() -> Router {
                 // On-demand human annotation from Discovery
                 .route("/{org_id}/annotations", post(annotations::annotate_target))
 
-                // LLM score-based Discovery
-                .route("/{org_id}/discovery", get(discovery::list_discovery_items))
-
                 // LLM Providers (Online Eval Phase 2)
                 .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
                 .route("/{org_id}/providers/test", post(providers::test_provider_config))
@@ -1535,13 +1866,15 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/tasks/{entity_id}/signing/end_grace", post(remote_tasks::end_remote_task_signing_grace))
                 .route("/{org_id}/tasks/{entity_id}/signing", get(remote_tasks::get_remote_task_signing_status).delete(remote_tasks::revoke_remote_task_signing_secret))
                 .route("/{org_id}/tasks/{entity_id}/versions", get(remote_tasks::list_remote_task_versions))
-                .route("/{org_id}/tasks/{entity_id}/stats", get(remote_tasks::get_remote_task_stats))
                 .route("/{org_id}/tasks/{entity_id}/draft", get(remote_tasks::get_remote_task_draft).delete(remote_tasks::discard_remote_task_draft))
                 .route("/{org_id}/tasks/{entity_id}/test_connection", post(remote_tasks::publish_remote_task))
                 .route("/{org_id}/tasks/{entity_id}/test_run", post(remote_tasks::test_run_remote_task))
                 .route("/{org_id}/tasks/{entity_id}", get(remote_tasks::get_remote_task).put(remote_tasks::save_remote_task_draft).delete(remote_tasks::delete_remote_task))
                 .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config).put(score_configs::ensure_score_config))
                 .route("/{org_id}/score_configs/{entity_id}/versions", get(score_configs::list_score_config_versions))
+                .route("/{org_id}/score_configs/quality", get(quality::list_quality_summaries))
+                .route("/{org_id}/score_configs/{entity_id}/quality", get(quality::list_quality_scores))
+                .route("/{org_id}/score_configs/{entity_id}/quality/timeline", get(quality::get_quality_timeline))
                 .route("/{org_id}/score_configs/{entity_id}", get(score_configs::get_score_config).put(score_configs::update_score_config).delete(score_configs::delete_score_config))
 
                 // Scorers (Online Eval Phase 2)
@@ -1565,20 +1898,17 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/eval_jobs/{job_id}/pause", post(eval_jobs::pause_eval_job))
                 .route("/{org_id}/eval_jobs/{job_id}/resume", post(eval_jobs::resume_eval_job))
                 .route("/{org_id}/eval_jobs/{job_id}/archive", post(eval_jobs::archive_eval_job))
-                .route("/{org_id}/eval_jobs/{job_id}/manual_eval", post(eval_jobs::manual_eval_job))
                 .route("/{org_id}/eval_jobs/{job_id}", get(eval_jobs::get_eval_job).put(eval_jobs::update_eval_job).delete(eval_jobs::delete_eval_job));
         }
     }
 
     #[cfg(feature = "enterprise")]
     {
-        router = router
+        router = fleet_routes(router)
             // Search jobs
-            .route("/{org_id}/search_jobs", get(search::search_job::list_status).post(search::search_job::submit_job))
+            .route("/{org_id}/search_jobs", get(search::search_job::list_status))
             .route("/{org_id}/search_jobs/{job_id}", get(search::search_job::get_status).delete(search::search_job::delete_job))
-            .route("/{org_id}/search_jobs/{job_id}/result", get(search::search_job::get_job_result))
             .route("/{org_id}/search_jobs/{job_id}/cancel", post(search::search_job::cancel_job))
-            .route("/{org_id}/search_jobs/{job_id}/retry", post(search::search_job::retry_job))
 
             // Query manager
             .route("/{org_id}/query_manager/status", get(search::query_manager::query_status))
@@ -1615,23 +1945,11 @@ pub fn service_routes() -> Router {
             // License
             .route("/license", get(license::get_license_info).post(license::store_license))
             .route("/license/refresh", post(license::refresh_license_limits))
-
-            // Topology
-            .route("/{org_id}/traces/service_graph/topology/current", get(traces::get_current_topology))
-            .route("/{org_id}/traces/service_graph/edge/history", get(traces::get_edge_history))
-            // Agent behavior signals (loop / failure / cost) — reads the _agent_signals stream
-            .route("/{org_id}/traces/agent_signals", get(traces::get_agent_signals))
-            .route("/{org_id}/traces/agent_signals/compare", post(traces::compare_agent_versions))
-
-            // Patterns
-            .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns))
+            .route("/license/rotate_key", post(license::rotate_license_key))
 
             // Service streams
             .route("/{org_id}/service_streams", get(service_streams::list_services))
-            .route("/{org_id}/service_streams/_analytics", get(service_streams::get_dimension_analytics))
-            .route("/{org_id}/service_streams/_correlate", post(service_streams::correlate_streams))
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
-            .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
             .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
         router = ai_chat_routes(router);
 
@@ -1675,6 +1993,31 @@ pub fn service_routes() -> Router {
                     "/{org_id}/workflows/promote/{id}",
                     post(workflows::promote_draft),
                 );
+            if openobserve_core::workflows::http_trigger::hooks_enabled() {
+                router = router
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger",
+                        get(workflows::http_trigger::get_http_trigger)
+                            .put(workflows::http_trigger::put_http_trigger)
+                            .delete(workflows::http_trigger::delete_http_trigger),
+                    )
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger/credentials",
+                        post(workflows::http_trigger::rotate_http_credential),
+                    )
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}",
+                        delete(workflows::http_trigger::revoke_http_credential),
+                    )
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+                        get(workflows::http_trigger::reveal_http_credential_secret),
+                    )
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger/test",
+                        post(workflows::http_trigger::test_http_trigger),
+                    );
+            }
         }
     }
 
@@ -1937,10 +2280,37 @@ pub fn service_routes() -> Router {
             )
             .route("/{org_id}/billing_group/members", get(billing_group::check_members))
             .route(
+                "/{org_id}/settings/domains",
+                get(org_domains::get_linked_domain).post(org_domains::link_domain)
+            )
+            .route("/{org_id}/settings/domains/requests",post(org_domains::raise_request).get(org_domains::list_requests))
+            .route("/{org_id}/settings/domain/request/{id}/approve",post(org_domains::approve_request))
+            .route("/{org_id}/settings/domain/request/{id}/reject",post(org_domains::reject_request))
+            .route("/{org_id}/settings/domains/{domain}",delete(org_domains::delete_linked_domain))
+            .route(
+                "/{org_id}/settings/domains/verify/{domain}",
+                post(org_domains::verify_domain),
+            )
+            .route(
                 "/{org_id}/billing_group/members/{member_org_id}",
                 delete(billing_group::remove_member),
             );
     }
+
+    router
+}
+
+fn with_service_layers(router: Router) -> Router {
+    let cfg = get_config();
+
+    #[cfg(feature = "enterprise")]
+    let server = format!(
+        "{}-{}",
+        get_o2_config().super_cluster.region,
+        cfg.common.instance_name_short
+    );
+    #[cfg(not(feature = "enterprise"))]
+    let server = cfg.common.instance_name_short.to_string();
 
     // Snappy preprocessing sits outside RequestDecompressionLayer, which rejects snappy with 415.
     router
@@ -1969,18 +2339,115 @@ pub fn service_routes() -> Router {
         }))
 }
 
+/// Registered in both builds so OSS answers the handlers' 403 enterprise-only stub, not a 404.
+#[rustfmt::skip]
+fn service_streams_routes() -> Router {
+    Router::new()
+        .route("/{org_id}/service_streams/_analytics", get(service_streams::get_dimension_analytics))
+        .route("/{org_id}/service_streams/_correlate", post(service_streams::correlate_streams))
+        .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
+}
+
+/// Routes that read customer data through search; the licence gate answers 429 while search is blocked.
+#[rustfmt::skip]
+fn search_routes() -> Router {
+    #[cfg(feature = "enterprise")]
+    let llm_eval = get_o2_config().llm_eval_config.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let llm_eval = false;
+    search_routes_with(llm_eval)
+}
+
+#[rustfmt::skip]
+#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+fn search_routes_with(llm_eval: bool) -> Router {
+    let router = Router::new()
+        .route("/{org_id}/_search_multi", post(search::multi_streams::search_multi))
+        .route("/{org_id}/_search_multi_stream", post(search::multi_streams::search_multi_stream))
+        .route("/{org_id}/_search_partition_multi", post(search::multi_streams::_search_partition_multi))
+        .route("/{org_id}/{stream_names}/_around_multi", get(search::multi_streams::around_multi))
+        .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details))
+        .route("/{org_id}/prometheus/api/v1/label/{label_name}/values", get(promql::label_values))
+        .route("/v2/{org_id}/downtimes/resources", post(downtimes::downtime_resources))
+        .route("/v2/{org_id}/downtimes/values", post(downtimes::downtime_values))
+        // A manual trigger of an anomaly alert runs detection now, and a retrain trains now.
+        .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/retrain", patch(alerts::retrain_alert))
+
+        // Both builds register these so OSS answers 403, not 404; OFGA keys on this path segment.
+        .route("/{org_id}/db_monitoring/databases", get(db_monitoring::handler::get_dbm_databases))
+        .route("/{org_id}/db_monitoring/queries", get(db_monitoring::handler::get_dbm_queries))
+        .route("/{org_id}/db_monitoring/query/history", get(db_monitoring::handler::get_dbm_query_history))
+        .route("/{org_id}/db_monitoring/query/endpoints", get(db_monitoring::handler::get_dbm_query_endpoints))
+        .route("/{org_id}/db_monitoring/samples", get(db_monitoring::handler::get_dbm_samples))
+        .route("/{org_id}/db_monitoring/deadlocks", get(db_monitoring::handler::get_dbm_deadlocks))
+        .route("/{org_id}/db_monitoring/blocking", get(db_monitoring::handler::get_dbm_blocking))
+        .route("/{org_id}/db_monitoring/activity", get(db_monitoring::handler::get_dbm_activity))
+        // plans and server_metrics are superseded by query/insights; kept for compatibility
+        .route("/{org_id}/db_monitoring/query/insights", get(db_monitoring::handler::get_dbm_query_insights))
+        .route("/{org_id}/db_monitoring/query/plans", get(db_monitoring::handler::get_dbm_query_plans))
+        .route("/{org_id}/db_monitoring/query/server_metrics", get(db_monitoring::handler::get_dbm_query_server_metrics))
+        .route("/{org_id}/db_monitoring/server_queries", get(db_monitoring::handler::get_dbm_server_queries))
+        .route("/{org_id}/db_monitoring/server_samples", get(db_monitoring::handler::get_dbm_server_samples))
+        .route("/{org_id}/db_monitoring/table_health", get(db_monitoring::handler::get_dbm_table_health))
+        .route("/{org_id}/db_monitoring/instances", get(db_monitoring::handler::get_dbm_instances))
+        .route(
+            "/{org_id}/db_monitoring/instance_metrics",
+            get(db_monitoring::handler::get_dbm_instance_metrics),
+        )
+        .route("/{org_id}/db_monitoring/badges", get(db_monitoring::handler::get_dbm_badges));
+    #[cfg(feature = "enterprise")]
+    let router = {
+        let router = router
+            .route("/{org_id}/anomaly_detection/{config_id}/train", post(anomaly_detection::train_model))
+            .route("/{org_id}/anomaly_detection/{config_id}/detect", post(anomaly_detection::detect_anomalies))
+            .route("/{org_id}/search_jobs", post(search::search_job::submit_job))
+            .route("/{org_id}/search_jobs/{job_id}/result", get(search::search_job::get_job_result))
+            .route("/{org_id}/search_jobs/{job_id}/retry", post(search::search_job::retry_job))
+            .route("/{org_id}/traces/service_graph/topology/current", get(traces::get_current_topology))
+            .route("/{org_id}/traces/service_graph/edge/history", get(traces::get_edge_history))
+            .route("/{org_id}/traces/agent_signals", get(traces::get_agent_signals))
+            .route("/{org_id}/traces/agent_signals/compare", post(traces::compare_agent_versions))
+            .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns));
+        if llm_eval {
+            router
+                .route("/{org_id}/annotation_queues/{queue_id}/items", post(annotation_queues::enqueue_annotation_queue_item))
+                .route("/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}", get(annotation_queues::get_annotation_queue_item))
+                .route("/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/reviews", get(annotation_queues::list_annotation_queue_item_reviews))
+                .route("/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/push_to_dataset", post(datasets::push_annotation_queue_item_to_dataset))
+                .route("/{org_id}/datasets/{dataset_id}/items", post(datasets::push_dataset_item))
+                .route("/{org_id}/experiments/compare", get(experiments::compare_experiments))
+                .route("/{org_id}/experiments/{experiment_id}", get(experiments::get_experiment))
+                .route("/{org_id}/experiments/{experiment_id}/rows", get(experiments::list_experiment_result_rows))
+                .route("/{org_id}/experiments/{experiment_id}/rows/{row_id}", get(experiments::get_experiment_row))
+                .route("/{org_id}/discovery", get(discovery::list_discovery_items))
+                .route("/{org_id}/tasks/{entity_id}/stats", get(remote_tasks::get_remote_task_stats))
+                .route("/{org_id}/eval_jobs/{job_id}/manual_eval", post(eval_jobs::manual_eval_job))
+        } else {
+            router
+        }
+    };
+    // A route layer, not a layer: it must not reach the ungated methods merged onto the same paths.
+    #[cfg(feature = "enterprise")]
+    let router = router.route_layer(middleware::from_fn(search_license_middleware));
+    router
+}
+
+pub fn service_routes() -> Router {
+    with_service_layers(service_route_table())
+}
+
 /// Downtimes routes; the literal segments stay before the {downtime_id} catch-all.
 #[rustfmt::skip]
 pub fn downtime_routes() -> Router {
     Router::new()
         .route("/v2/{org_id}/downtimes", get(downtimes::list_downtimes).post(downtimes::create_downtime))
         .route("/v2/{org_id}/downtimes/preview", post(downtimes::preview_downtime))
-        .route("/v2/{org_id}/downtimes/resources", post(downtimes::downtime_resources))
-        .route("/v2/{org_id}/downtimes/values", post(downtimes::downtime_values))
         .route("/v2/{org_id}/downtimes/move", patch(downtimes::move_downtimes))
         .route("/v2/{org_id}/downtimes/{downtime_id}", get(downtimes::get_downtime).put(downtimes::update_downtime).delete(downtimes::delete_downtime))
         .route("/v2/{org_id}/downtimes/{downtime_id}/cancel", post(downtimes::cancel_downtime))
         .route("/v2/{org_id}/downtimes/{downtime_id}/extend", post(downtimes::extend_downtime))
+        .route("/v2/{org_id}/downtimes/{downtime_id}/test", post(downtimes::test_downtime))
 }
 
 /// Dashboard report routes, v1 by name and v2 by id.
@@ -2009,6 +2476,11 @@ fn oncall_routes(router: Router) -> Router {
         .route(
             "/{org_id}/oncall/teams",
             get(oncall::list_teams).post(oncall::create_team),
+        )
+        // A literal, so axum routes it here rather than to `/teams/{team_id}`.
+        .route(
+            "/{org_id}/oncall/teams/context",
+            get(oncall::list_team_context),
         )
         .route(
             "/{org_id}/oncall/teams/{team_id}",
@@ -2060,12 +2532,21 @@ fn oncall_routes(router: Router) -> Router {
             get(oncall::get_resolved_schedule),
         )
         .route(
+            "/{org_id}/oncall/teams/{team_id}/resolved-schedule/preview",
+            post(oncall::preview_resolved_schedule),
+        )
+        .route(
             "/{org_id}/oncall/teams/{team_id}/policy",
             get(oncall::get_policy).put(oncall::set_policy),
         )
         .route(
             "/{org_id}/oncall/teams/{team_id}/channel",
             get(oncall::get_team_channel).put(oncall::set_team_channel),
+        )
+        // RO-6: one plain test message in the team's Slack channel; on-call PUT (RB-2).
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/slack/test",
+            post(oncall::test_team_slack_channel),
         )
         // Derived on every read, never stored: a saved list argues with the config beside it.
         .route(
@@ -2123,6 +2604,11 @@ fn oncall_routes(router: Router) -> Router {
             "/{org_id}/oncall/responses/{response_id}/escalation",
             get(oncall::get_escalation_progress),
         )
+        // A literal, so axum routes it here rather than to `/responses/{response_id}`.
+        .route(
+            "/{org_id}/oncall/responses/escalation",
+            get(oncall::list_escalation_progress),
+        )
         .route(
             "/{org_id}/oncall/responses/{response_id}/prior-causes",
             get(oncall::get_prior_causes),
@@ -2136,8 +2622,16 @@ fn oncall_routes(router: Router) -> Router {
             post(oncall::acknowledge_response),
         )
         .route(
+            "/{org_id}/oncall/responses/{response_id}/unacknowledge",
+            post(oncall::unacknowledge_response),
+        )
+        .route(
             "/{org_id}/oncall/responses/{response_id}/snooze",
             post(oncall::snooze_response),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/unsnooze",
+            post(oncall::unsnooze_response),
         )
         .route(
             "/{org_id}/oncall/responses/{response_id}/handoff",
@@ -2222,6 +2716,180 @@ fn oncall_routes(router: Router) -> Router {
                 .put(oncall::put_telephony)
                 .delete(oncall::delete_telephony),
         )
+        .route(
+            "/{org_id}/telephony/status",
+            get(oncall::get_telephony_status),
+        )
+}
+
+// Private and before the next `pub fn`, so the ROUTE_PERMISSIONS router scrape still reads it.
+#[cfg(feature = "enterprise")]
+fn fleet_routes(router: Router) -> Router {
+    router.merge(fleet_router())
+}
+
+// Its own router, so the gate layer covers exactly the fleet routes.
+#[cfg(feature = "enterprise")]
+fn fleet_router() -> Router {
+    Router::new()
+        .route("/{org_id}/v1/opamp", get(opamp::serve).post(opamp::serve))
+        .route("/{org_id}/fleet/collectors", get(fleet::list_collectors))
+        .route(
+            "/{org_id}/fleet/collectors/{id}",
+            get(fleet::get_collector)
+                .patch(fleet::rename_collector)
+                .delete(fleet::delete_collector),
+        )
+        .route(
+            "/{org_id}/fleet/collectors/{id}/restart",
+            post(fleet::restart_collector),
+        )
+        .route(
+            "/{org_id}/fleet/collectors/{id}/redeliver",
+            post(fleet::redeliver_collector),
+        )
+        .route(
+            "/{org_id}/fleet/fleets",
+            get(fleet::list_fleets).post(fleet::create_fleet),
+        )
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}",
+            get(fleet::get_fleet)
+                .patch(fleet::rename_fleet)
+                .delete(fleet::delete_fleet),
+        )
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}/settings",
+            get(fleet::get_fleet_settings).put(fleet::put_fleet_settings),
+        )
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}/desired",
+            put(fleet::set_desired),
+        )
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}/desired/preview",
+            post(fleet::preview_desired),
+        )
+        .route(
+            "/{org_id}/fleet/tokens",
+            get(fleet::list_tokens).post(fleet::create_token),
+        )
+        .route(
+            "/{org_id}/fleet/tokens/{id}/revoke",
+            post(fleet::revoke_token),
+        )
+        .route(
+            "/{org_id}/fleet/configs",
+            get(fleet::list_configs).post(fleet::create_config),
+        )
+        .route(
+            "/{org_id}/fleet/configs/validate",
+            post(fleet::validate_config),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}",
+            get(fleet::get_config).delete(fleet::delete_config),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}/draft",
+            put(fleet::save_config_draft),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}/versions",
+            post(fleet::publish_config_version),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}/versions/{version}",
+            get(fleet::get_config_version),
+        )
+        .route("/{org_id}/fleet/rollouts", get(fleet::list_rollouts))
+        .route("/{org_id}/fleet/rollouts/{id}", get(fleet::get_rollout))
+        .route(
+            "/{org_id}/fleet/rollouts/{id}/resume",
+            post(fleet::resume_rollout),
+        )
+        .route(
+            "/{org_id}/fleet/rollouts/{id}/skip",
+            post(fleet::skip_rollout),
+        )
+        .route(
+            "/{org_id}/fleet/rollouts/{id}/rollback",
+            post(fleet::rollback_rollout),
+        )
+        .route("/{org_id}/fleet/summary", get(fleet::summary))
+        .route("/{org_id}/fleet/pipelines", get(fleet::get_pipelines))
+        .route("/{org_id}/fleet/audit", get(fleet::list_audit))
+        .route(
+            "/{org_id}/fleet/settings",
+            get(fleet::get_settings).put(fleet::update_settings),
+        )
+        .route_layer(middleware::from_fn(fleet_gate))
+}
+
+/// With `O2_FLEET_ENABLED` off, auth refuses fleet tokens first (401); writes get 503.
+#[cfg(feature = "enterprise")]
+async fn fleet_gate(request: Request, next: Next) -> Response {
+    if openobserve_core::fleet::enabled() || request.method() == Method::GET && !is_opamp(&request)
+    {
+        return next.run(request).await;
+    }
+    let mut response = (
+        StatusCode::SERVICE_UNAVAILABLE,
+        "fleet management is disabled",
+    )
+        .into_response();
+    if is_opamp(&request) {
+        response.headers_mut().insert(
+            header::RETRY_AFTER,
+            header::HeaderValue::from_static(FLEET_RETRY_AFTER_SECS),
+        );
+    }
+    response
+}
+
+#[cfg(feature = "enterprise")]
+fn is_opamp(request: &Request) -> bool {
+    request
+        .uri()
+        .path()
+        .trim_end_matches('/')
+        .ends_with("/v1/opamp")
+}
+
+/// Slack install and settings routes (section 7.2); the paths match the ENT `SLACK_ROUTE_ROWS`.
+#[rustfmt::skip]
+pub fn slack_routes() -> Router {
+    use slack::{installations as inst, links as lnk, settings as set};
+    Router::new()
+        .route("/{org_id}/slack/link-requests/confirm", post(lnk::confirm))
+        .route("/{org_id}/slack/link-requests/{request_id}/start", post(lnk::start))
+        .route("/{org_id}/slack/link-requests/{request_id}/resend", post(lnk::resend))
+        .route("/{org_id}/slack/links/me", get(lnk::links_me))
+        .route("/{org_id}/slack/links/{link_id}", delete(lnk::delete_link))
+        .route("/{org_id}/slack/links", get(lnk::list_links))
+        .route("/{org_id}/slack/install/start", post(inst::install_start))
+        .route("/{org_id}/slack/install/exchange", post(inst::install_exchange))
+        .route("/{org_id}/slack/prerequisites", get(inst::prerequisites))
+        .route("/{org_id}/slack/connectivity", post(inst::connectivity))
+        .route("/{org_id}/slack/manifest", get(inst::manifest))
+        .route("/{org_id}/slack/connection/confirm", post(inst::connection_confirm))
+        .route("/{org_id}/slack/installations", get(inst::list_installations).post(inst::create_installation))
+        .route("/{org_id}/slack/installations/{installation_id}", delete(inst::uninstall))
+        .route("/{org_id}/slack/installations/{installation_id}/install-url", post(inst::install_url))
+        .route("/{org_id}/slack/installations/{installation_id}/credentials", put(inst::update_credentials))
+        .route("/{org_id}/slack/installations/{installation_id}/test", post(inst::test_installation))
+        .route("/{org_id}/slack/installations/{installation_id}/connection/start", post(inst::connection_start))
+        .route("/{org_id}/slack/installations/{installation_id}/connection", post(inst::connect).delete(inst::disconnect))
+        .route("/{org_id}/slack/installations/{installation_id}/linking", get(set::get_linking).put(set::put_linking))
+        .route("/{org_id}/slack/installations/{installation_id}/links/matches", get(set::link_matches))
+        .route("/{org_id}/slack/installations/{installation_id}/link-all", post(set::link_all))
+        .route("/{org_id}/slack/installations/{installation_id}/channels", get(set::channels))
+        .route("/{org_id}/slack/installations/{installation_id}/channel-defaults", get(set::channel_defaults))
+        .route("/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}", get(set::get_channel_default).put(set::put_channel_default).delete(set::delete_channel_default))
+        .route("/{org_id}/slack/installations/{installation_id}/help-contact", get(set::get_help_contact).put(set::put_help_contact))
+        .route("/{org_id}/slack/installations/{installation_id}/oncall-unlinked", get(set::oncall_unlinked))
+        .route("/{org_id}/slack/installations/{installation_id}/oncall-unlinked/remind", post(set::remind_oncall_unlinked))
+        .route("/{org_id}/slack/installations/{installation_id}/org-access", get(inst::get_org_access).put(inst::put_org_access))
 }
 
 /// Create other service routes (AWS, GCP, RUM)
@@ -2231,6 +2899,10 @@ pub fn other_service_routes() -> Router {
             "/{org_id}/{stream_name}/_kinesis_firehose",
             post(logs::ingest::handle_kinesis_request),
         )
+        .route_layer(middleware::from_fn(blocked_org_param))
+        .layer(middleware::from_fn(|req, next| {
+            require_features(&[Feature::Logs], req, next)
+        }))
         .layer(middleware::from_fn(aws_auth_middleware))
         .layer(RequestDecompressionLayer::new());
 
@@ -2239,6 +2911,10 @@ pub fn other_service_routes() -> Router {
             "/{org_id}/{stream_name}/_sub",
             post(logs::ingest::handle_gcp_request),
         )
+        .route_layer(middleware::from_fn(blocked_org_param))
+        .layer(middleware::from_fn(|req, next| {
+            require_features(&[Feature::Logs], req, next)
+        }))
         .layer(middleware::from_fn(gcp_auth_middleware))
         .layer(RequestDecompressionLayer::new());
 
@@ -2246,6 +2922,10 @@ pub fn other_service_routes() -> Router {
         .route("/v1/{org_id}/logs", post(rum::ingest::log))
         .route("/v1/{org_id}/replay", post(rum::ingest::sessionreplay))
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
+        .route_layer(middleware::from_fn(blocked_org_param))
+        .layer(middleware::from_fn(|req, next| {
+            require_features(&[Feature::Rum], req, next)
+        }))
         .layer(middleware::from_fn(RumExtraData::extractor_middleware))
         .layer(middleware::from_fn(rum_auth_middleware))
         .layer(RequestDecompressionLayer::new());
@@ -2254,6 +2934,7 @@ pub fn other_service_routes() -> Router {
         .nest("/aws", aws_routes)
         .nest("/gcp", gcp_routes)
         .nest("/rum", rum_routes)
+        .nest("/datadog", datadog_routes())
 }
 
 /// Splunk-compatible HEC collector routes.
@@ -2272,6 +2953,9 @@ pub fn splunk_collector_routes() -> Router {
     // rather than both leaking as 401.
     let event_handler = || {
         post(hec_collector::collector_event)
+            .route_layer(middleware::from_fn(|req, next| {
+                require_features(&[Feature::Logs], req, next)
+            }))
             .route_layer(middleware::from_fn(hec_collector::splunk_auth_middleware))
             .fallback(hec_collector::collector_method_not_allowed)
     };
@@ -2291,7 +2975,9 @@ pub fn splunk_collector_routes() -> Router {
         .layer(RequestDecompressionLayer::new())
         // Outermost, so the 10 MiB cap is measured on the wire before any
         // decompression can amplify an unauthenticated body.
-        .layer(middleware::from_fn(hec_collector::wire_body_limit_middleware))
+        .layer(middleware::from_fn(
+            hec_collector::wire_body_limit_middleware,
+        ))
         .layer(middleware::from_fn(ingest_rejections_middleware))
 }
 
@@ -2328,14 +3014,7 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
             .merge(crate::router::http::create_splunk_collector_proxy_routes())
             .merge(router_routes)
     } else {
-        // Non-router node: use direct service routes
-        Router::new()
-            .merge(basic_routes())
-            .merge(splunk_collector_routes())
-            .nest("/config", config_routes())
-            .nest("/api", service_routes())
-            .merge(other_service_routes())
-            .merge(proxy_routes(true))
+        local_routes()
     };
 
     // Ensure redirect takes into account base_uri
@@ -2389,6 +3068,17 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
     outer
 }
 
+/// Every route a non-router node serves itself, without the UI.
+fn local_routes() -> Router {
+    Router::new()
+        .merge(basic_routes())
+        .merge(splunk_collector_routes())
+        .nest("/config", config_routes())
+        .nest("/api", service_routes())
+        .merge(other_service_routes())
+        .merge(proxy_routes(true))
+}
+
 /// Root-only node management routes, before the authentication layers `basic_routes` adds.
 fn node_routes() -> Router {
     let node_routes = Router::new()
@@ -2422,6 +3112,51 @@ fn es_compat_routes() -> Router {
         .route("/{org_id}/_ingest/pipeline/{name}", get(organization::es::org_pipeline).head(organization::es::org_pipeline).post(organization::es::org_pipeline_create))
 }
 
+/// Datadog Agent intake, authenticated by an org ingestion token sent as `DD-API-KEY`.
+fn datadog_routes() -> Router {
+    let gated = |required: &'static [Feature]| {
+        middleware::from_fn(move |req: Request, next: Next| require_features(required, req, next))
+    };
+
+    // Last-added runs outermost: auth, org block, wire cap, decompression, decoded cap.
+    let intake = Router::new()
+        .route(
+            "/{org_id}/api/v2/series",
+            post(datadog::series).route_layer(gated(&[Feature::Metrics])),
+        )
+        .route(
+            "/{org_id}/api/beta/sketches",
+            post(datadog::sketches).route_layer(gated(&[Feature::Metrics])),
+        )
+        .route(
+            "/{org_id}/api/v1/check_run",
+            post(datadog::check_run).route_layer(gated(&[Feature::Metrics])),
+        )
+        .route(
+            "/{org_id}/api/v0.2/traces",
+            post(datadog::traces).route_layer(gated(&[Feature::Traces])),
+        )
+        .route(
+            "/{org_id}/api/v2/logs",
+            post(datadog::logs).route_layer(gated(&[Feature::Logs])),
+        )
+        .route(
+            "/{org_id}/v1/input",
+            post(datadog::logs).route_layer(gated(&[Feature::Logs])),
+        )
+        .route_layer(DefaultBodyLimit::max(datadog::DATADOG_MAX_BODY_BYTES))
+        .route_layer(RequestDecompressionLayer::new())
+        .route_layer(middleware::from_fn(datadog::datadog_wire_limit_middleware));
+
+    // Validate and the catch-all never read a body, so they skip the body layers.
+    Router::new()
+        .route("/{org_id}/api/v1/validate", get(datadog::validate))
+        .route("/{org_id}/{*rest}", any(datadog::unsupported))
+        .merge(intake)
+        .route_layer(middleware::from_fn(blocked_org_param))
+        .route_layer(middleware::from_fn(datadog::datadog_auth_middleware))
+}
+
 #[cfg(test)]
 mod tests {
     use axum::{body::Body, http::Request};
@@ -2429,6 +3164,9 @@ mod tests {
     use tower::ServiceExt;
 
     use super::*;
+
+    const DD_ORG: &str = "dd_routes_org";
+    const DD_KEY: &str = "o2oi_dd_routes_key";
 
     /// A router node merges `basic_routes()` beside its catch-all proxy
     /// `/api/{*path}`, and axum **panics at registration** — not at request
@@ -2496,6 +3234,354 @@ mod tests {
             &Method::GET,
             "api/org/prompts/settings/secret"
         ));
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn every_slack_route_reaches_its_oss_stub() {
+        let routes = [
+            (Method::POST, "/default/slack/install/start"),
+            (Method::POST, "/default/slack/install/exchange"),
+            (Method::GET, "/default/slack/prerequisites"),
+            (Method::POST, "/default/slack/connectivity"),
+            (Method::GET, "/default/slack/manifest"),
+            (Method::POST, "/default/slack/connection/confirm"),
+            (Method::GET, "/default/slack/installations"),
+            (Method::POST, "/default/slack/installations"),
+            (Method::DELETE, "/default/slack/installations/I1"),
+            (Method::POST, "/default/slack/installations/I1/install-url"),
+            (Method::PUT, "/default/slack/installations/I1/credentials"),
+            (Method::POST, "/default/slack/installations/I1/test"),
+            (
+                Method::POST,
+                "/default/slack/installations/I1/connection/start",
+            ),
+            (Method::POST, "/default/slack/installations/I1/connection"),
+            (Method::DELETE, "/default/slack/installations/I1/connection"),
+            (Method::GET, "/default/slack/installations/I1/linking"),
+            (Method::PUT, "/default/slack/installations/I1/linking"),
+            (Method::GET, "/default/slack/installations/I1/links/matches"),
+            (Method::POST, "/default/slack/installations/I1/link-all"),
+            (Method::GET, "/default/slack/installations/I1/channels"),
+            (
+                Method::GET,
+                "/default/slack/installations/I1/channel-defaults",
+            ),
+            (
+                Method::GET,
+                "/default/slack/installations/I1/channel-defaults/C1",
+            ),
+            (
+                Method::PUT,
+                "/default/slack/installations/I1/channel-defaults/C1",
+            ),
+            (
+                Method::DELETE,
+                "/default/slack/installations/I1/channel-defaults/C1",
+            ),
+            (Method::GET, "/default/slack/installations/I1/help-contact"),
+            (Method::PUT, "/default/slack/installations/I1/help-contact"),
+            (Method::GET, "/_meta/slack/installations/I1/org-access"),
+            (Method::PUT, "/_meta/slack/installations/I1/org-access"),
+            (Method::POST, "/default/slack/link-requests/R1/start"),
+            (Method::POST, "/default/slack/link-requests/confirm"),
+            (Method::POST, "/default/slack/link-requests/R1/resend"),
+            (Method::GET, "/default/slack/links/me"),
+            (Method::DELETE, "/default/slack/links/L1"),
+            (Method::GET, "/default/slack/links"),
+        ];
+        for (method, path) in routes {
+            let req = Request::builder()
+                .method(method.clone())
+                .uri(path)
+                .header("user_id", "root@example.com")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from("{}"))
+                .unwrap();
+            let response = slack_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{method} {path}");
+        }
+        let req = Request::builder()
+            .method(Method::PATCH)
+            .uri("/default/slack/installations")
+            .body(Body::empty())
+            .unwrap();
+        let response = slack_routes().oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    /// Requests whose body or query axum's extractors refuse, one per extractor shape.
+    fn slack_requests_the_extractors_refuse() -> Vec<Request<Body>> {
+        let mut requests = Vec::new();
+        for (method, path) in [
+            (Method::POST, "/default/slack/install/start"),
+            (Method::POST, "/default/slack/installations"),
+            (Method::PUT, "/default/slack/installations/I1/credentials"),
+            (Method::PUT, "/default/slack/installations/I1/linking"),
+            (Method::PUT, "/_meta/slack/installations/I1/org-access"),
+            (Method::POST, "/default/slack/link-requests/confirm"),
+        ] {
+            for (content_type, body) in [("application/json", "{not json"), ("text/plain", "{}")] {
+                requests.push(
+                    Request::builder()
+                        .method(method.clone())
+                        .uri(path)
+                        .header("user_id", "root@example.com")
+                        .header(header::CONTENT_TYPE, content_type)
+                        .body(Body::from(body))
+                        .unwrap(),
+                );
+            }
+        }
+        requests.push(
+            Request::builder()
+                .uri("/default/slack/manifest?channel_history=maybe")
+                .header("user_id", "root@example.com")
+                .body(Body::empty())
+                .unwrap(),
+        );
+        requests
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn a_bad_body_or_query_is_still_not_supported_in_the_oss_build() {
+        for req in slack_requests_the_extractors_refuse() {
+            let what = format!("{} {}", req.method(), req.uri());
+            let response = slack_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{what}");
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(json["message"], "Not Supported", "{what}");
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn service_streams_routes_answer_403_not_404_in_the_oss_build() {
+        let routes = [
+            (
+                Method::GET,
+                "/default/service_streams/_analytics",
+                Body::empty(),
+            ),
+            (
+                Method::POST,
+                "/default/service_streams/_correlate",
+                Body::from(
+                    r#"{"source_stream":"s","source_type":"logs","available_dimensions":{}}"#,
+                ),
+            ),
+            (
+                Method::DELETE,
+                "/default/service_streams/_reset",
+                Body::empty(),
+            ),
+        ];
+        for (method, uri, body) in routes {
+            let what = format!("{method} {uri}");
+            let req = Request::builder()
+                .method(method)
+                .uri(uri)
+                .header("user_id", "root@example.com")
+                .header("content-type", "application/json")
+                .body(body)
+                .unwrap();
+            let response = service_streams_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{what}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_bad_body_or_query_is_404_while_slack_is_off() {
+        for req in slack_requests_the_extractors_refuse() {
+            let what = format!("{} {}", req.method(), req.uri());
+            let response = slack_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{what}");
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(
+                json,
+                serde_json::json!({"code": 404, "message": "Slack is not enabled"}),
+                "{what}"
+            );
+        }
+    }
+
+    #[test]
+    fn workflow_endpoint_test_bodies_are_redacted() {
+        for path in [
+            "org/workflows/wf1/http_trigger/test",
+            "api/org/workflows/wf1/http_trigger/test",
+        ] {
+            assert!(is_secret_write(&Method::POST, path), "{path}");
+            assert_eq!(
+                audited(Method::POST, path, r#"{"data":[{"password":"p"}]}"#),
+                "[REDACTED: secret write]"
+            );
+        }
+        for (method, path) in [
+            (Method::PUT, "org/workflows/wf1/http_trigger"),
+            (Method::POST, "org/workflows/wf1/http_trigger/credentials"),
+            (Method::POST, "org/workflows/test"),
+        ] {
+            assert!(!is_secret_write(&method, path), "{method} {path}");
+        }
+    }
+
+    #[test]
+    fn slack_secret_writes_are_redacted() {
+        for (method, path) in [
+            (Method::POST, "org/slack/install/exchange"),
+            (Method::POST, "org/slack/installations"),
+            (Method::PUT, "org/slack/installations/I1/credentials"),
+            (Method::POST, "org/slack/connection/confirm"),
+            (Method::POST, "org/slack/installations/I1/connection"),
+            (Method::POST, "org/slack/link-requests/confirm"),
+            (Method::POST, "api/org/slack/installations"),
+            (Method::POST, "api/slack/installations"),
+        ] {
+            assert!(is_secret_write(&method, path), "{method} {path}");
+            assert_eq!(
+                audited(method, path, r#"{"code":"c-1","state":"s-1"}"#),
+                "[REDACTED: secret write]"
+            );
+        }
+        for (method, path) in [
+            (Method::GET, "org/slack/installations"),
+            (Method::POST, "org/slack/install/start"),
+            (Method::POST, "org/slack/installations/I1/connection/start"),
+            (Method::DELETE, "org/slack/installations/I1/connection"),
+            (Method::POST, "org/slack/installations/I1/link-all"),
+            (Method::PUT, "org/slack/installations/I1/linking"),
+            (Method::PUT, "_meta/slack/installations/I1/org-access"),
+            (Method::GET, "org/slack/installations/I1/credentials"),
+            (Method::POST, "org/slack/link-requests/R1/start"),
+            (Method::POST, "org/slack/link-requests/R1/resend"),
+            (Method::POST, "org/streams/slack/installations"),
+            (Method::POST, "slack/installations"),
+        ] {
+            assert!(!is_secret_write(&method, path), "{method} {path}");
+        }
+    }
+
+    /// What `audit_middleware` would store, seen from inside the `/api` and base-URI nesting.
+    async fn audited_through_the_router(
+        base: &str,
+        method: Method,
+        uri: &str,
+        body: &str,
+    ) -> String {
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let record = {
+            let seen = seen.clone();
+            move |request: Request<Body>, next: Next| {
+                let seen = seen.clone();
+                async move {
+                    let path = audited_path(request.uri());
+                    let method = request.method().clone();
+                    let (parts, body) = request.into_parts();
+                    let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
+                    seen.lock()
+                        .unwrap()
+                        .push(audit_body(&method, &path, None, bytes.to_vec()));
+                    next.run(Request::from_parts(parts, Body::from(bytes)))
+                        .await
+                }
+            }
+        };
+        let api = Router::new().nest("/api", slack_routes().layer(middleware::from_fn(record)));
+        let app = if base.is_empty() {
+            api
+        } else {
+            Router::new().nest(base, api)
+        };
+        let req = Request::builder()
+            .method(method)
+            .uri(uri)
+            .header("user_id", "root@example.com")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        app.oneshot(req).await.unwrap();
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 1, "{uri} reached the audit layer once");
+        seen[0].clone()
+    }
+
+    #[tokio::test]
+    async fn a_slack_secret_write_is_redacted_as_the_audit_layer_sees_it() {
+        let secret =
+            r#"{"code":"c-1","state":"s-1","client_secret":"cs-1","signing_secret":"ss-1"}"#;
+        for (base, method, uri) in [
+            ("", Method::POST, "/api/default/slack/install/exchange"),
+            ("", Method::POST, "/api/default/slack/installations"),
+            (
+                "",
+                Method::PUT,
+                "/api/default/slack/installations/I1/credentials",
+            ),
+            ("", Method::POST, "/api/default/slack/connection/confirm"),
+            (
+                "",
+                Method::POST,
+                "/api/default/slack/installations/I1/connection",
+            ),
+            ("", Method::POST, "/api/default/slack/link-requests/confirm"),
+            (
+                "/o2",
+                Method::POST,
+                "/o2/api/default/slack/install/exchange",
+            ),
+            (
+                "/o2",
+                Method::PUT,
+                "/o2/api/api/slack/installations/I1/credentials",
+            ),
+        ] {
+            let stored = audited_through_the_router(base, method.clone(), uri, secret).await;
+            assert_eq!(stored, "[REDACTED: secret write]", "{method} {uri}");
+        }
+        let start = audited_through_the_router(
+            "",
+            Method::POST,
+            "/api/default/slack/install/start",
+            r#"{"source":"settings"}"#,
+        )
+        .await;
+        assert_eq!(start, r#"{"source":"settings"}"#);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_delegated_chat_is_audited_without_the_question() {
+        let body = br#"{"messages":[{"role":"user","content":"why is checkout slow?"}],"context":{"currentPage":"slack"}}"#;
+        let stored =
+            delegated_chat_audit_body(&Method::POST, "org/ai/chat", true, Some("T0:C0:Ev1"), body)
+                .expect("a delegated /ai/chat gets the Slack record");
+        assert!(!stored.contains("checkout"), "{stored}");
+        let json: Value = serde_json::from_str(&stored).unwrap();
+        assert_eq!(json["messages"], "[REDACTED: slack]");
+        assert_eq!(json["slack_event"], "T0:C0:Ev1");
+        assert_eq!(json["context"]["currentPage"], "slack");
+        for (method, path, delegated) in [
+            (Method::POST, "org/ai/chat", false),
+            (Method::POST, "org/ai/chat_stream", true),
+            (Method::POST, "org/ai/chats", true),
+            (Method::GET, "org/ai/chat", true),
+            (Method::POST, "org/streams/ai/chat", true),
+        ] {
+            assert_eq!(
+                delegated_chat_audit_body(&method, path, delegated, None, body),
+                None,
+                "{method} {path} delegated={delegated}"
+            );
+        }
     }
 
     fn audited(method: Method, path: &str, body: &str) -> String {
@@ -2629,8 +3715,8 @@ mod tests {
     async fn the_routed_org_must_be_the_org_the_auth_layers_check() {
         async fn guard(request: axum::extract::Request, next: Next) -> Response {
             let (mut parts, body) = request.into_parts();
-            if routed_org_differs(&mut parts).await {
-                return StatusCode::FORBIDDEN.into_response();
+            if let Err(error) = validate_routed_org(&mut parts).await {
+                return error.into_response();
             }
             next.run(Request::from_parts(parts, body)).await
         }
@@ -2658,12 +3744,27 @@ mod tests {
                 .layer(middleware::from_fn(guard)),
         );
         for (uri, expected) in [
-            ("/api//kv/note", StatusCode::OK),
+            ("/api//kv/note", StatusCode::NOT_FOUND),
             ("/api/acme/kv/note", StatusCode::OK),
         ] {
             let request = Request::get(uri).body(Body::empty()).unwrap();
             let status = nested.clone().oneshot(request).await.unwrap().status();
             assert_eq!(status, expected, "{uri}");
+        }
+    }
+
+    #[test]
+    fn a_v2_request_is_audited_under_the_org_it_serves() {
+        for (path, org, next) in [
+            ("v2/acme/alerts/a1", "acme", "alerts"),
+            ("v2/v2/folders/alerts", "v2", "folders"),
+            ("v2/acme/_search_stream", "v2", "acme"),
+            ("acme/_search_stream", "acme", "_search_stream"),
+            ("organizations", "organizations", ""),
+            ("", "", ""),
+        ] {
+            let columns: Vec<&str> = path.split('/').collect();
+            assert_eq!(audit_org_and_next(&columns), (org, next), "{path}");
         }
     }
 
@@ -2972,6 +4073,244 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn router_node_tree_registers_and_claims_the_datadog_paths() {
+        // A param/wildcard clash panics at registration, so building the tree is half the test.
+        let router_routes = Router::new()
+            .merge(crate::router::http::create_router_routes())
+            .nest("/config", config_routes())
+            .merge(proxy_routes(true));
+        let app = Router::new()
+            .merge(basic_routes())
+            .merge(crate::router::http::create_splunk_collector_proxy_routes())
+            .merge(router_routes);
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/datadog/default/api/v2/series")
+            .body(Body::empty())
+            .unwrap();
+        assert_ne!(
+            app.oneshot(req).await.unwrap().status(),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    fn dd_request(method: Method, uri: &str, key: Option<&str>, body: Body) -> Request<Body> {
+        common::infra::config::ORG_INGESTION_TOKENS
+            .insert(format!("{DD_ORG}/{DD_KEY}"), "routes".to_string());
+        let mut req = Request::builder().method(method).uri(uri);
+        if let Some(key) = key {
+            req = req.header("DD-API-KEY", key);
+        }
+        req.body(body).unwrap()
+    }
+
+    async fn dd_send(req: Request<Body>) -> (StatusCode, String) {
+        let resp = local_routes().oneshot(req).await.unwrap();
+        let status = resp.status();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, String::from_utf8_lossy(&body).into_owned())
+    }
+
+    #[tokio::test]
+    async fn datadog_unknown_paths_are_202_and_counted_but_403_without_a_key() {
+        let dropped = || {
+            config::metrics::DATADOG_DROPPED_REQUESTS_TOTAL
+                .with_label_values(&[DD_ORG])
+                .get()
+        };
+        let before = dropped();
+        for (method, path) in [
+            (Method::POST, "api/v0.2/stats"),
+            (Method::POST, "intake/"),
+            (Method::GET, "api/v1/metadata"),
+        ] {
+            let uri = format!("/datadog/{DD_ORG}/{path}");
+            let req = dd_request(method.clone(), &uri, Some(DD_KEY), Body::from("x"));
+            assert_eq!(dd_send(req).await.0, StatusCode::ACCEPTED, "{uri}");
+            let req = dd_request(method, &uri, None, Body::from("x"));
+            assert_eq!(dd_send(req).await.0, StatusCode::FORBIDDEN, "{uri}");
+        }
+        // The catch-all never reads its body, so one past the intake cap is no 413.
+        let uri = format!("/datadog/{DD_ORG}/api/v0.2/stats");
+        let body = Body::from(vec![b' '; datadog::DATADOG_MAX_BODY_BYTES + 1]);
+        let req = dd_request(Method::POST, &uri, Some(DD_KEY), body);
+        assert_eq!(dd_send(req).await.0, StatusCode::ACCEPTED);
+        assert_eq!(dropped() - before, 4);
+    }
+
+    #[tokio::test]
+    async fn datadog_validate_reads_the_query_key() {
+        let uri = format!("/datadog/{DD_ORG}/api/v1/validate?api_key={DD_KEY}");
+        let (status, body) = dd_send(dd_request(Method::GET, &uri, None, Body::empty())).await;
+        assert_eq!(
+            (status, body.as_str()),
+            (StatusCode::OK, r#"{"valid":true}"#)
+        );
+        let uri = format!("/datadog/{DD_ORG}/api/v1/validate?api_key=not-a-token");
+        let (status, _) = dd_send(dd_request(Method::GET, &uri, None, Body::empty())).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn datadog_log_routes_answer_the_probe_and_reject_garbage() {
+        for path in ["api/v2/logs", "v1/input"] {
+            let uri = format!("/datadog/{DD_ORG}/{path}");
+            for (body, encoding, expected) in [
+                (b"{}".to_vec(), None, StatusCode::OK),
+                (Vec::new(), None, StatusCode::OK),
+                (
+                    zstd::encode_all(&b"{}"[..], 3).unwrap(),
+                    Some("zstd"),
+                    StatusCode::OK,
+                ),
+                (b"{not json".to_vec(), None, StatusCode::BAD_REQUEST),
+            ] {
+                let mut req = dd_request(Method::POST, &uri, Some(DD_KEY), Body::from(body));
+                if let Some(encoding) = encoding {
+                    req.headers_mut()
+                        .insert(header::CONTENT_ENCODING, encoding.parse().unwrap());
+                }
+                assert_eq!(dd_send(req).await.0, expected, "{uri} {encoding:?}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn datadog_undecodable_payloads_are_400() {
+        for path in [
+            "api/v2/series",
+            "api/beta/sketches",
+            "api/v1/check_run",
+            "api/v0.2/traces",
+        ] {
+            let uri = format!("/datadog/{DD_ORG}/{path}");
+            let req = dd_request(Method::POST, &uri, Some(DD_KEY), Body::from(vec![0xff; 64]));
+            assert_eq!(dd_send(req).await.0, StatusCode::BAD_REQUEST, "{uri}");
+        }
+    }
+
+    #[tokio::test]
+    async fn datadog_bodies_over_the_cap_are_413_as_sent_and_after_decompression() {
+        let uri = format!("/datadog/{DD_ORG}/api/v2/logs");
+        let limit = datadog::DATADOG_MAX_BODY_BYTES;
+        let req = dd_request(
+            Method::POST,
+            &uri,
+            Some(DD_KEY),
+            Body::from(vec![b' '; limit + 1]),
+        );
+        assert_eq!(dd_send(req).await.0, StatusCode::PAYLOAD_TOO_LARGE);
+
+        let bomb = zstd::encode_all(&vec![b' '; limit + 1][..], 3).unwrap();
+        assert!(bomb.len() < 64 * 1024);
+        let mut req = dd_request(Method::POST, &uri, Some(DD_KEY), Body::from(bomb));
+        req.headers_mut()
+            .insert(header::CONTENT_ENCODING, "zstd".parse().unwrap());
+        assert_eq!(dd_send(req).await.0, StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    #[tokio::test]
+    async fn datadog_a_streamed_compressed_body_over_the_wire_cap_is_413() {
+        let uri = format!("/datadog/{DD_ORG}/api/v2/logs");
+        // Pseudo-random bytes do not compress, so the compressed body stays past the cap.
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        let raw: Vec<u8> = (0..datadog::DATADOG_MAX_BODY_BYTES + 1024 * 1024)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                state as u8
+            })
+            .collect();
+        let compressed = zstd::encode_all(&raw[..], 1).unwrap();
+        assert!(compressed.len() > datadog::DATADOG_MAX_BODY_BYTES);
+        // A stream has no size hint, so only the streaming cap can stop it.
+        let chunks: Vec<Result<axum::body::Bytes, std::io::Error>> = compressed
+            .chunks(64 * 1024)
+            .map(|c| Ok(axum::body::Bytes::copy_from_slice(c)))
+            .collect();
+        let body = Body::from_stream(futures::stream::iter(chunks));
+        let mut req = dd_request(Method::POST, &uri, Some(DD_KEY), body);
+        req.headers_mut()
+            .insert(header::CONTENT_ENCODING, "zstd".parse().unwrap());
+        assert_eq!(dd_send(req).await.0, StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    #[tokio::test]
+    async fn the_datadog_key_header_does_not_authenticate_other_ingest_routes() {
+        let uri = format!("/api/{DD_ORG}/_bulk");
+        let req = dd_request(Method::POST, &uri, Some(DD_KEY), Body::from("{}"));
+        assert_eq!(dd_send(req).await.0, StatusCode::UNAUTHORIZED);
+    }
+
+    // Refused before any lookup, so a 400 proves the hook handler owns the path without a DB.
+    #[cfg(feature = "enterprise")]
+    fn credential_in_url_probe() -> Request<Body> {
+        Request::builder()
+            .method(Method::POST)
+            .uri("/api/v2/o/workflows/hooks/x?token=a")
+            .body(Body::empty())
+            .unwrap()
+    }
+
+    // basic_routes already holds the hook routes when the process runs with hooks on.
+    #[cfg(feature = "enterprise")]
+    fn hook_routes_unless_registered() -> Router {
+        if get_o2_config().common.workflows_enabled
+            && openobserve_core::workflows::http_trigger::hooks_enabled()
+        {
+            Router::new()
+        } else {
+            workflow_hook_routes()
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn create_app_router_builds_with_workflow_hook_routes() {
+        let app = Router::new()
+            .merge(basic_routes())
+            .merge(hook_routes_unless_registered())
+            .merge(splunk_collector_routes())
+            .nest("/config", config_routes())
+            .nest("/api", service_routes())
+            .merge(other_service_routes())
+            .merge(proxy_routes(true));
+        let status = app
+            .oneshot(credential_in_url_probe())
+            .await
+            .unwrap()
+            .status();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn router_node_app_builds_with_workflow_hook_routes() {
+        let router_routes = Router::new()
+            .merge(crate::router::http::create_router_routes())
+            .nest("/config", config_routes())
+            .merge(proxy_routes(true));
+        let app = Router::new()
+            .merge(basic_routes())
+            .merge(hook_routes_unless_registered())
+            .merge(crate::router::http::create_splunk_collector_proxy_routes())
+            .merge(router_routes);
+        let status = app
+            .oneshot(credential_in_url_probe())
+            .await
+            .unwrap()
+            .status();
+        assert_eq!(
+            status,
+            StatusCode::BAD_REQUEST,
+            "the hook route wins over /api/{{*path}}"
+        );
+    }
+
+    #[tokio::test]
     async fn non_router_node_shape_serves_the_collector_locally() {
         let app = Router::new()
             .nest("/api", Router::new().route("/ping", get(|| async { "" })))
@@ -3086,7 +4425,6 @@ mod tests {
                 "custom_logo_text",
                 "editor_suggest_mode",
                 "native_login_enabled",
-                "rum",
                 "sso_enabled",
                 "telemetry_enabled",
             ],
@@ -3099,19 +4437,30 @@ mod tests {
             "the editors need the suggest mode before the authenticated config arrives"
         );
 
-        // build_type (enterprise/cloud/opensource) is not sensitive and the o2
-        // CLI + o2-operator read it from this unauthenticated endpoint to gate
-        // enterprise commands — it must stay a real build-type token.
+        // The o2 CLI and o2-operator gate enterprise commands on this unauthenticated field.
+        let expected_build_type = if cfg!(feature = "cloud") {
+            "cloud"
+        } else if cfg!(feature = "enterprise") {
+            "enterprise"
+        } else {
+            "opensource"
+        };
         assert_eq!(
             payload.get("build_type").and_then(Value::as_str),
-            Some("opensource"),
+            Some(expected_build_type),
             "bootstrap build_type must carry the real build kind"
         );
 
+        let fingerprint = config::build_fingerprint();
         assert_eq!(
             payload.get("commit_hash").and_then(Value::as_str),
-            Some(config::COMMIT_HASH),
-            "bootstrap commit_hash must carry the real commit for stale-build detection"
+            Some(fingerprint.as_str()),
+            "bootstrap commit_hash must carry a per-build value for stale-build detection"
+        );
+        assert_ne!(
+            fingerprint,
+            config::COMMIT_HASH,
+            "the unauthenticated bootstrap must not disclose the commit"
         );
     }
 
@@ -3166,6 +4515,10 @@ mod tests {
             "authenticated config carries the version"
         );
         assert!(
+            payload.get("rum").is_some_and(Value::is_object),
+            "the RUM SDK settings are served only to signed-in callers"
+        );
+        assert!(
             payload.get("instance").is_none(),
             "the instance id is a fingerprinting handle no UI consumer reads; it must not be served"
         );
@@ -3181,6 +4534,34 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(wrong_method.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[tokio::test]
+    async fn settings_v2_refuses_an_invalid_auto_investigate_gate() {
+        let app = Router::new().route(
+            "/api/{org_id}/settings/v2",
+            post(organization::system_settings::set_org_setting),
+        );
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/api/default/settings/v2")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                r#"{"setting_key":"auto_investigate_gate","setting_value":{"flapping_onsets_7d":1},"setting_category":"alerts"}"#,
+            ))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let text = String::from_utf8_lossy(&body);
+        assert!(
+            text.contains(
+                "invalid auto_investigate_gate: flapping_onsets_7d must be between 2 and 100"
+            ),
+            "{text}"
+        );
     }
 
     // NOTE ON WHAT IS TESTABLE HERE.
@@ -3597,6 +4978,37 @@ mod tests {
         );
     }
 
+    #[test]
+    fn jira_setup_is_published_with_its_403() {
+        let spec = serde_json::to_value(super::openapi::ApiDoc::openapi()).unwrap();
+        let post = &spec["paths"]["/api/{org_id}/alerts/destinations/jira/setup"]["post"];
+        assert_eq!(post["operationId"], "JiraDestinationSetup", "{post}");
+        assert!(post["responses"]["403"].is_object(), "{post}");
+    }
+
+    #[test]
+    fn query_history_list_publishes_both_response_shapes() {
+        let spec = serde_json::to_value(super::openapi::ApiDoc::openapi()).unwrap();
+        let ok = &spec["paths"]["/api/{org_id}/query_history"]["get"]["responses"]["200"];
+        assert_eq!(
+            ok["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/QueryHistoryListResponse"
+        );
+        let shapes = spec["components"]["schemas"]["QueryHistoryListResponse"]["oneOf"]
+            .as_array()
+            .expect("the list response is a oneOf");
+        let shapes = serde_json::to_string(shapes).unwrap();
+        assert!(
+            shapes.contains("#/components/schemas/QueryHistoryEntry"),
+            "{shapes}"
+        );
+        assert!(shapes.contains("\"type\":\"array\""), "{shapes}");
+        assert!(
+            shapes.contains("#/components/schemas/QueryHistoryCountResponse"),
+            "{shapes}"
+        );
+    }
+
     #[cfg(feature = "enterprise")]
     #[test]
     fn experiment_lifecycle_actions_are_published_in_the_openapi_surface() {
@@ -3682,6 +5094,40 @@ mod tests {
 
     // ── is_origin_allowed unit tests ──────────────────────────────────────────
 
+    #[tokio::test]
+    async fn public_dashboard_polls_pass_cors_and_read_their_headers() {
+        let app = Router::new()
+            .route("/x", get(|| async { "ok" }))
+            .layer(cors_layer());
+        let preflight = Request::builder()
+            .method(Method::OPTIONS)
+            .uri("/x")
+            .header(header::ORIGIN, "http://localhost:5080")
+            .header(header::ACCESS_CONTROL_REQUEST_METHOD, "GET")
+            .header(header::ACCESS_CONTROL_REQUEST_HEADERS, "if-none-match")
+            .body(Body::empty())
+            .unwrap();
+        let get_req = Request::builder()
+            .uri("/x")
+            .header(header::ORIGIN, "http://localhost:5080")
+            .body(Body::empty())
+            .unwrap();
+        let preflight = app.clone().oneshot(preflight).await.unwrap();
+        let get_resp = app.oneshot(get_req).await.unwrap();
+        let allowed = preflight.headers()[header::ACCESS_CONTROL_ALLOW_HEADERS]
+            .to_str()
+            .unwrap()
+            .to_lowercase();
+        assert!(allowed.contains("if-none-match"), "{allowed}");
+        let exposed = get_resp.headers()[header::ACCESS_CONTROL_EXPOSE_HEADERS]
+            .to_str()
+            .unwrap()
+            .to_lowercase();
+        for name in ["etag", "retry-after", "date"] {
+            assert!(exposed.contains(name), "{exposed}");
+        }
+    }
+
     #[test]
     fn test_cors_exact_match_allowed() {
         assert!(is_origin_allowed(
@@ -3753,6 +5199,47 @@ mod tests {
     fn test_cors_empty_web_url_allows_all() {
         // Empty web_url is permissive (dev mode)
         assert!(is_origin_allowed(b"https://any.origin.com", ""));
+    }
+
+    #[tokio::test]
+    async fn test_cors_preflight_allows_assistant_chat_headers() {
+        // One header missing from the allow-list fails the preflight and the POST is never sent.
+        let app = Router::new()
+            .route(
+                "/default/ai/chat_stream",
+                axum::routing::post(|| async { "ok" }),
+            )
+            .layer(cors_layer());
+        let req = Request::builder()
+            .method(Method::OPTIONS)
+            .uri("/default/ai/chat_stream")
+            .header(header::ORIGIN, "http://localhost:8081")
+            .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
+            .header(
+                header::ACCESS_CONTROL_REQUEST_HEADERS,
+                "content-type,traceparent,x-o2-assistant-session-id,x-o2-assistant-turn-id",
+            )
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        let allowed = response
+            .headers()
+            .get(header::ACCESS_CONTROL_ALLOW_HEADERS)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        for name in [
+            "content-type",
+            "traceparent",
+            X_O2_ASSISTANT_SESSION_ID.as_str(),
+            X_O2_ASSISTANT_TURN_ID.as_str(),
+        ] {
+            assert!(
+                allowed.split(',').any(|h| h.trim() == name),
+                "{name} missing from access-control-allow-headers: {allowed}"
+            );
+        }
     }
 
     #[test]
@@ -3879,8 +5366,8 @@ mod tests {
     /// `service_routes()` minus comments, whitespace and wrap commas.
     fn service_routes_registrations() -> String {
         let source = include_str!("mod.rs");
-        let start = source.find("pub fn service_routes() -> Router {").unwrap();
-        let end = start + source[start..].find("\npub fn ").unwrap();
+        let start = source.find("fn service_route_table() -> Router {").unwrap();
+        let end = start + source[start..].find("\n}\n").unwrap();
         let mut body = String::new();
         let mut rest = &source[start..end];
         while let Some(at) = rest.find("/*") {
@@ -3896,6 +5383,14 @@ mod tests {
             .split_whitespace()
             .collect::<String>()
             .replace(",)", ")")
+    }
+
+    #[test]
+    fn service_streams_routes_are_merged_unconditionally_in_service_routes() {
+        assert!(
+            service_routes_registrations().contains(".merge(service_streams_routes())"),
+            "service_routes() must merge service_streams_routes() outside the enterprise block"
+        );
     }
 
     #[test]
@@ -3968,6 +5463,106 @@ mod tests {
         assert_eq!(post.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
+    #[test]
+    fn org_metric_usage_route_is_registered_and_published() {
+        assert!(
+            service_routes_registrations().contains(
+                r#".route("/{org_id}/metrics/usage",get(metrics_usage::get_org_metric_usage))"#
+            ),
+            "GET /{{org_id}}/metrics/usage must be registered in service_routes()"
+        );
+        let spec = super::openapi::ApiDoc::openapi();
+        let path = spec
+            .paths
+            .paths
+            .get("/api/{org_id}/metrics/usage")
+            .expect("org metric usage is missing from the OpenAPI surface");
+        assert_eq!(
+            path.get.as_ref().and_then(|op| op.operation_id.as_deref()),
+            Some("GetOrgMetricUsage")
+        );
+    }
+
+    #[tokio::test]
+    async fn rca_steer_route_refuses_put_and_delete() {
+        const STEER_PATH: &str =
+            "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steer";
+        assert!(
+            service_routes_registrations().contains(&format!(
+                r#".route("{STEER_PATH}",post(alerts::incidents::steer_incident_rca_run))"#
+            )),
+            "the steer path must be registered in service_routes() for POST only"
+        );
+        let app = Router::new().route(STEER_PATH, post(alerts::incidents::steer_incident_rca_run));
+        for method in ["PUT", "DELETE"] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri("/v2/myorg/alerts/incidents/inc1/rca/runs/run1/steer")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::METHOD_NOT_ALLOWED,
+                "{method}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn rca_resume_route_takes_only_post() {
+        const RESUME_PATH: &str =
+            "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume";
+        let registrations = service_routes_registrations();
+        assert!(
+            registrations.contains(&format!(
+                r#".route("{RESUME_PATH}",post(alerts::incidents::resume_incident_rca_run))"#
+            )),
+            "the resume path must be registered in service_routes() for POST only"
+        );
+
+        let app = Router::new().route(
+            RESUME_PATH,
+            post(alerts::incidents::resume_incident_rca_run),
+        );
+        for (method, uri) in [
+            (
+                "GET",
+                "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/resume",
+            ),
+            (
+                "PUT",
+                "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/resume",
+            ),
+            (
+                "DELETE",
+                "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/resume",
+            ),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri(uri)
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::METHOD_NOT_ALLOWED,
+                "{method} {uri}"
+            );
+        }
+    }
+
     fn node_request(user_id: &str) -> Request<Body> {
         Request::builder()
             .uri("/metrics")
@@ -4002,5 +5597,673 @@ mod tests {
         );
         let response = node_routes().oneshot(node_request(root)).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    async fn refusal_parts(error: AuthError, denied: bool) -> (StatusCode, String) {
+        let denial = denied.then(|| {
+            let err = infra::errors::ErrorCodes::LicenseFeatureNotEntitled("workflows".into());
+            (
+                StatusCode::FORBIDDEN,
+                axum::Json(common::meta::http::HttpResponse::error_code(err)),
+            )
+                .into_response()
+        });
+        let response = refusal_response(error, denial);
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, String::from_utf8_lossy(&body).into_owned())
+    }
+
+    #[tokio::test]
+    async fn only_a_refused_role_on_a_locked_route_answers_with_the_license_denial() {
+        let role = || AuthError::RoleRefused("Unauthorized Access".to_string());
+        let (status, body) = refusal_parts(role(), true).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert!(body.contains("40001"), "{body}");
+        assert!(body.contains("Workflows"), "{body}");
+
+        assert_eq!(
+            refusal_parts(role(), false).await,
+            (StatusCode::FORBIDDEN, "Unauthorized Access".to_string())
+        );
+        assert_eq!(
+            refusal_parts(AuthError::Unauthorized("no".to_string()), true).await,
+            (StatusCode::UNAUTHORIZED, "no".to_string())
+        );
+        assert_eq!(
+            refusal_parts(AuthError::Forbidden("Not allowed".to_string()), true).await,
+            (StatusCode::FORBIDDEN, "Not allowed".to_string())
+        );
+    }
+
+    /// Paths of the `.route(` calls in `source` that no `require_features` covers.
+    fn routes_without_a_gate(source: &str) -> Vec<String> {
+        const GATE: &str = "require_features";
+        fn call_args(text: &str) -> &str {
+            let mut depth = 1;
+            for (at, c) in text.char_indices() {
+                depth += match c {
+                    '(' => 1,
+                    ')' => -1,
+                    _ => 0,
+                };
+                if depth == 0 {
+                    return &text[..at];
+                }
+            }
+            text
+        }
+
+        let code = source
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let mut ungated = Vec::new();
+        for (at, _) in code.match_indices(".route(") {
+            let rest = &code[at + ".route(".len()..];
+            let args = call_args(rest);
+            let after = &rest[args.len()..];
+            let section_end = ["router = ", "let public"]
+                .iter()
+                .filter_map(|stop| after.find(stop))
+                .min()
+                .unwrap_or(after.len());
+            // A router-level layer covers the routes above it; a sibling's own layer does not.
+            let mut chain = String::new();
+            let mut tail = &after[..section_end];
+            while let Some(next) = tail.find(".route(") {
+                chain.push_str(&tail[..next]);
+                let sibling = &tail[next + ".route(".len()..];
+                tail = &sibling[call_args(sibling).len()..];
+            }
+            chain.push_str(tail);
+            let router_gated = chain
+                .match_indices(".route_layer(")
+                .any(|(at, _)| call_args(&chain[at + ".route_layer(".len()..]).contains(GATE));
+            if !args.contains(GATE) && !router_gated {
+                ungated.push(args.split('"').nth(1).unwrap_or(args).to_string());
+            }
+        }
+        ungated
+    }
+
+    #[test]
+    fn the_route_scan_tells_a_gate_from_a_sibling_gate() {
+        let source = r#"
+            router = router.route("/own", post(a).route_layer(require_features));
+            router = router.route("/none", get(a));
+            router = router.route("/mention_only", get(a)).named(require_features);
+            router = router
+                .route("/before_sibling", get(a))
+                .route("/sibling", get(a).route_layer(require_features));
+            // .route("/commented", get(a));
+            let public = Router::new()
+                .route("/chained", get(a))
+                .route_layer(require_features)
+                .route("/after_layer", get(a));
+            router = router.merge(public);
+        "#;
+        assert_eq!(
+            routes_without_a_gate(source),
+            ["/none", "/mention_only", "/before_sibling", "/after_layer"]
+        );
+    }
+
+    /// The route table cannot see routes served outside `auth_middleware`, so this reads them.
+    #[test]
+    fn every_public_route_has_a_license_gate_or_is_listed() {
+        let mut public_ungated = vec![
+            "/.well-known/oauth-authorization-server",
+            "/.well-known/oauth-protected-resource",
+            "/.well-known/oauth-protected-resource/{*resource_path}",
+            "/api/slack/commands",
+            "/api/slack/events",
+            "/api/slack/interactions",
+            "/api/v2/{org_id}/alerts/charts/render",
+            // These four are refused inside their handlers, only after the credential is verified.
+            "/api/v2/{org_id}/oncall/ack",
+            "/api/v2/{org_id}/oncall/ack/voice/{token}",
+            "/api/v2/{org_id}/workflows/hooks/{trigger_id}",
+            "/api/v2/{org_id}/workflows/hooks/{trigger_id}/runs/{run_id}",
+            "/azure",
+            "/docs",
+            "/healthz",
+            "/login",
+            "/marketplace/aws/register",
+            "/metrics",
+            "/presigned-url",
+            "/profile/cpu",
+            "/profile/memory",
+            "/profile/stats",
+            "/schedulez",
+            "/stripe",
+        ];
+        public_ungated.sort_unstable();
+        let src = include_str!("mod.rs");
+        let (production, _) = src
+            .split_once("\n#[cfg(test)]\nmod tests {")
+            .expect("test module marker moved; this scan would read fixtures as routes");
+        let body = |signature: &str| {
+            let start = production
+                .find(signature)
+                .unwrap_or_else(|| panic!("{signature} moved; point this scan at the new name"));
+            &production[start..start + production[start..].find("\n}\n").unwrap()]
+        };
+        let mut found = routes_without_a_gate(body("pub fn basic_routes() -> Router {"));
+        found.extend(routes_without_a_gate(body(
+            "fn workflow_hook_routes() -> Router {",
+        )));
+        found.sort_unstable();
+        assert_eq!(
+            found, public_ungated,
+            "left is what the source registers without a route gate, right is the allowed list: gate \
+             a new public route, list it if it stays open by design or checks in its handler, and \
+             remove an entry once it has a gate"
+        );
+    }
+
+    /// Every (method, template) the `/api` tree serves, parsed from this file's production code.
+    fn api_routes() -> std::collections::BTreeMap<String, std::collections::BTreeSet<String>> {
+        let src = include_str!("mod.rs");
+        let (production, _) = src.split_once("\n#[cfg(test)]\nmod tests {").unwrap();
+        let section = |from: &str, to: &str| {
+            let start = production.find(from).unwrap();
+            let end = start + production[start..].find(to).unwrap();
+            &production[start..end]
+        };
+        let api_tree = [
+            section("fn ai_chat_routes(", "pub fn other_service_routes("),
+            section("fn es_compat_routes(", "\n}\n"),
+        ];
+        let methods =
+            regex::Regex::new(r"(?:^|[\s(.,])(get|post|put|delete|patch|head)\(").unwrap();
+        let mut routes =
+            std::collections::BTreeMap::<String, std::collections::BTreeSet<String>>::new();
+        for text in api_tree {
+            for (at, _) in text.match_indices(".route(") {
+                let args = &text[at + ".route(".len()..];
+                let mut depth = 1;
+                let end = args
+                    .char_indices()
+                    .find(|(_, c)| {
+                        depth += match c {
+                            '(' => 1,
+                            ')' => -1,
+                            _ => 0,
+                        };
+                        depth == 0
+                    })
+                    .unwrap()
+                    .0;
+                let args = &args[..end];
+                let template = args.split('"').nth(1).unwrap().to_string();
+                let found: Vec<String> = methods
+                    .captures_iter(args)
+                    .map(|c| c[1].to_uppercase())
+                    .collect();
+                assert!(!found.is_empty(), "no method parsed for {template}");
+                routes.entry(template).or_default().extend(found);
+            }
+        }
+        routes
+    }
+
+    fn template_segments(template: &str) -> Vec<&str> {
+        template.trim_start_matches('/').split('/').collect()
+    }
+
+    fn is_param(segment: &str) -> bool {
+        segment.starts_with('{')
+    }
+
+    fn neutral_path(template: &str) -> String {
+        template_segments(template)
+            .iter()
+            .map(|s| if is_param(s) { "zz" } else { s })
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+
+    /// The route axum dispatches to: at the first differing segment a literal beats a parameter.
+    fn owner<'a>(templates: &[&'a str], path: &[&str]) -> Option<&'a str> {
+        let matches = |t: &&str| {
+            let segs = template_segments(t);
+            segs.len() == path.len() && segs.iter().zip(path).all(|(s, p)| is_param(s) || s == p)
+        };
+        templates.iter().copied().filter(matches).max_by(|a, b| {
+            let rank = |t: &str| -> Vec<bool> {
+                template_segments(t).iter().map(|s| !is_param(s)).collect()
+            };
+            rank(a).cmp(&rank(b))
+        })
+    }
+
+    /// Every `METHOD template` of the router that `in_scope` admits, sorted.
+    fn scope_allows(in_scope: fn(&Method, &str) -> bool) -> Vec<String> {
+        let mut allowed = Vec::new();
+        for (template, methods) in api_routes() {
+            for method in methods {
+                let m = Method::from_bytes(method.as_bytes()).unwrap();
+                if in_scope(&m, &neutral_path(&template)) {
+                    allowed.push(format!("{method} {template}"));
+                }
+            }
+        }
+        allowed.sort();
+        allowed
+    }
+
+    fn sorted(expected: &[&str]) -> Vec<String> {
+        let mut expected: Vec<String> = expected.iter().map(|s| s.to_string()).collect();
+        expected.sort();
+        expected
+    }
+
+    /// Paths where `in_scope` admits a request that axum hands to a route it refuses, or back.
+    fn dispatch_disagreements(in_scope: fn(&Method, &str) -> bool) -> Vec<String> {
+        let routes = api_routes();
+        let templates: Vec<&str> = routes.keys().map(String::as_str).collect();
+        let mut wrong = Vec::new();
+        for r in &templates {
+            for a in &templates {
+                let (rs, as_) = (template_segments(r), template_segments(a));
+                if rs.len() != as_.len() {
+                    continue;
+                }
+                let merged: Option<Vec<&str>> = rs
+                    .iter()
+                    .zip(&as_)
+                    .map(|(x, y)| match (is_param(x), is_param(y)) {
+                        (false, false) => (x == y).then_some(*x),
+                        (false, true) => Some(*x),
+                        (true, false) => Some(*y),
+                        (true, true) => Some("zz"),
+                    })
+                    .collect();
+                let Some(path) = merged else { continue };
+                let Some(owner) = owner(&templates, &path) else {
+                    continue;
+                };
+                for method in &routes[owner] {
+                    let m = Method::from_bytes(method.as_bytes()).unwrap();
+                    let joined = path.join("/");
+                    if in_scope(&m, &joined) != in_scope(&m, &neutral_path(owner)) {
+                        wrong.push(format!("{method} {joined} dispatches to {owner}"));
+                    }
+                }
+            }
+        }
+        wrong.sort();
+        wrong.dedup();
+        wrong
+    }
+
+    #[test]
+    fn assistant_scope_is_exactly_these_router_routes() {
+        use openobserve_api_common::auth::delegation::in_assistant_scope;
+
+        let expected = [
+            "GET /v2/{org_id}/alerts",
+            "GET /v2/{org_id}/alerts/history",
+            "GET /v2/{org_id}/alerts/incidents",
+            "GET /v2/{org_id}/alerts/incidents/stats",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/events",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}",
+            "GET /v2/{org_id}/alerts/tags",
+            "GET /v2/{org_id}/alerts/{alert_id}",
+            "GET /v2/{org_id}/alerts/{alert_id}/groups",
+            "GET /v2/{org_id}/alerts/{alert_id}/groups/transitions",
+            "GET /v2/{org_id}/folders/{folder_type}",
+            "GET /v2/{org_id}/folders/{folder_type}/name/{folder_name}",
+            "GET /v2/{org_id}/folders/{folder_type}/{folder_id}",
+            "GET /{org_id}/dashboards",
+            "GET /{org_id}/dashboards/{dashboard_id}",
+            "GET /{org_id}/functions",
+            "GET /{org_id}/mcp",
+            "GET /{org_id}/oncall/incidents/{incident_id}/responses",
+            "GET /{org_id}/oncall/responses",
+            "GET /{org_id}/oncall/responses/escalation",
+            "GET /{org_id}/oncall/responses/{response_id}",
+            "GET /{org_id}/oncall/responses/{response_id}/escalation",
+            "GET /{org_id}/oncall/responses/{response_id}/history",
+            "GET /{org_id}/oncall/teams",
+            "GET /{org_id}/oncall/teams/context",
+            "GET /{org_id}/oncall/teams/{team_id}",
+            "GET /{org_id}/oncall/teams/{team_id}/members",
+            "GET /{org_id}/oncall/teams/{team_id}/on-call",
+            "GET /{org_id}/oncall/teams/{team_id}/overrides",
+            "GET /{org_id}/oncall/teams/{team_id}/overview",
+            "GET /{org_id}/oncall/teams/{team_id}/resolved-schedule",
+            "GET /{org_id}/oncall/teams/{team_id}/schedule",
+            "GET /{org_id}/prometheus/api/v1/query",
+            "GET /{org_id}/prometheus/api/v1/query_range",
+            "GET /{org_id}/streams",
+            "GET /{org_id}/streams/{stream_name}/schema",
+            "GET /{org_id}/{stream_name}/_around",
+            "GET /{org_id}/{stream_name}/_values",
+            "GET /{org_id}/{stream_name}/traces/latest",
+            "GET /{org_id}/{stream_name}/traces/latest_stream",
+            "GET /{org_id}/{stream_name}/traces/session",
+            "GET /{org_id}/{stream_name}/traces/session/details",
+            "GET /{org_id}/{stream_name}/traces/time_range",
+            "GET /{org_id}/{stream_name}/traces/user",
+            "GET /{org_id}/{stream_name}/traces/{trace_id}/dag",
+            "GET /{org_id}/{stream_name}/traces/{trace_id}/details",
+            "PATCH /v2/{org_id}/alerts/incidents/{incident_id}/update",
+            "POST /v2/{org_id}/alerts/incidents/{incident_id}/events/comment",
+            "POST /v2/{org_id}/downtimes",
+            "POST /v2/{org_id}/downtimes/{downtime_id}/cancel",
+            "POST /{org_id}/_search",
+            "POST /{org_id}/ai/chat",
+            "POST /{org_id}/ai/chat_stream",
+            "POST /{org_id}/ai/chats/{session_id}/cancel",
+            "POST /{org_id}/ai/confirm/{session_id}",
+            "POST /{org_id}/ai/feedback",
+            "POST /{org_id}/mcp",
+            "POST /{org_id}/oncall/responses/{response_id}/acknowledge",
+            "POST /{org_id}/oncall/responses/{response_id}/resolve",
+            "POST /{org_id}/oncall/responses/{response_id}/snooze",
+            "POST /{org_id}/oncall/responses/{response_id}/unsnooze",
+            "POST /{org_id}/prometheus/api/v1/query",
+            "POST /{org_id}/prometheus/api/v1/query_range",
+            "POST /{org_id}/{stream_name}/_around",
+        ];
+        assert_eq!(scope_allows(in_assistant_scope), sorted(&expected));
+    }
+
+    #[test]
+    fn slack_action_scope_routes_are_exactly() {
+        use openobserve_api_common::auth::delegation::in_slack_action_scope;
+
+        let expected = [
+            "GET /v2/{org_id}/alerts/{alert_id}",
+            "GET /v2/{org_id}/alerts/{alert_id}/acks",
+            "GET /v2/{org_id}/alerts/{alert_id}/groups",
+            "PATCH /v2/{org_id}/alerts/incidents/{incident_id}/update",
+            "POST /v2/{org_id}/alerts/{alert_id}/ack",
+            "POST /v2/{org_id}/alerts/{alert_id}/mute",
+            "POST /v2/{org_id}/alerts/{alert_id}/mute/{downtime_id}/cancel",
+            "POST /v2/{org_id}/alerts/{alert_id}/mute/{downtime_id}/extend",
+            "POST /v2/{org_id}/alerts/{alert_id}/unack",
+            "POST /{org_id}/oncall/responses/{response_id}/acknowledge",
+            "POST /{org_id}/oncall/responses/{response_id}/resolve",
+            "POST /{org_id}/oncall/responses/{response_id}/snooze",
+            "POST /{org_id}/oncall/responses/{response_id}/unacknowledge",
+        ];
+        assert_eq!(scope_allows(in_slack_action_scope), sorted(&expected));
+    }
+
+    /// A pattern parameter must not admit a path that axum hands to a more specific route.
+    #[test]
+    fn assistant_scope_agrees_with_axum_dispatch() {
+        use openobserve_api_common::auth::delegation::in_assistant_scope;
+
+        let wrong = dispatch_disagreements(in_assistant_scope);
+        assert!(
+            wrong.is_empty(),
+            "add the literal to RESERVED_STREAM_SLOTS in api/common auth/delegation.rs: {wrong:#?}"
+        );
+    }
+
+    #[test]
+    fn slack_action_scope_agrees_with_axum_dispatch() {
+        use openobserve_api_common::auth::delegation::in_slack_action_scope;
+
+        let wrong = dispatch_disagreements(in_slack_action_scope);
+        assert!(
+            wrong.is_empty(),
+            "add the literal to ALERT_ID_LITERALS in api/common auth/delegation.rs: {wrong:#?}"
+        );
+    }
+
+    // Router-role pods merge basic_routes the same way, so this covers both node shapes.
+    #[tokio::test]
+    async fn slack_inbound_routes_need_no_o2_auth_and_cap_the_body_at_1_mib() {
+        let app = Router::new()
+            .merge(basic_routes())
+            .nest("/api", service_routes());
+        for path in [
+            "/api/slack/events",
+            "/api/slack/commands",
+            "/api/slack/interactions",
+        ] {
+            let req = Request::builder()
+                .method(Method::POST)
+                .uri(path)
+                .body(Body::from("{}"))
+                .unwrap();
+            let resp = app.clone().oneshot(req).await.unwrap();
+            assert_eq!(resp.status(), StatusCode::NOT_FOUND, "{path}");
+            let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let body: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(body["message"], "Slack is not enabled", "{path}");
+
+            let big = vec![b' '; slack::inbound::MAX_BODY_BYTES + 1];
+            let req = Request::builder()
+                .method(Method::POST)
+                .uri(path)
+                .body(Body::from(big))
+                .unwrap();
+            let status = app.clone().oneshot(req).await.unwrap().status();
+            assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE, "{path}");
+        }
+    }
+
+    #[tokio::test]
+    async fn an_org_named_slack_still_reaches_its_own_routes() {
+        let app = Router::new()
+            .merge(basic_routes())
+            .nest("/api", service_routes());
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri("/api/slack/streams")
+            .body(Body::empty())
+            .unwrap();
+        let status = app.oneshot(req).await.unwrap().status();
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn invites_are_not_served_unauthenticated_with_a_forged_identity_header() {
+        let app = Router::new()
+            .merge(basic_routes())
+            .nest("/api", service_routes());
+        for (method, uri, expected) in [
+            (Method::GET, "/auth/invites", StatusCode::NOT_FOUND),
+            (Method::DELETE, "/auth/invites/x", StatusCode::NOT_FOUND),
+            (Method::GET, "/api/invites", StatusCode::UNAUTHORIZED),
+            (Method::DELETE, "/api/invites/x", StatusCode::UNAUTHORIZED),
+        ] {
+            let req = Request::builder()
+                .method(method.clone())
+                .uri(uri)
+                .header("user_id", "someone@example.com")
+                .body(Body::empty())
+                .unwrap();
+            let status = app.clone().oneshot(req).await.unwrap().status();
+            assert_eq!(status, expected, "{method} {uri}");
+        }
+    }
+
+    #[tokio::test]
+    async fn an_org_ingestion_token_is_judged_by_the_route_each_auth_layer_matched() {
+        let org = "route_wiring_org";
+        let token = "o2oi_route_wiring";
+        common::infra::config::ORGANIZATIONS.write().await.insert(
+            org.to_string(),
+            common::meta::organization::Organization {
+                identifier: org.to_string(),
+                name: org.to_string(),
+                org_type: "custom".to_string(),
+                service_account: None,
+            },
+        );
+        common::infra::config::ORG_INGESTION_TOKENS
+            .insert(format!("{org}/{token}"), "wiring-token".to_string());
+        let credentials = config::utils::base64::encode(&format!("collector@example.com:{token}"));
+        let app = Router::new().nest(
+            "/o2",
+            Router::new()
+                .nest("/api", service_routes())
+                .merge(other_service_routes()),
+        );
+        for (uri, header, accepted) in [
+            (format!("/o2/api/{org}/_bulk"), "Authorization", true),
+            (format!("/o2/api/{org}/kv/_json"), "Authorization", false),
+            (
+                format!("/o2/api/{org}/streams/_sub"),
+                "Authorization",
+                false,
+            ),
+            (
+                format!("/o2/aws/{org}/s/_kinesis_firehose"),
+                "X-Amz-Firehose-Access-Key",
+                true,
+            ),
+            (
+                format!("/o2/gcp/{org}/s/_sub?API-Key={credentials}"),
+                "",
+                true,
+            ),
+        ] {
+            let mut req = Request::builder().method(Method::POST).uri(&uri);
+            if header == "Authorization" {
+                req = req.header(header, format!("Basic {credentials}"));
+            } else if !header.is_empty() {
+                req = req.header(header, &credentials);
+            }
+            let status = app
+                .clone()
+                .oneshot(req.body(Body::empty()).unwrap())
+                .await
+                .unwrap()
+                .status();
+            assert_eq!(
+                status != StatusCode::UNAUTHORIZED,
+                accepted,
+                "POST {uri}: {status}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn the_public_link_take_over_route_is_mounted_for_post_only() {
+        let app = public_dashboard_admin_routes(Router::new());
+        let request = |method: &str, path: &str| {
+            Request::builder()
+                .method(method)
+                .uri(format!("/o1/dashboards/d1/public_links/l1/{path}"))
+                .body(Body::empty())
+                .unwrap()
+        };
+        let status = |req: Request<Body>| {
+            let app = app.clone();
+            async move { app.oneshot(req).await.unwrap().status() }
+        };
+        assert_eq!(
+            status(request("GET", "take_over")).await,
+            StatusCode::METHOD_NOT_ALLOWED
+        );
+        // No user header: the handler's own extractor answers, so the route reached take_over.
+        assert_eq!(
+            status(request("POST", "take_over")).await,
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            status(request("POST", "take_overs")).await,
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    // OSS documents enterprise-only operations without routing them, so this holds only there.
+    #[cfg(feature = "enterprise")]
+    /// `METHOD /path` OpenAPI operations a non-router node does not route.
+    const UNROUTED_OPENAPI_OPERATIONS: &[&str] = &[
+        // The deprecated v1 folder API is still documented; only `/v2/{org_id}/folders` is routed.
+        "DELETE /api/{org_id}/folders/{folder_id}",
+        "GET /api/{org_id}/folders",
+        "GET /api/{org_id}/folders/name/{folder_name}",
+        "GET /api/{org_id}/folders/{folder_id}",
+        "POST /api/{org_id}/folders",
+        "PUT /api/{org_id}/folders/{folder_id}",
+    ];
+
+    #[cfg(feature = "enterprise")]
+    fn any_param(template: &str) -> String {
+        template
+            .split('/')
+            .map(|s| if is_param(s) { "{}" } else { s })
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+
+    #[cfg(feature = "enterprise")]
+    /// An unrouted documented path meets the auth layer's 401, failing its MCP tool.
+    #[tokio::test]
+    async fn every_openapi_operation_reaches_the_route_it_documents() {
+        // On-call is mounted only when enabled at runtime; the spec documents it regardless.
+        let routes = if get_o2_config().oncall.enabled {
+            local_routes()
+        } else {
+            local_routes().nest("/api", oncall_routes(Router::new()))
+        };
+        let app = routes.route_layer(middleware::from_fn(
+            |req: Request<Body>, _next: Next| async move {
+                let matched = req
+                    .extensions()
+                    .get::<axum::extract::MatchedPath>()
+                    .map(|p| p.as_str().to_string())
+                    .unwrap_or_default();
+                (StatusCode::IM_A_TEAPOT, matched).into_response()
+            },
+        ));
+        let spec = super::openapi::ApiDoc::openapi();
+        let mut unrouted = Vec::new();
+        for (template, item) in &spec.paths.paths {
+            let operations = [
+                (Method::GET, item.get.is_some()),
+                (Method::PUT, item.put.is_some()),
+                (Method::POST, item.post.is_some()),
+                (Method::DELETE, item.delete.is_some()),
+                (Method::PATCH, item.patch.is_some()),
+                (Method::HEAD, item.head.is_some()),
+            ];
+            let uri = template
+                .split('/')
+                .map(|s| if is_param(s) { "zz" } else { s })
+                .collect::<Vec<_>>()
+                .join("/");
+            for (method, _) in operations.into_iter().filter(|(_, documented)| *documented) {
+                let req = Request::builder()
+                    .method(method.clone())
+                    .uri(&uri)
+                    .body(Body::empty())
+                    .unwrap();
+                let resp = app.clone().oneshot(req).await.unwrap();
+                let status = resp.status();
+                let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                    .await
+                    .unwrap();
+                let matched = String::from_utf8_lossy(&bytes);
+                if status != StatusCode::IM_A_TEAPOT || any_param(&matched) != any_param(template) {
+                    unrouted.push(format!("{method} {template}"));
+                }
+            }
+        }
+        unrouted.sort();
+        let mut allowed = UNROUTED_OPENAPI_OPERATIONS.to_vec();
+        allowed.sort_unstable();
+        assert_eq!(
+            unrouted, allowed,
+            "each documented operation must resolve to the route of the same template; fix the \
+             utoipa `path`, or list a path no local route serves in UNROUTED_OPENAPI_OPERATIONS"
+        );
     }
 }

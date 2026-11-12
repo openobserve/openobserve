@@ -208,7 +208,9 @@ watch(
 async function confirmDelete(notice: StatusPageNotice) {
   const ok = await confirm({
     title: t("statusPages.notices.deleteTitle"),
-    message: t("statusPages.notices.deleteBody", { title: notice.title }),
+    messageKeypath: "statusPages.notices.deleteBody",
+    messageName: notice.title,
+    confirmVariant: "destructive",
   });
   if (!ok) return;
   const dismiss = toast({

@@ -322,6 +322,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { searchState } from "@/composables/useLogs/searchState";
 import searchService from "@/services/search";
+import analytics from "@/services/product_analytics";
 import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -347,6 +348,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { copyToClipboard } from "@/utils/clipboard";
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
@@ -421,7 +423,7 @@ export default defineComponent({
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
     const moreDetailsToDisplay = ref("");
 
     const { extractTimestamps } = logsUtils();
@@ -581,8 +583,7 @@ export default defineComponent({
           setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
         }
       } catch (error: any) {
-        forbidden.value = error?.response?.status === 403;
-        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        forbidden.value = forbiddenState(error);
         if (!forbidden.value) {
           toast({
             variant: "error",
@@ -746,6 +747,10 @@ export default defineComponent({
         queryObject["fn_editor"] = "false";
       }
 
+      analytics.track("search_history_query_reapplied", {
+        stream_type: queryObject.stream_type,
+        has_function: queryObject["fn_editor"] === "true",
+      });
       router.push({
         path: "/logs",
         query: queryObject,
@@ -760,6 +765,7 @@ export default defineComponent({
         org_identifier: row.org_id,
       };
 
+      analytics.track("search_history_inspector_opened");
       router.push({
         path: "/logs/inspector",
         query: queryObject,

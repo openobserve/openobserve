@@ -26,7 +26,7 @@ const docURL = databaseDocURLs[name];
 </script>
 
 <template>
-  <IngestionContent>
+  <IngestionContent snippet-kind="config" config-tool="OpenTelemetry Collector">
     <CredentialCodeBlock slug="elasticsearch" :content="content" />
     <IngestionDocLink :href="docURL" />
   </IngestionContent>

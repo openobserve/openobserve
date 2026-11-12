@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="homeDashboard"
         variant="outline"
         size="sm"
-        icon-left="keep"
+        icon-left="keep-outline"
         class="max-w-60"
         data-test="dashboard-home-shortcut"
         @click="openHomeDashboard"
@@ -48,6 +48,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="truncate">{{ homeDashboard.label }}</span>
       </OButton>
       <OTooltip v-if="homeDashboard" side="bottom" :content="t('dashboard.openHomeDashboard')" />
+      <OButton
+        v-if="publicLinksEnabled"
+        variant="outline"
+        size="sm"
+        icon-left="language"
+        data-test="dashboard-public-links"
+        @click="openPublicLinks"
+      >
+        {{ t("dashboard.publicLinks.pageTitle") }}
+        <BetaBadge size="xs" class="ms-1.5 max-md:hidden" />
+      </OButton>
       <!-- import dashboard button with dropdown -->
       <ODropdown side="bottom" align="end">
         <template #trigger>
@@ -64,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODropdownItem @select="importDashboard" data-test="dashboard-import-custom">
           <div class="flex flex-col">
             <span>{{ t("dashboard.importCustom") }}</span>
-            <span class="text-dropdown-item-text text-xs opacity-60">{{
+            <span class="text-dropdown-item-text text-xs opacity-60 max-md:mt-0.5">{{
               t("dashboard.importCustomDesc")
             }}</span>
           </div>
@@ -75,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex flex-col">
             <span>{{ t("dashboard.importTemplates") }}</span>
-            <span class="text-dropdown-item-text text-xs opacity-60">{{
+            <span class="text-dropdown-item-text text-xs opacity-60 max-md:mt-0.5">{{
               t("dashboard.importTemplatesDesc")
             }}</span>
           </div>
@@ -90,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex w-full items-center gap-2">
             <div class="flex min-w-0 flex-1 flex-col">
               <span>{{ t(`dashboard.${migration.labelKey}`) }}</span>
-              <span class="text-dropdown-item-text text-xs opacity-60">{{
+              <span class="text-dropdown-item-text text-xs opacity-60 max-md:mt-0.5">{{
                 t(`dashboard.${migration.descKey}`)
               }}</span>
             </div>
@@ -135,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="id"
             :loading="loading"
+            :loading-reset-key="activeFolderId"
             :forbidden="forbidden"
             :frame="false"
             :default-columns="false"
@@ -229,14 +241,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-xs-sq"
                   :icon-left="isFavorite(row.id) ? 'star' : 'star-outline'"
                   :class="isFavorite(row.id) ? 'text-favorite shrink-0' : 'shrink-0'"
-                  :title="
+                  :aria-label="
                     isFavorite(row.id)
                       ? t('dashboard.removeFromFavorites')
                       : t('dashboard.addToFavorites')
                   "
                   :data-test="`dashboard-favorite-toggle-${value}`"
                   @click.stop="toggleFavorite(row)"
-                />
+                >
+                  <OTooltip
+                    side="bottom"
+                    :content="
+                      isFavorite(row.id)
+                        ? t('dashboard.removeFromFavorites')
+                        : t('dashboard.addToFavorites')
+                    "
+                  />
+                </OButton>
                 <OTruncatedText
                   class="text-text-body"
                   :data-test="`dashboard-name-cell-${value}`"
@@ -289,35 +310,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   v-if="row.actions == 'true'"
                   icon-left="drive-file-move"
-                  :title="t('dashboard.move_to_another_folder')"
+                  :aria-label="t('dashboard.move_to_another_folder')"
                   variant="ghost"
                   size="icon-xs-sq"
                   class="max-md:hidden"
                   data-test="dashboard-move-to-another-folder"
                   @click.stop="showMoveDashboardPanel(row)"
-                />
+                >
+                  <OTooltip side="bottom" :content="t('dashboard.move_to_another_folder')" />
+                </OButton>
                 <OButton
                   v-if="row.actions == 'true'"
                   icon-left="content-copy"
-                  :title="t('dashboard.duplicate')"
+                  :aria-label="t('dashboard.duplicate')"
                   variant="ghost"
                   size="icon-xs-sq"
                   class="max-md:hidden"
                   data-test="dashboard-duplicate"
                   data-row-action="duplicate"
                   @click.stop="duplicateDashboard(row.id, row.folder_id)"
-                />
+                >
+                  <OTooltip side="bottom" :content="t('dashboard.duplicate')" />
+                </OButton>
                 <OButton
                   v-if="row.actions == 'true'"
                   icon-left="delete"
-                  :title="t('dashboard.delete')"
+                  :aria-label="t('dashboard.delete')"
                   variant="ghost-destructive"
                   size="icon-xs-sq"
                   class="max-md:hidden"
                   data-test="dashboard-delete"
                   data-row-action="delete"
                   @click.stop="showDeleteDialogFn({ row })"
-                />
+                >
+                  <OTooltip side="bottom" :content="t('dashboard.delete')" />
+                </OButton>
                 <!-- Overflow menu (rightmost) — houses the low-frequency "set as
                      home" action so it doesn't clutter every row with an
                      always-on icon. Move/Duplicate/Delete stay inline. -->
@@ -325,12 +352,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #trigger>
                     <OButton
                       icon-left="more-vert"
-                      :title="t('dashboard.moreActions')"
+                      :aria-label="t('dashboard.moreActions')"
                       variant="ghost"
                       size="icon-xs-sq"
                       data-test="dashboard-row-more-actions"
                       @click.stop
-                    />
+                    >
+                      <OTooltip side="bottom" :content="t('dashboard.moreActions')" />
+                    </OButton>
                   </template>
                   <ODropdownItem
                     icon-left="drive-file-move"
@@ -411,6 +440,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #selection-actions>
+              <OButton
+                variant="outline"
+                size="sm"
+                icon-left="tv"
+                data-test="dashboard-list-tv-playlist-btn"
+                @click="openPlaylistDialog"
+              >
+                {{ t("dashboard.playlist.action") }}
+                <OTooltip :content="t('dashboard.playlist.actionTooltip')" />
+              </OButton>
               <OButton
                 variant="outline"
                 size="sm"
@@ -499,7 +538,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('dashboard.deleteDashboardConfirmTitle')"
       data-test="dashboard-confirm-dialog"
-      :message="t('dashboard.deleteDashboardConfirmMsg')"
+      :message-keypath="
+        publicLinksEnabled
+          ? 'dashboard.deleteDashboardConfirmMsgPublicLinks'
+          : 'dashboard.deleteDashboardConfirmMsg'
+      "
+      :message-name="selectedDelete?.name"
+      ok-variant="destructive"
       @update:ok="deleteDashboard"
       @update:cancel="confirmDeleteDialog = false"
       v-model="confirmDeleteDialog"
@@ -519,10 +564,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('dashboard.deleteDashboardsConfirmTitle')"
       data-test="dashboard-confirm-bulk-delete-dialog"
-      :message="t('dashboard.deleteDashboardsConfirmMsg', { count: selectedIds.length })"
+      :message="
+        t(
+          publicLinksEnabled
+            ? 'dashboard.deleteDashboardsConfirmMsgPublicLinks'
+            : 'dashboard.deleteDashboardsConfirmMsg',
+          { count: selectedIds.length },
+          selectedIds.length,
+        )
+      "
+      ok-variant="destructive"
       @update:ok="bulkDeleteDashboards"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
+    />
+
+    <PlaylistDialog
+      v-model:open="showPlaylistDialog"
+      :entries="playlistEntries"
+      @open="openPlaylist"
     />
   </OPageLayout>
 </template>
@@ -530,6 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -553,6 +614,7 @@ import {
   toRaw,
 } from "vue";
 import { useStore } from "vuex";
+import { isCancelledError } from "@tanstack/vue-query";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
 
@@ -591,12 +653,20 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import analytics from "@/services/product_analytics";
 import { useFavoriteDashboards, FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import PlaylistDialog from "@/components/dashboards/kiosk/PlaylistDialog.vue";
+import {
+  PLAYLIST_TV_PATH,
+  buildPlaylistQuery,
+  type PlaylistConfig,
+  type PlaylistDialogEntry,
+} from "@/utils/dashboard/playlist";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -643,6 +713,7 @@ const asCaughtError = (e: unknown): CaughtError => (e ?? {}) as CaughtError;
 export default defineComponent({
   name: "Dashboards",
   components: {
+    BetaBadge,
     FirstDataPanel,
     OTruncatedText,
     OUserCell,
@@ -668,6 +739,7 @@ export default defineComponent({
     FolderList,
     OToggleGroup,
     OToggleGroupItem,
+    PlaylistDialog,
   },
   setup() {
     const store = useStore();
@@ -734,7 +806,13 @@ export default defineComponent({
 
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
-    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard(t);
+    const {
+      isHome,
+      setHomeDashboard,
+      clearHomeDashboard,
+      homeDashboard,
+      load: loadHomeDashboard,
+    } = useHomeDashboard(t);
 
     // Per-user favorites — heart toggle on each row + a folder-independent
     // favorites view.
@@ -755,6 +833,15 @@ export default defineComponent({
     // The favorites view is a rail location, not a toolbar filter: it is
     // active exactly when the Favorites pseudo-folder is selected.
     const showFavoritesOnly = computed(() => activeFolderId.value === FAVORITES_FOLDER_ID);
+    const publicLinksEnabled = computed(
+      () => store.state.zoConfig?.public_dashboards_enabled === true,
+    );
+    const openPublicLinks = () => {
+      router.push({
+        name: "publicDashboardLinks",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    };
     const toggleFavorite = (row: any) => {
       const org = store.state.selectedOrganization?.identifier;
       const userId = store.state.userInfo?.email;
@@ -809,10 +896,13 @@ export default defineComponent({
         },
       });
     };
-    const toggleHome = (row: any) => {
+    const toggleHome = async (row: any) => {
       const org = store.state.selectedOrganization?.identifier;
       if (isHome(row.id)) {
-        clearHomeDashboard(org);
+        await clearHomeDashboard(org);
+        // clearHomeDashboard reverts the pin instead of throwing when the write fails.
+        if (!isHome(row.id))
+          analytics.track("home_dashboard_unpinned", { source: "dashboard_list" });
       } else {
         // Resolve the folder the SAME way routeToViewD does: row.folder_id is
         // only populated in search-across-folders mode; in the normal folder
@@ -943,7 +1033,7 @@ export default defineComponent({
       try {
         await getFoldersList(store);
       } catch {
-        // Already reported by the grouped access toast; the empty rail stands in.
+        // The empty rail stands in; the access boundary reports a 403.
       }
 
       // Load favorites BEFORE picking the landing view — the favorites-first
@@ -1017,9 +1107,10 @@ export default defineComponent({
           // A folder switched away from mid-flight must not stamp over the one now active.
           if (activeFolderId.value === folderId) stampFolders([folderId ?? "default"]);
         } catch (error) {
+          // A newer folder switch cancelled this load; the newer one reports its own outcome.
+          if (isCancelledError(error)) return;
           console.error("Error loading dashboards:", error);
-          forbidden.value = asCaughtError(error).response?.status === 403;
-          // The grouped access toast already reports a 403; a second red toast adds nothing.
+          forbidden.value = forbiddenState(error);
           if (!forbidden.value) {
             showErrorNotification(
               raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
@@ -1066,7 +1157,8 @@ export default defineComponent({
         }
         currentSearchAbortController = new AbortController();
         const searchResults = await fetchSearchResults.execute(searchQuery.value);
-        filteredResults.value = toRaw(searchResults);
+        // fetchSearchResults resolves undefined when the request fails.
+        filteredResults.value = toRaw(searchResults ?? []);
       } catch (error) {
         if (asCaughtError(error).name !== "AbortError") {
           filteredResults.value = [];
@@ -1269,7 +1361,7 @@ export default defineComponent({
     };
     const loading = ref(true);
     // Only the dashboards fetch is authoritative on access; the folder list is not.
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
       loading,
@@ -1296,6 +1388,8 @@ export default defineComponent({
       // on screen keeps them and spins the button instead.
       refreshing.value = true;
       loading.value = dashboardList.value.length === 0;
+      forbidden.value = false;
+      const target = `${showFavoritesOnly.value}|${activeFolderId.value}`;
       try {
         if (showFavoritesOnly.value) {
           // Refresh in the favorites view: re-read the favorites setting and
@@ -1336,9 +1430,14 @@ export default defineComponent({
           stampFolders([folderId]);
         }
       } catch (err) {
-        showErrorNotification(
-          raw(asCaughtError(err).message || t("dashboard.dashboards.failedToLoad")),
-        );
+        // A late failure for a folder the user already left must not lock the folder now on screen.
+        if (target !== `${showFavoritesOnly.value}|${activeFolderId.value}`) return;
+        forbidden.value = asCaughtError(err).response?.status === 403;
+        if (!forbidden.value) {
+          showErrorNotification(
+            raw(asCaughtError(err).message || t("dashboard.dashboards.failedToLoad")),
+          );
+        }
       } finally {
         dismiss();
         loading.value = false;
@@ -1501,6 +1600,11 @@ export default defineComponent({
 
     const handleDashboardMoved = async () => {
       showMoveDashboardDialog.value = false;
+      const org = store.state.selectedOrganization?.identifier;
+      // The server rewrites the pin's folder on move; the cached copy would keep routing to the old one.
+      if (org && selectedDashboardIdToMove.value?.some((id) => isHome(id))) {
+        await loadHomeDashboard(org, true);
+      }
     };
 
     const deleteFolder = async () => {
@@ -1566,6 +1670,7 @@ export default defineComponent({
 
         return migratedDashboards;
       } catch (error) {
+        if (asCaughtError(error).response?.status === 403) return;
         showErrorNotification(
           raw(asCaughtError(error).message ?? t("dashboard.dashboards.errorFetchingSearch")),
         );
@@ -1578,7 +1683,7 @@ export default defineComponent({
       loading.value = true;
       try {
         const results = await fetchSearchResults.execute(query);
-        filteredResults.value = toRaw(results);
+        filteredResults.value = toRaw(results ?? []);
       } finally {
         loading.value = false;
       }
@@ -1658,6 +1763,51 @@ export default defineComponent({
 
     const confirmBulkDelete = ref<boolean>(false);
     const bulkDeleteLoading = ref(false);
+
+    const showPlaylistDialog = ref(false);
+    const playlistEntries = ref<PlaylistDialogEntry[]>([]);
+
+    // The table reports selection in row order; a playlist follows the order rows were ticked in.
+    const selectionOrder = ref<string[]>([]);
+    watch(
+      selectedIds,
+      (ids) => {
+        const selected = new Set(ids);
+        const kept = selectionOrder.value.filter((id) => selected.has(id));
+        const known = new Set(kept);
+        selectionOrder.value = [...kept, ...ids.filter((id) => !known.has(id))];
+      },
+      { flush: "sync" },
+    );
+
+    const openPlaylistDialog = () => {
+      const folderNames = new Map<string, string>(
+        (store.state.organizationData?.folders ?? []).map((f: any) => [f.folderId, f.name]),
+      );
+      const rows = new Map<string, any>(dashboards.value.map((row: any) => [row.id, row]));
+      playlistEntries.value = selectionOrder.value
+        .filter((id) => rows.has(id))
+        .map((id) => {
+          const row = rows.get(id);
+          const folderId = row.folder_id || activeFolderId.value || "default";
+          return {
+            dashboardId: row.id,
+            folderId,
+            title: row.name,
+            folderName: row.folder || folderNames.get(folderId) || null,
+          };
+        });
+      showPlaylistDialog.value = true;
+    };
+
+    // A new tab keeps the list where it was; the TV tab is the one that goes full screen.
+    const openPlaylist = (config: PlaylistConfig) => {
+      const href = router.resolve({
+        path: PLAYLIST_TV_PATH,
+        query: buildPlaylistQuery(config),
+      }).href;
+      window.open(href, "_blank", "noopener");
+    };
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
@@ -1807,7 +1957,7 @@ export default defineComponent({
           caught.response?.data?.message ||
           caught.message ||
           t("dashboard.dashboards.errorDeleting");
-        if (caught.response?.status != 403 || caught.status != 403) {
+        if (caught.response?.status !== 403 && caught.status !== 403) {
           toast({
             variant: "error",
             message: raw(errorMessage),
@@ -1850,6 +2000,7 @@ export default defineComponent({
     return {
       t,
       oTableRef,
+      selectedDelete,
       store,
       orgData,
       router,
@@ -1917,6 +2068,10 @@ export default defineComponent({
       moveMultipleDashboards,
       openBulkDeleteDialog,
       bulkDeleteDashboards,
+      showPlaylistDialog,
+      playlistEntries,
+      openPlaylistDialog,
+      openPlaylist,
       confirmBulkDelete,
       bulkDeleteLoading,
       isHome,
@@ -1926,6 +2081,8 @@ export default defineComponent({
       isFavorite,
       toggleFavorite,
       showFavoritesOnly,
+      publicLinksEnabled,
+      openPublicLinks,
     };
   },
   methods: {

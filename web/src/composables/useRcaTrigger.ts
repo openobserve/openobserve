@@ -1,0 +1,183 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { getCurrentScope, onScopeDispose } from "vue";
+import { isAxiosError } from "axios";
+import config from "@/aws-exports";
+import incidentsService, {
+  type ResumeRcaResponse,
+  type TriggerRcaResponse,
+} from "@/services/incidents";
+import {
+  isPaidOverageConsentError,
+  usePaidOverageConsent,
+} from "@/composables/usePaidOverageConsent";
+import { aiCreditsAction, aiCreditsNotice, isAiCreditsExhausted } from "@/utils/aiCredits";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
+/** Query flags of `POST …/rca`; `guidance` is sent as the JSON body. */
+export type RcaTriggerParams = {
+  build_on_previous?: boolean;
+  guidance?: string;
+};
+
+export interface RcaTriggerOptions {
+  /** Aborts the request and any consent prompt it waits on. */
+  signal?: AbortSignal;
+  /** False once the caller no longer shows this incident; a late result is then dropped. */
+  isStillActive?: () => boolean;
+  /** Runs before the consent prompt opens: the denied request started nothing on the server. */
+  onConsentRequired?: () => void;
+}
+
+/** The organization is out of AI credits: what to tell the user and the page that unblocks it. */
+export type RcaCreditsExhausted = {
+  status: "exhausted";
+  notice: I18nText;
+  /** Null when resending later is the remedy. */
+  remedy: "plans" | "contact" | null;
+};
+
+/** `declined`: the user declined paid usage; `dropped`: the caller moved on before it settled. */
+export type RcaTriggerResult =
+  | { status: "started"; runId: string; data: TriggerRcaResponse }
+  | { status: "declined" }
+  | { status: "dropped" }
+  | RcaCreditsExhausted
+  | { status: "unavailable"; message: I18nText };
+
+export type RcaResumeResult =
+  | { status: "started"; runId: string; data: ResumeRcaResponse }
+  | { status: "declined" }
+  | { status: "dropped" }
+  | RcaCreditsExhausted
+  | { status: "unavailable"; message: I18nText };
+
+/** Starts an RCA run and handles the paid-usage consent flow. */
+export function useRcaTrigger() {
+  const { t } = useI18nTyped();
+  const { promptForConsent } = usePaidOverageConsent();
+
+  // Prompts opened without a caller signal end with the owning component.
+  const lifecycle = new AbortController();
+  if (getCurrentScope()) onScopeDispose(() => lifecycle.abort());
+
+  type Gated<T> =
+    | { status: "started"; data: T }
+    | { status: "declined" }
+    | { status: "dropped" }
+    | RcaCreditsExhausted
+    | { status: "unavailable"; message: I18nText };
+
+  const responseBody = (error: unknown): unknown =>
+    isAxiosError(error) ? error.response?.data : null;
+
+  const creditsExhausted = (body: unknown): RcaCreditsExhausted | null =>
+    isAiCreditsExhausted(body)
+      ? {
+          status: "exhausted",
+          notice: aiCreditsNotice(body, t),
+          remedy: aiCreditsAction(body) ?? null,
+        }
+      : null;
+
+  /** One request with the 402/412 consent flow; a resume is metered like a manual run (J7). */
+  const withConsent = async <T>(
+    org: string,
+    send: () => Promise<{ data: T }>,
+    opts: RcaTriggerOptions,
+  ): Promise<Gated<T>> => {
+    const { signal } = opts;
+    try {
+      const res = await send();
+      return { status: "started", data: res.data };
+    } catch (error: unknown) {
+      const status = isAxiosError(error) ? (error.response?.status ?? 0) : 0;
+      const body = responseBody(error);
+
+      const exhausted = creditsExhausted(body);
+      if (exhausted) return exhausted;
+
+      if (config.isCloud !== "true") {
+        if (status !== 412) throw error;
+        const serverMessage =
+          typeof body === "object" && body !== null && "message" in body ? body.message : null;
+        return {
+          status: "unavailable",
+          message:
+            typeof serverMessage === "string" && serverMessage
+              ? raw(serverMessage)
+              : t("alerts.incidents.aiAnalysis.unavailable"),
+        };
+      }
+
+      if (!isPaidOverageConsentError(status, body)) throw error;
+
+      opts.onConsentRequired?.();
+      const consentSignal = signal ?? lifecycle.signal;
+      const accepted = await promptForConsent(org, "ai_credits", body.consent, consentSignal);
+      const stillActive = !consentSignal.aborted && (opts.isStillActive?.() ?? true);
+      if (!stillActive) return { status: "dropped" };
+      if (!accepted) return { status: "declined" };
+
+      // Exactly one guarded replacement request. A second denial propagates.
+      try {
+        const retry = await send();
+        return { status: "started", data: retry.data };
+      } catch (retryError: unknown) {
+        const retryExhausted = creditsExhausted(responseBody(retryError));
+        if (retryExhausted) return retryExhausted;
+        throw retryError;
+      }
+    }
+  };
+
+  const requestRca = async (
+    org: string,
+    incidentId: string,
+    params: RcaTriggerParams,
+    opts: RcaTriggerOptions = {},
+  ): Promise<RcaTriggerResult> => {
+    const result = await withConsent(
+      org,
+      () => incidentsService.triggerRca(org, incidentId, params, { signal: opts.signal }),
+      opts,
+    );
+    return result.status === "started"
+      ? { status: "started", runId: result.data.run_id, data: result.data }
+      : result;
+  };
+
+  /** Resume a failed or cancelled run (J7) with the same consent flow as a trigger. */
+  const requestResume = async (
+    org: string,
+    incidentId: string,
+    runId: string,
+    opts: RcaTriggerOptions = {},
+  ): Promise<RcaResumeResult> => {
+    const result = await withConsent(
+      org,
+      () => incidentsService.resumeRca(org, incidentId, runId, { signal: opts.signal }),
+      opts,
+    );
+    return result.status === "started"
+      ? { status: "started", runId: result.data.run_id, data: result.data }
+      : result;
+  };
+
+  return { requestRca, requestResume };
+}
+
+export default useRcaTrigger;

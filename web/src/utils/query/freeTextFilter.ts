@@ -361,7 +361,13 @@ export function quoteFreeTextPhrase(raw: string): string {
 
 export function isAuthoredStatement(raw: string): boolean {
   const word = leadingWord(raw);
-  return word === "select" || word === "with";
+  if (word === "select" || word === "with") return true;
+  if (word !== "explain") return false;
+  // A bare "explain" is a field name; only a plan keyword after it makes a statement.
+  const start = skipTrivia(raw, 0, false);
+  return (
+    start !== null && /^explain\s+(?:analyze|verbose|format|select|with)\b/i.test(raw.slice(start))
+  );
 }
 
 export function looksLikeSqlStatement(raw: string, lookup?: StreamLookup): boolean {
@@ -413,6 +419,8 @@ export function appendConjunct(
   if (isBlankFilter(filter)) return predicate;
   const materialized = materializeFreeText(filter, streams, ctx);
   if (materialized === null) return `${filter} and ${predicate}`;
+  if (materialized === filter && isGroupedConjunction(filter))
+    return `${filter.trimEnd()} AND ${predicate}`;
   return `(\n${materialized}\n) AND ${predicate}`;
 }
 
@@ -1424,6 +1432,31 @@ function maskLiteralsAndComments(raw: string): string {
     }
   }
   return out;
+}
+
+// True for `(...)` optionally followed only by ANDs, so appending another AND needs no new wrapper.
+function isGroupedConjunction(filter: string): boolean {
+  const text = filter.trim();
+  if (!text.startsWith("(")) return false;
+  let depth = 0;
+  let tail = "";
+  let i = 0;
+  while (i < text.length) {
+    const end = maskedSpanEnd(text, i);
+    if (end !== null) {
+      const isComment = text.startsWith("--", i) || text.startsWith("/*", i);
+      if (isComment ? depth === 0 : end - i < 2 || text[end - 1] !== text[i]) return false;
+      if (depth === 0) tail += " ";
+      i = end;
+      continue;
+    }
+    if (text[i] === "(") depth++;
+    else if (text[i] === ")") depth--;
+    else if (depth === 0) tail += text[i];
+    i++;
+  }
+  const rest = tail.trim();
+  return depth === 0 && (rest === "" || (/^AND\b/i.test(rest) && !/\bOR\b/i.test(rest)));
 }
 
 function isBlankFilter(filter: string): boolean {

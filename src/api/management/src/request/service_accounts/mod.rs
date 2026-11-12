@@ -37,6 +37,17 @@ use crate::{
     service::users,
 };
 
+// Only documents update's answer: a fresh token when rotating, otherwise the update result.
+#[derive(serde::Serialize, utoipa::ToSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+enum UpdateServiceAccountVariants {
+    Rotated(APIToken),
+    Updated(MetaHttpResponse),
+}
+
+config::any_of_schema!(UpdateServiceAccountAnswer, UpdateServiceAccountVariants);
+
 /// ListServiceAccounts
 
 #[utoipa::path(
@@ -56,7 +67,7 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = crate::common::meta::user::UserList),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "list"})),
@@ -130,7 +141,7 @@ pub async fn list(Path(org_id): Path<String>, Headers(user_email): Headers<UserE
     ),
     request_body(content = inline(ServiceAccountRequest), description = "ServiceAccount data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = crate::common::meta::service_account::ServiceAccountCreateResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "create"})),
@@ -188,7 +199,7 @@ pub async fn save(
     ),
     request_body(content = inline(UpdateServiceAccountRequest), description = "Service Account data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = UpdateServiceAccountAnswer),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "update"})),
@@ -323,7 +334,7 @@ pub async fn update(
         ("email_id" = String, Path, description = "Service Account email id"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(

@@ -45,12 +45,15 @@ import type { CardSubstitutions } from "./content/renderMarkdown";
 import { b64EncodeStandard } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import { MCP_READONLY_ROLE, useMcpCredential } from "@/composables/useMcpCredential";
+import analytics from "@/services/product_analytics";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import SetupCardRenderer from "@/components/ingestion/setupCard/SetupCardRenderer.vue";
 import type { RichCardContent } from "@/components/ingestion/setupCard/types";
 
@@ -63,6 +66,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const { generate, generating, error: genError, credential } = useMcpCredential();
+const { locked: mcpLocked, lockedReason: mcpLockedReason } = useLicenseLock("mcp");
 
 const endpoint = computed(() => `${props.subs.url}/api/${props.subs.org}/mcp`);
 
@@ -90,8 +94,9 @@ const TOKEN_PLACEHOLDER = "Basic <base64 of service-account-email:token>";
 const MASKED_AUTH = "Basic ••••••••••••••••";
 
 const SKILLS_REPO_URL = "https://www.npmjs.com/package/@openobserve/skills";
-// No -a flag: the CLI then asks which agents to install to, so one command serves every client.
-const SKILLS_INSTALL_CMD = "npx skills add openobserve/skills --skill openobserve";
+// The skills ship as the npm package @openobserve/skills; github.com/openobserve/skills does not
+// exist. --all installs every skill into each AI tool the CLI finds on the machine.
+const SKILLS_INSTALL_CMD = "npx @openobserve/skills add --all";
 
 // The Authorization header VALUE injected into token-mode snippets. OAuth mode
 // passes null so build() omits the header entirely.
@@ -427,6 +432,7 @@ const activeDeepLink = computed(
 const openDeepLink = () => {
   const link = activeDeepLink.value;
   if (!link) return;
+  analytics.track("mcp_client_deep_link_opened", { client: activeClient.value.id });
   if (link.startsWith("https://")) {
     window.open(link, "_blank", "noopener,noreferrer");
   } else {
@@ -507,7 +513,21 @@ const openSkillsRepo = () => {
                 </OText>
               </div>
               <template #actions>
+                <OTooltip v-if="mcpLocked" :content="mcpLockedReason">
+                  <span class="inline-flex">
+                    <OButton
+                      variant="primary"
+                      size="sm-action"
+                      icon-left="lock"
+                      disabled
+                      data-test="ai-integrations-mcp-generate-btn"
+                    >
+                      {{ t("ingestion.mcp.credential.generate") }}
+                    </OButton>
+                  </span>
+                </OTooltip>
                 <OButton
+                  v-else
                   variant="primary"
                   size="sm-action"
                   :loading="generating"
@@ -567,7 +587,21 @@ const openSkillsRepo = () => {
               >
                 {{ t("ingestion.mcp.credential.download") }}
               </OButton>
+              <OTooltip v-if="mcpLocked" :content="mcpLockedReason">
+                <span class="inline-flex">
+                  <OButton
+                    variant="ghost"
+                    size="sm-action"
+                    icon-left="lock"
+                    disabled
+                    data-test="ai-integrations-mcp-manage-btn"
+                  >
+                    {{ t("ingestion.mcp.credential.manage") }}
+                  </OButton>
+                </span>
+              </OTooltip>
               <OButton
+                v-else
                 variant="ghost"
                 size="sm-action"
                 icon-left="open-in-new"

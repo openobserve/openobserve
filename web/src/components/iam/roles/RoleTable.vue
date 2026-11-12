@@ -12,13 +12,18 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useI18nTyped } from "@/types/i18n";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import type { ForbiddenState } from "@/utils/featureGate";
 
 const { t } = useI18nTyped();
+
+const roleDrafts = useEditorDraftIds("iam_role");
 
 const props = defineProps<{
   data: any[];
   loading?: boolean;
-  forbidden?: boolean;
+  forbidden?: ForbiddenState;
   actionLoading?: boolean;
   selectedIds?: string[];
   globalFilter?: string;
@@ -43,7 +48,7 @@ const emit = defineEmits<{
   "update:currentPage": [value: number];
   "update:sortBy": [value: string];
   "update:sortOrder": [value: "asc" | "desc"];
-  edit: [row: any];
+  edit: [row: any, tab?: "users" | "serviceAccounts"];
   delete: [row: any];
   "bulk-delete": [];
   create: [];
@@ -67,6 +72,10 @@ const hasUserCounts = computed(() =>
   (props.data ?? []).some((row: any) => typeof row?.user_count === "number"),
 );
 
+const hasServiceAccountCounts = computed(() =>
+  (props.data ?? []).some((row: any) => typeof row?.service_account_count === "number"),
+);
+
 const columns = computed<OTableColumnDef[]>(() => {
   const cols: OTableColumnDef[] = [
     {
@@ -87,6 +96,20 @@ const columns = computed<OTableColumnDef[]>(() => {
       resizable: true,
       hideable: true,
       size: COL.count,
+      meta: { align: "right" },
+    });
+  }
+
+  if (hasServiceAccountCounts.value) {
+    cols.push({
+      id: "service_account_count",
+      header: t("iam.serviceAccounts"),
+      accessorKey: "service_account_count",
+      sortable: true,
+      resizable: true,
+      hideable: true,
+      size: 150,
+      minSize: 150,
       meta: { align: "right" },
     });
   }
@@ -115,11 +138,6 @@ const columns = computed<OTableColumnDef[]>(() => {
 
   return cols;
 });
-
-// A role nobody holds reads muted in the Users column — a cleanup candidate, not a
-// fault. No summary strip: the count is already in the footer and "unused" is just
-// this column sorted ascending, so a strip would restate what the rows already say.
-const isUnusedRole = (row: any): boolean => row?.user_count === 0;
 
 const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includes(row?.role_name);
 </script>
@@ -166,14 +184,44 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
       </div>
     </template>
 
-    <!-- Members: a role with nobody in it is muted, not coloured — it is a cleanup
-         candidate, not an error. -->
+    <template #cell-role_name="{ row, value }">
+      <span class="inline-flex items-center gap-2">
+        <span class="text-text-body">{{ value }}</span>
+        <EditorDraftDot
+          v-if="roleDrafts.ids.has(row?.role_name)"
+          :saved-at="roleDrafts.savedAt(row?.role_name)"
+          :data-test="`iam-roles-${row?.role_name}-draft-dot`"
+        />
+      </span>
+    </template>
+
     <template #cell-user_count="{ row }">
-      <span
+      <OButton
+        v-if="typeof row.user_count === 'number'"
+        :variant="row.user_count === 0 ? 'ghost-muted' : 'ghost-primary'"
+        size="xs"
         class="tabular-nums"
-        :class="isUnusedRole(row) ? 'text-text-muted' : 'text-text-body'"
-        >{{ typeof row.user_count === "number" ? row.user_count : "—" }}</span
+        :aria-label="`${row.role_name}: ${row.user_count} ${t('iam.roleUsers')}`"
+        :data-test="`iam-roles-${row.role_name}-users-link`"
+        @click.stop="emit('edit', row, 'users')"
       >
+        {{ row.user_count }}
+      </OButton>
+      <span v-else class="text-text-muted tabular-nums">—</span>
+    </template>
+    <template #cell-service_account_count="{ row }">
+      <OButton
+        v-if="typeof row.service_account_count === 'number'"
+        :variant="row.service_account_count === 0 ? 'ghost-muted' : 'ghost-primary'"
+        size="xs"
+        class="tabular-nums"
+        :aria-label="`${row.role_name}: ${row.service_account_count} ${t('iam.serviceAccounts')}`"
+        :data-test="`iam-roles-${row.role_name}-service-accounts-link`"
+        @click.stop="emit('edit', row, 'serviceAccounts')"
+      >
+        {{ row.service_account_count }}
+      </OButton>
+      <span v-else class="text-text-muted tabular-nums">—</span>
     </template>
     <template #toolbar-trailing>
       <slot name="toolbar-trailing" />
@@ -226,6 +274,7 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
         <ODropdown side="bottom" align="end">
           <template #trigger>
             <OButton
+              :aria-label="t('common.moreActions')"
               icon-left="more-vert"
               variant="ghost"
               size="icon-xs-sq"

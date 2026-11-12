@@ -17,12 +17,13 @@
 
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
+import { createStore } from "vuex";
 import type { ExperimentRowDetail } from "@/services/llm-experiments.service";
 import ExperimentRowDetailDrawer from "./ExperimentRowDetailDrawer.vue";
 
 const detail: ExperimentRowDetail = {
   experimentId: "experiment-1",
-  snapshot: { datasetId: "dataset-1", datasetVersion: 7 },
+  snapshot: { datasetId: "dataset-1", datasetVersion: 7, datasetWriteVersion: 3 },
   navigation: {
     rowIndex: 1,
     totalRows: 3,
@@ -93,16 +94,22 @@ const detail: ExperimentRowDetail = {
   ],
 };
 
-function mountDrawer(rowDetail: ExperimentRowDetail = detail) {
+function mountDrawer(
+  rowDetail: ExperimentRowDetail = detail,
+  features: Record<string, string> = {},
+) {
   return mount(ExperimentRowDetailDrawer, {
     props: { open: true, detail: rowDetail },
     global: {
+      plugins: [createStore({ state: { zoConfig: { features } } })],
       stubs: {
         ODrawer: {
           props: ["open", "title", "subTitle"],
           template: '<section v-if="open"><slot /><slot name="footer" /></section>',
         },
-        OButton: { template: "<button @click=\"$emit('click')\"><slot /></button>" },
+        OButton: {
+          template: '<button @click="$emit(\'click\')"><slot name="icon-left" /><slot /></button>',
+        },
         OTag: { template: "<span><slot /></span>" },
       },
     },
@@ -182,5 +189,99 @@ describe("ExperimentRowDetailDrawer", () => {
     expect(wrapper.emitted("score-trace")?.[0]).toEqual([
       { traceId: "evaluator-trace-1", timestamp: 200 },
     ]);
+  });
+
+  it("locks both trace buttons and emits nothing while the traces license is locked", async () => {
+    const wrapper = mountDrawer(detail, { traces: "locked" });
+
+    for (const id of ["ai-experiment-row-trace", "ai-experiment-row-score-trace-quality:3"]) {
+      const button = wrapper.get(`[data-test="${id}"]`);
+      expect(button.attributes("disabled")).toBeDefined();
+      await button.trigger("click");
+    }
+    expect(wrapper.find('[data-test="ai-experiment-row-trace-lock"]').exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="ai-experiment-row-score-trace-lock-quality:3"]').exists(),
+    ).toBe(true);
+    expect(wrapper.emitted("trace")).toBeUndefined();
+    expect(wrapper.emitted("score-trace")).toBeUndefined();
+  });
+
+  it("keeps both trace buttons live when the license enables traces", () => {
+    const wrapper = mountDrawer(detail, { traces: "enabled" });
+
+    expect(wrapper.find('[data-test$="-lock"]').exists()).toBe(false);
+    expect(
+      wrapper.get('[data-test="ai-experiment-row-trace"]').attributes("disabled"),
+    ).toBeUndefined();
+  });
+
+  it("renders a structured SDK output and the client-reported scores", () => {
+    const sdkRow: ExperimentRowDetail = {
+      ...detail,
+      trials: [
+        {
+          ...detail.trials[0],
+          taskStatus: "ok",
+          execution: {
+            ...detail.trials[0].execution!,
+            status: "ok",
+            output: { run_id: "run-1", grade: { band: "medium" } },
+            errorMessage: null,
+          },
+          scores: [],
+          clientScores: [
+            {
+              client_scorer_key: "six-axis/service",
+              score_config_id: "service-config",
+              status: "success",
+              value_numeric: 1,
+              reasoning: "Correct service",
+              evaluator_trace_id: "generated-not-a-trace",
+              _timestamp: 300,
+            },
+            {
+              client_scorer_key: "six-axis/uncertainty",
+              score_config_id: "uncertainty-config",
+              status: "success",
+              value_numeric: 0.5,
+              _timestamp: 300,
+            },
+          ],
+        },
+      ],
+      scoreSummaries: [],
+      clientScoreSummaries: [
+        {
+          scoreConfigId: "service-config",
+          scoreConfigName: "orca_service",
+          clientScorerKey: "six-axis/service",
+          sampleCount: 1,
+          value: { kind: "numeric", mean: 1 },
+        },
+        {
+          scoreConfigId: "uncertainty-config",
+          scoreConfigName: "orca_uncertainty",
+          clientScorerKey: "six-axis/uncertainty",
+          sampleCount: 1,
+          value: { kind: "numeric", mean: 0.5 },
+        },
+      ],
+    };
+
+    const wrapper = mountDrawer(sdkRow);
+    const output = wrapper.get('[data-test="ai-experiment-row-output"]').text();
+    const matrix = wrapper.get('[data-test="ai-experiment-row-score-matrix"]').text();
+
+    expect(output).toContain('"run_id": "run-1"');
+    expect(output).toContain('"band": "medium"');
+    expect(matrix).toContain("orca_service");
+    expect(matrix).toContain("1.000");
+    expect(matrix).toContain("orca_uncertainty");
+    expect(matrix).toContain("0.500");
+    expect(matrix).not.toContain("No data available");
+    expect(wrapper.text()).toContain("Correct service");
+    // A client Score's evaluator trace id is generated, not a real trace.
+    expect(wrapper.find('[data-test^="ai-experiment-row-score-trace-"]').exists()).toBe(false);
   });
 });

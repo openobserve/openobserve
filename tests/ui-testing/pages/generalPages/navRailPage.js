@@ -1,10 +1,16 @@
 // Page object for the left rail, its hover flyouts and the mobile drawer nav.
 
+import { expect } from '@playwright/test';
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
+
 const FRAME_MS = 16;
 // Minimum-jerk profile: the bell-shaped velocity of a real aimed hand movement.
 const ease = (t) => 10 * t ** 3 - 15 * t ** 4 + 6 * t ** 5;
 // The rail mask fades the last 3rem of an overflowing edge (railReveal.ts RAIL_FADE_REM).
 const RAIL_FADE_REM = 3;
+// Below ONavGroup OPEN_DELAY (120 ms): a longer gap between two moves reads to the app as a rest.
+const STALL_MS = 80;
+const SCAN_ATTEMPTS = 3;
 
 export class NavRailPage {
   constructor(page) {
@@ -17,6 +23,7 @@ export class NavRailPage {
     );
     this.contentScroll = page.locator('.o2-content-scroll');
     this.profileMenuBtn = page.locator('[data-test="header-my-account-profile-icon"]');
+    this.headerDropdown = page.locator('[data-reka-popper-content-wrapper]');
   }
 
   url(path = '/') {
@@ -31,6 +38,18 @@ export class NavRailPage {
     await this.nav.locator('.nav-menu-item--active').first().waitFor({ state: 'attached', timeout: 60000 });
     // Config-driven tiles settle a beat after the first paint.
     await this.page.waitForTimeout(1000);
+  }
+
+  // A menu opened while the home view is still loading can end with focus on <body>, so arrows go nowhere.
+  async waitForHomeLoaded() {
+    await expect(this.page.locator('[data-test="home-page"]')).toBeVisible();
+    await expect(this.page.locator('[data-test="home-view-skeleton-tile"]')).toHaveCount(0);
+  }
+
+  async expectFocusInMenu() {
+    await expect
+      .poll(() => this.page.evaluate(() => !!document.activeElement?.closest('[role="menu"]')))
+      .toBe(true);
   }
 
   async setDir(dir) {
@@ -111,7 +130,10 @@ export class NavRailPage {
 
   async resetPointer() {
     const vp = this.page.viewportSize();
-    await this.page.mouse.move(vp.width - 40, vp.height - 40);
+    const rail = await this.nav.boundingBox();
+    // In RTL the rail hugs the right edge, so the bottom-right corner would rest the pointer on a tile.
+    const x = rail && rail.x + rail.width / 2 > vp.width / 2 ? 40 : vp.width - 40;
+    await this.page.mouse.move(x, vp.height - 40);
     await this.page.waitForTimeout(500);
   }
 
@@ -122,6 +144,8 @@ export class NavRailPage {
 
   // Move onto a tile and let the pointer rest until the flyout is open.
   async restOn(locator) {
+    // On short viewports the tile can sit below the rail's visible area, so its centre would be off-screen.
+    await locator.scrollIntoViewIfNeeded();
     const c = await this.centre(locator);
     await this.page.mouse.move(c.x, c.y);
     await this.page.waitForTimeout(450);
@@ -138,11 +162,84 @@ export class NavRailPage {
     }
   }
 
+  // Glide while sampling open flyouts; a scan whose own pacing stalled is redone, and the caller asserts on the last one.
+  async scan(start, end, durationMs, { profile = 'ease', redo } = {}) {
+    let result;
+    for (let attempt = 1; attempt <= SCAN_ATTEMPTS; attempt++) {
+      if (attempt > 1 && redo) await redo();
+      const seen = new Set();
+      await this.startMoveClock();
+      await this.glide(
+        start,
+        end,
+        durationMs,
+        async () => {
+          for (const k of await this.openFlyoutKeys()) seen.add(k);
+        },
+        profile,
+      );
+      result = { seen: [...seen], maxGapMs: await this.maxMoveGap(), attempt };
+      if (result.maxGapMs <= STALL_MS) return result;
+      testLogger.info('Nav rail scan stalled, redoing it', { attempt, of: SCAN_ATTEMPTS, maxGapMs: result.maxGapMs });
+    }
+    return result;
+  }
+
+  // Page-side clock, so a stall in the runner, CDP or the renderer all show up as the gap the app saw.
+  async startMoveClock() {
+    await this.page.evaluate(() => {
+      window.__navRailMoves = [];
+      if (window.__navRailMoveClock) return;
+      window.__navRailMoveClock = () => window.__navRailMoves.push(performance.now());
+      document.addEventListener('pointermove', window.__navRailMoveClock, true);
+    });
+  }
+
+  async maxMoveGap() {
+    return this.page.evaluate(() => {
+      const t = window.__navRailMoves || [];
+      let max = 0;
+      for (let i = 1; i < t.length; i++) max = Math.max(max, t[i] - t[i - 1]);
+      return Math.round(max);
+    });
+  }
+
   async activeElementDataTest() {
     return this.page.evaluate(() => {
       const el = document.activeElement;
       return el ? { tag: el.tagName, dataTest: el.getAttribute('data-test'), inContent: !!el.closest('.o2-content-scroll') } : null;
     });
+  }
+
+  // ODropdownItem animates its colours over 150 ms; read once its transitions have finished.
+  async settledBackground(locator) {
+    await expect.poll(() => locator.evaluate((el) => el.getAnimations().length)).toBe(0);
+    return locator.evaluate((el) => getComputedStyle(el).backgroundColor);
+  }
+
+  async focusedMenuRow() {
+    return this.page.evaluate(() => {
+      const el = document.activeElement;
+      return el && el.closest('[role="menu"]') ? el.getAttribute('data-test') || el.textContent.trim() : null;
+    });
+  }
+
+  // Holds the org's full /api/{org}/config (not the bootstrap /config) until release().
+  async holdOrgConfig() {
+    const path = `/api/${process.env.ORGNAME || 'default'}/config`;
+    let release;
+    const released = new Promise((resolve) => (release = resolve));
+    let served;
+    const done = new Promise((resolve) => (served = resolve));
+    await this.page.route(
+      (url) => url.pathname.endsWith(path),
+      async (route) => {
+        await released;
+        await route.continue();
+        served();
+      },
+    );
+    return { release, served: done };
   }
 
   async openDrawer() {

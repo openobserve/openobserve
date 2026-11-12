@@ -17,9 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   Visualize mode for the Metrics explorer — a query-driven workspace.
 
-  This is the SAME dashboard PanelEditor the metrics editor route (plugins/metrics
-  /Index.vue) mounts in production, run in-page with editMode and the metrics
-  defaults (line + promql + query bar on). Chart types are NOT restricted — the
+  This is the SAME dashboard PanelEditor Add Panel mounts, run in-page with
+  editMode and the metrics defaults (line + promql + query bar on). Chart types are NOT restricted — the
   same full set AddPanel offers, gated only by ChartSelection's own PromQL rules.
   So the chart the user builds here is exactly the one they get on a dashboard,
   and it inherits right-click → Create Alert for free.
@@ -39,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :selected-date-time="dashboardPanelData.meta.dateTime"
       @add-to-dashboard="onAddToDashboard"
       @chart-api-error="onChartApiError"
+      @renderer-error="onRendererError"
     />
 
     <AddToDashboard
@@ -51,11 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import {
+  computed,
   defineComponent,
   ref,
   provide,
   onBeforeMount,
   onMounted,
+  onBeforeUnmount,
   nextTick,
   watch,
   type PropType,
@@ -67,10 +69,13 @@ import useNotifications from "@/composables/useNotifications";
 import { restoreMetricsStream } from "@/utils/streamPersist";
 import { applyMetricsBlob, normaliseMetricsBlobData } from "@/composables/metrics/metricsUrlState";
 import { useQueryHistoryRecorder } from "@/composables/metrics/useQueryHistoryRecorder";
+import type { PanelErrorDetail } from "@/utils/queryHistory/metrics";
 import type { SelectedDate } from "@/utils/dashboard/urlTimeParams";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import type { PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 import AddToDashboard from "../AddToDashboard.vue";
+import { usePanelLivePreview } from "@/composables/dashboard/usePanelLivePreview";
+import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 
 export default defineComponent({
   name: "MetricsVisualize",
@@ -123,8 +128,6 @@ export default defineComponent({
       values: [],
     };
 
-    // Same defaults the metrics editor route applies: a line chart driven by a
-    // promql query, with the query bar shown so the user can type PromQL.
     const applyMetricsDefaults = () => {
       resetDashboardPanelData();
       dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
@@ -141,8 +144,7 @@ export default defineComponent({
     };
 
     // Open on a card's type-based query: reset to a clean metrics panel, then lay
-    // the seed's panel-schema `data` on top (the same shape the metrics editor
-    // receives from the card drill-in). Every query is forced to the metrics
+    // the seed's panel-schema `data` on top. Every query is forced to the metrics
     // stream type. Mirrors `applyMetricsBlob`, but from a raw data object.
     const applySeed = (seed: Record<string, any>) => {
       resetDashboardPanelData();
@@ -162,7 +164,7 @@ export default defineComponent({
      */
     let seededOnMount = false;
 
-    // BEFORE the PanelEditor child mounts (matches the metrics editor route): if
+    // BEFORE the PanelEditor child mounts: if
     // it mounts first, it initialises an empty query area and a later assign does
     // not reflect into the already-built query bar.
     onBeforeMount(() => {
@@ -175,8 +177,7 @@ export default defineComponent({
       }
     });
 
-    // Validate before opening the add-to-dashboard dialog — the same handshake
-    // the metrics editor uses, so an incomplete panel can't be saved.
+    // Validate before opening the add-to-dashboard dialog, so an incomplete panel can't be saved.
     const onAddToDashboard = () => {
       const errors: string[] = [];
       validatePanel(errors, true);
@@ -191,6 +192,18 @@ export default defineComponent({
       // PanelEditor surfaces its own error UI; nothing extra to do here.
     };
 
+    // History reads the renderer's error to classify the run; PanelEditor shows it itself.
+    const onRendererError = (error: PanelErrorDetail | string | null) => {
+      historyRecorder.onPanelError(error);
+    };
+
+    const timeKey = () => `${props.selectedDateTime?.startTime}:${props.selectedDateTime?.endTime}`;
+    // The window the chart last ran with; null until the first one is applied, which always applies.
+    const appliedTimeKey = ref<string | null>(null);
+    const isTimeChangePending = computed(
+      () => appliedTimeKey.value !== null && timeKey() !== appliedTimeKey.value,
+    );
+
     /**
      * Push the toolbar's window into the panel's `meta.dateTime` — the shape the
      * PanelEditor/chart reads (absolute start/end Dates).
@@ -202,6 +215,7 @@ export default defineComponent({
     const applyDateTime = () => {
       const dt = props.selectedDateTime;
       if (dt?.startTime != null && dt?.endTime != null) {
+        appliedTimeKey.value = timeKey();
         dashboardPanelData.meta.dateTime = {
           start_time: new Date(dt.startTime),
           end_time: new Date(dt.endTime),
@@ -214,32 +228,71 @@ export default defineComponent({
      * so the toolbar's refresh can drive Visualize (in this mode refresh must
      * re-run this query, NOT sweep the Explore grid).
      */
-    const runQuery = () => {
+    const runQuery = (withoutCache = false) => {
+      livePreview.markRunStarted();
       applyDateTime();
-      panelEditorRef.value?.runQuery?.();
+      panelEditorRef.value?.runQuery?.(withoutCache);
     };
 
-    const { record } = useQueryHistoryRecorder();
+    const { isAutoRunOn } = useAutoRunToggle();
 
-    /** An explicit Run (button or shortcut): the only run that writes history. */
-    const onUserRun = (selectedDate: SelectedDate) => {
-      runQuery();
+    const isBuilderValid = () => {
+      const errors: string[] = [];
+      validatePanel(errors, true);
+      return errors.length === 0;
+    };
+
+    // Auto Run's live runs go through runQuery, never onUserRun, so they write no history.
+    const livePreview = usePanelLivePreview({
+      panel: () => dashboardPanelData.data,
+      applied: () => panelEditorRef.value?.chartData,
+      liveVariables: () => [],
+      committedVariables: () => [],
+      isBuilderValid,
+      isLoading: computed(() => panelEditorRef.value?.isLoading ?? false),
+      run: () => runQuery(),
+      pendingApply: () => isTimeChangePending.value,
+      autoRun: () => isAutoRunOn.value,
+    });
+    const isRunQueryPending = computed(() => livePreview.isPending.value);
+
+    // A seeded panel's load-time normalisation is not an edit, so live preview starts with the user's first input.
+    const armOnFirstInput = () => livePreview.arm();
+    onMounted(() => {
+      window.addEventListener("pointerdown", armOnFirstInput, true);
+      window.addEventListener("keydown", armOnFirstInput, true);
+    });
+    onBeforeUnmount(() => {
+      window.removeEventListener("pointerdown", armOnFirstInput, true);
+      window.removeEventListener("keydown", armOnFirstInput, true);
+    });
+
+    // Turning Auto Run back on applies a range picked while it was off.
+    watch(isAutoRunOn, (on) => {
+      if (on && isTimeChangePending.value) runQuery();
+    });
+
+    const historyRecorder = useQueryHistoryRecorder(() => !!panelEditorRef.value?.isLoading);
+
+    /** An explicit Run (button, shortcut or Refresh Cache & Run): the only run that writes history. */
+    const onUserRun = (selectedDate: SelectedDate, withoutCache = false) => {
+      runQuery(withoutCache);
       const errors: string[] = [];
       validatePanel(errors, false);
-      if (!errors.length) record(dashboardPanelData, selectedDate);
+      if (!errors.length) historyRecorder.record(dashboardPanelData, selectedDate);
     };
 
     // Set while applying an entry, so its range change does not also run the old query.
     let applyingEntry = false;
 
-    /** Loads a history entry live: its panel in place, its range on the parent's picker, one run. */
-    const applyPanelData = async (metricsData: string, timeRange: SelectedDate) => {
+    /** Loads a history entry live: its panel in place, its range on the parent's picker; a re-run is a user Run. */
+    const applyPanelData = async (metricsData: string, timeRange: SelectedDate, run = true) => {
       if (!applyMetricsBlob(metricsData, dashboardPanelData)) return;
       applyingEntry = true;
       emit("update:time-range", timeRange);
       await nextTick();
       applyingEntry = false;
-      runQuery();
+      if (run) onUserRun(timeRange);
     };
 
     // Declared AFTER applyDateTime/runQuery: the hooks call them, and a const
@@ -263,14 +316,13 @@ export default defineComponent({
       runQuery();
     });
 
-    // Follow the toolbar's window: re-run when the range changes (only once there
-    // is a query to run).
+    // With Auto Run off a picked range waits for Run like any other edit, as in Add Panel.
     watch(
       () => props.selectedDateTime,
       () => {
         if (applyingEntry) return;
-        if (dashboardPanelData.data?.queries?.[0]?.query) runQuery();
-        else applyDateTime();
+        if (!dashboardPanelData.data?.queries?.[0]?.query) applyDateTime();
+        else if (isAutoRunOn.value) runQuery();
       },
       { deep: true },
     );
@@ -282,9 +334,11 @@ export default defineComponent({
       showAddToDashboardDialog,
       onAddToDashboard,
       onChartApiError,
+      onRendererError,
       runQuery,
       onUserRun,
       applyPanelData,
+      isRunQueryPending,
     };
   },
 });

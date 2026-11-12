@@ -22,10 +22,7 @@ use std::{
 use bytes::Bytes;
 use config::{
     RwHashMap, get_config, is_local_disk_storage, metrics, spawn_pausable_job,
-    utils::{
-        hash::{Sum64, gxhash},
-        time::BASE_TIME,
-    },
+    utils::{hash::key_sum64, time::BASE_TIME},
 };
 use futures::StreamExt;
 use object_store::{GetOptions, GetResult, GetResultPayload, ObjectMeta};
@@ -158,8 +155,10 @@ impl FileData {
             let (key, data_size) = item.unwrap();
             // move the file from memory to disk cache
             let idx = get_bucket_idx(&key);
+            // A public dashboard body is a decompressed copy; its disk file is the source.
             if let Some((key, data)) = DATA[idx].remove(&key)
                 && !is_local_disk_storage()
+                && !key.starts_with(super::disk::PUBLIC_DASHBOARDS_PREFIX)
             {
                 _ = super::disk::set(&key, data).await;
             }
@@ -354,6 +353,24 @@ pub async fn remove(file: &str) -> Result<(), anyhow::Error> {
     files.remove(file).await
 }
 
+/// Removes one entry even while the cache is switched off; a point removal for the disk cache.
+pub async fn forget(file: &str) -> Result<(), anyhow::Error> {
+    let idx = get_bucket_idx(file);
+    FILES[idx].write().await.remove(file).await
+}
+
+/// Stores an entry even while the cache is switched off.
+#[cfg(test)]
+pub(crate) async fn set_for_test(file: &str, data: Bytes) {
+    let idx = get_bucket_idx(file);
+    FILES[idx].write().await.set(file, data).await.unwrap();
+}
+
+#[cfg(test)]
+pub(crate) fn holds(file: &str) -> bool {
+    DATA[get_bucket_idx(file)].contains_key(file)
+}
+
 async fn gc() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     if !cfg.memory_cache.enabled {
@@ -420,7 +437,7 @@ fn get_bucket_idx(file: &str) -> usize {
     if cfg.memory_cache.bucket_num <= 1 {
         0
     } else {
-        let h = gxhash::new().sum64(file);
+        let h = key_sum64(file);
         (h as usize) % cfg.memory_cache.bucket_num
     }
 }
@@ -546,7 +563,7 @@ mod tests {
         let content = Bytes::from("Test content for stats function");
 
         // Use the set function to add data
-        let bucket_id = gxhash::new().sum64(&test_key);
+        let bucket_id = key_sum64(&test_key);
         let bucket_id = (bucket_id as usize) % FILES.len();
         let mut file_data = FILES[bucket_id].write().await;
         let _ = file_data.set(&test_key, content.clone()).await;
@@ -579,7 +596,7 @@ mod tests {
                 test_id, i
             );
 
-            let bucket_id = gxhash::new().sum64(&file_key);
+            let bucket_id = key_sum64(&file_key);
             let bucket_id = (bucket_id as usize) % FILES.len();
             let mut file_data = FILES[bucket_id].write().await;
             let _ = file_data.set(&file_key, content.clone()).await;
@@ -633,7 +650,7 @@ mod tests {
         // Add small data
         let small_key = format!("files/test/{}_small.parquet", test_id);
         let small_content = Bytes::from("Small");
-        let bucket_id = gxhash::new().sum64(&small_key);
+        let bucket_id = key_sum64(&small_key);
         let bucket_id = (bucket_id as usize) % FILES.len();
         let mut file_data = FILES[bucket_id].write().await;
         let _ = file_data.set(&small_key, small_content.clone()).await;
@@ -642,7 +659,7 @@ mod tests {
         // Add large data
         let large_key = format!("files/test/{}_large.parquet", test_id);
         let large_content = Bytes::from(vec![0u8; 1000]);
-        let bucket_id = gxhash::new().sum64(&large_key);
+        let bucket_id = key_sum64(&large_key);
         let bucket_id = (bucket_id as usize) % FILES.len();
         let mut file_data = FILES[bucket_id].write().await;
         let _ = file_data.set(&large_key, large_content.clone()).await;
@@ -679,5 +696,16 @@ mod tests {
         let fd = FileData::default();
         assert!(fd.is_empty());
         assert_eq!(fd.size(), 0);
+    }
+
+    #[tokio::test]
+    async fn forget_removes_one_entry_and_its_accounting() {
+        let key = format!("public_dashboards/o/{}/r3600#1", config::ider::uuid());
+        set_for_test(&key, Bytes::from_static(b"body")).await;
+        assert!(holds(&key));
+        forget(&key).await.unwrap();
+        assert!(!holds(&key));
+        let idx = get_bucket_idx(&key);
+        assert!(!FILES[idx].read().await.exist(&key).await);
     }
 }

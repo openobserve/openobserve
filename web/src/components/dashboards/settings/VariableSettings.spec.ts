@@ -99,8 +99,8 @@ vi.mock("../../ConfirmDialog.vue", () => ({
   default: {
     name: "ConfirmDialog",
     template:
-      '<div data-test="confirm-dialog-mock" v-if="modelValue"><div>{{title}}</div><div>{{message}}</div></div>',
-    props: ["modelValue", "title", "message"],
+      '<div data-test="confirm-dialog-mock" v-if="modelValue" :data-keypath="messageKeypath" :data-variant="okVariant"><div>{{title}}</div><div>{{message}}</div><b data-test="confirm-dialog-mock-name">{{messageName}}</b></div>',
+    props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
     emits: ["update:ok", "update:cancel"],
   },
 }));
@@ -370,14 +370,19 @@ describe("VariableSettings", () => {
       vm.showDeleteDialogFn({ row: mockRowData });
       await nextTick();
 
-      // Since selectedDelete is not exposed in the component return,
-      // we can only verify that confirmDeleteDialog is set to true
-      // which indicates the function worked (as per the source code)
       expect(vm.confirmDeleteDialog).toBe(true);
+      expect(vm.selectedDelete).toEqual(mockRowData);
+    });
 
-      // The function implementation shows that selectedDelete should be set,
-      // but it's not exposed in the component's return statement.
-      // This is actually a bug in the original component.
+    it("names the variable in the delete dialog with a destructive button", async () => {
+      const vm = wrapper.vm as any;
+      vm.showDeleteDialogFn({ row: { name: "region" } });
+      await nextTick();
+
+      const dialog = wrapper.find('[data-test="confirm-dialog-mock"]');
+      expect(dialog.attributes("data-keypath")).toBe("dashboard.deleteVariableMsg");
+      expect(dialog.attributes("data-variant")).toBe("destructive");
+      expect(wrapper.find('[data-test="confirm-dialog-mock-name"]').text()).toBe("region");
     });
 
     it("should show confirm dialog component when delete dialog is active", async () => {

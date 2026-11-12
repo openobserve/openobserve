@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onAlertSelected"
         :placeholder="t('alerts.searcHistory')"
         data-test="alert-history-search-select"
-        class="o2-search-input min-w-62.5 max-lg:hidden"
+        class="o2-search-input max-w-62.5 min-w-62.5 max-lg:hidden"
         clearable
         @clear="clearSearch"
       >
@@ -67,16 +67,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OTooltip :content="t('common.search')" />
       </OButton>
-      <OButton
-        variant="ghost"
-        size="icon-sm"
-        icon-left="refresh"
-        @click="refreshData"
-        data-test="alert-history-refresh-btn"
+      <ORefreshButton
+        layout="inline"
+        variant="outline"
+        class="shrink-0"
+        :last-run-at="shownAt"
+        :failed-at="refreshFailure?.failedAt"
+        :data-from="refreshFailure?.dataFrom"
         :loading="fetching"
-      >
-        <OTooltip :content="t('common.refresh')" />
-      </OButton>
+        data-test="alert-history-refresh-btn"
+        @click="onRefreshClick"
+      />
     </template>
     <div
       class="border-border-default flex shrink-0 items-center gap-1 border-b px-3 py-1.5 lg:hidden"
@@ -130,6 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sort-by="sortBy"
           :sort-order="sortOrder"
           :loading="loading"
+          :error="refreshFailure ? null : historyError"
           show-index
           :show-global-filter="false"
           :default-columns="false"
@@ -175,14 +177,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
-          <template #cell-status="{ value }">
-            <OTag type="alertState" :value="value" data-test="alert-history-status-badge" />
+          <template #cell-status="{ row }">
+            <OTag
+              type="alertState"
+              :value="historyStatusOf(row)"
+              data-test="alert-history-status-badge"
+            />
           </template>
 
           <!-- T-10: what was observed, against what, and the level it
                classified to. Pre-change rows (no actual_value) render "—". -->
           <template #cell-condition="{ row }">
-            <div class="flex min-w-0 items-center gap-1.5">
+            <OTruncatedText
+              v-if="isAckEventRow(row)"
+              class="text-compact"
+              data-test="alert-history-ack-event-text"
+            >
+              {{ ackEventText(row, t) }}
+            </OTruncatedText>
+            <div v-else class="flex min-w-0 items-center gap-1.5">
               <span class="text-compact whitespace-nowrap tabular-nums">
                 {{ conditionSummary(row) }}
               </span>
@@ -200,8 +213,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <template #cell-is_realtime="{ value }">
+          <template #cell-is_realtime="{ row, value }">
+            <span v-if="isAckEventRow(row)" class="text-text-secondary">—</span>
             <OIcon
+              v-else
               :name="value ? 'check-circle' : 'schedule'"
               :class="value ? 'text-status-positive' : 'text-text-body'"
               size="xs"
@@ -210,8 +225,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OIcon>
           </template>
 
-          <template #cell-is_silenced="{ value }">
+          <template #cell-is_silenced="{ row, value }">
+            <span v-if="isAckEventRow(row)" class="text-text-secondary">—</span>
             <OIcon
+              v-else
               :name="value ? 'volume-off' : 'volume-up'"
               :class="value ? 'text-text-body' : 'text-status-positive'"
               size="md"
@@ -223,23 +240,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-duration="{ row }">
-            {{ formatDuration(row.end_time - row.start_time) }}
+            <span v-if="isAckEventRow(row)" class="text-text-secondary">—</span>
+            <template v-else>{{ formatDuration(row.end_time - row.start_time) }}</template>
           </template>
 
-          <template #cell-dedup="{ row }">
-            <span v-if="!row.dedup_enabled" class="text-text-secondary">-</span>
-            <div v-else-if="row.dedup_suppressed" class="text-status-error-text">
-              <OIcon name="block" size="sm">
-                <OTooltip>
-                  <template #content>
-                    {{ t("alerts.suppressedByDeduplication") }}
-                    <div v-if="row.dedup_count">
-                      {{ t("alerts.occurrence", { count: row.dedup_count }, row.dedup_count) }}
-                    </div>
-                  </template>
-                </OTooltip>
-              </OIcon>
-            </div>
+          <template #cell-retries="{ row }">
+            <span v-if="isAckEventRow(row)" class="text-text-secondary">—</span>
+            <template v-else>{{ row.retries }}</template>
+          </template>
+
+          <template #cell-suppression="{ row }">
+            <span v-if="isAckEventRow(row)" class="text-text-secondary">—</span>
+            <OTruncatedText
+              v-else-if="ackSuppressedBy(row)"
+              class="text-text-secondary text-xs"
+              data-test="alert-history-ack-dedup"
+            >
+              {{ t("alerts.ack.history.dedupSuppressed", { who: raw(ackSuppressedBy(row)) }) }}
+            </OTruncatedText>
+            <OTruncatedText
+              v-else-if="row.repeat_suppressed === true"
+              class="text-text-secondary text-xs"
+              data-test="alert-history-repeat-suppressed"
+            >
+              {{ t("alerts.suppressedAsRepeat") }}
+            </OTruncatedText>
             <div v-else-if="row.grouped" class="text-primary flex items-center justify-center">
               <OIcon name="group-work" size="md">
                 <OTooltip>
@@ -251,21 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OIcon>
               <span class="ms-1 text-xs">×{{ row.group_size || 1 }}</span>
             </div>
-            <div v-else class="text-status-positive flex items-center justify-center">
-              <OIcon name="check-circle" size="md">
-                <OTooltip>
-                  <template #content>
-                    {{ t("alerts.notificationSent") }}
-                    <div v-if="row.dedup_count && row.dedup_count > 1">
-                      {{ row.dedup_count }} {{ t("alerts.occurrencesDeduplicated") }}
-                    </div>
-                  </template>
-                </OTooltip>
-              </OIcon>
-              <span v-if="row.dedup_count && row.dedup_count > 1" class="ms-1 text-xs">
-                ×{{ row.dedup_count }}
-              </span>
-            </div>
+            <span v-else class="text-text-secondary">—</span>
           </template>
 
           <template #cell-actions="{ row }">
@@ -294,9 +305,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               />
             </OButton>
-            <ODropdown side="bottom" align="end">
+            <!-- Keyed by row, so a read that replaces the row under an open menu closes it instead of retargeting it. -->
+            <ODropdown :key="row.id" side="bottom" align="end">
               <template #trigger>
                 <OButton
+                  :aria-label="t('common.moreActions')"
                   icon-left="more-vert"
                   variant="ghost"
                   size="icon-xs-sq"
@@ -352,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="w-1/2">
               <div class="text-text-secondary mb-1 text-xs">{{ t("common.status") }}</div>
-              <OTag type="alertState" :value="selectedRow.status" />
+              <OTag type="alertState" :value="historyStatusOf(selectedRow)" />
             </div>
           </div>
         </div>
@@ -541,10 +554,11 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { alertHistoryQuery, alertsListQuery } from "@/services/alerts.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { ref, onMounted, watch, nextTick } from "vue";
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { formatDate } from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -555,16 +569,26 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { conditionSummary } from "@/utils/alerts/runOutcome";
+import {
+  ackEventText,
+  ackSuppressedBy,
+  historyStatusOf,
+  isAckEventRow,
+} from "@/utils/alerts/ackState";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import { announceAlert } from "@/lib/feedback/RegionStatus/announcer";
+import { formatRefreshFailed } from "@/utils/formatters";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
+
+type HistoryView = { page: number; size: number; sortBy: string; sortOrder: "asc" | "desc" };
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -600,6 +624,20 @@ const loading = historyList.isLoading;
 // spinner. `loading` is the skeleton, which only a cold read wants.
 const fetching = historyList.isFetching;
 const rows = ref<any[]>([]);
+// A failed read shows in the table, so the previous sort's or page's rows never pass for its result.
+const historyError = ref<string | null>(null);
+// Epoch ms the rows on screen were fetched, which a failed read reports as the data still shown.
+const shownAt = ref<number | null>(null);
+// A failed read of the shown alert and range keeps its rows under the notice, and Retry re-runs exactly that read.
+type FailedRead = HistoryView & { filter: string; range: typeof dateTimeValues.value };
+const refreshFailure = ref<{ failedAt: number; dataFrom: number; retry: FailedRead } | null>(null);
+// The view the rows on screen were read with, so a failed read puts the header and range back on it.
+let shownView: HistoryView | null = null;
+// The alert and time range the rows on screen answer; a failed read for another one must not keep them.
+let shownSource: string | null = null;
+let withdrawFailure: (() => void) | null = null;
+// A read that settles after the page is left must not announce on the page the user went to.
+let unmounted = false;
 const searchQuery = ref("");
 const selectedAlert = ref<any>(null);
 const allAlerts = ref<any[]>([]);
@@ -715,8 +753,8 @@ const columns = ref<OTableColumnDef[]>([
     header: t("alerts.status"),
     accessorKey: "status",
     sortable: true,
-    size: COL.status,
-    maxSize: COL.status,
+    size: 128,
+    maxSize: 128,
     cell: " ",
     meta: { align: "left" },
   },
@@ -737,14 +775,15 @@ const columns = ref<OTableColumnDef[]>([
     sortable: true,
     size: 64,
     maxSize: 64,
+    cell: " ",
     meta: { align: "right" },
   },
   {
-    id: "dedup",
-    header: t("alerts.dedup"),
+    id: "suppression",
+    header: t("alerts.suppression"),
     sortable: false,
-    size: 80,
-    maxSize: 80,
+    size: 112,
+    maxSize: 112,
     cell: " ",
     meta: { align: "left" },
   },
@@ -802,13 +841,25 @@ const clearSearch = () => {
 };
 
 const manualSearch = () => {
+  analytics.track("alert_history_searched", { alert_filtered: !!searchQuery.value });
   currentPage.value = 1;
   // The user explicitly asked for results, so this always hits the server even
   // when the filter shape is unchanged.
   fetchAlertHistory(true);
 };
 
+// Only the latest read may set the rows or the failure, so an earlier read settling late never relabels the view.
+let historyReadSeq = 0;
 const fetchAlertHistory = async (force = false) => {
+  const seq = ++historyReadSeq;
+  const requested = currentView();
+  const retry: FailedRead = {
+    ...requested,
+    filter: searchQuery.value,
+    range: { ...dateTimeValues.value },
+  };
+  const source = readSource(retry);
+  historyError.value = null;
   try {
     const org = store.state.selectedOrganization.identifier;
 
@@ -837,6 +888,10 @@ const fetchAlertHistory = async (force = false) => {
         id: `${hit.timestamp}_${index}`,
       }));
       totalCount.value = data.total || 0;
+      shownAt.value = historyList.dataUpdatedAt.value || Date.now();
+      shownView = requested;
+      shownSource = source;
+      clearRefreshFailure();
     };
 
     // Cached per query shape (range + page + sort + filter), so paging back to
@@ -847,15 +902,19 @@ const fetchAlertHistory = async (force = false) => {
     // Let the key pick up the new query shape before asking for the data.
     await nextTick();
 
+    let result;
     if (!hasRequestedHistory.value) {
       hasRequestedHistory.value = true;
       await nextTick();
-      await historyList.suspense();
+      result = await historyList.suspense();
     } else if (force) {
-      await historyList.refetch();
+      result = await historyList.refetch();
     } else {
-      await historyList.suspense();
+      result = await historyList.suspense();
     }
+    if (seq !== historyReadSeq) return;
+    // Both resolve with the failure instead of rejecting.
+    if (result?.error) throw result.error;
     await nextTick();
 
     {
@@ -871,14 +930,74 @@ const fetchAlertHistory = async (force = false) => {
       }
     }
   } catch (error: any) {
+    if (seq !== historyReadSeq) return;
     console.error("Error fetching alert history:", error);
-    console.error("Error response:", error.response);
-    toast({
-      variant: "error",
-      message: error.response?.data?.message || error.message || t("alerts.failedToFetchHistory"),
-    });
+    historyError.value =
+      error?.response?.data?.message || error?.message || t("alerts.failedToFetchHistory");
+    if (rows.value.length && shownAt.value && source === shownSource)
+      keepRowsAfterFailure(shownAt.value, retry);
+    else dropShownRows();
   }
 };
+
+// A relative range is named by its period, since its start and end move on every refresh.
+const readSource = (read: FailedRead) =>
+  JSON.stringify([
+    read.filter.trim(),
+    read.range.type === "relative"
+      ? read.range.relativeTimePeriod
+      : [read.range.startTime, read.range.endTime],
+  ]);
+
+const dropShownRows = () => {
+  rows.value = [];
+  totalCount.value = 0;
+  shownAt.value = null;
+  shownView = null;
+  shownSource = null;
+  clearRefreshFailure();
+};
+
+const currentView = (): HistoryView => ({
+  page: currentPage.value,
+  size: pageSize.value,
+  sortBy: sortBy.value,
+  sortOrder: sortOrder.value,
+});
+
+const applyView = (view: HistoryView) => {
+  currentPage.value = view.page;
+  pageSize.value = view.size;
+  sortBy.value = view.sortBy;
+  sortOrder.value = view.sortOrder;
+};
+
+const clearRefreshFailure = () => {
+  if (!refreshFailure.value) return;
+  refreshFailure.value = null;
+  withdrawFailure?.();
+  withdrawFailure = null;
+};
+
+const keepRowsAfterFailure = (dataFrom: number, retry: FailedRead) => {
+  if (unmounted || !shownView) return;
+  applyView(shownView);
+  refreshFailure.value = { failedAt: Date.now(), dataFrom, retry };
+  withdrawFailure?.();
+  withdrawFailure = announceAlert(formatRefreshFailed(t, refreshFailure.value));
+};
+
+const retryFailedRead = () => {
+  const retry = refreshFailure.value?.retry;
+  if (retry) {
+    applyView(retry);
+    searchQuery.value = retry.filter;
+    dateTimeValues.value = retry.range;
+  }
+  fetchAlertHistory(true);
+};
+
+const onRefreshClick = () => (refreshFailure.value ? retryFailedRead() : refreshData());
 
 const updateDateTime = (value: any) => {
   dateTimeValues.value = {
@@ -887,6 +1006,11 @@ const updateDateTime = (value: any) => {
     type: value.relativeTimePeriod ? "relative" : "absolute",
     relativeTimePeriod: value.relativeTimePeriod || "",
   };
+  if (value.userChangedValue) {
+    analytics.track("alert_history_time_range_changed", {
+      type: value.relativeTimePeriod ? "relative" : "absolute",
+    });
+  }
 
   if (value.relativeTimePeriod) {
     dateTimeType.value = "relative";
@@ -943,6 +1067,7 @@ const formatDuration = (microseconds: number) => {
 };
 
 const showDetailsDialog = (row: any) => {
+  analytics.track("alert_history_detail_opened");
   selectedRow.value = row;
   detailsDialog.value = true;
 };
@@ -964,6 +1089,12 @@ const goBack = () => {
     query: { org_identifier: store.state.selectedOrganization.identifier, folder, tab },
   });
 };
+
+onBeforeUnmount(() => {
+  unmounted = true;
+  withdrawFailure?.();
+  withdrawFailure = null;
+});
 
 // Lifecycle
 onMounted(async () => {

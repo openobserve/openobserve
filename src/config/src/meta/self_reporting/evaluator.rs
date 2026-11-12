@@ -42,6 +42,9 @@ pub const SPAN_NAME_EVALUATION: &str = "online_eval.evaluate";
 /// Standard span name for a Remote-Scorer evaluation.
 pub const SPAN_NAME_REMOTE_SCORER: &str = "remote_scorer.evaluate";
 
+/// Standard span name for a Code-Scorer evaluation.
+pub const SPAN_NAME_CODE_SCORER: &str = "code_scorer.evaluate";
+
 /// Standard span name when scorer type cannot be resolved.
 pub const SPAN_NAME_UNKNOWN_SCORER: &str = "unknown_scorer.evaluate";
 
@@ -65,6 +68,8 @@ pub const ATTR_TARGET_STREAM: &str = "target_stream";
 pub const ATTR_TARGET_STREAM_TYPE: &str = "target_stream_type";
 pub const ATTR_TARGET_AGENT_NAME: &str = "target_agent_name";
 pub const ATTR_TARGET_AGENT_ID: &str = "target_agent_id";
+pub const ATTR_TARGET_AGENT_ENV: &str = "target_agent_env";
+pub const ATTR_TARGET_AGENT_VERSION: &str = "target_agent_version";
 
 // Identity of the evaluator
 pub const ATTR_SCORER_ID: &str = "scorer_id";
@@ -138,6 +143,7 @@ mod tests {
         assert_ne!(SPAN_NAME_LLM_JUDGE, SPAN_NAME_REMOTE_SCORER);
         assert_ne!(SPAN_NAME_LLM_JUDGE, SPAN_NAME_UNKNOWN_SCORER);
         assert_ne!(SPAN_NAME_REMOTE_SCORER, SPAN_NAME_UNKNOWN_SCORER);
+        assert_ne!(SPAN_NAME_CODE_SCORER, SPAN_NAME_REMOTE_SCORER);
         assert_ne!(SPAN_NAME_SPAN_SKIPPED, SPAN_NAME_LLM_JUDGE);
     }
 
@@ -164,6 +170,8 @@ mod tests {
             ATTR_TARGET_STREAM_TYPE,
             ATTR_TARGET_AGENT_NAME,
             ATTR_TARGET_AGENT_ID,
+            ATTR_TARGET_AGENT_ENV,
+            ATTR_TARGET_AGENT_VERSION,
             ATTR_SCORER_ID,
             ATTR_SCORER_VERSION,
             ATTR_SCORER_TYPE,

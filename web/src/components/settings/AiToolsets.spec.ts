@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import AiToolsets from "./AiToolsets.vue";
+import aiToolsetsService from "@/services/ai_toolsets";
+import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -68,5 +70,67 @@ describe("AiToolsets list view state", () => {
       filterQuery: "xyz",
       pageSize: 100,
     });
+  });
+});
+
+describe("AiToolsets license lock", () => {
+  const mountWithEmpty = () =>
+    mount(AiToolsets, {
+      global: {
+        plugins: [i18n, store, router],
+        provide: { store },
+        stubs: {
+          AddAiToolset: true,
+          ConfirmDialog: true,
+          OTable: { template: "<div><slot name='empty' /></div>" },
+          OEmptyState: { name: "OEmptyState", template: "<div data-test='empty-stub' />" },
+        },
+      },
+    });
+
+  beforeEach(() => {
+    queryClient.clear();
+    vi.mocked(aiToolsetsService.list).mockClear();
+  });
+
+  afterEach(() => {
+    store.state.zoConfig.features = {};
+  });
+
+  it.each(["ai_toolsets", "ai_assistant"])(
+    "requests no toolsets while %s is locked and leaves the dimmed page's table empty",
+    async (feature) => {
+      store.state.zoConfig.features = { [feature]: "locked" };
+      const w = mountWithEmpty();
+      await flushPromises();
+      expect(aiToolsetsService.list).not.toHaveBeenCalled();
+      expect(w.find("[data-test='empty-stub']").exists()).toBe(true);
+      await (w.vm as any).refreshData();
+      expect(aiToolsetsService.list).not.toHaveBeenCalled();
+      w.unmount();
+    },
+  );
+
+  it("loads the toolsets and keeps the regular empty state when ai_toolsets is enabled", async () => {
+    store.state.zoConfig.features = { ai_toolsets: "enabled" };
+    const w = mountWithEmpty();
+    await flushPromises();
+    expect(aiToolsetsService.list).toHaveBeenCalled();
+    expect(w.find("[data-test='empty-stub']").exists()).toBe(true);
+    w.unmount();
+  });
+});
+
+describe("AiToolsets delete confirm", () => {
+  it("names the toolset and uses a destructive OK button", async () => {
+    const w: any = mountPage();
+    await flushPromises();
+    w.vm.confirmDeleteToolset({ id: "t1", name: "github-tools" });
+    await flushPromises();
+    const dialog = w.findComponent({ name: "ConfirmDialog" });
+    expect(dialog.props("messageKeypath")).toBe("aiToolset.deleteMessage");
+    expect(dialog.props("messageName")).toBe("github-tools");
+    expect(dialog.props("okVariant")).toBe("destructive");
+    w.unmount();
   });
 });

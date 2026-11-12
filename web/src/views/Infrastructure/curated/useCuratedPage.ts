@@ -34,6 +34,7 @@ import { workloadStateFromNames, type WorkloadState } from "@/composables/useWor
 import { gt, raw } from "@/types/i18n";
 import { chartColor } from "@/utils/chartTheme";
 import { colorToRgba } from "@/utils/dashboard/colorPalette";
+import { trustCustomChartCode } from "@/utils/dashboard/convertCustomChartData";
 import {
   buildDashboard,
   resolveManifest,
@@ -761,7 +762,11 @@ function translateTitles(
           ...panel,
           title: gt(panel.title),
           ...(typeof panel.customChartContent === "string"
-            ? { customChartContent: substituteThemeTokens(panel.customChartContent) }
+            ? {
+                customChartContent: trustCustomChartCode(
+                  substituteThemeTokens(panel.customChartContent),
+                ),
+              }
             : {}),
         })),
       };

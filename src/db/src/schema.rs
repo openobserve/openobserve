@@ -19,8 +19,11 @@ use arrow_schema::{DataType, Field, Schema};
 use bytes::Bytes;
 use common::meta::stream::StreamSchema;
 use config::{
-    O2_INGEST_TS_COL_NAME, cluster::LOCAL_NODE_ID, ider::SnowflakeIdGenerator,
-    meta::stream::StreamType, utils::json,
+    O2_INGEST_TS_COL_NAME,
+    cluster::LOCAL_NODE_ID,
+    ider::SnowflakeIdGenerator,
+    meta::{stream::StreamType, traces::GEN_AI_SCHEMA_FIELDS},
+    utils::json,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::schema::{
@@ -142,14 +145,7 @@ async fn ensure_gen_ai_fields_in_schema_inner(
     update_defined_schema_fields: bool,
 ) -> Result<(), anyhow::Error> {
     let schema_cache = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
-    let mut missing_fields: Vec<Field> = GEN_AI_SCHEMA_FIELDS
-        .iter()
-        .filter(|f| !schema_cache.contains_field(f.name()))
-        .cloned()
-        .collect();
-    if !schema_cache.contains_field(O2_INGEST_TS_COL_NAME) {
-        missing_fields.push(Field::new(O2_INGEST_TS_COL_NAME, DataType::Int64, true));
-    }
+    let missing_fields = get_missing_or_widened_gen_ai_fields(&schema_cache);
 
     if !missing_fields.is_empty() {
         let llm_schema = Schema::new(missing_fields);
@@ -159,6 +155,24 @@ async fn ensure_gen_ai_fields_in_schema_inner(
         ensure_gen_ai_fields_in_defined_schema_fields(org_id, stream_name, stream_type).await?;
     }
     Ok(())
+}
+
+fn get_missing_or_widened_gen_ai_fields(schema_cache: &SchemaCache) -> Vec<Field> {
+    let mut missing_fields: Vec<Field> = GEN_AI_SCHEMA_FIELDS
+        .iter()
+        .filter(|f| match schema_cache.field_with_name(f.name()) {
+            None => true,
+            Some(existing) => {
+                existing.data_type() != f.data_type()
+                    && infra::schema::is_widening_conversion(existing.data_type(), f.data_type())
+            }
+        })
+        .cloned()
+        .collect();
+    if !schema_cache.contains_field(O2_INGEST_TS_COL_NAME) {
+        missing_fields.push(Field::new(O2_INGEST_TS_COL_NAME, DataType::Int64, true));
+    }
+    missing_fields
 }
 
 async fn ensure_gen_ai_fields_in_defined_schema_fields(
@@ -199,90 +213,6 @@ fn append_gen_ai_fields_to_defined_schema_fields(defined_schema_fields: &mut Vec
     }
     updated
 }
-
-/// Arrow schema fields provisioned on streams marked as LLM streams.
-///
-/// Column names follow OTEL Gen-AI semantic conventions (after dot→underscore
-/// flattening of attribute keys at ingestion). Three columns are OpenObserve
-/// extensions kept under the `gen_ai_` namespace per project convention: the
-/// derived `gen_ai_usage_total_tokens`, and cost breakdown/estimate fields
-/// (the spec does not currently define cost attributes).
-static GEN_AI_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLock::new(|| {
-    vec![
-        // String fields
-        Field::new("gen_ai_operation_name", DataType::Utf8, true),
-        Field::new("gen_ai_response_model", DataType::Utf8, true),
-        Field::new("gen_ai_provider_name", DataType::Utf8, true),
-        Field::new("gen_ai_agent_name", DataType::Utf8, true),
-        Field::new("gen_ai_agent_id", DataType::Utf8, true),
-        // Canonical env/version columns the agent registry writes back onto
-        // spans; must be provisioned (and UDS-listed) so version-scoped agent
-        // queries never hit "No field named" on LLM streams.
-        Field::new("gen_ai_agent_env", DataType::Utf8, true),
-        Field::new("gen_ai_agent_version", DataType::Utf8, true),
-        Field::new("gen_ai_input_messages", DataType::Utf8, true),
-        Field::new("gen_ai_output_messages", DataType::Utf8, true),
-        Field::new("gen_ai_system_instructions", DataType::Utf8, true),
-        // Session span SQL always selects this, so a chat with no tool call still has the column.
-        Field::new("gen_ai_tool_name", DataType::Utf8, true),
-        Field::new("user_id", DataType::Utf8, true),
-        Field::new("gen_ai_conversation_id", DataType::Utf8, true),
-        Field::new("gen_ai_request_model", DataType::Utf8, true),
-        // Prompt Management attribution (`gen_ai.prompt.*`); label is only
-        // written for label-resolved calls, so it must be provisioned up front.
-        Field::new("gen_ai_prompt_name", DataType::Utf8, true),
-        Field::new("gen_ai_prompt_label", DataType::Utf8, true),
-        // Integer fields
-        Field::new("gen_ai_prompt_version", DataType::Int64, true),
-        Field::new("gen_ai_usage_input_tokens", DataType::Int64, true),
-        Field::new("gen_ai_usage_output_tokens", DataType::Int64, true),
-        Field::new("gen_ai_usage_total_tokens", DataType::Int64, true),
-        Field::new(
-            "gen_ai_usage_cache_read_input_tokens",
-            DataType::Int64,
-            true,
-        ),
-        Field::new(
-            "gen_ai_usage_cache_creation_input_tokens",
-            DataType::Int64,
-            true,
-        ),
-        // Float fields
-        Field::new(
-            "gen_ai_response_time_to_first_chunk",
-            DataType::Float64,
-            true,
-        ),
-        Field::new("gen_ai_usage_cost", DataType::Float64, true),
-        Field::new("gen_ai_usage_cost_input", DataType::Float64, true),
-        Field::new("gen_ai_usage_cost_output", DataType::Float64, true),
-        Field::new(
-            "gen_ai_usage_cost_cache_read_input",
-            DataType::Float64,
-            true,
-        ),
-        Field::new(
-            "gen_ai_usage_cost_cache_creation_input",
-            DataType::Float64,
-            true,
-        ),
-        Field::new(
-            "gen_ai_usage_cost_estimated_without_cache",
-            DataType::Float64,
-            true,
-        ),
-        Field::new(
-            "gen_ai_usage_cost_cache_read_savings",
-            DataType::Float64,
-            true,
-        ),
-        Field::new(
-            "gen_ai_usage_cost_net_cache_impact",
-            DataType::Float64,
-            true,
-        ),
-    ]
-});
 
 /// Ensure the eleven DBM identity columns (`o2_db_*`, written by trace-ingest
 /// enrichment) exist in the stream's Arrow schema, and — for streams with
@@ -954,5 +884,29 @@ mod tests {
         assert_eq!(split_start_dt("", 1), None);
         // an empty segment is not a stream
         assert_eq!(split_start_dt("default//slo_slices", 3), None);
+    }
+
+    #[test]
+    fn test_gen_ai_prompt_version_is_utf8_in_schema_fields() {
+        let field = GEN_AI_SCHEMA_FIELDS
+            .iter()
+            .find(|f| f.name() == "gen_ai_prompt_version")
+            .expect("gen_ai_prompt_version field missing from GEN_AI_SCHEMA_FIELDS");
+        assert_eq!(field.data_type(), &DataType::Utf8);
+        assert!(field.is_nullable());
+    }
+
+    #[test]
+    fn test_gen_ai_schema_fields_widens_existing_int64_prompt_version() {
+        let existing_schema = SchemaCache::new(Schema::new(vec![Field::new(
+            "gen_ai_prompt_version",
+            DataType::Int64,
+            true,
+        )]));
+
+        let missing = get_missing_or_widened_gen_ai_fields(&existing_schema);
+        let prompt_version_field = missing.iter().find(|f| f.name() == "gen_ai_prompt_version");
+        assert!(prompt_version_field.is_some());
+        assert_eq!(prompt_version_field.unwrap().data_type(), &DataType::Utf8);
     }
 }

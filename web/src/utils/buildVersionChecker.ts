@@ -16,10 +16,14 @@
 import { configQuery } from "@/services/config.queries";
 import { queryClient } from "@/composables/query/queryClient";
 
+// Chrome, Firefox and Safari word a failed dynamic import differently; Vite adds its own CSS preload error.
+const CHUNK_LOAD_ERROR_PATTERN =
+  /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Unable to preload CSS|Loading (CSS )?chunk \S+ failed/i;
+
 /**
  * Approach:
  * 1. When app loads, config API is called (by main.ts) and stored in Vuex store
- * 2. We store the initial commit hash from that config in localStorage
+ * 2. We store the initial commit hash from that config in sessionStorage (per tab)
  * 3. On chunk/resource errors, fetch config API again to check if commit hash changed
  * 4. Cache config responses to avoid excessive API calls
  * 5. Only treat as stale build if commit hash actually changed
@@ -32,28 +36,31 @@ class BuildVersionChecker {
   private cacheDuration = 5 * 60 * 1000; // Cache for 5 minutes
   private cachedConfig: any = null;
 
+  private initialVersion: string | null = null;
+
   /**
-   * Get initial version from localStorage or null if not set
+   * Get this tab's baseline version, or null if not set
    */
   private getStoredVersion(): string | null {
+    if (this.initialVersion) return this.initialVersion;
     try {
-      return localStorage.getItem(this.STORAGE_KEY);
-    } catch (error) {
-      console.warn("Failed to read from localStorage:", error);
+      return sessionStorage.getItem(this.STORAGE_KEY);
+    } catch {
       return null;
     }
   }
 
   /**
-   * Update the baseline version in localStorage
-   * This should be called from main.ts after the config is fetched
-   * Updates on every page load to ensure we track the current deployed version
+   * Record the build this tab loaded; called from main.ts on every page load.
    */
   public setInitialVersion(commitHash: string): void {
+    this.initialVersion = commitHash;
     try {
-      localStorage.setItem(this.STORAGE_KEY, commitHash);
-    } catch (error) {
-      console.warn("Failed to write to localStorage:", error);
+      sessionStorage.setItem(this.STORAGE_KEY, commitHash);
+      // The baseline must stay per tab; a shared one hides staleness from older tabs.
+      localStorage.removeItem(this.STORAGE_KEY);
+    } catch {
+      // Storage can be blocked; the in-memory baseline still works for this tab.
     }
   }
 
@@ -86,7 +93,6 @@ class BuildVersionChecker {
   async checkForNewVersion(): Promise<boolean> {
     if (this.isChecking) return false;
 
-    // Get stored version from localStorage
     const initialVersion = this.getStoredVersion();
 
     // Skip version check if we don't have an initial version
@@ -145,11 +151,7 @@ class BuildVersionChecker {
     const errorMessage = this.getErrorMessage(error);
 
     // Check if it's a chunk load error
-    const isChunkError = /Loading chunk|Failed to fetch dynamically imported module/i.test(
-      errorMessage,
-    );
-
-    if (!isChunkError) {
+    if (!CHUNK_LOAD_ERROR_PATTERN.test(errorMessage)) {
       return false;
     }
 
@@ -166,3 +168,9 @@ class BuildVersionChecker {
 
 // Export singleton instance
 export const buildVersionChecker = new BuildVersionChecker();
+
+/** True when the error is a failed code-split chunk or CSS preload. */
+export function isChunkLoadError(error: unknown): boolean {
+  const message = (error as { message?: unknown } | null | undefined)?.message;
+  return typeof message === "string" && CHUNK_LOAD_ERROR_PATTERN.test(message);
+}

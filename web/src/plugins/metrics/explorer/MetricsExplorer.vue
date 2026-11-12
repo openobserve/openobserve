@@ -94,38 +94,135 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroupItem>
       </OToggleGroup>
 
-      <!-- The filter control has its own row below (see `metrics-explorer-
-           filter-row`). This spacer is what pins the time cluster right. -->
-      <div class="flex-1 max-md:hidden" />
+      <div class="@container flex min-w-0 flex-1 items-center justify-end ps-3 max-md:hidden">
+        <template v-if="isGridMode && !detailOpen && failedSummary">
+          <ODataAge
+            :at="failedSummary.dataFrom"
+            :failed-at="failedSummary.failedAt"
+            :failed-count="failedSummary.count"
+            :failed-total="failedSummary.total"
+            class="@max-2xl:hidden"
+            data-test="metrics-explorer-refresh-failed"
+            @retry="() => onRefresh()"
+          />
+          <ODataAge
+            :at="failedSummary.dataFrom"
+            :failed-at="failedSummary.failedAt"
+            :failed-count="failedSummary.count"
+            :failed-total="failedSummary.total"
+            compact
+            class="@2xl:hidden"
+            data-test="metrics-explorer-refresh-failed-short"
+            @retry="() => onRefresh()"
+          />
+        </template>
+        <ORegionStatus
+          v-else-if="isGridMode && rangeStatusShown"
+          noun="charts"
+          :elapsed-seconds="region.elapsedSeconds.value"
+          :message="rangeStatusText"
+          data-test="metrics-explorer-range-status"
+        />
+        <ORegionStatus
+          v-else-if="isGridMode"
+          noun="charts"
+          :elapsed-seconds="region.elapsedSeconds.value"
+          data-test="metrics-explorer-long-wait"
+        />
+      </div>
 
       <div class="flex shrink-0 items-center gap-2 max-md:ms-auto max-md:gap-1">
+        <OPageHeaderStatus />
+        <!-- Explore keeps Apply: a date change there re-queries the whole card grid. -->
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
           v-model="selectedDate"
+          data-test="metrics-date-picker"
+          :auto-apply-dashboard="mode === 'visualize'"
+          calendar-presets
           @on:date-change="onDateChange"
         />
         <AutoRefreshInterval
           v-model="refreshInterval"
           trigger
+          data-test="metrics-auto-refresh"
           :is-compact="isMobile"
           @trigger="onRefreshTick"
         />
         <!-- Only an explicit Run writes query history; Refresh does not. -->
         <template v-if="mode === 'visualize'">
-          <QueryHistoryDrawer @load="onHistoryLoad" />
-          <OButton
-            variant="primary"
-            size="sm-toolbar"
-            icon-left="play-arrow"
-            data-test="metrics-explorer-run"
-            @click="onVisualizeRun"
-          >
-            <span class="max-md:hidden">{{ t("metrics.runQuery") }}</span>
-            <OTooltip :content="t('metrics.runQuery')" shortcut-id="metricsRunQuery" />
-          </OButton>
+          <QueryHistoryDrawer ref="historyDrawerRef" @load="onHistoryLoad" />
+          <RecentSearchesFocusDropdown
+            ref="recentDropdownRef"
+            v-model:open="recentEditor.open.value"
+            source="metrics"
+            :anchor="recentEditor.anchor.value"
+            @run="(entry, when) => historyDrawerRef?.restore(entry, when, true)"
+            @load="(entry, when) => historyDrawerRef?.restore(entry, when, false)"
+            @view-all="(status) => historyDrawerRef?.show(status)"
+          />
+          <RecentSearchesButton
+            data-test="metrics-history-btn"
+            @view-all="(status) => historyDrawerRef?.show(status)"
+          />
+          <OButtonGroup>
+            <OButton
+              :variant="isVisualizePending ? 'pending' : 'primary'"
+              size="sm-toolbar"
+              class="w-[5.875rem]! px-1!"
+              data-test="metrics-explorer-run"
+              :data-run-pending="isVisualizePending ? 'true' : undefined"
+              :aria-label="isVisualizePending ? t('search.runQueryPendingLabel') : undefined"
+              @click="onVisualizeRun"
+            >
+              {{ t("metrics.runQuery") }}
+              <OTooltip :content="visualizeRunTooltip" shortcut-id="metricsRunQuery" />
+            </OButton>
+            <ODropdown align="end" side="bottom">
+              <template #trigger>
+                <OButton
+                  :variant="isVisualizePending ? 'pending' : 'primary'"
+                  size="icon-toolbar"
+                  class="w-5"
+                  icon-left="arrow-drop-down"
+                  :aria-label="t('metrics.runQueryOptions')"
+                  data-test="metrics-explorer-run-options"
+                />
+              </template>
+              <ODropdownItem
+                icon-left="refresh"
+                data-test="metrics-explorer-refresh-cache-run"
+                @select="onVisualizeRunWithoutCache"
+              >
+                {{ t("search.refreshCacheAndRunQuery") }}
+              </ODropdownItem>
+              <template v-if="isAutoRunAvailable">
+                <ODropdownSeparator />
+                <ODropdownItem data-test="metrics-explorer-auto-run-toggle" @select="toggleAutoRun">
+                  <template #icon-left>
+                    <OIcon
+                      :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
+                      size="sm"
+                      :class="isAutoRunOn ? 'text-accent' : ''"
+                    />
+                  </template>
+                  <span>
+                    <div class="font-medium">
+                      {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
+                    </div>
+                    <div class="text-text-secondary text-xs">
+                      {{ t("search.liveModeTooltip") }}
+                    </div>
+                  </span>
+                </ODropdownItem>
+              </template>
+            </ODropdown>
+          </OButtonGroup>
         </template>
+        <!-- Visualize's Run query already re-runs the chart; the r shortcut and auto-refresh still refresh there. -->
         <OButton
-          :variant="mode === 'visualize' ? 'outline' : 'primary'"
+          v-if="mode !== 'visualize'"
+          variant="primary"
           size="sm-toolbar"
           icon-left="refresh"
           :disabled="isGridMode && (refreshing || grid.loading.value)"
@@ -159,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     -->
     <div
       v-if="isGridMode"
-      class="border-border-default flex shrink-0 items-center gap-2 border-b p-1.5"
+      class="border-border-default flex shrink-0 items-center gap-2 border-b px-1.5 py-0.75"
       data-test="metrics-explorer-filter-row"
     >
       <!-- No "Filters" caption: the chips already read `action = accept_challenge`
@@ -171,9 +268,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label-names-loading="grid.labelNamesLoading.value"
         :schema-loading="grid.schemaLoading.value"
         :load-values="grid.loadLabelValues"
+        :value-scope="grid.labelValueScope.value"
         @focus-picker="grid.loadLabelNames"
         @add="onAddLabelFilter"
         @remove="onRemoveLabelFilter"
+        @replace="onReplaceLabelFilter"
+        @negate-group="onNegateLabelGroup"
         @clear-all="onClearLabelFilters"
       />
     </div>
@@ -235,6 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :facets="grid.prefixFacets.value"
           :selected="grid.selectedPrefixes.value"
           :has-selection="railHasSelection"
+          :loading="firstLoadPending"
           @update:selected="onPrefixChange"
           @clear="clearActiveRail"
         />
@@ -245,6 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :facets="grid.suffixFacets.value"
           :selected="grid.selectedSuffixes.value"
           :has-selection="railHasSelection"
+          :loading="firstLoadPending"
           @update:selected="onSuffixChange"
           @clear="clearActiveRail"
         />
@@ -309,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OCheckboxGroup>
           <OEmptyState
-            v-else
+            v-else-if="!firstLoadPending"
             size="inline"
             icon="search-off"
             :title="t('metrics.explorer.facets.noTypeMatch')"
@@ -372,9 +474,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             aria-live="polite"
             data-test="metrics-explorer-count"
-            class="text-text-secondary shrink-0 text-xs whitespace-nowrap tabular-nums"
-            >{{ resultCountLabel }}</span
+            class="text-text-secondary min-w-[12ch] shrink-0 text-end text-xs whitespace-nowrap tabular-nums"
+            :class="{ [STALE_DIM]: settledCount.dimmed.value }"
+            :aria-busy="settledCount.state.value.loading ? 'true' : undefined"
           >
+            <template v-if="settledCount.state.value.loading">
+              <OSkeleton type="text" animation="none" class="inline-block h-3 w-10 align-middle" />
+            </template>
+            <template v-else>{{ settledCount.state.value.value }}</template>
+          </span>
+
+          <OToggleGroup
+            :model-value="[...grid.usageFilters.value]"
+            type="multiple"
+            data-test="metrics-explorer-usage-filter"
+            @update:model-value="onUsageFilterChange"
+          >
+            <OToggleGroupItem
+              v-for="opt in usageFilterOptions"
+              :key="opt.value"
+              :value="opt.value"
+              size="sm"
+              :data-test="`metrics-explorer-usage-${opt.value}`"
+              >{{ opt.label }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+          <OSpinner
+            v-if="grid.usageLoading.value"
+            size="xs"
+            :title="t('metrics.explorer.usageLoading')"
+            data-test="metrics-explorer-usage-loading"
+          />
+          <OButton
+            v-else-if="grid.usageError.value"
+            variant="ghost-destructive"
+            size="xs"
+            icon-left="refresh"
+            data-test="metrics-explorer-usage-retry"
+            @click="grid.retryUsage"
+          >
+            {{ t("metrics.explorer.usageFailed") }}
+          </OButton>
 
           <OToggleGroup v-model="sortModel" type="single" data-test="metrics-explorer-sort">
             <OToggleGroupItem
@@ -382,6 +522,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="opt.value"
               :value="opt.value"
               size="sm"
+              :tooltip="opt.tooltip"
               :data-test="`metrics-explorer-sort-${opt.value}`"
               >{{ opt.label }}</OToggleGroupItem
             >
@@ -410,8 +551,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Convert to dashboard: each favourite becomes a panel. FAVOURITES
                only, where they are what's on screen. -->
+          <OTooltip
+            v-if="isWorkspace && grid.favorites.value.length && dashboardsLocked"
+            :content="dashboardsLockedReason"
+          >
+            <span class="inline-flex">
+              <OButton
+                variant="outline"
+                size="sm-action"
+                disabled
+                data-test="metrics-explorer-convert-dashboard"
+              >
+                <template #icon-left>
+                  <OIcon
+                    name="lock"
+                    class="lock-chip"
+                    size="sm"
+                    data-test="metrics-explorer-convert-dashboard-lock"
+                  />
+                </template>
+                {{ t("metrics.explorer.convertToDashboard") }}
+              </OButton>
+            </span>
+          </OTooltip>
           <OButton
-            v-if="isWorkspace && grid.favorites.value.length"
+            v-else-if="isWorkspace && grid.favorites.value.length"
             variant="outline"
             size="sm-action"
             icon-left="dashboard-customize"
@@ -488,11 +652,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-workspace-empty-grid"
           />
 
+          <!-- Every card checked so far is empty but candidates remain: not a verdict, so no remedies, just Show more below. -->
+          <OEmptyState
+            v-else-if="!visibleCards.length && grid.hasMore.value"
+            size="block"
+            variant="no-results"
+            illustration="no-results"
+            :title="t('metrics.explorer.noMatchYet')"
+            :description="t('metrics.explorer.noMatchYetHint')"
+            data-test="metrics-explorer-no-match-yet"
+          />
+
           <!-- Every remedy the hint names, as an action card — but only the ones
              that would actually change anything right now: each card is gated
              on its own cause being active. "Clear all filters" is always last. -->
           <OEmptyState
-            v-else-if="!visibleCards.length"
+            v-else-if="!gridItems.length"
             size="block"
             preset="no-search-results"
             :title="t('metrics.explorer.noMatch')"
@@ -526,30 +701,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 gridTemplateColumns: isGrid ? `repeat(${columns}, minmax(0, 1fr))` : undefined,
               }"
             >
-              <MetricCard
+              <template
                 v-for="(card, offset) in rowsOfCards[row.index]"
-                :key="card.name"
-                :card="card"
-                :preview="grid.previews.value[card.name]"
-                :queries="queriesFor(card)"
-                :index="row.index * columns + offset"
-                :time-range="grid.timeRange.value"
-                :exemplars-eligible="grid.exemplarEligible(card)"
-                :exemplars-on="grid.exemplarsEnabled(card.name)"
-                :exemplars-swaps-variant="grid.exemplarSwapsVariant(card)"
-                :exemplars="grid.exemplarStateOf(card.name)"
-                @toggle-exemplars="grid.toggleExemplars"
-                @retry-exemplars="grid.retryExemplars"
-                @visible="onCardVisible"
-                @hidden="onCardHidden"
-                @refresh="grid.refreshCard"
-                @open-detail="openDetail"
-                @zoom="onCardZoom"
-              />
+                :key="card?.name ?? `placeholder-${row.index * columns + offset}`"
+              >
+                <div
+                  v-if="!card"
+                  class="border-border-default rounded-default flex h-full flex-col overflow-hidden border"
+                  data-test="metrics-explorer-card-placeholder"
+                >
+                  <PanelBar class="gap-2">
+                    <OSkeleton type="text" animation="none" class="h-3 w-40" aria-hidden="true" />
+                  </PanelBar>
+                  <!-- A slot is only drawn while the grid's emptiness sweep is still running. -->
+                  <div class="relative min-h-0 flex-1">
+                    <LoadingProgress :loading="true" :loading-progress-percentage="0" />
+                    <PanelChartPlaceholder />
+                  </div>
+                </div>
+                <MetricCard
+                  v-else
+                  :card="card"
+                  :preview="grid.previews.value[card.name]"
+                  :queries="queriesFor(card)"
+                  :index="row.index * columns + offset"
+                  :time-range="grid.timeRange.value"
+                  :exemplars-eligible="grid.exemplarEligible(card)"
+                  :exemplars-on="grid.exemplarsEnabled(card.name)"
+                  :exemplars-swaps-variant="grid.exemplarSwapsVariant(card)"
+                  :exemplars="grid.exemplarStateOf(card.name)"
+                  @toggle-exemplars="grid.toggleExemplars"
+                  @retry-exemplars="grid.retryExemplars"
+                  @visible="onCardVisible"
+                  @hidden="onCardHidden"
+                  @refresh="grid.refreshCard"
+                  @open-detail="openDetail"
+                  @zoom="onCardZoom"
+                />
+              </template>
             </div>
           </div>
 
-          <div v-if="grid.hasMore.value && visibleCards.length" class="flex justify-center py-4">
+          <div
+            v-if="grid.hasMore.value && !showLoading && !grid.loadError.value"
+            class="flex justify-center py-4"
+          >
             <OButton
               variant="outline"
               size="sm"
@@ -575,6 +771,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :card="detailCard"
       :metric-name="detailMetric ?? ''"
       :loading="detailLoading"
+      :labels-pending="detailSchemasPending"
+      :range-changing="!!rangeChange"
+      :seed="detailSeed"
       :tab="detailTab"
       :breakdown-label="breakdownLabel"
       :compare="compareOffset"
@@ -605,6 +804,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :exemplars-swaps-variant="!!detailCard && grid.exemplarSwapsVariant(detailCard)"
       :exemplars="detailMetric ? grid.exemplarStateOf(detailMetric) : undefined"
       @close="closeDetail"
+      @overview-status="onDetailOverviewStatus"
       @open-visualize="onDetailOpenVisualize"
       @toggle-favorite="detailMetric && grid.toggleFavorite(detailMetric)"
       @configure="detailCard && onConfigure(detailCard)"
@@ -626,7 +826,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <MetricsVisualize
       v-else-if="mode === 'visualize'"
       ref="visualizeRef"
-      key="metrics-visualize"
+      :key="`metrics-visualize-${visualizeMount}`"
       class="min-h-0 flex-1"
       :selected-date-time="visualizeDateTime"
       :seed="visualizeSeed"
@@ -661,6 +861,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { AcceptableValue } from "reka-ui";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import useNotifications from "@/composables/useNotifications";
+import { MAX_FILTER_BRANCHES } from "@/components/promql/labelBoolean";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
@@ -670,12 +872,25 @@ import { isEqual, debounce } from "lodash-es";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OCheckboxGroup from "@/lib/forms/Checkbox/OCheckboxGroup.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import ODataAge from "@/lib/core/RefreshButton/ODataAge.vue";
+import ORegionStatus from "@/lib/feedback/RegionStatus/ORegionStatus.vue";
+import { useRegionLoading } from "@/lib/feedback/RegionStatus/useRegionLoading";
+import PanelBar from "@/components/common/PanelBar.vue";
+import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
+import { useSettledValue } from "@/composables/useSettledValue";
+import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
+import { STALE_DIM, STALE_DIM_DELAY_MS } from "@/lib/styles/motion";
+import { formatRangeLength, formatRefreshFailed } from "@/utils/formatters";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
@@ -684,6 +899,9 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import useBreakpoint from "@/composables/useBreakpoint";
 
 import ShareButton from "@/components/common/ShareButton.vue";
@@ -693,12 +911,17 @@ import AddToDashboard from "../AddToDashboard.vue";
 import PrefixFilterPanel from "./PrefixFilterPanel.vue";
 import LabelFilterBar from "./LabelFilterBar.vue";
 import FunctionConfigDialog from "./FunctionConfigDialog.vue";
-import MetricDetailView from "./MetricDetailView.vue";
+import MetricDetailView, { type DetailStatus } from "./MetricDetailView.vue";
 import ExplorerSavedViews from "./ExplorerSavedViews.vue";
 import QueryHistoryDrawer from "../QueryHistoryDrawer.vue";
+import RecentSearchesButton from "@/components/queryHistory/RecentSearchesButton.vue";
+import RecentSearchesFocusDropdown from "@/components/queryHistory/RecentSearchesFocusDropdown.vue";
+import { useRecentSearchesEditorHost } from "@/composables/queryHistory/useRecentSearchesEditorHost";
+import { metricsEditorIsEmpty, metricsEditorIsEmptyWith } from "@/utils/queryHistory/metrics";
 
 import useMetricsExplorerGrid, {
   PAGE_SIZE_INCREMENT,
+  hasSamples,
   type LabelFilter,
   type QueryWindow,
 } from "@/composables/metrics/useMetricsExplorerGrid";
@@ -728,7 +951,7 @@ import {
 } from "@/utils/dashboard/urlTimeParams";
 import { pickerSavedDate } from "@/utils/metrics/queryHistory";
 import type { ExplorerViewState } from "@/utils/metrics/explorerSavedView";
-import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
+import { operandStreamsOf, type MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import analytics from "@/services/product_analytics";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -756,6 +979,13 @@ const ROW_HEIGHT = CARD_HEIGHT + ROW_GAP;
 export default defineComponent({
   name: "MetricsExplorer",
   components: {
+    OPageHeaderStatus,
+    OSkeleton,
+    ODataAge,
+    ORegionStatus,
+    PanelBar,
+    LoadingProgress,
+    PanelChartPlaceholder,
     FirstDataPanel,
     DateTimePickerDashboard,
     AutoRefreshInterval,
@@ -772,6 +1002,8 @@ export default defineComponent({
     OToggleGroupItem,
     ODropdown,
     ODropdownItem,
+    ODropdownSeparator,
+    OButtonGroup,
     ShareButton,
     MetricCard,
     MetricsVisualize,
@@ -782,10 +1014,26 @@ export default defineComponent({
     MetricDetailView,
     ExplorerSavedViews,
     QueryHistoryDrawer,
+    RecentSearchesButton,
+    RecentSearchesFocusDropdown,
   },
   setup() {
     const { t } = useI18nTyped();
+    const { showErrorNotification } = useNotifications();
+
+    /** A link whose label groups expand past the cap loses them; say so rather than filter less in silence. */
+    const notifyGroupsOverCap = (f: { labelGroupsOverCap?: number }) => {
+      if (!f.labelGroupsOverCap) return;
+      showErrorNotification(
+        t("metrics.labelGroups.tooManyBranches", {
+          count: f.labelGroupsOverCap,
+          max: MAX_FILTER_BRANCHES,
+        }),
+      );
+    };
     const store = useStore();
+    const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
+      useLicenseLock("dashboards");
     const router = useRouter();
     const route = useRoute();
     const grid = useMetricsExplorerGrid(t);
@@ -806,7 +1054,14 @@ export default defineComponent({
     const isGrid = computed(() => grid.viewMode.value === "grid");
     // The rendered slice. Colour index is a card's position here, which is a
     // prefix of the full sorted set, so colours stay stable as pages are added.
-    const visibleCards = computed(() => grid.pagedCards.value);
+    const visibleCards = computed(() => grid.displayed.value.cards);
+    // `null` marks a slot with no card to draw: not known yet (trailing), or known empty while the slice settles.
+    const gridItems = computed<(MetricCardModel | null)[]>(() => [
+      ...visibleCards.value.map((card) =>
+        grid.displayed.value.emptyHeld.has(card.name) ? null : card,
+      ),
+      ...Array.from({ length: grid.displayed.value.placeholders }, () => null),
+    ]);
 
     const refreshing = ref(false);
     // Swapping the grid for the spinner during a refresh's stream reload unmounts every card, emptying `onScreen` before the re-query runs.
@@ -818,7 +1073,7 @@ export default defineComponent({
     // `visibleCards.length > 0` implies not-loading, not-errored, and — in
     // Workspace — that favorites matched, so it's exactly the grid's own branch.
     const gridVisible = computed(
-      () => !showLoading.value && !grid.loadError.value && visibleCards.value.length > 0,
+      () => !showLoading.value && !grid.loadError.value && gridItems.value.length > 0,
     );
 
     // Just the count. It used to append "· N no-data hidden", but the checkbox
@@ -826,20 +1081,52 @@ export default defineComponent({
     // suffix restated the control next to it and wrapped onto two lines doing
     // it. The exact number still appears where it is actually needed: the empty
     // state, where it explains why the grid has nothing in it.
-    const resultCountLabel = computed(() => {
-      const shown = visibleCards.value.length;
+    // Matches, not the loaded page: unqueried candidates count, known-empty ones do not while "With data" is on.
+    const countText = (shown: number) => {
       const total = grid.cards.value.length;
       return shown === total
         ? total.toLocaleString()
         : `${shown.toLocaleString()} of ${total.toLocaleString()}`;
-    });
+    };
+    const resultCountLabel = computed(() => countText(grid.filteredCards.value.length));
+    // Written once per settled sweep, never decremented card by card; the total is unknown, not 0, until the list first loads.
+    const listSettled = ref(grid.cards.value.length > 0);
+    watch(
+      () => grid.loading.value,
+      (on, was) => {
+        if (was && !on) listSettled.value = true;
+      },
+    );
+    const settledCount = useSettledValue(() => ({
+      value: countText(grid.filteredCards.value.length),
+      busy: grid.holding.value || !listSettled.value,
+      key: grid.pageSlice.value.map((card) => card.name).join("|"),
+    }));
 
     /* ---------------------------------------------------------- toolbar */
 
     const sortOptions = computed(() => [
-      { value: "a-z", label: t("metrics.explorer.sortAsc") },
-      { value: "z-a", label: t("metrics.explorer.sortDesc") },
+      { value: "a-z", label: t("metrics.explorer.sortAsc"), tooltip: undefined },
+      { value: "z-a", label: t("metrics.explorer.sortDesc"), tooltip: undefined },
+      {
+        value: "dashboards",
+        label: t("metrics.explorer.sortDashboards"),
+        tooltip: t("metrics.explorer.sortDashboardsTitle"),
+      },
+      {
+        value: "alerts",
+        label: t("metrics.explorer.sortAlerts"),
+        tooltip: t("metrics.explorer.sortAlertsTitle"),
+      },
     ]);
+    const usageFilterOptions = computed(() => [
+      { value: "dashboards", label: t("metrics.explorer.usageInDashboards") },
+      { value: "alerts", label: t("metrics.explorer.usageHasAlerts") },
+      { value: "slos", label: t("metrics.explorer.usageInSlos") },
+    ]);
+    const onUsageFilterChange = (value: any) => {
+      grid.usageFilters.value = new Set(Array.isArray(value) ? value : []);
+    };
     const viewOptions = computed(() => [
       { value: "grid", label: t("metrics.explorer.viewGrid"), icon: "grid-on" },
       { value: "rows", label: t("metrics.explorer.viewRows"), icon: "list" },
@@ -909,6 +1196,91 @@ export default defineComponent({
     const forecastHorizon = ref<ForecastHorizon | null>(null);
     const detailOpen = computed(() => isGridMode.value && !!detailMetric.value);
 
+    // One page-level sentence for every card whose refresh failed over a kept chart (ruling 18).
+    const failedSummary = computed(() => {
+      const shown = visibleCards.value.map((card) => grid.previews.value[card.name]);
+      const failed = shown.filter((preview) => preview?.stale && preview.failedAt);
+      if (!failed.length) return null;
+      return {
+        failedAt: Math.max(...failed.map((preview) => preview!.failedAt ?? 0)),
+        dataFrom: Math.min(...failed.map((preview) => preview!.lastTriggeredAt ?? Date.now())),
+        count: failed.length,
+        total: shown.filter((preview) => preview?.results?.length).length,
+      };
+    });
+
+    // Only a running request counts: a kept chart off screen re-queries when it is next seen, not now.
+    const isRangeLoading = (name: string) => {
+      const preview = grid.previews.value[name];
+      return !!preview?.windowStale && preview.status === "loading";
+    };
+    /** Window lengths (s) of a range change still landing: "Showing last {from} · loading last {to}". */
+    const rangeChange = ref<{ from: number; to: number } | null>(null);
+    /** The detail's main chart, which stands for the page while the detail covers the paused grid. */
+    const detailChartStatus = ref<DetailStatus>({
+      loading: false,
+      drawn: false,
+      failed: false,
+      failure: null,
+    });
+    const onDetailOverviewStatus = (status: DetailStatus) => {
+      detailChartStatus.value = status;
+    };
+    // A range change still landing belongs to the surface it started on.
+    watch(detailOpen, () => {
+      rangeChange.value = null;
+    });
+    const rangeLoading = computed(() => {
+      if (!rangeChange.value) return false;
+      if (detailOpen.value) return detailChartStatus.value.loading;
+      return grid.holding.value || visibleCards.value.some((card) => isRangeLoading(card.name));
+    });
+    const rangeStatusShown = useDelayedFlag(() => rangeLoading.value, STALE_DIM_DELAY_MS);
+    const rangeWords = (spoken: boolean) => {
+      const change = rangeChange.value;
+      if (!change) return null;
+      return {
+        from: formatRangeLength(t, change.from, { spoken }),
+        to: formatRangeLength(t, change.to, { spoken }),
+      };
+    };
+    const rangeStatusText = computed(() => {
+      const words = rangeWords(false);
+      return words ? t("regionStatus.rangeChange", words) : null;
+    });
+
+    const region = useRegionLoading({
+      busy: () =>
+        isGridMode.value && (rangeLoading.value || (!detailOpen.value && refreshing.value)),
+      noun: "charts",
+      loading: () => {
+        const words = rangeWords(true);
+        return words ? t("regionStatus.rangeChangeSpoken", words) : null;
+      },
+      result: () => {
+        const words = rangeWords(true);
+        if (!words || (detailOpen.value && detailChartStatus.value.failed)) return null;
+        return t("regionStatus.rangeSettled", { to: words.to });
+      },
+      // The open detail owns the outcome; the paused grid's failures are not on screen.
+      error: () => {
+        if (detailOpen.value) return detailChartStatus.value.failure;
+        const summary = failedSummary.value;
+        return summary
+          ? formatRefreshFailed(t, {
+              failedAt: summary.failedAt,
+              dataFrom: summary.dataFrom,
+              count: summary.count,
+              total: summary.total,
+            })
+          : null;
+      },
+    });
+    // After the region helper has read the settle words above.
+    watch(rangeLoading, (on) => {
+      if (!on) rangeChange.value = null;
+    });
+
     const setMode = (v: boolean | AcceptableValue | AcceptableValue[]) => {
       if (v !== "explore" && v !== "visualize" && v !== "workspace") return;
       // Pause BEFORE the mode flips, synchronously. The watcher below also keeps
@@ -969,9 +1341,9 @@ export default defineComponent({
 
     const rowsOfCards = computed(() => {
       const size = columns.value;
-      const out: MetricCardModel[][] = [];
-      for (let i = 0; i < visibleCards.value.length; i += size) {
-        out.push(visibleCards.value.slice(i, i + size));
+      const out: (MetricCardModel | null)[][] = [];
+      for (let i = 0; i < gridItems.value.length; i += size) {
+        out.push(gridItems.value.slice(i, i + size));
       }
       return out;
     });
@@ -1228,8 +1600,19 @@ export default defineComponent({
       await requestOnScreen({ skipCache: true });
     };
 
+    const onReplaceLabelFilter = async (previous: LabelFilter, next: LabelFilter) => {
+      await grid.replaceLabelFilter(previous, next);
+      trackFilter("label");
+      await requestOnScreen({ skipCache: true });
+    };
+
     const onRemoveLabelFilter = async (filter: LabelFilter) => {
       grid.removeLabelFilter(filter);
+      await requestOnScreen({ skipCache: true });
+    };
+
+    const onNegateLabelGroup = async (group: number, negate: boolean) => {
+      grid.setLabelGroupNegated(group, negate);
       await requestOnScreen({ skipCache: true });
     };
 
@@ -1309,6 +1692,7 @@ export default defineComponent({
     // on the card's own query.
     // Consumed once by MetricsVisualize, then cleared.
     const visualizeSeed = ref<Record<string, any> | null>(null);
+    const visualizeMount = ref(0);
     const seedVisualizeFromUrl = (q: Record<string, any>) => {
       if (!q.metrics_data) return;
       const blob = decodeMetricsConfig(q.metrics_data);
@@ -1318,6 +1702,14 @@ export default defineComponent({
     // The mounted Visualize pane — the toolbar's refresh drives its runQuery in
     // visualize mode.
     const visualizeRef = ref<any>(null);
+    const isVisualizePending = computed(
+      () => mode.value === "visualize" && (visualizeRef.value?.isRunQueryPending ?? false),
+    );
+    const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
+    const visualizeRunTooltip = computed(() => {
+      if (isVisualizePending.value) return t("search.autoRunPendingDot");
+      return isAutoRunOn.value ? t("search.autoRunEnabled") : t("metrics.runQuery");
+    });
 
     // The toolbar window as a CONSUMABLE absolute range (ms) for the Visualize
     // chart. The picker's v-model is a RELATIVE descriptor ({relativeTimePeriod:
@@ -1337,11 +1729,19 @@ export default defineComponent({
 
     const shareUrl = computed(() => {
       void route.fullPath; // reactive dep on the URL
+      void selectedDate.value;
       if (mode.value !== "visualize") return window.location.href;
       const url = new URL(window.location.href);
       const blob = visualizeBlob.value;
       if (blob) url.searchParams.set("metrics_data", blob);
       else url.searchParams.delete("metrics_data");
+      // A shared chart shows the window it was shared with, so a relative range is frozen.
+      const ct = dateTimePickerRef.value?.getConsumableDateTime?.();
+      if (ct?.startTime && ct?.endTime) {
+        url.searchParams.delete("period");
+        url.searchParams.set("from", String(ct.startTime));
+        url.searchParams.set("to", String(ct.endTime));
+      }
       return url.href;
     });
 
@@ -1393,27 +1793,39 @@ export default defineComponent({
         : null,
     );
 
-    // Stream loading omits schemas, which Breakdown and Related both need.
+    // Stream loading omits schemas; Breakdown needs only this metric's own, so the view never waits on the org's.
     const detailSchemasPending = ref(false);
     let detailSchemaGeneration = 0;
     watch(
-      detailMetric,
+      () => detailCard.value?.name,
       async (name) => {
-        if (!name) return;
+        const card = detailCard.value;
+        if (!name || !card) return;
         const generation = ++detailSchemaGeneration;
         detailSchemasPending.value = true;
         try {
-          await grid.ensureSchemas();
+          await grid.ensureStreamSchemas([card.name, ...operandStreamsOf(card)]);
         } finally {
           if (generation === detailSchemaGeneration) detailSchemasPending.value = false;
         }
       },
       { immediate: true },
     );
+    const firstLoadPending = computed(() => grid.loading.value && !grid.cards.value.length);
     // Only the first load: a manual refresh must not remount the open view behind a spinner.
-    const detailLoading = computed(
-      () => (grid.loading.value && !grid.cards.value.length) || detailSchemasPending.value,
-    );
+    const detailLoading = computed(() => firstLoadPending.value);
+
+    // The card's drawn series, so the detail chart has something real in its first frame (M-5).
+    const detailSeed = computed(() => {
+      const name = detailMetric.value;
+      const preview = name ? grid.previews.value[name] : undefined;
+      if (!preview || preview.status === "error" || !preview.results?.some(hasSamples)) return null;
+      return {
+        results: preview.results,
+        timeRange: preview.cachedTimeRange ?? grid.timeRange.value,
+        lastTriggeredAt: preview.lastTriggeredAt,
+      };
+    });
 
     /** A card's current query, its ⚙ override and any NaN-guard / widening included. */
     const chartOf = (card: MetricCardModel) => {
@@ -1554,6 +1966,7 @@ export default defineComponent({
       // showFavoritesOnly is not restored from the URL — the mode drives it.
       if (f.hideEmptyPanels !== undefined) grid.hideEmptyPanels.value = f.hideEmptyPanels;
       if (f.sortBy) grid.sortBy.value = f.sortBy;
+      if (f.usageFilters) grid.usageFilters.value = f.usageFilters;
       if (f.viewMode) grid.viewMode.value = f.viewMode;
       if (f.mode) mode.value = f.mode;
       if (f.metric && f.mode !== "visualize") {
@@ -1576,6 +1989,7 @@ export default defineComponent({
         // Without membership data the chips fail open and narrow nothing.
         grid.ensureSchemas();
       }
+      notifyGroupsOverCap(f);
 
       if (q.period || (q.from && q.to)) {
         selectedDate.value = queryParamsToSelectedDate(q);
@@ -1603,6 +2017,7 @@ export default defineComponent({
         showFavoritesOnly: grid.showFavoritesOnly.value,
         hideEmptyPanels: grid.hideEmptyPanels.value,
         sortBy: grid.sortBy.value,
+        usageFilters: grid.usageFilters.value,
         viewMode: grid.viewMode.value,
         mode: mode.value,
         // Visualize has no detail view; without `metric` its tab keys drop too.
@@ -1730,6 +2145,7 @@ export default defineComponent({
         grid.showFavoritesOnly.value,
         grid.hideEmptyPanels.value,
         grid.sortBy.value,
+        grid.usageFilters.value,
         grid.viewMode.value,
         mode.value,
         detailMetric.value,
@@ -1744,10 +2160,13 @@ export default defineComponent({
       syncUrlState,
     );
 
+    // The blob this page last wrote, so its own replace is never read back as a new chart.
+    let writtenBlob = "";
     const syncVisualizeUrl = () => {
       if (route.name !== "metrics") return;
       const blob = mode.value === "visualize" ? visualizeBlob.value : "";
       if (String(blob) === String(route.query.metrics_data ?? "")) return;
+      writtenBlob = blob;
 
       const query: Record<string, any> = { ...route.query };
       if (blob) query.metrics_data = blob;
@@ -1785,6 +2204,22 @@ export default defineComponent({
     const onRouteQueryChange = () => {
       // Leaving the page fires this once with the next route's query.
       if (route.name !== "metrics") return;
+
+      // Visualize seeds only on mount, so another link's chart (or Back/Forward) remounts it.
+      const blobIn = String(route.query.metrics_data ?? "");
+      const ownWrite = !!blobIn && blobIn === writtenBlob;
+      // The marker is spent once its own update lands, or Back to that blob later would be ignored.
+      if (ownWrite) writtenBlob = "";
+      if (
+        !ownWrite &&
+        mode.value === "visualize" &&
+        route.query.mode === "visualize" &&
+        blobIn &&
+        blobIn !== visualizeBlob.value
+      ) {
+        seedVisualizeFromUrl(route.query as Record<string, any>);
+        visualizeMount.value += 1;
+      }
 
       const incoming: Record<string, string> = {};
       for (const key of MANAGED_PARAM_KEYS) {
@@ -1826,8 +2261,10 @@ export default defineComponent({
       grid.selectedSuffixes.value = f.selectedSuffixes ?? new Set();
       grid.selectedTypes.value = f.selectedTypes ?? new Set();
       grid.labelFilters.value = f.labelFilters ?? [];
+      notifyGroupsOverCap(f);
       grid.hideEmptyPanels.value = f.hideEmptyPanels ?? true;
       grid.sortBy.value = f.sortBy ?? "a-z";
+      grid.usageFilters.value = f.usageFilters ?? new Set();
       grid.viewMode.value = f.viewMode ?? "grid";
       // Setting mode last lets the isWorkspace watcher set showFavoritesOnly.
       mode.value = f.mode ?? "explore";
@@ -1897,11 +2334,18 @@ export default defineComponent({
       dateTimePickerRef.value?.setSavedDate?.(pickerSavedDate(date));
     };
 
-    const syncTimeRange = (opts?: { keepPreviews?: boolean }) => {
+    const syncTimeRange = (opts?: {
+      keepPreviews?: boolean;
+      keepPage?: boolean;
+      windowChanged?: boolean;
+    }) => {
       const consumable = dateTimePickerRef.value?.getConsumableDateTime?.();
       if (!consumable) return;
       grid.setTimeRange({ start_time: consumable.startTime, end_time: consumable.endTime }, opts);
     };
+
+    // True only around a zoom's picker refresh, which emits synchronously: the zoomed card must stay on the page.
+    let zooming = false;
 
     const onDateChange = async () => {
       // `dateTimePickerRef.refresh()` re-emits a date change, so a manual
@@ -1910,7 +2354,18 @@ export default defineComponent({
       // to a skeleton on each refresh.
       if (refreshing.value) return;
 
-      syncTimeRange();
+      const from = grid.rangeSeconds.value;
+      const drawn = detailOpen.value
+        ? detailChartStatus.value.drawn
+        : visibleCards.value.some((card) => grid.previews.value[card.name]?.results?.length);
+      syncTimeRange({
+        keepPreviews: true,
+        windowChanged: true,
+        ...(zooming && { keepPage: true }),
+      });
+      const to = grid.rangeSeconds.value;
+      // Named only when charts are kept and the lengths differ; "last 1 h · loading last 1 h" says nothing.
+      rangeChange.value = drawn && from !== to ? { from, to } : null;
       // A deliberate change of window must reach the backend — repainting the
       // persisted result would hand the user back the data they just moved away
       // from.
@@ -1966,7 +2421,12 @@ export default defineComponent({
       // `refresh()` calls `saveDate()` directly, which is what emits
       // `on:date-change` -> `onDateChange` -> skipCache + sweep. This is exactly
       // why ViewDashboard.onDataZoom calls it too; the pair is the contract.
-      dateTimePickerRef.value?.refresh?.();
+      zooming = true;
+      try {
+        dateTimePickerRef.value?.refresh?.();
+      } finally {
+        zooming = false;
+      }
       track("metrics_explorer_card_zoomed", {
         window_seconds: Math.round((range.end.getTime() - range.start.getTime()) / 1000),
       });
@@ -2029,9 +2489,24 @@ export default defineComponent({
 
     /** An explicit Run in Visualize — the only Visualize run that writes history. */
     const onVisualizeRun = () => visualizeRef.value?.onUserRun?.(selectedDate.value);
+    const onVisualizeRunWithoutCache = () =>
+      visualizeRef.value?.onUserRun?.(selectedDate.value, true);
 
-    const onHistoryLoad = (entry: { metricsData: string; timeRange: SelectedDate }) => {
-      visualizeRef.value?.applyPanelData?.(entry.metricsData, entry.timeRange);
+    const historyDrawerRef = ref<InstanceType<typeof QueryHistoryDrawer> | null>(null);
+    // One editor takes one query, so multi-query rows stay out of its clock rows.
+    const recentEditor = useRecentSearchesEditorHost("metrics", {
+      opensOnFocus: () => metricsEditorIsEmpty(visualizeRef.value?.dashboardPanelData),
+      emptyWith: (isBlank) =>
+        metricsEditorIsEmptyWith(visualizeRef.value?.dashboardPanelData, isBlank),
+      acceptsQuery: (query) => !query.includes("\n"),
+    });
+
+    const onHistoryLoad = (entry: {
+      metricsData: string;
+      timeRange: SelectedDate;
+      run?: boolean;
+    }) => {
+      visualizeRef.value?.applyPanelData?.(entry.metricsData, entry.timeRange, entry.run !== false);
       track("metrics_explorer_history_loaded");
     };
 
@@ -2131,9 +2606,7 @@ export default defineComponent({
     );
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
-    // Registered here (not just in the editor Index.vue) because `/metrics`
-    // mounts THIS explorer — the editor lives at `/metrics/editor`. Keys and
-    // scope come from the "metrics" group in shortcutRegistry.ts.
+    // Keys and scope come from the "metrics" group in shortcutRegistry.ts.
     useShortcuts([
       {
         // ⌘/Ctrl+Enter: an explicit Run in Visualize; elsewhere a grid refresh (there is no single query).
@@ -2199,7 +2672,18 @@ export default defineComponent({
       virtualizer,
       onDataScope,
       visibleCards,
+      gridItems,
       gridVisible,
+      settledCount,
+      STALE_DIM,
+      failedSummary,
+      rangeStatusShown,
+      rangeStatusText,
+      rangeChange,
+      region,
+      detailSeed,
+      detailSchemasPending,
+      onDetailOverviewStatus,
       showLoading,
       resultCountLabel,
       rails,
@@ -2215,8 +2699,12 @@ export default defineComponent({
       onSuffixChange,
       onAddLabelFilter,
       onRemoveLabelFilter,
+      onReplaceLabelFilter,
+      onNegateLabelGroup,
       onClearLabelFilters,
       sortOptions,
+      usageFilterOptions,
+      onUsageFilterChange,
       PAGE_SIZE_INCREMENT,
       viewOptions,
       sortModel,
@@ -2247,6 +2735,8 @@ export default defineComponent({
       onApplyOverride,
       onRestoreOverride,
       openConvertToDashboard,
+      dashboardsLocked,
+      dashboardsLockedReason,
       panelRateWindowFor,
       convertPanels,
       convertDialogOpen,
@@ -2261,6 +2751,7 @@ export default defineComponent({
       detailOpen,
       detailCard,
       detailLoading,
+      firstLoadPending,
       detailOverview,
       detailPanelQueries,
       chartOf,
@@ -2276,7 +2767,13 @@ export default defineComponent({
       onDetailOpenVisualize,
       onRouteQueryChange,
       visualizeSeed,
+      visualizeMount,
       visualizeRef,
+      isVisualizePending,
+      visualizeRunTooltip,
+      isAutoRunAvailable,
+      isAutoRunOn,
+      toggleAutoRun,
       visualizeDateTime,
       shareUrl,
       onDateChange,
@@ -2293,7 +2790,11 @@ export default defineComponent({
       onClearView,
       onViewSaved,
       onVisualizeRun,
+      onVisualizeRunWithoutCache,
       onHistoryLoad,
+      historyDrawerRef,
+      recentEditor,
+      recentDropdownRef: recentEditor.dropdownRef,
       onVisualizeTimeRange,
     };
   },

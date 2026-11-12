@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{HashMap, HashSet},
+    borrow::Cow,
+    collections::{HashMap, HashSet, VecDeque},
     io::{BufRead, Cursor, Read},
     sync::{LazyLock, Mutex},
     time::{Duration, Instant},
@@ -23,7 +24,7 @@ use std::{
 use axum::http;
 use chrono::Utc;
 use config::{
-    ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
+    TIMESTAMP_COL_NAME,
     meta::{
         db_monitoring::is_dbm_server_stream,
         self_reporting::usage::{UsageType, is_internal_rollup_stream},
@@ -58,12 +59,14 @@ use prost::Message;
 use transform::TRANSFORM_FAILED;
 
 use super::{
-    IngestJsonData, bulk::TS_PARSE_FAILED, columnar::JsonColumnar, ingestion_log_enabled,
-    log_failed_record,
+    DestinationSettings, IngestJsonData,
+    bulk::{BulkResponseOrder, TS_PARSE_FAILED},
+    columnar::JsonColumnar,
+    ingestion_log_enabled, log_failed_record,
 };
 use crate::{
     ingestion::check_ingestion_allowed, logs::handle_timestamp_for_value,
-    service::get_formatted_stream_name,
+    pipeline::batch_execution::ExecutablePipeline, service::get_formatted_stream_name,
 };
 
 /// A misbehaving client can wholly fail thousands of batches a second per stream.
@@ -90,6 +93,8 @@ struct FinalizeRecordContext<'a> {
     dbm_enabled: bool,
     stream_status: &'a mut StreamStatus,
     json_data_by_stream: &'a mut LogDataByStream,
+    /// A `_bulk` record's request position, and the accepted positions it joins once buffered.
+    bulk_position: Option<(&'a mut VecDeque<usize>, usize)>,
 }
 
 /// Why a record could not be prepared for writing.
@@ -98,6 +103,68 @@ pub enum PrepareRecordError {
     Flatten(anyhow::Error),
     /// Timestamp unresolvable or window-rejected; carries the flattened record.
     Timestamp(json::Value, anyhow::Error),
+}
+
+/// A stream's pipelines and the settings they and the stream impose on each record.
+struct StreamRecordNeeds {
+    executable_pipelines: Vec<ExecutablePipeline>,
+    user_defined_schema_map: HashMap<String, Option<HashSet<String>>>,
+    streams_need_original_map: HashMap<String, bool>,
+    streams_need_all_values_map: HashMap<String, bool>,
+}
+
+impl StreamRecordNeeds {
+    async fn load(stream_param: StreamParams) -> Self {
+        // Chat history is replayed verbatim and hash-checked; no user pipeline may
+        // read (copy elsewhere) or rewrite it.
+        let executable_pipelines =
+            if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+                &stream_param.stream_name,
+            ) {
+                Vec::new()
+            } else {
+                crate::ingestion::get_stream_executable_pipelines(&stream_param).await
+            };
+        let mut stream_params = vec![stream_param];
+        for exec_pl in &executable_pipelines {
+            stream_params.extend(exec_pl.get_all_destination_streams());
+        }
+        let mut needs = Self {
+            executable_pipelines,
+            user_defined_schema_map: HashMap::new(),
+            streams_need_original_map: HashMap::new(),
+            streams_need_all_values_map: HashMap::new(),
+        };
+        crate::ingestion::get_uds_and_original_data_streams(
+            &stream_params,
+            &mut needs.user_defined_schema_map,
+            &mut needs.streams_need_original_map,
+            &mut needs.streams_need_all_values_map,
+        )
+        .await;
+        needs
+    }
+
+    /// Whether the stream's records must keep their JSON form, ruling out the columnar path.
+    fn json_records(&self, stream_name: &str) -> bool {
+        !self.executable_pipelines.is_empty()
+            || matches!(self.user_defined_schema_map.get(stream_name), Some(Some(_)))
+            || self
+                .streams_need_original_map
+                .get(stream_name)
+                .is_some_and(|v| *v)
+            || self
+                .streams_need_all_values_map
+                .get(stream_name)
+                .is_some_and(|v| *v)
+    }
+}
+
+/// A `_bulk` stream's columnar rows with the pipeline and settings snapshot they were planned
+/// under.
+pub struct BulkPlan {
+    pub columnar: JsonColumnar,
+    needs: StreamRecordNeeds,
 }
 
 /// The `_o2_` write-guard predicate (design §5.3): true when a logs ingest
@@ -132,6 +199,95 @@ pub async fn ingest(
     extend_json: Option<&HashMap<String, serde_json::Value>>,
     is_derived: bool,
 ) -> Result<IngestionResponse> {
+    ingest_inner(
+        thread_id,
+        org_id,
+        in_stream_name,
+        in_req,
+        user,
+        extend_json,
+        is_derived,
+        None,
+        None,
+    )
+    .await
+}
+
+/// Ingests one stream's `_bulk` records beside the rows its data lines already built.
+pub(super) async fn ingest_bulk(
+    thread_id: usize,
+    org_id: &str,
+    stream_name: &str,
+    records: Vec<json::Value>,
+    plan: Option<BulkPlan>,
+    user: IngestUser,
+    response_order: &mut BulkResponseOrder,
+) -> Result<IngestionResponse> {
+    ingest_inner(
+        thread_id,
+        org_id,
+        stream_name,
+        IngestionRequest::JsonValues(IngestionValueType::Bulk, records),
+        user,
+        None,
+        false,
+        plan,
+        Some(response_order),
+    )
+    .await
+}
+
+/// The columnar plan for a `_bulk` stream, under the preconditions `ingest` applies to `_json`.
+pub async fn plan_bulk_columnar(
+    org_id: &str,
+    stream_name: &str,
+    time_range: (i64, i64),
+) -> Option<BulkPlan> {
+    // rows are matched to their stream by the name `ingest` resolves
+    if resolve_stream_name(org_id, stream_name).await.ok()? != stream_name {
+        return None;
+    }
+    let needs =
+        StreamRecordNeeds::load(StreamParams::new(org_id, stream_name, StreamType::Logs)).await;
+    if needs.json_records(stream_name) {
+        return None;
+    }
+    let flatten_level = get_flatten_level(org_id, stream_name, StreamType::Logs).await;
+    let columnar = JsonColumnar::plan(org_id, stream_name, flatten_level, time_range).await?;
+    Some(BulkPlan { columnar, needs })
+}
+
+/// Flatten a record and resolve its timestamp — the only two steps of record
+/// preparation that can reject an event.
+///
+/// Shared with the HEC collector's pre-write validation pass, which must reach
+/// the same verdict as the write does; a second implementation would drift.
+pub fn prepare_record(
+    item: json::Value,
+    flatten_level: u32,
+    min_ts: i64,
+    max_ts: i64,
+) -> std::result::Result<(json::Value, i64), PrepareRecordError> {
+    let mut res =
+        flatten::flatten_with_level(item, flatten_level).map_err(PrepareRecordError::Flatten)?;
+    match handle_timestamp_for_value(&mut res, min_ts, max_ts) {
+        Ok(ts) => Ok((res, ts)),
+        Err(e) => Err(PrepareRecordError::Timestamp(res, e)),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn ingest_inner(
+    thread_id: usize,
+    org_id: &str,
+    in_stream_name: &str,
+    in_req: IngestionRequest,
+    user: IngestUser,
+    extend_json: Option<&HashMap<String, serde_json::Value>>,
+    is_derived: bool,
+    bulk_plan: Option<BulkPlan>,
+    response_order: Option<&mut BulkResponseOrder>,
+) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     let started_at: i64 = Utc::now().timestamp_micros();
     let cfg = config::get_config();
@@ -157,11 +313,7 @@ pub async fn ingest(
     let stream_type = StreamType::Logs;
 
     // check stream
-    let stream_name = if cfg.common.skip_formatting_stream_name {
-        get_formatted_stream_name(StreamParams::new(org_id, in_stream_name, stream_type)).await?
-    } else {
-        format_stream_name(in_stream_name.to_string())
-    };
+    let stream_name = resolve_stream_name(org_id, in_stream_name).await?;
     if stream_name.is_empty() {
         return Err(Error::IngestionError("Stream name is empty".to_string()));
     }
@@ -221,57 +373,39 @@ pub async fn ingest(
         derived_streams.insert(stream_name.to_string());
     }
 
-    // Start retrieve associated pipeline and construct pipeline components
-    let stream_param = StreamParams::new(org_id, &stream_name, stream_type);
-    // Chat history is replayed verbatim and hash-checked; no user pipeline may
-    // read (copy elsewhere) or rewrite it.
-    let executable_pipelines =
-        if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(&stream_name) {
-            Vec::new()
-        } else {
-            crate::ingestion::get_stream_executable_pipelines(&stream_param).await
-        };
-    let mut stream_params = vec![stream_param];
-    let mut pipeline_inputs = Vec::with_capacity(stream_params.len());
-    let mut original_options = Vec::with_capacity(stream_params.len());
-    // End pipeline params construction
-
-    if !executable_pipelines.is_empty() {
-        for exec_pl in &executable_pipelines {
-            let pl_destinations = exec_pl.get_all_destination_streams();
-            stream_params.extend(pl_destinations);
-        }
-    }
-
-    // Start get user defined schema
-    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
-    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
-    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
-    crate::ingestion::get_uds_and_original_data_streams(
-        &stream_params,
-        &mut user_defined_schema_map,
-        &mut streams_need_original_map,
-        &mut streams_need_all_values_map,
+    let (needs, bulk_columnar) = request_needs(
+        StreamParams::new(org_id, &stream_name, stream_type),
+        bulk_plan,
     )
     .await;
+    // JsonColumnar::plan already refuses the fast path under vectorscan, before this is consulted.
+    let needs_json_records = extend_json.is_some() || needs.json_records(&stream_name);
+    let StreamRecordNeeds {
+        executable_pipelines,
+        mut user_defined_schema_map,
+        mut streams_need_original_map,
+        mut streams_need_all_values_map,
+    } = needs;
+    // Pipeline outputs have no per-record provenance, so their items carry no request position.
+    let mut response_order = response_order.filter(|_| executable_pipelines.is_empty());
+    let mut bulk_positions = response_order
+        .as_deref_mut()
+        .map(|order| (order.records.iter().copied(), &mut order.accepted));
+    let mut pipeline_inputs = Vec::new();
+    let mut original_options = Vec::new();
     // with pipeline, we need to store original if any of the destinations requires original
     let store_original_when_pipeline_exists =
         !executable_pipelines.is_empty() && streams_need_original_map.values().any(|val| *val);
     // End get user defined schema
 
-    let flatten_level = get_flatten_level(org_id, &stream_name, stream_type).await;
+    let flatten_level = match &bulk_columnar {
+        Some(columnar) => columnar.flatten_level(),
+        None => get_flatten_level(org_id, &stream_name, stream_type).await,
+    };
 
-    // JsonColumnar::plan already refuses the fast path under vectorscan, before this is consulted.
-    let needs_json_records = !executable_pipelines.is_empty()
-        || extend_json.is_some()
-        || matches!(user_defined_schema_map.get(&stream_name), Some(Some(_)))
-        || streams_need_original_map
-            .get(&stream_name)
-            .is_some_and(|v| *v)
-        || streams_need_all_values_map
-            .get(&stream_name)
-            .is_some_and(|v| *v);
-    let mut columnar = if matches!(in_req, IngestionRequest::JSON(_)) && !needs_json_records {
+    let mut columnar = if bulk_columnar.is_some() {
+        bulk_columnar
+    } else if matches!(in_req, IngestionRequest::JSON(_)) && !needs_json_records {
         JsonColumnar::plan(org_id, &stream_name, flatten_level, (min_ts, max_ts)).await
     } else {
         None
@@ -342,6 +476,9 @@ pub async fn ingest(
     let mut json_data_by_stream: LogDataByStream = HashMap::new();
     let mut size_by_stream = HashMap::new();
     for ret in data.iter() {
+        let input_position = bulk_positions
+            .as_mut()
+            .and_then(|(records, _)| records.next());
         let mut item = match ret {
             Ok(item) => item,
             Err(IngestionError::PayloadTooLarge(e)) => {
@@ -408,6 +545,10 @@ pub async fn ingest(
                 dbm_enabled: dbm_gate,
                 stream_status: &mut stream_status,
                 json_data_by_stream: &mut json_data_by_stream,
+                bulk_position: bulk_positions
+                    .as_mut()
+                    .map(|(_, accepted)| &mut **accepted)
+                    .zip(input_position),
             },
         ) {
             continue;
@@ -425,28 +566,17 @@ pub async fn ingest(
     // batch process records through pipeline
     if !executable_pipelines.is_empty() {
         let records_count = pipeline_inputs.len();
-        let mut evaluation_tasks = tokio::task::JoinSet::new();
-        for exec_pl in &executable_pipelines {
-            if exec_pl.kind == config::meta::pipeline::PipelineKind::Evaluation
-                && exec_pl.contains_llm_evaluation_node()
-            {
-                let exec_pl = exec_pl.clone();
-                let org_id = org_id.to_string();
-                let stream_name = stream_name.clone();
-                let records = pipeline_inputs.clone();
-                evaluation_tasks.spawn(async move {
-                    if let Err(e) = exec_pl
-                        .process_batch(&org_id, records, Some(stream_name.clone()))
-                        .await
-                    {
-                        log::error!(
-                            "[Pipeline] evaluation pipeline for stream {org_id}/{stream_name}: Batch execution error: {e}.",
-                        );
-                    }
-                });
-                continue;
-            }
-
+        let evaluation_tasks = crate::ingestion::spawn_llm_evaluations(
+            org_id,
+            &stream_name,
+            &executable_pipelines,
+            &pipeline_inputs,
+            Some(&stream_name),
+        );
+        for exec_pl in executable_pipelines
+            .iter()
+            .filter(|p| !crate::ingestion::is_llm_evaluation(p))
+        {
             let pipeline_start = std::time::Instant::now();
             let pl_result = exec_pl
                 .process_batch(org_id, pipeline_inputs.clone(), Some(stream_name.clone()))
@@ -514,6 +644,21 @@ pub async fn ingest(
                             )
                             .await;
                         }
+                        let settings = DestinationSettings {
+                            org_id,
+                            stream_name: &destination_stream,
+                            dbm: dest_dbm_gate,
+                            uds_fields: user_defined_schema_map
+                                .get(&destination_stream)
+                                .and_then(Option::as_ref),
+                            need_original: streams_need_original_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v),
+                            need_all_values: streams_need_all_values_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v),
+                            all_values_max_len: index_all_max_value_length,
+                        };
 
                         for (idx, mut res) in stream_pl_results {
                             // handle timestamp
@@ -542,77 +687,19 @@ pub async fn ingest(
                             // we calculate the size BEFORE applying uds
                             let original_size = estimate_json_bytes(&res);
 
-                            // get json object
-                            let mut local_val = match res.take() {
+                            let local_val = match res.take() {
                                 json::Value::Object(val) => val,
                                 _ => unreachable!(),
                             };
-
-                            // Keyed on the destination: client `o2_dbm_*` keys must not land raw.
-                            if dest_dbm_gate {
-                                crate::db_monitoring::server_vantage::canonicalize_dbm_record(
-                                    &mut local_val,
-                                );
-                            }
-
-                            if let Some(Some(fields)) =
-                                user_defined_schema_map.get(&destination_stream)
-                            {
-                                local_val = crate::ingestion::refactor_map(local_val, fields);
-                            }
-
-                            // usize::MAX used as a flag when pipeline is applied with
-                            // ResultArray vrl
-                            //  - invalid original_data
-                            // add `_original` and '_record_id` if required by StreamSettings
-                            if idx != usize::MAX
-                                && streams_need_original_map
-                                    .get(&destination_stream)
-                                    .is_some_and(|v| *v)
-                                && original_options[idx].is_some()
-                            {
-                                local_val.insert(
-                                    ORIGINAL_DATA_COL_NAME.to_string(),
-                                    original_options[idx].clone().unwrap().into(),
-                                );
-                                let record_id = crate::ingestion::generate_record_id(
-                                    org_id,
-                                    &destination_stream,
-                                    &StreamType::Logs,
-                                );
-                                local_val.insert(
-                                    ID_COL_NAME.to_string(),
-                                    json::Value::String(record_id.to_string()),
-                                );
-                            }
-
-                            // add `_all_values` if required by StreamSettings
-                            if streams_need_all_values_map
-                                .get(&destination_stream)
-                                .is_some_and(|v| *v)
-                            {
-                                let mut values = Vec::with_capacity(local_val.len());
-                                for (k, value) in local_val.iter() {
-                                    if ![
-                                        TIMESTAMP_COL_NAME,
-                                        ID_COL_NAME,
-                                        ORIGINAL_DATA_COL_NAME,
-                                        ALL_VALUES_COL_NAME,
-                                    ]
-                                    .contains(&k.as_str())
-                                        && (index_all_max_value_length == 0
-                                            || value.as_str().is_none_or(|s| {
-                                                s.len() <= index_all_max_value_length
-                                            }))
-                                    {
-                                        values.push(value.to_string());
-                                    }
-                                }
-                                local_val.insert(
-                                    ALL_VALUES_COL_NAME.to_string(),
-                                    json::Value::String(values.join(" ")),
-                                );
-                            }
+                            // a ResultArray record carries idx usize::MAX and has no source record
+                            let local_val = settings.apply(
+                                local_val,
+                                original_options
+                                    .get(idx)
+                                    .and_then(|o| o.as_deref())
+                                    .map(Cow::Borrowed),
+                                None,
+                            );
 
                             let (ts_data, fn_num) = json_data_by_stream
                                 .entry(destination_stream.clone())
@@ -637,29 +724,14 @@ pub async fn ingest(
             }
         } // for each pipeline
 
-        while let Some(result) = evaluation_tasks.join_next().await {
-            if let Err(e) = result {
-                log::error!(
-                    "[Pipeline] evaluation pipeline task for stream {org_id}/{stream_name} failed: {e}.",
-                );
-            }
-        }
+        crate::ingestion::join_llm_evaluations(evaluation_tasks, org_id, &stream_name).await;
 
-        // When only evaluation pipelines exist for this stream (no user pipeline
-        // is responsible for writing to the source stream), preserve original
-        // records by writing them back to the source stream.
-        let has_user_pipeline = executable_pipelines
-            .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
-        let has_evaluation_pipeline = executable_pipelines
-            .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::Evaluation);
-        log::debug!(
-            "[LOGS] source preservation check stream={stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, has_evaluation_pipeline={has_evaluation_pipeline}, source_buffered={}",
-            executable_pipelines.len(),
-            json_data_by_stream.contains_key(&stream_name)
-        );
-        if !has_user_pipeline && !json_data_by_stream.contains_key(&stream_name) {
+        if crate::ingestion::should_preserve_source(
+            org_id,
+            &stream_name,
+            &executable_pipelines,
+            json_data_by_stream.contains_key(&stream_name),
+        ) {
             for (idx, item) in pipeline_inputs.iter().enumerate() {
                 let _ = finalize_and_buffer_record(
                     item.clone(),
@@ -679,6 +751,7 @@ pub async fn ingest(
                         dbm_enabled: dbm_gate,
                         stream_status: &mut stream_status,
                         json_data_by_stream: &mut json_data_by_stream,
+                        bulk_position: None,
                     },
                 );
             }
@@ -784,6 +857,7 @@ pub async fn ingest(
             size_by_stream,
             derived_streams,
             columnar,
+            response_order,
         )
         .await;
         match status {
@@ -791,7 +865,7 @@ pub async fn ingest(
                 stream_status.status = status;
             }
             IngestionStatus::Bulk(items) => {
-                stream_status.items = items.items;
+                stream_status.items.extend(items.items);
             }
         };
         match write_result {
@@ -842,23 +916,25 @@ pub async fn ingest(
     )
 }
 
-/// Flatten a record and resolve its timestamp — the only two steps of record
-/// preparation that can reject an event.
-///
-/// Shared with the HEC collector's pre-write validation pass, which must reach
-/// the same verdict as the write does; a second implementation would drift.
-pub fn prepare_record(
-    item: json::Value,
-    flatten_level: u32,
-    min_ts: i64,
-    max_ts: i64,
-) -> std::result::Result<(json::Value, i64), PrepareRecordError> {
-    let mut res =
-        flatten::flatten_with_level(item, flatten_level).map_err(PrepareRecordError::Flatten)?;
-    match handle_timestamp_for_value(&mut res, min_ts, max_ts) {
-        Ok(ts) => Ok((res, ts)),
-        Err(e) => Err(PrepareRecordError::Timestamp(res, e)),
+/// The snapshot a request runs under; a `_bulk` stream's whole batch keeps its plan's.
+async fn request_needs(
+    stream_param: StreamParams,
+    bulk_plan: Option<BulkPlan>,
+) -> (StreamRecordNeeds, Option<JsonColumnar>) {
+    match bulk_plan {
+        Some(BulkPlan { columnar, needs }) => (needs, Some(columnar)),
+        None => (StreamRecordNeeds::load(stream_param).await, None),
     }
+}
+
+/// The name the writer uses for `in_stream_name`; `skip_formatting_stream_name` looks it up.
+pub(super) async fn resolve_stream_name(org_id: &str, in_stream_name: &str) -> Result<String> {
+    Ok(if config::get_config().common.skip_formatting_stream_name {
+        get_formatted_stream_name(StreamParams::new(org_id, in_stream_name, StreamType::Logs))
+            .await?
+    } else {
+        format_stream_name(in_stream_name.to_string())
+    })
 }
 
 /// A body is an array of records or a single record.
@@ -967,6 +1043,11 @@ fn finalize_and_buffer_record(
     original_data: Option<String>,
     ctx: &mut FinalizeRecordContext<'_>,
 ) -> bool {
+    let bulk_doc_id = ctx
+        .bulk_position
+        .as_ref()
+        .and_then(|_| item.get("_id")?.as_str())
+        .map(String::from);
     let (mut res, timestamp) = match prepare_record(item, ctx.flatten_level, ctx.min_ts, ctx.max_ts)
     {
         Ok(v) => v,
@@ -974,6 +1055,13 @@ fn finalize_and_buffer_record(
             ctx.stream_status.status.failed += 1;
             ctx.stream_status.status.error = e.to_string();
             log::error!("Record flattening error: {e}");
+            reject_bulk_record(
+                ctx,
+                bulk_doc_id,
+                None,
+                crate::logs::bulk::SCHEMA_CONFORMANCE_FAILED,
+                e.to_string(),
+            );
             return false;
         }
         Err(PrepareRecordError::Timestamp(res, e)) => {
@@ -987,73 +1075,49 @@ fn finalize_and_buffer_record(
                 ])
                 .inc();
             log_failed_record(ctx.log_ingestion_errors, &res, &e.to_string());
+            reject_bulk_record(
+                ctx,
+                bulk_doc_id,
+                Some(res),
+                crate::logs::bulk::TS_PARSE_FAILED,
+                e.to_string(),
+            );
             return false;
         }
     };
-    let mut local_val = match res.take() {
+    let local_val = match res.take() {
         json::Value::Object(val) => val,
         _ => {
             ctx.stream_status.status.failed += 1;
+            reject_bulk_record(
+                ctx,
+                bulk_doc_id,
+                None,
+                crate::logs::bulk::SCHEMA_CONFORMANCE_FAILED,
+                "record is not a JSON object".to_string(),
+            );
             return false;
         }
     };
-    // DBM server-vantage canonicalization (design D1, applied to logs): resolve the
-    // receiver-local vendor vocabulary (`dl_*`, `my_*`, `blocked_*`) into stable
-    // `o2_dbm_*` columns ONCE, here, so the read API and UI never touch a raw
-    // receiver field. Runs BEFORE `refactor_map` so a user-defined schema that
-    // lists the canonical columns keeps them (D1 condition 2).
-    //
-    // Client-supplied `o2_dbm_*` keys are dropped first — the logs path flattens
-    // user keys directly, so without this a caller could spoof a deadlock event
-    // (the same exposure D1 condition 1 closes for spans).
-    if ctx.dbm_enabled {
-        crate::db_monitoring::server_vantage::canonicalize_dbm_record(&mut local_val);
-    }
-
-    if let Some(Some(fields)) = ctx.user_defined_schema_map.get(ctx.stream_name) {
-        local_val = crate::ingestion::refactor_map(local_val, fields);
-    }
-    if ctx
-        .streams_need_original_map
-        .get(ctx.stream_name)
-        .is_some_and(|v| *v)
-        && let Some(ref od) = original_data
-    {
-        local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), od.clone().into());
-        let record_id =
-            crate::ingestion::generate_record_id(ctx.org_id, ctx.stream_name, &StreamType::Logs);
-        local_val.insert(
-            ID_COL_NAME.to_string(),
-            json::Value::String(record_id.to_string()),
-        );
-    }
-    if ctx
-        .streams_need_all_values_map
-        .get(ctx.stream_name)
-        .is_some_and(|v| *v)
-    {
-        let mut values = Vec::with_capacity(local_val.len());
-        for (k, value) in local_val.iter() {
-            if ![
-                TIMESTAMP_COL_NAME,
-                ID_COL_NAME,
-                ORIGINAL_DATA_COL_NAME,
-                ALL_VALUES_COL_NAME,
-            ]
-            .contains(&k.as_str())
-                && (ctx.index_all_max_value_length == 0
-                    || value
-                        .as_str()
-                        .is_none_or(|s| s.len() <= ctx.index_all_max_value_length))
-            {
-                values.push(value.to_string());
-            }
-        }
-        local_val.insert(
-            ALL_VALUES_COL_NAME.to_string(),
-            json::Value::String(values.join(" ")),
-        );
-    }
+    let settings = DestinationSettings {
+        org_id: ctx.org_id,
+        stream_name: ctx.stream_name,
+        dbm: ctx.dbm_enabled,
+        uds_fields: ctx
+            .user_defined_schema_map
+            .get(ctx.stream_name)
+            .and_then(Option::as_ref),
+        need_original: ctx
+            .streams_need_original_map
+            .get(ctx.stream_name)
+            .is_some_and(|v| *v),
+        need_all_values: ctx
+            .streams_need_all_values_map
+            .get(ctx.stream_name)
+            .is_some_and(|v| *v),
+        all_values_max_len: ctx.index_all_max_value_length,
+    };
+    let local_val = settings.apply(local_val, original_data.map(Cow::Owned), None);
     match ctx.json_data_by_stream.get_mut(ctx.stream_name) {
         Some((ts_data, fn_num)) => {
             ts_data.push((timestamp, local_val));
@@ -1069,7 +1133,35 @@ fn finalize_and_buffer_record(
             );
         }
     };
+    if let Some((accepted, position)) = ctx.bulk_position.as_mut() {
+        accepted.push_back(*position);
+    }
     true
+}
+
+/// Answers a `_bulk` record finalization refused with a failed item at its request position.
+fn reject_bulk_record(
+    ctx: &mut FinalizeRecordContext<'_>,
+    doc_id: Option<String>,
+    value: Option<json::Value>,
+    failure_type: &str,
+    reason: String,
+) {
+    let Some((_, position)) = ctx.bulk_position.as_ref() else {
+        return;
+    };
+    let mut item = crate::logs::bulk::failed_item(
+        "index".to_string(),
+        ctx.stream_name.to_string(),
+        doc_id.unwrap_or_default(),
+        value,
+        failure_type.to_string(),
+        reason,
+    );
+    for failed in item.values_mut() {
+        failed.request_position = Some(*position);
+    }
+    ctx.stream_status.items.push(item);
 }
 
 struct IngestionDataIterator(IngestionDataIter);
@@ -1491,16 +1583,23 @@ fn construct_values_from_open_telemetry_v1_metric(
 #[cfg(test)]
 mod tests {
 
-    use config::meta::self_reporting::{
-        redaction::REDACTION_EVIDENCE_STREAM,
-        usage::{
-            AUDIT_STREAM, DATA_RETENTION_USAGE_STREAM, ERROR_STREAM, STATS_STREAM, TRIGGERS_STREAM,
-            USAGE_STREAM,
+    use config::meta::{
+        pipeline::{
+            Pipeline, PipelineKind,
+            components::{Edge, Node, NodeData, PipelineSource},
+        },
+        self_reporting::{
+            redaction::REDACTION_EVIDENCE_STREAM,
+            usage::{
+                AUDIT_STREAM, DATA_RETENTION_USAGE_STREAM, ERROR_STREAM, STATS_STREAM,
+                TRIGGERS_STREAM, USAGE_STREAM,
+            },
         },
     };
     use ingestion_common::{IngestUser, SystemJobType};
 
     use super::*;
+    use crate::cache::STREAM_EXECUTABLE_PIPELINES;
 
     /// A bulk ingest returned 200 while dropping every record as "Too old data", and
     /// nothing server-side said so. The status code has to stay 200 — clients and
@@ -2064,5 +2163,119 @@ mod tests {
             decoded += 1;
         }
         assert_eq!(decoded, body_cap / (1024 * 1024) + 2);
+    }
+
+    fn realtime_pipeline(source_stream: &StreamParams) -> Pipeline {
+        let node = |id: &str, stream: StreamParams| {
+            Node::new(
+                id.to_string(),
+                NodeData::Stream(stream),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let dest = StreamParams::new(&source_stream.org_id, "dest_stream", StreamType::Logs);
+        Pipeline {
+            id: "bulk_snapshot_pl".to_string(),
+            version: 1,
+            enabled: true,
+            org: source_stream.org_id.to_string(),
+            name: "bulk_snapshot_pl".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(source_stream.clone()),
+            nodes: vec![node("source", source_stream.clone()), node("dest", dest)],
+            edges: vec![Edge::new("source".to_string(), "dest".to_string())],
+            kind: PipelineKind::User,
+        }
+    }
+
+    // regression: a pipeline enabled between a `_bulk` plan and its ingest reached only the
+    // fallback rows
+    #[tokio::test]
+    async fn test_bulk_batch_keeps_the_snapshot_it_was_planned_under() {
+        let stream = StreamParams::new(
+            "bulk_snapshot_org",
+            "bulk_snapshot_stream",
+            StreamType::Logs,
+        );
+        let needs = StreamRecordNeeds::load(stream.clone()).await;
+        assert!(!needs.json_records(&stream.stream_name));
+        let schema = arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+            TIMESTAMP_COL_NAME,
+            arrow_schema::DataType::Int64,
+            false,
+        )]);
+        let columnar =
+            JsonColumnar::for_schema(&stream.stream_name, &schema, 0, (0, i64::MAX), false)
+                .unwrap();
+        let plan = BulkPlan { columnar, needs };
+
+        let pipeline = ExecutablePipeline::new(&realtime_pipeline(&stream))
+            .await
+            .unwrap();
+        STREAM_EXECUTABLE_PIPELINES
+            .write()
+            .await
+            .insert(stream.clone(), vec![pipeline]);
+        let reloaded = StreamRecordNeeds::load(stream.clone()).await;
+        let (needs, columnar) = request_needs(stream.clone(), Some(plan)).await;
+        STREAM_EXECUTABLE_PIPELINES.write().await.remove(&stream);
+
+        assert!(reloaded.json_records(&stream.stream_name));
+        assert!(columnar.is_some());
+        assert!(needs.executable_pipelines.is_empty());
+        let (needs, columnar) = request_needs(stream.clone(), None).await;
+        assert!(columnar.is_none());
+        assert!(needs.executable_pipelines.is_empty());
+    }
+
+    #[test]
+    fn test_bulk_rejected_finalized_records_answer_at_their_positions() {
+        let mut accepted_positions = VecDeque::new();
+        let mut stream_status = StreamStatus::new("s");
+        let mut buffered = LogDataByStream::new();
+        let schema_map = HashMap::new();
+        let settings = HashMap::new();
+        for (position, record, accepted) in [
+            (0, json::json!({"_timestamp": 1000000000000000_i64}), true),
+            (1, json::json!({"_id": "b", "_timestamp": "invalid"}), false),
+            (2, json::json!({"_timestamp": 1000000000000001_i64}), true),
+        ] {
+            assert_eq!(
+                finalize_and_buffer_record(
+                    record,
+                    None,
+                    &mut FinalizeRecordContext {
+                        stream_name: "s",
+                        org_id: "o",
+                        flatten_level: 0,
+                        min_ts: 1,
+                        max_ts: i64::MAX,
+                        index_all_max_value_length: 0,
+                        user_defined_schema_map: &schema_map,
+                        streams_need_original_map: &settings,
+                        streams_need_all_values_map: &settings,
+                        need_usage_report: false,
+                        log_ingestion_errors: false,
+                        dbm_enabled: false,
+                        stream_status: &mut stream_status,
+                        json_data_by_stream: &mut buffered,
+                        bulk_position: Some((&mut accepted_positions, position)),
+                    }
+                ),
+                accepted,
+            );
+        }
+        assert_eq!(accepted_positions, [0, 2]);
+        assert_eq!(buffered["s"].0.len(), 2);
+        assert_eq!(stream_status.status.failed, 1);
+        let [rejected] = stream_status.items.as_slice() else {
+            panic!("one failed item expected, got {:?}", stream_status.items);
+        };
+        let rejected = &rejected["index"];
+        assert_eq!(rejected.request_position, Some(1));
+        assert_eq!(rejected._id, "b");
+        assert_eq!(rejected.error.as_ref().unwrap().err_type, TS_PARSE_FAILED);
     }
 }

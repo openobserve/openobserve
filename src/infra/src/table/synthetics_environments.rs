@@ -234,6 +234,18 @@ pub async fn delete<C: TransactionTrait>(
     Ok(res.rows_affected > 0)
 }
 
+/// Deletes an org's environments; its variables go first (`synthetics_variables_env_fk`).
+pub async fn delete_by_org<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
 /// Written to be shown: `DbError` would prefix it with its own type names.
 fn duplicate_name(name: &str) -> Error {
     Error::DuplicateName(format!("environment '{name}' already exists in this org"))

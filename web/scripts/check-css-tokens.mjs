@@ -35,6 +35,9 @@ const ALLOW_EXACT = new Set([
   // ("--sp-x: 300px") as a definition. Specs are excluded now, so they need a real entry.
   "--sp-x",
   "--sp-y",
+  // components/fleet/FleetFlowEdge.vue and FleetFlowOverview.vue position labels and the popover at runtime.
+  "--fleet-edge-at",
+  "--fleet-popover-at",
 ]);
 
 // Guard against accidental re-introduction of an --o2-* exemption above.

@@ -6,6 +6,7 @@ const PageManager = require('../../pages/page-manager.js');
 const { generateHexId } = require('../utils/trace-ingestion.js');
 const { waitForStreamRows } = require('../utils/rum-stream-verify.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { ingestBase } = require('../utils/ingest-url.js');
 
 const BASE = (process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/$/, '');
 const ORG = getOrgIdentifier() || 'default';
@@ -85,7 +86,7 @@ async function ingestDanglingTraceWithRumRow(page, { sessionHasReplay }) {
     ],
   };
 
-  const traceRes = await page.request.post(`${BASE}/api/${ORG}/v1/traces`, {
+  const traceRes = await page.request.post(`${ingestBase(BASE)}/api/${ORG}/v1/traces`, {
     headers: { ...AUTH_HEADERS, 'stream-name': 'default' },
     data: traceData,
   });
@@ -108,7 +109,7 @@ async function ingestDanglingTraceWithRumRow(page, { sessionHasReplay }) {
     date: nowMs, // epoch ms
   };
 
-  const rumRes = await page.request.post(`${BASE}/api/${ORG}/_rumdata/_json`, {
+  const rumRes = await page.request.post(`${ingestBase(BASE)}/api/${ORG}/_rumdata/_json`, {
     headers: AUTH_HEADERS,
     data: [rumRow],
   });
@@ -174,7 +175,7 @@ async function ingestRegularTrace(page) {
     ],
   };
 
-  const traceRes = await page.request.post(`${BASE}/api/${ORG}/v1/traces`, {
+  const traceRes = await page.request.post(`${ingestBase(BASE)}/api/${ORG}/v1/traces`, {
     headers: { ...AUTH_HEADERS, 'stream-name': 'default' },
     data: traceData,
   });
@@ -221,7 +222,7 @@ test.describe('RUM Session Replay testcases', () => {
         geo_info_city: 'San Francisco',
         geo_info_country: 'United States',
       };
-      const replayRes = await page.request.post(`${BASE}/api/${ORG}/_sessionreplay/_json`, {
+      const replayRes = await page.request.post(`${ingestBase(BASE)}/api/${ORG}/_sessionreplay/_json`, {
         headers: AUTH_HEADERS,
         data: [replayRow],
       });

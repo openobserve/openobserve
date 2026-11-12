@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::user::UserRole, stats::MemorySize};
+use config::{
+    meta::{stream::DataRetentionDefaults, user::UserRole},
+    stats::MemorySize,
+};
+#[cfg(feature = "cloud")]
+use o2_enterprise::enterprise::domain_management::meta::DomainManagementConfig;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -30,6 +35,7 @@ pub enum OrgStatus {
     Active,
     PendingDeletion,
     Deleting,
+    Deleted,
 }
 
 use config::meta::{cluster::Node, self_reporting::usage};
@@ -177,6 +183,9 @@ pub struct OrgDetails {
     /// to the local part of `owner_email` when this is empty.
     #[serde(default)]
     pub owner_first_name: String,
+    /// When the organization was created, as a Unix timestamp in microseconds; 0 when unknown.
+    #[serde(default)]
+    pub created_at: i64,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -281,6 +290,9 @@ pub struct OrgSummary {
 #[derive(Default, Clone, Serialize, Deserialize, ToSchema)]
 pub struct StreamSummary {
     pub num_streams: i64,
+    /// Streams holding data the user sent; `num_streams` also counts the ones O2 writes itself.
+    #[serde(default)]
+    pub num_user_streams: i64,
     pub total_records: i64,
     pub total_storage_size: f64,
     pub total_compressed_size: f64,
@@ -340,6 +352,8 @@ impl TriggerStatus {
                         status.failed += 1
                     }
                     usage::RunOutcome::Skipped => status.warning += 1,
+                    // An ack event is not a run, so it says nothing about the trigger health.
+                    usage::RunOutcome::AckEvent => {}
                 }
             }
         }
@@ -526,13 +540,31 @@ pub struct OrganizationSettingPayload {
     pub usage_stream_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub red_insights_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ai_rca_thread_tool_output: Option<bool>,
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claim_parser_function: Option<String>,
+    /// Replaces the stored values as a whole; a key left out inherits.
+    #[cfg(feature = "enterprise")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "DataRetentionDefaults::deserialize_strict"
+    )]
+    pub data_retention: Option<DataRetentionDefaults>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cross_links: Option<Vec<config::meta::stream::CrossLink>>,
+    #[cfg(feature = "cloud")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub domain_org_mappings: Option<Vec<DomainOrgMapping>>,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub domain_management_config: Option<DomainManagementConfig>,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub enforce_allowed_orgs_only: Option<bool>,
+    #[cfg(feature = "cloud")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub budget_config: Option<Vec<BudgetNotificationConfiguration>>,
 }
@@ -569,9 +601,19 @@ pub struct OrganizationSetting {
     pub usage_stream_enabled: bool,
     #[serde(default)]
     pub red_insights_enabled: bool,
+    /// Show raw tool input and output in incident investigation threads.
+    #[serde(default)]
+    pub ai_rca_thread_tool_output: bool,
+    /// Set through the Security case settings route, which checks the Security grant.
+    #[cfg(feature = "enterprise")]
+    #[serde(default)]
+    pub security_cases: o2_enterprise::enterprise::security::cases::CaseSettings,
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
     pub claim_parser_function: String,
+    #[cfg(feature = "enterprise")]
+    #[serde(default)]
+    pub data_retention: DataRetentionDefaults,
     #[serde(default)]
     pub cross_links: Vec<config::meta::stream::CrossLink>,
     #[serde(default)]
@@ -579,6 +621,12 @@ pub struct OrganizationSetting {
     #[cfg(feature = "cloud")]
     #[serde(default)]
     pub domain_org_mappings: Vec<DomainOrgMapping>,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub enforce_allowed_orgs_only: bool,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub domain_management_config: DomainManagementConfig,
     #[cfg(feature = "cloud")]
     #[serde(default)]
     pub budget_config: Vec<BudgetNotificationConfiguration>,
@@ -612,12 +660,21 @@ impl Default for OrganizationSetting {
             max_series_per_query: None,
             usage_stream_enabled: default_usage_stream_enabled(),
             red_insights_enabled: false,
+            ai_rca_thread_tool_output: false,
+            #[cfg(feature = "enterprise")]
+            security_cases: Default::default(),
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
+            #[cfg(feature = "enterprise")]
+            data_retention: DataRetentionDefaults::default(),
             cross_links: Vec::new(),
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: Vec::new(),
+            #[cfg(feature = "cloud")]
+            domain_management_config: Default::default(),
+            #[cfg(feature = "cloud")]
+            enforce_allowed_orgs_only: false,
             #[cfg(feature = "cloud")]
             budget_config: Vec::new(),
         }
@@ -637,6 +694,8 @@ impl MemorySize for OrganizationSetting {
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingResponse {
     pub data: OrganizationSetting,
+    /// The default each stream type resolves to here, computed on read and never stored.
+    pub resolved_data_retention: DataRetentionDefaults,
 }
 
 /// Request struct for node listing with region filtering
@@ -901,6 +960,7 @@ mod tests {
             plan: 0,
             owner_email: "admin1@example.com".to_string(),
             owner_first_name: "Admin".to_string(),
+            created_at: 1_700_000_000_000_000,
         };
 
         let response = OrganizationResponse {
@@ -910,6 +970,8 @@ mod tests {
         assert_eq!(response.data.len(), 1);
         assert_eq!(response.data[0].identifier, "org-1");
         assert_eq!(response.data[0].ingest_threshold, THRESHOLD);
+        let json = serde_json::to_value(&response).unwrap();
+        assert_eq!(json["data"][0]["created_at"], 1_700_000_000_000_000_i64);
     }
 
     #[test]
@@ -1136,6 +1198,7 @@ mod tests {
         let setting = OrganizationSetting::default();
         let response = OrganizationSettingResponse {
             data: setting.clone(),
+            resolved_data_retention: DataRetentionDefaults::default(),
         };
 
         assert_eq!(
@@ -1455,10 +1518,19 @@ mod tests {
             max_series_per_query: None,
             usage_stream_enabled: None,
             red_insights_enabled: None,
+            ai_rca_thread_tool_output: None,
             #[cfg(feature = "enterprise")]
             claim_parser_function: None,
+            #[cfg(feature = "enterprise")]
+            data_retention: None,
             cross_links: None,
+            #[cfg(feature = "cloud")]
             domain_org_mappings: None,
+            #[cfg(feature = "cloud")]
+            domain_management_config: None,
+            #[cfg(feature = "cloud")]
+            enforce_allowed_orgs_only: None,
+            #[cfg(feature = "cloud")]
             budget_config: None,
         };
         let json = serde_json::to_value(&payload).unwrap();
@@ -1534,12 +1606,21 @@ mod tests {
             max_series_per_query: None,
             usage_stream_enabled: false,
             red_insights_enabled: false,
+            ai_rca_thread_tool_output: false,
+            #[cfg(feature = "enterprise")]
+            security_cases: Default::default(),
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
+            #[cfg(feature = "enterprise")]
+            data_retention: DataRetentionDefaults::default(),
             cross_links: vec![],
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
+            #[cfg(feature = "cloud")]
+            domain_management_config: Default::default(),
+            #[cfg(feature = "cloud")]
+            enforce_allowed_orgs_only: false,
             #[cfg(feature = "cloud")]
             budget_config: vec![],
         };
@@ -1567,12 +1648,21 @@ mod tests {
             max_series_per_query: Some(1000),
             usage_stream_enabled: false,
             red_insights_enabled: false,
+            ai_rca_thread_tool_output: false,
+            #[cfg(feature = "enterprise")]
+            security_cases: Default::default(),
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
+            #[cfg(feature = "enterprise")]
+            data_retention: DataRetentionDefaults::default(),
             cross_links: vec![],
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
+            #[cfg(feature = "cloud")]
+            domain_management_config: Default::default(),
+            #[cfg(feature = "cloud")]
+            enforce_allowed_orgs_only: false,
             #[cfg(feature = "cloud")]
             budget_config: vec![],
         };
@@ -1657,5 +1747,41 @@ mod tests {
         let payload: OrganizationSettingPayload =
             serde_json::from_str(r#"{"red_insights_enabled": true}"#).unwrap();
         assert_eq!(payload.red_insights_enabled, Some(true));
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn test_org_data_retention_absent_outside_enterprise() {
+        let json = serde_json::to_value(OrganizationSetting::default()).unwrap();
+        assert!(json.get("data_retention").is_none());
+        let payload: OrganizationSettingPayload =
+            serde_json::from_str(r#"{"data_retention": {"default": 30}}"#).unwrap();
+        assert!(
+            serde_json::to_value(payload)
+                .unwrap()
+                .get("data_retention")
+                .is_none()
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_org_data_retention_defaults_to_inherit_on_stored_records() {
+        let legacy: OrganizationSetting = serde_json::from_str("{}").unwrap();
+        assert_eq!(legacy.data_retention, DataRetentionDefaults::default());
+        let partial: OrganizationSetting =
+            serde_json::from_str(r#"{"data_retention": {"metrics": 180}}"#).unwrap();
+        assert_eq!(partial.data_retention.metrics, 180);
+        assert_eq!(partial.data_retention.logs, 0);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_org_data_retention_payload_refuses_unknown_keys() {
+        let payload = |json| serde_json::from_str::<OrganizationSettingPayload>(json);
+        assert!(payload(r#"{"data_retention": {"index": 7}}"#).is_err());
+        let accepted = payload(r#"{"data_retention": {"profiles": 7}}"#).unwrap();
+        assert_eq!(accepted.data_retention.unwrap().profiles, 7);
+        assert!(payload("{}").unwrap().data_retention.is_none());
     }
 }

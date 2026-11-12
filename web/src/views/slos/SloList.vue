@@ -36,15 +36,38 @@
       <!-- The provider behind the Terraform export, which is otherwise only
            discoverable once the export dialog is already open. -->
       <IacRegistryLinks data-test="slos-slolist-iac-registries" :compact="isMobile" />
-      <OButton variant="primary" size="sm-action" data-test="slos-slolist-new" @click="goToNew">
+      <OButton
+        variant="outline"
+        size="sm-action"
+        icon-left="upload-file"
+        data-test="slos-slolist-import"
+        @click="goToImport"
+      >
+        {{ t("dashboard.import") }}
+      </OButton>
+      <OButton
+        variant="primary"
+        size="sm-action"
+        data-test="slos-slolist-new"
+        :aria-label="
+          sloDrafts.hasNew ? t('common.editorDraft.newDot', { label: t('slos.new') }) : undefined
+        "
+        @click="goToNew"
+      >
         {{ t("slos.new") }}
+        <EditorDraftDot
+          v-if="sloDrafts.hasNew"
+          :saved-at="sloDrafts.savedAt(null)"
+          corner
+          data-test="slos-slolist-new-draft-dot"
+        />
       </OButton>
     </template>
 
     <!-- SLOs share the ALERT folder namespace (there is no FolderType::Slos),
          so `type="alerts"` is not a copy-paste slip — it is what makes a
          "payments" folder hold that team's alerts and its SLOs together. -->
-    <template #sidebar>
+    <template v-if="!anomalyLocked" #sidebar>
       <FolderList type="alerts" :drawer-on-mobile="false" @update:activeFolderId="onFolderChange" />
     </template>
 
@@ -56,7 +79,9 @@
       :columns="columns"
       row-key="id"
       :loading="loading"
+      :loading-reset-key="activeFolderId"
       :error="error"
+      :forbidden="forbidden"
       :page-size="pageSize"
       :page-size-options="[25, 50, 100]"
       :sort-by="sortBy"
@@ -126,10 +151,7 @@
            read the counts for what you narrowed to. Always rendered (skeleton
            while loading) so data arriving never shifts the rows below. -->
       <template #subheader>
-        <div
-          class="px-page-edge border-table-row-divider border-b py-1.5"
-          data-test="slos-slolist-stats"
-        >
+        <div data-test="slos-slolist-stats">
           <OStatStrip
             :items="stats"
             :loading="loading"
@@ -144,6 +166,12 @@
       <template #cell-name="{ row }">
         <div class="flex min-w-0 items-center gap-2">
           <OTruncatedText class="font-medium">{{ row.name }}</OTruncatedText>
+          <EditorDraftDot
+            v-if="sloDrafts.ids.has(row.id)"
+            :saved-at="sloDrafts.savedAt(row.id)"
+            class="shrink-0"
+            :data-test="`slos-slolist-${row.name}-draft-dot`"
+          />
           <OTag
             v-if="isGrouped(row)"
             variant="purple-soft"
@@ -230,20 +258,18 @@
       </template>
 
       <template #cell-tags="{ row }">
-        <OTruncatedText
-          as="div"
-          class="flex flex-wrap gap-1"
-          :tooltip="raw((row.tags || []).join(', '))"
-        >
-          <OTag
-            v-for="tag in (row.tags || []).slice(0, 2)"
-            :key="tag"
-            variant="default-soft"
-            size="xs"
-            :label="raw(tag)"
-          />
-          <span v-if="(row.tags || []).length > 2" class="text-text-secondary">…</span>
-        </OTruncatedText>
+        <OTooltip v-if="row.tags?.length" :content="raw(row.tags.join(', '))">
+          <FitItems :items="row.tags">
+            <template #default="{ item }">
+              <OTag variant="default-soft" size="xs" class="max-w-full">
+                <span class="truncate">{{ item }}</span>
+              </OTag>
+            </template>
+            <template #more="{ count }">
+              <span class="text-text-secondary">+{{ count }}</span>
+            </template>
+          </FitItems>
+        </OTooltip>
       </template>
 
       <template #cell-folder="{ row }">
@@ -310,6 +336,7 @@
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
+                :aria-label="t('common.moreActions')"
                 icon-left="more-vert"
                 variant="ghost"
                 size="icon-xs-sq"
@@ -415,7 +442,15 @@
       :title="t('slos.deleteConfirmTitle')"
       data-test="slos-slolist-delete-dialog"
     >
-      <p>{{ t("slos.deleteConfirmBody", { name: pendingDelete?.name }) }}</p>
+      <i18n-t keypath="slos.deleteConfirmBody" tag="p" data-test="slos-slolist-delete-message">
+        <template #name>
+          <span
+            data-test="slos-slolist-delete-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ pendingDelete?.name }}</span
+          >
+        </template>
+      </i18n-t>
       <!-- The cascade, which is the irreversible part. Deleting an SLO deletes
            every alert attached to it, and until this said so the dialog warned
            only about disk. Three states, all distinct: still checking, a known
@@ -519,6 +554,8 @@ import { slosQuery } from "@/services/slos.queries";
 // stays off the query layer and calls the endpoint directly.
 import sloService from "@/services/slos";
 import { computed, onMounted, ref, nextTick, watch } from "vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useDowntimesEnabled } from "@/composables/downtimes/useDowntimesEnabled";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -543,6 +580,10 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import FitItems from "@/components/common/FitItems.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -583,10 +624,13 @@ const store = useStore();
 const readOrg = ref<string>(store.state.selectedOrganization?.identifier ?? "");
 const readFolder = ref<string | undefined>(undefined);
 
+// SLOs are licensed under anomaly detection; a locked license reads nothing and says so.
+const { locked: anomalyLocked } = useLicenseLock("anomaly_detection");
+
 const slosList = useQuery(() =>
   // Held until the folder resolves: the reactive key would otherwise fetch an unscoped list first.
   Object.assign(slosQuery(readOrg.value, readFolder.value), {
-    enabled: !!readOrg.value && readFolder.value !== undefined,
+    enabled: !!readOrg.value && readFolder.value !== undefined && !anomalyLocked.value,
   }),
 );
 
@@ -594,7 +638,8 @@ const slosList = useQuery(() =>
 // scope repaints these rows with no wiring here.
 const rows = computed<SloListItem[]>(() => (slosList.data.value ?? []) as SloListItem[]);
 
-const loading = slosList.isPending;
+// A disabled query stays pending forever, so a locked list must not read that as loading.
+const loading = computed(() => !anomalyLocked.value && slosList.isPending.value);
 // A request in flight while rows stay on screen — the refresh button's spinner.
 // `loading` is the skeleton, which only a cold read wants.
 const fetching = slosList.isFetching;
@@ -605,7 +650,11 @@ const lastUpdatedAt = slosList.dataUpdatedAt;
 // query's error and nothing else, so the table used to render an empty list
 // with no explanation.
 const loadError = ref<string | null>(null);
+const forbidden = computed<ForbiddenState>(() =>
+  anomalyLocked.value ? ["anomaly_detection"] : forbiddenState(slosList.error.value),
+);
 const error = computed<string | null>(() => {
+  if (forbidden.value) return null;
   if (loadError.value) return loadError.value;
   const e = slosList.error.value as any;
   if (!e) return null;
@@ -660,6 +709,7 @@ const org = computed(() => store.state.selectedOrganization?.identifier);
 const moveSlos = useMutation(() => moveSlosMutation(org.value));
 const setSloEnabled = useMutation(() => setSloEnabledMutation(org.value));
 const deleteSlo = useMutation(() => deleteSloMutation(org.value));
+const sloDrafts = useEditorDraftIds("slo");
 
 const selectedRows = computed(() => rows.value.filter((r) => selectedIds.value.includes(r.id)));
 
@@ -686,7 +736,6 @@ async function fetchSloForExport(id: string): Promise<Record<string, unknown> | 
     id: _id,
     status: _status,
     definition_generation: _generation,
-    groups_estimate: _estimate,
     groups_reserved: _reserved,
     ...definition
   } = body;
@@ -746,6 +795,8 @@ const typeOptions = computed<{ value: string; label: I18nText; icon: IconName }[
   { value: "alert", label: t("slos.type.alert"), icon: "shield-alert-outline" },
 ]);
 
+const downtimesEnabled = useDowntimesEnabled();
+
 const columns = computed<OTableColumnDef<SloListItem>[]>(() => [
   {
     id: "name",
@@ -799,17 +850,14 @@ const columns = computed<OTableColumnDef<SloListItem>[]>(() => [
     hideable: true,
     size: 140,
   },
-  // No hardcoded `size`: OTable derives an action column's width from
-  // `actionCount` (4 × 32px button + 3 × 4px gap + padding), but only when
-  // `isAction` marks it as one. Without the flag it fell through to the
-  // generic size and clipped the last two buttons.
+  // OTable sizes this column from `actionCount` and clips the cell, so it must equal the desktop buttons in `#cell-actions`.
   {
     id: "actions",
     header: t("slos.column.actions"),
     accessor: () => "",
     sortable: false,
     isAction: true,
-    meta: { align: "center", actionCount: 4 },
+    meta: { align: "center", actionCount: downtimesEnabled.value ? 6 : 5 },
   },
 ]);
 
@@ -967,7 +1015,7 @@ const refresh = () => load(null, undefined, true);
 // fall back to the current org and active folder — the folder-change path is the
 // only caller that passes a folder the refs have not caught up with yet.
 async function load(orgId?: string | null, folderId?: string, force = false) {
-  if (!org.value) return;
+  if (!org.value || anomalyLocked.value) return;
   loadError.value = null;
   // sometimes the folder id might not be updated so passed via
   // query params.
@@ -1036,7 +1084,12 @@ function goToNew() {
   router.push({ name: "addSlo", query: { ...route.query, org_identifier: org.value } });
 }
 
-const downtimesEnabled = useDowntimesEnabled();
+function goToImport() {
+  router.push({
+    name: "importSlo",
+    query: { ...route.query, org_identifier: org.value, folder: activeFolderId.value },
+  });
+}
 
 const activeCorrections = (row: SloListItem) =>
   (row.status?.corrections ?? []).filter((c) => c.status === "active");
@@ -1115,6 +1168,7 @@ async function doDelete() {
   if (!row) return;
   try {
     await deleteSlo.mutateAsync(row.id);
+    deleteEditorDraftsFor({ kind: "slo", org: String(org.value ?? ""), entityId: row.id });
     queryClient.setQueryData<SloListItem[]>(sloKeys.list(readOrg.value, readFolder.value), (old) =>
       (old ?? []).filter((r) => r.id !== row.id),
     );

@@ -32,12 +32,14 @@ const mockStore = {
 };
 
 vi.mock("vuex", () => ({ useStore: () => mockStore }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // The composable runs outside a component, where the global i18n plugin isn't installed.
 vi.mock("@/types/i18n", () => ({ useI18nTyped: () => ({ t: (key: string) => key }) }));
 
 import { createRole, getAllRolePermissions, getResources, updateRole } from "@/services/iam";
 import service_accounts from "@/services/service_accounts";
+import analytics from "@/services/product_analytics";
 import { MCP_READONLY_ROLE, useMcpCredential } from "./useMcpCredential";
 
 const created = () => ({
@@ -103,6 +105,52 @@ describe("useMcpCredential", () => {
       expect(getResources).not.toHaveBeenCalled();
       expect(updateRole).not.toHaveBeenCalled();
       expect(cred).toMatchObject({ role: null, scope: "rbacDisabled", token: "tok_123" });
+    });
+  });
+
+  describe("with mcp license-locked", () => {
+    it("mints nothing and calls no service-account or role API", async () => {
+      const { generate, credential } = useOrg("org-mcp-locked", { features: { mcp: "locked" } });
+
+      expect(await generate()).toBeNull();
+      expect(service_accounts.create).not.toHaveBeenCalled();
+      expect(createRole).not.toHaveBeenCalled();
+      expect(updateRole).not.toHaveBeenCalled();
+      expect(credential.value).toBeNull();
+    });
+
+    it("mints as usual when mcp is enabled", async () => {
+      const { generate } = useOrg("org-mcp-enabled", { features: { mcp: "enabled" } });
+
+      expect(await generate()).toMatchObject({ token: "tok_123" });
+      expect(service_accounts.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("with rbac enforced but not licensed", () => {
+    it.each(["locked", "hidden"])(
+      "keeps the token and calls no gated role API under a %s license",
+      async (state) => {
+        const { generate, error } = useOrg(`org-license-${state}`, { features: { rbac: state } });
+
+        const cred = await generate();
+
+        expect(service_accounts.create).toHaveBeenCalledTimes(1);
+        expect(createRole).not.toHaveBeenCalled();
+        expect(getAllRolePermissions).not.toHaveBeenCalled();
+        expect(updateRole).not.toHaveBeenCalled();
+        expect(cred).toMatchObject({ role: null, scope: "unscoped", token: "tok_123" });
+        expect(error.value).toBe("");
+      },
+    );
+
+    it("joins the role when the license grants rbac", async () => {
+      const { generate } = useOrg("org-license-enabled", { features: { rbac: "enabled" } });
+
+      const cred = await generate();
+
+      expect(updateRole).toHaveBeenCalledTimes(1);
+      expect(cred).toMatchObject({ role: "mcp_readonly", scope: "readonly" });
     });
   });
 
@@ -282,6 +330,18 @@ describe("useMcpCredential", () => {
 
       expect(service_accounts.create).toHaveBeenCalledTimes(1);
       expect(second).toBe(first);
+    });
+
+    it("tracks only a credential it actually minted", async () => {
+      const { generate } = useOrg("org-track");
+
+      await generate();
+      await generate();
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("mcp_credential_generated", {
+        scope: "readonly",
+      });
     });
 
     it("hands a remount the credential it can no longer be shown", async () => {

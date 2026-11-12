@@ -20,14 +20,21 @@
 //! the incident events ingestion endpoint. `incident_integration_senders`
 //! tracks distinct upstream senders observed per integration for visibility.
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr, sea_query::Expr};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, Set, SqlErr,
+    TransactionTrait,
+    sea_query::{Expr, Query},
+};
 
-use super::entity::{
-    incident_integration_senders::{
-        ActiveModel as SenderActiveModel, Column as SenderColumn, Entity as SenderEntity,
-        Model as SenderModel,
+use super::{
+    entity::{
+        incident_integration_senders::{
+            ActiveModel as SenderActiveModel, Column as SenderColumn, Entity as SenderEntity,
+            Model as SenderModel,
+        },
+        incident_integrations::{ActiveModel, Column, Entity, Model},
     },
-    incident_integrations::{ActiveModel, Column, Entity, Model},
+    slack_shared::db_err,
 };
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
@@ -130,40 +137,9 @@ pub fn generate_token() -> String {
     )
 }
 
-/// Insert a new integration row. Fails with a clear message if the token is
-/// already in use (the unique constraint).
+/// Insert a new integration row; a taken `(org_id, name)` fails with `DbError::UniqueViolation`.
 pub async fn add(record: &IncidentIntegrationRecord) -> Result<(), errors::Error> {
-    let now = chrono::Utc::now().timestamp_micros();
-    let model = ActiveModel {
-        id: Set(record.id.clone()),
-        org_id: Set(record.org_id.clone()),
-        name: Set(record.name.clone()),
-        source_type: Set(record.source_type.clone()),
-        token: Set(record.token.clone()),
-        enabled: Set(record.enabled),
-        config: Set(record.config.to_string()),
-        destinations: Set(if record.destinations.is_empty() {
-            None
-        } else {
-            serde_json::to_string(&record.destinations).ok()
-        }),
-        created_by: Set(record.created_by.clone()),
-        created_at: Set(now),
-        updated_at: Set(now),
-    };
-    let client = get_orm_client_rw().await;
-    match Entity::insert(model).exec(client).await {
-        Ok(_) => Ok(()),
-        Err(e) => match e.sql_err() {
-            Some(SqlErr::UniqueConstraintViolation(_)) => {
-                Err(Error::DbError(DbError::SeaORMError(format!(
-                    "incident integration '{}' already exists in org",
-                    record.name
-                ))))
-            }
-            _ => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
-        },
-    }
+    add_with(get_orm_client_rw().await, record).await
 }
 
 /// Find an enabled integration by token value (global — no org_id filter). The
@@ -272,30 +248,7 @@ pub async fn update(
     name: Option<&str>,
     destinations: Option<&[String]>,
 ) -> Result<(), errors::Error> {
-    let now = chrono::Utc::now().timestamp_micros();
-    let mut q = Entity::update_many().col_expr(Column::UpdatedAt, Expr::value(now));
-    if let Some(name) = name {
-        q = q.col_expr(Column::Name, Expr::value(name));
-    }
-    if let Some(destinations) = destinations {
-        let encoded = if destinations.is_empty() {
-            None
-        } else {
-            Some(serde_json::to_string(destinations).map_err(|e| {
-                Error::DbError(DbError::SeaORMError(format!(
-                    "failed to encode destinations: {e}"
-                )))
-            })?)
-        };
-        q = q.col_expr(Column::Destinations, Expr::value(encoded));
-    }
-    let client = get_orm_client_rw().await;
-    q.filter(Column::OrgId.eq(org_id))
-        .filter(Column::Id.eq(id))
-        .exec(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    Ok(())
+    update_with(get_orm_client_rw().await, org_id, id, name, destinations).await
 }
 
 /// Rotate an integration's token to a new random value, returning it.
@@ -468,6 +421,10 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
     Ok(true)
 }
 
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    delete_by_org_with(get_orm_client_rw().await, org_id).await
+}
+
 /// List all observed senders for an integration.
 pub async fn list_senders(integration_id: &str) -> Result<Vec<SenderRecord>, errors::Error> {
     let client = get_orm_client_ro().await;
@@ -479,9 +436,221 @@ pub async fn list_senders(integration_id: &str) -> Result<Vec<SenderRecord>, err
     Ok(records.into_iter().map(SenderRecord::from).collect())
 }
 
+async fn add_with<C: ConnectionTrait>(
+    conn: &C,
+    record: &IncidentIntegrationRecord,
+) -> Result<(), errors::Error> {
+    let now = chrono::Utc::now().timestamp_micros();
+    let model = ActiveModel {
+        id: Set(record.id.clone()),
+        org_id: Set(record.org_id.clone()),
+        name: Set(record.name.clone()),
+        source_type: Set(record.source_type.clone()),
+        token: Set(record.token.clone()),
+        enabled: Set(record.enabled),
+        config: Set(record.config.to_string()),
+        destinations: Set(if record.destinations.is_empty() {
+            None
+        } else {
+            serde_json::to_string(&record.destinations).ok()
+        }),
+        created_by: Set(record.created_by.clone()),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+    Entity::insert(model).exec(conn).await.map_err(db_err)?;
+    Ok(())
+}
+
+async fn update_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    name: Option<&str>,
+    destinations: Option<&[String]>,
+) -> Result<(), errors::Error> {
+    let now = chrono::Utc::now().timestamp_micros();
+    let mut q = Entity::update_many().col_expr(Column::UpdatedAt, Expr::value(now));
+    if let Some(name) = name {
+        q = q.col_expr(Column::Name, Expr::value(name));
+    }
+    if let Some(destinations) = destinations {
+        let encoded = if destinations.is_empty() {
+            None
+        } else {
+            Some(serde_json::to_string(destinations).map_err(|e| {
+                Error::DbError(DbError::SeaORMError(format!(
+                    "failed to encode destinations: {e}"
+                )))
+            })?)
+        };
+        q = q.col_expr(Column::Destinations, Expr::value(encoded));
+    }
+    q.filter(Column::OrgId.eq(org_id))
+        .filter(Column::Id.eq(id))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(())
+}
+
+async fn delete_by_org_with(
+    client: &DatabaseConnection,
+    org_id: &str,
+) -> Result<(), errors::Error> {
+    let txn = client.begin().await?;
+    let integration_ids = Query::select()
+        .column(Column::Id)
+        .from(Entity)
+        .and_where(Column::OrgId.eq(org_id))
+        .to_owned();
+    SenderEntity::delete_many()
+        .filter(SenderColumn::IntegrationId.in_subquery(integration_ids))
+        .exec(&txn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    txn.commit().await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
+    use sea_orm::{ConnectionTrait, Database, Schema, Statement};
+
     use super::*;
+
+    async fn integration_db() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(backend.build(&schema.create_table_from_entity(Entity)))
+            .await
+            .unwrap();
+        db.execute(backend.build(&schema.create_table_from_entity(SenderEntity)))
+            .await
+            .unwrap();
+        for org in ["deleted", "live"] {
+            Entity::insert(ActiveModel {
+                id: Set(org.to_string()),
+                org_id: Set(org.to_string()),
+                name: Set("default".to_string()),
+                source_type: Set("auto".to_string()),
+                token: Set(format!("o2iat_{org}")),
+                enabled: Set(true),
+                config: Set("{}".to_string()),
+                destinations: Set(None),
+                created_by: Set("owner".to_string()),
+                created_at: Set(1),
+                updated_at: Set(1),
+            })
+            .exec(&db)
+            .await
+            .unwrap();
+            SenderEntity::insert(SenderActiveModel {
+                id: Set(org.to_string()),
+                integration_id: Set(org.to_string()),
+                detected_source: Set("auto".to_string()),
+                sender_label: Set(None),
+                first_received_at: Set(1),
+                last_received_at: Set(1),
+                accepted_count: Set(0),
+                rejected_count: Set(0),
+                resolved_seen: Set(false),
+            })
+            .exec(&db)
+            .await
+            .unwrap();
+        }
+        db
+    }
+
+    #[tokio::test]
+    async fn delete_by_org_removes_integrations_and_senders_for_exact_org() {
+        let db = integration_db().await;
+        delete_by_org_with(&db, "deleted").await.unwrap();
+        delete_by_org_with(&db, "deleted").await.unwrap();
+        let integrations = Entity::find().all(&db).await.unwrap();
+        let senders = SenderEntity::find().all(&db).await.unwrap();
+        assert_eq!(integrations.len(), 1);
+        assert_eq!(integrations[0].org_id, "live");
+        assert_eq!(senders.len(), 1);
+        assert_eq!(senders[0].integration_id, "live");
+    }
+
+    #[tokio::test]
+    async fn delete_by_org_rolls_back_sender_deletion_when_integration_delete_fails() {
+        let db = integration_db().await;
+        db.execute(Statement::from_string(
+            db.get_database_backend(),
+            "CREATE TRIGGER reject_integration_delete BEFORE DELETE ON incident_integrations \
+             BEGIN SELECT RAISE(ABORT, 'injected failure'); END"
+                .to_string(),
+        ))
+        .await
+        .unwrap();
+        assert!(delete_by_org_with(&db, "deleted").await.is_err());
+        assert!(
+            Entity::find_by_id("deleted")
+                .one(&db)
+                .await
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            SenderEntity::find_by_id("deleted")
+                .one(&db)
+                .await
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_name_taken_in_the_org_is_a_unique_violation_on_add_and_update() {
+        let db = integration_db().await;
+        db.execute_unprepared(
+            "CREATE UNIQUE INDEX idx_incident_integrations_org_name \
+             ON incident_integrations (org_id, name)",
+        )
+        .await
+        .unwrap();
+        let record = |id: &str, name: &str| IncidentIntegrationRecord {
+            id: id.to_string(),
+            org_id: "live".to_string(),
+            name: name.to_string(),
+            source_type: "auto".to_string(),
+            token: generate_token(),
+            enabled: true,
+            config: serde_json::json!({}),
+            destinations: Vec::new(),
+            created_by: "owner".to_string(),
+            created_at: 1,
+            updated_at: 1,
+        };
+
+        let err = add_with(&db, &record("dup", "default")).await.unwrap_err();
+        assert!(
+            matches!(err, Error::DbError(DbError::UniqueViolation)),
+            "{err}"
+        );
+        add_with(&db, &record("other", "other")).await.unwrap();
+
+        let err = update_with(&db, "live", "other", Some("default"), None)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, Error::DbError(DbError::UniqueViolation)),
+            "{err}"
+        );
+        update_with(&db, "deleted", "deleted", Some("other"), None)
+            .await
+            .unwrap();
+    }
 
     #[test]
     fn test_generate_token_shape() {

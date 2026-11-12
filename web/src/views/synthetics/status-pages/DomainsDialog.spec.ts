@@ -46,8 +46,9 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
 }));
 
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
 vi.mock("@/composables/useConfirmDialog", () => ({
-  useConfirmDialog: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
+  useConfirmDialog: () => ({ confirm: confirmMock }),
 }));
 
 // ── Component under test ───────────────────────────────────────────────────
@@ -279,6 +280,26 @@ describe("DomainsDialog", () => {
 
       expect(wrapper.find('[data-test="status-page-domain-verify-dom-1"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="status-page-domain-serving-dom-1"]').exists()).toBe(true);
+    });
+  });
+
+  describe("delete confirm", () => {
+    it("names the domain and asks with a destructive confirm", async () => {
+      confirmMock.mockResolvedValue(false);
+      mockListDomains.mockResolvedValue({ data: [makeDomain()] });
+      wrapper = makeWrapper();
+      await flushPromises();
+
+      await wrapper.find('[data-test="status-page-domain-delete-dom-1"]').trigger("click");
+      await flushPromises();
+
+      expect(confirmMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageKeypath: "statusPages.domains.deleteBody",
+          messageName: "status.brandname.com",
+          confirmVariant: "destructive",
+        }),
+      );
     });
   });
 });

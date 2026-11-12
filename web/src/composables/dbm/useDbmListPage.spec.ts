@@ -19,6 +19,7 @@ import { defineComponent, h, shallowReadonly, shallowRef } from "vue";
 
 import { contextRegistry, DBM_CONTEXT_KEY } from "@/composables/contextProviders";
 import type { ContextProvider } from "@/composables/contextProviders";
+import analytics from "@/services/product_analytics";
 
 import { provideDbmTabCounts, type DbmTabCountsContext } from "./dbmTabCounts";
 import { refreshDbmFleet } from "./useDbmFleetInstances";
@@ -35,6 +36,8 @@ vi.mock("./useDbmFleetInstances", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./useDbmFleetInstances")>()),
   refreshDbmFleet: vi.fn(),
 }));
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({ name: "dbmActivity", query: routeQuery }),
@@ -155,6 +158,10 @@ describe("useDbmListPage", () => {
       query: expect.objectContaining({ period: "24h", system: "postgresql" }),
     });
     expect(load).toHaveBeenCalledTimes(1);
+    expect(analytics.track).toHaveBeenCalledWith("dbm_time_range_changed", {
+      page: "dbmActivity",
+      type: "relative",
+    });
   });
 
   /**
@@ -166,9 +173,11 @@ describe("useDbmListPage", () => {
     const load = vi.fn();
     const { page } = mountPage({ load });
     load.mockClear();
+    vi.mocked(analytics.track).mockClear();
     page.onDateChange({ relativeTimePeriod: "24h", userChangedValue: false });
     expect(page.scope.range.value.relativeTimePeriod).toBe("24h");
     expect(load).not.toHaveBeenCalled();
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 
   it("uses the page's own syncUrl when one is passed", () => {
@@ -261,6 +270,17 @@ describe("useDbmListPage", () => {
     expect(onForbidden).toHaveBeenCalledTimes(1);
     expect(page.error.value).toBeNull();
     expect(page.forbidden.value).toBe(false);
+  });
+
+  it("run reports a license denial as forbidden even when the page has a 403 handler", async () => {
+    const { page } = mountPage({ load: vi.fn() });
+    const onForbidden = vi.fn();
+    const denial = {
+      response: { status: 403, data: { code: 40001, error_detail: "db_monitoring" } },
+    };
+    await page.run(() => Promise.reject(denial), { onForbidden });
+    expect(onForbidden).not.toHaveBeenCalled();
+    expect(page.forbidden.value).toEqual(["db_monitoring"]);
   });
 
   it("run flags a 403 as forbidden, not an error, for a page with no handler", async () => {

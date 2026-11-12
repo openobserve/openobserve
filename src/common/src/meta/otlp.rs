@@ -19,14 +19,44 @@ use axum::{
 };
 use config::{meta::otlp::OtlpRequestType, utils::json};
 use opentelemetry_proto::tonic::collector::{
-    logs::v1::ExportLogsServiceResponse, profiles::v1development::ExportProfilesServiceResponse,
+    logs::v1::ExportLogsServiceResponse, metrics::v1::ExportMetricsServiceResponse,
+    profiles::v1development::ExportProfilesServiceResponse, trace::v1::ExportTraceServiceResponse,
 };
 use prost::Message;
+use utoipa::openapi::{
+    RefOr,
+    schema::{AdditionalProperties, ObjectBuilder, Schema, Type},
+};
 
 use super::http::{
     CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, ERROR_HEADER, HttpResponse as MetaHttpResponse,
     error_header_value,
 };
+
+macro_rules! export_json_schema {
+    ($name:ident, $rejected:literal) => {
+        /// ProtoJSON body `export_response_to_proto_json` writes for this signal.
+        pub struct $name;
+
+        impl utoipa::PartialSchema for $name {
+            fn schema() -> RefOr<Schema> {
+                export_json_schema($rejected)
+            }
+        }
+
+        impl utoipa::ToSchema for $name {}
+    };
+}
+
+export_json_schema!(OtlpLogsExportJson, "rejectedLogRecords");
+export_json_schema!(OtlpMetricsExportJson, "rejectedDataPoints");
+export_json_schema!(OtlpTracesExportJson, "rejectedSpans");
+export_json_schema!(OtlpProfilesExportJson, "rejectedProfiles");
+
+/// The protobuf-encoded `Export*ServiceResponse`, sent when the request was protobuf.
+#[derive(utoipa::ToSchema)]
+#[schema(value_type = String, format = Binary)]
+pub struct OtlpProtobufBody(pub Vec<u8>);
 
 /// OTLP `Export*ServiceResponse` whose `partial_success` gets a ProtoJSON body.
 pub trait OtlpExportResponse: Message {
@@ -53,6 +83,26 @@ impl OtlpExportResponse for ExportProfilesServiceResponse {
         self.partial_success
             .as_ref()
             .map(|ps| (ps.rejected_profiles, ps.error_message.as_str()))
+    }
+}
+
+impl OtlpExportResponse for ExportTraceServiceResponse {
+    const REJECTED_FIELD: &'static str = "rejectedSpans";
+
+    fn partial_success(&self) -> Option<(i64, &str)> {
+        self.partial_success
+            .as_ref()
+            .map(|ps| (ps.rejected_spans, ps.error_message.as_str()))
+    }
+}
+
+impl OtlpExportResponse for ExportMetricsServiceResponse {
+    const REJECTED_FIELD: &'static str = "rejectedDataPoints";
+
+    fn partial_success(&self) -> Option<(i64, &str)> {
+        self.partial_success
+            .as_ref()
+            .map(|ps| (ps.rejected_data_points, ps.error_message.as_str()))
     }
 }
 
@@ -162,6 +212,28 @@ pub fn export_response_to_proto_json<T: OtlpExportResponse>(res: &T) -> json::Va
         }
         _ => json::json!({}),
     }
+}
+
+// partialSuccess is absent on a clean success, and carries only the keys that are set.
+fn export_json_schema(rejected_field: &str) -> RefOr<Schema> {
+    let partial = ObjectBuilder::new()
+        .schema_type(Type::Object)
+        .property(
+            rejected_field,
+            ObjectBuilder::new()
+                .schema_type(Type::String)
+                .pattern(Some("^-?[0-9]+$")),
+        )
+        .property(
+            "errorMessage",
+            ObjectBuilder::new().schema_type(Type::String),
+        )
+        .additional_properties(Some(AdditionalProperties::FreeForm(false)));
+    ObjectBuilder::new()
+        .schema_type(Type::Object)
+        .property("partialSuccess", partial)
+        .additional_properties(Some(AdditionalProperties::FreeForm(false)))
+        .into()
 }
 
 #[cfg(test)]

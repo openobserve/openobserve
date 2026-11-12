@@ -607,10 +607,7 @@ fn normalize_cache_key_is_stable_and_distinguishes_its_inputs() {
     );
 }
 
-/// Hashing must be defined for every length up to the cache's own cap, at any
-/// allocation offset. gxhash's streaming hasher reads up to 16 bytes past the
-/// input under a hardcoded 4 KiB page assumption, which aborts the process on
-/// aarch64 when the read crosses a mapping; the key must not depend on that.
+/// Hashing must be defined for every length up to the cache's own cap, at any allocation offset.
 #[test]
 fn normalize_cache_key_handles_every_length_and_offset() {
     // A page-sized arena so slices land at every offset within a page,

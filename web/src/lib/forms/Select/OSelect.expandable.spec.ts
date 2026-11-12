@@ -174,3 +174,102 @@ describe("OSelect expandable rows", () => {
     expect(option("bytes")!.classList.contains("ps-3")).toBe(true);
   });
 });
+
+const GROUPED = [
+  { label: "Number group", header: true },
+  { label: "Numbers", value: "numbers" },
+  { label: "Locale Format (Auto)", value: "locale" },
+  { label: "Other Locale", value: "other-locale", expandable: true },
+  { label: "Czech (Czechia)", value: "locale:cs-CZ", parentValue: "other-locale" },
+  { label: "German (Germany)", value: "locale:de-DE", parentValue: "other-locale" },
+  { label: "Data group", header: true },
+  { label: "Bytes", value: "bytes" },
+  { label: "Time group", header: true },
+  { label: "Seconds", value: "seconds" },
+];
+
+describe("OSelect group headers while searching", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  const open = async (options: unknown[]) => {
+    wrapper = mount(OSelect, {
+      attachTo: document.body,
+      attrs: { "data-test": "unit" },
+      props: { options, modelValue: "bytes" } as Record<string, unknown>,
+    });
+    await wrapper.find("button").trigger("click");
+    await flushPromises();
+  };
+  const search = async (term: string) => {
+    const input = document.body.querySelector<HTMLInputElement>('[data-test="unit-search"]')!;
+    input.value = term;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await flushPromises();
+  };
+  const listText = () =>
+    document.body.querySelector('[data-test="unit-popover"]')?.textContent ?? "";
+  const optionValues = () =>
+    [...document.body.querySelectorAll<HTMLElement>('[data-test="unit-option"]')].map(
+      (el) => el.dataset.testValue,
+    );
+
+  it("hides a header whose group has no match", async () => {
+    await open(GROUPED);
+    await search("seconds");
+    expect(listText()).toContain("Time group");
+    expect(listText()).not.toContain("Number group");
+    expect(listText()).not.toContain("Data group");
+    expect(optionValues()).toEqual(["seconds"]);
+  });
+
+  it("keeps the header above a matching nested option", async () => {
+    await open(GROUPED);
+    await search("czech");
+    expect(listText()).toContain("Number group");
+    expect(listText()).not.toContain("Data group");
+    expect(optionValues()).toEqual(["locale:cs-CZ"]);
+  });
+
+  it("drops the header when only its expandable row matched, and shows the empty state", async () => {
+    await open(GROUPED);
+    await search("other");
+    expect(listText()).not.toContain("Number group");
+    expect(optionValues()).toEqual([]);
+    expect(listText()).toContain("No options found");
+  });
+
+  const headerRow = (label: string) =>
+    [...document.body.querySelectorAll<HTMLElement>("[data-vrow] > div")].find(
+      (el) => el.textContent?.trim() === label,
+    )!;
+
+  it("styles every header like the option text, bold, with no border", async () => {
+    await open(GROUPED);
+    for (const label of ["Number group", "Data group"]) {
+      const el = headerRow(label);
+      expect(el.classList.contains("text-select-item-text")).toBe(true);
+      expect(el.classList.contains("text-xs")).toBe(true);
+      expect(el.classList.contains("font-bold")).toBe(true);
+      expect([...el.classList].some((c) => c.includes("border"))).toBe(false);
+    }
+  });
+
+  it("shows every header without a search", async () => {
+    await open(GROUPED);
+    for (const header of ["Number group", "Data group", "Time group"]) {
+      expect(listText()).toContain(header);
+    }
+  });
+
+  it("keeps headers of a list without nesting as before", async () => {
+    await open(GROUPED.filter((o) => !("expandable" in o) && !("parentValue" in o)));
+    await search("by");
+    expect(listText()).toContain("Data group");
+    expect(listText()).not.toContain("Time group");
+    expect(optionValues()).toEqual(["bytes"]);
+  });
+});

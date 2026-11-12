@@ -16,6 +16,7 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import oncallService, { RESPONSE_PAGE_LIMIT } from "./oncall";
 import { incidentKeys } from "./incidents.querykeys";
+import { oneAckScopes } from "./alerts.querykeys";
 import { oncallKeys } from "./oncall.querykeys";
 import {
   LIVE_STALE_TIME,
@@ -27,6 +28,7 @@ import type {
   Contact,
   CoverageGaps,
   EscalationProgress,
+  EscalationProgressEntry,
   MyDeliveries,
   MyOnCall,
   OnCallPolicy,
@@ -35,6 +37,7 @@ import type {
   OnCallResponseReport,
   OnCallSchedule,
   OnCallTeam,
+  OnCallTeamContext,
   OnCallTeamMember,
   Override,
   OwnershipRule,
@@ -44,11 +47,15 @@ import type {
   Rotation,
   PutTelephonyBody,
   RoutingConfig,
+  SetTeamChannelBody,
   TeamLoad,
+  TelephonyStatus,
   TelephonyView,
   TeamOverview,
   Unavailability,
 } from "@/ts/interfaces/oncall";
+import { holderStretches } from "@/utils/oncall";
+import type { OncallTeamRoom } from "@/utils/slackAppDestination";
 
 /// Derived from the service so a new filter cannot silently fall out of the key.
 type ResponseFilters = Omit<Parameters<typeof oncallService.listResponses>[0], "org_identifier">;
@@ -65,6 +72,29 @@ export const oncallTeamsQuery = (org: string) =>
     queryKey: oncallKeys.teams(org),
     queryFn: async (): Promise<OnCallTeam[]> =>
       (await oncallService.listTeams({ org_identifier: org })).data ?? [],
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+/** Each team's room destinations; only the Slack app form reads it, so the per-team reads stay off the common path. */
+export const oncallTeamRoomsQuery = (org: string) =>
+  queryOptions({
+    queryKey: oncallKeys.teamRooms(org),
+    queryFn: async (): Promise<OncallTeamRoom[]> => {
+      const teams = (await oncallService.listTeams({ org_identifier: org })).data ?? [];
+      return Promise.all(
+        teams.map(async (team) => {
+          const res = await oncallService.getTeamChannel({
+            org_identifier: org,
+            team_id: team.id,
+          });
+          return {
+            team_id: team.id,
+            team_name: team.name,
+            destinations: res.data?.destinations ?? [],
+          };
+        }),
+      );
+    },
     staleTime: NORMAL_STALE_TIME,
   });
 
@@ -134,6 +164,21 @@ export const whoIsOnCallQuery = (org: string, teamId: string, at?: number) =>
     staleTime: LIVE_STALE_TIME,
   });
 
+/** Carries each team's rotation, which handovers move, so it takes the live tier like `whoIsOnCallQuery`. */
+export const teamContextQuery = (org: string, teamIds: string[], includeMine: boolean) =>
+  queryOptions({
+    queryKey: oncallKeys.teamContext(org, teamIds, includeMine),
+    queryFn: async (): Promise<OnCallTeamContext[]> =>
+      (
+        await oncallService.teamContext({
+          org_identifier: org,
+          team_ids: teamIds,
+          include_mine: includeMine,
+        })
+      ).data?.teams ?? [],
+    staleTime: LIVE_STALE_TIME,
+  });
+
 /** Mixes the ladder (config) with `covered_now`, so it follows the live half. */
 export const teamOverviewQuery = (org: string, teamId: string) =>
   queryOptions({
@@ -190,14 +235,40 @@ export const resolvedScheduleQuery = (
 ) =>
   queryOptions({
     queryKey: oncallKeys.resolvedSchedule(org, teamId, from, to, rotationId),
+    // Readers ask where the holder changes; the server also cuts where the roster under a cover does.
+    queryFn: async (): Promise<ResolvedSegment[]> =>
+      holderStretches(
+        (
+          await oncallService.resolvedSchedule({
+            org_identifier: org,
+            team_id: teamId,
+            from,
+            to,
+            rotation_id: rotationId,
+          })
+        ).data ?? [],
+      ),
+    staleTime: MEDIUM_STALE_TIME,
+  });
+
+/** The drawer's preview of an unsaved rotation, resolved by the server exactly as the calendar will be. */
+export const resolvedSchedulePreviewQuery = (
+  org: string,
+  teamId: string,
+  rotation: Rotation,
+  from: number,
+  to: number,
+) =>
+  queryOptions({
+    queryKey: oncallKeys.resolvedSchedulePreview(org, teamId, from, to, rotation),
     queryFn: async (): Promise<ResolvedSegment[]> =>
       (
-        await oncallService.resolvedSchedule({
+        await oncallService.previewResolvedSchedule({
           org_identifier: org,
           team_id: teamId,
+          rotation,
           from,
           to,
-          rotation_id: rotationId,
         })
       ).data ?? [],
     staleTime: MEDIUM_STALE_TIME,
@@ -285,6 +356,20 @@ export const responseProgressQuery = (org: string, responseId: string) =>
     queryFn: async (): Promise<EscalationProgress | null> =>
       (await oncallService.escalationProgress({ org_identifier: org, response_id: responseId }))
         .data ?? null,
+    staleTime: LIVE_STALE_TIME,
+  });
+
+/** The batch form of `responseProgressQuery`, for a list of open pages. */
+export const responsesProgressQuery = (org: string, responseIds: string[]) =>
+  queryOptions({
+    queryKey: oncallKeys.responsesProgress(org, responseIds),
+    queryFn: async (): Promise<EscalationProgressEntry[]> =>
+      (
+        await oncallService.escalationProgressBatch({
+          org_identifier: org,
+          response_ids: responseIds,
+        })
+      ).data?.progress ?? [],
     staleTime: LIVE_STALE_TIME,
   });
 
@@ -421,6 +506,15 @@ export const telephonyQuery = (org: string) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
+/** A live Twilio check, so it is stale at once and re-asked each time the page opens. */
+export const telephonyStatusQuery = (org: string) =>
+  queryOptions({
+    queryKey: oncallKeys.telephonyStatus(org),
+    queryFn: async (): Promise<TelephonyStatus> =>
+      (await oncallService.getTelephonyStatus({ org_identifier: org })).data,
+    staleTime: 0,
+  });
+
 export const unavailabilityQuery = (org: string, userEmail?: string, from?: number, to?: number) =>
   queryOptions({
     queryKey: oncallKeys.unavailability(org, userEmail, from, to),
@@ -446,6 +540,7 @@ export const unavailabilityQuery = (org: string, userEmail?: string, from?: numb
  */
 const teamWriteScopes = (org: string, teamId: string) => [
   oncallKeys.team(org, teamId),
+  oncallKeys.teamContextAll(org),
   oncallKeys.coverageGaps(org),
   oncallKeys.myAll(org),
 ];
@@ -504,10 +599,18 @@ export const removeTeamMemberMutation = (org: string, teamId: string) =>
     meta: { invalidates: teamWriteScopes(org, teamId), silentError: true },
   });
 
+/// Every client schedule write is a human's, so none of it is the untouched default; one place, so no caller can forget.
 export const setTeamScheduleMutation = (org: string, teamId: string) =>
   mutationOptions({
     mutationFn: (data: { timezone: string; rotations: Rotation[] }) =>
-      oncallService.setSchedule({ org_identifier: org, team_id: teamId, data }),
+      oncallService.setSchedule({
+        org_identifier: org,
+        team_id: teamId,
+        data: {
+          ...data,
+          rotations: data.rotations.map((rotation) => ({ ...rotation, source: undefined })),
+        },
+      }),
     meta: { invalidates: teamWriteScopes(org, teamId), silentError: true },
   });
 
@@ -524,18 +627,27 @@ export const setTeamPolicyMutation = (org: string, teamId: string) =>
     mutationFn: (data: Parameters<typeof oncallService.setPolicy>[0]["data"]) =>
       oncallService.setPolicy({ org_identifier: org, team_id: teamId, data }),
     // Rungs feed the overview, the dry run and the risk list; coverage is unmoved.
-    meta: { invalidates: [oncallKeys.team(org, teamId)], silentError: true },
+    meta: {
+      invalidates: [oncallKeys.team(org, teamId), oncallKeys.teamContextAll(org)],
+      silentError: true,
+    },
   });
 
 export const setTeamChannelMutation = (org: string, teamId: string) =>
   mutationOptions({
-    mutationFn: (destinations: string[] | null) =>
-      oncallService.setTeamChannel({
-        org_identifier: org,
-        team_id: teamId,
-        data: { destinations },
-      }),
-    meta: { invalidates: [oncallKeys.team(org, teamId)], silentError: true },
+    mutationFn: (data: SetTeamChannelBody) =>
+      oncallService.setTeamChannel({ org_identifier: org, team_id: teamId, data }),
+    meta: {
+      invalidates: [oncallKeys.team(org, teamId), oncallKeys.teamContextAll(org)],
+      silentError: true,
+    },
+  });
+
+/** RO-6: posts one plain message and writes no row, so it expires nothing. */
+export const testTeamSlackChannelMutation = (org: string, teamId: string) =>
+  mutationOptions({
+    mutationFn: () => oncallService.testTeamSlackChannel({ org_identifier: org, team_id: teamId }),
+    meta: { silentError: true },
   });
 
 export const createOverrideMutation = (org: string, teamId: string) =>
@@ -614,7 +726,25 @@ export const acknowledgeResponseMutation = (org: string) =>
   mutationOptions({
     mutationFn: (responseId: string) =>
       oncallService.acknowledgeResponse({ org_identifier: org, response_id: responseId }),
-    meta: { invalidates: responseWriteScopes(org), silentError: true },
+    meta: { invalidates: oneAckScopes(org), silentError: true },
+  });
+
+export const takeOverResponseMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (responseId: string) =>
+      oncallService.acknowledgeResponse({
+        org_identifier: org,
+        response_id: responseId,
+        take_over: true,
+      }),
+    meta: { invalidates: oneAckScopes(org), silentError: true },
+  });
+
+export const unacknowledgeResponseMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (responseId: string) =>
+      oncallService.unacknowledgeResponse({ org_identifier: org, response_id: responseId }),
+    meta: { invalidates: oneAckScopes(org), silentError: true },
   });
 
 /** The ladder resumes on its own when the snooze lapses — see the live tier on the reads. */
@@ -626,6 +756,13 @@ export const snoozeResponseMutation = (org: string) =>
         response_id: responseId,
         minutes,
       }),
+    meta: { invalidates: responseWriteScopes(org), silentError: true },
+  });
+
+export const unsnoozeResponseMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (responseId: string) =>
+      oncallService.unsnoozeResponse({ org_identifier: org, response_id: responseId }),
     meta: { invalidates: responseWriteScopes(org), silentError: true },
   });
 

@@ -24,6 +24,7 @@ import {
   docsReferrerSource,
   firstSourceOption,
   firstSourcePickRoute,
+  isFirstSourceLocked,
   prefillFirstSource,
   readFirstSource,
   readPrefill,
@@ -46,7 +47,7 @@ describe("firstSourceOptions", () => {
   });
 
   describe("FIRST_SOURCE_OPTIONS", () => {
-    it("lists the 11 options in the approved order", () => {
+    it("lists the 12 options in the approved order", () => {
       expect(FIRST_SOURCE_OPTIONS.map((o) => o.id)).toEqual([
         "kubernetes",
         "linux",
@@ -58,6 +59,7 @@ describe("firstSourceOptions", () => {
         "rum",
         "llm",
         "agent",
+        "sample",
         "unsure",
       ]);
     });
@@ -74,11 +76,12 @@ describe("firstSourceOptions", () => {
         "Browser (RUM)",
         "LLM or AI app",
         "Let an AI agent set it up",
+        "Explore sample data",
         "Not sure yet",
       ]);
     });
 
-    it("maps each option to its guide route, Not sure yet to none", () => {
+    it("maps each option to its guide route, sample data and Not sure yet to none", () => {
       expect(Object.fromEntries(FIRST_SOURCE_OPTIONS.map((o) => [o.id, o.route]))).toEqual({
         kubernetes: "ingestFromKubernetes",
         linux: "ingestFromLinux",
@@ -90,6 +93,7 @@ describe("firstSourceOptions", () => {
         rum: "frontendMonitoring",
         llm: "ai-integrations",
         agent: "recommendedMcp",
+        sample: undefined,
         unsure: undefined,
       });
     });
@@ -253,9 +257,11 @@ describe("firstSourceOptions", () => {
       expect(readFirstSource("")).toBeUndefined();
     });
 
-    it("gives the pick's guide route, and none for Not sure yet or no pick", () => {
+    it("gives the pick's guide route, and none for sample data, Not sure yet or no pick", () => {
       writeFirstSource("acme", "webserver");
       expect(firstSourcePickRoute("acme")).toBe("nginx");
+      writeFirstSource("acme", "sample");
+      expect(firstSourcePickRoute("acme")).toBeUndefined();
       writeFirstSource("acme", "unsure");
       expect(firstSourcePickRoute("acme")).toBeUndefined();
       expect(firstSourcePickRoute("other")).toBeUndefined();
@@ -273,5 +279,18 @@ describe("firstSourceOptions", () => {
     expect(firstSourceOption("agent")?.route).toBe("recommendedMcp");
     expect(firstSourceOption("missing")).toBeUndefined();
     expect(firstSourceOption(null)).toBeUndefined();
+  });
+
+  it("locks the agent and RUM options only while their feature is license-locked", () => {
+    const agent = firstSourceOption("agent")!;
+    const rum = firstSourceOption("rum")!;
+    const linux = firstSourceOption("linux")!;
+    const locked = { mcp: "locked", rum: "locked" } as const;
+
+    expect(isFirstSourceLocked(agent, locked)).toBe(true);
+    expect(isFirstSourceLocked(rum, locked)).toBe(true);
+    expect(isFirstSourceLocked(linux, locked)).toBe(false);
+    expect(isFirstSourceLocked(agent, { mcp: "enabled" })).toBe(false);
+    expect(isFirstSourceLocked(agent, undefined)).toBe(false);
   });
 });

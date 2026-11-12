@@ -17,6 +17,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { b64EncodeUnicode, useLocalLogFilterField } from "@/utils/zincutils";
 import { canvasFont } from "@/utils/fonts";
+import { featureState } from "@/utils/featureGate";
 
 import {
   encodeVisualizationConfig,
@@ -49,6 +50,7 @@ import {
   type ShownInputs,
 } from "@/composables/useLogs/useLogsUrl";
 import { activePermalink, columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
+import { resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
 
 interface SQLColumn {
   expr?: {
@@ -201,6 +203,9 @@ export const logsUtils = () => {
       console.error("Invalid period: must be a non-empty string");
       return undefined;
     }
+
+    const calendar = resolveCalendarPeriod(period);
+    if (calendar) return { from: calendar.startTime / 1000, to: calendar.endTime / 1000 };
 
     const currentTime = new Date();
     const toTimestamp = currentTime.getTime();
@@ -527,11 +532,14 @@ export const logsUtils = () => {
     query["quick_mode"] = inputs.quickMode;
     query["show_histogram"] = searchObj.meta.showHistogram;
 
-    if (store.state.zoConfig?.super_cluster_enabled && inputs.regions.length) {
+    const superCluster =
+      store.state.zoConfig?.super_cluster_enabled &&
+      featureState(store.state.zoConfig?.features, "super_cluster") !== "locked";
+    if (superCluster && inputs.regions.length) {
       query["regions"] = inputs.regions.join(",");
     }
 
-    if (store.state.zoConfig?.super_cluster_enabled && inputs.clusters.length) {
+    if (superCluster && inputs.clusters.length) {
       query["clusters"] = inputs.clusters.join(",");
     }
 
@@ -586,7 +594,11 @@ export const logsUtils = () => {
   const isLogsRoute = () => router?.currentRoute.value?.name === "logs";
 
   const dropTransientType = (query: any) => {
-    if (query.type === "search_history_re_apply" || query.type === "search_scheduler") {
+    if (
+      query.type === "search_history_re_apply" ||
+      query.type === "search_scheduler" ||
+      query.type === "rca_evidence_query"
+    ) {
       delete query.type;
     }
   };

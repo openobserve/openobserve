@@ -20,6 +20,7 @@
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
+const { openNavFlyoutChild } = require('../../pages/commonActions.js');
 const testLogger = require('../utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
@@ -184,7 +185,7 @@ test.describe('IAM · User Groups', { tag: '@enterprise' }, () => {
         // probe silently turns a slow render into a skip, and the run still reports green.
         const { status } = await req(page, 'GET', '/groups');
         test.skip(status >= 400, 'RBAC is off (OSS build)');
-        await page.locator('[data-test="menu-link-\\/iam-item"]').click();
+        await openNavFlyoutChild(page, 'iam');
         await pm.groupsPage.groupsTab.waitFor({ state: 'visible', timeout: 30000 });
     });
 

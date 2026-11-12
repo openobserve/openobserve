@@ -19,6 +19,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        alerts::auto_investigate::DecisionRow,
         self_reporting::{
             EnqueueError, ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
             error::ErrorData,
@@ -132,6 +133,16 @@ pub fn publish_triggers_usage(trigger: TriggerData) {
                  Self-reporting service may have shut down."
             );
         }
+    }
+}
+
+/// Logs one auto-investigate gate decision to `_meta`; unconditional, like trigger records.
+pub fn publish_auto_investigate_decision(row: DecisionRow) {
+    let (org, alert_id) = (row.org_id.clone(), row.alert_id.clone());
+    if let Err(e) = try_enqueue(ReportingData::AutoInvestigateDecision(Box::new(row))) {
+        log::warn!(
+            "[SELF-REPORTING] dropped the auto-investigate decision for {org}/{alert_id}: {e}"
+        );
     }
 }
 
@@ -526,9 +537,10 @@ fn decrement_queue_depth(batch: &[ReportingData]) {
 fn count_data(data: &[ReportingData]) -> (i64, i64) {
     // Redaction rides the usage queue, so it must be counted against that depth gauge.
     data.iter().fold((0, 0), |(usage, error), item| match item {
-        ReportingData::Usage(_) | ReportingData::Trigger(_) | ReportingData::Redaction(_) => {
-            (usage + 1, error)
-        }
+        ReportingData::Usage(_)
+        | ReportingData::Trigger(_)
+        | ReportingData::Redaction(_)
+        | ReportingData::AutoInvestigateDecision(_) => (usage + 1, error),
         ReportingData::Error(_) => (usage, error + 1),
     })
 }
@@ -585,7 +597,7 @@ mod tests {
     use config::meta::{
         self_reporting::{
             error::ErrorData,
-            usage::{RunOutcome, TriggerData, TriggerDataType},
+            usage::{TriggerData, TriggerDataType},
         },
         stream::StreamParams,
     };
@@ -639,44 +651,9 @@ mod tests {
             module: TriggerDataType::Report,
             key: "test-key".to_string(),
             next_run_at: 1234567890,
-            is_realtime: false,
-            is_silenced: false,
-            status: RunOutcome::Succeeded,
             start_time: 1234567890,
             end_time: 1234567890,
-            retries: 0,
-            skipped_alerts_count: None,
-            error: None,
-            success_response: None,
-            is_partial: None,
-            delay_in_secs: None,
-            evaluation_took_in_secs: None,
-            source_node: None,
-            query_took: None,
-            scheduler_trace_id: None,
-            time_in_queue_ms: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
-            grouped: None,
-            group_size: None,
-            actual_value: None,
-            rule_value: None,
-            threshold_value: None,
-            threshold_operator: None,
-            level: None,
-            group_label: None,
-            value_is_lower_bound: None,
-            synthetics_error_source: None,
-            synthetics_location: None,
-            downtime_id: None,
-            delivery_attempted: None,
-            trigger_source: None,
-            triggered_by: None,
-            recipient_count: None,
-            attachment_type: None,
-            dashboard_count: None,
-            scheduled_for: None,
+            ..Default::default()
         }
     }
 

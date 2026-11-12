@@ -59,18 +59,6 @@ describe("opsgenie template", () => {
       expect(opsgenieConfig.method).toBe("post");
     });
 
-    it("has URL validator", () => {
-      expect(typeof opsgenieConfig.urlValidator).toBe("function");
-    });
-
-    it("validates Opsgenie URLs", () => {
-      expect(opsgenieConfig.urlValidator("https://api.opsgenie.com/v2/alerts")).toBe(true);
-      expect(opsgenieConfig.urlValidator("https://api.eu.opsgenie.com/v2/alerts")).toBe(true);
-      expect(opsgenieConfig.urlValidator("https://example.com")).toBe(false);
-      expect(opsgenieConfig.urlValidator("https://api.opsgenie.com/v2/other")).toBe(false);
-      expect(opsgenieConfig.urlValidator("invalid-url")).toBe(false);
-    });
-
     it("API key validator validates key length", () => {
       const apiKeyField = opsgenieConfig.credentialFields.find((f) => f.key === "apiKey");
       const validator = apiKeyField?.validator;

@@ -15,10 +15,14 @@
 
 import http from "./http";
 
+export type ProfileFilterOp = "=" | "!=" | "=~" | "!~" | "in" | "not_in";
+
 export interface ProfileFilter {
   key: string;
-  op: "=";
+  op: ProfileFilterOp;
   value: string;
+  /** The list for `in` / `not_in`. */
+  values?: string[];
 }
 
 export interface ProfileTypeMeta {
@@ -37,6 +41,16 @@ export interface ProfilesMetaResponse {
 export interface ProfilesSeriesPoint {
   timestamp: number;
   value: number;
+  /** Value per second of profiled time; absent when the profiles carry no covered time (memory, older data). */
+  rate?: number | null;
+}
+
+export interface ProfilesSeriesGroup {
+  value: string;
+  total: number;
+  /** The values past `group_limit`, summed into one line. */
+  others: boolean;
+  series: ProfilesSeriesPoint[];
 }
 
 export interface ProfilesSeriesResponse {
@@ -44,6 +58,8 @@ export interface ProfilesSeriesResponse {
   profile_type: string;
   step_secs: number;
   series: ProfilesSeriesPoint[];
+  /** One line per value of `group_by`, heaviest first. */
+  groups?: ProfilesSeriesGroup[] | null;
   took: number;
 }
 
@@ -66,8 +82,40 @@ export interface ProfilesMergeResponse {
   total: number;
   merged_total: number;
   truncated: boolean;
+  /** The server folded small call paths into "other" to keep the tree under max_nodes. */
+  tree_truncated?: boolean;
   root: ProfilesTreeNode;
   top: ProfilesTopRow[];
+  took: number;
+}
+
+export interface ProfilesDiffNode {
+  name: string;
+  /** Comparison side. */
+  total: number;
+  self: number;
+  before_total: number;
+  before_self: number;
+  children?: ProfilesDiffNode[];
+}
+
+export interface ProfilesDiffTopRow {
+  name: string;
+  before_self: number;
+  before_total: number;
+  after_self: number;
+  after_total: number;
+}
+
+export interface ProfilesDiffResponse {
+  unit: string;
+  profile_type: string;
+  baseline_total: number;
+  comparison_total: number;
+  truncated: boolean;
+  tree_truncated?: boolean;
+  root: ProfilesDiffNode;
+  top: ProfilesDiffTopRow[];
   took: number;
 }
 
@@ -82,6 +130,9 @@ export interface ProfilesQueryBody {
   step?: string;
   max_nodes?: number;
   timeout?: number;
+  /** A label to draw one series per value of. */
+  group_by?: string;
+  group_limit?: number;
 }
 
 const decodeFilterPart = (part: string) => {
@@ -93,23 +144,54 @@ const decodeFilterPart = (part: string) => {
   }
 };
 
-/** Encodes filters as the backend's `k=v,k2=v2`, percent-encoding each side so a comma inside a value is not a pair separator. */
+/** Encodes the equality filters as the backend's GET `k=v,k2=v2`, which has no other operator; each side is percent-encoded. */
 export const encodeProfileFilters = (filters: ProfileFilter[]): string =>
   filters
     .filter((f) => f.key && f.value && f.op === "=")
     .map((f) => `${encodeURIComponent(f.key)}=${encodeURIComponent(f.value)}`)
     .join(",");
 
+const ROUTE_OPS: Record<string, ProfileFilterOp> = {
+  neq: "!=",
+  re: "=~",
+  nre: "!~",
+  in: "in",
+  nin: "not_in",
+};
+
+/** The page URL's filters: `k=v` for equality, `op:k=v` otherwise, a list's items joined with `|`; `:` and `|` are percent-encoded inside each part. */
+export const encodeProfileRouteFilters = (filters: ProfileFilter[]): string =>
+  filters
+    .map((f) => {
+      const prefix = Object.keys(ROUTE_OPS).find((k) => ROUTE_OPS[k] === f.op);
+      const value = f.values?.length
+        ? f.values.map(encodeURIComponent).join("|")
+        : encodeURIComponent(f.value);
+      if (!f.key || !value) return "";
+      return `${prefix ? `${prefix}:` : ""}${encodeURIComponent(f.key)}=${value}`;
+    })
+    .filter(Boolean)
+    .join(",");
+
 export const parseProfileFilters = (raw: string): ProfileFilter[] =>
   raw
     .split(",")
-    .map((pair) => pair.split("="))
-    .filter(([key, value]) => key && value)
-    .map(([key, value]) => ({
-      key: decodeFilterPart(key),
-      op: "=" as const,
-      value: decodeFilterPart(value),
-    }));
+    .map((pair) => {
+      const [head = "", value = ""] = pair.split("=");
+      const colon = head.indexOf(":");
+      const prefixed = colon > 0 ? ROUTE_OPS[head.slice(0, colon)] : undefined;
+      // Older links carry an unencoded `:` inside the key (k8s:pod=x), so an unknown prefix is part of it.
+      if (!prefixed) return { key: head, op: "=" as ProfileFilterOp, value };
+      return { key: head.slice(colon + 1), op: prefixed, value };
+    })
+    .filter(({ key, op, value }) => key && op && value)
+    .map(({ key, op, value }): ProfileFilter => {
+      if (op === "in" || op === "not_in") {
+        const values = value.split("|").map(decodeFilterPart).filter(Boolean);
+        return { key: decodeFilterPart(key), op, value: "", values };
+      }
+      return { key: decodeFilterPart(key), op, value: decodeFilterPart(value) };
+    });
 
 const appendProfilesQuery = (
   query: URLSearchParams,
@@ -135,7 +217,7 @@ const profiles = {
   meta: (
     orgIdentifier: string,
     streamName: string,
-    payload: Pick<ProfilesQueryBody, "start_time" | "end_time" | "timeout">,
+    payload: Pick<ProfilesQueryBody, "start_time" | "end_time" | "timeout" | "service_name">,
   ) => {
     const query = new URLSearchParams();
     appendProfilesQuery(query, payload);
@@ -165,6 +247,18 @@ const profiles = {
   ) =>
     http().post<ProfilesMergeResponse>(
       `/api/${orgIdentifier}/${encodeURIComponent(streamName)}/profiles/merge`,
+      payload,
+      options,
+    ),
+
+  diff: (
+    orgIdentifier: string,
+    streamName: string,
+    payload: { baseline: ProfilesQueryBody; comparison: ProfilesQueryBody; max_nodes?: number },
+    options: { signal?: AbortSignal } = {},
+  ) =>
+    http().post<ProfilesDiffResponse>(
+      `/api/${orgIdentifier}/${encodeURIComponent(streamName)}/profiles/diff`,
       payload,
       options,
     ),

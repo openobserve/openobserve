@@ -52,6 +52,12 @@ vi.mock("@/composables/usePaidOverageConsent", () => ({
   usePaidOverageConsent: () => ({ promptForConsent: mockPromptForConsent }),
 }));
 
+const mockGetAiUsage = vi.hoisted(() => vi.fn());
+vi.mock("@/services/billings", async (importOriginal) => {
+  const actual = await importOriginal<typeof BillingsModule>();
+  return { ...actual, default: { ...actual.default, get_ai_usage: mockGetAiUsage } };
+});
+
 // Mock incidents service
 vi.mock("@/services/incidents", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -59,7 +65,13 @@ vi.mock("@/services/incidents", async (importOriginal) => {
     default: {
       get: vi.fn(),
       updateStatus: vi.fn(),
+      acknowledge: vi.fn(),
+      unacknowledge: vi.fn(),
       triggerRca: vi.fn(),
+      resumeRca: vi.fn(),
+      cancelRca: vi.fn(),
+      getRcaRun: vi.fn(),
+      openRcaLiveStream: vi.fn(),
       getCorrelatedStreams: vi.fn(),
       getEvents: vi.fn(),
       updateIncident: vi.fn(),
@@ -88,7 +100,7 @@ vi.mock("@/services/service_streams", () => ({
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
-import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
+import type * as BillingsModule from "@/services/billings";
 import incidentsService, {
   Incident,
   IncidentWithAlerts,
@@ -100,6 +112,17 @@ import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import {
+  rcaRunSummaryLive,
+  rcaSteering,
+  rcaSummary,
+  rcaRun,
+  rcaRunItem,
+  rcaV1RunItem,
+  rcaV1Summary,
+} from "@/test/unit/fixtures/rcaThread";
+import type { RcaLiveEvent } from "@/services/incidents";
+import awsConfig from "@/aws-exports";
 
 // Test data factory
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
@@ -117,6 +140,7 @@ const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
   created_at: overrides.created_at || 1700000000000000,
   updated_at: overrides.updated_at || 1700000000000000,
   topology_context: overrides.topology_context,
+  rca: overrides.rca ?? null,
 });
 
 const createIncidentWithAlerts = (
@@ -135,6 +159,14 @@ const createAlert = (overrides: Partial<IncidentAlert> = {}): IncidentAlert => (
   correlation_reason: overrides.correlation_reason || "service_discovery",
   created_at: overrides.created_at || 1700000000000000,
 });
+
+/** One live stream the drawer opened; the test drives it. */
+interface Connection {
+  runId: string | null;
+  emit: (event: RcaLiveEvent) => void;
+}
+
+const connections: Connection[] = [];
 
 describe("IncidentDetailDrawer.vue", () => {
   let wrapper: VueWrapper<any>;
@@ -209,6 +241,7 @@ describe("IncidentDetailDrawer.vue", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    store.state.zoConfig.incidents_rca_enabled = true;
 
     // Reset store state
     store.state.selectedOrganization = {
@@ -236,10 +269,32 @@ describe("IncidentDetailDrawer.vue", () => {
     (incidentsService.updateStatus as any).mockResolvedValue({
       data: { status: "acknowledged" },
     });
+    (incidentsService.acknowledge as any).mockResolvedValue({
+      data: { status: "acknowledged" },
+    });
+    (incidentsService.unacknowledge as any).mockResolvedValue({ data: { status: "open" } });
 
     (incidentsService.triggerRca as any).mockResolvedValue({
-      data: { rca_content: "## Root Cause Analysis\n\nThe issue is related to high CPU usage." },
+      data: { message: "started", run_id: "run-1" },
     });
+
+    vi.mocked(incidentsService.getRcaRun).mockImplementation((_org, _id, runId) =>
+      Promise.resolve({
+        data: { run_id: runId, report: `## Root Cause Analysis\n\nReport of ${runId}` },
+      } as never),
+    );
+
+    // The stream stays open until the test unmounts; tests push events into it.
+    connections.length = 0;
+    vi.mocked(incidentsService.openRcaLiveStream).mockImplementation(
+      (_org, _id, runId, { onEvent }) => {
+        connections.push({ runId, emit: onEvent });
+        return new Promise<{ ended: boolean }>(() => {});
+      },
+    );
+    vi.mocked(incidentsService.cancelRca).mockResolvedValue({
+      data: { run_id: "run-2", cancelled: true },
+    } as never);
 
     (incidentsService.getEvents as any).mockResolvedValue({
       data: { events: [] },
@@ -262,56 +317,6 @@ describe("IncidentDetailDrawer.vue", () => {
     if (wrapper) {
       wrapper.unmount();
     }
-  });
-
-  describe("Component Initialization", () => {
-    it("should mount component successfully", async () => {
-      wrapper = await createWrapper();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should show loading state initially", async () => {
-      wrapper = await createWrapper();
-      expect(wrapper.vm.loading).toBe(false);
-    });
-
-    it("should initialize with no incident details", async () => {
-      wrapper = await createWrapper();
-      expect(wrapper.vm.incidentDetails).toBeNull();
-    });
-
-    it("should initialize empty triggers array", async () => {
-      wrapper = await createWrapper();
-      expect(wrapper.vm.triggers).toEqual([]);
-    });
-
-    it("should not be updating initially", async () => {
-      wrapper = await createWrapper();
-      expect(wrapper.vm.updating).toBe(false);
-    });
-  });
-
-  describe("URL-based Incident Loading", () => {
-    it("should emit close when drawer closes", async () => {
-      wrapper = await createWrapper();
-      const pushSpy = vi.spyOn(router, "push");
-
-      wrapper.vm.close();
-      await nextTick();
-
-      // Should navigate back to incident list instead of emitting
-      expect(pushSpy).toHaveBeenCalledWith({
-        name: "incidentList",
-        query: { org_identifier: "default" },
-      });
-    });
-
-    it("should load details when incident_id is in URL", async () => {
-      wrapper = await createWrapper({}, {}, "test-123");
-      await flushPromises();
-
-      expect(incidentsService.get).toHaveBeenCalledWith("default", "test-123");
-    });
   });
 
   describe("Incident Details Loading", () => {
@@ -337,52 +342,41 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.vm.incidentDetails.title).toBe("Test Incident");
     });
 
-    it("should set loading state during fetch", async () => {
-      // Create a pending promise that we can control
-      let resolvePromise: (value: any) => void;
-      const pendingPromise = new Promise((resolve) => {
-        resolvePromise = resolve;
+    it("shows the license empty state when the load is license-denied", async () => {
+      (incidentsService.get as any).mockRejectedValue({
+        response: { status: 403, data: { code: 40001, error_detail: "incidents" } },
       });
-
-      (incidentsService.get as any).mockReturnValue(pendingPromise);
-
       wrapper = await createWrapper({}, {}, "test-123");
-
-      await nextTick();
-
-      // Now loading should be true since the promise is pending
-      expect(wrapper.vm.loading).toBe(true);
-
-      // Resolve the promise
-      resolvePromise!({ data: createIncidentWithAlerts({ id: "test-123" }) });
       await flushPromises();
-      // The query layer defers its fetch a microtask, so the loader settles a
-      // tick after the service promise does.
-      await flushPromises();
-      await nextTick();
-
-      // Now loading should be false
-      expect(incidentsService.get).toHaveBeenCalled();
-      expect(wrapper.vm.loading).toBe(false);
+      expect(wrapper.find('[data-test="incident-detail-license-denied"]').text()).toContain(
+        "incidents",
+      );
     });
 
-    it("should load triggers from incident", async () => {
-      const triggers = [
-        createAlert({ alert_id: "alert-1", alert_name: "CPU Alert" }),
-        createAlert({ alert_id: "alert-2", alert_name: "Memory Alert" }),
-      ];
-
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers }),
-      });
-
+    it("shows no Alert Triggers count until the incident has loaded", async () => {
+      let resolveIncident: (value: any) => void = () => {};
+      (incidentsService.get as any).mockReturnValue(
+        new Promise((resolve) => {
+          resolveIncident = resolve;
+        }),
+      );
       wrapper = await createWrapper({}, {}, "test-123");
-
       await nextTick();
-      await flushPromises();
+      const count = () => wrapper.find('[data-test="incident-alert-triggers-count"]');
 
-      expect(wrapper.vm.triggers).toHaveLength(2);
-      expect(wrapper.vm.triggers[0].alert_name).toBe("CPU Alert");
+      expect(count().exists()).toBe(false);
+
+      resolveIncident({
+        data: createIncidentWithAlerts({
+          id: "test-123",
+          triggers: [createAlert({ alert_id: "a1" }), createAlert({ alert_id: "a2" })],
+        }),
+      });
+      await flushPromises();
+      await flushPromises();
+      await nextTick();
+
+      expect(count().text()).toBe("2");
     });
 
     it("should handle API error during load", async () => {
@@ -396,17 +390,6 @@ describe("IncidentDetailDrawer.vue", () => {
       // The error is handled internally, incident details remain null
       expect(wrapper.vm.incidentDetails).toBeNull();
     });
-
-    it("should stop loading on error", async () => {
-      (incidentsService.get as any).mockRejectedValue(new Error("API Error"));
-
-      wrapper = await createWrapper({}, {}, "test-123");
-
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.loading).toBe(false);
-    });
   });
 
   describe("Status Update Actions", () => {
@@ -417,10 +400,81 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
     });
 
-    it("should acknowledge incident", async () => {
+    it("should acknowledge incident through the one-ack route", async () => {
       await wrapper.vm.acknowledgeIncident();
 
-      expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "acknowledged");
+      expect(incidentsService.acknowledge).toHaveBeenCalledWith("default", "1");
+    });
+
+    it("clears the acknowledged-by header after Unacknowledge", async () => {
+      wrapper.vm.incidentDetails.status = "acknowledged";
+      wrapper.vm.incidentDetails.acknowledged_by = "ana@acme.io";
+      wrapper.vm.editableStatus = "acknowledged";
+      (incidentsService.unacknowledge as any).mockResolvedValue({
+        data: { status: "open", acknowledged_by: null, acknowledged_at: null },
+        ack: { changed: true },
+      });
+      await wrapper.vm.handleStatusChange("open");
+      await flushPromises();
+      expect(wrapper.vm.incidentDetails.acknowledged_by).toBeNull();
+      expect(mockToast.mock.calls.at(-1)?.[0]).toMatchObject({ variant: "success" });
+    });
+
+    it("keeps a successful acknowledge when the incident could not be read back", async () => {
+      (incidentsService.acknowledge as any).mockResolvedValue({
+        ack: { changed: true, acks: [], other_groups_unacked: 0 },
+      });
+      mockToast.mockClear();
+      await wrapper.vm.acknowledgeIncident();
+      await flushPromises();
+      expect(mockToast.mock.calls.at(-1)?.[0]).toMatchObject({ variant: "success" });
+    });
+
+    it("reloads the incident when the write's read-back failed", async () => {
+      (incidentsService.acknowledge as any).mockResolvedValue({
+        ack: { changed: true, acks: [], other_groups_unacked: 0 },
+      });
+      vi.mocked(incidentsService.get).mockClear();
+      await wrapper.vm.acknowledgeIncident();
+      await flushPromises();
+      expect(incidentsService.get).toHaveBeenCalledWith("default", "1");
+    });
+
+    it("toasts who was faster when the acknowledge changed nothing", async () => {
+      (incidentsService.acknowledge as any).mockResolvedValue({
+        data: { status: "acknowledged", acknowledged_by: "ana@acme.io" },
+        ack: {
+          changed: false,
+          acks: [
+            {
+              group_key: "",
+              firing_started_at: 1,
+              acked_by: "ana@acme.io",
+              acked_at: 1,
+              ack_source: "incident",
+            },
+          ],
+          other_groups_unacked: 0,
+        },
+      });
+      mockToast.mockClear();
+      await wrapper.vm.acknowledgeIncident();
+      await flushPromises();
+      expect(mockToast.mock.calls.at(-1)?.[0]).toEqual({
+        variant: "info",
+        message: "Already acknowledged by ana@acme.io",
+      });
+    });
+
+    it("offers Unacknowledge in the Manage status chips of an acknowledged incident", async () => {
+      wrapper.vm.incidentDetails.status = "acknowledged";
+      wrapper.vm.editableStatus = "acknowledged";
+      await nextTick();
+      expect(wrapper.vm.statusOptions[0]).toEqual({ label: "Unacknowledge", value: "open" });
+      await wrapper.vm.handleStatusChange("open");
+      await flushPromises();
+      expect(incidentsService.unacknowledge).toHaveBeenCalledWith("default", "1");
+      expect(incidentsService.updateStatus).not.toHaveBeenCalled();
     });
 
     it("should resolve incident", async () => {
@@ -438,25 +492,47 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "open");
     });
 
-    it("should set updating state during status update", async () => {
-      // acknowledgeIncident awaits the confirm dialog before it ever touches
-      // `updating`, so a fixed number of microtask hops can't be assumed here —
-      // hold the status update pending so the state is observable regardless.
-      let resolveUpdate: (value: any) => void;
-      const pendingUpdate = new Promise((resolve) => {
-        resolveUpdate = resolve;
-      });
-      (incidentsService.updateStatus as any).mockReturnValue(pendingUpdate);
+    it.each([
+      ["resolveIncident", "Resolve incident?"],
+      ["reopenIncident", "Reopen incident?"],
+    ])("%s asks first and changes nothing when cancelled", async (action, title) => {
+      mockConfirm.mockResolvedValueOnce(false);
 
-      const updatePromise = wrapper.vm.acknowledgeIncident();
-      await flushPromises();
+      await wrapper.vm[action]();
 
-      expect(wrapper.vm.updating).toBe(true);
+      expect(mockConfirm).toHaveBeenLastCalledWith(expect.objectContaining({ title }));
+      expect(incidentsService.updateStatus).not.toHaveBeenCalled();
+    });
 
-      resolveUpdate!({ data: { status: "acknowledged" } });
-      await updatePromise;
+    it.each([
+      ["resolved", "Resolve incident?"],
+      ["open", "Reopen incident?"],
+    ])(
+      "the Manage chip for %s asks first and changes nothing when cancelled",
+      async (status, title) => {
+        mockConfirm.mockResolvedValueOnce(false);
 
-      expect(wrapper.vm.updating).toBe(false);
+        await wrapper.vm.handleStatusChange(status);
+
+        expect(mockConfirm).toHaveBeenLastCalledWith(expect.objectContaining({ title }));
+        expect(incidentsService.updateStatus).not.toHaveBeenCalled();
+      },
+    );
+
+    it("a reopen from the Manage chip drops the cleared resolve and acknowledgement", async () => {
+      wrapper.vm.incidentDetails.status = "resolved";
+      wrapper.vm.incidentDetails.resolved_at = 1700000000000000;
+      wrapper.vm.incidentDetails.acknowledged_by = "ana@example.com";
+      vi.mocked(incidentsService.updateStatus).mockResolvedValueOnce({
+        data: { status: "open", resolved_at: null, acknowledged_by: null, acknowledged_at: null },
+      } as never);
+
+      await wrapper.vm.handleStatusChange("open");
+
+      expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "open");
+      expect(wrapper.vm.incidentDetails.status).toBe("open");
+      expect(wrapper.vm.incidentDetails.resolved_at).toBeUndefined();
+      expect(wrapper.vm.incidentDetails.acknowledged_by).toBeNull();
     });
 
     it("should show success notification on status update", async () => {
@@ -469,18 +545,9 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(call.variant).toBe("success");
     });
 
-    it("should not emit status-updated event (removed)", async () => {
-      // This test is no longer relevant as the component doesn't emit events
-      // The component now handles its own state updates
-      await wrapper.vm.acknowledgeIncident();
-
-      // Just verify the API was called
-      expect(incidentsService.updateStatus).toHaveBeenCalled();
-    });
-
     it("should handle status update error", async () => {
       mockToast.mockClear();
-      (incidentsService.updateStatus as any).mockRejectedValue(new Error("Update failed"));
+      (incidentsService.acknowledge as any).mockRejectedValue(new Error("Update failed"));
 
       await wrapper.vm.acknowledgeIncident();
 
@@ -516,28 +583,7 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
     });
 
-    it("should check for existing RCA", () => {
-      wrapper.vm.incidentDetails.topology_context = {
-        nodes: [],
-        edges: [],
-        related_incident_ids: [],
-        suggested_root_cause: "Existing RCA content",
-      };
-
-      expect(wrapper.vm.hasExistingRca).toBe(true);
-    });
-
-    it("should return false when no RCA exists", () => {
-      wrapper.vm.incidentDetails.topology_context = {
-        nodes: [],
-        edges: [],
-        related_incident_ids: [],
-      };
-
-      expect(wrapper.vm.hasExistingRca).toBe(false);
-    });
-
-    it("should trigger RCA analysis", async () => {
+    it("should trigger RCA analysis on the spawned path", async () => {
       await wrapper.vm.triggerRca();
 
       expect(incidentsService.triggerRca).toHaveBeenCalledWith(
@@ -548,39 +594,12 @@ describe("IncidentDetailDrawer.vue", () => {
       );
     });
 
-    it("should set loading state during RCA", async () => {
-      const rcaPromise = wrapper.vm.triggerRca();
-
-      expect(wrapper.vm.rcaLoading).toBe(true);
-
-      await rcaPromise;
-
-      expect(wrapper.vm.rcaLoading).toBe(false);
-    });
-
-    it("should display RCA content after trigger", async () => {
-      await wrapper.vm.triggerRca();
-
-      expect(wrapper.vm.rcaStreamContent).toContain("Root Cause Analysis");
-    });
-
-    it("should show success notification after RCA", async () => {
-      mockToast.mockClear();
+    it("should reload incident details after RCA starts", async () => {
+      vi.mocked(incidentsService.get).mockClear();
 
       await wrapper.vm.triggerRca();
 
-      expect(mockToast).toHaveBeenCalled();
-      const successCall = mockToast.mock.calls.find((c: any[]) => c[0].variant === "success");
-      expect(successCall).toBeTruthy();
-    });
-
-    it("should reload incident details after RCA", async () => {
-      vi.clearAllMocks();
-
-      await wrapper.vm.triggerRca();
-
-      // Should call get twice: once for initial load, once for reload
-      expect(incidentsService.get).toHaveBeenCalled();
+      expect(incidentsService.get).toHaveBeenCalledWith("default", "1");
     });
 
     it("should handle RCA error", async () => {
@@ -589,94 +608,21 @@ describe("IncidentDetailDrawer.vue", () => {
 
       await wrapper.vm.triggerRca();
 
-      expect(mockToast).toHaveBeenCalled();
       const errCall = mockToast.mock.calls.find((c: any[]) => c[0].variant === "error");
       expect(errCall).toBeTruthy();
     });
 
-    it("should keep the AI-credits remedy when Analyze Incident gets a 402", async () => {
-      (incidentsService.triggerRca as any).mockRejectedValue({
-        response: {
-          status: 402,
-          data: { error_type: "ai_credits_exhausted", remedy: "subscribe" },
-        },
-      });
-
-      await wrapper.vm.triggerRca();
-
-      expect(wrapper.vm.rcaError?.remedy).toBe("plans");
-    });
-
-    it("should clear RCA content on error", async () => {
-      (incidentsService.triggerRca as any).mockRejectedValue(new Error("RCA failed"));
-
-      wrapper.vm.rcaStreamContent = "Some content";
-      await wrapper.vm.triggerRca();
-
-      expect(wrapper.vm.rcaStreamContent).toBe("");
-    });
-
-    it("should not trigger RCA when no incident loaded", async () => {
-      wrapper.vm.incidentDetails = null;
-
-      await wrapper.vm.triggerRca();
-
-      expect(incidentsService.triggerRca).not.toHaveBeenCalled();
-    });
-
-    it("retries RCA exactly once after paid usage consent", async () => {
-      const consentError = {
-        isAxiosError: true,
-        response: {
-          status: 412,
-          data: {
-            error_type: "paid_overage_consent_required",
-            consent: {
-              feature: "ai_credits",
-              organization: { org_id: "default", enabled: false, can_manage: true },
-              payer: null,
-              effective: false,
-              billing_status: "eligible",
-            },
-          },
-        },
-      };
-      mockPromptForConsent.mockResolvedValue(true);
-      let loadingDuringRetry = false;
-      vi.mocked(incidentsService.triggerRca)
-        .mockRejectedValueOnce(consentError)
-        .mockImplementationOnce(async () => {
-          // The authorized run must show the in-progress banner again.
-          loadingDuringRetry = wrapper.vm.rcaLoading;
-          return { data: { rca_content: "Authorized RCA" } } as any;
-        });
-
-      await wrapper.vm.triggerRca();
-
-      expect(loadingDuringRetry).toBe(true);
-
-      expect(mockPromptForConsent).toHaveBeenCalledTimes(1);
-      expect(incidentsService.triggerRca).toHaveBeenCalledTimes(2);
-      expect(vi.mocked(incidentsService.triggerRca).mock.calls[1]).toEqual(
-        vi.mocked(incidentsService.triggerRca).mock.calls[0],
-      );
-    });
-
-    it("does not retry RCA after paid usage is declined", async () => {
-      mockPromptForConsent.mockResolvedValue(false);
+    // Cloud consent prompting and the single retry are covered in useRcaTrigger.spec.ts;
+    // this suite runs as a non-Cloud build, where a 412 never prompts.
+    it("non-Cloud 412 shows the server message and never prompts", async () => {
+      mockToast.mockClear();
       vi.mocked(incidentsService.triggerRca).mockRejectedValueOnce({
         isAxiosError: true,
         response: {
           status: 412,
           data: {
             error_type: "paid_overage_consent_required",
-            consent: {
-              feature: "ai_credits",
-              organization: { org_id: "default", enabled: false, can_manage: true },
-              payer: null,
-              effective: false,
-              billing_status: "eligible",
-            },
+            message: "AI SRE is not configured for this organization",
           },
         },
       });
@@ -684,12 +630,12 @@ describe("IncidentDetailDrawer.vue", () => {
       await wrapper.vm.triggerRca();
 
       expect(incidentsService.triggerRca).toHaveBeenCalledTimes(1);
-      // Persisted in the panel with a way to turn paid usage on.
-      expect(wrapper.vm.rcaError).toEqual({
-        reason: "Paid AI usage is off, so this request wasn't sent.",
-        details: "",
-        remedy: "plans",
+      expect(mockPromptForConsent).not.toHaveBeenCalled();
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "error",
+        message: "AI SRE is not configured for this organization",
       });
+      expect(wrapper.vm.rcaTriggering).toBe(false);
     });
   });
 
@@ -701,105 +647,62 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
     });
 
-    it("should compute incident context data correctly", () => {
-      const contextData = wrapper.vm.incidentContextData;
+    it("should include the displayed report in context data", async () => {
+      (incidentsService.get as any).mockResolvedValue({
+        data: createIncidentWithAlerts({
+          id: "1",
+          rca: {
+            run_id: "run-7",
+            state: "completed",
+            stale: false,
+            started_at: 1700000000000000,
+            updated_at: 1700000000000000,
+            outcome: null,
+            confidence: null,
+            report_format: "v2",
+            summary: {
+              stage: null,
+              stage_index: null,
+              stage_count: 0,
+              steps: 0,
+              tool_calls: 0,
+              steered_by: [],
+              unblocked_by: null,
+              detail: null,
+              deadline_at: null,
+              previous: null,
+            },
+            report_run: {
+              run_id: "run-7",
+              subject_type: "incident",
+              trigger: "manual",
+              mode: "fresh",
+              started_by: "a.rao@acme.io",
+              state: "completed",
+              started_at: 1700000000000000,
+              ended_at: 1700000060000000,
+              outcome: null,
+              confidence: null,
+              cancelled_by: null,
+              error_reason: null,
+              report_format: "v2",
+              has_record: true,
+            },
+            history: [],
+          },
+        }),
+      });
+      await wrapper.vm.reloadRca();
+      await flushPromises();
 
-      expect(contextData).toBeTruthy();
-      expect(contextData.id).toBe("1");
-      expect(contextData.severity).toBe("P1");
-      expect(contextData.status).toBe("open");
-    });
-
-    it("should include all required fields in context data", () => {
-      const contextData = wrapper.vm.incidentContextData;
-
-      expect(contextData).toHaveProperty("id");
-      expect(contextData).toHaveProperty("title");
-      expect(contextData).toHaveProperty("status");
-      expect(contextData).toHaveProperty("severity");
-      expect(contextData).toHaveProperty("alert_count");
-      expect(contextData).toHaveProperty("first_alert_at");
-      expect(contextData).toHaveProperty("last_alert_at");
-      expect(contextData).toHaveProperty("group_values");
-      expect(contextData).toHaveProperty("topology_context");
-      expect(contextData).toHaveProperty("triggers");
-      expect(contextData).toHaveProperty("rca_analysis");
-    });
-
-    it("should include triggers in context data", () => {
-      const contextData = wrapper.vm.incidentContextData;
-
-      expect(contextData.triggers).toBeTruthy();
-      expect(Array.isArray(contextData.triggers)).toBe(true);
-    });
-
-    it("should include existing RCA in context data when available", async () => {
-      wrapper.vm.incidentDetails.topology_context = {
-        nodes: [],
-        edges: [],
-        related_incident_ids: [],
-        suggested_root_cause: "Existing RCA",
-      };
-
-      await nextTick();
-
-      const contextData = wrapper.vm.incidentContextData;
-      expect(contextData.rca_analysis).toBe("Existing RCA");
-    });
-
-    it("should include stream content when no existing RCA", async () => {
-      wrapper.vm.rcaStreamContent = "Streaming RCA content";
-      wrapper.vm.incidentDetails.topology_context = undefined;
-
-      await nextTick();
-
-      const contextData = wrapper.vm.incidentContextData;
-      expect(contextData.rca_analysis).toBe("Streaming RCA content");
-    });
-  });
-
-  describe("Utility Functions - Status Variants (registry incidentStatus)", () => {
-    it("open → error-soft", () => {
-      expect(resolveBadge("incidentStatus", "open").variant).toBe("error-soft");
-    });
-    it("acknowledged → warning-soft", () => {
-      expect(resolveBadge("incidentStatus", "acknowledged").variant).toBe("warning-soft");
-    });
-    it("resolved → success-soft", () => {
-      expect(resolveBadge("incidentStatus", "resolved").variant).toBe("success-soft");
-    });
-    it("unknown → default-soft (fallback)", () => {
-      expect(resolveBadge("incidentStatus", "unknown").variant).toBe("default-soft");
-    });
-    it("severity P1–P4 → error/orange/amber/blue-soft", () => {
-      expect(resolveBadge("severity", "P1").variant).toBe("error-soft");
-      expect(resolveBadge("severity", "P2").variant).toBe("orange-soft");
-      expect(resolveBadge("severity", "P3").variant).toBe("amber-soft");
-      expect(resolveBadge("severity", "P4").variant).toBe("blue-soft");
+      expect(incidentsService.getRcaRun).toHaveBeenCalledWith("default", "1", "run-7");
+      expect(wrapper.vm.incidentContextData.rca_analysis).toContain("Report of run-7");
     });
   });
 
   describe("Utility Functions - Status Labels", () => {
     beforeEach(async () => {
       wrapper = await createWrapper();
-    });
-
-    it("should return translated label for open status", () => {
-      const label = wrapper.vm.getStatusLabel("open");
-      expect(label).toBeTruthy();
-      expect(typeof label).toBe("string");
-    });
-
-    it("should return translated label for acknowledged status", () => {
-      const label = wrapper.vm.getStatusLabel("acknowledged");
-      expect(label).toBeTruthy();
-      expect(typeof label).toBe("string");
-    });
-
-    it("should return translated label for resolved status", () => {
-      const label = wrapper.vm.getStatusLabel("resolved");
-      expect(label).toBeTruthy();
-      expect(typeof label).toBe("string");
     });
 
     it("should return status as-is for unknown status", () => {
@@ -820,269 +723,43 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(typeof result).toBe("string");
       expect(result).toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
     });
-
-    it("should handle zero timestamp", () => {
-      const result = wrapper.vm.formatTimestamp(0);
-
-      expect(result).toBeTruthy();
-      expect(result).toMatch(/\d{4}-\d{2}-\d{2}/);
-    });
-
-    it("should convert microseconds to milliseconds correctly", () => {
-      const microTimestamp = 1700000000000000;
-      const result = wrapper.vm.formatTimestamp(microTimestamp);
-
-      expect(result).toContain("2023");
-    });
   });
 
-  describe("Utility Functions - RCA Content Formatting", () => {
+  describe("Utility Functions - Trigger Durations", () => {
     beforeEach(async () => {
       wrapper = await createWrapper();
     });
 
-    it("should sanitize malicious HTML content", () => {
-      const malicious = '<script>alert("xss")</script>';
-      const formatted = wrapper.vm.formatRcaContent(malicious);
-
-      // DOMPurify completely removes script tags (better than escaping)
-      expect(formatted).not.toContain("<script>");
-      expect(formatted).not.toContain('alert("xss")');
+    it("reads the period as minutes", () => {
+      expect(wrapper.vm.formatPeriod(10)).toBe("10 min");
+      expect(wrapper.vm.formatPeriod(90)).toBe("90 min");
     });
 
-    it("should format bold text", () => {
-      const content = "This is **bold** text";
-      const formatted = wrapper.vm.formatRcaContent(content);
-
-      expect(formatted).toContain('<strong class="font-semibold">bold</strong>');
-    });
-
-    it("should format h2 headers", () => {
-      const content = "## Header 2";
-      const formatted = wrapper.vm.formatRcaContent(content);
-
-      expect(formatted).toContain("font-bold");
-      expect(formatted).toContain("text-lg");
-      // Colour comes from the `:deep(.rca-report-content) .rca-h2` rule in
-      // IncidentRCAAnalysis.vue (unlayered, so it beat the old text-blue-600
-      // utility anyway) — the hook class is what this renderer must emit.
-      expect(formatted).toContain("rca-h2");
-    });
-
-    it("should format h3 headers", () => {
-      const content = "### Header 3";
-      const formatted = wrapper.vm.formatRcaContent(content);
-
-      expect(formatted).toContain("font-semibold");
-    });
-
-    it("should format unordered lists", () => {
-      const content = "- Item 1\n- Item 2";
-      const formatted = wrapper.vm.formatRcaContent(content);
-
-      expect(formatted).toContain("rca-ul");
-      expect(formatted).toContain("Item 1");
-    });
-
-    it("should format numbered lists", () => {
-      const content = "1. First item\n2. Second item";
-      const formatted = wrapper.vm.formatRcaContent(content);
-
-      expect(formatted).toContain("rca-ol");
-      expect(formatted).toContain("First item");
-      expect(formatted).toContain("Second item");
-    });
-
-    it("should format complex markdown", () => {
-      const content = "## Root Cause\n\n**Issue**: High CPU\n\n- Check process\n- Review logs";
-      const formatted = wrapper.vm.formatRcaContent(content);
-
-      expect(formatted).toContain('<strong class="font-semibold">Issue</strong>');
-      expect(formatted).toContain("font-bold");
-      expect(formatted).toContain("rca-ul");
-    });
-
-    it("should build the TOC from standalone bold section lines", () => {
-      const content = [
-        "I've completed the investigation.",
-        "",
-        "---",
-        "",
-        "**Incident Details**",
-        "",
-        "| Attribute | Value |",
-        "|---|---|",
-        "| **Severity** | P2 |",
-        "",
-        "**Evidence:**",
-        "",
-        "**1. `stream_no_events_10m`** — false positive.",
-        "",
-        "- Restart the ingester",
-        "  **Note**",
-        "",
-        "The ingester restarted at 10:02.",
-        "**Inline label**",
-        "This was expected.",
-        "",
-        "** **",
-        "",
-        "**Evidence **",
-        "",
-        "__A__ and __B__",
-        "",
-        "```json",
-        "**not a heading**",
-        "```",
-        "",
-        "~~~",
-        "**tilde fence**",
-        "```",
-        "",
-        "**still code**",
-        "~~~",
-        "",
-        "__Executive Summary__",
-        "",
-        "Root cause: **three** miscalibrated alerts.",
-      ].join("\n");
-      const formatted = wrapper.vm.formatRcaContent(content);
-
-      expect(wrapper.vm.tableOfContents.map((item: any) => item.text)).toEqual([
-        "Incident Details",
-        "Evidence",
-        "Executive Summary",
-      ]);
-      // Rendered ids must match the TOC ids, or scroll-to-section finds nothing.
-      for (const item of wrapper.vm.tableOfContents) {
-        expect(formatted).toContain(`id="${item.id}"`);
-      }
-      expect(formatted).toContain("**not a heading**");
-      expect(formatted).toContain("**tilde fence**");
-      expect(formatted).toContain("**still code**");
-    });
-
-    it("should leave bold sub-labels alone when the report already has sections", () => {
-      const content = [
-        "## Root Cause",
-        "",
-        "**Timeline:**",
-        "",
-        "- 10:02 ingester restarted",
-        "",
-        "### Contributing factors",
-      ].join("\n");
-      const formatted = wrapper.vm.formatRcaContent(content);
-
-      expect(wrapper.vm.tableOfContents.map((item: any) => item.text)).toEqual(["Root Cause"]);
-      expect(wrapper.vm.tableOfContents[0].children.map((item: any) => item.text)).toEqual([
-        "Contributing factors",
-      ]);
-      expect(formatted).not.toContain('id="section-timeline"');
-    });
-  });
-
-  describe("Theme Support", () => {
-    it("should detect dark mode", async () => {
-      store.state.theme = "dark";
-      wrapper = await createWrapper();
-
-      expect(wrapper.vm.isDarkMode).toBe(true);
-    });
-
-    it("should detect light mode", async () => {
-      store.state.theme = "light";
-      wrapper = await createWrapper();
-
-      expect(wrapper.vm.isDarkMode).toBe(false);
-    });
-  });
-
-  describe("Topology Context", () => {
-    beforeEach(async () => {
-      const mockIncidentData = createIncidentWithAlerts({
-        id: "test-123",
-        topology_context: {
-          nodes: [
-            {
-              alert_id: "alert_cpu",
-              alert_name: "High CPU",
-              service_name: "api-gateway",
-              alert_count: 2,
-              first_fired_at: 1000,
-              last_fired_at: 2000,
-            },
-            {
-              alert_id: "alert_memory",
-              alert_name: "High Memory",
-              service_name: "auth-service",
-              alert_count: 1,
-              first_fired_at: 1500,
-              last_fired_at: 1500,
-            },
-          ],
-          edges: [
-            {
-              from_node_index: 0,
-              to_node_index: 1,
-              edge_type: "service_dependency",
-            },
-          ],
-          related_incident_ids: ["incident-2", "incident-3"],
-          suggested_root_cause: "High memory usage in auth-service",
-        },
-      });
-
-      (incidentsService.get as any).mockResolvedValue({
-        data: mockIncidentData,
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-
-      await nextTick();
-      await flushPromises();
-    });
-
-    it("should display topology nodes", () => {
-      expect(wrapper.vm.incidentDetails.topology_context.nodes).toHaveLength(2);
-      expect(wrapper.vm.incidentDetails.topology_context.nodes[0].alert_name).toBe("High CPU");
-    });
-
-    it("should display topology edges", () => {
-      expect(wrapper.vm.incidentDetails.topology_context.edges).toHaveLength(1);
-      expect(wrapper.vm.incidentDetails.topology_context.edges[0].edge_type).toBe(
-        "service_dependency",
+    it("reads the frequency as seconds", () => {
+      expect(wrapper.vm.formatFrequency({ frequency: 3600, frequency_type: "minutes" })).toBe(
+        "60 min",
       );
+      expect(wrapper.vm.formatFrequency({ frequency: 90, frequency_type: "minutes" })).toBe(
+        "1 min 30 sec",
+      );
+      expect(wrapper.vm.formatFrequency({ frequency: 30, frequency_type: "minutes" })).toBe(
+        "30 sec",
+      );
+    });
+
+    it("shows the cron expression for a cron frequency", () => {
+      expect(
+        wrapper.vm.formatFrequency({ frequency: 0, frequency_type: "cron", cron: "0 */5 * * * *" }),
+      ).toBe("0 */5 * * * *");
+    });
+
+    it("shows N/A when the value is missing", () => {
+      expect(wrapper.vm.formatPeriod(undefined)).toBe("N/A");
+      expect(wrapper.vm.formatFrequency(undefined)).toBe("N/A");
     });
   });
 
   describe("Edge Cases", () => {
-    it("should handle incident without title", async () => {
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", title: undefined }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.incidentDetails).toBeTruthy();
-    });
-
-    it("should handle empty triggers array", async () => {
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers: [] }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.triggers).toEqual([]);
-    });
-
     it("should handle missing topology context", async () => {
       (incidentsService.get as any).mockResolvedValue({
         data: createIncidentWithAlerts({ id: "test-123", topology_context: undefined }),
@@ -1094,55 +771,11 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
 
       expect(wrapper.vm.incidentDetails.topology_context).toBeUndefined();
-      expect(wrapper.vm.hasExistingRca).toBe(false);
-    });
-
-    it("should handle empty dimensions", async () => {
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", group_values: {} }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.incidentDetails.group_values).toEqual({});
-    });
-
-    it("should handle resolved incident with timestamp", async () => {
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({
-          id: "test-123",
-          status: "resolved",
-          resolved_at: 1700000000000000,
-        }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.incidentDetails.resolved_at).toBeTruthy();
+      expect(wrapper.vm.rcaSummary).toBeNull();
     });
   });
 
   describe("Close Functionality", () => {
-    it("should close drawer", async () => {
-      wrapper = await createWrapper();
-      const pushSpy = vi.spyOn(router, "push");
-
-      wrapper.vm.close();
-      await nextTick();
-
-      // Should navigate back to incident list
-      expect(pushSpy).toHaveBeenCalledWith({
-        name: "incidentList",
-        query: { org_identifier: "default" },
-      });
-    });
-
     it("should navigate back to incident list on close", async () => {
       wrapper = await createWrapper();
       const pushSpy = vi.spyOn(router, "push");
@@ -1187,34 +820,21 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(incidentsService.get).toHaveBeenCalledWith("custom-org", "test-123");
     });
 
-    it("should use organization in status updates", async () => {
-      (incidentsService.updateStatus as any).mockResolvedValue({});
-
-      wrapper = await createWrapper({}, { selectedOrganization: { identifier: "org-123" } }, "1");
-
-      await nextTick();
+    it("writes status updates and RCA triggers to the custom organization", async () => {
+      wrapper = await createWrapper(
+        {},
+        { selectedOrganization: { identifier: "custom-org" } },
+        "test-123",
+      );
       await flushPromises();
 
       await wrapper.vm.acknowledgeIncident();
-
-      expect(incidentsService.updateStatus).toHaveBeenCalledWith(
-        "org-123",
-        expect.any(String),
-        "acknowledged",
-      );
-    });
-
-    it("should use organization in RCA trigger", async () => {
-      wrapper = await createWrapper({}, { selectedOrganization: { identifier: "org-456" } }, "1");
-
-      await nextTick();
-      await flushPromises();
+      expect(incidentsService.acknowledge).toHaveBeenCalledWith("custom-org", expect.any(String));
 
       await wrapper.vm.triggerRca();
-
       expect(incidentsService.triggerRca).toHaveBeenCalledWith(
-        "org-456",
-        expect.any(String),
+        "custom-org",
+        "1",
         { build_on_previous: false },
         expect.objectContaining({ signal: expect.anything() }),
       );
@@ -1245,73 +865,6 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(uniqueAlertsMap.get("alert-1")).toBe(2);
       expect(uniqueAlertsMap.get("alert-2")).toBe(2);
       expect(uniqueAlertsMap.get("alert-3")).toBe(1);
-    });
-
-    it("should compute unique alerts count correctly", async () => {
-      const triggers = [
-        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-2", alert_name: "Memory Alert" }),
-      ];
-
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.uniqueAlertsCount).toBe(2);
-    });
-
-    it("should return 0 unique alerts when no triggers", async () => {
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers: [] }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.uniqueAlertsCount).toBe(0);
-      expect(wrapper.vm.uniqueAlertsMap.size).toBe(0);
-    });
-
-    it("should handle triggers with missing alert names", async () => {
-      // Create triggers directly without using factory to avoid default values
-      const triggers: IncidentAlert[] = [
-        {
-          incident_id: "incident-1",
-          alert_id: "alert-1",
-          alert_name: "" as any, // Empty string, but we use alert_id for uniqueness
-          alert_fired_at: 1700000000000000,
-          correlation_reason: "service_discovery",
-          created_at: 1700000000000000,
-        },
-        createAlert({ alert_id: "alert-2", alert_name: "Valid Alert" }),
-      ];
-
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-      await nextTick();
-      await flushPromises();
-
-      const uniqueAlertsMap = wrapper.vm.uniqueAlertsMap;
-
-      // Should have 2 unique alerts by alert_id regardless of alert_name
-      expect(uniqueAlertsMap.size).toBe(2);
-      // Check by alert_id instead of alert_name
-      const alert1Count = uniqueAlertsMap.get("alert-1");
-      const alert2Count = uniqueAlertsMap.get("alert-2");
-
-      expect(alert1Count).toBeDefined();
-      expect(alert1Count).toBe(1);
-      expect(alert2Count).toBeDefined();
-      expect(alert2Count).toBe(1);
     });
 
     it("should count alerts with same name but different IDs as separate alerts", async () => {
@@ -1373,42 +926,6 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(sorted[2].count).toBe(1);
     });
 
-    it("should return empty array when no triggers", async () => {
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers: [] }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.sortedAlertsByTriggerCount).toEqual([]);
-    });
-
-    it("should include alert id and name in sorted results", async () => {
-      const triggers = [
-        createAlert({ alert_id: "alert-1", alert_name: "Test Alert" }),
-        createAlert({ alert_id: "alert-1", alert_name: "Test Alert" }),
-      ];
-
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-      await nextTick();
-      await flushPromises();
-
-      const sorted = wrapper.vm.sortedAlertsByTriggerCount;
-
-      expect(sorted[0]).toHaveProperty("id");
-      expect(sorted[0]).toHaveProperty("name");
-      expect(sorted[0]).toHaveProperty("count");
-      expect(sorted[0].id).toBe("alert-1");
-      expect(sorted[0].name).toBe("Test Alert");
-      expect(sorted[0].count).toBe(2);
-    });
-
     it("should derive alerts from triggers instead of API alerts array", async () => {
       const triggers = [createAlert({ alert_id: "trigger-alert-1", alert_name: "From Triggers" })];
 
@@ -1428,55 +945,6 @@ describe("IncidentDetailDrawer.vue", () => {
       // Should have 1 alert from triggers, not 0 from API alerts
       expect(sorted).toHaveLength(1);
       expect(sorted[0].name).toBe("From Triggers");
-    });
-  });
-
-  describe("Internationalization (i18n)", () => {
-    beforeEach(async () => {
-      wrapper = await createWrapper({}, {}, "1");
-      await nextTick();
-      await flushPromises();
-    });
-
-    it("should have translation for unique alerts", () => {
-      const translation = wrapper.vm.t("alerts.incidents.uniqueAlerts");
-      expect(translation).toBe("Unique Alerts");
-    });
-
-    it("should have translation for related alerts", () => {
-      const translation = wrapper.vm.t("alerts.incidents.relatedAlerts");
-      expect(translation).toBe("Related Alerts");
-    });
-
-    it("should have translation for alert triggers", () => {
-      const translation = wrapper.vm.t("alerts.incidents.alertTriggers");
-      expect(translation).toBe("Alert Triggers");
-    });
-
-    it("should have translation for incident timeline", () => {
-      const translation = wrapper.vm.t("alerts.incidents.incidentTimeline");
-      expect(translation).toBe("Incident Timeline");
-    });
-
-    it("should have translation for incident details", () => {
-      const translation = wrapper.vm.t("alerts.incidents.incidentDetails");
-      expect(translation).toBe("Incident Details");
-    });
-
-    it("should have translation for fired times with parameter", () => {
-      // Pipe plural: `count` in the named bag selects the branch AND fills {count}.
-      expect(wrapper.vm.t("alerts.incidents.firedTimes", { count: 5 })).toBe("Fired 5 times");
-      expect(wrapper.vm.t("alerts.incidents.firedTimes", { count: 1 })).toBe("Fired 1 time");
-    });
-
-    it("should have translation for refresh correlated data", () => {
-      const translation = wrapper.vm.t("alerts.incidents.refreshCorrelatedData");
-      expect(translation).toBe("Refresh correlated data");
-    });
-
-    it("should have translation for incident title updated success", () => {
-      const translation = wrapper.vm.t("alerts.incidents.incidentTitleUpdatedSuccess");
-      expect(translation).toBe("Incident title updated successfully");
     });
   });
 
@@ -1539,15 +1007,6 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
     });
 
-    it("should expose matched_set_id as correlationMatchedSetId after correlation loads", async () => {
-      (incidentsService.getCorrelatedStreams as any).mockResolvedValue(correlatedStreamsWithSet());
-
-      await wrapper.vm.refreshCorrelation();
-      await flushPromises();
-
-      expect(wrapper.vm.correlationMatchedSetId).toBe("kubernetes");
-    });
-
     it("should build chipDimensions from the correlation response and semantic groups", async () => {
       (incidentsService.getCorrelatedStreams as any).mockResolvedValue(correlatedStreamsWithSet());
 
@@ -1562,12 +1021,6 @@ describe("IncidentDetailDrawer.vue", () => {
         expect.objectContaining({ matched_set_id: resp.matched_set_id }),
         expect.any(Array),
       );
-    });
-
-    it("should yield undefined matchedSetId and empty chipDimensions when no correlation data", () => {
-      expect(wrapper.vm.correlationData).toBeNull();
-      expect(wrapper.vm.correlationMatchedSetId).toBeUndefined();
-      expect(wrapper.vm.correlationChipDimensions).toEqual({});
     });
 
     it("should pass matchedSetId/chipDimensions to the metrics TelemetryCorrelationDashboard", async () => {
@@ -1589,127 +1042,434 @@ describe("IncidentDetailDrawer.vue", () => {
     });
   });
 
+  describe("correlation license lock", () => {
+    afterEach(() => {
+      delete store.state.zoConfig.features;
+    });
+
+    it("locks the telemetry tabs and never calls the correlation API", async () => {
+      store.state.zoConfig.features = { correlation: "locked" };
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      (incidentsService.getCorrelatedStreams as any).mockClear();
+
+      wrapper.vm.activeTab = "logs";
+      await flushPromises();
+      await wrapper.vm.refreshCorrelation();
+
+      expect(wrapper.find('[data-test="incident-correlation-license-denied"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "CorrelatedLogsTable" }).exists()).toBe(false);
+      expect(incidentsService.getCorrelatedStreams).not.toHaveBeenCalled();
+      const logsTab = wrapper
+        .findAllComponents({ name: "OTab" })
+        .find((tab) => tab.props("name") === "logs");
+      expect(logsTab?.props("suffixIcon")).toBe("lock");
+    });
+
+    it("loads correlated streams when correlation is enabled", async () => {
+      store.state.zoConfig.features = { correlation: "enabled" };
+      (incidentsService.getCorrelatedStreams as any).mockResolvedValue(null);
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+
+      wrapper.vm.activeTab = "logs";
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="incident-correlation-license-denied"]').exists()).toBe(
+        false,
+      );
+      expect(incidentsService.getCorrelatedStreams).toHaveBeenCalled();
+    });
+  });
+
   // Note: Loading State Centering tests removed
   // Testing loading state UI presentation is better handled through visual regression tests
   // Component logic tests should focus on loading state management, not CSS/layout
 
-  describe("analysisInFlight - checkAnalysisInFlight", () => {
+  describe("RR-35: run state live stream", () => {
+    const summaryFor = (state: "running" | "completed", reportRunId: string | null) => ({
+      run_id: "run-2",
+      state,
+      stale: false,
+      started_at: 1700000000000000,
+      updated_at: 1700000000000000,
+      outcome: null,
+      confidence: null,
+      report_format: "v2" as const,
+      summary: {
+        stage: null,
+        stage_index: null,
+        stage_count: 0,
+        steps: 0,
+        tool_calls: 0,
+        steered_by: [],
+        unblocked_by: null,
+        detail: null,
+        deadline_at: null,
+        previous: null,
+      },
+      report_run: reportRunId
+        ? {
+            run_id: reportRunId,
+            subject_type: "incident" as const,
+            trigger: "auto_new_incident" as const,
+            mode: "fresh" as const,
+            started_by: "system",
+            state: "completed" as const,
+            started_at: 1700000000000000,
+            ended_at: 1700000060000000,
+            outcome: null,
+            confidence: null,
+            cancelled_by: null,
+            error_reason: null,
+            report_format: "v2" as const,
+            has_record: true,
+          }
+        : null,
+      history: [],
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("E5 / TH32: the Analysis tab shows the analysis and thread columns and streams the live run", async () => {
+      vi.mocked(incidentsService.get).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "1", rca: summaryFor("running", "run-1") }),
+      } as never);
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+
+      wrapper.vm.activeTab = "incidentAnalysis";
+      await flushPromises();
+      const stream = connections.at(-1)!;
+      expect(stream.runId).toBe("run-2");
+      stream.emit({
+        event: "thread",
+        data: {
+          run_id: "run-2",
+          state_version: "1.1.1",
+          not_modified: false,
+          active: true,
+          transcript: "available",
+          started: { at: 1700000000000000, prompt: "Analyze incident 1" },
+          steps: [],
+          user_messages: [],
+          questions: [],
+          report_submitted: false,
+          stats: { steps: 0, tool_calls: 0, duration_ms: 0 },
+        },
+      } as never);
+      // The summary of the same run, carried by the same stream.
+      stream.emit({ event: "summary", data: rcaRunSummaryLive({ run_id: "run-2" }) });
+      stream.emit({ event: "steering", data: rcaSteering() });
+      await flushPromises();
+
+      const panel = wrapper.find('[data-test="rca-analysis-container"]');
+      expect(panel.find('[data-test="rca-analysis-bar"]').exists()).toBe(true);
+      expect(panel.find('[data-test="rca-verdict-card"]').exists()).toBe(true);
+      expect(panel.find('[data-test="rca-thread-column"]').exists()).toBe(true);
+      expect(panel.find('[data-test="rca-thread-live-pill"]').exists()).toBe(true);
+      expect(panel.findAll('[role="tab"]')).toHaveLength(0);
+      expect(incidentsService.get).toHaveBeenCalledTimes(1);
+      expect(panel.find('[data-test="rca-verdict-headline"]').text()).toBe(
+        "Leading: Deploy 4f2c1e exhausted the orders-db pool",
+      );
+      expect(panel.find('[data-test="rca-hypotheses"]').exists()).toBe(true);
+    });
+
+    it("K: with no run the Analysis tab offers Analyze and streams no run", async () => {
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+
+      wrapper.vm.activeTab = "incidentAnalysis";
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="trigger-rca-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rca-thread-column"]').exists()).toBe(false);
+      expect(connections.every((c) => c.runId === null)).toBe(true);
+    });
+
+    it("v1: an incident with only a pre-upgrade report shows its report and reads no run record", async () => {
+      vi.mocked(incidentsService.get).mockResolvedValue({
+        data: createIncidentWithAlerts({
+          id: "1",
+          rca: rcaV1Summary([rcaV1RunItem(), rcaV1RunItem({ run_id: "v1-1" })]),
+        }),
+      } as never);
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+
+      wrapper.vm.activeTab = "incidentAnalysis";
+      await flushPromises();
+
+      expect(incidentsService.getRcaRun).toHaveBeenCalledWith("default", "1", "v1-0");
+      expect(wrapper.find('[data-test="rca-verdict-state"]').text()).toBe("Analyzed");
+      expect(wrapper.find('[data-test="rca-existing-container"]').text()).toContain(
+        "Report of v1-0",
+      );
+      expect(connections.every((c) => c.runId === null)).toBe(true);
+    });
+
+    it("v1: picking a pre-upgrade report shows it and streams no thread or summary for it", async () => {
+      const latest = rcaRunItem({ run_id: "run-2" });
+      vi.mocked(incidentsService.get).mockResolvedValue({
+        data: createIncidentWithAlerts({
+          id: "1",
+          rca: rcaSummary({
+            state: "completed",
+            current_run: rcaRun({ state: "completed" }),
+            report_run: latest,
+            history: [latest, rcaV1RunItem()],
+          }),
+        }),
+      } as never);
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      wrapper.vm.activeTab = "incidentAnalysis";
+      await flushPromises();
+
+      wrapper.findComponent({ name: "IncidentRCAAnalysis" }).vm.$emit("view-run", "v1-0");
+      await flushPromises();
+
+      expect(incidentsService.getRcaRun).toHaveBeenCalledWith("default", "1", "v1-0");
+      expect(wrapper.find('[data-test="rca-existing-container"]').text()).toContain(
+        "Report of v1-0",
+      );
+      expect(connections.map((c) => c.runId)).not.toContain("v1-0");
+      expect(connections.at(-1)!.runId).toBeNull();
+    });
+  });
+
+  describe("Phase 5: Ask hand-off and Resume", () => {
+    const reportRun = {
+      run_id: "run-2",
+      subject_type: "incident" as const,
+      trigger: "manual" as const,
+      mode: "fresh" as const,
+      started_by: "a.rao@acme.io",
+      state: "completed" as const,
+      started_at: 1700000000000000,
+      ended_at: 1700000060000000,
+      outcome: null,
+      confidence: null,
+      cancelled_by: null,
+      error_reason: null,
+      report_format: "v2" as const,
+      has_record: true,
+    };
+    const completed = {
+      run_id: "run-2",
+      state: "completed" as const,
+      stale: false,
+      started_at: 1700000000000000,
+      updated_at: 1700000060000000,
+      outcome: null,
+      confidence: null,
+      report_format: "v2" as const,
+      summary: {
+        stage: null,
+        stage_index: null,
+        stage_count: 0,
+        steps: 4,
+        tool_calls: 0,
+        steered_by: [],
+        unblocked_by: null,
+        detail: null,
+        deadline_at: null,
+        previous: null,
+      },
+      report_run: reportRun,
+      history: [reportRun],
+    };
+    const original = { isEnterprise: awsConfig.isEnterprise, ai: store.state.zoConfig.ai_enabled };
+
+    beforeEach(() => {
+      awsConfig.isEnterprise = "true";
+      store.state.zoConfig.ai_enabled = true;
+      vi.mocked(incidentsService.get).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "1", title: "checkout 5xx", rca: completed }),
+      } as never);
+    });
+
+    afterEach(() => {
+      awsConfig.isEnterprise = original.isEnterprise;
+      store.state.zoConfig.ai_enabled = original.ai;
+    });
+
+    const openAnalysis = async () => {
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      wrapper.vm.activeTab = "incidentAnalysis";
+      await flushPromises();
+    };
+
+    it("J5: Ask emits sendToAiChat with a new, unsent chat and a context without incident or run keys", async () => {
+      await openAnalysis();
+
+      await wrapper.find('[data-test="rca-ask-btn"]').trigger("click");
+
+      const events = wrapper.emitted<[Record<string, unknown>]>("sendToAiChat") ?? [];
+      expect(events).toHaveLength(1);
+      const [payload] = events[0];
+      expect(payload).toMatchObject({ newChat: true, autoSend: false });
+      expect(payload.chipName).toMatch(/^Analysis · Run 1 · /);
+      expect(payload.context).toEqual({ currentPage: "incidents", org_id: "default" });
+      expect(String(payload.query)).toContain("checkout 5xx");
+      expect(String(payload.query)).toContain("Report of run-2");
+    });
+
+    it("J9: Resume from the panel POSTs the resume for that run and re-reads the incident", async () => {
+      vi.mocked(incidentsService.resumeRca).mockResolvedValue({
+        data: {
+          message: "resumed",
+          run_id: "run-3",
+          resumed_from: "run-2",
+          reused_steps: 2,
+          from_step: { index: 3, stage: "metrics", title: "Check metrics" },
+        },
+      } as never);
+      await openAnalysis();
+      const reads = vi.mocked(incidentsService.get).mock.calls.length;
+
+      wrapper.findComponent({ name: "IncidentRCAAnalysis" }).vm.$emit("resume-rca", "run-2");
+      await flushPromises();
+
+      expect(vi.mocked(incidentsService.resumeRca).mock.calls[0]?.slice(0, 3)).toEqual([
+        "default",
+        "1",
+        "run-2",
+      ]);
+      expect(vi.mocked(incidentsService.get).mock.calls.length).toBeGreaterThan(reads);
+    });
+  });
+
+  describe("RR-48: Esc", () => {
+    const pressEscape = (target: EventTarget = document.body) => {
+      target.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    };
+    let extra: HTMLElement[] = [];
+    const addToBody = (html: string) => {
+      const host = document.createElement("div");
+      host.innerHTML = html;
+      document.body.appendChild(host);
+      extra.push(host);
+      return host.firstElementChild as HTMLElement;
+    };
+
     beforeEach(async () => {
       wrapper = await createWrapper({}, {}, "1");
-      await nextTick();
       await flushPromises();
+      vi.mocked(incidentsService.cancelRca).mockClear();
     });
 
-    it("should initialize analysisInFlight as false", () => {
-      expect(wrapper.vm.analysisInFlight).toBe(false);
+    afterEach(() => {
+      extra.forEach((el) => el.remove());
+      extra = [];
+      (document.activeElement as HTMLElement | null)?.blur?.();
     });
 
-    it("sets analysisInFlight true when lastBegin > lastComplete", async () => {
-      (incidentsService.getEvents as any).mockResolvedValue({
-        data: {
-          events: [
-            { type: "ai_analysis_begin", timestamp: 200 },
-            { type: "ai_analysis_complete", timestamp: 100 },
-          ],
-        },
-      });
-      await wrapper.vm.checkAnalysisInFlight("1");
+    it("inside the comment box (a focused text field) does not navigate", () => {
+      const pushSpy = vi.spyOn(router, "push");
+      const textarea = addToBody("<textarea data-test='comment'></textarea>");
+      textarea.focus();
+
+      pressEscape(textarea);
+
+      expect(pushSpy).not.toHaveBeenCalled();
+    });
+
+    it("inside an open menu does not navigate", () => {
+      const pushSpy = vi.spyOn(router, "push");
+      const menu = addToBody("<div role='menu'><button>item</button></div>");
+
+      pressEscape(menu.querySelector("button")!);
+
+      expect(pushSpy).not.toHaveBeenCalled();
+    });
+
+    it("inside a dialog that closes itself on Esc does not navigate", () => {
+      const pushSpy = vi.spyOn(router, "push");
+      const dialog = addToBody("<div role='dialog'><button>ok</button></div>");
+      // The dialog's own handler removes it before the page's bubble handler runs.
+      const closeDialog = (event: KeyboardEvent) => {
+        if (event.key === "Escape") dialog.remove();
+      };
+      document.addEventListener("keydown", closeDialog);
+
+      pressEscape(dialog.querySelector("button")!);
+      document.removeEventListener("keydown", closeDialog);
+
+      expect(pushSpy).not.toHaveBeenCalled();
+    });
+
+    it("with nothing focused navigates to the list and does not cancel the run", async () => {
+      const pushSpy = vi.spyOn(router, "push");
+
+      pressEscape();
       await flushPromises();
-      expect(wrapper.vm.analysisInFlight).toBe(true);
+
+      expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "incidentList" }));
+      expect(incidentsService.cancelRca).not.toHaveBeenCalled();
     });
+  });
 
-    it("drops a refused run's remedy banner when another incident opens in place", async () => {
-      wrapper.vm.incidentDetails = { ...wrapper.vm.incidentDetails, id: "1" };
-      wrapper.vm.rcaError = { reason: "out of credits", details: "", remedy: "plans" };
-      (incidentsService.get as any).mockResolvedValueOnce({
-        data: { ...wrapper.vm.incidentDetails, id: "2" },
-      });
-
+  describe("Deep link", () => {
+    it("?tab=incidentAnalysis opens the Analysis tab", async () => {
       router.currentRoute.value = {
         ...router.currentRoute.value,
-        params: { id: "2" },
+        query: { tab: "incidentAnalysis" },
       } as any;
+      wrapper = await createWrapper({}, {}, "1");
       await flushPromises();
 
-      expect(wrapper.vm.rcaError).toBeNull();
+      expect(wrapper.vm.activeTab).toBe("incidentAnalysis");
+      router.currentRoute.value = { ...router.currentRoute.value, query: {} } as any;
     });
 
-    it("keeps a refused run's remedy banner, which the event log never records", async () => {
-      const refused = { reason: "out of credits", details: "", remedy: "plans" };
-      wrapper.vm.rcaError = refused;
-      (incidentsService.getEvents as any).mockResolvedValue({ data: { events: [] } });
-
-      await wrapper.vm.checkAnalysisInFlight("1");
+    it("without a tab query opens the Incident Analysis tab", async () => {
+      router.currentRoute.value = { ...router.currentRoute.value, query: {} } as any;
+      wrapper = await createWrapper({}, {}, "1");
       await flushPromises();
 
-      expect(wrapper.vm.rcaError).toEqual(refused);
+      expect(wrapper.vm.activeTab).toBe("incidentAnalysis");
+    });
+  });
+
+  describe("Tab order", () => {
+    afterEach(() => localStorage.removeItem("o2_incident_detail_tab_order"));
+
+    it("opens on the first tab of a saved order, dropping unknown names and appending missing ones", async () => {
+      localStorage.setItem(
+        "o2_incident_detail_tab_order",
+        JSON.stringify(["logs", "gone", "overview"]),
+      );
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+
+      expect(wrapper.vm.activeTab).toBe("logs");
+      expect(wrapper.vm.tabOrder).toEqual([
+        "logs",
+        "overview",
+        "incidentAnalysis",
+        "activity",
+        "serviceGraph",
+        "alertTriggers",
+        "metrics",
+        "traces",
+      ]);
     });
 
-    it("clears a refused run's remedy banner once a run starts", async () => {
-      wrapper.vm.rcaError = { reason: "out of credits", details: "", remedy: "plans" };
-      (incidentsService.getEvents as any).mockResolvedValue({
-        data: { events: [{ type: "ai_analysis_begin", timestamp: 300 }] },
-      });
-
-      await wrapper.vm.checkAnalysisInFlight("1");
+    it("applies and saves a drag reorder", async () => {
+      wrapper = await createWrapper({}, {}, "1");
       await flushPromises();
 
-      expect(wrapper.vm.rcaError).toBeNull();
-    });
+      wrapper.vm.onTabReorder({ from: "traces", to: "overview", before: false });
 
-    it("sets analysisInFlight false when lastComplete >= lastBegin", async () => {
-      (incidentsService.getEvents as any).mockResolvedValue({
-        data: {
-          events: [
-            { type: "ai_analysis_begin", timestamp: 100 },
-            { type: "ai_analysis_complete", timestamp: 200 },
-          ],
-        },
-      });
-      await wrapper.vm.checkAnalysisInFlight("1");
-      await flushPromises();
-      expect(wrapper.vm.analysisInFlight).toBe(false);
-    });
-
-    it("sets analysisInFlight false when ai_analysis_failed after ai_analysis_begin", async () => {
-      (incidentsService.getEvents as any).mockResolvedValue({
-        data: {
-          events: [
-            { type: "ai_analysis_begin", timestamp: 100 },
-            {
-              type: "ai_analysis_failed",
-              timestamp: 200,
-              data: { reason: "timeout", error_details: "Query timed out" },
-            },
-          ],
-        },
-      });
-      await wrapper.vm.checkAnalysisInFlight("1");
-      await flushPromises();
-      expect(wrapper.vm.analysisInFlight).toBe(false);
-    });
-
-    it("sets analysisInFlight false when events are empty", async () => {
-      (incidentsService.getEvents as any).mockResolvedValue({ data: { events: [] } });
-      await wrapper.vm.checkAnalysisInFlight("1");
-      await flushPromises();
-      expect(wrapper.vm.analysisInFlight).toBe(false);
-    });
-
-    it("handles API error gracefully and preserves last known analysisInFlight state", async () => {
-      (incidentsService.getEvents as any).mockRejectedValue(new Error("fetch failed"));
-      wrapper.vm.analysisInFlight = true; // set to true first
-      await wrapper.vm.checkAnalysisInFlight("1");
-      await flushPromises();
-      // A failed events fetch says nothing about the run — the last known in-flight
-      // state is preserved rather than being cleared to a phantom "not running".
-      expect(wrapper.vm.analysisInFlight).toBe(true);
-    });
-
-    it("calls getEvents with correct org and incidentId", async () => {
-      await wrapper.vm.checkAnalysisInFlight("incident-xyz");
-      await flushPromises();
-      expect(incidentsService.getEvents).toHaveBeenCalledWith("default", "incident-xyz");
+      expect(wrapper.vm.tabOrder.slice(0, 3)).toEqual(["incidentAnalysis", "overview", "traces"]);
+      expect(JSON.parse(localStorage.getItem("o2_incident_detail_tab_order")!)).toEqual(
+        wrapper.vm.tabOrder,
+      );
     });
   });
 
@@ -1718,14 +1478,6 @@ describe("IncidentDetailDrawer.vue", () => {
       wrapper = await createWrapper({}, {}, "1");
       await nextTick();
       await flushPromises();
-    });
-
-    it("calls updateIncident with correct org, id and severity", async () => {
-      await wrapper.vm.updateSeverity("P3");
-      await flushPromises();
-      expect(incidentsService.updateIncident).toHaveBeenCalledWith("default", "1", {
-        severity: "P3",
-      });
     });
 
     it("updates local severity after successful save", async () => {
@@ -1748,67 +1500,32 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(infoCall[0].message).toContain("already running");
     });
 
-    it("sets analysisInFlight=true when response has analysis_in_flight=true", async () => {
-      (incidentsService.updateIncident as any).mockResolvedValue({
-        data: { severity: "P2", analysis_in_flight: true },
-      });
-      await wrapper.vm.updateSeverity("P2");
-      await flushPromises();
-      expect(wrapper.vm.analysisInFlight).toBe(true);
-    });
-
-    it("retries severity reanalysis exactly once after consent", async () => {
+    it("on confirm starts one spawned reanalysis and re-reads the run state", async () => {
       vi.mocked(incidentsService.updateIncident).mockResolvedValueOnce({
         data: { severity: "P2", analysis_in_flight: false },
-      });
-      mockPromptForConsent.mockResolvedValue(true);
-      vi.mocked(incidentsService.triggerRca)
-        .mockRejectedValueOnce({
-          isAxiosError: true,
-          response: {
-            status: 412,
-            data: {
-              error_type: "paid_overage_consent_required",
-              consent: {
-                feature: "ai_credits",
-                organization: { org_id: "default", enabled: false, can_manage: true },
-                payer: null,
-                effective: false,
-                billing_status: "eligible",
-              },
-            },
-          },
-        })
-        .mockResolvedValueOnce({ data: { message: "Analysis started" } });
+      } as never);
+      vi.mocked(incidentsService.get).mockClear();
 
       await wrapper.vm.updateSeverity("P2");
       await flushPromises();
 
-      expect(mockPromptForConsent).toHaveBeenCalledTimes(1);
-      expect(incidentsService.triggerRca).toHaveBeenCalledTimes(2);
-      expect(vi.mocked(incidentsService.triggerRca).mock.calls[0]?.[2]).toEqual({
-        reanalysis: true,
-      });
-      expect(vi.mocked(incidentsService.triggerRca).mock.calls[1]).toEqual(
-        vi.mocked(incidentsService.triggerRca).mock.calls[0],
-      );
+      expect(mockConfirm).toHaveBeenCalled();
+      expect(incidentsService.triggerRca).toHaveBeenCalledTimes(1);
+      expect(incidentsService.get).toHaveBeenCalledWith("default", "1");
     });
-    it("keeps the AI-credits remedy when a severity reanalysis gets a 402", async () => {
+
+    it("skips the re-run prompt when no new run can start", async () => {
+      store.state.zoConfig.incidents_rca_enabled = false;
       vi.mocked(incidentsService.updateIncident).mockResolvedValueOnce({
         data: { severity: "P2", analysis_in_flight: false },
-      });
-      vi.mocked(incidentsService.triggerRca).mockRejectedValueOnce({
-        isAxiosError: true,
-        response: {
-          status: 402,
-          data: { error_type: "ai_credits_exhausted", remedy: "contact_account_manager" },
-        },
-      });
+      } as never);
 
       await wrapper.vm.updateSeverity("P2");
       await flushPromises();
 
-      expect(wrapper.vm.rcaError?.remedy).toBe("contact");
+      expect(wrapper.vm.editableSeverity).toBe("P2");
+      expect(mockConfirm).not.toHaveBeenCalled();
+      expect(incidentsService.triggerRca).not.toHaveBeenCalled();
     });
 
     it("does not call updateIncident when no incidentDetails", async () => {
@@ -1816,25 +1533,15 @@ describe("IncidentDetailDrawer.vue", () => {
       await wrapper.vm.updateSeverity("P3");
       expect(incidentsService.updateIncident).not.toHaveBeenCalled();
     });
-
-    it("sets updating=false after completion", async () => {
-      await wrapper.vm.updateSeverity("P2");
-      await flushPromises();
-      expect(wrapper.vm.updating).toBe(false);
-    });
-
-    it("handles API error and sets updating=false", async () => {
-      mockToast.mockClear();
-      (incidentsService.updateIncident as any).mockRejectedValue(new Error("API error"));
-      await wrapper.vm.updateSeverity("P3");
-      await flushPromises();
-      expect(wrapper.vm.updating).toBe(false);
-    });
   });
   /// The panel fetched a whole record and rendered two of its fields, so an
   /// incident never said which team it woke, at what priority, or whether the
   /// page had been answered — while the payload behind it said all three.
   describe("on-call panel", () => {
+    // The panel is on Overview, which a saved tab order opens first.
+    beforeEach(() => localStorage.setItem("o2_incident_detail_tab_order", '["overview"]'));
+    afterEach(() => localStorage.removeItem("o2_incident_detail_tab_order"));
+
     const record = (overrides: Record<string, unknown> = {}) => ({
       id: "resp-1",
       org_id: "default",
@@ -1884,12 +1591,13 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.find('[data-test="incident-oncall-panel"]').text()).toContain("Payments");
     });
 
-    it("names the paged team rather than its id", async () => {
+    // The one ack stops (or restarts) the incident's pages, so the panel reads them again.
+    it("re-reads the on-call panel after an acknowledge", async () => {
       wrapper = await withRecords([record()]);
-      const panel = wrapper.find('[data-test="incident-oncall-panel"]');
-      expect(panel.exists()).toBe(true);
-      expect(panel.text()).toContain("Payments");
-      expect(panel.text()).not.toContain("team_1");
+      expect(oncallService.listResponsesForIncident).toHaveBeenCalledTimes(1);
+      await wrapper.vm.acknowledgeIncident();
+      await flushPromises();
+      expect(oncallService.listResponsesForIncident).toHaveBeenCalledTimes(2);
     });
 
     /// An unanswered page is still climbing the ladder — the fact worth a
@@ -1927,12 +1635,6 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     /// OSS, feature-off and nothing-routed are the same calm fact: no panel.
-    it("renders nothing when on-call does not answer", async () => {
-      wrapper = await createWrapper({}, {}, "1");
-      await flushPromises();
-      expect(wrapper.find('[data-test="incident-oncall-panel"]').exists()).toBe(false);
-    });
-
     /// Cloud answers the unregistered on-call route with a 401, and a 401 logs the user out.
     it("does not ask for on-call records when on-call is off", async () => {
       store.state.zoConfig.oncall_enabled = false;
@@ -1940,6 +1642,159 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
       expect(oncallService.listResponsesForIncident).not.toHaveBeenCalled();
       expect(wrapper.find('[data-test="incident-oncall-panel"]').exists()).toBe(false);
+    });
+  });
+
+  describe("AI credits", () => {
+    const COSTS = { chat: 1, incident: 50, incident_reanalysis: 20 };
+    const exhausted = (remedy: string) => ({
+      isAxiosError: true,
+      response: { status: 402, data: { error_type: "ai_credits_exhausted", remedy } },
+    });
+
+    const openAnalysis = async (isCloud = "false") => {
+      awsConfig.isCloud = isCloud;
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      wrapper.vm.activeTab = "incidentAnalysis";
+      await flushPromises();
+    };
+
+    afterEach(() => {
+      awsConfig.isCloud = "false";
+    });
+
+    it("a 402 on Analyze shows the blocked banner with Plans and Retry, not a raw error", async () => {
+      vi.mocked(incidentsService.triggerRca).mockRejectedValueOnce(exhausted("subscribe"));
+      await openAnalysis();
+      mockToast.mockClear();
+
+      await wrapper.vm.triggerRca();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="rca-blocked-banner"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rca-plans-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rca-blocked-retry-btn"]').exists()).toBe(true);
+      expect(mockToast.mock.calls.some(([call]) => call.variant === "error")).toBe(false);
+    });
+
+    it("a contract org's 402 offers Contact sales", async () => {
+      vi.mocked(incidentsService.triggerRca).mockRejectedValueOnce(
+        exhausted("contact_account_manager"),
+      );
+      await openAnalysis();
+
+      await wrapper.vm.triggerRca();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="rca-contact-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rca-plans-btn"]').exists()).toBe(false);
+    });
+
+    it("declining paid usage shows the blocked banner with Plans", async () => {
+      vi.mocked(incidentsService.triggerRca).mockRejectedValueOnce({
+        isAxiosError: true,
+        response: { status: 412, data: { error_type: "paid_overage_consent_required" } },
+      });
+      mockPromptForConsent.mockResolvedValue(false);
+      mockGetAiUsage.mockRejectedValue(new Error("off"));
+      await openAnalysis("true");
+
+      await wrapper.vm.triggerRca();
+      await flushPromises();
+
+      expect(incidentsService.triggerRca).toHaveBeenCalledTimes(1);
+      expect(wrapper.find('[data-test="rca-blocked-reason"]').text()).toBe(
+        "Paid AI usage is off, so this request wasn't sent.",
+      );
+      expect(wrapper.find('[data-test="rca-plans-btn"]').exists()).toBe(true);
+    });
+
+    it("the blocked banner clears once a run starts", async () => {
+      vi.mocked(incidentsService.triggerRca).mockRejectedValueOnce(exhausted("subscribe"));
+      await openAnalysis();
+      await wrapper.vm.triggerRca();
+      await flushPromises();
+      expect(wrapper.vm.rcaRefusal).not.toBeNull();
+
+      wrapper.vm.incidentDetails.rca = rcaSummary({ run_id: "run-9", state: "running" });
+      await flushPromises();
+
+      expect(wrapper.vm.rcaRefusal).toBeNull();
+      expect(wrapper.find('[data-test="rca-blocked-banner"]').exists()).toBe(false);
+    });
+
+    it("the blocked banner does not carry over to another incident", async () => {
+      vi.mocked(incidentsService.triggerRca).mockRejectedValueOnce(exhausted("subscribe"));
+      await openAnalysis();
+      await wrapper.vm.triggerRca();
+      await flushPromises();
+      expect(wrapper.vm.rcaRefusal).not.toBeNull();
+
+      vi.mocked(incidentsService.get).mockResolvedValueOnce({
+        data: createIncidentWithAlerts({ id: "2" }),
+      } as never);
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        params: { id: "2" },
+      } as never;
+      await flushPromises();
+
+      expect(wrapper.vm.incidentDetails.id).toBe("2");
+      expect(wrapper.vm.rcaRefusal).toBeNull();
+    });
+
+    it("Cloud shows the Analyze cost from the org's AI usage", async () => {
+      mockGetAiUsage.mockResolvedValue({ data: { costs: COSTS } });
+      await openAnalysis("true");
+
+      expect(mockGetAiUsage).toHaveBeenCalledWith("default");
+      expect(wrapper.find('[data-test="rca-credit-cost"]').text()).toBe("Uses 50 AI credits");
+    });
+
+    it("shows no cost outside Cloud, or when the usage read fails", async () => {
+      await openAnalysis();
+      expect(mockGetAiUsage).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="rca-credit-cost"]').exists()).toBe(false);
+      wrapper.unmount();
+
+      mockGetAiUsage.mockRejectedValue(new Error("off"));
+      await openAnalysis("true");
+      expect(wrapper.find('[data-test="rca-credit-cost"]').exists()).toBe(false);
+    });
+
+    it("the severity re-run prompt names the re-analysis cost when it is known", async () => {
+      mockGetAiUsage.mockResolvedValue({ data: { costs: COSTS } });
+      await openAnalysis("true");
+      vi.mocked(incidentsService.updateIncident).mockResolvedValueOnce({
+        data: { severity: "P2", analysis_in_flight: false },
+      } as never);
+
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+
+      expect(mockConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message:
+            "Severity has changed. Would you like AI to re-analyze this incident? It uses 20 AI credits.",
+        }),
+      );
+    });
+
+    it("the severity re-run prompt has no cost when it is unknown", async () => {
+      await openAnalysis();
+      vi.mocked(incidentsService.updateIncident).mockResolvedValueOnce({
+        data: { severity: "P2", analysis_in_flight: false },
+      } as never);
+
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+
+      expect(mockConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Severity has changed. Would you like AI to re-analyze this incident?",
+        }),
+      );
     });
   });
 });

@@ -3,8 +3,9 @@
 
 import type { InputProps, InputEmits, InputSlots } from "./OInput.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { mergeDescribedBy, splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
+import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import { useI18nTyped } from "@/types/i18n";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch } from "vue";
 
 const { t } = useI18nTyped();
@@ -18,9 +19,16 @@ defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
+// Without a label the icon is aria-hidden and unreachable by assistive tech; the tooltip's own content never gets a name otherwise.
+const tooltipIconLabel = computed(() =>
+  props.label
+    ? t("components.input.moreInfoAbout", { field: props.label })
+    : t("components.input.moreInfo"),
+);
+
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
-const split = computed(() => splitControlAttrs($attrs));
+const split = computed(() => splitControlAttrs($attrs, { forwardRole: true }));
 const wrapperAttrs = computed(() => split.value.wrapperAttrs);
 const controlAttrs = computed(() => split.value.controlAttrs);
 onMounted(() =>
@@ -46,6 +54,8 @@ const props = withDefaults(defineProps<InputProps>(), {
 const emit = defineEmits<InputEmits>();
 
 defineSlots<InputSlots>();
+
+const isDisabled = useLockedDisabled(() => props.disabled);
 
 // useId() must be called at setup top-level — not inside computed — otherwise
 // each re-evaluation produces a new id, breaking the <label :for> association.
@@ -77,15 +87,15 @@ const effectiveError = computed(() => {
 });
 const hasError = computed(() => !!effectiveError.value);
 
-// `aria-invalid` alone tells a screen reader THAT the field is wrong but never
-// WHAT is wrong. Point the control at the message element so the reason is
-// announced with the field. Only set when a message is actually rendered —
-// `effectiveError` is " " when the text lives in OFormInput's #error slot, and
-// a dangling `aria-describedby` would reference a node that does not exist.
 const errorId = computed(() => `${inputId.value}-error`);
-const describedBy = computed(() =>
-  effectiveError.value && effectiveError.value.trim() ? errorId.value : undefined,
-);
+const describedBy = computed(() => {
+  const ids = String($attrs["aria-describedby"] ?? "")
+    .split(/\s+/)
+    .filter(Boolean);
+  // An external error slot has no built-in message node to reference.
+  if (effectiveError.value?.trim()) ids.push(errorId.value);
+  return [...new Set(ids)].join(" ") || undefined;
+});
 
 const isTextarea = computed(() => props.type === "textarea");
 
@@ -268,7 +278,7 @@ const wrapperClasses = computed(() => [
     : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
   /* Disabled inputs get a muted bg + dashed border so they read as obviously
      inactive at a glance. */
-  props.disabled
+  isDisabled.value
     ? "bg-input-disabled-bg border-input-disabled-border cursor-not-allowed border-dashed"
     : "",
   props.readonly ? "border-input-border bg-input-bg" : "",
@@ -284,7 +294,7 @@ const wrapperClasses = computed(() => [
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
-        props.disabled
+        isDisabled
           ? 'text-input-label-text-disabled font-normal'
           : 'text-input-label-text font-medium',
       ]"
@@ -294,6 +304,7 @@ const wrapperClasses = computed(() => [
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
+        :label="tooltipIconLabel"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help"
         ><slot name="tooltip"
@@ -335,7 +346,7 @@ const wrapperClasses = computed(() => [
         :value="String(modelValue ?? '')"
         :name="name"
         :placeholder="placeholder"
-        :disabled="disabled"
+        :disabled="isDisabled"
         :readonly="readonly"
         :aria-required="required || undefined"
         :aria-invalid="hasError || undefined"
@@ -345,7 +356,7 @@ const wrapperClasses = computed(() => [
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
         v-bind="controlAttrs"
-        :aria-describedby="mergeDescribedBy(describedBy, controlAttrs)"
+        :aria-describedby="describedBy"
         :style="autogrow ? { overflow: 'hidden' } : undefined"
         :class="[
           'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
@@ -378,7 +389,7 @@ const wrapperClasses = computed(() => [
         :type="effectiveType"
         :name="name"
         :placeholder="placeholder"
-        :disabled="disabled"
+        :disabled="isDisabled"
         :readonly="readonly"
         :aria-required="required || undefined"
         :autofocus="autofocus"
@@ -390,7 +401,7 @@ const wrapperClasses = computed(() => [
         :tabindex="inputTabindex"
         :aria-invalid="hasError || undefined"
         v-bind="controlAttrs"
-        :aria-describedby="mergeDescribedBy(describedBy, controlAttrs)"
+        :aria-describedby="describedBy"
         :class="[
           'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
           'text-input-text placeholder:text-input-placeholder',
@@ -483,12 +494,12 @@ const wrapperClasses = computed(() => [
         :id="errorId"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
         :data-test-error-text="effectiveError"
-        class="text-input-error-text text-xs leading-none"
+        class="text-input-error-text text-xs leading-snug"
         role="alert"
       >
         {{ effectiveError }}
       </span>
-      <span v-else-if="helpText" class="text-input-hint text-xs leading-none">
+      <span v-else-if="helpText" class="text-input-hint text-xs leading-snug">
         {{ helpText }}
       </span>
       <span v-else class="flex-1" />

@@ -85,11 +85,12 @@
       <CodeQueryEditor
         :ref="(el) => (editorRef = el)"
         :key="currentLanguage"
-        :editor-id="`${dataTestPrefix}-editor-${currentLanguage}`"
+        :editor-id="editorId ?? `${dataTestPrefix}-editor-${currentLanguage}`"
         :language="currentLanguage"
         :query="query"
         :nlp-mode="nlpMode"
         :read-only="readOnly"
+        :text-preview="textPreview"
         :release-wheel-to-page="releaseWheelToPage"
         :show-auto-complete="showAutoComplete"
         :keywords="keywords"
@@ -99,8 +100,10 @@
         :free-text-decorations="freeTextDecorations ?? null"
         :filter-mode="filterMode"
         :values-time-range="valuesTimeRange ?? null"
+        :recent-queries="recentQueries ?? []"
+        :transform-generated-query="transformGeneratedQuery ?? undefined"
         @update:query="handleQueryUpdate"
-        @user-edit="emit('user-edit')"
+        @user-edit="(isBlank: boolean, wasBlank: boolean) => emit('user-edit', isBlank, wasBlank)"
         @run-query="emit('run-query')"
         @focus="handleEditorFocus"
         @blur="handleEditorBlur"
@@ -119,7 +122,7 @@
         size="icon-toolbar"
         :disabled="props.disableAi"
         @click="onAiToggleClick"
-        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-0.75 z-100 h-7.5! min-h-7.5! w-7.5! min-w-7.5! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
+        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-1 z-100 h-7! min-h-7! w-7! min-w-7! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
         <img
@@ -132,7 +135,7 @@
           aria-hidden="true"
           class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
         >
-          <OIcon name="lock" size="xs" class="text-warning-600 size-2.5!" />
+          <OIcon name="lock" size="xs" class="text-icon-locked size-2.5!" />
         </span>
         <OTooltip
           v-if="aiAccess.allowed"
@@ -165,6 +168,11 @@ import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseF
 
 type Language = "sql" | "promql" | "vrl" | "javascript";
 
+interface QueryChangeOrigin {
+  /** false when the editor was written to (setValue), rather than typed in. */
+  fromUser: boolean;
+}
+
 interface Props {
   // Language configuration
   languages?: Language[]; // Available languages (default: ['sql'])
@@ -173,6 +181,7 @@ interface Props {
   // Query props
   query: string;
   readOnly?: boolean;
+  textPreview?: boolean; // Draw the query as plain text until Monaco has painted
   showAutoComplete?: boolean;
   releaseWheelToPage?: boolean; // default true: let the page scroll when editor has nothing left to scroll
 
@@ -184,6 +193,8 @@ interface Props {
   freeTextDecorations?: { ranges: { start: number; end: number }[]; hover: I18nText } | null;
   filterMode?: boolean; // The query is a bare WHERE fragment (Logs without SQL mode)
   valuesTimeRange?: { startTime: number; endTime: number } | null; // Range field values are looked up in (microseconds)
+  recentQueries?: string[]; // The user's recent queries, offered as clock rows while typing
+  transformGeneratedQuery?: ((sql: string) => string | null) | null; // Page-specific write of an AI result (null result = keep the editor)
 
   // NL Mode (optional external control)
   nlpMode?: boolean; // External NLP mode control (undefined = internal control)
@@ -199,12 +210,14 @@ interface Props {
 
   // Testing
   dataTestPrefix?: string;
+  editorId?: string; // Monaco host id; defaults to `<dataTestPrefix>-editor-<language>`
 }
 
 const props = withDefaults(defineProps<Props>(), {
   languages: () => ["sql"],
   defaultLanguage: "sql",
   readOnly: false,
+  textPreview: false,
   showAutoComplete: true,
   releaseWheelToPage: true,
   keywords: () => [],
@@ -220,8 +233,8 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  "update:query": [query: string];
-  "user-edit": [];
+  "update:query": [query: string, origin?: QueryChangeOrigin];
+  "user-edit": [isBlank: boolean, wasBlank: boolean];
   "language-change": [language: Language];
   "ask-ai": [naturalLanguage: string, language: Language];
   "run-query": [];
@@ -328,8 +341,8 @@ const rootStyle = computed(() => {
 });
 
 // Handle query update from editor
-const handleQueryUpdate = (newQuery: string) => {
-  emit("update:query", newQuery);
+const handleQueryUpdate = (newQuery: string, _event?: unknown, origin?: QueryChangeOrigin) => {
+  emit("update:query", newQuery, origin);
 };
 
 const handleEditorFocus = () => {
@@ -615,6 +628,7 @@ defineExpose({
   toggleNlpMode: (enabled: boolean) => {
     nlpMode.value = enabled;
   },
+  openAiMode: onAiToggleClick,
 
   // Language control
   getCurrentLanguage: () => currentLanguage.value,

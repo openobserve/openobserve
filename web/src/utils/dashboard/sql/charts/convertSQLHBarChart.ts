@@ -17,6 +17,7 @@ import { calculateWidthText } from "../../chartDimensionUtils";
 import { getAxisLabel } from "../../fieldLabel";
 import { largestLabel } from "../shared/contextBuilder";
 import { type SQLContext } from "../shared/types";
+import { barStyleSeriesProps, barTrackMax, pinBarTrackAxis, seriesDataMax } from "../../barTrack";
 
 /**
  * Applies chart-specific options for: h-bar
@@ -35,8 +36,12 @@ export function applyHBarChart(ctx: SQLContext): void {
     updateTrellisConfig,
   } = ctx;
 
+  const config = panelSchema.config ?? {};
   //generate trace based on the y axis keys
-  options.series = getSeries({ barMinHeight: 1 });
+  options.series = getSeries({
+    barMinHeight: 1,
+    ...barStyleSeriesProps(config, { withTrack: true }),
+  });
 
   if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
     updateTrellisConfig();
@@ -46,6 +51,15 @@ export function applyHBarChart(ctx: SQLContext): void {
   const temp = options.xAxis;
   options.xAxis = options.yAxis;
   options.yAxis = temp;
+
+  if (config.show_bar_track) {
+    const max = barTrackMax(config.y_axis_max, seriesDataMax(options.series));
+    // Replaces the max that grows past y_axis_max, so the track always spans the same range.
+    if (max !== undefined) pinBarTrackAxis(options.xAxis, max);
+    const dataZoom = options.toolbox?.feature?.dataZoom;
+    // The brush zoom filters out bars past the axis max by default; a track clips them instead.
+    if (dataZoom) dataZoom.filterMode = "none";
+  }
 
   // xAxisKeys will be 1
   if (!panelSchema.config.trellis?.layout) {

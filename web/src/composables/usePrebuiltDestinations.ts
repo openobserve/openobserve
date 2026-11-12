@@ -18,7 +18,7 @@ import { ref, computed, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 // Services
-import alertDestinationService from "@/services/alert_destination";
+import alertDestinationService, { type JiraTestIssueResponse } from "@/services/alert_destination";
 import templatesService from "@/services/alert_templates";
 
 // Types and configurations
@@ -26,13 +26,15 @@ import {
   PREBUILT_DESTINATION_TYPES,
   getPrebuiltConfig,
   isPrebuiltType,
-  detectPrebuiltTypeFromUrl,
+  detectPrebuiltType,
   generateDestinationUrl,
   generateDestinationHeaders,
   generatePrebuiltMetadata,
+  templateChannelFor,
   getPopularPrebuiltTypes,
   getPrebuiltTypesByCategory,
 } from "@/utils/prebuilt-templates";
+import { jiraKeepsSavedToken, jiraSetupRequest } from "@/utils/prebuilt-templates/jira";
 
 /**
  * System Templates Architecture:
@@ -115,7 +117,7 @@ const buildDestinationMetadata = (
   ...slackSetupMetadata(type, setup),
 });
 
-const requestErrorMessage = (error: unknown, fallback: I18nText): I18nText => {
+export const requestErrorMessage = (error: unknown, fallback: I18nText): I18nText => {
   if (!error || typeof error !== "object") return fallback;
   const requestError = error as {
     message?: unknown;
@@ -249,6 +251,8 @@ export function usePrebuiltDestinations() {
     // Validate each credential field
     for (const field of config.credentialFields) {
       const value = credentials[field.key];
+
+      if (type === "jira" && field.key === "token" && jiraKeepsSavedToken(credentials)) continue;
 
       // Check required fields
       if (field.required && (!value || value.toString().trim() === "")) {
@@ -399,6 +403,7 @@ export function usePrebuiltDestinations() {
   async function testDestination(
     type: string,
     credentials: Record<string, any>,
+    template?: string,
   ): Promise<TestResult> {
     const requestVersion = ++testRequestVersion;
     try {
@@ -426,37 +431,32 @@ export function usePrebuiltDestinations() {
         return publishTestResult(requestVersion, result);
       }
 
-      // Ensure system templates are fetched
-      await fetchSystemTemplates();
-
-      // Get template from cache or fetch from backend
-      let templateBody = config.templateBody; // Fallback
-      const cachedTemplate = getSystemTemplate(type);
-
-      if (cachedTemplate?.body) {
-        templateBody = cachedTemplate.body;
-      } else {
-        // Try fetching directly if not in cache
+      // Jira's test creates a real issue through the server, with the server's error text on failure.
+      if (type === "jira") {
         try {
-          const templateResponse = await templatesService.get_by_name({
-            org_identifier: organizationIdentifier.value,
-            template_name: config.templateName,
+          const response = await alertDestinationService.jiraSetup<JiraTestIssueResponse>(
+            organizationIdentifier.value,
+            jiraSetupRequest(credentials, "test_issue"),
+          );
+          return publishTestResult(requestVersion, {
+            success: true,
+            timestamp: Date.now(),
+            issue: response.data,
           });
-          if (templateResponse.data?.body) {
-            templateBody = templateResponse.data.body;
-          }
-        } catch (error) {
-          console.warn("Failed to fetch template from backend, using fallback:", error);
-          // Continue with hardcoded template as fallback
+        } catch (error: unknown) {
+          return publishTestResult(requestVersion, {
+            success: false,
+            timestamp: Date.now(),
+            error: requestErrorMessage(error, t("alerts.prebuilt.testFailedUnknownError")),
+          });
         }
       }
 
-      // Generate test payload with fetched template
       const testUrl = generateDestinationUrl(type, credentials);
       const testHeaders = generateDestinationHeaders(type, credentials);
-
-      // Generate preview using fetched template
-      const testBody = fillSampleData(templateBody, credentials);
+      const testBody = template
+        ? await renderTemplateBody(template, { type, credentials })
+        : await generatePreview(type, credentials);
 
       // For email type, send email-specific test request to backend
       if (type === "email") {
@@ -521,20 +521,33 @@ export function usePrebuiltDestinations() {
    * cached copy. A content template is rendered by the backend for the webhook
    * channel; a raw body gets sample values. Errors propagate to the caller.
    */
-  async function renderTemplateBody(name: string): Promise<string> {
+  async function renderTemplateBody(
+    name: string,
+    prebuilt?: { type: string; credentials: Record<string, any> },
+  ): Promise<string> {
     const response = await templatesService.get_by_name({
       org_identifier: organizationIdentifier.value,
       template_name: name,
     });
     const template: Template = response.data;
     if (template.kind === "content") {
+      const channel = prebuilt
+        ? templateChannelFor(
+            prebuilt.type,
+            generateDestinationUrl(prebuilt.type, prebuilt.credentials),
+          )
+        : "webhook";
       const preview = await templatesService.preview({
         org_identifier: organizationIdentifier.value,
-        data: { definition: JSON.parse(template.body), channel: "webhook" },
+        data: { definition: JSON.parse(template.body), channel },
       });
-      return JSON.stringify(preview.data.payload, null, 2);
+      const payload = preview.data.payload;
+      if (channel === "email") return payload.html;
+      // The server renderer leaves the integration key to the destination.
+      if (channel === "pagerduty") payload.routing_key = prebuilt?.credentials.integrationKey;
+      return JSON.stringify(payload, null, 2);
     }
-    return fillSampleData(String(template.body ?? ""));
+    return fillSampleData(String(template.body ?? ""), prebuilt?.credentials);
   }
 
   /**
@@ -693,7 +706,8 @@ export function usePrebuiltDestinations() {
         variant: "success",
         message: t("alert_destinations.saved"),
       });
-    } catch (error: unknown) {
+    } catch (error: any) {
+      if (error?.response?.status == 403) throw error;
       toast({
         variant: "error",
         message: requestErrorMessage(error, t("alerts.prebuilt.testFailedUnknownError")),
@@ -800,7 +814,8 @@ export function usePrebuiltDestinations() {
         variant: "success",
         message: t("alert_destinations.saved"),
       });
-    } catch (error: unknown) {
+    } catch (error: any) {
+      if (error?.response?.status == 403) throw error;
       toast({
         variant: "error",
         message: requestErrorMessage(error, t("alerts.prebuilt.testFailedUnknownError")),
@@ -809,38 +824,6 @@ export function usePrebuiltDestinations() {
     } finally {
       isLoading.value = false;
     }
-  }
-
-  /**
-   * Detect if an existing destination matches a prebuilt pattern
-   */
-  function detectPrebuiltType(destination: any): PrebuiltTypeId | null {
-    if (destination.metadata?.prebuilt_type) {
-      const type = destination.metadata.prebuilt_type;
-      return isPrebuiltType(type) ? (type as PrebuiltTypeId) : null;
-    }
-
-    // Check if template name starts with "prebuilt_" or "system-prebuilt-" - this is the definitive indicator
-    if (destination.template && typeof destination.template === "string") {
-      if (destination.template.startsWith("system-prebuilt-")) {
-        // Extract type from template name (e.g., "system-prebuilt-email" -> "email")
-        const type = destination.template.replace("system-prebuilt-", "");
-        return isPrebuiltType(type) ? (type as PrebuiltTypeId) : null;
-      }
-      if (destination.template.startsWith("prebuilt_")) {
-        // Extract type from template name (e.g., "prebuilt_slack" -> "slack")
-        const type = destination.template.replace("prebuilt_", "");
-        return isPrebuiltType(type) ? (type as PrebuiltTypeId) : null;
-      }
-    }
-
-    // Try to detect based on URL pattern (fallback for destinations without template info)
-    if (destination.url) {
-      const type = detectPrebuiltTypeFromUrl(destination.url);
-      return type && isPrebuiltType(type) ? (type as PrebuiltTypeId) : null;
-    }
-
-    return null;
   }
 
   /**
@@ -893,6 +876,7 @@ export function usePrebuiltDestinations() {
         message: t("alerts.prebuilt.conversionSuccess"),
       });
     } catch (error: any) {
+      if (error?.response?.status == 403) throw error;
       console.error("Failed to convert destination:", error);
       toast({
         variant: "error",

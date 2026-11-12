@@ -149,6 +149,18 @@ describe("ONavbar", () => {
       expect(wrapper.findAll('[data-test^="nav-group-"]')).toHaveLength(0);
     });
 
+    it("draws placeholder tiles while the menu is loading", () => {
+      wrapper = mountNavbar({ linksList: [], loading: true });
+      expect(wrapper.find('[data-test="navbar-rail-skeleton"]').exists()).toBe(true);
+      expect(wrapper.findAll('[data-test^="menu-link-"]')).toHaveLength(0);
+    });
+
+    it("replaces the placeholder tiles with the menu once it is ready", () => {
+      wrapper = mountNavbar({ loading: false });
+      expect(wrapper.find('[data-test="navbar-rail-skeleton"]').exists()).toBe(false);
+      expect(wrapper.findAll('[data-test^="menu-link-"]')).toHaveLength(3);
+    });
+
     it("passes the paywall verdict for each plain link's destination to its tile", () => {
       paywalled.add("/logs");
       wrapper = mountNavbar();
@@ -184,7 +196,7 @@ describe("ONavbar", () => {
       // Data behaves like a link+subnav tile (click navigates, hover reveals).
       expect(data.attributes("data-mode")).toBe("link");
       expect(data.attributes("data-children")).toBe(
-        "logstreams,pipelines,functionList,enrichmentTables",
+        "logstreams,pipelines,functionList,enrichmentTables,fleet",
       );
       // The children `requires` removed still reach the group.
       expect(data.attributes("data-filtered")).toBe("workflows,ingestion");
@@ -207,7 +219,7 @@ describe("ONavbar", () => {
       const reliability = wrapper.find('[data-test="nav-group-reliability"]');
       expect(reliability.exists()).toBe(true);
       expect(reliability.attributes("data-children")).toBe(
-        "alertList,alertDestinations,alertTemplates,alertLibrary,alertCalibration,onCallResponses,onCallTeams,onCallRouting",
+        "alertList,alertDestinations,alertTemplates,alertLibrary,alertCalibration,onCallResponses,onCallTeams,onCallRouting,onCallMine",
       );
       expect(reliability.attributes("data-filtered")).toBe(
         "sloList,incidentList,downtimes,alertSources",
@@ -215,23 +227,44 @@ describe("ONavbar", () => {
       expect(wrapper.find('[data-test="menu-link-reports-item"]').exists()).toBe(true);
     });
 
-    it("renders IAM / Management / AI as plain links (no submenu)", () => {
+    it("renders AI as a plain link and IAM inside the Settings flyout", () => {
       wrapper = mountNavbar({
         linksList: [
           { title: "Home", icon: "home", link: "/home", name: "home" },
           { title: "IAM", icon: "manage-accounts", link: "/iam", name: "iam" },
-          { title: "Management", icon: "settings", link: "/settings", name: "settings" },
+          { title: "Settings", icon: "settings", link: "/settings", name: "settings" },
           { title: "AI", icon: "auto-awesome", link: "/ai", name: "aiObservability" },
         ],
       });
-      // Plain top-level links …
-      expect(wrapper.find('[data-test="menu-link-iam-item"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="menu-link-settings-item"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="menu-link-aiObservability-item"]').exists()).toBe(true);
-      // … not flyout groups.
-      expect(wrapper.find('[data-test="nav-group-iam"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="nav-group-settings"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="nav-group-aiObservability"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="menu-link-iam-item"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="menu-link-settings-item"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="nav-group-settings"]').exists()).toBe(true);
+    });
+
+    it("adds no flyout groups to a flat rail", () => {
+      wrapper = mountNavbar({
+        flat: true,
+        linksList: [
+          {
+            title: "Overview",
+            icon: "bar-chart",
+            link: "/security/overview",
+            name: "securityOverview",
+          },
+          {
+            title: "Alerts",
+            icon: "notifications-active",
+            link: "/security/alerts",
+            name: "alertList",
+          },
+        ],
+      });
+      expect(wrapper.find('[data-test="nav-group-infra"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="nav-group-reliability"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="menu-link-securityOverview-item"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="menu-link-alertList-item"]').exists()).toBe(true);
     });
 
     it("drops the Data group entirely when no data items are present", () => {
@@ -469,7 +502,7 @@ describe("ONavbar", () => {
       "x1",
       "x2",
       "x3",
-      "iam",
+      "x6",
       "x4",
       "plans",
       "settings",
@@ -645,6 +678,17 @@ describe("ONavbar", () => {
       await shortRouterInstance.push("/x4");
       await flushPromises();
       expect(nav.scrollTop).toBe(30);
+    });
+
+    it("a query-only replace after a rail click leaves the half-faded tile where the pointer is", async () => {
+      await mountShort();
+      clickTile("x4");
+      await shortRouterInstance.push("/x4");
+      await flushPromises();
+      expect(nav.scrollTop).toBe(0);
+      await shortRouterInstance.replace({ path: "/x4", query: { period: "15m" } });
+      await flushPromises();
+      expect(nav.scrollTop).toBe(0);
     });
 
     it("a flyout-item click marks through the injected function", async () => {

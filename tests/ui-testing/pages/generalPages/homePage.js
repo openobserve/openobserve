@@ -1,6 +1,7 @@
 // homePage.js - Landing Page Object for OpenObserve
 import { expect } from '@playwright/test';
-import { openNavFlyoutChild, gotoMetricsEditor } from '../commonActions.js';
+import { confirmDraftSignOut } from './draftSignOut.js';
+import { openNavFlyoutChild, gotoMetricsVisualize, clickNavUntilRoute } from '../commonActions.js';
 
 export class HomePage {
     constructor(page) {
@@ -15,7 +16,6 @@ export class HomePage {
         this.dashboardsMenu = page.locator('[data-test="menu-link-\\/dashboards-item"]');
         this.streamsMenu = page.locator('[data-test="menu-link-\\/streams-item"]');
         this.alertsMenu = page.locator('[data-test="menu-link-\\/alerts-item"]');
-        this.iamMenu = page.locator('[data-test="menu-link-\\/iam-item"]');
 
         // ===== HEADER SELECTORS (VERIFIED) =====
         this.orgSelector = page.locator('[data-test="navbar-organizations-select"]');
@@ -57,7 +57,7 @@ export class HomePage {
         this.streamsPageIndicator = page.locator('[data-test="streams-search-stream-input"]').or(page.locator('[data-test="stream-add-stream-btn"]')).first();
         this.dashboardsPageIndicator = page.locator('[data-test="dashboard-new"]').or(page.locator('[data-test="dashboard-table"]')).first();
         this.alertsPageIndicator = page.locator('[data-test="alert-list-page"]').or(page.locator('[data-test="alerts-page"]')).first();
-        this.metricsPageIndicator = page.locator('[data-test="metrics-page"]').or(page.locator('[data-test="metrics-apply"]')).first();
+        this.metricsPageIndicator = page.locator('[data-test="metrics-explorer-visualize"]').or(page.locator('[data-test="metrics-explorer-run"]')).first();
         this.tracesPageIndicator = page.locator('[data-test="traces-search-bar-refresh-btn"]').or(page.locator('[data-test="logs-search-bar-refresh-btn"]')).first();
         this.ingestionPageIndicator = page.locator('[data-test="ingestion-page"]').or(page.locator('[data-test="recommended-list-search-input"]')).first();
         this.settingsPageIndicator = page.locator('[data-test="settings-general-page-title"]').or(page.locator('button[data-test="general-settings-tab"]')).first();
@@ -87,20 +87,12 @@ export class HomePage {
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
-    /**
-     * Clicks the sidebar's Metrics item — which is what this page object's
-     * callers are testing — and then continues into the panel EDITOR, whose
-     * controls `validateMetricsPageElements` asserts on.
-     *
-     * The sidebar now lands on the Metrics Explorer browse grid (`/metrics`);
-     * the editor moved to `/metrics/editor`. Both hops are kept so the sidebar
-     * link itself stays covered rather than being bypassed by a direct goto.
-     */
+    /** Clicks the sidebar Metrics item, then switches to Visualize mode. */
     async navigateToMetrics() {
         await this.metricsMenu.waitFor({ state: 'visible', timeout: 10000 });
         await this.metricsMenu.click();
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-        await gotoMetricsEditor(this.page);
+        await gotoMetricsVisualize(this.page);
     }
 
     async navigateToTraces() {
@@ -111,19 +103,19 @@ export class HomePage {
 
     async navigateToDashboards() {
         await this.dashboardsMenu.waitFor({ state: 'visible', timeout: 10000 });
-        await this.dashboardsMenu.click();
+        await clickNavUntilRoute(this.page, '[data-test="menu-link-\\/dashboards-item"]', '/dashboards');
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
     async navigateToStreams() {
         await this.streamsMenu.waitFor({ state: 'visible', timeout: 10000 });
-        await this.streamsMenu.click();
+        await clickNavUntilRoute(this.page, '[data-test="menu-link-\\/streams-item"]', '/streams');
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
     async navigateToAlerts() {
         await this.alertsMenu.waitFor({ state: 'visible', timeout: 10000 });
-        await this.alertsMenu.click();
+        await clickNavUntilRoute(this.page, '[data-test="menu-link-\\/alerts-item"]', '/alerts');
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
@@ -150,8 +142,7 @@ export class HomePage {
     }
 
     async navigateToIam() {
-        await this.iamMenu.waitFor({ state: 'visible', timeout: 10000 });
-        await this.iamMenu.click();
+        await openNavFlyoutChild(this.page, 'iam');
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
@@ -378,6 +369,7 @@ export class HomePage {
     async logout() {
         await this.openProfileMenu();
         await this.logoutButton.click();
+        await confirmDraftSignOut(this.page);
     }
 
     async openThemeManager() {
@@ -708,9 +700,9 @@ export class HomePage {
      * Validate Metrics page UI elements
      */
     async validateMetricsPageElements() {
-        await expect(this.page.locator('[data-test="metrics-apply"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="metrics-explorer-run"]')).toBeVisible({ timeout: 10000 });
         await expect(this.page.locator('[data-test="metrics-date-picker"]')).toBeVisible({ timeout: 5000 });
-        await expect(this.page.locator('[data-test="metrics-page"]')).toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('[data-test="metrics-explorer-visualize"]')).toBeVisible({ timeout: 5000 });
     }
 
     /**

@@ -6,6 +6,7 @@
 const crypto = require('crypto');
 const testLogger = require('./test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
+const { ingestBase } = require('./ingest-url.js');
 
 /**
  * Generate a random hex string of specified byte length
@@ -33,6 +34,7 @@ function getTimestampNs() {
  *   one. Used by tests that must guarantee error traces exist (e.g. the traces
  *   error-only toggle), removing the data-dependent flake where a random draw
  *   produced no error spans.
+ * @param {number} [options.ageMs] - Stamp the trace this many ms before now.
  * @returns {Object} OTLP trace data
  */
 function generateTrace(iteration, options = {}) {
@@ -42,7 +44,7 @@ function generateTrace(iteration, options = {}) {
   const clientSpanId = generateHexId(8);
   const serverSpanId = generateHexId(8);
 
-  const startTime = getTimestampNs();
+  const startTime = String((Date.now() - (options.ageMs || 0)) * 1000000);
 
   // Randomly choose scenario
   const scenarios = [
@@ -253,7 +255,7 @@ function generateTrace(iteration, options = {}) {
  * @returns {Promise<Object>} Ingestion result
  */
 async function ingestTraces(page, traceCount = 10, options = {}) {
-  testLogger.info(`Starting trace ingestion`, { traceCount, forceScenario: options.forceScenario });
+  testLogger.info(`Starting trace ingestion`, { traceCount, forceScenario: options.forceScenario, ageMs: options.ageMs });
 
   const orgId = getOrgIdentifier() || "default";
   const headers = getAuthHeaders();
@@ -267,7 +269,7 @@ async function ingestTraces(page, traceCount = 10, options = {}) {
     traceIds.push(traceData.resourceSpans[0].scopeSpans[0].spans[0].traceId);
 
     try {
-      const response = await page.request.post(`${baseUrl}/api/${orgId}/v1/traces`, {
+      const response = await page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/v1/traces`, {
         headers,
         data: traceData
       });
@@ -342,7 +344,7 @@ async function ingestSequencedErrorSpans(page, streamName, count) {
     spans.push(span(`err-op-${seq}`, start, i + 1, 2));
     spans.push(span(`ok-op-${seq}`, start + 2000000000n, 1, 1));
   }
-  const response = await page.request.post(`${baseUrl}/api/${orgId}/v1/traces`, {
+  const response = await page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/v1/traces`, {
     headers: { ...getAuthHeaders(), 'stream-name': streamName },
     data: {
       resourceSpans: [{

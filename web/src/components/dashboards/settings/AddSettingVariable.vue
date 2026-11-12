@@ -263,36 +263,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                   </OTooltip>
                 </div>
-                <div class="mt-2" data-test="dashboard-variable-filter-builder">
-                  <VariableFilterGroup
-                    :group="filterGroup"
-                    path="query_data.filter_group"
-                    test-key=""
-                    :depth="0"
-                    :field-options="data.currentFieldsList"
-                    :operator-options="
-                      queryLanguage === 'promql'
-                        ? promqlFilterOperatorOptions
-                        : filterOperatorOptions
-                    "
-                    :value-items="dashboardVariablesFilterItems"
-                    :promql="queryLanguage === 'promql'"
-                    :show-errors="filterSubmitAttempted"
+                <div class="mt-2">
+                  <FilterBuilder
+                    ref="filterBuilderRef"
+                    :profile="filterProfile"
+                    :model-value="filterValue"
+                    :fields="filterFields"
+                    :load-values="loadFilterValues"
+                    :extra-value-suggestions="filterVariableSuggestions"
+                    data-test="dashboard-variable-filter-builder"
+                    @update:model-value="onFilterChange"
                   />
-                </div>
-                <div
-                  v-if="queryLanguage === 'promql'"
-                  class="text-text-secondary mt-2 text-xs"
-                  data-test="dashboard-variable-filter-promql-hint"
-                >
-                  {{ t("dashboard.queryVariable.promqlFiltersAndHint") }}
-                </div>
-                <div
-                  v-if="promqlFilterGroupInvalid"
-                  class="text-status-error-text mt-1 text-xs"
-                  data-test="dashboard-variable-filter-promql-error"
-                >
-                  {{ t("dashboard.queryVariable.promqlFiltersAndOnly") }}
                 </div>
 
                 <!-- show error if filter has cycle -->
@@ -319,6 +300,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="value"
               :label="t('dashboard.DefaultValue')"
               data-test="dashboard-variable-textbox-default-value"
+            />
+          </div>
+          <div class="mt-3" v-if="variableData.type === 'date'">
+            <OFormDate
+              name="value"
+              :label="t('dashboard.DefaultValue')"
+              clearable
+              data-test="dashboard-variable-date-default-value"
+            />
+          </div>
+          <div class="mt-3 flex flex-col" v-if="variableData.type === 'date'">
+            <OFormSelect
+              name="dateFormat"
+              :label="t('dashboard.dateFormat')"
+              :options="dateFormatOptions"
+              :help-text="t('dashboard.dateFormatHelp')"
+              data-test="dashboard-variable-date-format-select"
             />
           </div>
           <div v-if="variableData.type == 'custom'">
@@ -466,6 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div v-if="variableData.multiSelect" class="flex w-1/2">
                 <OButton
+                  :aria-label="t('common.add')"
                   variant="outline"
                   size="sm"
                   class="mt-3"
@@ -539,17 +538,24 @@ import {
   reactive,
   onMounted,
   onActivated,
+  onBeforeUnmount,
   watch,
   toRef,
   computed,
   nextTick,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import {
+  DATE_VARIABLE_FORMATS,
+  DEFAULT_DATE_VARIABLE_FORMAT,
+} from "@/utils/dashboard/variables/variablesUtils";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
 import { addVariable, getDashboard, updateVariable } from "../../../utils/commons";
 import { useRoute } from "vue-router";
 import { useLoading } from "../../../composables/useLoading";
+import { useDashboardSettingsDraft } from "./dashboardSettingsDraft";
+import { stableStringify } from "@/utils/drafts/editorDraftStore";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -560,6 +566,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -577,19 +584,16 @@ import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 import {
   buildAutoPromqlQuery,
   buildAutoSqlQuery,
-  PROMQL_FILTER_OPERATORS,
+  type QueryVariableData,
   type QueryVariableLanguage,
 } from "@/utils/dashboard/variables/queryVariableUtils";
-import {
-  createFilterGroup,
-  filterGroupHasNesting,
-  filterGroupHasOr,
-  filterGroupToQueryData,
-  getVariableFilterGroup,
-  type VariableFilterGroup as VariableFilterGroupData,
-} from "@/utils/dashboard/variables/variableFilterGroupUtils";
 import QueryVariableEditor from "./QueryVariableEditor.vue";
-import VariableFilterGroup from "./VariableFilterGroup.vue";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import type { FilterBuilderExpose } from "@/components/filterBar/FilterBuilder.types";
+import type { VariableFilterValue } from "@/components/filterBar/codecs";
+import { FILTER_PROFILES } from "@/components/filterBar/filterProfiles";
+import { requestFieldValues } from "@/composables/fieldValueStore";
+import { toFilterFieldType, type FilterField } from "@/utils/query/filterBar";
 import useNotifications from "@/composables/useNotifications";
 import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import analytics from "@/services/product_analytics";
@@ -600,7 +604,7 @@ export default defineComponent({
   components: {
     DashboardHeader,
     QueryVariableEditor,
-    VariableFilterGroup,
+    FilterBuilder,
     OButton,
     OFormToggleGroup,
     OToggleGroup,
@@ -608,6 +612,7 @@ export default defineComponent({
     OForm,
     OFormSelect,
     OFormInput,
+    OFormDate,
     OFormSwitch,
     OFormCheckbox,
     OCheckbox,
@@ -639,7 +644,7 @@ export default defineComponent({
         stream: "",
         field: "",
         max_record_size: null,
-        filter_group: createFilterGroup("AND", []),
+        filter: [],
         query_type: "sql",
         custom_query: false,
         query: "",
@@ -647,6 +652,7 @@ export default defineComponent({
         label_field: "",
       },
       value: "",
+      dateFormat: DEFAULT_DATE_VARIABLE_FORMAT,
       options: [{ label: raw(""), value: "", selected: true }],
       multiSelect: false,
       hideOnDashboard: false,
@@ -655,45 +661,6 @@ export default defineComponent({
       escapeSingleQuotes: true,
     });
     const { t } = useI18nTyped();
-
-    /**
-     * Filter operators for the variable query builder. The `value` is persisted into
-     * `query_data.filter[].operator` and switched on by identity, so it stays English;
-     * only the label is translated. SQL/regex tokens are the syntax itself and stay
-     * `raw()`. Mirrors views/Dashboards/addPanel/AddCondition.vue.
-     */
-    const filterOperatorOptions = computed(() => [
-      { label: raw("="), value: "=" },
-      { label: raw("!="), value: "!=" },
-      { label: raw(">="), value: ">=" },
-      { label: raw("<="), value: "<=" },
-      { label: raw(">"), value: ">" },
-      { label: raw("<"), value: "<" },
-      { label: raw("IN"), value: "IN" },
-      { label: raw("NOT IN"), value: "NOT IN" },
-      { label: raw("str_match"), value: "str_match" },
-      { label: raw("str_match_ignore_case"), value: "str_match_ignore_case" },
-      { label: raw("match_all"), value: "match_all" },
-      { label: raw("re_match"), value: "re_match" },
-      { label: raw("re_not_match"), value: "re_not_match" },
-      { label: t("dashboard.filterOperators.contains"), value: "Contains" },
-      { label: t("dashboard.filterOperators.notContains"), value: "Not Contains" },
-      { label: t("dashboard.filterOperators.startsWith"), value: "Starts With" },
-      { label: t("dashboard.filterOperators.endsWith"), value: "Ends With" },
-      { label: t("dashboard.filterOperators.isNull"), value: "Is Null" },
-      { label: t("dashboard.filterOperators.isNotNull"), value: "Is Not Null" },
-    ]);
-    const PROMQL_OPERATOR_LABELS: Record<string, string> = { re_match: "=~", re_not_match: "!~" };
-    const promqlFilterOperatorOptions = computed(() =>
-      filterOperatorOptions.value
-        .filter((option) => PROMQL_FILTER_OPERATORS.includes(option.value))
-        .map((option) => ({
-          ...option,
-          label: PROMQL_OPERATOR_LABELS[option.value]
-            ? raw(PROMQL_OPERATOR_LABELS[option.value])
-            : option.label,
-        })),
-    );
 
     const addSettingVariableSchema = makeAddSettingVariableSchema(t);
     const form = useOForm<AddSettingVariableForm>({
@@ -735,6 +702,7 @@ export default defineComponent({
         name: fieldView("name"),
         label: fieldView("label"),
         value: fieldView("value"),
+        dateFormat: fieldView("dateFormat"),
         query_data: {
           get: () => formValues.value?.query_data ?? {},
           set: (v: unknown) => {
@@ -765,6 +733,73 @@ export default defineComponent({
     // Form-driven Save spinner for the footer (outside <OForm>, linked by
     // form-id). isSubmitting resets even if the save throws.
     const isSavingVariable = form.useStore((s: any) => s.isSubmitting);
+
+    // The panel editor's variable form has no settings drawer around it, so it keeps no draft.
+    const draftContext = props.isFromAddPanel ? null : useDashboardSettingsDraft();
+    // The form as loaded, once its own watchers settled; null until then.
+    let loadedKey: string | null = null;
+    // Set once the form saved or was cancelled, so its last values never come back as unsaved.
+    let released = false;
+    let lastSaveSucceeded = false;
+    let unregisterDraftSection: (() => void) | null = null;
+
+    const syncDraftSection = () => {
+      if (!draftContext || loadedKey === null || released) return;
+      const values = JSON.parse(JSON.stringify(formValues.value ?? {})) as AddSettingVariableForm;
+      draftContext.pending.variable =
+        stableStringify(values) === loadedKey
+          ? null
+          : { variableName: props.variableName ?? null, values };
+    };
+
+    const pendingForThisVariable = () => {
+      const pending = draftContext?.pending.variable;
+      return pending && pending.variableName === (props.variableName ?? null) ? pending : null;
+    };
+
+    const applyPendingDraft = async () => {
+      const pending = pendingForThisVariable();
+      if (!pending) return;
+      form.reset(pending.values);
+      customSelectAllModel.value =
+        pending.values.type === "custom" &&
+        (pending.values.options ?? []).length > 0 &&
+        (pending.values.options ?? []).every((option: { selected?: boolean }) => option.selected);
+      await nextTick();
+    };
+
+    const releaseDraftSection = () => {
+      released = true;
+      if (draftContext) draftContext.pending.variable = null;
+    };
+
+    const saveForDraft = async (): Promise<boolean> => {
+      lastSaveSucceeded = false;
+      await form.handleSubmit();
+      return lastSaveSucceeded;
+    };
+
+    const startDraftSection = async () => {
+      if (!draftContext) return;
+      // Two ticks: the scope and panel watchers prune the loaded selection after a reset.
+      await nextTick();
+      await nextTick();
+      loadedKey = stableStringify(formValues.value ?? {});
+      await applyPendingDraft();
+      syncDraftSection();
+      unregisterDraftSection = draftContext.register("variable", saveForDraft);
+    };
+
+    watch(formValues, syncDraftSection, { deep: true });
+    watch(
+      () => draftContext?.restoreRevision,
+      async () => {
+        if (loadedKey === null) return;
+        await applyPendingDraft();
+        syncDraftSection();
+      },
+    );
+    onBeforeUnmount(() => unregisterDraftSection?.());
 
     // Format tabs for selection from dashboard data
     const tabsOptions = computed(() =>
@@ -854,6 +889,10 @@ export default defineComponent({
         subLabel: t("dashboard.queryVariable.typeTextboxDescription"),
       },
       {
+        label: t("dashboard.date"),
+        value: "date",
+      },
+      {
         label: t("dashboard.custom"),
         value: "custom",
         subLabel: t("dashboard.queryVariable.typeCustomDescription"),
@@ -862,6 +901,22 @@ export default defineComponent({
 
     const selectedTypeDescription = computed(
       () => variableTypes.value.find((type) => type.value === variableData.type)?.subLabel,
+    );
+
+    // Each option shows its format name as written in `${name:<format>}`.
+    const dateFormatLabels = {
+      iso: "dashboard.dateFormatIso",
+      dmy: "dashboard.dateFormatDmy",
+      mdy: "dashboard.dateFormatMdy",
+      epoch: "dashboard.dateFormatEpoch",
+      epochms: "dashboard.dateFormatEpochms",
+      epochus: "dashboard.dateFormatEpochus",
+    } as const satisfies Record<(typeof DATE_VARIABLE_FORMATS)[number], string>;
+    const dateFormatOptions = computed(() =>
+      DATE_VARIABLE_FORMATS.map((format) => ({
+        label: t(dateFormatLabels[format]),
+        value: format,
+      })),
     );
 
     const filterCycleError: any = ref("");
@@ -891,9 +946,12 @@ export default defineComponent({
     const lastPrefills: Partial<Record<QueryVariableLanguage, string>> = {};
 
     const autoQueryFor = (language: QueryVariableLanguage): string => {
-      const queryData = variableData.query_data;
+      const queryData = variableData.query_data as QueryVariableData | undefined;
       if (!queryData?.stream || !queryData?.field) return "";
-      return language === "promql" ? buildAutoPromqlQuery(queryData) : buildAutoSqlQuery(queryData);
+      if (language === "sql") return buildAutoSqlQuery(queryData);
+      const { filter, filter_group, ...rest } = queryData;
+      const filters = { filter, filter_group } as VariableFilterValue;
+      return buildAutoPromqlQuery({ ...rest, ...filterPayload("promql", filters) });
     };
 
     // A hand-edited text stays; an empty one or an untouched prefill follows the auto settings.
@@ -940,16 +998,8 @@ export default defineComponent({
       }
     };
 
-    const filterGroup = computed<VariableFilterGroupData>(
-      () => variableData.query_data?.filter_group ?? createFilterGroup("AND", []),
-    );
-    const filterSubmitAttempted = form.useStore((s: any) => s.submissionAttempts > 0);
-    const promqlFilterGroupInvalid = computed(
-      () =>
-        queryLanguage.value === "promql" &&
-        !isCustomQuery.value &&
-        (filterGroupHasOr(filterGroup.value) || filterGroupHasNesting(filterGroup.value)),
-    );
+    // Defaults (multiSelect / hideOnDashboard / selectAllValueForMultiSelect /
+    // escapeSingleQuotes) are seeded by the schema defaults — no manual init.
 
     const editMode = ref(false);
 
@@ -986,7 +1036,8 @@ export default defineComponent({
           stream: variable.query_data?.stream ?? "",
           field: variable.query_data?.field ?? "",
           max_record_size: variable.query_data?.max_record_size ?? null,
-          filter_group: getVariableFilterGroup(variable.query_data),
+          filter: variable.query_data?.filter ?? [],
+          filter_group: variable.query_data?.filter_group,
           query_type: variable.query_data?.query_type ?? "sql",
           custom_query: variable.query_data?.custom_query === true,
           query: variable.query_data?.query ?? "",
@@ -994,6 +1045,7 @@ export default defineComponent({
           label_field: variable.query_data?.label_field ?? "",
         },
         value: variable.value ?? "",
+        dateFormat: variable.dateFormat ?? DEFAULT_DATE_VARIABLE_FORMAT,
         options,
         multiSelect: variable.multiSelect ?? false,
         hideOnDashboard: variable.hideOnDashboard ?? false,
@@ -1053,6 +1105,7 @@ export default defineComponent({
       } catch (error) {
         showErrorNotification(t("dashboard.addSettingVariable.failedToLoadDashboard"));
       }
+      await startDraftSection();
     });
 
     // Watch on scope — reset tab/panel selections via the form.
@@ -1105,6 +1158,15 @@ export default defineComponent({
     watch(
       () => [variableData.type],
       async () => {
+        // a date variable keeps its value only when it is a valid YYYY-MM-DD
+        // (only write when non-empty: the write re-triggers this watcher)
+        if (
+          variableData.type == "date" &&
+          variableData.value &&
+          !/^\d{4}-\d{2}-\d{2}$/.test(String(variableData.value))
+        ) {
+          form.setFieldValue("value", "" as never);
+        }
         if (variableData.type == "query_values") {
           // query_data always exists via the schema defaults (no manual init).
 
@@ -1223,6 +1285,7 @@ export default defineComponent({
       if (v.query_data) v.query_data = buildQueryDataPayload(v.query_data);
       // A custom query's options come from its query; the form's placeholder option would show as a blank row.
       if (v.query_data?.custom_query) v.options = [];
+      if (v.type !== "date") delete v.dateFormat;
       if (v.type !== "query_values" && v.type !== "custom") {
         v.multiSelect = false;
         v.selectAllValueForMultiSelect = "";
@@ -1241,6 +1304,17 @@ export default defineComponent({
       return v;
     };
 
+    // The builder writes filter_group only for OR or nesting; PromQL has no OR, so a SQL group is saved as its AND rows.
+    const filterPayload = (
+      language: QueryVariableLanguage,
+      { filter, filter_group }: VariableFilterValue,
+    ): VariableFilterValue => {
+      if (!filter_group) return { filter: filter ?? [] };
+      if (language === "sql") return { filter_group };
+      const codec = FILTER_PROFILES["dashboard-variable-promql"].codec;
+      return codec.serialize(codec.parse({ filter_group }, { fields: [] }), { fields: [] });
+    };
+
     // An auto SQL variable keeps the legacy shape; query keys are only saved for PromQL or a custom query.
     const buildQueryDataPayload = (queryData: any) => {
       const {
@@ -1253,12 +1327,8 @@ export default defineComponent({
         filter,
         ...base
       } = queryData;
-      // Only OR or nesting needs filter_group; anything else saves the legacy filter array unchanged.
-      const rest = {
-        ...base,
-        ...filterGroupToQueryData(getVariableFilterGroup({ filter, filter_group })),
-      };
-      const language = query_type === "promql" && rest.stream_type === "metrics" ? "promql" : "sql";
+      const language = query_type === "promql" && base.stream_type === "metrics" ? "promql" : "sql";
+      const rest = { ...base, ...filterPayload(language, { filter, filter_group }) };
       if (!custom_query) return language === "promql" ? { ...rest, query_type: language } : rest;
       const payload: any = { ...rest, custom_query: true, query_type: language, query };
       if (language === "sql" && value_field) payload.value_field = value_field;
@@ -1296,6 +1366,8 @@ export default defineComponent({
             route.query.folder ?? "default",
           );
           analytics.track("dashboard_variable_saved", { type: payload.type, is_new: false });
+          lastSaveSucceeded = true;
+          releaseDraftSection();
           emit("save");
         } catch (error: any) {
           if (saveConflict.isConflict(error)) {
@@ -1306,6 +1378,7 @@ export default defineComponent({
               onResolved: () => emit("save"),
             });
             // The variable is already in the working copy; leaving the form open would let Save add it again.
+            releaseDraftSection();
             emit("save");
           } else {
             showErrorNotification(
@@ -1320,6 +1393,8 @@ export default defineComponent({
         try {
           await addVariable(t, store, dashId, payload, route.query.folder ?? "default");
           analytics.track("dashboard_variable_saved", { type: payload.type, is_new: true });
+          lastSaveSucceeded = true;
+          releaseDraftSection();
           emit("save");
         } catch (error: any) {
           if (saveConflict.isConflict(error)) {
@@ -1330,6 +1405,7 @@ export default defineComponent({
               onResolved: () => emit("save"),
             });
             // The variable is already in the working copy; leaving the form open would let Save add it again.
+            releaseDraftSection();
             emit("save");
           } else {
             showErrorNotification(
@@ -1540,6 +1616,7 @@ export default defineComponent({
     };
 
     const close = () => {
+      releaseDraftSection();
       emit("close");
     };
 
@@ -1606,6 +1683,50 @@ export default defineComponent({
         value: "$" + it.name,
       }));
     });
+
+    const filterBuilderRef = ref<FilterBuilderExpose | null>(null);
+
+    const filterFields = computed<FilterField[]>(() =>
+      (data.currentFieldsList ?? [])
+        .filter((field: any) => field?.name)
+        .map((field: any) => ({ name: field.name, type: toFilterFieldType(field.type) })),
+    );
+
+    // A stream picked as a `$variable` is only known once the dashboard resolves it.
+    const loadFilterValues = (field: string, search: string): Promise<string[]> => {
+      const streamName = variableData.query_data?.stream;
+      const streamType = variableData.query_data?.stream_type;
+      if (!streamName || !streamType || /\$|\{\{/.test(streamName)) return Promise.resolve([]);
+      return requestFieldValues(
+        { org: store.state.selectedOrganization.identifier, streamType, streamName },
+        field,
+        { keyword: search || undefined },
+      );
+    };
+
+    const filterVariableSuggestions = (): string[] =>
+      dashboardVariablesFilterItems.value.map((item: any) => item.value);
+
+    // A PromQL selector has no OR, so its filters stay a flat AND list.
+    const filterProfile = computed(() =>
+      queryLanguage.value === "promql" ? "dashboard-variable-promql" : "dashboard-variable",
+    );
+    const filterValue = computed(
+      (): VariableFilterValue =>
+        ({
+          filter: variableData.query_data?.filter,
+          filter_group: variableData.query_data?.filter_group,
+        }) as VariableFilterValue,
+    );
+    const onFilterChange = (value: unknown) => {
+      const next = value as VariableFilterValue;
+      setFormField("query_data.filter", next.filter);
+      setFormField("query_data.filter_group", next.filter_group);
+    };
+
+    // The filter rows have no form field of their own, so a failed save marks their chips instead.
+    const submissionAttempts = form.useStore((s: any) => s.submissionAttempts);
+    watch(submissionAttempts, () => filterBuilderRef.value?.validate());
 
     // Merged stream options: variables + streams for the select
     const mergedStreamOptions = computed(() => {
@@ -1700,10 +1821,6 @@ export default defineComponent({
       store,
       t,
       raw,
-      filterOperatorOptions,
-      filterGroup,
-      filterSubmitAttempted,
-      promqlFilterGroupInvalid,
       data,
       streamsFilterFn,
       fieldsFilterFn,
@@ -1717,7 +1834,7 @@ export default defineComponent({
       onQueryModeChange,
       onQueryLanguageChange,
       queryVariableEditorRef,
-      promqlFilterOperatorOptions,
+      dateFormatOptions,
       streamTypeUpdated,
       streamUpdated,
       onActivated,
@@ -1729,6 +1846,14 @@ export default defineComponent({
       close,
       title,
       onSubmit,
+      filterBuilderRef,
+      filterFields,
+      loadFilterValues,
+      filterVariableSuggestions,
+      filterProfile,
+      filterValue,
+      onFilterChange,
+      setFormField,
       filterCycleError,
       dashboardVariablesFilterItems,
       mergedStreamOptionsWithLabel,

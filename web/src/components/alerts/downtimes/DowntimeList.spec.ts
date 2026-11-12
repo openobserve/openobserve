@@ -23,6 +23,9 @@ import type { DowntimeListItem, DowntimeListResponse } from "@/services/downtime
 import common from "@/services/common";
 import { queryClient } from "@/composables/query/queryClient";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // The route guard opens this page only with downtimes on.
 vi.mock("@/composables/downtimes/useDowntimesEnabled", async () => {
@@ -208,6 +211,28 @@ describe("DowntimeList", () => {
       },
     } as never);
 
+  it("reads no synthetics folders while synthetics is license-locked", async () => {
+    cutList();
+    store.state.zoConfig.features = { synthetics: "locked" };
+    try {
+      const wrapper = await mountList();
+      const types = vi.mocked(common.list_Folders).mock.calls.map((call) => call[1]);
+      expect(types).toContain("alerts");
+      expect(types).not.toContain("synthetics");
+      wrapper.unmount();
+    } finally {
+      delete store.state.zoConfig.features;
+    }
+  });
+
+  it("reads the synthetics folders while synthetics is enabled", async () => {
+    cutList();
+    const wrapper = await mountList();
+    const types = vi.mocked(common.list_Folders).mock.calls.map((call) => call[1]);
+    expect(types).toContain("synthetics");
+    wrapper.unmount();
+  });
+
   it("says when the list is cut and keeps a folder's tiles on the rows it shows", async () => {
     cutList();
     const wrapper = await mountList({ folder: "team-a" });
@@ -291,6 +316,19 @@ describe("DowntimeList", () => {
     wrapper.unmount();
   });
 
+  it("tracks the status and type filters a user picks", async () => {
+    vi.mocked(downtimes.list).mockResolvedValue(page([row()]) as never);
+    const wrapper = await mountList();
+    vi.mocked(analytics.track).mockClear();
+    await wrapper.get('[data-test="downtime-summary-scheduled"]').trigger("click");
+    (wrapper.vm as any).onTypeChange("recurring");
+    expect(vi.mocked(analytics.track).mock.calls).toEqual([
+      ["downtime_list_filtered", { filter: "status", value: "scheduled" }],
+      ["downtime_list_filtered", { filter: "type", value: "recurring" }],
+    ]);
+    wrapper.unmount();
+  });
+
   it("filters to the ended-early rows when the URL changes to that status after mount", async () => {
     vi.mocked(downtimes.list).mockResolvedValue(
       page([
@@ -310,5 +348,116 @@ describe("DowntimeList", () => {
     expect(shown("dt-1")).toBe(false);
     expect(shown("dt-2")).toBe(true);
     wrapper.unmount();
+  });
+
+  describe("quick mutes from an alert (MK-19)", () => {
+    const alertTarget = [
+      { module: "alerts" as const, folders: { kind: "all" as const }, ids: ["a1"] },
+    ];
+    const window = { start: NOW_MICROS, end: NOW_MICROS + 86400 * SECOND_MICROS };
+    const cell = (
+      wrapper: { find: (s: string) => { text: () => string } },
+      id: string,
+      col: string,
+    ) => wrapper.find(`[data-test="downtime-list-${id}-${col}"]`).text();
+
+    it("shows the group target, Until it clears and the end on clear for a live group mute", async () => {
+      vi.mocked(downtimes.list).mockResolvedValue(
+        page([
+          row({
+            id: "q1",
+            name: "Quick mute · checkout-error-rate-by-cluster",
+            targets: alertTarget,
+            alert_groups: [
+              { alert_id: "a1", group_key: "k1", group_labels: { cluster: "prod-eu" } },
+            ],
+            end_on_clear: { alert_id: "a1", group_key: "k1" },
+            status: "active",
+            current_window: window,
+            next_window: null,
+          }),
+        ]) as never,
+      );
+      const wrapper = await mountList();
+      await vi.waitFor(() =>
+        expect(wrapper.find('[data-test="downtime-list-q1-name"]').exists()).toBe(true),
+      );
+      expect(cell(wrapper, "q1", "targets")).toContain("Group: cluster=prod-eu");
+      expect(cell(wrapper, "q1", "schedule")).toContain("Until it clears");
+      expect(cell(wrapper, "q1", "schedule")).toContain("24 h at most");
+      expect(cell(wrapper, "q1", "when")).toContain("ends when it clears");
+      expect(wrapper.find('[data-test="downtime-list-q1-quick-mute"]').exists()).toBe(true);
+      wrapper.unmount();
+    });
+
+    it("names the 24 h safety end as a time tomorrow (MK-19)", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(NOW_MS);
+      vi.mocked(downtimes.list).mockResolvedValue(
+        page([
+          row({
+            id: "q3",
+            targets: alertTarget,
+            end_on_clear: { alert_id: "a1", group_key: null },
+            status: "active",
+            current_window: {
+              start: NOW_MICROS - 3600 * SECOND_MICROS,
+              end: NOW_MICROS + (86400 - 3600) * SECOND_MICROS,
+            },
+            next_window: null,
+          }),
+        ]) as never,
+      );
+      const wrapper = await mountList();
+      await vi.waitFor(() =>
+        expect(wrapper.find('[data-test="downtime-list-q3-name"]').exists()).toBe(true),
+      );
+      expect(cell(wrapper, "q3", "when")).toMatch(/by \d{1,2}:\d{2}\s?[AP]M tomorrow/);
+      wrapper.unmount();
+      vi.useRealTimers();
+    });
+
+    it("says a mute the clear ended ended when it cleared, and leaves who ended it to Created by", async () => {
+      vi.mocked(downtimes.list).mockResolvedValue(
+        page([
+          row({
+            id: "q2",
+            targets: alertTarget,
+            end_on_clear: { alert_id: "a1", group_key: null },
+            cancelled_by: "system@openobserve.ai",
+            cancelled_at: NOW_MICROS - 60 * SECOND_MICROS,
+            status: "ended_early",
+            current_window: null,
+            next_window: null,
+          }),
+        ]) as never,
+      );
+      const wrapper = await mountList();
+      await vi.waitFor(() =>
+        expect(wrapper.find('[data-test="downtime-list-q2-name"]').exists()).toBe(true),
+      );
+      const when = cell(wrapper, "q2", "when");
+      expect(when).toContain("ended");
+      expect(when).toContain("when it cleared");
+      expect(when).not.toContain("ended by");
+      wrapper.unmount();
+    });
+
+    it("reads a timed quick mute as once for its length, and leaves other rows alone", async () => {
+      vi.mocked(downtimes.list).mockResolvedValue(
+        page([
+          row({ id: "q3", targets: alertTarget, status: "active", current_window: window }),
+          row({ id: "dt-9" }),
+        ]) as never,
+      );
+      const wrapper = await mountList();
+      await vi.waitFor(() =>
+        expect(wrapper.find('[data-test="downtime-list-q3-name"]').exists()).toBe(true),
+      );
+      expect(cell(wrapper, "q3", "schedule")).toBe("Once, 1 h");
+      expect(cell(wrapper, "dt-9", "schedule")).toContain("Once ·");
+      expect(wrapper.find('[data-test="downtime-list-dt-9-quick-mute"]').exists()).toBe(false);
+      wrapper.unmount();
+    });
   });
 });

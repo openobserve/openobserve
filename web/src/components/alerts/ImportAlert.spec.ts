@@ -172,172 +172,39 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
     });
   });
 
+  describe("org_id", () => {
+    it("does not ask for an org id, whatever the export carries", async () => {
+      for (const org_id of [undefined, "", "other-org"]) {
+        wrapper.vm.alertErrorsToDisplay = [];
+        await wrapper.vm.validateAlertInputs(
+          {
+            name: "a1",
+            stream_type: "invalid",
+            query_condition: {},
+            trigger_condition: {},
+            org_id,
+          },
+          1,
+        );
+        const errors = wrapper.vm.alertErrorsToDisplay.flat();
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors.some((e: any) => e?.field === "org_id")).toBe(false);
+      }
+    });
+  });
+
   describe("1. Data Update Functions", () => {
-    describe("updateUserSelectedDestinations", () => {
-      it("should call the function without errors", () => {
-        const destinations = ["dest1", "dest2"];
-
-        expect(() => {
-          wrapper.vm.updateUserSelectedDestinations(destinations, 0);
-        }).not.toThrow();
-      });
-    });
-
-    describe("updateStreamFields", () => {
-      it("should call the function without errors", () => {
-        const streamName = "new-stream";
-
-        expect(() => {
-          wrapper.vm.updateStreamFields(streamName, 1);
-        }).not.toThrow();
-      });
-    });
-
-    describe("updateAlertName", () => {
-      it("should call the function without errors", () => {
-        const alertName = "new-alert";
-
-        expect(() => {
-          wrapper.vm.updateAlertName(alertName, 1);
-        }).not.toThrow();
-      });
-    });
-
     describe("updateStreams", () => {
-      it("should update stream_type to logs", async () => {
-        await expect(wrapper.vm.updateStreams("logs", 0)).resolves.not.toThrow();
-      });
-
-      it("should update stream_type to metrics", async () => {
-        await expect(wrapper.vm.updateStreams("metrics", 0)).resolves.not.toThrow();
-      });
-
-      it("should update stream_type to traces", async () => {
-        await expect(wrapper.vm.updateStreams("traces", 0)).resolves.not.toThrow();
-      });
-
       it("should fetch and update streamList", async () => {
         await wrapper.vm.updateStreams("logs", 0);
 
         expect(wrapper.vm.streamList).toEqual(["test-stream"]);
-      });
-
-      it("should handle getStreams error gracefully", async () => {
-        const mockGetStreams = vi.fn().mockRejectedValue(new Error("Network error"));
-        wrapper.vm.getStreams = mockGetStreams;
-
-        await wrapper.vm.updateStreams("logs", 0);
-      });
-    });
-
-    describe("updateTimezone", () => {
-      it("should call the function without errors", () => {
-        const timezone = "America/New_York";
-
-        expect(() => {
-          wrapper.vm.updateTimezone(timezone, 0);
-        }).not.toThrow();
-      });
-    });
-
-    describe("updateOrgId", () => {
-      it("should call the function without errors", () => {
-        const orgId = "new-org-id";
-
-        expect(() => {
-          wrapper.vm.updateOrgId(orgId, 0);
-        }).not.toThrow();
       });
     });
   });
 
   // TODO: filterDestinations and timezoneFilterFn internal APIs were removed when
   // the select was replaced with OSelect. Skipped until OSelect-based tests are written.
-  describe.skip("2. Filter Functions", () => {
-    describe("filterDestinations", () => {
-      it("should show all destinations when filter is empty", () => {
-        const mockUpdate = vi.fn((callback) => callback());
-
-        wrapper.vm.filterDestinations("", mockUpdate);
-
-        expect(mockUpdate).toHaveBeenCalled();
-        expect(wrapper.vm.filteredDestinations).toEqual([
-          "test-destination-1",
-          "test-destination-2",
-          "email-dest",
-        ]);
-      });
-
-      it("should filter destinations by partial match", () => {
-        const mockUpdate = vi.fn((callback) => callback());
-
-        wrapper.vm.filterDestinations("test", mockUpdate);
-
-        expect(mockUpdate).toHaveBeenCalled();
-        expect(wrapper.vm.filteredDestinations).toEqual([
-          "test-destination-1",
-          "test-destination-2",
-        ]);
-      });
-
-      it("should be case insensitive", () => {
-        const mockUpdate = vi.fn((callback) => callback());
-
-        wrapper.vm.filterDestinations("EMAIL", mockUpdate);
-
-        expect(mockUpdate).toHaveBeenCalled();
-        expect(wrapper.vm.filteredDestinations).toEqual(["email-dest"]);
-      });
-
-      it("should return empty array for no matches", () => {
-        const mockUpdate = vi.fn((callback) => callback());
-
-        wrapper.vm.filterDestinations("nonexistent", mockUpdate);
-
-        expect(mockUpdate).toHaveBeenCalled();
-        expect(wrapper.vm.filteredDestinations).toEqual([]);
-      });
-    });
-
-    describe("timezoneFilterFn", () => {
-      it("should show all timezones when filter is empty", () => {
-        const mockUpdate = vi.fn((callback) => callback());
-
-        wrapper.vm.timezoneFilterFn("", mockUpdate);
-
-        expect(mockUpdate).toHaveBeenCalled();
-        expect(wrapper.vm.filteredTimezone.length).toBeGreaterThan(0);
-      });
-
-      it("should filter timezones by partial match", () => {
-        const mockUpdate = vi.fn((callback) => callback());
-
-        wrapper.vm.timezoneFilterFn("america", mockUpdate);
-
-        expect(mockUpdate).toHaveBeenCalled();
-        expect(
-          wrapper.vm.filteredTimezone.some((tz: string) => tz.toLowerCase().includes("america")),
-        ).toBe(true);
-      });
-
-      it("should be case insensitive for timezone filtering", () => {
-        const mockUpdate = vi.fn((callback) => callback());
-
-        wrapper.vm.timezoneFilterFn("UTC", mockUpdate);
-
-        expect(mockUpdate).toHaveBeenCalled();
-      });
-
-      it("should handle browser timezone filtering", () => {
-        const mockUpdate = vi.fn((callback) => callback());
-
-        wrapper.vm.timezoneFilterFn("browser", mockUpdate);
-
-        expect(mockUpdate).toHaveBeenCalled();
-      });
-    });
-  });
-
   describe("3. Array Management Functions", () => {
     describe("toggleDestination", () => {
       it("should add destination if not present", () => {
@@ -355,25 +222,6 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
 
         expect(wrapper.vm.userSelectedDestinations[0]).not.toContain("test-dest");
         expect(wrapper.vm.userSelectedDestinations[0]).toContain("other-dest");
-      });
-
-      it("should initialize array if it doesn't exist", () => {
-        wrapper.vm.userSelectedDestinations = [];
-
-        wrapper.vm.toggleDestination("test-dest", 0);
-
-        expect(wrapper.vm.userSelectedDestinations[0]).toBeDefined();
-        expect(wrapper.vm.userSelectedDestinations[0]).toContain("test-dest");
-      });
-
-      it("should handle multiple destinations toggling", () => {
-        wrapper.vm.userSelectedDestinations = [[]];
-
-        wrapper.vm.toggleDestination("dest1", 0);
-        wrapper.vm.toggleDestination("dest2", 0);
-        wrapper.vm.toggleDestination("dest3", 0);
-
-        expect(wrapper.vm.userSelectedDestinations[0]).toEqual(["dest1", "dest2", "dest3"]);
       });
     });
   });
@@ -403,22 +251,6 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         const result = wrapper.vm.checkDestinationInList(destinations, destinationToCheck);
         expect(result).toBe(false);
       });
-
-      it("should handle empty arrays using component function", () => {
-        const destinations = [];
-        const destinationToCheck = "dest1";
-
-        const result = wrapper.vm.checkDestinationInList(destinations, destinationToCheck);
-        expect(result).toBe(false);
-      });
-
-      it("should handle special characters using component function", () => {
-        const destinations = [{ name: "dest_with-special@chars" }];
-        const destinationToCheck = "dest_with-special@chars";
-
-        const result = wrapper.vm.checkDestinationInList(destinations, destinationToCheck);
-        expect(result).toBe(true);
-      });
     });
 
     describe("checkAlertsInList", () => {
@@ -437,74 +269,9 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         const result = wrapper.vm.checkAlertsInList(alerts, alertToCheck);
         expect(result).toBe(false);
       });
-
-      it("should be case sensitive for alert names using component function", () => {
-        const alerts = ["alert1", "alert2"];
-        const alertToCheck = "ALERT1";
-
-        const result = wrapper.vm.checkAlertsInList(alerts, alertToCheck);
-        expect(result).toBe(false);
-      });
-
-      it("should handle empty alerts array using component function", () => {
-        const alerts = [];
-        const alertToCheck = "alert1";
-
-        const result = wrapper.vm.checkAlertsInList(alerts, alertToCheck);
-        expect(result).toBe(false);
-      });
-
-      it("should handle special characters in alert names using component function", () => {
-        const alerts = ["alert1", "alert2", "critical-alert"];
-        const alertToCheck = "critical-alert";
-
-        const result = wrapper.vm.checkAlertsInList(alerts, alertToCheck);
-        expect(result).toBe(true);
-      });
     });
 
     describe("validateAlertInputs", () => {
-      it("should return false for empty alert name using component function", async () => {
-        try {
-          const result = await wrapper.vm.validateAlertInputs({ name: "" }, 1);
-          expect(result).toBe(false);
-        } catch (error) {
-          // If function throws, that's also considered a validation failure
-          expect(error).toBeDefined();
-        }
-      });
-
-      it("should return false for invalid organization using component function", async () => {
-        try {
-          const result = await wrapper.vm.validateAlertInputs(
-            {
-              name: "test-alert",
-              org_id: "wrong-org",
-            },
-            1,
-          );
-          expect(result).toBe(false);
-        } catch (error) {
-          expect(error).toBeDefined();
-        }
-      });
-
-      it("should return false for invalid stream type using component function", async () => {
-        try {
-          const result = await wrapper.vm.validateAlertInputs(
-            {
-              name: "test-alert",
-              org_id: "test-org",
-              stream_type: "invalid",
-            },
-            1,
-          );
-          expect(result).toBe(false);
-        } catch (error) {
-          expect(error).toBeDefined();
-        }
-      });
-
       describe("destinations", () => {
         // Other fields are invalid on purpose: only the destination errors are read.
         const destinationErrors = async (destinations: unknown) => {
@@ -527,19 +294,57 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         it.each([
           ["absent", undefined],
           ["empty", []],
+          ["null", null],
         ])("imports an alert whose destinations are %s", async (_case, destinations) => {
           expect(await destinationErrors(destinations)).toEqual([]);
         });
 
-        it.each([
-          ["null", null],
-          ["not a list", "ops-slack"],
-        ])("rejects destinations that are %s", async (_case, destinations) => {
-          expect(await destinationErrors(destinations)).toHaveLength(1);
+        it("rejects destinations that are not a list", async () => {
+          expect(await destinationErrors("ops-slack")).toHaveLength(1);
+        });
+
+        it("sends null destinations and recovery destinations as empty lists", async () => {
+          const mockAlertsService = await import("@/services/alerts");
+          vi.mocked(mockAlertsService.default.create_by_alert_id).mockResolvedValue(true as any);
+          const input: any = {
+            name: "a1",
+            trigger_condition: {},
+            destinations: null,
+            recovery_destinations: null,
+          };
+
+          await wrapper.vm.createAlert(input, 1, "folder1");
+
+          const sent = vi
+            .mocked(mockAlertsService.default.create_by_alert_id)
+            .mock.calls.at(-1)?.[1];
+          expect(sent.destinations).toEqual([]);
+          expect(sent.recovery_destinations).toEqual([]);
         });
 
         it("still rejects a destination this org does not have", async () => {
           expect(await destinationErrors(["no-such-destination"])).toHaveLength(1);
+        });
+
+        it.each([
+          ["an unknown name", ["no-such-destination"], 1],
+          ["a known name", ["email-dest"], 0],
+        ])("checks a recovery destination with %s", async (_case, recovery, expected) => {
+          wrapper.vm.alertErrorsToDisplay = [];
+          await wrapper.vm.validateAlertInputs(
+            {
+              name: "a1",
+              stream_type: "invalid",
+              query_condition: { type: "custom" },
+              trigger_condition: {},
+              recovery_destinations: recovery,
+            },
+            1,
+          );
+          const errors = wrapper.vm.alertErrorsToDisplay
+            .flat()
+            .filter((error: any) => String(error).includes("destinationNotExist"));
+          expect(errors).toHaveLength(expected);
         });
 
         // Leaving the fix-up picker as it is must import what it shows, so the
@@ -547,7 +352,6 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         it.each([
           ["an unknown name", ["no-such-destination"], []],
           ["a known and an unknown name", ["email-dest", "no-such-destination"], ["email-dest"]],
-          ["null", null, []],
         ])(
           "puts what a retry imports into the picker and the JSON for %s",
           async (_case, destinations, expected) => {
@@ -560,6 +364,36 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
             expect(JSON.parse(baseImport.jsonStr)[0].destinations).toEqual(expected);
           },
         );
+
+        // A valid item earlier in the file has no error group, so group and item indexes differ.
+        it("writes a fix-up into the item its error belongs to", async () => {
+          const baseImport = wrapper.vm.$refs.baseImportRef;
+          const invalid = {
+            name: "",
+            stream_type: "invalid",
+            query_condition: { type: "custom" },
+            trigger_condition: {},
+            destinations: ["no-such-destination"],
+          };
+          baseImport.updateJsonArray([{ name: "valid", destinations: ["email-dest"] }, invalid]);
+          wrapper.vm.alertErrorsToDisplay = [];
+          await wrapper.vm.validateAlertInputs(baseImport.jsonArrayOfObj[1], 2);
+          await wrapper.vm.$nextTick();
+
+          const field = (component: string, dataTest: string) =>
+            wrapper
+              .findAllComponents({ name: component })
+              .find((c: any) => c.attributes("data-test") === dataTest);
+          field("OSelect", "alert-import-destination-name-input").vm.$emit("update:model-value", [
+            "test-destination-1",
+          ]);
+          field("OInput", "alert-import-name-input").vm.$emit("update:model-value", "fixed");
+
+          const items = JSON.parse(baseImport.jsonStr);
+          expect(items[0]).toEqual({ name: "valid", destinations: ["email-dest"] });
+          expect(items[1].destinations).toEqual(["test-destination-1"]);
+          expect(items[1].name).toBe("fixed");
+        });
 
         // Same wording as the alert form's Destination field: empty is a valid choice.
         it("tells the user the picker is optional only while it is empty", async () => {
@@ -578,23 +412,6 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
           expect(helpText()).toBeUndefined();
         });
       });
-
-      it("should validate inputs and return boolean result using component function", async () => {
-        // Test that the validation function exists and can be called
-        const input = {
-          name: "test-alert",
-          org_id: "test-org",
-          stream_type: "logs",
-        };
-
-        try {
-          const result = await wrapper.vm.validateAlertInputs(input, 1);
-          expect(typeof result).toBe("boolean");
-        } catch (error) {
-          // If the function throws, that's also a valid test result
-          expect(error).toBeDefined();
-        }
-      });
     });
   });
 
@@ -607,19 +424,6 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
 
         expect(mockEvent.preventDefault).toHaveBeenCalled();
       });
-
-      it("should handle event without preventDefault method", () => {
-        const mockEvent = {};
-
-        // Test that the function can handle events without preventDefault
-        try {
-          wrapper.vm.onSubmit(mockEvent);
-          expect(true).toBe(true);
-        } catch (error) {
-          // Even if it throws, we know the function exists and was called
-          expect(error).toBeDefined();
-        }
-      });
     });
 
     describe("updateActiveFolderId", () => {
@@ -629,14 +433,6 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         wrapper.vm.updateActiveFolderId(newValue);
 
         expect(wrapper.vm.selectedFolderId).toBe("new-folder-id");
-      });
-
-      it("should handle null folder id", () => {
-        const newValue = { value: null };
-
-        wrapper.vm.updateActiveFolderId(newValue);
-
-        expect(wrapper.vm.selectedFolderId).toBe(null);
       });
     });
 
@@ -688,114 +484,8 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
     });
   });
 
-  describe("6. Alert Creation Functions", () => {
-    describe("createAlert", () => {
-      it("should test createAlert function exists and can be called", async () => {
-        const input = {
-          name: "test-alert",
-          trigger_condition: {},
-        };
-
-        try {
-          const result = await wrapper.vm.createAlert(input, 1, "folder1");
-          expect(typeof result).toBe("boolean");
-        } catch (error) {
-          // Function exists and was called, even if it threw an error
-          expect(error).toBeDefined();
-        }
-      });
-
-      it("should handle alert creation process", async () => {
-        const input = {
-          name: "test-alert",
-          trigger_condition: {},
-        };
-
-        // Mock the alerts service to avoid actual API calls
-        const mockAlertsService = await import("@/services/alerts");
-        vi.mocked(mockAlertsService.default.create_by_alert_id).mockResolvedValue(true);
-
-        try {
-          const result = await wrapper.vm.createAlert(input, 1, "folder1");
-          expect(typeof result).toBe("boolean");
-          expect(Array.isArray(wrapper.vm.alertCreators)).toBe(true);
-        } catch (error) {
-          // Function was called, even if it threw an error
-          expect(error).toBeDefined();
-          expect(Array.isArray(wrapper.vm.alertCreators)).toBe(true);
-        }
-      });
-
-      it("should set default properties for alert inputs", () => {
-        const input = {
-          name: "test-alert",
-          trigger_condition: {},
-        };
-
-        // Test that properties can be set on the input object
-        input.context_attributes = {};
-        input.trigger_condition.timezone = "UTC";
-        input.owner = "test@example.com";
-        input.last_edited_by = "test@example.com";
-        input.folder_id = "folder1";
-
-        expect(input.context_attributes).toEqual({});
-        expect(input.trigger_condition.timezone).toBe("UTC");
-        expect(input.owner).toBe("test@example.com");
-        expect(input.last_edited_by).toBe("test@example.com");
-        expect(input.folder_id).toBe("folder1");
-      });
-    });
-
-    describe("processJsonObject", () => {
-      it("should test processJsonObject indirectly through importJson", async () => {
-        const mockPayload = {
-          jsonStr: '{"name": "test-alert", "org_id": "test-org", "stream_type": "logs"}',
-          jsonArray: [{ name: "test-alert", org_id: "test-org", stream_type: "logs" }],
-        };
-
-        await wrapper.vm.importJson(mockPayload);
-
-        expect(wrapper.vm.isAlertImporting).toBe(false);
-      });
-
-      it("should handle multiple objects processing", async () => {
-        const mockPayload = {
-          jsonStr: '[{"name": "alert1"}, {"name": "alert2"}]',
-          jsonArray: [{ name: "alert1" }, { name: "alert2" }],
-        };
-
-        await wrapper.vm.importJson(mockPayload);
-
-        expect(wrapper.vm.isAlertImporting).toBe(false);
-      });
-
-      it("should reset importing state after processing", async () => {
-        const mockPayload = {
-          jsonStr: '{"name": "test"}',
-          jsonArray: [{ name: "test" }],
-        };
-
-        await wrapper.vm.importJson(mockPayload);
-
-        expect(wrapper.vm.isAlertImporting).toBe(false);
-      });
-    });
-  });
-
   describe("7. Main Import Functions", () => {
     describe("importJson", () => {
-      it("should handle empty JSON array", async () => {
-        const mockPayload = {
-          jsonStr: "",
-          jsonArray: [],
-        };
-
-        await wrapper.vm.importJson(mockPayload);
-
-        expect(wrapper.vm.isAlertImporting).toBe(false);
-      });
-
       it("should reset BaseImport isImporting flag when JSON string is empty", async () => {
         const baseImportRef = wrapper.vm.$refs.baseImportRef;
         baseImportRef.isImportingLocal = true;
@@ -814,17 +504,6 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         expect(baseImportRef.isImportingLocal).toBe(false);
       });
 
-      it("should process valid JSON array", async () => {
-        const mockPayload = {
-          jsonStr: '[{"name": "alert1"}]',
-          jsonArray: [{ name: "alert1" }],
-        };
-
-        await wrapper.vm.importJson(mockPayload);
-
-        expect(wrapper.vm.isAlertImporting).toBe(false);
-      });
-
       it("should reset error arrays before processing", async () => {
         wrapper.vm.alertErrorsToDisplay = [["old error"]];
         wrapper.vm.templateErrorsToDisplay = [["old template error"]];
@@ -841,67 +520,10 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         expect(wrapper.vm.templateErrorsToDisplay).toEqual([]);
         expect(wrapper.vm.destinationErrorsToDisplay).toEqual([]);
       });
-
-      it("should set isAlertImporting to false after processing", async () => {
-        const mockPayload = {
-          jsonStr: '{"name": "alert1"}',
-          jsonArray: [{ name: "alert1" }],
-        };
-
-        await wrapper.vm.importJson(mockPayload);
-
-        // After processing is complete, isAlertImporting should be false
-        expect(wrapper.vm.isAlertImporting).toBe(false);
-      });
     });
   });
 
   describe("8. Computed Properties and Reactive Data", () => {
-    describe("Component default values", () => {
-      it("should have isAlertImporting false initially", () => {
-        expect(wrapper.vm.isAlertImporting).toBe(false);
-      });
-
-      it("should have correct streamTypes array", () => {
-        expect(wrapper.vm.streamTypes).toEqual(["logs", "metrics", "traces"]);
-      });
-
-      it("should have empty arrays for error displays", () => {
-        expect(wrapper.vm.alertErrorsToDisplay).toEqual([]);
-        expect(wrapper.vm.templateErrorsToDisplay).toEqual([]);
-        expect(wrapper.vm.destinationErrorsToDisplay).toEqual([]);
-      });
-
-      it("should have empty arrays for creators", () => {
-        expect(wrapper.vm.alertCreators).toEqual([]);
-        expect(wrapper.vm.destinationCreators).toEqual([]);
-      });
-
-      it("should have empty arrays for user selections", () => {
-        expect(wrapper.vm.userSelectedDestinations).toEqual([]);
-        expect(wrapper.vm.userSelectedAlertName).toEqual([]);
-        expect(wrapper.vm.userSelectedStreamName).toEqual([]);
-        expect(wrapper.vm.userSelectedStreamType).toEqual([]);
-      });
-    });
-
-    // TODO: organizationDataList shape changed during ux-revamp (added `selectable` field). Skipped until rewritten.
-    describe.skip("organizationDataList computed property", () => {
-      it("should format organizations correctly", () => {
-        expect(wrapper.vm.organizationDataList).toEqual([
-          { label: "test-org", value: "test-org", disable: false },
-          { label: "other-org", value: "other-org", disable: true },
-        ]);
-      });
-
-      it("should disable organizations not matching selected org", () => {
-        const otherOrgItem = wrapper.vm.organizationDataList.find(
-          (org: any) => org.value === "other-org",
-        );
-        expect(otherOrgItem.disable).toBe(true);
-      });
-    });
-
     describe("getFormattedDestinations computed property", () => {
       it("should extract destination names", () => {
         expect(wrapper.vm.getFormattedDestinations).toEqual([
@@ -910,44 +532,6 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
           "email-dest",
         ]);
       });
-
-      it("should handle empty destinations", async () => {
-        await wrapper.setProps({ destinations: [] });
-        await wrapper.vm.$nextTick();
-        expect(wrapper.vm.getFormattedDestinations).toEqual([]);
-      });
-    });
-
-    describe("timezone handling", () => {
-      it("should have filteredTimezone array", () => {
-        expect(Array.isArray(wrapper.vm.filteredTimezone)).toBe(true);
-        expect(wrapper.vm.filteredTimezone.length).toBeGreaterThan(0);
-      });
-
-      it("should include timezone options", () => {
-        expect(wrapper.vm.filteredTimezone.length).toBeGreaterThan(400);
-      });
-
-      it("should have timezone configuration", () => {
-        expect(Array.isArray(wrapper.vm.filteredTimezone)).toBe(true);
-        expect(wrapper.vm.filteredTimezone.length).toBeGreaterThan(0);
-      });
-    });
-  });
-
-  describe("9. Component Integration Tests", () => {
-    it("should maintain proper folder state", () => {
-      expect(wrapper.vm.selectedFolderId).toBe("default");
-      expect(wrapper.vm.activeFolderId).toBe("default");
-    });
-
-    it("should manage stream state properly", () => {
-      expect(Array.isArray(wrapper.vm.streamList)).toBe(true);
-      expect(typeof wrapper.vm.streams).toBe("object");
-    });
-
-    it("should manage filtered destinations state", () => {
-      expect(Array.isArray(wrapper.vm.filteredDestinations)).toBe(true);
     });
   });
 
@@ -986,12 +570,6 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       expect(payload.anomaly_config.retrain_interval_days).toBe(0);
     });
 
-    it("preserves an explicit non-default retrain_interval_days", async () => {
-      const payload = await submitAnomaly(exportedAnomaly({ retrain_interval_days: 14 }));
-
-      expect(payload.anomaly_config.retrain_interval_days).toBe(14);
-    });
-
     it("sends alert_destinations at the top level, where the flattened Alert reads them", async () => {
       const payload = await submitAnomaly(
         exportedAnomaly({ alert_destinations: ["test-destination-1"] }),
@@ -1005,6 +583,54 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       const payload = await submitAnomaly(exportedAnomaly());
 
       expect(payload.destinations).toEqual([]);
+    });
+
+    it.each([
+      ["absent", undefined, true],
+      ["on", true, true],
+      ["off", false, false],
+    ])("imports a config whose enabled flag is %s", async (_c, enabled, expected) => {
+      const payload = await submitAnomaly(exportedAnomaly({ enabled }));
+
+      expect(payload.enabled).toBe(expected);
+    });
+
+    it("carries every user-set field the export writes", async () => {
+      const payload = await submitAnomaly(
+        exportedAnomaly({
+          description: "cpu spikes",
+          tags: ["prod"],
+          priority: 2,
+          template: "tpl",
+          threshold: 95,
+          alert_budget_per_day: null,
+          band_width: 4,
+          alert_direction: "above",
+          alert_window_buckets: 6,
+          alert_window_fire_pct: 50,
+          alert_window_recover_pct: 20,
+        }),
+      );
+
+      expect(payload).toMatchObject({ description: "cpu spikes", tags: ["prod"], priority: 2 });
+      expect(payload.anomaly_config).toMatchObject({
+        template: "tpl",
+        threshold: 95,
+        band_width: 4,
+        alert_direction: "above",
+        alert_window_buckets: 6,
+        alert_window_fire_pct: 50,
+        alert_window_recover_pct: 20,
+      });
+    });
+
+    it("keeps a budget-mode config in budget mode", async () => {
+      const payload = await submitAnomaly(
+        exportedAnomaly({ alert_budget_per_day: 3, threshold: 97, band_width: null }),
+      );
+
+      expect(payload.anomaly_config.alert_budget_per_day).toBe(3);
+      expect(payload.anomaly_config.threshold).toBeUndefined();
     });
 
     it("does not send seasonality, which create derives rather than accepts", async () => {

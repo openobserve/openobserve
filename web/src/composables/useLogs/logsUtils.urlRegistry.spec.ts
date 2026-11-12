@@ -280,6 +280,12 @@ describe("logsUtils URL registry (4c C7, C7b)", () => {
       expect(route.value.query.timezone).toBeUndefined();
     });
 
+    it("drops the RCA evidence handoff type so a later reload does not re-run the handoff", async () => {
+      route.value = { name: "logs", query: { stream: "app", type: "rca_evidence_query" } };
+      await utils.patchUrlViewState();
+      expect(route.value.query.type).toBeUndefined();
+    });
+
     it("writes nothing off the logs route", async () => {
       route.value = { name: "dashboards", query: {} };
       await utils.updateUrlQueryParams();

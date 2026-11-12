@@ -85,6 +85,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Locked (not hidden): the family supports workflow routing, but this
          edition doesn't unlock it — kept as the discovery point since the
          dropdown's own "Workflows" header has no icon/tooltip slot to attach. -->
+    <OTooltip v-else-if="workflowsLicenseLocked" :content="workflowsLockMessage">
+      <span class="ms-2 inline-flex">
+        <OButton
+          data-test="create-workflow-btn"
+          variant="outline"
+          size="sm"
+          icon-left="lock"
+          disabled
+        >
+          {{ t("workflow.create") }}
+        </OButton>
+      </span>
+    </OTooltip>
     <template v-else-if="workflowsLocked">
       <OButton
         data-test="create-workflow-btn"
@@ -93,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="ms-2"
         @click="openUpgradeDialog"
       >
-        <template #icon-left><OIcon name="lock" size="sm" class="text-warning-600" /></template>
+        <template #icon-left><OIcon name="lock" size="sm" class="lock-chip" /></template>
         {{ t("workflow.create") }}
       </OButton>
     </template>
@@ -106,6 +119,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
@@ -125,7 +139,10 @@ const props = defineProps<{
   workflowsEnabled: boolean;
   /** Family supports workflows but this edition doesn't unlock them — show the group locked instead of hiding it. */
   workflowsLocked?: boolean;
+  workflowsLicenseLocked?: boolean;
   workflowsLockMessage?: I18nText;
+  /** Display names by id for selected workflows the closed group cannot list. */
+  lockedWorkflowNames?: Record<string, string>;
   error?: boolean;
   placeholder?: I18nText;
 }>();
@@ -212,20 +229,35 @@ const missingOptions = (
     }));
 };
 
+// A selected workflow with no list to come from still needs a row, or OSelect prints its raw value.
+const unlistedWorkflows = () =>
+  (props.workflows || []).filter(isFilled).map((id) => {
+    const name = props.lockedWorkflowNames?.[id];
+    return {
+      label: name ? raw(name) : t("alerts.alertSettings.lockedWorkflowFallback"),
+      value: `${WF}${id}`,
+    };
+  });
+
 const options = computed(() => {
   const dests = toTagged(props.destinationOptions, DEST);
   const missingDests = missingOptions(props.destinations, dests, DEST);
-  if (!props.workflowsEnabled && !props.workflowsLocked) return [...dests, ...missingDests];
+  if (!props.workflowsEnabled && !props.workflowsLocked) {
+    return [...dests, ...missingDests, ...unlistedWorkflows()];
+  }
   const workflowsHeader = { header: true, label: t("alerts.alertSettings.targetsWorkflowsGroup") };
   if (!props.workflowsEnabled) {
-    // Locked: the header stays visible (so the capability is discoverable
-    // while browsing), but there's nothing selectable beneath it — this
-    // edition has no entitlement to produce real options for.
+    // The header stays for discovery; only what the alert already selected sits under it, to remove.
     return [
       { header: true, label: t("alerts.alertSettings.targetsDestinationsGroup") },
       ...dests,
       ...missingDests,
       workflowsHeader,
+      ...unlistedWorkflows().map((option) => ({
+        ...option,
+        badge: t("alerts.alertSettings.lockedTargetBadge"),
+        badgeMuted: true,
+      })),
     ];
   }
   const wfs = toTagged(props.workflowOptions, WF);

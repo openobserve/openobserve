@@ -157,7 +157,6 @@ const onSubmit = async (value: MemberInvitationForm) => {
   analytics.track("Button Click", {
     button: "Invite User",
     user_org: store.state.selectedOrganization.identifier,
-    user_id: store.state.userInfo.email,
     page: "Users",
   });
 };

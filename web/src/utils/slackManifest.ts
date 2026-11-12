@@ -33,6 +33,9 @@ export interface SlackAppManifest {
   };
 }
 
+/** Any manifest JSON, such as the server-built two-way one, which `SlackAppManifest`'s literals reject. */
+export type LooseSlackAppManifest = { readonly [key: string]: unknown } | SlackAppManifest;
+
 export const buildSlackManifest = (appName: string): SlackAppManifest => {
   const trimmedAppName = appName.trim();
 
@@ -71,7 +74,10 @@ export const buildSlackManifest = (appName: string): SlackAppManifest => {
 export const slackManifestJson = (appName: string): string =>
   JSON.stringify(buildSlackManifest(appName), null, 2);
 
-export const buildSlackManifestUrl = (appName: string): string =>
+export const buildSlackManifestUrlFrom = (manifest: LooseSlackAppManifest): string =>
   `https://api.slack.com/apps?new_app=1&manifest_json=${encodeURIComponent(
-    JSON.stringify(buildSlackManifest(appName)),
+    JSON.stringify(manifest),
   )}`;
+
+export const buildSlackManifestUrl = (appName: string): string =>
+  buildSlackManifestUrlFrom(buildSlackManifest(appName));

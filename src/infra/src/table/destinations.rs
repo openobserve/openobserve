@@ -18,7 +18,7 @@ use std::str::FromStr;
 use config::{ider, meta::destinations, utils::json};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
-    ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
+    ModelTrait, QueryFilter, QueryOrder, QuerySelect, Set, TryIntoModel,
 };
 
 use crate::{
@@ -139,11 +139,12 @@ pub async fn put(
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Option<destinations::Destination>, Error> {
-    let client = get_orm_client_ro().await;
-    match get_model_and_template(client, org_id, name).await? {
-        Some((model, template)) => Ok(Some(model.try_into(template)?)),
-        None => Ok(None),
-    }
+    get_on(get_orm_client_ro().await, org_id, name).await
+}
+
+/// Whether a row exists under this name, decodable by this binary or not.
+pub async fn exists_row(org_id: &str, name: &str) -> Result<bool, Error> {
+    exists_row_on(get_orm_client_ro().await, org_id, name).await
 }
 
 pub async fn list(
@@ -151,22 +152,14 @@ pub async fn list(
     module: Option<&str>,
 ) -> Result<Vec<destinations::Destination>, Error> {
     let client = get_orm_client_ro().await;
-    let destinations = list_models(client, Some(org_id), module)
-        .await?
-        .into_iter()
-        .map(|(model, template)| model.try_into(template))
-        .collect::<Result<_, Error>>()?;
-    Ok(destinations)
+    Ok(decode_models(
+        list_models(client, Some(org_id), module).await?,
+    ))
 }
 
 pub async fn list_all() -> Result<Vec<destinations::Destination>, Error> {
     let client = get_orm_client_ro().await;
-    let destinations = list_models(client, None, None)
-        .await?
-        .into_iter()
-        .map(|(model, template)| model.try_into(template))
-        .collect::<Result<_, Error>>()?;
-    Ok(destinations)
+    Ok(decode_models(list_models(client, None, None).await?))
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), Error> {
@@ -178,6 +171,43 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+/// Skips rows this binary cannot decode, so a newer destination type never fails the whole list.
+fn decode_models(rows: Vec<(Model, Option<String>)>) -> Vec<destinations::Destination> {
+    rows.into_iter()
+        .filter_map(|(model, template)| {
+            let (org, name) = (model.org.clone(), model.name.clone());
+            // The decode error can quote row content, so only the key is logged.
+            let decoded = model.try_into(template).ok();
+            if decoded.is_none() {
+                log::warn!(
+                    "[DESTINATIONS] skipping undecodable destination, org: {org}, name: {name}"
+                );
+            }
+            decoded
+        })
+        .collect()
+}
+
+async fn get_on(
+    db: &DatabaseConnection,
+    org_id: &str,
+    name: &str,
+) -> Result<Option<destinations::Destination>, Error> {
+    // An old node reads a newer release's type as not found, as the list path does.
+    Ok(get_model_and_template(db, org_id, name)
+        .await?
+        .and_then(|row| decode_models(vec![row]).pop()))
+}
+
+async fn exists_row_on(db: &DatabaseConnection, org_id: &str, name: &str) -> Result<bool, Error> {
+    Ok(Entity::find()
+        .filter(Column::Org.eq(org_id))
+        .filter(Column::Name.eq(name))
+        .one(db)
+        .await?
+        .is_some())
 }
 
 async fn get_model_and_template(
@@ -216,18 +246,29 @@ async fn list_models(
         .collect())
 }
 
-/// Deletes all destinations belonging to the given org.
-pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
+/// Deletes all destinations of the org and returns their names.
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<String>, Error> {
     let client = get_orm_client_rw().await;
-    Entity::delete_many()
+    let delete = Entity::delete_many().filter(Column::Org.eq(org_id));
+    Ok(super::delete_returning(client, delete, &[Column::Name]).await?)
+}
+
+/// Names of the org's destinations.
+pub async fn list_names_by_org(org_id: &str) -> Result<Vec<String>, Error> {
+    let client = get_orm_client_ro().await;
+    let names = Entity::find()
+        .select_only()
+        .column(Column::Name)
         .filter(Column::Org.eq(org_id))
-        .exec(client)
+        .into_tuple::<String>()
+        .all(client)
         .await?;
-    Ok(())
+    Ok(names)
 }
 
 #[cfg(test)]
 mod tests {
+    use sea_orm::{ConnectionTrait, Database, Schema};
     use svix_ksuid::KsuidLike as _;
 
     use super::*;
@@ -281,6 +322,76 @@ mod tests {
             result.unwrap().module,
             destinations::Module::Pipeline { .. }
         ));
+    }
+
+    #[test]
+    fn decode_models_skips_unknown_destination_type() {
+        let good_id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let bad_id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let good = make_model(
+            &good_id,
+            "alert",
+            serde_json::json!({"type": "http", "url": "https://example.com"}),
+        );
+        let mut bad = make_model(
+            &bad_id,
+            "alert",
+            serde_json::json!({"type": "from_a_newer_release", "installation_id": "inst"}),
+        );
+        bad.name = "newer-dest".to_string();
+        assert!(bad.clone().try_into(None).is_err());
+        let decoded = decode_models(vec![(bad, None), (good, None)]);
+        assert_eq!(decoded.len(), 1);
+        assert_eq!(decoded[0].name, "my-dest");
+    }
+
+    async fn db_with_rows() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(templates::Entity),
+            schema.create_table_from_entity(Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        for name in ["my-dest", "slack-dest"] {
+            ActiveModel {
+                id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
+                org: Set("myorg".to_string()),
+                name: Set(name.to_string()),
+                module: Set("alert".to_string()),
+                template_id: Set(None),
+                r#type: Set(serde_json::json!({"type": "http", "url": "https://example.com"})),
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+        }
+        db.execute_unprepared(
+            r#"UPDATE destinations SET type='{"type":"from_a_newer_release"}' WHERE name='slack-dest'"#,
+        )
+        .await
+        .unwrap();
+        db
+    }
+
+    #[tokio::test]
+    async fn get_skips_undecodable_row() {
+        let db = db_with_rows().await;
+        assert!(
+            get_on(&db, "myorg", "slack-dest").await.unwrap().is_none(),
+            "an undecodable row reads as not found"
+        );
+        assert!(exists_row_on(&db, "myorg", "slack-dest").await.unwrap());
+        assert!(!exists_row_on(&db, "myorg", "no-such").await.unwrap());
+        let good = get_on(&db, "myorg", "my-dest").await.unwrap().unwrap();
+        assert_eq!(good.name, "my-dest");
+        let listed = decode_models(list_models(&db, Some("myorg"), None).await.unwrap());
+        assert_eq!(
+            listed.iter().map(|d| d.name.as_str()).collect::<Vec<_>>(),
+            ["my-dest"]
+        );
     }
 
     #[test]

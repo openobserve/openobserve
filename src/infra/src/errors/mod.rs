@@ -13,8 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use async_nats::{error::Error as NatsError, jetstream};
-use config::utils::json;
+use config::{meta::feature::Feature, utils::json};
 use thiserror::Error as ThisError;
 pub mod grpc;
 
@@ -104,6 +106,8 @@ pub enum Error {
     TrialPeriodExpired,
     #[error("QueueError# {0}")]
     QueueError(#[from] QueueError),
+    #[error("{0}")]
+    Ingestion(#[from] IngestionError),
 }
 
 unsafe impl Send for Error {}
@@ -133,6 +137,13 @@ pub enum QueueError {
     },
     #[error("queue is closed")]
     QueueClosed,
+}
+
+/// Admission refusals that callers map to a status of their own instead of a generic 4xx/5xx.
+#[derive(ThisError, Debug)]
+pub enum IngestionError {
+    #[error("Organization [{0}] is deleted")]
+    OrgBlocked(String),
 }
 
 #[derive(ThisError, Debug)]
@@ -251,6 +262,8 @@ pub enum ErrorCodes {
     /// Another turn is already running in this AI chat session; carries the
     /// session id. Retry once it finishes.
     AiChatSessionBusy(String),
+    /// The installed license does not entitle these features; carries the comma-joined keys.
+    LicenseFeatureNotEntitled(String),
 }
 
 impl From<sea_orm::DbErr> for Error {
@@ -301,12 +314,23 @@ impl Error {
         }
     }
 
+    /// True for a PostgreSQL data exception (SQLSTATE class 22), which a retry cannot fix.
+    pub fn is_data_exception(&self) -> bool {
+        match self {
+            Error::SqlxError(sqlx::Error::Database(e)) => e
+                .code()
+                .is_some_and(|code| code.len() == 5 && code.starts_with("22")),
+            _ => false,
+        }
+    }
+
     /// The HTTP status code this error maps to. This is the single source of
     /// truth shared by the HTTP response mapping and audit logging.
     pub fn http_status(&self) -> u16 {
         match self {
             Error::ErrorCode(code) => code.http_status(),
             Error::ResourceError(_) => 503,
+            Error::Ingestion(IngestionError::OrgBlocked(_)) => 403,
             // A JSON deserialization failure means the client sent a malformed
             // request body, so surface it as 400 rather than a 500 server error.
             _ => 400,
@@ -321,6 +345,7 @@ impl ErrorCodes {
             ErrorCodes::SearchCancelQuery(_) | ErrorCodes::RatelimitExceeded(_) => 429,
             ErrorCodes::SearchTimeout(_) => 408,
             ErrorCodes::AiSessionOwnerUnavailable(_) | ErrorCodes::AiChatSessionBusy(_) => 409,
+            ErrorCodes::LicenseFeatureNotEntitled(_) => 403,
             ErrorCodes::ServerInternalError(_) | ErrorCodes::SearchParquetFileNotFound => 500,
             ErrorCodes::InvalidParams(_)
             | ErrorCodes::SearchSQLExecuteError(_)
@@ -352,6 +377,7 @@ impl ErrorCodes {
             ErrorCodes::SearchHistogramNotAvailable(_) => 20013,
             ErrorCodes::AiSessionOwnerUnavailable(_) => 30001,
             ErrorCodes::AiChatSessionBusy(_) => 30002,
+            ErrorCodes::LicenseFeatureNotEntitled(_) => 40001,
         }
     }
 
@@ -387,6 +413,16 @@ impl ErrorCodes {
             ErrorCodes::AiChatSessionBusy(_) => {
                 "Another turn is already running in this conversation".to_string()
             }
+            ErrorCodes::LicenseFeatureNotEntitled(features) => {
+                let names: Vec<&str> = features
+                    .split(", ")
+                    .map(|key| Feature::from_str(key).map_or(key, |f| f.display_name()))
+                    .collect();
+                format!(
+                    "Features not included in your license: {}",
+                    names.join(", ")
+                )
+            }
         }
     }
 
@@ -408,6 +444,7 @@ impl ErrorCodes {
             ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
             ErrorCodes::AiSessionOwnerUnavailable(session_id) => session_id.to_owned(),
             ErrorCodes::AiChatSessionBusy(session_id) => session_id.to_owned(),
+            ErrorCodes::LicenseFeatureNotEntitled(features) => features.to_owned(),
         }
     }
 
@@ -429,6 +466,7 @@ impl ErrorCodes {
             ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
             ErrorCodes::AiSessionOwnerUnavailable(session_id) => session_id.to_owned(),
             ErrorCodes::AiChatSessionBusy(session_id) => session_id.to_owned(),
+            ErrorCodes::LicenseFeatureNotEntitled(features) => features.to_owned(),
         }
     }
 
@@ -483,6 +521,7 @@ impl ErrorCodes {
             20013 => Ok(ErrorCodes::SearchHistogramNotAvailable(message)),
             30001 => Ok(ErrorCodes::AiSessionOwnerUnavailable(message)),
             30002 => Ok(ErrorCodes::AiChatSessionBusy(message)),
+            40001 => Ok(ErrorCodes::LicenseFeatureNotEntitled(message)),
             _ => Ok(ErrorCodes::ServerInternalError(json.to_string())),
         }
     }
@@ -551,6 +590,32 @@ mod tests {
             ErrorCodes::SearchHistogramNotAvailable("x".into()).get_code(),
             20013
         );
+    }
+
+    #[test]
+    fn test_license_feature_not_entitled() {
+        let err = ErrorCodes::LicenseFeatureNotEntitled("oncall, workflows".into());
+        assert_eq!(err.get_code(), 40001);
+        assert_eq!(err.http_status(), 403);
+        assert_eq!(err.get_error_detail(), "oncall, workflows");
+        assert_eq!(
+            err.get_message(),
+            "Features not included in your license: On-Call, Workflows"
+        );
+        match ErrorCodes::from_json(&err.to_json()).unwrap() {
+            ErrorCodes::LicenseFeatureNotEntitled(keys) => assert_eq!(keys, "oncall, workflows"),
+            other => panic!("round trip lost the variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_license_feature_not_entitled_keeps_an_unknown_key() {
+        let err = ErrorCodes::LicenseFeatureNotEntitled("rum, not_a_feature".into());
+        assert_eq!(
+            err.get_message(),
+            "Features not included in your license: Real User Monitoring, not_a_feature"
+        );
+        assert_eq!(err.get_error_detail(), "rum, not_a_feature");
     }
 
     #[test]
@@ -727,6 +792,72 @@ mod tests {
         assert_eq!(
             ErrorCodes::SearchHistogramNotAvailable("msg".into()).get_message(),
             "Search histogram not available"
+        );
+    }
+
+    #[test]
+    fn test_org_blocked_is_forbidden() {
+        let e = Error::from(IngestionError::OrgBlocked("t1".into()));
+        assert_eq!(e.http_status(), 403);
+        assert_eq!(e.to_string(), "Organization [t1] is deleted");
+    }
+
+    #[derive(Debug)]
+    struct CodedDbError(&'static str);
+
+    impl std::fmt::Display for CodedDbError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str(self.0)
+        }
+    }
+
+    impl std::error::Error for CodedDbError {}
+
+    impl sqlx::error::DatabaseError for CodedDbError {
+        fn message(&self) -> &str {
+            self.0
+        }
+
+        fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
+            Some(self.0.into())
+        }
+
+        fn as_error(&self) -> &(dyn std::error::Error + Send + Sync + 'static) {
+            self
+        }
+
+        fn as_error_mut(&mut self) -> &mut (dyn std::error::Error + Send + Sync + 'static) {
+            self
+        }
+
+        fn into_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync + 'static> {
+            self
+        }
+
+        fn kind(&self) -> sqlx::error::ErrorKind {
+            sqlx::error::ErrorKind::Other
+        }
+    }
+
+    fn db_error(code: &'static str) -> Error {
+        Error::SqlxError(sqlx::Error::Database(Box::new(CodedDbError(code))))
+    }
+
+    #[test]
+    fn test_is_data_exception() {
+        // 22001: string_data_right_truncation, e.g. a stream key longer than VARCHAR(256)
+        assert!(db_error("22001").is_data_exception());
+        assert!(db_error("22P02").is_data_exception());
+        // 40001 serialization_failure is transient; "22" alone is SQLite's SQLITE_NOLFS
+        assert!(!db_error("40001").is_data_exception());
+        assert!(!db_error("22").is_data_exception());
+        assert!(!Error::Message("22001".to_string()).is_data_exception());
+        // callers that return anyhow, such as the stats job, downcast to reach it
+        let wrapped = anyhow::Error::from(db_error("22001"));
+        assert!(
+            wrapped
+                .downcast_ref::<Error>()
+                .is_some_and(Error::is_data_exception)
         );
     }
 }

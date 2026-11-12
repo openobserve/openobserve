@@ -18,23 +18,33 @@ import { describe, expect, it } from "vitest";
 import type {
   EscalationLevel,
   EscalationTarget,
+  OnCallResponseEvent,
   Rotation,
   ShiftRule,
   TimeWindow,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import {
+  apiErrorMessage,
+  apiErrorStatus,
   CHANNEL_WAKES,
+  fieldLabel,
+  literalDimensions,
+  readableConditions,
+  routingFieldIds,
   PRIORITY_TONE,
   colorIndexFor,
-  compareRulePrecedence,
   ruleClaimsDimensions,
   describeRestrictions,
   describeTarget,
   formatInZone,
   formatMinuteOfDay,
+  formatDayRange,
+  formatShiftRange,
+  formatZonedRange,
   fromZonedInputValue,
   groupBySubject,
+  holderStretches,
   isEscalating,
   isOnCallUnavailable,
   speakTarget,
@@ -42,10 +52,24 @@ import {
   isRotationValid,
   isShiftRuleValid,
   isSnoozed,
+  isDeletedTeam,
+  ladderStopped,
+  pagePhrase,
+  reachedStepOf,
+  pageState,
   isStaffed,
   isUnresolved,
+  coverageHoursSummary,
+  effectiveRivals,
+  effectiveWeekCoverage,
   memberAt,
   nextHandover,
+  nextWeekRange,
+  overlappingRules,
+  overlapStanding,
+  prioritiesFor,
+  ruleHoursSummary,
+  rulesClash,
   normalizeDimensionValue,
   ownershipPath,
   priorityLabel,
@@ -63,14 +87,34 @@ import {
   ruleAppliesAt,
   routingReasonOf,
   rungProblem,
-  shiftBands,
   shortReachReason,
+  channelList,
+  listInLocale,
+  stepsNamingRotation,
   toZonedInputValue,
+  zonedMidnight,
+  coversPresetOf,
+  COVERS_PRESETS,
+  rotateMembersTo,
+  withRoster,
+  turnLine,
+  ruleHolder,
+  anchorAtWeekdayTime,
+  anchorWeekdayTime,
+  dayFraction,
+  dayRows,
+  stopChoices,
+  stopConsequence,
+  offsetAnchor,
+  rungStillRetrying,
   stateTagVariant,
   upcomingShifts,
   windowContains,
 } from "@/utils/oncall";
 import type { TranslateFn } from "@/types/i18n";
+import i18n from "@/locales";
+import rosterParity from "../../../src/config/src/meta/oncall/roster_parity.json";
+import shiftParity from "../../../src/config/src/meta/oncall/shift_parity.json";
 
 const ANCHOR = 1_700_000_000_000_000;
 
@@ -83,26 +127,55 @@ function weekly(members: string[], level: EscalationLevel = "primary"): Rotation
   };
 }
 
+// Shifts count in the TEAM's zone, so these equal the Rust side whatever zone the browser is in.
+describe("shift maths matches the server (shift_parity.json)", () => {
+  it.each(shiftParity.map((c) => [c.case, c] as const))("%s", (_name, c) => {
+    const rule = {
+      name: "Base",
+      members: c.members,
+      shift_micros: c.shift_micros,
+      anchor_micros: c.anchor_micros,
+    };
+    const rotation = { id: "r", name: "R", shift_rules: [rule] };
+    expect(memberAt(rule, c.at_micros, c.timezone)).toBe(c.holder);
+    expect(resolveHolder(rotation, c.at_micros, c.timezone).member).toBe(c.holder);
+    expect(resolveNextHolder(rotation, c.at_micros, c.timezone)).toBe(c.next_holder);
+    expect(nextHandover(rule, c.at_micros, c.timezone)).toBe(c.next_handover);
+    const [first, second] = upcomingShifts(rule, c.at_micros, 2, c.timezone);
+    expect(first).toMatchObject({
+      startMicros: c.shift_start,
+      endMicros: c.next_handover,
+      member: c.holder,
+    });
+    expect(second).toMatchObject({ startMicros: c.next_handover, member: c.next_holder });
+    const secondaryAnchor = offsetAnchor(rule, 1, c.timezone);
+    expect(secondaryAnchor).toBe(c.secondary_anchor);
+    expect(
+      nextHandover({ ...rule, anchor_micros: secondaryAnchor }, secondaryAnchor, c.timezone),
+    ).toBe(c.secondary_next_handover);
+  });
+});
+
 describe("memberAt", () => {
   it("puts the first member on call from the anchor", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
-    expect(memberAt(r, ANCHOR)).toBe("ana@o2.ai");
-    expect(memberAt(r, ANCHOR + MICROS_PER_DAY)).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR, "UTC")).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR + MICROS_PER_DAY, "UTC")).toBe("ana@o2.ai");
   });
 
   // The handover instant belongs to the INCOMING person. An inclusive bound
   // would leave both of them on call for the same alert.
   it("treats the handover boundary as exclusive", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
-    expect(memberAt(r, ANCHOR + MICROS_PER_WEEK - 1)).toBe("ana@o2.ai");
-    expect(memberAt(r, ANCHOR + MICROS_PER_WEEK)).toBe("bob@o2.ai");
+    expect(memberAt(r, ANCHOR + MICROS_PER_WEEK - 1, "UTC")).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR + MICROS_PER_WEEK, "UTC")).toBe("bob@o2.ai");
   });
 
   it("wraps around the member list", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"]);
     const expected = ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"];
     for (let week = 0; week < 9; week++) {
-      expect(memberAt(r, ANCHOR + week * MICROS_PER_WEEK)).toBe(expected[week % 3]);
+      expect(memberAt(r, ANCHOR + week * MICROS_PER_WEEK, "UTC")).toBe(expected[week % 3]);
     }
   });
 
@@ -110,15 +183,15 @@ describe("memberAt", () => {
   // wrap. Without it this returns undefined instead of the right person.
   it("walks backwards for instants before the anchor", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
-    expect(memberAt(r, ANCHOR - 1)).toBe("bob@o2.ai");
-    expect(memberAt(r, ANCHOR - MICROS_PER_WEEK)).toBe("bob@o2.ai");
-    expect(memberAt(r, ANCHOR - MICROS_PER_WEEK - 1)).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR - 1, "UTC")).toBe("bob@o2.ai");
+    expect(memberAt(r, ANCHOR - MICROS_PER_WEEK, "UTC")).toBe("bob@o2.ai");
+    expect(memberAt(r, ANCHOR - MICROS_PER_WEEK - 1, "UTC")).toBe("ana@o2.ai");
   });
 
   it("keeps a single member on call at every instant", () => {
     const r = weekly(["ana@o2.ai"]);
     for (const offset of [-MICROS_PER_WEEK, 0, MICROS_PER_DAY, 99 * MICROS_PER_WEEK]) {
-      expect(memberAt(r, ANCHOR + offset)).toBe("ana@o2.ai");
+      expect(memberAt(r, ANCHOR + offset, "UTC")).toBe("ana@o2.ai");
     }
   });
 
@@ -129,17 +202,17 @@ describe("memberAt", () => {
       shift_micros: 8 * MICROS_PER_HOUR,
       anchor_micros: ANCHOR,
     };
-    expect(memberAt(r, ANCHOR)).toBe("ana@o2.ai");
-    expect(memberAt(r, ANCHOR + 8 * MICROS_PER_HOUR)).toBe("bob@o2.ai");
-    expect(memberAt(r, ANCHOR + 16 * MICROS_PER_HOUR)).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR, "UTC")).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR + 8 * MICROS_PER_HOUR, "UTC")).toBe("bob@o2.ai");
+    expect(memberAt(r, ANCHOR + 16 * MICROS_PER_HOUR, "UTC")).toBe("ana@o2.ai");
   });
 
   // An unusable rotation must read as a gap, never as a silently chosen
   // fallback member.
   it("resolves to nobody when the rotation is unusable", () => {
-    expect(memberAt(weekly([]), ANCHOR)).toBeNull();
-    expect(memberAt({ ...weekly(["ana@o2.ai"]), shift_micros: 0 }, ANCHOR)).toBeNull();
-    expect(memberAt({ ...weekly(["ana@o2.ai"]), shift_micros: -1 }, ANCHOR)).toBeNull();
+    expect(memberAt(weekly([]), ANCHOR, "UTC")).toBeNull();
+    expect(memberAt({ ...weekly(["ana@o2.ai"]), shift_micros: 0 }, ANCHOR, "UTC")).toBeNull();
+    expect(memberAt({ ...weekly(["ana@o2.ai"]), shift_micros: -1 }, ANCHOR, "UTC")).toBeNull();
   });
 });
 
@@ -147,14 +220,14 @@ describe("nextHandover", () => {
   it("brackets the instant and hands over to the next member", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
     const at = ANCHOR + MICROS_PER_DAY;
-    const handover = nextHandover(r, at)!;
+    const handover = nextHandover(r, at, "UTC")!;
     expect(handover).toBe(ANCHOR + MICROS_PER_WEEK);
-    expect(memberAt(r, handover - 1)).toBe("ana@o2.ai");
-    expect(memberAt(r, handover)).toBe("bob@o2.ai");
+    expect(memberAt(r, handover - 1, "UTC")).toBe("ana@o2.ai");
+    expect(memberAt(r, handover, "UTC")).toBe("bob@o2.ai");
   });
 
   it("is null for an unusable rotation", () => {
-    expect(nextHandover(weekly([]), ANCHOR)).toBeNull();
+    expect(nextHandover(weekly([]), ANCHOR, "UTC")).toBeNull();
   });
 });
 
@@ -392,54 +465,6 @@ describe("speakTarget", () => {
   });
 });
 
-describe("shiftBands", () => {
-  const DAY = 86_400_000_000;
-  const rotation = (members: string[], shift = DAY) => ({
-    name: "Primary",
-    members,
-    shift_micros: shift,
-    anchor_micros: 0,
-  });
-
-  it("lays shifts across the window as fractions of it", () => {
-    const bands = shiftBands(rotation(["ana", "bob"]), 0, 2 * DAY);
-
-    expect(bands).toHaveLength(2);
-    expect(bands[0]).toMatchObject({ user_email: "ana", offset: 0, width: 0.5 });
-    expect(bands[1]).toMatchObject({ user_email: "bob", offset: 0.5, width: 0.5 });
-  });
-
-  /// A band running past the edge would be drawn wider than the chart and push
-  /// everything else off screen.
-  it("clips a shift that overruns the window", () => {
-    const bands = shiftBands(rotation(["ana"], 7 * DAY), 0, DAY);
-
-    expect(bands).toHaveLength(1);
-    expect(bands[0].width).toBe(1);
-    expect(bands[0].endMicros).toBe(DAY);
-  });
-
-  it("includes a shift that started before the window", () => {
-    const bands = shiftBands(rotation(["ana", "bob"]), DAY / 2, DAY);
-
-    expect(bands[0].user_email).toBe("ana");
-    expect(bands[0].startMicros).toBe(DAY / 2);
-  });
-
-  /// A one-minute shift over a month would otherwise draw tens of thousands of
-  /// slivers and lock the page.
-  it("bounds how many bands it will draw", () => {
-    const bands = shiftBands(rotation(["ana"], 60_000_000), 0, 365 * DAY);
-    expect(bands.length).toBeLessThanOrEqual(500);
-  });
-
-  it("draws nothing for an unusable rotation", () => {
-    expect(shiftBands(rotation([]), 0, DAY)).toEqual([]);
-    expect(shiftBands(rotation(["ana"], 0), 0, DAY)).toEqual([]);
-    expect(shiftBands(rotation(["ana"]), DAY, DAY)).toEqual([]);
-  });
-});
-
 describe("colorIndexFor", () => {
   /// A band that changes colour as you page through the calendar is
   /// unreadable, so the colour comes from the person, not their position.
@@ -454,6 +479,241 @@ describe("colorIndexFor", () => {
       const i = colorIndexFor(email, 5);
       expect(i).toBeGreaterThanOrEqual(0);
       expect(i).toBeLessThan(5);
+    }
+  });
+});
+
+describe("pageState", () => {
+  const firedOnce = [{ after_micros: 0, at: 1, targets: [], reached: ["a@o2.ai"] }];
+  const progress = (exhausted: boolean, fired: unknown[] = firedOnce) =>
+    ({ fired, next_targets: [], next_at: null, exhausted }) as any;
+
+  it("says nobody answered for an unanswered page whose ladder ran out", () => {
+    const cases: [Record<string, unknown>, unknown, string][] = [
+      [{ state: "triggered", exhausted_at: 5 }, undefined, "exhausted"],
+      [{ state: "triggered", exhausted_at: null }, undefined, "triggered"],
+      [{ state: "triaged", exhausted_at: 5 }, undefined, "exhausted"],
+      [{ state: "acknowledged", exhausted_at: 5 }, undefined, "acknowledged"],
+      [{ state: "resolved", exhausted_at: 5 }, undefined, "resolved"],
+      // With the ladder's own progress, that is the one signal: the record's flag lags it by minutes.
+      [{ state: "triggered", exhausted_at: null }, progress(true), "exhausted"],
+      [{ state: "triggered", exhausted_at: 5 }, progress(false), "triggered"],
+      [{ state: "acknowledged" }, progress(true), "acknowledged"],
+      // The server marks an empty ladder exhausted; nobody was paged, so nobody failed to answer.
+      [{ state: "triggered" }, progress(true, []), "triggered"],
+    ];
+    for (const [record, ladder, expected] of cases) {
+      expect(pageState(record as any, ladder as any)).toBe(expected);
+    }
+  });
+});
+
+describe("isDeletedTeam", () => {
+  it("calls a team deleted only when it has an id the loaded list does not have", () => {
+    const cases: [string | null | undefined, string[] | null, boolean][] = [
+      [null, ["team_1"], false],
+      [undefined, ["team_1"], false],
+      ["", ["team_1"], false],
+      ["", [], false],
+      ["team_gone", ["team_1"], true],
+      ["team_gone", [], true],
+      ["team_1", ["team_1"], false],
+      ["team_1", null, false],
+    ];
+    for (const [teamId, known, expected] of cases) {
+      expect(isDeletedTeam(teamId, known), `${teamId} / ${known}`).toBe(expected);
+    }
+  });
+});
+
+describe("ladderStopped", () => {
+  const progress = (exhausted: boolean, stopped_because: string | null) =>
+    ({ fired: [], next_targets: [], next_at: null, exhausted, stopped_because }) as any;
+
+  it.each([
+    [
+      "an exhausted ladder",
+      progress(true, "the ladder is exhausted — nobody acknowledged"),
+      false,
+      false,
+    ],
+    [
+      "a ladder stopped for another reason",
+      progress(false, "the owning team was deleted"),
+      false,
+      true,
+    ],
+    ["a climbing ladder", progress(false, null), false, false],
+    [
+      "a deleted team, even with an exhausted ladder",
+      progress(true, "the ladder is exhausted — nobody acknowledged"),
+      true,
+      true,
+    ],
+    ["a deleted team with no progress loaded", undefined, true, true],
+  ])("%s", (_name, ladder, teamDeleted, expected) => {
+    expect(ladderStopped(ladder, teamDeleted)).toBe(expected);
+  });
+});
+
+describe("reachedStepOf", () => {
+  it("names the 1-based step a recorded rung delay matches, or nothing", () => {
+    const steps = [{ after_micros: 900 }, { after_micros: 0 }, { after_micros: 300 }];
+    const cases: [unknown, number | null | undefined, number | null][] = [
+      [steps, 0, 1],
+      [steps, 300, 2],
+      [steps, 900, 3],
+      [steps, 450, null],
+      [steps, null, null],
+      [steps, undefined, null],
+      [null, 300, null],
+    ];
+    for (const [ladder, micros, expected] of cases) {
+      expect(reachedStepOf(ladder as any, micros), `${micros}`).toBe(expected);
+    }
+  });
+});
+
+describe("pagePhrase", () => {
+  const NOW = 1_700_000_000_000_000;
+  const SEC = 1_000_000;
+  const base = { state: "triggered", opened_at: NOW - 600 * SEC };
+  const ladder = (over: Record<string, unknown> = {}) => ({
+    fired: [],
+    next_targets: [],
+    next_at: null,
+    exhausted: false,
+    ...over,
+  });
+  const rung = (reached: string[]) => ({ after_micros: 0, at: NOW, targets: [], reached });
+
+  it("gives each page one phrase, from one signal per fact", () => {
+    const cases: [string, Record<string, unknown>, Record<string, unknown>, unknown][] = [
+      [
+        "resolved",
+        { state: "resolved", closed_at: NOW - 300 * SEC },
+        {},
+        { kind: "resolved", afterMicros: 300 * SEC },
+      ],
+      [
+        "acknowledged",
+        { state: "acknowledged", acked_by: "ana@o2.ai" },
+        {},
+        { kind: "acknowledged", by: "ana@o2.ai" },
+      ],
+      [
+        "snoozed",
+        { snoozed_until: NOW + 60 * SEC },
+        {},
+        { kind: "snoozed", until: NOW + 60 * SEC },
+      ],
+      [
+        "ladder ran out",
+        {},
+        { progress: ladder({ exhausted: true, fired: [rung(["ana@o2.ai"])] }) },
+        { kind: "nobodyAnswered" },
+      ],
+      [
+        "held for triage",
+        {},
+        { progress: ladder({ held_until_micros: NOW + 54.2 * SEC }) },
+        { kind: "held", secondsLeft: 55 },
+      ],
+      [
+        "lapsed hold",
+        {},
+        { progress: ladder({ held_until_micros: NOW - SEC }) },
+        { kind: "notPaged" },
+      ],
+      [
+        "no rungs (the server sends an empty ladder as exhausted)",
+        {},
+        { progress: ladder({ exhausted: true, fired: [] }), totalRungs: 0 },
+        { kind: "pagesNobody" },
+      ],
+      [
+        "the step it is on reached nobody",
+        {},
+        {
+          progress: ladder({
+            fired: [rung(["ana@o2.ai"]), { ...rung([]), reached_nobody: true }],
+          }),
+        },
+        { kind: "reachedNobody", step: 2, total: 3 },
+      ],
+      ["still loading", {}, { progressLoaded: false }, { kind: "unknown" }],
+      [
+        "paging",
+        {},
+        { progress: ladder({ fired: [rung(["ana@o2.ai"]), rung(["bo@o2.ai", "cy@o2.ai"])] }) },
+        { kind: "paging", step: 2, total: 3, who: ["bo@o2.ai", "cy@o2.ai"] },
+      ],
+      [
+        "paging, no progress on the row",
+        {},
+        { reachedStep: 2 },
+        { kind: "paging", step: 2, total: 3, who: [] },
+      ],
+      ["not paged", {}, { progress: ladder() }, { kind: "notPaged" }],
+      [
+        "the first rung is due but not sent yet (after an unack restarts the ladder)",
+        {},
+        { progress: ladder({ next_at: NOW - SEC }) },
+        { kind: "paging", step: 1, total: 3, who: [] },
+      ],
+      [
+        "the first rung is still to come",
+        {},
+        { progress: ladder({ next_at: NOW + 60 * SEC }) },
+        { kind: "notPaged" },
+      ],
+      [
+        "its team was deleted, with no progress loaded",
+        {},
+        { reachedStep: 2, teamDeleted: true },
+        { kind: "nobodyPaged" },
+      ],
+      [
+        "the ladder stopped (its team was deleted)",
+        {},
+        {
+          progress: ladder({
+            fired: [rung(["ana@o2.ai"]), rung(["bo@o2.ai"]), rung(["cy@o2.ai"])],
+            stopped_because: "the owning team was deleted",
+          }),
+        },
+        { kind: "nobodyPaged" },
+      ],
+      [
+        "empty ladder on a list without progress, where the record says it ran out",
+        { exhausted_at: NOW },
+        { totalRungs: 0 },
+        { kind: "pagesNobody" },
+      ],
+      [
+        "no progress asked yet, but the record names its step",
+        {},
+        { progressLoaded: false, reachedStep: 2 },
+        { kind: "paging", step: 2, total: 3, who: [] },
+      ],
+      ["no progress asked, no step recorded", {}, { progressLoaded: false }, { kind: "unknown" }],
+      [
+        "the record paged a step the policy no longer has",
+        { reached_rung_micros: 300 * SEC },
+        { reachedStep: null },
+        { kind: "unknown" },
+      ],
+    ];
+    for (const [name, record, opts, expected] of cases) {
+      const phrase = pagePhrase({
+        record: { ...base, ...record } as any,
+        progress: null,
+        progressLoaded: true,
+        totalRungs: 3,
+        nowMicros: NOW,
+        ...opts,
+      } as any);
+      expect(phrase, name).toEqual(expected);
     }
   });
 });
@@ -517,7 +777,7 @@ describe("ownershipPath", () => {
 describe("upcomingShifts", () => {
   it("starts with the shift containing the given instant", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
-    const shifts = upcomingShifts(r, ANCHOR + MICROS_PER_DAY, 3);
+    const shifts = upcomingShifts(r, ANCHOR + MICROS_PER_DAY, 3, "UTC");
 
     expect(shifts).toHaveLength(3);
     expect(shifts[0].member).toBe("ana@o2.ai");
@@ -530,7 +790,7 @@ describe("upcomingShifts", () => {
   // Each shift must end exactly where the next begins, or the preview implies
   // a gap or an overlap that the resolver does not have.
   it("produces contiguous shifts", () => {
-    const shifts = upcomingShifts(weekly(["a", "b", "c"]), ANCHOR, 5);
+    const shifts = upcomingShifts(weekly(["a", "b", "c"]), ANCHOR, 5, "UTC");
     for (let i = 1; i < shifts.length; i++) {
       expect(shifts[i].startMicros).toBe(shifts[i - 1].endMicros);
     }
@@ -540,24 +800,24 @@ describe("upcomingShifts", () => {
   // of showing it.
   it("agrees with memberAt at every boundary", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"]);
-    for (const shift of upcomingShifts(r, ANCHOR - MICROS_PER_WEEK, 8)) {
-      expect(memberAt(r, shift.startMicros)).toBe(shift.member);
-      expect(memberAt(r, shift.endMicros - 1)).toBe(shift.member);
+    for (const shift of upcomingShifts(r, ANCHOR - MICROS_PER_WEEK, 8, "UTC")) {
+      expect(memberAt(r, shift.startMicros, "UTC")).toBe(shift.member);
+      expect(memberAt(r, shift.endMicros - 1, "UTC")).toBe(shift.member);
     }
   });
 
   it("works for instants before the anchor", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
-    const shifts = upcomingShifts(r, ANCHOR - 1, 2);
+    const shifts = upcomingShifts(r, ANCHOR - 1, 2, "UTC");
     expect(shifts[0].member).toBe("bob@o2.ai");
     expect(shifts[0].endMicros).toBe(ANCHOR);
     expect(shifts[1].member).toBe("ana@o2.ai");
   });
 
   it("returns nothing for an unusable rotation or a non-positive count", () => {
-    expect(upcomingShifts(weekly([]), ANCHOR, 3)).toEqual([]);
-    expect(upcomingShifts({ ...weekly(["a"]), shift_micros: 0 }, ANCHOR, 3)).toEqual([]);
-    expect(upcomingShifts(weekly(["a"]), ANCHOR, 0)).toEqual([]);
+    expect(upcomingShifts(weekly([]), ANCHOR, 3, "UTC")).toEqual([]);
+    expect(upcomingShifts({ ...weekly(["a"]), shift_micros: 0 }, ANCHOR, 3, "UTC")).toEqual([]);
+    expect(upcomingShifts(weekly(["a"]), ANCHOR, 0, "UTC")).toEqual([]);
   });
 });
 
@@ -957,6 +1217,102 @@ describe("resolvableTimezones", () => {
   });
 });
 
+describe("formatZonedRange", () => {
+  const FROM = Date.UTC(2026, 10, 4, 0, 0) * 1000;
+  const TO = Date.UTC(2026, 10, 5, 0, 0) * 1000;
+
+  it("states both ends on one clock, without a zone by default", () => {
+    expect(formatZonedRange(FROM, TO, "Asia/Kolkata", false, "en-GB")).toBe(
+      "Wed 4 Nov, 05:30 → Thu 5 Nov, 05:30",
+    );
+  });
+
+  it("names the zone once, at the end, when asked", () => {
+    expect(formatZonedRange(FROM, TO, "Asia/Kolkata", true, "en-GB")).toBe(
+      "Wed 4 Nov, 05:30 → Thu 5 Nov, 05:30 GMT+5:30",
+    );
+  });
+
+  it("falls back to UTC for a zone the runtime does not know", () => {
+    expect(formatZonedRange(FROM, TO, "Not/AZone", true, "en-GB")).toBe(
+      "Wed 4 Nov, 00:00 → Thu 5 Nov, 00:00",
+    );
+  });
+});
+
+describe("formatDayRange", () => {
+  const at = (local: string, zone: string) => fromZonedInputValue(local, zone) as number;
+  it.each([
+    ["one day", "2026-11-06T00:00", "2026-11-07T00:00", "Fri 6 Nov"],
+    [
+      "an exclusive end names the last day held",
+      "2026-11-07T09:00",
+      "2026-11-09T09:00",
+      "Sat 7 Nov – Mon 9 Nov",
+    ],
+    ["a week ending at midnight", "2026-11-09T00:00", "2026-11-16T00:00", "Mon 9 Nov – Sun 15 Nov"],
+  ])("%s", (_name, from, to, expected) => {
+    const zone = "Asia/Kolkata";
+    // Intl puts thin spaces around the dash.
+    expect(formatDayRange(at(from, zone), at(to, zone), zone, "en-GB").replace(/\s/g, " ")).toBe(
+      expected,
+    );
+  });
+});
+
+describe("formatShiftRange", () => {
+  const at = (local: string, zone: string) => fromZonedInputValue(local, zone) as number;
+  it.each([
+    [
+      "midnight to midnight reads as days",
+      "2026-11-09T00:00",
+      "2026-11-16T00:00",
+      "Mon 9 Nov – Sun 15 Nov",
+    ],
+    [
+      "a mid-day handover keeps its times, in one format",
+      "2026-11-07T09:00",
+      "2026-11-09T09:00",
+      "Sat 7 Nov, 09:00 – Mon 9 Nov, 09:00",
+    ],
+  ])("%s", (_name, from, to, expected) => {
+    const zone = "Asia/Kolkata";
+    expect(formatShiftRange(at(from, zone), at(to, zone), zone, "en-GB").replace(/\s/g, " ")).toBe(
+      expected,
+    );
+  });
+});
+
+describe("nextWeekRange", () => {
+  const at = (local: string, zone: string) => fromZonedInputValue(local, zone) as number;
+  it.each([
+    ["midweek", "2026-11-04T12:00", "UTC", "2026-11-09T00:00", "2026-11-16T00:00"],
+    [
+      "on a Monday it is the Monday after",
+      "2026-11-09T00:30",
+      "UTC",
+      "2026-11-16T00:00",
+      "2026-11-23T00:00",
+    ],
+    [
+      "on a Sunday it is tomorrow",
+      "2026-11-08T23:00",
+      "UTC",
+      "2026-11-09T00:00",
+      "2026-11-16T00:00",
+    ],
+    [
+      "the team's Monday, not UTC's",
+      "2026-11-09T02:00",
+      "Asia/Kolkata",
+      "2026-11-16T00:00",
+      "2026-11-23T00:00",
+    ],
+  ])("%s", (_name, now, zone, from, to) => {
+    expect(nextWeekRange(at(now, zone), zone)).toEqual({ from: at(from, zone), to: at(to, zone) });
+  });
+});
+
 describe("formatInZone", () => {
   // 04:30 UTC is 10:00 in Kolkata. The team's zone decides, never the browser's.
   const AT = Date.UTC(2026, 7, 10, 4, 30) * 1000;
@@ -1078,6 +1434,7 @@ describe("CHANNEL_WAKES", () => {
   // how a team discovers at 3 a.m. that their P1 only ever sent an email.
   it.each([
     ["email", false],
+    ["slack", false],
     ["sms", true],
     ["voice", true],
     ["webhook", false],
@@ -1158,8 +1515,19 @@ describe("parseRoutingReason", () => {
       "routed to tm_9 by ownership rule k8s-cluster=introspection/service=search",
     );
     expect(parsed?.mechanism).toBe("ownership");
-    expect(parsed?.teamId).toBe("tm_9");
+    expect(parsed?.team).toBe("tm_9");
     expect(parsed?.dimensions).toEqual({ "k8s-cluster": "introspection", service: "search" });
+  });
+
+  // The server now names the team, and a name may hold spaces.
+  it.each([
+    ["routed to Platform SRE by ownership rule service=search", "ownership"],
+    ["routed to Platform SRE by the alert's own setting", "explicit"],
+    ["no ownership rule matched, so it went to the default team Platform SRE", "default"],
+  ] as const)("reads a spaced team name out of %s", (sentence, mechanism) => {
+    const parsed = parseRoutingReason(sentence);
+    expect(parsed?.mechanism).toBe(mechanism);
+    expect(parsed?.team).toBe("Platform SRE");
   });
 
   it("keeps a value that contains its own equals sign whole", () => {
@@ -1363,54 +1731,6 @@ describe("ruleClaimsDimensions", () => {
   });
 });
 
-describe("compareRulePrecedence", () => {
-  const rule = (dimensions: Record<string, string>) => ({ dimensions });
-  const order = (...rules: { dimensions: Record<string, string> }[]) =>
-    [...rules].sort(compareRulePrecedence).map((r) => ownershipPath(r.dimensions));
-
-  /// The bug this exists to prevent: `k8s-namespace=payments` is the longer
-  /// STRING, so sorting on rendered text ranks it first — but the server
-  /// resolves the service rule as the winner, on literal characters.
-  it("ranks by pinned literal characters, not by rendered path length", () => {
-    expect(order(rule({ "k8s-namespace": "payments" }), rule({ service: "payments-api" }))).toEqual(
-      ["service=payments-api", "k8s-namespace=payments"],
-    );
-  });
-
-  it("puts the deeper rule first, however short its values", () => {
-    expect(
-      order(
-        rule({ service: "payments-api-gateway" }),
-        rule({ service: "a", "k8s-namespace": "b" }),
-      )[0],
-    ).toBe("k8s-namespace=b/service=a");
-  });
-
-  // `host=db-01` is a statement about one host, `host=db-*` about a family,
-  // and the narrower claim is the one whose author meant it.
-  it("puts an exact match ahead of a wildcard at the same depth", () => {
-    expect(order(rule({ host: "db-*" }), rule({ host: "db-01" }))).toEqual([
-      "host=db-01",
-      "host=db-*",
-    ]);
-  });
-
-  it("prefers the longer prefix between two wildcards", () => {
-    expect(order(rule({ host: "db-*" }), rule({ host: "db-prod-*" }))).toEqual([
-      "host=db-prod-*",
-      "host=db-*",
-    ]);
-  });
-
-  /// Equally specific rules must not reorder between renders.
-  it("breaks a dead tie on the path, so the order is stable", () => {
-    expect(order(rule({ service: "beta" }), rule({ service: "alpha" }))).toEqual([
-      "service=alpha",
-      "service=beta",
-    ]);
-  });
-});
-
 /// D5. The promote handler states "a promotion may raise the severity but must
 /// never lower what already woke somebody" and then takes whatever severity it
 /// is sent — so the picker is the only place the invariant can hold.
@@ -1466,6 +1786,35 @@ describe("isOnCallUnavailable", () => {
   });
 });
 
+/// A rung the engine gave up on is settled, so its lost page must not still promise a retry.
+describe("rungStillRetrying", () => {
+  const event = (over: Partial<OnCallResponseEvent>): OnCallResponseEvent => ({
+    kind: "page",
+    at: 1,
+    actor: "engine",
+    body: "paged ana@o2.ai",
+    rung_micros: 0,
+    ladder_run: 2,
+    ...over,
+  });
+  const lost = event({ delivered: false });
+  const gaveUp = (over: Partial<OnCallResponseEvent> = {}) =>
+    event({
+      kind: "sys",
+      body: "nothing could be delivered to this rung in 3 attempts; the ladder carries on",
+      ...over,
+    });
+  it.each([
+    ["a lost page with no give-up", lost, [lost], true],
+    ["a lost page the engine gave up on", lost, [lost, gaveUp()], false],
+    ["a give-up for another rung", lost, [lost, gaveUp({ rung_micros: 60 })], true],
+    ["a give-up from an earlier run", lost, [lost, gaveUp({ ladder_run: 1 })], true],
+    ["a page that reached somebody", event({}), [event({})], false],
+  ] as const)("%s", (_name, page, events, expected) => {
+    expect(rungStillRetrying(page, [...events])).toBe(expected);
+  });
+});
+
 /// A finished sentence is a paragraph on a rail. The badge is four words and
 /// the sentence stays on hover — but only where the cause is one we know.
 describe("shortReachReason", () => {
@@ -1478,6 +1827,12 @@ describe("shortReachReason", () => {
         t,
       ),
     ).toBe("oncall.reachShortNoSmtp");
+    expect(
+      shortReachReason(
+        "`ZO_SMTP_FROM_EMAIL` is missing or invalid, so no email page can be sent",
+        t,
+      ),
+    ).toBe("oncall.reachShortNoFromAddress");
     expect(shortReachReason("`ana@o2.ai` is not a user of this organization", t)).toBe(
       "oncall.reachShortNoAddress",
     );
@@ -1563,6 +1918,34 @@ describe("rungProblem", () => {
 /// while the label promised the team's, so an operator in Berlin editing an
 /// Asia/Kolkata team saw the handover three and a half hours from where it was
 /// and moved it there by saving.
+describe("zonedMidnight", () => {
+  const KOLKATA_10AM = Date.UTC(2026, 7, 17, 4, 30);
+  it.each([
+    ["Asia/Kolkata", KOLKATA_10AM, 0, Date.UTC(2026, 7, 16, 18, 30)],
+    ["America/New_York", KOLKATA_10AM, 0, Date.UTC(2026, 7, 17, 4, 0)],
+    ["UTC", KOLKATA_10AM, 2, Date.UTC(2026, 7, 19)],
+    // Starts in EST and lands in EDT: the step is local days, not 24-hour blocks.
+    ["America/New_York", Date.UTC(2026, 2, 1, 17), 14, Date.UTC(2026, 2, 15, 4, 0)],
+    // No local 00:00 on these days: the day starts where the clocks jump to 01:00.
+    ["America/Santiago", Date.UTC(2026, 8, 5, 16), 1, Date.UTC(2026, 8, 6, 4)],
+    ["America/Havana", Date.UTC(2026, 2, 7, 17), 1, Date.UTC(2026, 2, 8, 5)],
+    ["America/Santiago", Date.UTC(2026, 8, 6, 16), 0, Date.UTC(2026, 8, 6, 4)],
+  ])("%s from %i plus %i days", (zone, startMs, days, expectedMs) => {
+    expect(zonedMidnight(startMs * 1000, zone, days)).toBe(expectedMs * 1000);
+  });
+
+  it("rows tile without gap or overlap across a day with no midnight", () => {
+    const rows = dayRows([], Date.UTC(2026, 8, 4, 16) * 1000, 4, "America/Santiago");
+    expect(rows.map((r) => toZonedInputValue(r.start, "America/Santiago"))).toEqual([
+      "2026-09-04T00:00",
+      "2026-09-05T00:00",
+      "2026-09-06T01:00",
+      "2026-09-07T00:00",
+    ]);
+    rows.slice(1).forEach((row, i) => expect(row.start).toBe(rows[i].end));
+  });
+});
+
 describe("toZonedInputValue / fromZonedInputValue", () => {
   /// The instant Asia/Kolkata calls 2026-08-17 10:00 — UTC+05:30.
   const KOLKATA_10AM = Date.UTC(2026, 7, 17, 4, 30) * 1000;
@@ -1636,5 +2019,783 @@ describe("toZonedInputValue / fromZonedInputValue", () => {
 
   it("answers empty for an instant that is not one", () => {
     expect(toZonedInputValue(Number.NaN, "UTC")).toBe("");
+  });
+});
+
+describe("rotation drawer, part B", () => {
+  const MON = Date.UTC(2026, 0, 5) * 1000;
+  const HOUR = MICROS_PER_HOUR;
+  const seg = (
+    from: number,
+    to: number,
+    user?: string,
+    rule?: string,
+    override?: string,
+    scheduled?: string,
+  ) => ({
+    rotation_id: "rot",
+    from: MON + from * HOUR,
+    to: MON + to * HOUR,
+    user_email: user,
+    rotation: rule,
+    override_id: override,
+    scheduled_email: scheduled,
+  });
+
+  // B3 Covers: a pick writes exactly these windows, and only exact windows read back as that pick.
+  it.each([
+    ["all", []],
+    ["businessHours", [window([0, 1, 2, 3, 4], 540, 1020)]],
+    ["weekdays", [window([0, 1, 2, 3, 4], 0, 1440)]],
+    ["weekends", [window([5, 6], 0, 1440)]],
+  ] as const)("covers %s round-trips", (key, windows) => {
+    expect(COVERS_PRESETS[key]).toEqual(windows);
+    expect(coversPresetOf(windows as unknown as TimeWindow[])).toBe(key);
+  });
+
+  it.each([
+    ["different hours", [window([0, 1, 2, 3, 4], 540, 1080)]],
+    ["two windows", [window([0, 1, 2, 3, 4], 540, 1020), window([5], 600, 840)]],
+    ["one weekend day", [window([5], 0, 1440)]],
+  ])("covers %s is custom", (_name, windows) => {
+    expect(coversPresetOf(windows)).toBe("custom");
+  });
+
+  // B3 Make on call now: an array rotation that puts the person at the turn's index.
+  it.each([
+    [["a", "b", "c", "d"], "c", 0, ["c", "d", "a", "b"]],
+    [["a", "b", "c", "d"], "a", 2, ["c", "d", "a", "b"]],
+    [["a", "b", "c"], "b", 1, ["a", "b", "c"]],
+    [["a", "b"], "z", 0, ["a", "b"]],
+  ])("rotateMembersTo(%j, %s, %i)", (members, person, index, expected) => {
+    expect(rotateMembersTo(members, person, index)).toEqual(expected);
+  });
+
+  // The draft keeps the holder and the handovers, the same rule as `ShiftRule::with_roster`.
+  it.each([
+    [
+      "add before the first handover",
+      ["a", "b", "c"],
+      -MICROS_PER_DAY,
+      ["a", "b", "c", "d"],
+      ["c", "a", "b", "d"],
+    ],
+    [
+      "add mid-rotation",
+      ["a", "b", "c"],
+      4 * MICROS_PER_WEEK + MICROS_PER_DAY,
+      ["a", "b", "c", "d"],
+      ["b", "c", "a", "d"],
+    ],
+    [
+      "remove the holder",
+      ["a", "b", "c"],
+      4 * MICROS_PER_WEEK + MICROS_PER_DAY,
+      ["a", "c"],
+      ["c", "a"],
+    ],
+    [
+      "remove the next person",
+      ["a", "b", "c"],
+      4 * MICROS_PER_WEEK + MICROS_PER_DAY,
+      ["a", "b"],
+      ["b", "a"],
+    ],
+    [
+      "remove somebody else",
+      ["a", "b", "c"],
+      4 * MICROS_PER_WEEK + MICROS_PER_DAY,
+      ["b", "c"],
+      ["b", "c"],
+    ],
+    ["add to a single person", ["a"], 4 * MICROS_PER_WEEK, ["a", "b"], ["a", "b"]],
+  ])("withRoster: %s", (_case, before, offset, members, expectedOrder) => {
+    const rule = layer("Base", before, 0, []);
+    const now = ANCHOR + offset;
+    const after = { ...rule, members: withRoster(rule, members, now, "UTC") };
+    expect(turnLine(after.members, memberAt(after, now, "UTC"))).toEqual(expectedOrder);
+    expect(nextHandover(after, now, "UTC")).toBe(nextHandover(rule, now, "UTC"));
+  });
+
+  // The Rust suite runs these same cases (`roster_parity.json`), so preview and save cannot drift.
+  it.each(rosterParity.map((c) => [c.case, c] as const))(
+    "withRoster matches the server: %s",
+    (_name, c) => {
+      const rule = {
+        ...layer("Base", c.members, 0, []),
+        shift_micros: c.shift_micros,
+        anchor_micros: c.anchor_micros,
+      };
+      expect(withRoster(rule, c.new_members, c.now_micros, c.timezone)).toEqual(c.expected);
+    },
+  );
+
+  // Shifts are counted in the team's wall time, so a DST change between anchor and now moves no turn.
+  it("withRoster counts shifts in the team's zone across a DST change", () => {
+    // Monday 2026-03-02 09:00 New York (EST); the clocks spring forward on 2026-03-08.
+    const anchor = Date.UTC(2026, 2, 2, 14, 0) * 1000;
+    const rule = { ...layer("Base", ["a", "b", "c"], 0, []), anchor_micros: anchor };
+    // Monday 2026-03-16 09:30 EDT: shift 2 (c) on the wall clock, still shift 1 (b) by UTC arithmetic.
+    const now = Date.UTC(2026, 2, 16, 13, 30) * 1000;
+    const members = withRoster(rule, ["a", "b", "c", "d"], now, "America/New_York");
+    expect(members).toEqual(["b", "d", "c", "a"]);
+  });
+
+  it.each([
+    [["a", "b", "c", "d"], "c", ["c", "d", "a", "b"]],
+    [["a", "b"], null, ["a", "b"]],
+  ])("turnLine(%j, %s)", (members, holder, expected) => {
+    expect(turnLine(members, holder)).toEqual(expected);
+  });
+
+  // B3 People line: read from the server's segments, covers ignored.
+  it.each([
+    ["on now", [seg(-1, 1, "ana", "Base"), seg(1, 3, "bo", "Base")], { email: "ana", now: true }],
+    ["next up", [seg(-1, 1, "cy", "Office"), seg(1, 3, "bo", "Base")], { email: "bo", now: false }],
+    [
+      "a cover keeps the rostered turn",
+      [seg(-1, 1, "di", "Base", "ov1", "ana"), seg(1, 3, "bo", "Base")],
+      { email: "ana", now: true },
+    ],
+    [
+      "an absence keeps the rostered turn",
+      [seg(-1, 1, "bo", "Base", undefined, "ana")],
+      { email: "ana", now: true },
+    ],
+    [
+      "a gap left by an away holder keeps the rostered turn",
+      [seg(-1, 1, undefined, "Base", undefined, "ana")],
+      { email: "ana", now: true },
+    ],
+    ["never in the window", [seg(-1, 3, "cy", "Office")], null],
+  ])("ruleHolder: %s", (_name, segments, expected) => {
+    expect(ruleHolder(segments as any, "Base", MON)).toEqual(expected);
+  });
+
+  // B3 Handover: weekday and time move the first shift within its team-local week, DST-correct.
+  it.each([
+    [
+      "Kolkata weekly to Wed 09:00",
+      Date.UTC(2026, 2, 2, 3, 30),
+      "Asia/Kolkata",
+      2,
+      540,
+      Date.UTC(2026, 2, 4, 3, 30),
+    ],
+    [
+      "daily keeps the date",
+      Date.UTC(2026, 2, 2, 3, 30),
+      "Asia/Kolkata",
+      null,
+      0,
+      Date.UTC(2026, 2, 1, 18, 30),
+    ],
+    [
+      "New York across spring forward",
+      Date.UTC(2026, 2, 2, 14),
+      "America/New_York",
+      6,
+      540,
+      Date.UTC(2026, 2, 8, 13),
+    ],
+  ])("anchorAtWeekdayTime: %s", (_name, anchorMs, zone, weekday, minute, expectedMs) => {
+    expect(anchorAtWeekdayTime(anchorMs * 1000, zone, weekday, minute)).toBe(expectedMs * 1000);
+  });
+
+  it("anchorWeekdayTime reads the team-local weekday and minute", () => {
+    expect(anchorWeekdayTime(Date.UTC(2026, 2, 4, 3, 30) * 1000, "Asia/Kolkata")).toEqual({
+      weekday: 2,
+      minute: 540,
+    });
+  });
+
+  // B1 Picture: one row per team-local day, segments cut at its midnights.
+  it("dayRows cuts segments at the team's midnights", () => {
+    const rows = dayRows([seg(-2, 30, "ana", "Base")] as any, MON, 2, "UTC");
+    expect(rows.map((r) => [r.start, r.end])).toEqual([
+      [MON, MON + 24 * HOUR],
+      [MON + 24 * HOUR, MON + 48 * HOUR],
+    ]);
+    expect(rows[0].pieces.map((p) => [p.from, p.to])).toEqual([[MON, MON + 24 * HOUR]]);
+    expect(rows[1].pieces.map((p) => [p.from, p.to])).toEqual([[MON + 24 * HOUR, MON + 30 * HOUR]]);
+  });
+
+  // F1: an instant's place on its day row; the repeated hour holds both occurrences, half each.
+  const NY = "America/New_York";
+  const at = (zone: string, ms: number) =>
+    dayFraction(ms * 1000, dayRows([], ms * 1000, 1, zone)[0], zone);
+  it.each([
+    ["Kolkata 09:30 is wall/24", "Asia/Kolkata", Date.UTC(2026, 2, 4, 4), 9.5 / 24],
+    [
+      "Kolkata keeps micros",
+      "Asia/Kolkata",
+      Date.UTC(2026, 2, 4, 4, 0, 30, 500),
+      (570.5 + 0.5 / 60) / 1440,
+    ],
+    ["fall-back noon sits at the middle", NY, Date.UTC(2026, 10, 1, 17), 0.5],
+    [
+      "fall-back first 01:30 fills the slot's first half",
+      NY,
+      Date.UTC(2026, 10, 1, 5, 30),
+      75 / 1440,
+    ],
+    ["fall-back second 01:30 fills its second half", NY, Date.UTC(2026, 10, 1, 6, 30), 105 / 1440],
+    ["fall-back 03:00 is wall/24", NY, Date.UTC(2026, 10, 1, 8), 3 / 24],
+    ["spring-forward 01:30 EST is wall/24", NY, Date.UTC(2026, 2, 8, 6, 30), 1.5 / 24],
+    ["spring-forward 03:30 EDT is wall/24", NY, Date.UTC(2026, 2, 8, 7, 30), 3.5 / 24],
+    ["no-midnight day starts at 01:00", "America/Santiago", Date.UTC(2026, 8, 6, 4), 1 / 24],
+    ["no-midnight day noon", "America/Santiago", Date.UTC(2026, 8, 6, 15), 0.5],
+    ["no-midnight day noon in Havana", "America/Havana", Date.UTC(2026, 2, 8, 16), 0.5],
+  ])("dayFraction: %s", (_name, zone, ms, expected) => {
+    expect(at(zone, ms)).toBeCloseTo(expected, 12);
+  });
+
+  it("dayFraction strictly increases across a day with no midnight and stays below 1", () => {
+    const zone = "America/Santiago";
+    const row = dayRows([], Date.UTC(2026, 8, 6, 12) * 1000, 1, zone)[0];
+    const hours = Array.from({ length: 23 }, (_, h) => row.start + h * 3_600_000_000);
+    const positions = [...hours, row.end - 1].map((t) => dayFraction(t, row, zone));
+    positions.slice(1).forEach((p, i) => expect(p).toBeGreaterThan(positions[i]));
+    expect(positions.at(-1)).toBeLessThan(1);
+  });
+
+  it.each([
+    [
+      "fall-back cover 01:45 EDT to 01:15 EST",
+      NY,
+      Date.UTC(2026, 10, 1, 5, 45),
+      Date.UTC(2026, 10, 1, 6, 15),
+      15 / 1440,
+    ],
+    [
+      "spring-forward 01:30 EST to 03:30 EDT",
+      NY,
+      Date.UTC(2026, 2, 8, 6, 30),
+      Date.UTC(2026, 2, 8, 7, 30),
+      2 / 24,
+    ],
+    [
+      "a 30-second piece",
+      "Asia/Kolkata",
+      Date.UTC(2026, 2, 4, 4),
+      Date.UTC(2026, 2, 4, 4, 0, 30),
+      30 / 86400,
+    ],
+    [
+      "a 30-second piece in the repeated hour",
+      NY,
+      Date.UTC(2026, 10, 1, 6),
+      Date.UTC(2026, 10, 1, 6, 0, 30),
+      15 / 86400,
+    ],
+  ])("dayFraction width: %s", (_name, zone, fromMs, toMs, width) => {
+    const row = dayRows([], fromMs * 1000, 1, zone)[0];
+    const span = dayFraction(toMs * 1000, row, zone) - dayFraction(fromMs * 1000, row, zone);
+    expect(span).toBeGreaterThan(0);
+    expect(span).toBeCloseTo(width, 12);
+  });
+
+  // B4: the next ends of this rule's own stretches, inside the window and after now.
+  it("stopChoices lists up to three real ends of the rule's turns", () => {
+    const segments = [
+      seg(-5, 1, "ana", "Base"),
+      seg(1, 2, "cy", "Office"),
+      seg(2, 4, "bo", "Base"),
+      seg(4, 5, "di", "Base", "ov", "bo"),
+      seg(5, 6, "ana", "Base"),
+      seg(6, 7, "bo", "Base"),
+      seg(7, 9, "ana", "Base"),
+    ];
+    expect(stopChoices(segments as any, "Base", MON, MON + 9 * HOUR)).toEqual([
+      { email: "ana", at: MON + HOUR },
+      { email: "bo", at: MON + 5 * HOUR },
+      { email: "ana", at: MON + 6 * HOUR },
+    ]);
+  });
+
+  // D4: one holder's stretch stays one even where the rostered member under it changes.
+  it.each([
+    [
+      "a cover across a roster handover is one stretch",
+      [seg(0, 2, "di", "Base", "ov", "ana"), seg(2, 5, "di", "Base", "ov", "bo")],
+      [{ ...seg(0, 5, "di", "Base", "ov"), scheduled_email: undefined }],
+    ],
+    [
+      "parts that agree on the rostered member keep it",
+      [seg(0, 2, "di", "Base", "ov", "ana"), seg(2, 5, "di", "Base", "ov", "ana")],
+      [seg(0, 5, "di", "Base", "ov", "ana")],
+    ],
+    [
+      "a different cover, person or rule is kept apart",
+      [
+        seg(0, 1, "di", "Base", "ov"),
+        seg(1, 2, "di", "Base", "ov2"),
+        seg(2, 3, "cy", "Base", "ov2"),
+        seg(3, 4, "cy", "Office", "ov2"),
+      ],
+      [
+        seg(0, 1, "di", "Base", "ov"),
+        seg(1, 2, "di", "Base", "ov2"),
+        seg(2, 3, "cy", "Base", "ov2"),
+        seg(3, 4, "cy", "Office", "ov2"),
+      ],
+    ],
+    [
+      "parts that do not touch are kept apart",
+      [seg(0, 1, "ana", "Base"), seg(2, 3, "ana", "Base")],
+      [seg(0, 1, "ana", "Base"), seg(2, 3, "ana", "Base")],
+    ],
+  ])("holderStretches: %s", (_name, segments, expected) => {
+    expect(holderStretches(segments as any)).toEqual(expected);
+  });
+
+  // B4: who takes the stopped rule's hours, or which hours nobody covers.
+  it.each([
+    [
+      "the catch-all takes them",
+      [rule("Base"), rule("Office", [window([0, 1, 2, 3, 4], 540, 1020)])],
+      1,
+      MON,
+      [0],
+      0,
+    ],
+    [
+      "nobody takes them",
+      [rule("Night", [window([], 0, 480)]), rule("Day", [window([], 480, 1440)])],
+      0,
+      MON,
+      [],
+      7,
+    ],
+    [
+      "a rule stopped before the chosen stop takes nothing",
+      [rule("Primary"), { ...rule("Fallback"), ends_at: MON + 24 * HOUR }],
+      0,
+      MON + 7 * 24 * HOUR,
+      [],
+      1,
+    ],
+    [
+      "a rule starting after the chosen stop takes nothing",
+      [rule("Primary"), { ...rule("Fallback"), starts_at: MON + 8 * 24 * HOUR }],
+      0,
+      MON + 7 * 24 * HOUR,
+      [],
+      1,
+    ],
+  ])("stopConsequence: %s", (_name, rules, index, at, takers, gapSpans) => {
+    const result = stopConsequence(rules, index, at);
+    expect(result.takers).toEqual(takers);
+    expect(result.gap).toHaveLength(gapSpans);
+  });
+
+  function rule(name: string, restrictions: TimeWindow[] = []): ShiftRule {
+    return {
+      name,
+      members: [`${name}@o2.ai`],
+      shift_micros: MICROS_PER_DAY,
+      anchor_micros: MON,
+      priority: restrictions.length ? 1 : 0,
+      restrictions,
+    };
+  }
+});
+
+describe("rotation editor: how several shift rules add up", () => {
+  /** Monday 2026-01-05 00:00 UTC. */
+  const MON = Date.UTC(2026, 0, 5) * 1000;
+  const t = i18n.global.t as unknown as TranslateFn;
+
+  function shiftRule(name: string, over: Partial<ShiftRule> = {}): ShiftRule {
+    return {
+      name,
+      members: [`${name.toLowerCase()}@o2.ai`],
+      shift_micros: MICROS_PER_WEEK,
+      anchor_micros: MON,
+      priority: 0,
+      restrictions: [],
+      ...over,
+    };
+  }
+
+  const base = shiftRule("Base");
+  const office = shiftRule("Office", {
+    priority: 1,
+    restrictions: [window([0, 1, 2, 3, 4], 540, 1020)],
+  });
+
+  describe("rulesClash", () => {
+    it.each([
+      ["same priority, both all hours", shiftRule("A"), shiftRule("B"), true],
+      [
+        "missing fields read as their defaults",
+        { ...shiftRule("A"), priority: undefined, restrictions: undefined },
+        shiftRule("B"),
+        true,
+      ],
+      [
+        "same priority, different hours",
+        shiftRule("A", { priority: 10, restrictions: [window([], 0, 480)] }),
+        shiftRule("B", { priority: 10, restrictions: [window([], 480, 960)] }),
+        false,
+      ],
+      ["different priority, same hours", shiftRule("A", { priority: 1 }), shiftRule("B"), false],
+      [
+        "days in a different order still share their hours",
+        shiftRule("A", { restrictions: [window([0, 1], 0, 60)] }),
+        shiftRule("B", { restrictions: [window([1, 0], 0, 60)] }),
+        true,
+      ],
+      [
+        "same priority, window count and anchor, overlapping hours",
+        shiftRule("A", { restrictions: [window([], 0, 1440)] }),
+        shiftRule("B", { restrictions: [window([], 180, 300)] }),
+        true,
+      ],
+      [
+        "overlapping hours with a different anchor",
+        shiftRule("A", { restrictions: [window([], 0, 1440)] }),
+        shiftRule("B", { anchor_micros: MON + 1, restrictions: [window([], 180, 300)] }),
+        false,
+      ],
+      [
+        "overlapping hours in validity periods that never meet",
+        shiftRule("A", { ends_at: MON + MICROS_PER_WEEK, restrictions: [window([], 0, 1440)] }),
+        shiftRule("B", { starts_at: MON + MICROS_PER_WEEK, restrictions: [window([], 180, 300)] }),
+        false,
+      ],
+    ])("%s", (_name, a, b, expected) => {
+      expect(rulesClash(a, b)).toBe(expected);
+    });
+  });
+
+  describe("overlappingRules", () => {
+    const sun = (name: string, start: number, end: number) =>
+      shiftRule(name, { priority: 10, restrictions: [window([], start, end)] });
+    const followTheSun = [sun("APAC", 0, 480), sun("EMEA", 480, 960), sun("AMER", 960, 1440), base];
+
+    it.each([
+      ["a window over the catch-all", [base, office], 0, [1]],
+      ["follow-the-sun regions meet only the catch-all", followTheSun, 0, [3]],
+      ["the catch-all meets every region", followTheSun, 3, [0, 1, 2]],
+      [
+        "different days never meet",
+        [
+          office,
+          shiftRule("Tue", { restrictions: [window([1], 0, 1440)] }),
+          shiftRule("Sat", { restrictions: [window([5], 0, 1440)] }),
+        ],
+        2,
+        [],
+      ],
+      [
+        "a Sunday night runs into Monday",
+        [
+          shiftRule("Night", { restrictions: [window([6], 1320, 360)] }),
+          shiftRule("Early", { restrictions: [window([0], 60, 120)] }),
+        ],
+        0,
+        [1],
+      ],
+      [
+        "a zero-length window covers nothing",
+        [shiftRule("Zero", { restrictions: [window([], 600, 600)] }), base],
+        0,
+        [],
+      ],
+    ])("%s", (_name, rules, index, expected) => {
+      expect(overlappingRules(rules, index)).toEqual(expected);
+    });
+  });
+
+  describe("overlapStanding", () => {
+    const top = shiftRule("Top", { priority: 2, restrictions: [window([], 0, 60)] });
+    it.each([
+      ["the restricted rule wins", [base, office], 1, { winsOver: [0], losesTo: [] }],
+      ["the catch-all loses", [base, office], 0, { winsOver: [], losesTo: [1] }],
+      [
+        "wins over one, loses to another",
+        [
+          shiftRule("Mid", { priority: 1 }),
+          shiftRule("Low", { restrictions: [window([], 0, 60)] }),
+          top,
+        ],
+        0,
+        { winsOver: [1], losesTo: [2] },
+      ],
+    ])("%s", (_name, rules, index, expected) => {
+      expect(overlapStanding(rules, index)).toEqual(expected);
+    });
+  });
+
+  describe("prioritiesFor", () => {
+    const night = shiftRule("Night", { priority: 5, restrictions: [window([], 1320, 360)] });
+    it.each([
+      ["already in that order", [base, office], 1, true, [0, 1]],
+      ["the catch-all goes on top", [base, office], 0, true, [2, 1]],
+      ["a window drops below, never negative", [base, office], 1, false, [1, 0]],
+      [
+        "a region below a catch-all it overlaps",
+        [shiftRule("APAC", { priority: 10, restrictions: [window([], 0, 480)] }), base],
+        0,
+        false,
+        [0, 1],
+      ],
+      ["other rules keep their order", [base, office, night], 1, false, [1, 0, 6]],
+      ["nothing to overlap, nothing changes", [office, night], 0, true, [1, 5]],
+    ])("%s", (_name, rules, index, wins, expected) => {
+      expect(prioritiesFor(rules, index, wins)).toEqual(expected);
+    });
+  });
+
+  describe("ruleHoursSummary", () => {
+    it.each([
+      ["no windows", [], "All hours"],
+      ["the working week", [window([0, 1, 2, 3, 4], 540, 1080)], "Mon–Fri 09:00–18:00"],
+      ["every day past midnight", [window([], 1320, 360)], "Every day 22:00–06:00 next day"],
+      ["a whole weekend", [window([5, 6], 0, 1440)], "Sat, Sun · all day"],
+      [
+        "several windows",
+        [window([0], 540, 720), window([4], 780, 1020)],
+        "Mon 09:00–12:00, Fri 13:00–17:00",
+      ],
+    ])("%s", (_name, restrictions, expected) => {
+      expect(ruleHoursSummary(shiftRule("A", { restrictions }), t)).toBe(expected);
+    });
+  });
+
+  describe("effectiveWeekCoverage / effectiveRivals", () => {
+    const DAY = 1440;
+    const region = (name: string, start: number, end: number, over: Partial<ShiftRule> = {}) =>
+      shiftRule(name, { priority: 10, restrictions: [window([], start, end)], ...over });
+    const everyDay = (start: number, end: number) =>
+      [0, 1, 2, 3, 4, 5, 6].map((d): [number, number] => [d * DAY + start, d * DAY + end]);
+    const india = region("India", 0, 720);
+    const americas = region("Americas", 720, 1440);
+    const catchAll = shiftRule("Catch-all");
+
+    it.each([
+      ["a lone rule gets the whole week", [base], 0, [[0, 7 * DAY]], []],
+      [
+        "the window that wins keeps its hours",
+        [base, office],
+        1,
+        [0, 1, 2, 3, 4].map((d): [number, number] => [d * DAY + 540, d * DAY + 1020]),
+        [],
+      ],
+      ["a catch-all under regions that cover the day", [india, americas, catchAll], 2, [], [0, 1]],
+      [
+        "regions under a catch-all set to win",
+        [india, americas, shiftRule("Catch-all", { priority: 11 })],
+        0,
+        [],
+        [2],
+      ],
+      [
+        "a retired rival takes nothing",
+        [india, shiftRule("Catch-all", { priority: 11, ends_at: MON })],
+        0,
+        everyDay(0, 720),
+        [],
+      ],
+      [
+        "a rival not yet started takes nothing",
+        [india, shiftRule("Catch-all", { priority: 11, starts_at: MON + 30 * MICROS_PER_DAY })],
+        0,
+        everyDay(0, 720),
+        [],
+      ],
+      [
+        "a rival with nobody in it takes nothing",
+        [india, shiftRule("Empty", { priority: 11, members: [] })],
+        0,
+        everyDay(0, 720),
+        [],
+      ],
+      [
+        "a catch-all under a weekday rule keeps the weekend",
+        [
+          base,
+          shiftRule("Weekdays", { priority: 1, restrictions: [window([0, 1, 2, 3, 4], 0, DAY)] }),
+        ],
+        0,
+        [[5 * DAY, 7 * DAY]],
+        [1],
+      ],
+    ])("%s", (_name, rules, index, coverage, rivals) => {
+      expect(effectiveWeekCoverage(rules, index, MON)).toEqual(coverage);
+      expect(effectiveRivals(rules, index, MON)).toEqual(rivals);
+    });
+  });
+
+  describe("coverageHoursSummary", () => {
+    const DAY = 1440;
+    it.each([
+      ["the whole week", [[0, 7 * DAY]], "All hours"],
+      ["a whole weekend", [[5 * DAY, 7 * DAY]], "Sat, Sun · all day"],
+      [
+        "identical days grouped",
+        [
+          [5 * DAY, 5 * DAY + 480],
+          [6 * DAY, 6 * DAY + 480],
+        ],
+        "Sat, Sun 00:00–08:00",
+      ],
+      ["across midnight", [[4 * DAY + 1320, 5 * DAY + 360]], "Fri 22:00–06:00 next day"],
+      [
+        "across the end of the week",
+        [
+          [0, 360],
+          [6 * DAY + 1320, 7 * DAY],
+        ],
+        "Sun 22:00–06:00 next day",
+      ],
+      [
+        "every day",
+        [0, 1, 2, 3, 4, 5, 6].map((d) => [d * DAY + 540, d * DAY + 1020]),
+        "Every day 09:00–17:00",
+      ],
+      [
+        "two shapes",
+        [
+          [0, 480],
+          [DAY + 600, DAY + 660],
+        ],
+        "Mon 00:00–08:00, Tue 10:00–11:00",
+      ],
+    ])("%s", (_name, spans, expected) => {
+      expect(coverageHoursSummary(spans as Array<[number, number]>, t)).toBe(expected);
+    });
+  });
+});
+
+// S3/S4: one spelling and one order for a priority's channels.
+describe("channelList", () => {
+  const t = ((k: string) => k) as any;
+
+  it("says the channels in the fixed order, whatever order they are stored in", () => {
+    expect(channelList(["voice", "slack", "email", "sms"], t)).toBe(
+      "oncall.channel_email, oncall.channel_slack, oncall.channel_sms, oncall.channel_voice",
+    );
+  });
+
+  it("says nothing for no channels", () => {
+    expect(channelList([], t)).toBe("");
+    expect(channelList(undefined, t)).toBe("");
+  });
+});
+
+// S11: which escalation steps a rotation's removal touches.
+describe("stepsNamingRotation", () => {
+  const MIN = 60_000_000;
+  const policy = {
+    id: "p",
+    org_id: "o",
+    team_id: "t",
+    rungs: [
+      {
+        priority: 1 as const,
+        channels: [],
+        steps: [
+          { after_micros: 10 * MIN, targets: [{ kind: "rotation" as const, rotation_id: "r2" }] },
+          { after_micros: 0, targets: [{ kind: "rotation" as const, rotation_id: "r1" }] },
+          { after_micros: 20 * MIN, targets: [{ kind: "whole_team" as const }] },
+        ],
+      },
+      {
+        priority: 2 as const,
+        channels: [],
+        steps: [
+          {
+            after_micros: 0,
+            targets: [
+              { kind: "user" as const, email: "ana@o2.ai" },
+              { kind: "rotation" as const, rotation_id: "r2", mode: "all" as const },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  it("numbers steps by their delay within each priority", () => {
+    expect(stepsNamingRotation(policy, "r2")).toEqual([
+      { priority: 1, step: 2 },
+      { priority: 2, step: 1 },
+    ]);
+    expect(stepsNamingRotation(policy, "r1")).toEqual([{ priority: 1, step: 1 }]);
+  });
+
+  it("finds nothing for a rotation no step names, or with no policy", () => {
+    expect(stepsNamingRotation(policy, "r9")).toEqual([]);
+    expect(stepsNamingRotation(null, "r1")).toEqual([]);
+  });
+});
+
+// L4/F3: lists read as prose in the reader's language, via Intl.ListFormat and the app's locale code.
+describe("listInLocale", () => {
+  it.each([
+    ["en-us", [], ""],
+    ["en-us", ["Primary"], "Primary"],
+    ["en-us", ["Primary", "Secondary"], "Primary and Secondary"],
+    ["de", ["A", "B", "C"], "A, B und C"],
+    ["zh-cn", ["A", "B", "C"], "A、B和C"],
+    ["ja", ["A", "B", "C"], "A、B、C"],
+    ["tr-turk", ["A", "B"], "A ve B"],
+  ])("%s %j reads %j", (locale, items, expected) => {
+    expect(listInLocale(items as string[], locale)).toBe(expected);
+  });
+});
+
+describe("routing field helpers", () => {
+  it("labels a field in sentence case, from its alias or its id", () => {
+    expect(fieldLabel("k8s-namespace", [{ id: "k8s-namespace", display: "K8s Namespace" }])).toBe(
+      "K8s namespace",
+    );
+    expect(fieldLabel("service-namespace")).toBe("Service namespace");
+    expect(
+      fieldLabel("aws-ecs-cluster", [{ id: "aws-ecs-cluster", display: "AWS ECS Cluster" }]),
+    ).toBe("AWS ECS cluster");
+  });
+
+  it("offers the catalogue, the signals' identity fields and the rules' fields, once each", () => {
+    expect(
+      routingFieldIds(
+        ["service"],
+        [{ dimensions: { service: "a", environment: "prod", "k8s-pod-name": "p" } }],
+        [{ dimensions: { region: "eu", service: "b" } }],
+      ),
+    ).toEqual(["service", "environment", "region"]);
+  });
+
+  it("reads a rule as one concrete alert, a starts with value as its prefix", () => {
+    expect(literalDimensions({ service: "pay*", "k8s-namespace": "prod" })).toEqual({
+      service: "pay",
+      "k8s-namespace": "prod",
+    });
+  });
+
+  it("reads conditions as prose, a trailing star as starts with", () => {
+    expect(
+      readableConditions({ service: "api*", "k8s-namespace": "prod" }, [], {
+        and: "and",
+        startsWith: (field) => `${field} starts with`,
+      }),
+    ).toBe("K8s namespace prod and Service starts with api");
+  });
+});
+
+describe("apiErrorMessage / apiErrorStatus", () => {
+  it("reads the axios response's message and status", () => {
+    const err = { response: { status: 403, data: { message: "denied" } } };
+    expect(apiErrorMessage(err)).toBe("denied");
+    expect(apiErrorStatus(err)).toBe(403);
+  });
+
+  it("answers undefined for a client-side error or nothing at all", () => {
+    expect(apiErrorMessage(new Error("offline"))).toBeUndefined();
+    expect(apiErrorStatus(new Error("offline"))).toBeUndefined();
+    expect(apiErrorMessage(null)).toBeUndefined();
+    expect(apiErrorStatus(undefined)).toBeUndefined();
   });
 });

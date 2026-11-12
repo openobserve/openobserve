@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use axum::{
     Json,
@@ -22,17 +22,20 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::model_pricing::{
-    BUILT_IN_ORG, META_ORG, ModelPricingDefinition, PricingSource, PricingTierDefinition,
+    BUILT_IN_ORG, META_ORG, MatchKind, ModelPricingDefinition, PricingSource, PricingTierDefinition,
 };
-use db::model_pricing;
+use db::model_pricing::{self, CachedModelPricing};
 use serde::{Deserialize, Serialize};
+use svix_ksuid::KsuidLike;
 #[cfg(feature = "enterprise")]
 use {
     openobserve_api_common::extractors::Headers,
     openobserve_core::auth::{UserEmail, check_permissions},
 };
 
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse, request::gen_ai_health::MAX_AGENT_NAMES,
+};
 
 fn source_priority(source: &PricingSource) -> u8 {
     match source {
@@ -61,6 +64,10 @@ fn source_priority(source: &PricingSource) -> u8 {
         (status = 200, description = "Success", content_type = "application/json", body = Vec<ModelPricingDefinition>),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list(
     Path(org_id): Path<String>,
@@ -118,34 +125,41 @@ pub async fn list(
             .then_with(|| a.name.cmp(&b.name))
     });
 
-    // Build a parent-children hierarchy based on regex overlap.
-    //
-    // For each item (processed in priority order) we derive a testable literal string from its
-    // match_pattern (by stripping flags/anchors and extracting the literal prefix). We then check
-    // whether any already-placed parent's compiled regex matches that test string. If yes the item
-    // is a child (shadowed by that parent). If no, it becomes a new parent.
-    //
-    // This reflects actual runtime behaviour: a parent with pattern `(?i)claude-3` genuinely
-    // shadows any built-in whose pattern starts with "claude-3" (e.g. "claude-3-haiku").
+    // An item nests under the parent the resolver would pick for the item's own name: the
+    // higher-priority source first, then the better match kind; ties keep the earlier entry.
+    let rank = |source: &PricingSource, kind: Option<MatchKind>| {
+        (std::cmp::Reverse(source_priority(source)), kind)
+    };
     let never_matches = regex::Regex::new("$^").unwrap();
     let mut parents: Vec<(ModelPricingDefinition, regex::Regex)> = Vec::new();
 
     for item in all_items {
+        let compiled = regex::RegexBuilder::new(&item.match_pattern)
+            .size_limit(db::model_pricing::REGEX_SIZE_LIMIT)
+            .build()
+            .unwrap_or_else(|_| never_matches.clone());
         let test_str = derive_test_string(&item.match_pattern);
 
-        let parent_idx = if !test_str.is_empty() {
-            parents.iter().position(|(_, re)| re.is_match(&test_str))
-        } else {
+        let parent_idx = if test_str.is_empty() {
             None
+        } else {
+            let own_rank = rank(&item.source, MatchKind::of(&compiled, &test_str));
+            let mut best = None;
+            for (idx, (parent, re)) in parents.iter().enumerate() {
+                let Some(kind) = MatchKind::of(re, &test_str) else {
+                    continue;
+                };
+                let parent_rank = rank(&parent.source, Some(kind));
+                if parent_rank >= own_rank && best.is_none_or(|(_, b)| parent_rank > b) {
+                    best = Some((idx, parent_rank));
+                }
+            }
+            best.map(|(idx, _)| idx)
         };
 
         if let Some(idx) = parent_idx {
             parents[idx].0.children.push(item);
         } else {
-            let compiled = regex::RegexBuilder::new(&item.match_pattern)
-                .size_limit(db::model_pricing::REGEX_SIZE_LIMIT)
-                .build()
-                .unwrap_or_else(|_| never_matches.clone());
             parents.push((item, compiled));
         }
     }
@@ -173,6 +187,10 @@ pub async fn list(
         (status = 200, description = "Success", content_type = "application/json", body = ModelPricingDefinition),
         (status = 404, description = "Not found"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get(
     Path((org_id, model_id)): Path<(String, String)>,
@@ -225,12 +243,19 @@ pub async fn get(
         (status = 201, description = "Created", content_type = "application/json", body = ModelPricingDefinition),
         (status = 400, description = "Bad request"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn create(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(mut item): Json<ModelPricingDefinition>,
 ) -> Response {
+    if !cfg!(feature = "enterprise") {
+        return MetaHttpResponse::forbidden("Not supported in the open source version");
+    }
     #[cfg(feature = "enterprise")]
     if !check_permissions(
         &org_id,
@@ -309,12 +334,19 @@ pub async fn create(
         (status = 400, description = "Bad request"),
         (status = 404, description = "Not found"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn update(
     Path((org_id, model_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(mut item): Json<ModelPricingDefinition>,
 ) -> Response {
+    if !cfg!(feature = "enterprise") {
+        return MetaHttpResponse::forbidden("Not supported in the open source version");
+    }
     #[cfg(feature = "enterprise")]
     if !check_permissions(
         &org_id,
@@ -378,14 +410,19 @@ pub async fn update(
         ("model_id" = String, Path, description = "Model pricing definition ID"),
     ),
     responses(
-        (status = 200, description = "Success"),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not found"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn delete(
     Path((org_id, model_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    // Not edition-gated: OSS must still be able to remove prices it can no longer edit.
     #[cfg(feature = "enterprise")]
     if !check_permissions(
         &org_id,
@@ -421,6 +458,8 @@ pub async fn delete(
 pub struct BuiltInQuery {
     #[serde(default)]
     pub search: String,
+    #[serde(default)]
+    pub metadata_only: bool,
 }
 
 /// A model pricing entry from the community/built-in source.
@@ -436,11 +475,14 @@ pub struct BuiltInModelPricingEntry {
 }
 
 /// BuiltInModelPricingResponse
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, utoipa::ToSchema)]
 pub struct BuiltInModelPricingResponse {
     pub models: Vec<BuiltInModelPricingEntry>,
     pub source_url: String,
+    /// Unix seconds of this server's last successful online sync; 0 = none since startup.
     pub last_updated: i64,
+    /// Date of the seed price list compiled into this binary.
+    pub seed_date: &'static str,
 }
 
 /// GetBuiltInModelPricing
@@ -458,11 +500,16 @@ pub struct BuiltInModelPricingResponse {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("search" = Option<String>, Query, description = "Filter by name"),
+        ("metadata_only" = Option<bool>, Query, description = "Return seed/sync metadata without loading the catalogue"),
     ),
     responses(
-        (status = 200, description = "Success"),
+        (status = 200, description = "Success", content_type = "application/json", body = BuiltInModelPricingResponse),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_built_in(
     Path(_org_id): Path<String>,
@@ -487,6 +534,14 @@ pub async fn get_built_in(
     }
 
     let source_url = config::get_config().common.model_pricing_source_url.clone();
+    if query.metadata_only {
+        return MetaHttpResponse::json(BuiltInModelPricingResponse {
+            models: Vec::new(),
+            source_url,
+            last_updated: openobserve_builtins::model_pricing::last_sync_timestamp(),
+            seed_date: openobserve_builtins::model_pricing::SEED_DATE,
+        });
+    }
 
     // Read from DB (synced by background job) instead of making a live HTTP call.
     let all_built_in = match model_pricing::list(BUILT_IN_ORG).await {
@@ -521,6 +576,7 @@ pub async fn get_built_in(
         models,
         source_url,
         last_updated,
+        seed_date: openobserve_builtins::model_pricing::SEED_DATE,
     })
 }
 
@@ -551,14 +607,21 @@ fn map_set_error(e: anyhow::Error) -> Response {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success"),
+        (status = 200, description = "Success", content_type = "application/json", body = openobserve_builtins::model_pricing::SyncResult),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn refresh_built_in(
     Path(_org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    if !cfg!(feature = "enterprise") {
+        return MetaHttpResponse::forbidden("Not supported in the open source version");
+    }
     #[cfg(feature = "enterprise")]
     if !check_permissions(
         &_org_id,
@@ -587,6 +650,180 @@ pub async fn refresh_built_in(
     }
 }
 
+/// The pricing definition a listed model resolves to today.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct UnpricedModelMatch {
+    pub name: String,
+    pub match_pattern: String,
+    pub source: PricingSource,
+    pub tiers: Vec<PricingTierDefinition>,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct UnpricedModel {
+    #[serde(flatten)]
+    pub row: crate::request::gen_ai_health::UnpricedModelRow,
+    /// Null when no definition matches the model today.
+    pub matched: Option<UnpricedModelMatch>,
+    /// An exact definition covers new spans; these older spans retain their recorded cost.
+    pub priced_now: bool,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct UnpricedModelsResponse {
+    /// Models with recorded pricing gaps, including those priced since ingestion.
+    pub models: Vec<UnpricedModel>,
+    /// Distinct models ingest marked in the window, uncapped and before today's prices are
+    /// applied; spans without a model name count as one.
+    pub model_count: i64,
+    /// Tokens on every span ingest marked in the window.
+    pub tokens: i64,
+    /// The server listed only the models with the most tokens; `model_count` has them all.
+    pub models_truncated: bool,
+}
+
+/// Joins recorded pricing gaps with today's definitions without hiding historical gaps.
+fn resolve_unpriced(
+    rows: Vec<crate::request::gen_ai_health::UnpricedModelRow>,
+    entries: &[CachedModelPricing],
+    now_micros: i64,
+) -> Vec<UnpricedModel> {
+    let mut by_model: HashMap<Option<String>, UnpricedModel> = HashMap::new();
+    let mut order = Vec::new();
+    for row in rows {
+        let resolved = row
+            .model
+            .as_deref()
+            .and_then(|m| model_pricing::find_pricing_sync_at(entries, m, Some(now_micros)));
+        let priced_now = crate::request::gen_ai_health::priced_now(resolved.as_ref());
+        // A model seen both unpriced and approximate (a price was added mid-window) is one row.
+        if let Some(existing) = by_model.get_mut(&row.model) {
+            existing.row.spans += row.spans;
+            existing.row.tokens += row.tokens;
+            existing.row.cost += row.cost;
+            // Counts per status overlap, so the larger is a floor for the merged distinct count.
+            existing.row.agent_count = existing.row.agent_count.max(row.agent_count);
+            let mut seen: HashSet<String> = existing.row.agents.iter().cloned().collect();
+            for agent in row.agents {
+                if existing.row.agents.len() >= MAX_AGENT_NAMES {
+                    break;
+                }
+                if seen.insert(agent.clone()) {
+                    existing.row.agents.push(agent);
+                }
+            }
+            existing.row.agent_count = existing
+                .row
+                .agent_count
+                .max(existing.row.agents.len() as i64);
+            continue;
+        }
+        let matched = resolved.map(|r| UnpricedModelMatch {
+            name: r.definition.name,
+            match_pattern: r.definition.match_pattern,
+            source: r.definition.source,
+            tiers: r.definition.tiers,
+        });
+        let mut row = row;
+        if !priced_now {
+            row.status = if matched.is_some() {
+                config::meta::model_pricing::CostStatus::Approximate
+            } else {
+                config::meta::model_pricing::CostStatus::Unpriced
+            };
+        }
+        order.push(row.model.clone());
+        by_model.insert(
+            row.model.clone(),
+            UnpricedModel {
+                row,
+                matched,
+                priced_now,
+            },
+        );
+    }
+    order
+        .into_iter()
+        .filter_map(|m| by_model.remove(&m))
+        .collect()
+}
+
+/// ListUnpricedModels
+///
+/// #{"ratelimit_module":"ModelPricing", "ratelimit_module_operation":"list"}#
+#[utoipa::path(
+    get,
+    path = "/{org_id}/llm/models/unpriced",
+    context_path = "/api",
+    tag = "LLM",
+    operation_id = "ListUnpricedModels",
+    summary = "List models seen in traces with no price or an approximate one",
+    description = "Models in the stream's spans that ingest marked unpriced or approximately priced during the window, with spans, tokens and recorded cost. Historical gaps remain after adding an exact price and are marked priced_now; old costs are not backfilled. Spans with tokens but no model name are listed as one row with a null model.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        crate::request::gen_ai_health::UnpricedModelsQuery,
+    ),
+    responses(
+        (status = 200, description = "Success", body = UnpricedModelsResponse),
+        (status = 400, description = "Invalid query"),
+        (status = 403, description = "Forbidden"),
+        (status = 429, description = "Search not allowed for the organization"),
+        (status = 500, description = "Internal server error"),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
+)]
+pub async fn list_unpriced(
+    Path(org_id): Path<String>,
+    openobserve_api_common::extractors::Headers(user_email): openobserve_api_common::extractors::Headers<
+        openobserve_core::auth::UserEmail,
+    >,
+    Query(query): Query<crate::request::gen_ai_health::UnpricedModelsQuery>,
+) -> Response {
+    let user_id = &user_email.user_id;
+    #[cfg(feature = "enterprise")]
+    if !check_permissions(
+        &org_id,
+        &org_id,
+        user_id,
+        "model_pricing",
+        "LIST",
+        None,
+        true,
+        false,
+        false,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+    if let Err(resp) =
+        crate::request::gen_ai_health::authorize_unpriced(&org_id, user_id, &query).await
+    {
+        return resp;
+    }
+    match crate::request::gen_ai_health::unpriced_models(&org_id, user_id, &query).await {
+        Ok(listing) => {
+            let entries = model_pricing::get_org_pricing_entries(&org_id);
+            let models =
+                resolve_unpriced(listing.rows, &entries, config::utils::time::now_micros());
+            MetaHttpResponse::json(UnpricedModelsResponse {
+                models,
+                model_count: listing.model_count,
+                tokens: listing.tokens,
+                models_truncated: listing.truncated,
+            })
+        }
+        Err(e) => {
+            log::error!("[model_pricing] unpriced models for {org_id}: {e}");
+            MetaHttpResponse::internal_error("Failed to list unpriced models")
+        }
+    }
+}
+
 /// Strip leading inline flag groups like `(?i)`, `(?ms)`, `(?-i)` from a regex pattern.
 fn strip_leading_flags(s: &str) -> &str {
     let mut rest = s;
@@ -608,11 +845,45 @@ fn strip_leading_flags(s: &str) -> &str {
     rest
 }
 
+/// Strip one leading optional group such as `(?:[\w-]+[/.:])*` (a provider/route prefix like
+/// `openai/` or `us.anthropic.`). Only a group quantified with `*` or `?` is stripped, because it
+/// can match nothing; any other leading group is part of the model name and is kept.
+fn strip_leading_optional_group(s: &str) -> &str {
+    if !s.starts_with('(') {
+        return s;
+    }
+    let mut depth = 0usize;
+    let mut in_class = false;
+    let mut chars = s.char_indices();
+    while let Some((i, c)) = chars.next() {
+        match c {
+            '\\' => {
+                chars.next();
+            }
+            '[' if !in_class => in_class = true,
+            ']' if in_class => in_class = false,
+            '(' if !in_class => depth += 1,
+            ')' if !in_class => {
+                depth -= 1;
+                if depth == 0 {
+                    let rest = &s[i + 1..];
+                    return match rest.strip_prefix(['*', '?']) {
+                        Some(after) => after.strip_prefix('?').unwrap_or(after),
+                        None => s,
+                    };
+                }
+            }
+            _ => {}
+        }
+    }
+    s
+}
+
 /// Derive a testable literal string from a regex pattern.
 ///
-/// Strips inline flags and leading `^` anchors, then walks the pattern character by character
-/// collecting literal characters. Stops at the first unescaped regex metacharacter
-/// (`(`, `)`, `[`, `]`, `{`, `}`, `*`, `+`, `?`, `|`, `$`, `^`, `.`).
+/// Strips inline flags, leading `^` anchors and one leading optional prefix group, then walks the
+/// pattern character by character collecting literal characters. Stops at the first unescaped
+/// regex metacharacter (`(`, `)`, `[`, `]`, `{`, `}`, `*`, `+`, `?`, `|`, `$`, `^`, `.`).
 /// Backslash-escaped characters are treated as their literal value (e.g. `\.` → `.`).
 ///
 /// Examples:
@@ -620,9 +891,10 @@ fn strip_leading_flags(s: &str) -> &str {
 ///   `(?i)gpt-4o(?:-\d{4}[-\d]*)?$`   → `"gpt-4o"`
 ///   `(?i)claude-3-sonnet$`            → `"claude-3-sonnet"`
 ///   `(?i)gpt-3\.5`                    → `"gpt-3.5"`
+///   `(?i)^(?:[\w-]+[/.:])*gpt-5\.4(?:-\d{8})?$` → `"gpt-5.4"`
 fn derive_test_string(pattern: &str) -> String {
     let s = strip_leading_flags(pattern.trim());
-    let s = s.trim_start_matches('^');
+    let s = strip_leading_optional_group(s.trim_start_matches('^'));
     let mut result = String::new();
     let mut iter = s.chars().peekable();
     while let Some(c) = iter.next() {
@@ -642,7 +914,9 @@ fn derive_test_string(pattern: &str) -> String {
 /// Request body for the test-model-match endpoint.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct TestModelMatchRequest {
-    /// The model name to test (e.g. "gpt-4o", "claude-opus-3-5").
+    /// The model name to test (e.g. "gpt-4o", "claude-opus-3-5"). Empty skips the single-name
+    /// test, e.g. when only previewing `match_pattern`.
+    #[serde(default)]
     pub model_name: String,
     /// Optional token counts keyed by usage type (e.g. {"input": 1000, "output": 500}).
     /// When provided, cost is calculated using the matched pricing definition.
@@ -657,6 +931,15 @@ pub struct TestModelMatchRequest {
     #[serde(default)]
     #[schema(value_type = HashMap<String, Object>)]
     pub attributes: HashMap<String, config::utils::json::Value>,
+    /// An unsaved rule pattern to preview. When set, the response lists in `captured_models`
+    /// every known model this pattern would price if it were saved in this org. The
+    /// `model_name` test is unaffected and still runs against the saved rules.
+    #[serde(default)]
+    pub match_pattern: Option<String>,
+    /// Id of the rule being edited. It is left out of the preview, so its saved pattern does
+    /// not compete with the edited one.
+    #[serde(default)]
+    pub rule_id: Option<String>,
 }
 
 /// Response for the test-model-match endpoint.
@@ -664,6 +947,10 @@ pub struct TestModelMatchRequest {
 pub struct TestModelMatchResponse {
     /// The matched pricing definition, or null if no definition matched.
     pub matched: Option<ModelPricingDefinition>,
+    /// How the matched pattern covers the model name: `exact` when it matches the whole name,
+    /// `approximate` when the name continues before or after the match (the price may belong
+    /// to a different model). Null if nothing matched.
+    pub match_kind: Option<MatchKind>,
     /// The name of the selected pricing tier, or null if no definition matched.
     pub tier: Option<String>,
     /// Index of the selected tier in `matched.tiers`, which stays unambiguous when names repeat.
@@ -672,6 +959,79 @@ pub struct TestModelMatchResponse {
     pub costs: HashMap<String, f64>,
     /// Sum of all per-key costs.
     pub total_cost: f64,
+    /// The known models the previewed `match_pattern` would price, the model the pattern names
+    /// first. Empty when no pattern was sent.
+    pub captured_models: Vec<CapturedModel>,
+}
+
+/// A known model that a previewed rule pattern would price.
+#[derive(Debug, PartialEq, Serialize, utoipa::ToSchema)]
+pub struct CapturedModel {
+    /// A model name some pricing rule is written for.
+    pub model_name: String,
+    /// How the previewed pattern covers this name.
+    pub match_kind: MatchKind,
+    /// True for the model the pattern itself names (its literal text); false for every other
+    /// model the pattern also catches.
+    pub primary: bool,
+    /// The rule that prices this model today, which the previewed rule would replace.
+    pub replaces: Option<PricingRuleRef>,
+}
+
+/// The name and source of a pricing rule.
+#[derive(Debug, PartialEq, Serialize, utoipa::ToSchema)]
+pub struct PricingRuleRef {
+    pub name: String,
+    pub source: PricingSource,
+}
+
+/// The known models `candidate` would price if it were added to `entries`.
+///
+/// Known models are the names the saved rules are written for (see [`derive_test_string`]), plus
+/// the name the candidate itself spells out. A model counts as captured only when the candidate
+/// would actually win it, so a model an equal-or-higher source prices more precisely is left out.
+/// `candidate` must carry an id no entry has.
+fn captured_models(
+    entries: &[CachedModelPricing],
+    candidate: &CachedModelPricing,
+) -> Vec<CapturedModel> {
+    let primary = derive_test_string(&candidate.definition.match_pattern);
+    let names: BTreeSet<String> = entries
+        .iter()
+        .map(|e| derive_test_string(&e.definition.match_pattern))
+        .chain(std::iter::once(primary.clone()))
+        .filter(|name| !name.is_empty())
+        .collect();
+    let with_candidate: Vec<CachedModelPricing> = std::iter::once(candidate.clone())
+        .chain(entries.iter().cloned())
+        .collect();
+
+    let mut captured: Vec<CapturedModel> = names
+        .into_iter()
+        .filter_map(|name| {
+            let match_kind = MatchKind::of(&candidate.compiled_regex, &name)?;
+            let wins = matches!(
+                model_pricing::find_pricing_sync_at(&with_candidate, &name, None),
+                Some(r) if r.definition.id == candidate.definition.id
+            );
+            if !wins {
+                return None;
+            }
+            let replaces =
+                model_pricing::find_pricing_sync_at(entries, &name, None).map(|r| PricingRuleRef {
+                    name: r.definition.name,
+                    source: r.definition.source,
+                });
+            Some(CapturedModel {
+                primary: name == primary,
+                model_name: name,
+                match_kind,
+                replaces,
+            })
+        })
+        .collect();
+    captured.sort_by_key(|c| std::cmp::Reverse(c.primary));
+    captured
 }
 
 /// TestModelMatch
@@ -684,7 +1044,7 @@ pub struct TestModelMatchResponse {
     tag = "LLM",
     operation_id = "TestModelMatch",
     summary = "Test which pricing definition matches a model name and calculate cost",
-    description = "Simulates the pricing lookup for a given model name and optional usage data, returning the matched definition, selected tier, and cost breakdown.",
+    description = "Simulates the pricing lookup for a given model name and optional usage data, returning the matched definition, selected tier, and cost breakdown. With `match_pattern`, also lists the known models that pattern would price if saved as a rule in this organization.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -694,6 +1054,10 @@ pub struct TestModelMatchResponse {
         (status = 200, description = "Success", content_type = "application/json", body = TestModelMatchResponse),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn test_model_match(
     Path(org_id): Path<String>,
@@ -717,10 +1081,53 @@ pub async fn test_model_match(
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
 
-    let entries = model_pricing::get_org_pricing_entries(&org_id);
-    let matched = model_pricing::find_pricing_sync_at(&entries, &req.model_name, req.timestamp);
+    let saved = model_pricing::get_org_pricing_entries(&org_id);
 
-    let (tier, tier_index, costs, total_cost) = if let Some(ref def) = matched {
+    let captured_models = match req.match_pattern.as_deref().map(str::trim) {
+        Some(pattern) if !pattern.is_empty() => {
+            let compiled_regex = match regex::RegexBuilder::new(pattern)
+                .size_limit(model_pricing::REGEX_SIZE_LIMIT)
+                .build()
+            {
+                Ok(re) => re,
+                Err(e) => {
+                    return MetaHttpResponse::bad_request(format!("Invalid regex pattern: {e}"));
+                }
+            };
+            let others: Vec<CachedModelPricing> = saved
+                .iter()
+                .filter(|e| {
+                    req.rule_id.is_none() || e.definition.id.map(|id| id.to_string()) != req.rule_id
+                })
+                .cloned()
+                .collect();
+            let candidate = CachedModelPricing {
+                definition: ModelPricingDefinition {
+                    id: Some(svix_ksuid::Ksuid::new(None, None)),
+                    match_pattern: pattern.to_string(),
+                    source: if org_id == META_ORG {
+                        PricingSource::MetaOrg
+                    } else {
+                        PricingSource::Org
+                    },
+                    ..Default::default()
+                },
+                compiled_regex,
+            };
+            captured_models(&others, &candidate)
+        }
+        _ => Vec::new(),
+    };
+
+    let resolved = if req.model_name.is_empty() {
+        None
+    } else {
+        model_pricing::find_pricing_sync_at(&saved, &req.model_name, req.timestamp)
+    };
+    let match_kind = resolved.as_ref().map(|r| r.match_kind);
+    let matched = resolved.map(|r| r.definition);
+
+    let (tier, tier_index, costs, total_cost) = if let Some(def) = &matched {
         let ctx = openobserve_core::traces::otel::processor::pricing_context_for_test_endpoint(
             def,
             &req.attributes,
@@ -740,10 +1147,12 @@ pub async fn test_model_match(
 
     MetaHttpResponse::json(TestModelMatchResponse {
         matched,
+        match_kind,
         tier,
         tier_index,
         costs,
         total_cost,
+        captured_models,
     })
 }
 
@@ -891,6 +1300,23 @@ mod tests {
     #[test]
     fn test_derive_test_string_stops_at_pipe() {
         assert_eq!(derive_test_string("foo|bar"), "foo");
+    }
+
+    #[test]
+    fn test_derive_test_string_skips_optional_provider_prefix_group() {
+        assert_eq!(
+            derive_test_string(
+                r"(?i)^(?:[\w-]+[/.:])*gpt-5\.4-mini(?:-\d{4}-\d{2}-\d{2}|-\d{8})?$"
+            ),
+            "gpt-5.4-mini"
+        );
+        assert_eq!(derive_test_string(r"(?i)(?:openai/)?gpt-4o"), "gpt-4o");
+    }
+
+    #[test]
+    fn test_derive_test_string_keeps_required_leading_group() {
+        // A group that must match is part of the name; it stops literal collection.
+        assert_eq!(derive_test_string(r"(?i)(gpt|o)-4"), "");
     }
 
     // ── validate_definition ───────────────────────────────────────────────────
@@ -1232,5 +1658,197 @@ mod tests {
         tier.prices.insert("input".to_string(), 0.0);
         def.tiers = vec![tier];
         assert!(validate_definition(&def).is_ok());
+    }
+
+    // ── captured_models ───────────────────────────────────────────────────────
+
+    fn entry(name: &str, pattern: &str, source: PricingSource) -> CachedModelPricing {
+        CachedModelPricing {
+            definition: ModelPricingDefinition {
+                id: Some(svix_ksuid::Ksuid::new(None, None)),
+                name: name.to_string(),
+                match_pattern: pattern.to_string(),
+                source,
+                ..Default::default()
+            },
+            compiled_regex: regex::Regex::new(pattern).unwrap(),
+        }
+    }
+
+    fn org_candidate(pattern: &str) -> CachedModelPricing {
+        entry("", pattern, PricingSource::Org)
+    }
+
+    fn find<'a>(captured: &'a [CapturedModel], model: &str) -> Option<&'a CapturedModel> {
+        captured.iter().find(|c| c.model_name == model)
+    }
+
+    fn built_in_gpt_4o() -> Vec<CachedModelPricing> {
+        vec![
+            entry("GPT-4o", r"(?i)^gpt-4o$", PricingSource::BuiltIn),
+            entry("GPT-4o Mini", r"(?i)^gpt-4o-mini$", PricingSource::BuiltIn),
+        ]
+    }
+
+    fn unpriced_row(
+        model: &str,
+        status: config::meta::model_pricing::CostStatus,
+        tokens: i64,
+    ) -> crate::request::gen_ai_health::UnpricedModelRow {
+        crate::request::gen_ai_health::UnpricedModelRow {
+            model: Some(model.to_string()),
+            status,
+            spans: 1,
+            tokens,
+            cost: 0.0,
+            agents: vec!["a".to_string()],
+            agent_count: 1,
+        }
+    }
+
+    #[test]
+    fn test_resolve_unpriced_keeps_historical_gaps_and_merges_statuses() {
+        use config::meta::model_pricing::CostStatus;
+        let mut entries = built_in_gpt_4o();
+        // Approximate today: `gpt-5.4` covers only part of `gpt-5.4-mini`.
+        entries.push(entry("GPT-5.4", r"(?i)gpt-5\.4", PricingSource::BuiltIn));
+        let rows = vec![
+            unpriced_row("acme-internal-llm", CostStatus::Unpriced, 100),
+            // Now exactly priced, but the historical gap must remain visible.
+            unpriced_row("gpt-4o", CostStatus::Unpriced, 50),
+            unpriced_row("gpt-5.4-mini", CostStatus::Approximate, 30),
+            // Seen unpriced earlier in the window, approximate since: one row.
+            unpriced_row("gpt-5.4-mini", CostStatus::Unpriced, 20),
+        ];
+        let out = resolve_unpriced(rows, &entries, 0);
+        let models: Vec<_> = out.iter().map(|m| m.row.model.as_deref()).collect();
+        assert_eq!(
+            models,
+            [
+                Some("acme-internal-llm"),
+                Some("gpt-4o"),
+                Some("gpt-5.4-mini")
+            ]
+        );
+        assert!(out[0].matched.is_none());
+        assert!(!out[0].priced_now);
+        assert!(out[1].priced_now);
+        assert_eq!(out[2].row.status, CostStatus::Approximate);
+        assert!(!out[2].priced_now);
+        assert_eq!(out[2].row.tokens, 50);
+        assert_eq!(out[2].matched.as_ref().unwrap().name, "GPT-5.4");
+    }
+
+    #[test]
+    fn test_resolve_unpriced_keeps_spans_without_a_model_name() {
+        use config::meta::model_pricing::CostStatus;
+        let mut no_model = unpriced_row("x", CostStatus::Unpriced, 70);
+        no_model.model = None;
+        let mut no_model_again = no_model.clone();
+        no_model_again.tokens = 30;
+        let out = resolve_unpriced(vec![no_model, no_model_again], &built_in_gpt_4o(), 0);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].row.model, None);
+        assert_eq!(out[0].row.status, CostStatus::Unpriced);
+        assert_eq!(out[0].row.tokens, 100);
+        assert!(out[0].matched.is_none());
+        // The model is null on the wire, not an empty name.
+        let wire = config::utils::json::to_value(&out[0]).unwrap();
+        assert_eq!(wire.get("model"), Some(&config::utils::json::Value::Null));
+    }
+
+    #[test]
+    fn test_resolve_unpriced_caps_merged_agent_names_and_keeps_the_count() {
+        use config::meta::model_pricing::CostStatus;
+        let names = |range: std::ops::Range<usize>| range.map(|i| format!("agent-{i}")).collect();
+        let mut unpriced = unpriced_row("m", CostStatus::Unpriced, 10);
+        unpriced.agents = names(0..8);
+        unpriced.agent_count = 25;
+        let mut approximate = unpriced_row("m", CostStatus::Approximate, 10);
+        approximate.agents = names(4..10);
+        approximate.agent_count = 6;
+        let out = resolve_unpriced(vec![unpriced, approximate], &[], 0);
+        let agents = &out[0].row.agents;
+        assert_eq!(agents.len(), MAX_AGENT_NAMES);
+        assert_eq!(agents.iter().collect::<HashSet<_>>().len(), MAX_AGENT_NAMES);
+        assert_eq!(out[0].row.agent_count, 25);
+    }
+
+    #[test]
+    fn test_captured_models_prefix_rule_also_catches_other_models() {
+        let captured = captured_models(&built_in_gpt_4o(), &org_candidate(r"(?i)^gpt-4o"));
+
+        assert_eq!(
+            captured.first(),
+            Some(&CapturedModel {
+                model_name: "gpt-4o".to_string(),
+                match_kind: MatchKind::Exact,
+                primary: true,
+                replaces: Some(PricingRuleRef {
+                    name: "GPT-4o".to_string(),
+                    source: PricingSource::BuiltIn,
+                }),
+            })
+        );
+        assert_eq!(
+            find(&captured, "gpt-4o-mini"),
+            Some(&CapturedModel {
+                model_name: "gpt-4o-mini".to_string(),
+                match_kind: MatchKind::Approximate,
+                primary: false,
+                replaces: Some(PricingRuleRef {
+                    name: "GPT-4o Mini".to_string(),
+                    source: PricingSource::BuiltIn,
+                }),
+            })
+        );
+        assert!(find(&captured, "gpt-4").is_none());
+    }
+
+    #[test]
+    fn test_captured_models_anchored_rule_catches_only_its_model() {
+        let captured = captured_models(&built_in_gpt_4o(), &org_candidate(r"(?i)^gpt-4o$"));
+        let names: Vec<&str> = captured.iter().map(|c| c.model_name.as_str()).collect();
+        assert_eq!(names, ["gpt-4o"]);
+    }
+
+    #[test]
+    fn test_captured_models_skips_models_a_same_source_rule_prices_exactly() {
+        let mut entries = built_in_gpt_4o();
+        entries.push(entry("org-mini", r"(?i)^gpt-4o-mini$", PricingSource::Org));
+
+        let captured = captured_models(&entries, &org_candidate(r"(?i)^gpt-4o"));
+        assert!(find(&captured, "gpt-4o").is_some());
+        assert!(find(&captured, "gpt-4o-mini").is_none());
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn writes_are_refused_without_enterprise() {
+        let def = || {
+            Json(
+                serde_json::from_value::<ModelPricingDefinition>(serde_json::json!({
+                    "name": "x", "match_pattern": "(?i)x", "enabled": true,
+                    "tiers": [{"name": "Default", "prices": {"input": 1e-6, "output": 2e-6}}],
+                }))
+                .unwrap(),
+            )
+        };
+        let org = || Path("default".to_string());
+        let model = || Path(("default".to_string(), "m".to_string()));
+        for (op, resp) in [
+            ("create", create(org(), def()).await),
+            ("update", update(model(), def()).await),
+            ("refresh_built_in", refresh_built_in(org()).await),
+        ] {
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN, "{op}");
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert!(
+                String::from_utf8_lossy(&body).contains("open source version"),
+                "{op}"
+            );
+        }
     }
 }

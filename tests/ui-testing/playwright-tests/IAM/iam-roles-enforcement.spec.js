@@ -26,6 +26,7 @@
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
+const { openNavFlyoutChild } = require('../../pages/commonActions.js');
 const testLogger = require('../utils/test-logger.js');
 const {
     ns, req, reqAs, reqAsV2, allowed, listRoles, listUsers, createRole, setRolePerms, clearRolePerms,
@@ -190,7 +191,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
         // Capability is decided by the API, not by how fast a tab paints: a slow render
         // would otherwise turn a real test into a skip and still report green.
         test.skip(!(await rbacEnabled(page)), 'RBAC is off (OSS build)');
-        await page.locator('[data-test="menu-link-\\/iam-item"]').click();
+        await openNavFlyoutChild(page, 'iam');
         await pm.rolesPage.rolesTab.waitFor({ state: 'visible', timeout: 30000 });
     });
 
@@ -419,7 +420,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
     // ---------------- All Modules column select-all ----------------
 
     test('E-07 · a role granted ONLY from the All Modules headers really opens every module', {
-        tag: ['@iam', '@iamRolesEnforcement', '@P0', '@all']
+        tag: ['@iam', '@iamRolesEnforcement', '@bug-15217', '@regression', '@P0', '@all']
     }, async ({ page, browser }) => {
         test.setTimeout(240000);
 

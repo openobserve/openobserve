@@ -28,7 +28,7 @@
 -->
 <template>
   <OPageLayout
-    :title="notFound ? t('alerts.groups.notFoundTitle') : raw(alert?.name || alertId)"
+    :title="notFound ? t('alerts.groups.notFoundTitle') : raw(alert?.name || '')"
     icon="notifications"
     :subtitle="notFound ? raw('') : subtitle"
     :back="backTarget"
@@ -53,12 +53,28 @@
           data-test="alerts-alertdetail-level-badge"
         />
         <span
+          v-if="firingFor"
+          class="text-compact text-text-secondary"
+          data-test="alerts-alertdetail-firing-for"
+          >{{ firingFor }}</span
+        >
+        <span
           v-if="isMultiAlert && firingSummary"
           class="text-compact text-text-secondary"
           data-test="alerts-alertdetail-firing-summary"
         >
           {{ firingSummary }}
+          <template v-if="acknowledgedGroups">
+            {{ raw("·") }}
+            {{ t("alerts.ack.groupsAcknowledged", { count: acknowledgedGroups }) }}
+          </template>
         </span>
+        <AckChip v-if="headerAck" :ack="headerAck" data-test="alerts-alertdetail-ack-chip" />
+        <MutedChip
+          v-if="headerDowntime"
+          :downtime="headerDowntime"
+          data-test="alerts-alertdetail-muted-chip"
+        />
         <CompositeReferencesDrawer
           v-if="(alert?.referenced_by_composite_count ?? 0) > 0"
           :open="referenceDrawerOpen"
@@ -72,8 +88,36 @@
     </template>
 
     <template #actions>
+      <AlertHeaderActions
+        v-if="showHeaderActions"
+        :alert-id="alertId"
+        :name="alert?.name || alertId"
+        :folder-id="folderId"
+        :firing="isFiringNow"
+        :unacked-groups="unackedGroups"
+        :ack="headerAck"
+        :downtime="alertWideMute"
+        :mute-enabled="downtimesEnabled"
+        :groups="firingGroups"
+        @changed="onAckMuteChanged"
+      />
+      <OTooltip v-if="!notFound && editAnomalyLocked" :content="anomalyLockedReason">
+        <span class="inline-flex">
+          <OButton variant="outline" size="sm-action" disabled data-test="alerts-alertdetail-edit">
+            <template #icon-left>
+              <OIcon
+                name="lock"
+                class="lock-chip"
+                size="sm"
+                data-test="alerts-alertdetail-edit-lock"
+              />
+            </template>
+            {{ t("alerts.edit") }}
+          </OButton>
+        </span>
+      </OTooltip>
       <OButton
-        v-if="!notFound"
+        v-else-if="!notFound"
         variant="outline"
         size="sm-action"
         icon-left="edit"
@@ -142,33 +186,15 @@
         <OContent v-if="isMultiAlert" class="shrink-0 pt-3">
           <OStatStrip :items="groupStats" data-test="alerts-alertdetail-group-stats" />
         </OContent>
-
-        <!-- A grouped alert that never opted in has no Groups tab, because it
-           has no per-group state to show. Without saying so, the chart below
-           showing one line per group makes that look like a bug rather than
-           the deliberate opt-in it is (M-9). -->
-        <OBanner
-          v-if="isGroupedButSimple"
-          variant="info"
-          class="shrink-0"
-          data-test="alerts-alertdetail-simple-grouped-banner"
-        >
-          {{
-            t("alerts.multiAlert.groupedButSimple", {
-              columns: (aggregation?.group_by || []).join(", "),
-            })
-          }}
-          <template #actions>
-            <OButton
-              variant="outline"
-              size="sm"
-              data-test="alerts-alertdetail-enable-multi"
-              @click="editAlert"
-            >
-              {{ t("alerts.multiAlert.enableCta") }}
-            </OButton>
-          </template>
-        </OBanner>
+        <OContent v-else-if="firingTiles.length" class="shrink-0 pt-3">
+          <OStatStrip
+            :items="firingTiles"
+            selectable
+            :tray="false"
+            data-test="alerts-alertdetail-tiles"
+            @select="openIncident"
+          />
+        </OContent>
 
         <!-- Above the tabs, not inside the Groups tab: the evaluation chart
            answers "what is this alert watching, and how close is it to the
@@ -180,7 +206,8 @@
            renders then is an empty frame that reads as "no data" — a lie about
            an alert that is evaluating perfectly well. -->
         <!-- An anomaly config has no query_condition for generate_sql to build from. -->
-        <OContent v-if="alert && !isSloAlertView && !isAnomalyAlert" class="shrink-0 py-3">
+        <!-- Mounted before the GET lands so its placeholder holds the chart's height and the tabs never move. -->
+        <OContent v-if="!alert || (!isSloAlertView && !isAnomalyAlert)" class="shrink-0 py-3">
           <AlertGroupChart :alert="alert" />
         </OContent>
 
@@ -191,7 +218,9 @@
            the strip takes no horizontal wrapper padding (the first label
            self-aligns to the px-page-edge grid) and carries its own bottom
            divider via `bordered`. -->
+        <!-- Waits for the alert: an SLO or anomaly alert has no chart, and tabs painted under the placeholder would jump up. -->
         <OTabs
+          v-if="alert"
           v-model="activeTab"
           dense
           bordered
@@ -221,19 +250,50 @@
             name="charts"
             :label="t('alerts.anomaly.chartsTab')"
             icon="bar-chart"
+            :suffix-icon="anomalyLocked ? 'lock' : undefined"
+            :tooltip="anomalyLocked ? anomalyLockedReason : undefined"
             data-test="alerts-alertdetail-tab-charts"
           />
           <OTab name="history" :label="t('alerts.history')" icon="history" />
           <OTab name="configuration" :label="t('alerts.configuration')" icon="settings" />
         </OTabs>
 
-        <OTabPanels v-model="activeTab" class="min-h-0 flex-1">
+        <!-- Without a Groups tab a line per group reads as a bug (M-9); it lands with the alert, so nothing painted moves. -->
+        <OContent v-if="isGroupedButSimple" class="shrink-0 pt-3">
+          <OBanner variant="info" data-test="alerts-alertdetail-simple-grouped-banner">
+            {{
+              t("alerts.multiAlert.groupedButSimple", {
+                columns: (aggregation?.group_by || []).join(", "),
+              })
+            }}
+            <template #actions>
+              <OButton
+                variant="outline"
+                size="sm"
+                data-test="alerts-alertdetail-enable-multi"
+                @click="editAlert"
+              >
+                {{ t("alerts.multiAlert.enableCta") }}
+              </OButton>
+            </template>
+          </OBanner>
+        </OContent>
+
+        <!-- Every panel waits for the alert, so an empty box placed early would only be pushed down by the banner. -->
+        <OTabPanels v-if="alert" v-model="activeTab" class="min-h-0 flex-1">
           <OTabPanel v-if="isMultiAlert" name="groups" stretch>
             <AlertGroupsTable
               :groups="groupData?.list || []"
               :loading="loadingGroups"
+              :load-error="groupsLoadError"
+              :alert-id="alertId"
+              :alert-name="alert?.name || alertId"
+              :folder-id="folderId"
+              :downtime="headerDowntime"
+              :mute-enabled="downtimesEnabled"
               @refresh="fetchGroups"
               @show-history="openGroupHistory"
+              @changed="onAckMuteChanged"
             />
           </OTabPanel>
 
@@ -249,7 +309,12 @@
              repeat the same non-answer on every line. -->
           <OTabPanel v-if="isAnomalyAlert" name="charts" stretch>
             <OContent class="h-full overflow-y-auto py-4">
-              <AnomalyDetectionChart v-if="alert" :alert="alert" :anomaly-id="alertId" />
+              <LicenseDeniedState
+                v-if="anomalyLocked"
+                :features="['anomaly_detection']"
+                data-test="alerts-alertdetail-anomaly-license-denied"
+              />
+              <AnomalyDetectionChart v-else-if="alert" :alert="alert" :anomaly-id="alertId" />
             </OContent>
           </OTabPanel>
 
@@ -317,7 +382,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useQuery } from "@tanstack/vue-query";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -326,6 +392,9 @@ import AlertEvaluationHistory from "@/components/alerts/AlertEvaluationHistory.v
 import AlertGroupChart from "@/components/alerts/AlertGroupChart.vue";
 import AlertGroupHistory from "@/components/alerts/AlertGroupHistory.vue";
 import AlertGroupsTable from "@/components/alerts/AlertGroupsTable.vue";
+import AlertHeaderActions from "@/components/alerts/AlertHeaderActions.vue";
+import AckChip from "@/components/alerts/AckChip.vue";
+import MutedChip from "@/components/alerts/downtimes/MutedChip.vue";
 import AnomalyDetectionChart from "@/components/alerts/AnomalyDetectionChart.vue";
 import CompositeAlertDetail from "@/components/alerts/composite/CompositeAlertDetail.vue";
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
@@ -343,8 +412,20 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import alertsService from "@/services/alerts";
+import { alertAcksQuery, alertsListQuery } from "@/services/alerts.queries";
+import type { ActiveDowntime } from "@/services/downtimes";
+import { useDowntimesEnabled } from "@/composables/downtimes/useDowntimesEnabled";
+import { useNowMicros } from "@/composables/downtimes/useNowMicros";
+import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
+import { formatDuration } from "@/utils/downtimes/schedule";
+import { formatInZone } from "@/utils/oncall";
+import { isFiringOutcome, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
+import { ackedCount, unackedFiringCount } from "@/utils/alerts/ackState";
 import sloService from "@/services/slos";
 import {
   isSloAlert,
@@ -354,8 +435,10 @@ import {
 } from "@/utils/alerts/sloAlertRouting";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type {
+  AckView,
   AlertGroup,
   AlertGroupsResponse,
+  AlertListAck,
   AlertGroupTransition,
   CompositeAlertReference,
 } from "@/ts/interfaces/alert";
@@ -364,12 +447,18 @@ const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
+const { locked: anomalyLocked, lockedReason: anomalyLockedReason } =
+  useLicenseLock("anomaly_detection");
 
 const alertId = computed(() => String(route.params.alert_id || ""));
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
+// The GET carries no folder; entries navigate here with it, else the alert's list row names it.
+const routeFolderId = computed(() => String(route.query.folder || ""));
+const downtimesEnabled = useDowntimesEnabled();
 
 const alert = ref<any>(null);
 const groupData = ref<AlertGroupsResponse | null>(null);
+const groupsLoadError = ref(false);
 const transitions = ref<AlertGroupTransition[]>([]);
 const loadingGroups = ref(false);
 const loadingTransitions = ref(false);
@@ -431,7 +520,7 @@ const navigateToReference = (reference: CompositeAlertReference) => {
     params: { alert_id: reference.alert_id },
     query: {
       org_identifier: orgId.value,
-      folder: reference.folder_id || "default",
+      folder: reference.folder_id || undefined,
     },
   });
 };
@@ -447,17 +536,19 @@ const isGroupedButSimple = computed(
 // The GET response carries no rollup level, and M-2 defines the rollup as the
 // most severe group — which is exactly the first row of the worst-first group
 // list. Deriving it here beats showing nothing or re-fetching the list page.
-const rollupLevel = computed(() => groupData.value?.list?.[0]?.level);
+const rollupLevel = computed(
+  () => groupData.value?.list?.[0]?.level ?? (firingSince.value ? listRow.value?.level : null),
+);
 
 const backTarget = computed(() => ({
   label: t("alerts.header"),
   to: {
     name: "alertList",
     query: {
-      // Spread first so the tab the list pushed survives — folder still needs its own explicit fallback below since an absent query.folder must resolve to "default", not itself disappear.
+      // Spread first so the tab the list pushed survives; the list opens "default" when the folder is unknown.
       ...route.query,
       org_identifier: orgId.value,
-      folder: route.query.folder || "default",
+      folder: folderId.value || "default",
     },
   },
 }));
@@ -466,13 +557,17 @@ const backTarget = computed(() => ({
 // Plain row-click still lands here — only the EDIT action diverts to the SLO
 // page — so this page has to describe an alert with no stream and no query.
 const isSloAlertView = computed(() => isSloAlert(alert.value));
+// Anomaly configs and SLO alerts are edited on anomaly-detection pages.
+const editAnomalyLocked = computed(
+  () => anomalyLocked.value && (isAnomalyAlert.value || isSloAlertView.value),
+);
 const sloId = computed(() => sloIdOf(alert.value));
 // The alert GET carries `slo_condition` but not the SLO's NAME, which is the
 // one thing a human recognises. One extra fetch; failure degrades to the id.
 const sloName = ref("");
 
 const fetchSloName = async () => {
-  if (!orgId.value || !sloId.value) return;
+  if (!orgId.value || !sloId.value || anomalyLocked.value) return;
   try {
     const res = await sloService.get(orgId.value, sloId.value);
     sloName.value = res.data?.name || "";
@@ -576,6 +671,155 @@ const groupStats = computed<StatItem[]>(() => {
   ];
 });
 
+// The alert GET has no run state, so the header reads this alert's row: the list of its folder,
+// or of every folder when the URL names none, filtered to the alerts named like it.
+const listQuery = useQuery(() =>
+  Object.assign(alertsListQuery(orgId.value, routeFolderId.value, alert.value?.name), {
+    enabled: !!orgId.value && !!alertId.value && !!alert.value?.name,
+  }),
+);
+
+interface AlertListRow {
+  alert_id?: string;
+  id?: string;
+  folder_id?: string;
+  enabled?: boolean;
+  last_outcome?: string | null;
+  last_outcome_since?: number | null;
+  firing_started_at?: number | null;
+  level?: string | null;
+  ack?: AlertListAck | null;
+  active_downtime?: (ActiveDowntime & { version?: number }) | null;
+  incident?: { id: string; title?: string | null; status: string } | null;
+}
+
+const listRow = computed<AlertListRow | null>(
+  () =>
+    (listQuery.data.value as AlertListRow[] | undefined)?.find(
+      (row) => (row.alert_id ?? row.id) === alertId.value,
+    ) ?? null,
+);
+
+const folderId = computed(() => routeFolderId.value || listRow.value?.folder_id || "");
+const acksQuery = useQuery(() =>
+  Object.assign(alertAcksQuery(orgId.value, alertId.value, folderId.value), {
+    enabled: !!orgId.value && !!alertId.value && !!folderId.value,
+  }),
+);
+
+const showHeaderActions = computed(() => !!alert.value && !notFound.value && !isAnomalyAlert.value);
+
+const isFiringNow = computed(() => {
+  const row = listRow.value;
+  const runFiring =
+    !!row &&
+    shouldShowRunOutcome(row.enabled, row.last_outcome) &&
+    isFiringOutcome(row.last_outcome);
+  return runFiring || (isCompositeAlert.value && alert.value?.evaluation?.result === true);
+});
+
+const headerAck = computed<Pick<AckView, "acked_by" | "acked_at" | "ack_source"> | null>(() => {
+  if (isMultiAlert.value) return null;
+  const acks = acksQuery.data.value ?? [];
+  return acks.find((ack) => ack.group_key === "") ?? listRow.value?.ack ?? null;
+});
+
+const headerDowntime = computed(() => listRow.value?.active_downtime ?? null);
+
+// A group mute is extended and ended from its group's row, so the header keeps offering Mute.
+const alertWideMute = computed(() =>
+  headerDowntime.value && !headerDowntime.value.alert_groups?.length ? headerDowntime.value : null,
+);
+
+const firingGroups = computed<AlertGroup[]>(() =>
+  isMultiAlert.value
+    ? (groupData.value?.list || []).filter((g) => isFiringOutcome(g.last_outcome))
+    : [],
+);
+
+// The tiles describe one firing: a multi-alert has its group strip, a composite its own panel.
+const isSingleRow = computed(
+  () => !isMultiAlert.value && !isCompositeAlert.value && !isAnomalyAlert.value,
+);
+
+const nowMicros = useNowMicros();
+const viewerZone = useViewerTimezone();
+
+const firingSince = computed<number | null>(() => {
+  // A failed send moves the outcome, and with it last_outcome_since, but not the firing's start.
+  const since = listRow.value?.firing_started_at ?? listRow.value?.last_outcome_since;
+  return isSingleRow.value && isFiringNow.value && since ? since : null;
+});
+
+const firingFor = computed(() => {
+  if (firingSince.value === null) return null;
+  const secs = Math.max(0, Math.floor((nowMicros.value - firingSince.value) / 1_000_000));
+  return t("alerts.firingState.firingFor", { duration: formatDuration(secs, t) });
+});
+
+const LEVEL_TILES: Record<string, { label: I18nKey; tone: StatItem["tone"] }> = {
+  critical: { label: "alerts.groups.critical", tone: "error" },
+  warning: { label: "alerts.groups.warning", tone: "warning" },
+  ok: { label: "alerts.groups.ok", tone: "success" },
+};
+
+const firingTiles = computed<StatItem[]>(() => {
+  if (firingSince.value === null) return [];
+  const level = LEVEL_TILES[(listRow.value?.level || "").toLowerCase()];
+  const tiles: StatItem[] = [];
+  if (level) {
+    tiles.push({
+      key: "level",
+      label: t("alerts.firingState.level"),
+      value: t(level.label),
+      tone: level.tone,
+      selectable: false,
+      dataTest: "alerts-alertdetail-tile-level",
+    });
+  }
+  tiles.push({
+    key: "firing-since",
+    label: t("alerts.firingState.firingSince"),
+    value: formatInZone(firingSince.value, viewerZone.value, { timeStyle: "short" }),
+    selectable: false,
+    dataTest: "alerts-alertdetail-tile-firing-since",
+  });
+  const incident = listRow.value?.incident;
+  if (incident) {
+    tiles.push({
+      key: "incident",
+      label: t("alerts.firingState.incident"),
+      value: incident.title || incident.id,
+      dataTest: "alerts-alertdetail-tile-incident",
+    });
+  }
+  return tiles;
+});
+
+const openIncident = (key: string) => {
+  const incident = listRow.value?.incident;
+  if (key !== "incident" || !incident) return;
+  router.push({
+    name: "incidentDetail",
+    params: { id: incident.id },
+    query: { org_identifier: orgId.value },
+  });
+};
+
+const unackedGroups = computed(() =>
+  isMultiAlert.value ? unackedFiringCount(groupData.value?.list || []) : null,
+);
+
+const acknowledgedGroups = computed(() =>
+  isMultiAlert.value ? ackedCount(groupData.value?.list || []) : 0,
+);
+
+// The mutations invalidate the cached reads; the group table is a plain fetch, so it reloads here.
+const onAckMuteChanged = async () => {
+  await Promise.all([listQuery.refetch(), acksQuery.refetch()]);
+  if (isMultiAlert.value) await fetchGroups();
+};
+
 const fetchAlert = async () => {
   if (!orgId.value || !alertId.value) return;
   try {
@@ -598,8 +842,10 @@ const fetchGroups = async () => {
   try {
     const res = await alertsService.list_groups(orgId.value, alertId.value);
     groupData.value = res.data;
+    groupsLoadError.value = false;
   } catch {
     groupData.value = null;
+    groupsLoadError.value = true;
   } finally {
     loadingGroups.value = false;
   }
@@ -673,7 +919,7 @@ const editAlert = () => {
       params: { anomaly_id: alertId.value },
       query: {
         org_identifier: orgId.value,
-        folder: route.query.folder || "default",
+        folder: folderId.value || "default",
         tab: route.query.tab,
       },
     });
@@ -684,10 +930,9 @@ const editAlert = () => {
     params: { alert_id: alertId.value },
     query: {
       org_identifier: orgId.value,
-      // The GET response carries no folder, so carry through the one the list
-      // navigated with; "default" is the folder every org is created with. The
-      // editor needs it to send the user back to the right folder on save.
-      folder: route.query.folder || "default",
+      // The editor needs the alert's folder to send the user back to it on save;
+      // "default" is the folder every org is created with.
+      folder: folderId.value || "default",
       tab: route.query.tab,
     },
   });

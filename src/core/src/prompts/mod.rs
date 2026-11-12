@@ -34,10 +34,10 @@ impl PromptType {
     }
 }
 
-impl TryFrom<&str> for PromptType {
-    type Error = PromptError;
+impl std::str::FromStr for PromptType {
+    type Err = PromptError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "text" => Ok(Self::Text),
             "chat" => Ok(Self::Chat),
@@ -84,10 +84,10 @@ impl PromptSource {
     }
 }
 
-impl TryFrom<&str> for PromptSource {
-    type Error = PromptError;
+impl std::str::FromStr for PromptSource {
+    type Err = PromptError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "ui" => Ok(Self::Ui),
             "sdk" => Ok(Self::Sdk),

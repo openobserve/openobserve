@@ -74,4 +74,23 @@ describe("OForm awaited submit state", () => {
     await flushPromises();
     expect(overlayState.value).toBe(false);
   });
+
+  it("releases the overlay's submit state when unmounted mid-submit", async () => {
+    const d = deferred();
+    const overlayState = ref(false);
+    const wrapper = mount(OForm, {
+      props: { defaultValues: { name: "x" }, onSubmit: () => d.promise },
+      global: { provide: { [FORM_SUBMIT_STATE_KEY as symbol]: overlayState } },
+    });
+
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(overlayState.value).toBe(true);
+
+    wrapper.unmount();
+    expect(overlayState.value).toBe(false);
+    d.resolve();
+    await flushPromises();
+    expect(overlayState.value).toBe(false);
+  });
 });

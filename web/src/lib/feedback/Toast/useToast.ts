@@ -1,6 +1,7 @@
 import { reactive, ref } from "vue";
 import type { ToastVariant, ToastOptions, ToastPosition, ToastDetail } from "./OToast.types";
 import type { I18nText } from "@/types/i18n";
+import { isLicenseDenialToast } from "@/composables/useFeatureLock";
 
 // ── Internal record shape ────────────────────────────────────────────────────
 
@@ -80,7 +81,10 @@ if (typeof document !== "undefined") {
 
 // ── Public dismiss-function type ─────────────────────────────────────────────
 
-type DismissFn = (replacement?: Pick<ToastOptions, "variant" | "message" | "title">) => void;
+/** Closes the toast; `id` is its record's id, the same one a collapsed duplicate returns. */
+type DismissFn = ((replacement?: Pick<ToastOptions, "variant" | "message" | "title">) => void) & {
+  readonly id: string;
+};
 
 // ── Core toast() function ────────────────────────────────────────────────────
 
@@ -123,6 +127,9 @@ function capitalizeFirst(str: I18nText): I18nText {
 
 function toast(options: ToastOptions): DismissFn {
   const variant: ToastVariant = options.variant ?? "default";
+  // The license warning toast already names the features a refused request needed.
+  if (variant === "error" && isLicenseDenialToast(options.message))
+    return Object.assign(() => {}, { id: "" });
   const position: ToastPosition = options.position ?? defaultPositions[variant];
   const timeout = options.timeout !== undefined ? options.timeout : defaultTimeouts[variant];
 
@@ -188,7 +195,7 @@ function updateToast(
 }
 
 function makeDismissFn(id: string, position: ToastPosition): DismissFn {
-  return (replacement) => {
+  const close = (replacement?: Pick<ToastOptions, "variant" | "message" | "title">) => {
     dismiss(id);
     if (replacement) {
       toast({
@@ -199,6 +206,7 @@ function makeDismissFn(id: string, position: ToastPosition): DismissFn {
       });
     }
   };
+  return Object.assign(close, { id });
 }
 
 function dismiss(id: string): void {

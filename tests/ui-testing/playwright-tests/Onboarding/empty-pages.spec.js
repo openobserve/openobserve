@@ -2,6 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const { EmptyPagesPage } = require('../../pages/generalPages/emptyPagesPage.js');
 const { getAuthHeaders, authedRequest, isCloudEnvironment } = require('../utils/cloud-auth.js');
+const { ingestBase } = require('../utils/ingest-url.js');
 
 const base = () => process.env.ZO_BASE_URL.replace(/\/$/, '');
 const ingestionBase = () => (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, '');
@@ -119,7 +120,7 @@ test.describe('Pages before data', () => {
         const ep = new EmptyPagesPage(page);
         try {
             test.skip(!(await ep.restrictedRoutesOn(orgId)), 'needs ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA=true');
-            const metric = await request.post(`${ingestionBase()}/api/${orgId}/ingest/metrics/_json`, {
+            const metric = await request.post(`${ingestBase(ingestionBase())}/api/${orgId}/ingest/metrics/_json`, {
                 headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
                 data: [{ __name__: 'e2e_first_data_gauge', __type__: 'gauge', _timestamp: Date.now(), value: 1 }],
             });
@@ -132,7 +133,7 @@ test.describe('Pages before data', () => {
             await expect(ep.status).toHaveAttribute('data-state', 'waiting');
             const loadsBefore = ep.loads;
 
-            const logs = await request.post(`${ingestionBase()}/api/${orgId}/default/_json`, {
+            const logs = await request.post(`${ingestBase(ingestionBase())}/api/${orgId}/default/_json`, {
                 headers: getAuthHeaders(),
                 data: [{ level: 'info', log: 'first logs while Logs is open' }],
             });

@@ -195,6 +195,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :bounce-base="kpiMetrics.bounceBase"
                 :avg-duration-ms="kpiMetrics.avgDurationMs"
                 :median-duration-ms="kpiMetrics.medianDurationMs"
+                :totals-pending="windowTotalsPending"
+                :page-pending="isLoading.length > 0"
                 :sessions-delta-pct="kpiDeltas?.sessionsPct ?? null"
                 :errors-delta="kpiDeltas?.errors ?? null"
                 :frustrated-delta="kpiDeltas?.frustrated ?? null"
@@ -222,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="single"
                   :label="t('rum.health')"
                   label-position="left"
-                  @update:model-value="(v: any) => setHealthSegment(v)"
+                  @update:model-value="(v: any) => pickSegment('health', v)"
                 >
                   <OToggleGroupItem value="all" size="xs" data-test="rum-app-sessions-health-all">{{
                     t("rum.all")
@@ -231,21 +233,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     value="errors"
                     size="xs"
                     data-test="rum-app-sessions-health-errors"
-                    >{{ t("rum.withErrors") }} ·
-                    {{ sessionsSummary.errorSessions }}</OToggleGroupItem
+                    >{{ t("rum.withErrors")
+                    }}{{ segmentCount(sessionsSummary.errorSessions) }}</OToggleGroupItem
                   >
                   <OToggleGroupItem
                     value="frustrated"
                     size="xs"
                     data-test="rum-app-sessions-health-frustrated"
-                    >{{ t("rum.frustrated") }} ·
-                    {{ sessionsSummary.frustratedSessions }}</OToggleGroupItem
+                    >{{ t("rum.frustrated")
+                    }}{{ segmentCount(sessionsSummary.frustratedSessions) }}</OToggleGroupItem
                   >
                   <OToggleGroupItem
                     value="clean"
                     size="xs"
                     data-test="rum-app-sessions-health-clean"
-                    >{{ t("rum.clean") }} · {{ sessionsSummary.cleanSessions }}</OToggleGroupItem
+                    >{{ t("rum.clean")
+                    }}{{ segmentCount(sessionsSummary.cleanSessions) }}</OToggleGroupItem
                   >
                 </OToggleGroup>
 
@@ -254,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="single"
                   :label="t('rum.type')"
                   label-position="left"
-                  @update:model-value="(v: any) => setTypeSegment(v)"
+                  @update:model-value="(v: any) => pickSegment('type', v)"
                 >
                   <OToggleGroupItem value="all" size="xs" data-test="rum-app-sessions-type-all">{{
                     t("rum.all")
@@ -263,15 +266,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     value="engaged"
                     size="xs"
                     data-test="rum-app-sessions-type-engaged"
-                    >{{ t("rum.engaged") }} ·
-                    {{ sessionsSummary.engagedSessions }}</OToggleGroupItem
+                    >{{ t("rum.engaged")
+                    }}{{ segmentCount(sessionsSummary.engagedSessions) }}</OToggleGroupItem
                   >
                   <OToggleGroupItem
                     value="bounced"
                     size="xs"
                     data-test="rum-app-sessions-type-bounced"
-                    >{{ t("rum.bounced") }} ·
-                    {{ sessionsSummary.bouncedSessions }}</OToggleGroupItem
+                    >{{ t("rum.bounced")
+                    }}{{ segmentCount(sessionsSummary.bouncedSessions) }}</OToggleGroupItem
                   >
                 </OToggleGroup>
 
@@ -280,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="single"
                   :label="t('rum.device')"
                   label-position="left"
-                  @update:model-value="(v: any) => setDeviceSegment(v)"
+                  @update:model-value="(v: any) => pickSegment('device', v)"
                 >
                   <OToggleGroupItem value="all" size="xs" data-test="rum-app-sessions-device-all">{{
                     t("rum.all")
@@ -289,22 +292,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     value="desktop"
                     size="xs"
                     data-test="rum-app-sessions-device-desktop"
-                    >{{ t("rum.desktop") }} ·
-                    {{ sessionsSummary.deviceCounts.desktop }}</OToggleGroupItem
+                    >{{ t("rum.desktop")
+                    }}{{ segmentCount(sessionsSummary.deviceCounts.desktop) }}</OToggleGroupItem
                   >
                   <OToggleGroupItem
                     value="mobile"
                     size="xs"
                     data-test="rum-app-sessions-device-mobile"
-                    >{{ t("rum.mobile") }} ·
-                    {{ sessionsSummary.deviceCounts.mobile }}</OToggleGroupItem
+                    >{{ t("rum.mobile")
+                    }}{{ segmentCount(sessionsSummary.deviceCounts.mobile) }}</OToggleGroupItem
                   >
                   <OToggleGroupItem
                     value="tablet"
                     size="xs"
                     data-test="rum-app-sessions-device-tablet"
-                    >{{ t("rum.tablet") }} ·
-                    {{ sessionsSummary.deviceCounts.tablet }}</OToggleGroupItem
+                    >{{ t("rum.tablet")
+                    }}{{ segmentCount(sessionsSummary.deviceCounts.tablet) }}</OToggleGroupItem
                   >
                 </OToggleGroup>
               </div>
@@ -357,25 +360,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
                 <template #cell-session="{ row }">
-                  <div class="flex min-w-0 flex-col justify-center gap-0.5">
-                    <OUserCell
-                      :value="row.user_email || unknownUserLabel"
-                      class="truncate font-medium"
-                    />
-                    <div class="text-text-secondary flex items-center gap-1.5 text-xs">
-                      <span
-                        class="font-mono"
-                        :title="row.session_id"
-                        data-test="rum-app-sessions-session-id-text"
-                        >{{ shortSessionId(row.session_id) }}</span
-                      >
-                      <span aria-hidden="true">·</span>
-                      <OTimeCell
-                        :value="row.zo_sql_timestamp"
-                        unit="us"
-                        :timezone="store.state.timezone"
+                  <div class="flex min-w-0 items-center gap-2">
+                    <div class="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+                      <OUserCell
+                        :value="row.user_email || unknownUserLabel"
+                        class="truncate font-medium"
                       />
+                      <div class="text-text-secondary flex items-center gap-1.5 text-xs">
+                        <span
+                          class="font-mono"
+                          :title="row.session_id"
+                          data-test="rum-app-sessions-session-id-text"
+                          >{{ shortSessionId(row.session_id) }}</span
+                        >
+                        <span aria-hidden="true">·</span>
+                        <OTimeCell
+                          :value="row.zo_sql_timestamp"
+                          unit="us"
+                          :timezone="store.state.timezone"
+                        />
+                      </div>
                     </div>
+                    <OButton
+                      v-if="row.has_replay"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      :aria-label="t('rum.heatmap.viewHeatmap')"
+                      :disabled="heatmapOpening === row.session_id"
+                      data-test="rum-app-sessions-view-heatmap-btn"
+                      @click.stop="openSessionHeatmap(row.session_id, sessionStartUs(row))"
+                    >
+                      <OIcon name="grid-on" size="sm" />
+                      <OTooltip :content="t('rum.heatmap.viewHeatmapTip')" side="bottom" />
+                    </OButton>
                   </div>
                 </template>
                 <template #cell-platform="{ row }">
@@ -389,8 +406,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #cell-activity="{ row }">
                   <SessionActivitySparkline
                     :session-id="row.session_id"
-                    :start-time="row.start_time"
-                    :end-time="row.end_time"
+                    :start-time="row.start_time ?? row.rum_start_time"
+                    :end-time="row.end_time ?? row.rum_end_time"
                     :is-bounce="row.is_bounce"
                     :has-frustration-field="!!schemaMapping['action_frustration_type']"
                   />
@@ -520,12 +537,14 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import useStreams from "@/composables/useStreams";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import useSessionHeatmap from "@/composables/rum/useSessionHeatmap";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import analytics from "@/services/product_analytics";
 
 interface Session {
   timestamp: string;
@@ -591,8 +610,11 @@ const dateTime = ref({
 });
 const rumSessionStreamName = "_rumdata";
 
+// SDK telemetry rows carry no session_id and must not group into a phantom session.
+const SESSION_ROWS_FILTER = "session_id IS NOT NULL AND session_id <> ''";
+
 // Mirrors getSessions()'s WHERE clause minus the editor value, so the sidebar's checkbox state reflects the query, not what the user is still typing (health/type/device segments are excluded too — they filter client-side, see tableRows).
-const fieldListBaseFilter = "1 = 1";
+const fieldListBaseFilter = SESSION_ROWS_FILTER;
 
 // Dynamic editor height based on content lines
 const queryEditorHeight = computed(() => {
@@ -810,6 +832,7 @@ onMounted(async () => {
 function releaseInFlightSearches() {
   inFlightLoad?.abort();
   inFlightLoad = null;
+  windowTotalsPending.value = false;
   cancelPendingActivityQueries();
 }
 
@@ -913,6 +936,8 @@ const getStreamFields = () => {
         // Feed full schema into autosuggestion (all fields, not just userDataSet subset)
         updateFieldKeywords(stream.schema);
       })
+      // An org that has not ingested RUM yet has no session stream; the field list stays empty.
+      .catch(() => {})
       .finally(() => {
         isLoading.value.pop();
         resolve(true);
@@ -962,6 +987,7 @@ const getSessions = () => {
   // Aggregates are now stage 3, so clear the strip here rather than when they start —
   // otherwise it keeps showing the PREVIOUS window's numbers while the new list loads.
   clearWindowAggregates();
+  windowTotalsPending.value = true;
 
   const interval = getTimeInterval(dateTime.value.startTime, dateTime.value.endTime);
   const parsedQuery = parseQuery(sessionState.data.editorValue, false);
@@ -1014,7 +1040,7 @@ const getSessions = () => {
       "MAX(CASE WHEN session_has_replay IS NOT NULL THEN 1 ELSE 0 END) AS has_replay";
   }
 
-  let whereClause = "1 = 1";
+  let whereClause = SESSION_ROWS_FILTER;
   if (sessionState.data.editorValue.length) {
     whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
   }
@@ -1067,6 +1093,7 @@ const getSessions = () => {
         // time range (they would return 0), and activity sparklines are per-row. Zero the
         // KPI state directly instead of spending 4 more searches to be told the same.
         clearWindowAggregates();
+        windowTotalsPending.value = false;
         return "empty" as const;
       }
 
@@ -1075,6 +1102,7 @@ const getSessions = () => {
         sessionState.data.sessions[hit.session_id] = {
           session_id: hit.session_id,
           zo_sql_timestamp: hit.zo_sql_timestamp,
+          zo_sql_end_timestamp: hit.zo_sql_end_timestamp,
           timestamp: hit.zo_sql_timestamp,
           type: hit.type,
           source: hit.source,
@@ -1089,6 +1117,8 @@ const getSessions = () => {
           // _rumdata-derived fallback (us → ms) for sessions with no replay recording;
           // getSessionTimeFromReplay overwrites it with the replay-authoritative value.
           time_spent: (hit.zo_sql_end_timestamp - hit.zo_sql_timestamp) / 1000,
+          rum_start_time: Math.floor(hit.zo_sql_timestamp / 1000),
+          rum_end_time: Math.ceil(hit.zo_sql_end_timestamp / 1000),
         };
       });
 
@@ -1316,6 +1346,10 @@ const fetchWindowAggregates = (baseReq: any, whereClause: string, signal?: Abort
       })
       .catch(() => {
         windowTotals.value = null;
+      })
+      .finally(() => {
+        // An aborted summary belongs to a load that was replaced or left, and that path settles the flag.
+        if (!signal?.aborted) windowTotalsPending.value = false;
       }),
   );
 
@@ -1436,6 +1470,7 @@ const deviceSegment = ref<DeviceSegment>("all");
 // Window-level aggregates (no LIMIT) so the KPI strip reflects the true
 // totals, not just the fetched page. Null until the summary query resolves.
 const windowTotals = ref<WindowTotals | null>(null);
+const windowTotalsPending = ref(true);
 const previousWindowTotals = ref<WindowTotals | null>(null);
 const frustrationCluster = ref<SessionInsight | null>(null);
 const errorCluster = ref<SessionInsight | null>(null);
@@ -1476,11 +1511,14 @@ const enrichedRows = computed(() =>
   rows.value.map((row: any) => ({
     ...row,
     is_bounce: (row.events ?? 0) <= 1 || (row.time_spent ?? 0) < BOUNCE_MAX_MS,
-    is_active: isSessionLive(row.end_time, Date.now()),
+    is_active: isSessionLive(row.end_time ?? row.rum_end_time, Date.now()),
     device_type: classifyDevice(row.device_family, row.os),
     platform: classifySource(row.source),
   })),
 );
+
+// The counts come from the fetched page, so while it loads they would be the empty page's zeros.
+const segmentCount = (count: number) => (isLoading.value.length > 0 ? "" : ` · ${count}`);
 
 const sessionsSummary = computed(() => {
   const all = enrichedRows.value;
@@ -1581,6 +1619,7 @@ const topInsight = computed<SessionInsight | null>(() => {
 
 const applyInsightFilter = (insight: SessionInsight) => {
   setHealthSegment(insight.kind === "frustration" ? "frustrated" : "errors");
+  analytics.track("rum_session_insight_used", { action: "segment", kind: insight.kind });
 };
 
 const escapeSqlString = (value: string) => value.replace(/'/g, "''");
@@ -1595,6 +1634,7 @@ const filterSessionsByInsightError = (insight: SessionInsight) => {
     sessionState.data.editorValue = existing ? `${existing} AND ${condition}` : condition;
   }
   runQuery();
+  analytics.track("rum_session_insight_used", { action: "filter", kind: insight.kind });
 };
 
 // Jump to Error Tracking pre-filtered to this error, carrying the time range.
@@ -1613,6 +1653,7 @@ const openInsightInErrorTracking = (insight: SessionInsight) => {
     query.query = b64EncodeUnicode(`error_message='${escapeSqlString(insight.message)}'`);
   }
   router.push({ name: "ErrorTracking", query });
+  analytics.track("rum_session_insight_used", { action: "error_tracking", kind: insight.kind });
 };
 
 const tableRows = computed(() =>
@@ -1657,6 +1698,15 @@ const setDeviceSegment = (value: DeviceSegment | undefined | null) => {
   updateUrlQueryParams();
 };
 
+const pickSegment = (segment: "health" | "type" | "device", value: string | null | undefined) => {
+  if (segment === "health") setHealthSegment(value as HealthSegment);
+  else if (segment === "type") setTypeSegment(value as TypeSegment);
+  else setDeviceSegment(value as DeviceSegment);
+  const applied = { health: healthSegment, type: typeSegment, device: deviceSegment }[segment]
+    .value;
+  analytics.track("rum_session_segment_applied", { segment, value: applied });
+};
+
 const resetSegments = () => {
   healthSegment.value = "all";
   typeSegment.value = "all";
@@ -1668,11 +1718,11 @@ const handleMetricSelect = (card: string) => {
   if (card === "sessions") {
     resetSegments();
   } else if (card === "errors") {
-    setHealthSegment(healthSegment.value === "errors" ? "all" : "errors");
+    pickSegment("health", healthSegment.value === "errors" ? "all" : "errors");
   } else if (card === "frustrated") {
-    setHealthSegment(healthSegment.value === "frustrated" ? "all" : "frustrated");
+    pickSegment("health", healthSegment.value === "frustrated" ? "all" : "frustrated");
   } else if (card === "bounced") {
-    setTypeSegment(typeSegment.value === "bounced" ? "all" : "bounced");
+    pickSegment("type", typeSegment.value === "bounced" ? "all" : "bounced");
   }
 };
 
@@ -1696,6 +1746,7 @@ const getSessionStatusColor = (row: any) => {
 };
 
 const router = useRouter();
+const { openSessionHeatmap, openingSessionId: heatmapOpening } = useSessionHeatmap();
 
 // A RUM tab switch pushes Performance's range, so only a Product Analytics handoff may replace the list's own.
 let enteredFromAnalytics = false;
@@ -1727,15 +1778,29 @@ const handleScrollEnd = () => {
   }
 };
 
+// Replay start/end are ms; sessions without replay only have the _rumdata us timestamps.
+const sessionStartUs = (row: any): number | undefined => {
+  const us = Number(row.start_time) * 1000 || Number(row.zo_sql_timestamp);
+  return us || undefined;
+};
+
+const sessionEndUs = (row: any): number | undefined => {
+  const us = Number(row.end_time) * 1000 || Number(row.zo_sql_end_timestamp);
+  return us || undefined;
+};
+
 const handleCellClick = (payload: any) => {
   if (payload.columnName !== "action_play") return;
   sessionState.data.selectedSession = sessionState.data.sessions[payload.row.session_id];
+  const start = sessionStartUs(payload.row);
+  const end = sessionEndUs(payload.row);
   router.push({
     name: "SessionViewer",
     params: { id: payload.row.session_id },
     query: {
-      start_time: payload.row.start_time * 1000,
-      end_time: payload.row.end_time * 1000,
+      ...(start && { start_time: start }),
+      ...(end && { end_time: end }),
+      org_identifier: store.state.selectedOrganization.identifier,
     },
   });
 };

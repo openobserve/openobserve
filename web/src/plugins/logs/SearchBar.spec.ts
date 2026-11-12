@@ -34,7 +34,7 @@ const replaceExistingFieldConditionForTest = (
   newExpression: string,
 ): string => {
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+  const valPat = `(?:'(?:[^']|'')*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|is(?:\\s+not)?)`;
   const fieldPat = `(?:"${esc}"|${esc})`;
   const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
@@ -1354,8 +1354,6 @@ describe("SearchBar.vue Actual Component Methods", () => {
       savedViewDropdownModel: false,
       deleteViewID: "view123",
       confirmDelete: false,
-      updateViewObj: { view_id: "view456", view_name: "Test View" },
-      confirmUpdate: false,
       customDownloadDialog: false,
       downloadCustomRange: 100,
       downloadCustomInitialNumber: 1,
@@ -1401,20 +1399,8 @@ describe("SearchBar.vue Actual Component Methods", () => {
       handleDeleteSavedView: vi.fn((item) => {
         componentInstance.savedViewDropdownModel = false;
         componentInstance.deleteViewID = item.view_id;
+        componentInstance.deleteViewName = item.view_name;
         componentInstance.confirmDelete = true;
-      }),
-
-      handleUpdateSavedView: vi.fn((item) => {
-        if (componentInstance.searchObj.data.stream.selectedStream.length === 0) {
-          componentInstance.notify({
-            type: "negative",
-            message: "No stream available to update save view.",
-          });
-          return;
-        }
-        componentInstance.savedViewDropdownModel = false;
-        componentInstance.updateViewObj = item;
-        componentInstance.confirmUpdate = true;
       }),
 
       confirmDeleteSavedViews: vi.fn(() => {
@@ -1423,13 +1409,6 @@ describe("SearchBar.vue Actual Component Methods", () => {
 
       toggleCustomDownloadDialog: vi.fn(() => {
         componentInstance.customDownloadDialog = true;
-      }),
-
-      confirmUpdateSavedViews: vi.fn(() => {
-        componentInstance.updateSavedViews(
-          componentInstance.updateViewObj.view_id,
-          componentInstance.updateViewObj.view_name,
-        );
       }),
 
       downloadRangeData: vi.fn(() => {
@@ -1962,31 +1941,6 @@ describe("SearchBar.vue Actual Component Methods", () => {
     expect(componentInstance.savedViewDropdownModel).toBe(false);
     expect(componentInstance.deleteViewID).toBe("view123");
     expect(componentInstance.confirmDelete).toBe(true);
-  });
-
-  // Test 81: handleUpdateSavedView with no streams
-  it("should notify when no streams available for update", () => {
-    componentInstance.searchObj.data.stream.selectedStream = [];
-    const item = { view_id: "view123", view_name: "Test View" };
-
-    componentInstance.handleUpdateSavedView(item);
-
-    expect(componentInstance.notify).toHaveBeenCalledWith({
-      type: "negative",
-      message: "No stream available to update save view.",
-    });
-  });
-
-  // Test 82: handleUpdateSavedView with streams available
-  it("should set up update confirmation when streams available", () => {
-    componentInstance.searchObj.data.stream.selectedStream = ["test-stream"];
-    const item = { view_id: "view123", view_name: "Test View" };
-
-    componentInstance.handleUpdateSavedView(item);
-
-    expect(componentInstance.savedViewDropdownModel).toBe(false);
-    expect(componentInstance.updateViewObj).toEqual(item);
-    expect(componentInstance.confirmUpdate).toBe(true);
   });
 
   // Test 83: toggleCustomDownloadDialog method
@@ -2872,15 +2826,6 @@ describe("SearchBar.vue Actual Component Methods", () => {
 
     expect(componentInstance.searchObj.data.customDownloadQueryObj.query.from).toBe(0);
     expect(componentInstance.searchObj.data.customDownloadQueryObj.query.size).toBe(100);
-  });
-
-  // Test 166: confirmUpdateSavedViews method
-  it("should call updateSavedViews with correct parameters", () => {
-    componentInstance.updateViewObj = { view_id: "123", view_name: "Test View" };
-
-    componentInstance.confirmUpdateSavedViews();
-
-    expect(componentInstance.updateSavedViews).toHaveBeenCalledWith("123", "Test View");
   });
 
   // Test 167: confirmDeleteSavedViews method
@@ -4539,7 +4484,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
       newExpr: string,
     ): string => {
       const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+      const valPat = `(?:'(?:[^']|'')*'|null|\\d+(?:\\.\\d+)?|true|false)`;
       const opPat = `(?:=|!=|is(?:\\s+not)?)`;
       const fieldPat = `(?:"${esc}"|${esc})`;
       const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;

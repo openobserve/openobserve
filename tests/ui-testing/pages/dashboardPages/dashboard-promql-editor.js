@@ -5,7 +5,9 @@
 // suggest controller via page.evaluate — they never touch the
 // `.monaco-editor`, `.suggest-widget`, or `.monaco-list-row` DOM.
 
+import { expect } from "@playwright/test";
 const testLogger = require("../../playwright-tests/utils/test-logger.js");
+import { settlePanelLeave } from "./panel-leave-dialog.js";
 
 export default class DashboardPromQLEditor {
   constructor(page) {
@@ -28,6 +30,11 @@ export default class DashboardPromQLEditor {
     );
     this.discardPanelBtn = page.locator(
       '[data-test="dashboard-panel-discard"]',
+    );
+
+    // Range / Instant select in the PromQL "Options" row of the active query
+    this.queryTypeSelectTrigger = page.locator(
+      '[data-test="dashboard-promql-builder-query-type-trigger"]',
     );
   }
 
@@ -73,6 +80,37 @@ export default class DashboardPromQLEditor {
     await this.customQueryTypeBtn.click();
   }
 
+  /**
+   * Option of the Range / Instant select.
+   * @param {"Range"|"Instant"} label
+   */
+  getQueryTypeOption(label) {
+    return this.page.locator(
+      `[data-test="dashboard-promql-builder-query-type-option"][data-test-label="${label}"]`,
+    );
+  }
+
+  /**
+   * Pick the PromQL query type of the active query tab.
+   * Retries the open → pick cycle, since OSelect closes its popover when an
+   * ancestor scrolls or re-renders right after opening.
+   * @param {"Range"|"Instant"} label
+   */
+  async selectQueryType(label) {
+    const option = this.getQueryTypeOption(label);
+    await this.queryTypeSelectTrigger.waitFor({ state: "visible", timeout: 10000 });
+    await expect(async () => {
+      if ((await this.queryTypeSelectTrigger.getAttribute("data-state")) !== "open") {
+        await this.queryTypeSelectTrigger.click();
+      }
+      await option.waitFor({ state: "visible", timeout: 3000 });
+      // Short timeout: a re-render detaches the option, and a default-length click would use up the whole retry window.
+      await option.click({ timeout: 3000 });
+      await expect(this.queryTypeSelectTrigger).toContainText(label, { timeout: 3000 });
+    }).toPass({ timeout: 20000, intervals: [300, 700, 1500] });
+    testLogger.debug("PromQL query type selected", { label });
+  }
+
   async discardPanelIfVisible() {
     // Same reason as isPromqlAvailable: isVisible() ignores `timeout` and does
     // not wait, so this could miss a discard button that was about to render.
@@ -82,6 +120,7 @@ export default class DashboardPromQLEditor {
       .catch(() => false);
     if (visible) {
       await this.discardPanelBtn.click().catch(() => {});
+      await settlePanelLeave(this.page, { timeout: 10000 }).catch(() => {});
     }
   }
 
@@ -245,6 +284,50 @@ export default class DashboardPromQLEditor {
   async getSuggestionCount() {
     const labels = await this.getSuggestionLabels(1000);
     return labels.length;
+  }
+
+  // Re-triggers via Monaco's action because metric keywords land asynchronously and the first trigger can beat them.
+  async triggerAndWaitForSuggestions({ totalTimeoutMs = 30000, perTryTimeoutMs = 5000 } = {}) {
+    const deadline = Date.now() + totalTimeoutMs;
+    let lastCount = 0;
+    let lastError = null;
+    while (Date.now() < deadline) {
+      try {
+        await this.page.evaluate(() => {
+          const m = window.monaco;
+          const editors = m?.editor?.getEditors?.() || [];
+          const editor = editors[editors.length - 1];
+          if (!editor) return;
+          editor.focus();
+          editor.trigger("e2e", "editor.action.triggerSuggest", {});
+        });
+        await this.waitForSuggestionsReady(perTryTimeoutMs);
+        lastCount = await this.getSuggestionCount();
+        if (lastCount > 0) return lastCount;
+      } catch (err) {
+        lastError = err;
+      }
+      await this.dismissSuggestions();
+    }
+    if (lastError) {
+      testLogger.warn(`Suggestions widget not visible: ${lastError.message}`);
+    }
+    return lastCount;
+  }
+
+  // Re-trigger until the list has settled past "...Loading" and the stale pre-debounce list into one holding a seeded entry.
+  async waitForSeededSuggestions(matchesSeed, message) {
+    let labels = [];
+    await expect.poll(async () => {
+      await this.triggerAndWaitForSuggestions({ totalTimeoutMs: 5000, perTryTimeoutMs: 2000 });
+      labels = await this.getSuggestionLabels(1000);
+      return !labels.includes("...Loading") && labels.some(matchesSeed);
+    }, { message, timeout: 30000, intervals: [500, 1000, 2000] }).toBe(true);
+    return labels;
+  }
+
+  isMetricEntry(label) {
+    return /\([A-Za-z]+\)$/.test(label);
   }
 
   async logSuggestions(prefix, limit = 10) {

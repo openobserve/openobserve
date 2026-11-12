@@ -17,7 +17,7 @@ import type {
 export function useShortcut(
   key: string,
   handler: (e?: KeyboardEvent) => void,
-  options: Pick<Shortcut, "description" | "scope" | "whenFocused"> = {},
+  options: Pick<Shortcut, "description" | "scope" | "whenFocused" | "allowInDialog"> = {},
 ): void {
   let id: string;
 
@@ -70,6 +70,7 @@ function resolveShortcuts(
           whenFocused: input.whenFocused,
           allowInInput: def.allowInInput,
           skipInInput: def.skipInInput,
+          allowInDialog: def.allowInDialog,
         });
       });
     } else {

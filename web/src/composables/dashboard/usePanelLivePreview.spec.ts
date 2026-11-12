@@ -25,6 +25,11 @@ import {
   usePanelLivePreview,
   variablesSignature,
 } from "./usePanelLivePreview";
+import {
+  defaultLogsPanelQuery,
+  markPanelStarterQuery,
+  orderLogsStarter,
+} from "./usePanelAggregation";
 
 const makeQuery = (overrides: Record<string, any> = {}) => ({
   query: 'SELECT histogram(_timestamp) AS "x_axis_1" FROM "default"',
@@ -99,12 +104,24 @@ describe("usePanelLivePreview", () => {
   });
 
   describe("signatures", () => {
-    it("ignores display-only query keys such as labels and the PromQL legend", () => {
+    it("ignores display-only query keys such as labels", () => {
       const panel = makePanel();
       const edited = clone(panel);
       edited.queries[0].fields.y[0].label = "Events";
-      edited.queries[0].config.promql_legend = "{{service}}";
       expect(panelPayloadSignature(edited)).toBe(panelPayloadSignature(panel));
+    });
+
+    it.each([
+      ["PromQL legend", (q: any) => (q.config.promql_legend = "{{service}}")],
+      ["PromQL query type", (q: any) => (q.config.query_type = "instant")],
+      ["time shift", (q: any) => (q.config.time_shift = [{ offSet: "1d" }])],
+      ["formula", (q: any) => (q.config.formula = "A / B")],
+      ["hidden query", (q: any) => (q.config.hide = true)],
+    ])("changes when the %s changes", (_, edit) => {
+      const panel = makePanel();
+      const edited = clone(panel);
+      edit(edited.queries[0]);
+      expect(panelPayloadSignature(edited)).not.toBe(panelPayloadSignature(panel));
     });
 
     it("changes when the generated query or step changes", () => {
@@ -147,6 +164,17 @@ describe("usePanelLivePreview", () => {
       expect(hasTypedChanges(builder, applied)).toBe(false);
     });
 
+    it("does not hold a type switch's starter SQL back as typed text", () => {
+      const applied = makePanel();
+      const flame = clone(applied);
+      flame.queries[0].customQuery = true;
+      flame.queries[0].query = 'SELECT stack, sum(samples) AS value FROM "default" GROUP BY stack';
+      markPanelStarterQuery(flame.queries[0]);
+      expect(hasTypedChanges(flame, applied)).toBe(false);
+      flame.queries[0].query += " LIMIT 10";
+      expect(hasTypedChanges(flame, applied)).toBe(true);
+    });
+
     it("holds only for an open select list, not tooltips, menus or popovers", () => {
       document.body.innerHTML =
         '<div data-reka-popper-content-wrapper><span role="tooltip">tip</span></div>' +
@@ -157,9 +185,32 @@ describe("usePanelLivePreview", () => {
         '<div data-reka-popper-content-wrapper><div role="listbox"></div></div>';
       expect(isPopupOpen()).toBe(true);
     });
+
+    it("does not hold for a resting list that only offers the next pick", () => {
+      document.body.innerHTML =
+        '<div data-reka-popper-content-wrapper><div role="listbox" data-list-resting></div></div>';
+      expect(isPopupOpen()).toBe(false);
+    });
   });
 
   describe("live runs", () => {
+    it("runs a logs starter flipped to oldest first without waiting for Apply", async () => {
+      const { panel, applied, run, live, scope } = setup();
+      panel.type = "logs";
+      panel.queries[0].customQuery = true;
+      panel.queries[0].query = defaultLogsPanelQuery("default", "_timestamp");
+      markPanelStarterQuery(panel.queries[0]);
+      applied.value = clone(panel);
+      live.arm();
+      orderLogsStarter(panel.queries[0], "oldest");
+      await nextTick();
+      expect(live.applyState.value).not.toBe("typed");
+      vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS);
+      expect(run).toHaveBeenCalledTimes(1);
+      expect(applied.value.queries[0].query).toMatch(/ASC LIMIT 100$/);
+      scope.stop();
+    });
+
     it("runs an aggregation change made inside the still-open axis menu", async () => {
       const { panel, run, live, scope } = setup({ domOverlay: true });
       document.body.innerHTML =
@@ -309,6 +360,33 @@ describe("usePanelLivePreview", () => {
       expect(live.isPending.value).toBe(false);
       scope.stop();
     });
+
+    it.each([
+      ["legend", (q: any) => (q.config.promql_legend = "{{service}}")],
+      ["query type", (q: any) => (q.config.query_type = "instant")],
+    ])(
+      "runs a PromQL %s change live with Auto Run on, and only marks Apply pending with it off",
+      async (_, edit) => {
+        const on = setup();
+        on.live.arm();
+        edit(on.panel.queries[0]);
+        await nextTick();
+        expect(on.live.isPending.value).toBe(false);
+        vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS);
+        expect(on.run).toHaveBeenCalledTimes(1);
+        on.scope.stop();
+
+        const off = setup();
+        off.autoRun.value = false;
+        off.live.arm();
+        edit(off.panel.queries[0]);
+        await nextTick();
+        vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS * 2);
+        expect(off.run).not.toHaveBeenCalled();
+        expect(off.live.isPending.value).toBe(true);
+        off.scope.stop();
+      },
+    );
 
     it("only marks Apply pending while Auto Run is off, then runs once it is turned back on", async () => {
       const { panel, autoRun, run, live, scope } = setup();

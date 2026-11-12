@@ -24,12 +24,20 @@ import { fetchInto } from "@/composables/query/fetchInto";
 import { dropDashboardPanelCache, dropPanelCache } from "@/composables/dashboard/usePanelCache";
 import dashboardService from "../services/dashboards";
 import { subtractRelativeTime } from "@/utils/date";
-import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
+import {
+  CURRENT_DASHBOARD_SCHEMA_VERSION,
+  convertDashboardSchemaVersion,
+} from "./dashboard/convertDashboardSchemaVersion";
+import { same } from "./dashboard/saveConflict";
 import { normalizeReservedTimestampAlias } from "./dashboard/timestampAliasRewrite";
 import commonService from "../services/common";
-import type { TranslateFn } from "@/types/i18n";
+import { gt, type TranslateFn } from "@/types/i18n";
+import { findPanelById } from "./dashboard/findPanel";
+import { deletePanelDraftsFor } from "@/composables/dashboard/usePanelDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { toRaw, type Ref } from "vue";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
+import { pruneAnnotationSourcePanels } from "@/utils/dashboard/pruneAnnotationSourcePanels";
 
 let moment: any;
 let momentInitialized = false;
@@ -37,6 +45,8 @@ let momentInitialized = false;
 export interface LoadedDashboardVersion {
   hash: string;
   updatedAt: number | null;
+  /** The schema version the server stores, before the browser upgrades it on load. */
+  storedVersion: number;
   snapshot: any;
 }
 
@@ -475,6 +485,11 @@ export const deletePanel = async (
   // The panel is gone, so its cached results are unreachable — without this they
   // sit in IndexedDB until the 24 h TTL or the record cap reclaims them.
   await dropPanelCache(store.state.selectedOrganization.identifier, folderId, dashboardId, panelId);
+  deletePanelDraftsFor({
+    org: store.state.selectedOrganization.identifier,
+    dashboardId: String(dashboardId),
+    panelId: String(panelId),
+  });
 };
 
 export const updateVariable = async (
@@ -528,12 +543,10 @@ export const updatePanel = async (
   // call the update dashboard function
   const currentDashboard = await getDashboard(store, dashboardId, folderId);
 
-  // find tab from tabId
-  const tab = getTabDataFromTabId(currentDashboard, tabId);
-
-  const panelIndex = tab?.panels?.findIndex((panel: any) => panel.id == panelData.id) ?? -1;
-  if (panelIndex === -1) return;
-  tab.panels[panelIndex] = panelData;
+  // A teammate may have moved the panel to another tab since the editor opened.
+  const found = findPanelById(currentDashboard, panelData.id, tabId);
+  if (!found) throw new Error(gt("dashboard.panelDraft.panelMissingOnSave"));
+  found.tab.panels[found.index] = panelData;
   return await updateDashboard(
     store,
     store.state.selectedOrganization.identifier,
@@ -553,6 +566,14 @@ const clearUnresolvedDashboardConflict = (dashboardId: any) => {
 const updatedAtOf = (data: any): number | null =>
   Number(data?.updatedAt ?? data?.updated_at) || null;
 
+// An inherited key such as `constructor` must never resolve to a shared prototype object.
+const ownDashboard = (store: any, dashboardId: any) => {
+  if (dashboardId === "__proto__" || dashboardId === "constructor" || dashboardId === "prototype")
+    return undefined;
+  const all = store.state.organizationData.allDashboardData;
+  return Object.prototype.hasOwnProperty.call(all, dashboardId) ? all[dashboardId] : undefined;
+};
+
 const retrieveAndStoreDashboardData = async (
   store: any,
   dashboardId: any,
@@ -570,6 +591,7 @@ const retrieveAndStoreDashboardData = async (
   loadedDashboardVersions.set(String(dashboardId), {
     hash,
     updatedAt: updatedAtOf(apiResponse.data),
+    storedVersion: version,
     snapshot: structuredClone(toRaw(convertedData ?? null)),
   });
 
@@ -582,7 +604,7 @@ const retrieveAndStoreDashboardData = async (
     hash: hash,
   });
 
-  return store.state.organizationData.allDashboardData[dashboardId];
+  return ownDashboard(store, dashboardId);
 };
 
 export const updateDashboard = async (
@@ -593,6 +615,8 @@ export const updateDashboard = async (
   folderId: any,
   hash?: string,
 ) => {
+  // Every panel deletion path ends here, so a deleted panel never lingers in an annotation source.
+  pruneAnnotationSourcePanels(currentDashboardData);
   const isObject = !!currentDashboardData && typeof currentDashboardData === "object";
   // The server only stamps updatedAt on create and stores the client's value on update, so the save carries its own time.
   const body = isObject
@@ -627,6 +651,20 @@ export const updateDashboard = async (
 export const getLoadedDashboardVersion = (dashboardId: any): LoadedDashboardVersion | null =>
   loadedDashboardVersions.get(String(dashboardId)) ?? null;
 
+/** True when the server still stores the loaded dashboard at an older schema than the one it is shown in. */
+export const isDashboardStoredAtOldVersion = (dashboardId: any): boolean =>
+  (getLoadedDashboardVersion(dashboardId)?.storedVersion ?? CURRENT_DASHBOARD_SCHEMA_VERSION) <
+  CURRENT_DASHBOARD_SCHEMA_VERSION;
+
+/** Whether the working copy differs from the loaded version, beyond key order and the defaults getDashboard fills in. */
+export const hasUnsavedDashboardEdits = (dashboardId: any, workingCopy: any): boolean => {
+  const loaded = getLoadedDashboardVersion(dashboardId)?.snapshot;
+  if (!loaded) return false;
+  const base = structuredClone(loaded);
+  ensureVariablesStructure(base);
+  return !same(base, toRaw(workingCopy));
+};
+
 /** This object keeps saving with its old hash, so it conflicts again instead of overwriting. */
 export const markDashboardStale = (dashboardData: any, hash: string | undefined) => {
   if (!dashboardData || typeof dashboardData !== "object" || !hash) return;
@@ -657,12 +695,13 @@ export const fetchServerDashboard = async (store: any, dashboardId: any, folderI
     data: convertDashboardSchemaVersion(apiResponse.data[`v${version}`]),
     hash: apiResponse.data.hash.toString() as string,
     updatedAt: updatedAtOf(apiResponse.data),
+    storedVersion: version as number,
   };
 };
 
 /** Makes the cached dashboard equal to `source` in place, so views holding the cached object show it too. */
 export const adoptDashboardWorkingCopy = (store: any, dashboardId: any, source: any) => {
-  const target = store.state.organizationData.allDashboardData?.[dashboardId];
+  const target = ownDashboard(store, dashboardId);
   if (!target || !source || toRaw(target) === toRaw(source)) return;
   const next = JSON.parse(JSON.stringify(toRaw(source)));
   // The source can be JSON-editor input, so keys that reach Object.prototype are never copied or deleted.
@@ -711,8 +750,12 @@ const ensureVariablesStructure = (dashboard: any): void => {
 };
 
 export const getDashboard = async (store: any, dashboardId: any, folderId: any) => {
+  // The id comes from the URL, and a prototype key would hand back Object.prototype to be mutated.
+  if (dashboardId === "__proto__" || dashboardId === "constructor" || dashboardId === "prototype")
+    return {};
+
   // check if dashboard data is present in store
-  let dashboardJson = store.state.organizationData.allDashboardData[dashboardId];
+  let dashboardJson = ownDashboard(store, dashboardId);
 
   if (!dashboardJson && dashboardId) {
     clearUnresolvedDashboardConflict(dashboardId);
@@ -887,6 +930,15 @@ export const deleteDashboardById = async (store: any, dashboardId: any, folderId
   pruneDashboardQueryCache(store, folderId, [dashboardId]);
 
   await dropDashboardPanelCache(store.state.selectedOrganization.identifier, folderId, dashboardId);
+  deletePanelDraftsFor({
+    org: store.state.selectedOrganization.identifier,
+    dashboardId: String(dashboardId),
+  });
+  deleteEditorDraftsFor({
+    kind: "dashboard_settings",
+    org: store.state.selectedOrganization.identifier,
+    entityId: String(dashboardId),
+  });
 
   const allDashboardData = store.state.organizationData.allDashboardData;
 
@@ -926,6 +978,12 @@ export const evictDashboardsFromCache = (store: any, idsByFolder: Map<string, st
     pruneDashboardQueryCache(store, folderId, ids);
     for (const id of ids) {
       void dropDashboardPanelCache(store.state.selectedOrganization.identifier, folderId, id);
+      deletePanelDraftsFor({ org: store.state.selectedOrganization.identifier, dashboardId: id });
+      deleteEditorDraftsFor({
+        kind: "dashboard_settings",
+        org: store.state.selectedOrganization.identifier,
+        entityId: id,
+      });
     }
 
     const cached = next[folderId];
@@ -949,12 +1007,7 @@ export const getPanel = async (
 ) => {
   const currentDashboard = await getDashboard(store, dashboardId, folderId);
 
-  // find tab from tabId
-  const tab = getTabDataFromTabId(currentDashboard, tabId);
-
-  const paneldata = tab?.panels?.find((it: any) => it?.id == panelId);
-
-  return paneldata;
+  return findPanelById(currentDashboard, panelId, tabId)?.panel;
 };
 
 export const getPanelId = () => {
@@ -1004,13 +1057,24 @@ export const deleteTab = async (
   // delete the tab
   currentDashboard.tabs = currentDashboard.tabs.filter((tab: any) => tab.tabId != deleteTabId);
 
-  return await updateDashboard(
+  const result = await updateDashboard(
     store,
     store.state.selectedOrganization.identifier,
     dashboardId,
     currentDashboard,
     folderId ?? "default",
   );
+  // Moved panels live on in the other tab, so only panels deleted with the tab lose their drafts.
+  if (!moveToTabId) {
+    (deleteTabData.panels ?? []).forEach((panel: any) =>
+      deletePanelDraftsFor({
+        org: store.state.selectedOrganization.identifier,
+        dashboardId: String(dashboardId),
+        panelId: String(panel.id),
+      }),
+    );
+  }
+  return result;
 };
 
 export const editTab = async (

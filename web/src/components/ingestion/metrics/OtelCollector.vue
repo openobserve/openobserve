@@ -1,5 +1,9 @@
 <template>
-  <IngestionContent>
+  <IngestionContent
+    snippet-kind="config"
+    config-tool="OpenTelemetry Collector"
+    copy-snippet="first"
+  >
     <div class="flex flex-col gap-2">
       <div class="text-base font-semibold">{{ t("ingestion.hostMetricsReceiver") }}</div>
       <CredentialCodeBlock slug="metrics-otel-host-metrics" :content="getHostMetricsConfig" />

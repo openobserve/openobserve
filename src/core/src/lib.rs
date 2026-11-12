@@ -29,6 +29,7 @@ pub mod background_access;
 pub mod bootstrap;
 pub mod cache;
 pub mod dashboards;
+pub mod datadog;
 pub mod db_monitoring;
 #[cfg(feature = "enterprise")]
 pub mod downtimes;
@@ -36,6 +37,8 @@ use ::common;
 use ::db;
 pub mod error_suggest;
 use ::db::folders;
+#[cfg(feature = "enterprise")]
+pub mod fleet;
 pub mod functions;
 pub mod functions_cache;
 pub mod http;
@@ -55,16 +58,21 @@ pub mod org_cleanup;
 #[cfg(feature = "cloud")]
 pub mod org_usage;
 pub mod organization;
+pub mod overview;
 pub mod pipeline;
 pub mod profiles;
 pub mod prompts;
 #[cfg(feature = "enterprise")]
 pub mod providers;
+pub mod public_dashboards;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
 pub mod rum_pa;
+pub mod sample_data;
+#[cfg(feature = "enterprise")]
+pub mod security;
 use search_service as search;
-#[cfg(feature = "profiling")]
+#[cfg(feature = "cpu-profiling")]
 pub mod self_profiles;
 pub mod self_reporting;
 pub mod service;
@@ -85,6 +93,10 @@ pub mod users;
 #[cfg(feature = "enterprise")]
 pub mod workflows;
 
+#[cfg(feature = "cloud")]
+pub mod org_domain_ownership;
+#[cfg(feature = "cloud")]
+pub mod org_domain_requests;
 /// One authorized AI operation, or `()` in builds without the quota module, so
 /// the RCA signature keeps one shape instead of being cfg-gated at every caller.
 #[cfg(feature = "cloud")]

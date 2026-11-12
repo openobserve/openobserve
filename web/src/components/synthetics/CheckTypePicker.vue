@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { useI18nTyped } from "@/types/i18n";
+import { useId } from "vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import { CHECK_TYPE_CARDS, type CheckTypeCard } from "@/constants/synthetics";
@@ -27,10 +30,13 @@ const props = withDefaults(
     layout: "row" | "grid";
     disabledTypes?: SyntheticCheckType[];
     comingSoonTypes?: SyntheticCheckType[];
+    /** When each type's kept new-check draft was written, so the user picks the type that holds it. */
+    draftSavedAt?: Partial<Record<SyntheticCheckType, number | null>>;
   }>(),
   {
     disabledTypes: () => [],
     comingSoonTypes: () => [],
+    draftSavedAt: () => ({}),
   },
 );
 
@@ -39,6 +45,18 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const draftLabel = useDraftLabel();
+
+const draftAt = (card: CheckTypeCard): number | null => props.draftSavedAt[card.type] ?? null;
+
+// The dot is presentational, so the card's own name says it holds a draft.
+const cardName = (card: CheckTypeCard): I18nText | undefined => {
+  const at = draftAt(card);
+  return at === null ? undefined : draftLabel(t(card.labelKey), at);
+};
+// A name set by aria-label hides the card's description, so the description is linked back.
+const idBase = useId();
+const descriptionId = (card: CheckTypeCard) => `${idBase}-${card.type}-description`;
 
 function isDisabled(card: CheckTypeCard): boolean {
   return props.disabledTypes.includes(card.type);
@@ -90,9 +108,24 @@ function onSelect(card: CheckTypeCard) {
         :label="t(card.labelKey)"
         :sublabel="t(card.descKey)"
         :hide-chevron="variant === 'inline'"
+        :aria-label="cardName(card)"
+        :aria-describedby="draftAt(card) === null ? undefined : descriptionId(card)"
         class="w-full max-w-full"
         :class="{ 'pointer-events-none': !isClickable(card) }"
-      />
+      >
+        <!-- The label's own title would tooltip twice next to the dot's. -->
+        <template v-if="draftAt(card) !== null" #label>{{ t(card.labelKey) }}</template>
+        <template v-if="draftAt(card) !== null" #badge>
+          <EditorDraftDot
+            corner
+            :saved-at="draftAt(card)"
+            :data-test="`check-type-picker-${layout}-card-${card.type}-draft-dot`"
+          />
+        </template>
+      </EmptyStateActionCard>
+      <span v-if="draftAt(card) !== null" :id="descriptionId(card)" hidden>{{
+        t(card.descKey)
+      }}</span>
     </div>
   </div>
 </template>

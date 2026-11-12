@@ -16,8 +16,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex min-h-0 flex-col gap-3" data-test="metrics-breakdown">
+    <template v-if="!labels.length && labelsPending">
+      <div class="flex min-h-6 items-center">
+        <p class="text-text-secondary text-xs">
+          {{ t("metrics.explorer.detail.breakdown.selectHint") }}
+        </p>
+      </div>
+      <div class="relative" aria-busy="true" data-test="metrics-breakdown-pending">
+        <div class="pointer-events-none absolute inset-x-0 top-0 isolate h-0.5">
+          <LoadingProgress
+            :loading="true"
+            :loading-progress-percentage="0"
+            indeterminate
+            :label="chartsLoadingLabel"
+            data-test="metrics-progress-line"
+          />
+        </div>
+        <div class="grid grid-cols-3 gap-3 max-lg:grid-cols-2 max-md:grid-cols-1">
+          <div
+            v-for="slot in PENDING_TILES"
+            :key="slot"
+            class="border-border-default rounded-surface flex h-56 flex-col overflow-hidden border"
+          >
+            <PanelBar class="min-w-0 gap-2">
+              <OSkeleton type="text" animation="none" class="h-3 w-24" aria-hidden="true" />
+            </PanelBar>
+            <div class="min-h-0 flex-1"><PanelChartPlaceholder /></div>
+          </div>
+        </div>
+      </div>
+    </template>
+
     <OEmptyState
-      v-if="!labels.length"
+      v-else-if="!labels.length"
       size="inline"
       icon="label"
       :title="t('metrics.explorer.detail.breakdown.noLabels')"
@@ -25,11 +56,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <template v-else-if="activeLabel">
-      <div>
+      <div class="flex min-w-0 items-center gap-3">
         <OButton
           variant="ghost"
           size="sm"
           icon-left="arrow-back"
+          class="shrink-0"
           data-test="metrics-breakdown-back"
           @click="$emit('update:selectedLabel', null)"
         >
@@ -48,7 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <MetricChartTile
         ref="focusedTile"
         :class="heatmap ? 'min-h-60' : 'h-60'"
-        :queries="heatmap ? heatmapQueries : queriesByLabel[activeLabel]"
+        parent-reports-failures
+        :retry-token="retryToken"
+        @busy="(on: boolean) => (focusedBusy = on)"
+        :queries="heatmap ? heatmapQueries : focusedQueries"
         :chart-type="chartType"
         :unit="unit"
         :color="color"
@@ -61,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :step-seconds="stepSeconds"
         data-test="metrics-breakdown-chart"
         @results="focused = $event"
+        @failed="(failure: TileFailure | null) => (focusedFailure = failure)"
       >
         <template #header>
           <span class="truncate">{{ focusedTitle }}</span>
@@ -82,7 +118,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div class="flex-1" />
           <!-- Only once the chart has drawn: the panel's decimals come from its values. -->
+          <OTooltip v-if="dashboardsLocked" :content="dashboardsLockedReason">
+            <span class="inline-flex shrink-0">
+              <OButton
+                variant="ghost"
+                size="xs"
+                disabled
+                data-test="metrics-breakdown-add-to-dashboard"
+              >
+                <template #icon-left>
+                  <OIcon
+                    name="lock"
+                    class="lock-chip"
+                    size="sm"
+                    data-test="metrics-breakdown-add-to-dashboard-lock"
+                  />
+                </template>
+                {{ t("metrics.explorer.detail.breakdown.addToDashboard") }}
+              </OButton>
+            </span>
+          </OTooltip>
           <OButton
+            v-else
             variant="ghost"
             size="xs"
             icon-left="dashboard-customize"
@@ -142,6 +199,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`metrics-breakdown-distinct-${activeLabel}`"
             >{{ distinctText(activeLabel) }}</span
           >
+          <div class="flex-1" />
+          <OToggleGroup
+            v-if="!heatmap"
+            v-model="rowSortModel"
+            type="single"
+            class="shrink-0"
+            data-test="metrics-breakdown-sort"
+          >
+            <OToggleGroupItem
+              value="avg"
+              size="xs"
+              :title="t('metrics.explorer.detail.breakdown.sortAvgTitle')"
+              data-test="metrics-breakdown-sort-avg"
+              >{{ t("metrics.explorer.detail.breakdown.sortAvg") }}</OToggleGroupItem
+            >
+            <OToggleGroupItem
+              value="outlying"
+              size="xs"
+              :title="t('metrics.explorer.detail.breakdown.sortOutlyingTitle')"
+              data-test="metrics-breakdown-sort-outlying"
+              >{{ t("metrics.explorer.detail.breakdown.sortOutlying") }}</OToggleGroupItem
+            >
+          </OToggleGroup>
         </PanelBar>
 
         <div class="p-2">
@@ -203,12 +283,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @row-mouseleave="(row) => highlight(row, 'downplay')"
           >
             <template #cell-value="{ row }">
-              <span
-                class="text-text-body block truncate font-mono text-xs"
-                :title="row.value"
-                :data-test="`metrics-breakdown-value-${activeLabel}-${row.value}`"
-                >{{ row.value }}</span
-              >
+              <div class="flex min-w-0 items-center gap-1">
+                <span
+                  class="text-text-body block truncate font-mono text-xs"
+                  :title="row.value"
+                  :data-test="`metrics-breakdown-value-${activeLabel}-${row.value}`"
+                  >{{ row.value }}</span
+                >
+                <OTag
+                  v-if="row.outlier"
+                  variant="warning-outline"
+                  size="sm"
+                  class="shrink-0"
+                  :data-test="`metrics-breakdown-outlier-${activeLabel}-${row.value}`"
+                  >{{ t("metrics.explorer.detail.breakdown.outlier") }}</OTag
+                >
+              </div>
             </template>
 
             <template #cell-trend="{ row }">
@@ -236,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     vector-effect="non-scaling-stroke"
                   />
                 </svg>
-                <span v-else class="text-text-secondary text-xs">{{ ABSENT }}</span>
+                <OValue v-else-if="!statsFailed" state="none" class="text-xs" />
               </div>
             </template>
 
@@ -245,12 +335,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-text-body block text-xs tabular-nums"
                 :data-test="`metrics-breakdown-${stat}-${activeLabel}-${row.value}`"
               >
-                <OSkeleton
-                  v-if="statsLoading"
-                  class="ms-auto h-3 w-12"
-                  data-test="metrics-breakdown-stat-loading"
+                <OValue
+                  v-if="!statsFailed"
+                  :state="statsLoading ? 'loading' : row[stat] == null ? 'none' : 'value'"
+                  :value="row[stat]"
+                  class="ms-auto"
+                  :data-test="statsLoading ? 'metrics-breakdown-stat-loading' : undefined"
                 />
-                <template v-else>{{ row[stat] ?? ABSENT }}</template>
               </span>
             </template>
 
@@ -314,59 +405,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OBanner>
 
-      <p class="text-text-secondary text-xs">
-        {{ t("metrics.explorer.detail.breakdown.selectHint") }}
-      </p>
+      <div class="flex min-h-6 items-center">
+        <p class="text-text-secondary text-xs">
+          {{ t("metrics.explorer.detail.breakdown.selectHint") }}
+        </p>
+      </div>
 
-      <div
-        class="grid grid-cols-3 gap-3 max-lg:grid-cols-2 max-md:grid-cols-1"
-        data-test="metrics-breakdown-grid"
-      >
-        <MetricChartTile
-          v-for="label in labels"
-          :key="label"
-          class="hover:border-primary h-56 cursor-pointer"
-          :queries="queriesByLabel[label]"
-          :chart-type="chartType"
-          :unit="unit"
-          :color="color"
-          :time-range="timeRange"
-          :run-query="runQuery"
-          :data-test="`metrics-breakdown-card-${label}`"
-          @select="select(label)"
+      <div class="relative" :aria-busy="gridBusy ? 'true' : undefined">
+        <div
+          class="grid grid-cols-3 gap-3 max-lg:grid-cols-2 max-md:grid-cols-1"
+          data-test="metrics-breakdown-grid"
         >
-          <template #header>
-            <span class="min-w-0 truncate font-mono" :title="label">{{
-              heatmap ? titleOf(label) : label
-            }}</span>
-            <span
-              v-if="distinctText(label)"
-              class="text-2xs text-text-secondary shrink-0 font-normal tabular-nums"
-              :data-test="`metrics-breakdown-distinct-${label}`"
-              >{{ distinctText(label) }}</span
-            >
-            <OTag
-              v-if="topkByLabel[label]"
-              variant="default-outline"
-              size="sm"
-              class="shrink-0"
-              :data-test="`metrics-breakdown-topk-${label}`"
-              >{{ t("metrics.explorer.detail.breakdown.topk", { count: TOPK }) }}</OTag
-            >
-            <div class="flex-1" />
-            <OButton
-              variant="ghost-primary"
-              size="xs"
-              icon-left="open-in-full"
-              class="shrink-0"
-              :aria-label="t('metrics.explorer.detail.breakdown.drillDownAria', { label })"
-              :data-test="`metrics-breakdown-select-${label}`"
-              @click.stop="select(label)"
-            >
-              {{ t("metrics.explorer.detail.breakdown.drillDown") }}
-            </OButton>
-          </template>
-        </MetricChartTile>
+          <MetricChartTile
+            v-for="label in labels"
+            :key="label"
+            class="hover:border-primary h-56 cursor-pointer"
+            parent-reports-failures
+            :retry-token="retryToken"
+            @busy="(on: boolean) => onTileBusy(label, on)"
+            @failed="(failure: TileFailure | null) => onTileFailed(label, failure)"
+            :queries="queriesByLabel[label]"
+            :chart-type="chartType"
+            :unit="unit"
+            :color="color"
+            :time-range="timeRange"
+            :step-seconds="stepSeconds"
+            :run-query="runQuery"
+            :data-test="`metrics-breakdown-card-${label}`"
+            @select="select(label)"
+          >
+            <template #header>
+              <span class="min-w-0 truncate font-mono" :title="label">{{
+                heatmap ? titleOf(label) : label
+              }}</span>
+              <span
+                v-if="distinctText(label)"
+                class="text-2xs text-text-secondary shrink-0 font-normal tabular-nums"
+                :data-test="`metrics-breakdown-distinct-${label}`"
+                >{{ distinctText(label) }}</span
+              >
+              <OTag
+                v-if="topkByLabel[label]"
+                variant="default-outline"
+                size="sm"
+                class="shrink-0"
+                :data-test="`metrics-breakdown-topk-${label}`"
+                >{{ t("metrics.explorer.detail.breakdown.topk", { count: TOPK }) }}</OTag
+              >
+              <div class="flex-1" />
+              <OButton
+                variant="ghost-primary"
+                size="xs"
+                icon-left="open-in-full"
+                class="shrink-0"
+                :aria-label="t('metrics.explorer.detail.breakdown.drillDownAria', { label })"
+                :data-test="`metrics-breakdown-select-${label}`"
+                @click.stop="select(label)"
+              >
+                {{ t("metrics.explorer.detail.breakdown.drillDown") }}
+              </OButton>
+            </template>
+          </MetricChartTile>
+        </div>
       </div>
     </template>
 
@@ -402,12 +502,22 @@ import MetricOverlayKey from "./MetricOverlayKey.vue";
 import AddToDashboard from "../AddToDashboard.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OValue from "@/lib/data/Value/OValue.vue";
+import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import { loadingText } from "@/lib/feedback/RegionStatus/regionText";
+import type { TileFailure } from "./MetricChartTile.vue";
+import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
+import { useRegionLoading } from "@/lib/feedback/RegionStatus/useRegionLoading";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import streamService from "@/services/stream";
@@ -419,10 +529,12 @@ import {
   BREAKDOWN_LABEL_LIMIT,
   breakdownTitleKey,
   buildBreakdownQuery,
+  buildBreakdownRank,
   buildHeatmapBreakdownQuery,
   buildHeatmapValueQuery,
   breakdownQueryOf,
   CARD_KIND,
+  formatPromDuration,
   toO2Unit,
 } from "@/utils/metrics/metricDefaults";
 import {
@@ -436,6 +548,7 @@ import {
   type HeatmapStats,
   type SeriesStats,
 } from "@/utils/metrics/breakdownStats";
+import { OUTLIER_SCORE, outlierScores, seriesPointsByValue } from "@/utils/metrics/outlierScore";
 import { operandStreamsOf, type MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { labelFiltersToSql } from "@/utils/metrics/labelFilterSql";
 import { buildPanelDataForCard } from "@/utils/metrics/metricsHandoff";
@@ -476,8 +589,8 @@ const isAdditive = (expr: string | undefined) =>
 
 const STAT_COLUMNS = ["avg", "latest", "share", "rate", "p50", "p90", "p99"] as const;
 
-const ABSENT = raw("—");
-
+/** At most this many rows carry the outlier tag, so it marks the standouts rather than a crowd. */
+const OUTLIER_TAGS = 3;
 interface BreakdownRow {
   value: string;
   /** Formatted like the chart's y-axis; `null` when the value has no series. */
@@ -492,6 +605,8 @@ interface BreakdownRow {
   /** Sparkline path in a 100×24 box, one subpath per unbroken run. */
   trend: string | null;
   color: string | null;
+  /** Among the few series that stray furthest from the rest, under the Outlying sort. */
+  outlier: boolean;
 }
 
 /**
@@ -514,6 +629,16 @@ const trendOf = (points: (number | null)[]): string | null => {
   return xy.length === 1 ? `M${xy[0]} l0 0` : `M${xy.join(" L")}`;
 };
 
+/** What failed in the grid: kept charts for the page's sentence, and how many tiles have nothing drawn. */
+export interface BreakdownFailures {
+  total: number;
+  kept: { count: number; failedAt: number; dataFrom: number } | null;
+  lost: number;
+}
+
+/** Placeholder tiles while the labels are unknown: one grid row. */
+const PENDING_TILES = [0, 1, 2];
+
 const PENDING: LabelCounts = { ready: false, counted: true, failed: false, error: "", values: [] };
 const UNCOUNTED: LabelCounts = {
   ready: true,
@@ -532,15 +657,23 @@ export default defineComponent({
     AddToDashboard,
     PanelBar,
     OButton,
+    OIcon,
     OTag,
     OEmptyState,
     OBanner,
     OSkeleton,
+    OValue,
+    LoadingProgress,
+    PanelChartPlaceholder,
     OTooltip,
     OTable,
+    OToggleGroup,
+    OToggleGroupItem,
   },
   props: {
     card: { type: Object as PropType<MetricCardModel>, required: true },
+    /** This metric's schema is still loading, so its labels are not known yet. */
+    labelsPending: { type: Boolean, default: false },
     labelsByStream: { type: Object as PropType<Record<string, string[]>>, required: true },
     filters: { type: Array as PropType<LabelFilter[]>, required: true },
     /** The Explorer's window, µs. */
@@ -574,11 +707,18 @@ export default defineComponent({
     compare: { type: Object as PropType<TileCompare | null>, default: null },
     forecast: { type: Object as PropType<TileForecast | null>, default: null },
     stepSeconds: { type: Number, default: 0 },
+    /** Bumped by the page's Retry, so failed tiles load again with it. */
+    retryToken: { type: Number, default: 0 },
+    /** Off while the page itself announces a load for every chart, e.g. a range change. */
+    announces: { type: Boolean, default: true },
   },
-  emits: ["update:selectedLabel", "add-filter"],
+  emits: ["update:selectedLabel", "add-filter", "failures", "busy"],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
+    const chartsLoadingLabel = computed(() => loadingText(t, "charts"));
     const store = useStore();
+    const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
+      useLicenseLock("dashboards");
 
     /** The stream the card's default query reads — `_count` for the exp fallback. */
     const valuesStream = computed(() => operandStreamsOf(props.card)[0]);
@@ -782,28 +922,37 @@ export default defineComponent({
         ? t("metrics.explorer.detail.breakdown.titleFn", { fn: raw(fnLabel.value), label })
         : t(breakdownTitleKey(props.card.cardKind), { label });
 
-    /** `panel`: at the dashboard panel's rate window rather than the tile's. */
-    const queriesFor = (label: string, panel = false): TileQuery[] | null => {
+    /** `panel`: at the dashboard panel's rate window; `ranked`: capped by a whole-window rank, else per step. */
+    const queriesFor = (label: string, panel = false, ranked = false): TileQuery[] | null => {
       if (!countsByLabel.value[label].ready) return null;
-      const topk = topkByLabel.value[label] ? { topk: TOPK } : undefined;
+      const { start_time, end_time } = props.timeRange;
+      const window = panel ? "$__range" : formatPromDuration((end_time - start_time) / 1e6);
+      const cap = topkByLabel.value[label] ? { topk: TOPK } : undefined;
+      const ctx = {
+        metricName: props.card.name,
+        filters: props.filters,
+        rateWindow: panel ? props.panelRateWindow : props.rateWindow,
+        applyNanGuard: props.nanGuard,
+      };
       // Several-line functions chart their first line: a tile is one series per label value.
       const source = follows.value
         ? (panel ? props.panelQueries : props.variant!.queries)[0]?.expr
         : undefined;
       const expr = follows.value
         ? source
-          ? breakdownQueryOf(source, label, topk)
+          ? breakdownQueryOf(source, label, {
+              topk: cap?.topk,
+              rank:
+                cap && ranked
+                  ? buildBreakdownRank(props.card.cardKind, ctx, label, { ...cap, window })
+                  : null,
+            })
           : null
         : buildBreakdownQuery(
             props.card.cardKind,
-            {
-              metricName: props.card.name,
-              filters: props.filters,
-              rateWindow: panel ? props.panelRateWindow : props.rateWindow,
-              applyNanGuard: props.nanGuard,
-            },
+            ctx,
             label,
-            topk,
+            cap && ranked ? { ...cap, window } : cap,
           );
       const stream =
         (follows.value && props.variant!.queries[0]?.builder?.metric) || props.card.name;
@@ -813,6 +962,10 @@ export default defineComponent({
     /** `null` until the label's counts answer: only they know whether to cap at top 10. */
     const queriesByLabel = computed<Record<string, TileQuery[] | null>>(() =>
       Object.fromEntries(labels.value.map((label) => [label, queriesFor(label)])),
+    );
+    // One label, so its values can afford a rank over the whole window instead of rotating per step.
+    const focusedQueries = computed(() =>
+      activeLabel.value ? queriesFor(activeLabel.value, false, true) : null,
     );
 
     const distinctText = (label: string) => {
@@ -847,6 +1000,12 @@ export default defineComponent({
     const statsLoading = computed(
       () => focused.value.status === "idle" || focused.value.status === "loading",
     );
+    const focusedFailure = ref<TileFailure | null>(null);
+    /** The focused chart failed with nothing drawn; its stats come from the same query, so they failed with it. */
+    const statsFailed = computed(
+      () => !!activeLabel.value && focusedFailure.value?.keptAt === null,
+    );
+    const focusedBusy = ref(false);
     const heatmap = computed(() => props.variant?.chartType === "heatmap");
     const heatmapCtx = (panel: boolean) => ({
       metricName: props.card.name,
@@ -990,12 +1149,25 @@ export default defineComponent({
         focusedChart()?.dispatchAction({ type, seriesName: chartNameOf(row.value) });
     };
 
+    const rowSort = ref<"avg" | "outlying">("avg");
+    // A toggle group emits undefined when its active item is clicked again; the table always has one order.
+    const rowSortModel = computed({
+      get: () => rowSort.value,
+      set: (v: any) => {
+        if (v) rowSort.value = v;
+      },
+    });
+
     const rows = computed<BreakdownRow[]>(() => {
       const label = activeLabel.value;
       const stats =
         label && focused.value.status === "done" && !heatmap.value
           ? seriesStatsByValue(focused.value.results, label)
           : new Map<string, SeriesStats>();
+      const scores =
+        rowSort.value === "outlying" && label && stats.size
+          ? outlierScores(seriesPointsByValue(focused.value.results, label))
+          : null;
       const values = [...activeValues.value];
       for (const value of [...stats.keys(), ...heatmapStats.value.keys()])
         if (!values.includes(value)) values.push(value);
@@ -1015,7 +1187,7 @@ export default defineComponent({
             : null;
         return {
           value,
-          rank: h?.rate ?? s?.avg ?? -Infinity,
+          rank: h?.rate ?? (scores && s ? scores.get(value) : s?.avg) ?? -Infinity,
           avg: s ? format(s.avg, s.decimals) : null,
           latest: s ? format(s.latest, s.decimals) : null,
           share: s && total > 0 ? `${((s.sum / total) * 100).toFixed(1)}%` : null,
@@ -1029,7 +1201,10 @@ export default defineComponent({
       });
       // Stable: values without a series keep their count order, after the rest.
       ranked.sort((a, b) => b.rank - a.rank);
-      return ranked.map(({ rank: _rank, ...row }) => row);
+      return ranked.map(({ rank, ...row }, i) => ({
+        ...row,
+        outlier: !!scores && i < OUTLIER_TAGS && rank >= OUTLIER_SCORE,
+      }));
     });
 
     const columns = computed<OTableColumnDef<BreakdownRow>[]>(() => [
@@ -1082,7 +1257,6 @@ export default defineComponent({
         : []),
       { id: "actions", header: raw(""), size: 72, isAction: true },
     ]);
-
     const select = (label: string) => emit("update:selectedLabel", label);
 
     const dashboardDialogOpen = ref(false);
@@ -1116,7 +1290,7 @@ export default defineComponent({
       const label = activeLabel.value;
       if (label && heatmap.value) return openHeatmapToDashboard(label);
       // Not the tile's window, which would freeze the panel at this range.
-      const queries = label ? queriesFor(label, true) : null;
+      const queries = label ? queriesFor(label, true, true) : null;
       if (!label || !queries?.length) return;
       const data = buildPanelDataForCard(props.card, {
         queries,
@@ -1143,7 +1317,95 @@ export default defineComponent({
       if (boundChart && !boundChart.isDisposed()) boundChart.off("finished", readColors);
     });
 
+    const failedTiles = ref<Map<string, TileFailure>>(new Map());
+    const onTileFailed = (label: string, failure: TileFailure | null) => {
+      if (!failure && !failedTiles.value.has(label)) return;
+      const next = new Map(failedTiles.value);
+      if (failure) next.set(label, failure);
+      else next.delete(label);
+      failedTiles.value = next;
+    };
+    /** Kept charts go to the page's one failed-refresh sentence (j3); tiles with nothing drawn show their own error. */
+    const gridFailure = computed(() => {
+      const failed = labels.value
+        .map((label) => failedTiles.value.get(label))
+        .filter((failure): failure is TileFailure => !!failure);
+      const kept = failed.filter((failure) => failure.keptAt !== null);
+      const lost = failed.filter((failure) => failure.keptAt === null);
+      return {
+        total: labels.value.length,
+        kept: kept.length
+          ? {
+              count: kept.length,
+              failedAt: Math.max(...kept.map((failure) => failure.failedAt)),
+              dataFrom: Math.min(...kept.map((failure) => failure.keptAt ?? 0)),
+            }
+          : null,
+        lost: lost.length,
+      };
+    });
+    /** What this view shows: the focused chart alone, or the grid's tiles. */
+    const failures = computed<BreakdownFailures>(() => {
+      const focusedOne = focusedFailure.value;
+      if (activeLabel.value)
+        return {
+          total: 1,
+          kept:
+            focusedOne && focusedOne.keptAt !== null
+              ? { count: 1, failedAt: focusedOne.failedAt, dataFrom: focusedOne.keptAt }
+              : null,
+          lost: focusedOne && focusedOne.keptAt === null ? 1 : 0,
+        };
+      return {
+        total: gridFailure.value.total,
+        kept: gridFailure.value.kept,
+        lost: gridFailure.value.lost,
+      };
+    });
+    watch(
+      () => JSON.stringify(failures.value),
+      () => emit("failures", failures.value),
+      { immediate: true },
+    );
+    const busyTiles = ref<Set<string>>(new Set());
+    const onTileBusy = (label: string, on: boolean) => {
+      if (busyTiles.value.has(label) === on) return;
+      const next = new Set(busyTiles.value);
+      if (on) next.add(label);
+      else next.delete(label);
+      busyTiles.value = next;
+    };
+    const gridBusy = computed(
+      () =>
+        !activeLabel.value &&
+        !!labels.value.length &&
+        (!headLoaded.value || labels.value.some((label) => busyTiles.value.has(label))),
+    );
+    const focusedLoading = computed(() => !!activeLabel.value && focusedBusy.value);
+    watch(
+      () => gridBusy.value || focusedLoading.value,
+      (busy) => emit("busy", busy),
+      { immediate: true },
+    );
+    // While the page announces a range change for every chart, this grid adds no words of its own.
+    const gridRegion = useRegionLoading({
+      busy: () => gridBusy.value && props.announces,
+      noun: "charts",
+      // A failed grid is said once, by its own alert or the page's, never as "Charts loaded".
+      result: () =>
+        gridFailure.value.lost || gridFailure.value.kept ? null : t("regionStatus.chartsLoaded"),
+    });
+
     return {
+      PENDING_TILES,
+      onTileBusy,
+      onTileFailed,
+      gridFailure,
+      gridRegion,
+      gridBusy,
+      focusedBusy,
+      statsFailed,
+      chartsLoadingLabel,
       t,
       raw,
       titleOf,
@@ -1171,14 +1433,16 @@ export default defineComponent({
       retryCounts,
       topkByLabel,
       queriesByLabel,
+      focusedQueries,
       distinctText,
       activeCounts,
-      ABSENT,
       STAT_COLUMNS,
+      focusedFailure,
       focused,
       focusedTile,
       statsLoading,
       rows,
+      rowSortModel,
       columns,
       highlight,
       select,
@@ -1187,6 +1451,8 @@ export default defineComponent({
       dashboardPanel,
       dashboardPanelTitle,
       openAddToDashboard,
+      dashboardsLocked,
+      dashboardsLockedReason,
     };
   },
 });

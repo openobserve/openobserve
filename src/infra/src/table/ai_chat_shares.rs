@@ -425,6 +425,23 @@ pub async fn purge_orphans_with<C: ConnectionTrait>(
     Ok(result.rows_affected)
 }
 
+/// Remove every share of `org_id`, live or revoked, for the org's deletion; returns how many.
+pub async fn delete_by_org(org_id: &str) -> Result<u64, errors::Error> {
+    delete_by_org_with(get_orm_client_rw().await, org_id).await
+}
+
+pub async fn delete_by_org_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<u64, errors::Error> {
+    let result = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -709,5 +726,28 @@ mod tests {
         assert_eq!(revoked_at(ORG, here.id).await, Some(20));
         assert_eq!(revoked_at("other-org", elsewhere.id).await, Some(21));
         assert_eq!(revoked_at(ORG, bob.id).await, None);
+    }
+
+    #[tokio::test]
+    async fn org_delete_removes_every_share_of_the_org_only() {
+        let db = db().await;
+        let live = insert_with(&db, &new_share(MODE_LIVE, None), 10)
+            .await
+            .unwrap();
+        revoke_with(&db, ORG, &live.id, 11).await.unwrap();
+        insert_with(&db, &new_share(MODE_SNAPSHOT, None), 12)
+            .await
+            .unwrap();
+        let mut elsewhere = new_share(MODE_LIVE, None);
+        elsewhere.org_id = "other-org";
+        let kept = insert_with(&db, &elsewhere, 13).await.unwrap();
+        assert_eq!(delete_by_org_with(&db, ORG).await.unwrap(), 2);
+        assert!(get_with(&db, ORG, &live.id).await.unwrap().is_none());
+        assert!(
+            get_with(&db, "other-org", &kept.id)
+                .await
+                .unwrap()
+                .is_some()
+        );
     }
 }

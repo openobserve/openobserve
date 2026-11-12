@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
@@ -21,7 +21,9 @@ import announcements from "@/services/announcements";
 import AnnouncementBannerEditorForm from "./AnnouncementBannerEditorForm.vue";
 import { makeBannerSchema } from "./AnnouncementBannerEditor.schema";
 import { emptyDraft, type BannerDraft, type BannerStyle } from "./announcementDrafts";
+import analytics from "@/services/product_analytics";
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/announcements", () => ({
   default: { getActive: vi.fn(), getConfig: vi.fn(), setConfig: vi.fn() },
 }));
@@ -160,8 +162,19 @@ describe("makeBannerSchema", () => {
 describe("AnnouncementBannerEditorForm", () => {
   const stored = [{ message: "First" }, { message: "Second", variant: "warning" }];
 
+  // A form left mounted would autosave into the next test's new-banner draft slot.
+  const mounted: VueWrapper[] = [];
+
   beforeEach(() => {
+    for (const wrapper of mounted.splice(0)) {
+      try {
+        wrapper.unmount();
+      } catch {
+        // A test that cleared the body has already detached this form's elements.
+      }
+    }
     document.body.innerHTML = "";
+    localStorage.clear();
     vi.clearAllMocks();
     service.getConfig.mockResolvedValue({ data: { banners: stored } });
     service.setConfig.mockResolvedValue({ data: {} });
@@ -184,6 +197,7 @@ describe("AnnouncementBannerEditorForm", () => {
       global: { plugins: [i18n], provide: { store } },
       attachTo: document.body,
     });
+    mounted.push(wrapper);
     await flushPromises();
     return wrapper;
   };
@@ -266,6 +280,7 @@ describe("AnnouncementBannerEditorForm", () => {
       { message: "First" },
       { message: "Second, edited", variant: "warning" },
     ]);
+    expect(analytics.track).toHaveBeenCalledWith("announcement_updated");
     expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ name: "announcementBanners" }));
   });
 
@@ -284,6 +299,7 @@ describe("AnnouncementBannerEditorForm", () => {
       id: expect.stringMatching(/^banner-/),
       colors: { light: "#FEF3C7", dark: "#78350F" },
     });
+    expect(analytics.track).toHaveBeenCalledWith("announcement_created");
   });
 
   it("sends a duration as typed, for the server to pin to an absolute end", async () => {
@@ -332,6 +348,7 @@ describe("AnnouncementBannerEditorForm", () => {
     await submit(wrapper);
 
     expect(service.setConfig).not.toHaveBeenCalled();
+    expect(analytics.track).not.toHaveBeenCalled();
     expect(document.querySelector('[data-test="announcement-editor-reload"]')).not.toBeNull();
   });
 
@@ -429,6 +446,7 @@ describe("AnnouncementBannerEditorForm", () => {
     expect(savedConfig().styles).toEqual([
       { id: expect.stringMatching(/^style-/), name: "Maintenance", icon: "build" },
     ]);
+    expect(analytics.track).toHaveBeenCalledWith("announcement_style_saved");
   });
 
   it("keeps a critical banner critical when it is restyled", async () => {
@@ -557,6 +575,10 @@ describe("AnnouncementBannerEditorForm", () => {
     });
     document.querySelector<HTMLElement>('[data-test="announcement-editor-delete-style"]')!.click();
     await flushPromises();
+    const named = document.querySelector(
+      '[data-test="announcement-editor-delete-style-message"] span.font-semibold',
+    );
+    expect(named?.textContent).toBe("Release");
     document
       .querySelector<HTMLElement>(
         '[data-test="announcement-editor-delete-style-dialog"] [data-test="o-dialog-primary-btn"]',
@@ -572,6 +594,28 @@ describe("AnnouncementBannerEditorForm", () => {
     service.setConfig.mockClear();
     await submit(wrapper);
     expect(service.setConfig).toHaveBeenCalled();
+  });
+
+  it("keeps the deleted style's name for the closing fade", async () => {
+    const labelled = { message: "Second", style: "style-1" };
+    service.getConfig.mockResolvedValue({
+      data: { banners: [stored[0], labelled], styles: [{ id: "style-1", name: "Release" }] },
+    });
+    const wrapper = await mountForm({ message: "Second", styleId: "style-1" }, 1, labelled, {
+      styles: [release],
+    });
+    document.querySelector<HTMLElement>('[data-test="announcement-editor-delete-style"]')!.click();
+    await flushPromises();
+    document
+      .querySelector<HTMLElement>(
+        '[data-test="announcement-editor-delete-style-dialog"] [data-test="o-dialog-primary-btn"]',
+      )!
+      .click();
+    await flushPromises();
+
+    const vm = wrapper.vm as unknown as { deleteStyleOpen: boolean; deleteStyleName: string };
+    expect(vm.deleteStyleOpen).toBe(false);
+    expect(vm.deleteStyleName).toBe("Release");
   });
 
   it("warns only when a critical banner reaches every org the promotion targets", async () => {

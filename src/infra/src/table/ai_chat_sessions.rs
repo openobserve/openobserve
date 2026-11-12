@@ -37,6 +37,8 @@ pub const STATUS_ACTIVE: &str = "active";
 pub const STATUS_DELETED: &str = "deleted";
 /// "No durable event committed": opencode's `seq` is 0-based.
 pub const NO_SEQ: i64 = -1;
+/// Deleted chats keep being purged this long, for replicas that were down at delete time.
+pub const REPLICA_REPURGE_WINDOW_MICROS: i64 = 7 * 24 * 60 * 60 * 1_000_000;
 
 /// Outcome of [`bind_opencode_session`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -657,7 +659,8 @@ pub async fn due_for_replica_purge_with<C: ConnectionTrait>(
                 .filter(Column::OrgId.eq(org_id))
                 .filter(Column::Status.eq(STATUS_DELETED))
                 .filter(Column::ReplicaPurgedAt.gt(repurge_since))
-                .order_by_asc(Column::ReplicaPurgedAt)
+                // Least recently tried, so past the limit every held chat takes its turn.
+                .order_by_asc(Column::UpdatedAt)
                 .limit(left)
                 .all(conn)
                 .await
@@ -667,7 +670,7 @@ pub async fn due_for_replica_purge_with<C: ConnectionTrait>(
     Ok(rows)
 }
 
-/// Every live o2-ai replica confirmed it no longer holds this deleted chat.
+/// Every live o2-ai replica confirmed it no longer holds this deleted chat; keeps the first time.
 pub async fn mark_replica_purged(
     org_id: &str,
     session_id: &str,
@@ -683,11 +686,18 @@ pub async fn mark_replica_purged_with<C: ConnectionTrait>(
     now: i64,
 ) -> Result<(), errors::Error> {
     Entity::update_many()
-        .col_expr(Column::ReplicaPurgedAt, Expr::value(Some(now)))
+        .col_expr(
+            Column::ReplicaPurgedAt,
+            Func::coalesce([
+                Expr::col(Column::ReplicaPurgedAt).into(),
+                Expr::value(Some(now)),
+            ])
+            .into(),
+        )
+        .col_expr(Column::UpdatedAt, Expr::value(now))
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::SessionId.eq(session_id))
         .filter(Column::Status.eq(STATUS_DELETED))
-        .filter(Column::ReplicaPurgedAt.is_null())
         .exec(conn)
         .await
         .map_err(db_err)?;
@@ -714,7 +724,6 @@ pub async fn defer_replica_purge_with<C: ConnectionTrait>(
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::SessionId.eq(session_id))
         .filter(Column::Status.eq(STATUS_DELETED))
-        .filter(Column::ReplicaPurgedAt.is_null())
         .exec(conn)
         .await
         .map_err(db_err)?;
@@ -761,6 +770,118 @@ pub async fn purge_expired_with<C: ConnectionTrait>(
                         .add(Column::UpdatedAt.lt(cutoff)),
                 ),
         )
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected)
+}
+
+/// Tombstone every active chat of `org_id`, for the org's deletion; returns their session ids.
+pub async fn mark_org_deleted(org_id: &str, now: i64) -> Result<Vec<String>, errors::Error> {
+    mark_org_deleted_with(get_orm_client_rw().await, org_id, now).await
+}
+
+pub async fn mark_org_deleted_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    now: i64,
+) -> Result<Vec<String>, errors::Error> {
+    use sea_orm::QueryTrait;
+    let mut update = Entity::update_many()
+        .col_expr(Column::Status, Expr::value(STATUS_DELETED.to_string()))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Status.eq(STATUS_ACTIVE))
+        .into_query();
+    update.returning_col(Column::SessionId);
+    let rows = conn
+        .query_all(conn.get_database_backend().build(&update))
+        .await
+        .map_err(db_err)?;
+    rows.iter()
+        .map(|row| row.try_get::<String>("", "session_id").map_err(db_err))
+        .collect()
+}
+
+/// Session ids of the org's deleted chats no replica purge has confirmed yet.
+pub async fn list_unpurged_ids_by_org(org_id: &str) -> Result<Vec<String>, errors::Error> {
+    list_unpurged_ids_by_org_with(get_orm_client_ro().await, org_id).await
+}
+
+pub async fn list_unpurged_ids_by_org_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<Vec<String>, errors::Error> {
+    Entity::find()
+        .select_only()
+        .column(Column::SessionId)
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Status.eq(STATUS_DELETED))
+        .filter(Column::ReplicaPurgedAt.is_null())
+        .into_tuple()
+        .all(conn)
+        .await
+        .map_err(db_err)
+}
+
+/// Remove every chat row of `org_id`, active or tombstoned.
+pub async fn delete_by_org(org_id: &str) -> Result<u64, errors::Error> {
+    delete_by_org_with(get_orm_client_rw().await, org_id).await
+}
+
+pub async fn delete_by_org_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<u64, errors::Error> {
+    let result = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected)
+}
+
+/// Remove the org's chat rows except deleted chats purged after `repurge_since`, still re-purged.
+pub async fn delete_by_org_except_repurging(
+    org_id: &str,
+    repurge_since: i64,
+) -> Result<u64, errors::Error> {
+    delete_by_org_except_repurging_with(get_orm_client_rw().await, org_id, repurge_since).await
+}
+
+pub async fn delete_by_org_except_repurging_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    repurge_since: i64,
+) -> Result<u64, errors::Error> {
+    let result = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(
+            Condition::any()
+                .add(Column::Status.ne(STATUS_DELETED))
+                .add(Column::ReplicaPurgedAt.is_null())
+                .add(Column::ReplicaPurgedAt.lte(repurge_since)),
+        )
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected)
+}
+
+/// Remove the org's deleted chats whose replica purge was confirmed at or before `purged_through`.
+pub async fn delete_purged_by_org(org_id: &str, purged_through: i64) -> Result<u64, errors::Error> {
+    delete_purged_by_org_with(get_orm_client_rw().await, org_id, purged_through).await
+}
+
+pub async fn delete_purged_by_org_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    purged_through: i64,
+) -> Result<u64, errors::Error> {
+    let result = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Status.eq(STATUS_DELETED))
+        .filter(Column::ReplicaPurgedAt.lte(purged_through))
         .exec(conn)
         .await
         .map_err(db_err)?;
@@ -1470,5 +1591,111 @@ mod tests {
             active_ids_for_user_with(&db, ORG, ALICE).await.unwrap(),
             vec!["active".to_string()]
         );
+    }
+
+    #[tokio::test]
+    async fn org_delete_tombstones_lists_unpurged_and_removes_only_its_org() {
+        let db = db().await;
+        chat(&db, "a", ALICE, 10).await;
+        chat(&db, "b", BOB, 10).await;
+        get_or_create_with(&db, "other-org", "c", ALICE, "a@x", "o2-ai", 10)
+            .await
+            .unwrap();
+        assert_eq!(mark_org_deleted_with(&db, ORG, 20).await.unwrap().len(), 2);
+        let mut unpurged = list_unpurged_ids_by_org_with(&db, ORG).await.unwrap();
+        unpurged.sort();
+        assert_eq!(unpurged, vec!["a".to_string(), "b".to_string()]);
+        mark_replica_purged_with(&db, ORG, "a", 30).await.unwrap();
+        assert_eq!(
+            list_unpurged_ids_by_org_with(&db, ORG).await.unwrap(),
+            vec!["b".to_string()]
+        );
+        let other = get_with(&db, "other-org", "c").await.unwrap().unwrap();
+        assert_eq!(other.status, STATUS_ACTIVE);
+        assert_eq!(delete_by_org_with(&db, ORG).await.unwrap(), 2);
+        assert!(get_with(&db, ORG, "a").await.unwrap().is_none());
+        assert!(get_with(&db, "other-org", "c").await.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn org_delete_holds_only_chats_still_inside_the_repurge_window() {
+        let db = db().await;
+        for sid in ["unpurged", "old", "recent"] {
+            chat(&db, sid, ALICE, 10).await;
+        }
+        assert_eq!(mark_org_deleted_with(&db, ORG, 20).await.unwrap().len(), 3);
+        mark_replica_purged_with(&db, ORG, "old", 100)
+            .await
+            .unwrap();
+        mark_replica_purged_with(&db, ORG, "recent", 500)
+            .await
+            .unwrap();
+        chat(&db, "raced", ALICE, 30).await;
+        get_or_create_with(&db, "other-org", "c", ALICE, "a@x", "o2-ai", 10)
+            .await
+            .unwrap();
+        mark_org_deleted_with(&db, "other-org", 20).await.unwrap();
+        mark_replica_purged_with(&db, "other-org", "c", 100)
+            .await
+            .unwrap();
+
+        let removed = delete_by_org_except_repurging_with(&db, ORG, 200)
+            .await
+            .unwrap();
+        assert_eq!(removed, 3);
+        let left: Vec<String> = listed_all(&db, ORG).await;
+        assert_eq!(left, vec!["recent".to_string()]);
+        assert_eq!(delete_purged_by_org_with(&db, ORG, 499).await.unwrap(), 0);
+        assert_eq!(delete_purged_by_org_with(&db, ORG, 500).await.unwrap(), 1);
+        assert!(get_with(&db, "other-org", "c").await.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn every_held_chat_is_re_purged_when_more_than_a_pass_are_held() {
+        let db = db().await;
+        let ids: Vec<String> = (0..5).map(|i| format!("held-{i}")).collect();
+        for sid in &ids {
+            chat(&db, sid, ALICE, 10).await;
+        }
+        mark_org_deleted_with(&db, ORG, 20).await.unwrap();
+        for (i, sid) in ids.iter().enumerate() {
+            mark_replica_purged_with(&db, ORG, sid, 30 + i as i64)
+                .await
+                .unwrap();
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        for pass in 0..3 {
+            let due = due_for_replica_purge_with(&db, ORG, 2, 0).await.unwrap();
+            assert_eq!(due.len(), 2);
+            for (i, row) in due.iter().enumerate() {
+                let now = 100 + pass * 10 + i as i64;
+                if i == 0 {
+                    mark_replica_purged_with(&db, ORG, &row.session_id, now)
+                        .await
+                        .unwrap();
+                } else {
+                    defer_replica_purge_with(&db, ORG, &row.session_id, now)
+                        .await
+                        .unwrap();
+                }
+                seen.insert(row.session_id.clone());
+            }
+        }
+        assert_eq!(seen.into_iter().collect::<Vec<_>>(), ids);
+        for sid in &ids {
+            let row = get_with(&db, ORG, sid).await.unwrap().unwrap();
+            assert!(row.replica_purged_at.is_some_and(|t| t < 40), "{sid}");
+        }
+    }
+
+    async fn listed_all(db: &sea_orm::DatabaseConnection, org_id: &str) -> Vec<String> {
+        Entity::find()
+            .select_only()
+            .column(Column::SessionId)
+            .filter(Column::OrgId.eq(org_id))
+            .into_tuple()
+            .all(db)
+            .await
+            .unwrap()
     }
 }

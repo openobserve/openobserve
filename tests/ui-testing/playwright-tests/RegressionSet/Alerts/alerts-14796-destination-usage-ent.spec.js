@@ -160,7 +160,7 @@ test.describe('Enterprise consumers of the destination delete guard testcases', 
     const destinationName = await seedDestination(page, 'e2e_14796_anom');
     const stream = uniq('e2e_14796_anom_stream');
     createdStreams.push(stream);
-    await api(page, 'post', `${v1}/${stream}/_json`, [{ level: 'error', latency: 10 }]);
+    await api(page, 'post', `${urls().ingest}/${stream}/_json`, [{ level: 'error', latency: 10 }]);
 
     const configName = uniq('e2e_14796_anom_cfg');
     const res = await api(page, 'post', `${v1}/anomaly_detection`, {

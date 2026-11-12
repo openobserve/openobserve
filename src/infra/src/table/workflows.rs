@@ -15,8 +15,8 @@
 
 use config::meta::pipeline::components::{Edge, Node};
 use sea_orm::{
-    ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set,
-    TransactionTrait, prelude::Expr, sea_query::Func,
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect,
+    Set, TransactionTrait, prelude::Expr, sea_query::Func,
 };
 use serde::{Deserialize, Serialize};
 
@@ -27,7 +27,7 @@ use crate::{
     table::entity::workflow_associations,
 };
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, utoipa::ToSchema)]
 pub struct Workflow {
     pub id: String,
     pub org_id: String,
@@ -45,13 +45,13 @@ pub struct Workflow {
     pub edges: Vec<Edge>,
 }
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, utoipa::ToSchema)]
 pub struct WorkflowError {
     pub node_id: String,
     pub error: Vec<String>,
 }
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, utoipa::ToSchema)]
 pub struct WorkflowRunErrors {
     pub id: i32,
     pub cluster: String,
@@ -142,7 +142,7 @@ impl From<workflow_run_data::Model> for WorkflowRunData {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, utoipa::ToSchema)]
 pub struct WorkflowAssociation {
     pub id: i32,
     pub org_id: String,
@@ -181,27 +181,31 @@ impl std::fmt::Display for WorkflowTriggerEntity {
     }
 }
 
+/// Every workflow; a row this version cannot read is logged and skipped.
 pub async fn list_all() -> Result<Vec<Workflow>, anyhow::Error> {
     let client = get_orm_client_ro().await;
     let entities = workflows::Entity::find().all(client).await?;
-    let mut ret = Vec::with_capacity(entities.len());
-    for e in entities {
-        ret.push(e.try_into()?);
-    }
-    Ok(ret)
+    Ok(readable_workflows(entities))
 }
 
+/// An org's workflows; a row this version cannot read is logged and skipped.
 pub async fn list_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
     let client = get_orm_client_ro().await;
     let entities = workflows::Entity::find()
         .filter(workflows::Column::OrgId.eq(org_id))
         .all(client)
         .await?;
-    let mut ret = Vec::with_capacity(entities.len());
-    for e in entities {
-        ret.push(e.try_into()?);
-    }
-    Ok(ret)
+    Ok(readable_workflows(entities))
+}
+
+/// An org's workflows, failing on a row this version cannot read, for reference checks.
+pub async fn list_by_org_fully_decoded(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
+    let client = get_orm_client_ro().await;
+    let entities = workflows::Entity::find()
+        .filter(workflows::Column::OrgId.eq(org_id))
+        .all(client)
+        .await?;
+    Ok(fully_decoded_workflows(entities)?)
 }
 
 /// Lists an org's workflows, optionally restricted to one folder and/or to rows
@@ -212,6 +216,7 @@ pub async fn list_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
 ///
 /// The leading-wildcard LIKE cannot use an index; the scan is accepted because
 /// `workflows_org_folder_idx` bounds it to one org. Revisit with `pg_trgm` if that grows.
+/// A row this version cannot read is logged and skipped.
 pub async fn list_by_org_folder(
     org_id: &str,
     folder_pk: Option<&str>,
@@ -239,11 +244,7 @@ pub async fn list_by_org_folder(
         );
     }
     let entities = query.all(client).await?;
-    let mut ret = Vec::with_capacity(entities.len());
-    for e in entities {
-        ret.push(e.try_into()?);
-    }
-    Ok(ret)
+    Ok(readable_workflows(entities))
 }
 
 /// Counts the workflows in a folder, drafts included. Backs the folder delete
@@ -450,6 +451,32 @@ pub async fn delete_workflow(id: &str) -> Result<(), anyhow::Error> {
         .await?;
     // we do not handler workflow errors here, as background job will take care of them eventually,
     // and will also handle input data file deletion
+    Ok(())
+}
+
+pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+    workflows::Entity::delete_many()
+        .filter(workflows::Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_children_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+    workflow_associations::Entity::delete_many()
+        .filter(workflow_associations::Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    workflow_errors::Entity::delete_many()
+        .filter(workflow_errors::Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    workflow_run_data::Entity::delete_many()
+        .filter(workflow_run_data::Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
     Ok(())
 }
 
@@ -714,7 +741,7 @@ pub async fn delete_association_by_entity(org_id: &str, entity: &str) -> Result<
 }
 
 /// Lists an org's drafts, optionally restricted to one folder. `folder_pk` is the
-/// folder's primary key, not the slug from the URL.
+/// folder's primary key, not the slug from the URL. A row this version cannot read is skipped.
 pub async fn list_drafts_by_org(
     org_id: &str,
     folder_pk: Option<&str>,
@@ -726,11 +753,7 @@ pub async fn list_drafts_by_org(
         query = query.filter(workflow_drafts::Column::FolderId.eq(pk));
     }
     let entities = query.all(client).await?;
-    let mut ret = Vec::with_capacity(entities.len());
-    for e in entities {
-        ret.push(e.try_into()?);
-    }
-    Ok(ret)
+    Ok(readable_drafts(entities))
 }
 
 pub async fn get_draft_by_org_draft_id(
@@ -768,31 +791,25 @@ pub async fn save_draft(draft: Workflow) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn update_draft(draft: Workflow) -> Result<(), anyhow::Error> {
-    let client = get_orm_client_rw().await;
-
-    let now = chrono::Utc::now().timestamp_millis();
-    let model = workflow_drafts::ActiveModel {
-        updated_at: Set(now),
-        name: Set(draft.name),
-        description: Set(draft.description),
-        nodes: Set(serde_json::to_string(&draft.nodes)?),
-        edges: Set(serde_json::to_string(&draft.edges)?),
-        ..Default::default()
-    };
-    workflow_drafts::Entity::update_many()
-        .filter(workflow_drafts::Column::Id.eq(draft.id))
-        .set(model)
-        .exec(client)
-        .await?;
-    Ok(())
+/// Returns the number of drafts updated, 0 when `org_id` does not own the draft.
+pub async fn update_draft(org_id: &str, draft: Workflow) -> Result<u64, anyhow::Error> {
+    update_draft_in(get_orm_client_rw().await, org_id, draft).await
 }
 
-pub async fn delete_draft(id: &str) -> Result<(), anyhow::Error> {
-    let client = get_orm_client_rw().await;
+/// Returns the number of drafts deleted, 0 when `org_id` does not own the draft.
+pub async fn delete_draft(org_id: &str, id: &str) -> Result<u64, anyhow::Error> {
+    delete_draft_in(get_orm_client_rw().await, org_id, id).await
+}
 
+/// Org that owns draft `id`, for the super-cluster replay whose delete message carries no org.
+pub async fn get_draft_org_id(id: &str) -> Result<Option<String>, anyhow::Error> {
+    get_draft_org_id_in(get_orm_client_ro().await, id).await
+}
+
+pub async fn delete_drafts_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
     workflow_drafts::Entity::delete_many()
-        .filter(workflow_drafts::Column::Id.eq(id))
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
         .exec(client)
         .await?;
     Ok(())
@@ -853,4 +870,338 @@ pub async fn promote_draft_to_workflow(org_id: &str, draft: Workflow) -> Result<
     }
 
     Ok(())
+}
+
+fn readable_workflows(models: Vec<workflows::Model>) -> Vec<Workflow> {
+    super::convert_skipping_unreadable(
+        "workflows",
+        models,
+        |m| format!("org={} id={}", m.org_id, m.id),
+        Workflow::try_from,
+    )
+}
+
+fn fully_decoded_workflows(
+    models: Vec<workflows::Model>,
+) -> Result<Vec<Workflow>, crate::errors::Error> {
+    super::convert_failing_on_unreadable(
+        "workflows",
+        models,
+        |m| format!("org={} id={}", m.org_id, m.id),
+        Workflow::try_from,
+    )
+}
+
+fn readable_drafts(models: Vec<workflow_drafts::Model>) -> Vec<Workflow> {
+    super::convert_skipping_unreadable(
+        "workflow_drafts",
+        models,
+        |m| format!("org={} id={}", m.org_id, m.id),
+        Workflow::try_from,
+    )
+}
+
+async fn update_draft_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    draft: Workflow,
+) -> Result<u64, anyhow::Error> {
+    let now = chrono::Utc::now().timestamp_millis();
+    let model = workflow_drafts::ActiveModel {
+        updated_at: Set(now),
+        name: Set(draft.name),
+        description: Set(draft.description),
+        nodes: Set(serde_json::to_string(&draft.nodes)?),
+        edges: Set(serde_json::to_string(&draft.edges)?),
+        ..Default::default()
+    };
+    let res = workflow_drafts::Entity::update_many()
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
+        .filter(workflow_drafts::Column::Id.eq(draft.id))
+        .set(model)
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected)
+}
+
+async fn delete_draft_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+) -> Result<u64, anyhow::Error> {
+    let res = workflow_drafts::Entity::delete_many()
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
+        .filter(workflow_drafts::Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected)
+}
+
+async fn get_draft_org_id_in<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+) -> Result<Option<String>, anyhow::Error> {
+    let res = workflow_drafts::Entity::find()
+        .select_only()
+        .column(workflow_drafts::Column::OrgId)
+        .filter(workflow_drafts::Column::Id.eq(id))
+        .into_tuple::<String>()
+        .one(conn)
+        .await?;
+    Ok(res)
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn create_tables_for_tests(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), sea_orm::DbErr> {
+    use sea_orm::ConnectionTrait;
+
+    let backend = db.get_database_backend();
+    let schema = sea_orm::Schema::new(backend);
+    for mut table in [
+        schema.create_table_from_entity(workflows::Entity),
+        schema.create_table_from_entity(workflow_drafts::Entity),
+        schema.create_table_from_entity(workflow_errors::Entity),
+        schema.create_table_from_entity(workflow_associations::Entity),
+        schema.create_table_from_entity(workflow_run_data::Entity),
+    ] {
+        table.if_not_exists();
+        db.execute(backend.build(&table)).await?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{
+        ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, IntoActiveModel, Schema,
+    };
+
+    use super::*;
+    use crate::table::testing::{capture_error_logs, logged_errors_containing};
+
+    const DRAFT_ID: &str = "draft-1";
+    const OWNER_ORG: &str = "owner";
+    const OTHER_ORG: &str = "other";
+
+    fn nodes_with_operator(operator: &str) -> String {
+        serde_json::json!([{"id": "c", "io_type": "default", "position": {"x": 0.0, "y": 0.0},
+            "data": {"node_type": "condition", "version": 2, "conditions": {
+                "filterType": "group", "logicalOperator": "AND", "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": operator,
+                     "value": "error", "logicalOperator": "AND"}]}}}])
+        .to_string()
+    }
+
+    fn model(id: &str, nodes: String) -> workflows::Model {
+        workflows::Model {
+            id: id.to_string(),
+            org_id: "o".to_string(),
+            folder_id: "f".to_string(),
+            created_at: 0,
+            updated_at: 0,
+            created_by: "u".to_string(),
+            enabled: true,
+            name: id.to_string(),
+            description: String::new(),
+            nodes,
+            edges: "[]".to_string(),
+        }
+    }
+
+    fn draft(workflow: workflows::Model) -> workflow_drafts::Model {
+        workflow_drafts::Model {
+            id: workflow.id,
+            org_id: workflow.org_id,
+            folder_id: workflow.folder_id,
+            created_at: workflow.created_at,
+            updated_at: workflow.updated_at,
+            created_by: workflow.created_by,
+            name: workflow.name,
+            description: workflow.description,
+            nodes: workflow.nodes,
+            edges: workflow.edges,
+        }
+    }
+
+    /// A readable workflow, one with an operator this version lacks, and one with junk nodes.
+    fn rows() -> Vec<workflows::Model> {
+        vec![
+            model("w1_good", nodes_with_operator("=")),
+            model("w2_in", nodes_with_operator("future_op")),
+            model("w3_junk", "{".to_string()),
+        ]
+    }
+
+    #[tokio::test]
+    async fn test_listed_workflows_skip_and_log_rows_they_cannot_read() {
+        capture_error_logs();
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let create = Schema::new(backend).create_table_from_entity(workflows::Entity);
+        db.execute(backend.build(&create)).await.unwrap();
+        for row in rows() {
+            row.into_active_model().insert(&db).await.unwrap();
+        }
+
+        let stored = workflows::Entity::find().all(&db).await.unwrap();
+        let ids: Vec<String> = readable_workflows(stored)
+            .into_iter()
+            .map(|w| w.id)
+            .collect();
+
+        assert_eq!(ids, ["w1_good"]);
+        let logged = logged_errors_containing("[workflows] skipped unreadable row org=o id=w2_in");
+        assert!(
+            logged
+                .iter()
+                .any(|l| l.contains("unknown variant `future_op`")),
+            "{logged:?}"
+        );
+        assert!(!logged_errors_containing("id=w3_junk").is_empty());
+    }
+
+    #[test]
+    fn test_fully_decoded_workflows_fail_on_a_row_they_cannot_read() {
+        let Err(err) = fully_decoded_workflows(rows()) else {
+            panic!("an unreadable row must fail the list");
+        };
+        let err = err.to_string();
+        assert!(err.contains("org=o id=w2_in is unreadable"), "{err}");
+        let good = fully_decoded_workflows(rows().into_iter().take(1).collect()).unwrap();
+        assert_eq!(good.len(), 1);
+    }
+
+    #[test]
+    fn test_listed_drafts_skip_rows_they_cannot_read() {
+        let ids: Vec<String> = readable_drafts(rows().into_iter().map(draft).collect())
+            .into_iter()
+            .map(|w| w.id)
+            .collect();
+        assert_eq!(ids, ["w1_good"]);
+    }
+
+    #[test]
+    fn test_an_unreadable_workflow_converts_to_an_error() {
+        let Err(err) = Workflow::try_from(model("w2_in", nodes_with_operator("future_op"))) else {
+            panic!("an unknown operator must not convert");
+        };
+        assert!(
+            err.to_string().contains("unknown variant `future_op`"),
+            "{err}"
+        );
+    }
+
+    async fn db_with_draft() -> DatabaseConnection {
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(backend.build(&schema.create_table_from_entity(workflow_drafts::Entity)))
+            .await
+            .unwrap();
+        workflow_drafts::Entity::insert(workflow_drafts::ActiveModel {
+            id: Set(DRAFT_ID.to_string()),
+            org_id: Set(OWNER_ORG.to_string()),
+            folder_id: Set("folder".to_string()),
+            created_at: Set(1),
+            updated_at: Set(1),
+            created_by: Set("user".to_string()),
+            name: Set("original".to_string()),
+            description: Set("original".to_string()),
+            nodes: Set("[]".to_string()),
+            edges: Set("[]".to_string()),
+        })
+        .exec(&db)
+        .await
+        .unwrap();
+        db
+    }
+
+    async fn stored_draft(db: &DatabaseConnection) -> Option<workflow_drafts::Model> {
+        workflow_drafts::Entity::find_by_id(DRAFT_ID)
+            .one(db)
+            .await
+            .unwrap()
+    }
+
+    fn renamed_draft(org_id: &str) -> Workflow {
+        Workflow {
+            id: DRAFT_ID.to_string(),
+            org_id: org_id.to_string(),
+            folder_id: "folder".to_string(),
+            created_at: 1,
+            updated_at: 1,
+            created_by: "user".to_string(),
+            enabled: true,
+            name: "renamed".to_string(),
+            description: "renamed".to_string(),
+            nodes: vec![],
+            edges: vec![],
+        }
+    }
+
+    #[tokio::test]
+    async fn update_draft_from_another_org_changes_nothing() {
+        let db = db_with_draft().await;
+
+        let updated = update_draft_in(&db, OTHER_ORG, renamed_draft(OTHER_ORG))
+            .await
+            .unwrap();
+
+        assert_eq!(updated, 0);
+        assert_eq!(stored_draft(&db).await.unwrap().name, "original");
+    }
+
+    #[tokio::test]
+    async fn update_draft_from_owning_org_applies() {
+        let db = db_with_draft().await;
+
+        let updated = update_draft_in(&db, OWNER_ORG, renamed_draft(OWNER_ORG))
+            .await
+            .unwrap();
+
+        assert_eq!(updated, 1);
+        assert_eq!(stored_draft(&db).await.unwrap().name, "renamed");
+    }
+
+    #[tokio::test]
+    async fn delete_draft_from_another_org_removes_nothing() {
+        let db = db_with_draft().await;
+
+        let deleted = delete_draft_in(&db, OTHER_ORG, DRAFT_ID).await.unwrap();
+
+        assert_eq!(deleted, 0);
+        assert!(stored_draft(&db).await.is_some());
+    }
+
+    #[tokio::test]
+    async fn delete_draft_from_owning_org_removes_it() {
+        let db = db_with_draft().await;
+
+        let deleted = delete_draft_in(&db, OWNER_ORG, DRAFT_ID).await.unwrap();
+
+        assert_eq!(deleted, 1);
+        assert!(stored_draft(&db).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn get_draft_org_id_returns_the_owning_org() {
+        let db = db_with_draft().await;
+
+        let org = get_draft_org_id_in(&db, DRAFT_ID).await.unwrap();
+
+        assert_eq!(org.as_deref(), Some(OWNER_ORG));
+    }
+
+    #[tokio::test]
+    async fn get_draft_org_id_returns_none_for_an_unknown_draft() {
+        let db = db_with_draft().await;
+
+        let org = get_draft_org_id_in(&db, "missing").await.unwrap();
+
+        assert_eq!(org, None);
+    }
 }

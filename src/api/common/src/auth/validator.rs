@@ -34,8 +34,8 @@ pub use openobserve_core::auth::get_user_email_from_auth_str;
 pub use openobserve_core::authz::{check_permissions, list_objects_for_user};
 use openobserve_core::{
     auth::{
-        AuthExtractor, SESSION_AUTH_MARKER, get_hash, get_user_details, org_from_path, routed_path,
-        try_get_hash,
+        AuthExtractor, SESSION_AUTH_MARKER, get_hash, get_user_details,
+        is_license_path_without_org, org_from_path, routed_path, try_get_hash,
     },
     users,
 };
@@ -63,6 +63,8 @@ pub struct RequestData {
     pub uri: Uri,
     pub method: Method,
     pub headers: HeaderMap,
+    /// The route template axum matched (`MatchedPath`); ingestion is classified by it.
+    pub route: Option<String>,
 }
 
 /// Error type for auth validation
@@ -70,6 +72,8 @@ pub struct RequestData {
 pub enum AuthError {
     Unauthorized(String),
     Forbidden(String),
+    /// A valid credential whose role was refused; `Forbidden` also means a failed credential.
+    RoleRefused(String),
     NotFound(String),
     /// Refused by the failed-login lockout rather than by the credential itself. Only the seconds
     /// left are disclosed: the thresholds behind them stay admin-only, since a brute-forcer who
@@ -77,17 +81,22 @@ pub enum AuthError {
     Locked {
         retry_after_secs: i64,
     },
+    /// The credential could not be checked because a store it needs is down; the client may retry.
+    Unavailable(String),
 }
 
 impl std::fmt::Display for AuthError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AuthError::Unauthorized(msg) => write!(f, "Unauthorized: {}", msg),
-            AuthError::Forbidden(msg) => write!(f, "Forbidden: {}", msg),
+            AuthError::Forbidden(msg) | AuthError::RoleRefused(msg) => {
+                write!(f, "Forbidden: {}", msg)
+            }
             AuthError::NotFound(msg) => write!(f, "NotFound: {}", msg),
             AuthError::Locked { retry_after_secs } => {
                 write!(f, "Locked: {}", lockout_message(*retry_after_secs))
             }
+            AuthError::Unavailable(msg) => write!(f, "Unavailable: {}", msg),
         }
     }
 }
@@ -120,7 +129,9 @@ impl IntoResponse for AuthError {
                     .body(Body::from(msg))
                     .unwrap()
             }
-            AuthError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg).into_response(),
+            AuthError::Forbidden(msg) | AuthError::RoleRefused(msg) => {
+                (StatusCode::FORBIDDEN, msg).into_response()
+            }
             AuthError::NotFound(msg) => (StatusCode::NOT_FOUND, msg).into_response(),
             // 429 rather than 423: `Retry-After` is canonical on it, and clients and proxies
             // already know to back off rather than retry immediately.
@@ -129,6 +140,7 @@ impl IntoResponse for AuthError {
                 .header(header::RETRY_AFTER, retry_after_secs)
                 .body(Body::from(lockout_message(retry_after_secs)))
                 .unwrap(),
+            AuthError::Unavailable(msg) => (StatusCode::SERVICE_UNAVAILABLE, msg).into_response(),
         }
     }
 }
@@ -148,6 +160,7 @@ pub struct AuthValidationResult {
     pub is_internal_user: bool,
     /// Name of the org ingestion token the request authenticated with.
     pub token_name: Option<String>,
+    pub delegation: Option<super::delegation::DelegatedCaller>,
 }
 
 /// What a password comparison decided, once the lockout policy has had its say.
@@ -209,6 +222,7 @@ pub async fn validator(
             user_id,
             password.trim(),
             path,
+            req_data.route.as_deref(),
             &req_data.method,
             from_session,
         )
@@ -217,7 +231,8 @@ pub async fn validator(
         Ok(res) => {
             if res.is_valid {
                 // Check and create organization if needed
-                check_and_create_org(user_id, &req_data.method, path).await?;
+                check_and_create_org(user_id, &req_data.method, path, req_data.route.as_deref())
+                    .await?;
 
                 #[cfg(feature = "enterprise")]
                 let path = path.to_owned();
@@ -234,6 +249,7 @@ pub async fn validator(
                         user_role: res.user_role,
                         is_internal_user: res.is_internal_user,
                         token_name: None,
+                        delegation: None,
                     });
                 }
 
@@ -255,9 +271,10 @@ pub async fn validator(
                         user_role: res.user_role,
                         is_internal_user: res.is_internal_user,
                         token_name,
+                        delegation: None,
                     })
                 } else {
-                    Err(AuthError::Forbidden("Unauthorized Access".to_string()))
+                    Err(AuthError::RoleRefused("Unauthorized Access".to_string()))
                 }
             } else {
                 Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
@@ -291,7 +308,7 @@ pub async fn validate_token(token: &str, org_id: &str) -> Result<(), AuthError> 
 /// `is_external` short-circuit means native/internal principals (incl. root, which is internal)
 /// skip the cache lookup entirely. Kept as one helper so the validator call sites stay identical.
 #[cfg(feature = "enterprise")]
-async fn blocked_external(user: &config::meta::user::User) -> bool {
+pub(crate) async fn blocked_external(user: &config::meta::user::User) -> bool {
     use o2_enterprise::enterprise::domain_management::{self, meta::AccessDecision};
     user.is_external
         && matches!(
@@ -300,19 +317,18 @@ async fn blocked_external(user: &config::meta::user::User) -> bool {
         )
 }
 
-/// Reads whose answer is instance-wide, so membership in the org named by the path is irrelevant.
-///
-/// `license` carries no org at all. `password_complexity` carries one but ignores it: the policy is
-/// the same for every organization, and the caller who most needs it is a user blocked for a forced
-/// password reset — who has to be told what password will satisfy the policy regardless of which
-/// org the console happens to be pointed at. Neither response contains org-scoped data, so nothing
-/// cross-tenant leaks by admitting a non-member.
-fn is_org_agnostic_read(path: &str) -> bool {
-    if path == "license" {
+/// A non-member may be looked up here: license routes name no org, password_complexity ignores it.
+fn is_org_agnostic_path(path: &str) -> bool {
+    if is_license_path_without_org(&path.split('/').collect::<Vec<_>>()) {
         return true;
     }
     let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
     matches!(segments.as_slice(), [_org, "password_complexity"])
+}
+
+/// GHSA-29xv-5rx7-5q7v: matching only the last segment let `/{org}/kv/organizations` skip the org.
+fn is_top_level_org_route(path_columns: &[&str]) -> bool {
+    matches!(path_columns, ["organizations"])
 }
 
 /// Compare a password under the lockout policy, recording the attempt.
@@ -380,10 +396,66 @@ where
     }
 }
 
+#[cfg(feature = "enterprise")]
+async fn fleet_token_response(
+    user_id: &str,
+    token: &str,
+    path_org: Option<&str>,
+    method: &Method,
+    path: &str,
+    route: Option<&str>,
+) -> TokenValidationResponse {
+    let fleet_enabled = openobserve_core::fleet::enabled();
+    fleet_token_response_with(fleet_enabled, user_id, token, path_org, method, path, route).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn fleet_token_response(
+    _user_id: &str,
+    _token: &str,
+    _path_org: Option<&str>,
+    _method: &Method,
+    _path: &str,
+    _route: Option<&str>,
+) -> TokenValidationResponse {
+    TokenValidationResponse::default()
+}
+
+#[cfg(feature = "enterprise")]
+async fn fleet_token_response_with(
+    fleet_enabled: bool,
+    user_id: &str,
+    token: &str,
+    path_org: Option<&str>,
+    method: &Method,
+    path: &str,
+    route: Option<&str>,
+) -> TokenValidationResponse {
+    use o2_enterprise::enterprise::fleet::enrollment::ENROLLMENT;
+
+    let ingestion_write = ingestion_routes::is_ingestion_write(method, path, route);
+    match ENROLLMENT
+        .accept(fleet_enabled, ingestion_write, token, path_org)
+        .await
+    {
+        Some(t) => TokenValidationResponse {
+            is_valid: true,
+            user_email: user_id.to_string(),
+            is_internal_user: true,
+            user_role: None,
+            user_name: t.name.clone(),
+            family_name: "".to_string(),
+            given_name: t.name,
+        },
+        None => TokenValidationResponse::default(),
+    }
+}
+
 pub async fn validate_credentials(
     user_id: &str,
     user_password: &str,
     path: &str,
+    route: Option<&str>,
     method: &Method,
     from_session: bool,
 ) -> Result<TokenValidationResponse, AuthError> {
@@ -437,17 +509,32 @@ pub async fn validate_credentials(
         }
     }
 
+    // Never falls through, so an `o2ft_` value is never tried as a user's password.
+    if user_password.starts_with(config::meta::fleet::FLEET_TOKEN_PREFIX) {
+        return Ok(fleet_token_response(
+            user_id,
+            user_password,
+            path_columns.first().copied(),
+            method,
+            path,
+            route,
+        )
+        .await);
+    }
+
     // Decide whether an org ingestion token (`o2oi_`) may be used on this
     // request. GHSA-wffq-g8qf-ccmv: the previous check accepted the token
     // whenever an ingestion word appeared *anywhere* in the path for *any*
     // method, so `GET /{org}/{stream}/traces/latest` (a data-read route that
     // merely contains the `traces` segment) leaked protected data. The
     // authoritative ingestion-route table classifies the request by method and
-    // exact path shape, so only real writes and the read-only ES handshake
-    // stubs are accepted — data-read routes are not in the table. `path` (not
-    // the trailing-slash-trimmed `path_columns`) is passed so the ES root ping
-    // `GET /{org}/` stays distinguishable from `/organizations` etc.
-    let is_ingestion_path = ingestion_routes::is_ingestion_allowed(method, path);
+    // matched route template, so only real writes and the read-only ES handshake
+    // stubs are accepted — data-read routes are not in the table.
+    // OpAMP accepts fleet tokens only, which returned above.
+    if ingestion_routes::is_opamp(path) {
+        return Ok(TokenValidationResponse::default());
+    }
+    let is_ingestion_path = ingestion_routes::is_ingestion_allowed(method, path, route);
 
     // Check org-level ingestion tokens before user lookup.
     // Org tokens are prefixed with "o2oi_" for fast identification —
@@ -526,7 +613,7 @@ pub async fn validate_credentials(
         }
     }
 
-    let mut user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+    let mut user = if is_top_level_org_route(&path_columns) {
         let db_user = db::user::get_db_user(user_id).await;
         match db_user {
             Ok(user) => {
@@ -571,7 +658,7 @@ pub async fn validate_credentials(
         // rest of api calls will get blocked anyways, but without this,
         // native users get stuck in logout loop if they go to any page calling license
         // api call
-        if is_org_agnostic_read(path)
+        if is_org_agnostic_path(path)
             && let Ok(v) = db::user::get_user_record(user_id).await
         {
             // we set the record manually with minimal permission,
@@ -737,7 +824,7 @@ pub async fn validate_credentials(
             given_name: user.first_name,
         })
     } else {
-        Err(AuthError::Forbidden("Not allowed".to_string()))
+        Err(AuthError::RoleRefused("Not allowed".to_string()))
     }
 }
 
@@ -759,7 +846,7 @@ pub async fn validate_credentials_ext(
         path_columns.pop();
     }
 
-    let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+    let user = if is_top_level_org_route(&path_columns) {
         let db_user = db::user::get_db_user(user_id).await;
         match db_user {
             Ok(user) => {
@@ -863,7 +950,7 @@ pub async fn validate_credentials_ext(
             given_name: user.first_name,
         })
     } else {
-        Err(AuthError::Forbidden("Not allowed".to_string()))
+        Err(AuthError::RoleRefused("Not allowed".to_string()))
     }
 }
 
@@ -871,7 +958,12 @@ pub async fn validate_credentials_ext(
 /// - The org does not exist in the meta table
 /// - The user is a root user
 /// - This is a ingestion POST endpoint
-async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Result<(), AuthError> {
+async fn check_and_create_org(
+    user_id: &str,
+    method: &Method,
+    path: &str,
+    route: Option<&str>,
+) -> Result<(), AuthError> {
     let cfg = get_config();
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.first()
@@ -903,9 +995,12 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
         if !cfg.common.create_org_through_ingestion {
             Err(AuthError::NotFound("Organization not found".to_string()))
         } else if is_root_user(user_id)
-            && ingestion_routes::is_ingestion_write(method, path)
+            && ingestion_routes::is_ingestion_write(method, path, route)
             && openobserve_core::organization::check_and_create_org(org_id)
                 .await
+                .inspect_err(|error| {
+                    log::warn!("Failed to auto-create organization '{org_id}': {error}");
+                })
                 .is_ok()
         {
             Ok(())
@@ -1060,7 +1155,15 @@ pub async fn validator_aws(req_data: &RequestData) -> Result<AuthValidationResul
                     return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
                 };
 
-                match validate_credentials(&user_id, &password, path, &req_data.method, false).await
+                match validate_credentials(
+                    &user_id,
+                    &password,
+                    path,
+                    req_data.route.as_deref(),
+                    &req_data.method,
+                    false,
+                )
+                .await
                 {
                     Ok(res) => {
                         if res.is_valid {
@@ -1069,6 +1172,7 @@ pub async fn validator_aws(req_data: &RequestData) -> Result<AuthValidationResul
                                 user_role: res.user_role,
                                 is_internal_user: res.is_internal_user,
                                 token_name: None,
+                                delegation: None,
                             })
                         } else {
                             Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
@@ -1104,7 +1208,16 @@ pub async fn validator_gcp(req_data: &RequestData) -> Result<AuthValidationResul
                 return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
             };
 
-            match validate_credentials(&user_id, &password, path, &req_data.method, false).await {
+            match validate_credentials(
+                &user_id,
+                &password,
+                path,
+                req_data.route.as_deref(),
+                &req_data.method,
+                false,
+            )
+            .await
+            {
                 Ok(res) => {
                     if res.is_valid {
                         Ok(AuthValidationResult {
@@ -1112,6 +1225,7 @@ pub async fn validator_gcp(req_data: &RequestData) -> Result<AuthValidationResul
                             user_role: res.user_role,
                             is_internal_user: res.is_internal_user,
                             token_name: None,
+                            delegation: None,
                         })
                     } else {
                         Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
@@ -1194,6 +1308,7 @@ pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResul
                         user_role: Some(user.role),
                         is_internal_user: !user.is_external,
                         token_name: None,
+                        delegation: None,
                     })
                 } else {
                     Ok(AuthValidationResult {
@@ -1201,6 +1316,7 @@ pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResul
                         user_role: None,
                         is_internal_user: false,
                         token_name: None,
+                        delegation: None,
                     })
                 }
             }
@@ -1262,6 +1378,19 @@ async fn oo_validator_internal(
             is_from_session,
         )
         .await
+    } else if let Some(token) = auth_str
+        .strip_prefix("Bearer ")
+        .map(str::trim)
+        .filter(|token| token.starts_with(config::utils::delegation::TOKEN_PREFIX))
+    {
+        let result = super::delegation::validate_delegated(
+            token,
+            req_data.uri.path(),
+            path_prefix,
+            &req_data.method,
+        )
+        .await?;
+        super::delegation::authorize(result, auth_info).await
     } else if auth_str.starts_with("Bearer") {
         log::debug!("Bearer token found");
         // token_validator unwraps a "Bearer" prefix, so it must not see the session marker.
@@ -1436,6 +1565,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // This holds structurally — `Splunk` matches no branch in
         // oo_validator_internal and falls through to Unauthorized.
         let req_data = RequestData {
+            route: Some("/api/{org_id}/_bulk".to_string()),
             uri: "/orgb/_bulk".parse::<Uri>().unwrap(),
             method: Method::POST,
             headers: HeaderMap::new(),
@@ -1450,6 +1580,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             use_all_org: false,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         };
 
         let result = oo_validator(&req_data, &auth_info).await;
@@ -1460,6 +1591,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
     async fn auth_ext_token_without_its_prefix_is_rejected() {
         let now = Utc::now().timestamp();
         let req_data = RequestData {
+            route: Some("/api/{org_id}/streams".to_string()),
             uri: "/default/streams".parse::<Uri>().unwrap(),
             method: Method::GET,
             headers: HeaderMap::new(),
@@ -1489,6 +1621,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         let mut headers = HeaderMap::new();
         headers.insert("X-Amz-Firehose-Access-Key", encoded.parse().unwrap());
         let aws = RequestData {
+            route: Some("/aws/{org_id}/{stream_name}/_kinesis_firehose".to_string()),
             uri: "/default/mystream/_kinesis_firehose"
                 .parse::<Uri>()
                 .unwrap(),
@@ -1504,6 +1637,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             .append_pair("API-Key", &encoded)
             .finish();
         let gcp = RequestData {
+            route: Some("/gcp/{org_id}/{stream_name}/_sub".to_string()),
             uri: format!("/default/mystream/_sub?{query}")
                 .parse::<Uri>()
                 .unwrap(),
@@ -1521,6 +1655,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // A GUID is not an `o2oi_` token and is not a user password, so Basic
         // with it must fail too.
         let req_data = RequestData {
+            route: Some("/api/{org_id}/_bulk".to_string()),
             uri: "/orgb/_bulk".parse::<Uri>().unwrap(),
             method: Method::POST,
             headers: HeaderMap::new(),
@@ -1538,6 +1673,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             use_all_org: false,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         };
 
         let result = oo_validator(&req_data, &auth_info).await;
@@ -1747,19 +1883,41 @@ CN5lTowpVXP2OIiiNTGa75Fj
         ORG_INGESTION_TOKENS.insert(format!("{org_id}/{token}"), "regression-token".to_string());
 
         // --- The bypass: data-bearing GET reads must be rejected. ---
-        for path in [
-            "default/mystream/traces/latest", // the exact route from the report
-            "default/mystream/traces/latest_stream",
-            "default/mystream/traces/session",
-            "default/mystream/traces/user",
-            "default/logs/_values",
-            "default/metrics/latest",
+        for (path, route) in [
+            (
+                "default/mystream/traces/latest", // the exact route from the report
+                "/api/{org_id}/{stream_name}/traces/latest",
+            ),
+            (
+                "default/mystream/traces/latest_stream",
+                "/api/{org_id}/{stream_name}/traces/latest_stream",
+            ),
+            (
+                "default/mystream/traces/session",
+                "/api/{org_id}/{stream_name}/traces/session",
+            ),
+            (
+                "default/mystream/traces/user",
+                "/api/{org_id}/{stream_name}/traces/user",
+            ),
+            (
+                "default/logs/_values",
+                "/api/{org_id}/{stream_name}/_values",
+            ),
+            ("default/metrics/latest", "/api/{org_id}/metrics/latest"),
         ] {
             assert!(
-                !validate_credentials("collector@example.com", token, path, &Method::GET, false,)
-                    .await
-                    .unwrap()
-                    .is_valid,
+                !validate_credentials(
+                    "collector@example.com",
+                    token,
+                    path,
+                    Some(route),
+                    &Method::GET,
+                    false,
+                )
+                .await
+                .unwrap()
+                .is_valid,
                 "org ingestion token must not read GET /{path}"
             );
         }
@@ -1768,25 +1926,50 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // template/data-stream/ingest-pipeline POST-create stubs (whose `{name}`
         // is the last segment, so the old last-segment rule would have missed
         // them — the route table matches them by shape). ---
-        for path in [
-            "default/traces",                      // OTLP/native traces write
-            "default/_bulk",                       // ES bulk
-            "default/mystream/_json",              // JSON ingest
-            "default/_hec",                        // Splunk HEC
-            "default/loki/api/v1/push",            // Loki push
-            "default/v1/logs",                     // OTLP logs
-            "default/prometheus/api/v1/write",     // Prometheus remote-write
-            "default/mystream/_kinesis_firehose",  // AWS Firehose
-            "default/mystream/_sub",               // GCP Pub/Sub push
-            "default/_index_template/filebeat-7",  // ES template create
-            "default/_data_stream/filebeat-7",     // ES data-stream create
-            "default/_ingest/pipeline/filebeat-7", // ES ingest-pipeline create
+        for (path, route) in [
+            ("default/traces", "/api/{org_id}/traces"),
+            ("default/_bulk", "/api/{org_id}/_bulk"),
+            (
+                "default/mystream/_json",
+                "/api/{org_id}/{stream_name}/_json",
+            ),
+            ("default/_hec", "/api/{org_id}/_hec"),
+            ("default/loki/api/v1/push", "/api/{org_id}/loki/api/v1/push"),
+            ("default/v1/logs", "/api/{org_id}/v1/logs"),
+            (
+                "default/prometheus/api/v1/write",
+                "/api/{org_id}/prometheus/api/v1/write",
+            ),
+            (
+                "default/mystream/_kinesis_firehose",
+                "/aws/{org_id}/{stream_name}/_kinesis_firehose",
+            ),
+            ("default/mystream/_sub", "/gcp/{org_id}/{stream_name}/_sub"),
+            (
+                "default/_index_template/filebeat-7",
+                "/api/{org_id}/_index_template/{name}",
+            ),
+            (
+                "default/_data_stream/filebeat-7",
+                "/api/{org_id}/_data_stream/{name}",
+            ),
+            (
+                "default/_ingest/pipeline/filebeat-7",
+                "/api/{org_id}/_ingest/pipeline/{name}",
+            ),
         ] {
             assert!(
-                validate_credentials("collector@example.com", token, path, &Method::POST, false,)
-                    .await
-                    .unwrap()
-                    .is_valid,
+                validate_credentials(
+                    "collector@example.com",
+                    token,
+                    path,
+                    Some(route),
+                    &Method::POST,
+                    false,
+                )
+                .await
+                .unwrap()
+                .is_valid,
                 "org ingestion token must be accepted on POST /{path}"
             );
         }
@@ -1798,6 +1981,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
                 "collector@example.com",
                 token,
                 "default",
+                Some("/api/{org_id}"),
                 &Method::POST,
                 false,
             )
@@ -1810,21 +1994,44 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // --- Reads: only the static Elasticsearch handshake/setup stubs (and
         // the bare ES root ping) are reachable so ES ingestion clients connect
         // and load templates. These return no user data. ---
-        for (path, method) in [
-            ("default/", Method::GET),  // ES root version ping `GET /{org}/`
-            ("default/", Method::HEAD), // ES root ping via HEAD
-            ("default/_license", Method::GET),
-            ("default/_xpack", Method::GET),
-            ("default/_ilm/policy/filebeat-7", Method::GET),
-            ("default/_index_template/filebeat-7", Method::GET),
-            ("default/_data_stream/filebeat-7", Method::HEAD),
-            ("default/_ingest/pipeline/filebeat-7", Method::GET),
+        for (path, route, method) in [
+            ("default/", "/api/{org_id}/", Method::GET),
+            ("default/", "/api/{org_id}/", Method::HEAD),
+            ("default/_license", "/api/{org_id}/_license", Method::GET),
+            ("default/_xpack", "/api/{org_id}/_xpack", Method::GET),
+            (
+                "default/_ilm/policy/filebeat-7",
+                "/api/{org_id}/_ilm/policy/{name}",
+                Method::GET,
+            ),
+            (
+                "default/_index_template/filebeat-7",
+                "/api/{org_id}/_index_template/{name}",
+                Method::GET,
+            ),
+            (
+                "default/_data_stream/filebeat-7",
+                "/api/{org_id}/_data_stream/{name}",
+                Method::HEAD,
+            ),
+            (
+                "default/_ingest/pipeline/filebeat-7",
+                "/api/{org_id}/_ingest/pipeline/{name}",
+                Method::GET,
+            ),
         ] {
             assert!(
-                validate_credentials("collector@example.com", token, path, &method, false,)
-                    .await
-                    .unwrap()
-                    .is_valid,
+                validate_credentials(
+                    "collector@example.com",
+                    token,
+                    path,
+                    Some(route),
+                    &method,
+                    false,
+                )
+                .await
+                .unwrap()
+                .is_valid,
                 "org ingestion token must be accepted on {method} /{path}"
             );
         }
@@ -1837,6 +2044,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
                 "collector@example.com",
                 token,
                 "default",
+                Some("/api/{org_id}"),
                 &Method::GET,
                 false,
             )
@@ -1853,6 +2061,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
                 "collector@example.com",
                 token,
                 "default/dashboards",
+                Some("/api/{org_id}/dashboards"),
                 &Method::POST,
                 false,
             )
@@ -1870,6 +2079,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
                     "collector@example.com",
                     token,
                     "default/traces",
+                    Some("/api/{org_id}/traces"),
                     &method,
                     false,
                 )
@@ -1880,7 +2090,139 @@ CN5lTowpVXP2OIiiNTGa75Fj
             );
         }
 
+        // OpAMP is an ingestion-write row, yet only `o2ft_` tokens may manage collectors.
+        for method in [Method::GET, Method::POST] {
+            assert!(
+                !validate_credentials(
+                    "collector@example.com",
+                    token,
+                    "default/v1/opamp",
+                    Some("/api/{org_id}/v1/opamp"),
+                    &method,
+                    false,
+                )
+                .await
+                .unwrap()
+                .is_valid,
+                "org ingestion token must not be accepted on {method} /default/v1/opamp"
+            );
+        }
+
+        // A management write whose last segment is an ingestion literal is not ingestion.
+        for (path, route) in [
+            ("default/kv/_json", "/api/{org_id}/kv/{key}"),
+            (
+                "default/streams/_sub",
+                "/api/{org_id}/streams/{stream_name}",
+            ),
+            (
+                "default/enrichment_tables/_sub",
+                "/api/{org_id}/enrichment_tables/{table_name}",
+            ),
+        ] {
+            assert!(
+                !validate_credentials(
+                    "collector@example.com",
+                    token,
+                    path,
+                    Some(route),
+                    &Method::POST,
+                    false,
+                )
+                .await
+                .unwrap()
+                .is_valid,
+                "org ingestion token must not be accepted on POST {route} as /{path}"
+            );
+        }
+
         ORG_INGESTION_TOKENS.remove(&format!("{org_id}/{token}"));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn fleet_token_is_valid_only_on_its_org_writes_while_fleet_is_on() {
+        use o2_enterprise::enterprise::fleet::enrollment::{CachedToken, ENROLLMENT, hash_token};
+
+        let cached = |id: &str, revoked: bool| CachedToken {
+            id: id.to_string(),
+            org_id: "default".to_string(),
+            name: format!("fleet-{id}"),
+            fleet_id: "default".to_string(),
+            created_at: 1,
+            expires_at: None,
+            revoked,
+            loaded_at: std::time::Instant::now(),
+        };
+        let live = "o2ft_validator_live_0123456789abcdef0";
+        let revoked = "o2ft_validator_revoked_0123456789abc";
+        let hash = hash_token;
+        ENROLLMENT.cache_token(hash(live), cached("live", false));
+        ENROLLMENT.cache_token(hash(revoked), cached("revoked", true));
+        let check = |enabled: bool,
+                     token: &'static str,
+                     method: Method,
+                     path: &'static str,
+                     route: &'static str| async move {
+            let org = path.split('/').next();
+            fleet_token_response_with(enabled, "agent", token, org, &method, path, Some(route))
+                .await
+                .is_valid
+        };
+
+        for (method, path, route) in [
+            (Method::GET, "default/v1/opamp", "/api/{org_id}/v1/opamp"),
+            (Method::POST, "default/v1/opamp", "/api/{org_id}/v1/opamp"),
+            (Method::POST, "default/v1/logs", "/api/{org_id}/v1/logs"),
+            (
+                Method::POST,
+                "default/v1/metrics",
+                "/api/{org_id}/v1/metrics",
+            ),
+        ] {
+            assert!(
+                check(true, live, method.clone(), path, route).await,
+                "{method} /{path}"
+            );
+        }
+        let valid = fleet_token_response_with(
+            true,
+            "agent",
+            live,
+            Some("default"),
+            &Method::POST,
+            "default/v1/opamp",
+            Some("/api/{org_id}/v1/opamp"),
+        )
+        .await;
+        assert_eq!(
+            (
+                valid.user_email.as_str(),
+                valid.is_internal_user,
+                valid.user_role
+            ),
+            ("agent", true, None)
+        );
+        assert_eq!(valid.given_name, "fleet-live");
+
+        let opamp = "/api/{org_id}/v1/opamp";
+        for (method, path, route) in [
+            (Method::POST, "other/v1/opamp", opamp),
+            (
+                Method::GET,
+                "default/mystream/traces/latest",
+                "/api/{org_id}/{stream_name}/traces/latest",
+            ),
+            (Method::GET, "default/", "/api/{org_id}/"),
+            (Method::POST, "default/kv/_json", "/api/{org_id}/kv/{key}"),
+        ] {
+            assert!(
+                !check(true, live, method.clone(), path, route).await,
+                "{method} /{path}"
+            );
+        }
+        assert!(!check(true, revoked, Method::POST, "default/v1/opamp", opamp).await);
+        assert!(!check(false, live, Method::POST, "default/v1/opamp", opamp).await);
     }
 
     #[tokio::test]
@@ -1914,6 +2256,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // token must still be rejected: bypass_check must not double as
         // from_session and skip the allow_static_token policy.
         let req_data = RequestData {
+            route: None,
             uri: "/default/config".parse().unwrap(),
             method: Method::GET,
             headers: HeaderMap::new(),
@@ -1929,7 +2272,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // The same credentials through an assume_service_account session
         // (from_session=true) are accepted.
         assert!(
-            validate_credentials(sa_email, token, "default/config", &Method::GET, true)
+            validate_credentials(sa_email, token, "default/config", None, &Method::GET, true)
                 .await
                 .unwrap()
                 .is_valid,
@@ -1964,6 +2307,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
 
         let credentials = base64::encode(&format!("{sa_email}:{token}"));
         let req_data = RequestData {
+            route: None,
             uri: "/default/users".parse().unwrap(),
             method: Method::GET,
             headers: HeaderMap::new(),
@@ -1978,6 +2322,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             use_all_org: false,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         };
         assert!(
             oo_validator(&req_data, &plain).await.is_err(),
@@ -1997,7 +2342,10 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // The same marker backed by a real assume_service_account session still authenticates.
         let session_id = "session-forged-marker-test";
         USER_SESSIONS.insert(session_id.to_string(), format!("Basic {credentials}"));
-        USER_SESSIONS_EXPIRY.insert(session_id.to_string(), Utc::now().timestamp() + 3600);
+        USER_SESSIONS_EXPIRY.insert(
+            session_id.to_string(),
+            Utc::now().timestamp_micros() + 3_600_000_000,
+        );
         let genuine = AuthExtractor {
             auth: format!("{SESSION_AUTH_MARKER}{session_id}::Basic {credentials}"),
             ..plain.clone()
@@ -2062,43 +2410,52 @@ CN5lTowpVXP2OIiiNTGa75Fj
         .await;
 
         assert!(
-            validate_credentials(init_user, pwd, "default/_bulk", &Method::POST, false)
+            validate_credentials(init_user, pwd, "default/_bulk", None, &Method::POST, false)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials("", pwd, "default/_bulk", &Method::POST, false)
+            !validate_credentials("", pwd, "default/_bulk", None, &Method::POST, false)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials("", pwd, "/", &Method::GET, false)
+            !validate_credentials("", pwd, "/", None, &Method::GET, false)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials(user_id, pwd, "/", &Method::GET, false)
+            !validate_credentials(user_id, pwd, "/", None, &Method::GET, false)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials(user_id, "x", "default/user", &Method::GET, false)
+            !validate_credentials(user_id, "x", "default/user", None, &Method::GET, false)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(validate_user(init_user, pwd).await.unwrap().is_valid);
+        for method in [Method::GET, Method::POST] {
+            assert!(
+                !validate_credentials(init_user, pwd, "default/v1/opamp", None, &method, false)
+                    .await
+                    .unwrap()
+                    .is_valid,
+                "a login must not manage collectors on {method}"
+            );
+        }
         let stored_ext = get_hash(pwd, &config::get_ext_auth_salt());
-        for (path, method) in [
-            ("default/_bulk", Method::POST),
-            ("default/streams", Method::GET),
+        for (path, route, method) in [
+            ("default/_bulk", "/api/{org_id}/_bulk", Method::POST),
+            ("default/streams", "/api/{org_id}/streams", Method::GET),
         ] {
             assert!(
-                !validate_credentials(init_user, &stored_ext, path, &method, false)
+                !validate_credentials(init_user, &stored_ext, path, Some(route), &method, false)
                     .await
                     .unwrap()
                     .is_valid,
@@ -2109,9 +2466,85 @@ CN5lTowpVXP2OIiiNTGa75Fj
         exercise_empty_password_rejected(org_id).await;
         exercise_saltless_sso_user_refused(org_id).await;
         exercise_path_org_is_the_routed_org().await;
+        exercise_object_named_organizations_stays_in_its_org(org_id).await;
+        exercise_user_path_refusal_is_a_role_refusal(org_id).await;
+
+        let static_token = users::get_user(Some(org_id), init_user)
+            .await
+            .unwrap()
+            .token;
+        assert!(
+            validate_credentials(
+                init_user,
+                &static_token,
+                "default/v1/logs",
+                Some("/api/{org_id}/v1/logs"),
+                &Method::POST,
+                false
+            )
+            .await
+            .unwrap()
+            .is_valid
+        );
+        assert!(
+            !validate_credentials(
+                init_user,
+                &static_token,
+                "default/v1/opamp",
+                Some("/api/{org_id}/v1/opamp"),
+                &Method::POST,
+                false
+            )
+            .await
+            .unwrap()
+            .is_valid,
+            "a user's ingestion-only static token must not manage collectors"
+        );
+        fleet_prefixed_password_never_reaches_the_user_lookup(org_id, init_user).await;
+        exercise_root_creates_an_org_only_on_an_ingestion_route(init_user, pwd).await;
 
         #[cfg(feature = "enterprise")]
         exercise_lockout(org_id, init_user, pwd).await;
+    }
+
+    async fn exercise_root_creates_an_org_only_on_an_ingestion_route(root_user: &str, pwd: &str) {
+        // `is_root_user` reads the org-user cache, which nothing populates under test.
+        ORG_USERS.insert(
+            format!("{DEFAULT_ORG}/{root_user}"),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: "root_token".to_string(),
+                rum_token: None,
+                org_id: DEFAULT_ORG.to_string(),
+                email: root_user.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+        let credentials = base64::encode(&format!("{root_user}:{pwd}"));
+        let auth = AuthExtractor::bypass(format!("Basic {credentials}"), String::new());
+        for (org, uri, route, created) in [
+            (
+                "autoviakv",
+                "/autoviakv/kv/_json",
+                "/api/{org_id}/kv/{key}",
+                false,
+            ),
+            (
+                "autoviabulk",
+                "/autoviabulk/_bulk",
+                "/api/{org_id}/_bulk",
+                true,
+            ),
+        ] {
+            let result = oo_validator(&post_request(uri, route, HeaderMap::new()), &auth).await;
+            assert_eq!(result.is_ok(), created, "root POST {uri}");
+            assert_eq!(
+                organization::get_org(org).await.is_some(),
+                created,
+                "org {org}"
+            );
+        }
     }
 
     // NULL `password_ext`, exactly as the SRE-agent service-account migration writes it.
@@ -2146,13 +2579,84 @@ CN5lTowpVXP2OIiiNTGa75Fj
             .unwrap();
     }
 
+    // The user lookup ignores case and the email comparison does not, which reaches this refusal.
+    async fn exercise_user_path_refusal_is_a_role_refusal(org_id: &str) {
+        let pwd = "Complexpass#123";
+        let login = "Path-Viewer@example.com";
+        let stored = login.to_lowercase();
+        seed_user_without_password_ext(org_id, &stored, UserRole::Viewer, pwd, "path-viewer").await;
+        let path = "default/stream/traces/user";
+        let refused = validate_credentials(login, pwd, path, None, &Method::GET, false).await;
+        assert!(
+            matches!(&refused, Err(AuthError::RoleRefused(msg)) if msg == "Not allowed"),
+            "a verified non-admin on a /user path: {:?}",
+            refused.map(|res| res.is_valid)
+        );
+        let bad = validate_credentials(login, "wrong", path, None, &Method::GET, false).await;
+        assert!(
+            !bad.unwrap().is_valid,
+            "a bad password stays a failed login"
+        );
+    }
+
+    async fn exercise_object_named_organizations_stays_in_its_org(victim_org: &str) {
+        let pwd = "Complexpass#123";
+        let attacker = "other-org-member@example.com";
+        let _ = organization::check_and_create_org_without_ofga("attacker_org").await;
+        seed_user_without_password_ext("attacker_org", attacker, UserRole::Admin, pwd, "atk-tok")
+            .await;
+        assert!(
+            validate_credentials(
+                attacker,
+                pwd,
+                "attacker_org/kv/organizations",
+                None,
+                &Method::GET,
+                false
+            )
+            .await
+            .unwrap()
+            .is_valid,
+            "a member must still reach its own org"
+        );
+        for (path, method) in [
+            ("kv/organizations", Method::GET),
+            ("kv/organizations", Method::POST),
+            ("alerts/templates/organizations", Method::GET),
+            ("functions/organizations", Method::PUT),
+            ("enrichment_tables/organizations", Method::POST),
+            ("streams/organizations", Method::DELETE),
+            ("organizations", Method::DELETE),
+        ] {
+            let path = format!("{victim_org}/{path}");
+            assert!(
+                !validate_credentials(attacker, pwd, &path, None, &method, false)
+                    .await
+                    .unwrap()
+                    .is_valid,
+                "GHSA-29xv-5rx7-5q7v: a non-member was accepted on {method} /{path}"
+            );
+        }
+    }
+
     // Each URI is what the auth layer sees once axum has stripped its mount.
     async fn exercise_path_org_is_the_routed_org() {
         let pwd = "Complexpass#123";
         let member = "kv-member@example.com";
-        for org in ["kv", "api", "v2", "aws", "gcp"] {
+        for org in ["kv", "api", "aws", "gcp"] {
             let _ = organization::check_and_create_org_without_ofga(org).await;
         }
+        // `v2` is reserved for new orgs, so it is seeded as an org that predates the reservation.
+        let _ = infra::table::organizations::add(
+            "v2",
+            "v2",
+            config::meta::organization::OrganizationType::Custom,
+        )
+        .await;
+        assert!(
+            organization::get_org("v2").await.is_some(),
+            "org v2 is not seeded"
+        );
         seed_user_without_password_ext("kv", member, UserRole::Admin, pwd, "kv-member-tok").await;
         let credentials = base64::encode(&format!("{member}:{pwd}"));
         let basic = AuthExtractor::bypass(format!("Basic {credentials}"), String::new());
@@ -2160,9 +2664,13 @@ CN5lTowpVXP2OIiiNTGa75Fj
         let mut failures = routed_org_failures(&basic, "Basic").await;
         let mut firehose = HeaderMap::new();
         firehose.insert("X-Amz-Firehose-Access-Key", credentials.parse().unwrap());
-        if validator_aws(&post_request("/aws/kv/_kinesis_firehose", firehose))
-            .await
-            .is_ok()
+        if validator_aws(&post_request(
+            "/aws/kv/_kinesis_firehose",
+            "/aws/{org_id}/{stream_name}/_kinesis_firehose",
+            firehose,
+        ))
+        .await
+        .is_ok()
         {
             failures.push("POST /aws/aws/kv/_kinesis_firehose: accepted for org aws".to_string());
         }
@@ -2171,6 +2679,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             .finish();
         if validator_gcp(&post_request(
             &format!("/gcp/kv/_sub?{query}"),
+            "/gcp/{org_id}/{stream_name}/_sub",
             HeaderMap::new(),
         ))
         .await
@@ -2186,8 +2695,9 @@ CN5lTowpVXP2OIiiNTGa75Fj
         assert!(failures.is_empty(), "{failures:#?}");
     }
 
-    fn post_request(uri: &str, headers: HeaderMap) -> RequestData {
+    fn post_request(uri: &str, route: &str, headers: HeaderMap) -> RequestData {
         RequestData {
+            route: Some(route.to_string()),
             uri: uri.parse().unwrap(),
             method: Method::POST,
             headers,
@@ -2196,17 +2706,21 @@ CN5lTowpVXP2OIiiNTGa75Fj
 
     // A member of `kv` is served in `kv` and refused by the orgs named like route segments.
     async fn routed_org_failures(auth: &AuthExtractor, scheme: &str) -> Vec<String> {
+        const KV_ROUTE: &str = "/api/{org_id}/kv/{key}";
         let mut failures = vec![];
-        if oo_validator(&post_request("/kv/kv/note", HeaderMap::new()), auth)
-            .await
-            .is_err()
+        if oo_validator(
+            &post_request("/kv/kv/note", KV_ROUTE, HeaderMap::new()),
+            auth,
+        )
+        .await
+        .is_err()
         {
             failures.push(format!(
                 "{scheme} POST /api/kv/kv/note: a member of kv was refused in kv"
             ));
         }
         for (served, uri) in [("api", "/api/kv/note"), ("v2", "/v2/kv/note")] {
-            if oo_validator(&post_request(uri, HeaderMap::new()), auth)
+            if oo_validator(&post_request(uri, KV_ROUTE, HeaderMap::new()), auth)
                 .await
                 .is_ok()
             {
@@ -2314,9 +2828,16 @@ CN5lTowpVXP2OIiiNTGa75Fj
 
         for guess in ["anything", " "] {
             assert!(
-                !validate_credentials(sso_user, guess, "default/streams", &Method::GET, false)
-                    .await
-                    .is_ok_and(|r| r.is_valid)
+                !validate_credentials(
+                    sso_user,
+                    guess,
+                    "default/streams",
+                    None,
+                    &Method::GET,
+                    false
+                )
+                .await
+                .is_ok_and(|r| r.is_valid)
             );
             assert!(
                 !validate_user(sso_user, guess)
@@ -2326,6 +2847,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         }
         let credentials = base64::encode(&format!("{sso_user}:anything"));
         let req_data = RequestData {
+            route: Some("/api/{org_id}/streams".to_string()),
             uri: "/default/streams".parse().unwrap(),
             method: Method::GET,
             headers: HeaderMap::new(),
@@ -2346,10 +2868,17 @@ CN5lTowpVXP2OIiiNTGa75Fj
             .await;
 
         assert!(
-            validate_credentials(plain_user, pwd, "default/streams", &Method::GET, false)
-                .await
-                .unwrap()
-                .is_valid,
+            validate_credentials(
+                plain_user,
+                pwd,
+                "default/streams",
+                None,
+                &Method::GET,
+                false
+            )
+            .await
+            .unwrap()
+            .is_valid,
             "the seeded user must still sign in with its real password"
         );
         let mut accepted = vec![];
@@ -2359,7 +2888,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
                 ("default/_search", Method::POST),
                 ("default/users", Method::GET),
             ] {
-                let res = validate_credentials(email, "", path, &method, false).await;
+                let res = validate_credentials(email, "", path, None, &method, false).await;
                 if res.is_ok_and(|r| r.is_valid) {
                     accepted.push(format!("validate_credentials {email} {method} /{path}"));
                 }
@@ -2368,6 +2897,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         for email in [sre_agent, plain_user] {
             let credentials = base64::encode(&format!("{email}:"));
             let req_data = RequestData {
+                route: None,
                 uri: "/default/streams".parse().unwrap(),
                 method: Method::GET,
                 headers: HeaderMap::new(),
@@ -2398,6 +2928,59 @@ CN5lTowpVXP2OIiiNTGa75Fj
                     .unwrap()
                     .is_valid,
                 "auth_ext for {email} without a password_ext must be refused"
+            );
+        }
+    }
+
+    /// A real user whose password happens to start `o2ft_` still cannot log in with it.
+    async fn fleet_prefixed_password_never_reaches_the_user_lookup(org_id: &str, root_user: &str) {
+        let user = "fleetpwd@example.com";
+        let pwd = "o2ft_Complexpass#123";
+        // `is_root_user` reads the org-user cache, which nothing populates under test.
+        ORG_USERS.insert(
+            format!("{DEFAULT_ORG}/{root_user}"),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: "root_token".to_string(),
+                rum_token: None,
+                org_id: DEFAULT_ORG.to_string(),
+                email: root_user.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+        let _ = users::post_user(
+            org_id,
+            UserRequest {
+                email: user.to_string(),
+                password: pwd.to_string(),
+                role: common::meta::user::UserOrgRole {
+                    base_role: config::meta::user::UserRole::Admin,
+                    custom_role: None,
+                },
+                first_name: "fleet".to_owned(),
+                last_name: "".to_owned(),
+                is_external: false,
+                token: None,
+            },
+            root_user,
+        )
+        .await;
+        assert!(
+            users::get_user(Some(org_id), user).await.is_some(),
+            "fixture must create the user"
+        );
+        for (path, method) in [
+            ("default/v1/opamp", Method::POST),
+            ("default/v1/logs", Method::POST),
+            ("default/user", Method::GET),
+        ] {
+            assert!(
+                !validate_credentials(user, pwd, path, None, &method, false)
+                    .await
+                    .unwrap()
+                    .is_valid,
+                "an o2ft_ password reached the user lookup on {method} /{path}"
             );
         }
     }
@@ -2473,19 +3056,33 @@ CN5lTowpVXP2OIiiNTGa75Fj
             "root must never acquire lockout state"
         );
         assert!(
-            validate_credentials(root_user, root_pwd, "default/_bulk", &Method::POST, false)
-                .await
-                .unwrap()
-                .is_valid,
+            validate_credentials(
+                root_user,
+                root_pwd,
+                "default/_bulk",
+                None,
+                &Method::POST,
+                false
+            )
+            .await
+            .unwrap()
+            .is_valid,
             "root is never locked out"
         );
 
         // Without this the final assertion would also hold for a user who was never created.
         assert!(
-            validate_credentials(locked_user, pwd, "default/_bulk", &Method::POST, false)
-                .await
-                .unwrap()
-                .is_valid,
+            validate_credentials(
+                locked_user,
+                pwd,
+                "default/_bulk",
+                None,
+                &Method::POST,
+                false
+            )
+            .await
+            .unwrap()
+            .is_valid,
             "the fixture's user must authenticate before being locked out"
         );
         assert_eq!(
@@ -2551,7 +3148,9 @@ CN5lTowpVXP2OIiiNTGa75Fj
     /// mismatch. Panics if the credentials are accepted.
     #[cfg(feature = "enterprise")]
     async fn refuse(user: &str, password: &str) -> Option<i64> {
-        match validate_credentials(user, password, "default/_bulk", &Method::POST, false).await {
+        match validate_credentials(user, password, "default/_bulk", None, &Method::POST, false)
+            .await
+        {
             Ok(response) => {
                 assert!(!response.is_valid, "{user} was expected to be refused");
                 None
@@ -2574,6 +3173,12 @@ CN5lTowpVXP2OIiiNTGa75Fj
             "42",
             "clients and proxies back off on the header, not on the sentence"
         );
+    }
+
+    #[test]
+    fn an_unavailable_store_answers_503() {
+        let response = AuthError::Unavailable("Service Unavailable".to_string()).into_response();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 
     #[test]
@@ -2669,16 +3274,17 @@ CN5lTowpVXP2OIiiNTGa75Fj
     }
 
     #[test]
-    fn test_validate_credentials_path_handling() {
-        // Test path handling in validate_credentials
-        let path_columns = ["api", "v1", "organizations"];
-        let last_segment = path_columns.last().unwrap_or(&"");
-        assert_eq!(*last_segment, "organizations");
-
-        // Test path with trailing slash
-        let path_with_slash = ["api", "v1", "logs", ""];
-        let last_segment_with_slash = path_with_slash.last().unwrap_or(&"");
-        assert_eq!(*last_segment_with_slash, "");
+    fn only_the_top_level_org_route_skips_the_path_org() {
+        assert!(is_top_level_org_route(&["organizations"]));
+        for path in [
+            &["acme", "kv", "organizations"][..],
+            &["acme", "alerts", "templates", "organizations"],
+            &["acme", "streams", "organizations"],
+            &["acme", "organizations"],
+            &["_meta", "organizations"],
+        ] {
+            assert!(!is_top_level_org_route(path), "{path:?}");
+        }
     }
 
     #[test]
@@ -2712,24 +3318,78 @@ CN5lTowpVXP2OIiiNTGa75Fj
 
     #[test]
     fn org_agnostic_reads_cover_license_and_password_complexity() {
-        assert!(is_org_agnostic_read("license"));
-        assert!(is_org_agnostic_read("acme/password_complexity"));
-        assert!(is_org_agnostic_read("_meta/password_complexity"));
+        assert!(is_org_agnostic_path("license"));
+        assert!(is_org_agnostic_path("license/refresh"));
+        assert!(is_org_agnostic_path("acme/password_complexity"));
+        assert!(is_org_agnostic_path("_meta/password_complexity"));
         // An org literally named "api" still resolves as an org.
-        assert!(is_org_agnostic_read("api/password_complexity"));
+        assert!(is_org_agnostic_path("api/password_complexity"));
     }
 
     #[test]
     fn org_agnostic_reads_do_not_widen_anything_else() {
         // Authoring the policy keeps its org-membership requirement.
-        assert!(!is_org_agnostic_read("acme/settings/password_policy"));
-        assert!(!is_org_agnostic_read("_meta/settings/password_policy"));
+        assert!(!is_org_agnostic_path("acme/settings/password_policy"));
+        assert!(!is_org_agnostic_path("_meta/settings/password_policy"));
         // Neither do neighbouring or deeper paths.
-        assert!(!is_org_agnostic_read("acme/password_complexity/detail"));
+        assert!(!is_org_agnostic_path("acme/password_complexity/detail"));
         // The path arrives nest-stripped, so a leading `api` is an org name, not the mount.
-        assert!(!is_org_agnostic_read("api/kv/password_complexity"));
-        assert!(!is_org_agnostic_read("acme/streams"));
-        assert!(!is_org_agnostic_read("password_complexity"));
-        assert!(!is_org_agnostic_read("license/keys"));
+        assert!(!is_org_agnostic_path("api/kv/password_complexity"));
+        assert!(!is_org_agnostic_path("acme/streams"));
+        assert!(!is_org_agnostic_path("password_complexity"));
+        assert!(!is_org_agnostic_path("license/keys"));
+        assert!(!is_org_agnostic_path("license/refresh/now"));
+        assert!(!is_org_agnostic_path("license/refresh/"));
+        assert!(!is_org_agnostic_path("acme/license/refresh"));
+    }
+
+    #[tokio::test]
+    async fn an_o2dt_bearer_token_goes_to_the_delegated_validator() {
+        let req_data = RequestData {
+            route: None,
+            uri: "/api/default/streams".parse::<Uri>().unwrap(),
+            method: Method::GET,
+            headers: HeaderMap::new(),
+        };
+        let auth_info = AuthExtractor::bypass("Bearer o2dt.e30.bWFj".to_string(), String::new());
+        match oo_validator(&req_data, &auth_info).await {
+            Err(AuthError::Unauthorized(msg)) => assert_eq!(msg, "Unauthorized Access"),
+            Err(other) => panic!("expected 401, got {other}"),
+            Ok(_) => panic!("a forged delegated token was accepted"),
+        }
+    }
+
+    /// The source pins what may reveal a locked license; files outside this list are not read.
+    #[test]
+    fn test_role_refused_sites_are_pinned_with_no_auth_error_after_their_role_check() {
+        const GUARDS: [&str; 2] = ["check_permissions(", "path.contains(\"/user\")"];
+        for (file, source, sites) in [
+            ("validator.rs", include_str!("validator.rs"), 3),
+            ("token.rs", include_str!("token.rs"), 1),
+            ("delegation.rs", include_str!("delegation.rs"), 1),
+        ] {
+            let (production, _) = source
+                .split_once("\n#[cfg(test)]\nmod tests {")
+                .unwrap_or_else(|| panic!("{file}: test module marker moved; update this scan"));
+            let refusals: Vec<usize> = production
+                .match_indices("Err(AuthError::RoleRefused(")
+                .map(|(at, _)| at)
+                .collect();
+            assert_eq!(
+                refusals.len(),
+                sites,
+                "{file}: RoleRefused site count changed; it reveals the license, review each site"
+            );
+            for at in refusals {
+                let before = &production[..at];
+                let guard = GUARDS.iter().filter_map(|g| before.rfind(g)).max();
+                let guard = guard.unwrap_or_else(|| panic!("{file}: no role check before {at}"));
+                assert!(
+                    !before[guard..].contains("AuthError::"),
+                    "{file}: another auth error sits between the role check and RoleRefused: {}",
+                    &before[guard..]
+                );
+            }
+        }
     }
 }

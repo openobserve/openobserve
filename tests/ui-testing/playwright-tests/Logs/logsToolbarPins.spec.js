@@ -135,15 +135,14 @@ test.describe('Logs toolbar pins', () => {
     expect(await pins.readPins()).toContain('quickMode');
 
     await pins.gotoTracesViaNav();
-    // Its own default being pinned proves the traces scope really instantiated.
-    await pins.expectTracesPinState('savedViews', true);
+    // Traces has no default pins, and logs' quickMode pin must not leak into it.
+    await pins.expectTracesPinState('savedViews', false);
     await pins.expectTracesPinState('histogram', false);
     await pins.expectTracesMetricsPinnedHidden();
 
     await pins.toggleTracesPin('histogram');
     const tracesPins = JSON.parse((await pins.readTracesPins()) ?? 'null');
-    expect(tracesPins).toContain('savedViews');
-    expect(tracesPins).toContain('histogram');
+    expect(tracesPins).toEqual(['histogram']);
     expect(tracesPins).not.toContain('quickMode');
 
     // Same document, so this reads the live shared map, not storage.
@@ -212,6 +211,60 @@ test.describe('Logs toolbar pins', () => {
     testLogger.info(
       `Pinned items kept per width: ${kept.map((e) => `${e.width}px:${e.count}`).join(', ')}` +
         ` | first collapse at ${collapsedAt.width}px, dropped: ${dropped.join(', ')}`,
+    );
+  });
+
+  test('the syntax guide pin is tracked via the menu pin button title', {
+    tag: ['@toolbarPins', '@logs', '@P2', '@all'],
+  }, async () => {
+    const pins = pm.logsToolbarPinsPage;
+    await pins.seedPinStorage();
+    await pins.navigateToLogs(getOrgIdentifier());
+
+    await pins.openMoreMenu();
+    // The pinned syntax guide control never reaches the DOM (its ODropdown root
+    // drops the data-test), so its pin state is assertable only via this title.
+    await pins.expectPinToggleTitle('syntaxGuide', pins.pinTitle.unpinned);
+
+    await pins.clickPinToggle('syntaxGuide');
+    await pins.expectPinToggleTitle('syntaxGuide', pins.pinTitle.pinned);
+    expect(await pins.readPins()).toContain('syntaxGuide');
+
+    await pins.closeMoreMenu();
+
+    testLogger.info('Syntax guide pin state was tracked through the menu pin button title');
+  });
+
+  test('the function editor outlives the width budget that collapses the left section', {
+    tag: ['@toolbarPins', '@logs', '@P2', '@all'],
+  }, async () => {
+    const pins = pm.logsToolbarPinsPage;
+    // Left section pinned too, so the budget contends and the exemption is a contrast.
+    await pins.seedPinStorage({
+      pins: [...pins.leftSectionOrder, 'functionEditor'],
+      decided: true,
+    });
+    await pins.navigateToLogs(getOrgIdentifier());
+    await pins.expectPinnedUnclipped('functionEditor');
+
+    const kept = [];
+    for (const width of [1700, 1300, 1100, 900, 700]) {
+      // The settled left-pin set is the barrier: it only changes once the ResizeObserver fired.
+      const visible = await pins.setViewportWidthAndSettle(width);
+      kept.push({ width, count: visible.length });
+      await pins.expectPinnedUnclipped('functionEditor');
+    }
+
+    // Without a width that actually dropped a left pin, the sweep proves nothing.
+    expect(kept[0].count, 'the whole left section must fit at the widest viewport').toBe(
+      pins.assertablePinOrder.length,
+    );
+    const collapsed = kept.find((entry) => entry.count < pins.assertablePinOrder.length);
+    expect(collapsed, 'no width in the sweep collapsed a left-section pin').toBeDefined();
+
+    testLogger.info(
+      `Left pins kept per width: ${kept.map((e) => `${e.width}px:${e.count}`).join(', ')}` +
+        ` | first collapse at ${collapsed.width}px, function editor unclipped throughout`,
     );
   });
 });

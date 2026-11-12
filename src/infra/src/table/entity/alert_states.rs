@@ -57,6 +57,11 @@ pub struct Model {
     pub recovering_since: Option<i64>,
     /// Rollup row only: the downtime that suppressed the latest firing run.
     pub last_downtime_id: Option<String>,
+    /// Start of the current firing cycle (µs). NULL = not firing.
+    pub firing_started_at: Option<i64>,
+    /// Group rows only: the group's label map as serialized JSON.
+    #[sea_orm(column_type = "Text", nullable)]
+    pub group_label_set: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

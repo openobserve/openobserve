@@ -9,6 +9,7 @@ import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import useDragHandle from "@/composables/useDragHandle";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 // Disable auto-attribute inheritance so the consumer's `data-test="..."` lands
 // on the inner clickable TabsTrigger (Reka button) instead of the wrapper
@@ -24,16 +25,14 @@ const slots = defineSlots<OTabSlots>();
 
 const context = inject<ComputedRef<TabsContext>>(TABS_CONTEXT_KEY);
 
+const isDisabled = useLockedDisabled(() => props.disable);
 const isActive = computed<boolean>(() => context?.value.modelValue === props.name);
 const isDense = computed<boolean>(() => context?.value.dense ?? false);
 const isVertical = computed<boolean>(() => context?.value.isVertical ?? false);
 const isReorderable = computed<boolean>(() => context?.value.reorderable ?? false);
 /** Reorderable, and this tab hasn't opted out (e.g. while its label is edited). */
 const isDraggable = computed<boolean>(() => isReorderable.value && !props.disableDrag);
-// Drag starts only from the grip: mousedown on the grip arms the tab's
-// `draggable` attribute for the duration of that press (useDragHandle disarms
-// on mouseup/dragend), so grabbing the tab body just clicks/selects — text on
-// the label stays selectable-feeling and accidental drags can't happen.
+// Only a grip press arms a drag; it stops mousedown because the trigger selects on press, which would navigate away.
 const { arm: armDrag, isArmed: isDragArmed } = useDragHandle();
 /** This tab is the one being dragged → dim it. */
 const isDragging = computed<boolean>(
@@ -92,15 +91,25 @@ const baseClasses = computed<string>(() =>
           : "px-2",
     "font-normal text-sm whitespace-nowrap",
     isVertical.value ? "rounded-default" : "rounded-t-default",
-    "outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150",
+    "outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke] duration-(--duration-hover-out) hover:duration-(--duration-hover-in)",
     "select-none",
-    "ring-offset-1 ring-offset-surface-base",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tabs-indicator",
+    "focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-focus-ring-accent",
+    // The horizontal strip scrolls on x, which clips y as well, so an outside outline would lose its bottom edge.
+    isVertical.value ? "focus-visible:outline-offset-2" : "focus-visible:-outline-offset-2",
   ].join(" "),
 );
 
 const stateClasses = computed<string>(() => {
-  if (props.disable) {
+  // A locked page disables its active tab too; it still has to read as the current one.
+  if (isDisabled.value && isActive.value) {
+    return [
+      "text-tabs-active-text cursor-not-allowed opacity-60",
+      isVertical.value
+        ? "bg-tabs-active-bg border-s-2 border-tabs-indicator"
+        : "border-b-2 border-transparent",
+    ].join(" ");
+  }
+  if (isDisabled.value) {
     return [
       "text-tabs-disabled-text cursor-not-allowed opacity-60",
       // Keep the transparent left border so disabled items don't shift width.
@@ -146,7 +155,7 @@ const heightClasses = computed<string>(() => {
     on the button itself never renders. The span wrapper intercepts hover and
     shows the cursor and tooltip even when the inner button is disabled.
   -->
-  <span :class="disable ? 'cursor-not-allowed' : 'contents'">
+  <span :class="isDisabled ? 'cursor-not-allowed' : 'contents'">
     <!--
       TabsTrigger handles: role="tab", aria-selected, tabindex (via RovingFocusItem),
       disabled, data-state, click/keyboard activation, and aria-controls linkage.
@@ -158,8 +167,8 @@ const heightClasses = computed<string>(() => {
     -->
     <TabsTrigger
       :value="name"
-      :disabled="disable"
-      :aria-disabled="disable || undefined"
+      :disabled="isDisabled"
+      :aria-disabled="isDisabled || undefined"
       :id="`tab-${name}`"
       :aria-controls="`tab-panel-${name}`"
       :class="[baseClasses, stateClasses, heightClasses, isDragging ? 'opacity-40' : '']"
@@ -185,7 +194,7 @@ const heightClasses = computed<string>(() => {
            (disableDrag, e.g. label editing) the grip stays mounted but inert so
            nothing shifts. Decorative for AT — drag has no keyboard path. -->
       <span
-        v-if="isReorderable && !disable"
+        v-if="isReorderable && !isDisabled"
         aria-hidden="true"
         data-otab-grip
         class="absolute inset-y-0 left-0 z-10 flex w-3 items-center justify-center transition-opacity duration-150"
@@ -194,7 +203,7 @@ const heightClasses = computed<string>(() => {
             ? 'cursor-grab opacity-0 group-hover/otab:opacity-50 hover:!opacity-100 active:cursor-grabbing'
             : 'pointer-events-none opacity-0'
         "
-        @mousedown="isDraggable && armDrag()"
+        @mousedown.stop="isDraggable && armDrag()"
       >
         <OIcon name="drag-indicator" size="sm" />
       </span>
@@ -239,8 +248,11 @@ const heightClasses = computed<string>(() => {
           :name="suffixIcon as any"
           size="xs"
           class="ms-auto shrink-0"
-          :class="suffixIcon === 'lock' ? 'text-warning-600' : ''"
+          :class="suffixIcon === 'lock' ? 'lock-chip' : ''"
         />
+        <span v-if="suffixIcon === 'lock' && (suffixLabel ?? tooltip)" class="sr-only">{{
+          suffixLabel ?? tooltip
+        }}</span>
       </template>
       <slot v-else />
     </TabsTrigger>

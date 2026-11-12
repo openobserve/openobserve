@@ -22,271 +22,152 @@
       </div>
       <span class="mx-0.5 flex items-center" data-test="dashboard-filter-layout-separator">:</span>
       <div
-        class="droppable scroll flex min-h-9 flex-wrap items-center ps-0.5"
+        class="flex min-h-9 min-w-0 flex-1 items-center ps-0.5"
         data-test="dashboard-filter-layout"
         :data-condition-count="conditionCount"
       >
-        <Group
-          v-if="topLevelGroup"
-          :group="topLevelGroup"
-          :group-nested-index="0"
-          :group-index="0"
-          :schema-options="schemaOptions"
-          :dashboard-variables-filter-items="dashboardVariablesFilterItems(0)"
-          :load-filter-item="loadFilterItem"
-          :dashboard-panel-data="dashboardPanelData"
-          @add-condition="addConditionToGroup"
-          @add-group="addGroupToGroup"
-          @remove-group="() => removeGroup(0)"
-          @logical-operator-change="handleLogicalOperatorChange"
+        <FilterBuilder
+          profile="dashboard-panel"
+          :model-value="filterTree"
+          :fields="fields"
+          :load-values="loadValues"
+          :extra-value-suggestions="variableSuggestions"
+          appearance="plain"
+          data-test="dashboard-filter-builder"
+          @update:model-value="onFilterChange"
         />
       </div>
-      <div></div>
     </div>
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent, ref, computed, inject } from "vue";
-import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
-import { useI18nTyped } from "@/types/i18n";
+<script setup lang="ts">
+import { computed, inject } from "vue";
 import { useRoute } from "vue-router";
+import { useStore } from "vuex";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import { requestFieldValues } from "@/composables/fieldValueStore";
+import { useI18nTyped } from "@/types/i18n";
 import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
-import Group from "./Group.vue";
+import { toFilterFieldType, type FilterField } from "@/utils/query/filterBar";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import {
+  dashboardFieldKey,
+  type DashboardColumn,
+  type DashboardFilterGroup,
+} from "@/components/filterBar/codecs";
 
-export default defineComponent({
-  name: "DashboardFiltersOption",
-  components: {
-    Group,
-  },
-  // labelWidthClass keeps the ":" separator aligned with the parent chart's
-  // axis labels (e.g. geomap's wider "Longitude"). Defaults to the main
-  // builder's width.
-  props: {
-    dashboardData: { type: Object, default: undefined },
-    labelWidthClass: { type: String, default: "min-w-20" },
-  },
+defineOptions({ name: "DashboardFiltersOption" });
 
-  setup(props) {
-    const route = useRoute();
-    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+const props = withDefaults(
+  defineProps<{
+    dashboardData?: any;
+    labelWidthClass?: string;
+  }>(),
+  { dashboardData: undefined, labelWidthClass: "min-w-20" },
+);
 
-    const { t } = useI18nTyped();
-    const {
-      dashboardPanelData,
-      removeFilterItem,
-      loadFilterItem,
-      selectedStreamFieldsBasedOnUserDefinedSchema,
-    } = useDashboardPanelData(dashboardPanelDataPageKey, t);
+const route = useRoute();
+const store = useStore();
+const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+const { t } = useI18nTyped();
+const { dashboardPanelData, getStreamNameFromStreamAlias } = useDashboardPanelData(
+  dashboardPanelDataPageKey,
+  t,
+);
 
-    const showAddMenu = ref(false);
+const currentQuery = computed(
+  () => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex || 0],
+);
 
-    const topLevelGroup = computed(() => {
-      return dashboardPanelData?.data?.queries?.[dashboardPanelData?.layout?.currentQueryIndex || 0]
-        ?.fields?.filter;
-    });
+// The field list adds filters by pushing into the saved tree in place, so the builder gets a copy per content change.
+const filterSnapshot = computed(() => JSON.stringify(currentQuery.value?.fields?.filter ?? null));
+const filterTree = computed<DashboardFilterGroup | null>(() => JSON.parse(filterSnapshot.value));
 
-    /**
-     * Recursive count of leaf conditions (filterType === "condition"), traversing nested groups.
-     * Mirrors what `[data-test^="dashboard-add-condition-label-"]` counts in the DOM, so e2e tests
-     * can read this attribute directly instead of polling the DOM for row mounts.
-     */
-    const conditionCount = computed<number>(() => {
-      const countLeaves = (group: any): number => {
-        if (!group?.conditions?.length) return 0;
-        return group.conditions.reduce((sum: number, c: any) => {
-          if (c?.filterType === "condition") return sum + 1;
-          if (c?.filterType === "group") return sum + countLeaves(c);
-          return sum;
-        }, 0);
-      };
-      return countLeaves(topLevelGroup.value);
-    });
+const countLeaves = (group: any): number =>
+  (group?.conditions ?? []).reduce((sum: number, item: any) => {
+    if (item?.filterType === "condition") return sum + 1;
+    if (item?.filterType === "group") return sum + countLeaves(item);
+    return sum;
+  }, 0);
 
-    const addFilter = (filterType: string) => {
-      showAddMenu.value = false;
-      const currentQuery =
-        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+/** Leaf conditions in the filter tree, read by e2e tests instead of counting chips. */
+const conditionCount = computed<number>(() => countLeaves(currentQuery.value?.fields?.filter));
 
-      if (filterType === "condition") {
-        const firstOption = schemaOptions.value[0];
-        const defaultCondition = {
-          type: "list",
-          column: {
-            field: firstOption?.value || "",
-            streamAlias: firstOption?.streamAlias,
-          },
-          filterType: "condition",
-          operator: null,
-          value: null,
-          logicalOperator: "AND",
-          values: [],
-        };
-        currentQuery.fields?.filter.conditions.push(defaultCondition);
-      } else if (filterType === "group") {
-        const defaultGroup = {
-          conditions: [
-            {
-              type: "list",
-              column: {
-                field: schemaOptions.value[0]?.value || "",
-                streamAlias: schemaOptions.value[0]?.streamAlias,
-              },
-              filterType: "condition",
-              operator: null,
-              value: null,
-              logicalOperator: "AND",
-              values: [],
-            },
-          ],
-          filterType: "group",
-          logicalOperator: "AND",
-        };
-        currentQuery.fields?.filter.conditions.push(defaultGroup);
-      }
-    };
-
-    const addConditionToGroup = (group: any) => {
-      const firstOption = schemaOptions.value[0];
-      group.conditions.push({
-        type: "list",
-        column: {
-          field: firstOption?.value || "",
-          streamAlias: firstOption?.streamAlias,
-        },
-        filterType: "condition",
-        operator: null,
-        value: null,
-        logicalOperator: "AND",
-        values: [],
-      });
-    };
-
-    const addGroupToGroup = (group: any) => {
-      group.conditions.push({
-        conditions: [
-          {
-            type: "list",
-            column: {
-              field: schemaOptions.value[0]?.value || "",
-              streamAlias: schemaOptions.value[0]?.streamAlias,
-            },
-            filterType: "condition",
-            operator: null,
-            value: null,
-            logicalOperator: "AND",
-            values: [],
-          },
-        ],
-        filterType: "group",
-        logicalOperator: "AND",
-      });
-    };
-
-    const removeGroup = (index: number) => {
-      const currentQuery =
-        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
-      currentQuery.fields?.filter?.splice(index, 1);
-    };
-
-    const handleLogicalOperatorChange = (index: number, newOperator: string) => {
-      const currentQuery =
-        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
-      const item = currentQuery.fields?.filter.conditions[index];
-
-      if (item) {
-        if (item.filterType === "condition") {
-          item.logicalOperator = newOperator;
-        } else if (item.filterType === "group") {
-          updateGroupLogicalOperators(item, newOperator);
-        }
-      }
-    };
-
-    const updateGroupLogicalOperators = (group: any, newOperator: string) => {
-      group.logicalOperator = newOperator;
-      group.conditions.forEach((condition: any) => {
-        if (condition.filterType === "group") {
-          updateGroupLogicalOperators(condition, newOperator);
-        } else {
-          condition.logicalOperator = newOperator;
-        }
-      });
-    };
-
-    const dashboardVariablesFilterItems = (index: number) => {
-      const currentPanelId = route.query.panelId as string;
-      const currentTabId = route.query.tab as string;
-      const allVars = props.dashboardData?.variables?.list ?? [];
-
-      // Filter to show only: global + current tab + current panel variables
-      const filteredVars = allVars.filter((v: any) => {
-        const scopeType = getScopeType(v);
-
-        if (scopeType === "global") {
-          return true; // Always show global
-        }
-
-        if (scopeType === "tabs") {
-          // Show if variable is scoped to current tab
-          return v.tabs && v.tabs.includes(currentTabId);
-        }
-
-        if (scopeType === "panels") {
-          // In EDIT mode: show if variable is scoped to current panel
-          // In ADD mode: show if variable uses "current_panel"
-          if (currentPanelId) {
-            return v.panels && v.panels.includes(currentPanelId);
-          } else {
-            return v.panels && v.panels.includes("current_panel");
-          }
-        }
-
-        return false;
-      });
-
-      return filteredVars.map((it: any) => {
-        let value;
-        const operator =
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-            ?.filter?.conditions?.[index]?.operator || null;
-
-        if (operator === "Contains" || operator === "Not Contains") {
-          value = it.multiSelect ? "(" + "$" + "{" + it.name + "}" + ")" : "$" + it.name;
-        } else {
-          value = it.multiSelect ? "(" + "$" + "{" + it.name + "}" + ")" : "$" + it.name;
-        }
-
-        return {
-          label: it.name,
-          value: value,
-        };
-      });
-    };
-
-    const schemaOptions = computed(() =>
-      selectedStreamFieldsBasedOnUserDefinedSchema?.value?.map((field: any) => ({
-        label: field.name,
-        value: field.name,
-      })),
-    );
-
-    return {
-      t,
-      showAddMenu,
-      dashboardPanelData,
-      removeFilterItem,
-      loadFilterItem,
-      addFilter,
-      addConditionToGroup,
-      addGroupToGroup,
-      removeGroup,
-      handleLogicalOperatorChange,
-      dashboardVariablesFilterItems,
-      schemaOptions,
-      topLevelGroup,
-      conditionCount,
-    };
-  },
+// A joined stream's columns are named `alias.field`, the key the codec gives a saved column.
+const fields = computed<FilterField[]>(() => {
+  const groups: any[] = dashboardPanelData.meta?.streamFields?.groupedFields ?? [];
+  const seen = new Set<string>();
+  const list: FilterField[] = [];
+  for (const group of groups) {
+    const streamAlias = group?.stream_alias ?? undefined;
+    for (const column of group?.schema ?? []) {
+      if (!column?.name) continue;
+      const payload: DashboardColumn = { field: column.name, streamAlias };
+      const name = dashboardFieldKey(payload);
+      if (seen.has(name)) continue;
+      seen.add(name);
+      list.push({ name, type: toFilterFieldType(column.type), payload });
+    }
+  }
+  return list;
 });
+
+const columnFor = (key: string): DashboardColumn => {
+  const known = fields.value.find((field) => field.name === key)?.payload as
+    DashboardColumn | undefined;
+  return known ?? { field: key };
+};
+
+// The panel's range, in the microseconds the values API takes; absent until the date picker has run.
+const panelTimeRange = () => {
+  const range: any = dashboardPanelData.meta?.dateTime;
+  const start = range?.start_time?.getTime?.();
+  const end = range?.end_time?.getTime?.();
+  return Number.isFinite(start) && Number.isFinite(end)
+    ? { startTime: start as number, endTime: end as number }
+    : undefined;
+};
+
+const loadValues = async (key: string, search: string): Promise<string[]> => {
+  const column = columnFor(key);
+  const streamName = column.streamAlias
+    ? getStreamNameFromStreamAlias(column.streamAlias)
+    : currentQuery.value?.fields?.stream;
+  if (!streamName) return [];
+  const values = await requestFieldValues(
+    {
+      org: store.state.selectedOrganization.identifier,
+      streamType: currentQuery.value?.fields?.stream_type ?? "logs",
+      streamName,
+    },
+    column.field,
+    { timeRange: panelTimeRange(), keyword: search || undefined },
+  );
+  return [...values].sort((a, b) => a.localeCompare(b));
+};
+
+// Global, this tab's and this panel's variables; a new panel's own variables are scoped to "current_panel".
+const visibleVariables = computed(() => {
+  const panelId = route.query.panelId as string | undefined;
+  const tabId = route.query.tab as string | undefined;
+  return (props.dashboardData?.variables?.list ?? []).filter((variable: any) => {
+    const scope = getScopeType(variable);
+    if (scope === "global") return true;
+    if (scope === "tabs") return Boolean(variable.tabs?.includes(tabId));
+    if (scope === "panels") return Boolean(variable.panels?.includes(panelId ?? "current_panel"));
+    return false;
+  });
+});
+
+const variableSuggestions = (): string[] =>
+  visibleVariables.value.map((variable: any) =>
+    variable.multiSelect ? `(\${${variable.name}})` : `$${variable.name}`,
+  );
+
+function onFilterChange(next: unknown) {
+  const query = currentQuery.value;
+  if (!query?.fields) return;
+  query.fields.filter = next as DashboardFilterGroup;
+}
 </script>

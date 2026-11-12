@@ -13,8 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, onScopeDispose, ref, shallowRef, watch } from "vue";
+import { computed, onScopeDispose, reactive, ref, shallowRef, watch } from "vue";
 import { type TranslateFn, I18nText } from "@/types/i18n";
+import {
+  filterGroupsOf,
+  hasFilterGroups,
+  INVERSE,
+  type LabelMatchOp,
+} from "@/components/promql/labelBoolean";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import useHttpStreamingSearch from "@/composables/useStreamingSearch";
@@ -24,9 +30,10 @@ import { isEqual } from "lodash-es";
 import { generateTraceContext } from "@/utils/zincutils";
 import { parseSearchError, toSearchErrorObject } from "@/utils/query/searchError";
 import StreamService from "@/services/stream";
-import metricsService from "@/services/metrics";
+import metricsService, { type MetricUsageCounts } from "@/services/metrics";
 import {
   buildMetricCards,
+  labelsOf,
   operandStreamsOf,
   type MetricCard,
   type MetricStream,
@@ -36,16 +43,21 @@ import {
   computeSuffixGroups,
   MISC_GROUP_ID,
   matchesSearch,
+  matchesSearchName,
   type PrefixGroup,
   type SuffixGroup,
 } from "@/utils/metrics/prefixGrouping";
 import {
+  buildExportIntervalQuery,
   buildPresenceQuery,
+  computeAlignedStepSeconds,
   computeRateWindow,
   computePercentileWindow,
-  computeStepSeconds,
   computeWidenedRateWindows,
   DEFAULT_SCRAPE_INTERVAL_SECONDS,
+  EXPORT_INTERVAL_PROBE_WINDOWS,
+  MIN_STEP_SECONDS,
+  snapExportInterval,
   baseNameOf,
   getMetricDefaults,
   inferUnit,
@@ -61,11 +73,16 @@ import {
   PRIORITY,
 } from "./useMetricsPreviewQueue";
 import { useMetricsExplorerExemplars } from "./useMetricsExplorerExemplars";
+import { exportIntervalCache } from "./metricExportInterval";
 
 export interface LabelFilter {
   label: I18nText;
   value: string;
   operator?: string;
+  /** The OR group; absent means the base list every group is ANDed with. */
+  group?: number;
+  /** Set on every filter of a negated group. */
+  negate?: boolean;
 }
 
 /**
@@ -80,7 +97,17 @@ export const labelFilterKey = (filter: LabelFilter): string =>
   // the source makes git classify the whole file as BINARY: no line-by-line diff
   // in review, and some editors refuse to open it at all. Same runtime value,
   // plain-text source.
-  `${filter.label}\u0000${filter.operator ?? "="}\u0000${filter.value}`;
+  `${filter.label}\u0000${filter.operator ?? "="}\u0000${filter.value}${
+    filter.group ? `\u0000${filter.group}` : ""
+  }`;
+
+export type ExplorerSort = "a-z" | "z-a" | "dashboards" | "alerts";
+
+/** Narrows the grid to metrics that some object of this kind reads. */
+export type UsageFilter = "dashboards" | "alerts" | "slos";
+
+/** The org's usage counts, fetched at most once per org in a session: a full scan of the org. */
+const orgUsageCache = new Map<string, Promise<Record<string, MetricUsageCounts>>>();
 
 /** A query window other than the grid's own, in µs. */
 export interface QueryWindow {
@@ -168,6 +195,10 @@ export interface CardPreview {
   cachedTimeRange?: { start_time: number; end_time: number } | null;
   /** The function actually in effect — reflects a ⚙ override, not the default. */
   footerLabel: string;
+  /** The results describe the window before a range change; dims while the new window loads. */
+  windowStale?: boolean;
+  /** Epoch ms of the refresh that failed while `stale` keeps the previous result. */
+  failedAt?: number | null;
 }
 
 export interface FnOverride {
@@ -259,6 +290,14 @@ export const SWEEP_DEBOUNCE_MS = 250;
  * "a whole new page". The button's label is computed from this constant.
  */
 export const PAGE_SIZE_INCREMENT = 6;
+/**
+ * A single "Show more" may pull at most this many budget batches while
+ * stepping over no-data cards. A guard, not a target: it stops a long run of
+ * empty metrics from walking the whole list in one click. ~8 batches is the
+ * same order as a handful of manual clicks, never the query storm an unbounded
+ * fill would cost on a sparse org.
+ */
+export const SHOW_MORE_MAX_BATCHES = 8;
 
 /** Cards are ~40-60 points wide; a coarse step keeps preview responses tiny. */
 const PREVIEW_POINTS = 50;
@@ -266,7 +305,7 @@ const PREVIEW_POINTS = 50;
 const HEATMAP_POINTS = 40;
 
 /** The label-values picker fans out over at most this many matching streams. */
-const LABEL_VALUE_FANOUT = 5;
+const LABEL_VALUE_FANOUT = 10;
 const LABEL_VALUE_CAP = 100;
 
 const storageKey = (kind: string, org: string) => `o2.metricsExplorer.${kind}.${org}`;
@@ -289,6 +328,22 @@ function writeJson(key: string, value: unknown) {
   }
 }
 
+/** PromQL reads an absent label as "", so a matcher that passes "" never needs the label. */
+function passesAbsent(op: LabelMatchOp, value: string): boolean {
+  if (op === "=") return value === "";
+  if (op === "!=") return value !== "";
+  try {
+    return new RegExp(`^(?:${value})$`).test("") === (op === "=~");
+  } catch {
+    return false;
+  }
+}
+
+/** A kept chart with nothing in flight behind it is settled; with no chart there is nothing to keep. */
+function settledSnapshot(preview: CardPreview): CardPreview | null {
+  return preview.results.length ? { ...preview, status: "done" } : null;
+}
+
 export function useMetricsExplorerGrid(t: TranslateFn) {
   const store = useStore();
   const { getStreams } = useStreams(t);
@@ -309,7 +364,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const selectedSuffixes = ref<Set<string>>(new Set());
   const selectedTypes = ref<Set<string>>(new Set());
   const labelFilters = ref<LabelFilter[]>([]);
-  const sortBy = ref<"a-z" | "z-a">("a-z");
+  const sortBy = ref<ExplorerSort>("a-z");
+  const usageFilters = ref<Set<UsageFilter>>(new Set());
   const viewMode = ref<"grid" | "rows">("grid");
   /**
    * The rail is exactly three filter panels. `""` means every panel is closed —
@@ -549,6 +605,36 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     }
   };
 
+  const streamSchemaInFlight = new Map<string, Promise<void>>();
+
+  /** One stream's labels from its own schema; a failure leaves it unknown, so readers fail open. */
+  const loadStreamSchema = (name: string): Promise<void> => {
+    const generation = orgGeneration;
+    // Keyed by org generation: a request still pending for the previous org must not stand in for this one.
+    const key = `${generation}:${name}`;
+    const pending = streamSchemaInFlight.get(key);
+    if (pending) return pending;
+    const request = StreamService.schema(org.value, name, "metrics")
+      .then((response: any) => {
+        if (generation !== orgGeneration) return;
+        const labels = labelsOf({ ...(response?.data ?? {}), name } as MetricStream);
+        if (labels) labelsByStream.value = { ...labelsByStream.value, [name]: labels };
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (streamSchemaInFlight.get(key) === request) streamSchemaInFlight.delete(key);
+      });
+    streamSchemaInFlight.set(key, request);
+    return request;
+  };
+
+  /** Labels for just these streams, without the org-wide schema sweep `ensureSchemas` runs. */
+  const ensureStreamSchemas = async (names: string[]): Promise<void> => {
+    if (schemaLoaded.value) return;
+    const missing = [...new Set(names)].filter((name) => !labelsByStream.value[name]);
+    await Promise.all(missing.map(loadStreamSchema));
+  };
+
   /* ------------------------------------------------------------ filtering */
 
   /**
@@ -573,13 +659,35 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * card would quietly render unfiltered data. Narrowing the grid — rather than
    * charting a lie — is what makes the chips safe.
    */
-  const isLabelEligible = (card: MetricCard): boolean =>
-    inapplicableLabelFilters(card).length === 0;
+  const isLabelEligible = (card: MetricCard): boolean => labelFit(card).eligible;
 
-  /** The active filters this card cannot apply (those `isLabelEligible` fails on). */
-  const inapplicableLabelFilters = (card: MetricCard): LabelFilter[] => {
-    if (labelFilters.value.length === 0) return [];
-    if (!membershipKnown.value) return [];
+  /** The base filters this card's streams lack a label of; OR groups run as written, so never listed. */
+  const inapplicableLabelFilters = (card: MetricCard): LabelFilter[] => labelFit(card).inapplicable;
+
+  /** A stream with no known schema cannot be proven to carry the label. */
+  const carriedBy = (streams: string[], filter: LabelFilter): boolean =>
+    streams.every((stream) => {
+      const labels = labelsByStream.value[stream];
+      return !!labels && labels.includes(filter.label);
+    });
+
+  /** Built once per filter change; `labelFit` runs for every card on every grid pass. */
+  const labelGroups = computed(() =>
+    hasFilterGroups(labelFilters.value)
+      ? filterGroupsOf(labelFilters.value).map(({ negate, members }) => ({
+          negate,
+          members: members.map((filter) => {
+            const op = (filter.operator ?? "=") as LabelMatchOp;
+            return { filter, absentOk: passesAbsent(negate ? INVERSE[op] : op, filter.value) };
+          }),
+        }))
+      : null,
+  );
+
+  const labelFit = (card: MetricCard): { eligible: boolean; inapplicable: LabelFilter[] } => {
+    if (labelFilters.value.length === 0 || !membershipKnown.value) {
+      return { eligible: true, inapplicable: [] };
+    }
 
     // The streams the EFFECTIVE variant reads — not the card kind's default ones.
     // A ⚙ override changes the operands: a histogram switched to "Rate of count"
@@ -589,14 +697,18 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // the card would chart unfiltered data under an active filter chip. That is
     // the exact lie this whole eligibility rule exists to prevent.
     const operands = operandStreamsOfVariant(card);
-    return labelFilters.value.filter(
-      (filter) =>
-        !operands.every((stream) => {
-          const labels = labelsByStream.value[stream];
-          // A stream with no known schema cannot be proven to carry the label.
-          return !!labels && labels.includes(filter.label);
-        }),
+    const missing = labelFilters.value.filter((filter) => !carriedBy(operands, filter));
+    const groups = labelGroups.value;
+    if (!groups) return { eligible: missing.length === 0, inapplicable: missing };
+    // Grid narrowing only: the query keeps every group, since a negated or empty-matching one still matches here.
+    const baseMissing = missing.filter((f) => (f.group ?? 0) <= 0);
+    const fits = ({ filter, absentOk }: { filter: LabelFilter; absentOk: boolean }) =>
+      absentOk || carriedBy(operands, filter);
+    // A negated group pushes down to one branch per inverted member, so any one fitting suffices.
+    const someGroupFits = groups.some(({ negate, members }) =>
+      negate ? members.some(fits) : members.every(fits),
     );
+    return { eligible: !baseMissing.length && someGroupFits, inapplicable: baseMissing };
   };
 
   /**
@@ -632,6 +744,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * times over.
    */
   const emptyMetrics = ref<Set<string>>(new Set());
+  /** Slice cards whose sweep request has settled in this window, preview or not. */
+  const sweptNames = ref<Set<string>>(new Set());
 
   /**
    * Metrics whose settled-empty preview has already spent its one bounded
@@ -674,6 +788,58 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     emptyRecheckedCards.value = next;
   };
 
+  /** `null` until the org's usage has loaded; only a usage sort or filter asks for it. */
+  const metricUsage = shallowRef<Record<string, MetricUsageCounts> | null>(null);
+  const usageLoading = ref(false);
+  const usageError = ref(false);
+  const needsUsage = computed(
+    () => sortBy.value === "dashboards" || sortBy.value === "alerts" || usageFilters.value.size > 0,
+  );
+
+  const loadUsage = async () => {
+    const orgId = org.value;
+    if (!orgId) return;
+    let request = orgUsageCache.get(orgId);
+    if (!request) {
+      request = metricsService
+        .getOrgMetricUsage({ org_identifier: orgId })
+        .then((res) => res.data?.metrics ?? {});
+      orgUsageCache.set(orgId, request);
+    }
+    usageLoading.value = true;
+    usageError.value = false;
+    try {
+      const usage = await request;
+      if (org.value === orgId) metricUsage.value = usage;
+    } catch {
+      // Not cached, so a retry scans again.
+      orgUsageCache.delete(orgId);
+      if (org.value === orgId) usageError.value = true;
+    } finally {
+      if (org.value === orgId) usageLoading.value = false;
+    }
+  };
+
+  watch(
+    [needsUsage, org],
+    ([needed], [, previousOrg]) => {
+      if (org.value !== previousOrg) {
+        metricUsage.value = null;
+        usageLoading.value = false;
+        usageError.value = false;
+      }
+      if (needed && !metricUsage.value) loadUsage();
+    },
+    { immediate: true },
+  );
+
+  /** Fails open until usage has loaded, so a pending or failed scan never empties the grid. */
+  const passesUsage = (card: MetricCard): boolean => {
+    if (!usageFilters.value.size || !metricUsage.value) return true;
+    const counts = metricUsage.value[card.name];
+    return !!counts && [...usageFilters.value].every((kind) => counts[kind] > 0);
+  };
+
   /** Everything except one facet — for that facet's "how many more" counts. */
   const passesExcept = (card: MetricCard, except: string): boolean => {
     if (except !== "search" && !matchesSearch(card.name, card.help, searchTerm.value)) return false;
@@ -704,6 +870,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     if (showFavoritesOnly.value && !favorites.value.includes(card.name)) return false;
     if (except !== "empty" && hideEmptyPanels.value && emptyMetrics.value.has(card.name))
       return false;
+    if (!passesUsage(card)) return false;
     return true;
   };
 
@@ -742,6 +909,19 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     const out = [...list];
     out.sort((a, b) => a.name.localeCompare(b.name));
     if (sortBy.value === "z-a") out.reverse();
+    const kind = sortBy.value;
+    if ((kind === "dashboards" || kind === "alerts") && metricUsage.value) {
+      const usage = metricUsage.value;
+      // Stable over the A–Z order above, so equally used metrics stay alphabetical.
+      out.sort((a, b) => (usage[b.name]?.[kind] ?? 0) - (usage[a.name]?.[kind] ?? 0));
+    }
+    const query = searchTerm.value;
+    if (!query) return out;
+    // Stable, so each group keeps the order chosen above; help-only hits otherwise fill page one.
+    const nameHits = new Set(
+      out.filter((c) => matchesSearchName(c.name, query)).map((c) => c.name),
+    );
+    out.sort((a, b) => Number(nameHits.has(b.name)) - Number(nameHits.has(a.name)));
     return out;
   };
 
@@ -758,13 +938,18 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * cost the page size exists to bound.
    *
    * So the budget is counted BEFORE the no-data filter and the hiding happens
-   * WITHIN the slice: at most `pageSize` cards are ever rendered or queried, and
-   * hiding empties shrinks the visible grid rather than refilling it. "Show more"
-   * is how the user asks to spend more.
+   * WITHIN the slice: at most `pageSize` cards are ever rendered, and hiding
+   * empties shrinks the visible grid rather than refilling it. "Show more" is how
+   * the user asks to spend more, and its look-ahead is the only thing that queries
+   * past the slice, in bounded batches; it also runs once per page generation
+   * when a page resolves to nothing visible.
    */
   const sortedCandidates = computed(() =>
     sortCards(cards.value.filter((card) => passesExcept(card, "empty"))),
   );
+
+  // A reload rebuilds every card, so array identity changes even when the list itself did not.
+  const candidatesKey = computed(() => sortedCandidates.value.map((card) => card.name).join("\n"));
 
   const isHiddenAsEmpty = (card: MetricCard) =>
     hideEmptyPanels.value && emptyMetrics.value.has(card.name);
@@ -820,29 +1005,103 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const pageSize = ref(INITIAL_PAGE_SIZE);
 
   /**
-   * The page's query budget: at most `pageSize` cards, chosen BEFORE the no-data
-   * filter. Nothing outside this slice is ever rendered or queried.
+   * The page's committed query budget: at most `pageSize` cards, chosen BEFORE the
+   * no-data filter. Nothing outside it is rendered; only a "Show more" look-ahead
+   * queries past it, in bounded batches, before committing a larger slice.
    */
   const pageSlice = computed(() => sortedCandidates.value.slice(0, pageSize.value));
 
   /** The slice actually rendered. Colour index is position in this same order. */
   const pagedCards = computed(() => pageSlice.value.filter((card) => !isHiddenAsEmpty(card)));
 
+  /** Emptiness is known: the card has an answer for this window, or its sweep ended without one. */
+  const isResolved = (card: MetricCard): boolean => {
+    if (card.unsupported) return true;
+    const preview = previews.value[card.name];
+    if (!preview) return sweptNames.value.has(card.name);
+    if (preview.status === "loading") return false;
+    // A kept chart whose new-window request was cancelled waits for its next visit, not the grid.
+    return !preview.windowStale || sweptNames.value.has(card.name);
+  };
+
+  /** The slice's emptiness sweep has not settled, so the count waits and unknown slots stay placeholders (M-1). */
+  const holding = computed(
+    () => hideEmptyPanels.value && pageSlice.value.some((card) => !isResolved(card)),
+  );
+
+  const namesOf = (list: MetricCard[]) => list.map((card) => card.name);
+  const startsWith = (list: string[], head: string[]) =>
+    head.length <= list.length && head.every((name, i) => list[i] === name);
+
+  /** The slice's cards with data, in order, up to the first card whose emptiness is still unknown. */
+  const knownPrefix = computed(() => {
+    const names: string[] = [];
+    for (const card of pageSlice.value) {
+      if (!isResolved(card)) break;
+      if (!isHiddenAsEmpty(card)) names.push(card.name);
+    }
+    return names;
+  });
+
+  const gridView = shallowRef<{
+    slice: string[];
+    filtered: boolean;
+    shown: string[];
+    placeholders: number;
+  }>({ slice: [], filtered: false, shown: [], placeholders: 0 });
+  // Pre-flush, not sync: a preview write and its emptiness mark land in the same tick and must be read together.
+  watch(
+    [holding, pagedCards, knownPrefix, hideEmptyPanels],
+    () => {
+      const slice = namesOf(pageSlice.value);
+      const filtered = hideEmptyPanels.value;
+      if (!holding.value) {
+        gridView.value = { slice, filtered, shown: namesOf(pagedCards.value), placeholders: 0 };
+        return;
+      }
+      const previous = gridView.value;
+      const sameSearch =
+        previous.filtered && previous.slice.length > 0 && startsWith(slice, previous.slice);
+      const prefix = knownPrefix.value;
+      // Within a search the grid only appends, so a drawn card never moves or leaves (M-1).
+      const shown = !sameSearch || startsWith(prefix, previous.shown) ? prefix : previous.shown;
+      const placeholders = Math.max(0, pagedCards.value.length - shown.length);
+      gridView.value = { slice, filtered, shown, placeholders };
+    },
+    { immediate: true },
+  );
+
+  /** What the grid draws: the cards known in order, then same-size placeholders for the slots still unknown. */
+  const displayed = computed<{
+    cards: MetricCard[];
+    placeholders: number;
+    /** Drawn cards whose new answer is empty: each keeps its slot as a placeholder until the slice settles. */
+    emptyHeld: Set<string>;
+  }>(() => {
+    if (!holding.value) return { cards: pagedCards.value, placeholders: 0, emptyHeld: new Set() };
+    const byName = new Map(pageSlice.value.map((card) => [card.name, card]));
+    const view = gridView.value;
+    const cards = view.shown.map((name) => byName.get(name)).filter((c): c is MetricCard => !!c);
+    return {
+      cards,
+      placeholders: view.placeholders,
+      // Empty cards are never shown with "With data" on, and a drawn slot never closes up mid-search (M-1).
+      emptyHeld: new Set(namesOf(cards.filter(isHiddenAsEmpty))),
+    };
+  });
+
   const hasMore = computed(() => sortedCandidates.value.length > pageSize.value);
   const remainingCount = computed(() =>
     Math.max(0, sortedCandidates.value.length - pageSize.value),
   );
 
-  /**
-   * A single "Show more" may pull at most this many budget batches while
-   * stepping over no-data cards. A guard, not a target: it stops a long run of
-   * empty metrics from walking the whole list in one click. ~8 batches is the
-   * same order as a handful of manual clicks, never the query storm an unbounded
-   * fill would cost on a sparse org.
-   */
-  const SHOW_MORE_MAX_BATCHES = 8;
   /** True while a "Show more" click is resolving; drives the button's spinner. */
   const showingMore = ref(false);
+
+  // Bumped whenever the look-ahead is owed again (page reset, new window, filter off), so an older walk never commits.
+  let pageGeneration = 0;
+  // Generation whose look-ahead walk committed: one walk per generation, then only Show more.
+  let autoAdvancedFor: number | null = null;
 
   /**
    * Reveal one more page.
@@ -854,7 +1113,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * cards are found (or SHOW_MORE_MAX_BATCHES caps the walk), and only THEN
    * commit the budget. One commit per click — committing per batch made the
    * grid grow in visible steps, and rendering cards before their emptiness was
-   * known made the count tick back down as they resolved.
+   * known made the count tick back down as they resolved. The auto-advance below
+   * calls this too, at most once per page generation.
    */
   const showMore = async () => {
     if (!hideEmptyPanels.value) {
@@ -865,6 +1125,12 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     showingMore.value = true;
     try {
       const cands = sortedCandidates.value;
+      const generation = pageGeneration;
+      // A reload or usage re-sort changes the list without a page reset, and `cursor` indexes the old one.
+      const key = candidatesKey.value;
+      // Paused means nobody is looking; the auto-advance re-runs the walk on unpause if it is still owed.
+      const abandoned = () =>
+        pageGeneration !== generation || candidatesKey.value !== key || paused.value;
       let cursor = pageSize.value;
       let revealed = 0;
       let batches = 0;
@@ -873,6 +1139,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         cursor < cands.length &&
         revealed < PAGE_SIZE_INCREMENT
       ) {
+        if (abandoned()) return;
         const next = Math.min(cands.length, cursor + PAGE_SIZE_INCREMENT);
         await Promise.all(
           cands
@@ -885,8 +1152,9 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       }
       // The list changed while we were querying (filter edit, org switch) — the
       // reset watcher already chose the right page size for the new list.
-      if (sortedCandidates.value !== cands) return;
+      if (abandoned()) return;
       pageSize.value = cursor;
+      autoAdvancedFor = generation;
     } finally {
       showingMore.value = false;
     }
@@ -904,13 +1172,28 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       selectedTypes,
       labelFilters,
       sortBy,
+      usageFilters,
       showFavoritesOnly,
     ],
     () => {
+      pageGeneration++;
       pageSize.value = INITIAL_PAGE_SIZE;
     },
     { deep: true },
   );
+
+  watch(hideEmptyPanels, (on) => {
+    // Turning it back on then finds this generation unwalked, so the same list earns a fresh auto-advance.
+    if (!on) pageGeneration++;
+  });
+
+  // After the page-one reset (watchers flush in creation order); `showingMore` re-runs it so an aborted walk is retried.
+  watch([pagedCards, pageSlice, hasMore, hideEmptyPanels, paused, showingMore], () => {
+    if (!hideEmptyPanels.value || paused.value || showingMore.value) return;
+    if (!hasMore.value || !pageSlice.value.length || pagedCards.value.length) return;
+    if (autoAdvancedFor === pageGeneration) return;
+    void showMore();
+  });
 
   const clearFilters = () => {
     searchTerm.value = "";
@@ -918,6 +1201,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     selectedSuffixes.value = new Set();
     selectedTypes.value = new Set();
     labelFilters.value = [];
+    usageFilters.value = new Set();
     // Otherwise unpinning your last favorite while this is on strands you on an
     // empty grid with no visible way out.
     showFavoritesOnly.value = false;
@@ -929,6 +1213,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       selectedSuffixes.value.size +
       selectedTypes.value.size +
       labelFilters.value.length +
+      usageFilters.value.size +
       (searchTerm.value ? 1 : 0) +
       (showFavoritesOnly.value ? 1 : 0),
   );
@@ -969,6 +1254,25 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const pointsFor = (card: MetricCard) =>
     card.chartType === "heatmap" ? HEATMAP_POINTS : PREVIEW_POINTS;
 
+  /** Intervals measured by this grid; reactive per key, so a landing measurement re-renders only its cards. */
+  const measuredIntervals = reactive(new Map<string, number>());
+
+  /** Keyed on the stream the card's default query reads: a histogram card's own name holds no samples. */
+  const exportIntervalKey = (card: MetricCard) =>
+    `${org.value}|${operandStreamsOf(card)[0] ?? card.name}`;
+
+  /** The interval a card's step aligns to: measured when known, else the org's scrape interval, so the first query already fits it. */
+  const exportIntervalFor = (card: MetricCard): number => {
+    const key = exportIntervalKey(card);
+    return (
+      measuredIntervals.get(key) || exportIntervalCache.peek(key) || scrapeIntervalSeconds.value
+    );
+  };
+
+  /** A card's step: from the range, aligned to the metric's export interval once known. */
+  const stepFor = (card: MetricCard, points = pointsFor(card)) =>
+    computeAlignedStepSeconds(rangeSeconds.value, points, exportIntervalFor(card));
+
   const exemplars = useMetricsExplorerExemplars({
     queue,
     org,
@@ -978,7 +1282,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         expr: q.expr,
         legend: q.legendTemplate && !q.legendTemplate.includes("{") ? q.legendTemplate : undefined,
       })),
-    stepOf: (card) => computeStepSeconds(rangeSeconds.value, pointsFor(card as MetricCard)),
+    stepOf: (card) => stepFor(card as MetricCard),
     valueUnitOf: (card) => {
       const model = card as MetricCard;
       const bucketUnit = effectiveVariant(model).defaults?.bucketUnit;
@@ -1076,7 +1380,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       cachedEpoch = epoch;
     }
     const exemplarsOn = !opts?.ignoreExemplars && exemplars.enabled(card.name);
-    const cacheKey = `${card.name}|${points}|${opts?.applyNanGuard ? 1 : 0}|${opts?.rateWindow ?? ""}|${opts?.percentileWindow ?? ""}|${exemplarsOn ? 1 : 0}`;
+    const interval = exportIntervalFor(card);
+    const cacheKey = `${card.name}|${points}|${opts?.applyNanGuard ? 1 : 0}|${opts?.rateWindow ?? ""}|${opts?.percentileWindow ?? ""}|${exemplarsOn ? 1 : 0}|${interval}`;
     const hit = variantCache.get(cacheKey);
     if (hit) return hit;
 
@@ -1102,12 +1407,17 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         // `$__rate_interval` instead, because a PANEL resolves that itself.
         rateWindow:
           opts?.rateWindow ??
-          computeRateWindow(rangeSeconds.value, points, scrapeIntervalSeconds.value),
+          computeRateWindow(rangeSeconds.value, points, scrapeIntervalSeconds.value, interval),
         // Wider than the rate window on purpose — a quantile needs samples, not
         // just two points. See `computePercentileWindow`.
         percentileWindow:
           opts?.percentileWindow ??
-          computePercentileWindow(rangeSeconds.value, points, scrapeIntervalSeconds.value),
+          computePercentileWindow(
+            rangeSeconds.value,
+            points,
+            scrapeIntervalSeconds.value,
+            interval,
+          ),
         labels: card.labels ?? labelsByStream.value[card.name],
         applyNanGuard: opts?.applyNanGuard,
       },
@@ -1330,6 +1640,81 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     }
   };
 
+  const probeWindow = (): QueryWindow => ({
+    start: timeRange.value.end_time,
+    end: timeRange.value.end_time,
+  });
+  const probeKey = (expr: string) => previewCacheKey(expr, MIN_STEP_SECONDS, probeWindow(), true);
+  const probeKeysOf = (card: MetricCard) =>
+    EXPORT_INTERVAL_PROBE_WINDOWS.map((s) =>
+      probeKey(buildExportIntervalQuery(operandStreamsOf(card)[0] ?? card.name, s)),
+    );
+
+  /** The stream's export interval, from the most samples one series holds at the window's end. */
+  const measureExportInterval = async (stream: string, owner: string): Promise<number | null> => {
+    for (const windowSeconds of EXPORT_INTERVAL_PROBE_WINDOWS) {
+      const expr = buildExportIntervalQuery(stream, windowSeconds);
+      const window = probeWindow();
+      let response: any;
+      try {
+        response = await queue.run(
+          probeKey(expr),
+          PRIORITY.BACKGROUND,
+          (signal) => streamQuery(expr, MIN_STEP_SECONDS, signal, 1, window, "instant"),
+          { owner, cache: false },
+        );
+      } catch (error) {
+        // Only a cancel stays uncached: the next request measures again.
+        if (isCancelled(error)) throw error;
+        return null;
+      }
+      const series = response?.result?.[0];
+      const count = Number((series?.value ?? series?.values?.at(-1))?.[1]);
+      const interval = snapExportInterval(windowSeconds, count);
+      if (interval !== null) return interval;
+    }
+    return null;
+  };
+
+  /** The step each card's last request charted at. */
+  const previewSteps = new Map<string, number>();
+
+  /** Cards with a realign request in flight, so a landing result cannot queue another. */
+  const realigning = new Set<string>();
+
+  /** A settled card asks again, keeping its chart up, only when the measured interval does not divide the step it ran. */
+  const realignIfStale = (card: MetricCard) => {
+    const used = previewSteps.get(card.name);
+    if (!used || previews.value[card.name]?.status !== "done") return;
+    const measured = measuredIntervals.get(exportIntervalKey(card));
+    if (!measured || used % measured === 0) return;
+    // An interval wider than the range leaves the step unaligned, and asking again would only repeat it.
+    if (stepFor(card) === used || realigning.has(card.name)) return;
+    realigning.add(card.name);
+    void requestPreview(card, { realign: true }).finally(() => realigning.delete(card.name));
+  };
+
+  /** Measures an on-screen card's export interval once its chart has landed, behind every preview in the queue. */
+  const ensureExportInterval = (card: MetricCard, priority: number) => {
+    // A prefetched card is not on screen, and one still loading must chart before it is measured.
+    if (priority === PRIORITY.PREFETCH || previews.value[card.name]?.status !== "done") return;
+    // A never-written metric has no cadence to find, and the long tail of them would each cost two probes.
+    if (!card.hasData) return;
+    const key = exportIntervalKey(card);
+    const stream = operandStreamsOf(card)[0] ?? card.name;
+    const epoch = previewsEpoch;
+    exportIntervalCache
+      .detect(key, () => measureExportInterval(stream, card.name))
+      .then((interval) => {
+        if (epoch !== previewsEpoch) return;
+        measuredIntervals.set(key, interval ?? 0);
+        realignIfStale(card);
+      })
+      .catch(() => {
+        // Cancelled with the state that asked; that card keeps its unaligned step.
+      });
+  };
+
   /* -------------------------------------------------- persistent card cache */
 
   const cacheFor = (card: MetricCard) =>
@@ -1480,7 +1865,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
 
   const requestPreview = async (
     card: MetricCard,
-    opts?: { skipCache?: boolean; priority?: number },
+    opts?: { skipCache?: boolean; priority?: number; realign?: boolean },
   ) => {
     if (card.unsupported) return;
     if (!timeRange.value.end_time) return;
@@ -1525,7 +1910,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       return;
     }
 
-    const step = computeStepSeconds(rangeSeconds.value, points);
+    const step = stepFor(card, points);
+    const priority = opts?.priority ?? PRIORITY.VISIBLE;
 
     // Already resolved — reuse it, fire NO query. A card that already has a
     // SETTLED preview (done/no-data/unavailable) is just being re-triggered
@@ -1543,10 +1929,14 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     const settled = previews.value[card.name];
     const pendingRefresh = !!settled?.pendingRefresh;
     let forcedRecheck = false;
+    // A refresh re-queries, and its probe follows the chart; queued first it would take the chart's slot.
+    if (!opts?.skipCache && !pendingRefresh) ensureExportInterval(card, priority);
 
     if (
       !opts?.skipCache &&
+      !opts?.realign &&
       !pendingRefresh &&
+      !settled?.windowStale &&
       settled &&
       settled.status !== "loading" &&
       settled.status !== "error"
@@ -1569,9 +1959,11 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // dashboard panel gets on revisit. Matters more here than there: a first
     // screenful is ~60 queries against a backend that already times out on the
     // heavy metrics.
-    if (!opts?.skipCache && !previews.value[card.name]) {
+    previewSteps.set(card.name, step);
+    // A realign may paint from the persisted aligned result over the chart it replaces.
+    if (!opts?.skipCache && (opts?.realign || !previews.value[card.name])) {
       const restored = await restoreFromCache(card, resolved, defaults, step, epoch);
-      if (restored === "painted") return;
+      if (restored === "painted") return ensureExportInterval(card, priority);
       if (restored === "recheck") forcedRecheck = true;
     }
 
@@ -1579,7 +1971,9 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // the recheck must reach the backend, not just get past the guards above —
     // `queue.run`'s own `cache: true, refresh: false` default would otherwise
     // hand back the very cached empty answer this recheck exists to get past.
-    const queryOpts = forcedRecheck || pendingRefresh ? { ...opts, skipCache: true } : opts;
+    // The queue caches by query and step, so an answer for the previous window must not be served back.
+    const queryOpts =
+      forcedRecheck || pendingRefresh || settled?.windowStale ? { ...opts, skipCache: true } : opts;
     // The MISS path of the await above: a restore that painted checks the epoch
     // itself, but a cache miss fell through to the loading write below — and if
     // the map was cleared while IndexedDB was answering, that write resurrects
@@ -1597,7 +1991,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       bucketUnit: defaults.bucketUnit,
       stale: false,
       nanGuardApplied: false,
-      sparse: false,
+      // Describes the kept `results`, so a sparse answer stays "too few samples" while it reloads.
+      sparse: !!existing?.sparse && !!existing.results.length,
       // Carried like `results`: the old (possibly widened) chart stays on
       // screen while the re-query runs, so a drill-in during that window must
       // still hand the editor the window that chart is true of.
@@ -1609,6 +2004,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       // new data lands.
       cachedTimeRange: existing?.cachedTimeRange ?? null,
       footerLabel: resolved.footerLabel,
+      windowStale: !!existing?.windowStale && !!existing.results.length,
     };
 
     try {
@@ -1668,6 +2064,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
           rangeSeconds.value,
           points,
           scrapeIntervalSeconds.value,
+          exportIntervalFor(card),
         )) {
           const widened = effectiveVariant(card, points, { rateWindow });
           if (!widened.resolved?.queries.length) break;
@@ -1729,6 +2126,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       markEmptiness(card.name, !results.some(hasSamples) && !sparse);
       rememberPreview(card.name);
       persistToCache(card, previews.value[card.name], resolved.queries, step);
+      ensureExportInterval(card, priority);
     } catch (error: any) {
       // A cancelled request belongs to a state the user has already left; it is
       // not an error the card should show. Restore whatever was on screen before
@@ -1741,10 +2139,12 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         // A recheck that never answered has not been spent, or the stale empty answer it restores sticks for good.
         if (forcedRecheck) markRechecked(card.name, false);
         // A card remounted by a grid reflow (a sibling hidden as no-data) cancels its own refresh; the remount must re-ask, not reuse this.
-        if (existing) {
+        // A loading snapshot restored here has no request left behind it, so it would read as loading forever.
+        const restored = existing?.status === "loading" ? settledSnapshot(existing) : existing;
+        if (restored) {
           previews.value[card.name] = queryOpts?.skipCache
-            ? { ...existing, pendingRefresh: true }
-            : existing;
+            ? { ...restored, pendingRefresh: true }
+            : restored;
         } else delete previews.value[card.name];
         return;
       }
@@ -1773,6 +2173,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         // A failed auto-refresh leaves the previous chart up, flagged stale,
         // rather than blanking a chart the user was reading.
         stale: previous.length > 0,
+        failedAt: previous.length > 0 ? Date.now() : null,
         nanGuardApplied: existing?.nanGuardApplied ?? false,
         sparse: existing?.sparse ?? false,
         widenedRateWindow: existing?.widenedRateWindow ?? null,
@@ -1802,7 +2203,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    */
   const previewKeysOf = (card: MetricCard): string[] => {
     const points = pointsFor(card);
-    const step = computeStepSeconds(rangeSeconds.value, points);
+    const step = stepFor(card, points);
     const keys = new Set<string>(exemplars.exemplarKeysOf(card));
 
     for (const guarded of [false, true]) {
@@ -1817,6 +2218,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       rangeSeconds.value,
       points,
       scrapeIntervalSeconds.value,
+      exportIntervalFor(card),
     )) {
       const { resolved } = effectiveVariant(card, points, { rateWindow });
       for (const q of (resolved?.queries ?? []) as any[]) {
@@ -1852,7 +2254,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   };
 
   const cancelPreview = (card: MetricCard) => {
-    for (const key of previewKeysOf(card)) queue.cancel(key, card.name);
+    for (const key of [...previewKeysOf(card), ...probeKeysOf(card)]) queue.cancel(key, card.name);
   };
 
   /** Time or filters changed: every in-flight preview is now for the wrong state. */
@@ -1861,9 +2263,12 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     queue.cancelAll();
     exemplars.clearAll();
     previews.value = {};
+    previewSteps.clear();
     previewOrder = [];
     emptyMetrics.value = new Set();
     emptyRecheckedCards.value = new Set();
+    pageGeneration++;
+    sweptNames.value = new Set();
   };
 
   /**
@@ -1890,8 +2295,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * already loaded, and `cancelDialogQueries` would compute keys that match
    * nothing and cancel nothing.
    */
-  const dialogStepFor = (card: MetricCard) =>
-    computeStepSeconds(rangeSeconds.value, pointsFor(card));
+  const dialogStepFor = (card: MetricCard) => stepFor(card);
 
   /**
    * Runs one query for a ⚙-dialog tile.
@@ -1956,7 +2360,12 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   /** The rate window the card charts with, widened if it was, so a breakdown measures alike. */
   const rateWindowFor = (card: MetricCard): string =>
     previews.value[card.name]?.widenedRateWindow ??
-    computeRateWindow(rangeSeconds.value, pointsFor(card), scrapeIntervalSeconds.value);
+    computeRateWindow(
+      rangeSeconds.value,
+      pointsFor(card),
+      scrapeIntervalSeconds.value,
+      exportIntervalFor(card),
+    );
 
   /** The family map the cards were built from (`buildMetricFamilies`). */
   const familyByName = computed(() => new Map(cards.value.map((c) => [c.name, c.familyName])));
@@ -2030,9 +2439,10 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   };
 
   /**
-   * Suggested values per label, for the CURRENT org and window.
+   * Suggested values per label, for the CURRENT org, window and prefix scope.
    *
-   * Keyed by the label ALONE, and emptied whenever the org or the window changes.
+   * Keyed by the label ALONE, and emptied whenever the org, the window or the
+   * selected prefixes change.
    *
    * It used to key the org and the time range into the string and never drop
    * anything but on an org switch. That grew without bound — one permanent entry
@@ -2046,26 +2456,66 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    */
   const labelValueCache = new Map<string, string[]>();
 
+  /** Prefix groups the value suggestions sample from, as a key; "" is org-wide (none selected, or Workspace). */
+  const labelValueScope = computed(() =>
+    showFavoritesOnly.value ? "" : [...selectedPrefixes.value].sort().join("\u0000"),
+  );
+
+  const inLabelValueScope = (name: string) =>
+    !labelValueScope.value || selectedPrefixes.value.has(prefixOf(name));
+
+  /** Bumped whenever the cache is emptied (scope, window or org), so an answer asked before never refills it. */
+  let labelValueGeneration = 0;
+
+  /** Queue keys of the label-value requests in flight; a scope change cancels them and starts a new set. */
+  let labelValueKeys = new Set<string>();
+
+  // Sync, so a load issued in the same tick as the prefix change never reads the old scope's answers.
+  watch(
+    labelValueScope,
+    () => {
+      labelValueGeneration++;
+      labelValueCache.clear();
+      // No owner: everything queued here was asked for the old scope, and would hold DIALOG slots.
+      for (const key of labelValueKeys) queue.cancel(key);
+      labelValueKeys = new Set();
+    },
+    { flush: "sync" },
+  );
+
   /**
    * Best-effort value suggestions.
    *
    * `label/{label}/values` returns nothing without a `match[]`, and accepts only
    * one selector per request — so this is a bounded fan-out over a deterministic
-   * (alphabetical) sample of matching streams, unioned and capped. Failure is
-   * fail-open: the chip stays usable as free text. Safety comes from the grid
-   * narrowing above, not from these suggestions.
+   * sample of matching streams in the selected prefixes (alphabetical, each prefix in turn), unioned
+   * and capped. Failure is fail-open: the chip stays usable as free text. Safety
+   * comes from the grid narrowing above, not from these suggestions.
    */
   const loadLabelValues = async (label: string): Promise<string[]> => {
     const cached = labelValueCache.get(label);
     if (cached) return cached;
 
-    await ensureSchemas();
+    // Without the stream labels an empty sample is a failure, not a cacheable "none".
+    if (!(await ensureSchemas())) return [];
 
+    const generation = labelValueGeneration;
+    const inFlight = labelValueKeys;
+    const turns = new Map<string, number>();
+    // One stream per selected prefix in turn (the sort is stable), so a large prefix cannot fill the sample alone.
     const matching = Object.entries(labelsByStream.value)
-      .filter(([, labels]) => labels.includes(label))
+      .filter(([name, labels]) => labels.includes(label) && inLabelValueScope(name))
       .map(([name]) => name)
       .sort()
-      .slice(0, LABEL_VALUE_FANOUT);
+      .map((name) => {
+        const group = labelValueScope.value ? prefixOf(name) : "";
+        const turn = turns.get(group) ?? 0;
+        turns.set(group, turn + 1);
+        return { name, turn };
+      })
+      .sort((a, b) => a.turn - b.turn)
+      .slice(0, LABEL_VALUE_FANOUT)
+      .map(({ name }) => name);
 
     // The same widening ladder as the label names, for the same reason: the
     // label index lags ingestion, so a short recent window answers empty while
@@ -2092,11 +2542,13 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       // window would be deduplicated against, and answered by, a request for
       // another.
       const requestKey = `${org.value}|${label}|${win.start_time}|${win.end_time}`;
+      const keys = matching.map((stream) => `labelvalues:${requestKey}:${stream}`);
+      for (const key of keys) inFlight.add(key);
 
       const responses = await Promise.allSettled(
-        matching.map((stream) =>
+        matching.map((stream, i) =>
           queue.run(
-            `labelvalues:${requestKey}:${stream}`,
+            keys[i],
             PRIORITY.DIALOG,
             (signal) =>
               metricsService
@@ -2110,7 +2562,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
                 })
                 .then((r: any) => r.data?.data ?? []),
             // These are label strings, not chart data. Letting them into the preview
-            // LRU meant a 5-way fan-out per label evicted five cards' worth of query
+            // LRU meant each label's fan-out evicted `LABEL_VALUE_FANOUT` cards' worth of query
             // results from a cache sized for charts — and they have their own cache
             // (`labelValueCache`) anyway. Use the queue for its concurrency limit and
             // cancellation, not for its cache.
@@ -2118,6 +2570,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
           ),
         ),
       );
+      for (const key of keys) inFlight.delete(key);
 
       const union = new Set<string>();
       anyFulfilled = false;
@@ -2128,8 +2581,11 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       }
       values = [...union].sort().slice(0, LABEL_VALUE_CAP);
 
-      if (values.length || matching.length === 0) break;
+      if (values.length || matching.length === 0 || generation !== labelValueGeneration) break;
     }
+
+    // The scope, window or org changed mid-flight: this answer belongs to a cache that was emptied.
+    if (generation !== labelValueGeneration) return values;
 
     // Only cache an ANSWER. If every request failed, `values` is empty because we
     // learned nothing — not because the label has no values — and caching that
@@ -2166,10 +2622,32 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     invalidateAll();
   };
 
+  /** Swaps one filter in place, so an edited chip keeps its position. */
+  const replaceLabelFilter = async (previous: LabelFilter, next: LabelFilter) => {
+    await ensureSchemas();
+    const key = labelFilterKey(previous);
+    const nextKey = labelFilterKey(next);
+    labelFilters.value = labelFilters.value
+      .filter((f) => labelFilterKey(f) === key || labelFilterKey(f) !== nextKey)
+      .map((f) => (labelFilterKey(f) === key ? next : f));
+    invalidateAll();
+  };
+
   /** By identity, not by label — several filters can share a label. */
   const removeLabelFilter = (filter: LabelFilter) => {
     const key = labelFilterKey(filter);
     labelFilters.value = labelFilters.value.filter((f) => labelFilterKey(f) !== key);
+    invalidateAll();
+  };
+
+  const setLabelGroupNegated = (group: number, negate: boolean) => {
+    labelFilters.value = labelFilters.value.map((f) => {
+      if (f.group !== group) return f;
+      const next = { ...f };
+      if (negate) next.negate = true;
+      else delete next.negate;
+      return next;
+    });
     invalidateAll();
   };
 
@@ -2248,8 +2726,10 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       }
     }
 
+    const epoch = previewsEpoch;
     for (const card of slice) {
-      const resolved = !!previews.value[card.name];
+      const known = previews.value[card.name];
+      const resolved = !!known && !known.windowStale;
       const recheck = !!opts?.skipCache && emptyMetrics.value.has(card.name);
       if (resolved && !recheck) continue;
 
@@ -2260,6 +2740,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       }).finally(() => {
         // Settled: there is nothing left to cancel.
         prefetching.delete(card.name);
+        if (epoch === previewsEpoch) sweptNames.value = new Set(sweptNames.value).add(card.name);
       });
     }
   };
@@ -2275,7 +2756,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * re-applied) and the grid answers by re-querying every card — ~40 requests for
    * a view the user just left.
    */
-  watch([pageSlice, hideEmptyPanels], () => {
+  // Also on un-pause: a placeholder is not a card, so nothing else asks for a slot left unresolved while paused.
+  watch([pageSlice, hideEmptyPanels, paused], () => {
     if (paused.value) return;
     if (sweepTimer) clearTimeout(sweepTimer);
     sweepTimer = setTimeout(() => {
@@ -2289,17 +2771,50 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     if (sweepTimer) clearTimeout(sweepTimer);
   });
 
+  /** Keeps each drawn chart, pinned to the window it describes, until its new window lands. */
+  const keepPreviewsAsStale = (previous: { start_time: number; end_time: number }) => {
+    previewsEpoch++;
+    const slice = new Set(pageSlice.value.map((card) => card.name));
+    const kept: Record<string, CardPreview> = {};
+    for (const [name, preview] of Object.entries(previews.value)) {
+      if (!preview.results.length) continue;
+      kept[name] = {
+        ...preview,
+        // The request that wrote "loading" is cancelled below, so the kept chart is settled until its next visit.
+        status: "done",
+        windowStale: true,
+        stale: false,
+        failedAt: null,
+        cachedTimeRange: preview.cachedTimeRange ?? previous,
+      };
+    }
+    previews.value = kept;
+    previewOrder = previewOrder.filter((name) => name in kept);
+    sweptNames.value = new Set();
+    // The slice's answers hold the grid still until its sweep settles; off-slice answers cannot be rechecked.
+    emptyMetrics.value = new Set([...emptyMetrics.value].filter((name) => slice.has(name)));
+  };
+
+  /** `windowChanged` with `keepPreviews`: a new window, drawn over the previous charts (ruling 10). */
   const setTimeRange = (
     range: { start_time: number; end_time: number },
-    opts?: { keepPreviews?: boolean },
+    opts?: { keepPreviews?: boolean; keepPage?: boolean; windowChanged?: boolean },
   ) => {
+    const previous = timeRange.value;
     timeRange.value = range;
     queue.cancelAll();
-    if (opts?.keepPreviews) return;
+    if (opts?.keepPreviews && !opts.windowChanged) return;
+
+    if (opts?.keepPreviews) {
+      keepPreviewsAsStale(previous);
+      resetWindowCaches(opts.keepPage);
+      return;
+    }
 
     previewsEpoch++;
     previews.value = {};
     previewOrder = [];
+    sweptNames.value = new Set();
     // Emptiness is a property of the WINDOW, not of the metric, and this set is
     // self-sealing: a card in it is filtered out of the grid, so it never
     // renders, never re-queries, and can never clear itself. Carried across a
@@ -2312,9 +2827,16 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // window, so its answers still hold; clearing there would un-hide every
     // no-data card on each auto-refresh tick just to re-hide it a moment later.
     emptyMetrics.value = new Set();
+    resetWindowCaches(opts?.keepPage);
+  };
+
+  const resetWindowCaches = (keepPage?: boolean) => {
     // A new window deserves its own bounded recheck, not one already spent by
     // the window just left.
     emptyRecheckedCards.value = new Set();
+    // Cards empty in the old window may have data in this one; a zoom keeps its page so the dragged card stays.
+    pageGeneration++;
+    if (!keepPage) pageSize.value = INITIAL_PAGE_SIZE;
 
     // Label VALUES are a property of the window too — `job` has the values it had
     // in the last 15 minutes, which is not what it had over 30 days. Their cache
@@ -2322,6 +2844,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // suggestions back (never, since the key misses) and grows the map forever
     // (always, since nothing else drops them).
     labelValueCache.clear();
+    labelValueGeneration++;
 
     // And so are the label NAMES, for the same reason: the endpoint is asked over
     // the window. Dropping the values but keeping the names left the picker
@@ -2350,6 +2873,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     previewOrder = [];
     emptyMetrics.value = new Set();
     emptyRecheckedCards.value = new Set();
+    pageGeneration++;
+    sweptNames.value = new Set();
     pageSize.value = INITIAL_PAGE_SIZE;
     schemaLoaded.value = false;
     // The in-flight guards, not just the loaded flags.
@@ -2373,6 +2898,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     labelsByStream.value = {};
     labelNames.value = [];
     labelValueCache.clear();
+    labelValueGeneration++;
     clearFilters();
   };
 
@@ -2384,6 +2910,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     sortedCards,
     filteredCards,
     pagedCards,
+    displayed,
+    holding,
     /** The page's query budget — exposed so the cap can be asserted directly. */
     pageSlice,
     hasMore,
@@ -2401,6 +2929,10 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     selectedTypes,
     labelFilters,
     sortBy,
+    usageFilters,
+    usageLoading,
+    usageError,
+    retryUsage: loadUsage,
     viewMode,
     activeRail,
     showFavoritesOnly,
@@ -2422,9 +2954,13 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     schemaLoaded,
     loadLabelNames,
     loadLabelValues,
+    labelValueScope,
     addLabelFilter,
+    replaceLabelFilter,
     removeLabelFilter,
+    setLabelGroupNegated,
     ensureSchemas,
+    ensureStreamSchemas,
     isLabelEligible,
     inapplicableLabelFilters,
 

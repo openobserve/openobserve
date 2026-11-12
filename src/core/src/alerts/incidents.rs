@@ -17,16 +17,23 @@
 //!
 //! Correlates fired alerts into unified incidents to reduce alert fatigue.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    hash::{DefaultHasher, Hash, Hasher},
+    sync::LazyLock,
+};
 
 use config::{
-    meta::alerts::{
-        alert::Alert,
-        incidents::{
-            AlertEdge, AlertKind, AlertNode, CompositeAlertSummary, CorrelationReason, EdgeType,
-            Incident, IncidentAlert, IncidentCorrelationOutcome, IncidentEvent, IncidentTopology,
-            IncidentWithAlerts,
+    meta::{
+        alerts::{
+            alert::Alert,
+            incidents::{
+                AlertEdge, AlertKind, AlertNode, CompositeAlertSummary, CorrelationReason,
+                EdgeType, Incident, IncidentAlert, IncidentCorrelationOutcome, IncidentEvent,
+                IncidentTopology, IncidentWithAlerts,
+            },
         },
+        correlation::{FieldAlias, ServiceIdentityConfig},
     },
     utils::json::{Map, Value},
 };
@@ -37,10 +44,18 @@ use config::{
 /// alert nobody can identify belongs in the unrouted queue, not on the pager of
 /// whichever team happens to own this string.
 const UNKNOWN_SERVICE: &str = "unknown";
+/// The `incident_event` of the first notification after a manual reopen.
+const FIRED_AFTER_REOPEN_EVENT: &str = "alert_fired_after_reopen";
 /// Window behind the alert in which a service-graph edge counts as a dependency.
 const INCIDENT_EDGE_RANGE_SECS: i64 = 3600;
 /// How many of an alert's latest firings a Firing run after a window looks through for open pages.
 const MUTED_RESOLVES_SCANNED: u64 = 10;
+/// Pause between two attempts of one incident notification.
+#[cfg(feature = "enterprise")]
+const INCIDENT_NOTIFY_RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
+/// Per-entity case lock, so detections firing in one tick join one case; striped to stay bounded.
+static SIEM_CASE_LOCKS: LazyLock<Vec<tokio::sync::Mutex<()>>> =
+    LazyLock::new(|| (0..64).map(|_| tokio::sync::Mutex::new(())).collect());
 
 /// Service Discovery correlation result
 struct ServiceDiscoveryResult {
@@ -58,13 +73,21 @@ struct FilteredSemanticResult {
     key_type: config::meta::alerts::incidents::KeyType,
 }
 
+/// One rendering of an incident notification and the destinations it goes to.
+#[cfg(feature = "enterprise")]
+struct IncidentSend<'a> {
+    ctx: crate::alerts::notifications::NotificationContext,
+    dest_names: Vec<String>,
+    alert_template: Option<&'a config::meta::destinations::Template>,
+}
+
 /// Identity being correlated into an incident.
 ///
 /// Decouples correlation/incident-creation from the concrete `Alert` type so that
 /// non-alert identities (e.g. external alert sources) can be correlated using the
 /// same machinery. For the internal alert path this is built from an `Alert`.
 #[derive(Debug, Clone)]
-pub struct CorrelationSubject {
+pub struct CorrelationSubject<'a> {
     /// internal: `alert.get_unique_key()`; external: `external_alerts.id`
     pub id: String,
     pub name: String,
@@ -75,6 +98,29 @@ pub struct CorrelationSubject {
     /// carry `alert.priority` mapped through `determine_severity`, when set.
     /// `None` → eval_level default (Critical→P2, Warning→P3).
     pub severity: Option<config::meta::alerts::incidents::IncidentSeverity>,
+    pub title_inputs: Option<super::incident_title::TitleInputs<'a>>,
+    /// Title for a new incident when no template renders one.
+    pub case_title: Option<String>,
+    /// Case window (µs): join a recent open case with exactly these values, never an ops incident.
+    pub siem_case_window: Option<i64>,
+    /// A SIEM detection: the incident it opens or joins is marked a security case.
+    pub security_case: bool,
+    /// A SIEM backfill firing whose evidence all predates its run's own window.
+    pub historical: bool,
+    /// Security case only: the firing's evidence span, the case's first and last seen.
+    pub case_activity: Option<infra::table::alert_incidents::CaseActivity>,
+    /// Security case only: the entity a case growing to several detections is retitled on.
+    pub case_entity: Option<o2_enterprise::enterprise::security::cases::Entity>,
+}
+
+/// One event an analyst opens a security case from.
+#[derive(Debug, Clone)]
+pub struct CaseEvent {
+    pub stream: String,
+    /// The event's `_timestamp`, in microseconds.
+    pub at: i64,
+    /// The event's fields; they name the case's host, user or address.
+    pub fields: Map<String, Value>,
 }
 
 /// An alert's incident correlation, and why its incident notification missed a destination.
@@ -110,11 +156,10 @@ enum MuteChange<'a> {
 async fn extract_filtered_semantic_dimensions(
     org_id: &str,
     labels: &HashMap<String, String>,
+    identity_config: &ServiceIdentityConfig,
+    semantic_groups: &[FieldAlias],
 ) -> Option<FilteredSemanticResult> {
     use config::meta::alerts::incidents::KeyType;
-
-    // Load ServiceIdentityConfig with auto-configuration applied
-    let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
 
     // No identity sets configured AND service is opted out — nothing to extract.
     // Otherwise fall through: "service" alone is a viable dimension even with zero sets.
@@ -125,9 +170,6 @@ async fn extract_filtered_semantic_dimensions(
         );
         return None;
     }
-
-    // Load semantic groups for field mapping
-    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
 
     // Collect all distinguish_by group IDs from ALL identity sets (flattened)
     // Don't require a specific set to "match" - extract whatever we can
@@ -191,6 +233,8 @@ async fn extract_filtered_semantic_dimensions(
 async fn extract_filtered_semantic_dimensions(
     _org_id: &str,
     _labels: &HashMap<String, String>,
+    _identity_config: &ServiceIdentityConfig,
+    _semantic_groups: &[FieldAlias],
 ) -> Option<FilteredSemanticResult> {
     None
 }
@@ -199,11 +243,13 @@ async fn extract_filtered_semantic_dimensions(
 async fn correlate_parallel(
     org_id: &str,
     labels: &HashMap<String, String>,
+    semantic_groups: &[FieldAlias],
 ) -> ParallelCorrelationResult {
+    let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
     // Execute both approaches in parallel
     let (sd_result, semantic_result) = tokio::join!(
-        query_service_discovery_key(org_id, labels),
-        extract_filtered_semantic_dimensions(org_id, labels)
+        query_service_discovery_key(org_id, labels, &identity_config, semantic_groups),
+        extract_filtered_semantic_dimensions(org_id, labels, &identity_config, semantic_groups)
     );
 
     log::debug!(
@@ -346,56 +392,88 @@ async fn collect_incident_destinations(
     destinations
 }
 
-/// Build an incident-specific notification payload and send to all given destinations.
-///
-/// Loads severity, title, and service from the incident record. Constructs an
-/// incident-centric JSON body (not the alert row template) and dispatches to each
-/// destination using the raw transport (HTTP/email/SNS).
-#[cfg(feature = "enterprise")]
-async fn send_incident_notifications(
-    alert: &Alert,
-    incident_id: &str,
-    event: &str,
-    triggered_at: i64,
-    dest_names: &[String],
-) -> Option<String> {
-    // Preserve the alert/stream sub-object emitted for the internal alert path.
-    let alert_block = config::utils::json::json!({
-        "name": alert.name,
-        "stream": {
-            "name": alert.stream_name,
-            "type": alert.stream_type.to_string(),
-        }
-    });
-    send_incident_notifications_inner(
-        &alert.org_id,
-        &alert.name,
-        incident_id,
-        event,
-        triggered_at,
-        dest_names,
-        Some(alert_block),
-    )
-    .await
-}
-
-/// Build an incident-specific notification payload and send to all given destinations.
-///
-/// Identity-agnostic core of [`send_incident_notifications`]. `alert_block`, when
-/// present, is emitted verbatim as the payload's `incident.alert` sub-object (used
-/// by the internal alert path to carry alert/stream metadata).
+/// Send an incident notification: `alert`'s own destinations get its rows and template, merged-in
+/// ones a rowless context and their own template.
 #[cfg(feature = "enterprise")]
 #[allow(clippy::too_many_arguments)]
-async fn send_incident_notifications_inner(
-    org_id: &str,
-    subject_name: &str,
+async fn send_incident_notifications(
+    alert: &Alert,
+    notify_rows: &[Map<String, Value>],
+    level: Option<config::meta::alerts::level::AlertLevel>,
+    actual_value: Option<f64>,
     incident_id: &str,
     event: &str,
     triggered_at: i64,
     dest_names: &[String],
-    alert_block: Option<Value>,
 ) -> Option<String> {
     if dest_names.is_empty() {
+        return None;
+    }
+    // The rows are this alert's data; destinations merged in from other alerts never received it.
+    let (own, others): (Vec<String>, Vec<String>) = dest_names
+        .iter()
+        .cloned()
+        .partition(|name| alert.destinations.contains(name));
+    let alert_template = match alert.template.as_ref().filter(|n| !n.is_empty()) {
+        Some(name) => crate::db::alerts::templates::get(&alert.org_id, name)
+            .await
+            .ok(),
+        None => None,
+    };
+
+    let mut sends = Vec::with_capacity(2);
+    if !own.is_empty() {
+        let ctx = crate::alerts::alert::build_send_context(
+            alert,
+            notify_rows,
+            triggered_at,
+            None,
+            triggered_at,
+            level,
+            actual_value,
+            None,
+            None,
+            false,
+        )
+        .await;
+        sends.push(IncidentSend {
+            ctx,
+            dest_names: own,
+            alert_template: alert_template.as_ref(),
+        });
+    }
+    if !others.is_empty() {
+        let ctx = crate::alerts::alert::build_send_context(
+            alert,
+            &[],
+            triggered_at,
+            None,
+            triggered_at,
+            level,
+            None,
+            None,
+            None,
+            false,
+        )
+        .await;
+        sends.push(IncidentSend {
+            ctx,
+            dest_names: others,
+            alert_template: None,
+        });
+    }
+    send_incident_notifications_inner(&alert.org_id, incident_id, event, sends).await
+}
+
+/// Render the incident into each send's context and deliver it through each destination's template.
+#[cfg(feature = "enterprise")]
+async fn send_incident_notifications_inner(
+    org_id: &str,
+    incident_id: &str,
+    event: &str,
+    sends: Vec<IncidentSend<'_>>,
+) -> Option<String> {
+    if sends.iter().all(|send| send.dest_names.is_empty()) {
         return None;
     }
 
@@ -421,73 +499,33 @@ async fn send_incident_notifications_inner(
         "{}/web/alerts/incidents/{incident_id}?org_identifier={org_id}",
         cfg.common.web_url
     );
-    let time_str = chrono::DateTime::from_timestamp_micros(triggered_at)
-        .map(|dt: chrono::DateTime<chrono::Utc>| dt.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string())
-        .unwrap_or_default();
-
-    // Internal path supplies a full alert/stream block; other subjects fall back to
-    // a name-only block derived from `subject_name`.
-    let alert_block =
-        alert_block.unwrap_or_else(|| config::utils::json::json!({ "name": subject_name }));
-
-    let payload = config::utils::json::json!({
-        "incident": {
-            "id": incident_id,
-            "title": title,
-            "event": event,
-            "service": service_name,
-            "severity": severity,
-            "alert": alert_block,
-            "time": time_str,
-            "url": incident_url,
-        }
-    });
-    let msg = match serde_json::to_string(&payload) {
-        Ok(s) => s,
-        Err(e) => {
-            log::error!(
-                "[incidents] Failed to serialize notification payload for {org_id}/{incident_id}: {e}"
-            );
-            return Some(format!("failed to serialize incident notification: {e}"));
-        }
-    };
-
     let subject = format!("[{event}] {title}");
+
     let mut success_parts: Vec<String> = Vec::new();
     let mut err_parts: Vec<String> = Vec::new();
 
-    for dest_name in dest_names {
-        match crate::db::alerts::destinations::get(org_id, dest_name).await {
-            Ok(dest) => {
-                use config::meta::destinations::Module;
-                let Module::Alert {
-                    destination_type, ..
-                } = dest.module
-                else {
-                    err_parts.push(format!("{dest_name}: not an alert destination"));
-                    continue;
-                };
-                match crate::alerts::alert::dispatch_notification(
-                    &destination_type,
-                    &subject,
-                    msg.clone(),
-                )
+    for mut send in sends {
+        apply_incident_to_context(
+            &mut send.ctx,
+            incident_id,
+            event,
+            &title,
+            &severity,
+            &service_name,
+            &incident_url,
+        );
+        let explicit: Vec<_> = send.alert_template.into_iter().cloned().collect();
+        for dest_name in &send.dest_names {
+            match notify_incident_destination(org_id, dest_name, &explicit, &subject, &mut send.ctx)
                 .await
-                {
-                    Ok(resp) => success_parts.push(format!("{dest_name}: {resp}")),
-                    Err(e) => {
-                        log::error!(
-                            "[incidents] Failed to notify {dest_name} for incident {org_id}/{incident_id}: {e}"
-                        );
-                        err_parts.push(format!("{dest_name}: {e}"));
-                    }
+            {
+                Ok(sent) => success_parts.push(format!("{dest_name}: {}", sent.response)),
+                Err(e) => {
+                    log::error!(
+                        "[incidents] Failed to notify {dest_name} for incident {org_id}/{incident_id}: {e}"
+                    );
+                    err_parts.push(format!("{dest_name}: {e}"));
                 }
-            }
-            Err(e) => {
-                log::error!(
-                    "[incidents] Destination {dest_name} not found for incident {org_id}/{incident_id}: {e}"
-                );
-                err_parts.push(format!("{dest_name}: {e}"));
             }
         }
     }
@@ -505,6 +543,120 @@ async fn send_incident_notifications_inner(
         );
         Some(error)
     }
+}
+
+/// Retries a temporary failure in place: later firings join as repeats and never re-send it.
+#[cfg(feature = "enterprise")]
+async fn notify_incident_destination(
+    org_id: &str,
+    dest_name: &str,
+    explicit: &[config::meta::destinations::Template],
+    subject: &str,
+    ctx: &mut crate::alerts::notifications::NotificationContext,
+) -> Result<
+    crate::alerts::notifications::notify::SendOutcome,
+    crate::alerts::notifications::notify::NotifyError,
+> {
+    let attempts = infra::scheduler::get_scheduler_max_retries();
+    let mut attempt = 1;
+    loop {
+        match crate::alerts::notifications::notify::notify(
+            org_id,
+            dest_name,
+            explicit,
+            Some(subject),
+            ctx,
+        )
+        .await
+        {
+            Err(error) if retries_incident_notify(&error, attempt, attempts) => {
+                log::warn!(
+                    "[incidents] notify {dest_name} failed for {org_id}, attempt {attempt}/{attempts}: {error}"
+                );
+                attempt += 1;
+                tokio::time::sleep(INCIDENT_NOTIFY_RETRY_DELAY).await;
+            }
+            result => return result,
+        }
+    }
+}
+
+/// Whether a failed incident send is tried again; a refusal that cannot pass is not.
+#[cfg(feature = "enterprise")]
+fn retries_incident_notify(
+    error: &crate::alerts::notifications::notify::NotifyError,
+    attempt: i32,
+    attempts: i32,
+) -> bool {
+    error.is_retryable() && attempt < attempts
+}
+
+/// Point `ctx` at the incident: its link, and the `incident_*` template variables.
+#[cfg(feature = "enterprise")]
+fn apply_incident_to_context(
+    ctx: &mut crate::alerts::notifications::NotificationContext,
+    incident_id: &str,
+    event: &str,
+    title: &str,
+    severity: &str,
+    service_name: &str,
+    incident_url: &str,
+) {
+    // The alert's own link points at its search; an incident notification must open the incident.
+    ctx.alert_url = incident_url.to_string();
+    ctx.incident_id = incident_id.to_string();
+    ctx.kind = config::meta::alerts::notification_kind::NotificationKind::Incident;
+    ctx.event = config::meta::alerts::notification_kind::NotificationEvent::Firing;
+    ctx.episode_id = Some(incident_id.to_string());
+    // Level, the dot and show_when follow the incident severity, as an on-call priority does.
+    ctx.alert_level = severity.to_string();
+    // P4 is informational, so it gets no level rather than a warning dot.
+    ctx.level = match severity {
+        "P1" | "P2" => Some(config::meta::alerts::level::AlertLevel::Critical),
+        "P3" => Some(config::meta::alerts::level::AlertLevel::Warning),
+        _ => None,
+    };
+    ctx.context_attributes.extend(
+        [
+            ("incident_id", incident_id),
+            ("incident_title", title),
+            ("incident_event", event),
+            ("incident_severity", severity),
+            ("incident_service", service_name),
+            ("incident_url", incident_url),
+        ]
+        .map(|(key, value)| (key.to_string(), value.to_string())),
+    );
+}
+
+/// Notification context for an incident subject with no alert behind it.
+#[cfg(feature = "enterprise")]
+async fn subject_notification_context(
+    org_id: &str,
+    subject_name: &str,
+    triggered_at: i64,
+) -> crate::alerts::notifications::NotificationContext {
+    crate::alerts::notifications::NotificationContext {
+        org_name: org_display_name(org_id).await,
+        alert_name: subject_name.to_string(),
+        alert_status: crate::alerts::notifications::STATUS_FIRING.to_string(),
+        alert_start_time: String::from("N/A"),
+        alert_end_time: String::from("N/A"),
+        alert_start_time_millis: String::from("N/A"),
+        alert_end_time_millis: String::from("N/A"),
+        alert_trigger_time: triggered_at,
+        alert_trigger_time_str: crate::alerts::alert::format_alert_time(triggered_at),
+        ..Default::default()
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn org_display_name(org_id: &str) -> String {
+    crate::common::infra::config::ORGANIZATIONS
+        .read()
+        .await
+        .get(org_id)
+        .map_or_else(|| org_id.to_string(), |org| org.name.clone())
 }
 
 /// Send a notification for an incident severity change to all correlated alert destinations.
@@ -546,6 +698,9 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
 
     send_incident_notifications(
         &first_alert,
+        &[],
+        None,
+        None,
         incident_id,
         "severity_changed",
         chrono::Utc::now().timestamp_micros(),
@@ -554,16 +709,39 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
     .await;
 }
 
+/// Whether the operator switched incident correlation on and the license grants it.
+#[cfg(feature = "enterprise")]
+pub fn incidents_enabled() -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .incidents
+        .enabled
+        && o2_enterprise::enterprise::license::check_features(&[
+            config::meta::feature::Feature::Incidents,
+        ])
+}
+
+/// Whether O2's agent may answer an analysis: operator switch, agent target and assistant license.
+#[cfg(feature = "enterprise")]
+pub fn rca_agent_available() -> bool {
+    let cfg = o2_enterprise::enterprise::common::config::get_config();
+    cfg.ai.enabled
+        && cfg.ai.has_agent_target()
+        && o2_enterprise::enterprise::license::check_features(&[
+            config::meta::feature::Feature::AiAssistant,
+        ])
+}
+
 /// Correlate an alert to an incident, and send a notification if appropriate.
 ///
 /// This is the main entry point for incident correlation in the alert execution flow.
-/// Called after deduplication, instead of direct notification for `creates_incident=true` alerts.
+/// Called instead of direct notification for `creates_incident=true` alerts.
 ///
 /// Notification behaviour:
 /// - `NewIncidentCreated` → sends incident notification to merged destinations of all correlated
 ///   alerts.
 /// - `NewAlertTypeJoined` → same as above (new alert type joining is an escalation signal).
 /// - `ExistingAlertRepeated` → notification suppressed (same alert type already in incident).
+/// - `FiredAfterReopen` → sends once: the first repeat after a manual reopen.
 /// - A failed send is returned in `CorrelatedIncident::notify_error` for the caller to record.
 ///
 /// When `notify_rows` is empty the function still correlates but sends no notification.
@@ -572,6 +750,7 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
 /// Correlation priority:
 /// 1. Service Discovery — uses labels matched by service_streams to identify service
 /// 2. Manual extraction — extracts semantic dimensions from alert labels
+#[allow(clippy::too_many_arguments)]
 pub async fn correlate_alert_to_incident(
     alert: &Alert,
     result_row: &Map<String, Value>,
@@ -581,16 +760,99 @@ pub async fn correlate_alert_to_incident(
     // Warning → P3). None (manual triggers, single-level alerts) keeps the
     // enterprise default.
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
+    // The exact evaluated observation, so `{alert_count}` is not capped at the sampled rows.
+    actual_value: Option<f64>,
     downtime: Option<&config::meta::downtimes::ActiveDowntime>,
+    // Where a backfill run's own window starts; `None` outside a backfill.
+    history_before: Option<i64>,
+) -> Result<Option<CorrelatedIncident>, anyhow::Error> {
+    use o2_enterprise::enterprise::security::{cases, detection};
+
+    let siem = detection::is_siem(alert.context_attributes.as_ref());
+    if !siem || notify_rows.is_empty() {
+        let historical = siem
+            && history_before.is_some_and(|cutoff| {
+                detection::predates(std::slice::from_ref(result_row), cutoff)
+            });
+        return correlate_rows(
+            alert,
+            result_row,
+            notify_rows,
+            siem.then(|| cases::entity_of(result_row)).flatten(),
+            triggered_at,
+            eval_level,
+            actual_value,
+            downtime,
+            historical,
+        )
+        .await;
+    }
+    let group_window = db::organization::read_org_setting(&alert.org_id, |s| s.security_cases)
+        .await
+        .unwrap_or_default()
+        .group_window_micros();
+    // One case per entity and window, so old and current evidence never share a case.
+    let mut merged: Option<CorrelatedIncident> = None;
+    for part in cases::case_partitions(notify_rows, group_window, history_before) {
+        let Some(first_row) = part.rows.first() else {
+            continue;
+        };
+        let correlated = correlate_rows(
+            alert,
+            first_row,
+            &part.rows,
+            part.entity,
+            triggered_at,
+            eval_level,
+            actual_value,
+            downtime,
+            part.historical,
+        )
+        .await?;
+        merged = merge_correlations(merged, correlated);
+    }
+    Ok(merged)
+}
+
+/// The first partition's incident, with every partition's notification outcome.
+fn merge_correlations(
+    merged: Option<CorrelatedIncident>,
+    next: Option<CorrelatedIncident>,
+) -> Option<CorrelatedIncident> {
+    match (merged, next) {
+        (Some(first), Some(next)) => Some(CorrelatedIncident {
+            notify_error: match (first.notify_error, next.notify_error) {
+                (Some(a), Some(b)) => Some(format!("{a}; {b}")),
+                (a, b) => a.or(b),
+            },
+            notify_attempted: first.notify_attempted || next.notify_attempted,
+            outcome: first.outcome,
+        }),
+        (first, next) => first.or(next),
+    }
+}
+
+/// `entity` is the security case's grouping entity; the overflow partition passes `None`.
+#[allow(clippy::too_many_arguments)]
+async fn correlate_rows(
+    alert: &Alert,
+    result_row: &Map<String, Value>,
+    notify_rows: &[Map<String, Value>],
+    entity: Option<o2_enterprise::enterprise::security::cases::Entity>,
+    triggered_at: i64,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
+    actual_value: Option<f64>,
+    downtime: Option<&config::meta::downtimes::ActiveDowntime>,
+    historical: bool,
 ) -> Result<Option<CorrelatedIncident>, anyhow::Error> {
     let mut labels = labels_from_row(result_row);
+    let semantic_groups =
+        crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
 
     // Enrich with alert condition dimensions (deterministic baseline)
     // Handles SQL WHERE, GUI conditions, and PromQL label matchers
     #[cfg(feature = "enterprise")]
     {
-        let semantic_groups =
-            crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
         let condition_dims =
             o2_enterprise::enterprise::alerts::sql_parser::extract_dimensions_from_alert_conditions(
                 &alert.query_condition,
@@ -621,11 +883,55 @@ pub async fn correlate_alert_to_incident(
     );
 
     // Execute Service Discovery and semantic extraction in parallel (non-blocking)
-    let parallel_result = correlate_parallel(&alert.org_id, &labels).await;
+    let parallel_result = correlate_parallel(&alert.org_id, &labels, &semantic_groups).await;
 
-    let group_values = parallel_result.final_group_values;
+    let mut group_values = parallel_result.final_group_values;
     let mut key_type = parallel_result.final_key_type;
-    let correlation_reason = parallel_result.correlation_reason;
+    let mut correlation_reason = parallel_result.correlation_reason;
+    let siem =
+        o2_enterprise::enterprise::security::detection::is_siem(alert.context_attributes.as_ref());
+    let mut siem_case_window = None;
+    let mut case_title = None;
+    let mut case_activity = None;
+    let mut case_entity = None;
+    if siem {
+        use o2_enterprise::enterprise::security::cases;
+        let settings = db::organization::read_org_setting(&alert.org_id, |s| s.security_cases)
+            .await
+            .unwrap_or_default();
+        let entity = settings.group_window_micros().and(entity);
+        let rule_title = alert
+            .context_attributes
+            .as_ref()
+            .and_then(|attrs| attrs.get("sigma_title"))
+            .filter(|t| !t.trim().is_empty())
+            .cloned()
+            .unwrap_or_else(|| alert.name.clone());
+        case_title = Some(cases::case_title(&rule_title, entity.as_ref()));
+        // Ops dimensions never reach a security case: it groups only on its own entity key.
+        group_values = entity
+            .as_ref()
+            .map(cases::Entity::group_values)
+            .unwrap_or_default();
+        if entity.is_some() {
+            key_type = config::meta::alerts::incidents::KeyType::Primary;
+            correlation_reason = cases::ENTITY_REASON.to_string();
+        }
+        siem_case_window = settings.group_window_micros();
+        let evidence = if notify_rows.is_empty() {
+            std::slice::from_ref(result_row)
+        } else {
+            notify_rows
+        };
+        let (first_event_at, last_event_at) =
+            cases::event_span(evidence).unwrap_or((triggered_at, triggered_at));
+        case_activity = Some(infra::table::alert_incidents::CaseActivity {
+            first_event_at,
+            last_event_at,
+            historical,
+        });
+        case_entity = entity;
+    }
 
     // Extract service name using both results
     let service_name = extract_service_name_parallel(&labels, &parallel_result.service_discovery);
@@ -664,11 +970,18 @@ pub async fn correlate_alert_to_incident(
     // wins over the Critical/Warning->P2/P3 fallback in `create_new_incident`
     // — otherwise the incident dashboard's severity tiles silently undercount
     // P1s for every alert that only defines a Critical tier.
-    let severity = alert.priority.and_then(|p| {
-        o2_enterprise::enterprise::alerts::incidents::determine_severity(Some(p.as_str()))
-            .parse()
-            .ok()
-    });
+    let severity = alert
+        .priority
+        .and_then(|p| {
+            o2_enterprise::enterprise::alerts::incidents::determine_severity(Some(p.as_str()))
+                .parse()
+                .ok()
+        })
+        .or_else(|| {
+            siem.then(|| alert.context_attributes.as_ref()?.get("sigma_level"))
+                .flatten()
+                .and_then(|level| o2_enterprise::enterprise::security::cases::sigma_severity(level))
+        });
 
     // Build the correlation subject for the internal alert path.
     let subject = CorrelationSubject {
@@ -678,10 +991,25 @@ pub async fn correlate_alert_to_incident(
         kind: AlertKind::Internal,
         base_destinations: alert.destinations.clone(),
         severity,
+        title_inputs: Some(super::incident_title::TitleInputs {
+            alert,
+            result_row,
+            notify_rows,
+            labels: &labels,
+        }),
+        case_title,
+        siem_case_window,
+        security_case: siem,
+        historical: siem && historical,
+        case_activity,
+        case_entity,
     };
 
-    // Find or create incident
-    let outcome = find_or_create_incident(
+    let _case_guard = match subject.siem_case_window {
+        Some(_) => Some(siem_case_lock(&alert.org_id, &group_values).lock().await),
+        None => None,
+    };
+    let correlation = find_or_create_incident(
         &alert.org_id,
         &group_values,
         key_type,
@@ -693,7 +1021,35 @@ pub async fn correlate_alert_to_incident(
         downtime.map(|d| d.id.as_str()),
     )
     .await?;
+    let outcome = correlation.outcome;
+    if siem
+        && !matches!(
+            outcome,
+            IncidentCorrelationOutcome::NewIncidentCreated { .. }
+        )
+        && let Err(e) =
+            infra::table::alert_incidents::mark_security_case(&alert.org_id, outcome.incident_id())
+                .await
+    {
+        log::error!(
+            "[incidents] could not mark {}/{} a security case: {e}",
+            alert.org_id,
+            outcome.incident_id()
+        );
+    }
+    // D23: a firing joining an acknowledged incident is acknowledged too, so nobody is re-paged.
+    if !matches!(
+        outcome,
+        IncidentCorrelationOutcome::NewIncidentCreated { .. }
+    ) && let Some(alert_id) = alert.id.map(|id| id.to_string())
+    {
+        crate::alerts::ack::join_acked_incident(&alert.org_id, outcome.incident_id(), &alert_id)
+            .await;
+    }
 
+    // The on-call record routing opened; its team decides L0 for the incident.
+    #[cfg(feature = "enterprise")]
+    let mut routed_origin: Option<config::meta::oncall::Response> = None;
     // Only on creation: an alert joining an existing incident must not open a second record.
     #[cfg(feature = "enterprise")]
     if let IncidentCorrelationOutcome::NewIncidentCreated {
@@ -705,7 +1061,7 @@ pub async fn correlate_alert_to_incident(
     {
         // Single-sourced with `scheduler::handlers`: the row, then the alert's own conditions.
         let mut dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
-            &crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await,
+            &semantic_groups,
             &alert.query_condition,
             result_row,
         );
@@ -735,7 +1091,11 @@ pub async fn correlate_alert_to_incident(
         let priority = alert
             .priority
             .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
-        let title = alert.name.clone();
+        // The stored title, so a templated or reopened incident pages under the name it shows.
+        let title = match infra::table::alert_incidents::get(&alert.org_id, incident_id).await {
+            Ok(Some(incident)) => incident.title.unwrap_or_else(|| alert.name.clone()),
+            _ => alert.name.clone(),
+        };
         match o2_enterprise::enterprise::oncall::escalation::start_for_incident(
             &alert.org_id,
             &incident_id.to_string(),
@@ -774,12 +1134,34 @@ pub async fn correlate_alert_to_incident(
                         alert.org_id
                     );
                 }
+                routed_origin = Some(origin);
             }
             Ok(None) => {}
             Err(e) => log::error!(
                 "[incidents] on-call paging failed for {}/{incident_id}: {e}",
                 alert.org_id
             ),
+        }
+    }
+
+    // A new alert is new evidence, so a page whose ladder ran out may page again.
+    #[cfg(feature = "enterprise")]
+    if let Some(incident_id) = outcome.joined_by_new_alert()
+        && downtime.is_none()
+        && o2_enterprise::enterprise::oncall::is_enabled()
+    {
+        page_again_after_new_alert(&alert.org_id, incident_id).await;
+    }
+
+    // Starts after routing decides L0; an un-mute keeps an already stored off decision.
+    #[cfg(feature = "enterprise")]
+    if let IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. } = &outcome
+        && downtime.is_none()
+    {
+        if correlation.created {
+            start_new_incident_rca(&alert.org_id, incident_id, routed_origin.as_ref()).await;
+        } else {
+            start_unmuted_incident_rca(&alert.org_id, incident_id, routed_origin.as_ref()).await;
         }
     }
 
@@ -790,10 +1172,12 @@ pub async fn correlate_alert_to_incident(
         match &outcome {
             IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. }
             | IncidentCorrelationOutcome::NewAlertTypeJoined { incident_id, .. }
-            | IncidentCorrelationOutcome::SeverityEscalated { incident_id, .. } => {
+            | IncidentCorrelationOutcome::SeverityEscalated { incident_id, .. }
+            | IncidentCorrelationOutcome::FiredAfterReopen { incident_id, .. } => {
                 let event = match &outcome {
                     IncidentCorrelationOutcome::NewIncidentCreated { .. } => "new_incident_created",
                     IncidentCorrelationOutcome::SeverityEscalated { .. } => "severity_escalated",
+                    IncidentCorrelationOutcome::FiredAfterReopen { .. } => FIRED_AFTER_REOPEN_EVENT,
                     _ => "new_alert_correlated",
                 };
                 let merged_destinations =
@@ -802,6 +1186,9 @@ pub async fn correlate_alert_to_incident(
                 notify_attempted = !merged_destinations.is_empty();
                 notify_error = send_incident_notifications(
                     alert,
+                    notify_rows,
+                    eval_level,
+                    actual_value,
                     incident_id,
                     event,
                     triggered_at,
@@ -861,7 +1248,8 @@ pub async fn correlate_external_event(
     );
 
     // Same parallel correlation the internal path uses.
-    let parallel_result = correlate_parallel(org_id, &labels).await;
+    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
+    let parallel_result = correlate_parallel(org_id, &labels, &semantic_groups).await;
 
     let group_values = parallel_result.final_group_values;
     let mut key_type = parallel_result.final_key_type;
@@ -897,12 +1285,20 @@ pub async fn correlate_external_event(
         kind: AlertKind::External,
         base_destinations,
         severity: Some(external.severity.parse().unwrap_or(IncidentSeverity::P3)),
+        title_inputs: None,
+        case_title: None,
+        siem_case_window: None,
+        security_case: false,
+        historical: false,
+        case_activity: None,
+        case_entity: None,
     };
 
     let triggered_at = external.last_seen_at;
 
     // Find or create incident.
-    let outcome = find_or_create_incident(
+    // An un-mute starts the same way; `rca_off_reason` stays as creation stored it.
+    let Correlation { outcome, .. } = find_or_create_incident(
         org_id,
         &group_values,
         key_type,
@@ -915,31 +1311,48 @@ pub async fn correlate_external_event(
     )
     .await?;
 
+    // A new external alert is new evidence too, so an unanswered page may page again.
+    #[cfg(feature = "enterprise")]
+    if let Some(incident_id) = outcome.joined_by_new_alert()
+        && o2_enterprise::enterprise::oncall::is_enabled()
+    {
+        page_again_after_new_alert(org_id, incident_id).await;
+    }
+
+    // No on-call routing on this path, so nothing decides L0 and the run starts.
+    #[cfg(feature = "enterprise")]
+    if let IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. } = &outcome {
+        start_automatic_rca(
+            org_id,
+            incident_id,
+            config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+        )
+        .await;
+    }
+
     // Send incident notification unless the outcome is a repeated alert (suppressed
     // by design). External events always carry a single occurrence, so there is no
     // empty-`notify_rows` manual-trigger case to guard against here.
     match &outcome {
         IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. }
         | IncidentCorrelationOutcome::NewAlertTypeJoined { incident_id, .. }
-        | IncidentCorrelationOutcome::SeverityEscalated { incident_id, .. } => {
+        | IncidentCorrelationOutcome::SeverityEscalated { incident_id, .. }
+        | IncidentCorrelationOutcome::FiredAfterReopen { incident_id, .. } => {
             let event = match &outcome {
                 IncidentCorrelationOutcome::NewIncidentCreated { .. } => "new_incident_created",
                 IncidentCorrelationOutcome::SeverityEscalated { .. } => "severity_escalated",
+                IncidentCorrelationOutcome::FiredAfterReopen { .. } => FIRED_AFTER_REOPEN_EVENT,
                 _ => "new_alert_correlated",
             };
             let merged_destinations =
                 collect_incident_destinations(org_id, incident_id, &subject.base_destinations)
                     .await;
-            send_incident_notifications_inner(
-                org_id,
-                &subject.name,
-                incident_id,
-                event,
-                triggered_at,
-                &merged_destinations,
-                None,
-            )
-            .await;
+            let send = IncidentSend {
+                ctx: subject_notification_context(org_id, &subject.name, triggered_at).await,
+                dest_names: merged_destinations,
+                alert_template: None,
+            };
+            send_incident_notifications_inner(org_id, incident_id, event, vec![send]).await;
         }
         IncidentCorrelationOutcome::ExistingAlertRepeated { incident_id, .. } => {
             log::debug!(
@@ -951,8 +1364,7 @@ pub async fn correlate_external_event(
     Ok(Some(outcome))
 }
 
-/// Narrow on purpose: one member recovering is not the incident being over, and an acknowledged or
-/// assigned incident is a human's to close. `auto_resolve_after_minutes` stays as the backstop.
+/// Narrow on purpose: acknowledged, assigned and security cases are a human's to close.
 pub async fn resolve_alert_firing(
     event: &config::meta::alerts::recovery::RecoveryEvent,
     muted: bool,
@@ -989,15 +1401,11 @@ pub async fn resolve_alert_firing(
     else {
         return Ok(());
     };
-    if incident.status == "resolved" {
-        return Ok(());
-    }
-    if incident.acknowledged_by.is_some() || incident.assigned_to.is_some() {
-        return Ok(());
-    }
-
     let links = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
-    if links.is_empty() || links.iter().any(|l| l.resolved_at.is_none()) {
+    let fired_by_detection =
+        db::alerts::alert::any_siem_alert(&event.org_id, links.iter().map(|l| l.alert_id.as_str()))
+            .await;
+    if !recovery_closes(&incident, &links, fired_by_detection) {
         return Ok(());
     }
 
@@ -1082,6 +1490,163 @@ pub async fn try_auto_resolve_incident_for_external_alert(
     Ok(())
 }
 
+/// Whether all of an incident's firings recovering closes it; a security case never closes so.
+fn recovery_closes(
+    incident: &infra::table::entity::alert_incidents::Model,
+    links: &[infra::table::entity::alert_incident_alerts::Model],
+    fired_by_detection: bool,
+) -> bool {
+    incident.status != "resolved"
+        && incident.acknowledged_by.is_none()
+        && incident.assigned_to.is_none()
+        && !links.is_empty()
+        && links.iter().all(|l| l.resolved_at.is_some())
+        && !incident.security_case
+        && !fired_by_detection
+}
+
+/// The lock stripe for one org's security case on `group_values`.
+fn siem_case_lock(
+    org_id: &str,
+    group_values: &HashMap<String, String>,
+) -> &'static tokio::sync::Mutex<()> {
+    let mut dims: Vec<(&String, &String)> = group_values.iter().collect();
+    dims.sort();
+    let mut hasher = DefaultHasher::new();
+    org_id.hash(&mut hasher);
+    dims.hash(&mut hasher);
+    &SIEM_CASE_LOCKS[(hasher.finish() % SIEM_CASE_LOCKS.len() as u64) as usize]
+}
+
+/// The open security case with exactly `group_values` active within `window` of `span`.
+async fn find_open_siem_case(
+    org_id: &str,
+    group_values: &HashMap<String, String>,
+    span: (i64, i64),
+    window: i64,
+) -> Result<Option<infra::table::entity::alert_incidents::Model>, anyhow::Error> {
+    let client = infra::db::get_orm_client_ro().await;
+    let mut open = Vec::new();
+    for candidate in infra::table::alert_incidents::find_correlation_candidates(org_id).await? {
+        // Only the exact entity can be this case, so every other candidate stays unread.
+        let same_entity = serde_json::from_value::<HashMap<String, String>>(candidate.group_values)
+            .is_ok_and(|dims| &dims == group_values);
+        if same_entity
+            && let Some(incident) =
+                infra::table::alert_incidents::get_with(client, org_id, &candidate.id).await?
+            && incident.status != "resolved"
+        {
+            open.push(incident);
+        }
+    }
+    Ok(o2_enterprise::enterprise::security::cases::pick_open_case(
+        open,
+        group_values,
+        span,
+        window,
+    ))
+}
+
+/// The open case a detection naming no entity fired into, active within `window` of `span`.
+async fn find_open_detection_case(
+    org_id: &str,
+    alert_id: &str,
+    span: (i64, i64),
+    window: i64,
+) -> Result<Option<infra::table::entity::alert_incidents::Model>, anyhow::Error> {
+    let open =
+        infra::table::alert_incidents::find_open_incidents_by_alert_id(org_id, alert_id).await?;
+    Ok(o2_enterprise::enterprise::security::cases::pick_open_case(
+        open,
+        &HashMap::new(),
+        span,
+        window,
+    ))
+}
+
+/// Links a firing; a security case's span widens to the firing's evidence, not its run time.
+async fn link_firing(
+    incident_id: &str,
+    subject: &CorrelationSubject<'_>,
+    triggered_at: i64,
+    correlation_reason: &str,
+) -> Result<bool, infra::errors::Error> {
+    match subject.case_activity {
+        Some(activity) => {
+            infra::table::alert_incidents::add_firing_to_case(
+                incident_id,
+                &subject.id,
+                &subject.name,
+                subject.kind.as_str(),
+                triggered_at,
+                correlation_reason,
+                activity,
+            )
+            .await
+        }
+        None => {
+            infra::table::alert_incidents::add_alert_to_incident(
+                incident_id,
+                &subject.id,
+                &subject.name,
+                subject.kind.as_str(),
+                triggered_at,
+                correlation_reason,
+            )
+            .await
+        }
+    }
+}
+
+/// Renames a case a second detection joined, unless an analyst already renamed it.
+async fn retitle_growing_case(
+    org_id: &str,
+    incident: &infra::table::entity::alert_incidents::Model,
+    entity: &o2_enterprise::enterprise::security::cases::Entity,
+) {
+    let detections =
+        match infra::table::alert_incidents::get_alert_counts(std::slice::from_ref(&incident.id))
+            .await
+        {
+            Ok(counts) => counts.get(&incident.id).map_or(0, |c| c.groups.len()),
+            Err(e) => {
+                log::error!(
+                    "[incidents] could not count detections of case {org_id}/{}: {e}",
+                    incident.id
+                );
+                return;
+            }
+        };
+    let Some(title) = o2_enterprise::enterprise::security::cases::grown_case_title(
+        incident.title.as_deref(),
+        detections,
+        entity,
+    ) else {
+        return;
+    };
+    if let Err(e) = infra::table::alert_incidents::update_title(org_id, &incident.id, &title).await
+    {
+        log::error!(
+            "[incidents] could not retitle case {org_id}/{}: {e}",
+            incident.id
+        );
+        return;
+    }
+    let from = incident.title.clone().unwrap_or_default();
+    if let Err(e) = infra::table::incident_events::append(
+        org_id,
+        &incident.id,
+        IncidentEvent::title_changed(from, title, "system@openobserve.ai"),
+    )
+    .await
+    {
+        log::error!(
+            "[incidents] could not record the retitle of case {org_id}/{}: {e}",
+            incident.id
+        );
+    }
+}
+
 /// The scalar columns of a result row, as the labels correlation matches on.
 fn labels_from_row(row: &Map<String, Value>) -> HashMap<String, String> {
     row.iter()
@@ -1110,7 +1675,15 @@ pub(crate) async fn correlated_service_for_routing(
     org_id: &str,
     row: &Map<String, Value>,
 ) -> Option<String> {
-    let found = query_service_discovery_key(org_id, &labels_from_row(row)).await?;
+    let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
+    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
+    let found = query_service_discovery_key(
+        org_id,
+        &labels_from_row(row),
+        &identity_config,
+        &semantic_groups,
+    )
+    .await?;
     if found.service_name_from_stream || found.service_name.trim().is_empty() {
         return None;
     }
@@ -1124,18 +1697,16 @@ pub(crate) async fn correlated_service_for_routing(
 async fn query_service_discovery_key(
     org_id: &str,
     labels: &HashMap<String, String>,
+    identity_config: &ServiceIdentityConfig,
+    semantic_groups: &[FieldAlias],
 ) -> Option<ServiceDiscoveryResult> {
     #[cfg(feature = "enterprise")]
     {
-        let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
-
-        let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
-
         match o2_enterprise::enterprise::service_streams::storage::correlate(
             org_id,
             labels,
-            &identity_config,
-            &semantic_groups,
+            identity_config,
+            semantic_groups,
         )
         .await
         {
@@ -1231,95 +1802,6 @@ fn spawn_topology_enrichment(
         }
     });
 }
-
-/// Starts the first RCA of an incident: at creation, or when a downtime mute is lifted.
-#[cfg(feature = "enterprise")]
-async fn spawn_initial_rca(org_id: &str, incident_id: &str) {
-    if !rca_will_run(org_id, incident_id).await {
-        return;
-    }
-    #[cfg(feature = "cloud")]
-    let usage_permit = {
-        let usage_context = crate::trial_quota::AiUsageContext {
-            user_email: "system@openobserve.ai".to_string(),
-            incident_id: Some(incident_id.to_string()),
-            ..Default::default()
-        };
-        match crate::trial_quota::authorize_ai_usage(
-            org_id,
-            crate::trial_quota::TrialQuotaFeature::NewIncident,
-            &usage_context,
-        )
-        .await
-        {
-            Ok(permit) => Some(permit),
-            Err(error) => {
-                log::info!(
-                    "[INCIDENTS::RCA] New incident {incident_id} retained without RCA: {error}"
-                );
-                // §6: no verdict is coming, so nothing may go on holding a page for one.
-                o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-                    org_id,
-                    incident_id,
-                )
-                .await;
-                None
-            }
-        }
-    };
-    #[cfg(not(feature = "cloud"))]
-    let usage_permit = None;
-
-    if cfg!(feature = "cloud") && usage_permit.is_none() {
-        return;
-    }
-    if let Err(e) = crate::incidents::append_event(
-        org_id,
-        incident_id,
-        config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-    )
-    .await
-    {
-        log::error!(
-            "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {org_id}/{incident_id}: {e}"
-        );
-    }
-
-    let org_id_rca = org_id.to_string();
-    let incident_id_rca = incident_id.to_string();
-    let handle = tokio::spawn(async move {
-        if let Err(e) = trigger_rca_for_incident(
-            org_id_rca.clone(),
-            incident_id_rca.clone(),
-            false,
-            true,
-            "system@openobserve.ai".to_string(),
-            // First analysis for this incident — there is nothing to build on.
-            false,
-            usage_permit,
-        )
-        .await
-        {
-            log::debug!(
-                "[INCIDENTS::RCA] Immediate trigger failed for incident {incident_id_rca}: {e}"
-            );
-
-            emit_analysis_failure(
-                &org_id_rca,
-                &incident_id_rca,
-                config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident,
-                "Background spawn failed",
-                Some(&e),
-            )
-            .await;
-        }
-        unregister_rca_task(&org_id_rca, &incident_id_rca);
-    });
-    register_rca_task(org_id, incident_id, handle.abort_handle());
-}
-
-#[cfg(not(feature = "enterprise"))]
-async fn spawn_initial_rca(_org_id: &str, _incident_id: &str) {}
 
 /// Runs the incident-created workflows; an error must not block the incident flow.
 async fn trigger_created_workflows(org_id: &str, incident_id: &str) {
@@ -1418,14 +1900,13 @@ async fn retarget_mute(org_id: &str, incident_id: &str, from: &str, to: &str) {
     }
 }
 
-/// An un-muted incident runs as a fresh one: workflows, RCA, then the page and "opened".
+/// An un-muted incident runs as a fresh one; its analysis starts in the correlation caller.
 async fn reopened_after_mute(
     org_id: &str,
     incident_id: String,
     service_name: &str,
 ) -> IncidentCorrelationOutcome {
     trigger_created_workflows(org_id, &incident_id).await;
-    spawn_initial_rca(org_id, &incident_id).await;
     IncidentCorrelationOutcome::NewIncidentCreated {
         incident_id,
         service_name: service_name.to_string(),
@@ -1453,7 +1934,7 @@ async fn create_new_incident(
     org_id: &str,
     group_values: &HashMap<String, String>,
     key_type: config::meta::alerts::incidents::KeyType,
-    subject: &CorrelationSubject,
+    subject: &CorrelationSubject<'_>,
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
@@ -1473,19 +1954,61 @@ async fn create_new_incident(
         }
     };
 
-    let title =
-        o2_enterprise::enterprise::alerts::incidents::generate_title(&subject.name, group_values);
+    // Rendered once here, so later firings that join the incident never retitle it.
+    let custom_title = match subject
+        .title_inputs
+        .as_ref()
+        .filter(|i| i.alert.incident_title_template.is_some())
+    {
+        Some(inputs) => super::incident_title::render(
+            inputs,
+            &org_display_name(org_id).await,
+            group_values,
+            triggered_at,
+        ),
+        None => None,
+    };
+    let title = custom_title
+        .or_else(|| subject.case_title.clone())
+        .unwrap_or_else(|| {
+            o2_enterprise::enterprise::alerts::incidents::generate_title(
+                &subject.name,
+                group_values,
+            )
+        });
 
-    let incident = infra::table::alert_incidents::create_with_mute(
-        org_id,
-        &severity,
-        serde_json::to_value(group_values)?,
-        &key_type.to_string(),
-        triggered_at,
-        Some(title.clone()),
-        muted_by.map(str::to_string),
-    )
-    .await?;
+    let dims = serde_json::to_value(group_values)?;
+    let key = key_type.to_string();
+    let muted = muted_by.map(str::to_string);
+    let incident = if subject.security_case {
+        infra::table::alert_incidents::create_security_case(
+            org_id,
+            &severity,
+            dims,
+            &key,
+            subject
+                .case_activity
+                .unwrap_or(infra::table::alert_incidents::CaseActivity {
+                    first_event_at: triggered_at,
+                    last_event_at: triggered_at,
+                    historical: subject.historical,
+                }),
+            Some(title.clone()),
+            muted,
+        )
+        .await?
+    } else {
+        infra::table::alert_incidents::create_with_mute(
+            org_id,
+            &severity,
+            dims,
+            &key,
+            triggered_at,
+            Some(title.clone()),
+            muted,
+        )
+        .await?
+    };
 
     // Initialize event timeline for new incident
     if let Err(e) = infra::table::incident_events::init(org_id, &incident.id).await {
@@ -1500,15 +2023,7 @@ async fn create_new_incident(
     }
 
     // Add the first alert to the incident
-    infra::table::alert_incidents::add_alert_to_incident(
-        &incident.id,
-        &subject.id,
-        &subject.name,
-        subject.kind.as_str(),
-        triggered_at,
-        correlation_reason,
-    )
-    .await?;
+    link_firing(&incident.id, subject, triggered_at, correlation_reason).await?;
 
     // Record alert event
     if let Err(e) = infra::table::incident_events::record_alert(
@@ -1583,9 +2098,7 @@ async fn create_new_incident(
         triggered_at,
     );
 
-    if muted_by.is_none() {
-        spawn_initial_rca(org_id, &incident.id).await;
-    }
+    // The analysis starts after on-call routing, in the correlation caller.
 
     Ok(IncidentCorrelationOutcome::NewIncidentCreated {
         incident_id: incident.id,
@@ -1597,7 +2110,7 @@ async fn create_new_incident(
 async fn escalate_severity(
     org_id: &str,
     incident: &infra::table::entity::alert_incidents::Model,
-    subject: &CorrelationSubject,
+    subject: &CorrelationSubject<'_>,
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
 ) -> Result<bool, anyhow::Error> {
     let Some((current_severity, new_severity)) =
@@ -1669,44 +2182,114 @@ fn firing_is_muted(
     muted_by.is_some() || (incident.muted_by_downtime_id.is_some() && !reopened)
 }
 
+/// What correlation did; `created` tells a true creation from an un-mute, which keeps a stored L0
+/// decision.
+struct Correlation {
+    outcome: IncidentCorrelationOutcome,
+    #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+    created: bool,
+}
+
+impl Correlation {
+    /// An incident that already existed, un-muted or not.
+    fn existing(outcome: IncidentCorrelationOutcome) -> Self {
+        Self {
+            outcome,
+            created: false,
+        }
+    }
+}
+
+fn candidate_can_join(stored: &serde_json::Value, incoming: &HashMap<String, String>) -> bool {
+    use config::meta::alerts::incidents::DimensionRelationship;
+
+    let dimensions = serde_json::from_value(stored.clone()).unwrap_or_default();
+    matches!(
+        DimensionRelationship::check(&dimensions, incoming),
+        DimensionRelationship::Equal
+            | DimensionRelationship::NewIsSubset
+            | DimensionRelationship::NewIsSuperset
+    )
+}
+
+async fn select_correlation_candidate<C: sea_orm::ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    incoming: &HashMap<String, String>,
+    candidates: Vec<infra::table::alert_incidents::CorrelationCandidate>,
+) -> Result<Option<infra::table::entity::alert_incidents::Model>, infra::errors::Error> {
+    for candidate in candidates {
+        if !candidate_can_join(&candidate.group_values, incoming) {
+            continue;
+        }
+        let Some(incident) =
+            infra::table::alert_incidents::get_with(client, org_id, &candidate.id).await?
+        else {
+            continue;
+        };
+        if incident.status != "resolved" && candidate_can_join(&incident.group_values, incoming) {
+            return Ok(Some(incident));
+        }
+    }
+    Ok(None)
+}
+
+/// A muted firing never sends, and an acknowledged incident already has a person on it.
+fn reopen_can_send(
+    incident: &infra::table::entity::alert_incidents::Model,
+    muted_by: Option<&str>,
+) -> bool {
+    muted_by.is_none()
+        && incident.muted_by_downtime_id.is_none()
+        && incident.status != "acknowledged"
+}
+
 /// Find an existing open incident or create a new one
 #[allow(clippy::too_many_arguments)]
 async fn find_or_create_incident(
     org_id: &str,
     group_values: &HashMap<String, String>,
     key_type: config::meta::alerts::incidents::KeyType,
-    subject: &CorrelationSubject,
+    subject: &CorrelationSubject<'_>,
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
     muted_by: Option<&str>,
-) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
+) -> Result<Correlation, anyhow::Error> {
     use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
 
-    // STEP 1: AlertId exact match - check for existing incident with same alert_id
-    if key_type == KeyType::AlertId {
-        let alert_id = subject.id.clone();
-
-        // Use the dedicated DB query: junction table lookup + incident fetch
-        if let Some(incident) =
-            infra::table::alert_incidents::find_open_incident_by_alert_id(org_id, &alert_id).await?
-        {
-            // Found existing AlertId incident for this alert - join it
-            let (_, reopened) = join_then_unmute(
-                infra::table::alert_incidents::add_alert_to_incident(
-                    &incident.id,
-                    &alert_id,
-                    &subject.name,
-                    subject.kind.as_str(),
-                    triggered_at,
-                    correlation_reason,
-                ),
+    // STEP 1: AlertId exact match, or a security case for the same entity within its window
+    let span = subject
+        .case_activity
+        .map_or((triggered_at, triggered_at), |a| {
+            (a.first_event_at, a.last_event_at)
+        });
+    let exact = match (key_type, subject.siem_case_window) {
+        (KeyType::AlertId, Some(window)) => {
+            find_open_detection_case(org_id, &subject.id, span, window).await?
+        }
+        (KeyType::AlertId, None) => {
+            infra::table::alert_incidents::find_open_incident_by_alert_id(org_id, &subject.id)
+                .await?
+        }
+        (_, Some(window)) => find_open_siem_case(org_id, group_values, span, window).await?,
+        _ => None,
+    };
+    {
+        if let Some(incident) = exact {
+            let alert_id = subject.id.clone();
+            let (is_new_alert_type, reopened) = join_then_unmute(
+                link_firing(&incident.id, subject, triggered_at, correlation_reason),
                 async || unmute_for_firing(org_id, &incident, muted_by).await,
             )
             .await?;
+            if is_new_alert_type && let Some(entity) = subject.case_entity.as_ref() {
+                retitle_growing_case(org_id, &incident, entity).await;
+            }
 
-            if let Err(e) = infra::table::incident_events::record_alert(
+            // The write decides under its row lock, so two firings cannot both take the reopen.
+            let after_reopen = match infra::table::incident_events::record_alert(
                 org_id,
                 &incident.id,
                 &alert_id,
@@ -1715,11 +2298,15 @@ async fn find_or_create_incident(
             )
             .await
             {
-                log::error!(
-                    "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
-                    incident.id
-                );
-            }
+                Ok(waited) => waited && reopen_can_send(&incident, muted_by),
+                Err(e) => {
+                    log::error!(
+                        "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
+                        incident.id
+                    );
+                    false
+                }
+            };
 
             if muted_by.is_none()
                 && !reopened
@@ -1746,59 +2333,65 @@ async fn find_or_create_incident(
             );
             if reopened {
                 // Recomputed from the un-muting firing, so "opened" carries the right level.
-                return Ok(escalate_then_reopen(
-                    org_id,
-                    &incident.id,
-                    escalate_severity(org_id, &incident, subject, eval_level),
-                    reopened_after_mute(org_id, incident.id.clone(), service_name),
-                )
-                .await);
+                return Ok(Correlation::existing(
+                    escalate_then_reopen(
+                        org_id,
+                        &incident.id,
+                        escalate_severity(org_id, &incident, subject, eval_level),
+                        reopened_after_mute(org_id, incident.id.clone(), service_name),
+                    )
+                    .await,
+                ));
             }
 
             // A muted firing must not raise the severity silently; the un-muting firing does it.
             if !firing_is_muted(muted_by, &incident, reopened)
                 && escalate_severity(org_id, &incident, subject, eval_level).await?
             {
-                return Ok(IncidentCorrelationOutcome::SeverityEscalated {
-                    incident_id: incident.id,
-                    service_name: service_name.to_string(),
-                });
+                return Ok(Correlation::existing(
+                    IncidentCorrelationOutcome::SeverityEscalated {
+                        incident_id: incident.id,
+                        service_name: service_name.to_string(),
+                    },
+                ));
             }
 
-            return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
-                incident_id: incident.id,
-                service_name: service_name.to_string(),
-            });
+            if is_new_alert_type {
+                return Ok(Correlation::existing(
+                    IncidentCorrelationOutcome::NewAlertTypeJoined {
+                        incident_id: incident.id,
+                        service_name: service_name.to_string(),
+                    },
+                ));
+            }
+            return Ok(Correlation::existing(IncidentCorrelationOutcome::repeated(
+                incident.id,
+                service_name.to_string(),
+                after_reopen,
+            )));
         }
     }
 
-    // STEP 2: Venn diagram match against all open incidents (for Primary/Secondary key types)
+    // STEP 2: Venn diagram match against open incidents (for Primary/Secondary key types)
     //
-    // Load all open incidents and check for dimension compatibility.
     // Equal or NewIsSubset → join incident; NewIsSuperset → upgrade and join.
     // PartialOverlap or Incompatible → skip (create new incident).
-    if key_type != KeyType::AlertId {
-        let open_incidents =
-            infra::table::alert_incidents::find_open_incidents_filtered(org_id, None, None).await?;
-
-        for existing in open_incidents {
+    if key_type != KeyType::AlertId && subject.siem_case_window.is_none() {
+        let candidates = infra::table::alert_incidents::find_correlation_candidates(org_id).await?;
+        if let Some(existing) = select_correlation_candidate(
+            infra::db::get_orm_client_ro().await,
+            org_id,
+            group_values,
+            candidates,
+        )
+        .await?
+        {
             let existing_key_type = KeyType::from_stored(&existing.key_type);
 
             let existing_dims: HashMap<String, String> =
                 serde_json::from_value(existing.group_values.clone()).unwrap_or_default();
 
             let relationship = DimensionRelationship::check(&existing_dims, group_values);
-
-            let join_incident = matches!(
-                relationship,
-                DimensionRelationship::Equal
-                    | DimensionRelationship::NewIsSubset
-                    | DimensionRelationship::NewIsSuperset
-            );
-
-            if !join_incident {
-                continue;
-            }
 
             let mut merged_dims = existing_dims.clone();
             let dimensions_changed = merge_dimensions(&mut merged_dims, group_values, &existing.id);
@@ -1816,7 +2409,8 @@ async fn find_or_create_incident(
             )
             .await?;
 
-            if let Err(e) = infra::table::incident_events::record_alert(
+            // The write decides under its row lock, so two firings cannot both take the reopen.
+            let after_reopen = match infra::table::incident_events::record_alert(
                 org_id,
                 &existing.id,
                 &subject.id,
@@ -1825,11 +2419,15 @@ async fn find_or_create_incident(
             )
             .await
             {
-                log::error!(
-                    "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
-                    existing.id
-                );
-            }
+                Ok(waited) => waited && reopen_can_send(&existing, muted_by),
+                Err(e) => {
+                    log::error!(
+                        "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
+                        existing.id
+                    );
+                    false
+                }
+            };
 
             if !is_new_alert_type
                 && muted_by.is_none()
@@ -1924,119 +2522,45 @@ async fn find_or_create_incident(
                 triggered_at,
             );
             if reopened {
-                return Ok(escalate_then_reopen(
-                    org_id,
-                    &existing.id,
-                    escalate_severity(org_id, &existing, subject, eval_level),
-                    reopened_after_mute(org_id, existing.id.clone(), service_name),
-                )
-                .await);
+                return Ok(Correlation::existing(
+                    escalate_then_reopen(
+                        org_id,
+                        &existing.id,
+                        escalate_severity(org_id, &existing, subject, eval_level),
+                        reopened_after_mute(org_id, existing.id.clone(), service_name),
+                    )
+                    .await,
+                ));
             }
 
             if is_new_alert_type {
+                // A new alert type changes the picture: a fresh automatic run.
                 #[cfg(feature = "enterprise")]
                 if muted_by.is_none() {
-                    let org_id_rca = org_id.to_string();
-                    let incident_id_rca = existing.id.clone();
-                    let cooldown = o2_enterprise::enterprise::common::config::get_config()
-                        .incidents
-                        .reanalysis_cooldown_minutes;
-                    let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
-                        .await
-                        .unwrap_or_default();
-                    if !is_analysis_in_flight(&events, cooldown * 2)
-                        && rca_will_run(&org_id_rca, &incident_id_rca).await
-                    {
-                        #[cfg(feature = "cloud")]
-                        let usage_permit = {
-                            let usage_context = crate::trial_quota::AiUsageContext {
-                                user_email: "system@openobserve.ai".to_string(),
-                                incident_id: Some(incident_id_rca.clone()),
-                                ..Default::default()
-                            };
-                            match crate::trial_quota::authorize_ai_usage(
-                                &org_id_rca,
-                                crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
-                                &usage_context,
-                            )
-                            .await
-                            {
-                                Ok(permit) => Some(permit),
-                                Err(error) => {
-                                    log::info!(
-                                        "[INCIDENTS::RCA] Skipping new-alert reanalysis for {incident_id_rca}: {error}"
-                                    );
-                                    // §6: no verdict is coming, so nothing may go on holding a page
-                                    // for one.
-                                    o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-                                        &org_id_rca,
-                                        &incident_id_rca,
-                                    )
-                                    .await;
-                                    None
-                                }
-                            }
-                        };
-                        #[cfg(not(feature = "cloud"))]
-                        let usage_permit = None;
-
-                        if !cfg!(feature = "cloud") || usage_permit.is_some() {
-                            let _ = crate::incidents::append_event(
-                                &org_id_rca,
-                                &incident_id_rca,
-                                config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-                            )
-                            .await;
-                            let handle = tokio::spawn(async move {
-                                if let Err(e) = trigger_rca_for_incident(
-                                    org_id_rca.clone(),
-                                    incident_id_rca.clone(),
-                                    true,
-                                    true,
-                                    "system@openobserve.ai".to_string(),
-                                    // Fresh analysis: a new alert type changes the picture,
-                                    // so the agent should reassess rather than extend.
-                                    false,
-                                    usage_permit,
-                                )
-                                .await
-                                {
-                                    log::debug!(
-                                        "[INCIDENTS::RCA] Reanalysis trigger failed for {incident_id_rca}: {e}"
-                                    );
-
-                                    emit_analysis_failure(
-                                        &org_id_rca,
-                                        &incident_id_rca,
-                                        config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis,
-                                        "Reanalysis trigger failed",
-                                        Some(&e),
-                                    ).await;
-                                }
-                                unregister_rca_task(&org_id_rca, &incident_id_rca);
-                            });
-                            register_rca_task(org_id, &existing.id, handle.abort_handle());
-                        }
-                    } else {
-                        log::debug!(
-                            "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping NewAlertTypeJoined trigger"
-                        );
-                    }
+                    start_automatic_rca(
+                        org_id,
+                        &existing.id,
+                        config::meta::alerts::rca_runs::RunTrigger::AutoNewAlertType,
+                    )
+                    .await;
                 }
-                return Ok(IncidentCorrelationOutcome::NewAlertTypeJoined {
-                    incident_id: existing.id,
-                    service_name: service_name.to_string(),
-                });
+                return Ok(Correlation::existing(
+                    IncidentCorrelationOutcome::NewAlertTypeJoined {
+                        incident_id: existing.id,
+                        service_name: service_name.to_string(),
+                    },
+                ));
             } else {
-                return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
-                    incident_id: existing.id,
-                    service_name: service_name.to_string(),
-                });
+                return Ok(Correlation::existing(IncidentCorrelationOutcome::repeated(
+                    existing.id,
+                    service_name.to_string(),
+                    after_reopen,
+                )));
             }
         }
     }
 
-    create_new_incident(
+    let outcome = create_new_incident(
         org_id,
         group_values,
         key_type,
@@ -2047,14 +2571,94 @@ async fn find_or_create_incident(
         eval_level,
         muted_by,
     )
-    .await
+    .await?;
+    Ok(Correlation {
+        outcome,
+        created: true,
+    })
 }
 
-/// Get incident with its alerts for detail view
+/// The detail view: the incident, its RCA runs and the alert definitions `user_id` may read.
 pub async fn get_incident_with_alerts(
     org_id: &str,
     incident_id: &str,
+    user_id: &str,
 ) -> Result<Option<IncidentWithAlerts>, anyhow::Error> {
+    incident_with_alerts(
+        org_id,
+        incident_id,
+        true,
+        |alert_id: String, folder_id: String| async move {
+            can_read_alert(org_id, user_id, &alert_id, &folder_id).await
+        },
+    )
+    .await
+}
+
+/// [get_incident_with_alerts] without the RCA runs, for callers that never read them.
+pub async fn get_incident_with_triggers(
+    org_id: &str,
+    incident_id: &str,
+) -> Result<Option<IncidentWithAlerts>, anyhow::Error> {
+    incident_with_alerts(org_id, incident_id, false, |_, _| std::future::ready(true)).await
+}
+
+/// Whether `user_id` may GET the alert, checked as the `GET /v2/{org}/alerts/{id}` route checks it.
+#[cfg(feature = "enterprise")]
+async fn can_read_alert(org_id: &str, user_id: &str, alert_id: &str, folder_id: &str) -> bool {
+    !o2_openfga::config::get_config().enabled
+        || crate::auth::check_permissions(
+            alert_id,
+            org_id,
+            user_id,
+            "alerts",
+            "GET",
+            Some(folder_id),
+            false,
+            true,
+            false,
+        )
+        .await
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn can_read_alert(_org_id: &str, _user_id: &str, _alert_id: &str, _folder_id: &str) -> bool {
+    true
+}
+
+/// The alerts, given as `(alert_id, folder_id, alert)`, and composites that `can_read` allows.
+async fn readable_definitions<F>(
+    alerts: Vec<(String, String, Alert)>,
+    composites: Vec<CompositeAlertSummary>,
+    can_read: impl Fn(String, String) -> F,
+) -> (Vec<Alert>, Vec<CompositeAlertSummary>)
+where
+    F: Future<Output = bool>,
+{
+    let mut readable_alerts = Vec::with_capacity(alerts.len());
+    for (alert_id, folder_id, alert) in alerts {
+        if can_read(alert_id, folder_id).await {
+            readable_alerts.push(alert);
+        }
+    }
+    let mut readable_composites = Vec::with_capacity(composites.len());
+    for composite in composites {
+        if can_read(composite.id.clone(), composite.folder_id.clone()).await {
+            readable_composites.push(composite);
+        }
+    }
+    (readable_alerts, readable_composites)
+}
+
+async fn incident_with_alerts<F>(
+    org_id: &str,
+    incident_id: &str,
+    with_rca_runs: bool,
+    can_read: impl Fn(String, String) -> F,
+) -> Result<Option<IncidentWithAlerts>, anyhow::Error>
+where
+    F: Future<Output = bool>,
+{
     let incident = match infra::table::alert_incidents::get(org_id, incident_id).await? {
         Some(i) => i,
         None => return Ok(None),
@@ -2065,8 +2669,24 @@ pub async fn get_incident_with_alerts(
     // Store org_id before moving incident
     let incident_org_id = incident.org_id.clone();
 
+    // Without the runs the detail still carries the run summary.
+    let rca = if with_rca_runs {
+        match super::rca_runs::rca_detail(org_id, &incident).await {
+            Ok(rca) => Some(rca),
+            Err(e) => {
+                log::warn!("[incidents] Failed to read RCA runs for {org_id}/{incident_id}: {e}");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     // Convert to config types
     let mut incident_data = model_to_incident(incident).await?;
+    if let Some(rca) = rca {
+        incident_data.rca = rca;
+    }
 
     // Fix alert_count from actual triggers (source of truth)
     // This heals any inconsistencies from race conditions or historical bugs
@@ -2094,11 +2714,12 @@ pub async fn get_incident_with_alerts(
             correlation_reason: a
                 .correlation_reason
                 .as_ref()
-                .and_then(|r| CorrelationReason::try_from(r.as_str()).ok())
+                .and_then(|r| r.parse::<CorrelationReason>().ok())
                 .unwrap_or(CorrelationReason::AlertId),
             created_at: a.created_at,
             source_url: None,
             labels: None,
+            annotations: None,
             detected_source: None,
         })
         .collect();
@@ -2125,6 +2746,10 @@ pub async fn get_incident_with_alerts(
                     if let Some(record) = records_by_id.get(&trigger.alert_id) {
                         trigger.source_url = record.source_url.clone();
                         trigger.labels = serde_json::from_value(record.labels.clone()).ok();
+                        trigger.annotations = record
+                            .last_payload
+                            .get("annotations")
+                            .and_then(|a| serde_json::from_value(a.clone()).ok());
                         trigger.detected_source = Some(record.detected_source.clone());
                     }
                 }
@@ -2156,8 +2781,16 @@ pub async fn get_incident_with_alerts(
         if let Some(trigger) = incident_alerts.iter().find(|a| a.alert_name == alert_name) {
             // Parse alert_id as Ksuid
             if let Ok(alert_ksuid) = trigger.alert_id.parse() {
-                match super::alert::get_by_id_db(&incident_org_id, alert_ksuid).await {
-                    Ok(alert) => alerts.push(alert),
+                match super::alert::get_by_id(
+                    infra::db::get_orm_client_ro().await,
+                    &incident_org_id,
+                    alert_ksuid,
+                )
+                .await
+                {
+                    Ok((folder, alert)) => {
+                        alerts.push((trigger.alert_id.clone(), folder.folder_id, alert))
+                    }
                     Err(e) => {
                         // Not an ordinary alert — a composite has no `alerts`
                         // row, so fall back to the composite graph (§9.6).
@@ -2195,6 +2828,7 @@ pub async fn get_incident_with_alerts(
             }
         }
     }
+    let (alerts, composite_alerts) = readable_definitions(alerts, composite_alerts, can_read).await;
 
     Ok(Some(IncidentWithAlerts {
         incident: incident_data,
@@ -2211,32 +2845,55 @@ pub async fn list_incidents(
     limit: u64,
     offset: u64,
 ) -> Result<(Vec<Incident>, u64), anyhow::Error> {
-    // Get total count before pagination
-    let total = infra::table::alert_incidents::count(org_id, status).await?;
+    list_incidents_filtered(
+        org_id,
+        status,
+        infra::table::alert_incidents::CaseFilter::All,
+        limit,
+        offset,
+    )
+    .await
+}
 
-    let incidents = infra::table::alert_incidents::list(org_id, status, limit, offset).await?;
+/// List incidents, keeping only the security cases `cases` allows.
+pub async fn list_incidents_filtered(
+    org_id: &str,
+    status: Option<&str>,
+    cases: infra::table::alert_incidents::CaseFilter,
+    limit: u64,
+    offset: u64,
+) -> Result<(Vec<Incident>, u64), anyhow::Error> {
+    // Get total count before pagination
+    let total = infra::table::alert_incidents::count_filtered(org_id, status, cases).await?;
+
+    let incidents =
+        infra::table::alert_incidents::list_filtered(org_id, status, cases, limit, offset).await?;
 
     // Get actual alert counts from junction table (source of truth)
     let incident_ids: Vec<String> = incidents.iter().map(|i| i.id.clone()).collect();
-    let actual_counts = infra::table::alert_incidents::get_alert_counts(&incident_ids).await?;
+    let mut actual_counts = infra::table::alert_incidents::get_alert_counts(&incident_ids).await?;
 
     let incidents_list: Vec<Incident> = incidents
         .into_iter()
         .map(|i| {
-            let mut incident = model_to_incident_with_topology(i.clone(), None);
+            let counts = actual_counts.remove(&i.id);
+            let mut incident = model_to_incident_with_topology(i, None);
+            let Some(counts) = counts else {
+                incident.alert_groups = Some(Vec::new());
+                return incident;
+            };
 
             // Fix alert_count from actual triggers (self-healing for corrupted data)
-            if let Some(&actual_count) = actual_counts.get(&i.id)
-                && incident.alert_count != actual_count
-            {
+            if incident.alert_count != counts.total {
                 log::debug!(
                     "[incidents] List: Incident {} alert_count mismatch: stored={}, actual={}",
-                    i.id,
+                    incident.id,
                     incident.alert_count,
-                    actual_count
+                    counts.total
                 );
-                incident.alert_count = actual_count;
+                incident.alert_count = counts.total;
             }
+            incident.alert_groups = Some(counts.groups);
 
             incident
         })
@@ -2371,17 +3028,8 @@ pub async fn enrich_with_topology(
     Ok(())
 }
 
-/// Whether the service graph knows the `from -> to` dependency around `at`.
+/// Whether the service graph saw `from -> to` near `at`; an unquotable name is no dependency.
 async fn dependency_edge_type(org_id: &str, from: &str, to: &str, at: i64) -> EdgeType {
-    if crate::traces::service_graph::use_v4_source(org_id, None).await {
-        dependency_edge_type_v4(org_id, from, to, at).await
-    } else {
-        dependency_edge_type_v1(org_id, from, to).await
-    }
-}
-
-/// One forward instant query at the alert time; a name the escaper refuses is not a dependency.
-async fn dependency_edge_type_v4(org_id: &str, from: &str, to: &str, at: i64) -> EdgeType {
     use crate::traces::service_graph::v4::read::{
         edge_type_from, instant, q_edge_exists, scalar_sum,
     };
@@ -2398,512 +3046,608 @@ async fn dependency_edge_type_v4(org_id: &str, from: &str, to: &str, at: i64) ->
     }
 }
 
-async fn dependency_edge_type_v1(org_id: &str, from: &str, to: &str) -> EdgeType {
-    // Query service graph to check for a known dependency
-    let raw_sg_edges = match crate::traces::service_graph::query_edges_from_stream_internal(
-        org_id, None, None, None, None,
-    )
-    .await
-    {
-        Ok(e) => e,
-        Err(e) => {
-            log::debug!("[incidents] Service graph query failed: {e}, defaulting to temporal edge");
-            vec![]
-        }
-    };
-
-    let (_, sg_topo_edges) = if !raw_sg_edges.is_empty() {
-        o2_enterprise::enterprise::service_graph::build_topology(
-            raw_sg_edges,
-            std::collections::HashMap::new(),
-        )
-    } else {
-        (vec![], vec![])
-    };
-
-    let has_sg_edge = sg_topo_edges
-        .iter()
-        .any(|e| e.from.as_deref() == Some(from) && e.to == to);
-
-    if has_sg_edge {
-        EdgeType::ServiceDependency
-    } else {
-        EdgeType::Temporal
-    }
-}
-
-/// Trigger RCA for a single incident immediately after creation
-///
-/// Called asynchronously via tokio::spawn to avoid blocking incident creation.
-/// Reuses AiAgentClient configuration from enterprise crate.
-///
-/// # Arguments
-/// * `org_id` - Organization ID
-/// * `incident_id` - Incident ID
-///
-/// # Returns
-/// * `Ok(())` if RCA successfully triggered and saved
-/// * `Err(_)` if configuration invalid, agent unavailable, or analysis failed
-///
-/// # Note
-/// Errors are logged but not propagated to caller.
-///
-/// Abort handles for in-flight RCA runs, keyed by `{org_id}/{incident_id}`.
-///
-/// Registered when a run is spawned and removed when it settles. A cancel request
-/// looks the incident up here and aborts the task; if the entry is missing (another
-/// node owns the run, or the process restarted) the caller still writes the terminal
-/// `AIAnalysisCancelled` event so the in-flight guard is released.
-#[cfg(feature = "enterprise")]
-static RCA_ABORT_HANDLES: std::sync::LazyLock<dashmap::DashMap<String, tokio::task::AbortHandle>> =
-    std::sync::LazyLock::new(dashmap::DashMap::new);
-
-#[cfg(feature = "enterprise")]
-fn rca_task_key(org_id: &str, incident_id: &str) -> String {
-    format!("{org_id}/{incident_id}")
-}
-
-/// Track a spawned RCA task so it can be cancelled later.
-#[cfg(feature = "enterprise")]
-pub fn register_rca_task(org_id: &str, incident_id: &str, handle: tokio::task::AbortHandle) {
-    RCA_ABORT_HANDLES.insert(rca_task_key(org_id, incident_id), handle);
-}
-
-/// Stop tracking a run once it has settled. Safe to call when nothing is registered.
-#[cfg(feature = "enterprise")]
-pub fn unregister_rca_task(org_id: &str, incident_id: &str) {
-    RCA_ABORT_HANDLES.remove(&rca_task_key(org_id, incident_id));
-}
-
-/// Cancel the in-flight RCA run for an incident.
-///
-/// Aborts the local task when this node owns it, then records the terminal
-/// `AIAnalysisCancelled` event. The event is written even when no local handle exists,
-/// so a run stranded by a restart can be cleared without waiting for the stale window.
-///
-/// Re-checks in-flight state here, after the abort handle has been atomically removed,
-/// rather than trusting a check made by the caller. The caller's check is separated from
-/// this call by an await, during which a fresh analysis can start — cancelling then would
-/// abort the wrong run. Returns `Ok(None)` when nothing was in flight.
-///
-/// Returns `Ok(Some(true))` if a local task was actually aborted.
-#[cfg(feature = "enterprise")]
-pub async fn cancel_rca_for_incident(
-    org_id: &str,
-    incident_id: &str,
-    user_id: Option<String>,
-    stale_threshold_minutes: u64,
-) -> Result<Option<bool>, anyhow::Error> {
-    let aborted = match RCA_ABORT_HANDLES.remove(&rca_task_key(org_id, incident_id)) {
-        Some((_, handle)) => {
-            handle.abort();
-            true
-        }
-        None => false,
-    };
-
-    // Authoritative check: no local handle means the run may be on another node, or may
-    // never have existed. Consult the event log before writing a terminal event, so a
-    // cancel for an already-settled run doesn't leave a spurious event behind.
-    if !aborted {
-        let events = infra::table::incident_events::get(org_id, incident_id).await?;
-        if !is_analysis_in_flight(&events, stale_threshold_minutes) {
-            return Ok(None);
-        }
-    }
-
-    infra::table::incident_events::append(
-        org_id,
-        incident_id,
-        config::meta::alerts::incidents::IncidentEvent::ai_analysis_cancelled(user_id),
-    )
-    .await?;
-
-    log::info!("[INCIDENTS::RCA] Cancelled analysis for {incident_id} (local_task={aborted})");
-
-    Ok(Some(aborted))
-}
-
-/// Returns true if an analysis is currently in-flight (started but not yet completed).
-///
-/// An in-flight analysis is detected by finding an `AIAnalysisBegin` event with no
-/// subsequent `AIAnalysisComplete`. Begins older than `stale_threshold_minutes` are
-/// treated as stale (the run died) and do not block new runs.
-#[cfg(feature = "enterprise")]
-pub fn is_analysis_in_flight(
-    events: &[config::meta::alerts::incidents::IncidentEvent],
-    stale_threshold_minutes: u64,
-) -> bool {
-    use config::meta::alerts::incidents::IncidentEventType;
-
-    let stale_cutoff =
-        chrono::Utc::now().timestamp_micros() - (stale_threshold_minutes as i64 * 60 * 1_000_000);
-
-    // Walk backwards: find the last terminal event (Complete, Failed OR Cancelled), then
-    // check if a non-stale AIAnalysisBegin comes after it. AIAnalysisFailed is
-    // also terminal — leaving it out would keep the in-flight lock held until
-    // stale_threshold expires after every failed RCA, blocking manual retries.
-    // AIAnalysisCancelled is terminal for the same reason: an explicit cancel must
-    // free the guard immediately so the user can retry straight away.
-    let last_terminal_pos = events.iter().rposition(|e| {
-        matches!(
-            e.event_type,
-            IncidentEventType::AIAnalysisComplete
-                | IncidentEventType::AIAnalysisFailed { .. }
-                | IncidentEventType::AIAnalysisCancelled { .. }
-        )
-    });
-
-    let search_from = last_terminal_pos.map(|p| p + 1).unwrap_or(0);
-
-    events[search_from..].iter().any(|e| {
-        matches!(e.event_type, IncidentEventType::AIAnalysisBegin) && e.timestamp > stale_cutoff
-    })
-}
-
-/// Returns true if enough time has passed since the last completed analysis.
-///
-/// If no analysis has ever completed, returns `true` (proceed freely).
-#[cfg(feature = "enterprise")]
-fn cooldown_elapsed(
-    events: &[config::meta::alerts::incidents::IncidentEvent],
-    cooldown_minutes: u64,
-) -> bool {
-    use config::meta::alerts::incidents::IncidentEventType;
-
-    let cooldown_micros = cooldown_minutes as i64 * 60 * 1_000_000;
-    let now = chrono::Utc::now().timestamp_micros();
-
-    let last_complete = events
-        .iter()
-        .rposition(|e| matches!(e.event_type, IncidentEventType::AIAnalysisComplete))
-        .map(|pos| events[pos].timestamp);
-
-    match last_complete {
-        None => true, // never analyzed (or all prior runs failed) — proceed
-        Some(ts) => now - ts >= cooldown_micros,
-    }
-}
-
-/// Emit an AI analysis failure event for the specified incident
-#[cfg(feature = "enterprise")]
-async fn emit_analysis_failure(
-    org_id: &str,
-    incident_id: &str,
-    trigger_type: config::meta::alerts::incidents::AnalysisTriggerType,
-    reason: &str,
-    error: Option<&anyhow::Error>,
-) {
-    use config::meta::alerts::incidents::IncidentEvent;
-
-    let error_details = error.map(|e| format!("{:#}", e).chars().take(500).collect::<String>());
-
-    if let Err(e) = crate::incidents::append_event(
-        org_id,
-        incident_id,
-        IncidentEvent::ai_analysis_failed(reason, trigger_type, error_details),
-    )
-    .await
-    {
-        log::error!(
-            "[INCIDENTS::RCA] Failed to emit AIAnalysisFailed event for {org_id}/{incident_id}: {e}"
-        );
-    }
-}
-
-/// Whether `trigger_rca_for_incident` would reach the agent for this incident. Callers check this
-/// before authorizing AI usage so a run the trigger would skip is never charged. When it returns
-/// false no verdict is coming, so any triage hold is released here.
+/// Whether the deployment can run an analysis at all.
 #[cfg(feature = "enterprise")]
 pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
     use o2_enterprise::enterprise::{alerts::rca_service, common::config::get_config};
 
     let cfg = get_config();
-    let will_run = cfg.incidents.enabled
-        && cfg.incidents.rca_enabled
-        && cfg.ai.has_agent_target()
-        && !rca_service::l0_off_for_incident(org_id, incident_id).await;
+    let will_run = incidents_enabled() && cfg.incidents.rca_enabled && rca_agent_available();
     if !will_run {
         rca_service::skip_analysis_for_incident(org_id, incident_id).await;
     }
     will_run
 }
 
+/// The user that automatic runs act and are metered as.
+#[cfg(feature = "enterprise")]
+const SYSTEM_USER_EMAIL: &str = "system@openobserve.ai";
+
+/// The one start path of automatic runs.
+#[cfg(feature = "enterprise")]
+async fn start_automatic_rca(
+    org_id: &str,
+    incident_id: &str,
+    trigger: config::meta::alerts::rca_runs::RunTrigger,
+) {
+    use config::meta::alerts::rca_runs::{RunMode, RunTrigger};
+    use o2_enterprise::enterprise::alerts::rca_service;
+
+    use super::rca_runs::{RunSubject, StartOutcome, StartRun};
+
+    if !rca_will_run(org_id, incident_id).await {
+        return;
+    }
+    match infra::table::alert_incidents::get(org_id, incident_id).await {
+        Ok(Some(incident)) if incident.rca_off_reason.is_some() => {
+            log::debug!(
+                "[INCIDENTS::RCA] Automatic analysis is off for {incident_id}, skipping {}",
+                trigger.as_str()
+            );
+            rca_service::skip_analysis_for_incident(org_id, incident_id).await;
+            return;
+        }
+        Ok(_) => {}
+        Err(e) => {
+            log::error!("[INCIDENTS::RCA] Could not read incident {org_id}/{incident_id}: {e}");
+            rca_service::skip_analysis_for_incident(org_id, incident_id).await;
+            return;
+        }
+    }
+
+    // A refusal starts nothing and charges nothing; the meter runs after the start.
+    #[cfg(feature = "cloud")]
+    let usage_feature = if trigger == RunTrigger::AutoNewIncident {
+        crate::trial_quota::TrialQuotaFeature::NewIncident
+    } else {
+        crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis
+    };
+    #[cfg(feature = "cloud")]
+    if let Err(error) =
+        crate::trial_quota::precheck_ai_usage(org_id, usage_feature, SYSTEM_USER_EMAIL).await
+    {
+        log::info!(
+            "[INCIDENTS::RCA] Incident {incident_id} retained without {} analysis: {error}",
+            trigger.as_str()
+        );
+        // No verdict is coming, so nothing may go on holding a page for one.
+        rca_service::skip_analysis_for_incident(org_id, incident_id).await;
+        return;
+    }
+
+    let outcome = super::rca_runs::start_run(StartRun {
+        org_id: org_id.to_string(),
+        subject: RunSubject::Incident(incident_id.to_string()),
+        trigger,
+        mode: RunMode::Fresh,
+        started_by: "system".to_string(),
+        guidance: None,
+        skip_cooldown: trigger == RunTrigger::AutoNewIncident,
+        oncall_subjects: None,
+        context_used: None,
+    })
+    .await;
+    let run_id = match outcome {
+        Ok(StartOutcome::Started { run_id }) => run_id,
+        Ok(StartOutcome::InFlight) => {
+            log::debug!(
+                "[INCIDENTS::RCA] Analysis already in-flight for {incident_id}, skipping {} trigger",
+                trigger.as_str()
+            );
+            return;
+        }
+        Ok(StartOutcome::CoolingDown) => {
+            log::debug!(
+                "[INCIDENTS::RCA] Cooldown not elapsed for {incident_id}, skipping {} trigger",
+                trigger.as_str()
+            );
+            rca_service::skip_analysis_for_incident(org_id, incident_id).await;
+            return;
+        }
+        Err(e) => {
+            log::error!("[INCIDENTS::RCA] Could not start a run for {org_id}/{incident_id}: {e}");
+            rca_service::skip_analysis_for_incident(org_id, incident_id).await;
+            return;
+        }
+    };
+
+    // The turn's finalizer ends the run; this task only starts it.
+    let org_id_rca = org_id.to_string();
+    let incident_id_rca = incident_id.to_string();
+    tokio::spawn(async move {
+        // Every failure has already ended the run and released the hold.
+        if let Err(e) = trigger_rca_for_incident(
+            org_id_rca,
+            incident_id_rca.clone(),
+            run_id.clone(),
+            RcaLaunch {
+                trigger,
+                user_email: SYSTEM_USER_EMAIL.to_string(),
+                // Automatic runs stand on their own.
+                build_on_previous: false,
+                // Metered inside, right before the turn starts.
+                usage_permit: None,
+                // Automatic runs carry no guidance.
+                guidance: None,
+                // Automatic runs start fresh.
+                resume: None,
+            },
+        )
+        .await
+        {
+            log::debug!(
+                "[INCIDENTS::RCA] {} run {run_id} for {incident_id_rca} did not start: {}",
+                trigger.as_str(),
+                e.error_code()
+            );
+        }
+    });
+}
+
+/// A new incident's first analysis, decided after on-call routing.
+#[cfg(feature = "enterprise")]
+async fn start_new_incident_rca(
+    org_id: &str,
+    incident_id: &str,
+    routed: Option<&config::meta::oncall::Response>,
+) {
+    if let Some(record) = routed
+        && o2_enterprise::enterprise::alerts::rca_service::l0_off_for_record(org_id, record).await
+    {
+        if let Err(e) =
+            infra::table::alert_incidents::set_rca_off_reason(org_id, incident_id, Some("l0_off"))
+                .await
+        {
+            log::error!(
+                "[INCIDENTS::RCA] Could not record that L0 is off for {org_id}/{incident_id}: {e}"
+            );
+        }
+        // No verdict is coming, so nothing may go on holding a page for one.
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            org_id,
+            incident_id,
+        )
+        .await;
+        return;
+    }
+    start_automatic_rca(
+        org_id,
+        incident_id,
+        config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+    )
+    .await;
+}
+
+/// An un-muted incident's analysis.
+#[cfg(feature = "enterprise")]
+async fn start_unmuted_incident_rca(
+    org_id: &str,
+    incident_id: &str,
+    routed: Option<&config::meta::oncall::Response>,
+) {
+    // The primary: the un-mute just committed, and a replica may not show it yet.
+    let undecided = match infra::table::alert_incidents::get_rw(org_id, incident_id).await {
+        Ok(Some(incident)) => l0_undecided(&incident),
+        Ok(None) => false,
+        Err(e) => {
+            log::error!("[INCIDENTS::RCA] Could not read incident {org_id}/{incident_id}: {e}");
+            false
+        }
+    };
+    if undecided {
+        start_new_incident_rca(org_id, incident_id, routed).await;
+    } else {
+        start_automatic_rca(
+            org_id,
+            incident_id,
+            config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+        )
+        .await;
+    }
+}
+
+/// Tells each of the incident's pages that a new alert joined, re-running a ladder that ran out.
+#[cfg(feature = "enterprise")]
+async fn page_again_after_new_alert(org_id: &str, incident_id: &str) {
+    use config::meta::oncall::NewAlertEffect;
+    use o2_enterprise::enterprise::oncall::{escalation::ENGINE_ACTOR, replicate};
+
+    let now = config::utils::time::now_micros();
+    let pages = match infra::table::oncall_responses::list_for_incident(org_id, incident_id).await {
+        Ok(pages) => pages,
+        Err(e) => {
+            log::error!("[incidents] on-call pages of {org_id}/{incident_id}: {e}");
+            return;
+        }
+    };
+    for page in pages {
+        let repaged = match page.on_new_alert(now) {
+            NewAlertEffect::Nothing => continue,
+            NewAlertEffect::NoteOnly => false,
+            // Ok(false): acked, snoozed or re-run since the read, so this alert only gets the note.
+            NewAlertEffect::PageAgain => match restart_exhausted_ladder(org_id, &page, now).await {
+                Ok(repaged) => repaged,
+                Err(e) => {
+                    log::error!("[incidents] could not page {org_id}/{} again: {e}", page.id);
+                    continue;
+                }
+            },
+        };
+        let event = page.new_alert_note(repaged, ENGINE_ACTOR, now);
+        if let Err(e) = replicate::add_event(org_id, &page.id, &event).await {
+            log::error!("[incidents] timeline of {org_id}/{}: {e}", page.id);
+        }
+    }
+}
+
+/// Re-runs an exhausted page's ladder if nobody touched it since `seen`, then re-arms its timer.
+#[cfg(feature = "enterprise")]
+async fn restart_exhausted_ladder(
+    org_id: &str,
+    seen: &config::meta::oncall::Response,
+    now: i64,
+) -> Result<bool, anyhow::Error> {
+    use config::meta::triggers::{Trigger, TriggerModule};
+    use o2_enterprise::enterprise::oncall::replicate;
+
+    let Some(updated) =
+        infra::table::oncall_responses::restart_exhausted(org_id, seen, now).await?
+    else {
+        return Ok(false);
+    };
+    // Upsert keeps the row's data; a racing tick may delete it, and the reconcile sweep re-arms it.
+    infra::scheduler::arm_with(
+        infra::db::get_orm_client_rw().await,
+        &Trigger {
+            org: org_id.to_string(),
+            module: TriggerModule::OncallEscalation,
+            module_key: updated.id.clone(),
+            next_run_at: now,
+            ..Default::default()
+        },
+    )
+    .await?;
+    replicate::response(&updated).await;
+    Ok(true)
+}
+
+/// A manual run does not decide L0, so only a stored off reason skips the un-mute decision.
+#[cfg(feature = "enterprise")]
+fn l0_undecided(incident: &infra::table::entity::alert_incidents::Model) -> bool {
+    incident.rca_off_reason.is_none()
+}
+
+/// The run's `error.reason` and `error.details` for a turn that could not start.
+#[cfg(feature = "enterprise")]
+pub(crate) fn rca_turn_failure(
+    error: &super::rca_turn::RcaTurnError,
+) -> (&'static str, Option<String>) {
+    use super::{rca_runs, rca_turn::RcaTurnError};
+
+    match error {
+        RcaTurnError::TurnLimit => (TURN_LIMIT_REASON, None),
+        RcaTurnError::Credentials(details) => (rca_runs::CREDENTIALS_REASON, Some(details.clone())),
+        RcaTurnError::AgentUnavailable(details) => {
+            (rca_runs::AGENT_UNAVAILABLE_REASON, Some(details.clone()))
+        }
+        RcaTurnError::Busy => (TURN_BUSY_REASON, None),
+        RcaTurnError::Other(details) => (rca_runs::AGENT_ERROR_REASON, Some(details.clone())),
+    }
+}
+
+/// `error.reason` of a run refused by the active-turn cap.
+#[cfg(feature = "enterprise")]
+const TURN_LIMIT_REASON: &str = "Too many analyses running";
+/// `error.reason` of a run whose session already had a turn running.
+#[cfg(feature = "enterprise")]
+const TURN_BUSY_REASON: &str = "The analysis session is busy";
+
+/// How a started run's first turn is launched.
+#[cfg(feature = "enterprise")]
+pub struct RcaLaunch {
+    pub trigger: config::meta::alerts::rca_runs::RunTrigger,
+    /// Email of the user who triggered the analysis, used for AI usage tracking.
+    pub user_email: String,
+    /// When true, the newest completed report is sent so the agent extends it.
+    pub build_on_previous: bool,
+    /// None authorizes immediately before first-turn launch.
+    pub usage_permit: Option<crate::AiUsagePermit>,
+    pub guidance: Option<String>,
+    /// A resume uses its copied steps instead of a previous report.
+    pub resume: Option<super::rca_resume::ResumeSeed>,
+}
+
+/// Return after spawning; every launch error must terminate the admitted run.
 #[cfg(feature = "enterprise")]
 pub async fn trigger_rca_for_incident(
     org_id: String,
     incident_id: String,
-    reanalysis: bool,
-    // When `true`, the caller has already:
-    //  - verified RCA is enabled and the agent URL is set
-    //  - checked cooldown / in-flight guards
-    //  - emitted `AIAnalysisBegin` synchronously (same DB context as `init`)
-    // The function skips those steps and goes straight to the agent call.
-    begin_already_emitted: bool,
-    // Email of the user who triggered the analysis, used for AI usage tracking.
-    // For automated/system-initiated calls, use "system@openobserve.ai".
-    user_email: String,
-    // When true, the previous report is sent to the agent so it extends that analysis.
-    // Automatic triggers pass false so each run stands on its own.
-    build_on_previous: bool,
-    // A caller that emits Begin before spawning must authorize synchronously and
-    // pass this one-shot proof so the spawned task cannot meter twice.
-    #[cfg_attr(not(feature = "cloud"), allow(unused_variables))] usage_permit: Option<
-        crate::AiUsagePermit,
-    >,
-) -> Result<(), anyhow::Error> {
+    run_id: String,
+    launch: RcaLaunch,
+) -> Result<(), super::rca_turn::RcaTurnError> {
+    #[cfg_attr(not(feature = "cloud"), allow(unused_variables))]
+    let RcaLaunch {
+        trigger,
+        user_email,
+        build_on_previous,
+        usage_permit,
+        guidance,
+        resume,
+    } = launch;
+    use config::meta::alerts::rca_runs::RunMode;
     use o2_enterprise::enterprise::{
-        ai::client::get_agent_client, common::config::get_config as get_o2_config,
+        alerts::rca_service, common::config::get_config as get_o2_config,
+    };
+
+    use super::{
+        rca_runs::{
+            AGENT_NOT_CONFIGURED_REASON, ERROR_AGENT_NOT_CONFIGURED, ERROR_L0_OFF,
+            ERROR_RCA_DISABLED, ERROR_RESUME_FAILED, L0_OFF_REASON, RCA_DISABLED_REASON,
+            RESUME_FAILED_REASON, RunSubject, fail_run, newest_completed_report,
+        },
+        rca_turn::{
+            RcaPrompt, RcaPromptSubject, RcaTurnError, RcaTurnRun, start_forked_rca_turn,
+            start_rca_turn,
+        },
+    };
+
+    // Ends the run as failed and releases any triage hold: no verdict is coming.
+    let has_guidance = guidance.is_some();
+    let end_failed = async |code: &str, reason: &str, details: Option<String>| {
+        if let Err(e) = fail_run(&org_id, &run_id, trigger, code, reason, details).await {
+            log::error!("[INCIDENTS::RCA] Could not end run {run_id} as failed: {e}");
+        }
+        // The guidance no turn read ends `not_read`.
+        if has_guidance {
+            super::rca_steering::close_unread(
+                &org_id,
+                &run_id,
+                config::meta::alerts::rca_runs::RunState::Failed,
+            )
+            .await;
+        }
+        rca_service::skip_analysis_for_incident(&org_id, &incident_id).await;
+    };
+    let end_turn_failed = async |e: RcaTurnError| {
+        let (reason, details) = rca_turn_failure(&e);
+        log::warn!(
+            "[INCIDENTS::RCA] Run {run_id} for {org_id}/{incident_id} could not start its turn: {}",
+            e.error_code()
+        );
+        end_failed(e.error_code(), reason, details).await;
+        Err(e)
     };
 
     let config = get_o2_config();
 
-    // Check if RCA is enabled and configured
-    if !config.incidents.enabled || !config.incidents.rca_enabled {
-        log::debug!("[INCIDENTS::RCA] RCA not enabled, skipping immediate trigger");
-        // §6: no verdict is coming, so nothing may go on holding a page for
-        // one. Every guard below reaches this same state.
-        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-            &org_id,
-            &incident_id,
-        )
-        .await;
-        return Ok(()); // Not an error - just not configured
+    if !incidents_enabled() || !config.incidents.rca_enabled {
+        log::debug!("[INCIDENTS::RCA] RCA not enabled, ending run {run_id}");
+        end_failed(ERROR_RCA_DISABLED, RCA_DISABLED_REASON, None).await;
+        return Ok(());
     }
 
     if !config.ai.has_agent_target() {
-        log::debug!("[INCIDENTS::RCA] RCA agent URL not set, skipping immediate trigger");
-        // §6: no verdict is coming, so nothing may go on holding a page for
-        // one. Every guard below reaches this same state.
-        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-            &org_id,
-            &incident_id,
+        log::debug!("[INCIDENTS::RCA] RCA agent URL not set, ending run {run_id}");
+        end_failed(
+            ERROR_AGENT_NOT_CONFIGURED,
+            AGENT_NOT_CONFIGURED_REASON,
+            None,
         )
         .await;
         return Ok(());
     }
 
-    // I20: the run must be refused here — before the billable agent call below — or `Off` only
-    // stops the ladder from waiting while the agent still runs and still bills.
-    if o2_enterprise::enterprise::alerts::rca_service::l0_off_for_incident(&org_id, &incident_id)
-        .await
-    {
-        log::debug!("[INCIDENTS::RCA] L0 is off for {incident_id}'s priority, skipping trigger");
-        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-            &org_id,
-            &incident_id,
-        )
-        .await;
+    // The run must be refused before the billable turn.
+    if !trigger.is_user_started() && rca_service::l0_off_for_incident(&org_id, &incident_id).await {
+        log::debug!("[INCIDENTS::RCA] L0 is off for {incident_id}'s priority, ending run {run_id}");
+        end_failed(ERROR_L0_OFF, L0_OFF_REASON, None).await;
         return Ok(());
     }
 
-    // When the caller already emitted Begin synchronously, skip the guards and Begin emission
-    // to avoid a DB race where the spawned task can't yet see the freshly-init'd events row.
-    if !begin_already_emitted {
-        let cooldown = config.incidents.reanalysis_cooldown_minutes;
-        // Use 2× cooldown as the stale-begin threshold
-        let stale_threshold = cooldown * 2;
-
-        let events = infra::table::incident_events::get(&org_id, &incident_id)
-            .await
-            .unwrap_or_default();
-
-        // In-flight guard: always enforced, even for user-initiated reanalysis
-        if is_analysis_in_flight(&events, stale_threshold) {
-            log::debug!("[INCIDENTS::RCA] Analysis already in-flight for {incident_id}, skipping");
-            // §6: no verdict is coming, so nothing may go on holding a page for
-            // one. Every guard below reaches this same state.
-            o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-                &org_id,
-                &incident_id,
-            )
+    // The primary, since the run just started.
+    let incident = match infra::table::alert_incidents::get_rw(&org_id, &incident_id).await {
+        Ok(Some(incident)) => incident,
+        Ok(None) => {
+            return end_turn_failed(RcaTurnError::Other(format!(
+                "incident {incident_id} not found"
+            )))
             .await;
-            return Ok(());
         }
-
-        // Cooldown gate: skip for user-initiated reanalysis (reanalysis=true bypasses it)
-        if !reanalysis && !cooldown_elapsed(&events, cooldown) {
-            log::debug!("[INCIDENTS::RCA] Cooldown not elapsed for {incident_id}, skipping");
-            // §6: no verdict is coming, so nothing may go on holding a page for
-            // one. Every guard below reaches this same state.
-            o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-                &org_id,
-                &incident_id,
-            )
-            .await;
-            return Ok(());
-        }
-    }
-
-    // Get incident from database
-    let incident = match infra::table::alert_incidents::get(&org_id, &incident_id).await? {
-        Some(inc) => inc,
-        None => {
-            log::warn!("[INCIDENTS::RCA] Incident {org_id}/{incident_id} not found");
-            return Err(anyhow::anyhow!("Incident not found"));
-        }
+        Err(e) => return end_turn_failed(RcaTurnError::Other(format!("{e:#}"))).await,
     };
 
     log::info!(
-        "[INCIDENTS::RCA] Triggering RCA for incident {incident_id} (reanalysis={reanalysis})"
+        "[INCIDENTS::RCA] Running RCA {run_id} for incident {incident_id} (trigger={})",
+        trigger.as_str()
     );
 
-    #[cfg(feature = "cloud")]
-    let usage_permit = match usage_permit {
-        Some(permit) => permit,
-        None => {
-            let feature = if reanalysis {
-                crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis
-            } else {
-                crate::trial_quota::TrialQuotaFeature::NewIncident
-            };
-            let usage_context = crate::trial_quota::AiUsageContext {
-                user_email: user_email.clone(),
-                incident_id: Some(incident_id.clone()),
-                ..Default::default()
-            };
-            crate::trial_quota::authorize_ai_usage(&org_id, feature, &usage_context)
-                .await
-                .map_err(|error| anyhow::anyhow!(error))?
-        }
-    };
-    #[cfg(feature = "cloud")]
-    debug_assert_eq!(
-        usage_permit.feature(),
-        if reanalysis {
-            crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis
-        } else {
-            crate::trial_quota::TrialQuotaFeature::NewIncident
-        }
-    );
-
-    // Emit AIAnalysisBegin only when the caller hasn't already done so
-    if !begin_already_emitted
-        && let Err(e) = crate::incidents::append_event(
-            &org_id,
-            &incident_id,
-            config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-        )
-        .await
-    {
-        log::error!(
-            "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {org_id}/{incident_id}: {e}"
-        );
-    }
-
-    // Authorization and metering happen before Begin, either synchronously in
-    // the caller or directly above. No quota work occurs after the lifecycle starts.
-
-    // Create RCA agent client with SA credentials
-    let (email, token) = crate::organization::get_sre_agent_credentials(&org_id).await?;
-    let auth_header = crate::auth::build_basic_auth_header(&email, &token);
-
-    let client =
-        get_agent_client().ok_or_else(|| anyhow::anyhow!("RCA agent client not initialized"))?;
-
-    // Quick health check
-    if let Err(e) = client.health(&auth_header).await {
-        log::debug!("[INCIDENTS::RCA] Agent health check failed for immediate trigger: {e}");
-        // §6: no verdict is coming, so nothing may go on holding a page for
-        // one. Every guard below reaches this same state.
-        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-            &org_id,
-            &incident_id,
-        )
-        .await;
-        return Err(anyhow::anyhow!("RCA agent not available: {}", e));
-    }
-
-    // Analyze incident
-    // `build_on_previous` opts into continuity: the prior report is sent so the
-    // agent extends it rather than starting over. Extracted via typed
-    // `IncidentTopology` (same deserialization path used by `save_rca_result`)
-    // so field renames are caught at compile time.
-    let previous_analysis: Option<String> = if build_on_previous {
-        incident
-            .topology_context
-            .as_ref()
-            .and_then(|v| serde_json::from_value::<IncidentTopology>(v.clone()).ok())
-            .and_then(|t| t.suggested_root_cause)
-            .filter(|s| !s.is_empty())
+    let previous_analysis = if build_on_previous && resume.is_none() {
+        newest_completed_report(&org_id, &incident_id)
+            .await
+            .unwrap_or_else(|e| {
+                log::warn!(
+                    "[INCIDENTS::RCA] Could not read the previous report of {incident_id}: {e}"
+                );
+                None
+            })
     } else {
         None
     };
-    // §7/C1: the single builder, so this and the manual endpoint cannot tell
-    // the agent different things about the same incident.
-    let context = o2_enterprise::enterprise::alerts::rca_service::build_incident_context(
-        &org_id,
-        &incident_id,
-        previous_analysis,
-    )
-    .await;
-    match client.analyze_incident(context, &auth_header).await {
-        Ok(rca_result) => {
-            log::info!(
-                "[INCIDENTS::RCA] RCA completed for {incident_id}: {} chars",
-                rca_result.len()
+    let context =
+        rca_service::build_incident_context(&org_id, &incident_id, previous_analysis).await;
+    let context = rca_service::rca_context_json(&context);
+
+    #[cfg(feature = "cloud")]
+    {
+        use config::meta::alerts::rca_runs::RunTrigger;
+
+        let feature = match trigger {
+            RunTrigger::AutoNewIncident | RunTrigger::Manual => {
+                crate::trial_quota::TrialQuotaFeature::NewIncident
+            }
+            _ => crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+        };
+        let usage_permit = match usage_permit {
+            Some(permit) => permit,
+            None => {
+                let usage_context = crate::trial_quota::AiUsageContext {
+                    user_email: user_email.clone(),
+                    incident_id: Some(incident_id.clone()),
+                    ..Default::default()
+                };
+                match crate::trial_quota::authorize_ai_usage(&org_id, feature, &usage_context).await
+                {
+                    Ok(permit) => permit,
+                    Err(error) => {
+                        log::info!(
+                            "[INCIDENTS::RCA] Run {run_id} for {incident_id} ended without analysis: {error}"
+                        );
+                        end_failed(
+                            super::rca_runs::ERROR_USAGE_DENIED,
+                            super::rca_runs::USAGE_DENIED_REASON,
+                            Some(error.to_string()),
+                        )
+                        .await;
+                        return Ok(());
+                    }
+                }
+            }
+        };
+        debug_assert_eq!(usage_permit.feature(), feature);
+    }
+
+    let (mode, fork) = match resume {
+        Some(seed) => {
+            let source_run_id = seed.source_run_id.clone();
+            match fork_for_resume(
+                &org_id,
+                &run_id,
+                seed,
+                crate::ai_chat::fork::fork_run_session,
+            )
+            .await
+            {
+                Ok((mode, fork)) => (mode, Some(fork)),
+                Err(e) => {
+                    log::warn!(
+                        "[INCIDENTS::RCA] Run {run_id} could not copy the session of run \
+                         {source_run_id}: {e:#}"
+                    );
+                    end_failed(
+                        ERROR_RESUME_FAILED,
+                        RESUME_FAILED_REASON,
+                        Some(format!("{e:#}")),
+                    )
+                    .await;
+                    return Ok(());
+                }
+            }
+        }
+        None if build_on_previous => (RunMode::BuildOnPrevious, None),
+        None => (RunMode::Fresh, None),
+    };
+
+    // The guidance goes after the initial prompt, with its header.
+    let guidance_row = if has_guidance {
+        let row = super::rca_steering::queued_guidance(&org_id, &run_id).await;
+        if row.is_none() {
+            log::error!(
+                "[INCIDENTS::RCA] Run {run_id} was started with guidance but has no guidance row"
             );
-
-            // §2.2: the report and the verdict are read once, by the single
-            // writer. Writing `topology_context` here instead is what left the
-            // autonomous run — the one that IS L0 acting — with an answer no
-            // ladder could ever see.
-            if let Err(e) = o2_enterprise::enterprise::alerts::rca_service::save_rca_result(
-                &org_id,
-                &incident_id,
-                &rca_result,
-            )
-            .await
-            {
-                log::error!(
-                    "[INCIDENTS::RCA] Failed to save RCA result for {org_id}/{incident_id}: {e}"
-                );
-                return Err(e);
+        }
+        row
+    } else {
+        None
+    };
+    let run = RcaTurnRun {
+        org_id: org_id.clone(),
+        run_id: run_id.clone(),
+        subject: RunSubject::Incident(incident_id.clone()),
+        trigger,
+        mode,
+        context,
+        session_id: None,
+    };
+    let started = match fork {
+        Some(fork) => start_forked_rca_turn(run, fork).await,
+        None => {
+            let prompt = RcaPrompt::Initial {
+                trigger,
+                subject: RcaPromptSubject::Incident {
+                    id: incident_id.clone(),
+                    title: incident
+                        .title
+                        .clone()
+                        .unwrap_or_else(|| incident_id.clone()),
+                    alerts: u32::try_from(incident.alert_count).unwrap_or(0),
+                    severity: incident.severity.clone(),
+                },
+                guidance: guidance_row.as_ref().map(super::rca_steering::render_row),
+            };
+            start_rca_turn(run, prompt).await
+        }
+    };
+    match started {
+        Ok(started) => {
+            log::info!(
+                "[INCIDENTS::RCA] Run {run_id} for {incident_id} started turn {} in session {}",
+                started.turn_id,
+                started.session_id
+            );
+            // The guidance row is delivered once the turn is admitted.
+            if let Some(row) = guidance_row {
+                super::rca_steering::guidance_admitted(row).await;
             }
-
-            // Emit AIAnalysisComplete on success
-            if let Err(e) = crate::incidents::append_event(
-                &org_id,
-                &incident_id,
-                config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
-            )
-            .await
-            {
-                log::error!(
-                    "[INCIDENTS::RCA] Failed to emit AIAnalysisComplete for {org_id}/{incident_id}: {e}"
-                );
-            }
-
-            // Authorization and usage reporting completed before AIAnalysisBegin.
-
             Ok(())
         }
-        Err(e) => {
-            log::warn!("[INCIDENTS::RCA] RCA failed for {org_id}/{incident_id}: {e}");
-
-            // Determine trigger type based on function context
-            let trigger_type = if reanalysis {
-                if user_email == "system@openobserve.ai" {
-                    config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis
-                } else {
-                    config::meta::alerts::incidents::AnalysisTriggerType::Manual
-                }
-            } else {
-                config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident
-            };
-
-            emit_analysis_failure(
-                &org_id,
-                &incident_id,
-                trigger_type,
-                "RCA service call failed",
-                Some(&e),
-            )
-            .await;
-
-            Err(e)
-        }
+        Err(e) => end_turn_failed(e).await,
     }
+}
+
+#[cfg(feature = "enterprise")]
+async fn fork_for_resume<F>(
+    org_id: &str,
+    run_id: &str,
+    seed: super::rca_resume::ResumeSeed,
+    fork: F,
+) -> anyhow::Result<(
+    config::meta::alerts::rca_runs::RunMode,
+    super::rca_turn::ForkedSession,
+)>
+where
+    F: AsyncFnOnce(
+        &str,
+        &infra::table::ai_chat_sessions::Model,
+        Vec<o2_enterprise::enterprise::ai::chat::batcher::DurableEvent>,
+        &str,
+    ) -> anyhow::Result<crate::ai_chat::fork::RunFork>,
+{
+    // The same lineage the route wrote on the run before the launch.
+    let resumed_from = seed.resumed_from();
+    let reused = crate::ai_chat::rca_thread::project_rca_thread(&seed.prefix, &[], false, false);
+    let stage = reused.steps.last().and_then(|step| step.stage.clone());
+    let fork = fork(
+        org_id,
+        &seed.source_session,
+        seed.prefix,
+        &seed.source_run_id,
+    )
+    .await?;
+    log::info!(
+        "[INCIDENTS::RCA] Run {run_id} resumes run {} after {} steps, on session {} (seq 0..={} \
+         copied)",
+        seed.source_run_id,
+        seed.reused_steps,
+        fork.session_id,
+        fork.last_seq
+    );
+    let fork = super::rca_turn::ForkedSession {
+        session_id: fork.session_id,
+        resumed_from,
+        reused: reused.stats,
+        stage,
+    };
+    Ok((seed.mode, fork))
 }
 
 /// Convert database model to domain model
@@ -2965,6 +3709,14 @@ fn model_to_incident_with_topology(
     db_model: infra::table::entity::alert_incidents::Model,
     topology_context: Option<IncidentTopology>,
 ) -> Incident {
+    // The run summary columns only; the detail view adds the runs.
+    let rca = infra::table::rca_runs::summary_from_incident(
+        &db_model,
+        config::utils::time::now_micros(),
+        o2_enterprise::enterprise::common::config::get_config()
+            .incidents
+            .rca_timeout_secs,
+    );
     Incident {
         id: db_model.id,
         org_id: db_model.org_id,
@@ -2984,6 +3736,10 @@ fn model_to_incident_with_topology(
         key_type: config::meta::alerts::incidents::KeyType::from_stored(&db_model.key_type),
         topology_context,
         muted_by_downtime_id: db_model.muted_by_downtime_id,
+        rca,
+        rca_off_reason: db_model.rca_off_reason,
+        alert_groups: None,
+        historical: db_model.historical,
     }
 }
 
@@ -3013,6 +3769,27 @@ async fn record_muted_auto_resolve<C: sea_orm::ConnectionTrait + sea_orm::Transa
     Ok(())
 }
 
+/// The event and the super-cluster status of an ack change the one ack wrote.
+/// [weak: a lost event or publish is logged; the row change stands]
+pub async fn record_ack_change(
+    org_id: &str,
+    incident_id: &str,
+    status: config::meta::alerts::incidents::IncidentStatus,
+    event: IncidentEvent,
+) {
+    let muted = match infra::table::alert_incidents::get(org_id, incident_id).await {
+        Ok(m) => m.is_some_and(|m| m.muted_by_downtime_id.is_some()),
+        Err(e) => {
+            log::error!("[incidents] could not read {org_id}/{incident_id} after an ack: {e}");
+            false
+        }
+    };
+    if let Err(e) = append_event_unless_muted(org_id, incident_id, event, muted).await {
+        log::error!("[incidents] could not record the ack of {org_id}/{incident_id}: {e}");
+    }
+    publish_status(org_id, incident_id, &status.to_string()).await;
+}
+
 /// Update incident status
 pub async fn update_status(
     org_id: &str,
@@ -3031,25 +3808,24 @@ pub async fn update_status_as(
     user_id: &str,
     quiet: bool,
 ) -> Result<Incident, anyhow::Error> {
-    // Acknowledging goes through a dedicated atomic path so the actor and
-    // timestamp land on the row itself (not just the event log) and a
-    // second/concurrent acknowledge can't silently overwrite the first
-    // acknowledger — see `infra::table::alert_incidents::acknowledge`.
+    if is_the_one_ack(org_id, incident_id, status).await? {
+        return through_the_one_ack(org_id, incident_id, status, user_id).await;
+    }
     // Read before the resolve clears it, so resolving a muted incident still notifies nobody.
+    let before = infra::table::alert_incidents::get(org_id, incident_id).await?;
     let muted_before = reads_mute_before(
         status,
         o2_enterprise::enterprise::common::config::get_config()
             .downtimes
             .enabled,
-    ) && infra::table::alert_incidents::get(org_id, incident_id)
-        .await?
+    ) && before
+        .as_ref()
         .is_some_and(|m| m.muted_by_downtime_id.is_some());
-    let updated = if status == "acknowledged" {
-        infra::table::alert_incidents::acknowledge(org_id, incident_id, user_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Incident not found"))?
-    } else {
-        infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
+    // A re-sent Resolve re-runs the idempotent repairs but keeps the first row and event.
+    let again = status == "resolved" && before.as_ref().is_some_and(|m| m.status == "resolved");
+    let updated = match before {
+        Some(m) if again => m,
+        _ => infra::table::alert_incidents::update_status(org_id, incident_id, status).await?,
     };
 
     let muted = status_change_is_muted(
@@ -3071,110 +3847,114 @@ pub async fn update_status_as(
     // Emit status change event
     use config::meta::alerts::incidents::IncidentEvent;
     let event = match status {
-        "acknowledged" => Some(IncidentEvent::acknowledged(user_id)),
         "resolved" => Some(IncidentEvent::resolved(Some(user_id.to_string()))),
-        "open" => Some(IncidentEvent::reopened(user_id, "Manually reopened")),
+        "open" => Some(IncidentEvent::manually_reopened(user_id)),
         _ => None,
     };
-    if let Some(evt) = event
+    if let Some(evt) = event.filter(|_| !again)
         && let Err(e) = append_event_unless_muted(org_id, incident_id, evt, muted).await
     {
         log::error!("[Incidents] Failed to record status event: org_id: {org_id}, error: {e}");
     }
 
-    // Trigger RCA reanalysis when incident is reopened — context is fresh,
-    // cooldown is bypassed, but in-flight guard still applies.
+    // A resolve cancels a run that waits for an answer; a working run finishes.
     #[cfg(feature = "enterprise")]
-    if status == "open" && !muted {
-        let org_id_rca = org_id.to_string();
-        let incident_id_rca = incident_id.to_string();
-        let cooldown = o2_enterprise::enterprise::common::config::get_config()
-            .incidents
-            .reanalysis_cooldown_minutes;
-        let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
-            .await
-            .unwrap_or_default();
-        if !is_analysis_in_flight(&events, cooldown * 2)
-            && rca_will_run(&org_id_rca, &incident_id_rca).await
-        {
-            #[cfg(feature = "cloud")]
-            let usage_permit = {
-                let usage_context = crate::trial_quota::AiUsageContext {
-                    user_email: "system@openobserve.ai".to_string(),
-                    incident_id: Some(incident_id_rca.clone()),
-                    ..Default::default()
-                };
-                match crate::trial_quota::authorize_ai_usage(
-                    &org_id_rca,
-                    crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
-                    &usage_context,
-                )
-                .await
-                {
-                    Ok(permit) => Some(permit),
-                    Err(error) => {
-                        log::info!(
-                            "[INCIDENTS::RCA] Reopened incident {incident_id_rca} retained without reanalysis: {error}"
-                        );
-                        // §6: no verdict is coming, so nothing may go on holding a page for one.
-                        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-                            &org_id_rca,
-                            &incident_id_rca,
-                        )
-                        .await;
-                        None
-                    }
-                }
-            };
-            #[cfg(not(feature = "cloud"))]
-            let usage_permit = None;
-
-            if !cfg!(feature = "cloud") || usage_permit.is_some() {
-                // Emit Begin synchronously so the frontend sees it on the next poll.
-                let _ = crate::incidents::append_event(
-                    &org_id_rca,
-                    &incident_id_rca,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-                )
-                .await;
-                let handle = tokio::spawn(async move {
-                    if let Err(e) = trigger_rca_for_incident(
-                        org_id_rca.clone(),
-                        incident_id_rca.clone(),
-                        true,
-                        true,
-                        "system@openobserve.ai".to_string(),
-                        // Reopened incidents get a fresh read of the current state.
-                        false,
-                        usage_permit,
-                    )
-                    .await
-                    {
-                        log::debug!(
-                            "[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}"
-                        );
-
-                        emit_analysis_failure(
-                            &org_id_rca,
-                            &incident_id_rca,
-                            config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReopened,
-                            "Reanalysis after reopen failed",
-                            Some(&e),
-                        )
-                        .await;
-                    }
-                    unregister_rca_task(&org_id_rca, &incident_id_rca);
-                });
-                register_rca_task(org_id, incident_id, handle.abort_handle());
-            }
-        } else {
-            log::debug!(
-                "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping Reopened trigger"
-            );
-        }
+    if status == "resolved"
+        && let Err(e) =
+            super::rca_steering::cancel_waiting_on_resolve(org_id, incident_id, user_id).await
+    {
+        log::error!(
+            "[INCIDENTS::RCA] Could not stop the paused run of {org_id}/{incident_id}: {e}"
+        );
     }
 
+    // A reopened incident gets a fresh automatic run.
     #[cfg(feature = "enterprise")]
+    if status == "open" && !muted {
+        start_automatic_rca(
+            org_id,
+            incident_id,
+            config::meta::alerts::rca_runs::RunTrigger::AutoReopen,
+        )
+        .await;
+    }
+
+    publish_status(org_id, incident_id, status).await;
+    model_to_incident(updated).await
+}
+
+/// Runs the one rule when the status change is the one ack's (AK-2, D20). [strong] (reads)
+pub async fn authorize_status(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+    user_id: &str,
+) -> Result<(), crate::alerts::ack::AckError> {
+    use crate::alerts::ack::{self, AckError, Act, Problem};
+
+    if !is_the_one_ack(org_id, incident_id, status)
+        .await
+        .map_err(|e| AckError::Internal(e.to_string()))?
+    {
+        return Ok(());
+    }
+    let problem = Problem::Incident {
+        org_id: org_id.to_string(),
+        incident_id: incident_id.to_string(),
+    };
+    ack::authorize_problem(&problem, user_id, Act::Ack)
+        .await
+        .map(|_| ())
+}
+
+/// Acknowledging, and reopening an acknowledged incident, are the one ack's (AK-2).
+async fn is_the_one_ack(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+) -> Result<bool, anyhow::Error> {
+    Ok(match status {
+        "acknowledged" => true,
+        "open" => infra::table::alert_incidents::get(org_id, incident_id)
+            .await?
+            .is_some_and(|m| m.status == "acknowledged"),
+        _ => false,
+    })
+}
+
+async fn through_the_one_ack(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+    user_id: &str,
+) -> Result<Incident, anyhow::Error> {
+    use crate::alerts::ack::{self, AckError, Problem};
+
+    let problem = Problem::Incident {
+        org_id: org_id.to_string(),
+        incident_id: incident_id.to_string(),
+    };
+    let source = config::meta::alerts::ack::AckSource::Incident;
+    let done = if status == "acknowledged" {
+        ack::acknowledge(&problem, user_id, source)
+            .await
+            .map(|_| ())
+    } else {
+        ack::unack(&problem, user_id, source).await.map(|_| ())
+    };
+    match done {
+        // A resolved incident has nothing to acknowledge; the answer is the incident as it stands.
+        Ok(()) | Err(AckError::Conflict(_)) => {}
+        Err(AckError::NotFound) => anyhow::bail!("Incident not found"),
+        Err(e) => anyhow::bail!("could not change the ack of {incident_id}: {e:?}"),
+    }
+    let model = infra::table::alert_incidents::get(org_id, incident_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
+    model_to_incident(model).await
+}
+
+async fn publish_status(org_id: &str, incident_id: &str, status: &str) {
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
@@ -3190,8 +3970,6 @@ pub async fn update_status_as(
             "[SUPER_CLUSTER] Failed to publish incident update_status: org_id: {org_id}, error: {e}"
         );
     }
-
-    model_to_incident(updated).await
 }
 
 /// Records the resolved event of the auto-resolve job; a muted incident notifies nobody (D3).
@@ -3239,6 +4017,295 @@ pub async fn update_title(
     }
 
     model_to_incident(updated).await
+}
+
+/// Sets or clears the incident's assignee and records who changed it.
+pub async fn update_assignee(
+    org_id: &str,
+    incident_id: &str,
+    assigned_to: Option<&str>,
+    user_id: &str,
+) -> Result<Incident, anyhow::Error> {
+    let current = infra::table::alert_incidents::get_rw(org_id, incident_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
+    if current.assigned_to.as_deref() == assigned_to {
+        return model_to_incident(current).await;
+    }
+    let updated =
+        infra::table::alert_incidents::update_assigned_to(org_id, incident_id, assigned_to).await?;
+    if let Err(e) = crate::incidents::append_event(
+        org_id,
+        incident_id,
+        IncidentEvent::assignment_changed(
+            current.assigned_to,
+            assigned_to.map(str::to_string),
+            user_id,
+        ),
+    )
+    .await
+    {
+        log::error!("[Incidents] Failed to record assignment event: org_id: {org_id}, error: {e}");
+    }
+    model_to_incident(updated).await
+}
+
+/// A more severe attached firing raises the case's priority; the timeline records who attached.
+pub async fn attach_firings_to_case(
+    org_id: &str,
+    case_id: Option<&str>,
+    title: &str,
+    severity: config::meta::alerts::incidents::IncidentSeverity,
+    firings: &[o2_enterprise::enterprise::security::cases::AttachedFiring],
+    user_id: &str,
+) -> Result<Incident, anyhow::Error> {
+    let key_type = config::meta::alerts::incidents::KeyType::AlertId.to_string();
+    let (case, opened_at) = match case_id {
+        Some(id) => (
+            infra::table::alert_incidents::get_rw(org_id, id)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("Incident not found"))?,
+            None,
+        ),
+        None => {
+            let first = firings
+                .iter()
+                .map(|f| f.fired_at)
+                .min()
+                .unwrap_or_else(config::utils::time::now_micros);
+            let case = infra::table::alert_incidents::create_security_case(
+                org_id,
+                &severity.to_string(),
+                serde_json::json!({}),
+                &key_type,
+                infra::table::alert_incidents::CaseActivity {
+                    first_event_at: first,
+                    last_event_at: first,
+                    historical: false,
+                },
+                Some(title.to_string()),
+                None,
+            )
+            .await?;
+            if let Err(e) = infra::table::incident_events::init(org_id, &case.id).await {
+                log::error!(
+                    "[Incidents] Failed to init events for case {org_id}/{}: {e}",
+                    case.id
+                );
+            }
+            (case, Some(first))
+        }
+    };
+    if opened_at.is_none() {
+        infra::table::alert_incidents::mark_security_case(org_id, &case.id).await?;
+    }
+    if let Some(first) = opened_at
+        && let Err(e) = publish_case_create(org_id, &key_type, severity, first, title).await
+    {
+        log::error!("[SUPER_CLUSTER] Failed to publish case create: org_id: {org_id}, error: {e}");
+    }
+
+    let linked: std::collections::HashSet<(String, i64)> =
+        infra::table::alert_incidents::get_incident_alerts(&case.id)
+            .await?
+            .into_iter()
+            .map(|l| (l.alert_id, l.alert_fired_at))
+            .collect();
+    let mut alert_ids = Vec::new();
+    let mut alert_names = Vec::new();
+    for firing in firings {
+        if linked.contains(&(firing.alert_id.clone(), firing.fired_at)) {
+            continue;
+        }
+        infra::table::alert_incidents::add_alert_to_incident(
+            &case.id,
+            &firing.alert_id,
+            &firing.alert_name,
+            AlertKind::Internal.as_str(),
+            firing.fired_at,
+            "manual",
+        )
+        .await?;
+        if let Err(e) = publish_case_add_alert(org_id, &case.id, firing).await {
+            log::error!(
+                "[SUPER_CLUSTER] Failed to publish case add_alert: org_id: {org_id}, error: {e}"
+            );
+        }
+        if let Err(e) = infra::table::incident_events::record_alert(
+            org_id,
+            &case.id,
+            &firing.alert_id,
+            &firing.alert_name,
+            firing.fired_at,
+        )
+        .await
+        {
+            log::error!(
+                "[Incidents] Failed to record alert event for case {org_id}/{}: {e}",
+                case.id
+            );
+        }
+        alert_ids.push(firing.alert_id.clone());
+        alert_names.push(firing.alert_name.clone());
+    }
+    if !alert_ids.is_empty()
+        && let Err(e) = crate::incidents::append_event(
+            org_id,
+            &case.id,
+            IncidentEvent::alerts_attached(user_id, alert_ids, alert_names),
+        )
+        .await
+    {
+        log::error!("[Incidents] Failed to record attach event: org_id: {org_id}, error: {e}");
+    }
+    if let Some((from, to)) = escalated_severity(&case.severity, Some(severity), None) {
+        infra::table::alert_incidents::update_severity(org_id, &case.id, &to.to_string()).await?;
+        if let Err(e) = crate::incidents::append_event(
+            org_id,
+            &case.id,
+            IncidentEvent::severity_upgrade(from, to, format!("{user_id} attached a {to} firing")),
+        )
+        .await
+        {
+            log::error!(
+                "[Incidents] Failed to record severity event: org_id: {org_id}, error: {e}"
+            );
+        }
+    }
+
+    let case = infra::table::alert_incidents::get_rw(org_id, &case.id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
+    model_to_incident(case).await
+}
+
+/// Opens a case from one event, or adds it to `case_id`; the case spans the event's time.
+pub async fn attach_event_to_case(
+    org_id: &str,
+    case_id: Option<&str>,
+    title: Option<&str>,
+    event: &CaseEvent,
+    user_id: &str,
+) -> Result<Incident, anyhow::Error> {
+    use o2_enterprise::enterprise::security::cases;
+    let case = match case_id {
+        Some(id) => {
+            infra::table::alert_incidents::widen_case_span(org_id, id, event.at, event.at).await?;
+            infra::table::alert_incidents::mark_security_case(org_id, id).await?;
+            id.to_string()
+        }
+        None => {
+            let entity = cases::entity_of(&event.fields);
+            let title = title
+                .map(str::trim)
+                .filter(|t| !t.is_empty())
+                .map(str::to_string)
+                .unwrap_or_else(|| cases::event_case_title(&event.stream, entity.as_ref()));
+            let key_type = match entity {
+                Some(_) => config::meta::alerts::incidents::KeyType::Primary,
+                None => config::meta::alerts::incidents::KeyType::AlertId,
+            }
+            .to_string();
+            let dims = serde_json::to_value(
+                entity
+                    .as_ref()
+                    .map(cases::Entity::group_values)
+                    .unwrap_or_default(),
+            )?;
+            let severity = config::meta::alerts::incidents::IncidentSeverity::default();
+            let case = infra::table::alert_incidents::create_security_case(
+                org_id,
+                &severity.to_string(),
+                dims,
+                &key_type,
+                infra::table::alert_incidents::CaseActivity {
+                    first_event_at: event.at,
+                    last_event_at: event.at,
+                    historical: false,
+                },
+                Some(title.clone()),
+                None,
+            )
+            .await?;
+            if let Err(e) = infra::table::incident_events::init(org_id, &case.id).await {
+                log::error!(
+                    "[Incidents] Failed to init events for case {org_id}/{}: {e}",
+                    case.id
+                );
+            }
+            if let Err(e) = publish_case_create(org_id, &key_type, severity, event.at, &title).await
+            {
+                log::error!(
+                    "[SUPER_CLUSTER] Failed to publish case create: org_id: {org_id}, error: {e}"
+                );
+            }
+            case.id
+        }
+    };
+    if let Err(e) = crate::incidents::append_event(
+        org_id,
+        &case,
+        IncidentEvent::event_attached(user_id, &event.stream, event.at),
+    )
+    .await
+    {
+        log::error!("[Incidents] Failed to record event attach: org_id: {org_id}, error: {e}");
+    }
+    let case = infra::table::alert_incidents::get_rw(org_id, &case)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
+    model_to_incident(case).await
+}
+
+/// Whether incident writes are published to the other regions of a super-cluster.
+fn replicates_incidents() -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !config::get_config().common.local_mode
+}
+
+/// Replicates a manually opened case, as correlation does for one a firing opens.
+async fn publish_case_create(
+    org_id: &str,
+    key_type: &str,
+    severity: config::meta::alerts::incidents::IncidentSeverity,
+    first: i64,
+    title: &str,
+) -> Result<(), anyhow::Error> {
+    if !replicates_incidents() {
+        return Ok(());
+    }
+    o2_enterprise::enterprise::super_cluster::queue::incidents_create_with_mute(
+        org_id,
+        key_type,
+        &severity.to_string(),
+        serde_json::json!({}),
+        first,
+        Some(title.to_string()),
+        None,
+    )
+    .await
+}
+
+/// Replicates one firing attached to a case by hand.
+async fn publish_case_add_alert(
+    org_id: &str,
+    case_id: &str,
+    firing: &o2_enterprise::enterprise::security::cases::AttachedFiring,
+) -> Result<(), anyhow::Error> {
+    if !replicates_incidents() {
+        return Ok(());
+    }
+    o2_enterprise::enterprise::super_cluster::queue::incidents_add_alert(
+        org_id,
+        case_id,
+        &firing.alert_id,
+        &firing.alert_name,
+        firing.fired_at,
+        "manual",
+    )
+    .await
 }
 
 /// Update incident severity
@@ -3289,6 +4356,256 @@ pub async fn update_severity(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    async fn correlation_db() -> sea_orm::DatabaseConnection {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ConnectionTrait, Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let table = Schema::new(backend).create_table_from_entity(alert_incidents::Entity);
+        db.execute(backend.build(&table)).await.unwrap();
+        db
+    }
+
+    async fn store_correlation_incident(
+        db: &sea_orm::DatabaseConnection,
+        id: &str,
+        created_at: i64,
+        group_values: serde_json::Value,
+    ) -> infra::table::entity::alert_incidents::Model {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::ActiveModelTrait;
+
+        let mut row = incident(None);
+        row.id = id.to_string();
+        row.created_at = created_at;
+        row.group_values = group_values;
+        let active: alert_incidents::ActiveModel = row.into();
+        active.reset_all().insert(db).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn correlation_selection_preserves_matching_and_legacy_fallbacks() {
+        use sea_orm::ConnectionTrait;
+
+        let incoming = HashMap::from([
+            ("ns".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "a".to_string()),
+        ]);
+        let cases = [
+            Some(serde_json::json!({"ns": "prod", "cluster": "a"})),
+            Some(serde_json::json!({"ns": "prod"})),
+            Some(serde_json::json!({"ns": "prod", "cluster": "a", "pod": "p1"})),
+            Some(serde_json::json!({})),
+            Some(serde_json::json!({"ns": 1})),
+            Some(serde_json::Value::Null),
+            Some(serde_json::json!(["legacy"])),
+            None,
+        ];
+        for dimensions in cases {
+            let db = correlation_db().await;
+            if let Some(dimensions) = &dimensions {
+                store_correlation_incident(&db, "older", 1, dimensions.clone()).await;
+                store_correlation_incident(&db, "selected", 2, dimensions.clone()).await;
+            }
+            store_correlation_incident(&db, "conflicting", 3, serde_json::json!({"ns": "dev"}))
+                .await;
+            store_correlation_incident(
+                &db,
+                "partial",
+                4,
+                serde_json::json!({"ns": "prod", "db": "redis"}),
+            )
+            .await;
+            db.execute_unprepared(
+                "UPDATE alert_incidents SET topology_context = 'invalid JSON' WHERE id IN ('conflicting', 'partial')",
+            )
+            .await
+            .unwrap();
+            let candidates =
+                infra::table::alert_incidents::find_correlation_candidates_with(&db, "default")
+                    .await
+                    .unwrap();
+            let found = select_correlation_candidate(&db, "default", &incoming, candidates)
+                .await
+                .unwrap();
+            assert_eq!(
+                found.as_ref().map(|row| row.id.as_str()),
+                dimensions.as_ref().map(|_| "selected"),
+                "stored dimensions: {dimensions:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn correlation_selection_continues_after_stale_projected_matches() {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+
+        let same = serde_json::json!({"ns": "prod", "cluster": "a"});
+        let incoming = serde_json::from_value(same.clone()).unwrap();
+        let changes = [
+            None,
+            Some(("default", "resolved", same.clone())),
+            Some(("other", "open", same.clone())),
+            Some(("default", "open", serde_json::json!({"ns": "dev"}))),
+            Some((
+                "default",
+                "open",
+                serde_json::json!({"ns": "prod", "db": "redis"}),
+            )),
+        ];
+        for change in changes {
+            let db = correlation_db().await;
+            store_correlation_incident(&db, "older", 1, same.clone()).await;
+            let newest = store_correlation_incident(&db, "newest", 2, same.clone()).await;
+            let candidates =
+                infra::table::alert_incidents::find_correlation_candidates_with(&db, "default")
+                    .await
+                    .unwrap();
+            if let Some((org, status, dimensions)) = change {
+                let mut active: alert_incidents::ActiveModel = newest.into();
+                active.org_id = Set(org.to_string());
+                active.status = Set(status.to_string());
+                active.group_values = Set(dimensions);
+                active.update(&db).await.unwrap();
+            } else {
+                alert_incidents::Entity::delete_by_id("newest")
+                    .exec(&db)
+                    .await
+                    .unwrap();
+            }
+            let found = select_correlation_candidate(&db, "default", &incoming, candidates)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(found.id, "older");
+        }
+    }
+
+    #[tokio::test]
+    async fn correlation_selection_returns_current_compatible_dimensions() {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ActiveModelTrait, Set};
+
+        let db = correlation_db().await;
+        let original = serde_json::json!({"ns": "prod", "cluster": "a", "pod": "p1"});
+        let current = serde_json::json!({"ns": "prod"});
+        let row = store_correlation_incident(&db, "newest", 1, original).await;
+        let candidates =
+            infra::table::alert_incidents::find_correlation_candidates_with(&db, "default")
+                .await
+                .unwrap();
+        let mut active: alert_incidents::ActiveModel = row.into();
+        active.group_values = Set(current.clone());
+        active.update(&db).await.unwrap();
+        let incoming = HashMap::from([
+            ("ns".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "a".to_string()),
+        ]);
+        let found = select_correlation_candidate(&db, "default", &incoming, candidates)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.group_values, current);
+    }
+
+    #[tokio::test]
+    async fn correlation_selection_propagates_selected_lookup_errors() {
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+        let incoming = HashMap::from([("ns".to_string(), "prod".to_string())]);
+        let candidates = vec![infra::table::alert_incidents::CorrelationCandidate {
+            id: "selected".to_string(),
+            group_values: serde_json::json!({"ns": "prod"}),
+        }];
+        assert!(matches!(
+            select_correlation_candidate(&db, "default", &incoming, candidates).await,
+            Err(infra::errors::Error::DbError(
+                infra::errors::DbError::SeaORMError(_)
+            ))
+        ));
+        assert!(
+            select_correlation_candidate(&db, "default", &incoming, Vec::new())
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn firings_on_one_entity_share_a_case_lock() {
+        let dims = |pairs: &[(&str, &str)]| -> HashMap<String, String> {
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect()
+        };
+        let a = siem_case_lock("org", &dims(&[("security_host", "win-1")]));
+        let b = siem_case_lock("org", &dims(&[("security_host", "win-1")]));
+        assert!(std::ptr::eq(a, b));
+        let both = siem_case_lock("org", &dims(&[("a", "1"), ("b", "2")]));
+        let swapped = siem_case_lock("org", &dims(&[("b", "2"), ("a", "1")]));
+        assert!(std::ptr::eq(both, swapped));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_incident_send_is_keyed_by_the_incident_id() {
+        use config::meta::alerts::notification_kind::{NotificationEvent, NotificationKind};
+        let mut ctx = crate::alerts::notifications::NotificationContext {
+            episode_id: Some("alert-episode".into()),
+            ..Default::default()
+        };
+        apply_incident_to_context(
+            &mut ctx,
+            "inc_1",
+            "severity_escalated",
+            "High error rate",
+            "P1",
+            "checkout",
+            "https://o2/web/alerts/incidents/inc_1",
+        );
+        assert_eq!(ctx.kind, NotificationKind::Incident);
+        assert_eq!(ctx.event, NotificationEvent::Firing);
+        assert_eq!(ctx.episode_id.as_deref(), Some("inc_1"));
+        assert_eq!(ctx.alert_url, "https://o2/web/alerts/incidents/inc_1");
+        let route =
+            crate::alerts::notifications::notify::route(&pagerduty_resolved(), &ctx).unwrap();
+        assert_eq!(route, crate::alerts::notifications::notify::Route::Render);
+        // Strict D8: an incident sends no recovery today, so a platform hears nothing on resolve.
+        ctx.event = NotificationEvent::Resolved;
+        assert!(matches!(
+            crate::alerts::notifications::notify::route(&pagerduty_resolved(), &ctx),
+            Err(crate::alerts::notifications::notify::NotifyError::Skipped(
+                _
+            ))
+        ));
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn pagerduty_resolved() -> crate::alerts::notifications::notify::Resolved {
+        use crate::alerts::notifications::org_default::{
+            EffectiveTemplate, TemplateSource, compiled_fallback,
+        };
+        let dest_type = config::meta::destinations::DestinationType::Http(
+            config::meta::destinations::Endpoint {
+                destination_type: Some("pagerduty".into()),
+                url: "https://events.pagerduty.com/v2/enqueue".into(),
+                ..Default::default()
+            },
+        );
+        crate::alerts::notifications::notify::Resolved {
+            destination: Default::default(),
+            channel: crate::alerts::notifications::derive_channel_format(&dest_type),
+            destination_type: dest_type,
+            effective: EffectiveTemplate {
+                template: compiled_fallback("org"),
+                source: TemplateSource::Compiled,
+                skipped: vec![],
+            },
+        }
+    }
 
     /// The incident path and the alert path page the same person about the same
     /// alert, so an unset priority has to mean the same thing on both. They used
@@ -3396,69 +4713,6 @@ mod tests {
     }
 
     #[test]
-    fn test_cooldown_elapsed_no_events_returns_true() {
-        assert!(cooldown_elapsed(&[], 5));
-    }
-
-    #[test]
-    fn test_cooldown_elapsed_no_ai_complete_event_returns_true() {
-        use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
-        let events = vec![IncidentEvent {
-            timestamp: chrono::Utc::now().timestamp_micros(),
-            event_type: IncidentEventType::Created,
-        }];
-        assert!(cooldown_elapsed(&events, 5));
-    }
-
-    #[test]
-    fn test_cooldown_elapsed_recent_ai_complete_returns_false() {
-        use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
-        // Timestamp = now - 30 seconds; cooldown = 5 minutes → not elapsed
-        let recent_ts = chrono::Utc::now().timestamp_micros() - 30 * 1_000_000;
-        let events = vec![IncidentEvent {
-            timestamp: recent_ts,
-            event_type: IncidentEventType::AIAnalysisComplete,
-        }];
-        assert!(!cooldown_elapsed(&events, 5));
-    }
-
-    #[test]
-    fn test_cooldown_elapsed_old_ai_complete_returns_true() {
-        use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
-        // Timestamp = epoch (very old); cooldown = 1 minute → elapsed
-        let events = vec![IncidentEvent {
-            timestamp: 1_000_000, // 1 second after epoch
-            event_type: IncidentEventType::AIAnalysisComplete,
-        }];
-        assert!(cooldown_elapsed(&events, 1));
-    }
-
-    #[test]
-    fn test_cooldown_elapsed_uses_last_ai_complete() {
-        use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
-        // Two AIAnalysisComplete events: old one and recent one
-        // Should use the last (most recent) one → not elapsed
-        let old_ts = 1_000_000i64;
-        let recent_ts = chrono::Utc::now().timestamp_micros() - 30 * 1_000_000;
-        let events = vec![
-            IncidentEvent {
-                timestamp: old_ts,
-                event_type: IncidentEventType::AIAnalysisComplete,
-            },
-            IncidentEvent {
-                timestamp: chrono::Utc::now().timestamp_micros(),
-                event_type: IncidentEventType::Created,
-            },
-            IncidentEvent {
-                timestamp: recent_ts,
-                event_type: IncidentEventType::AIAnalysisComplete,
-            },
-        ];
-        // last AIAnalysisComplete is at recent_ts (30 seconds ago), cooldown = 5 minutes
-        assert!(!cooldown_elapsed(&events, 5));
-    }
-
-    #[test]
     fn test_merge_correlation_results_sd_wins_over_semantic() {
         use config::meta::alerts::incidents::KeyType;
         let sd = ServiceDiscoveryResult {
@@ -3497,6 +4751,50 @@ mod tests {
         assert!(dims.is_empty());
         assert!(matches!(key_type, KeyType::AlertId));
         assert_eq!(reason, "alert_id_fallback");
+    }
+
+    #[tokio::test]
+    async fn semantic_extraction_uses_the_settings_it_is_given() {
+        use config::meta::correlation::IdentitySet;
+        let identity = ServiceIdentityConfig {
+            sets: vec![IdentitySet {
+                id: "k8s".to_string(),
+                label: "Kubernetes".to_string(),
+                distinguish_by: vec!["k8s-namespace".to_string()],
+            }],
+            ..Default::default()
+        };
+        let groups = vec![
+            FieldAlias::new("k8s-namespace", "Namespace", &["k8s_namespace_name"]),
+            FieldAlias::new("service", "Service", &["service_name"]),
+        ];
+        let labels: HashMap<String, String> = [
+            ("k8s_namespace_name".to_string(), "prod".to_string()),
+            ("service_name".to_string(), "checkout".to_string()),
+            ("host".to_string(), "node-1".to_string()),
+        ]
+        .into();
+
+        let found = extract_filtered_semantic_dimensions("org-16560", &labels, &identity, &groups)
+            .await
+            .expect("the configured groups resolve");
+        assert_eq!(
+            found.group_values,
+            HashMap::from([
+                ("k8s-namespace".to_string(), "prod".to_string()),
+                ("service".to_string(), "checkout".to_string()),
+            ])
+        );
+
+        let opted_out = ServiceIdentityConfig {
+            service_optional: true,
+            ..Default::default()
+        };
+        assert!(
+            extract_filtered_semantic_dimensions("org-16560", &labels, &opted_out, &groups)
+                .await
+                .is_none()
+        );
     }
 
     #[test]
@@ -3585,6 +4883,16 @@ mod tests {
             created_at: 1,
             updated_at: 1,
             muted_by_downtime_id: muted_by.map(str::to_string),
+            rca_run_id: None,
+            rca_state: None,
+            rca_started_at: None,
+            rca_updated_at: None,
+            rca_outcome: None,
+            rca_confidence: None,
+            rca_summary: None,
+            rca_off_reason: None,
+            security_case: false,
+            historical: false,
         }
     }
 
@@ -3715,6 +5023,16 @@ mod tests {
         assert!(!unmute_for_firing("default", &incident(None), None).await);
     }
 
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_unmuted_incident_with_a_manual_run_still_decides_l0() {
+        let mut manual = incident(None);
+        manual.rca_run_id = Some("run_manual".to_string());
+        assert!(l0_undecided(&manual));
+        manual.rca_off_reason = Some("l0_off".to_string());
+        assert!(!l0_undecided(&manual));
+    }
+
     #[tokio::test]
     async fn a_muted_auto_resolve_whose_event_append_fails_still_clears_the_mute() {
         use infra::table::entity::alert_incidents;
@@ -3836,5 +5154,1015 @@ mod tests {
                 if incident_id == "inc-1"
         ));
         assert_eq!(paged, 1, "the delayed opened message goes out once");
+    }
+
+    /// A run whose RCA setting went off after the start ends `failed`, not `running`.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_run_started_while_rca_is_off_ends_rca_disabled() {
+        use config::meta::alerts::rca_runs::{RunState, RunTrigger};
+
+        use crate::alerts::rca_runs::tests::{
+            db, failures, new_incident, rca_off, start, stored, timeline,
+        };
+
+        let _db = db().await;
+        rca_off();
+        let cfg = o2_enterprise::enterprise::common::config::get_config();
+        assert!(
+            !(cfg.incidents.enabled && cfg.incidents.rca_enabled),
+            "rca_off() turned RCA off"
+        );
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+
+        trigger_rca_for_incident(
+            org.clone(),
+            inc.clone(),
+            run_id.clone(),
+            RcaLaunch {
+                trigger: RunTrigger::Manual,
+                user_email: "a.rao@acme.io".to_string(),
+                build_on_previous: false,
+                usage_permit: None,
+                guidance: None,
+                resume: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Failed);
+        assert_eq!(run.error.unwrap().code, "rca_disabled");
+        assert_eq!(failures(&timeline(&org, &inc).await).len(), 1);
+    }
+
+    /// A seed of `source_run` over `three_steps`, as `prepare_resume` makes it.
+    #[cfg(feature = "enterprise")]
+    fn resume_seed(org_id: &str, source_run: &str) -> super::super::rca_resume::ResumeSeed {
+        use config::meta::alerts::rca_runs::RunMode;
+        use infra::table::ai_chat_sessions::STATUS_ACTIVE;
+
+        use crate::{
+            ai_chat::fork::{plan_resume, tests::three_steps},
+            alerts::rca_resume::{ResumeSeed, ResumeStep, tests::session_row},
+        };
+
+        let events = three_steps();
+        let plan = plan_resume(&events).unwrap();
+        ResumeSeed {
+            source_run_id: source_run.to_string(),
+            source_session: session_row(org_id, &format!("ses-{source_run}"), 17, STATUS_ACTIVE),
+            prefix: events[..=plan.cut_seq as usize].to_vec(),
+            cut_seq: plan.cut_seq,
+            reused_steps: plan.reused_steps,
+            from_step: ResumeStep {
+                index: plan.from_step.index,
+                stage: plan.from_step.stage.unwrap_or_default().to_string(),
+                title: plan.from_step.title,
+            },
+            mode: RunMode::BuildOnPrevious,
+            latest_run_id: source_run.to_string(),
+        }
+    }
+
+    /// A resumed run copies the source's session, and the run and its continuation stay on the
+    /// fork.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_resumed_run_goes_on_from_the_fork_with_the_copied_counts() {
+        use std::time::Duration;
+
+        use config::meta::alerts::rca_runs::{RunMode, RunState, RunTrigger};
+        use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
+        use serde_json::json;
+
+        use crate::{
+            ai_chat::{fork::RunFork, rca_thread::project_rca_thread},
+            alerts::{
+                rca_runs::{
+                    RunSubject, StartOutcome, StartRun, start_run,
+                    tests::{db, incident_start, new_incident, start, stored},
+                },
+                rca_turn::{RcaTurnRun, start_forked_rca_turn, turn_run_of},
+            },
+        };
+
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let source_run = start(&org, &inc, RunTrigger::Manual).await;
+        crate::alerts::rca_runs::fail_run(
+            &org,
+            &source_run,
+            RunTrigger::Manual,
+            "timeout",
+            "stopped",
+            None,
+        )
+        .await
+        .unwrap();
+        let seed = resume_seed(&org, &source_run);
+        let start_resume = StartRun {
+            mode: seed.mode,
+            context_used: Some(json!({ "resumed_from": seed.resumed_from() })),
+            ..incident_start(&org, &inc, RunTrigger::Resume)
+        };
+        let StartOutcome::Started { run_id } = start_run(start_resume).await.unwrap() else {
+            panic!("the resume did not start");
+        };
+
+        // A copy that fails is the launch's error and changes nothing on the run.
+        let failed = fork_for_resume(
+            &org,
+            &run_id,
+            seed.clone(),
+            async |_: &str,
+                   _: &infra::table::ai_chat_sessions::Model,
+                   _: Vec<DurableEvent>,
+                   _: &str| {
+                Err::<RunFork, _>(anyhow::anyhow!("the stream refused the batch"))
+            },
+        )
+        .await;
+        assert!(failed.is_err());
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Running);
+        assert_eq!(run.session_id, None);
+        assert_eq!(
+            run.context_used,
+            Some(json!({"resumed_from": seed.resumed_from()}))
+        );
+
+        let fork_session = "0195a1b2-c3d4-7e5f-8a9b-f0e4ed000001".to_string();
+        let copied = seed.prefix.clone();
+        let (mode, fork) = fork_for_resume(
+            &org,
+            &run_id,
+            seed.clone(),
+            async |org_id: &str,
+                   source: &infra::table::ai_chat_sessions::Model,
+                   prefix: Vec<DurableEvent>,
+                   from_run: &str| {
+                assert_eq!(org_id, org);
+                assert_eq!(source.session_id, format!("ses-{source_run}"));
+                assert_eq!(prefix, copied);
+                assert_eq!(from_run, source_run);
+                Ok(RunFork {
+                    session_id: fork_session.clone(),
+                    last_seq: seed.cut_seq,
+                })
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(mode, RunMode::BuildOnPrevious);
+        assert_eq!(fork.session_id, fork_session);
+
+        // No agent here: the turn stops at its credentials; its earlier run writes are under test.
+        let turn = RcaTurnRun {
+            org_id: org.clone(),
+            run_id: run_id.clone(),
+            subject: RunSubject::Incident(inc.clone()),
+            trigger: RunTrigger::Resume,
+            mode,
+            context: json!({}),
+            session_id: None,
+        };
+        let started =
+            tokio::time::timeout(Duration::from_secs(60), start_forked_rca_turn(turn, fork))
+                .await
+                .expect("the start ends");
+        assert!(started.is_err());
+
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.session_id.as_deref(), Some(fork_session.as_str()));
+        assert_eq!(run.mode, RunMode::BuildOnPrevious);
+        let used = run.context_used.unwrap();
+        assert_eq!(used["resumed_from"], seed.resumed_from());
+        assert!(
+            used.get("toolsets").is_some(),
+            "the first turn's context_used, the lineage kept in it: {used}"
+        );
+        let reused = project_rca_thread(&seed.prefix, &[], false, false).stats;
+        assert_eq!(reused.steps, 2);
+        let stats = run.stats.unwrap();
+        assert_eq!(
+            (stats.steps, stats.tool_calls),
+            (Some(reused.steps), Some(reused.tool_calls)),
+            "the live counts start from the copied steps"
+        );
+        assert_eq!(
+            stats.tokens,
+            Some(json!({"input": 3_000, "output": 600, "reasoning": 50, "cache_read": 400}))
+        );
+        assert_eq!(run.stage.as_deref(), Some("metrics"));
+        assert_eq!(run.stage_index, Some(6));
+
+        let row = infra::table::rca_runs::get_rw(&org, &run_id)
+            .await
+            .unwrap()
+            .unwrap();
+        let next = turn_run_of(&row).await.unwrap();
+        assert_eq!(next.session_id.as_deref(), Some(fork_session.as_str()));
+        assert_eq!(
+            (next.trigger, next.mode),
+            (RunTrigger::Resume, RunMode::BuildOnPrevious)
+        );
+    }
+
+    /// A resume launch ends on the same guards as any run, before anything is copied.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_resume_refused_by_a_guard_copies_nothing() {
+        use std::time::Duration;
+
+        use config::meta::alerts::rca_runs::{RunState, RunTrigger};
+        use infra::table::entity::ai_chat_sessions as session_rows;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+        use crate::alerts::rca_runs::{
+            StartOutcome, StartRun, start_run,
+            tests::{db, incident_start, new_incident, rca_off, start, stored},
+        };
+
+        let _db = db().await;
+        rca_off();
+        let (org, inc) = new_incident(None).await;
+        let source_run = start(&org, &inc, RunTrigger::Manual).await;
+        crate::alerts::rca_runs::fail_run(
+            &org,
+            &source_run,
+            RunTrigger::Manual,
+            "timeout",
+            "stopped",
+            None,
+        )
+        .await
+        .unwrap();
+        let seed = resume_seed(&org, &source_run);
+        let start_resume = StartRun {
+            context_used: Some(serde_json::json!({ "resumed_from": seed.resumed_from() })),
+            ..incident_start(&org, &inc, RunTrigger::Resume)
+        };
+        let StartOutcome::Started { run_id } = start_run(start_resume).await.unwrap() else {
+            panic!("the resume did not start");
+        };
+
+        tokio::time::timeout(
+            Duration::from_secs(60),
+            trigger_rca_for_incident(
+                org.clone(),
+                inc.clone(),
+                run_id.clone(),
+                RcaLaunch {
+                    trigger: RunTrigger::Resume,
+                    user_email: "a.rao@acme.io".to_string(),
+                    build_on_previous: false,
+                    usage_permit: None,
+                    guidance: None,
+                    resume: Some(seed.clone()),
+                },
+            ),
+        )
+        .await
+        .expect("the launch ends")
+        .unwrap();
+
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Failed);
+        assert_eq!(run.error.unwrap().code, "rca_disabled");
+        assert_eq!(run.session_id, None);
+        assert_eq!(
+            run.context_used.unwrap()["resumed_from"],
+            seed.resumed_from()
+        );
+        let sessions = session_rows::Entity::find()
+            .filter(session_rows::Column::OrgId.eq(&org))
+            .all(infra::db::get_orm_client_rw().await)
+            .await
+            .unwrap();
+        assert!(sessions.is_empty(), "no copy was made");
+    }
+
+    /// A stale live run can be cancelled; the user is recorded.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_stale_run_on_another_node_is_cancelled_by_the_user() {
+        use config::meta::alerts::{
+            incidents::IncidentEventType,
+            rca_runs::{RunState, RunTrigger},
+        };
+
+        use crate::alerts::rca_runs::tests::{
+            age, db, incident_row, new_incident, start, stored, timeline,
+        };
+
+        let _db = db().await;
+        let timeout = o2_enterprise::enterprise::common::config::get_config()
+            .incidents
+            .rca_timeout_secs;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        age(&org, &inc, &run_id, timeout as i64 + 121).await;
+
+        let cancelled = crate::alerts::rca_turn::cancel_rca_run(&org, &inc, "a.rao@acme.io")
+            .await
+            .unwrap()
+            .expect("a stale running run is cancellable");
+
+        assert_eq!(cancelled, run_id);
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Cancelled);
+        assert_eq!(run.cancelled_by.as_deref(), Some("a.rao@acme.io"));
+        let row = incident_row(&org, &inc).await;
+        assert_eq!(row.rca_state.as_deref(), Some("cancelled"));
+        assert_eq!(
+            infra::table::rca_runs::decode::<serde_json::Value>(row.rca_summary.as_deref())
+                .unwrap()["cancelled_by"]
+                .as_str(),
+            Some("a.rao@acme.io")
+        );
+        let cancels: Vec<_> = timeline(&org, &inc)
+            .await
+            .into_iter()
+            .filter_map(|e| match e {
+                IncidentEventType::AIAnalysisCancelled { user_id } => Some(user_id),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(cancels, [Some("a.rao@acme.io".to_string())]);
+    }
+
+    /// With no live run there is nothing to cancel.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_cancel_of_an_ended_or_absent_run_returns_none() {
+        use config::meta::alerts::rca_runs::{RunState, RunTrigger};
+        use infra::table::rca_runs::RunUpdate;
+
+        use crate::alerts::{
+            rca_runs::{
+                complete_run,
+                tests::{db, new_incident, start, stored},
+            },
+            rca_turn::cancel_rca_run,
+        };
+
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        assert_eq!(
+            cancel_rca_run(&org, &inc, "a.rao@acme.io").await.unwrap(),
+            None
+        );
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        assert!(
+            complete_run(&org, &run_id, "report", RunUpdate::default())
+                .await
+                .unwrap()
+        );
+
+        assert_eq!(
+            cancel_rca_run(&org, &inc, "a.rao@acme.io").await.unwrap(),
+            None
+        );
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Completed);
+        assert_eq!(run.cancelled_by, None);
+    }
+
+    /// Each listed incident carries its run summary, or `rca: null` when never analyzed.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_list_carries_each_incidents_run_summary() {
+        use config::meta::alerts::rca_runs::{ReportFormat, RunState, RunTrigger};
+
+        use crate::alerts::rca_runs::{
+            rca_detail,
+            tests::{
+                add_incident, completed_at, db, incident_row, new_incident, pre_run_topology, start,
+            },
+        };
+
+        let _db = db().await;
+        let (org, analyzed) = new_incident(None).await;
+        let run_id = start(&org, &analyzed, RunTrigger::AutoNewIncident).await;
+        let never = add_incident(&org, None).await;
+        // Reports from before runs existed: dated by the archive, else by the Complete event.
+        let archived = add_incident(&org, Some(pre_run_topology())).await;
+        let single = add_incident(
+            &org,
+            Some(serde_json::json!({"nodes": [], "edges": [], "suggested_root_cause": "r"})),
+        )
+        .await;
+        completed_at(&org, &single, 150).await;
+        let rerun = add_incident(&org, Some(pre_run_topology())).await;
+        let rerun_id = start(&org, &rerun, RunTrigger::Manual).await;
+        infra::table::rca_runs::backfill_v1_pointers_for_tests()
+            .await
+            .unwrap();
+
+        let (incidents, total) = list_incidents(&org, None, 50, 0).await.unwrap();
+
+        assert_eq!(total, 5);
+        let by_id = |id: &str| incidents.iter().find(|i| i.id == id).unwrap();
+        let rca = by_id(&analyzed).rca.as_ref().unwrap();
+        assert_eq!(rca.run_id, run_id);
+        assert_eq!(rca.state, RunState::Running);
+        assert!(!rca.stale);
+        assert!(rca.detail.is_none(), "the list adds no join");
+        assert!(by_id(&never).rca.is_none());
+        let v1 = |id: &str| {
+            let rca = by_id(id).rca.as_ref().expect("a pre-run report shows");
+            (
+                rca.run_id.as_str(),
+                rca.report_format,
+                rca.state,
+                rca.outcome.as_deref(),
+                rca.updated_at,
+            )
+        };
+        let (format, state) = (ReportFormat::V1, RunState::Completed);
+        assert_eq!(v1(&archived), ("v1-0", format, state, None, 200));
+        assert_eq!(v1(&single), ("v1-0", format, state, None, 150));
+        let rca = by_id(&rerun).rca.as_ref().unwrap();
+        assert_eq!(
+            (rca.run_id.as_str(), rca.report_format),
+            (rerun_id.as_str(), ReportFormat::V2),
+            "a run replaces the pre-run report"
+        );
+        for id in [&archived, &single] {
+            let listed = by_id(id).rca.as_ref().unwrap();
+            let mut detail = rca_detail(&org, &incident_row(&org, id).await)
+                .await
+                .unwrap()
+                .unwrap();
+            let fields = detail.detail.take().unwrap();
+            assert_eq!(&detail, listed, "the detail summary is the list summary");
+            assert_eq!(fields.history[0].started_at, listed.updated_at);
+        }
+
+        let json = serde_json::to_value(&incidents).unwrap();
+        let json_of = |id: &str| {
+            json.as_array()
+                .unwrap()
+                .iter()
+                .find(|i| i["id"] == id)
+                .unwrap()
+                .clone()
+        };
+        assert_eq!(json_of(&analyzed)["rca"]["state"], "running");
+        assert!(json_of(&analyzed)["rca"].get("current_run").is_none());
+        assert!(json_of(&never)["rca"].is_null());
+        assert!(json_of(&never).as_object().unwrap().contains_key("rca"));
+        assert_eq!(json_of(&archived)["rca"]["report_format"], "v1");
+    }
+
+    /// A case spans its evidence, stays historical while every firing is, and an event widens it.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_security_case_spans_event_time_and_tracks_backfill_only_firings() {
+        use infra::table::alert_incidents::{
+            CaseActivity, add_firing_to_case, create_security_case, get_rw,
+        };
+
+        use crate::alerts::rca_runs::tests::db;
+
+        const HOUR: i64 = 3_600_000_000;
+        let _db = db().await;
+        let org = format!("case_span_{}", config::ider::uuid());
+        let span = |first, last, historical| CaseActivity {
+            first_event_at: first,
+            last_event_at: last,
+            historical,
+        };
+        let case = create_security_case(
+            &org,
+            "P2",
+            serde_json::json!({}),
+            "AlertId",
+            span(10 * HOUR, 11 * HOUR, true),
+            Some("Kerberoasting on DC-02".to_string()),
+            None,
+        )
+        .await
+        .unwrap();
+        add_firing_to_case(
+            &case.id,
+            "det-1",
+            "d",
+            "internal",
+            30 * HOUR,
+            "entity",
+            span(10 * HOUR, 11 * HOUR, true),
+        )
+        .await
+        .unwrap();
+        let stored = get_rw(&org, &case.id).await.unwrap().unwrap();
+        assert_eq!(
+            (stored.first_alert_at, stored.last_alert_at),
+            (10 * HOUR, 11 * HOUR)
+        );
+        assert!(stored.historical, "the run time never becomes last seen");
+
+        let open = infra::table::alert_incidents::find_open_incidents_by_alert_id(&org, "det-1")
+            .await
+            .unwrap();
+        assert_eq!(open.len(), 1);
+        assert!(
+            find_open_detection_case(&org, "det-1", (40 * HOUR, 40 * HOUR), 2 * HOUR)
+                .await
+                .unwrap()
+                .is_none(),
+            "a firing a day later opens its own case"
+        );
+        assert!(
+            find_open_detection_case(&org, "det-1", (12 * HOUR, 12 * HOUR), 2 * HOUR)
+                .await
+                .unwrap()
+                .is_some()
+        );
+
+        add_firing_to_case(
+            &case.id,
+            "det-2",
+            "d2",
+            "internal",
+            31 * HOUR,
+            "entity",
+            span(9 * HOUR, 12 * HOUR, false),
+        )
+        .await
+        .unwrap();
+        let stored = get_rw(&org, &case.id).await.unwrap().unwrap();
+        assert_eq!(
+            (stored.first_alert_at, stored.last_alert_at),
+            (9 * HOUR, 12 * HOUR)
+        );
+        assert!(
+            !stored.historical,
+            "a current firing makes the case current"
+        );
+
+        let event = CaseEvent {
+            stream: "okta_auth".to_string(),
+            at: 13 * HOUR,
+            fields: serde_json::json!({"actor_alternateid": "bob@acme.io"})
+                .as_object()
+                .unwrap()
+                .clone(),
+        };
+        let widened = attach_event_to_case(&org, Some(&case.id), None, &event, "a@acme.io")
+            .await
+            .unwrap();
+        assert_eq!(widened.last_alert_at, 13 * HOUR);
+        let opened = attach_event_to_case(&org, None, None, &event, "a@acme.io")
+            .await
+            .unwrap();
+        assert_eq!(
+            opened.title.as_deref(),
+            Some("Event from okta_auth on bob@acme.io")
+        );
+        assert_eq!(
+            opened.group_values,
+            serde_json::json!({"security_user": "bob@acme.io"})
+        );
+        assert_eq!(
+            (opened.first_alert_at, opened.last_alert_at),
+            (13 * HOUR, 13 * HOUR)
+        );
+    }
+
+    /// Hosts past the partition cap join the detection's entity-less case, not the first of them.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn rows_past_the_entity_cap_never_file_under_an_overflow_host() {
+        use infra::table::alert_incidents::CaseFilter;
+        use o2_enterprise::enterprise::security::cases::MAX_ENTITY_PARTITIONS;
+        use svix_ksuid::{Ksuid, KsuidLike};
+
+        use crate::alerts::rca_runs::tests::db;
+
+        const HOUR: i64 = 3_600_000_000;
+        let _db = db().await;
+        let org = format!("case_cap_{}", config::ider::uuid());
+        let mut alert = Alert::default();
+        alert.id = Some(Ksuid::new(None, None));
+        alert.org_id = org.clone();
+        alert.name = "brute_force".to_string();
+        alert.context_attributes = Some(
+            [
+                ("siem".to_string(), "true".to_string()),
+                ("sigma_title".to_string(), "Brute force".to_string()),
+            ]
+            .into_iter()
+            .collect(),
+        );
+        let rows: Vec<Map<String, Value>> = (0..60)
+            .map(|i| {
+                serde_json::json!({"hostname": format!("host-{i:02}"), "_timestamp": HOUR})
+                    .as_object()
+                    .unwrap()
+                    .clone()
+            })
+            .collect();
+
+        correlate_alert_to_incident(&alert, &rows[0], &rows, 2 * HOUR, None, None, None, None)
+            .await
+            .unwrap();
+
+        let (cases, total) = list_incidents_filtered(&org, None, CaseFilter::OnlyCases, 100, 0)
+            .await
+            .unwrap();
+        assert_eq!(total as usize, MAX_ENTITY_PARTITIONS + 1);
+        let mut titles: Vec<String> = cases.iter().filter_map(|c| c.title.clone()).collect();
+        titles.sort();
+        assert_eq!(titles.first().map(String::as_str), Some("Brute force"));
+        assert!(
+            !titles.iter().any(|t| t == "Brute force on host-50"),
+            "the first overflow host gets no case of its own"
+        );
+        let overflow = cases
+            .iter()
+            .find(|c| c.title.as_deref() == Some("Brute force"))
+            .unwrap();
+        assert_eq!(overflow.group_values, serde_json::json!({}));
+        assert_eq!(overflow.alert_count, 1);
+    }
+
+    /// A backfill firing with old and current rows on one host files each into its own case.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_backfill_keeps_old_evidence_out_of_the_current_case() {
+        use infra::table::alert_incidents::CaseFilter;
+        use svix_ksuid::{Ksuid, KsuidLike};
+
+        use crate::alerts::rca_runs::tests::db;
+
+        const HOUR: i64 = 3_600_000_000;
+        let _db = db().await;
+        let org = format!("case_backfill_{}", config::ider::uuid());
+        let mut alert = Alert::default();
+        alert.id = Some(Ksuid::new(None, None));
+        alert.org_id = org.clone();
+        alert.name = "uid0".to_string();
+        alert.context_attributes = Some(
+            [
+                ("siem".to_string(), "true".to_string()),
+                (
+                    "sigma_title".to_string(),
+                    "Linux Account Created With UID 0".to_string(),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        );
+        let now = 48 * HOUR;
+        let rows: Vec<Map<String, Value>> = [now - 6 * HOUR, now - 60_000_000]
+            .iter()
+            .map(|at| {
+                serde_json::json!({"host": "web-01", "_timestamp": at})
+                    .as_object()
+                    .unwrap()
+                    .clone()
+            })
+            .collect();
+
+        correlate_alert_to_incident(
+            &alert,
+            &rows[0],
+            &rows,
+            now,
+            None,
+            None,
+            None,
+            Some(now - HOUR),
+        )
+        .await
+        .unwrap();
+
+        let (cases, total) = list_incidents_filtered(&org, None, CaseFilter::OnlyCases, 10, 0)
+            .await
+            .unwrap();
+        assert_eq!(total, 2, "one case per window of evidence");
+        let mut shape: Vec<(i64, i64, bool)> = cases
+            .iter()
+            .map(|c| (c.first_alert_at, c.last_alert_at, c.historical))
+            .collect();
+        shape.sort();
+        assert_eq!(
+            shape,
+            [
+                (now - 6 * HOUR, now - 6 * HOUR, true),
+                (now - 60_000_000, now - 60_000_000, false),
+            ]
+        );
+    }
+
+    /// Each listed incident names the alerts that fired into it and how often; an incident
+    /// with no links lists none, and `alert_count` heals to the junction's firing total.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_list_carries_each_incidents_alert_groups() {
+        use config::meta::alerts::incidents::IncidentAlertGroup;
+        use infra::table::alert_incidents::add_alert_to_incident;
+
+        use crate::alerts::rca_runs::tests::{add_incident, db, new_incident};
+
+        let _db = db().await;
+        let (org, repeat) = new_incident(None).await;
+        let unlinked = add_incident(&org, None).await;
+        for (alert, fired_at, new_type) in [
+            ("a", 1, true),
+            ("b", 2, true),
+            ("a", 3, false),
+            ("a", 4, false),
+        ] {
+            let joined = add_alert_to_incident(
+                &repeat,
+                alert,
+                &format!("{alert}-name"),
+                "alert",
+                fired_at,
+                "manual",
+            )
+            .await
+            .unwrap();
+            assert_eq!(joined, new_type, "{alert} at {fired_at}");
+        }
+
+        let (incidents, _) = list_incidents(&org, None, 50, 0).await.unwrap();
+
+        let by_id = |id: &str| incidents.iter().find(|i| i.id == id).unwrap();
+        let group = |id: &str, count| IncidentAlertGroup {
+            alert_id: id.to_string(),
+            alert_name: format!("{id}-name"),
+            count,
+        };
+        let listed = by_id(&repeat);
+        assert_eq!(
+            listed.alert_groups.as_deref(),
+            Some(&[group("a", 3), group("b", 1)][..])
+        );
+        // Seeded at 1 and incremented per link, so stored is 5: the list heals it to 4.
+        assert_eq!(listed.alert_count, 4);
+        let none = by_id(&unlinked);
+        assert_eq!(none.alert_groups.as_deref(), Some(&[][..]));
+
+        let json = serde_json::to_value(listed).unwrap();
+        assert_eq!(json["alert_groups"][0]["count"], 3);
+    }
+
+    /// A turn that could not start fails its run with the turn's code and an actionable reason.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_turn_that_could_not_start_names_its_code_and_reason() {
+        use crate::alerts::{rca_runs, rca_turn::RcaTurnError};
+
+        for (error, code, reason, details) in [
+            (
+                RcaTurnError::TurnLimit,
+                "turn_limit",
+                TURN_LIMIT_REASON,
+                None,
+            ),
+            (
+                RcaTurnError::Credentials("no SA".to_string()),
+                "credentials",
+                rca_runs::CREDENTIALS_REASON,
+                Some("no SA"),
+            ),
+            (
+                RcaTurnError::AgentUnavailable("down".to_string()),
+                "agent_unavailable",
+                rca_runs::AGENT_UNAVAILABLE_REASON,
+                Some("down"),
+            ),
+            (RcaTurnError::Busy, "busy", TURN_BUSY_REASON, None),
+            (
+                RcaTurnError::Other("boom".to_string()),
+                "agent_error",
+                rca_runs::AGENT_ERROR_REASON,
+                Some("boom"),
+            ),
+        ] {
+            assert_eq!(error.error_code(), code);
+            let (got_reason, got_details) = rca_turn_failure(&error);
+            assert_eq!(got_reason, reason, "{error:?}");
+            assert_eq!(got_details.as_deref(), details, "{error:?}");
+        }
+    }
+
+    /// The cap, a busy session and a missing SysRcaAgent user get their own codes; the rest are
+    /// agent errors.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_admission_refusal_maps_to_a_turn_error() {
+        use crate::{ai_chat::admission::AdmitError, alerts::rca_turn::RcaTurnError};
+
+        assert_eq!(
+            RcaTurnError::from(AdmitError::TurnLimit("user")),
+            RcaTurnError::TurnLimit
+        );
+        assert_eq!(RcaTurnError::from(AdmitError::Busy), RcaTurnError::Busy);
+        assert!(matches!(
+            RcaTurnError::from(AdmitError::NotRegistered),
+            RcaTurnError::Credentials(_)
+        ));
+        for other in [
+            AdmitError::InvalidSession("bad"),
+            AdmitError::NotFound("gone"),
+            AdmitError::AlreadySubmitted,
+            AdmitError::Unavailable("down"),
+        ] {
+            assert_eq!(RcaTurnError::from(other).error_code(), "agent_error");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn incident_notification_renders_through_slack_and_custom_templates() {
+        use crate::alerts::notifications::{
+            ChannelFormat, NotificationContext, RenderedMessage, apply_custom_template,
+            default_template::compiled_default_content, render, resolve_content,
+        };
+
+        let incident_url = "https://o2.example/web/alerts/incidents/inc-1?org_identifier=default";
+        let mut ctx = NotificationContext {
+            alert_name: "go_gc_rate_high".into(),
+            stream_name: "go_gc_duration_seconds".into(),
+            alert_status: "firing".into(),
+            alert_url: "https://o2.example/short/alert".into(),
+            alert_level: "critical".into(),
+            ..Default::default()
+        };
+        super::apply_incident_to_context(
+            &mut ctx,
+            "inc-1",
+            "new_incident_created",
+            "go_gc_rate_high on coredns",
+            "P2",
+            "coredns",
+            incident_url,
+        );
+        assert_eq!(ctx.alert_url, incident_url);
+        assert_eq!(ctx.incident_id, "inc-1");
+        assert_eq!(ctx.alert_level, "P2");
+        assert_eq!(
+            ctx.level,
+            Some(config::meta::alerts::level::AlertLevel::Critical)
+        );
+        for (severity, level) in [
+            (
+                "P1",
+                Some(config::meta::alerts::level::AlertLevel::Critical),
+            ),
+            ("P3", Some(config::meta::alerts::level::AlertLevel::Warning)),
+            ("P4", None),
+            ("", None),
+        ] {
+            let mut other = NotificationContext::default();
+            super::apply_incident_to_context(&mut other, "inc-2", "e", "t", severity, "s", "u");
+            assert_eq!(other.level, level, "{severity}");
+        }
+
+        let content = resolve_content(
+            &compiled_default_content(),
+            &ctx,
+            ChannelFormat::Slack.channel_family(),
+        );
+        let Ok(RenderedMessage::Http { body }) = render(ChannelFormat::Slack, &content, &ctx)
+        else {
+            panic!("slack renders an http body");
+        };
+        let slack: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert!(slack.get("incident").is_none(), "{body}");
+        assert!(slack["blocks"].is_array(), "{body}");
+        assert!(body.contains("incidents/inc-1"), "{body}");
+
+        let custom = apply_custom_template(
+            r#"{"text":"{incident_title} [{incident_severity}] {incident_event} {incident_url}"}"#,
+            &ctx,
+            false,
+        );
+        assert_eq!(
+            custom,
+            format!(
+                r#"{{"text":"go_gc_rate_high on coredns [P2] new_incident_created {incident_url}"}}"#
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn incident_details_keep_only_the_alert_definitions_the_caller_may_read() {
+        let alert = |name: &str| {
+            let mut alert = Alert::default();
+            alert.name = name.to_string();
+            alert
+        };
+        let composite = |id: &str, folder_id: &str| CompositeAlertSummary {
+            id: id.to_string(),
+            name: id.to_string(),
+            alert_type: "composite".to_string(),
+            enabled: true,
+            folder_id: folder_id.to_string(),
+        };
+        let alerts = vec![
+            ("allowed".to_string(), "open".to_string(), alert("allowed")),
+            ("denied".to_string(), "open".to_string(), alert("denied")),
+            (
+                "in_closed".to_string(),
+                "closed".to_string(),
+                alert("in_closed"),
+            ),
+        ];
+        let composites = vec![
+            composite("c_allowed", "open"),
+            composite("c_closed", "closed"),
+        ];
+
+        let (alerts, composites) = readable_definitions(alerts, composites, |id, folder| {
+            std::future::ready(id != "denied" && folder != "closed")
+        })
+        .await;
+
+        let names: Vec<_> = alerts.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(names, ["allowed"]);
+        let ids: Vec<_> = composites.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, ["c_allowed"]);
+    }
+
+    fn recovered_link(alert_id: &str) -> infra::table::entity::alert_incident_alerts::Model {
+        infra::table::entity::alert_incident_alerts::Model {
+            incident_id: "inc-1".to_string(),
+            alert_id: alert_id.to_string(),
+            alert_fired_at: 1,
+            alert_name: alert_id.to_string(),
+            alert_kind: "internal".to_string(),
+            correlation_reason: None,
+            created_at: 1,
+            resolved_at: Some(2),
+        }
+    }
+
+    #[test]
+    fn an_ops_incident_closes_once_every_firing_recovers() {
+        let open = incident(None);
+        assert!(recovery_closes(&open, &[recovered_link("cpu")], false));
+
+        let mut still_firing = recovered_link("cpu");
+        still_firing.resolved_at = None;
+        assert!(!recovery_closes(&open, &[still_firing], false));
+        assert!(!recovery_closes(&open, &[], false));
+
+        let mut assigned = incident(None);
+        assigned.assigned_to = Some("a@acme.io".to_string());
+        assert!(!recovery_closes(&assigned, &[recovered_link("cpu")], false));
+    }
+
+    #[test]
+    fn a_security_case_never_closes_on_recovery() {
+        let open = incident(None);
+        assert!(!recovery_closes(&open, &[recovered_link("siem-1")], true));
+        let mut marked = incident(None);
+        marked.security_case = true;
+        assert!(
+            !recovery_closes(&marked, &[recovered_link("deleted-detection")], false),
+            "the marker keeps a case open after its detection is deleted"
+        );
+    }
+
+    #[test]
+    fn a_higher_sigma_firing_raises_the_case_priority() {
+        use config::meta::alerts::incidents::IncidentSeverity;
+        use o2_enterprise::enterprise::security::cases;
+        assert_eq!(
+            escalated_severity("P3", cases::sigma_severity("critical"), None),
+            Some((IncidentSeverity::P3, IncidentSeverity::P1))
+        );
+        assert_eq!(
+            escalated_severity("P1", cases::sigma_severity("low"), None),
+            None
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_an_incident_notification_retries_only_a_temporary_failure() {
+        use crate::alerts::notifications::notify::NotifyError;
+        let rejected = |status| NotifyError::Rejected {
+            status,
+            body: String::new(),
+        };
+        assert!(retries_incident_notify(&rejected(500), 1, 3));
+        assert!(retries_incident_notify(&rejected(429), 2, 3));
+        assert!(!retries_incident_notify(&rejected(500), 3, 3));
+        assert!(!retries_incident_notify(&rejected(400), 1, 3));
+        assert!(!retries_incident_notify(
+            &NotifyError::DestinationNotFound("slack".to_string()),
+            1,
+            3
+        ));
+        assert!(!retries_incident_notify(&rejected(500), 1, 0));
     }
 }

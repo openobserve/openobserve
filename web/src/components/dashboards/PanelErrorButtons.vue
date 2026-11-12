@@ -232,8 +232,8 @@
       class="lastRefreshedAt ms-1.25 overflow-hidden text-[smaller] text-ellipsis whitespace-nowrap @max-[28rem]/panelbar:hidden"
       data-test="panel-last-refreshed-at"
     >
-      <span class="lastRefreshedAtIcon me-0.5 text-[smaller]">
-        {{ "🕑" }}
+      <span class="lastRefreshedAtIcon me-0.5 inline-flex align-middle">
+        <OIcon name="schedule" size="xs" data-test="panel-last-refreshed-icon" />
         <OTooltip side="bottom" align="end">
           <template #content
             >{{ t("dashboard.panelErrorButtons.lastRefreshed")
@@ -259,6 +259,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import PanelNoticeContent from "@/components/dashboards/PanelNoticeContent.vue";
 import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
+import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
+import type { SankeyNotice } from "@/utils/dashboard/convertSankeyData";
 import {
   buildPanelNotices,
   seriesTotalBoundOf,
@@ -302,6 +304,14 @@ export default defineComponent({
     },
     seriesLimit: {
       type: Object as PropType<SeriesLimitInfo | null>,
+      default: null,
+    },
+    regionJoin: {
+      type: Object as PropType<RegionJoinInfo | null>,
+      default: null,
+    },
+    sankeyNotice: {
+      type: Object as PropType<SankeyNotice | null>,
       default: null,
     },
     serverPartial: {
@@ -386,10 +396,12 @@ export default defineComponent({
             rowsCapped: props.rowsCapped,
             serverPartial: props.serverPartial,
           }),
+          sankeyNotice: props.sankeyNotice,
           serverPartial: props.serverPartial,
           partialReasons: props.serverPartialReasons,
           interrupted: props.isPartialData && !props.isPanelLoading,
           functionErrors: props.functionErrors,
+          regionJoin: props.regionJoin,
           canEdit: props.canEdit && !props.viewOnly,
           canRefresh: props.canRefresh,
         },

@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="email"
           :loading="loading"
           :forbidden="forbidden"
+          forbidden-resource="service_accounts"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -131,12 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="rbacAccess.allowed ? serviceAccountRolesText(row.email) : rbacAccess.message"
               @click="!rbacAccess.allowed && openUpgradeDialog()"
               >{{ serviceAccountRolesText(row.email) }}
-              <OIcon
-                v-if="!rbacAccess.allowed"
-                name="lock"
-                size="xs"
-                class="text-warning-600 shrink-0"
-              />
+              <OIcon v-if="!rbacAccess.allowed" name="lock" size="xs" class="lock-chip shrink-0" />
             </span>
           </template>
 
@@ -287,9 +283,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="service-accounts-list-delete-dialog"
       v-model="confirmDelete"
       :title="t('serviceAccounts.confirmDeleteHead')"
-      :message="t('serviceAccounts.confirmDeleteMsg', { identifier: deleteUserEmailIdentifier })"
+      message-keypath="serviceAccounts.confirmDeleteMsg"
+      :message-name="deleteUserEmailIdentifier"
       :ok-label="t('serviceAccounts.confirmDeleteBtn')"
-      ok-color="destructive"
+      ok-variant="destructive"
       @update:ok="deleteUser"
       @update:cancel="confirmDelete = false"
     />
@@ -300,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('serviceAccounts.confirmBulkDeleteHead')"
       :message="t('serviceAccounts.confirmBulkDeleteMsg', { count: selectedAccounts.length })"
       :ok-label="t('serviceAccounts.confirmBulkDeleteBtn', { count: selectedAccounts.length })"
-      ok-color="destructive"
+      ok-variant="destructive"
       @update:ok="bulkDeleteServiceAccounts"
       @update:cancel="confirmBulkDelete = false"
     />
@@ -487,7 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     rbacAccess.allowed
                       ? 'text-text-secondary group-hover:translate-x-0.5'
-                      : 'text-warning-600'
+                      : 'lock-chip'
                   "
                   class="shrink-0 transition-transform"
                 />
@@ -506,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     rbacAccess.allowed
                       ? 'text-text-secondary group-hover:translate-x-0.5'
-                      : 'text-warning-600'
+                      : 'lock-chip'
                   "
                   class="shrink-0 transition-transform"
                 />
@@ -555,7 +552,6 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
-import config from "@/aws-exports";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import AddServiceAccount from "./AddServiceAccount.vue";
@@ -586,6 +582,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { forbiddenState } from "@/utils/featureGate";
 export default defineComponent({
   name: "ServiceAccountsList",
   components: {
@@ -677,8 +674,9 @@ export default defineComponent({
     // OpenObserve authenticates API requests with HTTP Basic auth —
     // base64("<identifier>:<token>"), NOT a Bearer token. The service account's
     // email is the username and the token is the password.
+    // The host the UI's own API calls use; Cloud regions accept the account only there (e.g. us2.openobserve.ai).
     const tokenEndpoint = computed(() =>
-      config.isCloud === "true" ? "https://api.openobserve.ai" : window.location.origin,
+      new URL(store.state.API_ENDPOINT || "/", window.location.origin).href.replace(/\/$/, ""),
     );
 
     const tokenBasicCredential = computed(() =>
@@ -914,7 +912,7 @@ export default defineComponent({
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = serviceAccountsList.error.value;
-      return e?.status === 403 || e?.response?.status === 403;
+      return forbiddenState(e) || e?.status === 403;
     });
     // Bound to refresh / post-write reloads: always hits the server.
     const refreshServiceAccounts = () => {
@@ -1193,7 +1191,7 @@ export default defineComponent({
         confirmBulkDelete.value = false;
         await getServiceAccountsUsers(true);
       } catch (err: any) {
-        if (err.response?.status != 403 || err?.status != 403) {
+        if (err.response?.status !== 403 && err?.status !== 403) {
           toast({
             message:
               err?.response?.data?.message ||
@@ -1277,7 +1275,6 @@ export default defineComponent({
       t,
       router,
       store,
-      config,
       serviceAccountsState,
       columns,
       loading,

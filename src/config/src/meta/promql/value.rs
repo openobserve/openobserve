@@ -1014,8 +1014,6 @@ fn hash_labels(labels: &Labels, include: impl Fn(&str) -> bool) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use std::f64;
-
     use float_cmp::approx_eq;
 
     use super::*;

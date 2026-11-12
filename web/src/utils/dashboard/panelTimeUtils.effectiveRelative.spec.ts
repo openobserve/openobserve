@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { isEffectivePanelTimeRelative } from "./panelTimeUtils";
+import { isEffectivePanelTimeCalendar, isEffectivePanelTimeRelative } from "./panelTimeUtils";
 
 const RELATIVE = { valueType: "relative" };
 const ABSOLUTE = { valueType: "absolute" };
@@ -76,5 +76,24 @@ describe("isEffectivePanelTimeRelative", () => {
 
   it("is not relative before the global picker is set", () => {
     expect(isEffectivePanelTimeRelative(panel(), {}, null)).toBe(false);
+  });
+});
+
+describe("isEffectivePanelTimeCalendar", () => {
+  it("is true only for a relative calendar period, the panel's own range first", () => {
+    const month = { valueType: "relative", relativeTimePeriod: "calendar:month:0" };
+    const rolling = { valueType: "relative", relativeTimePeriod: "1h" };
+    const ownRolling = panel({
+      panel_time_enabled: true,
+      panel_time_range: { type: "relative", relativeTimePeriod: "1h" },
+    });
+
+    expect(isEffectivePanelTimeCalendar(panel(), {}, month)).toBe(true);
+    expect(isEffectivePanelTimeCalendar(panel(), {}, rolling)).toBe(false);
+    expect(isEffectivePanelTimeCalendar(panel(), {}, ABSOLUTE)).toBe(false);
+    expect(isEffectivePanelTimeCalendar(ownRolling, {}, month)).toBe(false);
+    expect(
+      isEffectivePanelTimeCalendar(panel(), { "pt-period.P1": "calendar:day:-1" }, rolling),
+    ).toBe(false);
   });
 });

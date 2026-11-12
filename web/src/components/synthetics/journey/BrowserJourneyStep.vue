@@ -317,6 +317,7 @@ function toggleExpanded() {
             {{ t("synthetics.journey.stackTraceLabel") }}
           </OButton>
           <OButton
+            :aria-label="t('common.copyToClipboard')"
             v-if="showStackTrace"
             variant="ghost"
             size="xs"

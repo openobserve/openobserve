@@ -547,6 +547,48 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(result).toBe("");
     });
 
+    it("reads a string state column with max, grouped by time and entity", () => {
+      const field = (alias: string, column: string, functionName: string | null) => ({
+        alias,
+        column,
+        isDerived: false,
+        functionName,
+        args: [{ type: "field", value: { field: column } }],
+      });
+      mockQueryData.fields.x = [field("x_axis_1", "_timestamp", null)];
+      mockQueryData.fields.breakdown = [field("breakdown_1", "port", null)];
+      mockQueryData.fields.y = [field("y_axis_1", "link_state", "max")];
+
+      const result = buildSQLChartQuery({
+        queryData: mockQueryData,
+        chartType: "state-timeline",
+        dashboardPanelData: mockDashboardPanelData,
+      });
+      expect(result).toContain('max(link_state) as "y_axis_1"');
+      expect(result).toContain("GROUP BY x_axis_1, breakdown_1");
+    });
+
+    it("drops a y HAVING filter on a distribution, whose raw rows are not grouped", () => {
+      mockQueryData.fields.y = [
+        {
+          alias: "y_axis_1",
+          column: "latency",
+          isDerived: false,
+          functionName: null,
+          args: [{ type: "field", value: { field: "latency" } }],
+          havingConditions: [{ operator: ">", value: 5 }],
+        },
+      ];
+
+      const result = buildSQLChartQuery({
+        queryData: mockQueryData,
+        chartType: "distribution",
+        dashboardPanelData: mockDashboardPanelData,
+      });
+      expect(result).toContain('latency as "y_axis_1"');
+      expect(result).not.toContain("HAVING");
+    });
+
     it("should build query with x-axis fields only", () => {
       mockQueryData.fields.x = [
         {
@@ -672,6 +714,151 @@ describe("dashboardAutoQueryBuilder", () => {
       };
       const result = buildSQLChartQuery(config);
       expect(result).toContain("GROUP BY x_alias, y_alias");
+    });
+
+    describe("heatmap numeric y bucketing", () => {
+      const yFieldOf = (field: string, extra: Record<string, unknown> = {}) => ({
+        alias: "y_axis_1",
+        isDerived: false,
+        functionName: null,
+        args: [{ type: "field", value: { field } }],
+        ...extra,
+      });
+      const heatmapQuery = (config: Record<string, unknown>, yField: any = yFieldOf("age")) => {
+        mockQueryData.fields.x = [
+          {
+            alias: "x_axis_1",
+            isDerived: false,
+            functionName: "histogram",
+            args: [{ type: "field", value: { field: "_timestamp" } }],
+          },
+        ];
+        mockQueryData.fields.y = [yField];
+        mockQueryData.fields.z = [
+          {
+            alias: "z_axis_1",
+            isDerived: false,
+            functionName: "count",
+            args: [{ type: "field", value: { field: "_timestamp" } }],
+          },
+        ];
+        mockDashboardPanelData.data.config = config;
+        return buildSQLChartQuery({
+          queryData: mockQueryData,
+          chartType: "heatmap",
+          dashboardPanelData: mockDashboardPanelData,
+        });
+      };
+
+      it("is unchanged when bucketing is unset", () => {
+        expect(heatmapQuery({})).toBe(
+          'SELECT histogram(_timestamp) as "x_axis_1", age as "y_axis_1", count(_timestamp) as "z_axis_1" FROM "logs"  GROUP BY x_axis_1, y_axis_1',
+        );
+      });
+
+      it("groups by the lower bound of a fixed-size bucket", () => {
+        expect(heatmapQuery({ heatmap_y_bucket: { mode: "size", size: 10 } })).toBe(
+          'SELECT histogram(_timestamp) as "x_axis_1", floor(CAST(age AS DOUBLE) / 10) * 10 as "y_axis_1", count(_timestamp) as "z_axis_1" FROM "logs"  GROUP BY x_axis_1, y_axis_1',
+        );
+      });
+
+      it("groups by the power of the log base, with <= 0 in one bucket", () => {
+        const sql = heatmapQuery({ heatmap_y_bucket: { mode: "log", base: 2 } });
+        expect(sql).toContain(
+          'CASE WHEN age > 0 THEN pow(2, floor(log2(CAST(age AS DOUBLE)))) WHEN age <= 0 THEN 0 END as "y_axis_1"',
+        );
+        expect(sql).toContain("GROUP BY x_axis_1, y_axis_1");
+      });
+
+      it("references the y column through the stream alias when joins exist", () => {
+        mockQueryData.joins = [
+          { stream: "other", streamAlias: "b", joinType: "inner", conditions: [] },
+        ];
+        const sql = heatmapQuery({
+          heatmap_y_bucket: { mode: "size", size: 5 },
+          heatmap_y_min: 1,
+        });
+        expect(sql).toContain('floor(CAST(logs.age AS DOUBLE) / 5) * 5 as "y_axis_1"');
+        expect(sql).toContain("WHERE logs.age >= 1");
+      });
+
+      it("adds the y range to the WHERE clause, keeping the user's OR group intact", () => {
+        mockQueryData.fields.filter.conditions = [
+          {
+            type: "condition",
+            column: { field: "status" },
+            operator: "=",
+            value: "a",
+            logicalOperator: "AND",
+          },
+          {
+            type: "condition",
+            column: { field: "status" },
+            operator: "=",
+            value: "b",
+            logicalOperator: "OR",
+          },
+        ];
+        const sql = heatmapQuery({
+          heatmap_y_bucket: { mode: "size", size: 10 },
+          heatmap_y_min: -5,
+          heatmap_y_max: 500,
+        });
+        expect(sql).toContain(
+          "WHERE (status = 'a' OR status = 'b') AND age >= -5 AND age <= 500 GROUP BY",
+        );
+      });
+
+      it("adds a WHERE for the y range when there are no filters", () => {
+        expect(heatmapQuery({ heatmap_y_bucket: { mode: "log" }, heatmap_y_max: 1000 })).toContain(
+          'FROM "logs"  WHERE age <= 1000 GROUP BY',
+        );
+      });
+
+      it("ignores an inverted y range", () => {
+        const sql = heatmapQuery({
+          heatmap_y_bucket: { mode: "size", size: 10 },
+          heatmap_y_min: 50,
+          heatmap_y_max: 10,
+        });
+        expect(sql).not.toContain("WHERE");
+        expect(sql).toContain("floor(CAST(age AS DOUBLE) / 10) * 10");
+      });
+
+      it.each([0, -1, null, "abc"])("generates no query for bucket size %s", (size) => {
+        expect(heatmapQuery({ heatmap_y_bucket: { mode: "size", size } })).toBe("");
+      });
+
+      it("generates no query when the known range exceeds the cell budget", () => {
+        expect(
+          heatmapQuery({
+            heatmap_y_bucket: { mode: "size", size: 0.001 },
+            heatmap_y_min: 0,
+            heatmap_y_max: 1000,
+          }),
+        ).toBe("");
+      });
+
+      it("leaves a non-numeric or aggregated y as it is", () => {
+        const config = { heatmap_y_bucket: { mode: "size", size: 10 }, heatmap_y_min: 1 };
+        expect(heatmapQuery(config, yFieldOf("status"))).toContain('status as "y_axis_1"');
+        expect(heatmapQuery(config, yFieldOf("status"))).not.toContain("WHERE");
+        expect(heatmapQuery(config, yFieldOf("age", { functionName: "max" }))).toContain(
+          'max(age) as "y_axis_1"',
+        );
+      });
+
+      it("does not bucket other chart types", () => {
+        mockQueryData.fields.x = [yFieldOf("status", { alias: "x_axis_1" })];
+        mockQueryData.fields.y = [yFieldOf("age")];
+        mockDashboardPanelData.data.config = { heatmap_y_bucket: { mode: "size", size: 10 } };
+        const sql = buildSQLChartQuery({
+          queryData: mockQueryData,
+          chartType: "bar",
+          dashboardPanelData: mockDashboardPanelData,
+        });
+        expect(sql).toContain('age as "y_axis_1"');
+      });
     });
 
     it("should build query with breakdown fields", () => {
@@ -1219,6 +1406,41 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(result).toContain("AND");
       expect(result).toContain("age < 50");
     });
+
+    it("keeps each WHERE connector on its own row when a blank condition is skipped", () => {
+      mockQueryData.fields.x = [
+        {
+          alias: "x_alias",
+          isDerived: false,
+          functionName: null,
+          args: [{ type: "field", value: { field: "status" } }],
+        },
+      ];
+      const leaf = (field: string, value: string, logicalOperator: string) => ({
+        type: "condition",
+        filterType: "condition",
+        operator: "=",
+        column: { field },
+        value,
+        values: [],
+        logicalOperator,
+      });
+      mockQueryData.fields.filter = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          leaf("status", "a", "AND"),
+          { ...leaf("count", "", "AND"), type: "list", operator: null },
+          leaf("age", "5", "OR"),
+        ],
+      };
+      const result = buildSQLChartQuery({
+        queryData: mockQueryData,
+        chartType: "bar",
+        dashboardPanelData: mockDashboardPanelData,
+      });
+      expect(result).toContain("WHERE status = 'a' OR age = 5 ");
+    });
   });
 
   describe("addMissingArgs", () => {
@@ -1748,6 +1970,65 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(result).toBe("count > 100");
     });
 
+    it.each([
+      ["1); DROP TABLE logs; --", "count IN (1, 1); DROP TABLE logs; --)"],
+      ["1 OR 1=1", "count IN (1, 1 OR 1=1)"],
+      ["2' OR '1'='1", "count IN (1, 2'' OR ''1''=''1)"],
+    ])("emits list value %s raw on a numeric column as main does", (payload, expected) => {
+      const condition = { type: "list", column: { field: "count" }, values: ["1", payload] };
+      expect(buildCondition(condition, mockDashboardPanelData)).toBe(expected);
+    });
+
+    it.each([
+      ["-1.5e3", "count IN (-1.5e3)"],
+      ["$count", "count IN ($count)"],
+      ["${count:csv}", "count IN (${count:csv})"],
+      ["true", "count IN (true)"],
+    ])("keeps %s bare on a numeric column", (value, expected) => {
+      const condition = { type: "list", column: { field: "count" }, values: [value] };
+      expect(buildCondition(condition, mockDashboardPanelData)).toBe(expected);
+    });
+
+    it.each([
+      ["=", "now()", "count = now()"],
+      [">", "now()", "count > now()"],
+      [">", "$var*1000", "count > $var*1000"],
+      ["=", "(${var})", "count = (${var})"],
+      ["Contains", "(${var})", "str_match(count, (${var}))"],
+      [">", "5 ", "count > 5 "],
+      ["=", "CAST(x AS INT)", "count = CAST(x AS INT)"],
+      ["=", "100", "count = 100"],
+      ["=", "-1.5e3", "count = -1.5e3"],
+      ["=", "true", "count = true"],
+      ["=", "$count", "count = $count"],
+      ["=", "${count:csv}", "count = ${count:csv}"],
+      ["=", "{{count}}", "count = {{count}}"],
+      ["=", "$or", "count = $or"],
+      ["=", "'abc'", "count = abc"],
+      ["=", "abc", "count = abc"],
+      ["=", "(1 OR 2)", "count = (1 OR 2)"],
+      ["<=", "$a + $b", "count <= $a + $b"],
+    ])("keeps main's raw SQL for %s %s on a numeric column", (operator, value, expected) => {
+      const condition = { type: "condition", operator, column: { field: "count" }, value };
+      expect(buildCondition(condition, mockDashboardPanelData)).toBe(expected);
+    });
+
+    it.each([
+      ["1 OR 1=1", "count = 1 OR 1=1"],
+      ["200 or status=404", "count = 200 or status=404"],
+      ["x BETWEEN 1 AND 5", "count = x BETWEEN 1 AND 5"],
+      ["abc'", "count = abc''"],
+      ["$x--", "count = $x--"],
+    ])("emits %s raw on a numeric column as main does", (value, expected) => {
+      const condition = { type: "condition", operator: "=", column: { field: "count" }, value };
+      expect(buildCondition(condition, mockDashboardPanelData)).toBe(expected);
+    });
+
+    it("emits number-typed list values instead of throwing", () => {
+      const condition = { type: "list", column: { field: "count" }, values: ["1", 2] };
+      expect(buildCondition(condition, mockDashboardPanelData)).toBe("count IN (1, 2)");
+    });
+
     it("should escape single quotes in value", () => {
       const condition = {
         type: "condition",
@@ -1894,6 +2175,73 @@ describe("dashboardAutoQueryBuilder", () => {
       );
       expect(result).toContain("status = 'active'");
     });
+
+    const leaf = (
+      field: string,
+      operator: string | null,
+      value: unknown,
+      logicalOperator = "AND",
+    ) => ({
+      type: "condition",
+      filterType: "condition",
+      column: { field },
+      operator,
+      value,
+      values: [],
+      logicalOperator,
+    });
+
+    it("builds Is Empty and Is Not Empty as null-or-blank checks", () => {
+      expect(buildCondition(leaf("status", "Is Empty", ""), mockDashboardPanelData)).toBe(
+        "(status IS NULL OR status = '')",
+      );
+      expect(buildCondition(leaf("status", "Is Not Empty", ""), mockDashboardPanelData)).toBe(
+        "(status IS NOT NULL AND status != '')",
+      );
+    });
+
+    it("prefixes Is Empty with the stream alias when the query has joins", () => {
+      mockDashboardPanelData.data.queries[0].joins = [{ stream: "other", streamAlias: "b" }];
+      const condition = {
+        ...leaf("status", "Is Empty", ""),
+        column: { field: "status", streamAlias: "b" },
+      };
+      expect(buildCondition(condition, mockDashboardPanelData)).toBe(
+        "(b.status IS NULL OR b.status = '')",
+      );
+    });
+
+    it("a blank row in a saved group goes with its own connector", () => {
+      const group = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          leaf("status", "=", "a"),
+          leaf("count", "=", "", "OR"),
+          leaf("status", "=", "b", "AND"),
+        ],
+      };
+      expect(buildCondition(group, mockDashboardPanelData)).toBe("(status = 'a' AND status = 'b')");
+    });
+
+    it("builds a group without blanks exactly as before", () => {
+      const group = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          leaf("status", "=", "a"),
+          leaf("count", ">", "1", "OR"),
+          {
+            filterType: "group",
+            logicalOperator: "AND",
+            conditions: [leaf("status", "<>", "c"), leaf("count", "<", "9", "AND")],
+          },
+        ],
+      };
+      expect(buildCondition(group, mockDashboardPanelData)).toBe(
+        "(status = 'a' OR count > 1 AND (status <> 'c' AND count < 9))",
+      );
+    });
   });
 
   describe("mapChart", () => {
@@ -1994,6 +2342,81 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(result).toContain("SELECT");
       expect(result).toContain("country");
       expect(result).toContain("name_alias");
+    });
+
+    describe("WHERE clause with skipped conditions (issue 16022)", () => {
+      const cond = (operator: string, value: any, extra: any = {}) => ({
+        type: "condition",
+        values: [],
+        column: { field: "country", streamAlias: null },
+        operator,
+        value,
+        logicalOperator: "AND",
+        filterType: "condition",
+        ...extra,
+      });
+      const setConditions = (conditions: any[]) => {
+        mockDashboardPanelData.data.queries[0].fields.filter.conditions = conditions;
+      };
+
+      it("keeps a <> '' parsed from SQL and leaves no trailing AND", () => {
+        setConditions([cond("Is Not Null", null), cond("<>", "", { emptyLiteral: true })]);
+        expect(mapChart(mockDashboardPanelData)).toContain(
+          "WHERE country IS NOT NULL AND country <> '' GROUP BY",
+        );
+      });
+
+      it("keeps a lone <> '' parsed from SQL", () => {
+        setConditions([cond("<>", "", { emptyLiteral: true })]);
+        expect(mapChart(mockDashboardPanelData)).toContain("WHERE country <> '' GROUP BY");
+      });
+
+      it("keeps = '' parsed from SQL on a non-string column", () => {
+        setConditions([
+          { ...cond("=", "", { emptyLiteral: true }), column: { field: "id", streamAlias: null } },
+        ]);
+        expect(mapChart(mockDashboardPanelData)).toContain("WHERE id = '' GROUP BY");
+      });
+
+      it("skips an empty value not entered yet without a trailing AND", () => {
+        setConditions([cond("Is Not Null", null), cond("=", "")]);
+        const result = mapChart(mockDashboardPanelData);
+        expect(result).toContain("WHERE country IS NOT NULL GROUP BY");
+        expect(result).not.toMatch(/AND\s+GROUP BY/);
+      });
+
+      it("drops the WHERE clause when every condition is empty", () => {
+        setConditions([cond("=", "")]);
+        expect(mapChart(mockDashboardPanelData)).not.toContain("WHERE");
+      });
+
+      it("keeps each condition's own operator when a middle one is skipped", () => {
+        setConditions([
+          cond("=", "a"),
+          cond("=", ""),
+          { ...cond("=", "b"), logicalOperator: "OR" },
+        ]);
+        expect(mapChart(mockDashboardPanelData)).toContain(
+          "WHERE country = 'a' OR country = 'b' GROUP BY",
+        );
+      });
+
+      it("keeps each condition's own operator inside a group", () => {
+        setConditions([
+          {
+            filterType: "group",
+            logicalOperator: "AND",
+            conditions: [
+              cond("=", "a"),
+              { ...cond("=", ""), logicalOperator: "AND" },
+              { ...cond("=", "b"), logicalOperator: "OR" },
+            ],
+          },
+        ]);
+        expect(mapChart(mockDashboardPanelData)).toContain(
+          "WHERE (country = 'a' OR country = 'b') GROUP BY",
+        );
+      });
     });
   });
 

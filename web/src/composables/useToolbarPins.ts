@@ -49,7 +49,7 @@ const SCOPES: Record<ToolbarPinScope, ToolbarPinScopeConfig> = {
   traces: {
     storageKey: "traces_toolbar_pinned_items",
     keys: ["histogram", "savedViews"],
-    defaultPins: { savedViews: "traces_toolbar_saved_views_pin_decided" },
+    defaultPins: {},
   },
 };
 

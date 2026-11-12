@@ -307,7 +307,7 @@ impl Engine {
                     .eval_ctx
                     .timestamps()
                     .into_iter()
-                    // Prometheus truncates toward zero (`enh.Ts/1000`): a step at -0.5 s reads as second 0
+                    // Prometheus truncates toward zero (`enh.Ts/1000`): a -0.5 s step reads as 0
                     .map(|ts| Sample::new(ts, (ts / 1_000_000) as f64))
                     .collect(),
                 exemplars: None,

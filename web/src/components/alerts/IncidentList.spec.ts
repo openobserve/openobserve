@@ -24,6 +24,9 @@ vi.mock("@/services/incidents", async (importOriginal) => {
     default: {
       list: vi.fn(),
       updateStatus: vi.fn(),
+      acknowledge: vi.fn(),
+      unacknowledge: vi.fn(),
+      triggerRca: vi.fn(),
     },
   });
 });
@@ -41,6 +44,7 @@ vi.mock("@/utils/date", () => ({
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
 }));
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // acknowledgeIncident awaits a confirm dialog that only resolves via user
 // interaction with a rendered provider — unmocked, the call hangs until timeout.
@@ -63,6 +67,7 @@ import IncidentList from "./IncidentList.vue";
 import incidentsService from "@/services/incidents";
 import downtimesService from "@/services/downtimes";
 import { queryClient } from "@/composables/query/queryClient";
+import { oncallKeys } from "@/services/oncall.querykeys";
 import type { Incident } from "@/services/incidents";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -76,6 +81,9 @@ const OTableStub = {
     data: { default: () => [] },
     columns: { default: () => [] },
     loading: { default: false },
+    tableId: { default: undefined },
+    persistColumns: { default: false },
+    keepPageOnDataChange: { type: Boolean, default: false },
   },
   emits: ["row-click"],
   template: `
@@ -86,9 +94,11 @@ const OTableStub = {
       <template v-for="row in data" :key="row.id">
         <div :data-test="'row-' + row.id" @click="$emit('row-click', row)">
           <slot name="cell-status" :row="row" />
+          <slot name="cell-ai_analysis" :row="row" />
           <slot name="cell-severity" :row="row" />
           <slot name="cell-title" :row="row" />
           <slot name="cell-dimensions" :row="row" />
+          <div data-test="cell-alert_count"><slot name="cell-alert_count" :row="row" /></div>
           <slot name="cell-actions" :row="row" />
         </div>
       </template>
@@ -109,7 +119,7 @@ const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
   created_at: 1700000000000000,
   updated_at: 1700000000000000,
   related_incidents: [],
-  rca_summary: null,
+  rca: null,
   ...overrides,
 });
 
@@ -124,7 +134,7 @@ function createWrapper() {
         NoData: { template: '<div data-test="no-data-stub" />' },
         OEmptyState: { template: '<div data-test="no-data-stub" />' },
         OButton: {
-          template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
+          template: '<button v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></button>',
           emits: ["click"],
         },
         OIcon: { template: "<span />" },
@@ -135,7 +145,7 @@ function createWrapper() {
           template:
             '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
         },
-        OTooltip: { template: "<span />" },
+        OTooltip: { template: '<span data-test="o-tooltip"><slot name="content" /></span>' },
       },
     },
   });
@@ -182,6 +192,8 @@ describe("IncidentList.vue", () => {
     });
 
     (incidentsService.updateStatus as any).mockResolvedValue({});
+    (incidentsService.acknowledge as any).mockResolvedValue({});
+    (incidentsService.unacknowledge as any).mockResolvedValue({});
   });
 
   afterEach(() => {
@@ -299,6 +311,18 @@ describe("IncidentList.vue", () => {
       await (wrapper.vm as any).refreshIncidents();
       await flushPromises();
       expect(incidentsService.list).toHaveBeenCalled();
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    });
+
+    it("does not report success when the refresh fails", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      vi.clearAllMocks();
+      (incidentsService.list as any).mockRejectedValue({ response: { status: 403 } });
+      await (wrapper.vm as any).refreshIncidents();
+      await flushPromises();
+      expect(incidentsService.list).toHaveBeenCalled();
+      expect(toast).not.toHaveBeenCalled();
     });
   });
 
@@ -425,15 +449,62 @@ describe("IncidentList.vue", () => {
       await flushPromises();
     });
 
-    it("acknowledgeIncident calls updateStatus with acknowledged", async () => {
+    it("acknowledgeIncident goes through the one-ack route", async () => {
+      const invalidate = vi.spyOn(queryClient, "invalidateQueries");
       const incident = (wrapper.vm as any).allIncidents[0];
       await (wrapper.vm as any).acknowledgeIncident(incident);
       await flushPromises();
-      expect(incidentsService.updateStatus).toHaveBeenCalledWith(
-        "default",
-        incident.id,
-        "acknowledged",
-      );
+      expect(incidentsService.acknowledge).toHaveBeenCalledWith("default", incident.id);
+      expect(incidentsService.updateStatus).not.toHaveBeenCalled();
+      // The one ack also wrote the alert rows and the pages, so their reads drop too.
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: oncallKeys.responsesAll("default") });
+      invalidate.mockRestore();
+    });
+
+    it("toasts the incident and the teams its acknowledge stopped paging", async () => {
+      (incidentsService.acknowledge as any).mockResolvedValue({
+        data: {},
+        ack: {
+          changed: true,
+          acks: [],
+          oncall: {
+            acknowledged: ["p1"],
+            still_paging: [],
+            stopped: [{ response_id: "p1", team: "Payments" }],
+          },
+          other_groups_unacked: 0,
+        },
+      });
+      const incident = (wrapper.vm as any).allIncidents[0];
+      await (wrapper.vm as any).acknowledgeIncident(incident);
+      await flushPromises();
+      expect(vi.mocked(toast).mock.calls.at(-1)?.[0]).toMatchObject({
+        variant: "success",
+        message: `Acknowledged incident ${incident.title} · paging stopped for Payments`,
+      });
+    });
+
+    it("shows who can act when the acknowledge is refused", async () => {
+      (incidentsService.acknowledge as any).mockRejectedValue({
+        response: {
+          status: 403,
+          data: {
+            code: "ack_refused",
+            message: "m",
+            rule: "role",
+            on_call: [{ email: "bo@acme.io", team: "sre" }],
+            can_act: [],
+          },
+        },
+      });
+      const incident = (wrapper.vm as any).allIncidents[0];
+      await (wrapper.vm as any).acknowledgeIncident(incident);
+      await flushPromises();
+      expect(vi.mocked(toast).mock.calls.at(-1)?.[0]).toMatchObject({
+        variant: "error",
+        title: "You can't acknowledge this.",
+        message: "On call: bo@acme.io",
+      });
     });
 
     it("resolveIncident calls updateStatus with resolved", async () => {
@@ -452,6 +523,22 @@ describe("IncidentList.vue", () => {
       await (wrapper.vm as any).reopenIncident(incident);
       await flushPromises();
       expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", incident.id, "open");
+    });
+
+    it.each([
+      ["resolveIncident", "Resolve incident?"],
+      ["reopenIncident", "Reopen incident?"],
+    ] as const)("%s asks first and changes nothing when cancelled", async (action, title) => {
+      // The instance exposes setup() bindings that the mounted type does not declare.
+      const vm = wrapper.vm as unknown as Record<
+        typeof action,
+        (incident: Incident) => Promise<void>
+      > & { allIncidents: Incident[] };
+      mockConfirm.mockResolvedValueOnce(false);
+      await vm[action](vm.allIncidents[0]);
+      await flushPromises();
+      expect(mockConfirm).toHaveBeenLastCalledWith(expect.objectContaining({ title }));
+      expect(incidentsService.updateStatus).not.toHaveBeenCalled();
     });
 
     it("reloads incidents after successful status update", async () => {
@@ -758,6 +845,267 @@ describe("IncidentList.vue", () => {
       const saved: any = useListViewState("incidents", {});
       expect(saved.severityFilter).toBe("P1");
       expect(saved.pageSize).toBe(100);
+    });
+  });
+
+  // ── AI analysis column ─────────────────────────────
+
+  describe("AI analysis column", () => {
+    const liveRca = (): Incident["rca"] => ({
+      run_id: "run-1",
+      state: "running",
+      stale: false,
+      started_at: 1700000000000000,
+      updated_at: 1700000000000000,
+      outcome: null,
+      confidence: null,
+      report_format: "v2",
+      summary: {
+        stage: null,
+        stage_index: null,
+        stage_count: 0,
+        steps: 0,
+        tool_calls: 0,
+        steered_by: [],
+        unblocked_by: null,
+        detail: null,
+        deadline_at: null,
+        previous: null,
+      },
+    });
+    const listMock = vi.mocked(incidentsService.list);
+    const triggerRcaMock = vi.mocked(incidentsService.triggerRca);
+    let zoConfig: typeof store.state.zoConfig;
+
+    beforeEach(() => {
+      zoConfig = store.state.zoConfig;
+      store.state.zoConfig = { ...zoConfig, incidents_rca_enabled: true };
+    });
+
+    afterEach(() => {
+      store.state.zoConfig = zoConfig;
+      vi.useRealTimers();
+    });
+
+    it("RR-32: ai_analysis is column 4 (after title, severity, status), hideable, not sortable, persisted", () => {
+      wrapper = createWrapper();
+      const table = wrapper.findComponent({ name: "OTable" });
+      const columns = table.props("columns") as {
+        id: string;
+        hideable?: boolean;
+        sortable?: boolean;
+      }[];
+
+      expect(columns.slice(0, 4).map((c) => c.id)).toEqual([
+        "title",
+        "severity",
+        "status",
+        "ai_analysis",
+      ]);
+      const column = columns[3];
+      expect(column.hideable).toBe(true);
+      expect(column.sortable).toBeFalsy();
+      expect(table.props("persistColumns")).toBe(true);
+      expect(table.props("tableId")).toBe("alerts-incident-list");
+    });
+
+    it("RR-33: Analyze sends one POST with reanalysis=true, skips the row click and refetches", async () => {
+      listMock.mockResolvedValue({
+        data: { incidents: [createIncident({ id: "1" })], total: 1 },
+      });
+      triggerRcaMock.mockResolvedValue({
+        data: { message: "started", run_id: "run-1" },
+      });
+      const pushSpy = vi.spyOn(router, "push");
+      wrapper = createWrapper();
+      await flushPromises();
+      const listCalls = listMock.mock.calls.length;
+
+      await wrapper.find('[data-test="incident-ai-analysis-analyze-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(incidentsService.triggerRca).toHaveBeenCalledTimes(1);
+      expect(incidentsService.triggerRca).toHaveBeenCalledWith(
+        "default",
+        "1",
+        {},
+        { signal: undefined },
+      );
+      expect(pushSpy).not.toHaveBeenCalled();
+      expect(listMock.mock.calls.length).toBe(listCalls + 1);
+    });
+
+    it("opens the incident on the Analysis tab from the cell, not via the row click", async () => {
+      listMock.mockResolvedValue({
+        data: { incidents: [createIncident({ id: "1", rca: liveRca() })], total: 1 },
+      });
+      // No call-through: a real navigation lazy-loads the app's route pages, which took over 5 s on a loaded runner.
+      const pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
+      wrapper = createWrapper();
+      await flushPromises();
+
+      await wrapper.find('[data-test="incident-ai-analysis-label"]').trigger("click");
+      await flushPromises();
+
+      expect(pushSpy).toHaveBeenCalledTimes(1);
+      expect(pushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "incidentDetail",
+          params: { id: "1" },
+          query: expect.objectContaining({ tab: "incidentAnalysis" }),
+        }),
+      );
+      pushSpy.mockRestore();
+    });
+
+    it("RR-34: one live row on the current page refetches after 30 s", async () => {
+      vi.useFakeTimers();
+      listMock.mockResolvedValue({
+        data: {
+          incidents: [createIncident({ id: "1", rca: liveRca() }), createIncident({ id: "2" })],
+          total: 2,
+        },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+      const listCalls = listMock.mock.calls.length;
+
+      await vi.advanceTimersByTimeAsync(30_000);
+      await flushPromises();
+
+      expect(listMock.mock.calls.length).toBe(listCalls + 1);
+    });
+
+    it("RR-34: no live row → no refetch after 30 s", async () => {
+      vi.useFakeTimers();
+      wrapper = createWrapper();
+      await flushPromises();
+      const listCalls = listMock.mock.calls.length;
+
+      await vi.advanceTimersByTimeAsync(30_000);
+      await flushPromises();
+
+      expect(listMock.mock.calls.length).toBe(listCalls);
+    });
+
+    it("RR-34: a poll refetch on page 2 keeps page 2", async () => {
+      vi.useFakeTimers();
+      // 25 rows at page size 20: the live row (index 22) is on page 2.
+      const incidents = Array.from({ length: 25 }, (_, i) =>
+        createIncident({ id: `inc-${i}`, rca: i === 22 ? liveRca() : null }),
+      );
+      listMock.mockResolvedValue({ data: { incidents, total: 25 } });
+      wrapper = createWrapper();
+      await flushPromises();
+      const restorePage = vi.fn();
+      wrapper.vm.qTableRef.restorePage = restorePage;
+      wrapper.vm.onPageChange(2);
+      await flushPromises();
+      const listCalls = listMock.mock.calls.length;
+
+      await vi.advanceTimersByTimeAsync(30_000);
+      await flushPromises();
+
+      expect(listMock.mock.calls.length).toBe(listCalls + 1);
+      expect(wrapper.vm.currentPage).toBe(2);
+      expect(restorePage).not.toHaveBeenCalledWith(1);
+      expect(wrapper.findComponent({ name: "OTable" }).props("keepPageOnDataChange")).toBe(true);
+    });
+
+    it("a filter change starts over on page 1", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.onPageChange(2);
+      await flushPromises();
+
+      wrapper.vm.severityFilter = "P2";
+      await flushPromises();
+
+      expect(wrapper.vm.currentPage).toBe(1);
+    });
+
+    it("a sort change starts over on page 1", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.onPageChange(2);
+      await flushPromises();
+
+      wrapper.vm.sortBy = "last_alert_at";
+      await flushPromises();
+
+      expect(wrapper.vm.currentPage).toBe(1);
+    });
+  });
+
+  describe("Alerts cell", () => {
+    const mountWith = async (incident: Incident) => {
+      (incidentsService.list as any).mockResolvedValue({
+        data: { incidents: [incident], total: 1 },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+      return wrapper.find('[data-test="cell-alert_count"]');
+    };
+
+    it("renders one name ×count chip per alert group, in API order", async () => {
+      const cell = await mountWith(
+        createIncident({
+          alert_groups: [
+            { alert_id: "a", alert_name: "demo-alert-a", count: 3 },
+            { alert_id: "b", alert_name: "demo-alert-b", count: 1 },
+          ],
+        }),
+      );
+      const chips = cell.findAll('[data-test="incident-alert-group-chip"]');
+      expect(chips.map((c) => c.text().replace(/\s+/g, " "))).toEqual([
+        "demo-alert-a ×3",
+        "demo-alert-b ×1",
+      ]);
+      expect(cell.find('[data-test="incident-alert-group-more"]').exists()).toBe(false);
+    });
+
+    it("shows the top two alerts as chips and the rest in the +N more tooltip", async () => {
+      const cell = await mountWith(
+        createIncident({
+          alert_groups: ["a", "b", "c", "d", "e", "f", "g"].map((id, i) => ({
+            alert_id: id,
+            alert_name: `alert-${id}`,
+            count: 7 - i,
+          })),
+        }),
+      );
+      const chips = cell.findAll('[data-test="incident-alert-group-chip"]');
+      expect(chips.map((c) => c.text().replace(/\s+/g, " "))).toEqual(["alert-a ×7", "alert-b ×6"]);
+      const more = cell.find('[data-test="incident-alert-group-more"]');
+      expect(more.text()).toMatch(/^\+5 more/);
+      const rows = more
+        .find('[data-test="incident-alert-group-list"]')
+        .findAll("span")
+        .map((s) => s.text());
+      expect(rows).toEqual([
+        "alert-c",
+        "×5",
+        "alert-d",
+        "×4",
+        "alert-e",
+        "×3",
+        "alert-f",
+        "×2",
+        "alert-g",
+        "×1",
+      ]);
+    });
+
+    it("falls back to the alert count chip without alert groups", async () => {
+      const cell = await mountWith(createIncident({ alert_count: 7 }));
+      expect(cell.find('[data-test="incident-alert-group-chip"]').exists()).toBe(false);
+      expect(cell.text()).toBe("7");
+    });
+
+    it("shows the count chip for an incident with no linked alerts", async () => {
+      const cell = await mountWith(createIncident({ alert_groups: [], alert_count: 0 }));
+      expect(cell.find('[data-test="incident-alert-group-chip"]').exists()).toBe(false);
+      expect(cell.text()).toBe("0");
     });
   });
 });

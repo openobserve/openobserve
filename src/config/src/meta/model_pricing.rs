@@ -84,8 +84,69 @@ impl From<&str> for PricingSource {
     }
 }
 
-/// A user-defined model pricing definition that maps model names (via regex) to pricing tiers.
-/// These definitions take priority over the built-in pricing in `pricing.rs`.
+/// How a pricing pattern matched a model name.
+///
+/// Ordered so that `Exact > Approximate`: when several patterns of the same source match, an exact
+/// match wins.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+#[schema(as = PricingMatchKind)]
+pub enum MatchKind {
+    /// The pattern matched only part of the model name: the name continues before or after
+    /// the match (e.g. `gpt-5\.4` matching `gpt-5.4-mini`). The span is still priced, but the
+    /// price may belong to a different model.
+    Approximate,
+    /// The pattern matched the whole model name.
+    Exact,
+}
+
+impl MatchKind {
+    /// Match `pattern` against `model_name`; `None` when it does not match at all.
+    ///
+    /// Exactness is judged from the span `find` reports, i.e. with leftmost-first semantics: an
+    /// alternation whose earlier branch is a prefix of a later one (`gpt-4|gpt-4o` on `gpt-4o`)
+    /// reports the shorter match and so counts as approximate. Anchor such patterns with `$`.
+    pub fn of(pattern: &regex::Regex, model_name: &str) -> Option<Self> {
+        pattern.find(model_name).map(|m| {
+            if m.start() == 0 && m.end() == model_name.len() {
+                MatchKind::Exact
+            } else {
+                MatchKind::Approximate
+            }
+        })
+    }
+}
+
+/// Stream column that marks how ingest priced an LLM span. Exact non-zero prices and
+/// client-reported costs leave it unset, so streams written before it existed have no such
+/// column.
+pub const COST_STATUS_COLUMN: &str = "gen_ai_usage_cost_status";
+
+/// How ingest priced an LLM span whose cost is not an exact non-zero price; stored in
+/// [`COST_STATUS_COLUMN`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CostStatus {
+    /// No pricing definition matched the model: the span keeps its tokens and has no cost.
+    Unpriced,
+    /// A pattern matched only part of the model name; the cost uses that pattern's prices.
+    Approximate,
+    /// The model matched a price exactly and the span costs nothing (a free or muted model).
+    /// The zero cost is a real price, unlike the zero legacy spans stored for no price.
+    Free,
+}
+
+impl CostStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CostStatus::Unpriced => "unpriced",
+            CostStatus::Approximate => "approximate",
+            CostStatus::Free => "free",
+        }
+    }
+}
+
+/// A model pricing definition that maps model names (via regex) to pricing tiers.
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 #[serde(default)]
 pub struct ModelPricingDefinition {
@@ -138,6 +199,8 @@ pub struct ModelPricingDefinition {
     /// Definitions shadowed by this one (same match_pattern, lower source/sort priority).
     /// Only populated in list responses — not stored in the database.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    // Self-referential: a typed field would recurse forever in utoipa's schema walk.
+    #[schema(value_type = Vec<Object>)]
     pub children: Vec<ModelPricingDefinition>,
     #[serde(skip)]
     #[schema(ignore)]

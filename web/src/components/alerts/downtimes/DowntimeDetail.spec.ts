@@ -21,8 +21,10 @@ import DowntimeDetail from "./DowntimeDetail.vue";
 import downtimes from "@/services/downtimes";
 import type { DowntimeDetail as DowntimeDetailData } from "@/services/downtimes";
 import alerts from "@/services/alerts";
+import common from "@/services/common";
 import { queryClient } from "@/composables/query/queryClient";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 
 vi.mock("@/services/downtimes", () => ({
   default: {
@@ -158,6 +160,26 @@ describe("DowntimeDetail", () => {
     wrapper.unmount();
   });
 
+  it("keys the suppressed table on the downtime so a switch shows the skeleton, not the last one's rows", async () => {
+    vi.mocked(downtimes.get).mockResolvedValue({ data: detail } as never);
+    const { wrapper, router } = await mountDetail();
+    await wrapper.get('[data-test="downtime-detail-tab-suppressed"]').trigger("mousedown", {
+      button: 0,
+    });
+    await flushPromises();
+    const table = () => wrapper.findComponent(OTable);
+    expect(table().props("loadingResetKey")).toBe("dt-1");
+
+    await router.push({
+      name: "downtimeDetail",
+      params: { id: "dt-2" },
+      query: { org_identifier: "default", folder: "default" },
+    });
+    await flushPromises();
+    expect(table().props("loadingResetKey")).toBe("dt-2");
+    wrapper.unmount();
+  });
+
   it("shows suppressed times in the app's zone, the zone every downtime view uses", async () => {
     store.state.timezone = "Pacific/Chatham";
     vi.mocked(downtimes.get).mockResolvedValue({ data: detail } as never);
@@ -233,6 +255,22 @@ describe("DowntimeDetail", () => {
     expect(downtimes.get).toHaveBeenCalledTimes(1);
     await vi.waitFor(() => expect(downtimes.get).toHaveBeenCalledTimes(2), { timeout: 5_000 });
     wrapper.unmount();
+  });
+
+  it("reads no synthetics folders while synthetics is license-locked", async () => {
+    vi.mocked(downtimes.get).mockResolvedValue({ data: detail } as never);
+    vi.mocked(common.list_Folders).mockClear();
+    store.state.zoConfig.features = { synthetics: "locked" };
+    try {
+      const { wrapper } = await mountDetail();
+      await flushPromises();
+      const types = vi.mocked(common.list_Folders).mock.calls.map((call) => call[1]);
+      expect(types).toContain("alerts");
+      expect(types).not.toContain("synthetics");
+      wrapper.unmount();
+    } finally {
+      delete store.state.zoConfig.features;
+    }
   });
 
   it("shows a not-found state on a 404", async () => {

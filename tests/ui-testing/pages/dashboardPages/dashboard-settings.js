@@ -2,13 +2,12 @@
 // This class contains methods to interact with the dashboard settings page in OpenObserve.
 // This includes changing the dashboard name, adding tabs, managing variables, and more.
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
-const { getTabSelector } = require('./dashboard-selectors.js');
+const { getTabSelector, SELECTORS, clickDashboardMenuItem } = require('./dashboard-selectors.js');
 const { selectStreamFromDropdown, selectFieldFromDropdown } = require('./dashboard-stream-field-utils.js');
 
 export default class DashboardSetting {
   constructor(page) {
     this.page = page;
-    this.setting = page.locator('[data-test="dashboard-setting-btn"]');
     this.addVariableBtn = page.locator(
       '[data-test="dashboard-add-variable-btn"]'
     );
@@ -21,6 +20,9 @@ export default class DashboardSetting {
     this.time = page.locator('[data-test="date-time-btn"]');
     this.dynamicFilter = page.locator(
       '[data-test="dashboard-general-setting-dynamic-filter"]'
+    );
+    this.dynamicFilterSwitch = page.locator(
+      '[data-test="dashboard-general-setting-dynamic-filter-btn"]'
     );
     this.newName = page.locator('[data-test="dashboard-general-setting-name-field"]');
     this.saveSettingBtn = page.locator(
@@ -79,7 +81,7 @@ export default class DashboardSetting {
   async openSetting() {
     // Idempotent: if the settings ODrawer is already open, do nothing.
     // The settings UI is rendered as an ODrawer with a backdrop overlay; clicking
-    // the dashboard-setting-btn while the drawer is open causes the overlay to
+    // the More button while the drawer is open causes the overlay to
     // intercept the pointer and dismiss the drawer (onInteractOutside), so blindly
     // re-clicking after a save would close the drawer mid-test.
     const generalTab = this.page.locator('[data-test="dashboard-settings-general-tab"]');
@@ -88,11 +90,11 @@ export default class DashboardSetting {
       return;
     }
 
-    await this.page.waitForSelector('[data-test="dashboard-setting-btn"]', {
+    await this.page.waitForSelector(SELECTORS.MORE_OPTIONS_BTN, {
       state: "visible",
       timeout: 15000,
     });
-    await this.setting.click();
+    await clickDashboardMenuItem(this.page, SELECTORS.SETTING_BTN);
     // Wait for settings dialog to open - use more specific selector
     await generalTab.waitFor({ state: "visible", timeout: 10000 });
     await this.page.waitForLoadState('domcontentloaded').catch(() => {});
@@ -146,11 +148,26 @@ export default class DashboardSetting {
   async cancelSettingDashboard() {
     await this.cancelBtn.waitFor({ state: "visible" });
     await this.cancelBtn.click();
+    await this.discardSettingsDraftIfAsked();
+  }
+
+  // Closing with unsaved settings opens the leave dialog; Discard keeps the old close-and-forget behaviour.
+  async discardSettingsDraftIfAsked() {
+    const dialog = this.page.locator('[data-test="editor-draft-leave-dialog"]');
+    const drawer = this.page.locator('[data-test="dashboard-settings-drawer"]');
+    const asked = await Promise.race([
+      dialog.waitFor({ state: "visible", timeout: 5000 }).then(() => true),
+      drawer.waitFor({ state: "hidden", timeout: 5000 }).then(() => false),
+    ]).catch(() => false);
+    if (!asked) return;
+    await dialog.locator('[data-test="o-dialog-neutral-btn"]').click();
+    await dialog.waitFor({ state: "hidden", timeout: 10000 });
   }
   //close setting dashboard//
   async closeSettingDashboard() {
     await this.closeSetting.waitFor({ state: "visible" });
     await this.closeSetting.click();
+    await this.discardSettingsDraftIfAsked();
     // The ODrawer animates out over a backdrop that still swallows pointer
     // events mid-transition, so a following click (e.g. the back button) can be
     // eaten. Wait for it to actually be gone.
@@ -164,6 +181,21 @@ export default class DashboardSetting {
   async showDynamicFilter() {
     await this.dynamicFilter.waitFor({ state: "visible" });
     await this.dynamicFilter.click();
+  }
+
+  // New dashboards hide dynamic filters, so tests that use them turn the setting on first.
+  async enableDynamicFilters() {
+    await this.openSetting();
+    await this.dynamicFilterSwitch.waitFor({ state: "visible" });
+    if ((await this.dynamicFilterSwitch.getAttribute("aria-checked")) !== "true") {
+      await this.dynamicFilter.click();
+    }
+    await this.saveSetting();
+    await this.getToastMessageByText("Dashboard updated successfully").waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+    await this.closeSettingDashboard();
   }
   //Add Tabs//
   generateUniqueTabnewName(prefix = "u") {
@@ -528,6 +560,7 @@ export default class DashboardSetting {
         // Wait for close button with a short timeout
         await closeBtn.waitFor({ state: "visible", timeout: 3000 });
         await closeBtn.click({ timeout: 2000 });
+        await this.discardSettingsDraftIfAsked();
 
         // Wait for dialog to actually disappear
         await settingsDialog.waitFor({ state: "hidden", timeout: 5000 });

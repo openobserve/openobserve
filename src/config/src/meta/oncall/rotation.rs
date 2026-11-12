@@ -54,6 +54,7 @@ pub const MINUTES_PER_DAY: u32 = 1440;
 /// Local wall time, because that is how people state their hours: "I cover
 /// 09:00 to 17:00" means their 09:00, not UTC's.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[schema(as = RotationTimeWindow)]
 pub struct TimeWindow {
     /// 0 = Monday … 6 = Sunday. Empty means every day.
     #[serde(default)]
@@ -179,6 +180,11 @@ pub enum ShiftRuleError {
         got: u32,
         max: u32,
     },
+    /// A restriction names a day past Sunday, which matches no local day.
+    RestrictionDayOutOfRange {
+        field: String,
+        got: u8,
+    },
     /// Start and end are the same minute, so the restriction covers no instant
     /// at all. This is the trap `end_minute: 0` sets for someone who means
     /// "all day": the rule looks configured but never wins.
@@ -204,6 +210,10 @@ impl std::fmt::Display for ShiftRuleError {
             Self::RestrictionMinuteOutOfRange { field, got, max } => write!(
                 f,
                 "`{field}` is {got}; minutes past midnight must be between 0 and {max}"
+            ),
+            Self::RestrictionDayOutOfRange { field, got } => write!(
+                f,
+                "`{field}` has day {got}; days must be between 0 (Monday) and 6 (Sunday)"
             ),
             Self::EmptyRestriction { field, minute } => write!(
                 f,
@@ -261,16 +271,14 @@ impl ShiftRule {
         }
     }
 
-    /// The same rule, shifted `shifts` handovers earlier.
+    /// The same rule, shifted `shifts` handovers earlier on `tz`'s wall clock.
     ///
     /// The whole "secondary" mechanism, and deliberately a plain constructor
     /// the resolver knows nothing about. If somebody edits one side, the two
     /// drift and `config-risks` reports it — no hidden rule keeps them in step.
-    pub fn offset_from(other: &ShiftRule, shifts: i64) -> Self {
+    pub fn offset_from(other: &ShiftRule, shifts: i64, tz: chrono_tz::Tz) -> Self {
         Self {
-            anchor_micros: other
-                .anchor_micros
-                .saturating_sub(shifts.saturating_mul(other.shift_micros)),
+            anchor_micros: other.offset_anchor(shifts, tz),
             ..other.clone()
         }
     }
@@ -316,6 +324,12 @@ impl ShiftRule {
             return Err(ShiftRuleError::EmptyValidityWindow { starts_at, ends_at });
         }
         for (index, window) in self.restrictions.iter().enumerate() {
+            if let Some(&got) = window.days.iter().find(|&&d| d > 6) {
+                return Err(ShiftRuleError::RestrictionDayOutOfRange {
+                    field: format!("restrictions[{index}].days"),
+                    got,
+                });
+            }
             if window.start_minute >= MINUTES_PER_DAY {
                 return Err(ShiftRuleError::RestrictionMinuteOutOfRange {
                     field: format!("restrictions[{index}].start_minute"),
@@ -349,6 +363,17 @@ impl ShiftRule {
         let local_anchor = to_local_micros(self.anchor_micros, tz)?;
         let offset = index.checked_mul(self.shift_micros)?;
         from_local_micros(local_anchor.checked_add(offset)?, tz)
+    }
+
+    /// Handover `-shifts` on the local clock; an out-of-calendar anchor keeps the fixed step.
+    fn offset_anchor(&self, shifts: i64, tz: chrono_tz::Tz) -> i64 {
+        shifts
+            .checked_neg()
+            .and_then(|index| self.boundary(index, tz))
+            .unwrap_or_else(|| {
+                self.anchor_micros
+                    .saturating_sub(shifts.saturating_mul(self.shift_micros))
+            })
     }
 
     /// Zero-based index of the shift containing `at`.
@@ -467,6 +492,36 @@ impl ShiftRule {
             return None;
         }
         self.boundary(self.shift_index(at, tz)? + 1, tz)
+    }
+
+    /// This rule with roster `members`, keeping today's holder and every handover. [pure] [no-fail]
+    pub fn with_roster(&self, members: Vec<String>, now: i64, tz: chrono_tz::Tz) -> ShiftRule {
+        let key = |m: &str| m.trim().to_ascii_lowercase();
+        let wanted: std::collections::HashSet<String> = members.iter().map(|m| key(m)).collect();
+        let mut order: Vec<String> = self
+            .order_at(now, tz)
+            .into_iter()
+            .filter(|m| wanted.contains(&key(m)))
+            .map(str::to_string)
+            .collect();
+        let kept: std::collections::HashSet<String> = order.iter().map(|m| key(m)).collect();
+        order.extend(members.into_iter().filter(|m| !kept.contains(&key(m))));
+        // An unresolvable rule has no holder to keep, so the roster is taken as given.
+        let index = match self.validate() {
+            Ok(()) => self.shift_index(now, tz),
+            Err(_) => None,
+        };
+        let len = order.len() as i64;
+        if len > 0
+            && let Some(index) = index
+        {
+            // Rotated so the anchor's turn arithmetic lands `order[0]` on the shift holding `now`.
+            order.rotate_right(index.rem_euclid(len) as usize);
+        }
+        ShiftRule {
+            members: order,
+            ..self.clone()
+        }
     }
 }
 
@@ -751,6 +806,7 @@ impl Rotation {
         name: impl Into<String>,
         other: &Rotation,
         shifts: i64,
+        tz: chrono_tz::Tz,
     ) -> Self {
         Self {
             id: id.into(),
@@ -758,7 +814,7 @@ impl Rotation {
             shift_rules: other
                 .shift_rules
                 .iter()
-                .map(|r| ShiftRule::offset_from(r, shifts))
+                .map(|r| ShiftRule::offset_from(r, shifts, tz))
                 .collect(),
             source: other.source.clone(),
         }
@@ -842,8 +898,9 @@ impl Rotation {
     ///
     /// The away are removed, which is a different judgement: a cover is a night
     /// off from a shift, an absence is not being there at all. When that empties
-    /// the level the ladder advances, and `WholeTeam` below it ignores absence,
-    /// so a page still has somewhere to go.
+    /// the level the ladder advances, and `WholeTeam` below it skips the away
+    /// only while someone else is left, so a page still has somewhere to go.
+    /// The cover holder is never removed: a cover outranks an absence, as in [`Rotation::on_call`].
     pub fn everyone(
         &self,
         overrides: &[ScheduleOverride],
@@ -855,12 +912,12 @@ impl Rotation {
             .winning_rule(at, tz)
             .map(|r| r.members.clone())
             .unwrap_or_default();
+        out.retain(|m| !is_unavailable(unavailability, m, at));
         if let Some(ov) = covering_override_for(overrides, &self.id, at)
             && !out.iter().any(|m| m.eq_ignore_ascii_case(&ov.user_email))
         {
             out.push(ov.user_email.clone());
         }
-        out.retain(|m| !is_unavailable(unavailability, m, at));
         out
     }
 
@@ -978,18 +1035,29 @@ pub struct CoverageSegment {
     /// infer from missing rows is a gap nobody notices.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user_email: Option<String>,
-    /// The layer that produced the holder, so the grid can colour by layer.
+    /// The layer that produced the holder, or whose rostered turn a gap leaves unfilled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rotation: Option<String>,
     /// Set when an override produced the holder.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub override_id: Option<String>,
+    /// The rule's rostered member here, before absences and covers, when not `user_email`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheduled_email: Option<String>,
 }
 
 impl CoverageSegment {
     pub fn is_gap(&self) -> bool {
         self.user_email.is_none()
     }
+}
+
+/// Who holds this rotation's pager at `at`, what put them there, and whom the roster had there.
+struct Holder {
+    user_email: Option<String>,
+    rule: Option<String>,
+    override_id: Option<String>,
+    scheduled_email: Option<String>,
 }
 
 /// Why a window could not be resolved.
@@ -1076,14 +1144,19 @@ pub fn resolve_window(
         if end <= start {
             continue;
         }
-        let (user_email, rule, override_id) =
-            holder_at(rotation, overrides, unavailability, start, tz);
+        let Holder {
+            user_email,
+            rule,
+            override_id,
+            scheduled_email,
+        } = holder_at(rotation, overrides, unavailability, start, tz);
         match segments.last_mut() {
             // Two candidates resolving the same way were not really a boundary, so merge them.
             Some(last)
                 if last.user_email == user_email
                     && last.rotation == rule
-                    && last.override_id == override_id =>
+                    && last.override_id == override_id
+                    && last.scheduled_email == scheduled_email =>
             {
                 last.to = end;
             }
@@ -1100,6 +1173,7 @@ pub fn resolve_window(
                     user_email,
                     rotation: rule,
                     override_id,
+                    scheduled_email,
                 });
             }
         }
@@ -1117,27 +1191,36 @@ fn holder_at(
     unavailability: &[Unavailability],
     at: i64,
     tz: chrono_tz::Tz,
-) -> (Option<String>, Option<String>, Option<String>) {
+) -> Holder {
     let winner = rotation.winning_rule(at, tz);
-    if let Some(ov) = covering_override_for(overrides, &rotation.id, at) {
-        return (
-            Some(ov.user_email.clone()),
-            winner.map(|r| r.name.clone()),
-            Some(ov.id.clone()),
-        );
-    }
-    match winner.and_then(|r| {
-        r.available_member_at(at, tz, unavailability)
-            .map(|m| (r.name.clone(), m.to_string()))
-    }) {
-        Some((rule, member)) => (Some(member), Some(rule), None),
-        None => (None, None, None),
+    let rostered = winner.and_then(|r| r.member_at(at, tz)).map(str::to_string);
+    let (user_email, override_id) = match covering_override_for(overrides, &rotation.id, at) {
+        Some(ov) => (Some(ov.user_email.clone()), Some(ov.id.clone())),
+        None => (
+            winner
+                .and_then(|r| r.available_member_at(at, tz, unavailability))
+                .map(str::to_string),
+            None,
+        ),
+    };
+    let scheduled_email = rostered.filter(|r| user_email.as_deref() != Some(r.as_str()));
+    // An away holder's gap is still the rule's turn, so the turn must keep its rule.
+    let rule = if override_id.is_some() || user_email.is_some() || scheduled_email.is_some() {
+        winner.map(|r| r.name.clone())
+    } else {
+        None
+    };
+    Holder {
+        user_email,
+        rule,
+        override_id,
+        scheduled_email,
     }
 }
 
 /// Every instant in `[from, to)` at which the answer could change, sorted and
 /// deduplicated, always beginning with `from`.
-fn candidate_boundaries(
+pub(super) fn candidate_boundaries(
     rotation: &Rotation,
     overrides: &[ScheduleOverride],
     unavailability: &[Unavailability],
@@ -2659,6 +2742,52 @@ mod tests {
         assert!(segments[2].is_gap());
     }
 
+    /// The roster's own holder rides along only when somebody else holds the pager.
+    #[test]
+    fn test_a_segment_names_the_scheduled_member_only_when_someone_else_holds_it() {
+        let rotations = vec![ShiftRule::weekly(
+            "On-call rotation",
+            vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
+            ANCHOR,
+        )];
+        let (from, to) = (ANCHOR, ANCHOR + MICROS_PER_DAY);
+        let cases = [
+            ("plain", vec![], vec![], Some("ana@o2.ai"), None),
+            (
+                "absence stand-in",
+                vec![],
+                vec![away("ana@o2.ai", from, to)],
+                Some("bob@o2.ai"),
+                Some("ana@o2.ai"),
+            ),
+            (
+                "cover",
+                vec![cover("ov_1", "sam@o2.ai", from, to, 1)],
+                vec![],
+                Some("sam@o2.ai"),
+                Some("ana@o2.ai"),
+            ),
+            (
+                "everyone away",
+                vec![],
+                vec![away("ana@o2.ai", from, to), away("bob@o2.ai", from, to)],
+                None,
+                Some("ana@o2.ai"),
+            ),
+        ];
+        for (name, overrides, absences, holder, scheduled) in cases {
+            let segments = resolve_grid(&rotations, &overrides, &absences, from, to, TZ).unwrap();
+            assert_eq!(segments.len(), 1, "{name}");
+            assert_eq!(segments[0].user_email.as_deref(), holder, "{name}");
+            assert_eq!(segments[0].scheduled_email.as_deref(), scheduled, "{name}");
+            assert_eq!(
+                segments[0].rotation.as_deref(),
+                Some("On-call rotation"),
+                "{name}"
+            );
+        }
+    }
+
     /// The grid is the resolved schedule, so a cover appears in it as a cover
     /// — marked, and splitting the shift it took a slice out of.
     #[test]
@@ -2877,7 +3006,7 @@ mod tests {
     /// An override that starts before the window and ends after it covers the
     /// whole of it, without contributing boundaries outside it.
     #[test]
-    fn test_an_override_enclosing_the_whole_window_is_one_segment() {
+    fn test_an_override_enclosing_the_whole_window_splits_only_at_the_handover_beneath() {
         let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
@@ -2894,12 +3023,17 @@ mod tests {
         let segments = resolve_grid(&rotations, &overrides, &[], from, to, TZ).unwrap();
 
         assert_tiles(&segments, from, to);
+        // The handover underneath splits the cover, because whose turn it covers changes there.
         assert_eq!(
-            segments.len(),
-            1,
-            "the handover underneath is invisible while one person covers both shifts"
+            segments
+                .iter()
+                .map(|s| (s.user_email.as_deref(), s.scheduled_email.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                (Some("sam@o2.ai"), Some("ana@o2.ai")),
+                (Some("sam@o2.ai"), Some("bob@o2.ai")),
+            ]
         );
-        assert_eq!(segments[0].user_email.as_deref(), Some("sam@o2.ai"));
     }
 
     // GAP 1: two slots answer at once without interfering, and a pre-slots schedule is unchanged.
@@ -2914,7 +3048,7 @@ mod tests {
     #[test]
     fn test_an_offset_rotation_is_never_the_person_already_on_call() {
         let primary = rota("rot_p", &["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"]);
-        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1);
+        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1, TZ);
 
         for week in 0..9i64 {
             let at = ANCHOR + week * MICROS_PER_WEEK;
@@ -2946,7 +3080,7 @@ mod tests {
         assert_eq!(primary.name, "Primary");
         assert_eq!(primary.shift_rules[0].name, DEFAULT_SHIFT_RULE_NAME);
 
-        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1);
+        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1, TZ);
         assert_eq!(secondary.name, "Secondary");
         assert_eq!(
             secondary.shift_rules[0].name, DEFAULT_SHIFT_RULE_NAME,
@@ -2972,7 +3106,7 @@ mod tests {
     #[test]
     fn test_a_one_person_roster_collides_with_its_own_offset() {
         let primary = rota("rot_p", &["ana@o2.ai"]);
-        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1);
+        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1, TZ);
         let rotations = [primary, secondary];
         let found = colliding_rotations(&rotations, &[], &[], ANCHOR, TZ);
         assert_eq!(found.len(), 1, "{found:?}");
@@ -2985,7 +3119,7 @@ mod tests {
     #[test]
     fn test_a_roster_edited_on_one_side_only_is_reported_as_a_collision() {
         let primary = rota("rot_p", &["ana@o2.ai", "bob@o2.ai"]);
-        let mut secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1);
+        let mut secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1, TZ);
         // Somebody adds cara to the secondary and forgets the primary.
         secondary.shift_rules[0].members =
             vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cara@o2.ai".into()];
@@ -3026,7 +3160,7 @@ mod tests {
     #[test]
     fn test_a_cover_only_stands_over_the_rotation_it_names() {
         let primary = rota("rot_p", &["ana@o2.ai", "bob@o2.ai"]);
-        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1);
+        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1, TZ);
         let ov = ScheduleOverride {
             rotation_id: "rot_p".into(),
             ..cover("ov_1", "sam@o2.ai", ANCHOR, ANCHOR + 1_000, 1)
@@ -3242,6 +3376,41 @@ mod tests {
             on_call_now(&rotations, &overrides, &unavailability, after, TZ).as_deref(),
             Some("bob@o2.ai")
         );
+    }
+
+    /// The cover holder is paged despite their absence; an absent roster member is not.
+    #[test]
+    fn test_everyone_keeps_an_absent_cover_holder() {
+        let rotation = of(&[ShiftRule::weekly(
+            "On-call rotation",
+            vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
+            ANCHOR,
+        )]);
+        let end = ANCHOR + MICROS_PER_DAY;
+        let cases: [(&str, &[Unavailability], &[&str]); 3] = [
+            (
+                "sam@o2.ai",
+                &[
+                    away("sam@o2.ai", ANCHOR, end),
+                    away("bob@o2.ai", ANCHOR, end),
+                ],
+                &["ana@o2.ai", "sam@o2.ai"],
+            ),
+            (
+                "ana@o2.ai",
+                &[away("ana@o2.ai", ANCHOR, end)],
+                &["bob@o2.ai", "ana@o2.ai"],
+            ),
+            ("ana@o2.ai", &[], &["ana@o2.ai", "bob@o2.ai"]),
+        ];
+        for (holder, unavailability, expected) in cases {
+            let overrides = vec![cover("ov_1", holder, ANCHOR, end, 1)];
+            assert_eq!(
+                rotation.everyone(&overrides, unavailability, ANCHOR, TZ),
+                expected,
+                "{holder} covering, away: {unavailability:?}"
+            );
+        }
     }
 
     /// Determinism, which the whole skip rule stands on. Two properties.
@@ -3508,4 +3677,156 @@ mod tests {
     }
 
     // ── The offset composed with an absence ─────────────────────────────────
+
+    /// Editing a roster never moves who holds it now, and every handover stays where it was.
+    #[test]
+    fn test_with_roster_keeps_the_holder_and_the_handover_grid() {
+        let before_first = ANCHOR - MICROS_PER_DAY;
+        // Shift index 4 of three people: `b` holds, `c` is next.
+        let mid = ANCHOR + 4 * MICROS_PER_WEEK + MICROS_PER_DAY;
+        let abc: &[&str] = &["a", "b", "c"];
+        // (case, roster before, now, roster asked for, turn order expected from now)
+        type Case<'a> = (&'a str, &'a [&'a str], i64, &'a [&'a str], &'a [&'a str]);
+        let cases: &[Case] = &[
+            (
+                "add before the first handover",
+                abc,
+                before_first,
+                &["a", "b", "c", "d"],
+                &["c", "a", "b", "d"],
+            ),
+            (
+                "add mid-rotation",
+                abc,
+                mid,
+                &["a", "b", "c", "d"],
+                &["b", "c", "a", "d"],
+            ),
+            ("remove the holder", abc, mid, &["a", "c"], &["c", "a"]),
+            ("remove the next person", abc, mid, &["a", "b"], &["b", "a"]),
+            ("remove somebody else", abc, mid, &["b", "c"], &["b", "c"]),
+            (
+                "add to a single person",
+                &["a"],
+                mid,
+                &["a", "b"],
+                &["a", "b"],
+            ),
+            (
+                "remove down to a single person",
+                &["a", "b"],
+                mid,
+                &["b"],
+                &["b"],
+            ),
+        ];
+        for (case, before, now, members, expected) in cases {
+            let rule = weekly(before);
+            let after = rule.with_roster(members.iter().map(|m| m.to_string()).collect(), *now, TZ);
+            assert_eq!(
+                after.order_at(*now, TZ),
+                expected.to_vec(),
+                "{case}: turn order from now"
+            );
+            let next = rule.next_handover(*now, TZ).unwrap();
+            assert_eq!(
+                after.shift_start(*now, TZ),
+                rule.shift_start(*now, TZ),
+                "{case}"
+            );
+            assert_eq!(after.next_handover(*now, TZ), Some(next), "{case}");
+            assert_eq!(
+                after.next_handover(next, TZ),
+                rule.next_handover(next, TZ),
+                "{case}"
+            );
+        }
+    }
+
+    /// The cases `web/src/utils/oncall.spec.ts` also runs, so preview and save cannot drift.
+    #[test]
+    fn test_with_roster_matches_the_shared_parity_cases() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            case: String,
+            timezone: String,
+            members: Vec<String>,
+            shift_micros: i64,
+            anchor_micros: i64,
+            now_micros: i64,
+            new_members: Vec<String>,
+            expected: Vec<String>,
+        }
+        let cases: Vec<Case> = serde_json::from_str(include_str!("roster_parity.json")).unwrap();
+        for c in cases {
+            let rule = ShiftRule {
+                shift_micros: c.shift_micros,
+                ..ShiftRule::weekly("Base", c.members, c.anchor_micros)
+            };
+            let tz: chrono_tz::Tz = c.timezone.parse().unwrap();
+            assert_eq!(
+                rule.with_roster(c.new_members, c.now_micros, tz).members,
+                c.expected,
+                "{}",
+                c.case
+            );
+        }
+    }
+
+    /// The holder, next holder and handovers `web/src/utils/oncall.spec.ts` also checks.
+    #[test]
+    fn test_shift_maths_matches_the_shared_parity_cases() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            case: String,
+            timezone: String,
+            members: Vec<String>,
+            shift_micros: i64,
+            anchor_micros: i64,
+            at_micros: i64,
+            holder: String,
+            next_holder: String,
+            shift_start: i64,
+            next_handover: i64,
+            secondary_anchor: i64,
+            secondary_next_handover: i64,
+        }
+        let cases: Vec<Case> = serde_json::from_str(include_str!("shift_parity.json")).unwrap();
+        for c in cases {
+            let rule = ShiftRule {
+                shift_micros: c.shift_micros,
+                ..ShiftRule::weekly("Base", c.members, c.anchor_micros)
+            };
+            let tz: chrono_tz::Tz = c.timezone.parse().unwrap();
+            let at = c.at_micros;
+            assert_eq!(
+                rule.member_at(at, tz),
+                Some(c.holder.as_str()),
+                "{}",
+                c.case
+            );
+            assert_eq!(
+                rule.member_offset(at, 1, tz),
+                Some(c.next_holder.as_str()),
+                "{}",
+                c.case
+            );
+            assert_eq!(rule.shift_start(at, tz), Some(c.shift_start), "{}", c.case);
+            assert_eq!(
+                rule.next_handover(at, tz),
+                Some(c.next_handover),
+                "{}",
+                c.case
+            );
+            // One shift earlier on the team's clock, so it hands over at the Primary's anchor.
+            let secondary = ShiftRule::offset_from(&rule, 1, tz);
+            assert_eq!(secondary.anchor_micros, c.secondary_anchor, "{}", c.case);
+            assert_eq!(
+                secondary.next_handover(c.secondary_anchor, tz),
+                Some(c.secondary_next_handover),
+                "{}",
+                c.case
+            );
+        }
+    }
 }

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
@@ -108,9 +109,11 @@ describe("RelatedPodsTable", () => {
     ]);
   });
 
-  it("is a dense, virtualized table capped at 41.25rem", () => {
+  it("is a dense, virtualized, sortable, resizable table capped at 70vh", () => {
     const table = mountTable().findComponent(OTableStub);
-    expect(table.props("maxHeight")).toBe("41.25rem");
+    expect(table.props("maxHeight")).toBe("70vh");
+    expect(table.attributes("sorting")).toBe("client");
+    expect(table.attributes("enable-column-resize")).toBeDefined();
     expect(table.props("virtualScroll")).toBe(true);
     expect(table.props("dense")).toBe(true);
     expect((table.props("columns") as any[]).map((c) => c.id)).toEqual([
@@ -137,10 +140,10 @@ describe("RelatedPodsTable", () => {
     );
   });
 
-  it("colours the status text by tone and links name and node", async () => {
+  it("shows the status as a tone pill and links name and node", async () => {
     const wrapper = mountTable();
-    expect(cell(wrapper, "web-1", "status").find("span").classes()).toContain(
-      "text-status-error-text",
+    expect(cell(wrapper, "web-1", "status").findComponent(OTag).props("variant")).toBe(
+      "error-soft",
     );
     await cell(wrapper, "web-1", "node").find("button").trigger("click");
     await cell(wrapper, "web-1", "name").find("button").trigger("click");

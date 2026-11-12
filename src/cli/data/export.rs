@@ -50,7 +50,6 @@ impl Context for Export {
             from: 0,
             size: cfg.limit.query_default_limit,
             quick_mode: false,
-            query_type: "".to_owned(),
             start_time: c.start_time,
             end_time: c.end_time,
             ..Default::default()
@@ -65,6 +64,7 @@ impl Context for Export {
             search_type,
             search_event_context,
             use_cache: false,
+            use_index: true,
             clear_cache: false,
             local_mode: None,
             agent_options: None,

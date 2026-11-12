@@ -265,7 +265,7 @@ impl opentelemetry_sdk::trace::SpanExporter for MetaOrgTraceExporter {
                     .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
                     .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
                     .export(grpc_request)
-                    // a traced export would emit a CLIENT span that this exporter forwards again, forever
+                    // a traced export emits a CLIENT span this exporter forwards again, forever
                     .with_subscriber(tracing::subscriber::NoSubscriber::default())
                     .await
                 {

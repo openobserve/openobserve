@@ -66,6 +66,13 @@ test.describe("DateTime Picker Copy Paste testcases", () => {
       testLogger.info('Copy/paste controls verified');
     });
 
+    test("should close the picker when a relative time is picked", {
+      tag: ['@datetime-picker', '@all', '@P1']
+    }, async () => {
+      await pm.dateTimePickerPage.relativePeriodBtn('15-m').click();
+      await pm.dateTimePickerPage.expectPickerClosed();
+    });
+
     // TC-02
     test("should copy a relative range as an absolute epoch payload", {
       tag: ['@datetime-picker', '@all', '@smoke', '@P0']
@@ -276,19 +283,21 @@ test.describe("DateTime Picker Copy Paste testcases", () => {
     });
 
     // TC-12
-    test("should show the parse error toast when the clipboard is empty", {
+    test("should say the clipboard is empty when pasting an empty clipboard", {
       tag: ['@datetime-picker', '@all', '@P2']
     }, async () => {
       testLogger.info('Pasting with an empty clipboard');
 
       await pm.dateTimePickerPage.selectRelativePeriod('15-m');
+      const labelBeforePaste = await pm.dateTimePickerPage.getTriggerLabel();
       await pm.dateTimePickerPage.seedClipboard('');
       await pm.dateTimePickerPage.clickPaste();
 
-      await pm.dateTimePickerPage.expectPasteErrorToast();
+      await pm.dateTimePickerPage.expectPasteEmptyToast();
       await pm.dateTimePickerPage.expectRelativePanelActive();
+      expect(await pm.dateTimePickerPage.getTriggerLabel()).toBe(labelBeforePaste);
 
-      testLogger.info('Empty clipboard rejected with the parse error toast');
+      testLogger.info('Empty clipboard rejected with the empty-clipboard toast');
     });
   });
 

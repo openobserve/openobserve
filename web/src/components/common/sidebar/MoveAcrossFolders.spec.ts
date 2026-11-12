@@ -272,6 +272,20 @@ describe("MoveAcrossFolders.vue", () => {
     expect(wrapper.vm.getModuleName()).toBe("alert_ids");
   });
 
+  it("keeps the folder wording for alerts", async () => {
+    wrapper = createWrapper({ activeFolderId: "folder1", moduleId: ["a1"], type: "alerts" });
+    expect(wrapper.findComponent(ODialogStub).props("title")).toBe("Move Alerts To Another Folder");
+    expect(wrapper.text()).toContain("Current Folder");
+    wrapper.vm.selectedFolder = { label: "Folder 2", value: "folder2" };
+    mockMoveModuleToAnotherFolder.mockResolvedValue(true);
+
+    await wrapper.vm.onSubmit.execute();
+
+    expect(mockShowPositiveNotification).toHaveBeenCalledWith("Alerts moved successfully", {
+      timeout: 5000,
+    });
+  });
+
   // Test 11: Successful form submission (migrated — no form validation)
   it("should handle successful form submission", async () => {
     wrapper = createWrapper({
@@ -779,7 +793,7 @@ describe("MoveAcrossFolders.vue", () => {
 
     await wrapper.vm.onSubmit.execute();
 
-    expect(mockShowErrorNotification).toHaveBeenCalledWith("Top level message", {
+    expect(mockShowErrorNotification).toHaveBeenCalledWith("Nested error message", {
       timeout: 5000,
     });
   });

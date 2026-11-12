@@ -14,9 +14,22 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import "vue-router";
+import type { I18nKey } from "@/types/i18n";
 
 declare module "vue-router" {
   interface RouteMeta {
     allowOnEmptyData?: boolean;
+    /** Resource key of this route's main list; a 403 on it replaces the page with the no-access state. */
+    accessResource?: string;
+    /** Query keys naming the item this route shows; access denials are remembered per item. */
+    accessScopeQuery?: string[];
+    /** API exists only with online evaluations on, else the shell renders the disabled state. */
+    requiresOnlineEvals?: boolean;
+    /** License feature key the page needs; a `locked` key renders the page with every control disabled. */
+    licenseFeature?: string;
+    /** The license key comes from `query.stream_type` instead, via `streamTypeFeature`. */
+    licenseFeatureFromStreamType?: boolean;
+    /** Tab-title key per `?tab=` value, for a route several rail items share; wins over `titleKey`. */
+    titleKeyByTab?: Record<string, I18nKey>;
   }
 }

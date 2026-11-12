@@ -16,7 +16,7 @@
 use config::meta::folder::{Folder, FolderType};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
-    IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
+    IntoActiveModel, QueryFilter, QueryOrder, Set, TryIntoModel,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -47,6 +47,7 @@ pub(crate) fn folder_type_into_i16(folder_type: FolderType) -> i16 {
         FolderType::Workflows => 4,
         FolderType::Prompts => 5,
         FolderType::Downtimes => 6,
+        FolderType::Fleets => 7,
     }
 }
 
@@ -60,6 +61,7 @@ pub fn folder_type_from_i16(value: i16) -> Option<FolderType> {
         4 => Some(FolderType::Workflows),
         5 => Some(FolderType::Prompts),
         6 => Some(FolderType::Downtimes),
+        7 => Some(FolderType::Fleets),
         _ => None,
     }
 }
@@ -219,13 +221,21 @@ pub async fn delete(
     folder_id: &str,
     folder_type: FolderType,
 ) -> Result<(), errors::Error> {
-    let client = get_orm_client_rw().await;
-    let model = get_model(client, org_id, folder_id, folder_type).await?;
+    delete_with(get_orm_client_rw().await, org_id, folder_id, folder_type).await
+}
 
-    if let Some(model) = model {
-        let _ = model.delete(client).await?;
-    }
-
+pub async fn delete_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: &str,
+    folder_type: FolderType,
+) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::Org.eq(org_id))
+        .filter(Column::FolderId.eq(folder_id))
+        .filter(Column::Type.eq(folder_type_into_i16(folder_type)))
+        .exec(conn)
+        .await?;
     Ok(())
 }
 
@@ -367,14 +377,11 @@ async fn list_models(
         .await
 }
 
-/// Deletes all folders belonging to the given org.
-pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+/// Deletes all folders of the org and returns each one's `(folder_id, type)`.
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, i16)>, errors::Error> {
     let client = get_orm_client_rw().await;
-    Entity::delete_many()
-        .filter(Column::Org.eq(org_id))
-        .exec(client)
-        .await?;
-    Ok(())
+    let delete = Entity::delete_many().filter(Column::Org.eq(org_id));
+    Ok(super::delete_returning(client, delete, &[Column::FolderId, Column::Type]).await?)
 }
 
 #[cfg(test)]
@@ -388,6 +395,7 @@ mod tests {
         assert_eq!(folder_type_into_i16(FolderType::Reports), 2);
         assert_eq!(folder_type_into_i16(FolderType::Prompts), 5);
         assert_eq!(folder_type_into_i16(FolderType::Downtimes), 6);
+        assert_eq!(folder_type_into_i16(FolderType::Fleets), 7);
     }
 
     #[test]
@@ -400,11 +408,12 @@ mod tests {
             FolderType::Workflows,
             FolderType::Prompts,
             FolderType::Downtimes,
+            FolderType::Fleets,
         ] {
             let n = folder_type_into_i16(folder_type);
             assert_eq!(folder_type_from_i16(n), Some(folder_type));
         }
-        assert_eq!(folder_type_from_i16(7), None);
+        assert_eq!(folder_type_from_i16(8), None);
     }
 
     #[test]

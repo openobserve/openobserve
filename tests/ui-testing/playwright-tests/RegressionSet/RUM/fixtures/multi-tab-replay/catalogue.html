@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Catalogue browser</title>
+  <!--O2_CONFIG-->
+  <script src="/sdk/openobserve-rum.js"></script>
+  <script src="/rum-init.js"></script>
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+  <header class="bar" data-test="mt-heading"><strong>Catalogue browser</strong><span>Tab B</span></header>
+  <main>
+    <section class="panel">
+      <p>Pick a product to see its details.</p>
+      <p data-test="mt-product-name">No product selected</p>
+      <button data-test="mt-next-product-btn" type="button">Next product</button>
+    </section>
+    <section class="panel">
+      <h2>Shelf</h2>
+      <ol>
+        <li>Desk lamp</li>
+        <li>Office chair</li>
+        <li>Notebook</li>
+        <li>Monitor arm</li>
+        <li>Cable tray</li>
+      </ol>
+    </section>
+  </main>
+  <script>
+    (function () {
+      var products = ['Desk lamp', 'Office chair', 'Notebook', 'Monitor arm', 'Cable tray'];
+      var index = -1;
+      var name = document.querySelector('[data-test="mt-product-name"]');
+      document.querySelector('[data-test="mt-next-product-btn"]').addEventListener('click', function () {
+        index = (index + 1) % products.length;
+        name.textContent = 'Viewing ' + products[index];
+      });
+    })();
+  </script>
+</body>
+</html>

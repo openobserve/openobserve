@@ -47,8 +47,8 @@ use openobserve_core::auth::UserEmail;
 #[cfg(feature = "cloud")]
 use openobserve_core::organization::is_org_in_free_trial_period;
 use search::{
-    datafusion::plan::projections::get_result_schema, sql::visitor::pickup_where::pickup_where,
-    utils::is_permissable_function_error,
+    datafusion::logical_plan::projections::get_result_schema,
+    sql::visitor::pickup_where::pickup_where, utils::is_permissable_function_error,
 };
 use search_service as SearchService;
 use search_service::query_range::get_settings_max_query_range;
@@ -61,11 +61,11 @@ use utils::{StreamPermissionResourceType, check_cipher_key_permissions, check_st
 use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse,
     utils::http::{
-        get_clear_cache_from_request, get_dashboard_info_from_request,
+        get_clear_cache_from_request, get_client_search_type, get_dashboard_info_from_request,
         get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
         get_is_ui_histogram_from_request, get_or_create_trace_id,
-        get_search_event_context_from_request, get_search_type_from_request,
-        get_stream_type_from_request, get_use_cache_from_request, get_work_group,
+        get_search_event_context_from_request, get_stream_type_from_request,
+        get_use_cache_from_request, get_work_group,
     },
 };
 
@@ -114,7 +114,7 @@ pub mod utils;
         }
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -234,19 +234,8 @@ pub async fn search(
         }
     };
     #[cfg(feature = "enterprise")]
-    for stream in stream_names.iter() {
-        {
-            if let Err(e) = search_service::check_search_allowed(&org_id, Some(stream)) {
-                return (
-                    StatusCode::TOO_MANY_REQUESTS,
-                    Json(MetaHttpResponse::error(
-                        StatusCode::TOO_MANY_REQUESTS,
-                        e.to_string(),
-                    )),
-                )
-                    .into_response();
-            }
-        }
+    if let Some(refused) = search_license_refusal(&org_id, &req.query.sql, stream_type) {
+        return refused;
     }
 
     // Handle histogram data for UI
@@ -286,17 +275,29 @@ pub async fn search(
     }
 
     // set search event type
-    if req.search_type.is_none() {
-        req.search_type = match get_search_type_from_request(&url_query) {
-            Ok(v) => v,
-            Err(e) => return MetaHttpResponse::bad_request(e),
-        };
+    req.search_type = match get_client_search_type(req.search_type, &url_query) {
+        Ok(v) => v,
+        Err(e) => return MetaHttpResponse::bad_request(e),
     };
     if req.search_event_context.is_none() {
         req.search_event_context = req
             .search_type
             .as_ref()
             .and_then(|event_type| get_search_event_context_from_request(event_type, &url_query));
+    }
+
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_sql_stream_permissions(
+        &req.query.sql,
+        &org_id,
+        user_id,
+        stream_type,
+        StreamPermissionResourceType::Search,
+        &trace_id,
+    )
+    .await
+    {
+        return res;
     }
 
     // get stream settings
@@ -308,10 +309,13 @@ pub async fn search(
                     .await;
             // Enrichment tables have no retention and must be searched in full; skip the clamp.
             if stream_type != StreamType::EnrichmentTables
-                && max_query_range > 0
-                && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
+                && let Some(clamped) = config::utils::query_range::clamp_start_time(
+                    req.query.start_time,
+                    req.query.end_time,
+                    max_query_range,
+                )
             {
-                req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
+                req.query.start_time = clamped;
                 range_error = format!(
                     "Query duration is modified due to query range restriction of {max_query_range} hours"
                 );
@@ -325,20 +329,6 @@ pub async fn search(
                     .await
         {
             return map_error_to_http_response(&e, Some(trace_id));
-        }
-
-        // Check permissions on stream
-        #[cfg(feature = "enterprise")]
-        if let Some(res) = check_stream_permissions(
-            stream_name,
-            &org_id,
-            user_id,
-            &stream_type,
-            StreamPermissionResourceType::Search,
-        )
-        .await
-        {
-            return res;
         }
     }
 
@@ -449,7 +439,7 @@ pub async fn search(
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -491,7 +481,8 @@ pub async fn around_v1(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -583,7 +574,7 @@ pub async fn around_v1(
         "pod_name": "openobserve-ingester-0"
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -626,7 +617,8 @@ pub async fn around_v2(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -716,7 +708,7 @@ pub async fn around_v2(
         ("no_count" = Option<bool>, Query, description = "no need count, true of false"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json!({
             "took": 155,
             "values": [
                 {
@@ -743,7 +735,8 @@ pub async fn values(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -912,6 +905,7 @@ pub async fn build_search_request_per_field(
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
         use_cache: req.use_cache,
+        use_index: true,
         clear_cache: req.clear_cache,
         local_mode: None,
         agent_options: None,
@@ -1095,6 +1089,7 @@ async fn values_inner(
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
         use_cache: default_use_cache(),
+        use_index: true,
         clear_cache: get_clear_cache_from_request(query),
         local_mode: None,
         agent_options: None,
@@ -1288,13 +1283,36 @@ fn resolve_typed_stream_names(
         .collect())
 }
 
-/// Requires search permission on every stream `sql` reads; `None` means allowed.
+/// The licence 429 unless every stream `sql` reads, under the type its SQL names, is exempt.
 #[cfg(feature = "enterprise")]
-async fn check_sql_stream_permissions(
+fn search_license_refusal(org_id: &str, sql: &str, stream_type: StreamType) -> Option<Response> {
+    // an unparsed query is checked as the whole org, so a parse gap never opens the gate
+    let refused = match resolve_typed_stream_names(sql, stream_type) {
+        Ok(streams) => streams.iter().find_map(|(stream, stream_type)| {
+            search_service::check_search_allowed(org_id, Some((stream, *stream_type))).err()
+        }),
+        Err(_) => search_service::check_search_allowed(org_id, None).err(),
+    };
+    refused.map(|e| {
+        (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(MetaHttpResponse::error(
+                StatusCode::TOO_MANY_REQUESTS,
+                e.to_string(),
+            )),
+        )
+            .into_response()
+    })
+}
+
+/// Requires permission on every stream `sql` reads, under the type its SQL names; `None` = allowed.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn check_sql_stream_permissions(
     sql: &str,
     org_id: &str,
     user_id: &str,
     stream_type: StreamType,
+    permission_resource_type: StreamPermissionResourceType,
     trace_id: &str,
 ) -> Option<Response> {
     let streams = match resolve_typed_stream_names(sql, stream_type) {
@@ -1307,7 +1325,7 @@ async fn check_sql_stream_permissions(
             org_id,
             user_id,
             &stream_type,
-            StreamPermissionResourceType::Search,
+            permission_resource_type,
         )
         .await
         {
@@ -1340,7 +1358,7 @@ async fn check_sql_stream_permissions(
         "end_time": 1675185660872049i64
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::SearchPartitionResponse, example = json!({
             "took": 155,
             "file_num": 10,
             "original_size": 10240,
@@ -1414,24 +1432,18 @@ pub async fn search_partition(
 
     #[cfg(feature = "enterprise")]
     {
-        let stream_names = match resolve_stream_names(&req.sql) {
-            Ok(stream_names) => stream_names,
-            Err(err) => return map_error_to_http_response(&err.into(), Some(trace_id)),
-        };
-        for stream in stream_names.iter() {
-            if let Err(e) = search_service::check_search_allowed(&org_id, Some(stream)) {
-                return (
-                    StatusCode::TOO_MANY_REQUESTS,
-                    Json(MetaHttpResponse::error(
-                        StatusCode::TOO_MANY_REQUESTS,
-                        e.to_string(),
-                    )),
-                )
-                    .into_response();
-            }
+        if let Some(refused) = search_license_refusal(&org_id, &req.sql, stream_type) {
+            return refused;
         }
-        if let Some(res) =
-            check_sql_stream_permissions(&req.sql, &org_id, user_id, stream_type, &trace_id).await
+        if let Some(res) = check_sql_stream_permissions(
+            &req.sql,
+            &org_id,
+            user_id,
+            stream_type,
+            StreamPermissionResourceType::Search,
+            &trace_id,
+        )
+        .await
         {
             return res;
         }
@@ -1509,7 +1521,7 @@ pub async fn search_partition(
         })
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json ! ({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json ! ({
             "took": 40,
             "took_detail": {
                 "total": 40,
@@ -1690,6 +1702,8 @@ pub async fn search_history(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("is_streaming" = Option<bool>, Query, description = "Describe the schema of a streaming query"),
+        ("cross_linking" = Option<bool>, Query, description = "Include cross-link fields"),
     ),
     request_body(content = inline(config::meta::search::Request), description = "Search query", content_type = "application/json", example = json!({
         "query": {
@@ -1701,13 +1715,17 @@ pub async fn search_history(
         }
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::ResultSchemaResponse, example = json!({
             "projections": ["ns","histogram(k8s._timestamp)"],
             "group_by": ["histogram(k8s._timestamp)"],
             "timeseries_field": "histogram(k8s._timestamp)",
         })),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn result_schema(
@@ -1758,11 +1776,9 @@ pub async fn result_schema(
     };
 
     // set search event type
-    if req.search_type.is_none() {
-        req.search_type = match get_search_type_from_request(&url_query) {
-            Ok(v) => v,
-            Err(e) => return MetaHttpResponse::bad_request(e),
-        };
+    req.search_type = match get_client_search_type(req.search_type, &url_query) {
+        Ok(v) => v,
+        Err(e) => return MetaHttpResponse::bad_request(e),
     };
     if req.search_event_context.is_none() {
         req.search_event_context = req
@@ -1779,6 +1795,20 @@ pub async fn result_schema(
         }
     };
 
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_sql_stream_permissions(
+        &req.query.sql,
+        &org_id,
+        user_id,
+        stream_type,
+        StreamPermissionResourceType::Search,
+        "",
+    )
+    .await
+    {
+        return res;
+    }
+
     // get stream settings
     for stream_name in stream_names {
         if let Some(settings) =
@@ -1789,25 +1819,14 @@ pub async fn result_schema(
                     .await;
             // Enrichment tables have no retention and must be searched in full; skip the clamp.
             if stream_type != StreamType::EnrichmentTables
-                && max_query_range > 0
-                && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
+                && let Some(clamped) = config::utils::query_range::clamp_start_time(
+                    req.query.start_time,
+                    req.query.end_time,
+                    max_query_range,
+                )
             {
-                req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
+                req.query.start_time = clamped;
             }
-        }
-
-        // Check permissions on stream
-        #[cfg(feature = "enterprise")]
-        if let Some(res) = check_stream_permissions(
-            &stream_name,
-            &org_id,
-            user_id,
-            &stream_type,
-            StreamPermissionResourceType::Search,
-        )
-        .await
-        {
-            return res;
         }
     }
 
@@ -1969,6 +1988,69 @@ mod tests {
         assert!(resolve_typed_stream_names("not sql", StreamType::Logs).is_err());
     }
 
+    #[test]
+    fn sql_search_handlers_authorize_the_streams_their_sql_resolves_to() {
+        let handlers = [
+            ("mod.rs", include_str!("mod.rs"), "pub async fn search("),
+            (
+                "mod.rs",
+                include_str!("mod.rs"),
+                "pub async fn search_partition(",
+            ),
+            (
+                "mod.rs",
+                include_str!("mod.rs"),
+                "pub async fn result_schema(",
+            ),
+            (
+                "search_stream.rs",
+                include_str!("search_stream.rs"),
+                "pub async fn search_http2_stream(",
+            ),
+            (
+                "search_job.rs",
+                include_str!("search_job.rs"),
+                "pub async fn submit_job(",
+            ),
+            (
+                "search_job.rs",
+                include_str!("search_job.rs"),
+                "async fn check_permissions(",
+            ),
+            (
+                "patterns.rs",
+                include_str!("patterns.rs"),
+                "pub async fn extract_patterns(",
+            ),
+            (
+                "multi_streams.rs",
+                include_str!("multi_streams.rs"),
+                "pub async fn search_multi(",
+            ),
+            (
+                "multi_streams.rs",
+                include_str!("multi_streams.rs"),
+                "pub async fn _search_partition_multi(",
+            ),
+            (
+                "multi_streams.rs",
+                include_str!("multi_streams.rs"),
+                "pub async fn search_multi_stream(",
+            ),
+        ];
+        for (file, text, signature) in handlers {
+            let start = text
+                .find(signature)
+                .unwrap_or_else(|| panic!("{file}: {signature} not found"));
+            let body = &text[start..];
+            let body = &body[..body.find("\n}\n").expect("handler end")];
+            assert!(
+                body.contains("check_sql_stream_permissions("),
+                "{file}: {signature} must authorize each stream under the type its SQL names"
+            );
+        }
+    }
+
     fn schema() -> Schema {
         Schema::new(vec![
             Field::new("level", DataType::Utf8, true),
@@ -2083,6 +2165,7 @@ mod tests {
                 histogram_interval: 0,
                 sampling_ratio: None,
                 search_type: None,
+                timezone: None,
             }),
         )
         .await;

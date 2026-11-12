@@ -32,8 +32,11 @@ use config::{
     get_config, get_instance_id,
     meta::{
         cluster::{NodeStatus, Role, RoleGroup},
+        feature::{Feature, FeatureState},
         function::ZoFunction,
         search::{HashFileRequest, HashFileResponse},
+        slack::DisabledReason,
+        stream::DataRetentionDefaults,
         user::UserRole,
     },
     stats::{CacheStats, CacheStatsAsync},
@@ -63,8 +66,9 @@ use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
     audit::audit,
+    axum::{Extension, http::HeaderMap},
     common::utils::jwt::verify_decode_token,
-    config::{ider, utils::time::now_micros},
+    config::{axum::middlewares::RealIp, ider, utils::time::now_micros},
     o2_dex::{
         config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
         service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
@@ -75,7 +79,8 @@ use {
         settings::{get_logo, get_logo_dark, get_logo_text},
     },
     o2_enterprise::enterprise::license::{
-        block_feature_for_report_failure, last_reported_timestamp,
+        block_feature_for_report_failure, check_features, last_reported_timestamp,
+        runtime_definition,
     },
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
@@ -142,7 +147,7 @@ pub fn reload_enterprise_config() -> Result<(), anyhow::Error> {
 }
 
 /// Authenticated full UI configuration (`GET /api/{org_id}/config`).
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct ConfigResponse<'a> {
     version: String,
     commit_hash: String,
@@ -157,8 +162,11 @@ struct ConfigResponse<'a> {
     sql_base64_enabled: bool,
     timestamp_column: String,
     data_retention_days: i64,
+    data_retention_defaults: DataRetentionDefaults,
+    resolved_data_retention: DataRetentionDefaults,
     extended_data_retention_days: i64,
     restricted_routes_on_empty_data: bool,
+    sample_data_onboarding_enabled: bool,
     sso_enabled: bool,
     native_login_enabled: bool,
     service_account_enabled: bool,
@@ -188,6 +196,8 @@ struct ConfigResponse<'a> {
     min_auto_refresh_interval: u32,
     query_default_limit: i64,
     max_dashboard_series: usize,
+    max_dashboard_state_timeline_series: usize,
+    max_dashboard_hostmap_cells: usize,
     streaming_enabled: bool,
     histogram_enabled: bool,
     timechart_enabled: bool,
@@ -214,18 +224,15 @@ struct ConfigResponse<'a> {
     dashboard_show_field_as_json_enabled: bool,
     ingest_flatten_level: u32,
     #[cfg(feature = "enterprise")]
-    license_expiry: i64,
-    #[cfg(feature = "enterprise")]
-    license_server_url: String,
-    #[cfg(feature = "enterprise")]
-    ingestion_quota_used: f64,
-    #[cfg(feature = "enterprise")]
-    ingestion_history: Vec<o2_enterprise::enterprise::license::UsageResult>,
+    #[serde(flatten)]
+    license: LicenseConfig,
     log_page_default_field_list: String,
     query_values_default_num: i64,
     alert_preview_timerange_minutes: i64,
     incidents_enabled: bool,
+    incidents_rca_enabled: bool,
     downtimes_enabled: bool,
+    fleet_enabled: bool,
     alert_calibration_enabled: bool,
     service_streams_enabled: bool,
     model_pricing_enabled: bool,
@@ -233,7 +240,14 @@ struct ConfigResponse<'a> {
     anomaly_detection_enabled: bool,
     composite_alerts_available: bool,
     synthetics_enabled: bool,
+    /// Hides the publish button and the Public links view when the feature is off.
+    public_dashboards_enabled: bool,
+    /// The clamped operator refresh floor; the share form shows each range's floor from it.
+    public_dashboard_min_refresh_secs: u32,
     oncall_enabled: bool,
+    slack_enabled: bool,
+    /// The same reason for every org, null when on.
+    slack_disabled_reason: Option<DisabledReason>,
     /// Enterprise-only private locations; the UI gates their views on this flag.
     synthetics_private_locations_enabled: bool,
     /// Server-side step cap (`ZO_SYNTHETICS_BROWSER_MAX_STEPS`); the UI budget must follow it.
@@ -242,6 +256,10 @@ struct ConfigResponse<'a> {
     synthetics_recorder_extension_url: String,
     /// The only DBM flag (`ZO_DB_MONITORING_ENABLED`): one OSS switch for every signal.
     database_monitoring_enabled: bool,
+    /// Off hides recent searches in the UI; the server then records nothing.
+    query_history_enabled: bool,
+    /// Days unstarred recent searches are kept; 0 or less keeps them until the per-page cap.
+    query_history_retention_days: i64,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
@@ -258,6 +276,46 @@ struct ConfigResponse<'a> {
     billing_group_allowed_orgs: String,
     #[cfg(feature = "enterprise")]
     workflows_enabled: bool,
+    workflow_hooks_enabled: bool,
+    #[cfg(feature = "enterprise")]
+    feature_revision: u32,
+    features: HashMap<Feature, FeatureState>,
+    feature_names: HashMap<String, String>,
+}
+
+#[cfg(feature = "enterprise")]
+#[derive(Serialize, utoipa::ToSchema)]
+struct LicenseConfig {
+    license_expiry: i64,
+    license_server_url: String,
+    ingestion_quota_used: f64,
+    ingestion_history: Vec<o2_enterprise::enterprise::license::UsageResult>,
+    #[cfg(not(feature = "cloud"))]
+    #[serde(flatten)]
+    search: LicenseSearchConfig,
+}
+
+/// Cloud never shows the license search banner, so it does not serve these fields.
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+#[derive(Serialize, utoipa::ToSchema)]
+struct LicenseSearchConfig {
+    license_search_allowed: bool,
+    license_waiver_until: Option<i64>,
+}
+
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+impl LicenseSearchConfig {
+    /// The flag is the gate `check_search_allowed` reads, never a follower's possibly newer status.
+    fn new(
+        gate_allowed: bool,
+        status: &o2_enterprise::enterprise::license::LicenseStatus,
+        now: i64,
+    ) -> Self {
+        Self {
+            license_search_allowed: gate_allowed,
+            license_waiver_until: status.search_unblock_until(now),
+        }
+    }
 }
 
 /// Unauthenticated `GET /config`: every field is public, so only what the login page consumes, plus
@@ -266,7 +324,7 @@ struct ConfigResponse<'a> {
 struct ConfigBootstrapResponse {
     /// `enterprise` / `cloud` / `opensource`; the o2 CLI and o2-operator read it here.
     build_type: String,
-    /// The UI's stale-build checker compares it across deploys.
+    /// [`config::build_fingerprint`], not the commit: the UI's stale-build checker compares it.
     commit_hash: String,
     telemetry_enabled: bool,
     sso_enabled: bool,
@@ -277,10 +335,10 @@ struct ConfigBootstrapResponse {
     custom_hide_self_logo: bool,
     /// The editors need it before the authenticated config lands, or `off` arrives too late.
     editor_suggest_mode: String,
-    rum: Rum,
 }
 
-#[derive(Serialize, serde::Deserialize)]
+#[derive(Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[schema(as = RumConfig)]
 struct Rum {
     pub enabled: bool,
     pub client_token: String,
@@ -304,7 +362,7 @@ impl Rum {
             site: cfg.rum.site.to_string(),
             service: cfg.rum.service.to_string(),
             env: cfg.rum.env.to_string(),
-            version: cfg.rum.version.to_string(),
+            version: config::VERSION.to_string(),
             organization_identifier: cfg.rum.organization_identifier.to_string(),
             api_version: cfg.rum.api_version.to_string(),
             insecure_http: cfg.rum.insecure_http,
@@ -325,6 +383,7 @@ impl Rum {
     responses(
         (status = 200, description="Status OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "ok"}))
     ),
+    security(),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
@@ -411,7 +470,7 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
 
     axum::Json(ConfigBootstrapResponse {
         build_type: build_type.to_string(),
-        commit_hash: config::COMMIT_HASH.to_string(),
+        commit_hash: config::build_fingerprint(),
         telemetry_enabled: cfg.common.telemetry_enabled,
         sso_enabled,
         native_login_enabled,
@@ -420,11 +479,29 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
         custom_logo_dark_img,
         custom_hide_self_logo,
         editor_suggest_mode: cfg.limit.editor_suggest_mode.clone(),
-        rum: Rum::from_cfg(cfg.clone()),
     })
 }
 
 /// Full UI configuration; `search_inspector_enabled` and `is_org_admin` are per caller and org.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/config",
+    context_path = "/api",
+    tag = "Meta",
+    operation_id = "GetOrgConfig",
+    summary = "Get the configuration for an organization",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = ConfigResponse<'static>),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn zo_config(
     Path(org_id): Path<String>,
     user_email: Option<Headers<UserEmail>>,
@@ -453,7 +530,7 @@ pub async fn zo_config(
     let sso_enabled = enterprise_value!(false, dex_cfg.dex_enabled, block_features);
     let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
     let service_account_enabled = cfg.auth.service_account_enabled;
-    let rbac_enabled = enterprise_value!(false, rbac_enabled_for_config(openfga_cfg.enabled).await);
+    let rbac_enabled = enterprise_value!(false, openfga_cfg.enabled);
     let super_cluster_enabled = enterprise_value!(false, o2cfg.super_cluster.enabled);
 
     #[cfg(feature = "enterprise")]
@@ -474,27 +551,55 @@ pub async fn zo_config(
     let custom_hide_menus = enterprise_value!("", &o2cfg.common.custom_hide_menus);
     let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
     // AI needs o2-ai to answer; with no agent target its buttons could only fail, so report it off.
-    let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled && o2cfg.ai.has_agent_target());
-    let ai_chat_persistence_enabled = enterprise_value!(
+    let ai_enabled = enterprise_value!(
         false,
-        o2cfg.ai.enabled && o2cfg.ai.has_agent_target() && o2cfg.ai.chat_persistence_enabled
+        o2cfg.ai.enabled && o2cfg.ai.has_agent_target() && check_features(&[Feature::AiAssistant])
     );
-    let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
-    let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
-    let alert_calibration_enabled = enterprise_value!(false, o2cfg.alert_calibration.enabled);
+    let ai_chat_persistence_enabled =
+        enterprise_value!(false, ai_enabled && o2cfg.ai.chat_persistence_enabled);
+    let incidents_enabled = enterprise_value!(
+        false,
+        o2cfg.incidents.enabled && check_features(&[Feature::Incidents])
+    );
+    let downtimes_enabled = enterprise_value!(
+        false,
+        o2cfg.downtimes.enabled && check_features(&[Feature::Alerts])
+    );
+    let alert_calibration_enabled = enterprise_value!(
+        false,
+        o2cfg.alert_calibration.enabled && check_features(&[Feature::Alerts])
+    );
+    // Incident analysis needs RCA on and an agent to answer.
+    let incidents_rca_enabled = enterprise_value!(
+        false,
+        incidents_enabled
+            && o2cfg.incidents.rca_enabled
+            && openobserve_core::alerts::incidents::rca_agent_available()
+    );
+    let fleet_enabled = enterprise_value!(false, openobserve_core::fleet::enabled());
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Enterprise builds have it unless O2_ANOMALY_DETECTION_DISABLED turns it off.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
     // Composite alerts are not available in super-cluster mode (§18, §19.2).
     let composite_alerts_available =
         config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
-    let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
+    let online_evals_enabled = enterprise_value!(
+        false,
+        o2cfg.llm_eval_config.enabled && check_features(&[Feature::AiObservability])
+    );
     let synthetics_enabled = cfg.synthetics.enabled;
     // Private agents stay enterprise, so an OSS build shows synthetics without them.
     let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
     let synthetics_browser_max_steps = cfg.synthetics.browser_max_steps;
-    let oncall_enabled = enterprise_value!(false, o2cfg.oncall.enabled);
+    let oncall_enabled = enterprise_value!(
+        false,
+        o2cfg.oncall.enabled && check_features(&[Feature::Oncall])
+    );
+    let slack_disabled_reason = enterprise_value!(
+        Some(DisabledReason::Edition),
+        o2_enterprise::enterprise::slack::disabled_reason(&org_id)
+    );
 
     #[cfg(feature = "cloud")]
     let build_type = "cloud";
@@ -504,13 +609,7 @@ pub async fn zo_config(
     let build_type = "opensource";
 
     #[cfg(feature = "enterprise")]
-    let expiry_time = o2_enterprise::enterprise::license::get_expiry_time().await;
-    #[cfg(feature = "enterprise")]
-    let license_server_url = o2cfg.common.license_server_url.to_string();
-    #[cfg(feature = "enterprise")]
-    let ingestion_quota_used = o2_enterprise::enterprise::license::ingestion_used() * 100.0;
-    #[cfg(feature = "enterprise")]
-    let ingestion_history = o2_enterprise::enterprise::license::get_ingestion_history().await;
+    let license = license_config(o2cfg.common.license_server_url.to_string()).await;
     #[cfg(feature = "enterprise")]
     let last_usage_report_ts = last_reported_timestamp().await;
 
@@ -526,7 +625,59 @@ pub async fn zo_config(
     let billing_group_allowed_orgs = o2cfg.cloud.billing_group_allowed_orgs.clone();
 
     #[cfg(feature = "enterprise")]
-    let workflows_enabled = o2cfg.common.workflows_enabled;
+    let workflows_enabled = o2cfg.common.workflows_enabled && check_features(&[Feature::Workflows]);
+    #[cfg(feature = "enterprise")]
+    let workflow_hooks_enabled = openobserve_core::workflows::http_trigger::hooks_enabled();
+    #[cfg(not(feature = "enterprise"))]
+    let workflow_hooks_enabled = false;
+
+    #[cfg(feature = "enterprise")]
+    let featuremap: HashMap<Feature, FeatureState> = Feature::all()
+        .map(|variant| {
+            // operator-off hides whatever the license says; operator-on but unlicensed locks
+            let switched_on = match variant {
+                Feature::AiAssistant => o2cfg.ai.enabled,
+                Feature::Incidents => o2cfg.incidents.enabled,
+                Feature::Oncall => o2cfg.oncall.enabled,
+                Feature::Workflows => o2cfg.common.workflows_enabled,
+                _ => true,
+            };
+            let entitled = check_features(&[variant]);
+            let key: &str = variant.into();
+            let listed = o2cfg
+                .common
+                .custom_hide_menus
+                .split(',')
+                .any(|m| m.trim() == key);
+            let state = if listed || !switched_on {
+                FeatureState::Hidden
+            } else if entitled {
+                FeatureState::Enabled
+            } else {
+                FeatureState::Locked
+            };
+            (variant, state)
+        })
+        .collect();
+    #[cfg(not(feature = "enterprise"))]
+    let featuremap: HashMap<Feature, FeatureState> = [
+        Feature::AiAssistant,
+        Feature::AiObservability,
+        Feature::Incidents,
+        Feature::Oncall,
+        Feature::Workflows,
+    ]
+    .into_iter()
+    .map(|variant| (variant, FeatureState::Locked))
+    .collect();
+    #[cfg(feature = "enterprise")]
+    let feature_names: HashMap<String, String> = runtime_definition()
+        .features
+        .iter()
+        .filter_map(|(key, gate)| Some((key.clone(), gate.display_name.clone()?)))
+        .collect();
+    #[cfg(not(feature = "enterprise"))]
+    let feature_names: HashMap<String, String> = HashMap::new();
 
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
@@ -548,8 +699,13 @@ pub async fn zo_config(
         sql_base64_enabled: cfg.common.ui_sql_base64_enabled,
         timestamp_column: TIMESTAMP_COL_NAME.to_string(),
         data_retention_days: cfg.compact.data_retention_days,
+        data_retention_defaults: db::organization::resolved_retention_defaults(
+            &DataRetentionDefaults::default(),
+        ),
+        resolved_data_retention: org_resolved_retention(&org_id).await,
         extended_data_retention_days: cfg.compact.extended_data_retention_days,
         restricted_routes_on_empty_data: cfg.common.restricted_routes_on_empty_data,
+        sample_data_onboarding_enabled: cfg.common.sample_data_onboarding_enabled,
         sso_enabled,
         native_login_enabled,
         service_account_enabled,
@@ -579,6 +735,8 @@ pub async fn zo_config(
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
+        max_dashboard_state_timeline_series: cfg.limit.max_dashboard_state_timeline_series,
+        max_dashboard_hostmap_cells: cfg.limit.max_dashboard_hostmap_cells,
         streaming_enabled: cfg.http_streaming.streaming_enabled,
         histogram_enabled: cfg.limit.histogram_enabled,
         timechart_enabled: cfg.limit.timechart_enabled,
@@ -597,19 +755,15 @@ pub async fn zo_config(
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
         dashboard_show_field_as_json_enabled: cfg.common.dashboard_show_field_as_json_enabled,
         ingest_flatten_level: cfg.limit.ingest_flatten_level,
-        #[cfg(feature = "enterprise")]
-        license_expiry: expiry_time,
         log_page_default_field_list: cfg.common.log_page_default_field_list.clone(),
         #[cfg(feature = "enterprise")]
-        license_server_url,
-        #[cfg(feature = "enterprise")]
-        ingestion_quota_used,
-        #[cfg(feature = "enterprise")]
-        ingestion_history,
+        license,
         query_values_default_num: cfg.limit.query_values_default_num,
         alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         incidents_enabled,
+        incidents_rca_enabled,
         downtimes_enabled,
+        fleet_enabled,
         alert_calibration_enabled,
         service_streams_enabled,
         model_pricing_enabled: cfg.common.model_pricing_enabled,
@@ -617,11 +771,17 @@ pub async fn zo_config(
         anomaly_detection_enabled,
         composite_alerts_available,
         synthetics_enabled,
+        public_dashboards_enabled: cfg.public_dashboards.enabled,
+        public_dashboard_min_refresh_secs: cfg.public_dashboards.min_refresh_secs,
         oncall_enabled,
+        slack_enabled: slack_disabled_reason.is_none(),
+        slack_disabled_reason,
         synthetics_private_locations_enabled,
         synthetics_browser_max_steps,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         database_monitoring_enabled: cfg.db_monitoring.enabled,
+        query_history_enabled: cfg.limit.query_history_enabled,
+        query_history_retention_days: cfg.limit.query_history_retention_days,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled,
@@ -638,7 +798,39 @@ pub async fn zo_config(
         billing_group_allowed_orgs,
         #[cfg(feature = "enterprise")]
         workflows_enabled,
+        workflow_hooks_enabled,
+        #[cfg(feature = "enterprise")]
+        feature_revision: runtime_definition().feature_revision,
+        features: featuremap,
+        feature_names,
     })
+}
+
+#[cfg(feature = "enterprise")]
+async fn license_config(license_server_url: String) -> LicenseConfig {
+    LicenseConfig {
+        license_expiry: o2_enterprise::enterprise::license::get_expiry_time().await,
+        license_server_url,
+        ingestion_quota_used: o2_enterprise::enterprise::license::ingestion_used() * 100.0,
+        ingestion_history: o2_enterprise::enterprise::license::get_ingestion_history().await,
+        #[cfg(not(feature = "cloud"))]
+        search: LicenseSearchConfig::new(
+            o2_enterprise::enterprise::license::search_allowed(),
+            &o2_enterprise::enterprise::license::license_status().await,
+            now_micros(),
+        ),
+    }
+}
+
+// Every org member reads this response, unlike org settings, so stream pages can rely on it.
+async fn org_resolved_retention(org_id: &str) -> DataRetentionDefaults {
+    let org = db::organization::org_retention_defaults(org_id)
+        .await
+        .unwrap_or_else(|e| {
+            log::warn!("[RETENTION] org {org_id} settings unreadable for config: {e}");
+            DataRetentionDefaults::default()
+        });
+    db::organization::resolved_retention_defaults(&org)
 }
 
 /// The route check of `GET /{org}/search/profile`, so the UI hides what the caller may not use.
@@ -665,17 +857,12 @@ async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
             use_all_org: true,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         },
         user.role,
         user.is_external,
     )
     .await
-}
-
-/// Same rule as `check_permissions`, so the UI never hides RBAC the backend enforces.
-#[cfg(feature = "enterprise")]
-async fn rbac_enabled_for_config(openfga_enabled: bool) -> bool {
-    openfga_enabled && !openobserve_core::authz::report_failure_lifts_rbac().await
 }
 
 async fn org_admin(org_id: &str, user_id: &str) -> bool {
@@ -1009,6 +1196,8 @@ pub async fn config_reload(Headers(user_email): Headers<UserEmail>) -> impl Into
     // Audit this event
     #[cfg(feature = "enterprise")]
     audit(AuditMessage {
+        login_ip: None,
+        user_agent: None,
         user_email: user_id.to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -1022,6 +1211,9 @@ pub async fn config_reload(Headers(user_email): Headers<UserEmail>) -> impl Into
             error_msg: None,
             trace_id: None,
         },
+        delegated: None,
+        fleet_id: None,
+        target: None,
     })
     .await;
     (
@@ -1111,12 +1303,15 @@ async fn get_stream_schema_status() -> (usize, usize) {
 #[cfg(feature = "enterprise")]
 pub async fn redirect(
     cookies: CookieJar,
+    headers: HeaderMap,
+    real_ip: Option<Extension<RealIp>>,
     Query(query): Query<std::collections::HashMap<String, String>>,
 ) -> Response {
     use axum_extra::extract::cookie::{Cookie, SameSite};
     use common::meta::user::AuthTokens;
     use config::meta::user::UserRole;
-    use itertools::Itertools;
+
+    use crate::request::{LoginFailure, audit_login_failure};
 
     let code = match query.get("code") {
         Some(code) => code,
@@ -1127,8 +1322,9 @@ pub async fn redirect(
                 .unwrap();
         }
     };
-    let query_string = query.iter().map(|(k, v)| format!("{k}={v}")).join("&");
     let mut audit_message = AuditMessage {
+        login_ip: real_ip.map(|Extension(ip)| ip.0.to_string()),
+        user_agent: super::users::login_user_agent(&headers),
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -1137,28 +1333,32 @@ pub async fn redirect(
             http_method: "GET".to_string(),
             http_path: "/config/redirect".to_string(),
             http_body: "".to_string(),
-            http_query_params: query_string,
+            http_query_params: String::new(),
             http_response_code: 302,
             error_msg: None,
             trace_id: None,
         },
+        delegated: None,
+        fleet_id: None,
+        target: None,
     };
 
     let state_cookie = cookies.get(LOGIN_STATE_COOKIE).map(|c| c.value());
     if let Err(msg) = consume_login_state(query.get("state"), state_cookie).await {
-        audit_message.response_meta.http_response_code = 400;
-        audit(audit_message).await;
+        audit_login_failure(
+            audit_message,
+            LoginFailure::InvalidLoginState,
+            StatusCode::BAD_REQUEST,
+        )
+        .await;
         return Response::builder()
             .status(StatusCode::BAD_REQUEST)
             .body(Body::from(msg))
             .unwrap();
     }
 
-    log::info!("entering exchange_code: {code}");
-
     match exchange_code(code).await {
         Ok(login_data) => {
-            let login_url;
             let access_token = login_data.access_token;
             let keys = get_dex_jwks().await;
             let token_ver = verify_decode_token(
@@ -1169,8 +1369,9 @@ pub async fn redirect(
                 true,
             );
             let id_token;
-            match token_ver {
+            let login_url = match token_ver {
                 Ok(res) => {
+                    audit_message.user_email = res.0.user_email.clone();
                     // check for service accounts , do not to allow login
                     if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await
                         && db_user
@@ -1193,9 +1394,12 @@ pub async fn redirect(
                     {
                         Ok(allowed) => {
                             if !allowed {
-                                audit_message.response_meta.http_response_code = 403;
-                                audit_message._timestamp = now_micros();
-                                audit(audit_message).await;
+                                audit_login_failure(
+                                    audit_message,
+                                    LoginFailure::LoginPolicyDenied,
+                                    StatusCode::UNAUTHORIZED,
+                                )
+                                .await;
                                 return Response::builder()
                                     .status(StatusCode::UNAUTHORIZED)
                                     .header(header::CONTENT_TYPE, "application/json")
@@ -1210,7 +1414,6 @@ pub async fn redirect(
                         }
                     }
 
-                    audit_message.user_email = res.0.user_email.clone();
                     id_token = json::to_string(&json::json!({
                         "email": res.0.user_email,
                         "name": res.0.user_name,
@@ -1223,41 +1426,47 @@ pub async fn redirect(
                         Ok(v) => v.map(|(new_user, pending_invites)| {
                             format!("&new_user_login={new_user}&pending_invites={pending_invites}")
                         }),
-                        Err(_) => {
+                        Err(e) => {
                             return Response::builder()
                                 .status(StatusCode::UNAUTHORIZED)
                                 .header(header::CONTENT_TYPE, "application/json")
-                                .body(Body::from("\"Email Domain not allowed\""))
+                                .body(Body::from(e.to_string()))
                                 .unwrap();
                         }
                     };
-                    login_url = format!(
+                    format!(
                         "{}#id_token={}.{}{}",
                         login_data.url,
                         ID_TOKEN_HEADER,
                         base64::encode(&id_token),
                         url_params.unwrap_or_default()
-                    );
+                    )
                 }
                 Err(e) => {
-                    audit_message.response_meta.http_response_code = 400;
-                    audit_message._timestamp = now_micros();
-                    audit(audit_message).await;
+                    audit_login_failure(
+                        audit_message,
+                        LoginFailure::TokenValidationFailed,
+                        StatusCode::UNAUTHORIZED,
+                    )
+                    .await;
                     return Response::builder()
                         .status(StatusCode::UNAUTHORIZED)
                         .header(header::CONTENT_TYPE, "application/json")
                         .body(Body::from(format!("\"{e}\"")))
                         .unwrap();
                 }
-            }
+            };
 
             // generate new UUID for access token & store token in DB
             let session_id = ider::uuid();
 
             if access_token.is_empty() {
-                audit_message.response_meta.http_response_code = 400;
-                audit_message._timestamp = now_micros();
-                audit(audit_message).await;
+                audit_login_failure(
+                    audit_message,
+                    LoginFailure::TokenValidationFailed,
+                    StatusCode::UNAUTHORIZED,
+                )
+                .await;
                 return Response::builder()
                     .status(StatusCode::UNAUTHORIZED)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -1315,9 +1524,12 @@ pub async fn redirect(
                 .unwrap()
         }
         Err(e) => {
-            audit_message.response_meta.http_response_code = 400;
-            audit_message._timestamp = now_micros();
-            audit(audit_message).await;
+            audit_login_failure(
+                audit_message,
+                LoginFailure::TokenExchangeFailed,
+                StatusCode::UNAUTHORIZED,
+            )
+            .await;
             Response::builder()
                 .status(StatusCode::UNAUTHORIZED)
                 .header(header::CONTENT_TYPE, "application/json")
@@ -1380,6 +1592,8 @@ pub async fn refresh_token_with_dex(
         .collect::<Vec<_>>()
         .join("&");
     let mut audit_message = AuditMessage {
+        login_ip: None,
+        user_agent: None,
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -1393,6 +1607,9 @@ pub async fn refresh_token_with_dex(
             error_msg: None,
             trace_id: None,
         },
+        delegated: None,
+        fleet_id: None,
+        target: None,
     };
 
     let token = if let Some(cookie) = cookies.get("auth_tokens") {
@@ -1670,6 +1887,8 @@ pub async fn logout(
     #[cfg(feature = "enterprise")]
     if let Some(user_email) = user_email {
         audit(AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email,
             org_id: "".to_string(),
             _timestamp: now_micros(),
@@ -1683,6 +1902,9 @@ pub async fn logout(
                 error_msg: None,
                 trace_id: None,
             },
+            delegated: None,
+            fleet_id: None,
+            target: None,
         })
         .await;
     }
@@ -1969,15 +2191,6 @@ mod tests {
     async fn with_downtimes_off_a_cache_reload_loads_no_downtime() {
         reload_downtimes(false).await.unwrap();
         assert!(db::downtimes::all_cached().is_empty());
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[tokio::test]
-    async fn test_config_rbac_enabled_matches_enforcement_before_any_usage_report() {
-        assert!(block_feature_for_report_failure().await);
-        assert_eq!(last_reported_timestamp().await, 0);
-        assert!(rbac_enabled_for_config(true).await);
-        assert!(!rbac_enabled_for_config(false).await);
     }
 
     #[test]
@@ -2403,6 +2616,12 @@ mod tests {
         assert!(!rum.api_version.is_empty());
     }
 
+    #[test]
+    fn test_rum_from_cfg_uses_build_version() {
+        let rum = Rum::from_cfg(get_config());
+        assert_eq!(rum.version, config::VERSION);
+    }
+
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_login_state_matches() {
@@ -2477,5 +2696,260 @@ mod tests {
             json["ingest_allowed_in_future"],
             cfg.limit.ingest_allowed_in_future
         );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_the_global_and_merged_retention() {
+        let org_id = "zo_config_retention_org";
+        #[cfg(feature = "enterprise")]
+        crate::common::infra::config::ORGANIZATION_SETTING
+            .write()
+            .await
+            .insert(
+                format!("{}/{org_id}", db::organization::ORG_SETTINGS_KEY_PREFIX),
+                crate::common::meta::organization::OrganizationSetting {
+                    data_retention: DataRetentionDefaults {
+                        default: 50,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            );
+        let response = zo_config(Path(org_id.to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let global = db::organization::resolved_retention_defaults(&Default::default());
+        assert_eq!(
+            json["data_retention_defaults"],
+            serde_json::to_value(global).unwrap()
+        );
+        #[cfg(not(feature = "enterprise"))]
+        assert_eq!(
+            json["resolved_data_retention"],
+            serde_json::to_value(global).unwrap()
+        );
+        #[cfg(feature = "enterprise")]
+        assert_eq!(json["resolved_data_retention"]["logs"], 50);
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_the_public_dashboard_refresh_floor() {
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["public_dashboard_min_refresh_secs"], 60);
+        assert_eq!(json["public_dashboards_enabled"], true);
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_query_history_settings() {
+        let cfg = get_config();
+        let json = zo_config_json().await;
+        assert_eq!(
+            json["query_history_enabled"],
+            cfg.limit.query_history_enabled
+        );
+        assert_eq!(
+            json["query_history_retention_days"],
+            cfg.limit.query_history_retention_days
+        );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_reports_slack_per_org() {
+        let reason = if cfg!(feature = "enterprise") {
+            "flag"
+        } else {
+            "edition"
+        };
+        for org in ["default", "acme_eu", "_meta"] {
+            let response = zo_config(Path(org.to_string()), None).await.into_response();
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(json["slack_enabled"], false, "{org}: {json}");
+            assert_eq!(json["slack_disabled_reason"], reason, "{org}: {json}");
+            assert_ne!(json["slack_disabled_reason"], "allowlist", "{org}: {json}");
+            assert!(json.get("slack_home_region").is_none(), "{org}: {json}");
+        }
+    }
+
+    async fn zo_config_json() -> serde_json::Value {
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_zo_config_serves_incidents_rca_enabled() {
+        let o2cfg = o2_enterprise::enterprise::common::config::get_config();
+        let json = zo_config_json().await;
+        assert_eq!(
+            json["incidents_rca_enabled"],
+            openobserve_core::alerts::incidents::incidents_enabled()
+                && o2cfg.incidents.rca_enabled
+                && openobserve_core::alerts::incidents::rca_agent_available()
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_zo_config_online_evals_need_the_observability_license() {
+        let o2cfg = o2_enterprise::enterprise::common::config::get_config();
+        let json = zo_config_json().await;
+        assert_eq!(
+            json["online_evals_enabled"],
+            o2cfg.llm_eval_config.enabled && check_features(&[Feature::AiObservability])
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_zo_config_feature_names_come_from_the_embedded_definition() {
+        let json = zo_config_json().await;
+        for (key, gate) in &runtime_definition().features {
+            assert_eq!(
+                json["feature_names"][key].as_str(),
+                gate.display_name.as_deref(),
+                "{key}"
+            );
+        }
+        for feature in Feature::all() {
+            let key: &str = feature.into();
+            assert_eq!(
+                runtime_definition().features[key].display_name.as_deref(),
+                Some(feature.display_name()),
+                "{key}"
+            );
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_zo_config_has_no_license_fields_in_oss() {
+        let json = zo_config_json().await;
+        for k in [
+            "license_search_allowed",
+            "license_waiver_until",
+            "ingestion_quota_used",
+        ] {
+            assert!(json.get(k).is_none(), "{k}");
+        }
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn test_zo_config_has_no_license_search_fields_on_cloud() {
+        let json = zo_config_json().await;
+        for k in ["license_search_allowed", "license_waiver_until"] {
+            assert!(json.get(k).is_none(), "{k}");
+        }
+        assert!(json.get("license_expiry").is_some());
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_license_search_flag_follows_the_gate_not_the_status() {
+        let mut status = o2_enterprise::enterprise::license::LicenseStatus::default();
+        status.decision.search_allowed = true;
+        assert!(!LicenseSearchConfig::new(false, &status, 0).license_search_allowed);
+        status.decision.search_allowed = false;
+        assert!(LicenseSearchConfig::new(true, &status, 0).license_search_allowed);
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[tokio::test]
+    async fn test_zo_config_serves_license_search_state() {
+        let json = zo_config_json().await;
+        assert_eq!(
+            json["license_search_allowed"],
+            serde_json::Value::Bool(o2_enterprise::enterprise::license::search_allowed())
+        );
+        assert!(json.get("license_waiver_until").is_some());
+        for k in [
+            "license_expiry",
+            "license_server_url",
+            "ingestion_quota_used",
+            "ingestion_history",
+        ] {
+            assert!(json.get(k).is_some(), "flatten must keep {k}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn report_grace_license(now: i64, active: bool) -> o2_enterprise::enterprise::license::License {
+        serde_json::from_value(serde_json::json!({
+            "version":2,"license_id":"grace-authz","installation_id":"*","active":true,
+            "created_at":now-1_000_000,"expires_at":now+86_400_000_000i64,"msv":"0.0.0",
+            "company":"Test Co","address":"1 Test Way","contact_name":"Test User",
+            "contact_email":"test@example.com","additional_emails":[],"base_urls":[],
+            "limits":{"Ingestion":{"typ":"PerDayCount","value":100}},"company_id":"test",
+            "environment_type":"online","limit_breach_allowed_count":0,
+            "allow_search_after_limit_exceeded":false,"validator_url":"","validator_auth":"",
+            "no_usage_report_allowed_duration":1,
+            "waivers":[{"id":"g","type":"report_grace","starts_at":now-3_600_000_000i64,
+                "ends_at":if active {now+3_600_000_000i64} else {now-1}}]
+        }))
+        .unwrap()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn report_grace_sso_availability_and_unauthenticated_refresh_denial() {
+        use o2_enterprise::enterprise::license::{
+            TEST_STATICS_LOCK, replace_license_for_tests, set_last_reported_timestamp_for_tests,
+        };
+        let held = TEST_STATICS_LOCK.lock().await;
+        let previous_ts = o2_enterprise::enterprise::license::last_reported_timestamp().await;
+        let now = chrono::Utc::now().timestamp_micros();
+        let previous = replace_license_for_tests(
+            &held,
+            Some(("grace".into(), report_grace_license(now, true))),
+        )
+        .await;
+        set_last_reported_timestamp_for_tests(&held, now - 86_400_000_000i64);
+        for active in [true, false] {
+            replace_license_for_tests(
+                &held,
+                Some(("grace".into(), report_grace_license(now, active))),
+            )
+            .await;
+            let response = zo_config_bootstrap().await.into_response();
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let config: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(
+                config["sso_enabled"],
+                get_dex_config().dex_enabled && active
+            );
+            let denied =
+                refresh_token_with_dex(CookieJar::new(), Query(std::collections::HashMap::new()))
+                    .await;
+            assert_eq!(
+                denied.status(),
+                if active {
+                    StatusCode::UNAUTHORIZED
+                } else {
+                    StatusCode::FORBIDDEN
+                }
+            );
+        }
+        replace_license_for_tests(&held, previous).await;
+        set_last_reported_timestamp_for_tests(&held, previous_ts);
     }
 }

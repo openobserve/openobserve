@@ -158,22 +158,10 @@ fn details_request(sql: String, size: usize, range: (i64, i64), timeout: i64) ->
     Request {
         query: Query {
             sql,
-            from: 0,
             size: size as i64 + 1,
             start_time: range.0,
             end_time: range.1.saturating_add(1),
-            quick_mode: false,
-            query_type: String::new(),
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
+            ..Default::default()
         },
         encoding: RequestEncoding::Empty,
         regions: vec![],
@@ -182,6 +170,7 @@ fn details_request(sql: String, size: usize, range: (i64, i64), timeout: i64) ->
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
         use_cache: false,
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,
@@ -216,6 +205,10 @@ fn details_request(sql: String, size: usize, range: (i64, i64), timeout: i64) ->
         (status = 400, description = "Invalid time range or page parameters"),
         (status = 403, description = "Forbidden"),
         (status = 500, description = "Failure")
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"}))
     )
 )]
 pub async fn get_trace_details(

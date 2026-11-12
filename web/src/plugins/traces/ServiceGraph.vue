@@ -83,6 +83,18 @@
           </div>
         </div>
         <OSeparator vertical class="mx-1 self-stretch max-md:hidden" />
+        <div
+          class="flex flex-none flex-row items-center gap-1.5"
+          data-test="sg-legend-inferred-dependency"
+        >
+          <span
+            class="border-text-secondary h-3 w-3 flex-none rounded-full border-2 border-dashed bg-transparent"
+          />
+          <div class="text-text-secondary! text-left text-xs font-semibold">
+            {{ t("traces.serviceGraph.dashedRingInferred") }}
+          </div>
+        </div>
+        <OSeparator vertical class="mx-1 self-stretch max-md:hidden" />
         <!-- Inventory chip: total entity count. Click to expand the per-kind
              distribution (read-only; the show/hide toggles live in "Show types"). -->
         <ODropdown side="bottom" align="start">
@@ -93,7 +105,9 @@
               size="xs"
               icon-right="expand-more"
             >
-              <span class="text-text-secondary font-bold">{{ totalEntities }}</span>
+              <span v-if="lastRunAt !== null" class="text-text-secondary font-bold">{{
+                totalEntities
+              }}</span>
               <span class="text-text-body ms-1">{{ t("traces.serviceGraph.entities") }}</span>
             </OButton>
           </template>
@@ -236,7 +250,12 @@
             data-test="service-graph-container"
             class="graph-container rounded-default bg-surface-subtle relative h-full w-full overflow-hidden"
           >
-            <div v-if="loading" class="flex h-full items-center justify-center">
+            <!-- Before the first load settles an empty graph means "not fetched yet", not "no data". -->
+            <div
+              v-if="loading || lastRunAt === null"
+              class="flex h-full items-center justify-center"
+              data-test="service-graph-loading"
+            >
               <div class="flex flex-col items-center text-center">
                 <OSpinner size="lg" />
                 <div class="text-text-secondary mt-3 text-sm">
@@ -280,45 +299,12 @@
                 @click="handleNodeClick"
               />
 
-              <!-- Zoom controls: explicit buttons drive zoom + fit-to-screen,
-                   floated bottom-right like a map control. -->
-              <div
-                class="rounded-default border-border-default bg-surface-panel absolute right-3 bottom-3 z-10 flex flex-col overflow-hidden border"
-                data-test="service-graph-zoom-controls"
-              >
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  icon-left="add"
-                  class="rounded-none"
-                  data-test="service-graph-zoom-in"
-                  @click="zoomIn"
-                >
-                  <OTooltip side="left" :content="t('traces.serviceGraph.zoomIn')" />
-                </OButton>
-                <OSeparator />
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  icon-left="remove"
-                  class="rounded-none"
-                  data-test="service-graph-zoom-out"
-                  @click="zoomOut"
-                >
-                  <OTooltip side="left" :content="t('traces.serviceGraph.zoomOut')" />
-                </OButton>
-                <OSeparator />
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  icon-left="fullscreen"
-                  class="rounded-none"
-                  data-test="service-graph-fit-screen"
-                  @click="fitToScreen"
-                >
-                  <OTooltip side="left" :content="t('traces.serviceGraph.fitToScreen')" />
-                </OButton>
-              </div>
+              <ChartZoomControls
+                data-test-prefix="service-graph"
+                @zoom-in="zoomIn"
+                @zoom-out="zoomOut"
+                @fit="fitToScreen"
+              />
 
               <!-- Service Graph Side Panel (node) -->
               <ServiceGraphSidePanel
@@ -328,6 +314,7 @@
                 :time-range="sidePanelTimeRange"
                 :visible="showSidePanel"
                 :stream-filter="selectedStreamFilter"
+                :agent-scope="agentScope"
                 :container-el="graphContainerRef"
                 @close="handleCloseSidePanel"
                 @view-traces="$emit('view-traces', $event)"
@@ -409,11 +396,14 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ServiceGraphNoDataState from "./ServiceGraphNoDataState.vue";
+import ChartZoomControls from "@/components/traces/ChartZoomControls.vue";
+import useChartZoom from "@/composables/traces/useChartZoom";
 import { getEffectiveTimeRange } from "@/utils/date";
 
 export default defineComponent({
   name: "ServiceGraph",
   components: {
+    ChartZoomControls,
     OSeparator,
     ChartRenderer,
     ServiceGraphSidePanel,
@@ -494,6 +484,15 @@ export default defineComponent({
       type: String as PropType<string | null>,
       default: null,
     },
+    // env/version may be UNSET (not set); null outside Agent mode.
+    agentScope: {
+      type: Object as PropType<{
+        name: string;
+        env: string | null;
+        version: string | null;
+      } | null>,
+      default: null,
+    },
     // Optional external time window (Agent Graph page owns its own date picker
     // via useAiDateController). When set it drives the topology query instead of
     // the shared traces store's `searchObj.data.datetime` — otherwise the page's
@@ -539,11 +538,18 @@ export default defineComponent({
     // Node side panel state
     const selectedNode = ref<any>(null);
     const showSidePanel = ref(false);
-    // Stored relative start/end go stale, so the panel resolves "now" when it opens or the range changes.
-    const sidePanelTimeRange = ref(getEffectiveTimeRange(searchObj.data.datetime));
+    // Stored relative start/end go stale, so "now" is resolved on each call.
+    const effectiveTimeRange = () =>
+      props.timeRange && props.timeRange.startTime && props.timeRange.endTime
+        ? { startTime: props.timeRange.startTime, endTime: props.timeRange.endTime }
+        : getEffectiveTimeRange(searchObj.data.datetime);
+    // The panel resolves its window when it opens or the range changes.
+    const sidePanelTimeRange = ref(effectiveTimeRange());
     watch(
       () => [
         selectedNode.value,
+        props.timeRange?.startTime,
+        props.timeRange?.endTime,
         searchObj.data.datetime.type,
         searchObj.data.datetime.relativeTimePeriod,
         searchObj.data.datetime.startTime,
@@ -551,7 +557,7 @@ export default defineComponent({
       ],
       () => {
         if (selectedNode.value) {
-          sidePanelTimeRange.value = getEffectiveTimeRange(searchObj.data.datetime);
+          sidePanelTimeRange.value = effectiveTimeRange();
         }
       },
     );
@@ -631,44 +637,6 @@ export default defineComponent({
       collapseMode.value = m;
       lastChartOptions = null;
       applyFilters();
-    };
-
-    // ── Zoom controls ─────────────────────────────────────────────────────────
-    // The mouse still zooms (roam:true) so you can focus an area with the wheel;
-    // scaleLimit on the series bounds it so it can't run away (the old "erratic"
-    // feel). The +/- buttons drive the SAME series `zoom` option via setOption,
-    // reading the chart's CURRENT zoom first so button + wheel stay in sync.
-    // Match the series `scaleLimit` (convertTraceData.ts) so the +/- buttons and
-    // box-zoom never compute a factor the chart will silently clamp away.
-    const ZOOM_MIN = 0.4;
-    const ZOOM_MAX = 3;
-
-    // The live zoom level from the chart (kept in sync with wheel zoom), so a
-    // button press adjusts from where the user actually is, not a stale ref.
-    const currentZoom = (chart: any): number => {
-      const opt = chart.getOption?.();
-      const z = opt?.series?.[0]?.zoom;
-      return typeof z === "number" && z > 0 ? z : 1;
-    };
-
-    const zoomBy = (factor: number) => {
-      const chart = chartRendererRef.value?.chart;
-      if (!chart) return;
-      const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, currentZoom(chart) * factor));
-      // Merge only the zoom so positions/data stay put.
-      chart.setOption({ series: [{ zoom: next }] }, { lazyUpdate: true });
-    };
-
-    const zoomIn = () => zoomBy(1.25);
-    const zoomOut = () => zoomBy(1 / 1.25);
-
-    // Fit-to-screen: recreate the chart (keyed on chartKey) so ECharts re-fits
-    // the full graph bounding box into the panel at zoom 1, re-centered — the
-    // reliable reset for both tree (layout:none) and graph series (also clears
-    // any wheel pan/zoom the user applied).
-    const fitToScreen = () => {
-      lastChartOptions = null;
-      chartKey.value++;
     };
 
     const toggleKindVisibility = (kind: string) => {
@@ -802,8 +770,12 @@ export default defineComponent({
     // filtered — the "Show types" button reflects this (active state + count).
     const activeFilterCount = computed(() => hiddenKinds.value.size);
 
-    // Key to control chart recreation - only change when layout/visualization type changes
-    const chartKey = ref(0);
+    const { chartKey, zoomIn, zoomOut, fitToScreen } = useChartZoom(
+      () => chartRendererRef.value?.chart,
+      () => {
+        lastChartOptions = null;
+      },
+    );
 
     // Restore drag-to-pan (map-style). The shared ChartRenderer arms the
     // `dataZoomSelect` global cursor on every render, which turns a drag into a
@@ -1614,20 +1586,9 @@ export default defineComponent({
           throw new Error(t("traces.serviceGraph.noOrganizationSelected"));
         }
 
-        // Prefer the parent-supplied window (Agent Graph page's date picker); fall
-        // back to the shared traces datetime (Traces Service Graph tab).
-        const { startTime, endTime } =
-          props.timeRange && props.timeRange.startTime && props.timeRange.endTime
-            ? props.timeRange
-            : getEffectiveTimeRange(searchObj.data.datetime);
+        const { startTime, endTime } = effectiveTimeRange();
 
-        // Topology, node kinds, edges and latency all come from the
-        // pre-aggregated _o2_service_graph stream via /topology/current. The
-        // backend hourly job (processor + build_topology) computes the complete,
-        // classified topology — queue consumers, collision handling, GenAI
-        // agent/tool/model edges — incrementally per window, so reading it here
-        // is a cheap small-stream read that scales to TB-level trace volumes
-        // (we do NOT re-scan raw traces per load). The UI is a thin renderer.
+        // /topology/current reads the rollup metrics, so a load never re-scans raw traces.
         const streamName =
           selectedStreamFilter.value && selectedStreamFilter.value !== "all"
             ? selectedStreamFilter.value
@@ -1681,6 +1642,14 @@ export default defineComponent({
           nodes,
           edges,
         };
+
+        // The side panel reads the clicked node's numbers, so it follows the refreshed node or closes when the node is gone.
+        const selectedId = selectedNode.value?.id;
+        if (selectedId) {
+          const refreshed = nodes.find((n: any) => n.id === selectedId);
+          if (refreshed) selectedNode.value = refreshed;
+          else handleCloseSidePanel();
+        }
 
         // Calculate stats
         const totalRequests = graphData.value.edges.reduce(
@@ -1922,6 +1891,7 @@ export default defineComponent({
       raw,
       t,
       loading,
+      lastRunAt,
       error,
       graphData,
       filteredGraphData,

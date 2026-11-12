@@ -300,13 +300,8 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     expect(pickerText2.toLowerCase()).toContain("day");
 
     // Close without saving
-    // Set up dialog handler BEFORE clicking discard
-    page.once("dialog", async (dialog) => {
-      expect(dialog.message()).toContain("unsaved changes");
-      await dialog.accept();
-    });
-    await pm.dashboardPanelTime.clickPanelDiscard();
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    // Edits open the in-app leave dialog, which discardPanelChanges answers with Discard
+    await pm.dashboardPanelTime.discardPanelChanges();
 
     // Step 9: Edit panel without panel time config
     // First disable panel time
@@ -329,13 +324,8 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await expect(panelTimePickerInConfig).not.toBeVisible();
 
     // Cleanup
-    // Set up dialog handler BEFORE clicking discard
-    page.once("dialog", async (dialog) => {
-      expect(dialog.message()).toContain("unsaved changes");
-      await dialog.accept();
-    });
-    await pm.dashboardPanelTime.clickPanelDiscard();
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    // Edits open the in-app leave dialog, which discardPanelChanges answers with Discard
+    await pm.dashboardPanelTime.discardPanelChanges();
     await cleanupDashboard(page, pm, dashboardName);
   });
 

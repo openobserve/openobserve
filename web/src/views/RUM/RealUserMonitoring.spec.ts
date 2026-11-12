@@ -15,8 +15,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
-import { createRouter, createWebHistory, type Router } from "vue-router";
+import { createRouter, createWebHistory, RouterView, type Router } from "vue-router";
 import { createStore } from "vuex";
+import { defineComponent, h, ref } from "vue";
+import { provideFeatureLock } from "@/composables/useFeatureLock";
 
 const streams: Record<string, { name: string; schema: { name: string }[] } | undefined> = {};
 let streamGate: Promise<void> = Promise.resolve();
@@ -52,7 +54,12 @@ const makeRouter = () =>
             path: "performance",
             name: "RumPerformance",
             component: Stub,
-            children: [{ path: "overview", name: "rumPerformanceSummary", component: Stub }],
+            children: [
+              { path: "overview", name: "rumPerformanceSummary", component: Stub },
+              { path: "web-vitals", name: "rumPerformanceWebVitals", component: Stub },
+              { path: "errors", name: "rumPerformanceErrors", component: Stub },
+              { path: "apis", name: "rumPerformanceApis", component: Stub },
+            ],
           },
         ],
       },
@@ -96,6 +103,22 @@ describe("RealUserMonitoring tabs", () => {
     const tabs = wrapper!.findAll('[role="tab"]').map((t) => t.text());
     expect(tabs).toEqual(["Performance", "Sessions", "Error Tracking", "Source Maps"]);
     expect(wrapper!.find('[data-test="rum-tab-product-analytics"]').exists()).toBe(false);
+  });
+
+  it("keeps the section tabs live on a license-locked page", async () => {
+    router = makeRouter();
+    await router.push("/rum/sessions");
+    const LockedShell = defineComponent({
+      setup() {
+        provideFeatureLock(ref("rum"));
+        return () => h(RouterView);
+      },
+    });
+    wrapper = mount(LockedShell, { global: { plugins: [router, store] } });
+    await flushPromises();
+    const tabs = wrapper.findAll('[role="tab"]');
+    expect(tabs.length).toBeGreaterThan(0);
+    expect(tabs.filter((t) => t.attributes("aria-disabled") === "true")).toHaveLength(0);
   });
 
   it("keeps Performance as the default landing tab", async () => {
@@ -145,11 +168,101 @@ describe("RealUserMonitoring tabs", () => {
     ).toBeTruthy();
   });
 
+  const activeTabText = () => wrapper!.find('[role="tab"][aria-selected="true"]').text();
+
+  const performanceSubTabs = [
+    ["/rum/performance/web-vitals", "rumPerformanceWebVitals"],
+    ["/rum/performance/errors", "rumPerformanceErrors"],
+    ["/rum/performance/apis", "rumPerformanceApis"],
+  ] as const;
+
+  it.each(performanceSubTabs)(
+    "a link to %s opens that Performance tab, not Overview",
+    async (path, name) => {
+      await mountAt(path);
+      expect(router.currentRoute.value.name).toBe(name);
+      expect(activeTabText()).toBe("Performance");
+    },
+  );
+
+  it.each(performanceSubTabs)(
+    "moving from Sessions to %s selects Performance and stays there",
+    async (path, name) => {
+      await mountAt("/rum/sessions");
+      expect(activeTabText()).toBe("Sessions");
+      await router.push(path);
+      await flushPromises();
+      await flushPromises();
+      expect(router.currentRoute.value.name).toBe(name);
+      expect(activeTabText()).toBe("Performance");
+    },
+  );
+
+  it("a link to the Overview tab still lands on Overview", async () => {
+    await mountAt("/rum/performance/overview");
+    expect(router.currentRoute.value.name).toBe("rumPerformanceSummary");
+    expect(activeTabText()).toBe("Performance");
+  });
+
   it("still shows the no-RUM empty state when _rumdata does not exist", async () => {
     streams._rumdata = undefined;
     streams._sessionreplay = undefined;
     await mountAt("/rum/sessions");
     expect(wrapper!.find('[data-test="rum-empty-web-card"]').exists()).toBe(true);
     expect(wrapper!.find('[role="tab"]').exists()).toBe(false);
+  });
+});
+
+describe("RealUserMonitoring without replay data", () => {
+  let wrapper: VueWrapper | null = null;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+  });
+
+  it("loads the shell without an unhandled rejection when _sessionreplay is absent", async () => {
+    streamGate = Promise.resolve();
+    streams._rumdata = { name: "_rumdata", schema: [{ name: "application_id" }] };
+    streams._sessionreplay = undefined;
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+
+    const router = makeRouter();
+    await router.push("/rum/sessions");
+    wrapper = mount({ template: "<router-view />" }, { global: { plugins: [router, store] } });
+    for (let i = 0; i < 4; i++) await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    process.off("unhandledRejection", unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
+    expect(router.currentRoute.value.name).toBe("Sessions");
+  });
+});
+
+describe("RealUserMonitoring with a failing _rumdata lookup", () => {
+  let wrapper: VueWrapper | null = null;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+  });
+
+  it("loads the shell without an unhandled rejection when only _sessionreplay exists", async () => {
+    streamGate = Promise.resolve();
+    streams._rumdata = undefined;
+    streams._sessionreplay = { name: "_sessionreplay", schema: [{ name: "session_id" }] };
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+
+    const router = makeRouter();
+    await router.push("/rum/sessions");
+    wrapper = mount({ template: "<router-view />" }, { global: { plugins: [router, store] } });
+    for (let i = 0; i < 4; i++) await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    process.off("unhandledRejection", unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
+    expect(router.currentRoute.value.name).toBe("Sessions");
   });
 });

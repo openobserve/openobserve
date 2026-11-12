@@ -1,6 +1,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import rate_limit from "@/services/rate_limit";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -310,5 +313,28 @@ describe("rate_limit service", () => {
 
       await expect(rate_limit.getModules("test-org")).rejects.toThrow("Service unavailable");
     });
+  });
+});
+
+describe("rate_limit analytics", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (http as any).mockReturnValue({
+      get: vi.fn().mockResolvedValue({ data: {} }),
+      put: vi.fn().mockResolvedValue({ data: {} }),
+    });
+  });
+
+  it("tracks rule updates and template download/upload", async () => {
+    await rate_limit.update_batch("o", {}, "role", "admin", "minute");
+    await rate_limit.download_template("o");
+    await rate_limit.upload_template("o", {});
+
+    expect(analytics.track).toHaveBeenCalledWith("rate_limit_updated", {
+      update_type: "role",
+      interval: "minute",
+    });
+    expect(analytics.track).toHaveBeenCalledWith("rate_limit_template_downloaded");
+    expect(analytics.track).toHaveBeenCalledWith("rate_limit_template_uploaded");
   });
 });

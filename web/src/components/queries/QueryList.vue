@@ -8,6 +8,7 @@
             {{ t("queries.queryList") }}
           </div>
           <OButton
+            :aria-label="t('common.close')"
             variant="ghost"
             size="icon-sm"
             data-test="queryList-cancel"

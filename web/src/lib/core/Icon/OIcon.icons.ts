@@ -57,6 +57,8 @@ import EditNote from "~icons/material-symbols/edit-note-outline";
 import Error from "~icons/material-symbols/error-outline";
 import ErrorOutline from "~icons/material-symbols/error-outline";
 import Event from "~icons/material-symbols/event-outline";
+import EventAvailable from "~icons/material-symbols/event-available-outline";
+import EventBusy from "~icons/material-symbols/event-busy-outline";
 import ExpandMore from "~icons/material-symbols/expand-more";
 import Extension from "~icons/material-symbols/extension-outline";
 import UploadFile from "~icons/material-symbols/upload-file-outline";
@@ -126,6 +128,7 @@ import WorkspacePremium from "~icons/material-symbols/workspace-premium-outline"
 import UnfoldLess from "~icons/material-symbols/unfold-less";
 import LeftPanelClose from "~icons/material-symbols/left-panel-close";
 import LeftPanelOpen from "~icons/material-symbols/left-panel-open";
+import PinDrop from "~icons/material-symbols/pin-drop-outline";
 import Reorder from "~icons/material-symbols/reorder";
 import FirstPage from "~icons/material-symbols/first-page";
 import LastPage from "~icons/material-symbols/last-page";
@@ -158,6 +161,7 @@ import Label from "~icons/material-symbols/label-outline";
 import Layers from "~icons/material-symbols/layers-outline";
 import Public from "~icons/material-symbols/public";
 import Mail from "~icons/material-symbols/mail-outline";
+import MarkEmailUnread from "~icons/material-symbols/mark-email-unread-outline";
 import ManageSearch from "~icons/material-symbols/manage-search";
 import Merge from "~icons/material-symbols/merge";
 import MoreHoriz from "~icons/material-symbols/more-horiz";
@@ -166,6 +170,7 @@ import Notifications from "~icons/material-symbols/notifications-outline";
 import OpenInFull from "~icons/material-symbols/open-in-full";
 import PlayCircle from "~icons/material-symbols/play-circle-outline";
 import SmartToy from "~icons/material-symbols/smart-toy-outline";
+import Terminal from "~icons/material-symbols/terminal";
 import Speed from "~icons/material-symbols/speed-outline";
 import Target from "~icons/material-symbols/target";
 import TrackChanges from "~icons/material-symbols/track-changes";
@@ -178,6 +183,8 @@ import Title from "~icons/material-symbols/title";
 import TrendingUp from "~icons/material-symbols/trending-up";
 import Undo from "~icons/material-symbols/undo";
 import UnfoldMore from "~icons/material-symbols/unfold-more";
+import ZoomIn from "~icons/material-symbols/zoom-in";
+import ZoomOut from "~icons/material-symbols/zoom-out";
 import Upload from "~icons/material-symbols/upload";
 import VerifiedUser from "~icons/material-symbols/verified-user-outline";
 import Webhook from "~icons/material-symbols/webhook";
@@ -192,6 +199,8 @@ import PhotoCamera from "~icons/material-symbols/photo-camera-outline";
 import AddCircleIcon from "~icons/material-symbols/add-circle-outline";
 import AdsClickIcon from "~icons/material-symbols/ads-click";
 import AnalyticsIcon from "~icons/material-symbols/analytics-outline";
+import DoNotDisturbOnIcon from "~icons/material-symbols/do-not-disturb-on-outline";
+import LibraryAddIcon from "~icons/material-symbols/library-add-outline";
 import ArrowBackIosIcon from "~icons/material-symbols/arrow-back-ios";
 import ArrowForwardIosIcon from "~icons/material-symbols/arrow-forward-ios";
 import ArrowRightIcon from "~icons/material-symbols/arrow-right";
@@ -261,6 +270,7 @@ import MonetizationOnIcon from "~icons/material-symbols/paid-outline-rounded";
 import NoteAddIcon from "~icons/material-symbols/note-add-outline";
 import NotificationsActiveIcon from "~icons/material-symbols/notifications-active-outline";
 import PaletteIcon from "~icons/material-symbols/palette-outline";
+import WaterDropIcon from "~icons/material-symbols/water-drop-outline";
 import PaymentsIcon from "~icons/material-symbols/payments-outline";
 import PrintIcon from "~icons/material-symbols/print-outline";
 import PsychologyIcon from "~icons/material-symbols/psychology-outline";
@@ -299,6 +309,7 @@ import TrendingDownIcon from "~icons/material-symbols/trending-down";
 import TrendingFlatIcon from "~icons/material-symbols/trending-flat";
 import TroubleshootIcon from "~icons/material-symbols/troubleshoot";
 import UpdateIcon from "~icons/material-symbols/update";
+import TvIcon from "~icons/material-symbols/tv-outline";
 import VerifiedIcon from "~icons/material-symbols/verified-outline";
 import ViewColumnIcon from "~icons/material-symbols/view-column-outline";
 import VolumeOffIcon from "~icons/material-symbols/volume-off-outline";
@@ -410,6 +421,8 @@ export const iconRegistry = {
   error: Error,
   "error-outline": ErrorOutline,
   event: Event,
+  "event-available": EventAvailable,
+  "event-busy": EventBusy,
   "expand-more": ExpandMore,
   extension: Extension,
   "upload-file": UploadFile,
@@ -480,6 +493,7 @@ export const iconRegistry = {
   "unfold-less": UnfoldLess,
   "left-panel-close": LeftPanelClose,
   "left-panel-open": LeftPanelOpen,
+  "pin-drop": PinDrop,
   reorder: Reorder,
   "first-page": FirstPage,
   "last-page": LastPage,
@@ -543,6 +557,7 @@ export const iconRegistry = {
   layers: Layers,
   public: Public,
   mail: Mail,
+  "mark-email-unread": MarkEmailUnread,
   "manage-search": ManageSearch,
   merge: Merge,
   "more-horiz": MoreHoriz,
@@ -551,6 +566,7 @@ export const iconRegistry = {
   "open-in-full": OpenInFull,
   "play-circle": PlayCircle,
   "smart-toy": SmartToy,
+  terminal: Terminal,
   speed: Speed,
   target: Target,
   "track-changes": TrackChanges,
@@ -563,6 +579,8 @@ export const iconRegistry = {
   "trending-up": TrendingUp,
   undo: Undo,
   "unfold-more": UnfoldMore,
+  "zoom-in": ZoomIn,
+  "zoom-out": ZoomOut,
   upload: Upload,
   "verified-user": VerifiedUser,
   webhook: Webhook,
@@ -572,6 +590,8 @@ export const iconRegistry = {
   "add-circle": AddCircleIcon,
   "add-circle-outline": AddCircleIcon,
   "ads-click": AdsClickIcon,
+  "do-not-disturb-on": DoNotDisturbOnIcon,
+  "library-add": LibraryAddIcon,
   analytics: AnalyticsIcon,
   "arrow-back-ios": ArrowBackIosIcon,
   "arrow-forward-ios": ArrowForwardIosIcon,
@@ -643,6 +663,7 @@ export const iconRegistry = {
   "notifications-active": NotificationsActiveIcon,
   palette: PaletteIcon,
   payments: PaymentsIcon,
+  "water-drop": WaterDropIcon,
   print: PrintIcon,
   psychology: PsychologyIcon,
   radar: RadarIcon,
@@ -679,6 +700,7 @@ export const iconRegistry = {
   "trending-flat": TrendingFlatIcon,
   troubleshoot: TroubleshootIcon,
   update: UpdateIcon,
+  tv: TvIcon,
   verified: VerifiedIcon,
   "view-column": ViewColumnIcon,
   "volume-off": VolumeOffIcon,

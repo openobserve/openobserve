@@ -123,6 +123,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </template>
+        <div
+          v-if="loading && !filteredEvents.length"
+          class="flex flex-col gap-3 px-2 py-2"
+          aria-busy="true"
+          data-test="player-events-loading"
+        >
+          <OSkeleton v-for="i in 6" :key="i" type="text" />
+        </div>
+        <OEmptyState
+          v-else-if="!filteredEvents.length"
+          size="inline"
+          icon="search-off"
+          :title="t('logs.noEvents.title')"
+          data-test="player-events-empty"
+        />
       </div>
     </template>
   </div>
@@ -141,6 +156,9 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import PlayerTracesTab from "./PlayerTracesTab.vue";
+import analytics from "@/services/product_analytics";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 const { t } = useI18nTyped();
 
@@ -177,11 +195,17 @@ const props = defineProps({
     type: Array as PropType<number[]>,
     default: () => [],
   },
+  loading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const markedSet = computed(() => new Set(props.markedTimestamps));
 
 const activeTab = ref<string>("breadcrumbs");
+watch(activeTab, (tab) => analytics.track("rum_session_sidebar_tab_switched", { tab }));
+
 const tabs: Array<{
   label: I18nText;
   value: string;
@@ -224,7 +248,13 @@ watch(
   { immediate: true, deep: true },
 );
 
-const selectedEventTypes = ref<string[]>(["error", "action", "view", "frustration"]);
+const selectedEventTypes = ref<string[]>([
+  "error",
+  "action",
+  "view",
+  "frustration",
+  "failed_request",
+]);
 const searchEvent = ref<string>("");
 
 const eventOptions = [
@@ -232,6 +262,7 @@ const eventOptions = [
   { label: t("rum.playerEvents.action"), value: "action" },
   { label: t("rum.playerEvents.view"), value: "view" },
   { label: t("rum.playerEvents.frustration"), value: "frustration" },
+  { label: t("rum.playerEvents.failedRequest"), value: "failed_request" },
 ];
 
 const searchEvents = (value: string | number | null) => {

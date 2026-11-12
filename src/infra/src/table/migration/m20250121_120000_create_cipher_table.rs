@@ -41,14 +41,27 @@ fn create_cipher_table_statement() -> TableCreateStatement {
         .table(CipherKeys::Table)
         .if_not_exists()
         .col(ColumnDef::new(CipherKeys::Org).string_len(100).not_null())
-        .col(ColumnDef::new(CipherKeys::CreatedBy).string_len(256).not_null())
-        .col(ColumnDef::new(CipherKeys::CreatedAt).big_integer().not_null())
+        .col(
+            ColumnDef::new(CipherKeys::CreatedBy)
+                .string_len(256)
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(CipherKeys::CreatedAt)
+                .big_integer()
+                .not_null(),
+        )
         .col(ColumnDef::new(CipherKeys::Name).string_len(256).not_null())
         // kind is more of an extension mechanism, if we want to store things other than
         // cipher keys, we can differentiate based on the kind
         .col(ColumnDef::new(CipherKeys::Kind).string_len(100).not_null())
         .col(ColumnDef::new(CipherKeys::Data).text().not_null())
-        .primary_key(Index::create().col(CipherKeys::Org).col(CipherKeys::Name).col(CipherKeys::Kind))
+        .primary_key(
+            Index::create()
+                .col(CipherKeys::Org)
+                .col(CipherKeys::Name)
+                .col(CipherKeys::Kind),
+        )
         .to_owned()
 }
 

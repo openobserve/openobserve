@@ -2,6 +2,7 @@ import { expect } from "playwright/test";
 import logData from "../../../fixtures/log.json";
 import testLogger from '../../utils/test-logger.js';
 import { SELECTORS } from "../../../pages/dashboardPages/dashboard-selectors.js";
+import { safeWaitForNetworkIdle } from "../../utils/wait-helpers.js";
 
 // Function to wait for the dashboard page to load
 export const waitForDashboardPage = async function (page) {
@@ -112,6 +113,9 @@ export async function deleteDashboard(page, dashboardName) {
     .locator('xpath=ancestor::*[starts-with(@data-test,"o2-table-row-")]')
     .locator('[data-test="dashboard-delete"]');
   await deleteButton.waitFor({ state: 'visible', timeout: 10000 });
+  // A prior delete leaves pointer and focus on the row that slid up; its bottom-side tooltip covers this button until mouseleave and blur.
+  await nameCell.hover();
+  await deleteButton.focus();
   await deleteButton.click();
 
   // Wait for the confirmation dialog to ensure it is fully rendered
@@ -139,6 +143,7 @@ export async function deleteDashboard(page, dashboardName) {
 
       return isStable;
     },
+    undefined,
     { timeout: 15000, polling: 100 }
   );
 
@@ -386,6 +391,36 @@ export async function cleanupTestDashboard(page, pm, dashboardName) {
   await deleteDashboard(page, dashboardName);
 
   testLogger.info('Test dashboard cleanup complete', { dashboardName });
+}
+
+/**
+ * Create a fresh dashboard with one single-query line panel (Panel1) over
+ * `e2e_automate` / `kubernetes_pod_name`, and wait for it to finish loading.
+ * Every test mutates only this freshly created dashboard; the shared
+ * `e2e_automate` stream stays read-only.
+ *
+ * @param {import('@playwright/test').Page} page - Playwright page
+ * @param {import('../../pages/page-manager.js')} pm - PageManager instance
+ * @param {string} suffix - unique per-test dashboard-name suffix
+ * @returns {Promise<string>} the created dashboard name
+ */
+export async function createLoadedDashboardWithPanel(page, pm, suffix) {
+  const dashboardName = `RefreshCancel_${suffix}_${Date.now()}`;
+
+  await pm.dashboardList.menuItem("dashboards-item");
+  await waitForDashboardPage(page);
+  await pm.dashboardCreate.waitForDashboardUIStable();
+  await pm.dashboardCreate.createDashboard(dashboardName);
+
+  await waitForEmptyDashboardReady(page, dashboardName);
+  await addSimplePanel(pm, "Panel1");
+
+  await pm.dashboardVariablesScoped.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
+  await pm.dashboardVariablesScoped.waitForDashboardReady();
+  await safeWaitForNetworkIdle(page, { timeout: 5000 });
+  await pm.dashboardVariablesScoped.waitForPanelIdle("Panel1");
+
+  return dashboardName;
 }
 
 /**

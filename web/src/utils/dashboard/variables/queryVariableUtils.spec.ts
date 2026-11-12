@@ -18,6 +18,7 @@ import { CUSTOM_VALUE, SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import {
   buildAutoPromqlQuery,
   buildAutoSqlQuery,
+  buildFilterGroupSql,
   expandMultiValueFilter,
   formatPromSeries,
   getQueryVariableLanguage,
@@ -26,6 +27,7 @@ import {
   getQueryVariableQuery,
   getSqlResultColumns,
   getUndefinedQueryVariableNames,
+  getVariableFilterValues,
   isExplicitQuerySelection,
   isCustomQueryVariable,
   isQueryVariableAllPending,
@@ -153,6 +155,9 @@ describe("expandMultiValueFilter", () => {
     expect(expandMultiValueFilter({ operator: "!=", value: "$cluster" }, valueOf).operator).toBe(
       "NOT IN",
     );
+    expect(expandMultiValueFilter({ operator: "<>", value: "$cluster" }, valueOf).operator).toBe(
+      "NOT IN",
+    );
   });
 
   it("leaves single values, other operators, formats and mixed text alone", () => {
@@ -222,6 +227,55 @@ describe("buildAutoSqlQuery", () => {
         ],
       }),
     ).toBe(`SELECT DISTINCT "f" FROM "s" WHERE "a" = '1' AND "b" IS NULL`);
+  });
+});
+
+describe("filter_group SQL", () => {
+  const leaf = (field: string, operator: string, value: string, logicalOperator = "AND") => ({
+    type: "condition" as const,
+    column: { field },
+    filterType: "condition" as const,
+    operator,
+    value,
+    logicalOperator: logicalOperator as "AND" | "OR",
+    values: [],
+  });
+  const group = {
+    filterType: "group" as const,
+    logicalOperator: "AND" as const,
+    conditions: [
+      leaf("env", "=", "$env"),
+      {
+        filterType: "group" as const,
+        logicalOperator: "AND" as const,
+        conditions: [leaf("svc", "<>", "$svc"), leaf("level", "=", "error", "OR")],
+      },
+    ],
+  };
+
+  it("renders AND/OR and nesting with the panel builder", () => {
+    expect(buildFilterGroupSql(group)).toBe(`env = '$env' AND (svc <> '$svc' OR level = 'error')`);
+  });
+
+  it("turns a multi-value $variable leaf into IN / NOT IN before rendering", () => {
+    const values: Record<string, unknown> = { env: "prod", svc: ["a", "b"] };
+    const sql = buildFilterGroupSql(group, (leafNode) =>
+      expandMultiValueFilter(leafNode, (name) => values[name]),
+    );
+    expect(sql).toBe(`env = '$env' AND (svc NOT IN ($svc) OR level = 'error')`);
+  });
+
+  it("prefills the custom SQL with the same WHERE", () => {
+    expect(buildAutoSqlQuery({ stream: "s", field: "f", filter_group: group })).toBe(
+      `SELECT DISTINCT "f" FROM "s" WHERE env = '$env' AND (svc <> '$svc' OR level = 'error')`,
+    );
+  });
+
+  it("lists the values of both saved shapes for dependency scans", () => {
+    expect(
+      getVariableFilterValues({ filter: [{ name: "a", operator: "=", value: "$x" }] }),
+    ).toEqual(["$x"]);
+    expect(getVariableFilterValues({ filter_group: group })).toEqual(["$env", "$svc", "error"]);
   });
 });
 

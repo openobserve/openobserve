@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :page-size="pageSize"
         :page-size-options="[20, 50, 100, 250, 500]"
         :current-page="currentPage"
+        keep-page-on-data-change
         @update:current-page="onPageChange"
         @update:page-size="pageSize = $event"
         sorting="client"
@@ -52,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         table-id="alerts-incident-list"
         data-test="incident-list-table"
         :get-row-style="incidentRowStyle"
-        @row-click="viewIncident"
+        @row-click="viewIncident($event)"
       >
         <!-- Toolbar: status toggle (All / Active / Resolved) + search — same
              shape as the Alerts page tabs. -->
@@ -93,10 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Severity summary strip below the toolbar (mirrors the Alerts state
              strip): Total + the four severities as selectable filter tiles. -->
         <template #subheader>
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="incident-list-summary"
-          >
+          <div data-test="incident-list-summary">
             <OStatStrip
               :items="severityStats"
               :loading="loading"
@@ -125,6 +123,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="raw(getStatusLabel(row.status))"
             size="sm"
             data-test="incident-status-badge"
+          />
+        </template>
+        <template #cell-ai_analysis="{ row }">
+          <IncidentAiAnalysisCell
+            :incident="row"
+            :rca-enabled="rcaEnabled"
+            :now="now"
+            @open="viewIncident(row, 'incidentAnalysis')"
+            @started="loadIncidents(true)"
+            @failed="loadIncidents(true)"
           />
         </template>
         <template #cell-severity="{ row }">
@@ -196,7 +204,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #cell-alert_count="{ row }">
-          <OTag type="countChip" value="neutral">{{ row.alert_count }}</OTag>
+          <div
+            v-if="row.alert_groups?.length"
+            class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
+          >
+            <OTag
+              v-for="group in row.alert_groups.slice(0, 2)"
+              :key="group.alert_id"
+              type="countChip"
+              value="neutral"
+              class="min-w-0"
+              data-test="incident-alert-group-chip"
+            >
+              <!-- One element, so the tooltip anchors on the whole label, truncated name included. -->
+              <span class="flex min-w-0">
+                <span class="truncate">{{ group.alert_name }}</span>
+                <span class="shrink-0">&nbsp;×{{ group.count }}</span>
+              </span>
+              <OTooltip
+                :delay="300"
+                :content="
+                  t(
+                    'alerts.incidents.alertGroupTooltip',
+                    { name: group.alert_name, count: group.count },
+                    group.count,
+                  )
+                "
+              />
+            </OTag>
+            <OTag
+              v-if="row.alert_groups.length > 2"
+              type="countChip"
+              value="neutral"
+              class="shrink-0"
+              data-test="incident-alert-group-more"
+            >
+              {{ t("alerts.incidents.moreAlertGroups", { count: row.alert_groups.length - 2 }) }}
+              <OTooltip :delay="300" :max-width="'28rem'">
+                <template #content>
+                  <div
+                    class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1"
+                    data-test="incident-alert-group-list"
+                  >
+                    <template v-for="group in row.alert_groups.slice(2)" :key="group.alert_id">
+                      <span class="truncate">{{ group.alert_name }}</span>
+                      <span class="text-right tabular-nums">×{{ group.count }}</span>
+                    </template>
+                  </div>
+                </template>
+              </OTooltip>
+            </OTag>
+          </div>
+          <OTag v-else type="countChip" value="neutral">{{ row.alert_count }}</OTag>
         </template>
         <template #cell-last_alert_at="{ row }">
           <OTimeCell
@@ -303,14 +362,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
 import { useOrgId } from "@/composables/query/useOrgId";
-import { useQuery } from "@tanstack/vue-query";
-import { incidentsQuery } from "@/services/incidents.queries";
-import { defineComponent, ref, shallowRef, computed, onMounted, watch, nextTick } from "vue";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { incidentsQuery, updateIncidentStatusMutation } from "@/services/incidents.queries";
+import { incidentRefusalToast, incidentStatusToast } from "@/utils/alerts/ackState";
+import type { AckAlertResponse, UnackAlertResponse } from "@/ts/interfaces/alert";
+import {
+  defineComponent,
+  ref,
+  shallowRef,
+  computed,
+  onMounted,
+  onUnmounted,
+  watch,
+  nextTick,
+} from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
-import incidentsService, { Incident } from "@/services/incidents";
+import { type Incident } from "@/services/incidents";
+import IncidentAiAnalysisCell from "@/components/alerts/IncidentAiAnalysisCell.vue";
+import { isLiveRca } from "@/utils/incidents/rcaCell";
 import { useListViewState } from "@/composables/useListViewState";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -322,6 +394,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { forbiddenState } from "@/utils/featureGate";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
@@ -336,6 +409,9 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+
+/** Re-fetch period while a live RCA run is on the current page. */
+const RCA_LIVE_POLL_MS = 30_000;
 
 export default defineComponent({
   name: "IncidentList",
@@ -357,6 +433,7 @@ export default defineComponent({
     OToggleGroupItem,
     ODropdown,
     ODropdownItem,
+    IncidentAiAnalysisCell,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -367,9 +444,13 @@ export default defineComponent({
 
     const qTableRef: any = ref(null);
     const orgIdForList = useOrgId();
+    // Set from `liveRowOnPage` below; the query getter reads it, so a change
+    // re-applies the options and TanStack restarts or stops its interval timer.
+    const pollLiveRows = ref(false);
     const incidentsList = useQuery(() =>
       Object.assign(incidentsQuery(orgIdForList.value, undefined as unknown as string, 1000, 0), {
         enabled: !!orgIdForList.value,
+        refetchInterval: pollLiveRows.value ? RCA_LIVE_POLL_MS : (false as const),
       }),
     );
 
@@ -383,9 +464,9 @@ export default defineComponent({
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = incidentsList.error.value;
-      return e?.status === 403 || e?.response?.status === 403;
+      return forbiddenState(e) || e?.status === 403;
     });
-    // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+    // The first real load lands after mount: land on the saved page, or page 1 when it no longer exists. setTimeout(0) runs after the table has taken the new rows.
     watch(
       loading,
       (isLoading) => {
@@ -452,6 +533,16 @@ export default defineComponent({
         sortOrder: sortOrder.value,
       });
     });
+    // The table keeps its page when the rows change (a poll refetch), so
+    // a new filter, sort or page size starts over on page 1 here.
+    const resetPage = () => {
+      currentPage.value = 1;
+      qTableRef.value?.restorePage?.(1);
+      savePageState();
+    };
+    watch([searchQuery, statusFilter, severityFilter, pageSize, sortBy, sortOrder], () => {
+      if (!isRestoringState.value) resetPage();
+    });
 
     const columns: OTableColumnDef[] = [
       {
@@ -483,12 +574,20 @@ export default defineComponent({
         meta: { align: "left" },
       },
       {
+        id: "ai_analysis",
+        header: t("alerts.incidents.aiAnalysis.column"),
+        resizable: true,
+        hideable: true,
+        size: 220,
+        meta: { align: "left" },
+      },
+      {
         id: "dimensions",
         header: t("alerts.incidents.stableDimensions"),
         accessorKey: "group_values",
         resizable: true,
         hideable: true,
-        size: 500,
+        size: 320,
         meta: { align: "left" },
       },
       {
@@ -497,8 +596,8 @@ export default defineComponent({
         accessorKey: "alert_count",
         resizable: true,
         hideable: true,
-        size: 80,
-        meta: { align: "right" },
+        size: 260,
+        meta: { align: "left" },
       },
       {
         id: "last_alert_at",
@@ -571,6 +670,34 @@ export default defineComponent({
         (incident) => String(incident.severity).toUpperCase() === severityFilter.value,
       );
     });
+
+    // OTable pages and sorts on the client, so mirror its only sortable
+    // column to know which rows the current page shows.
+    const liveRowOnPage = computed(() => {
+      let rows = visibleIncidents.value;
+      if (sortBy.value === "last_alert_at") {
+        const dir = sortOrder.value === "desc" ? -1 : 1;
+        rows = [...rows].sort((a, b) => dir * (a.last_alert_at - b.last_alert_at));
+      }
+      const start = (currentPage.value - 1) * pageSize.value;
+      return rows.slice(start, start + pageSize.value).some((incident) => isLiveRca(incident.rca));
+    });
+    watch(
+      liveRowOnPage,
+      (live) => {
+        pollLiveRows.value = live;
+      },
+      { immediate: true },
+    );
+
+    // Deployment-wide switch; undefined (older server) reads as disabled.
+    const rcaEnabled = computed(() => store.state.zoConfig?.incidents_rca_enabled === true);
+    // Elapsed and "ago" labels in the AI analysis cell are relative to this clock.
+    const now = ref(Date.now());
+    const nowTimer = setInterval(() => {
+      now.value = Date.now();
+    }, RCA_LIVE_POLL_MS);
+    onUnmounted(() => clearInterval(nowTimer));
 
     // Severity breakdown for the summary strip (over the status-scoped set, so it
     // tracks the toggle). The four hues (red/orange/amber/blue) match the rail.
@@ -681,6 +808,7 @@ export default defineComponent({
       // rows raw both here and in the Vuex cache below.
       for (const it of items) Object.freeze(it);
       allIncidents.value = items;
+      now.value = Date.now();
       store.dispatch("incidents/setCachedData", items);
     };
 
@@ -694,7 +822,6 @@ export default defineComponent({
       { immediate: true },
     );
     watch(incidentsList.error, (error: any) => {
-      // The grouped access toast already reports a 403; a second red toast adds nothing.
       if (!error || forbidden.value) return;
       toast({ variant: "error", message: t("alerts.incidents.errorLoading") });
       console.error("Failed to load incidents:", error);
@@ -706,7 +833,8 @@ export default defineComponent({
       if (force) await incidentsList.refetch();
     };
 
-    const viewIncident = (incident: Incident) => {
+    // `tab` selects the incident page's tab (e.g. "incidentAnalysis" from the AI analysis cell).
+    const viewIncident = (incident: Incident, tab?: string) => {
       store.dispatch("incidents/setIncidents", {
         searchQuery: searchQuery.value,
         statusFilter: statusFilter.value,
@@ -718,7 +846,11 @@ export default defineComponent({
       router.push({
         name: "incidentDetail",
         params: { id: incident.id },
-        query: { ...route.query, org_identifier: store.state.selectedOrganization.identifier },
+        query: {
+          ...route.query,
+          org_identifier: store.state.selectedOrganization.identifier,
+          ...(tab ? { tab } : {}),
+        },
       });
     };
 
@@ -746,25 +878,41 @@ export default defineComponent({
       filterByStatus("active");
     };
 
+    // The mutation drops the alert, incident and on-call reads the one ack wrote.
+    const statusWrite = useMutation(() =>
+      updateIncidentStatusMutation(store.state.selectedOrganization.identifier),
+    );
     const updateStatus = async (
       incident: Incident,
       newStatus: "open" | "acknowledged" | "resolved",
     ) => {
       try {
-        const org = store.state.selectedOrganization.identifier;
-        await incidentsService.updateStatus(org, incident.id, newStatus);
-        toast({
-          variant: "success",
-          message: t("alerts.incidents.statusUpdated"),
+        const res = await statusWrite.mutateAsync({
+          id: incident.id,
+          status: newStatus,
+          from: incident.status,
         });
+        // Only the one ack's routes answer with what they did.
+        const { ack } = res as { ack?: AckAlertResponse | UnackAlertResponse };
+        toast(
+          incidentStatusToast(
+            newStatus,
+            ack,
+            incident.title || incident.id,
+            store.state.userInfo?.email,
+            t,
+          ) ?? { variant: "success", message: t("alerts.incidents.statusUpdated") },
+        );
         // Post-write reload: must reach the server.
         loadIncidents(true);
         store.dispatch("incidents/setShouldRefresh", true);
       } catch (error: any) {
-        toast({
-          variant: "error",
-          message: t("alerts.incidents.statusUpdateFailed"),
-        });
+        toast(
+          incidentRefusalToast(error, newStatus, t) ?? {
+            variant: "error",
+            message: t("alerts.incidents.statusUpdateFailed"),
+          },
+        );
         console.error("Failed to update incident status:", error);
       }
     };
@@ -781,11 +929,27 @@ export default defineComponent({
       updateStatus(incident, "acknowledged");
     };
 
-    const resolveIncident = (incident: Incident) => {
+    const resolveIncident = async (incident: Incident) => {
+      const ok = await confirm({
+        title: t("alerts.incidents.resolveConfirmTitle"),
+        message: t("alerts.incidents.resolveConfirmMessage"),
+        confirmLabel: t("alerts.incidents.resolve"),
+        cancelLabel: t("common.cancel"),
+        persistent: false,
+      });
+      if (!ok) return;
       updateStatus(incident, "resolved");
     };
 
-    const reopenIncident = (incident: Incident) => {
+    const reopenIncident = async (incident: Incident) => {
+      const ok = await confirm({
+        title: t("alerts.incidents.reopenConfirmTitle"),
+        message: t("alerts.incidents.reopenConfirmMessage"),
+        confirmLabel: t("alerts.incidents.reopen"),
+        cancelLabel: t("common.cancel"),
+        persistent: false,
+      });
+      if (!ok) return;
       updateStatus(incident, "open");
     };
 
@@ -945,11 +1109,16 @@ export default defineComponent({
       isRestoringState.value = false;
     });
 
-    watch(() => searchQuery.value, savePageState);
+    // Rows can leave under the current page (a resolve, a refetch); a page past
+    // the end falls back to page 1, and the table reports it to `onPageChange`.
+    watch(
+      () => visibleIncidents.value.length,
+      () => qTableRef.value?.restorePage?.(currentPage.value),
+      { flush: "post" },
+    );
 
     const refreshIncidents = async () => {
-      // Explicit refresh: must reach the server.
-      await loadIncidents(true);
+      if ((await incidentsList.refetch()).isError) return;
       toast({
         variant: "success",
         message: t("toastMessages.alerts.incidentsRefreshed"),
@@ -977,6 +1146,8 @@ export default defineComponent({
       forbidden,
       allIncidents,
       visibleIncidents,
+      rcaEnabled,
+      now,
       severityStats,
       severityFilter,
       onSeveritySelect,

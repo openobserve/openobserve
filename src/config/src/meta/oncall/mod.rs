@@ -16,10 +16,13 @@
 //! On-call shared types — in `config` because `infra` and `o2_enterprise` both name them.
 
 pub mod agent;
+pub mod chat;
+pub mod confidence;
 pub mod contact;
 pub mod policy;
 pub mod preset;
 pub mod rca;
+pub mod rca_run;
 pub mod response;
 pub mod rotation;
 pub mod routing;
@@ -28,16 +31,25 @@ pub mod target;
 pub mod team;
 
 pub use agent::{
-    AnalysisState, AnalysisStatus, AnalysisVerdict, Confidence, GatePlan, L0Error, L0Metric,
-    L0Mode, L0Modes, L0Policy, PageAction, PageRecommendation, ParsedReport, ProposedAction,
-    SeverityDecision, VerdictOutcome, analysis_status_for_start, apply_verdict, gate_plan,
-    metrics_for, parse_report, promotion_note, quieter_channels, ratchet, severity_pages,
+    AnalysisState, AnalysisStatus, AnalysisVerdict, Confidence, ConfidenceRefusal, GatePlan,
+    L0Error, L0Metric, L0Mode, L0Modes, L0Policy, PageAction, PageRecommendation, ProposedAction,
+    SeverityDecision, VerdictOutcome, analysis_status_for_start, apply_verdict, confidence_refusal,
+    gate_plan, metrics_for, promotion_note, quieter_channels, ratchet, severity_pages,
     update_channels, verdict_lines,
 };
+pub use chat::{
+    ChatMessage, ChatMessageKind, ChatMessageStatus, SlackRoomEdit, SlackRoomEditError,
+    TeamSlackView,
+};
+pub use confidence::{
+    CauseGrade, ConfidenceGrade, GradeReason, SignalClass, ToolCallRecord, UnverifiedCitation,
+    UnverifiedReason, apply_outcome, grade_confidence, match_citation, min_band, normalize_key_arg,
+    signal_class, stream_type,
+};
 pub use contact::{
-    CODE_MAX_ATTEMPTS, CODE_TTL_MICROS, CodeCheck, CodeRow, Contact, ContactError, DAY_MICROS,
-    SEND_GAP_MICROS, SENDS_PER_NUMBER_PER_DAY, SENDS_PER_USER_PER_DAY, SendDecision, WaitLimit,
-    code_check, code_send_decision, next_counts, to_e164, wait_message,
+    CODE_MAX_ATTEMPTS, CODE_TTL_MICROS, CodeCheck, CodeRow, Contact, ContactError, SEND_GAP_MICROS,
+    SEND_WINDOW_MICROS, SENDS_PER_NUMBER_PER_WINDOW, SENDS_PER_USER_PER_WINDOW, SendDecision,
+    WaitLimit, code_check, code_send_decision, next_counts, to_e164, wait_message,
 };
 pub use policy::{
     Admission, AfterRung, BREAKER_OPEN_MICROS, BREAKER_WINDOW_MICROS, CHANNEL_ORDER, Channel,
@@ -51,12 +63,14 @@ pub use preset::{
     MAX_GROUP_MEMBERS, MAX_HANDOVER_MICROS, MIN_FOLLOW_THE_SUN_GROUPS, MIN_HANDOVER_MICROS,
     PresetDescriptor, PresetError, PresetId, PresetInput, PresetInputKind, PresetSpec,
     RESTRICTED_PRIORITY, RegionGroup, build as build_preset, catalogue as preset_catalogue,
+    resolve_anchor as preset_anchor,
 };
 pub use rca::RcaContext;
 pub use response::{
-    DEFAULT_FLAP_DAMPENING_SECS, FIRST_LADDER_RUN, NoBlastRadius, PageDecision, ResolutionCause,
-    ResponderRole, Response, ResponseEvent, ResponseEventKind, ResponseState, UpstreamRecovery,
-    dependents_all_clear, flap_note, next_ladder_run, page_decision, upstream_recovery,
+    DEFAULT_FLAP_DAMPENING_SECS, FIRST_LADDER_RUN, NewAlertEffect, NoBlastRadius, PageDecision,
+    ResolutionCause, ResponderRole, Response, ResponseEvent, ResponseEventKind, ResponseState,
+    UpstreamRecovery, dependents_all_clear, flap_note, next_ladder_run, page_decision,
+    upstream_recovery,
 };
 pub use rotation::{
     AwayShift, CoverageSegment, DEFAULT_ROTATION_NAME, DEFAULT_SHIFT_RULE_NAME, GridError,
@@ -69,8 +83,8 @@ pub use rotation::{
 };
 pub use routing::{
     DimensionDepth, OwnershipError, OwnershipRule, Routed, RoutingConfig, RoutingDecision,
-    RoutingInputs, SERVICE_DIMENSION, UnroutedSignal, canonical_path, outstanding, resolve_owner,
-    resolve_owner_ranked, route,
+    RoutingInputs, SERVICE_DIMENSION, UnroutedSignal, canonical_path, compare_precedence,
+    outstanding, resolve_owner, resolve_owner_ranked, route,
 };
 pub use subject::{SubjectError, SubjectRef, SubjectType};
 pub use target::{EscalationTarget, RotationMode, TargetError};

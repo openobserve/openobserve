@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import OInlineEdit from "./OInlineEdit.vue";
 
@@ -145,6 +145,121 @@ describe("OInlineEdit", () => {
     const message = wrapper.find('[data-test="name-error"]');
     expect(message.text()).toBe("Name is required");
     expect(message.attributes("role")).toBe("alert");
+  });
+
+  describe("suggestions", { timeout: 20_000 }, () => {
+    const SUGGESTIONS = [
+      { name: "rack", description: "Query values" },
+      { name: "rack:csv", description: "Commas: a,b" },
+      { name: "switch", description: "Constant" },
+    ];
+    let restoreLayout: () => void;
+    let mounted: VueWrapper | null = null;
+
+    // The virtualised list renders no rows in jsdom without a sized scroll box.
+    beforeEach(() => {
+      const realRect = Element.prototype.getBoundingClientRect;
+      const realHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetHeight");
+      Element.prototype.getBoundingClientRect = function (this: Element) {
+        const size = this.hasAttribute("data-index") ? 28 : 200;
+        return { top: 0, bottom: size, left: 0, right: 200, width: 200, height: size } as DOMRect;
+      };
+      Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
+        configurable: true,
+        get(this: HTMLElement) {
+          return this.hasAttribute("data-index") ? 28 : 200;
+        },
+      });
+      Element.prototype.scrollIntoView = vi.fn();
+      restoreLayout = () => {
+        Element.prototype.getBoundingClientRect = realRect;
+        if (realHeight) Object.defineProperty(HTMLElement.prototype, "offsetHeight", realHeight);
+      };
+    });
+
+    afterEach(() => {
+      mounted?.unmount();
+      mounted = null;
+      restoreLayout();
+    });
+
+    const openWith = async (text: string) => {
+      mounted = mount(OInlineEdit, {
+        props: {
+          modelValue: "Temp",
+          "data-test": "name",
+          suggestions: SUGGESTIONS,
+          delimiter: "dollar",
+          "onUpdate:modelValue": (value: string) => mounted?.setProps({ modelValue: value }),
+        },
+        global: { stubs: { OIcon: true } },
+        attachTo: document.body,
+      });
+      await mounted.find('[data-test="name-trigger"]').trigger("click");
+      const field = mounted.find('[data-test="name-input"]').element as HTMLInputElement;
+      field.value = text;
+      field.setSelectionRange(text.length, text.length);
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      await flushPromises();
+      return field;
+    };
+
+    const press = (field: HTMLInputElement, key: string) => {
+      const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+      field.dispatchEvent(event);
+      return event;
+    };
+
+    const rows = () =>
+      [...document.body.querySelectorAll('[data-test^="name-suggest-item-"]')].filter(
+        (el) => !el.getAttribute("data-test")?.endsWith("-description"),
+      );
+
+    it("lists every variable with its description on a bare $", async () => {
+      await openWith("Temp $");
+
+      expect(rows().map((el) => el.querySelector("span > span")?.textContent?.trim())).toEqual([
+        "$rack",
+        "${rack:csv}",
+        "$switch",
+      ]);
+      expect(
+        document.body.querySelector('[data-test="name-suggest-item-rack:csv-description"]')
+          ?.textContent,
+      ).toBe("Commas: a,b");
+    });
+
+    it("narrows on ${r and inserts the braced token on Enter without committing", async () => {
+      const field = await openWith("Temp ${r");
+      expect(rows()).toHaveLength(2);
+
+      press(field, "Enter");
+      await flushPromises();
+
+      expect(field.value).toBe("Temp ${rack}");
+      expect(mounted?.emitted("commit")).toBeUndefined();
+      expect(mounted?.find('[data-test="name-input"]').exists()).toBe(true);
+    });
+
+    it("closes only the list on Escape, keeping the typed text", async () => {
+      const field = await openWith("Temp $sw");
+
+      press(field, "Escape");
+      await flushPromises();
+
+      expect(document.body.querySelector('[data-test="name-suggest"]')).toBeNull();
+      expect(mounted?.emitted("cancel")).toBeUndefined();
+      expect(field.value).toBe("Temp $sw");
+    });
+
+    it("commits on Enter once the list is closed", async () => {
+      const field = await openWith("Temp $rack x");
+
+      press(field, "Enter");
+      await flushPromises();
+
+      expect(mounted?.emitted("commit")).toEqual([["Temp $rack x"]]);
+    });
   });
 
   it("offers no edit affordance when readonly", () => {

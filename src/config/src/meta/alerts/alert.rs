@@ -21,16 +21,16 @@ use utoipa::ToSchema;
 
 use crate::{
     meta::{
-        alerts::{
-            Operator, QueryCondition, TriggerCondition, deduplication::DeduplicationConfig,
-            priority::AlertPriority,
-        },
+        alerts::{Operator, QueryCondition, TriggerCondition, priority::AlertPriority},
         stream::StreamType,
         triggers::{ScheduledTriggerData, Trigger},
     },
     stats::MemorySize,
     utils::json,
 };
+
+/// Context attribute that marks an alert as a SIEM detection.
+pub const SIEM_ATTRIBUTE: &str = "siem";
 
 #[derive(Clone, Copy, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 #[repr(i16)]
@@ -93,8 +93,6 @@ pub struct Alert {
     pub updated_at: Option<DateTime<FixedOffset>>,
     #[serde(default)]
     pub last_edited_by: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub deduplication: Option<DeduplicationConfig>,
     /// When true, this alert creates/joins incidents instead of sending direct notifications.
     /// Notification is sent only when a new incident is created or a new alert type joins
     /// an existing incident. Repeated firings are suppressed.
@@ -150,11 +148,15 @@ pub struct Alert {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runbook_url: Option<String>,
 
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub incident_title_template: Option<String>,
+
     #[serde(default)]
     pub pending_period_sec: i64,
 
-    /// Send one notification when this alert stops firing. Off by default: an existing template
-    /// that never mentions `{alert_status}` would otherwise render the firing wording twice.
+    /// Send one notification when this alert, or each group of a multi-alert, stops firing. Off by
+    /// default: an existing template that never mentions `{alert_status}` would otherwise render
+    /// the firing wording twice.
     #[serde(default)]
     pub notify_on_recovery: bool,
 
@@ -169,6 +171,10 @@ pub struct Alert {
     /// today. Named after Prometheus' `keep_firing_for`, with the same meaning.
     #[serde(default)]
     pub keep_firing_for: i64,
+
+    /// Notify once per state change; enterprise only, other builds ignore it.
+    #[serde(default)]
+    pub suppress_repeats: bool,
 }
 
 /// Accept a runbook link, or say why not.
@@ -222,7 +228,6 @@ impl MemorySize for Alert {
             + self.description.mem_size()
             + self.owner.mem_size()
             + self.last_edited_by.mem_size()
-            + self.deduplication.mem_size()
             + self.workflows.mem_size()
             + self.tags.mem_size()
             + std::mem::size_of::<Option<AlertPriority>>()
@@ -242,6 +247,7 @@ impl Default for Alert {
         Self {
             oncall_team: None,
             runbook_url: None,
+            incident_title_template: None,
             id: None,
             name: "".to_string(),
             org_id: "".to_string(),
@@ -263,7 +269,6 @@ impl Default for Alert {
             updated_at: None,
             last_edited_by: None,
             last_satisfied_at: None,
-            deduplication: None,
             creates_incident: false,
             workflows: vec![],
             priority: None,
@@ -272,11 +277,17 @@ impl Default for Alert {
             notify_on_recovery: false,
             recovery_destinations: vec![],
             keep_firing_for: 0,
+            suppress_repeats: false,
         }
     }
 }
 
 impl Alert {
+    /// Whether repeat notifications are withheld; other builds than enterprise ignore the switch.
+    pub fn suppresses_repeats(&self) -> bool {
+        cfg!(feature = "enterprise") && self.suppress_repeats
+    }
+
     /// Pending rule mode needs per-series state; the default count gate means any series.
     pub fn normalize_promql_rule_mode(&mut self) {
         if self.query_condition.query_type != super::QueryType::PromQL
@@ -390,6 +401,9 @@ pub struct ListAlertsParams {
     /// The optional folder ID surrogate key with which to filter alerts.
     pub folder_id: Option<String>,
 
+    /// Folders the caller may list; `None` is unrestricted and `Some(empty)` matches nothing.
+    pub listable_folder_ids: Option<Vec<String>>,
+
     /// The optional case-insensitive alert name substring with which to filter alerts.
     pub name_substring: Option<String>,
 
@@ -434,6 +448,9 @@ pub struct ListAlertsParams {
     /// against.
     pub tag_alert_ids: Option<Vec<String>>,
 
+    /// Alert ids the caller may not see, dropped in SQL so pagination stays correct.
+    pub excluded_alert_ids: Vec<String>,
+
     /// Optional sort column (PT-3). `None` keeps the historical ordering
     /// (name, then folder name).
     pub sort_by: Option<AlertSortField>,
@@ -465,6 +482,7 @@ impl ListAlertsParams {
         Self {
             org_id: org_id.to_owned(),
             folder_id: None,
+            listable_folder_ids: None,
             name_substring: None,
             stream_type_and_name: None,
             enabled: None,
@@ -473,6 +491,7 @@ impl ListAlertsParams {
             alert_type: AlertTypeFilter::All,
             priority: None,
             tag_alert_ids: None,
+            excluded_alert_ids: Vec::new(),
             sort_by: None,
             sort_desc: false,
             slo_id: None,
@@ -492,6 +511,12 @@ impl ListAlertsParams {
         self
     }
 
+    /// Drop these alert ids from the result.
+    pub fn without_alert_ids(mut self, ids: Vec<String>) -> Self {
+        self.excluded_alert_ids = ids;
+        self
+    }
+
     /// Sort by a column. Ascending priority = most urgent first (PT-3).
     pub fn sorted_by(mut self, field: AlertSortField, desc: bool) -> Self {
         self.sort_by = Some(field);
@@ -502,6 +527,12 @@ impl ListAlertsParams {
     /// Filter alerts by the given folder ID surrogate key.
     pub fn in_folder(mut self, folder_id: &str) -> Self {
         self.folder_id = Some(folder_id.to_string());
+        self
+    }
+
+    /// Restrict the list to these folders; an empty set matches nothing.
+    pub fn within_folders(mut self, folder_ids: Vec<String>) -> Self {
+        self.listable_folder_ids = Some(folder_ids);
         self
     }
 
@@ -516,6 +547,13 @@ impl ListAlertsParams {
         self.page_size_and_idx = Some((page_size, page_idx));
         self
     }
+}
+
+/// The one rule for whether an alert's context attributes mark it as a SIEM detection.
+pub fn is_siem_detection(attrs: Option<&HashMap<String, String>>) -> bool {
+    attrs
+        .and_then(|attrs| attrs.get(SIEM_ATTRIBUTE))
+        .is_some_and(|v| v == "true")
 }
 
 #[cfg(test)]
@@ -966,7 +1004,6 @@ mod tests {
             template: None,
             context_attributes: None,
             updated_at: None,
-            deduplication: None,
             ..Default::default()
         };
         let json = serde_json::to_value(&alert).unwrap();
@@ -974,14 +1011,12 @@ mod tests {
         assert!(!obj.contains_key("template"));
         assert!(!obj.contains_key("context_attributes"));
         assert!(!obj.contains_key("updated_at"));
-        assert!(!obj.contains_key("deduplication"));
     }
 
     #[test]
     fn test_alert_skip_serializing_if_some_fields_present() {
         use chrono::TimeZone;
 
-        use crate::meta::alerts::deduplication::DeduplicationConfig;
         let mut ctx = HashMap::new();
         ctx.insert("env".to_string(), "prod".to_string());
         let tz = chrono::FixedOffset::east_opt(0).unwrap();
@@ -990,7 +1025,6 @@ mod tests {
             template: Some("my_template".to_string()),
             context_attributes: Some(ctx),
             updated_at: Some(dt),
-            deduplication: Some(DeduplicationConfig::default()),
             ..Default::default()
         };
         let json = serde_json::to_value(&alert).unwrap();
@@ -999,7 +1033,29 @@ mod tests {
         assert_eq!(obj["template"], serde_json::json!("my_template"));
         assert!(obj.contains_key("context_attributes"));
         assert!(obj.contains_key("updated_at"));
-        assert!(obj.contains_key("deduplication"));
+    }
+
+    #[test]
+    fn test_stored_deduplication_still_loads_and_is_dropped_on_save() {
+        let stored = r#"{
+            "name": "test_alert",
+            "org_id": "test_org",
+            "stream_type": "logs",
+            "stream_name": "test_stream",
+            "is_real_time": false,
+            "destinations": [],
+            "deduplication": {
+                "enabled": true,
+                "fingerprint_fields": ["host"],
+                "time_window_minutes": 30,
+                "grouping": {"enabled": true, "max_group_size": 10, "group_wait_seconds": 30}
+            }
+        }"#;
+
+        let alert: Alert = serde_json::from_str(stored).unwrap();
+        assert_eq!(alert.name, "test_alert");
+        let saved = serde_json::to_value(&alert).unwrap();
+        assert!(!saved.as_object().unwrap().contains_key("deduplication"));
     }
 
     // ── Feature 2: list params (PT-3, PT-8) ─────────────────────────────────
@@ -1220,5 +1276,32 @@ mod tests {
         assert_eq!(alert.runbook_url, None);
         let json = serde_json::to_value(&alert).unwrap();
         assert!(json.get("runbook_url").is_none());
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn repeat_suppression_is_ignored_outside_enterprise() {
+        let alert = Alert {
+            suppress_repeats: true,
+            ..Default::default()
+        };
+        assert!(!alert.suppresses_repeats());
+    }
+
+    #[test]
+    fn an_alert_saved_before_repeat_suppression_reads_with_it_off() {
+        let mut stored = serde_json::to_value(Alert::default()).unwrap();
+        stored.as_object_mut().unwrap().remove("suppress_repeats");
+        let alert: Alert = serde_json::from_value(stored).unwrap();
+        assert!(!alert.suppress_repeats);
+    }
+
+    #[test]
+    fn test_only_a_true_siem_attribute_marks_a_detection() {
+        let attrs = |v: &str| HashMap::from([(SIEM_ATTRIBUTE.to_string(), v.to_string())]);
+        assert!(is_siem_detection(Some(&attrs("true"))));
+        assert!(!is_siem_detection(Some(&attrs("false"))));
+        assert!(!is_siem_detection(Some(&HashMap::new())));
+        assert!(!is_siem_detection(None));
     }
 }

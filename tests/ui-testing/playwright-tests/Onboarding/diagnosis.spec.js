@@ -2,6 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const { FirstEventPage } = require('../../pages/generalPages/firstEventPage.js');
 const { authedRequest } = require('../utils/cloud-auth.js');
+const { ingestBase } = require('../utils/ingest-url.js');
 
 const base = () => process.env.ZO_BASE_URL.replace(/\/$/, '');
 const ingestionBase = () => (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, '');
@@ -18,7 +19,7 @@ test.describe('First event diagnosis', () => {
         const orgId = createdBody.identifier || (createdBody.data && createdBody.data.identifier);
         try {
             const bad = Buffer.from(`${process.env.ZO_ROOT_USER_EMAIL}:not-the-token`).toString('base64');
-            const res = await request.post(`${ingestionBase()}/api/${orgId}/nginx/_json`, {
+            const res = await request.post(`${ingestBase(ingestionBase())}/api/${orgId}/nginx/_json`, {
                 headers: { Authorization: `Basic ${bad}`, 'Content-Type': 'application/json' },
                 data: [{ log: 'rejected e2e' }],
             });
