@@ -33,8 +33,9 @@ import { generateWhereClause } from "@/utils/alerts/alertQueryBuilder";
 
 // Shared so the SQL → stream-name sync tests can parse a FROM clause and fail a
 // stream lookup; the defaults match the old per-call mocks.
-const { getStreamMock, sqlParseMock } = vi.hoisted(() => ({
+const { getStreamMock, getStreamsMock, sqlParseMock } = vi.hoisted(() => ({
   getStreamMock: vi.fn(),
+  getStreamsMock: vi.fn(),
   sqlParseMock: vi.fn(),
 }));
 const STREAM_SCHEMA = {
@@ -44,6 +45,7 @@ const STREAM_SCHEMA = {
   ],
 };
 getStreamMock.mockResolvedValue(STREAM_SCHEMA);
+getStreamsMock.mockResolvedValue({ list: [] });
 
 // Desktop by default; a test sets it false to read the form as it renders below lg.
 const breakpoint = vi.hoisted(() => ({ lgUp: null as { value: boolean } | null }));
@@ -57,7 +59,7 @@ vi.mock("@/composables/useBreakpoint", async (importOriginal) => {
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStream: getStreamMock,
-    getStreams: vi.fn().mockResolvedValue({ list: [] }),
+    getStreams: getStreamsMock,
   }),
 }));
 
@@ -359,9 +361,13 @@ describe("AddAlert (OForm owner)", () => {
       seedValidScheduled(form);
       form.setFieldValue("query_condition.type", "sql");
       form.setFieldValue("query_condition.sql", "");
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
 
       await form.handleSubmit();
       await flushPromises();
+
+      expect(scrollToSection).toHaveBeenCalledWith("condition");
 
       // The schema passes (query text is not a schema rule) …
       expect(form.state.isValid).toBe(true);
@@ -380,9 +386,13 @@ describe("AddAlert (OForm owner)", () => {
       form.setFieldValue("query_condition.type", "sql");
       form.setFieldValue("query_condition.sql", "SELECT * FROM logs");
       wrapper.vm.sqlQueryErrorMsg = "Invalid syntax";
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
 
       await form.handleSubmit();
       await flushPromises();
+
+      expect(scrollToSection).toHaveBeenCalledWith("condition");
 
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
       expect(toast).toHaveBeenCalledWith(
@@ -399,14 +409,39 @@ describe("AddAlert (OForm owner)", () => {
       seedValidScheduled(form);
       form.setFieldValue("query_condition.type", "promql");
       form.setFieldValue("query_condition.promql", "");
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
 
       await form.handleSubmit();
       await flushPromises();
+
+      expect(scrollToSection).toHaveBeenCalledWith("condition");
 
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
       expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ message: "PromQL query cannot be empty." }),
       );
+    });
+
+    it("keeps the newer stream type's list when an older type's list arrives last", async () => {
+      const replies: Record<string, (value: unknown) => void> = {};
+      getStreamsMock.mockImplementation(
+        (type: string) => new Promise((resolve) => (replies[type] = resolve)),
+      );
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_type", "logs");
+      wrapper.vm.updateStreams();
+      wrapper.vm.form.setFieldValue("stream_type", "metrics");
+      wrapper.vm.updateStreams();
+
+      replies.metrics({ list: [{ name: "cpu_usage" }] });
+      await flushPromises();
+      replies.logs({ list: [{ name: "app_logs" }] });
+      await flushPromises();
+
+      expect(wrapper.vm.indexOptions).toEqual(["cpu_usage"]);
+      getStreamsMock.mockResolvedValue({ list: [] });
     });
 
     // The measure-column rule is SCHEMA-owned (QueryConfig.schema.ts), not an

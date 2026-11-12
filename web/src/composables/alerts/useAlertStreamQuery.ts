@@ -28,6 +28,11 @@ export interface AlertStreamQueryRequest {
   size: number;
 }
 
+interface AlertStreamChunk {
+  type?: string;
+  content?: { results?: { hits?: Record<string, unknown>[] } };
+}
+
 /** One SQL search over the streaming endpoint, collecting every chunk of hits; a new run cancels the last. */
 export function useAlertStreamQuery() {
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
@@ -70,7 +75,7 @@ export function useAlertStreamQuery() {
         searchType: "ui",
       },
       {
-        data: (_payload: unknown, response: any) => {
+        data: (_payload: unknown, response: AlertStreamChunk | undefined) => {
           if (!owns() || response?.type !== "search_response_hits") return;
           hits.value = [...hits.value, ...(response.content?.results?.hits ?? [])];
         },

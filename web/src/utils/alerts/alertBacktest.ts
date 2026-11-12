@@ -67,20 +67,29 @@ export function backtestWindows(
   const compare = COMPARE[options.operator] ?? COMPARE[">="];
   const total = Math.max(1, Math.round(MINUTES_PER_DAY / Math.max(options.period, 1)));
   const hours = Array.from({ length: options.hours }, () => false);
+  const windowMs = Math.max(options.period, 1) * 60_000;
+  const hourOf = (ms: number) => Math.min(options.hours - 1, Math.max(0, Math.floor(ms / HOUR_MS)));
+  // Histogram buckets start on multiples of the window, not at startMs.
+  const firstWindowMs = Math.floor(options.startMs / windowMs) * windowMs;
+  const seenWindows = new Set<number>();
+  let unplaced = false;
   let fired = 0;
   for (const row of rows) {
+    const at = keyToMs(row.zo_sql_key);
+    if (at === null) unplaced = true;
+    else seenWindows.add(Math.floor((at - firstWindowMs) / windowMs));
     if (!compare(Number(row.zo_sql_val ?? 0), options.threshold)) continue;
     fired += 1;
-    const at = keyToMs(row.zo_sql_key);
-    if (at === null) continue;
-    const hour = Math.floor((at - options.startMs) / HOUR_MS);
-    hours[Math.min(options.hours - 1, Math.max(0, hour))] = true;
+    if (at !== null) hours[hourOf(at - options.startMs)] = true;
   }
   // Windows with no events never come back as rows, yet a "fewer than" limit fires on them.
   const silent = Math.max(0, total - rows.length);
   if (silent > 0 && compare(0, options.threshold)) {
     fired += silent;
-    hours.fill(true);
+    if (unplaced) hours.fill(true);
+    for (let i = 0; i < total && !unplaced; i++) {
+      if (!seenWindows.has(i)) hours[hourOf(firstWindowMs + i * windowMs - options.startMs)] = true;
+    }
   }
   return { fired: Math.min(fired, total), total, hours };
 }

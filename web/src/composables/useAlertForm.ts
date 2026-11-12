@@ -1235,6 +1235,8 @@ export function useAlertForm(
     return getStreams(streamType, false)
       .then(async (res: any) => {
         streams.value[streamType] = res.list;
+        // A slower reply for a type the user already switched away from must not replace the current list.
+        if (form.state.values.stream_type !== streamType) return Promise.resolve();
         schemaList.value = res.list;
         indexOptions.value = res.list.map((data: any) => {
           return data.name;
@@ -2161,16 +2163,12 @@ export function useAlertForm(
       return;
     }
 
-    // These two gates must move the user to the tab holding the offending field.
-    // They used to set `wizardStep`, which the V2 stepper navigated by — the V3
-    // single-pane layout navigates by `activeTab` and passes a hardcoded
-    // wizard-step to the summary, so setting it here steered nothing and Save &
-    // Train just appeared dead. Toast as well: the invalid field is on a tab the
-    // user isn't looking at, so the highlight alone is invisible.
+    // The invalid field may be in a section off-screen, so scroll to it as well as toasting.
     if (anomalyStep2Ref.value) {
       const step2Valid = await anomalyStep2Ref.value.validate();
       if (!step2Valid) {
         activeTab.value = "anomaly-config";
+        hooks.showSection?.("condition");
         toast({
           variant: "error",
           message: t("alerts.messages.fixHighlightedFields"),
@@ -2181,6 +2179,7 @@ export function useAlertForm(
 
     if (Object.values(anomalyWindowShareErrors(anomalyConfig.value)).some((e) => e !== null)) {
       activeTab.value = "anomaly-alerting";
+      hooks.showSection?.("notify");
       toast({
         variant: "error",
         message: t("alerts.messages.fixHighlightedFields"),
@@ -2447,7 +2446,7 @@ export function useAlertForm(
     if (tab === "sql") {
       if (!qc.sql || String(qc.sql).trim() === "") {
         activeTab.value = "condition";
-        hooks.showSection?.("watch");
+        hooks.showSection?.("condition");
         toast({
           variant: "error",
           message: t("alerts.messages.sqlQueryEmpty"),
@@ -2456,7 +2455,7 @@ export function useAlertForm(
       }
       if (sqlQueryErrorMsg.value && sqlQueryErrorMsg.value.trim() !== "") {
         activeTab.value = "condition";
-        hooks.showSection?.("watch");
+        hooks.showSection?.("condition");
         toast({
           variant: "error",
           message: t("alerts.messages.fixSqlErrorBeforeSaving"),
@@ -2466,7 +2465,7 @@ export function useAlertForm(
     } else if (tab === "promql") {
       if (!qc.promql || String(qc.promql).trim() === "") {
         activeTab.value = "condition";
-        hooks.showSection?.("watch");
+        hooks.showSection?.("condition");
         toast({
           variant: "error",
           message: t("alerts.messages.promqlQueryEmpty"),
@@ -2512,7 +2511,7 @@ export function useAlertForm(
       !getParser(formData.value.query_condition.sql)
     ) {
       activeTab.value = "condition";
-      hooks.showSection?.("watch");
+      hooks.showSection?.("condition");
       toast({
         variant: "error",
         message: t("alerts.messages.selectAllColumnsNotAllowed"),
@@ -2585,7 +2584,7 @@ export function useAlertForm(
       });
 
       activeTab.value = "condition";
-      hooks.showSection?.("watch");
+      hooks.showSection?.("condition");
       return false;
     }
 
