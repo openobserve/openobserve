@@ -108,7 +108,6 @@ export class DashboardPage {
     this.absoluteTab = page.locator(absoluteTabLocator);
 
     // Share / view dashboard locators
-    this.shareSuccessToast = page.locator('[data-test-variant="success"]');
     this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.dashboardNameTitle = page.locator('[data-test="dashboard-name-title"]');
 
@@ -420,40 +419,56 @@ export class DashboardPage {
     await expect(this.dateTimeButton).toContainText(Past30SecondsValue);
   }
   async verifyShareDashboardLink(randomDashboardName){
-    // Firefox gives tests no clipboard-read permission, so keep a copy of what the app writes.
+    // readText() waits forever on Firefox's Paste prompt, so record what the app itself copies.
     await this.page.evaluate(() => {
       window.__e2eCopiedText = "";
       const clip = navigator.clipboard;
-      if (!clip || clip.__e2eWrapped) return;
-      const write = clip.writeText.bind(clip);
-      clip.writeText = (text) => {
-        window.__e2eCopiedText = text;
-        return write(text);
-      };
-      clip.__e2eWrapped = true;
+      if (clip && !clip.__e2eWrapped) {
+        const write = clip.writeText.bind(clip);
+        clip.writeText = (text) =>
+          write(text).then((result) => {
+            window.__e2eCopiedText = text;
+            return result;
+          });
+        clip.__e2eWrapped = true;
+      }
+      if (window.__e2eCopyListener) return;
+      window.__e2eCopyListener = true;
+      // The app's execCommand fallback copies a selected textarea, which writeText never sees.
+      document.addEventListener(
+        "copy",
+        (event) => {
+          const el = event.target;
+          const text =
+            el && typeof el.value === "string"
+              ? el.value.slice(el.selectionStart ?? 0, el.selectionEnd ?? el.value.length)
+              : String(document.getSelection() || "");
+          if (text) window.__e2eCopiedText = text;
+        },
+        true
+      );
     });
+    const shortUrlResponse = this.page.waitForResponse(
+      (res) =>
+        res.request().method() === "POST" &&
+        /\/api\/[^/]+\/short$/.test(new URL(res.url()).pathname),
+      { timeout: 30000 }
+    );
     await this.shareButton.click();
-    // Success toast container — ShareButton.vue triggers it after the
-    // short-URL API resolves AND the clipboard write completes.
-    await this.shareSuccessToast
-      .last()
-      .waitFor({ state: "visible", timeout: 15000 });
-    // Poll for clipboard text to absorb the microtask gap between toast
-    // render and clipboard becoming readable.
+    const response = await shortUrlResponse;
+    expect(response.status()).toBe(200);
+    const shortUrl = (await response.json()).short_url;
+    expect(shortUrl).toBeTruthy();
     let copiedUrl = "";
     await expect
       .poll(
         async () => {
-          copiedUrl = await this.page.evaluate(
-            async () =>
-              window.__e2eCopiedText ||
-              (await navigator.clipboard.readText().catch(() => ""))
-          );
+          copiedUrl = await this.page.evaluate(() => window.__e2eCopiedText);
           return copiedUrl;
         },
         { timeout: 10000, intervals: [200, 400, 800] }
       )
-      .not.toBe("");
+      .toBe(shortUrl);
     // The backend's short-URL service can bake in an external host (e.g.
     // production ingestion endpoint). Rewrite to the test base URL so we
     // exercise the same local instance the rest of the test runs against.
