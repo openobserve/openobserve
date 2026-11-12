@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('alert_templates.appliesTo')"
                 :placeholder="t('alert_templates.appliesToAll')"
                 :disabled="isPrebuiltTemplate"
+                :error="!!appliesToError"
                 :error-message="appliesToError ? raw(appliesToError) : undefined"
                 class="max-w-120"
                 data-test="add-template-applies-to-select"
@@ -108,6 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="resetAppliesTo"
                   >{{ t("alert_templates.appliesToReset") }}</OButton
                 >
+              </div>
+              <div
+                v-if="appliesToMode === 'manual' && !appliesTo.length && !isPrebuiltTemplate"
+                class="text-text-secondary pt-1 text-xs"
+                data-test="add-template-applies-to-all-hint"
+              >
+                {{ t("alert_templates.appliesToAllHint") }}
               </div>
             </div>
 
@@ -224,6 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="primary"
               size="sm-action"
               :loading="isSubmitting"
+              :disabled="isPrebuiltTemplate"
               data-test="add-template-submit-btn"
               @click="handleSave"
               >{{ t("alerts.save") }}</OButton
@@ -286,10 +295,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="!shownVariableGroups.length">
                 <div>{{ raw("org_name, stream_type, stream_name") }}</div>
                 <div>{{ raw("alert_name, alert_type, alert_status") }}</div>
-                <div>
-                  <b>{{ raw("episode_id") }}</b>
-                  {{ t("alert_templates.variableEpisodeIdDescription") }}
-                </div>
                 <div>{{ raw("alert_period, alert_operator, alert_threshold") }}</div>
                 <div>{{ raw("alert_count, alert_agg_value") }}</div>
                 <div>{{ raw("alert_description") }}</div>
@@ -307,10 +312,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     )
                   }}
                 </div>
-                <div>
-                  <b>{{ raw("rows") }}</b> {{ t("alert_templates.variableRowsDescription") }}
-                </div>
               </template>
+              <div data-test="add-template-variable-episode-id">
+                <b>{{ raw("episode_id") }}</b>
+                {{ t("alert_templates.variableEpisodeIdDescription") }}
+              </div>
+              <div data-test="add-template-variable-rows">
+                <b>{{ raw("rows") }}</b> {{ t("alert_templates.variableRowsDescription") }}
+              </div>
               <div>
                 <b>{{ t("alert_templates.variableStreamFields") }}</b>
               </div>
@@ -513,7 +522,10 @@ const inferenceSource = computed(() =>
 const onAppliesToChange = (value: unknown) => {
   const picked = Array.isArray(value) ? value : [];
   const allKindsJustTicked = picked.includes(ALL_KINDS) && appliesTo.value.length > 0;
-  appliesTo.value = allKindsJustTicked ? [] : NOTIFICATION_KINDS.filter((k) => picked.includes(k));
+  const next = allKindsJustTicked ? [] : NOTIFICATION_KINDS.filter((k) => picked.includes(k));
+  // Clicking the ticked "All kinds" item changes nothing, so it keeps inference on.
+  if (!next.length && !appliesTo.value.length) return;
+  appliesTo.value = next;
   appliesToMode.value = "manual";
   appliesToError.value = null;
 };
@@ -552,9 +564,16 @@ const shownVariableGroups = computed(() => {
     (g) => g.name === "common" || (kinds.includes(g.name) && g.variables.length > 0),
   );
 });
-// The chips use the same groups as the guide, each variable once.
+// Kind groups lead so they are not behind "+N more"; `group.<label>` is a pattern, not a variable.
 const guideVariables = computed(() => [
-  ...new Set(shownVariableGroups.value.flatMap((g) => g.variables)),
+  ...new Set(
+    [
+      ...shownVariableGroups.value.filter((g) => g.name !== "common"),
+      ...shownVariableGroups.value.filter((g) => g.name === "common"),
+    ]
+      .flatMap((g) => g.variables)
+      .filter((v) => !v.startsWith("group.")),
+  ),
 ]);
 const variableGroupLabel = (name: string) =>
   isKind(name) ? t(kindLabelKey(name)) : t("alert_templates.variableGroupCommon");
@@ -733,6 +752,8 @@ const startContentVersion = () => {
 // it's a bare Monaco bridged in via setFieldValue with no name= binding, so it has
 // no field to highlight either. Restore the toast on a rejected submit.
 const handleSave = async () => {
+  // A prebuilt row is read-only; the leave dialog's Save also comes through here.
+  if (isPrebuiltTemplate.value) return;
   await form.handleSubmit();
   if (!form.state.isValid) {
     toast({
@@ -969,6 +990,7 @@ const isTemplateBodyValid = (bodyValue: string) => {
 // @submit(value) is the source of truth. OForm awaits this, so the inline Save
 // button's spinner (v-slot isSubmitting) spans the whole request.
 async function saveTemplate(value: AddTemplateForm) {
+  if (isPrebuiltTemplate.value) return;
   const isContentMode = value.kind === "content";
 
   // Custom mode keeps the pre-migration JSON-validity check (http only);
