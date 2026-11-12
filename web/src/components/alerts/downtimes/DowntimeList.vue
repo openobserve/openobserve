@@ -90,6 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OStatStrip
                     :items="summaryStats"
                     :loading="loading"
+                    compact
+                    stacked
                     selectable
                     :selected-key="statFilter"
                     default-key="total"

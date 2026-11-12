@@ -64,20 +64,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+              :last-run-at="lastUpdatedAt"
               :loading="loading"
+              shortcut-id="iamOrganizationsRefresh"
               data-test="organizations-list-refresh-btn"
               @click="getOrganizations"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="iamOrganizationsRefresh"
-              />
-            </OButton>
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -189,12 +184,12 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import analytics from "@/services/product_analytics";
@@ -214,12 +209,12 @@ export default defineComponent({
     OButton,
     ODropdown,
     ODropdownItem,
-    OTooltip,
     OTag,
     OPageLayout,
     OIcon,
     OTable,
     OSearchInput,
+    ORefreshButton,
   },
   setup() {
     const store = useStore();
@@ -331,6 +326,7 @@ export default defineComponent({
 
     const loading = ref(false);
     const forbidden = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
     const getOrganizations = () => {
       const dismiss = toast({
         variant: "loading",
@@ -405,6 +401,7 @@ export default defineComponent({
             return commonOrganization;
           });
 
+          lastUpdatedAt.value = Date.now();
           dismiss();
         })
         .catch((err: any) => {
@@ -540,6 +537,7 @@ export default defineComponent({
       config,
       loading,
       forbidden,
+      lastUpdatedAt,
       organizations,
       organization,
       columns,

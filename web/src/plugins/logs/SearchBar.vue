@@ -2611,13 +2611,6 @@ export default defineComponent({
     // Responsive toolbar — width tracking via shared composable
     const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive();
 
-    // Approximate rendered widths of left-section content at each collapse state:
-    // Each threshold has a small buffer (+16px) so collapse fires before clipping.
-    const shouldHideToolbarButtonText = computed(() => availableLeftWidth.value < 810);
-    const toolbarToggleIconOnly = computed(() => availableLeftWidth.value < 658);
-    const toolbarMoveResetToMenu = computed(() => availableLeftWidth.value < 288);
-    const toolbarToggleAsDropdown = computed(() => availableLeftWidth.value < 216);
-
     // ── Pinned toolbar items ──────────────────────────────────────────────
     // Items pinned out of the "More" menu render as fixed-position toolbar
     // controls. They share the left section with the toggle group / reset, so we
@@ -2635,16 +2628,48 @@ export default defineComponent({
     const SYNTAX_GUIDE_ICON_WIDTH = 40;
     const PIN_ITEM_GAP = 8;
 
+    // Rendered widths (px) of the left-section controls at the 34px toolbar size; collapse
+    // thresholds derive from them so they cannot drift apart when a control is resized.
+    const TOGGLE_LABELS_WIDTH = computed(() => (windowWidth.value < 1366 ? 385 : 401));
+    const TOGGLE_ICONS_WIDTH = 168;
+    const TOGGLE_DROPDOWN_WIDTH = 120;
+    const RESET_LABEL_WIDTH = 89;
+    const RESET_ICON_WIDTH = 34;
+    const MORE_BUTTON_WIDTH = computed(() => (windowWidth.value < 1366 ? 73 : 85));
+    const TOOLBAR_GAP = 8;
+    const COLLAPSE_BUFFER = 16;
+
+    // The default-pinned histogram keeps its slot ahead of button labels.
+    const leftContentWidth = (toggleWidth: number, resetWidth: number) =>
+      toggleWidth +
+      resetWidth +
+      MORE_BUTTON_WIDTH.value +
+      2 * TOOLBAR_GAP +
+      (isPinned("histogram") ? TOOLBAR_GAP + PIN_BUTTON_WIDTH.value : 0) +
+      COLLAPSE_BUFFER;
+    const shouldHideToolbarButtonText = computed(
+      () =>
+        availableLeftWidth.value < leftContentWidth(TOGGLE_LABELS_WIDTH.value, RESET_LABEL_WIDTH),
+    );
+    const toolbarToggleIconOnly = computed(
+      () =>
+        availableLeftWidth.value < leftContentWidth(TOGGLE_LABELS_WIDTH.value, RESET_ICON_WIDTH),
+    );
+    const toolbarMoveResetToMenu = computed(() => availableLeftWidth.value < 288);
+    const toolbarToggleAsDropdown = computed(() => availableLeftWidth.value < 216);
+
     // Width consumed by the always-present left content (toggle group in its
     // current collapse state, reset) plus the reserved More button.
     const baseReservedWidth = computed(() => {
       let w = 0;
-      if (toolbarToggleAsDropdown.value) w += 120;
-      else if (toolbarToggleIconOnly.value) w += 186;
-      else w += 400;
-      if (!toolbarMoveResetToMenu.value) w += shouldHideToolbarButtonText.value ? 34 : 80;
-      w += windowWidth.value < 1366 ? 76 : 84; // More button (always visible)
-      w += 24; // inter-item gaps / padding buffer
+      if (toolbarToggleAsDropdown.value) w += TOGGLE_DROPDOWN_WIDTH;
+      else if (toolbarToggleIconOnly.value) w += TOGGLE_ICONS_WIDTH;
+      else w += TOGGLE_LABELS_WIDTH.value;
+      if (!toolbarMoveResetToMenu.value) {
+        w +=
+          (shouldHideToolbarButtonText.value ? RESET_ICON_WIDTH : RESET_LABEL_WIDTH) + TOOLBAR_GAP;
+      }
+      w += MORE_BUTTON_WIDTH.value + 2 * TOOLBAR_GAP;
       return w;
     });
 

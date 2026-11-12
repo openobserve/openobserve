@@ -83,15 +83,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="pipeline-list-tabs"
               >
                 <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                  <template #icon-left><OIcon name="format-list-bulleted" size="xs" /></template>
+                  <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
                   {{ t("pipeline_list.tab_all") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
-                  <template #icon-left><OIcon name="schedule" size="xs" /></template>
+                  <template #icon-left><OIcon name="schedule" size="sm" /></template>
                   {{ t("pipeline_list.tab_scheduled") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="realtime" size="sm" data-test="tab-realtime">
-                  <template #icon-left><OIcon name="bolt" size="xs" /></template>
+                  <template #icon-left><OIcon name="bolt" size="sm" /></template>
                   {{ t("pipeline_list.tab_realtime") }}
                 </OToggleGroupItem>
               </OToggleGroup>

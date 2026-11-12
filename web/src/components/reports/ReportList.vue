@@ -126,9 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="@container/report-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
                 >
                   <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
-                  <div
-                    class="min-w-0 flex-1 max-md:order-last max-md:basis-full md:max-lg:min-w-80"
-                  >
+                  <div class="min-w-0 flex-1 max-lg:basis-full max-md:order-last">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="

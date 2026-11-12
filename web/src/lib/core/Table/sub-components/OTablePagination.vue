@@ -279,6 +279,7 @@ const selectionLabel = computed(() => {
         <OButton
           variant="outline"
           size="icon-xs-sq"
+          class="max-lg:h-6 max-lg:w-6"
           :disabled="isFirstPage || stale"
           focusable-unavailable
           :aria-label="t('search.firstPage')"
@@ -294,6 +295,7 @@ const selectionLabel = computed(() => {
         <OButton
           variant="outline"
           size="icon-xs-sq"
+          class="max-lg:h-6 max-lg:w-6"
           :disabled="isFirstPage || stale"
           focusable-unavailable
           :aria-label="t('components.pagination.previousPage')"
@@ -309,6 +311,7 @@ const selectionLabel = computed(() => {
         <OButton
           variant="outline"
           size="icon-xs-sq"
+          class="max-lg:h-6 max-lg:w-6"
           :disabled="isLastPage || stale"
           focusable-unavailable
           :aria-label="t('components.pagination.nextPage')"
@@ -325,6 +328,7 @@ const selectionLabel = computed(() => {
           v-if="totalCountExact"
           variant="outline"
           size="icon-xs-sq"
+          class="max-lg:h-6 max-lg:w-6"
           :disabled="isLastPage || stale"
           focusable-unavailable
           :aria-label="t('search.lastPage')"

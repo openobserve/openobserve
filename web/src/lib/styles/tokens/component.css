@@ -143,7 +143,7 @@
   --color-toggle-item-bg: transparent;
   --color-toggle-item-text: var(--color-text-body);
   --color-toggle-item-hover-bg: var(--color-grey-150);
-  --color-toggle-item-active-bg: var(--color-surface-base);
+  --color-toggle-item-active-bg: var(--color-surface-accent-active);
   --color-toggle-item-active-text: var(--color-primary-700);
   --color-toggle-item-active-border: var(--color-primary-600);
   --color-toggle-item-disabled: var(--color-text-disabled);
