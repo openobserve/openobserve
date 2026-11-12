@@ -487,6 +487,24 @@ describe("AddAlert drafts", () => {
     expect(readEditorDraft(editScope)).toBeNull();
   });
 
+  it("does not count a pause from the header as an unsaved draft, and a continued draft keeps the current state", async () => {
+    await mountEditor("/alerts?action=update&alert_id=3HGifdlCfgrm1thif69NRJig9E5", {
+      modelValue: { ...savedAlert, enabled: true },
+      isUpdated: true,
+    });
+    window.dispatchEvent(new Event("pointerdown"));
+    vm().form.setFieldValue("enabled", false);
+    await flushPromises();
+    window.dispatchEvent(new Event("pagehide"));
+
+    expect(vm().alertDraft.hasUnsavedChanges()).toBe(false);
+    expect(readEditorDraft(editScope)).toBeNull();
+
+    await edit("description", "pages on-call");
+    window.dispatchEvent(new Event("pagehide"));
+    expect(readEditorDraft(editScope)?.data).not.toHaveProperty("values.enabled");
+  });
+
   it("does not take a hidden select's change during the load for an edit, so nothing autosaves", async () => {
     await mountEditor(
       "/alerts?action=update&alert_id=3HGifdlCfgrm1thif69NRJig9E5",
