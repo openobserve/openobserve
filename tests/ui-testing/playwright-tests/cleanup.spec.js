@@ -339,6 +339,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_sev_str_/,               // logs-histogram-severity.spec.js (#11353)
         /^e2e_sev_num_/,               // logs-histogram-severity.spec.js (#11441)
         /^e2e_ms7332_/,                // logs-multistream-share-url.spec.js (#7332)
+        /^e2e_kbd_logs_/,              // logs-query-editor-keyboard.spec.js seed stream (suffixed per worker)
         /^e2e_12647_dest_/,            // pipeline-preview-bounds.spec.js (#12647) destination stream
         /^e2e7030[a-z0-9]+-(alpha|beta)_dest$/, // pipeline-export.spec.js (#7030) destination streams
         /^e2e_10602_/,                 // logs-v040-limit-and-stream-list.spec.js (#10602)
