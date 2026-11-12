@@ -268,6 +268,7 @@ describe("SettingsIndex", () => {
         ["synthetics_locations", "synthetics"],
         ["queryManagement", "query_management"],
         ["storageSettings", "byob"],
+        ["ai_toolsets", "ai_toolsets"],
       ])("marks %s license-locked under a locked %s license", (key, feature) => {
         const byKey = byKeyUnder({ features: { [feature]: "locked" } });
         expect(byKey(key)?.licenseLocked).toBe(true);
@@ -290,6 +291,7 @@ describe("SettingsIndex", () => {
         ["queryManagement", "query_management"],
         ["storageSettings", "byob"],
         ["correlation_settings", "correlation"],
+        ["ai_toolsets", "ai_toolsets"],
       ])("hides %s under a hidden %s license", (key, feature) => {
         const byKey = byKeyUnder({ features: { [feature]: "hidden" } });
         expect(byKey(key)?.visible).toBe(false);
@@ -493,6 +495,60 @@ describe("SettingsIndex", () => {
       expect(cipherItem?.visible).toBe(false);
       expect(nodesItem?.visible).toBe(false);
       expect(pipelineItem?.visible).toBe(false);
+    });
+
+    describe("AI Toolsets entry", () => {
+      beforeEach(async () => {
+        const config = await import("@/aws-exports");
+        vi.mocked(config.default).isEnterprise = "true";
+        vi.mocked(config.default).isCloud = "false";
+      });
+
+      afterEach(async () => {
+        const config = await import("@/aws-exports");
+        vi.mocked(config.default).isEnterprise = "true";
+        vi.mocked(config.default).isCloud = "true";
+      });
+
+      const aiToolsets = () =>
+        getAllItems(createWrapper()).find((i: any) => i.key === "ai_toolsets");
+
+      it("is listed and unlocked on enterprise", () => {
+        expect(aiToolsets()).toMatchObject({
+          group: "Integrations",
+          dataTest: "ai-toolsets-tab",
+          to: { name: "aiToolsets", query: { org_identifier: "test-org" } },
+          visible: true,
+          locked: false,
+        });
+      });
+
+      it("is shown locked on OSS", async () => {
+        const config = await import("@/aws-exports");
+        vi.mocked(config.default).isEnterprise = "false";
+        vi.mocked(config.default).isCloud = "false";
+        expect(aiToolsets()).toMatchObject({ visible: true, locked: true });
+      });
+
+      it("follows the ai_assistant feature the page depends on", () => {
+        const under = (features: Record<string, string>) => {
+          mockStore.state.zoConfig = { service_streams_enabled: true, features } as any;
+          return aiToolsets();
+        };
+        expect(under({ ai_assistant: "hidden" })?.visible).toBe(false);
+        expect(under({ ai_assistant: "locked" })).toMatchObject({
+          visible: true,
+          licenseLocked: true,
+        });
+        expect(under({ ai_assistant: "enabled" })?.licenseLocked).toBe(false);
+      });
+
+      it("is hidden on a pure cloud build", async () => {
+        const config = await import("@/aws-exports");
+        vi.mocked(config.default).isEnterprise = "false";
+        vi.mocked(config.default).isCloud = "true";
+        expect(aiToolsets()?.visible).toBe(false);
+      });
     });
 
     // Synthetics ships in OSS: the locations hub card stays visible on an OSS

@@ -522,6 +522,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    applyPresets: {
+      type: Boolean,
+      default: false,
+    },
     initialTimezone: {
       type: String as PropType<string | null>,
       required: false,
@@ -1007,12 +1011,12 @@ export default defineComponent({
       calendarToken.value = null;
       relativePeriod.value = period;
       relativeValue.value = value;
-      if (props.autoApply) saveDate("relative");
+      if (props.autoApply || props.applyPresets) saveDate("relative");
     };
 
     const pickRelativeChip = (period: string, value: number) => {
       setRelativeDate(period, value);
-      if (props.autoApply) closeMenu();
+      if (props.autoApply || props.applyPresets) closeMenu();
     };
 
     const isValidCustomValue = (value: unknown) =>
@@ -1171,8 +1175,9 @@ export default defineComponent({
      * Promote the pending selection to the applied one, so the trigger button
      * starts advertising it. Called from every path that actually puts a range
      * into force — Apply, `refresh()`, mount, and the parent-invoked setters.
-     * NOT called from `setRelativeDate` / `onCustomPeriodSelect` / the popup's
-     * absolute inputs when `autoApply` is off: those stay pending until Apply.
+     * NOT called from `onCustomPeriodSelect` / the popup's absolute inputs when
+     * `autoApply` is off: those stay pending until Apply. `setRelativeDate` also
+     * applies under `applyPresets`.
      */
     const markApplied = () => {
       appliedDisplayValue.value = getDisplayValue.value;

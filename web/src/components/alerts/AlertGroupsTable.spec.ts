@@ -28,7 +28,8 @@ vi.mock("@/services/alerts", async (importOriginal) => {
   return overlayServiceMock(await importOriginal(), { default: {} });
 });
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
-vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+const push = vi.fn();
+vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
 
 const ME = (store.state as any).userInfo.email as string;
 
@@ -68,8 +69,13 @@ const groupMute = {
   name: "Quick mute",
   ends_at: 4_102_444_800_000_000,
   version: 2,
+  folder_id: "ops",
   alert_groups: [{ alert_id: "a1", group_key: "ap" }],
 };
+
+// The group lookup answers for the row itself, so it says whether End frees only this group.
+const ownedBy = (key: string, mute: Record<string, unknown> = groupMute) =>
+  groups.map((g) => (g.group_key === key ? { ...g, downtime: { ...mute, end_here: true } } : g));
 
 let wrapper: VueWrapper<any>;
 
@@ -185,7 +191,7 @@ describe("AlertGroupsTable row actions", () => {
     vi.mocked(alerts.extendAlertMute).mockResolvedValue({
       data: { version: 3, ends_at: groupMute.ends_at },
     } as any);
-    await mountTable({ downtime: groupMute });
+    await mountTable({ downtime: groupMute, groups: ownedBy("ap") });
     expect(find("alerts-alertgroupstable-extend-ap-1h").exists()).toBe(true);
     expect(find("alerts-alertgroupstable-end-mute-ap").exists()).toBe(true);
     expect(find("alerts-alertgroupstable-end-mute-eu").exists()).toBe(false);
@@ -216,9 +222,9 @@ describe("AlertGroupsTable row actions", () => {
       downtime: groupMute,
       groups: groups.map((g) =>
         g.group_key === "eu"
-          ? { ...g, downtime: euMute }
+          ? { ...g, downtime: { ...euMute, end_here: true } }
           : g.group_key === "ap"
-            ? { ...g, downtime: groupMute }
+            ? { ...g, downtime: { ...groupMute, end_here: true } }
             : g,
       ),
     });
@@ -234,6 +240,58 @@ describe("AlertGroupsTable row actions", () => {
       { version: 5, minutes: 60 },
       "ops",
     );
+  });
+
+  it("shows a group covered only by the alert's mute as muted, with Muted by and no End", async () => {
+    push.mockReset();
+    const whole = { ...groupMute, name: "Whole alert", alert_groups: null, end_here: true };
+    await mountTable({ downtime: whole });
+    expect(find("alerts-alertgroupstable-muted-eu").exists()).toBe(true);
+    expect(find("alerts-alertgroupstable-end-mute-eu").exists()).toBe(false);
+    expect(find("alerts-alertgroupstable-extend-eu-1h").exists()).toBe(false);
+    expect(find("alerts-alertgroupstable-mute-eu-until-clear").exists()).toBe(false);
+    const link = find("alerts-alertgroupstable-muted-by-eu");
+    expect(link.text()).toBe("Muted by Whole alert");
+    await link.trigger("click");
+    expect(push).toHaveBeenCalledWith({
+      name: "downtimeDetail",
+      params: { id: "d1" },
+      query: { org_identifier: "default", folder: "ops" },
+    });
+  });
+
+  it("shows Muted by on a group whose own downtime is shared", async () => {
+    await mountTable({
+      groups: groups.map((g) =>
+        g.group_key === "ap" ? { ...g, downtime: { ...groupMute, end_here: false } } : g,
+      ),
+    });
+    expect(find("alerts-alertgroupstable-end-mute-ap").exists()).toBe(false);
+    expect(find("alerts-alertgroupstable-muted-by-ap").exists()).toBe(true);
+  });
+
+  it("refreshes after a stale group row is refused on End and on Extend", async () => {
+    const stale = {
+      response: { status: 409, data: { code: "version_changed", version: 3, ends_at: 1 } },
+    };
+    vi.mocked(alerts.cancelAlertMute).mockRejectedValue(stale);
+    vi.mocked(alerts.extendAlertMute).mockRejectedValue(stale);
+    await mountTable({ groups: ownedBy("ap") });
+    await find("alerts-alertgroupstable-end-mute-ap").trigger("click");
+    await flushPromises();
+    expect(alerts.cancelAlertMute).toHaveBeenCalledWith("default", "a1", "d1", "ops", 2);
+    expect(wrapper.emitted("changed")).toHaveLength(1);
+    await find("alerts-alertgroupstable-extend-ap-1h").trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("changed")).toHaveLength(2);
+  });
+
+  it.each([403, 404])("refreshes after a %s on End mute", async (status) => {
+    vi.mocked(alerts.cancelAlertMute).mockRejectedValue({ response: { status, data: {} } });
+    await mountTable({ groups: ownedBy("ap") });
+    await find("alerts-alertgroupstable-end-mute-ap").trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("changed")).toHaveLength(1);
   });
 
   it("shows a load error with Retry instead of the empty state", async () => {

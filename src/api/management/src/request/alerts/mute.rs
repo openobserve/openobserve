@@ -15,12 +15,17 @@
 
 //! The alert-scoped mute routes (§6, Q1): enterprise only, 403 "Not Supported" in the OSS build.
 
-use axum::{Extension, Json, extract::Path, http::HeaderMap, response::Response};
+use axum::{
+    Extension, Json,
+    extract::{Path, Query},
+    http::HeaderMap,
+    response::Response,
+};
 use config::meta::{
     alerts::ack::ActRefusal,
     downtimes::{
         AlertMuteConflict, AlertMuteExtendRequest, AlertMuteExtendResponse, AlertMuteRequest,
-        AlertMuteResponse, Downtime,
+        AlertMuteResponse, CancelDowntimeQuery, Downtime,
     },
 };
 use openobserve_api_common::{auth::delegation::DelegatedCaller, extractors::Headers};
@@ -153,7 +158,7 @@ pub async fn extend_alert_mute(
     tag = "Alerts",
     operation_id = "CancelAlertMute",
     summary = "End an alert's quick mute now",
-    description = "Cancels a quick mute of this alert; the row stays for history. Same rule as mute.",
+    description = "Cancels a quick mute of this alert; the row stays for history. A `version` other than the stored one cancels nothing and answers 409 `version_changed`. Same rule as mute.",
     security(
         ("Authorization"= [])
     ),
@@ -162,12 +167,13 @@ pub async fn extend_alert_mute(
         ("alert_id" = String, Path, description = "Alert ID"),
         ("downtime_id" = String, Path, description = "Downtime ID of the quick mute"),
         ("folder" = Option<String>, Query, description = "Folder ID of the alert, for the permission check"),
+        CancelDowntimeQuery,
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Downtime),
         (status = 403, description = "Refused, with who is on call and who can act; or not supported", content_type = "application/json", body = ActRefusal),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
-        (status = 409, description = "Not a quick mute of this alert", content_type = "application/json", body = AlertMuteConflict),
+        (status = 409, description = "Not a quick mute of this alert, or the version changed", content_type = "application/json", body = AlertMuteConflict),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
@@ -176,6 +182,7 @@ pub async fn extend_alert_mute(
 )]
 pub async fn cancel_alert_mute(
     Path((org_id, alert_id, downtime_id)): Path<(String, String, String)>,
+    Query(query): Query<CancelDowntimeQuery>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -184,8 +191,13 @@ pub async fn cancel_alert_mute(
             Ok(t) => t,
             Err(resp) => return resp,
         };
-        match openobserve_core::alerts::mute::unmute(&target, &downtime_id, &user_email.user_id)
-            .await
+        match openobserve_core::alerts::mute::unmute(
+            &target,
+            &downtime_id,
+            query.version,
+            &user_email.user_id,
+        )
+        .await
         {
             Ok(body) => crate::common::meta::http::HttpResponse::json(body),
             Err(e) => error_response(e),
@@ -193,7 +205,7 @@ pub async fn cancel_alert_mute(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, alert_id, downtime_id, user_email);
+        let _ = (org_id, alert_id, downtime_id, query, user_email);
         crate::request::downtimes::not_supported()
     }
 }
@@ -229,6 +241,8 @@ fn error_response(e: openobserve_core::alerts::mute::MuteError) -> Response {
 #[cfg(test)]
 mod tests {
     use axum::http::StatusCode;
+    #[cfg(feature = "enterprise")]
+    use svix_ksuid::KsuidLike as _;
 
     use super::*;
 
@@ -252,11 +266,114 @@ mod tests {
             )
             .await,
             extend_alert_mute(two(), user(), Json(AlertMuteExtendRequest::default())).await,
-            cancel_alert_mute(two(), user()).await,
+            cancel_alert_mute(two(), Query(CancelDowntimeQuery::default()), user()).await,
         ];
         for response in responses {
             assert_eq!(response.status(), StatusCode::FORBIDDEN);
         }
+    }
+
+    // The route reads the alert through the cache first, so a cached alert needs no alert table.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_unmute_route_refuses_a_version_the_mute_widened_past() {
+        use config::meta::folder::{DEFAULT_FOLDER, Folder, FolderType};
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let now = config::utils::time::now_micros();
+        let org = format!("unmute_route_{now}");
+        let root = "root-unmute-route@example.com";
+        common::infra::config::ORG_USERS.insert(
+            format!("{}/{root}", config::DEFAULT_ORG),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: String::new(),
+                rum_token: None,
+                org_id: config::DEFAULT_ORG.to_string(),
+                email: root.to_string(),
+                created_at: 0,
+                allow_static_token: false,
+            },
+        );
+        let folder = Folder {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: DEFAULT_FOLDER.to_string(),
+            description: String::new(),
+            icon: None,
+        };
+        infra::table::folders::get_or_create(&org, folder.clone(), FolderType::Downtimes)
+            .await
+            .unwrap();
+        let alert_id = svix_ksuid::Ksuid::new(None, None);
+        let mut alert = config::meta::alerts::alert::Alert::default();
+        alert.id = Some(alert_id);
+        alert.name = "checkout errors".to_string();
+        common::infra::config::ALERTS
+            .write()
+            .await
+            .insert(format!("{org}/{alert_id}"), (folder, alert));
+        let alert_id = alert_id.to_string();
+        let hour = 3_600_000_000;
+        let group = |key: &str| serde_json::json!({ "alert_id": alert_id, "group_key": key });
+        let conn = infra::db::get_orm_client_rw().await;
+        let put = |id: &str, groups: serde_json::Value, version: i64| {
+            let row: Downtime = serde_json::from_value(serde_json::json!({
+                "id": id, "org": org, "name": "Quick mute",
+                "targets": [{ "module": "alerts", "folders": { "kind": "all" }, "ids": [alert_id] }],
+                "alert_groups": groups,
+                "schedule": { "repeat": "none", "starts_at": now - hour, "ends_at": now + hour,
+                              "timezone": "UTC", "duration_secs": 7200 },
+                "version": version,
+                "created_by": root, "created_at": now, "updated_by": root, "updated_at": now
+            }))
+            .unwrap();
+            async move { infra::table::downtimes::put_with(conn, &row).await.unwrap() }
+        };
+        let unmute = |id: &'static str, version: Option<i64>| {
+            cancel_alert_mute(
+                Path((org.clone(), alert_id.clone(), id.to_string())),
+                Query(CancelDowntimeQuery { version }),
+                Headers(UserEmail {
+                    user_id: root.to_string(),
+                }),
+            )
+        };
+        let cancelled = |id: &'static str| {
+            let org = org.clone();
+            async move {
+                let stored = infra::table::downtimes::get_rw(&org, id)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                stored.cancelled_at.is_some()
+            }
+        };
+
+        put("widened", serde_json::json!([group("g1")]), 1).await;
+        put("widened", serde_json::json!([group("g1"), group("g2")]), 2).await;
+        let one_group = unmute("widened", Some(1)).await;
+        assert_eq!(one_group.status(), StatusCode::CONFLICT);
+        assert!(
+            !cancelled("widened").await,
+            "a refused unmute leaves the mute live"
+        );
+        put("widened", serde_json::Value::Null, 3).await;
+        let two_groups = unmute("widened", Some(2)).await;
+        assert_eq!(two_groups.status(), StatusCode::CONFLICT);
+        assert!(!cancelled("widened").await);
+        let whole_alert = unmute("widened", Some(3)).await;
+        assert_eq!(whole_alert.status(), StatusCode::OK);
+        assert!(cancelled("widened").await);
+
+        put("absent", serde_json::Value::Null, 1).await;
+        let absent = unmute("absent", None).await;
+        assert_eq!(absent.status(), StatusCode::OK);
+        assert!(cancelled("absent").await);
     }
 
     #[cfg(feature = "enterprise")]
