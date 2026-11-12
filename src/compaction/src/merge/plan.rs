@@ -135,28 +135,6 @@ async fn closed_hour_batches(
     }
 }
 
-// /// What a closed indexed metrics hour merges, see [`MetricsIndexMergeScope`].
-// fn indexed_hour_scope(mut files: Vec<FileKey>, max_file_size: usize, stream: &str) ->
-// Vec<FileKey> {     match metrics_index_merge_scope(&files, max_file_size) {
-//         MetricsIndexMergeScope::Skip => Vec::new(),
-//         MetricsIndexMergeScope::LateFilesOnly => {
-//             files.retain(|f| MetricsFileLayout::of(&f.key) != Some(MetricsFileLayout::Indexed));
-//             log::debug!(
-//                 "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed late merge of {} files,
-// indexed files untouched",                 files.len()
-//             );
-//             files
-//         }
-//         MetricsIndexMergeScope::WholeHour => {
-//             log::debug!(
-//                 "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed fragmentation cap hit,
-// full rewrite of {} files",                 files.len()
-//             );
-//             files
-//         }
-//     }
-// }
-
 /// `files`, once `min_files` piled up, in batches of at most `max_groups`.
 pub(super) fn capped_batches(
     files: Vec<FileKey>,
