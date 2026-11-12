@@ -24,9 +24,11 @@ pub(super) fn generate_partitions_aligned_with_histogram_interval(
     step: i64,
     order_by: OrderBy,
     min_step: i64,
+    tz_offset: i64,
 ) -> Vec<[i64; 2]> {
-    let mut partitions =
-        generate_histogram_aligned_partitions(start_time, end_time, step, order_by, min_step);
+    let mut partitions = generate_histogram_aligned_partitions(
+        start_time, end_time, step, order_by, min_step, tz_offset,
+    );
 
     if partitions.is_empty() {
         partitions.push([start_time, end_time]);
@@ -41,19 +43,20 @@ fn generate_histogram_aligned_partitions(
     step: i64,
     order_by: OrderBy,
     min_step: i64,
+    tz_offset: i64,
 ) -> Vec<[i64; 2]> {
     let mut partitions = Vec::new();
     let duration = end_time - start_time;
 
     // Handle the alignment for the first and last partition
     let mut new_end = end_time;
-    let last_partition_step = histogram_bucket_offset(end_time, min_step);
+    let last_partition_step = histogram_bucket_offset(end_time + tz_offset, min_step);
     if last_partition_step > 0 && duration > min_step {
         new_end = end_time - last_partition_step;
         partitions.push([new_end, end_time]);
     }
     let mut new_start = start_time;
-    let last_partition_step = histogram_bucket_offset(start_time, min_step);
+    let last_partition_step = histogram_bucket_offset(start_time + tz_offset, min_step);
     if last_partition_step > 0 && duration > min_step {
         new_start = start_time + min_step - last_partition_step;
         partitions.push([start_time, new_start]);
@@ -114,6 +117,7 @@ mod tests {
             step,
             OrderBy::Desc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -139,6 +143,7 @@ mod tests {
             step,
             OrderBy::Asc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -172,6 +177,7 @@ mod tests {
             step,
             OrderBy::Desc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -199,6 +205,7 @@ mod tests {
             step,
             OrderBy::Asc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -234,6 +241,7 @@ mod tests {
             step,
             OrderBy::Desc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -261,6 +269,7 @@ mod tests {
             step,
             OrderBy::Asc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -295,6 +304,7 @@ mod tests {
             step,
             OrderBy::Desc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -322,6 +332,7 @@ mod tests {
             step,
             OrderBy::Asc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -356,6 +367,7 @@ mod tests {
             step,
             OrderBy::Desc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -384,6 +396,7 @@ mod tests {
             step,
             OrderBy::Asc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -423,6 +436,7 @@ mod tests {
             step,
             OrderBy::Desc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -448,6 +462,7 @@ mod tests {
             step,
             OrderBy::Asc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -484,6 +499,7 @@ mod tests {
             step,
             OrderBy::Desc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -512,6 +528,7 @@ mod tests {
             step,
             OrderBy::Asc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -551,6 +568,7 @@ mod tests {
             step,
             OrderBy::Desc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -577,6 +595,7 @@ mod tests {
             step,
             OrderBy::Asc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -614,6 +633,7 @@ mod tests {
             step,
             OrderBy::Desc,
             min_step,
+            0,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -633,6 +653,7 @@ mod tests {
             step,
             OrderBy::Asc,
             min_step,
+            0,
         );
 
         println!("partitions: {partitions:#?}");
@@ -657,7 +678,7 @@ mod tests {
 
         for order_by in [OrderBy::Asc, OrderBy::Desc] {
             let partitions = generate_partitions_aligned_with_histogram_interval(
-                start_time, end_time, step, order_by, min_step,
+                start_time, end_time, step, order_by, min_step, 0,
             );
             for edge in partitions.iter().flatten() {
                 if *edge != start_time && *edge != end_time {

@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { FieldIndex, toColumnName } from "./fields";
+import { FieldIndex, readPath, toColumnName } from "./fields";
 
 describe("toColumnName", () => {
   it("collapses nesting into underscores", () => {
@@ -62,5 +62,26 @@ describe("FieldIndex", () => {
     const both = new FieldIndex(["user.name", "user_name"]);
     expect(both.resolve("user.name")).toBe("user.name");
     expect(both.resolve("user_name")).toBe("user_name");
+  });
+});
+
+describe("readPath", () => {
+  it("reads a flattened dotted column, a nested object and an ingested column", () => {
+    expect(readPath({ "actor.user.name": "j.torres" }, "actor.user.name")).toBe("j.torres");
+    expect(readPath({ actor: { user: { name: "j.torres" } } }, "actor.user.name")).toBe("j.torres");
+    expect(readPath({ useridentity_type: "IAMUser" }, "userIdentity.type")).toBe("IAMUser");
+  });
+
+  it("reads the JSON remainder past the flatten depth", () => {
+    const row = { process_parent_process_file: '{"path":"C:\\\\x.exe"}' };
+    expect(readPath(row, "process.parent_process.file.path")).toBe("C:\\x.exe");
+    expect(readPath({ process_parent_process_file: "x" }, "process.parent_process.file.path")).toBe(
+      undefined,
+    );
+  });
+
+  it("returns undefined rather than throwing on a missing branch", () => {
+    expect(readPath({ actor: null }, "actor.user.name")).toBeUndefined();
+    expect(readPath(null, "a.b")).toBeUndefined();
   });
 });

@@ -1585,6 +1585,8 @@ pub async fn report_to_audit(
     let is_audit_enabled = get_o2_config().common.audit_enabled;
     if is_audit_enabled {
         audit(AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: user_id,
             org_id,
             _timestamp: config::utils::time::now_micros(),

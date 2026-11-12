@@ -440,6 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :source-stream="streamFilter"
               :start-time="timeRange.startTime"
               :end-time="timeRange.endTime"
+              :agent-scope="agentScope"
             />
           </OTabPanel>
 
@@ -1022,6 +1023,14 @@ export default defineComponent({
     },
     containerEl: {
       type: Object as PropType<HTMLElement | null>,
+      default: null,
+    },
+    agentScope: {
+      type: Object as PropType<{
+        name: string;
+        env: string | null;
+        version: string | null;
+      } | null>,
       default: null,
     },
   },
@@ -1733,8 +1742,8 @@ export default defineComponent({
         const res = await queryClient.fetchQuery(
           genAiAgentsQuery(
             org,
-            Math.trunc(props.timeRange.startTime * 1000),
-            Math.trunc(props.timeRange.endTime * 1000),
+            Math.trunc(props.timeRange.startTime),
+            Math.trunc(props.timeRange.endTime),
           ),
         );
         const match = res.agents.find(

@@ -628,6 +628,7 @@ defineExpose({
   toggleNlpMode: (enabled: boolean) => {
     nlpMode.value = enabled;
   },
+  openAiMode: onAiToggleClick,
 
   // Language control
   getCurrentLanguage: () => currentLanguage.value,

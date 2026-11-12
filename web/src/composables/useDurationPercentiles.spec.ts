@@ -166,6 +166,24 @@ describe("parseDurationWhereClause", () => {
       const result = parseDurationWhereClause("service_name = 'foo'", p, "x");
       expect(result).toBe("service_name = 'foo'");
     });
+
+    it("should return a clause with no duration predicate exactly as written", () => {
+      const clause =
+        `trace_id IN (SELECT trace_id FROM "default" WHERE (tenant_id = 'globex')) AND ` +
+        `gen_ai_tool_name = 'web_search' AND span_status = 'ERROR'`;
+      expect(parseDurationWhereClause(clause, p, "default")).toBe(clause);
+    });
+
+    it("should keep double-quoted identifiers when a duration predicate is converted", () => {
+      const result = parseDurationWhereClause(
+        `trace_id IN (SELECT trace_id FROM "default" WHERE (tenant_id = 'globex')) AND duration > '100ms'`,
+        p,
+        "default",
+      );
+      expect(result).toContain(`FROM "default"`);
+      expect(result).not.toContain("`");
+      expect(result).toContain("duration > 100000");
+    });
   });
 
   describe("combined clauses", () => {
@@ -176,8 +194,24 @@ describe("parseDurationWhereClause", () => {
         "x",
       );
       // service_name is preserved; duration is converted to 1500 microseconds
-      expect(result).toContain("service_name = 'svc-a'");
-      expect(result).toContain("duration >= 1500");
+      expect(result).toBe("service_name='svc-a' AND duration >= 1500");
+    });
+
+    it("should convert both bounds of a BETWEEN", () => {
+      const result = parseDurationWhereClause("duration BETWEEN '1ms' AND '2s'", p, "x");
+      expect(result).toBe("duration BETWEEN 1000 AND 2000000");
+    });
+
+    it.each([
+      String.raw`path = 'C:\new\temp'`,
+      String.raw`msg = 'tab\there'`,
+      String.raw`v = 'a\b'`,
+      "note = 'it''s'",
+      "str_match(body, '```')",
+      "`svc` = 'x'",
+    ])("should leave other literals byte-identical: %s", (other) => {
+      const result = parseDurationWhereClause(`${other} AND duration > '1ms'`, p, "x");
+      expect(result).toBe(`${other} AND duration > 1000`);
     });
   });
 

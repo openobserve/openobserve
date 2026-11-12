@@ -60,6 +60,12 @@ fn is_top_level_org_list(path_columns: &[&str], method: &str) -> bool {
     matches!(path_columns, ["organizations"]) && method == "LIST"
 }
 
+/// GHSA-29xv-5rx7-5q7v: only these org-less routes may resolve the caller from any membership.
+#[cfg(any(feature = "enterprise", test))]
+fn is_top_level_cross_org_route(path_columns: &[&str]) -> bool {
+    matches!(path_columns, ["organizations"] | ["clusters"])
+}
+
 /// A license path names no org, and like the other license writes it needs a `_meta` member.
 #[cfg(any(feature = "enterprise", test))]
 fn user_lookup_org<'a>(path_columns: &[&'a str]) -> &'a str {
@@ -141,9 +147,7 @@ pub async fn token_validator(
                     && path_columns.first().is_some_and(|p| p.eq(&"invites"))
                     && auth_info.method.eq("DELETE");
 
-                let path_suffix = path_columns.last().unwrap_or(&"");
-                if path_suffix.eq(&"organizations")
-                    || path_suffix.eq(&"clusters")
+                if is_top_level_cross_org_route(&path_columns)
                     || is_member_subscription
                     || is_list_invite_call
                     || is_reject_invite_call
@@ -342,6 +346,21 @@ mod tests {
         assert!(!is_top_level_org_list(&["acme", "organizations"], "LIST"));
         assert!(!is_top_level_org_list(&["organizations"], "POST"));
         assert!(!is_top_level_org_list(&["organizations"], "GET"));
+    }
+
+    #[test]
+    fn an_org_scoped_object_named_organizations_does_not_skip_the_org() {
+        assert!(is_top_level_cross_org_route(&["organizations"]));
+        assert!(is_top_level_cross_org_route(&["clusters"]));
+        for path in [
+            &["acme", "kv", "organizations"][..],
+            &["acme", "functions", "organizations"],
+            &["acme", "streams", "clusters"],
+            &["_meta", "organizations"],
+            &["acme", "organizations"],
+        ] {
+            assert!(!is_top_level_cross_org_route(path), "{path:?}");
+        }
     }
 
     #[test]

@@ -25,7 +25,6 @@ use config::{
     get_config,
     meta::{
         alerts::alert,
-        pipeline::PipelineKind,
         promql::VALUE_LABEL,
         self_reporting::usage::UsageType,
         stream::{StreamPartition, StreamType},
@@ -151,7 +150,7 @@ pub(super) async fn run_pipelines<T: Clone>(
             continue;
         };
         let (records, sides): (Vec<json::Value>, Vec<T>) = stream_inputs.into_iter().unzip();
-        let has_user_pipeline = pipelines.iter().any(|p| p.kind == PipelineKind::User);
+        let has_user_pipeline = crate::ingestion::has_user_pipeline(pipelines);
 
         for exec_pl in pipelines {
             let results = match exec_pl
@@ -232,7 +231,11 @@ pub(super) async fn resolve_batch_schema<T>(
     .await?;
     drop(records);
     // the check that turned the UDS on projected the schema, which would drop unpacked columns
-    if let Some(fields) = newly_enabled_uds_fields(has_uds, stream_schema_map.get(stream_name)) {
+    if let Some(fields) = newly_enabled_uds_fields(
+        StreamType::Metrics,
+        has_uds,
+        stream_schema_map.get(stream_name),
+    ) {
         repack_records(rows.iter_mut().map(record), &fields);
         let records: Vec<_> = rows.iter_mut().map(|row| &*record(row)).collect();
         check_metrics_schema(

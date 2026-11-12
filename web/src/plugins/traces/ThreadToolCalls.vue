@@ -14,20 +14,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  ThreadToolCalls — the collapsed "Show calls" tool thread (zigzag pill that
-  reveals the per-tool args/result rows). Extracted from ThreadView so the same
-  design is reused by both the Pretty transcript (ThreadView) and the Session
-  Detail collapsed turn body. Takes the turn's execute_tool spans; emits the
-  span id when a tool's "open span" button is clicked.
-
-  Self-contained: own one-way reveal state + per-tool expand state + the scoped
-  artwork (the zigzag is a tiled inline SVG Tailwind can't express, so scoped
-  CSS is allowed here per the redesign rules §5a).
--->
 <template>
   <div v-if="toolCalls.length > 0" class="thread-tools-thread">
-    <!-- One-way reveal: clicking shows the calls and removes the pill. -->
+    <!-- One-way reveal (collapsed mode): clicking shows the calls and removes the pill. -->
     <button v-if="!shown" class="tt-toggle" @click="shown = true">
       <span class="tt-zz bg-border-strong"></span>
       <span class="tt-pill border-border-default bg-surface-base border">
@@ -59,11 +48,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             expandedTools.has(tool.span_id) ? "▾" : "▸"
           }}</span>
           <OIcon name="build" size="xs" class="thread-tool-row__icon" />
-          <span class="thread-tool-row__name">{{
-            tool.tool_name || tool.gen_ai_tool_name || tool.operation_name
-          }}</span>
-          <span class="flex-1" />
+          <span class="thread-tool-row__name">{{ toolName(tool) }}</span>
+          <!-- Collapsed card: one summary line of the arguments. -->
           <span
+            v-if="!expandedTools.has(tool.span_id)"
+            class="text-2xs text-text-secondary min-w-0 flex-1 truncate font-mono"
+            >{{ summaryLine(tool) }}</span
+          >
+          <span v-else class="flex-1" />
+          <span
+            v-if="!tool.synthetic"
             class="thread-pill"
             :class="
               tool.span_status === 'ERROR'
@@ -75,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             · {{ formatTimeWithSuffix(Number(tool.duration)) }}
           </span>
           <button
+            v-if="!tool.synthetic"
             class="thread-tool-row__view text-text-secondary"
             @click.stop="emit('span-selected', tool.span_id)"
             :title="t('traces.threadToolCalls.openSpanDetails')"
@@ -87,13 +82,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="expandedTools.has(tool.span_id)"
           class="thread-tool-body bg-surface-base border-border-default border-t border-dashed"
         >
+          <BehindThisStep v-if="explain(tool.span_id)" :step="explain(tool.span_id)!" />
           <div class="thread-tool-body__section">
             <div class="thread-tool-body__label text-text-secondary">
               {{ t("traces.threadToolCalls.arguments") }}
             </div>
             <pre
               class="thread-tool-body__pre bg-surface-base border-border-default text-text-body border"
-              >{{ formatToolPayload(getInputRaw(tool) || tool.tool_args) }}</pre>
+              >{{ formatToolPayload(toolArgs(tool)) }}</pre>
           </div>
           <div class="thread-tool-body__section">
             <div class="thread-tool-body__label text-text-secondary">
@@ -104,11 +100,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <pre
               class="thread-tool-body__pre bg-surface-base border-border-default text-text-body border"
-              >{{
-                formatToolPayload(getOutputRaw(tool)) ||
-                tool.status_message ||
-                t("traces.threadToolCalls.empty")
-              }}</pre>
+              >{{ shownResult(tool) }}</pre>
+            <button
+              v-if="resultLines(tool).length > RESULT_LINES && !fullResults.has(tool.span_id)"
+              type="button"
+              class="text-2xs text-text-link mt-1 hover:underline"
+              :data-test="`thread-tool-show-json-${tool.span_id}`"
+              @click="showFullResult(tool.span_id)"
+            >
+              {{ t("traces.threadToolCalls.showJson", { n: resultLines(tool).length }) }}
+            </button>
           </div>
         </div>
       </div>
@@ -117,23 +118,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { inject, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getInputRaw, getOutputRaw } from "./threadView.utils";
+import BehindThisStep from "./BehindThisStep.vue";
+import { REQUEST_TIMELINE_KEY, stepToExplain } from "./timeAttribution";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
 
-defineProps<{
-  /** The turn's execute_tool spans (name/args/result/status/duration). */
+const props = defineProps<{
+  /** The turn's tool calls: execute_tool spans (name/args/result/status/duration). */
   toolCalls: any[];
+  /** Start behind the "N tool calls · Show calls" pill (Session Detail collapsed body). */
+  collapsed?: boolean;
 }>();
 const emit = defineEmits<{ (e: "span-selected", spanId: string): void }>();
 
 const { t } = useI18nTyped();
 
+const RESULT_LINES = 6;
+
+// Provided by TraceDetails only: a call that failed or ran slow shows what was behind it.
+const timeline = inject(REQUEST_TIMELINE_KEY, null);
+const explain = (spanId: string) => stepToExplain(timeline, spanId);
+
 // One-way reveal for the whole group; per-tool rows expand independently.
-const shown = ref(false);
+const shown = ref(!props.collapsed);
 const expandedTools = ref<Set<string>>(new Set());
+const fullResults = ref<Set<string>>(new Set());
+
+// The first call, every failed call and every slow one open by default.
+watch(
+  () => props.toolCalls,
+  (calls) => {
+    expandedTools.value = new Set(
+      calls
+        .filter((c, i) => i === 0 || c.span_status === "ERROR" || explain(c.span_id))
+        .map((c) => c.span_id),
+    );
+  },
+  { immediate: true },
+);
+
+function toolName(tool: any): string {
+  return tool.tool_name || tool.gen_ai_tool_name || tool.operation_name || "";
+}
+
+function toolArgs(tool: any): unknown {
+  return getInputRaw(tool) || tool.gen_ai_tool_call_arguments || tool.tool_args;
+}
+
+function summaryLine(tool: any): string {
+  return formatToolPayload(toolArgs(tool)).replace(/\s+/g, " ").slice(0, 160);
+}
+
+function resultText(tool: any): string {
+  return (
+    formatToolPayload(getOutputRaw(tool) || tool.gen_ai_tool_call_result) ||
+    tool.status_message ||
+    // A call with no tool span never had a result recorded; it did not return nothing.
+    (tool.synthetic ? t("traces.threadToolCalls.noResult") : t("traces.threadToolCalls.empty"))
+  );
+}
+
+function resultLines(tool: any): string[] {
+  return resultText(tool).split("\n");
+}
+
+function shownResult(tool: any): string {
+  const lines = resultLines(tool);
+  if (lines.length <= RESULT_LINES || fullResults.value.has(tool.span_id)) return lines.join("\n");
+  return `${lines.slice(0, RESULT_LINES).join("\n")}\n…`;
+}
+
+function showFullResult(spanId: string) {
+  fullResults.value = new Set(fullResults.value).add(spanId);
+}
 
 function toggleTool(spanId: string) {
   const next = new Set(expandedTools.value);

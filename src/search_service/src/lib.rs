@@ -1004,6 +1004,7 @@ pub async fn search_partition_multi(
                 histogram_interval: req.histogram_interval,
                 sampling_ratio: None,
                 search_type: None,
+                timezone: None,
             },
             false,
             false, // disable aggs cache

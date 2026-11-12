@@ -15,9 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, inject, nextTick, onMounted, provide, ref, watch } from "vue";
+import { computed, inject, nextTick, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
-import { cloneDeep } from "lodash-es";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { getUUID } from "@/utils/zincutils";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -36,12 +35,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
-import FilterGroup from "@/components/alerts/FilterGroup.vue";
-import {
-  CONDITION_VALUE_SUGGEST_KEY,
-  type ConditionValueSuggest,
-} from "@/components/alerts/conditionOperators";
-import { updateGroup, removeConditionGroup } from "@/utils/alerts/alertDataTransforms";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import { streamValuesLoader } from "@/components/filterBar/streamValues";
+import type { FilterField } from "@/utils/query/filterBar";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import AnnotationSourcePreview from "./AnnotationSourcePreview.vue";
 import useStreams from "@/composables/useStreams";
@@ -148,9 +144,6 @@ const fieldsStream = computed(() =>
 );
 
 const streamTypeOptions = STREAM_TYPES.map((type) => ({ label: raw(type), value: type }));
-const variableItems = computed(() =>
-  props.variableNames.map((name) => ({ label: raw(name), value: `$${name}` })),
-);
 // Same list, labelled to read as a variable once mixed into a picker of real stream/field names.
 const variablePickerItems = computed(() =>
   props.variableNames.map((name) => ({
@@ -164,11 +157,7 @@ const streamOptions = computed(() => [
 ]);
 
 // Offers `$variable` as a value suggestion, same as the old filter rows did.
-const annotationValueSuggest: ConditionValueSuggest = () => ({
-  options: variableItems,
-  hint: computed(() => undefined),
-});
-provide(CONDITION_VALUE_SUGGEST_KEY, annotationValueSuggest);
+const variableValues = () => props.variableNames.map((name) => `$${name}`);
 
 const fieldNames = computed(() => [
   ...new Set(
@@ -184,6 +173,13 @@ const fieldOptions = computed(() => [
   ...fieldNames.value.map((name) => ({ label: raw(name), value: name })),
 ]);
 const fieldSuggestions = computed(() => fieldNames.value.map((name) => ({ name })));
+const filterFields = computed<FilterField[]>(() =>
+  fieldOptions.value.map((option) => ({
+    name: option.value,
+    label: String(option.label),
+    type: "string",
+  })),
+);
 
 const loadStreams = async (streamType: string) => {
   streamLoadError.value = "";
@@ -209,6 +205,14 @@ const resolveVariableValue = (value: string): string => {
   const resolved = Array.isArray(match?.value) ? match.value[0] : match?.value;
   return typeof resolved === "string" ? resolved : "";
 };
+
+const filterValueLoader = computed(() =>
+  streamValuesLoader({
+    org: store.state.selectedOrganization?.identifier,
+    streamType: values.value.streamType,
+    streamName: resolveVariableValue(values.value.stream),
+  }),
+);
 
 const loadFields = async (stream: string, streamType: string) => {
   const resolvedStream = resolveVariableValue(stream);
@@ -297,22 +301,7 @@ onMounted(async () => {
   await loadFields(fieldsStream.value, values.value.streamType);
 });
 
-// FilterGroup edits a clone and emits the result; this context just renames the field to alerts' shape.
-const filtersTransformContext = () => ({
-  formData: { query_condition: { conditions: cloneDeep(values.value.filters) } },
-});
-
-const updateFilters = (updatedGroup: unknown) => {
-  const ctx = filtersTransformContext();
-  updateGroup(updatedGroup, ctx);
-  setField("filters", ctx.formData.query_condition.conditions);
-};
-
-const removeFiltersGroup = (targetGroupId: string) => {
-  const ctx = filtersTransformContext();
-  removeConditionGroup(targetGroupId, undefined, ctx);
-  setField("filters", ctx.formData.query_condition.conditions);
-};
+const updateFilters = (next: unknown) => setField("filters", next ?? emptyAnnotationFilterGroup());
 
 const filtersGroup = computed(() => values.value.filters as AnnotationConditionGroup);
 const hasBlankFilters = computed(() => annotationFiltersHaveBlankCondition(filtersGroup.value));
@@ -578,15 +567,14 @@ const title = computed(() =>
                 <span class="text-compact text-input-label-text leading-tight font-medium">{{
                   t("dashboard.addSettingVariable.filters")
                 }}</span>
-                <FilterGroup
-                  :group="filtersGroup"
-                  :stream-fields="fieldOptions"
-                  :depth="0"
-                  name-prefix="filters"
+                <FilterBuilder
+                  profile="annotation"
+                  :model-value="filtersGroup"
+                  :fields="filterFields"
+                  :load-values="filterValueLoader"
+                  :extra-value-suggestions="variableValues"
                   data-test="dashboard-annotation-source-filters"
-                  @add-condition="updateFilters"
-                  @add-group="updateFilters"
-                  @remove-group="removeFiltersGroup"
+                  @update:model-value="updateFilters"
                 />
                 <p
                   v-if="hasBlankFilters"

@@ -246,6 +246,10 @@ describe("OverviewTab", () => {
     } as never);
   };
 
+  /** The deployment serves anomaly detection; the OSS build reports it off. */
+  const givenAnomalyDetectionOn = () =>
+    store.commit("setConfig", { ...store.state.zoConfig, anomaly_detection_enabled: true });
+
   /** Make the anomalies fetch hang until the returned deferred is resolved. */
   const givenAnomaliesHang = () => {
     const pending = deferred<{ data: unknown[] }>();
@@ -430,6 +434,7 @@ describe("OverviewTab", () => {
     beforeEach(async () => {
       // Recreated per test — a describe-scoped deferred would already be
       // settled by the time the second test mounts.
+      givenAnomalyDetectionOn();
       anomaliesPending = givenAnomaliesHang();
       recentEventsPending = givenRecentEventsHang();
       wrapper = mountOverviewTab();
@@ -463,6 +468,7 @@ describe("OverviewTab", () => {
 
     beforeEach(async () => {
       // Recent events resolves immediately with rows; anomalies hangs.
+      givenAnomalyDetectionOn();
       givenRecentEvents();
       anomaliesPending = givenAnomaliesHang();
       wrapper = mountOverviewTab();
@@ -519,6 +525,7 @@ describe("OverviewTab", () => {
     let anomaliesPending: Deferred<{ data: unknown[] }>;
 
     beforeEach(async () => {
+      givenAnomalyDetectionOn();
       givenRecentEvents();
       anomaliesPending = givenAnomaliesHang();
       wrapper = mountOverviewTab();
@@ -602,6 +609,7 @@ describe("OverviewTab", () => {
     beforeEach(async () => {
       // First load: anomalies has rows (so content is on screen), recent events
       // legitimately empty.
+      givenAnomalyDetectionOn();
       vi.mocked(anomalyService.list).mockResolvedValue({
         data: mockOverview.anomalyConfigs,
       } as never);
@@ -677,6 +685,7 @@ describe("OverviewTab", () => {
 
   describe("hasAnyData sources", () => {
     it("should count anomalies as data when the anomaly history returns hits", async () => {
+      givenAnomalyDetectionOn();
       vi.mocked(anomalyService.list).mockResolvedValue({
         data: mockOverview.anomalyConfigs,
       } as never);
@@ -797,6 +806,37 @@ describe("OverviewTab", () => {
       expect(alertsService.getHistory).toHaveBeenCalled();
       expect(anomalyService.list).toHaveBeenCalled();
       expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
+    });
+  });
+
+  describe("a build without anomaly detection", () => {
+    it("should not request anomalies when the build reports anomaly detection off", async () => {
+      config.isEnterprise = "false";
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        anomaly_detection_enabled: false,
+        features: { incidents: "locked", oncall: "locked" },
+      });
+      givenRecentEvents();
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(anomalyService.list).not.toHaveBeenCalled();
+      expect(anomalyService.getAllHistory).not.toHaveBeenCalled();
+      expect(alertsService.getHistory).toHaveBeenCalled();
+      expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
+    });
+
+    it("should request anomalies when the config reports anomaly detection on after mount", async () => {
+      givenRecentEvents();
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(anomalyService.list).not.toHaveBeenCalled();
+
+      givenAnomalyDetectionOn();
+      await flushPromises();
+
+      expect(anomalyService.list).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -2625,6 +2665,7 @@ describe("OverviewTab", () => {
 
   describe("the alert history drawer across an org switch", () => {
     it("closes the drawer and clears its alert when the organization changes", async () => {
+      givenAnomalyDetectionOn();
       vi.mocked(anomalyService.list).mockResolvedValue({
         data: mockOverview.anomalyConfigs,
       } as never);

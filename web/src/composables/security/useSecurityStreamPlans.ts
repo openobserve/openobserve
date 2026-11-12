@@ -8,7 +8,7 @@ import useHttpStreaming from "@/composables/useStreamingSearch";
 import store from "@/stores";
 import streamService from "@/services/stream";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
-import { bestMatch } from "@/utils/security/classify";
+import { fetchSecuritySources, fetchSourceMatch } from "@/services/securitySources.queries";
 import {
   LARGE_STREAM_ROWS,
   acceptOutcome,
@@ -16,13 +16,12 @@ import {
   planStream,
   volumeFromStats,
   type StreamPlan,
-} from "@/utils/security/entities";
+} from "@/utils/security/streamPlan";
 import {
   outcomeFallbackWindow,
   outcomeSampleSql,
   outcomeSampleWindow,
 } from "@/utils/security/outcome";
-import { securitySourceNames } from "@/utils/security/sourceSelection";
 
 /** Queries in flight at once; the search service rejects a flood with 429. */
 export const QUERY_CONCURRENCY = 4;
@@ -165,7 +164,8 @@ export function runSql(
           );
           error.status = body.status;
           error.code = body.code;
-          error.response = { data: body };
+          // Shaped like an axios error, so isForbiddenError and licenseDeniedFeatures read its status.
+          error.response = { status: body.status, data: body };
           reject(error);
         },
         complete: () => {
@@ -196,6 +196,8 @@ export function useSecurityStreamPlans() {
   const unreadable = ref<string[]>([]);
   const loading = ref(false);
   const error = ref("");
+  /** The request that failed the load, kept so a page can tell a refusal from an outage. */
+  const failure = shallowRef<unknown>(null);
   let seq = 0;
 
   async function sampleOutcome(
@@ -230,7 +232,11 @@ export function useSecurityStreamPlans() {
     const fields: string[] = (schema.data?.schema ?? schema.data?.fields ?? []).map((f: any) =>
       String(f.name),
     );
-    const source = fields.length ? (bestMatch(fields)?.source ?? null) : null;
+    const source = fields.length
+      ? await fetchSourceMatch(orgId, fields)
+          .then((m) => m.classification?.source ?? null)
+          .catch(() => null)
+      : null;
     const plan = { ...planStream(name, fields, source), volume: volumeFromStats(stats) };
     if (!plan.outcomeColumn) return plan;
     if (options.requireUser && !plan.columns.user) return acceptOutcome(plan, []);
@@ -256,14 +262,13 @@ export function useSecurityStreamPlans() {
     const mine = ++seq;
     loading.value = true;
     error.value = "";
+    failure.value = null;
     try {
       const res = await streamService.nameList(orgId, "logs", false);
       const list: any[] = res.data?.list ?? [];
       const statsByName = new Map(list.map((s) => [String(s.name), s.stats]));
-      const wanted = securitySourceNames(
-        orgId,
-        list.map((s) => String(s.name)),
-      );
+      const listed = new Set(list.map((s) => String(s.name)));
+      const wanted = (await fetchSecuritySources(orgId)).sources.filter((n) => listed.has(n));
       if (mine !== seq) return;
       names.value = [...wanted].sort();
       const settled = await runPool(
@@ -283,6 +288,7 @@ export function useSecurityStreamPlans() {
     } catch (e: any) {
       if (mine !== seq) return;
       error.value = e?.response?.data?.message ?? e?.message ?? "";
+      failure.value = e;
       names.value = [];
       plans.value = [];
       unreadable.value = [];
@@ -291,5 +297,5 @@ export function useSecurityStreamPlans() {
     }
   }
 
-  return { plans, names, unreadable, loading, error, load };
+  return { plans, names, unreadable, loading, error, failure, load };
 }

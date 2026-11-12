@@ -510,4 +510,75 @@ describe("conditionsFormatter", () => {
       ).toBe("name NOT LIKE '%O''Hare%'");
     });
   });
+
+  describe("a condition that writes no SQL", () => {
+    const leaf = (column: string, operator: string, value: unknown, logicalOperator = "AND") => ({
+      filterType: "condition",
+      column,
+      operator,
+      value,
+      logicalOperator,
+    });
+    const sql = (conditions: unknown[]) =>
+      buildConditionsString(
+        { filterType: "group", logicalOperator: "AND", conditions },
+        { sqlMode: true, addWherePrefix: true, formatValues: true, streamFieldsMap },
+      );
+
+    it("leaves no dangling connector when it comes first", () => {
+      expect(sql([leaf("age", "starts_with", "1"), leaf("city", "=", "x")])).toBe(
+        "WHERE city = 'x'",
+      );
+      expect(sql([leaf("age", "re_match", "1"), leaf("city", "=", "x", "OR")])).toBe(
+        "WHERE city = 'x'",
+      );
+    });
+
+    it("keeps the connectors of the conditions written after the first", () => {
+      expect(
+        sql([leaf("age", "starts_with", "1"), leaf("city", "=", "x"), leaf("age", ">", 3, "OR")]),
+      ).toBe("WHERE city = 'x' OR age > 3");
+      expect(sql([leaf("city", "=", "x"), leaf("age", "starts_with", "1")])).toBe(
+        "WHERE city = 'x'",
+      );
+    });
+
+    it("writes the original operators with their connectors as before", () => {
+      expect(sql([leaf("city", "=", "x"), leaf("name", "Contains", "a", "OR")])).toBe(
+        "WHERE city = 'x' OR name LIKE '%a%'",
+      );
+    });
+  });
+
+  describe("regex operators", () => {
+    const sql = (condition: Record<string, unknown>) =>
+      buildConditionsString(
+        { filterType: "condition", column: "name", ...condition },
+        { sqlMode: true, formatValues: true, streamFieldsMap },
+      );
+
+    it("writes re_match as regexp_like with the raw pattern, as the backend does", () => {
+      expect(sql({ operator: "re_match", value: "\\bprod\\b" })).toBe(
+        "regexp_like(name, '\\bprod\\b')",
+      );
+    });
+
+    it("writes re_not_match as NOT regexp_like", () => {
+      expect(sql({ operator: "re_not_match", value: "^api-" })).toBe(
+        "NOT regexp_like(name, '^api-')",
+      );
+    });
+
+    it("prefixes (?i) for case_insensitive and doubles quotes", () => {
+      expect(sql({ operator: "re_match", value: "o'h", case_insensitive: true })).toBe(
+        "regexp_like(name, '(?i)o''h')",
+      );
+    });
+
+    it("leaves the original operators' SQL unchanged", () => {
+      expect(sql({ operator: "=", value: "x" })).toBe("name = 'x'");
+      expect(sql({ operator: "contains", value: "a" })).toBe("name LIKE '%a%'");
+      expect(sql({ operator: "not_contains", value: "a" })).toBe("name NOT LIKE '%a%'");
+    });
+  });
 });

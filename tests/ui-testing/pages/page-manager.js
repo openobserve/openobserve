@@ -50,6 +50,7 @@ import { SloListPage } from "./sloPages/sloListPage.js";
 import { SloFormPage } from "./sloPages/sloFormPage.js";
 import { SloDetailPage } from "./sloPages/sloDetailPage.js";
 import { SloAlertsPage } from "./sloPages/sloAlertsPage.js";
+import { SloImportPage } from "./sloPages/sloImportPage.js";
 import { OnCallTeamsPage } from "./oncallPages/oncallTeamsPage.js";
 import { OnCallTeamDetailPage } from "./oncallPages/oncallTeamDetailPage.js";
 import { OnCallPagesListPage } from "./oncallPages/oncallPagesListPage.js";
@@ -58,6 +59,7 @@ import { OnCallResponseDetailPage } from "./oncallPages/oncallResponseDetailPage
 import { OnCallCoveragePage } from "./oncallPages/oncallCoveragePage.js";
 import { OnCallPolicyEditorPage } from "./oncallPages/oncallPolicyEditorPage.js";
 import { OnCallMinePage } from "./oncallPages/oncallMinePage.js";
+import { TelephonySettingsPage } from "./oncallPages/telephonySettingsPage.js";
 import { SyntheticsListPage } from "./syntheticsPages/syntheticsListPage.js";
 import { SyntheticsCreatePage } from "./syntheticsPages/syntheticsCreatePage.js";
 import { SyntheticsResultsPage } from "./syntheticsPages/syntheticsResultsPage.js";
@@ -132,6 +134,7 @@ import { LogoManagementPage } from "./generalPages/logoManagementPage.js";
 import { StatusPagesPage } from "./generalPages/statusPagesPage.js";
 import { QueryManagementPage } from "./generalPages/queryManagementPage.js";
 import { BillingGroupPage } from "./generalPages/billingGroupPage.js";
+import { BillingUsagePage } from "./generalPages/billingUsagePage.js";
 import { RegexPatternsFormValidationPage } from "./generalPages/regexPatternsFormValidationPage.js";
 import { CipherKeysFormValidationPage } from "./generalPages/cipherKeysFormValidationPage.js";
 import { SharedComponentsFormValidationPage } from "./generalPages/sharedComponentsFormValidationPage.js";
@@ -245,6 +248,7 @@ class PageManager {
     this.sloFormPage = new SloFormPage(page);
     this.sloDetailPage = new SloDetailPage(page);
     this.sloAlertsPage = new SloAlertsPage(page);
+    this.sloImportPage = new SloImportPage(page);
 
     // ===== ON-CALL PAGE OBJECTS (enterprise) =====
     this.oncallTeamsPage = new OnCallTeamsPage(page);
@@ -255,6 +259,7 @@ class PageManager {
     this.oncallCoveragePage = new OnCallCoveragePage(page);
     this.oncallPolicyEditorPage = new OnCallPolicyEditorPage(page);
     this.oncallMinePage = new OnCallMinePage(page);
+    this.telephonySettingsPage = new TelephonySettingsPage(page);
 
     // ===== SYNTHETICS PAGE OBJECTS =====
     this.syntheticsListPage = new SyntheticsListPage(page);
@@ -342,6 +347,7 @@ class PageManager {
     this.statusPagesPage = new StatusPagesPage(page);
     this.queryManagementPage = new QueryManagementPage(page);
     this.billingGroupPage = new BillingGroupPage(page);
+    this.billingUsagePage = new BillingUsagePage(page);
     this.regexPatternsFormValidation = new RegexPatternsFormValidationPage(page);
     this.sharedComponentsFormValidation = new SharedComponentsFormValidationPage(page);
     this.schemaPage = new SchemaPage(page);

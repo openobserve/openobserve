@@ -5,10 +5,16 @@
 import { computed, ref, shallowRef } from "vue";
 
 import { runSql } from "@/composables/security/useSecurityStreamPlans";
-import type { SourceType } from "@/utils/security/sourceTypes";
 import { quoteIdent } from "@/utils/security/sql";
-import type { ApplicableRule } from "@/utils/security/sigma";
-import { applicableRules } from "@/utils/security/sigma";
+import { queryClient } from "@/composables/query/queryClient";
+import { sigmaCatalogQuery, sigmaCompileQuery } from "@/services/securitySigma.queries";
+import type { CatalogRule, CompiledSigma } from "@/services/securitySigma";
+import type { SourceType } from "@/services/securitySources";
+
+export interface ApplicableRule {
+  rule: CatalogRule;
+  compiled: CompiledSigma;
+}
 
 export interface RuleHit extends ApplicableRule {
   /** Matching rows in the window, or null when the counts have not been run. */
@@ -34,14 +40,31 @@ export function useSigmaRules() {
   const counting = ref(false);
   const error = ref("");
 
-  /** Compiles the shipped pack against a stream. Cheap, and does not query. */
-  function compileFor(source: SourceType | null, fields: string[]) {
+  let compileSeq = 0;
+  /** Compiles the shipped pack against a stream on the server; runnable and severe first. */
+  async function compileFor(orgId: string, source: SourceType | null, fields: string[]) {
     error.value = "";
-    if (!source || !fields.length) {
+    const seq = ++compileSeq;
+    if (!orgId || !source || !fields.length) {
       rules.value = [];
       return;
     }
-    rules.value = applicableRules(source, fields).map((entry) => ({ ...entry, count: null }));
+    try {
+      const [catalog, result] = await Promise.all([
+        queryClient.fetchQuery(sigmaCatalogQuery(orgId)),
+        queryClient.fetchQuery(sigmaCompileQuery(orgId, { source_type: source.id, fields })),
+      ]);
+      if (seq !== compileSeq) return;
+      const byKey = new Map(catalog.rules.map((rule) => [rule.key, rule]));
+      rules.value = result.applicable.flatMap(({ key, compiled }) => {
+        const rule = byKey.get(key);
+        return rule ? [{ rule, compiled, count: null }] : [];
+      });
+    } catch (e: any) {
+      if (seq !== compileSeq) return;
+      rules.value = [];
+      error.value = e?.response?.data?.message ?? e?.message ?? "Could not compile rules";
+    }
   }
 
   async function countHits(orgId: string, stream: string, range: SigmaRunRange) {

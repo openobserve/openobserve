@@ -1022,6 +1022,122 @@ describe("PanelSchemaRenderer", () => {
         expect(wrapper.find('[data-test="no-data"]').exists()).toBe(false);
       });
 
+      it("shows one static placeholder named Loading chart until the first load settles", async () => {
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ loading: ref(true) }) as any,
+        );
+        wrapper = createWrapper();
+        await flushPromises();
+
+        const placeholder = wrapper.find('[data-test="panel-chart-placeholder"]');
+        expect(placeholder.exists()).toBe(true);
+        expect(placeholder.attributes("role")).toBe("img");
+        expect(placeholder.attributes("aria-label")).toBe("Loading chart");
+        expect(placeholder.element.childElementCount).toBe(0);
+      });
+
+      const promqlPanel = () => ({
+        ...defaultProps.panelSchema,
+        queryType: "promql",
+        queries: [{ query: "up", fields: {}, config: {} }],
+      });
+      const settleWithData = async (refs: { data: any; loading: any; isFirstLoadSettled: any }) => {
+        refs.data.value = [{ resultType: "matrix", result: [{ metric: {}, values: [[1, "4"]] }] }];
+        refs.loading.value = false;
+        refs.isFirstLoadSettled.value = true;
+        await flushPromises();
+      };
+      const paint = async () => {
+        wrapper.findComponent({ name: "ChartRenderer" }).vm.$emit("painted");
+        await flushPromises();
+      };
+
+      it("keeps the placeholder over the mounted chart until its first frame is drawn, then keeps the chart on a refresh", async () => {
+        const refs = { isFirstLoadSettled: ref(false), loading: ref(true), data: ref<any[]>([]) };
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(loaderWith(refs) as any);
+        wrapper = createWrapper({ panelSchema: promqlPanel() });
+        await flushPromises();
+        expect(wrapper.find('[data-test="panel-chart-placeholder"]').exists()).toBe(true);
+
+        await settleWithData(refs);
+        // The data has landed and the chart is mounted under the placeholder, but nothing is drawn yet.
+        expect(wrapper.find('[data-test="chart-renderer"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="panel-chart-placeholder"]').exists()).toBe(true);
+        expect(wrapper.emitted("painted")).toBeUndefined();
+
+        await paint();
+        expect(wrapper.find('[data-test="panel-chart-placeholder"]').exists()).toBe(false);
+        expect(wrapper.emitted("painted")).toHaveLength(1);
+
+        refs.loading.value = true;
+        await flushPromises();
+        expect(wrapper.find('[data-test="panel-chart-placeholder"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="chart-renderer"]').exists()).toBe(true);
+      });
+
+      it("ignores a frame drawn before the data was converted", async () => {
+        const refs = { isFirstLoadSettled: ref(false), loading: ref(true), data: ref<any[]>([]) };
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(loaderWith(refs) as any);
+        let release: (value: any) => void = () => {};
+        vi.mocked(convertPanelData).mockImplementationOnce(
+          () => new Promise((resolve) => (release = resolve)) as any,
+        );
+        wrapper = createWrapper({ panelSchema: promqlPanel() });
+        await settleWithData(refs);
+
+        await paint();
+        expect(wrapper.find('[data-test="panel-chart-placeholder"]').exists()).toBe(true);
+
+        release({ options: { series: [{ data: [[1, 4]] }] }, extras: {} });
+        await flushPromises();
+        await paint();
+        expect(wrapper.find('[data-test="panel-chart-placeholder"]').exists()).toBe(false);
+      });
+
+      it("ends the placeholder at the settle for a panel ChartRenderer does not draw", async () => {
+        const refs = { isFirstLoadSettled: ref(false), loading: ref(true), data: ref<any[]>([]) };
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(loaderWith(refs) as any);
+        wrapper = createWrapper({ panelSchema: { ...promqlPanel(), type: "table" } });
+        await settleWithData(refs);
+
+        expect(wrapper.find('[data-test="panel-chart-placeholder"]').exists()).toBe(false);
+        expect(wrapper.emitted("painted")).toHaveLength(1);
+      });
+
+      it("hands a settled panel with no data to the No data state, not the placeholder", async () => {
+        const refs = { isFirstLoadSettled: ref(false), loading: ref(true), data: ref<any[]>([]) };
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(loaderWith(refs) as any);
+        wrapper = createWrapper({ panelSchema: promqlPanel() });
+        refs.data.value = [{ resultType: "matrix", result: [] }];
+        refs.loading.value = false;
+        refs.isFirstLoadSettled.value = true;
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="panel-chart-placeholder"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
+      });
+
+      it("never shows the placeholder for a panel that renders without a query", async () => {
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(loaderWith({}) as any);
+        wrapper = createWrapper({ panelSchema: { ...defaultProps.panelSchema, type: "markdown" } });
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="panel-chart-placeholder"]').exists()).toBe(false);
+      });
+
+      it("shows the error, not the placeholder, when the first load fails", async () => {
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ errorDetail: ref({ message: "boom", code: "400" }) }) as any,
+        );
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="panel-chart-placeholder"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="panel-schema-renderer-error-message"]').exists()).toBe(
+          true,
+        );
+      });
+
       it("hands custom chart code the committed variables, time range, timezone and theme", async () => {
         const isFirstLoadSettled = ref(false);
         const data = ref<any[]>([]);

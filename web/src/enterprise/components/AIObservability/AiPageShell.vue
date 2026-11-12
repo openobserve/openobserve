@@ -36,12 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :data-test="`${dataTest}-page`"
-    :title="title"
-    :subtitle="subtitle"
-    :icon="icon"
+    :title="header?.title ?? title"
+    :subtitle="header?.subtitle ?? subtitle"
+    :icon="header?.icon ?? icon"
     bleed
     :scroll="false"
+    :tabs-below="hasTabs"
   >
+    <template v-if="hasTabs" #header-tabs><AiSectionTabs /></template>
     <template #actions>
       <!-- Last-refreshed indicator (staleness dot + relative time), left of the
            picker — the labeled Refresh button carries no timestamp of its own. -->
@@ -106,11 +108,14 @@ import type { AiDateState } from "@/enterprise/composables/useAiDateRange";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import DateTime from "@/components/DateTime.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import AiSectionTabs from "./AiSectionTabs.vue";
+import { useAiSectionTabs } from "./aiSectionTabs";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AiLastRefreshed from "./AiLastRefreshed.vue";
 
 const { t } = useI18nTyped();
+const { hasTabs, header } = useAiSectionTabs();
 
 defineProps<{
   /** Page prefix — the header derives `${dataTest}-page`,

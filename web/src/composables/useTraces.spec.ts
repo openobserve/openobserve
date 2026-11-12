@@ -15,6 +15,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
+import { createMemoryHistory, createRouter, useRouter } from "vue-router";
+import { flushPromises } from "@vue/test-utils";
+import { trackPendingNavigation } from "@/utils/pendingNavigation";
 import i18nInstance from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -33,7 +36,8 @@ const mockCurrentRoute = {
   } as { name?: string; query: Record<string, unknown> },
 };
 
-vi.mock("vue-router", () => ({
+vi.mock("vue-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vue-router")>()),
   useRouter: vi.fn(() => ({
     push: mockRouterPush,
     replace: mockRouterReplace,
@@ -707,20 +711,16 @@ describe("useTraces", () => {
         : null;
     };
 
-    beforeEach(() => {
-      // Default: the span has logs of its own, so no fallback.
-      mockSearch.mockResolvedValue({ data: { hits: [{ zo_count: 3 }] } });
-    });
-
     // o2-enterprise#1280: without the reset, a second View Logs re-showed the first span's logs.
     it("resets the logs page before every View Logs navigation, one span after another", async () => {
+      mockSearch.mockResolvedValue({ data: { hits: [{ zo_count: 3 }] } });
       const { navigateToCorrelatedLogs } = useTraces();
-      selectSpan("span-A", "trace-1");
+      selectSpan("span-A", "trace-A");
       await navigateToCorrelatedLogs({
         ...correlationProps(),
         timeRange: { startTime: 1000, endTime: 2000 },
       });
-      selectSpan("span-B", "trace-1");
+      selectSpan("span-B", "trace-B");
       await navigateToCorrelatedLogs({
         ...correlationProps(),
         timeRange: { startTime: 3000, endTime: 4000 },
@@ -738,29 +738,10 @@ describe("useTraces", () => {
       expect(resetOrder[1]).toBeLessThan(pushOrder[1]);
 
       const pushed = mockRouterPush.mock.calls.map((c) => c[0].query);
-      expect(String(pushed[0].query)).toContain("span_id = 'span-A'");
+      expect(String(pushed[0].query)).toContain("trace_id = 'trace-A'");
       expect(pushed[0]).toMatchObject({ from: "1000", to: "2000" });
-      expect(String(pushed[1].query)).toContain("span_id = 'span-B'");
+      expect(String(pushed[1].query)).toContain("trace_id = 'trace-B'");
       expect(pushed[1]).toMatchObject({ from: "3000", to: "4000" });
-    });
-
-    it("drops the stream dimension filters once the trace id is known", async () => {
-      const { navigateToCorrelatedLogs } = useTraces();
-      selectSpan("span-1", "trace-1");
-
-      await navigateToCorrelatedLogs(correlationProps({ k8s_namespace_name: "prod" }));
-
-      expect(pushedQuery()).toBe("span_id = 'span-1' and trace_id = 'trace-1'");
-    });
-
-    it("keeps the stream dimension filters when there is no trace id", async () => {
-      const { navigateToCorrelatedLogs } = useTraces();
-      selectSpan("span-1b", null);
-
-      await navigateToCorrelatedLogs(correlationProps({ k8s_namespace_name: "prod" }));
-
-      expect(pushedQuery()).toBe("k8s_namespace_name = 'prod' and span_id = 'span-1b'");
-      expect(mockSearch).not.toHaveBeenCalled();
     });
 
     const streams = (...names: string[]) => ({
@@ -772,60 +753,158 @@ describe("useTraces", () => {
       req.query.query.sql.includes(`FROM ${stream} `)
         ? Promise.resolve({ data: { hits: [{ zo_count: count }] } })
         : undefined;
+    const badRequest = () =>
+      Promise.reject({
+        response: { status: 400, data: { message: "Field 'trace_id' does not exist" } },
+      });
 
-    it("counts each eligible stream separately over the span's time range", async () => {
+    beforeEach(() => {
+      mockSearch.mockResolvedValue({ data: { hits: [{ zo_count: 3 }] } });
+    });
+
+    it("counts each eligible stream by trace id over the trace's window and opens the ones that hold it on that same window", async () => {
+      mockSearch.mockImplementation(
+        (req: any) =>
+          countFor("app_logs", 4)(req) ?? Promise.resolve({ data: { hits: [{ zo_count: 0 }] } }),
+      );
       const { navigateToCorrelatedLogs } = useTraces();
       selectSpan("span-c", "trace-c");
 
-      await navigateToCorrelatedLogs(streams("_o2_db_stats", "app_logs", "web_logs"));
+      const outcome = await navigateToCorrelatedLogs(
+        streams("_o2_db_stats", "app_logs", "web_logs"),
+      );
 
-      expect(mockSearch).toHaveBeenCalledTimes(2);
+      expect(outcome).toBe("opened");
       const sqls = mockSearch.mock.calls.map((c: any[]) => c[0].query.query.sql);
       expect(sqls).toEqual([
-        "SELECT count(*) AS zo_count FROM app_logs WHERE span_id = 'span-c' and trace_id = 'trace-c'",
-        "SELECT count(*) AS zo_count FROM web_logs WHERE span_id = 'span-c' and trace_id = 'trace-c'",
+        "SELECT count(*) AS zo_count FROM app_logs WHERE trace_id = 'trace-c'",
+        "SELECT count(*) AS zo_count FROM web_logs WHERE trace_id = 'trace-c'",
       ]);
       expect(mockSearch.mock.calls[0][0].org_identifier).toBe("test-org");
+      expect(mockSearch.mock.calls[0][0].query.query).toMatchObject({
+        start_time: 500,
+        end_time: 9000,
+      });
+      expect(pushedQuery()).toBe("trace_id = 'trace-c'");
+      expect(mockRouterPush.mock.calls[0][0].query).toMatchObject({
+        stream: "app_logs",
+        from: "500",
+        to: "9000",
+      });
+      expect(mockShowInfoNotification).not.toHaveBeenCalled();
+    });
+
+    it("counts and opens on the span's window when the trace's window is unknown", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-u", "trace-u");
+
+      await navigateToCorrelatedLogs(correlationProps());
+
       expect(mockSearch.mock.calls[0][0].query.query).toMatchObject({
         start_time: 1000,
         end_time: 2000,
       });
-      expect(pushedQuery()).toBe("span_id = 'span-c' and trace_id = 'trace-c'");
       expect(mockRouterPush.mock.calls[0][0].query).toMatchObject({ from: "1000", to: "2000" });
-      expect(mockShowInfoNotification).not.toHaveBeenCalled();
     });
 
-    it("falls back to the trace's logs over the whole trace's window when the span has none", async () => {
+    it("opens Logs on a window holding the log the count found, even outside the span's window", async () => {
+      const logTimestamp = 8000;
+      mockSearch.mockImplementation(async (req: any) => {
+        const { start_time, end_time } = req.query.query;
+        const inside = start_time <= logTimestamp && end_time >= logTimestamp;
+        return { data: { hits: [{ zo_count: inside ? 1 : 0 }] } };
+      });
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("child-span", "trace-c");
+
+      expect(await navigateToCorrelatedLogs(streams("app_logs"))).toBe("opened");
+      const opened = mockRouterPush.mock.calls[0][0].query;
+      expect(Number(opened.from)).toBeLessThanOrEqual(logTimestamp);
+      expect(Number(opened.to)).toBeGreaterThanOrEqual(logTimestamp);
+    });
+
+    it("drops the stream dimension filters once the trace id is known", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-1", "trace-1");
+
+      await navigateToCorrelatedLogs(correlationProps({ k8s_namespace_name: "prod" }));
+
+      expect(pushedQuery()).toBe("trace_id = 'trace-1'");
+    });
+
+    it("keeps the stream dimension filters and the span id when there is no trace id, without probing", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-1b", null);
+
+      const outcome = await navigateToCorrelatedLogs(
+        correlationProps({ k8s_namespace_name: "prod" }),
+      );
+
+      expect(outcome).toBe("opened");
+      expect(pushedQuery()).toBe("k8s_namespace_name = 'prod' and span_id = 'span-1b'");
+      expect(mockSearch).not.toHaveBeenCalled();
+    });
+
+    it("stays put and reports none when no stream holds the trace", async () => {
       mockSearch.mockResolvedValue({ data: { hits: [{ zo_count: 0 }] } });
       const { navigateToCorrelatedLogs } = useTraces();
       selectSpan("span-f", "trace-f");
 
-      await navigateToCorrelatedLogs({
-        ...streams("app_logs", "web_logs"),
-        logStreams: [{ stream_name: "app_logs", filters: { k8s_namespace_name: "prod" } }],
-      });
+      const outcome = await navigateToCorrelatedLogs(streams("app_logs", "web_logs"));
 
-      expect(pushedQuery()).toBe("trace_id = 'trace-f'");
-      expect(mockRouterPush.mock.calls[0][0].query).toMatchObject({ from: "500", to: "9000" });
-      expect(mockShowInfoNotification).toHaveBeenCalledTimes(1);
+      expect(outcome).toBe("none");
+      expect(mockRouterPush).not.toHaveBeenCalled();
+      expect(mockShowInfoNotification).not.toHaveBeenCalled();
+      expect(mockToast).not.toHaveBeenCalled();
     });
 
-    it("treats a failing stream count as unknown and still falls back on the rest", async () => {
+    it("leaves out a stream whose probe answers 4xx and opens the one that holds the trace", async () => {
+      mockSearch.mockImplementation((req: any) => countFor("app_logs", 2)(req) ?? badRequest());
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-k", "trace-k");
+
+      const outcome = await navigateToCorrelatedLogs(streams("web_logs", "app_logs"));
+
+      expect(outcome).toBe("opened");
+      expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("app_logs");
+    });
+
+    it("reports a denied probe as a failure, not as a stream without logs", async () => {
+      const denied = { response: { status: 403, data: { message: "Forbidden" } } };
+      mockSearch.mockRejectedValue(denied);
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-denied", "trace-denied");
+
+      expect(await navigateToCorrelatedLogs(streams("private_logs"))).toEqual({
+        failed: true,
+        error: denied,
+      });
+      expect(mockRouterPush).not.toHaveBeenCalled();
+    });
+
+    it("opens the stream that holds the trace even when another probe is denied", async () => {
       mockSearch.mockImplementation(
-        (req: any) => countFor("app_logs", 0)(req) ?? Promise.reject(new Error("no span_id")),
+        (req: any) => countFor("app_logs", 2)(req) ?? Promise.reject({ response: { status: 403 } }),
       );
       const { navigateToCorrelatedLogs } = useTraces();
-      selectSpan("span-u", "trace-u");
+      selectSpan("span-d2", "trace-d2");
 
-      await navigateToCorrelatedLogs(streams("app_logs", "web_logs"));
-
-      expect(mockSearch).toHaveBeenCalledTimes(2);
-      expect(pushedQuery()).toBe("trace_id = 'trace-u'");
-      // trace_id alone: the stream whose span count failed keeps its trace logs.
-      expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("app_logs,web_logs");
+      expect(await navigateToCorrelatedLogs(streams("private_logs", "app_logs"))).toBe("opened");
+      expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("app_logs");
     });
 
-    it("stops waiting for a stream that never answers and navigates on the counted ones", async () => {
+    it("reports none when every probe answers 4xx", async () => {
+      mockSearch.mockImplementation(() => badRequest());
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-e", "trace-e");
+
+      const outcome = await navigateToCorrelatedLogs(streams("app_logs", "web_logs"));
+
+      expect(outcome).toBe("none");
+      expect(mockRouterPush).not.toHaveBeenCalled();
+    });
+
+    it("stops waiting for a stream that never answers and opens the counted ones", async () => {
       vi.useFakeTimers();
       try {
         mockSearch.mockImplementation(
@@ -849,27 +928,13 @@ describe("useTraces", () => {
       }
     });
 
-    it("keeps the span query when any successful count is non-zero, despite a failure", async () => {
-      mockSearch.mockImplementation(
-        (req: any) => countFor("app_logs", 4)(req) ?? Promise.reject(new Error("no span_id")),
-      );
-      const { navigateToCorrelatedLogs } = useTraces();
-      selectSpan("span-k", "trace-k");
-
-      await navigateToCorrelatedLogs(streams("app_logs", "web_logs"));
-
-      expect(pushedQuery()).toBe("span_id = 'span-k' and trace_id = 'trace-k'");
-      // web_logs (no span_id column) would fail the span-scoped logs query.
-      expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("app_logs");
-      expect(mockShowInfoNotification).not.toHaveBeenCalled();
-    });
-
-    it("treats partial, errored or non-numeric count responses as unknown", async () => {
+    it("counts a partial positive count as holding the trace, never a zero, errored or non-numeric one", async () => {
       const responses: Record<string, any> = {
-        a_logs: { data: { is_partial: true, hits: [{ zo_count: 0 }] } },
-        b_logs: { data: { function_error: "vrl failed", hits: [{ zo_count: 0 }] } },
+        a_logs: { data: { is_partial: true, hits: [{ zo_count: 2 }] } },
+        b_logs: { data: { function_error: "vrl failed", hits: [{ zo_count: 5 }] } },
         c_logs: { data: { hits: [] } },
         d_logs: { data: { hits: [{ zo_count: "n/a" }] } },
+        e_logs: { data: { is_partial: true, hits: [{ zo_count: 0 }] } },
       };
       mockSearch.mockImplementation(async (req: any) => {
         const stream = Object.keys(responses).find((n) =>
@@ -880,41 +945,99 @@ describe("useTraces", () => {
       const { navigateToCorrelatedLogs } = useTraces();
       selectSpan("span-p", "trace-p");
 
-      await navigateToCorrelatedLogs(streams("a_logs", "b_logs", "c_logs", "d_logs"));
+      await navigateToCorrelatedLogs(streams("a_logs", "b_logs", "c_logs", "d_logs", "e_logs"));
 
-      // Nothing is known: trace_id alone works on every stream; no "span has no logs" claim.
-      expect(pushedQuery()).toBe("trace_id = 'trace-p'");
-      expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("a_logs,b_logs,c_logs,d_logs");
-      expect(mockShowInfoNotification).not.toHaveBeenCalled();
+      expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("a_logs");
     });
 
-    it("does not let a partial zero count outweigh a complete non-zero count", async () => {
-      mockSearch.mockImplementation(async (req: any) =>
-        req.query.query.sql.includes("FROM a_logs ")
-          ? { data: { is_partial: true, hits: [{ zo_count: 0 }] } }
-          : { data: { hits: [{ zo_count: 0 }] } },
+    it("reports a failure, not none, when every count is throttled", async () => {
+      const throttled = { response: { status: 429 } };
+      mockSearch.mockRejectedValue(throttled);
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-t", "trace-t");
+
+      expect(await navigateToCorrelatedLogs(streams("app_logs", "web_logs"))).toEqual({
+        failed: true,
+        error: throttled,
+      });
+      expect(mockRouterPush).not.toHaveBeenCalled();
+    });
+
+    it("reports a failure with the server error when every probe answers 5xx", async () => {
+      const serverError = { response: { status: 500, data: { message: "boom" } } };
+      mockSearch.mockRejectedValue(serverError);
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-5", "trace-5");
+
+      const outcome = await navigateToCorrelatedLogs(streams("app_logs", "web_logs"));
+
+      expect(outcome).toEqual({ failed: true, error: serverError });
+      expect(mockRouterPush).not.toHaveBeenCalled();
+      expect(mockToast).not.toHaveBeenCalled();
+    });
+
+    it("reports a timeout failure when every probe is cut off by the wait limit", async () => {
+      vi.useFakeTimers();
+      try {
+        mockSearch.mockImplementation(
+          (req: any) =>
+            new Promise((_, reject) =>
+              req.signal.addEventListener("abort", () => reject(new Error("canceled"))),
+            ),
+        );
+        const { navigateToCorrelatedLogs } = useTraces();
+        selectSpan("span-w", "trace-w");
+
+        const done = navigateToCorrelatedLogs(streams("app_logs", "web_logs"));
+        await vi.advanceTimersByTimeAsync(5000);
+
+        expect(await done).toEqual({ failed: true, error: { code: "ETIMEDOUT" } });
+        expect(mockRouterPush).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("reports the failure, not none, when one probe answers 4xx and another fails for a server reason", async () => {
+      const unavailable = { response: { status: 503 } };
+      mockSearch.mockImplementation((req: any) =>
+        req.query.query.sql.includes("FROM app_logs ") ? badRequest() : Promise.reject(unavailable),
       );
       const { navigateToCorrelatedLogs } = useTraces();
-      selectSpan("span-q", "trace-q");
+      selectSpan("span-m", "trace-m");
 
-      await navigateToCorrelatedLogs(streams("a_logs", "b_logs"));
-
-      // The one complete count is 0, the partial one is unknown: fall back.
-      expect(pushedQuery()).toBe("trace_id = 'trace-q'");
-      expect(mockShowInfoNotification).toHaveBeenCalledTimes(1);
+      expect(await navigateToCorrelatedLogs(streams("app_logs", "web_logs"))).toEqual({
+        failed: true,
+        error: unavailable,
+      });
+      expect(mockRouterPush).not.toHaveBeenCalled();
     });
 
-    it("navigates with the trace-only query when every count fails, e.g. throttled", async () => {
-      mockSearch.mockRejectedValue({ response: { status: 429 } });
+    it("reports the failure, not none, when one stream counts zero and another is throttled", async () => {
+      const throttled = { response: { status: 429 } };
+      mockSearch.mockImplementation(
+        (req: any) => countFor("app_logs", 0)(req) ?? Promise.reject(throttled),
+      );
       const { navigateToCorrelatedLogs } = useTraces();
-      selectSpan("span-e", "trace-e");
+      selectSpan("span-z", "trace-z");
 
-      await navigateToCorrelatedLogs(streams("app_logs", "web_logs"));
+      expect(await navigateToCorrelatedLogs(streams("app_logs", "web_logs"))).toEqual({
+        failed: true,
+        error: throttled,
+      });
+      expect(mockRouterPush).not.toHaveBeenCalled();
+    });
 
-      expect(pushedQuery()).toBe("trace_id = 'trace-e'");
-      expect(mockRouterPush.mock.calls[0][0].query).toMatchObject({ from: "500", to: "9000" });
-      expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("app_logs,web_logs");
-      expect(mockShowInfoNotification).not.toHaveBeenCalled();
+    it.each([
+      ["a partial zero", { is_partial: true, hits: [{ zo_count: 0 }] }],
+      ["a function error", { function_error: "execution failed", hits: [] }],
+    ])("reports the failure, not none, when the only count is %s", async (_, data) => {
+      mockSearch.mockResolvedValue({ data });
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-i", "trace-i");
+
+      expect(await navigateToCorrelatedLogs(streams("app_logs"))).toMatchObject({ failed: true });
+      expect(mockRouterPush).not.toHaveBeenCalled();
     });
 
     it("runs at most four count queries at once", async () => {
@@ -946,20 +1069,16 @@ describe("useTraces", () => {
       expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("app_logs,_my_app");
     });
 
-    it("shows the no-correlated-logs warning and stays put when only internal streams remain", async () => {
+    it("reports none without probing or a toast when only internal streams remain", async () => {
       const { navigateToCorrelatedLogs } = useTraces();
       selectSpan("span-n", "trace-n");
 
-      await navigateToCorrelatedLogs(streams("_o2_db_stats", "_agent_signals"));
+      const outcome = await navigateToCorrelatedLogs(streams("_o2_db_stats", "_agent_signals"));
 
+      expect(outcome).toBe("none");
       expect(mockRouterPush).not.toHaveBeenCalled();
       expect(mockSearch).not.toHaveBeenCalled();
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "warning",
-          message: "No correlated logs found for this span",
-        }),
-      );
+      expect(mockToast).not.toHaveBeenCalled();
     });
 
     it("does not navigate when the selected span changes while counting", async () => {
@@ -970,41 +1089,8 @@ describe("useTraces", () => {
         return { data: { hits: [{ zo_count: 1 }] } };
       });
 
-      await navigateToCorrelatedLogs(streams("app_logs"));
-
+      expect(await navigateToCorrelatedLogs(streams("app_logs"))).toBe("moved");
       expect(mockRouterPush).not.toHaveBeenCalled();
-    });
-
-    it("shows no fallback notification when the span changed while counting", async () => {
-      const { navigateToCorrelatedLogs, searchObj } = useTraces();
-      selectSpan("span-a", "trace-a");
-      mockSearch.mockImplementation(async () => {
-        searchObj.data.traceDetails.selectedSpanId = "span-b";
-        return { data: { hits: [{ zo_count: 0 }] } };
-      });
-
-      await navigateToCorrelatedLogs(streams("app_logs"));
-
-      expect(mockShowInfoNotification).not.toHaveBeenCalled();
-      expect(mockRouterPush).not.toHaveBeenCalled();
-    });
-
-    it("adds the id conditions when the correlated stream has no filters", async () => {
-      const { navigateToCorrelatedLogs } = useTraces();
-      selectSpan("span-2", "trace-2");
-
-      await navigateToCorrelatedLogs(correlationProps());
-
-      expect(pushedQuery()).toBe("span_id = 'span-2' and trace_id = 'trace-2'");
-    });
-
-    it("omits each id condition when its value is unavailable", async () => {
-      const { navigateToCorrelatedLogs } = useTraces();
-      selectSpan(null, "trace-3");
-
-      await navigateToCorrelatedLogs(correlationProps());
-
-      expect(pushedQuery()).toBe("trace_id = 'trace-3'");
     });
 
     it("escapes single quotes in id values", async () => {
@@ -1023,7 +1109,6 @@ describe("useTraces", () => {
 
       await navigateToCorrelatedLogs(correlationProps({ traceId: "stale-value" }));
 
-      // The exact trace id wins over the stream's alias for the same group.
       expect(pushedQuery()).toBe("trace_id = 'trace-4'");
     });
 
@@ -1032,10 +1117,13 @@ describe("useTraces", () => {
       mockOrgSettings.trace_id_field_name = "custom_trace_col";
       const { navigateToCorrelatedLogs } = useTraces();
       selectSpan("span-5", "trace-5");
-
       await navigateToCorrelatedLogs(correlationProps());
+      expect(pushedQuery()).toBe("custom_trace_col = 'trace-5'");
 
-      expect(pushedQuery()).toBe("custom_span_col = 'span-5' and custom_trace_col = 'trace-5'");
+      mockRouterPush.mockClear();
+      selectSpan("span-5", null);
+      await navigateToCorrelatedLogs(correlationProps());
+      expect(pushedQuery()).toBe("custom_span_col = 'span-5'");
     });
 
     it("falls back to span_id/trace_id when the org settings are absent", async () => {
@@ -1046,7 +1134,7 @@ describe("useTraces", () => {
 
       await navigateToCorrelatedLogs(correlationProps());
 
-      expect(pushedQuery()).toBe("span_id = 'span-6' and trace_id = 'trace-6'");
+      expect(pushedQuery()).toBe("trace_id = 'trace-6'");
     });
   });
 
@@ -2037,6 +2125,39 @@ describe("useTraces", () => {
         stop();
         vi.useRealTimers();
       }
+    });
+
+    it("lets a held navigation away finish when the debounced write fires during it", async () => {
+      const appRouter = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/traces", name: "traces", component: { template: "<div />" } },
+          { path: "/logs", name: "logs", component: { template: "<div />" } },
+        ],
+      });
+      await appRouter.push("/traces");
+      trackPendingNavigation(appRouter);
+      vi.mocked(useRouter).mockReturnValueOnce(appRouter);
+      const { searchObj, syncUrlViewState } = freshState();
+      const stop = syncUrlViewState();
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      appRouter.beforeEach(() => gate);
+      const leaving = appRouter.push("/logs");
+      await flushPromises();
+      vi.useFakeTimers();
+      try {
+        searchObj.data.editorValue = "duration > 1";
+        await nextTick();
+        vi.advanceTimersByTime(300);
+      } finally {
+        vi.useRealTimers();
+      }
+      release();
+      await leaving;
+      await flushPromises();
+      stop();
+      expect(appRouter.currentRoute.value.fullPath).toBe("/logs");
     });
 
     it("writes a pending change at once when the sync stops, then stops writing", async () => {

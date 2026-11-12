@@ -545,8 +545,11 @@ pub struct Condition {
     pub value: JsonValue,
     #[serde(default)]
     pub ignore_case: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub case_insensitive: Option<bool>,
 }
 
+/// Comparison operator; `In` to `ReNotMatch` are only valid in condition trees, not thresholds.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, Default)]
 pub enum Operator {
     #[serde(rename = "=")]
@@ -568,6 +571,12 @@ pub enum Operator {
     IsNotNull,
     IsEmpty,
     IsNotEmpty,
+    In,
+    NotIn,
+    StartsWith,
+    EndsWith,
+    ReMatch,
+    ReNotMatch,
 }
 
 #[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
@@ -760,6 +769,7 @@ impl From<meta_alerts::Condition> for Condition {
             operator: value.operator.into(),
             value: value.value,
             ignore_case: value.ignore_case,
+            case_insensitive: value.case_insensitive,
         }
     }
 }
@@ -779,6 +789,12 @@ impl From<meta_alerts::Operator> for Operator {
             meta_alerts::Operator::IsNotNull => Self::IsNotNull,
             meta_alerts::Operator::IsEmpty => Self::IsEmpty,
             meta_alerts::Operator::IsNotEmpty => Self::IsNotEmpty,
+            meta_alerts::Operator::In => Self::In,
+            meta_alerts::Operator::NotIn => Self::NotIn,
+            meta_alerts::Operator::StartsWith => Self::StartsWith,
+            meta_alerts::Operator::EndsWith => Self::EndsWith,
+            meta_alerts::Operator::ReMatch => Self::ReMatch,
+            meta_alerts::Operator::ReNotMatch => Self::ReNotMatch,
         }
     }
 }
@@ -976,6 +992,7 @@ impl From<Condition> for meta_alerts::Condition {
             operator: value.operator.into(),
             value: value.value,
             ignore_case: value.ignore_case,
+            case_insensitive: value.case_insensitive,
         }
     }
 }
@@ -995,6 +1012,12 @@ impl From<Operator> for meta_alerts::Operator {
             Operator::IsNotNull => Self::IsNotNull,
             Operator::IsEmpty => Self::IsEmpty,
             Operator::IsNotEmpty => Self::IsNotEmpty,
+            Operator::In => Self::In,
+            Operator::NotIn => Self::NotIn,
+            Operator::StartsWith => Self::StartsWith,
+            Operator::EndsWith => Self::EndsWith,
+            Operator::ReMatch => Self::ReMatch,
+            Operator::ReNotMatch => Self::ReNotMatch,
         }
     }
 }
@@ -1442,6 +1465,7 @@ mod tests {
             operator: meta_alerts::Operator::EqualTo,
             value: serde_json::Value::String("error".to_string()),
             ignore_case: false,
+            case_insensitive: None,
         };
         let local = Condition::from(meta);
         assert_eq!(local.column, "level");
@@ -1518,6 +1542,7 @@ mod tests {
                 operator: meta_alerts::Operator::GreaterThanEquals,
                 value: serde_json::json!(100),
                 ignore_case: false,
+                case_insensitive: None,
             },
         };
         let agg = Aggregation::from(meta);
@@ -1541,6 +1566,7 @@ mod tests {
                 operator: Operator::GreaterThan,
                 value: serde_json::json!(42),
                 ignore_case: false,
+                case_insensitive: None,
             },
         };
         let meta = meta_alerts::Aggregation::from(agg);

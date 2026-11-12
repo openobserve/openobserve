@@ -223,7 +223,7 @@ describe("MetricChartTile", () => {
     await flushPromises();
     const chart = () => wrapper.findComponent({ name: "MetricCardChart" });
     expect(chart().props("results")).toEqual([SERIES]);
-    expect(wrapper.find('[data-test="tile-refreshing"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "LoadingProgress" }).props("loading")).toBe(true);
 
     // The kept samples stay on the axis they were queried for.
     expect(chart().props("timeRange")).toEqual({ start_time: 1, end_time: 2 });
@@ -232,7 +232,50 @@ describe("MetricChartTile", () => {
     await flushPromises();
     expect(chart().props("results")).toEqual([NEXT]);
     expect(chart().props("timeRange")).toEqual({ start_time: 1, end_time: 3 });
+    expect(wrapper.findComponent({ name: "LoadingProgress" }).props("loading")).toBe(false);
+  });
+
+  it("draws the dashboard panel line on its header edge, not a corner spinner, on first load and refresh", async () => {
+    let first!: (value: any) => void;
+    runQuery.mockImplementationOnce(() => new Promise((resolve) => (first = resolve)));
+    wrapper = mountTile();
+    await flushPromises();
+    const line = () => wrapper.findComponent({ name: "LoadingProgress" });
+    expect(line().props()).toMatchObject({
+      loading: true,
+      loadingProgressPercentage: 0,
+      indeterminate: false,
+    });
+    expect(line().element.nextElementSibling?.getAttribute("data-test")).toBe("tile-loading");
+    expect(wrapper.findComponent({ name: "OSpinner" }).exists()).toBe(false);
+    expect(wrapper.emitted("busy")!.at(-1)).toEqual([true]);
+
+    first(SERIES);
+    await flushPromises();
+    expect(line().props("loading")).toBe(false);
+    expect(wrapper.emitted("busy")!.at(-1)).toEqual([false]);
+
+    let answer!: (value: any) => void;
+    runQuery.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+    await wrapper.setProps({ timeRange: { start_time: 1, end_time: 3 } });
+    await flushPromises();
+    expect(line().props("loading")).toBe(true);
     expect(wrapper.find('[data-test="tile-refreshing"]').exists()).toBe(false);
+    expect(wrapper.emitted("busy")!.at(-1)).toEqual([true]);
+
+    answer(SERIES);
+    await flushPromises();
+    expect(line().props("loading")).toBe(false);
+    expect(wrapper.emitted("busy")!.at(-1)).toEqual([false]);
+  });
+
+  it("shows the static chart placeholder, not a shimmer, before its first answer", async () => {
+    runQuery.mockImplementation(() => new Promise(() => {}));
+    wrapper = mountTile();
+    await flushPromises();
+    const body = wrapper.find('[data-test="tile-loading"]');
+    expect(body.attributes("role")).toBe("img");
+    expect(body.find(".skeleton-wave").exists()).toBe(false);
   });
 
   it("never lands a superseded refresh", async () => {
@@ -288,6 +331,72 @@ describe("MetricChartTile", () => {
     await flushPromises();
     wrapper.unmount();
     expect(cancelled()).toEqual(["sum(rate(x[4m]))"]);
+  });
+
+  describe("one failure for many tiles (CS8)", () => {
+    const FORBIDDEN = { response: { status: 403, data: { message: "Forbidden" } } };
+
+    it("by default still says its own query failed, with its own Retry", async () => {
+      runQuery.mockRejectedValue(FORBIDDEN);
+      wrapper = mountTile();
+      await flushPromises();
+      expect(wrapper.find('[data-test="tile-error"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="tile-retry"]').exists()).toBe(true);
+    });
+
+    it("when the parent reports failures, a failed first load still shows its own error and Retry, and reports the cause", async () => {
+      let fail!: (error: any) => void;
+      runQuery.mockImplementation(() => new Promise((_, reject) => (fail = reject)));
+      wrapper = mountTile({ parentReportsFailures: true });
+      await flushPromises();
+      expect(wrapper.find('[data-test="tile-loading"]').attributes("aria-label")).toBe(
+        "Loading chart",
+      );
+      fail(FORBIDDEN);
+      await flushPromises();
+      expect(wrapper.find('[data-test="tile-error"]').text()).toContain("Query failed");
+      expect(wrapper.find('[data-test="tile-loading"]').exists()).toBe(false);
+      const failure = wrapper.emitted("failed")!.at(-1)![0] as any;
+      expect(failure).toMatchObject({ cause: { status: 403 }, keptAt: null });
+
+      runQuery.mockResolvedValue(SERIES);
+      await wrapper.find('[data-test="tile-retry"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="tile-error"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="tile-chart-stub"]').exists()).toBe(true);
+    });
+
+    it("when the parent reports failures, a failed refresh keeps the drawn chart and says when it was fetched", async () => {
+      wrapper = mountTile({ parentReportsFailures: true });
+      await flushPromises();
+      runQuery.mockRejectedValue(FORBIDDEN);
+      await wrapper.setProps({ timeRange: { start_time: 1, end_time: 3 } });
+      await flushPromises();
+      expect(wrapper.find('[data-test="tile-chart-stub"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="tile-error"]').exists()).toBe(false);
+      const failure = wrapper.emitted("failed")!.at(-1)![0] as any;
+      expect(failure.keptAt).toEqual(expect.any(Number));
+    });
+
+    it("loads again when the parent's Retry bumps the token, and clears the failure when it lands", async () => {
+      runQuery.mockRejectedValue(FORBIDDEN);
+      wrapper = mountTile({ parentReportsFailures: true });
+      await flushPromises();
+      runQuery.mockResolvedValue(SERIES);
+      await wrapper.setProps({ retryToken: 1 });
+      await flushPromises();
+      expect(wrapper.find('[data-test="tile-chart-stub"]').exists()).toBe(true);
+      expect(wrapper.emitted("failed")!.at(-1)![0]).toBeNull();
+    });
+
+    it("a token bump does not reload a tile that has not failed", async () => {
+      wrapper = mountTile({ parentReportsFailures: true });
+      await flushPromises();
+      const calls = runQuery.mock.calls.length;
+      await wrapper.setProps({ retryToken: 1 });
+      await flushPromises();
+      expect(runQuery.mock.calls.length).toBe(calls);
+    });
   });
 
   describe("forecast", () => {

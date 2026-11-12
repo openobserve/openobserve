@@ -3,8 +3,8 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <!-- A rule that applies to your data but is not installed is coverage already paid for in ingestion. -->
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { computed, nextTick, onMounted, ref, shallowRef, watch } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
@@ -21,7 +21,14 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
+import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
+import { failedRequests, viewDenial, type AccessDenial } from "@/composables/useAccessStore";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import SecurityBulkInstallDialog, {
+  type BulkRule,
+  type BulkStream,
+} from "@/components/security/SecurityBulkInstallDialog.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import SecurityRecordDrawer, {
@@ -31,11 +38,27 @@ import SecurityRecordDrawer, {
 import SecurityKeyValues, { type KeyValueRow } from "@/components/security/SecurityKeyValues.vue";
 import streamService from "@/services/stream";
 import { useSiemDetections } from "@/composables/security/useSiemDetections";
-import { blockedReason, caveat, sigmaCatalog, type SigmaRule } from "@/utils/security/sigma";
-import { SOURCE_TYPES, sigmaLogsourceLabel, type SourceType } from "@/utils/security/sourceTypes";
+import {
+  forbiddenReason,
+  isForbiddenError,
+  useSecurityAccess,
+} from "@/composables/security/useSecurityAccess";
+import { useQueries, useQuery } from "@tanstack/vue-query";
+import { blockedReason, caveat } from "@/utils/security/compileText";
+import type { CatalogRule } from "@/services/securitySigma";
+import { sigmaCatalogQuery, sigmaCompileQuery } from "@/services/securitySigma.queries";
+import { sigmaLogsourceLabel, type SourceType } from "@/services/securitySources";
+import { fetchSourceMatch, sourceTypesQuery } from "@/services/securitySources.queries";
 import { ocsfClass } from "@/utils/security/ocsf";
 import { displayOrder, positionOf, stepRow, type NavTable } from "@/utils/security/recordNav";
 import { normalizeTactic, techniqueUrl } from "@/utils/security/mitre";
+import {
+  loadRunnableSeen,
+  newlyRunnable,
+  saveRunnableSeen,
+  syncRunnableSeen,
+  type RunnableSeen,
+} from "@/utils/security/runnableSeen";
 import {
   groupByLogsource,
   installedBySigmaId,
@@ -63,21 +86,37 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
+// Installing a rule creates a detection, which is authoring; browsing and previews only read.
+const { canAuthor } = useSecurityAccess();
 
 type ContentTab = "rules" | "sources";
 const tab = ref<ContentTab>(route.query.tab === "sources" ? "sources" : "rules");
 watch(tab, (value) => router.replace({ query: { ...route.query, tab: value } }));
 
 const {
+  rows: alertRows,
   siemRows,
   loading: rulesLoading,
   error: rulesError,
+  forbidden: rulesForbidden,
+  failure: rulesFailure,
   load: loadDetections,
 } = useSiemDetections();
-const streams = ref<StreamSchema[]>([]);
+const streams = ref<(StreamSchema & { fieldTypes: Record<string, string> })[]>([]);
 const streamsLoading = ref(false);
 const streamsError = ref("");
+/** The stream list was refused; without it no rule can be matched to the org's data. */
+const streamsRefusal = shallowRef<unknown>(null);
 let streamsSeq = 0;
+// Both reads decide what every row says, so a refusal of either locks the lists instead of showing them wrong.
+const accessDenials = computed<AccessDenial[]>(() => [
+  ...(streamsRefusal.value
+    ? [viewDenial("streams", "list", failedRequests(streamsRefusal.value))]
+    : []),
+  ...(rulesForbidden.value
+    ? [viewDenial("alerts", "list", failedRequests(rulesFailure.value))]
+    : []),
+]);
 
 const notices = computed<SecurityNotice[]>(() => {
   const out: SecurityNotice[] = [];
@@ -87,6 +126,35 @@ const notices = computed<SecurityNotice[]>(() => {
       tone: "error",
       text: streamsError.value,
       dataTest: "security-content-streams-error",
+    });
+  }
+  if (catalogQuery.error.value) {
+    out.push({
+      key: "catalog-error",
+      tone: "error",
+      text: t("siem.content.catalogError", { reason: catalogQuery.error.value.message }),
+      dataTest: "security-content-catalog-error",
+    });
+  }
+  if (reviewing.value) {
+    const { stream, keys } = reviewing.value;
+    out.push({
+      key: "reviewing-new",
+      tone: "info",
+      text: t("siem.content.reviewingNewRules", { n: keys.length, stream }, keys.length),
+      actionLabel: t("siem.content.showAllRules"),
+      onAction: () => (reviewing.value = null),
+      dataTest: "security-content-reviewing-new",
+    });
+  }
+  for (const [stream, keys] of newByStream.value) {
+    out.push({
+      key: `new-rules-${stream}`,
+      tone: "info",
+      text: t("siem.content.newRulesAvailable", { n: keys.length, stream }, keys.length),
+      actionLabel: t("siem.content.reviewNewRules"),
+      onAction: () => reviewNewRules(stream),
+      dataTest: `security-content-new-rules-${stream}`,
     });
   }
   // Without the rule list every rule would read as "not installed", so the gap is said.
@@ -105,31 +173,64 @@ async function loadStreams() {
   const mine = ++streamsSeq;
   streamsLoading.value = true;
   streamsError.value = "";
+  streamsRefusal.value = null;
   try {
     // One request carries every stream's schema, which is all identification needs.
     const res = await streamService.nameList(orgId.value, "logs", true);
     if (mine !== streamsSeq) return;
-    streams.value = (res.data?.list ?? []).map((s: any) => ({
-      name: String(s.name),
-      fields: (s.schema ?? []).map((f: any) => String(f.name)),
-    }));
+    const org = orgId.value;
+    const list = await Promise.all(
+      (res.data?.list ?? []).map(async (s: any) => {
+        const fields: string[] = (s.schema ?? []).map((f: any) => String(f.name));
+        // Types travel with the fields so a bulk install compiles exactly as the dialog does.
+        const fieldTypes: Record<string, string> = Object.fromEntries(
+          (s.schema ?? [])
+            .filter((f: any) => f.type)
+            .map((f: any) => [String(f.name), String(f.type)]),
+        );
+        const match = fields.length ? await fetchSourceMatch(org, fields).catch(() => null) : null;
+        return {
+          name: String(s.name),
+          fields,
+          fieldTypes,
+          sourceId: match?.classification?.source.id ?? null,
+        };
+      }),
+    );
+    if (mine !== streamsSeq) return;
+    streams.value = list;
   } catch (e: any) {
     if (mine !== streamsSeq) return;
     streams.value = [];
-    streamsError.value = e?.response?.data?.message ?? e?.message ?? t("siem.content.streamsError");
+    if (isForbiddenError(e)) streamsRefusal.value = e;
+    else
+      streamsError.value =
+        e?.response?.data?.message ?? e?.message ?? t("siem.content.streamsError");
   } finally {
     if (mine === streamsSeq) streamsLoading.value = false;
   }
 }
 
+const sourceTypesResult = useQuery(() => ({
+  ...sourceTypesQuery(orgId.value),
+  enabled: !!orgId.value,
+}));
+const sourceTypes = computed<SourceType[]>(() => sourceTypesResult.data.value ?? []);
+
+const catalogQuery = useQuery(() => ({
+  ...sigmaCatalogQuery(orgId.value),
+  enabled: !!orgId.value,
+}));
+
 function refresh() {
   void loadDetections(orgId.value);
   void loadStreams();
+  void catalogQuery.refetch();
 }
 onMounted(refresh);
 watch(orgId, refresh);
 
-const catalog = computed(() => sigmaCatalog());
+const catalog = computed<CatalogRule[]>(() => catalogQuery.data.value?.rules ?? []);
 const installed = computed(() => installedBySigmaId(siemRows.value));
 const bySource = computed(() => streamsBySource(streams.value));
 const fieldsByStream = computed(() => new Map(streams.value.map((s) => [s.name, s.fields])));
@@ -147,17 +248,98 @@ interface RuleRow {
   /** Matching streams the rule actually compiles on. */
   runnable: string[];
   checks: StreamCheck[];
+  /** Why the rule cannot run on any matching stream yet, from the first stream's compile. */
+  blocked: I18nText;
   installed: boolean;
-  rule: SigmaRule;
+  rule: CatalogRule;
 }
 
-const checks = computed(() => checksByRule(bySource.value, fieldsByStream.value));
+/** Each matched stream's pack compiled on the server, once per (source, stream). */
+const streamTargets = computed(() =>
+  [...bySource.value].flatMap(([sourceId, names]) => {
+    const source = sourceTypes.value.find((s) => s.id === sourceId);
+    return source ? names.map((stream) => ({ source, stream })) : [];
+  }),
+);
+const streamCompiles = useQueries({
+  queries: computed(() =>
+    streamTargets.value.map(({ source, stream }) =>
+      sigmaCompileQuery(orgId.value, {
+        source_type: source.id,
+        stream,
+        fields: fieldsByStream.value.get(stream) ?? [],
+      }),
+    ),
+  ),
+});
+const checksLoading = computed(() => streamCompiles.value.some((q) => q.isPending));
+const checks = computed(() =>
+  checksByRule(
+    streamTargets.value.map((target, i) => ({
+      ...target,
+      applicable: streamCompiles.value[i]?.data?.applicable ?? [],
+    })),
+  ),
+);
+
+/** Rule keys each compiled stream can run now; a stream still compiling is left out. */
+const runnableByStream = computed(() => {
+  const map = new Map<string, string[]>();
+  streamTargets.value.forEach(({ stream }, i) => {
+    const applicable = streamCompiles.value[i]?.data?.applicable;
+    if (applicable)
+      map.set(
+        stream,
+        applicable.filter((a) => a.compiled.runnable).map((a) => a.key),
+      );
+  });
+  return map;
+});
+
+const seenRunnable = ref<RunnableSeen>({});
+watch(orgId, (org) => (seenRunnable.value = org ? loadRunnableSeen(org) : {}), {
+  immediate: true,
+});
+// A schema change refetches the compile, so a rule that just became runnable is counted against the last look.
+watch(runnableByStream, (current) => {
+  if (!orgId.value || !current.size) return;
+  const next = syncRunnableSeen(seenRunnable.value, current);
+  if (JSON.stringify(next) === JSON.stringify(seenRunnable.value)) return;
+  seenRunnable.value = next;
+  saveRunnableSeen(orgId.value, next);
+});
+
+const installedKeys = computed(
+  () => new Set(catalog.value.filter((r) => installed.value.has(r.id ?? "")).map((r) => r.key)),
+);
+/** Per stream, the not-yet-installed rules that became runnable since the stream was last reviewed. */
+const newByStream = computed(() => {
+  const map = new Map<string, string[]>();
+  if (installPending.value) return map;
+  for (const [stream, keys] of runnableByStream.value) {
+    const fresh = newlyRunnable(seenRunnable.value[stream], keys).filter(
+      (key) => !installedKeys.value.has(key),
+    );
+    if (fresh.length) map.set(stream, fresh);
+  }
+  return map;
+});
+
+const reviewing = ref<{ stream: string; keys: string[] } | null>(null);
+function reviewNewRules(stream: string) {
+  const keys = newByStream.value.get(stream) ?? [];
+  reviewing.value = { stream, keys };
+  tab.value = "rules";
+  const next = { ...seenRunnable.value, [stream]: runnableByStream.value.get(stream) ?? [] };
+  seenRunnable.value = next;
+  saveRunnableSeen(orgId.value, next);
+}
 
 const ruleRows = computed<RuleRow[]>(() =>
   catalog.value.map((rule) => {
-    const ruleChecks = checks.value.get(rule) ?? [];
+    const ruleChecks = checks.value.get(rule.key) ?? [];
     return {
-      id: rule.id ?? rule.title,
+      id: rule.key,
       title: rule.title,
       tone: toneOfSigmaLevel(rule.level),
       logsource: logsourceKey(rule),
@@ -166,6 +348,7 @@ const ruleRows = computed<RuleRow[]>(() =>
       streams: streamsForRule(rule, bySource.value),
       runnable: ruleChecks.filter((c) => c.compiled.runnable).map((c) => c.stream),
       checks: ruleChecks,
+      blocked: ruleChecks[0] ? blockedReason(ruleChecks[0].compiled) : raw(""),
       installed: installed.value.has(rule.id ?? ""),
       rule,
     };
@@ -189,7 +372,9 @@ const ruleCounts = computed(() => ({
 
 const filteredRules = computed(() => {
   const needle = ruleSearch.value.trim().toLowerCase();
+  const reviewKeys = reviewing.value ? new Set(reviewing.value.keys) : null;
   return ruleRows.value.filter((r) => {
+    if (reviewKeys && !reviewKeys.has(r.id)) return false;
     if (ruleFacet.value === "ready" && !isReady(r)) return false;
     if (ruleFacet.value === "installed" && !r.installed) return false;
     if (ruleFacet.value === "applies" && !r.streams.length) return false;
@@ -205,9 +390,15 @@ const filteredRules = computed(() => {
 });
 
 const ruleFiltersActive = computed(
-  () => !!ruleSearch.value || !!ruleLevel.value || !!ruleFacet.value || !!logsourceFilter.value,
+  () =>
+    !!ruleSearch.value ||
+    !!ruleLevel.value ||
+    !!ruleFacet.value ||
+    !!logsourceFilter.value ||
+    !!reviewing.value,
 );
 function clearRuleFilters() {
+  reviewing.value = null;
   ruleSearch.value = "";
   ruleLevel.value = null;
   ruleFacet.value = null;
@@ -218,7 +409,10 @@ const ruleStats = computed<StatItem[]>(() => [
   {
     key: "ready",
     label: t("siem.content.stat.ready"),
-    value: streamsLoading.value || installPending.value ? "—" : ruleCounts.value.ready,
+    value:
+      streamsLoading.value || installPending.value || checksLoading.value
+        ? "—"
+        : ruleCounts.value.ready,
     icon: "lightbulb",
     tone: "warning",
     max: ruleRows.value.length,
@@ -251,6 +445,35 @@ const ruleStats = computed<StatItem[]>(() => [
     dataTest: "security-content-stat-all",
   },
 ]);
+
+const selectedRuleIds = ref<string[]>([]);
+const bulkOpen = ref(false);
+const canBulkInstall = (row: RuleRow) =>
+  canAuthor.value && !installPending.value && row.runnable.length > 0;
+const bulkRules = computed<BulkRule[]>(() =>
+  ruleRows.value
+    .filter((r) => selectedRuleIds.value.includes(r.id) && canBulkInstall(r))
+    .map((r) => ({ rule: r.rule, runnable: r.runnable })),
+);
+const bulkStreams = computed(
+  () =>
+    new Map<string, BulkStream>(
+      streams.value.map((s) => [
+        s.name,
+        { fields: s.fields, fieldTypes: s.fieldTypes, sourceId: s.sourceId },
+      ]),
+    ),
+);
+const existingNames = computed(() => alertRows.value.map((r) => String(r.alert.name ?? "")));
+/** The rules shown that run on your data and are not installed yet. */
+function selectRunnable() {
+  selectedRuleIds.value = filteredRules.value.filter(isReady).map((r) => r.id);
+}
+function onBulkDone(n: number) {
+  selectedRuleIds.value = [];
+  if (n) toast({ variant: "success", message: t("siem.content.bulk.done", { n }, n) });
+  void loadDetections(orgId.value);
+}
 
 function onRuleStat(key: string) {
   ruleFacet.value = key === "all" || ruleFacet.value === key ? null : (key as RuleFacet);
@@ -316,7 +539,7 @@ interface SourceRow {
 }
 
 const sourceRows = computed<SourceRow[]>(() =>
-  SOURCE_TYPES.map((source) => ({
+  sourceTypes.value.map((source) => ({
     id: source.id,
     label: source.label,
     vendor: source.vendor,
@@ -428,8 +651,8 @@ const ruleIndex = ref<number | null>(null);
 const sourceIndex = ref<number | null>(null);
 
 const contextRuleIds = computed(() => {
-  const source = SOURCE_TYPES.find((s) => s.id === ruleContextSource.value);
-  return source ? rulesForSource(source, catalog.value).map((r) => r.id ?? r.title) : null;
+  const source = sourceTypes.value.find((s) => s.id === ruleContextSource.value);
+  return source ? rulesForSource(source, catalog.value).map((r) => r.key) : null;
 });
 const ruleTotal = computed(() => contextRuleIds.value?.length ?? filteredRules.value.length);
 
@@ -558,6 +781,7 @@ const installedDetection = computed(() => {
 });
 
 function install(ruleId: string, stream?: string, sourceId?: string) {
+  if (!canAuthor.value) return;
   router.push({
     path: "/security/detections",
     query: {
@@ -620,7 +844,7 @@ const mappingRows = computed<KeyValueRow[]>(() => {
     {
       key: "required",
       label: t("siem.content.field.required"),
-      value: source.required.join(", "),
+      value: (source.required ?? []).join(", "),
       mono: true,
     },
   ];
@@ -676,7 +900,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         variant="outline"
         size="icon-sm"
         icon-left="refresh"
-        :loading="streamsLoading || rulesLoading"
+        :loading="streamsLoading || rulesLoading || catalogQuery.isPending.value"
         data-test="security-content-refresh"
         @click="refresh"
       >
@@ -700,7 +924,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
             <OIcon name="database" size="sm" />{{ t("siem.content.tab.sources") }}
             <span
               class="bg-surface-subtle text-text-secondary text-2xs rounded-full px-1.5 font-semibold tabular-nums"
-              >{{ SOURCE_TYPES.length }}</span
+              >{{ sourceTypes.length }}</span
             >
           </span>
         </OTab>
@@ -765,8 +989,15 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         data-test="security-content-notices"
       />
 
+      <SecurityAccessLock
+        v-if="accessDenials.length"
+        :denials="accessDenials"
+        :reason="raw(forbiddenReason(streamsRefusal))"
+        size="hero"
+        data-test="security-content-access-lock"
+      />
       <OTable
-        v-if="tab === 'rules'"
+        v-else-if="tab === 'rules'"
         :data="filteredRules"
         :columns="ruleColumns"
         row-key="id"
@@ -777,6 +1008,9 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         table-id="security-content-rules"
         :enable-column-resize="true"
         :get-row-status-color="(row: RuleRow) => severityRailColor(row.tone)"
+        :selection="canAuthor ? 'multiple' : 'none'"
+        v-model:selected-ids="selectedRuleIds"
+        :is-row-selectable="canBulkInstall"
         class="min-h-0 flex-1"
         ref="rulesTable"
         data-test="security-content-rules-table"
@@ -799,6 +1033,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
           <div class="flex w-full items-center gap-2">
             <div class="w-40 shrink-0">
               <OSelect
+                :aria-label="t('siem.aria.severityFilter')"
                 :model-value="ruleLevel"
                 :options="levelOptions"
                 :placeholder="t('siem.content.anyLevel')"
@@ -813,7 +1048,30 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
               :placeholder="t('siem.content.searchRules')"
               data-test="security-content-search-rules"
             />
+            <OButton
+              v-if="canAuthor"
+              variant="outline"
+              size="sm"
+              icon-left="check-box"
+              :disabled="installPending || checksLoading || !ruleCounts.ready"
+              data-test="security-content-select-runnable"
+              @click="selectRunnable"
+            >
+              {{ t("siem.content.selectRunnable") }}
+              <OTooltip :content="t('siem.content.selectRunnableHint')" />
+            </OButton>
           </div>
+        </template>
+        <template #selection-actions>
+          <OButton
+            variant="primary"
+            size="sm"
+            icon-left="add"
+            :disabled="!bulkRules.length"
+            data-test="security-content-install-selected"
+            @click="bulkOpen = true"
+            >{{ t("siem.content.installSelected") }}</OButton
+          >
         </template>
         <template #cell-severity="{ row }">
           <OTag
@@ -871,9 +1129,16 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
           <OTag v-else-if="row.runnable.length" variant="warning-soft" icon="lightbulb" size="xs">{{
             t("siem.content.readyToInstall")
           }}</OTag>
-          <OTag v-else-if="row.streams.length" variant="default-soft" icon="block" size="xs">{{
-            t("siem.content.cannotRun")
-          }}</OTag>
+          <span
+            v-else-if="row.streams.length"
+            class="inline-flex"
+            :data-test="`security-content-not-runnable-${row.id}`"
+          >
+            <OTag variant="default-soft" icon="hourglass-empty" size="xs">{{
+              t("siem.content.notRunnableYet")
+            }}</OTag>
+            <OTooltip v-if="row.blocked" :content="row.blocked" />
+          </span>
           <span v-else class="text-text-secondary">—</span>
         </template>
         <template #empty>
@@ -1118,7 +1383,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
               >{{
                 check.compiled?.runnable
                   ? t("siem.content.runnable")
-                  : t("siem.content.notRunnable")
+                  : t("siem.content.notRunnableYet")
               }}</OTag
             >
           </div>
@@ -1142,7 +1407,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
               >{{ t("siem.content.openInEvents") }}</OButton
             >
             <OButton
-              v-if="check.compiled?.runnable"
+              v-if="check.compiled?.runnable && canAuthor"
               variant="outline"
               size="xs"
               icon-left="add"
@@ -1173,10 +1438,12 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
           variant="primary"
           size="sm-action"
           icon-left="add"
+          :disabled="!canAuthor"
           data-test="security-content-rule-install"
           @click="installDefault(openRule)"
         >
           {{ openRule.installed ? t("siem.content.installAgain") : t("siem.content.install") }}
+          <OTooltip v-if="!canAuthor" :content="t('siem.access.needsAuthor')" />
         </OButton>
       </template>
     </SecurityRecordDrawer>
@@ -1224,7 +1491,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
           :title="t('siem.content.noStreamsForSource')"
           :description="
             t('siem.content.noStreamsForSourceHint', {
-              fields: openSource.source.required.join(', '),
+              fields: (openSource.source.required ?? []).join(', '),
             })
           "
         />
@@ -1259,14 +1526,14 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         <ul v-else class="border-border-default rounded-surface overflow-hidden border">
           <li
             v-for="rule in sourceRulesList"
-            :key="rule.id"
+            :key="rule.key"
             role="button"
             tabindex="0"
             class="border-border-subtle hover:bg-surface-subtle focus-visible:ring-accent flex cursor-pointer items-center gap-2 border-b px-3 py-2 outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-inset"
-            :data-test="`security-content-source-rule-${rule.id}`"
-            @click="showRule(rule.id ?? rule.title, openSource.id)"
-            @keydown.enter="showRule(rule.id ?? rule.title, openSource.id)"
-            @keydown.space.prevent="showRule(rule.id ?? rule.title, openSource.id)"
+            :data-test="`security-content-source-rule-${rule.key}`"
+            @click="showRule(rule.key, openSource.id)"
+            @keydown.enter="showRule(rule.key, openSource.id)"
+            @keydown.space.prevent="showRule(rule.key, openSource.id)"
           >
             <OTag
               type="severity"
@@ -1294,5 +1561,14 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         <SecurityKeyValues :rows="mappingRows" data-test="security-content-source-mapping" />
       </template>
     </SecurityRecordDrawer>
+
+    <SecurityBulkInstallDialog
+      v-model:open="bulkOpen"
+      :org-id="orgId"
+      :rules="bulkRules"
+      :streams="bulkStreams"
+      :existing-names="existingNames"
+      @done="onBulkDone"
+    />
   </OPageLayout>
 </template>

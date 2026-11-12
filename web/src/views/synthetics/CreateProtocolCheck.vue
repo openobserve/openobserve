@@ -45,6 +45,7 @@ import { getFoldersListByType } from "@/utils/commons";
 import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { templateBindingError } from "@/utils/alerts/templateBindingError";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import {
@@ -363,6 +364,16 @@ const reentryErrors = computed<Record<string, string>>(() =>
   ),
 );
 
+// A template refusal is about the stored pick; a new pick clears it.
+watch(
+  () => check.value.template,
+  () => {
+    if (!validationErrors.value.template) return;
+    const { template: _cleared, ...rest } = validationErrors.value;
+    validationErrors.value = rest;
+  },
+);
+
 onMounted(async () => {
   fetchFolders();
   fetchLocations();
@@ -391,6 +402,10 @@ async function persistCheck(): Promise<"saved" | "missing" | "failed"> {
     message: t("synthetics.newCheck.saving"),
     timeout: 0,
   });
+  // A refusal names the template sent; a pick made during the request is not the one refused.
+  const submittedTemplate = check.value.template ?? null;
+  // The payload drops the template without a destination; read now, the user can edit during the save.
+  const sentNullTemplate = !check.value.notifications?.destinations?.length;
   try {
     const payload = buildCreateProtocolCheckPayload(check.value);
     if (props.editId) {
@@ -406,11 +421,18 @@ async function persistCheck(): Promise<"saved" | "missing" | "failed"> {
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
     }
+    // With no destination the payload sent a null template, so the hidden name must not come back.
+    if (sentNullTemplate && submittedTemplate && check.value.template === submittedTemplate) {
+      check.value = { ...check.value, template: null };
+    }
     isDirty.value = false;
     return "saved";
   } catch (err: any) {
     dismiss();
     if (err?.response?.status === 404) return "missing";
+    const templateError = templateBindingError(err);
+    if (templateError && (check.value.template ?? null) === submittedTemplate)
+      validationErrors.value = { ...validationErrors.value, template: templateError };
     toast({
       variant: "error",
       message:

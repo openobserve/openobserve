@@ -234,6 +234,8 @@ const props = defineProps<{
   sampledNote?: string | null;
   /** Either arm's queries are in flight — drives the results skeleton. */
   loading?: boolean;
+  /** Versions to open on (e.g. Release watch's card), A = new, B = previous. */
+  initialPair?: { a: string; b: string } | null;
 }>();
 
 const emit = defineEmits<{
@@ -287,17 +289,23 @@ const versionOptions = computed<SelectOption[]>(() =>
   })),
 );
 
-// Default: B = the immediately-previous version, A = current (latest). Sort the
-// DEDUPED versions by first_seen desc so "current" and "previous" are two
-// distinct versions regardless of how many buckets each spanned.
+// Sort deduped versions so "current" and "previous" are distinct regardless of bucket count.
 function seedDefaults() {
   if (selectedA.value && selectedB.value) return;
+  const listed = new Set(uniqueVersions.value.map((v) => v.version));
+  const preset = props.initialPair;
+  if (preset && preset.a !== preset.b && listed.has(preset.a) && listed.has(preset.b)) {
+    selectedA.value = preset.a;
+    selectedB.value = preset.b;
+    requestRun();
+    return;
+  }
   const sorted = [...uniqueVersions.value].sort(
     (x, y) => (y.first_seen ?? 0) - (x.first_seen ?? 0),
   );
   if (sorted.length >= 2) {
-    selectedA.value = sorted[0].version as string;
-    selectedB.value = sorted[1].version as string;
+    selectedA.value = sorted[1].version as string;
+    selectedB.value = sorted[0].version as string;
     requestRun();
   } else if (sorted.length === 1) {
     selectedA.value = sorted[0].version as string;

@@ -446,9 +446,14 @@ pub async fn get_gen_ai_agent_mapping_config(
         get_cached(&SettingScope::Org, Some(org_id), None, GEN_AI_AGENT_MAPPING).await
         && let Ok(config) = serde_json::from_value::<GenAiAgentMappingConfig>(setting.setting_value)
         && let Ok(config) = config.normalize_and_validate()
-        && !config.is_all_empty()
     {
-        return config;
+        if !config.is_all_empty() {
+            return config;
+        }
+        // Only attribution fallbacks saved: keep them on top of the identity defaults.
+        let mut defaults = get_default_gen_ai_agent_mapping_config();
+        defaults.attribution_fields = config.attribution_fields;
+        return defaults;
     }
 
     get_default_gen_ai_agent_mapping_config()

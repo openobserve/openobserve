@@ -143,8 +143,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :columns="columns"
               show-index
               row-key="alert_id"
-              :loading="loading"
+              :loading="loading || refreshing"
               :loading-reset-key="`${activeFolderId}:${activeTab}`"
+              keep-page-on-data-change
               :forbidden="anomalyTabLicenseLocked ? ['anomaly_detection'] : forbidden"
               forbidden-resource="alert_folders"
               pagination="client"
@@ -265,6 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   :last-run-at="lastUpdatedAt"
                   :loading="fetching"
+                  :spinner="!tableKeepsRows"
                   shortcut-id="alertsRefresh"
                   data-test="alert-list-refresh-btn"
                   @click="refreshAlerts"
@@ -283,6 +285,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon :name="typeIconName(row)" size="sm" :class="typeIconClass(row)" />
                   </span>
                   <OTruncatedText>{{ row.name || "--" }}</OTruncatedText>
+                  <OTag
+                    v-if="leftFilterIds.has(String(row.alert_id))"
+                    variant="default-outline"
+                    size="sm"
+                    class="shrink-0"
+                    :label="t('alerts.rowAction.leftFilter')"
+                    :data-test="`alert-list-${row.name}-left-filter`"
+                  />
                   <EditorDraftDot
                     v-if="alertDrafts.ids.has(row.alert_id)"
                     :saved-at="alertDrafts.savedAt(row.alert_id)"
@@ -595,17 +605,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <template #cell-actions="{ row }">
                 <div class="actions-container flex items-center">
-                  <div
-                    data-test="alert-list-loading-alert"
-                    v-if="alertStateLoadingMap[row.uuid]"
-                    style="display: inline-block; width: 2.07125rem; height: auto"
-                    class="ms-1 flex items-center justify-center max-md:hidden"
-                    :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
-                  >
-                    <OSpinner size="xs" />
-                  </div>
                   <OTooltip
-                    v-else-if="anomalyRowLocked(row)"
+                    v-if="anomalyRowLocked(row)"
                     side="bottom"
                     :content="anomalyLockedReason"
                   >
@@ -629,10 +630,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                     size="icon-sm"
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    :loading="!!alertStateLoadingMap[row.uuid]"
                     @click.stop="toggleAlertState(row)"
                   >
                     <OTooltip
                       side="bottom"
+                      exclusive
                       :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
                       :shortcut-id="row.enabled ? 'alertsRowPause' : undefined"
                     />
@@ -666,6 +669,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OTooltip
                       side="bottom"
+                      exclusive
                       :content="t('alerts.edit')"
                       shortcut-id="alertsRowEdit"
                     />
@@ -684,6 +688,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTooltip
                       v-else-if="isSloRow(row)"
                       side="bottom"
+                      exclusive
                       :content="t('alerts.sloCloneDisabled')"
                     />
                     <OButton
@@ -699,6 +704,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTooltip
                         v-if="!isSloRow(row) && !anomalyRowLocked(row)"
                         side="bottom"
+                        exclusive
                         :content="t('alerts.clone')"
                         shortcut-id="alertsRowDuplicate"
                       />
@@ -1006,6 +1012,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="sm"
                   icon-left="drive-file-move"
+                  focusable-unavailable
+                  :disabled="bulkWriteBusy"
                   @click="moveMultipleAlerts"
                   >{{ t("common.move") }}</OButton
                 >
@@ -1014,6 +1022,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="sm"
                   icon-left="download"
+                  focusable-unavailable
+                  :disabled="bulkWriteBusy"
                   @click="multipleExportAlert"
                   >{{ t("common.export") }}</OButton
                 >
@@ -1022,6 +1032,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="sm"
                   icon-left="pause"
+                  focusable-unavailable
+                  :disabled="bulkWriteBusy && bulkToggleBusy !== 'pause'"
+                  :loading="bulkToggleBusy === 'pause'"
                   @click="bulkToggleAlerts('pause')"
                   >{{ t("alerts.pause") }}</OButton
                 >
@@ -1030,33 +1043,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="sm"
                   icon-left="play-arrow"
+                  focusable-unavailable
+                  :disabled="bulkWriteBusy && bulkToggleBusy !== 'resume'"
+                  :loading="bulkToggleBusy === 'resume'"
                   @click="bulkToggleAlerts('resume')"
                   >{{ t("alerts.resume") }}</OButton
                 >
-                <ODropdown v-if="downtimesEnabled" side="top">
-                  <template #trigger>
-                    <OButton
-                      variant="outline"
-                      size="sm"
-                      icon-left="notifications-paused"
-                      data-test="alert-list-mute-alerts-btn"
-                    >
-                      {{ t("alerts.downtimes.mute.bulk") }}
-                    </OButton>
-                  </template>
-                  <MuteMenuItems
-                    data-test-prefix="alert-list-bulk-mute"
-                    :until-clear="!!bulkMuteAlert"
-                    @preset="(secs) => muteAndRefresh(selectedAlerts, secs)"
-                    @until-clear="bulkMuteAlert && muteRowUntilClear(bulkMuteAlert)"
-                    @until="openBulkMuteDialog"
-                  />
-                </ODropdown>
+                <span
+                  v-if="downtimesEnabled"
+                  class="contents"
+                  @pointerdown.capture="swallowWhileBulkBusy"
+                  @keydown.capture="swallowWhileBulkBusy"
+                >
+                  <ODropdown side="top">
+                    <template #trigger>
+                      <OButton
+                        variant="outline"
+                        size="sm"
+                        icon-left="notifications-paused"
+                        data-test="alert-list-mute-alerts-btn"
+                        focusable-unavailable
+                        :disabled="bulkWriteBusy"
+                      >
+                        {{ t("alerts.downtimes.mute.bulk") }}
+                      </OButton>
+                    </template>
+                    <MuteMenuItems
+                      data-test-prefix="alert-list-bulk-mute"
+                      :until-clear="!!bulkMuteAlert"
+                      @preset="(secs) => muteAndRefresh(selectedAlerts, secs)"
+                      @until-clear="bulkMuteAlert && muteRowUntilClear(bulkMuteAlert)"
+                      @until="openBulkMuteDialog"
+                    />
+                  </ODropdown>
+                </span>
                 <OButton
                   data-test="alert-list-delete-alerts-btn"
                   variant="outline-destructive"
                   size="sm"
                   icon-left="delete"
+                  focusable-unavailable
+                  :disabled="bulkWriteBusy && !bulkDeleteLoading"
                   :loading="bulkDeleteLoading"
                   @click="openBulkDeleteDialog"
                   >{{ t("common.delete") }}</OButton
@@ -1219,7 +1246,7 @@ import {
   toggleAlertStateMutation,
   toggleAnomalyAlertStateMutation,
 } from "@/services/alerts.queries";
-import { useMutation } from "@tanstack/vue-query";
+import { hashKey, useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import {
@@ -1298,7 +1325,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -1306,6 +1332,7 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import FitItems from "@/components/common/FitItems.vue";
+import { activates } from "@/lib/core/Button/activation";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
@@ -1319,6 +1346,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useLicenseLock } from "@/composables/useFeatureLock";
+import { announcePolite } from "@/lib/feedback/RegionStatus/announcer";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -1367,7 +1395,6 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
-    OSpinner,
     OSelect,
     OTable,
     OTimeCell,
@@ -1473,9 +1500,13 @@ export default defineComponent({
     // A request in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = ref(false);
+    // A user refresh, which keeps the rows dimmed rather than painting the cache over them.
+    const refreshing = ref(false);
     const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref<ForbiddenState>(false);
     const oTableRef: any = ref(null);
+    // The table's own progress line is the region's one loader while it keeps rows, so the refresh button keeps its age.
+    const tableKeepsRows = computed(() => !!oTableRef.value?.keepingRows);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
       loading,
@@ -1928,23 +1959,89 @@ export default defineComponent({
     const stateFilter = ref<
       "active" | "paused" | "failed" | "firing" | "acknowledged" | "recent" | null
     >(savedAlertListFilters.stateFilter);
+    const matchesStateFilter = (r: any, f: NonNullable<typeof stateFilter.value>): boolean => {
+      if (f === "firing") return isFiringRow(r);
+      if (f === "acknowledged") return isAckedFiring(r);
+      if (f === "recent") return recencyLevel(r.last_satisfied_at_raw) === "hot";
+      if (f === "failed")
+        return r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed";
+      // active = unpaused (enabled); paused = disabled — matching the summary
+      // counts. A failed anomaly is still active here (failed is an overlay).
+      return f === "active" ? !!r.enabled : !r.enabled;
+    };
+    // Counts list fetches as they start, so a write can tell a fetch that began after it settled from one already in flight.
+    let alertsFetchSeq = 0;
+    // Rows a confirmed write moved out of the selected tile stay in place, tagged, until a fetch started after the write or a filter change; keyed by alert id to the fetch count at the write.
+    const leftFilterIds = ref(new Map<string, number>());
+    // Confirmed write states a fetch begun before them may not carry yet, keyed by alert id.
+    const confirmedWrites = new Map<string, { enabled: boolean; seq: number }>();
+    // The newest fetch meant for the table: an older one's answer or failure would paint an outdated view over it.
+    let latestTableFetch = 0;
+    // Fetch count at the start of each list key's request in flight: fetchQuery hands a later fetch of that key the same request.
+    const listRequestStarts = new Map<string, number>();
+    // List reads still outstanding, by the start of the request each one waits on.
+    const pendingListReads = new Set<{ start: number }>();
     const displayedAlerts = computed(() => {
       if (anomalyTabLicenseLocked.value) return [];
       const rows = filteredResults.value || [];
       const f = stateFilter.value;
       if (!f) return rows;
-      if (f === "firing") return rows.filter(isFiringRow);
-      if (f === "acknowledged") return rows.filter(isAckedFiring);
-      if (f === "recent")
-        return rows.filter((r: any) => recencyLevel(r.last_satisfied_at_raw) === "hot");
-      if (f === "failed")
-        return rows.filter(
-          (r: any) => r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed",
-        );
-      // active = unpaused (enabled); paused = disabled — matching the summary
-      // counts. A failed anomaly is still active here (failed is an overlay).
-      return rows.filter((r: any) => (f === "active" ? r.enabled : !r.enabled));
+      return rows.filter(
+        (r: any) => matchesStateFilter(r, f) || leftFilterIds.value.has(String(r.alert_id)),
+      );
     });
+    const markIfLeftFilter = (row: any): boolean => {
+      const f = stateFilter.value;
+      if (!f) return false;
+      if (matchesStateFilter(row, f)) {
+        // A row toggled back into the filter matches again, so its old tag would be false.
+        leftFilterIds.value.delete(String(row.alert_id));
+        return false;
+      }
+      leftFilterIds.value.set(String(row.alert_id), alertsFetchSeq);
+      return true;
+    };
+    // A request that started after a write settled has the server's word on it, so the write's tag goes.
+    const dropSettledTags = (requestStart: number) => {
+      for (const [id, seq] of leftFilterIds.value) {
+        if (seq < requestStart) leftFilterIds.value.delete(id);
+      }
+    };
+    // A write is kept until no read that began before it is outstanding, since any such read can still answer with the old state.
+    const dropUnneededWrites = () => {
+      let oldest = Infinity;
+      for (const read of pendingListReads) oldest = Math.min(oldest, read.start);
+      for (const [id, write] of confirmedWrites) {
+        if (write.seq < oldest) confirmedWrites.delete(id);
+      }
+    };
+    const trackListRead = (queryKey: readonly unknown[], fetchStart: number) => {
+      const hash = hashKey(queryKey);
+      const state = queryClient.getQueryState(queryKey);
+      const joined = !!state && state.fetchStatus !== "idle";
+      // A request in flight that no list fetch started may predate every write, so it counts as the oldest.
+      const read = { start: joined ? (listRequestStarts.get(hash) ?? 0) : fetchStart };
+      if (!joined) listRequestStarts.set(hash, fetchStart);
+      pendingListReads.add(read);
+      return read;
+    };
+    const releaseListRead = (read: { start: number }) => {
+      pendingListReads.delete(read);
+      dropUnneededWrites();
+    };
+    // The read wrote its answer into the cache, so every write it predates is laid back over the cached rows.
+    const repatchConfirmedWrites = (requestStart: number) => {
+      for (const [id, write] of confirmedWrites) {
+        if (write.seq >= requestStart) patchCachedAlert(id, { enabled: write.enabled });
+      }
+    };
+    const withConfirmedWrites = (rows: any[], requestStart: number): any[] =>
+      confirmedWrites.size
+        ? rows.map((r: any) => {
+            const write = confirmedWrites.get(String(r?.alert_id ?? r?.anomaly_id ?? r?.id));
+            return write && write.seq >= requestStart ? { ...r, enabled: write.enabled } : r;
+          })
+        : rows;
     const onStatSelect = (key: string) => {
       if (key === "total") {
         stateFilter.value = null;
@@ -2316,6 +2413,7 @@ export default defineComponent({
       refreshResults = true,
       alertType = "",
       force = false,
+      keepSelection = false,
     ) => {
       //why refreshResults flag is used
       // this is the only used for one edge case when we move alerts from one folder to another folder
@@ -2327,8 +2425,10 @@ export default defineComponent({
       //and if the flag is true then we are assigning the alerts to the filteredResults
       //and also we are not filtering the alerts by the activeTab if the flag is false because we dont need to show the alerts in the table
       //for a moment also so we are not filtering the alerts by the activeTab
-      selectedAlerts.value = [];
-      allSelectedAlerts.value = false;
+      if (!keepSelection) {
+        selectedAlerts.value = [];
+        allSelectedAlerts.value = false;
+      }
       // The alerts list is refreshed after every alert mutation — drop the shared
       // dependency-graph cache so the destination/template impact dialogs reflect
       // the change on next open.
@@ -2344,11 +2444,11 @@ export default defineComponent({
       // Painting the same rows twice is safe: uuids are stable per alert, and
       // the route-driven dialogs below run once, on the fresh result. Returns
       // false when the folder changed mid-flight and the render was skipped.
-      const renderAlerts = (rows: any[]): boolean => {
+      const renderAlerts = (rows: any[], requestStart: number): boolean => {
         var counter = 1;
         let localAllAlerts = [];
         //this is the alerts that we use to store
-        localAllAlerts = rows.map((alert: any) => {
+        localAllAlerts = withConfirmedWrites(rows, requestStart).map((alert: any) => {
           return {
             ...alert,
             uuid: stableUuid(alert.alert_id || alert.name),
@@ -2524,20 +2624,24 @@ export default defineComponent({
       // renderAlerts reports whether it rendered — the folder can change
       // mid-flight — so the paint is driven here rather than through `apply`.
       // Painted even on a manual refresh: the rows stay while the request runs.
+      const fetchStart = ++alertsFetchSeq;
+      if (refreshResults) latestTableFetch = fetchStart;
+      const obsolete = () => refreshResults && fetchStart !== latestTableFetch;
       const cachedRows = queryClient.getQueryData<any[]>(
         alertKeys.list(org, folderId, query, alertType),
       );
-      const painted = cachedRows ? renderAlerts(cachedRows) : false;
+      // Cached rows have no known request behind them, so every kept write applies.
+      const painted = cachedRows ? renderAlerts(cachedRows, 0) : false;
       const opts = alertsListQuery(org, folderId, query, alertType);
-      const pending = force
-        ? queryClient
-            .invalidateQueries({
-              queryKey: opts.queryKey,
-              exact: true,
-              refetchType: "none",
-            })
-            .then(() => queryClient.fetchQuery(opts))
-        : queryClient.fetchQuery(opts);
+      // Marks the entry stale in place, so the read is tracked against the request fetchQuery really joins.
+      if (force)
+        void queryClient.invalidateQueries({
+          queryKey: opts.queryKey,
+          exact: true,
+          refetchType: "none",
+        });
+      const read = trackListRead(opts.queryKey, fetchStart);
+      const pending = queryClient.fetchQuery(opts);
 
       loading.value = !painted;
       fetching.value = true;
@@ -2551,9 +2655,16 @@ export default defineComponent({
           });
 
       try {
-        if (!renderAlerts(await pending)) {
+        const rows = await pending;
+        repatchConfirmedWrites(read.start);
+        if (obsolete() || !renderAlerts(rows, read.start)) {
           dismiss();
           return;
+        }
+        if (refreshResults) dropSettledTags(read.start);
+        if (keepSelection) {
+          const present = new Set(allAlerts.value.map((a: any) => String(a.alert_id)));
+          selectedAlertIds.value = selectedAlertIds.value.filter((id) => present.has(String(id)));
         }
         // The cache records the fetch time; fetchQuery does not hand it back, so read it here.
         lastUpdatedAt.value = queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
@@ -2565,6 +2676,7 @@ export default defineComponent({
       } catch (error: any) {
         console.error(error);
         dismiss();
+        if (obsolete()) return;
         forbidden.value = forbiddenState(error);
         if (!forbidden.value) {
           toast({
@@ -2573,8 +2685,12 @@ export default defineComponent({
           });
         }
       } finally {
-        loading.value = false;
-        fetching.value = false;
+        releaseListRead(read);
+        // A newer fetch still running owns the loading state.
+        if (fetchStart === alertsFetchSeq) {
+          loading.value = false;
+          fetching.value = false;
+        }
       }
     };
     /** Send an SLO alert to its SLO page instead of the generic editor.
@@ -2789,11 +2905,17 @@ export default defineComponent({
       extendUntilOpen.value = true;
     };
 
+    // Keeps the rows, page and selection, dimming the rows like any other list refetch.
     const refreshAlerts = async () => {
-      if (searchAcrossFolders.value && searchQuery.value) {
-        await getAlertsFn(store, activeFolderId.value, searchQuery.value, true, "", true);
-      } else {
-        await getAlertsFn(store, activeFolderId.value, "", true, "", true);
+      refreshing.value = true;
+      try {
+        if (searchAcrossFolders.value && searchQuery.value) {
+          await getAlertsFn(store, activeFolderId.value, searchQuery.value, true, "", true, true);
+        } else {
+          await getAlertsFn(store, activeFolderId.value, "", true, "", true, true);
+        }
+      } finally {
+        refreshing.value = false;
       }
       filterAlertsByTab();
       // Re-apply the in-folder search too. Without it a refresh handed back the
@@ -3555,6 +3677,60 @@ export default defineComponent({
       streamNames.value = filterColumns(indexOptions.value, val, update);
     };
 
+    // Confirmed writes only, found by id at settle time, since a refresh mid-write replaces the row objects.
+    const applyConfirmedState = (alertId: any, enabled: boolean): boolean => {
+      const id = String(alertId);
+      let left = false;
+      confirmedWrites.set(id, { enabled, seq: alertsFetchSeq });
+      for (const alert of filteredResults.value as any[]) {
+        if (String(alert.alert_id) !== id) continue;
+        alert.enabled = enabled;
+        left = markIfLeftFilter(alert) || left;
+      }
+      patchCachedAlert(alertId, { enabled });
+      patchStoredAlert(id, enabled);
+      dropUnneededWrites();
+      return left;
+    };
+    let withdrawLeftFilterNote: (() => void) | null = null;
+    // A write that settles after the page is left must not announce on the page the user went to.
+    let leftFilterNoteOwned = true;
+    // The polite line is the screen reader's confirmation; sighted users have the tag and the tile counts, so there is no toast.
+    const announceLeftFilter = (names: string[], enabled: boolean) => {
+      if (!leftFilterNoteOwned || !names.length) return;
+      const params = { name: raw(names[0]), count: names.length };
+      withdrawLeftFilterNote?.();
+      withdrawLeftFilterNote = announcePolite(
+        enabled
+          ? t("alerts.rowAction.resumedLeftFilter", params, names.length)
+          : t("alerts.rowAction.pausedLeftFilter", params, names.length),
+      );
+    };
+    onBeforeUnmount(() => {
+      leftFilterNoteOwned = false;
+      withdrawLeftFilterNote?.();
+      withdrawLeftFilterNote = null;
+    });
+    // Turning off a cross-folder search restores the folder from the store's copy, so a write reaches that copy too.
+    const patchStoredAlert = (id: string, enabled: boolean) => {
+      const byFolder = store.state.organizationData.allAlertsListByFolderId;
+      if (!byFolder || typeof byFolder !== "object") return;
+      let hit = false;
+      const next = Object.fromEntries(
+        Object.entries(byFolder).map(([folderId, rows]) => [
+          folderId,
+          Array.isArray(rows)
+            ? rows.map((r: any) => {
+                if (String(r?.alert_id) !== id || r.enabled === enabled) return r;
+                hit = true;
+                return { ...r, enabled };
+              })
+            : rows,
+        ]),
+      );
+      if (hit) store.dispatch("setAllAlertsListByFolderId", next);
+    };
+
     const toggleAlertState = (row: any) => {
       if (anomalyRowLocked(row)) return;
       alertStateLoadingMap.value[row.uuid] = true;
@@ -3562,7 +3738,7 @@ export default defineComponent({
       // Two mutations, not one conditional invalidation: an anomaly row is also a config Overview renders.
       const toggle = row.type === "anomaly" ? toggleAnomalyState : toggleAlertStateWrite;
 
-      toggle
+      return toggle
         .mutateAsync({
           alertId: row.alert_id,
           enabled: !row?.enabled,
@@ -3570,16 +3746,8 @@ export default defineComponent({
         })
         .then((res: any) => {
           const isEnabled = res.data.enabled;
-          filteredResults.value.forEach((alert: any) => {
-            alert.uuid === row.uuid ? (alert.enabled = isEnabled) : null;
-          });
-          patchCachedAlert(row.alert_id, { enabled: isEnabled });
-          toast({
-            variant: "success",
-            message: isEnabled
-              ? t("toastMessages.alerts.alertResumedSuccessfully")
-              : t("toastMessages.alerts.alertPausedSuccessfully"),
-          });
+          if (applyConfirmedState(row.alert_id, isEnabled))
+            announceLeftFilter([row.name], isEnabled);
         })
         .catch(() => {
           /* the mutation handler already toasts the failure; this only keeps the rejection handled */
@@ -4004,6 +4172,28 @@ export default defineComponent({
         });
       },
     );
+    // The table keeps its page across data changes (a refresh, a toggle), so a new filter, search, tab or sort starts at page 1 here.
+    watch(
+      [stateFilter, activeTab, searchQuery, filterQuery, searchAcrossFolders, sortBy, sortOrder],
+      () => {
+        leftFilterIds.value.clear();
+        currentPage.value = 1;
+        oTableRef.value?.restorePage?.(1);
+      },
+    );
+    // A refresh or delete that shrinks the list must not leave the table on a page past its end.
+    watch(
+      () => displayedAlerts.value.length,
+      (count) => {
+        if (loading.value || !count) return;
+        const last = Math.ceil(count / pageSize.value);
+        const shown = (oTableRef.value?.table?.getState?.().pagination?.pageIndex ?? 0) + 1;
+        if (shown <= last) return;
+        currentPage.value = last;
+        oTableRef.value?.restorePage?.(last);
+      },
+      { flush: "post" },
+    );
     watch(activeTab, async (newVal) => {
       //here we are resetting the filterQuery when the activeTab is changed
       //this is done because we need to trigger again the filterQuery watch
@@ -4136,89 +4326,98 @@ export default defineComponent({
       });
     };
 
+    const bulkToggleBusy = ref<"pause" | "resume" | null>(null);
+    // Each bulk write gets a number, so only the latest one may set the summary, the busy state and the selection.
+    let bulkRequestSeq = 0;
     const bulkToggleAlerts = async (action: "pause" | "resume") => {
-      const dismiss = toast({
-        variant: "loading",
-        message:
-          action === "resume"
-            ? t("toastMessages.alerts.resumingAlerts")
-            : t("toastMessages.alerts.pausingAlerts"),
-        timeout: 0,
-      });
+      // Synchronous, so a second bulk write can't start before the first one's busy state renders.
+      if (bulkWriteBusy.value) return;
+      const isResuming = action === "resume";
+      const alertsToToggle = selectedAlerts.value.filter((alert: any) =>
+        isResuming ? !alert.enabled : alert.enabled,
+      );
+
+      if (alertsToToggle.length === 0) {
+        toast({
+          variant: "error",
+          message: isResuming
+            ? t("toastMessages.alerts.noAlertsToResume")
+            : t("toastMessages.alerts.noAlertsToPause"),
+        });
+        return;
+      }
+
+      const request = ++bulkRequestSeq;
+      bulkToggleBusy.value = action;
+      const payload = {
+        ids: alertsToToggle.map((a: any) => a.alert_id),
+        names: alertsToToggle.map((a: any) => a.name),
+      };
+      let failed: any[] = [];
+      let failureMessage: I18nText | null = null;
       try {
-        const isResuming = action === "resume";
-
-        // Filter alerts based on action
-        const alertsToToggle = selectedAlerts.value.filter((alert: any) =>
-          isResuming ? !alert.enabled : alert.enabled,
-        );
-
-        if (alertsToToggle.length === 0) {
-          toast({
-            variant: "error",
-            message:
-              action === "resume"
-                ? t("toastMessages.alerts.noAlertsToResume")
-                : t("toastMessages.alerts.noAlertsToPause"),
-          });
-          dismiss();
-          return;
-        }
-
-        // Collect IDs and names
-        const payload = {
-          ids: alertsToToggle.map((a: any) => a.alert_id),
-          names: alertsToToggle.map((a: any) => a.name),
-        };
-
-        // Toggle (true = resume, false = pause)
         const response = await alertsService.bulkToggleState(
           store.state.selectedOrganization.identifier,
           isResuming,
           payload,
         );
-
-        if (response) {
-          dismiss();
-          toast({
-            variant: "success",
-            message:
-              action === "resume"
-                ? t("toastMessages.alerts.alertsResumedSuccessfully")
-                : t("toastMessages.alerts.alertsPausedSuccessfully"),
-          });
-        }
+        const refused = new Set((response?.data?.unsuccessful ?? []).map(String));
+        failed = alertsToToggle.filter((a: any) => refused.has(String(a.alert_id)));
         queryClient.invalidateQueries({
           queryKey: alertKeys.firing(store.state.selectedOrganization.identifier),
         });
-        // Refresh alerts
-        await getAlertsFn(store, activeFolderId.value, "", true, "", true);
-
-        if (filterQuery.value) {
-          filterAlertsByQuery(filterQuery.value);
+        const leftRows = alertsToToggle.filter(
+          (row: any) =>
+            !refused.has(String(row.alert_id)) && applyConfirmedState(row.alert_id, isResuming),
+        );
+        announceLeftFilter(
+          leftRows.map((row: any) => String(row.name)),
+          isResuming,
+        );
+        if (failed.length) {
+          const params = { failed: failed.length, total: alertsToToggle.length };
+          failureMessage = isResuming
+            ? t("alerts.rowAction.bulkResumeFailed", params, alertsToToggle.length)
+            : t("alerts.rowAction.bulkPauseFailed", params, alertsToToggle.length);
         }
       } catch (error: any) {
-        dismiss();
+        failed = alertsToToggle;
         console.error(`Error ${action}ing alerts:`, error);
-        if (error?.response?.status === 403) return;
-        toast({
-          variant: "error",
-          message:
-            action === "resume"
-              ? t("toastMessages.alerts.errorResumingAlerts")
-              : t("toastMessages.alerts.errorPausingAlerts"),
-        });
+        if (error?.response?.status !== 403)
+          failureMessage = isResuming
+            ? t("toastMessages.alerts.errorResumingAlerts")
+            : t("toastMessages.alerts.errorPausingAlerts");
       }
+      if (request !== bulkRequestSeq) return;
+      bulkToggleBusy.value = null;
+      // No success toast: the rows' buttons, tags and the tile counts already show the result.
+      if (!failed.length) {
+        selectedAlerts.value = [];
+        return;
+      }
+      if (failureMessage) toast({ variant: "error", message: failureMessage });
+      // Only the rows that failed stay selected, so a retry is one click.
+      selectedAlertIds.value = failed.map((a: any) => a.alert_id);
+      for (const row of filteredResults.value as any[]) row.selected = false;
     };
 
     const confirmBulkDelete = ref<boolean>(false);
     const bulkDeleteLoading = ref<boolean>(false);
+    // While one bulk write runs, the other bulk actions are inactive, so two writes never race on one selection.
+    const bulkWriteBusy = computed(() => bulkToggleBusy.value !== null || bulkDeleteLoading.value);
+    const swallowWhileBulkBusy = (event: Event) => {
+      if (!bulkWriteBusy.value || !activates(event)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
 
     const openBulkDeleteDialog = () => {
+      if (bulkWriteBusy.value) return;
       confirmBulkDelete.value = true;
     };
 
     const bulkDeleteAlerts = async () => {
+      if (bulkWriteBusy.value) return;
       bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
@@ -4408,7 +4607,10 @@ export default defineComponent({
       summaryStats,
       stateFilter,
       displayedAlerts,
+      leftFilterIds,
       onStatSelect,
+      bulkToggleBusy,
+      refreshing,
       formData,
       hideForm,
       confirmDelete,
@@ -4452,6 +4654,7 @@ export default defineComponent({
       isFetchingStreams,
       loading,
       fetching,
+      tableKeepsRows,
       lastUpdatedAt,
       forbidden,
       isSubmitting,
@@ -4542,6 +4745,8 @@ export default defineComponent({
       transformToExpression,
       filterAlertsByQuery,
       bulkToggleAlerts,
+      bulkWriteBusy,
+      swallowWhileBulkBusy,
       openBulkDeleteDialog,
       bulkDeleteAlerts,
       confirmBulkDelete,

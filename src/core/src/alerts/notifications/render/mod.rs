@@ -1336,6 +1336,93 @@ mod tests {
         );
     }
 
+    #[test]
+    fn teams_adaptive_card_keeps_raw_surfaces_as_written() {
+        use config::meta::alerts::content_spec::{
+            ContentField, ContentLink, ContentSpec, RowsSpec,
+        };
+
+        use crate::alerts::notifications::resolve::resolve_content;
+
+        let mut ctx = fixture_ctx();
+        ctx.rows = vec![serde_json::from_str(r#"{"op":">=","v":"80"}"#).unwrap()];
+        let spec = |format: Option<&str>| ContentSpec {
+            title: "{alert_operator} 80".into(),
+            fields: vec![ContentField {
+                label: "{alert_operator} label".into(),
+                value: "{alert_operator} 80".into(),
+                show_when: None,
+            }],
+            links: vec![ContentLink {
+                label: "{alert_operator} link".into(),
+                url: "https://o2.example/x".into(),
+                show_when: None,
+            }],
+            rows: RowsSpec {
+                enabled: true,
+                format: format.map(Into::into),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let card = |format, ctx: &NotificationContext| {
+            let content = resolve_content(&spec(format), ctx, "teams");
+            teams::render_teams_adaptive_card(&content, ctx)["attachments"][0]["content"].clone()
+        };
+        let formatted = card(Some("{op} {v}"), &ctx);
+        let body = formatted["body"].as_array().unwrap();
+        assert_eq!(body[0]["text"], ">= 80");
+        let facts = body.iter().find(|b| b["type"] == "FactSet").unwrap();
+        assert_eq!(facts["facts"][0]["title"], ">= label");
+        assert_eq!(facts["facts"][0]["value"], ">= 80");
+        assert_eq!(body.last().unwrap()["text"], ">= 80");
+        assert_eq!(formatted["actions"][0]["title"], ">= link");
+
+        let unformatted = card(None, &ctx);
+        let rows = unformatted["body"].as_array().unwrap().last().unwrap();
+        assert_eq!(rows["text"], "op: >= · v: 80");
+
+        ctx.rows = vec![
+            serde_json::from_str(r#"{"op":"[View](https://evil.example)","v":"80"}"#).unwrap(),
+        ];
+        let linked = card(Some("{op} {v}"), &ctx);
+        assert_eq!(
+            linked["body"].as_array().unwrap().last().unwrap()["text"],
+            r"[View]\(https://evil.example) 80"
+        );
+
+        ctx.rows = vec![serde_json::from_str(r#"{"op":"[prod] CPU high","v":"80"}"#).unwrap()];
+        let plain = card(Some("{op} {v}"), &ctx);
+        assert_eq!(
+            plain["body"].as_array().unwrap().last().unwrap()["text"],
+            "[prod] CPU high 80"
+        );
+    }
+
+    #[test]
+    fn email_body_links_get_the_link_scheme_rule() {
+        use config::meta::alerts::content_spec::ContentSpec;
+
+        use crate::alerts::notifications::resolve::resolve_content;
+
+        let spec = ContentSpec {
+            title: "t".into(),
+            body: "[a](javascript:window.x=1) ![i](JaVaScRiPt:alert(1)) [b](https://o2.example/ok)"
+                .into(),
+            ..Default::default()
+        };
+        let ctx = fixture_ctx();
+        let (_, html, _) = email::render_email(&resolve_content(&spec, &ctx, "email"), &ctx);
+        assert!(!html.to_ascii_lowercase().contains("javascript:"), "{html}");
+        assert!(html.contains(r##"<a href="#">a</a>"##), "{html}");
+        assert!(html.contains(r##"<img src="#" alt="i" />"##), "{html}");
+        assert!(
+            html.contains(r#"<a href="https://o2.example/ok">b</a>"#),
+            "{html}"
+        );
+    }
+
     /// Regenerate `testdata/`. `#[ignore]`d so a normal run never rewrites
     /// the goldens it is supposed to be checking — the whole point of a
     /// golden is that a diff is a failure, not a silent update.

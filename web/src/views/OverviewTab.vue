@@ -1387,7 +1387,8 @@ const loadUserStreams = async (force = false) => {
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
 const loadAnomalies = async (force = false, current: () => boolean = () => true) => {
   sectionFailure.anomalies = null;
-  if (anomalyLocked.value) {
+  // the OSS build does not register the anomaly routes, and their 401 would end the session
+  if (!anomalyEnabled.value) {
     anomalies.value = [];
     anomalyConfigCount.value = null;
     return;
@@ -1947,5 +1948,11 @@ watch(isIncidentsEnabled, (enabled) => {
   // the earlier pass returned early and marked the section loaded, so re-arm its skeleton
   sectionState.incidents.loaded = false;
   void runSection("incidents", (current) => loadIncidents(false, current));
+});
+// a failed config fetch is retried after mount, so the flag can turn on once the first pass has skipped the section
+watch(anomalyEnabled, (enabled) => {
+  if (!enabled) return;
+  sectionState.anomalies.loaded = false;
+  void runSection("anomalies", (current) => loadAnomalies(false, current));
 });
 </script>

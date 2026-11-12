@@ -126,8 +126,11 @@ async fn get_event_metadata(
             metadata.push(("new_title", to.into()));
             metadata.push(("user_id", user_id.into()));
         }
-        IncidentEventType::AssignmentChanged { from, to } => {
+        IncidentEventType::AssignmentChanged { from, to, user_id } => {
             metadata.push(("event_type", "assignment_changed".into()));
+            if let Some(user_id) = user_id {
+                metadata.push(("user_id", user_id.into()));
+            }
             metadata.push((
                 "from_user",
                 from.unwrap_or_else(|| "unknown".to_string()).into(),
@@ -136,6 +139,38 @@ async fn get_event_metadata(
                 "to_user",
                 to.unwrap_or_else(|| "unknown".to_string()).into(),
             ));
+        }
+
+        IncidentEventType::Verdict {
+            user_id,
+            verdict,
+            reason,
+        } => {
+            metadata.push(("event_type", "verdict".into()));
+            metadata.push(("user_id", user_id.into()));
+            metadata.push(("verdict", verdict.as_str().into()));
+            metadata.push(("reason", reason.into()));
+        }
+
+        IncidentEventType::AlertsAttached {
+            user_id,
+            alert_names,
+            ..
+        } => {
+            metadata.push(("event_type", "alerts_attached".into()));
+            metadata.push(("user_id", user_id.into()));
+            metadata.push(("alert_names", alert_names.join(", ").into()));
+        }
+
+        IncidentEventType::EventAttached {
+            user_id,
+            stream,
+            event_at,
+        } => {
+            metadata.push(("event_type", "event_attached".into()));
+            metadata.push(("user_id", user_id.into()));
+            metadata.push(("stream", stream.into()));
+            metadata.push(("event_at", event_at.to_string().into()));
         }
 
         IncidentEventType::Comment { user_id, comment } => {

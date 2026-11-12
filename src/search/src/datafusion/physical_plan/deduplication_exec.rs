@@ -29,8 +29,7 @@ use datafusion::{
     common::{Result, Statistics, internal_err, tree_node::TreeNodeRecursion},
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::{
-        EquivalenceProperties, LexRequirement, OrderingRequirements, Partitioning, PhysicalExpr,
-        PhysicalSortRequirement,
+        LexRequirement, OrderingRequirements, Partitioning, PhysicalExpr, PhysicalSortRequirement,
     },
     physical_plan::{
         DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, PlanProperties,
@@ -58,7 +57,7 @@ impl DeduplicationExec {
         deduplication_columns: Vec<Column>,
         max_rows: usize,
     ) -> Self {
-        let cache = Self::compute_properties(input.schema());
+        let cache = Self::compute_properties(&input);
         DeduplicationExec {
             input,
             deduplication_columns,
@@ -68,10 +67,13 @@ impl DeduplicationExec {
         }
     }
 
-    fn compute_properties(schema: SchemaRef) -> Arc<PlanProperties> {
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Arc<PlanProperties> {
+        let mut eq_properties = input.properties().eq_properties.clone();
+        eq_properties.clear_orderings();
+        eq_properties.clear_per_partition_constants();
         Arc::new(PlanProperties::new(
             // TODO: add the order by properties
-            EquivalenceProperties::new(schema.clone()),
+            eq_properties,
             // Output Partitioning
             Partitioning::UnknownPartitioning(1),
             // Execution Mode
@@ -424,9 +426,15 @@ mod tests {
         array::{BooleanArray, Float64Array, Int64Array, StringArray, UInt64Array},
         datatypes::{DataType, Field, Schema},
     };
-    use datafusion::physical_plan::empty::EmptyExec;
+    use datafusion::{
+        common::ScalarValue,
+        logical_expr::Operator,
+        physical_expr::expressions::{BinaryExpr, Literal},
+        physical_plan::{empty::EmptyExec, filter::FilterExec, union::UnionExec},
+    };
 
     use super::*;
+    use crate::datafusion::{physical_plan::empty_exec::NewEmptyExec, sort_order::FileSortOrder};
 
     fn make_exec() -> DeduplicationExec {
         let schema = Arc::new(Schema::new(vec![
@@ -533,5 +541,57 @@ mod tests {
             arrays.get_value(1),
             vec![Value::String("b".to_string()), Value::Int64(2)]
         );
+    }
+
+    fn filtered_to(value: &str) -> Arc<dyn ExecutionPlan> {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, false)]));
+        let predicate = BinaryExpr::new(
+            Arc::new(Column::new("a", 0)),
+            Operator::Eq,
+            Arc::new(Literal::new(ScalarValue::from(value))),
+        );
+        Arc::new(
+            FilterExec::try_new(Arc::new(predicate), Arc::new(EmptyExec::new(schema))).unwrap(),
+        )
+    }
+
+    #[test]
+    fn test_deduplication_exec_keeps_constants() {
+        let exec = DeduplicationExec::new(filtered_to("x"), vec![Column::new("a", 0)], 100);
+        let column: Arc<dyn PhysicalExpr> = Arc::new(Column::new("a", 0));
+        assert!(
+            exec.properties()
+                .eq_properties
+                .is_expr_constant(&column)
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn test_deduplication_exec_drops_per_partition_constants() {
+        let union = UnionExec::try_new(vec![filtered_to("x"), filtered_to("y")]).unwrap();
+        let exec = DeduplicationExec::new(union, vec![Column::new("a", 0)], 100);
+        assert!(exec.properties().eq_properties.constants().is_empty());
+    }
+
+    #[test]
+    fn test_deduplication_exec_drops_input_ordering() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "_timestamp",
+            DataType::Int64,
+            false,
+        )]));
+        let scan: Arc<dyn ExecutionPlan> = Arc::new(NewEmptyExec::new(
+            "t",
+            Arc::clone(&schema),
+            None,
+            &[],
+            None,
+            FileSortOrder::TimestampDesc,
+            schema,
+        ));
+        assert!(scan.properties().output_ordering().is_some());
+        let exec = DeduplicationExec::new(scan, vec![Column::new("_timestamp", 0)], 100);
+        assert!(exec.properties().output_ordering().is_none());
     }
 }

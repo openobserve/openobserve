@@ -19,6 +19,8 @@
  * (no Vue / echarts deps).
  */
 
+import { formatCost } from "@/utils/llmUtils";
+
 export type TrendDirection = "up" | "down" | "flat";
 export type TrendSentiment = "good" | "bad" | "neutral";
 
@@ -161,18 +163,11 @@ export function formatWindowLabel(durationMicros: number): string {
   return `${Math.round(days)}d`;
 }
 
-/**
- * Split a USD cost into `{ value: "$X.XX", unit }` for the cost KPI.
- * The `$` prefix is part of the value (so the unit suffix can be a
- * separate "K"/"M" multiplier).
- *
- * @example splitCost(2_500_000) // { value: "$2.50", unit: "M" }
- * @example splitCost(12_345)    // { value: "$12.3", unit: "K" }
- * @example splitCost(123.45)    // { value: "$123.45", unit: "" }
- * @example splitCost(0)         // { value: "$0.00", unit: "" }
- */
+/** The `$` is part of the value so the unit can be a separate "K"/"M" multiplier. */
 export function splitCost(cost: number): { value: string; unit: string } {
   if (cost >= 1_000_000) return { value: `$${(cost / 1_000_000).toFixed(2)}`, unit: "M" };
   if (cost >= 1_000) return { value: `$${(cost / 1_000).toFixed(1)}`, unit: "K" };
+  // Sub-cent spend keeps the shared LLM precision, so it never reads as a free $0.00.
+  if (cost > 0 && cost < 0.01) return { value: `$${formatCost(cost)}`, unit: "" };
   return { value: `$${cost.toFixed(2)}`, unit: "" };
 }

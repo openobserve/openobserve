@@ -13,20 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  computed,
-  onScopeDispose,
-  readonly,
-  ref,
-  shallowRef,
-  watch,
-  type ComputedRef,
-  type Ref,
-  type WatchSource,
-} from "vue";
+import { computed, shallowRef, watch, type ComputedRef, type Ref, type WatchSource } from "vue";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { LOADER_DELAY_MS } from "@/lib/styles/motion";
+import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
 
-export const RESULTS_LOADER_DELAY_MS = 300;
+export { useDelayedFlag };
+
+export const RESULTS_LOADER_DELAY_MS = LOADER_DELAY_MS;
 // Search responses carry scan_size in MiB (format_to_mb on the server); partition totals (original_size) are raw bytes.
 export const MIB_IN_BYTES = 1024 * 1024;
 
@@ -48,31 +42,6 @@ export const formatScannedSize = (mib: unknown): string | null => {
   const { value, unit } = getUnitValue(bytes, "bytes", "");
   return `${value} ${unit}`;
 };
-
-/** Follows `source`, but turns on only after it has stayed true for `delayMs`; it turns off at once. */
-export function useDelayedFlag(
-  source: WatchSource<boolean>,
-  delayMs = RESULTS_LOADER_DELAY_MS,
-): Readonly<Ref<boolean>> {
-  const shown = ref(false);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  watch(
-    source,
-    (on) => {
-      clearTimeout(timer);
-      if (!on) {
-        shown.value = false;
-        return;
-      }
-      timer = setTimeout(() => {
-        shown.value = true;
-      }, delayMs);
-    },
-    { immediate: true },
-  );
-  onScopeDispose(() => clearTimeout(timer));
-  return readonly(shown);
-}
 
 /** The delayed results loader for `busy`, plus the size scanned so far by a fresh run (null while paging). */
 export function useResultsLoadingIndicator(

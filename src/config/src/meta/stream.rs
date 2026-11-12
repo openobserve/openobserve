@@ -1024,8 +1024,10 @@ pub struct UpdateStreamSettings {
     pub storage_type: Option<StorageType>,
     #[serde(default)]
     pub is_llm_stream: Option<bool>,
-    #[serde(default)]
-    pub security: Option<SecuritySourceSetting>,
+    /// Absent leaves the setting unchanged; `null` removes it.
+    #[serde(default, deserialize_with = "deserialize_present")]
+    #[schema(value_type = Option<SecuritySourceSetting>)]
+    pub security: Option<Option<SecuritySourceSetting>>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
@@ -1581,6 +1583,19 @@ pub struct SecuritySourceSetting {
     pub pipeline_created: bool,
     /// `None` leaves inclusion to the classifier.
     pub included: Option<bool>,
+    /// The classifier's decision, stored so every analyst reads the same one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verdict: Option<SecurityVerdict>,
+    #[serde(default)]
+    pub confidence: f64,
+    /// Set by the server on every write; client values are ignored.
+    #[serde(default)]
+    pub updated_by: String,
+    #[serde(default)]
+    pub updated_at: i64,
+    /// Newest last; set by the server.
+    #[serde(default)]
+    pub changes: Vec<SecuritySettingChange>,
 }
 
 impl MemorySize for SecuritySourceSetting {
@@ -1589,7 +1604,43 @@ impl MemorySize for SecuritySourceSetting {
             + self.source_type.mem_size()
             + self.pack_id.mem_size()
             + self.pipeline_id.mem_size()
+            + self.updated_by.mem_size()
+            + self
+                .changes
+                .iter()
+                .map(|c| {
+                    std::mem::size_of::<SecuritySettingChange>()
+                        + c.by.mem_size()
+                        + c.summary.mem_size()
+                })
+                .sum::<usize>()
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum SecurityVerdict {
+    Auto,
+    Suggested,
+    Ignored,
+}
+
+impl SecurityVerdict {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Suggested => "suggested",
+            Self::Ignored => "ignored",
+        }
+    }
+}
+
+/// One recorded write to a stream's security setting.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct SecuritySettingChange {
+    pub at: i64,
+    pub by: String,
+    pub summary: String,
 }
 
 #[derive(Clone, Debug, Default, Hash, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -1704,6 +1755,14 @@ impl From<&str> for FileListBookKeepMode {
             _ => FileListBookKeepMode::default(),
         }
     }
+}
+
+fn deserialize_present<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
 }
 
 #[cfg(test)]
@@ -2728,6 +2787,15 @@ mod tests {
             pipeline_id: "pipe-1".to_string(),
             pipeline_created: true,
             included: Some(false),
+            verdict: Some(SecurityVerdict::Auto),
+            confidence: 0.75,
+            updated_by: "a@b.io".to_string(),
+            updated_at: 7,
+            changes: vec![SecuritySettingChange {
+                at: 7,
+                by: "a@b.io".to_string(),
+                summary: "included: classifier -> excluded".to_string(),
+            }],
         };
         let settings = StreamSettings {
             security: Some(security.clone()),
@@ -2745,7 +2813,9 @@ mod tests {
         let body = r#"{"security": {"source_type": "entity", "pack_id": "entity", "pack_version": 1,
             "attached_at": 5, "pipeline_id": "p", "pipeline_created": false, "included": true}}"#;
         let set: UpdateStreamSettings = json::from_str(body).unwrap();
-        assert_eq!(set.security.unwrap().included, Some(true));
+        assert_eq!(set.security.unwrap().unwrap().included, Some(true));
+        let cleared: UpdateStreamSettings = json::from_str(r#"{"security": null}"#).unwrap();
+        assert_eq!(cleared.security, Some(None));
     }
 
     #[test]

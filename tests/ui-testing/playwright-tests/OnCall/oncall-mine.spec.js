@@ -508,4 +508,16 @@ test.describe('On-call — my duty, my inbox, my history', {
       'the Causes tab must name the cause this rule turned out to be last time',
     ).toBeVisible({ timeout: 30000 });
   });
+
+  test('UN-01 with no provider the phone card takes no number and points at Telephony', {
+    tag: ['@P0'],
+  }, async () => {
+    await pm.oncallMinePage.goto(ORG);
+    // o2-enterprise#3420 D2: the spec's disabled card and sentence differ from the app's, so only the missing box and the link are read.
+    testLogger.info('Expect no number box and no way to add a phone (U3)');
+    await pm.oncallMinePage.expectNoProviderCard();
+
+    await pm.oncallMinePage.openTelephonyFromCard();
+    await pm.telephonySettingsPage.expectTitle('Telephony');
+  });
 });

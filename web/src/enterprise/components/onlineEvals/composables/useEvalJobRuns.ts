@@ -7,6 +7,7 @@
 
 import { computed, ref, watch, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import {
   buildEvaluatorAgentFilterWhere,
   combineWhere,
@@ -47,10 +48,6 @@ const EMPTY_KPIS: JobRunKpis = {
   avgLatencyMs: null,
   failureCount: null,
 };
-
-function escapeSqlString(s: string): string {
-  return s.replace(/'/g, "''");
-}
 
 // Each evaluation invocation writes one root/summary `_evaluator` span
 // (`online_eval.evaluate`, `is_root`) with NO `attributes_scorer_id` — plus one
@@ -200,7 +197,7 @@ export function useEvalJobRuns(
     const id = jobId.value;
     if (!id) return null;
     const where = combineWhere(
-      `CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
+      `CAST(attributes_job_id AS VARCHAR) = ${sqlLiteral(id)}`,
       buildEvaluatorAgentFilterWhere(agentFilter?.value ?? null),
       SCORER_ROW_FILTER,
     );
@@ -223,7 +220,7 @@ export function useEvalJobRuns(
     const id = jobId.value;
     if (!id) return null;
     const where = combineWhere(
-      `CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
+      `CAST(attributes_job_id AS VARCHAR) = ${sqlLiteral(id)}`,
       buildEvaluatorAgentFilterWhere(agentFilter?.value ?? null),
       SCORER_ROW_FILTER,
     );
@@ -254,7 +251,7 @@ export function useEvalJobRuns(
     const id = jobId.value;
     if (!id) return null;
     const where = combineWhere(
-      `CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
+      `CAST(attributes_job_id AS VARCHAR) = ${sqlLiteral(id)}`,
       buildEvaluatorAgentFilterWhere(agentFilter?.value ?? null),
       SCORER_ROW_FILTER,
       "attributes_status IN ('error', 'timeout')",

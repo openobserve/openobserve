@@ -210,6 +210,27 @@ pub async fn names_using_template<C: ConnectionTrait>(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// The template each composite in scope names, one entry per composite, for the template list's
+/// usage counts.
+pub async fn templates_in_use<C: ConnectionTrait>(
+    conn: &C,
+    org: Option<&str>,
+) -> Result<Vec<String>, Error> {
+    let mut query = alert_composites::Entity::find()
+        .select_only()
+        .column(alert_composites::Column::Template)
+        .filter(alert_composites::Column::Template.is_not_null());
+    if let Some(org) = org {
+        query = query.filter(alert_composites::Column::Org.eq(org));
+    }
+    query
+        .into_tuple::<Option<String>>()
+        .all(conn)
+        .await
+        .map(|rows| rows.into_iter().flatten().collect())
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 /// Total composite definitions across every org — the super-cluster startup
 /// preflight fails closed when this is non-zero.
 pub async fn count_all<C: ConnectionTrait>(conn: &C) -> Result<u64, sea_orm::DbErr> {

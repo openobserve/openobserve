@@ -19,6 +19,7 @@ import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
 import { featureState, withLicenseFeature } from "@/utils/featureGate";
+import { loadSecurityAccess, securityFeatureState } from "@/composables/security/useSecurityAccess";
 import {
   hasMetricsEditorParams,
   hasMetricsOverrideParams,
@@ -178,6 +179,20 @@ const profilesRouteGuard = (to: any, from: any, next: any) => {
     return;
   }
   routeGuard(to, from, next);
+};
+
+// Only a hidden feature leaves; a user without Security read gets MainLayout's page-level lock, which names the grant.
+const securityGuard = (to: any, from: any, next: any) => {
+  // routeGuard reads the store through inject(), which only works before the guard's first await.
+  routeGuard(to, from, (redirect?: any) => {
+    if (redirect !== undefined) return next(redirect);
+    const org = to.query.org_identifier || store.state.selectedOrganization?.identifier;
+    const state = securityFeatureState(store.state.zoConfig?.features);
+    if (state === "hidden") return next({ name: "home", query: { org_identifier: org } });
+    if (state === "locked" || !org) return next();
+    // Waits for the answer so the page mounts already knowing whether to lock.
+    loadSecurityAccess(String(org)).finally(() => next());
+  });
 };
 
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
@@ -1543,105 +1558,76 @@ const useRoutes = () => {
             path: "security",
             redirect: "security/overview",
           },
-          {
-            path: "security/overview",
-            name: "securityOverview",
-            component: () => import("@/views/Security/SecurityOverview.vue"),
-            meta: { title: "Security Overview" },
-            beforeEnter(to: any, from: any, next: any) {
-              routeGuard(to, from, next);
+          ...[
+            {
+              path: "security/overview",
+              name: "securityOverview",
+              component: () => import("@/views/Security/SecurityOverview.vue"),
+              meta: { title: "Security Overview" },
             },
-          },
-          {
-            path: "security/events",
-            name: "securityEvents",
-            component: () => import("@/views/Security/SecurityEvents.vue"),
-            meta: { title: "Security Events" },
-            beforeEnter(to: any, from: any, next: any) {
-              routeGuard(to, from, next);
+            {
+              path: "security/events",
+              name: "securityEvents",
+              component: () => import("@/views/Security/SecurityEvents.vue"),
+              meta: { title: "Security Events" },
             },
-          },
-          {
-            path: "security/detections",
-            name: "securityDetections",
-            component: () => import("@/views/Security/SecurityDetections.vue"),
-            meta: { title: "Security Detections" },
-            beforeEnter(to: any, from: any, next: any) {
-              routeGuard(to, from, next);
+            {
+              path: "security/detections",
+              name: "securityDetections",
+              component: () => import("@/views/Security/SecurityDetections.vue"),
+              meta: { title: "Security Detections" },
             },
-          },
-          {
-            path: "security/alerts",
-            name: "securityAlerts",
-            component: () => import("@/views/Security/SecurityAlerts.vue"),
-            meta: { title: "Security Alerts" },
-            beforeEnter(to: any, from: any, next: any) {
-              routeGuard(to, from, next);
+            {
+              path: "security/alerts",
+              name: "securityAlerts",
+              component: () => import("@/views/Security/SecurityAlerts.vue"),
+              meta: { title: "Security Alerts" },
             },
-          },
-          {
-            path: "security/cases",
-            name: "securityCases",
-            component: () => import("@/views/Security/SecurityCases.vue"),
-            meta: { title: "Security Cases" },
-            beforeEnter(to: any, from: any, next: any) {
-              routeGuard(to, from, next);
+            {
+              path: "security/cases",
+              name: "securityCases",
+              component: () => import("@/views/Security/SecurityCases.vue"),
+              meta: { title: "Security Cases" },
             },
-          },
-          {
-            path: "security/entities",
-            name: "securityEntities",
-            component: () => import("@/views/Security/SecurityEntities.vue"),
-            meta: { title: "Security Entities" },
-            beforeEnter(to: any, from: any, next: any) {
-              routeGuard(to, from, next);
+            {
+              path: "security/entities",
+              name: "securityEntities",
+              component: () => import("@/views/Security/SecurityEntities.vue"),
+              meta: { title: "Security Entities" },
             },
-          },
-          {
-            path: "security/intel",
-            name: "securityIntel",
-            component: () => import("@/views/Security/SecurityIntel.vue"),
-            meta: { title: "Threat Intel" },
-            beforeEnter(to: any, from: any, next: any) {
-              routeGuard(to, from, next);
+            {
+              path: "security/intel",
+              name: "securityIntel",
+              component: () => import("@/views/Security/SecurityIntel.vue"),
+              meta: { title: "Threat Intel" },
             },
-          },
-          {
-            path: "security/ueba",
-            name: "securityUEBA",
-            component: () => import("@/views/Security/SecurityUEBA.vue"),
-            meta: { title: "UEBA" },
-            beforeEnter(to: any, from: any, next: any) {
-              routeGuard(to, from, next);
+            {
+              path: "security/ueba",
+              name: "securityUEBA",
+              component: () => import("@/views/Security/SecurityUEBA.vue"),
+              meta: { title: "UEBA" },
             },
-          },
-          {
-            path: "security/mitre",
-            name: "securityMitre",
-            component: () => import("@/views/Security/SecurityMitre.vue"),
-            meta: { title: "MITRE ATT&CK" },
-            beforeEnter(to: any, from: any, next: any) {
-              routeGuard(to, from, next);
+            {
+              path: "security/mitre",
+              name: "securityMitre",
+              component: () => import("@/views/Security/SecurityMitre.vue"),
+              meta: { title: "MITRE ATT&CK" },
             },
-          },
-          {
-            path: "security/sources",
-            name: "securitySources",
-            component: () => import("@/views/Security/SecuritySources.vue"),
-            meta: { title: "Data Sources" },
-            beforeEnter(to: any, from: any, next: any) {
-              routeGuard(to, from, next);
+            {
+              path: "security/sources",
+              name: "securitySources",
+              component: () => import("@/views/Security/SecuritySources.vue"),
+              meta: { title: "Data Sources" },
             },
-          },
-          {
-            path: "security/content",
-            name: "securityContent",
-            component: () => import("@/views/Security/SecurityContent.vue"),
-            meta: { title: "Content" },
-            beforeEnter(to: any, from: any, next: any) {
-              routeGuard(to, from, next);
+            {
+              path: "security/content",
+              name: "securityContent",
+              component: () => import("@/views/Security/SecurityContent.vue"),
+              meta: { title: "Content" },
             },
-          },
+          ].map((route) =>
+            withLicenseFeature("security", { ...route, beforeEnter: securityGuard }),
+          ),
         ]
       : []),
 

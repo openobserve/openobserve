@@ -1083,6 +1083,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "the tick is drawn inside the checked box",
   },
   {
+    fg: "--color-copy-confirm-text",
+    bg: "--color-copy-confirm-bg",
+    category: "text",
+    why: "the copy bubble's label is painted on the bubble's own inverse fill",
+  },
+  {
     fg: "--color-dag-node-agent-text",
     bg: "--color-dag-node-agent-bg",
     category: "text",

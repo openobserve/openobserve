@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { gt } from "@/types/i18n";
+import { gt, raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import { safeTimezone } from "@/utils/dashboard/calendarPeriods";
 
 export const b64EncodeUnicode = (str: string) => {
   try {
@@ -342,6 +343,7 @@ export function formatUtcWindows(
 // render. `null` caches a timezone the runtime rejects, so it is not retried.
 const hhmmFormatters = new Map<string, Intl.DateTimeFormat | null>();
 const abbrFormatters = new Map<string, Intl.DateTimeFormat | null>();
+const clockFormatters = new Map<string, Intl.DateTimeFormat | null>();
 
 function cachedFormatter(
   cache: Map<string, Intl.DateTimeFormat | null>,
@@ -400,6 +402,97 @@ export function timezoneAbbr(timeZone: string, at: Date = new Date()): string {
   if (!formatter) return timeZone;
   const parts = formatter.formatToParts(at);
   return parts.find((p) => p.type === "timeZoneName")?.value ?? timeZone;
+}
+
+/** The browser's IANA time zone, the fallback for a zone the runtime rejects. */
+export function localTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+/** `at` (epoch ms) as a 24-hour clock time in `timeZone`: "10:42", or "10:42:07" with seconds. */
+export function formatClockTime(at: number, timeZone: string, withSeconds = false): string {
+  const formatter = cachedFormatter(
+    clockFormatters,
+    `${timeZone}|${withSeconds}`,
+    () =>
+      new Intl.DateTimeFormat("en-GB", {
+        timeZone,
+        hour: "2-digit",
+        minute: "2-digit",
+        ...(withSeconds ? { second: "2-digit" } : {}),
+        hourCycle: "h23",
+      }),
+  );
+  if (formatter) return formatter.format(at);
+  const local = localTimeZone();
+  return local === timeZone ? "" : formatClockTime(at, local, withSeconds);
+}
+
+export interface DataAgeText {
+  /** The visible label, e.g. "Updated 10:42". */
+  text: I18nText;
+  /** The clock time alone, e.g. "10:42", for a label too narrow for `text`. */
+  time: I18nText;
+  /** Tooltip and hidden text with seconds and zone, e.g. "Updated 10:42:07 · Asia/Calcutta". */
+  full: I18nText;
+  /** Accessible name of a refresh control showing this age. */
+  refreshName: I18nText;
+}
+
+/** "Updated hh:mm" in the app's selected zone unless one is given, with the zone kept for the tooltip and name. */
+export function formatDataAge(
+  t: TranslateFn,
+  { at, timeZone = safeTimezone() }: { at: number; timeZone?: string },
+): DataAgeText {
+  const time = formatClockTime(at, timeZone);
+  return {
+    text: t("dataAge.updated", { time }),
+    time: raw(time),
+    full: t("dataAge.withZone", {
+      age: t("dataAge.updated", { time: formatClockTime(at, timeZone, true) }),
+      timeZone,
+    }),
+    refreshName: t("dataAge.refreshUpdated", { time, timeZone }),
+  };
+}
+
+/** "Refresh failed at hh:mm · showing data from hh:mm"; with `count` and `total`, the page summary for several charts. */
+export function formatRefreshFailed(
+  t: TranslateFn,
+  {
+    failedAt,
+    dataFrom,
+    timeZone = safeTimezone(),
+    count,
+    total,
+  }: { failedAt: number; dataFrom: number; timeZone?: string; count?: number; total?: number },
+): I18nText {
+  const times = {
+    failedAt: formatClockTime(failedAt, timeZone),
+    dataFrom: formatClockTime(dataFrom, timeZone),
+  };
+  if (count === undefined || total === undefined) return t("dataAge.refreshFailed", times);
+  return t("dataAge.refreshFailedCharts", { ...times, count, total }, total);
+}
+
+const RANGE_UNITS = [
+  { unit: "days", seconds: 86400 },
+  { unit: "hours", seconds: 3600 },
+  { unit: "minutes", seconds: 60 },
+  { unit: "seconds", seconds: 1 },
+] as const;
+
+/** A window's length as "6 h" or "15 min" (spoken: "6 hours"), in the largest unit it fills, to one decimal. */
+export function formatRangeLength(
+  t: TranslateFn,
+  seconds: number,
+  { spoken = false }: { spoken?: boolean } = {},
+): I18nText {
+  const whole = Math.max(0, Math.round(seconds));
+  const fit = RANGE_UNITS.find((u) => whole >= u.seconds) ?? RANGE_UNITS[3];
+  const count = Math.round((whole / fit.seconds) * 10) / 10;
+  const key = spoken ? "regionStatus.rangeLengthSpoken" : "regionStatus.rangeLength";
+  return t(`${key}.${fit.unit}`, { count: count.toLocaleString() }, count);
 }
 
 /**

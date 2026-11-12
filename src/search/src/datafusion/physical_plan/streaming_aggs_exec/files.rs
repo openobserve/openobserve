@@ -505,9 +505,8 @@ pub fn get_cache_file_path(file_path: &str, file_name: &str) -> String {
 }
 
 pub fn get_aggregation_cache_key_from_request(req: &SearchPartitionRequest) -> u64 {
-    let origin_sql = req.sql.clone();
-
-    let mut hash_body = vec![origin_sql];
+    // Keep UTC entries separate from caches written before timezone eligibility was enforced.
+    let mut hash_body = vec!["aggregation-v2".to_string(), req.sql.clone()];
     if let Some(vrl_function) = &req.query_fn {
         hash_body.push(vrl_function.to_string());
     }
@@ -525,6 +524,23 @@ mod tests {
     use arrow::array::StringArray;
 
     use super::*;
+
+    #[test]
+    fn timezone_aggregation_cache_key_excludes_legacy() {
+        let req: SearchPartitionRequest = serde_json::from_value(serde_json::json!({
+            "sql": "SELECT count(*) AS cnt FROM t GROUP BY histogram(_timestamp, '1 day')",
+            "start_time": 1,
+            "end_time": 2,
+        }))
+        .unwrap();
+        let utc = get_aggregation_cache_key_from_request(&req);
+        assert_eq!(utc, get_aggregation_cache_key_from_request(&req));
+        assert_ne!(
+            utc,
+            config::utils::hash::sum64(&req.sql),
+            "legacy key must not match"
+        );
+    }
 
     #[test]
     fn test_get_record_batches_rejects_invalid_ipc() {

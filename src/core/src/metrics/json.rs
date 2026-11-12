@@ -118,7 +118,7 @@ async fn buffer_record(
         unreachable!("flatten only returns an object")
     };
     let stream_name = match stream_name {
-        Some(name) => name.to_string(),
+        Some(name) => format_stream_name(name.to_string()),
         None => match record
             .get(NAME_LABEL)
             .ok_or_else(|| anyhow!("missing __name__"))?

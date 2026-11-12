@@ -98,10 +98,10 @@ const withoutEditorMode = (panel: any) =>
     queries: (panel.queries ?? []).map((query: any) => ({ ...query, customQuery: false })),
   };
 
-/** An open select list (field or function picker), but not menus, popovers or tooltips. */
+/** An open select list mid-pick (field or function picker), but not a resting list, menus, popovers or tooltips. */
 export const isPopupOpen = (): boolean =>
   Array.from(document.querySelectorAll("[data-reka-popper-content-wrapper]")).some((wrapper) =>
-    wrapper.querySelector('[role="listbox"]'),
+    wrapper.querySelector('[role="listbox"]:not([data-list-resting])'),
   );
 
 /**

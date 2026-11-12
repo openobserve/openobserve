@@ -553,6 +553,7 @@ impl ListAlertsQuery {
         meta_alerts::ListAlertsParams {
             org_id: org_id.to_string(),
             folder_id: self.folder,
+            listable_folder_ids: None,
             name_substring: self.alert_name_substring,
             stream_type_and_name: self
                 .stream_type
@@ -567,6 +568,7 @@ impl ListAlertsQuery {
             // Resolved by the service layer, which owns the alert cache the
             // infra layer cannot reach (PT-8).
             tag_alert_ids: None,
+            excluded_alert_ids: Vec::new(),
             sort_by: match self.sort_by.as_deref() {
                 Some("priority") => Some(meta_alerts::AlertSortField::Priority),
                 Some("name") => Some(meta_alerts::AlertSortField::Name),

@@ -332,7 +332,9 @@ const { t, locale } = useI18nTyped();
 
 const WRITE_ACTIONS = new Set(["AllowAll", "AllowPost", "AllowPut", "AllowDelete"]);
 
+// Security leads: a SOC role is built from these, and below the other sections they sat out of view.
 const SECTIONS = [
+  { id: "security", labelKey: "iam.editRole.presetsSectionSecurity" },
   { id: "builtin", labelKey: "iam.editRole.presetsSectionBuiltin" },
   { id: "job", labelKey: "iam.editRole.presetsSectionJob" },
 ] as const;

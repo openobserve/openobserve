@@ -75,8 +75,14 @@ const grid = vi.hoisted(() => {
     loadLabelValues: vi.fn(),
     labelValueScope: { value: "" },
     addLabelFilter: vi.fn(async () => {}),
+    replaceLabelFilter: vi.fn(async () => {}),
     removeLabelFilter: vi.fn(),
     ensureSchemas: vi.fn(),
+    ensureStreamSchemas: vi.fn(async () => {}),
+    holding: { value: false },
+    get displayed() {
+      return { value: { cards: g.pagedCards.value, placeholders: 0, emptyHeld: new Set() } };
+    },
     setOverride: vi.fn(),
     toggleFavorite: vi.fn(),
     exemplarEligible: vi.fn(() => false),
@@ -159,11 +165,15 @@ vi.mock("@/composables/useNotifications", () => ({
   default: () => ({ showErrorNotification }),
 }));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+// Empty unless a test asks for rows, so the grid's cards are only mounted where they are under test.
+const virtualRows = vi.hoisted(() => ({
+  items: [] as Array<{ index: number; key: number; start: number; size: number }>,
+}));
 vi.mock("@tanstack/vue-virtual", () => ({
   useVirtualizer: () =>
     computed(() => ({
       getTotalSize: () => 0,
-      getVirtualItems: () => [],
+      getVirtualItems: () => virtualRows.items,
     })),
 }));
 
@@ -888,6 +898,11 @@ describe("MetricsExplorer wiring", () => {
       expect(filterRow(wrapper).exists()).toBe(true);
     });
 
+    it("pads the row like the Logs query row, which holds its flush filter bar the same way", () => {
+      const wrapper = mountExplorer();
+      expect(filterRow(wrapper).classes()).toEqual(expect.arrayContaining(["px-1.5", "py-0.75"]));
+    });
+
     it("is hidden in Visualize, where the PromQL query carries its own matchers", async () => {
       const wrapper = mountExplorer();
       expect(filterRow(wrapper).exists()).toBe(true);
@@ -969,14 +984,14 @@ describe("MetricsExplorer wiring", () => {
       expect(grid.setTimeRange).toHaveBeenCalledTimes(1);
       expect(grid.setTimeRange).toHaveBeenLastCalledWith(
         { start_time: 10, end_time: 20 },
-        { keepPage: true },
+        { keepPreviews: true, windowChanged: true, keepPage: true },
       );
 
       vm.onDateChange();
       expect(grid.setTimeRange).toHaveBeenCalledTimes(2);
       expect(grid.setTimeRange).toHaveBeenLastCalledWith(
         { start_time: 10, end_time: 20 },
-        undefined,
+        { keepPreviews: true, windowChanged: true },
       );
     });
 
@@ -1358,7 +1373,7 @@ describe("MetricsExplorer wiring", () => {
       }));
     });
 
-    it("opens from a card: pushes a history entry, pauses the grid, loads the schemas", async () => {
+    it("opens from a card: pushes a history entry, pauses the grid, loads only its schema", async () => {
       const wrapper = mountExplorer();
       routerState.push.mockClear();
 
@@ -1369,7 +1384,8 @@ describe("MetricsExplorer wiring", () => {
 
       expect(routerState.push).toHaveBeenCalled();
       expect(routerState.push.mock.calls.at(-1)[0].query.metric).toBe(CARD.name);
-      expect(grid.ensureSchemas).toHaveBeenCalled();
+      expect(grid.ensureStreamSchemas).toHaveBeenCalledWith(expect.arrayContaining([CARD.name]));
+      expect(grid.ensureSchemas).not.toHaveBeenCalled();
       expect(wrapper.find(DETAIL).exists()).toBe(false);
       expect(detailView(wrapper).exists()).toBe(true);
       // The mode is untouched — closing returns to whichever grid was showing.
@@ -2329,6 +2345,506 @@ describe("MetricsExplorer wiring", () => {
         .vm.$emit("update:time-range", { valueType: "absolute", startTime: 5, endTime: 9 });
       expect(setSavedDate).toHaveBeenCalledWith({ type: "absolute", startTime: 5, endTime: 9 });
       expect((wrapper.vm as any).selectedDate).toMatchObject({ startTime: 5, endTime: 9 });
+    });
+  });
+
+  describe("the steady grid: settled count, held slice, range status, failed refresh", () => {
+    const CARDS = ["a_total", "b_total", "c_total"].map((name) => ({
+      ...CARD,
+      name,
+      familyName: name,
+    }));
+    const saved: Record<string, any> = {};
+    const swap = (key: string, value: any) => {
+      saved[key] = Object.getOwnPropertyDescriptor(grid, key);
+      Object.defineProperty(grid, key, { value, configurable: true, writable: true });
+    };
+    const picker = {
+      DateTimePickerDashboard: {
+        setup: (_: any, { expose }: any) => {
+          expose({
+            setSavedDate: vi.fn(),
+            refresh: vi.fn(),
+            getConsumableDateTime: () => ({ startTime: 1, endTime: 2 }),
+          });
+          return {};
+        },
+        template: "<div />",
+      },
+    };
+    const count = (w: any) => w.find('[data-test="metrics-explorer-count"]');
+
+    afterEach(() => {
+      for (const [key, descriptor] of Object.entries(saved)) {
+        Object.defineProperty(grid, key, descriptor as PropertyDescriptor);
+        delete saved[key];
+      }
+      document.body
+        .querySelectorAll('[data-test^="region-announcer"]')
+        .forEach((node) => node.remove());
+    });
+
+    it("writes the count once per settled sweep: a skeleton, never 0, then the final number", async () => {
+      const holding = ref(true);
+      const paged = ref(CARDS);
+      swap("cards", { value: CARDS });
+      swap("pageSlice", ref(CARDS));
+      swap("pagedCards", paged);
+      swap("filteredCards", paged);
+      swap("holding", holding);
+      const wrapper = mountExplorer();
+      await flushPromises();
+
+      expect(count(wrapper).attributes("aria-busy")).toBe("true");
+      expect(count(wrapper).text()).not.toMatch(/\d/);
+
+      holding.value = false;
+      await flushPromises();
+      expect(count(wrapper).text()).toBe("3");
+
+      // The same slice re-sweeps and a card turns out empty: the count holds its settled value.
+      holding.value = true;
+      paged.value = CARDS.slice(0, 2);
+      await flushPromises();
+      expect(count(wrapper).text()).toBe("3");
+
+      holding.value = false;
+      await flushPromises();
+      expect(count(wrapper).text()).toBe("2 of 3");
+    });
+
+    it("draws the known cards first, then same-size placeholders, never the no-match state", async () => {
+      const displayed = ref<{ cards: any[]; placeholders: number; emptyHeld: Set<string> }>({
+        cards: [],
+        placeholders: 3,
+        emptyHeld: new Set(),
+      });
+      swap("cards", { value: CARDS });
+      swap("pageSlice", ref(CARDS));
+      swap("pagedCards", ref([]));
+      swap("holding", ref(true));
+      swap("displayed", displayed);
+      const wrapper = mountExplorer();
+      await flushPromises();
+
+      // The virtualizer is faked out, so the rows it would draw are read directly.
+      expect((wrapper.vm as any).rowsOfCards.flat()).toEqual([null, null, null]);
+      expect((wrapper.vm as any).gridVisible).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-no-match"]').exists()).toBe(false);
+
+      displayed.value = { cards: [CARDS[0]], placeholders: 2, emptyHeld: new Set() };
+      await flushPromises();
+      expect((wrapper.vm as any).rowsOfCards.flat()).toEqual([CARDS[0], null, null]);
+
+      // A drawn card whose new answer is empty keeps its slot as a placeholder, never an empty card (CS10).
+      displayed.value = {
+        cards: [CARDS[0], CARDS[1]],
+        placeholders: 1,
+        emptyHeld: new Set([CARDS[0].name]),
+      };
+      await flushPromises();
+      expect((wrapper.vm as any).rowsOfCards.flat()).toEqual([null, CARDS[1], null]);
+    });
+
+    it("draws no grid-wide line: every card keeps its own panel line, and a held slot draws one over its placeholder", async () => {
+      const previews = ref<Record<string, any>>({
+        a_total: { status: "done", results: [{}] },
+        b_total: { status: "loading", results: [] },
+      });
+      const displayed = ref<{ cards: any[]; placeholders: number; emptyHeld: Set<string> }>({
+        cards: [CARDS[0], CARDS[1]],
+        placeholders: 1,
+        emptyHeld: new Set(),
+      });
+      swap("cards", { value: CARDS });
+      swap("pageSlice", ref(CARDS));
+      swap("pagedCards", ref(CARDS.slice(0, 2)));
+      swap("previews", previews);
+      swap("holding", ref(true));
+      swap("displayed", displayed);
+      virtualRows.items = [0, 1, 2].map((index) => ({
+        index,
+        key: index,
+        start: index * 200,
+        size: 200,
+      }));
+      onTestFinished(() => (virtualRows.items = []));
+      const wrapper = mountExplorer(picker);
+      await flushPromises();
+      expect((wrapper.vm as any).rowsOfCards.flat()).toEqual([CARDS[0], CARDS[1], null]);
+
+      expect(wrapper.find('[data-test="metrics-explorer-progress"]').exists()).toBe(false);
+      const stubs = wrapper.findAll("metric-card-stub");
+      expect(stubs.length).toBe(2);
+      for (const stub of stubs) expect(stub.attributes("quiet")).toBeUndefined();
+      const slots = wrapper.findAll('[data-test="metrics-explorer-card-placeholder"]');
+      expect(slots).toHaveLength(1);
+      const slotLine = slots[0].findComponent({ name: "LoadingProgress" });
+      expect(slotLine.props()).toMatchObject({
+        loading: true,
+        loadingProgressPercentage: 0,
+        indeterminate: false,
+      });
+      expect(wrapper.findAllComponents({ name: "LoadingProgress" })).toHaveLength(1);
+    });
+
+    it("a time change keeps the drawn charts: the grid is told the window changed, not wiped", async () => {
+      const wrapper = mountExplorer(picker);
+      await flushPromises();
+      grid.setTimeRange.mockClear();
+
+      await (wrapper.vm as any).onDateChange();
+
+      expect(grid.setTimeRange).toHaveBeenCalledWith(
+        { start_time: 1, end_time: 2 },
+        { keepPreviews: true, windowChanged: true },
+      );
+      expect(grid.sweepSlice).toHaveBeenCalledWith({ skipCache: true });
+    });
+
+    it("names both windows once in the toolbar after 150 ms, and announces the settle", async () => {
+      vi.useFakeTimers();
+      onTestFinished(() => vi.useRealTimers());
+      const holding = ref(false);
+      const rangeSeconds = ref(3600);
+      swap("cards", { value: CARDS });
+      swap("pageSlice", ref(CARDS));
+      swap("pagedCards", ref(CARDS));
+      swap("holding", holding);
+      swap("rangeSeconds", rangeSeconds);
+      swap("previews", { value: { a_total: { status: "done", results: [{}] } } });
+      const wrapper = mountExplorer(picker);
+      await flushPromises();
+      // After mount: the mount itself syncs the window once.
+      grid.setTimeRange.mockImplementationOnce(() => {
+        rangeSeconds.value = 6 * 3600;
+        holding.value = true;
+      });
+
+      void (wrapper.vm as any).onDateChange();
+      await wrapper.vm.$nextTick();
+      const status = () => wrapper.find('[data-test="metrics-explorer-range-status"]');
+      expect(status().exists()).toBe(false);
+
+      vi.advanceTimersByTime(150);
+      await wrapper.vm.$nextTick();
+      expect(status().text()).toBe("regionStatus.rangeChange");
+
+      vi.advanceTimersByTime(400);
+      await wrapper.vm.$nextTick();
+      vi.advanceTimersByTime(100);
+      const polite = () =>
+        document.body.querySelector('[data-test="region-announcer"]')?.textContent ?? "";
+      expect(polite()).toBe("regionStatus.rangeChangeSpoken");
+
+      holding.value = false;
+      await wrapper.vm.$nextTick();
+      vi.advanceTimersByTime(100);
+      await wrapper.vm.$nextTick();
+      vi.advanceTimersByTime(100);
+      expect(status().exists()).toBe(false);
+      expect(polite()).toBe("regionStatus.rangeSettled");
+    });
+
+    it("ends the range status once no request runs, though kept charts off screen are still stale", async () => {
+      vi.useFakeTimers();
+      onTestFinished(() => vi.useRealTimers());
+      const rangeSeconds = ref(3600);
+      const previews = ref<Record<string, any>>({
+        a_total: { status: "done", results: [{}] },
+        b_total: { status: "done", results: [{}] },
+      });
+      swap("cards", { value: CARDS });
+      swap("pageSlice", ref(CARDS));
+      swap("pagedCards", ref(CARDS));
+      swap("hideEmptyPanels", { value: false });
+      swap("rangeSeconds", rangeSeconds);
+      swap("previews", previews);
+      const wrapper = mountExplorer(picker);
+      await flushPromises();
+      grid.setTimeRange.mockImplementationOnce(() => {
+        rangeSeconds.value = 6 * 3600;
+        // a_total is on screen and re-queries; b_total scrolled away, so it waits for its next visit.
+        previews.value = {
+          a_total: { status: "loading", results: [{}], windowStale: true },
+          b_total: { status: "done", results: [{}], windowStale: true },
+        };
+      });
+
+      void (wrapper.vm as any).onDateChange();
+      await wrapper.vm.$nextTick();
+      vi.advanceTimersByTime(150);
+      await wrapper.vm.$nextTick();
+      const status = () => wrapper.find('[data-test="metrics-explorer-range-status"]');
+      expect(status().exists()).toBe(true);
+
+      previews.value = { ...previews.value, a_total: { status: "done", results: [{}] } };
+      await wrapper.vm.$nextTick();
+      vi.advanceTimersByTime(100);
+      await wrapper.vm.$nextTick();
+      vi.advanceTimersByTime(100);
+      const polite = () =>
+        document.body.querySelector('[data-test="region-announcer"]')?.textContent ?? "";
+      expect(status().exists()).toBe(false);
+      expect(polite()).toBe("regionStatus.rangeSettled");
+    });
+
+    describe("on the detail page the range status follows the detail's chart (CS2)", () => {
+      const status = (wrapper: any) => wrapper.find('[data-test="metrics-explorer-range-status"]');
+      const polite = () =>
+        document.body.querySelector('[data-test="region-announcer"]')?.textContent ?? "";
+      const mountOnDetail = async () => {
+        vi.useFakeTimers();
+        onTestFinished(() => vi.useRealTimers());
+        const holding = ref(false);
+        const rangeSeconds = ref(3600);
+        swap("cards", { value: CARDS });
+        swap("pageSlice", ref(CARDS));
+        swap("pagedCards", ref(CARDS));
+        swap("holding", holding);
+        swap("rangeSeconds", rangeSeconds);
+        swap("previews", ref({ a_total: { status: "done", results: [{}] } }));
+        const wrapper = mountExplorer(picker);
+        await flushPromises();
+        return { wrapper, holding, rangeSeconds };
+      };
+
+      it("names both windows while the detail chart loads, then clears and announces once, though the paused grid still holds", async () => {
+        const { wrapper, holding, rangeSeconds } = await mountOnDetail();
+        (wrapper.vm as any).openDetail(CARDS[0]);
+        await wrapper.vm.$nextTick();
+        (wrapper.vm as any).onDetailOverviewStatus({ loading: false, drawn: true });
+        grid.setTimeRange.mockImplementationOnce(() => {
+          rangeSeconds.value = 6 * 3600;
+          // The grid is paused under the detail, so its slice never settles here.
+          holding.value = true;
+        });
+
+        void (wrapper.vm as any).onDateChange();
+        (wrapper.vm as any).onDetailOverviewStatus({ loading: true, drawn: true });
+        await wrapper.vm.$nextTick();
+        vi.advanceTimersByTime(150);
+        await wrapper.vm.$nextTick();
+        expect(status(wrapper).exists()).toBe(true);
+
+        (wrapper.vm as any).onDetailOverviewStatus({ loading: false, drawn: true });
+        await wrapper.vm.$nextTick();
+        vi.advanceTimersByTime(200);
+        await wrapper.vm.$nextTick();
+        expect(holding.value).toBe(true);
+        expect(status(wrapper).exists()).toBe(false);
+        expect(polite()).toBe("regionStatus.rangeSettled");
+      });
+
+      const changeRangeOnDetail = async () => {
+        const mounted = await mountOnDetail();
+        const { wrapper, rangeSeconds } = mounted;
+        (wrapper.vm as any).openDetail(CARDS[0]);
+        await wrapper.vm.$nextTick();
+        const settled = { loading: false, drawn: true, failed: false, failure: null };
+        (wrapper.vm as any).onDetailOverviewStatus(settled);
+        grid.setTimeRange.mockImplementationOnce(() => {
+          rangeSeconds.value = 6 * 3600;
+        });
+        void (wrapper.vm as any).onDateChange();
+        (wrapper.vm as any).onDetailOverviewStatus({ ...settled, loading: true });
+        await wrapper.vm.$nextTick();
+        vi.advanceTimersByTime(400);
+        await wrapper.vm.$nextTick();
+        return mounted;
+      };
+      const alertText = () =>
+        document.body.querySelector('[data-test="region-announcer-alert"]')?.textContent ?? "";
+
+      it("says a failed detail range change failed, never that its charts updated, though the paused grid is healthy (F14)", async () => {
+        const { wrapper } = await changeRangeOnDetail();
+        const sentence = "Refresh failed at 10:47 · showing data from 10:42";
+        (wrapper.vm as any).onDetailOverviewStatus({
+          loading: false,
+          drawn: true,
+          failed: true,
+          failure: sentence,
+        });
+        await wrapper.vm.$nextTick();
+        vi.advanceTimersByTime(200);
+        await wrapper.vm.$nextTick();
+        expect(alertText()).toBe(sentence);
+        expect(polite()).not.toBe("regionStatus.rangeSettled");
+      });
+
+      it("says nothing of its own when the detail failed with nothing kept, which its breakdown alerts (F14)", async () => {
+        const { wrapper } = await changeRangeOnDetail();
+        (wrapper.vm as any).onDetailOverviewStatus({
+          loading: false,
+          drawn: true,
+          failed: true,
+          failure: null,
+        });
+        await wrapper.vm.$nextTick();
+        vi.advanceTimersByTime(200);
+        await wrapper.vm.$nextTick();
+        expect(alertText()).toBe("");
+        expect(polite()).not.toBe("regionStatus.rangeSettled");
+      });
+
+      it("does not carry a grid range change still landing onto the detail page", async () => {
+        const { wrapper, holding, rangeSeconds } = await mountOnDetail();
+        grid.setTimeRange.mockImplementationOnce(() => {
+          rangeSeconds.value = 6 * 3600;
+          holding.value = true;
+        });
+        void (wrapper.vm as any).onDateChange();
+        await wrapper.vm.$nextTick();
+        vi.advanceTimersByTime(150);
+        await wrapper.vm.$nextTick();
+        expect(status(wrapper).exists()).toBe(true);
+
+        (wrapper.vm as any).openDetail(CARDS[0]);
+        (wrapper.vm as any).onDetailOverviewStatus({ loading: true, drawn: true });
+        await wrapper.vm.$nextTick();
+        vi.advanceTimersByTime(200);
+        await wrapper.vm.$nextTick();
+        expect(status(wrapper).exists()).toBe(false);
+      });
+    });
+
+    it("a date change with no chart drawn yet names no windows and announces nothing", async () => {
+      vi.useFakeTimers();
+      onTestFinished(() => vi.useRealTimers());
+      const holding = ref(false);
+      const rangeSeconds = ref(3600);
+      swap("cards", { value: CARDS });
+      swap("pageSlice", ref(CARDS));
+      swap("pagedCards", ref(CARDS));
+      swap("holding", holding);
+      swap("rangeSeconds", rangeSeconds);
+      const wrapper = mountExplorer(picker);
+      await flushPromises();
+      // After mount: the mount itself syncs the window once.
+      grid.setTimeRange.mockImplementationOnce(() => {
+        rangeSeconds.value = 6 * 3600;
+        holding.value = true;
+      });
+
+      void (wrapper.vm as any).onDateChange();
+      await wrapper.vm.$nextTick();
+      vi.advanceTimersByTime(700);
+      await wrapper.vm.$nextTick();
+      const status = () => wrapper.find('[data-test="metrics-explorer-range-status"]');
+      const polite = () =>
+        document.body.querySelector('[data-test="region-announcer"]')?.textContent ?? "";
+      expect(status().exists()).toBe(false);
+      expect(polite()).toBe("");
+
+      holding.value = false;
+      await wrapper.vm.$nextTick();
+      vi.advanceTimersByTime(300);
+      await wrapper.vm.$nextTick();
+      expect(status().exists()).toBe(false);
+      expect(polite()).toBe("");
+    });
+
+    it("shows a skeleton, not 0, for the count until the first metric list settles", async () => {
+      const loading = ref(true);
+      const cards = ref<any[]>([]);
+      const slice = ref<any[]>([]);
+      swap("loading", loading);
+      swap("cards", cards);
+      swap("pageSlice", slice);
+      swap("pagedCards", slice);
+      swap("filteredCards", slice);
+      const wrapper = mountExplorer();
+      await flushPromises();
+
+      expect(count(wrapper).attributes("aria-busy")).toBe("true");
+      expect(count(wrapper).text()).not.toMatch(/\d/);
+
+      cards.value = CARDS;
+      slice.value = CARDS;
+      loading.value = false;
+      await flushPromises();
+      expect(count(wrapper).attributes("aria-busy")).toBeUndefined();
+      expect(count(wrapper).text()).toBe("3");
+      // Its width is reserved and end-aligned, so the skeleton → "8 of 3,612" swap moves nothing in the row (CS3).
+      expect(count(wrapper).classes()).toEqual(
+        expect.arrayContaining(["min-w-[12ch]", "text-end", "tabular-nums"]),
+      );
+    });
+
+    it("says a failed refresh once for the page with a Retry, and alerts once when the run ends", async () => {
+      const refreshing = Date.now();
+      swap("cards", { value: CARDS });
+      swap("pageSlice", ref(CARDS));
+      swap("pagedCards", ref(CARDS));
+      swap("previews", {
+        value: {
+          a_total: {
+            status: "done",
+            results: [{}],
+            stale: true,
+            failedAt: refreshing,
+            lastTriggeredAt: refreshing - 60_000,
+          },
+          b_total: { status: "done", results: [{}], stale: false, lastTriggeredAt: refreshing },
+          c_total: {
+            status: "done",
+            results: [{}],
+            stale: true,
+            failedAt: refreshing,
+            lastTriggeredAt: refreshing - 60_000,
+          },
+        },
+      });
+      const wrapper = mountExplorer(picker);
+      await flushPromises();
+
+      const notice = wrapper.find('[data-test="metrics-explorer-refresh-failed"]');
+      expect(notice.attributes("data-state")).toBe("failed");
+      // vue-i18n is faked to echo keys here; the sentence itself is pinned in formatters.dataAge.spec.
+      expect(notice.text()).toContain("dataAge.refreshFailedCharts");
+      expect(wrapper.find('[data-test="metrics-explorer-refresh-failed-retry"]').exists()).toBe(
+        true,
+      );
+
+      await (wrapper.vm as any).onRefresh();
+      await flushPromises();
+      const alerts = document.body.querySelectorAll(
+        '[data-test="region-announcer-alert"] [role="alert"]',
+      );
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0].textContent).toBe("dataAge.refreshFailedCharts");
+    });
+
+    it("swaps the page sentence for the short marker when the toolbar slot is too narrow for it", async () => {
+      const now = Date.now();
+      swap("cards", { value: CARDS });
+      swap("pageSlice", ref(CARDS));
+      swap("pagedCards", ref(CARDS));
+      swap("previews", {
+        value: {
+          a_total: {
+            status: "done",
+            results: [{}],
+            stale: true,
+            failedAt: now,
+            lastTriggeredAt: now - 60_000,
+          },
+        },
+      });
+      const wrapper = mountExplorer(picker);
+      await flushPromises();
+
+      const full = wrapper.find('[data-test="metrics-explorer-refresh-failed"]');
+      const short = wrapper.find('[data-test="metrics-explorer-refresh-failed-short"]');
+      // A container query picks one: below the width the sentence needs, the short words keep its times in a tooltip (N1).
+      expect(full.classes()).toContain("@max-2xl:hidden");
+      expect(short.classes()).toContain("@2xl:hidden");
+      expect(short.attributes("data-state")).toBe("failed");
+      expect(short.find('[tabindex="0"]').exists()).toBe(true);
+      expect(short.text()).toContain("dataAge.refreshFailedShort");
+      expect(short.find('[data-test="metrics-explorer-refresh-failed-short-retry"]').exists()).toBe(
+        true,
+      );
     });
   });
 });
