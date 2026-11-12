@@ -95,10 +95,11 @@ export const limitText = (op: string | undefined, value: unknown): string =>
 
 const num = (value: unknown): number => Number(value ?? 0) || 0;
 
+// The plural choice must be the count itself: vue-i18n puts the choice in {n} when n is 0.
 const durationText = (minutes: number, t: TranslateFn): I18nText =>
   minutes >= 60 && minutes % 60 === 0
-    ? t("alerts.summary.hourCount", { n: minutes / 60 }, minutes === 60 ? 1 : 2)
-    : t("alerts.summary.minuteCount", { n: minutes }, minutes === 1 ? 1 : 2);
+    ? t("alerts.summary.hourCount", { n: minutes / 60 }, minutes / 60)
+    : t("alerts.summary.minuteCount", { n: minutes }, minutes);
 
 function whoText(alert: ReadBackAlert | ReadBackCompositeAlert, t: TranslateFn): I18nText {
   if (!hasDeliveryTarget(alert)) return t("alerts.readBack.nobody");
