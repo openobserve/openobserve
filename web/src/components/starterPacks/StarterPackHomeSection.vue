@@ -207,7 +207,7 @@ const compact = computed(() =>
       />
     </section>
 
-    <div v-if="!home.setUp.value.length" class="flex justify-end">
+    <div v-if="!home.setUp.value.length && !home.loading.value" class="flex justify-end">
       <StarterPackFindMore :org="org" variant="link" />
     </div>
 

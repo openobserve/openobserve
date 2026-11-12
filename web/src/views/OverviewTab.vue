@@ -220,11 +220,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('overview.activeIncidents')"
     />
 
-    <section v-else-if="homePacks?.silent.value.length" data-test="overview-pack-silent-alerts">
-      <div v-if="isIncidentsEnabled" class="mb-2 flex min-h-8 items-center gap-2 ps-1">
+    <section v-else-if="silentReplacesEmpty" data-test="overview-pack-silent-alerts">
+      <div class="mb-2 flex min-h-8 items-center gap-2 ps-1">
         <OText variant="card-title">{{ t("overview.activeIncidents") }}</OText>
       </div>
-      <StarterPackSilentAlerts :items="homePacks.silent.value" :incidents="isIncidentsEnabled" />
+      <StarterPackSilentAlerts :items="silentPacks" incidents />
     </section>
     <OverviewSectionEmpty
       v-else-if="showSectionEmpty('incidents')"
@@ -232,6 +232,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       kind="empty"
       :title="t('overview.activeIncidents')"
     />
+    <section v-if="showSilentPacks && !silentReplacesEmpty" data-test="overview-pack-silent-alerts">
+      <StarterPackSilentAlerts :items="silentPacks" :incidents="false" />
+    </section>
 
     <!-- the upsell sits below the alerts grid so it never outranks live alert state -->
     <section
@@ -1179,6 +1182,19 @@ const showSectionEmpty = (key: SectionKey) =>
   sectionState[key].loaded &&
   !isFailed(key) &&
   sectionApplies(key);
+
+const silentPacks = computed(() => homePacks.value?.silent.value ?? []);
+// Held back while incidents load, so the row does not move once they settle.
+const showSilentPacks = computed(
+  () =>
+    silentPacks.value.length > 0 &&
+    showOverviewCards.value &&
+    pageShowsSections.value &&
+    !isSectionPending("incidents"),
+);
+const silentReplacesEmpty = computed(
+  () => showSilentPacks.value && incidents.value.length === 0 && showSectionEmpty("incidents"),
+);
 
 // two one-line messages share a row instead of stacking as two full-width boxes
 const rendersSlim = (key: "anomalies" | "recentEvents") => {

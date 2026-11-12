@@ -3000,10 +3000,53 @@ describe("OverviewTab", () => {
       expect(wrapper.findComponent({ name: "StarterPackHomeMenu" }).exists()).toBe(false);
     });
 
-    it("shows the silent pack alerts where incidents would be", async () => {
-      wrapper = mountWithPacks({ showMenu: true, silent: [{ pack: { id: "kubernetes" } }] });
+    const SILENT = '[data-test="overview-pack-silent-alerts"]';
+    const silentPack = [{ pack: { id: "kubernetes" } }];
+    const silentRow = () => wrapper.findComponent({ name: "StarterPackSilentAlerts" });
+    const givenIncidentsOn = () => {
+      config.isEnterprise = "true";
+      store.commit("setConfig", { ...store.state.zoConfig, incidents_enabled: true });
+    };
+
+    it("shows the silent pack alerts without an incidents title where incidents are off", async () => {
+      wrapper = mountWithPacks({ showMenu: true, silent: silentPack });
       await flushPromises();
-      expect(wrapper.find('[data-test="overview-pack-silent-alerts"]').exists()).toBe(true);
+      expect(wrapper.find(SILENT).exists()).toBe(true);
+      expect(wrapper.find(SILENT).text()).not.toContain("Active incidents");
+      expect(silentRow().props("incidents")).toBe(false);
+    });
+
+    it("keeps the silent pack alerts under an active incident, without the no-incidents prefix", async () => {
+      givenIncidentsOn();
+      vi.mocked(incidentsService.list).mockResolvedValue({
+        data: mockOverview.buildIncidentList(),
+      } as never);
+      wrapper = mountWithPacks({ showMenu: true, silent: silentPack });
+      await flushPromises();
+      expect(wrapper.find(INCIDENTS).exists()).toBe(true);
+      expect(wrapper.findAll(SILENT)).toHaveLength(1);
+      expect(wrapper.find(SILENT).text()).not.toContain("Active incidents");
+      expect(silentRow().props("incidents")).toBe(false);
+    });
+
+    it("puts the silent pack alerts under Active incidents in place of the empty state", async () => {
+      givenIncidentsOn();
+      wrapper = mountWithPacks({ showMenu: true, silent: silentPack });
+      await flushPromises();
+      expect(wrapper.findAll(SILENT)).toHaveLength(1);
+      expect(wrapper.find(SILENT).text()).toContain("Active incidents");
+      expect(silentRow().props("incidents")).toBe(true);
+      expect(wrapper.find('[data-test="overview-incidents-empty"]').exists()).toBe(false);
+    });
+
+    it("shows no silent pack alerts when the whole page failed to load", async () => {
+      const boom = () => Object.assign(new Error("boom"), { response: { status: 500 } });
+      vi.mocked(alertsService.getHistory).mockRejectedValue(boom());
+      vi.mocked(overviewService.getOrgOverview).mockRejectedValue(boom());
+      wrapper = mountWithPacks({ showMenu: true, silent: silentPack });
+      await flushPromises();
+      expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(true);
+      expect(wrapper.find(SILENT).exists()).toBe(false);
     });
 
     it("renders no pack UI when Home did not provide any", async () => {

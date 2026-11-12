@@ -26,7 +26,7 @@ import type { StarterPack } from "./types";
 import { useStarterPackFlow } from "./useStarterPackFlow";
 import { useStarterPackMatcher } from "./useStarterPackMatcher";
 
-export type HomePackView =
+type HomePackView =
   | "hidden"
   | "hiddenAdmin"
   | "loading"
@@ -90,7 +90,7 @@ function useHomePack(org: string, pack: StarterPack) {
   const view = computed<HomePackView>(() => {
     if (!flow.loaded.value || !orgHide.loaded.value) return "loading";
     if (flow.interrupted.value) return "interrupted";
-    if (flow.record.value) return "installed";
+    if (flow.record.value && !flow.running.value) return "installed";
     if (dismissal.dismissed.value) return "dismissed";
     if (orgHide.hidden.value) return flow.isAdmin.value ? "hiddenAdmin" : "hidden";
     if (flow.loadFailed.value || matcher.state.value === "error") return "error";
@@ -164,14 +164,13 @@ export function useHomePacks(org: string, packs: StarterPack[] = STARTER_PACKS) 
     items.filter((item) => item.view.value === "offer" || item.view.value === "forbidden"),
   );
   const setUp = computed(() => items.filter((item) => item.view.value === "installed"));
-  const showSection = computed(() => !anySetUp.value && offered.value.length > 0);
-  const showMenu = computed(() => anySetUp.value && !menu.dismissed.value);
-  const loading = computed(
-    () =>
-      !anySetUp.value &&
-      !offered.value.length &&
-      items.some((item) => item.view.value === "loading"),
+  const anyLoading = computed(() => items.some((item) => item.view.value === "loading"));
+  // Waits for every pack, so the badge never moves rows and the section never flashes before the menu.
+  const showSection = computed(
+    () => !anySetUp.value && !anyLoading.value && offered.value.length > 0,
   );
+  const showMenu = computed(() => anySetUp.value && !menu.dismissed.value);
+  const loading = computed(() => !anySetUp.value && anyLoading.value);
   // Said once for all packs, and only when none has anything else to show.
   const empty = computed(
     () =>
@@ -183,7 +182,6 @@ export function useHomePacks(org: string, packs: StarterPack[] = STARTER_PACKS) 
     router.push({ name: "alertLibrary", query: { org_identifier: org } }).catch(() => {});
 
   return {
-    org,
     items,
     menu,
     offered,

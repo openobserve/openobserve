@@ -15171,8 +15171,6 @@
       "showAgain": "Show again",
       "empty": "No starter pack matches your data yet",
       "error": "Couldn't check your data for packs",
-      "alertsOnLabel": "Alerts on",
-      "alertsOnValue": "{on} of {total}",
       "reminder": "{count} {title} alert is off | {count} {title} alerts are off",
       "turnOn": "Turn on alerts",
       "viewPack": "View pack",
@@ -15194,6 +15192,8 @@
       "menuIdle": "Starter packs",
       "menuHeader": "Packs that fit data you already send · undo any setup for 24 h",
       "menuOfferLine": "{count} dashboard · fits {streams} | {count} dashboards · fits {streams}",
+      "menuOfferFits": "Fits {streams}",
+      "menuStreamsMore": "{streams} +{count} more",
       "setUpDone": "Set up",
       "setUpToday": "Set up today {time}",
       "setUpOn": "Set up {date}",
@@ -15488,10 +15488,7 @@
       "error": "Couldn't check your data",
       "daily": "Check for new matches every day",
       "dailyHint": "Suggests matches once a day for everyone in this organization. Nothing is added until someone adds it.",
-      "dailyFailed": "Couldn't change that setting. Try again.",
-      "homeRow": "{count} source has new matches for your data | {count} sources have new matches for your data",
-      "homeRowIdle": "Data you started sending may fit more dashboards and alerts.",
-      "review": "Review"
+      "dailyFailed": "Couldn't change that setting. Try again."
     },
     "update": {
       "available": "An update to this pack is available",

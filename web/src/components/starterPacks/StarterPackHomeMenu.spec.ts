@@ -1,6 +1,22 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import { mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { computed, ref, shallowRef } from "vue";
+import { createStore } from "vuex";
 
 import i18n from "@/locales";
 
@@ -12,14 +28,19 @@ import StarterPackHomeMenu from "./StarterPackHomeMenu.vue";
 import StarterPackSilentAlerts from "./StarterPackSilentAlerts.vue";
 import { fakeFlow } from "./starterPackTestFlow";
 
-const itemDouble = (pack: typeof KUBERNETES_PACK, view: string, flow = fakeFlow()) =>
+const itemDouble = (
+  pack: typeof KUBERNETES_PACK,
+  view: string,
+  flow = fakeFlow(),
+  streams = ["syslog", "node_metrics"],
+) =>
   ({
     pack,
     title: pack.id === "hosts" ? "Hosts" : "Kubernetes",
     testId: (id: string) =>
       pack.id === "kubernetes" ? id : id.replace("home-pack", `home-pack-${pack.id}`),
     flow,
-    matcher: { streams: ref(["syslog", "node_metrics"]), clusters: ref([]) },
+    matcher: { streams: ref(streams), clusters: ref([]) },
     view: ref(view),
     startSetup: vi.fn(),
     openUndo: vi.fn(),
@@ -36,11 +57,11 @@ const homeDouble = (offered: HomePack[], setUp: HomePack[]) =>
     library: vi.fn(),
   }) as unknown as HomePacks;
 
-const render = (home: HomePacks) =>
+const render = (home: HomePacks, timezone = "UTC") =>
   mount(StarterPackHomeMenu, {
     props: { home },
     global: {
-      plugins: [i18n],
+      plugins: [i18n, createStore({ state: { timezone } })],
       stubs: {
         OIcon: true,
         OPopover: { template: '<div><slot name="trigger" /><slot /></div>' },
@@ -50,7 +71,13 @@ const render = (home: HomePacks) =>
 
 const NOW_US = Date.now() * 1000;
 
+const usOf = (iso: string) => new Date(iso).getTime() * 1000;
+
 describe("StarterPackHomeMenu", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("counts the packs that fit, in the singular and plural", () => {
     const k8s = itemDouble(KUBERNETES_PACK, "installed");
     const hosts = itemDouble(HOSTS_PACK, "offer");
@@ -92,6 +119,41 @@ describe("StarterPackHomeMenu", () => {
     expect(home.library).toHaveBeenCalled();
     await wrapper.get('[data-test="home-pack-menu-hide-btn"]').trigger("click");
     expect(home.menu.dismiss).toHaveBeenCalled();
+  });
+
+  it("names two matched streams and counts the rest", () => {
+    const streams = ["syslog", "node_metrics", "auth", "kernel"];
+    const hosts = itemDouble(HOSTS_PACK, "offer", fakeFlow(), streams);
+    const row = render(homeDouble([hosts], []))
+      .get('[data-test="home-pack-menu-row-hosts"]')
+      .text();
+    expect(row).toContain("1 dashboard · fits syslog, node_metrics +2 more");
+    expect(row).not.toContain("auth");
+  });
+
+  it("leaves the dashboards out of the line for a pack that has none", () => {
+    const flow = fakeFlow({ dashboardCount: ref(0) });
+    const row = render(homeDouble([itemDouble(HOSTS_PACK, "offer", flow)], []))
+      .get('[data-test="home-pack-menu-row-hosts"]')
+      .text();
+    expect(row).toContain("Fits syslog, node_metrics");
+    expect(row).not.toContain("0 dashboard");
+  });
+
+  it("tells the set-up time and day in the app timezone", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-03-10T23:30:00Z"));
+    const rowIn = (timezone: string, installedAt: number) => {
+      const flow = fakeFlow({ record: shallowRef({ status: "complete", installedAt }) });
+      const home = homeDouble([], [itemDouble(KUBERNETES_PACK, "installed", flow)]);
+      return render(home, timezone).get('[data-test="home-pack-menu-row-kubernetes"]').text();
+    };
+    const lateEvening = usOf("2026-03-10T23:10:00Z");
+    expect(rowIn("UTC", lateEvening)).toContain("Set up today 23:10");
+    expect(rowIn("Asia/Kolkata", lateEvening)).toContain("Set up today 04:40");
+    const afternoon = usOf("2026-03-10T17:00:00Z");
+    expect(rowIn("UTC", afternoon)).toContain("Set up today 17:00");
+    expect(rowIn("Asia/Kolkata", afternoon)).toContain("Set up 2026-03-10");
   });
 
   it("hides Undo setup once the undo window has passed", () => {

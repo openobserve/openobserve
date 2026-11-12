@@ -752,7 +752,6 @@ export const iconRegistry = {
   "notifications-paused": NotificationsPaused,
   repeat: RepeatIcon,
 
-  // Batch 6: Starter packs on Home (2026-11-12)
   sensors: Sensors,
   "notifications-off": NotificationsOff,
 } as const satisfies Record<string, Component>;

@@ -36,12 +36,11 @@ const props = withDefaults(
     testId: string;
     primaryLabel?: I18nText;
     primaryTestId?: string;
-    dismissible?: boolean;
     status?: StarterPackCardStatus;
   }>(),
   { status: "ready" },
 );
-const emit = defineEmits<{ install: []; details: []; dismiss: [] }>();
+const emit = defineEmits<{ install: []; details: [] }>();
 
 const { t } = useI18nTyped();
 
@@ -174,16 +173,6 @@ const rows = computed(() => [
           t("starterPacks.offline")
         }}</OText>
       </div>
-      <OButton
-        v-if="dismissible"
-        variant="ghost"
-        size="icon-sm"
-        :aria-label="t('starterPacks.card.close')"
-        :data-test="`${testId}-dismiss-btn`"
-        @click="emit('dismiss')"
-      >
-        <OIcon name="close" size="sm" />
-      </OButton>
     </div>
 
     <ul
