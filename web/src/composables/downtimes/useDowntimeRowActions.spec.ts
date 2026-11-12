@@ -126,7 +126,7 @@ describe("useDowntimeRowActions", () => {
 
   it("extends until a time at the row's version, with the row messages on a refusal", async () => {
     vi.mocked(downtimes.get).mockResolvedValue({
-      data: { id: "d1", folder_id: "ops", version: 5, current_window: { start: 1, end: 2 } },
+      data: { id: "d1", folder_id: "ops", version: 3, current_window: { start: 1, end: 2 } },
     } as any);
     const api = mountActions();
     expect(await api.extendUntil(9)).toBe("failed");
@@ -152,15 +152,66 @@ describe("useDowntimeRowActions", () => {
     refetch.mockRestore();
   });
 
-  it("opens Extend until on the stored row, kept at the version the row showed", async () => {
+  it("opens Extend until on the stored row the row's version names", async () => {
+    vi.mocked(downtimes.get).mockResolvedValue({
+      data: { id: "d1", folder_id: "ops", version: 3, current_window: { start: 1, end: 2 } },
+    } as any);
+    const api = mountActions();
+    expect(await api.openExtendUntil(mute)).toBe("ok");
+    expect(downtimes.get).toHaveBeenCalledWith("acme", "d1", "ops");
+    expect(api.extendUntilOpen.value).toBe(true);
+    expect(api.extendUntilRow.value).toMatchObject({ id: "d1", version: 3 });
+  });
+
+  it("refuses to open on a stored row newer than the row, and refreshes the list", async () => {
+    const refetch = vi.spyOn(queryClient, "invalidateQueries");
     vi.mocked(downtimes.get).mockResolvedValue({
       data: { id: "d1", folder_id: "ops", version: 5, current_window: { start: 1, end: 2 } },
     } as any);
     const api = mountActions();
-    await api.openExtendUntil(mute);
-    expect(downtimes.get).toHaveBeenCalledWith("acme", "d1", "ops");
-    expect(api.extendUntilOpen.value).toBe(true);
-    expect(api.extendUntilRow.value).toMatchObject({ id: "d1", version: 3 });
+    expect(await api.openExtendUntil(mute)).toBe("conflict");
+    expect(api.extendUntilOpen.value).toBe(false);
+    expect(lastToast()?.message).toBe("This mute changed. Open the downtime.");
+    expect(refetch).toHaveBeenCalled();
+    refetch.mockRestore();
+  });
+
+  it("keeps the last Extend until opened when an earlier read answers later", async () => {
+    const answers: Record<string, (v: unknown) => void> = {};
+    vi.mocked(downtimes.get).mockImplementation(
+      (_org, id) => new Promise((resolve) => (answers[id] = resolve)) as any,
+    );
+    const api = mountActions();
+    const first = api.openExtendUntil(mute);
+    const second = api.openExtendUntil({ ...mute, id: "d2" });
+    answers.d2({
+      data: { id: "d2", folder_id: "ops", version: 3, current_window: { start: 1, end: 9 } },
+    });
+    expect(await second).toBe("ok");
+    answers.d1({
+      data: { id: "d1", folder_id: "ops", version: 3, current_window: { start: 1, end: 2 } },
+    });
+    expect(await first).toBe("failed");
+    expect(api.extendUntilRow.value).toMatchObject({ id: "d2", current_window: { end: 9 } });
+  });
+
+  it("reads again when it joined a read that started before the row moved on", async () => {
+    let answerOld: (v: unknown) => void = () => {};
+    vi.mocked(downtimes.get)
+      .mockImplementationOnce(() => new Promise((resolve) => (answerOld = resolve)) as any)
+      .mockResolvedValueOnce({
+        data: { id: "d1", folder_id: "ops", version: 4, current_window: { start: 1, end: 5 } },
+      } as any);
+    const api = mountActions();
+    const stale = api.openExtendUntil(mute);
+    const fresh = api.openExtendUntil({ ...mute, version: 4 });
+    answerOld({
+      data: { id: "d1", folder_id: "ops", version: 3, current_window: { start: 1, end: 2 } },
+    });
+    expect(await stale).toBe("failed");
+    expect(await fresh).toBe("ok");
+    expect(downtimes.get).toHaveBeenCalledTimes(2);
+    expect(api.extendUntilRow.value).toMatchObject({ version: 4, current_window: { end: 5 } });
   });
   it("reads the stored window fresh each time Extend until opens", async () => {
     vi.mocked(downtimes.get).mockResolvedValue({
@@ -183,6 +234,29 @@ describe("useDowntimeRowActions", () => {
     vi.mocked(downtimes.get).mockRejectedValueOnce(new Error("Network Error"));
     expect(await api.openExtendUntil(mute)).toBe("failed");
     expect(api.extendUntilOpen.value).toBe(false);
+  });
+
+  it("drops a refusal that answers after an org switch, and refreshes the old org's lists", async () => {
+    const refetch = vi.spyOn(queryClient, "invalidateQueries");
+    let refuse: (e: unknown) => void = () => {};
+    vi.mocked(downtimes.cancel).mockImplementation(
+      () => new Promise((_resolve, reject) => (refuse = reject)) as any,
+    );
+    const api = mountActions();
+    const ending = api.end(mute);
+    await Promise.resolve();
+    store.state.selectedOrganization = { identifier: "other" };
+    try {
+      refuse(httpError(409));
+      expect(await ending).toBe("conflict");
+      expect(toast).not.toHaveBeenCalled();
+      const orgs = refetch.mock.calls.map(([f]) => (f as { queryKey: unknown[] }).queryKey[1]);
+      expect(orgs.length).toBeGreaterThan(0);
+      expect(orgs.every((o) => o === "acme")).toBe(true);
+    } finally {
+      store.state.selectedOrganization = { identifier: "acme" };
+      refetch.mockRestore();
+    }
   });
 
   it("replaces the changed-mute toast, so View downtime opens the latest row", async () => {

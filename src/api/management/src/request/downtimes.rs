@@ -662,6 +662,94 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]
+    async fn the_cancel_route_answers_409_at_a_stale_version_and_200_at_a_current_or_absent_one() {
+        use config::meta::folder::{DEFAULT_FOLDER, Folder, FolderType};
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let now = config::utils::time::now_micros();
+        let org = format!("cancel_route_{now}");
+        let root = "root-cancel-route@example.com";
+        common::infra::config::ORG_USERS.insert(
+            format!("{}/{root}", config::DEFAULT_ORG),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: String::new(),
+                rum_token: None,
+                org_id: config::DEFAULT_ORG.to_string(),
+                email: root.to_string(),
+                created_at: 0,
+                allow_static_token: false,
+            },
+        );
+        let folder = Folder {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: DEFAULT_FOLDER.to_string(),
+            description: String::new(),
+            icon: None,
+        };
+        infra::table::folders::get_or_create(&org, folder, FolderType::Downtimes)
+            .await
+            .unwrap();
+        let hour = 3_600_000_000;
+        let conn = infra::db::get_orm_client_rw().await;
+        let mut versions = std::collections::HashMap::new();
+        for id in ["stale", "current", "absent"] {
+            let row: Downtime = serde_json::from_value(serde_json::json!({
+                "id": id, "org": org, "name": id,
+                "targets": [{ "module": "alerts", "folders": { "kind": "all" } }],
+                "schedule": { "repeat": "none", "starts_at": now - hour, "ends_at": now + hour,
+                              "timezone": "UTC", "duration_secs": 7200 },
+                "created_by": root, "created_at": now, "updated_by": root, "updated_at": now
+            }))
+            .unwrap();
+            infra::table::downtimes::put_with(conn, &row).await.unwrap();
+            let stored = infra::table::downtimes::get_rw(&org, id)
+                .await
+                .unwrap()
+                .unwrap();
+            versions.insert(id, stored.version);
+        }
+        let cancel = |id: &'static str, version: Option<i64>| {
+            cancel_downtime(
+                Path((org.clone(), id.to_string())),
+                Query(CancelDowntimeQuery { version }),
+                Headers(UserEmail {
+                    user_id: root.to_string(),
+                }),
+            )
+        };
+        let cancelled = |id: &'static str| {
+            let org = org.clone();
+            async move {
+                let stored = infra::table::downtimes::get_rw(&org, id)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                stored.cancelled_at.is_some()
+            }
+        };
+
+        let stale = cancel("stale", Some(versions["stale"] - 1)).await;
+        assert_eq!(stale.status(), StatusCode::CONFLICT);
+        assert!(
+            !cancelled("stale").await,
+            "a refused cancel leaves the window live"
+        );
+        let current = cancel("current", Some(versions["current"])).await;
+        assert_eq!(current.status(), StatusCode::OK);
+        assert!(cancelled("current").await);
+        let absent = cancel("absent", None).await;
+        assert_eq!(absent.status(), StatusCode::OK);
+        assert!(cancelled("absent").await);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
     async fn an_internal_error_answers_without_the_database_text() {
         let db_text = "error returned from database: relation \"downtimes\" does not exist";
         let response = error_response(openobserve_core::downtimes::DowntimeError::Internal(

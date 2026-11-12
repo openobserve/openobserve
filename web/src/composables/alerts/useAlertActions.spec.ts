@@ -467,6 +467,24 @@ describe("useAlertActions", () => {
     expect(await api.endMute(target, mute)).toBe("failed");
   });
 
+  it("drops a changed-mute refusal that answers after an org switch", async () => {
+    let refuse: (e: unknown) => void = () => {};
+    vi.mocked(alerts.cancelAlertMute).mockImplementation(
+      () => new Promise((_resolve, reject) => (refuse = reject)) as any,
+    );
+    const api = mountActions();
+    const ending = api.endMute(target, { id: "d1", ends_at: 1, version: 4 });
+    await Promise.resolve();
+    store.state.selectedOrganization = { identifier: "other" };
+    try {
+      refuse(httpError(409, { code: "version_changed", version: 5, ends_at: 9 }));
+      expect(await ending).toBe("conflict");
+      expect(toast).not.toHaveBeenCalled();
+    } finally {
+      store.state.selectedOrganization = { identifier: "acme" };
+    }
+  });
+
   it("replaces the changed-mute toast, so View downtime opens the latest mute", async () => {
     const dismiss = vi.fn();
     vi.mocked(toast).mockReturnValue(dismiss as any);

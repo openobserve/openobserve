@@ -27,6 +27,7 @@ import {
 } from "@/services/downtimes.queries";
 import type { ActiveDowntime, DowntimeListItem, ExtendDowntimeRequest } from "@/services/downtimes";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { showChangedMuteToast } from "@/utils/downtimes/changedMuteToast";
 import { endTimeText } from "@/utils/downtimes/quickMute";
 import { downtimeLink } from "@/utils/downtimes/link";
 import { failureResult, failureStatus, type MuteActionResult } from "@/utils/downtimes/muteResult";
@@ -48,28 +49,29 @@ export function useDowntimeRowActions() {
   const extendUntilRow = ref<DowntimeListItem | null>(null);
 
   // A refused write invalidates nothing on its own, yet the row it acted on is stale.
-  const refetchLists = () => {
-    for (const key of mutedListKeys(orgId.value)) {
+  const refetchLists = (org: string) => {
+    for (const key of mutedListKeys(org)) {
       void queryClient.invalidateQueries({ queryKey: key });
     }
   };
 
-  // Same-text toasts merge and keep the first action, so a new 409 replaces the last one.
-  let dismissChanged: (() => void) | undefined;
+  const changed = (downtime: MuteRow, org: string) =>
+    showChangedMuteToast({
+      variant: "error",
+      message: t("toastMessages.downtimes.muteChangedOpen"),
+      action: {
+        label: t("toastMessages.downtimes.viewDowntime"),
+        handler: () => void router?.push(downtimeLink(downtime, org)),
+      },
+    });
 
-  const failed = (err: unknown, downtime: MuteRow, fallback: "cancel" | "extend") => {
+  // The org the write went to; a refusal that answers after a switch says nothing on the new org.
+  const failed = (err: unknown, downtime: MuteRow, fallback: "cancel" | "extend", org: string) => {
     const status = failureStatus(err);
-    if (status !== undefined) refetchLists();
+    if (status !== undefined) refetchLists(org);
+    if (org !== orgId.value) return failureResult(err);
     if (status === 409) {
-      dismissChanged?.();
-      dismissChanged = toast({
-        variant: "error",
-        message: t("toastMessages.downtimes.muteChangedOpen"),
-        action: {
-          label: t("toastMessages.downtimes.viewDowntime"),
-          handler: () => void router?.push(downtimeLink(downtime, orgId.value)),
-        },
-      });
+      changed(downtime, org);
     } else if (status === 403 && fallback === "cancel") {
       toast({ variant: "error", message: t("toastMessages.downtimes.noPermissionToEnd") });
     } else {
@@ -83,6 +85,7 @@ export function useDowntimeRowActions() {
   };
 
   const end = async (downtime: ActiveDowntime): Promise<MuteActionResult> => {
+    const org = orgId.value;
     try {
       await cancelWrite.mutateAsync({
         id: downtime.id,
@@ -92,7 +95,7 @@ export function useDowntimeRowActions() {
       toast({ variant: "success", message: t("toastMessages.downtimes.muteEnded") });
       return "ok";
     } catch (err: unknown) {
-      return failed(err, downtime, "cancel");
+      return failed(err, downtime, "cancel", org);
     }
   };
 
@@ -100,6 +103,7 @@ export function useDowntimeRowActions() {
     downtime: MuteRow,
     body: ExtendDowntimeRequest,
   ): Promise<MuteActionResult> => {
+    const org = orgId.value;
     try {
       const result = await extendWrite.mutateAsync({
         id: downtime.id,
@@ -111,7 +115,7 @@ export function useDowntimeRowActions() {
       toast({ variant: "success", message: t("toastMessages.downtimes.extended", { time }) });
       return "ok";
     } catch (err: unknown) {
-      return failed(err, downtime, "extend");
+      return failed(err, downtime, "extend", org);
     }
   };
 
@@ -125,19 +129,40 @@ export function useDowntimeRowActions() {
     return extendWith(row, { until });
   };
 
-  /** Extend until… needs the stored window; the row's version still guards the write. */
+  // Only the latest open may fill the dialog; an earlier read can answer after it.
+  let latestOpen = 0;
+
+  const readStored = (downtime: ActiveDowntime, org: string) =>
+    queryClient.fetchQuery({
+      ...downtimeDetailQuery(org, downtime.id, downtime.folder_id || undefined),
+      staleTime: 0,
+    });
+
+  /** Extend until… needs the stored window at the version the row's write sends. */
   const openExtendUntil = async (downtime: ActiveDowntime): Promise<MuteActionResult> => {
+    const open = ++latestOpen;
+    const org = orgId.value;
+    const current = () => open === latestOpen && org === orgId.value;
     try {
-      // A fresh read, so the dialog's bounds match the window the version guards.
-      const row = await queryClient.fetchQuery({
-        ...downtimeDetailQuery(orgId.value, downtime.id, downtime.folder_id || undefined),
-        staleTime: 0,
-      });
-      extendUntilRow.value = { ...row, version: downtime.version ?? row.version };
+      let row = await readStored(downtime, org);
+      // fetchQuery joins a read already in flight, which can predate the row's version.
+      const off = () =>
+        downtime.version !== undefined &&
+        row.version !== undefined &&
+        row.version !== downtime.version;
+      if (current() && off()) row = await readStored(downtime, org);
+      if (!current()) return "failed";
+      if (off()) {
+        refetchLists(org);
+        changed(downtime, org);
+        return "conflict";
+      }
+      extendUntilRow.value = row;
       extendUntilOpen.value = true;
       return "ok";
     } catch (err: unknown) {
-      return failed(err, downtime, "extend");
+      if (open !== latestOpen) return "failed";
+      return failed(err, downtime, "extend", org);
     }
   };
 

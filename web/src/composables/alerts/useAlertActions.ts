@@ -40,6 +40,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { refusalToast, teamsOf, unchangedAckToast, type AckVerb } from "@/utils/alerts/ackState";
 import { buildAlertMuteRequest, endTimeText, type AlertMuteEnd } from "@/utils/downtimes/quickMute";
 import { downtimeLink } from "@/utils/downtimes/link";
+import { showChangedMuteToast } from "@/utils/downtimes/changedMuteToast";
 import { failureResult, failureStatus, type MuteActionResult } from "@/utils/downtimes/muteResult";
 
 /** The alert an action is for; `folderId` is the alert's own folder, which the route check reads. */
@@ -357,26 +358,22 @@ export function useAlertActions() {
     }
   };
 
-  const openDowntime = (downtime: AlertMuteRef) =>
+  const openDowntime = (downtime: AlertMuteRef, org: string) =>
     router
       ? {
           action: {
             label: t("toastMessages.downtimes.viewDowntime"),
-            handler: () => void router.push(downtimeLink(downtime, orgId.value)),
+            handler: () => void router.push(downtimeLink(downtime, org)),
           },
         }
       : {};
 
-  // Same-text toasts merge and keep the first action, so a new one replaces the last one.
-  let dismissChanged: (() => void) | undefined;
-
-  const endFailureToast = (err: unknown, downtime: AlertMuteRef) => {
+  const endFailureToast = (err: unknown, downtime: AlertMuteRef, org: string) => {
     if (alertActionErrorOf(err)?.code === "version_changed") {
-      dismissChanged?.();
-      dismissChanged = toast({
+      showChangedMuteToast({
         variant: "error",
         message: t("toastMessages.downtimes.muteChangedOpen"),
-        ...openDowntime(downtime),
+        ...openDowntime(downtime, org),
       });
       return;
     }
@@ -392,6 +389,7 @@ export function useAlertActions() {
     target: AlertActionTarget,
     downtime: AlertMuteRef,
   ): Promise<MuteActionResult> => {
+    const org = orgId.value;
     try {
       await cancelWrite.mutateAsync({
         alertId: target.alertId,
@@ -402,7 +400,9 @@ export function useAlertActions() {
       toast({ variant: "success", message: t("toastMessages.downtimes.muteEnded") });
       return "ok";
     } catch (err: unknown) {
-      if (!sharedErrorToast(alertActionErrorOf(err), "mute")) endFailureToast(err, downtime);
+      // A refusal that answers after an org switch says nothing on the new org.
+      if (org !== orgId.value) return failureResult(err);
+      if (!sharedErrorToast(alertActionErrorOf(err), "mute")) endFailureToast(err, downtime, org);
       return failureResult(err);
     }
   };
