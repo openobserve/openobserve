@@ -69,6 +69,9 @@ export class OnCallPolicyEditorPage {
       teamChannelSource: '[data-test="oncall-team-channel-source"]',
       teamChannelClear: '[data-test="oncall-team-channel-clear"]',
       teamChannelSilent: '[data-test="oncall-team-channel-silent"]',
+      phoneWithoutEmail: '[data-test="oncall-policy-phone-without-email"]',
+      noProvider: '[data-test="oncall-policy-no-provider"]',
+      noProviderLink: '[data-test="oncall-policy-telephony-link"]',
 
       // triage (L0) tab
       l0Editor: '[data-test="oncall-l0-editor"]',
@@ -254,6 +257,79 @@ export class OnCallPolicyEditorPage {
     await option.click();
     // A multi-select keeps its popover open; close it so the Save button is hit.
     await this.page.keyboard.press('Escape');
+  }
+
+  /** OCheckbox puts `data-test` on its label; the state lives on the inner button. */
+  channelBox(priority, channel) {
+    return this.page.locator(`${this.channelToggle(priority, channel)} button[role="checkbox"]`);
+  }
+
+  async setChannel(priority, channel, on) {
+    await this.openTab('delivery');
+    const box = this.channelBox(priority, channel);
+    await box.waitFor({ state: 'visible', timeout: 20000 });
+    if ((await box.getAttribute('aria-checked')) !== String(on)) await box.click();
+    await this.expectChannelTicked(priority, channel, on);
+  }
+
+  async expectChannelTicked(priority, channel, on) {
+    await expect(this.channelBox(priority, channel), `P${priority} ${channel} ticked = ${on}`)
+      .toHaveAttribute('aria-checked', String(on), { timeout: 20000 });
+  }
+
+  async expectPhoneWithoutEmailWarning(sentence) {
+    await expect(this.page.locator(this.locators.phoneWithoutEmail)).toHaveText(sentence, { timeout: 20000 });
+  }
+
+  async expectNoPhoneWithoutEmailWarning() {
+    await expect(this.page.locator(this.locators.phoneWithoutEmail)).toHaveCount(0, { timeout: 20000 });
+  }
+
+  async expectNoProviderNote({ note, link }) {
+    await expect(this.page.locator(this.locators.noProvider)).toContainText(note, { timeout: 20000 });
+    await expect(this.page.locator(this.locators.noProviderLink)).toHaveText(link);
+  }
+
+  async expectNoNoProviderNote() {
+    await expect(this.page.locator(this.locators.noProvider)).toHaveCount(0, { timeout: 20000 });
+  }
+
+  /** The note hangs on the caller's contact read, so absence means nothing until that read has answered. */
+  async openEditorReadingContact() {
+    const [response] = await Promise.all([
+      this.page.waitForResponse(
+        (res) => /\/oncall\/contacts\//.test(res.url()) && res.request().method() === 'GET',
+        { timeout: 30000 },
+      ),
+      this.openEditor(),
+    ]);
+    return await response.json();
+  }
+
+  /** Saves and waits for the write to answer, so what follows reads the stored policy and not a race. */
+  async savePolicyAndWait() {
+    const [response] = await Promise.all([
+      this.page.waitForResponse((res) => this._isPolicyWrite(res), { timeout: 30000 }),
+      this.savePolicy(),
+    ]);
+    return response.status();
+  }
+
+  /** The status of the refused write, or null when the screen held it back without sending one. */
+  async savePolicyExpectingRefusal() {
+    const write = this.page
+      .waitForResponse((res) => this._isPolicyWrite(res), { timeout: 15000 })
+      .catch((error) => {
+        if (error.name !== 'TimeoutError') throw error;
+        return null;
+      });
+    await this.savePolicy();
+    const response = await write;
+    return response ? response.status() : null;
+  }
+
+  _isPolicyWrite(res) {
+    return /\/oncall\/teams\/[^/]+\/policy$/.test(new URL(res.url()).pathname) && res.request().method() === 'PUT';
   }
 
   // ------------------------------------------------------------------ L0

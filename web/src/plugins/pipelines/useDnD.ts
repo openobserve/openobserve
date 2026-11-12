@@ -224,12 +224,13 @@ export default function useDragAndDrop(t: TranslateFn) {
   }
 
   function onEdgesChange(changes: any) {
+    // Selecting a node deselects its edges, which Vue Flow reports as an edge change that edits nothing.
+    const edits = (changes ?? []).filter((change: any) => change?.type !== "select");
+    if (!edits.length) return;
     if (pipelineObj.isEditPipeline == true) {
       pipelineObj.dirtyFlag = true;
     }
-    if (changes.length > 0) {
-      pipelineObj.edgesChange = true;
-    }
+    pipelineObj.edgesChange = true;
   }
 
   function onConnect(connection: any) {

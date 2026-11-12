@@ -33,12 +33,13 @@ const template = {
         return res;
       });
   },
-  list: ({ org_identifier, applies_to, type }: any) => {
+  list: ({ org_identifier, applies_to, type, include_usage }: any) => {
     const url = `/api/${org_identifier}/alerts/templates`;
-    if (!applies_to && !type) return http().get(url);
+    if (!applies_to && !type && !include_usage) return http().get(url);
     const params: Record<string, string> = {};
     if (applies_to) params.applies_to = applies_to;
     if (type) params.type = type;
+    if (include_usage) params.include_usage = "true";
     return http().get(url, { params });
   },
   get_by_name: ({ org_identifier, template_name }: any) => {

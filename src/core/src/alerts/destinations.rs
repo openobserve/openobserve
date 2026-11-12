@@ -173,7 +173,7 @@ async fn check_jira_conversion(
         return Ok(());
     }
     let conn = infra::db::get_orm_client_ro().await;
-    let alerts = db::alerts::alert::list_with_folders(
+    let alerts = db::alerts::alert::list_with_folders_fully_decoded(
         conn,
         config::meta::alerts::alert::ListAlertsParams::new(&destination.org_id),
     )

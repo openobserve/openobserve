@@ -1228,7 +1228,7 @@ async fn delete_org_search_jobs(org_id: &str) -> Result<(), anyhow::Error> {
 
 async fn delete_org_pipelines(org_id: &str) -> Result<(), anyhow::Error> {
     // Through the service layer, so triggers, backfill jobs, ownership and caches go cluster-wide.
-    let pipelines = infra::pipeline::list_by_org(org_id).await?;
+    let pipelines = infra::pipeline::list_by_org_fully_decoded(org_id).await?;
     for p in pipelines {
         let id = p.id.clone();
         crate::pipeline::delete_listed_pipeline(p)

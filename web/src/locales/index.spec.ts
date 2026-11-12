@@ -33,7 +33,13 @@ import {
   toLocaleUnit,
   toSupportedNumberLocale,
 } from "@/locales/numberFormat";
-import { applyDocumentLocale, getLocale, isRtlLocale, localeFileMap } from "@/locales";
+import i18n, {
+  applyDocumentLocale,
+  getLocale,
+  isRtlLocale,
+  loadLocaleMessages,
+  localeFileMap,
+} from "@/locales";
 
 const withNavigatorLanguage = (language: string, assertion: () => void) => {
   const descriptor = Object.getOwnPropertyDescriptor(navigator, "language");
@@ -224,5 +230,17 @@ describe("document locale", () => {
     applyDocumentLocale(locale);
     expect(document.documentElement.lang).toBe(language);
     expect(document.documentElement.dir).toBe(direction);
+  });
+});
+
+describe("untranslated keys fall back to en-US", () => {
+  it("shows English for a filterBar key the locale file lacks and keeps its translated ones", async () => {
+    await loadLocaleMessages("de");
+    const t = (key: string, params?: Record<string, unknown>) =>
+      (i18n.global as any).t(key, params ?? {}, { locale: "de" });
+    expect(t("filterBar.addFilter")).toBe("Add filter");
+    expect(t("filterBar.validation.regexLength", { max: 5 })).toBe(
+      "Verwenden Sie für das Muster höchstens 5 Zeichen.",
+    );
   });
 });

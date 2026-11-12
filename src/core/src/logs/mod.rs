@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     sync::Arc,
     time::Instant,
@@ -44,11 +45,13 @@ use infra::{
     schema::{SchemaCache, get_partition_time_level},
 };
 use ingestion_common::IngestionStatus;
+use itertools::Itertools;
 use schema::{get_future_discard_error, get_upto_discard_error, stream_schema_exists};
 
 use crate::{
     alerts::alert::AlertExt,
     common::meta::stream::SchemaRecords,
+    db_monitoring::server_vantage::O2_EVENT_NAME,
     ingestion::{
         PartitionMemo, TriggerAlertData, evaluate_trigger, newly_enabled_uds_fields,
         repack_records, resolve_batch_schema, schema_records_to_entries, write_entries,
@@ -74,6 +77,63 @@ type BulkAction<'a> =
 struct WriteLogsContext<'a> {
     is_derived: bool,
     response_order: Option<&'a mut BulkResponseOrder>,
+}
+
+/// What a stream's settings strip from or add to a record bound for it.
+struct DestinationSettings<'a> {
+    org_id: &'a str,
+    stream_name: &'a str,
+    dbm: bool,
+    uds_fields: Option<&'a HashSet<String>>,
+    need_original: bool,
+    need_all_values: bool,
+    all_values_max_len: usize,
+}
+
+impl DestinationSettings<'_> {
+    fn apply(
+        &self,
+        mut record: Map<String, Value>,
+        original: Option<Cow<'_, str>>,
+        trusted_event_name: Option<Value>,
+    ) -> Map<String, Value> {
+        // before the UDS trim, so a schema that lists the canonical columns keeps them
+        if self.dbm {
+            crate::db_monitoring::server_vantage::canonicalize_dbm_record(&mut record);
+        }
+        // canonicalization strips the reserved key, so only a receiver-set name is put back
+        if let Some(event_name) = trusted_event_name {
+            record.insert(O2_EVENT_NAME.to_string(), event_name);
+        }
+        if let Some(fields) = self.uds_fields {
+            record = crate::ingestion::refactor_map(record, fields);
+        }
+        if self.need_original
+            && let Some(original) = original
+        {
+            record.insert(
+                config::ORIGINAL_DATA_COL_NAME.to_string(),
+                Value::String(original.into_owned()),
+            );
+            let record_id = crate::ingestion::generate_record_id(
+                self.org_id,
+                self.stream_name,
+                &StreamType::Logs,
+            );
+            record.insert(
+                config::ID_COL_NAME.to_string(),
+                Value::String(record_id.to_string()),
+            );
+        }
+        if self.need_all_values {
+            let values = all_values_of(&record, self.all_values_max_len);
+            record.insert(
+                config::ALL_VALUES_COL_NAME.to_string(),
+                Value::String(values),
+            );
+        }
+        record
+    }
 }
 
 /// No association names `_all_values`, so the scan leaves its stale pre-redaction text.
@@ -112,24 +172,21 @@ pub fn refresh_derived_columns(before: &[String], records: &mut [(i64, Map<Strin
 }
 
 /// The `_all_values` concatenation: every field but the derived ones, space-joined.
-#[cfg(feature = "vectorscan")]
 fn all_values_of(record: &Map<String, Value>, max_len: usize) -> String {
-    let mut values = Vec::with_capacity(record.len());
-    for (k, value) in record.iter() {
-        if [
-            TIMESTAMP_COL_NAME,
-            config::ID_COL_NAME,
-            config::ORIGINAL_DATA_COL_NAME,
-            config::ALL_VALUES_COL_NAME,
-        ]
-        .contains(&k.as_str())
-            || (max_len != 0 && value.as_str().is_some_and(|s| s.len() > max_len))
-        {
-            continue;
-        }
-        values.push(value.to_string());
-    }
-    values.join(" ")
+    const DERIVED: [&str; 4] = [
+        TIMESTAMP_COL_NAME,
+        config::ID_COL_NAME,
+        config::ORIGINAL_DATA_COL_NAME,
+        config::ALL_VALUES_COL_NAME,
+    ];
+    record
+        .iter()
+        .filter(|(k, v)| {
+            !DERIVED.contains(&k.as_str())
+                && (max_len == 0 || v.as_str().is_none_or(|s| s.len() <= max_len))
+        })
+        .map(|(_, v)| v)
+        .join(" ")
 }
 
 fn parse_bulk_index(v: &Value) -> Option<BulkAction<'_>> {

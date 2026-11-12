@@ -107,6 +107,30 @@ impl Default for OtelIngestionProcessor {
     }
 }
 
+/// Resource keys arrive as `service_<key>` (`resource_attribute_key`).
+fn apply_attribution_fallbacks(
+    span_attributes: &mut HashMap<String, json::Value>,
+    resource_attributes: &HashMap<String, json::Value>,
+    config: &GenAiAgentMappingConfig,
+) {
+    for (target, fallbacks) in config.attribution_fields.targets() {
+        if fallbacks.is_empty() || span_attributes.contains_key(target) {
+            continue;
+        }
+        let found = fallbacks.iter().find_map(|f| {
+            span_attributes
+                .get(f)
+                .or_else(|| resource_attributes.get(&format!("service_{f}")))
+                .or_else(|| resource_attributes.get(f))
+                .filter(|v| !v.is_null() && v.as_str() != Some(""))
+                .cloned()
+        });
+        if let Some(value) = found {
+            span_attributes.insert(target.to_string(), value);
+        }
+    }
+}
+
 impl OtelIngestionProcessor {
     pub fn new() -> Self {
         Self {
@@ -176,6 +200,8 @@ impl OtelIngestionProcessor {
         span: SpanContext<'_>,
         agent_mapping_config: &GenAiAgentMappingConfig,
     ) {
+        apply_attribution_fallbacks(span_attributes, resource_attributes, agent_mapping_config);
+
         // Phase 1: Extract all raw data from span attributes.
         let extracted = self.extract_all(
             span_attributes,
@@ -1183,6 +1209,36 @@ mod tests {
         assert_eq!(
             span_attrs.get(GenAiAttributes::AGENT_ID),
             Some(&json::json!("agent-1"))
+        );
+    }
+
+    #[test]
+    fn attribution_fallbacks_fill_the_standard_keys_only_when_missing() {
+        use config::meta::gen_ai::AttributionFields;
+        let config = GenAiAgentMappingConfig {
+            attribution_fields: AttributionFields {
+                tenant: vec!["customer.org".to_string()],
+                user: vec!["app.user".to_string()],
+                feature: vec!["app.feature".to_string()],
+            },
+            ..Default::default()
+        };
+        let mut span = HashMap::from([
+            ("app.user".to_string(), json::json!("u-1")),
+            ("user.id".to_string(), json::json!("u-standard")),
+            ("app.feature".to_string(), json::json!("")),
+        ]);
+        let resource = HashMap::from([("service_customer.org".to_string(), json::json!("acme"))]);
+        apply_attribution_fallbacks(&mut span, &resource, &config);
+        assert_eq!(span["tenant.id"], json::json!("acme"), "resource fallback");
+        assert_eq!(
+            span["user.id"],
+            json::json!("u-standard"),
+            "standard key wins"
+        );
+        assert!(
+            !span.contains_key("feature.name"),
+            "empty fallback is skipped"
         );
     }
 

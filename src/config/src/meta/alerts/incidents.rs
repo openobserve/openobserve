@@ -20,6 +20,9 @@ use utoipa::ToSchema;
 
 use super::rca_steering::SteerKind;
 
+/// The `Reopened` reason of a manual status change; an unacknowledge writes another one.
+pub const MANUAL_REOPEN_REASON: &str = "Manually reopened";
+
 /// Incident status lifecycle: Open → Acknowledged → Resolved
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
@@ -449,15 +452,36 @@ pub enum IncidentCorrelationOutcome {
         incident_id: String,
         service_name: String,
     },
+    /// A member alert's first firing after a manual reopen; notification should be sent.
+    FiredAfterReopen {
+        incident_id: String,
+        service_name: String,
+    },
 }
 
 impl IncidentCorrelationOutcome {
+    /// A member alert firing again sends only when a manual reopen still waited for it.
+    pub fn repeated(incident_id: String, service_name: String, after_reopen: bool) -> Self {
+        if after_reopen {
+            Self::FiredAfterReopen {
+                incident_id,
+                service_name,
+            }
+        } else {
+            Self::ExistingAlertRepeated {
+                incident_id,
+                service_name,
+            }
+        }
+    }
+
     pub fn incident_id(&self) -> &str {
         match self {
             Self::NewIncidentCreated { incident_id, .. }
             | Self::NewAlertTypeJoined { incident_id, .. }
             | Self::ExistingAlertRepeated { incident_id, .. }
-            | Self::SeverityEscalated { incident_id, .. } => incident_id,
+            | Self::SeverityEscalated { incident_id, .. }
+            | Self::FiredAfterReopen { incident_id, .. } => incident_id,
         }
     }
 
@@ -466,7 +490,8 @@ impl IncidentCorrelationOutcome {
             Self::NewIncidentCreated { service_name, .. }
             | Self::NewAlertTypeJoined { service_name, .. }
             | Self::ExistingAlertRepeated { service_name, .. }
-            | Self::SeverityEscalated { service_name, .. } => service_name,
+            | Self::SeverityEscalated { service_name, .. }
+            | Self::FiredAfterReopen { service_name, .. } => service_name,
         }
     }
 
@@ -476,7 +501,8 @@ impl IncidentCorrelationOutcome {
             Self::NewAlertTypeJoined { incident_id, .. } => Some(incident_id),
             Self::NewIncidentCreated { .. }
             | Self::ExistingAlertRepeated { .. }
-            | Self::SeverityEscalated { .. } => None,
+            | Self::SeverityEscalated { .. }
+            | Self::FiredAfterReopen { .. } => None,
         }
     }
 }
@@ -905,6 +931,10 @@ impl IncidentEvent {
         })
     }
 
+    pub fn manually_reopened(user_id: impl Into<String>) -> Self {
+        Self::reopened(user_id, MANUAL_REOPEN_REASON)
+    }
+
     pub fn reopened(user_id: impl Into<String>, reason: impl Into<String>) -> Self {
         Self::now(IncidentEventType::Reopened {
             user_id: user_id.into(),
@@ -1060,6 +1090,13 @@ impl IncidentEvent {
         false
     }
 
+    pub fn is_manual_reopen(&self) -> bool {
+        matches!(
+            &self.event_type,
+            IncidentEventType::Reopened { reason, .. } if reason == MANUAL_REOPEN_REASON
+        )
+    }
+
     /// Check if this event is any Alert event (regardless of alert_id)
     pub fn is_alert(&self) -> bool {
         matches!(&self.event_type, IncidentEventType::Alert { .. })
@@ -1074,9 +1111,139 @@ impl IncidentEvent {
     }
 }
 
+/// Counts a firing into the trailing block of Alert events, or appends a new Alert event.
+pub fn push_alert_event(
+    events: &mut Vec<IncidentEvent>,
+    alert_id: &str,
+    alert_name: &str,
+    triggered_at: i64,
+) {
+    for event in events.iter_mut().rev() {
+        if !event.is_alert() {
+            break;
+        }
+        if event.is_alert_for(alert_id) {
+            event.increment_alert(alert_id, triggered_at);
+            return;
+        }
+    }
+    events.push(IncidentEvent::alert(alert_id, alert_name, triggered_at));
+}
+
+/// Whether no firing followed the latest manual reopen; metadata edits do not end the wait.
+pub fn manual_reopen_awaits_firing(events: &[IncidentEvent]) -> bool {
+    for event in events.iter().rev() {
+        if event.is_manual_reopen() {
+            return true;
+        }
+        if event.is_alert() {
+            return false;
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors record_alert: decide on the timeline, then record the firing into it.
+    fn fire_repeat(events: &mut Vec<IncidentEvent>, alert_id: &str) -> bool {
+        let after_reopen = manual_reopen_awaits_firing(events);
+        push_alert_event(events, alert_id, alert_id, 1);
+        matches!(
+            IncidentCorrelationOutcome::repeated("inc_1".into(), "checkout".into(), after_reopen),
+            IncidentCorrelationOutcome::FiredAfterReopen { .. }
+        )
+    }
+
+    #[test]
+    fn a_manual_reopen_sends_the_next_firing_once() {
+        let title = || IncidentEvent::title_changed("old", "new", "u@x.io");
+        let cases: Vec<(&str, Vec<IncidentEvent>, Vec<bool>)> = vec![
+            (
+                "reopen, two firings",
+                vec![IncidentEvent::manually_reopened("u@x.io")],
+                vec![true, false],
+            ),
+            (
+                "reopen, title change, two firings",
+                vec![IncidentEvent::manually_reopened("u@x.io"), title()],
+                vec![true, false],
+            ),
+            (
+                "reopen, title change, assignment, two firings",
+                vec![
+                    IncidentEvent::manually_reopened("u@x.io"),
+                    title(),
+                    IncidentEvent::assignment_changed(None, Some("v@x.io".into()), "u@x.io"),
+                ],
+                vec![true, false],
+            ),
+            (
+                "unacknowledge is not a manual reopen",
+                vec![IncidentEvent::reopened("u@x.io", "Unacknowledged")],
+                vec![false, false],
+            ),
+            (
+                "an acknowledge and unacknowledge after the reopen keep the wait",
+                vec![
+                    IncidentEvent::manually_reopened("u@x.io"),
+                    IncidentEvent::acknowledged("u@x.io"),
+                    IncidentEvent::reopened("u@x.io", "Unacknowledged"),
+                ],
+                vec![true, false],
+            ),
+            ("no reopen", vec![], vec![false, false]),
+        ];
+        for (name, after_reopen, want) in cases {
+            // The alert's pre-reopen Alert event must not end the wait.
+            let mut events = vec![
+                IncidentEvent::created(),
+                IncidentEvent::alert("a1", "a1", 0),
+                IncidentEvent::resolved(Some("u@x.io".into())),
+            ];
+            events.extend(after_reopen);
+            let got: Vec<bool> = want
+                .iter()
+                .map(|_| fire_repeat(&mut events, "a1"))
+                .collect();
+            assert_eq!(got, want, "{name}");
+        }
+    }
+
+    #[test]
+    fn another_member_firing_first_uses_up_the_reopen() {
+        let mut events = vec![
+            IncidentEvent::alert("a1", "a1", 0),
+            IncidentEvent::alert("a2", "a2", 0),
+            IncidentEvent::manually_reopened("u@x.io"),
+        ];
+        assert!(fire_repeat(&mut events, "a2"));
+        assert!(!fire_repeat(&mut events, "a1"));
+    }
+
+    #[test]
+    fn each_manual_reopen_sends_its_first_firing() {
+        let mut events = vec![IncidentEvent::manually_reopened("u@x.io")];
+        assert!(fire_repeat(&mut events, "a1"));
+        assert!(!fire_repeat(&mut events, "a1"));
+        events.push(IncidentEvent::resolved(Some("u@x.io".into())));
+        events.push(IncidentEvent::manually_reopened("u@x.io"));
+        assert!(fire_repeat(&mut events, "a1"));
+        assert!(!fire_repeat(&mut events, "a1"));
+    }
+
+    #[test]
+    fn push_alert_event_compacts_only_the_trailing_alert_block() {
+        let mut events = vec![IncidentEvent::alert("a1", "a1", 0)];
+        push_alert_event(&mut events, "a1", "a1", 5);
+        assert_eq!(events.len(), 1);
+        events.push(IncidentEvent::manually_reopened("u@x.io"));
+        push_alert_event(&mut events, "a1", "a1", 9);
+        assert_eq!(events.len(), 3);
+        assert!(events[2].is_alert_for("a1"));
+    }
 
     /// Only a new alert joining counts; the same alert firing again never re-pages.
     #[test]
@@ -1106,6 +1273,13 @@ mod tests {
             ),
             (
                 IncidentCorrelationOutcome::NewIncidentCreated {
+                    incident_id: id(),
+                    service_name: svc(),
+                },
+                None,
+            ),
+            (
+                IncidentCorrelationOutcome::FiredAfterReopen {
                     incident_id: id(),
                     service_name: svc(),
                 },

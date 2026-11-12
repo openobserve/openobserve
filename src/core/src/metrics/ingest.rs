@@ -25,7 +25,6 @@ use config::{
     get_config,
     meta::{
         alerts::alert,
-        pipeline::PipelineKind,
         promql::VALUE_LABEL,
         self_reporting::usage::UsageType,
         stream::{StreamPartition, StreamType},
@@ -151,7 +150,7 @@ pub(super) async fn run_pipelines<T: Clone>(
             continue;
         };
         let (records, sides): (Vec<json::Value>, Vec<T>) = stream_inputs.into_iter().unzip();
-        let has_user_pipeline = pipelines.iter().any(|p| p.kind == PipelineKind::User);
+        let has_user_pipeline = crate::ingestion::has_user_pipeline(pipelines);
 
         for exec_pl in pipelines {
             let results = match exec_pl

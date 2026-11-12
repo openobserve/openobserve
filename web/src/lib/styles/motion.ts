@@ -19,3 +19,20 @@ export const ENTER_FADE =
 
 export const ENTER_SLIDE =
   "motion-safe:animate-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-200 motion-safe:ease-out";
+
+// Region loaders (skeleton, progress line, button spinner) wait this long, so fast loads never flash one.
+export const LOADER_DELAY_MS = 300;
+
+// A skeleton, once shown, stays at least this long so it never blinks.
+export const MIN_SKELETON_MS = 300;
+
+// Past this a wait gets words and elapsed time, since a bare loader no longer says enough.
+export const LONG_WAIT_MS = 10_000;
+
+// A long wait is re-announced at most this often, so a screen reader is not flooded.
+export const STILL_LOADING_REPEAT_MS = 30_000;
+
+// Kept content dims only after this long, so a fast refetch neither flickers nor swallows a click.
+export const STALE_DIM_DELAY_MS = 150;
+
+export const STALE_DIM = "opacity-60";

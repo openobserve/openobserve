@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  alertConditionIsQuery,
   alertConditionText,
   alertPeriodMinutes,
   alertWarningConditionText,
@@ -117,6 +118,61 @@ describe("alertConditionText", () => {
       expect(alertConditionText({ query_condition: { type: "sql", sql } })).toBe(sql);
       expect(alertConditionText({ query_condition: { sql } })).toBe(sql);
     });
+  });
+});
+
+describe("alertConditionIsQuery", () => {
+  it("is true for the raw SQL of a SQL alert and of an alert with no type", () => {
+    expect(alertConditionIsQuery({ query_condition: { type: "sql", sql: "SELECT 1" } })).toBe(true);
+    expect(alertConditionIsQuery({ condition: { sql: "SELECT 1" } })).toBe(true);
+  });
+
+  it("is false for an aggregation threshold, even with SQL stored beside it", () => {
+    expect(
+      alertConditionIsQuery({
+        query_condition: {
+          type: "sql",
+          sql: "SELECT 1",
+          aggregation: { function: "avg", having: { column: "x", operator: ">", value: 1 } },
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("is false for a Builder alert, whose stored SQL never runs", () => {
+    expect(alertConditionIsQuery({ query_condition: { type: "custom", sql: "SELECT 1" } })).toBe(
+      false,
+    );
+  });
+
+  it("is true for a PromQL rule and false for a PromQL threshold", () => {
+    expect(
+      alertConditionIsQuery({
+        query_condition: { type: "promql", promql_rule_mode: true, promql: "up == 0" },
+      }),
+    ).toBe(true);
+    expect(
+      alertConditionIsQuery({
+        query_condition: { type: "promql", promql_condition: { operator: ">", value: 1 } },
+      }),
+    ).toBe(false);
+  });
+
+  it("is true for an anomaly config in custom SQL and in filters mode", () => {
+    expect(
+      alertConditionIsQuery({ alert_type: "anomaly_detection", query_mode: "custom_sql" }),
+    ).toBe(true);
+    expect(alertConditionIsQuery({ alert_type: "anomaly_detection", query_mode: "filters" })).toBe(
+      true,
+    );
+  });
+
+  it("is false when there is no query to show", () => {
+    expect(alertConditionIsQuery(null)).toBe(false);
+    expect(alertConditionIsQuery({ query_condition: { type: "sql", sql: "" } })).toBe(false);
+    expect(alertConditionIsQuery({ query_condition: { type: "slo", slo_condition: {} } })).toBe(
+      false,
+    );
   });
 });
 

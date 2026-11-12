@@ -11,15 +11,20 @@ keeps the API contracts deterministic.
 from __future__ import annotations
 
 import logging
+import os
+import time
 from copy import deepcopy
 from collections.abc import Generator
 from typing import Any
 
 import pytest
 
+from helpers.webhook_sink import WebhookSink
 from support.client import OpenObserveClient
 from support.factories import unique_name
+from support.wait import wait_until
 
+from .multialert_helpers import AlertsClient, fast_eval, simple_alert, uniq
 from .test_v2 import _alert_payload, _destination_payload, _template_payload
 
 logger = logging.getLogger(__name__)
@@ -1225,3 +1230,112 @@ def test_list_exposes_the_name_resolved_expression_for_composite_rows(
     for item in rows:
         if item.get("alert_type") != "composite":
             assert item.get("expression_summary") is None, item
+
+
+# ----- openobserve#16633: a destination delivered in one firing is notified again in the next -----
+
+# Must match the server's setting; CI lowers it from the 300 s default.
+COMPOSITE_SWEEP_S = int(os.environ.get("ZO_ALERT_COMPOSITE_SWEEP_SECS", "300"))
+# Must match the server's ZO_SCHEDULER_MAX_RETRIES: a failing destination gets this many attempts per firing.
+MAX_ATTEMPTS = int(os.environ.get("ZO_SCHEDULER_MAX_RETRIES", "3"))
+# The server retries a failed composite delivery 10 s later, so an uncapped retry lands within this window.
+RETRY_GAP_S = 15
+
+
+@pytest.fixture
+def firing_composites(
+    client: OpenObserveClient, webhook_sink: WebhookSink
+) -> Generator[dict[str, Any], None, None]:
+    """Two always-true children feeding composite `AB` (dA, dB) and control `ctl` (cA, cB), all delivering to the sink."""
+    alerts = AlertsClient(client)
+    stream = uniq("cmp_redeliver_s")
+    template = uniq("cmp_redeliver_tmpl")
+    destinations = {path: uniq(f"cmp_redeliver_{path}") for path in ("child", "dA", "dB", "cA", "cB")}
+    alert_ids: list[str] = []
+    created_destinations: list[str] = []
+    template_created = False
+    try:
+        resp = alerts._v1("POST", "alerts/templates", json={
+            "name": template, "type": "http", "title": "", "body": '{"text": "{alert_name}"}'})
+        assert resp.status_code == 200, resp.text
+        template_created = True
+        for path, name in destinations.items():
+            resp = alerts._v1("POST", "alerts/destinations", json={
+                "name": name, "url": webhook_sink.url(path), "method": "post", "type": "http",
+                "skip_tls_verify": False, "template": template, "headers": {}})
+            assert resp.status_code == 200, resp.text
+            created_destinations.append(name)
+        webhook_sink.respond("dB", then=500)
+        alerts.ingest(stream, [{"level": "error", "i": i} for i in range(3)])
+
+        children = []
+        for _ in range(2):
+            name = uniq("cmp_redeliver_child")
+            child = fast_eval(simple_alert(name), stream)
+            child["trigger_condition"].update(threshold=1, silence=0)
+            child["destinations"] = [destinations["child"]]
+            resp = alerts.create_alert(child)
+            assert resp.status_code == 200, resp.text
+            children.append(alerts.find_alert_id(name))
+            alert_ids.append(children[-1])
+
+        names = {}
+        for key, (first, second) in {"AB": ("dA", "dB"), "ctl": ("cA", "cB")}.items():
+            names[key] = uniq(f"cmp_redeliver_{key}")
+            payload = _composite_payload(
+                name=names[key], child_ids=children, enabled=True, template=template)
+            payload["destinations"] = [destinations[first], destinations[second]]
+            payload["trigger_condition"] = {"silence": 0}
+            resp = alerts.create_alert(payload)
+            assert resp.status_code == 200, resp.text
+            alert_ids.insert(0, alerts.find_alert_id(names[key]))
+        yield {"alerts": alerts, "stream": stream, "names": names, "destinations": destinations,
+               "ids": {key: alerts.find_alert_id(n) for key, n in names.items()}}
+    finally:
+        alerts.delete_alerts(alert_ids)
+        for name in created_destinations:
+            alerts._v1("DELETE", f"alerts/destinations/{name}")
+        if template_created:
+            alerts._v1("DELETE", f"alerts/templates/{template}")
+        client.streams.delete(stream)
+
+
+def test_composite_notifies_a_destination_again_on_the_next_firing(
+    firing_composites: dict[str, Any], webhook_sink: WebhookSink
+):
+    """openobserve#16633: dA succeeding while dB fails must not keep dA marked as notified into the next firing."""
+    alerts, stream = firing_composites["alerts"], firing_composites["stream"]
+
+    def _count(path: str) -> int:
+        alerts.ingest(stream, [{"level": "error"}])
+        return len(webhook_sink.deliveries(path))
+
+    wait_until(lambda: _count("dB") >= MAX_ATTEMPTS, timeout=COMPOSITE_SWEEP_S + 300, interval=5,
+               msg="the first firing never exhausted its attempts on the failing destination")
+    first_firing_end = webhook_sink.deliveries("dB")[MAX_ATTEMPTS - 1].at
+    cycle_end = first_firing_end + RETRY_GAP_S
+    time.sleep(max(0.0, cycle_end - time.monotonic()))
+    # A second dA delivery opens the next firing, whose dB attempt runs alongside it.
+    next_firing = next((d.at - 1 for d in webhook_sink.deliveries("dA")[1:]), cycle_end)
+    first_cycle = [d for d in webhook_sink.deliveries("dB") if d.at < min(next_firing, cycle_end)]
+    assert len(first_cycle) == MAX_ATTEMPTS, f"one firing tried the failing destination {len(first_cycle)} times"
+    assert sum(d.at <= first_firing_end for d in webhook_sink.deliveries("dA")) == 1, \
+        "retries within one firing re-sent the destination that already delivered"
+    assert webhook_sink.deliveries("cA"), "control composite never delivered"
+    assert webhook_sink.deliveries("cB"), "control composite never delivered"
+
+    webhook_sink.respond("dA", then=500)
+    webhook_sink.respond("dB", then=200)
+    wait_until(lambda: _count("dA") >= 2, timeout=COMPOSITE_SWEEP_S + 300, interval=5,
+               msg="the next firing skipped the destination the previous firing delivered to")
+
+    dest_a = firing_composites["destinations"]["dA"]
+    wait_until(
+        lambda: any(h.get("status") == "notify_failed" and dest_a in str(h.get("error"))
+                    for h in alerts.history_for(firing_composites["ids"]["AB"])),
+        timeout=COMPOSITE_SWEEP_S + 300, interval=5,
+        msg="history never recorded a failed attempt on dA after it started refusing",
+    )
+
+    wait_until(lambda: _count("cA") >= 2 and _count("cB") >= 2, timeout=COMPOSITE_SWEEP_S + 300, interval=5,
+               msg="control composite with two healthy destinations was not re-notified on the next firing")

@@ -30,6 +30,7 @@ use config::{
     ider::SnowflakeIdGenerator,
     meta::{
         alerts::{TriggerCondition, alert::Alert},
+        pipeline::PipelineKind,
         promql::HASH_LABEL,
         self_reporting::usage::{RequestStats, RunOutcome, TriggerData, TriggerDataType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
@@ -174,6 +175,75 @@ pub async fn get_stream_partition_keys(
 pub async fn get_stream_executable_pipelines(stream: &StreamParams) -> Vec<ExecutablePipeline> {
     pipeline::report_broken_realtime_pipelines(stream).await;
     pipeline::get_executable_pipelines(stream).await
+}
+
+/// Whether a user pipeline, which owns what reaches the source stream, is among `pipelines`.
+pub fn has_user_pipeline(pipelines: &[ExecutablePipeline]) -> bool {
+    pipelines.iter().any(|p| p.kind == PipelineKind::User)
+}
+
+/// Whether the source stream gets its inputs back: no user pipeline owns it and none reached it.
+pub fn should_preserve_source(
+    org_id: &str,
+    stream_name: &str,
+    pipelines: &[ExecutablePipeline],
+    source_buffered: bool,
+) -> bool {
+    let has_user_pipeline = has_user_pipeline(pipelines);
+    log::debug!(
+        "[Pipeline] source preservation check stream={org_id}/{stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, source_buffered={source_buffered}",
+        pipelines.len()
+    );
+    !has_user_pipeline && !source_buffered
+}
+
+/// Whether the pipeline only scores records with an LLM, so its batch runs off the write path.
+pub fn is_llm_evaluation(pipeline: &ExecutablePipeline) -> bool {
+    pipeline.kind == PipelineKind::Evaluation && pipeline.contains_llm_evaluation_node()
+}
+
+/// Starts the stream's LLM evaluation pipelines over `records`; nothing they return is ingested.
+pub fn spawn_llm_evaluations(
+    org_id: &str,
+    stream_name: &str,
+    pipelines: &[ExecutablePipeline],
+    records: &[Value],
+    in_stream_name: Option<&str>,
+) -> tokio::task::JoinSet<()> {
+    let mut tasks = tokio::task::JoinSet::new();
+    for exec_pl in pipelines.iter().filter(|p| is_llm_evaluation(p)) {
+        let exec_pl = exec_pl.clone();
+        let org_id = org_id.to_string();
+        let stream_name = stream_name.to_string();
+        let records = records.to_vec();
+        let in_stream_name = in_stream_name.map(String::from);
+        tasks.spawn(async move {
+            if let Err(e) = exec_pl
+                .process_batch(&org_id, records, in_stream_name)
+                .await
+            {
+                log::error!(
+                    "[Pipeline] evaluation pipeline for stream {org_id}/{stream_name}: Batch execution error: {e}.",
+                );
+            }
+        });
+    }
+    tasks
+}
+
+/// Waits for the evaluations `spawn_llm_evaluations` started, logging any that panicked.
+pub async fn join_llm_evaluations(
+    mut tasks: tokio::task::JoinSet<()>,
+    org_id: &str,
+    stream_name: &str,
+) {
+    while let Some(result) = tasks.join_next().await {
+        if let Err(e) = result {
+            log::error!(
+                "[Pipeline] evaluation pipeline task for stream {org_id}/{stream_name} failed: {e}.",
+            );
+        }
+    }
 }
 
 pub async fn get_stream_alerts(

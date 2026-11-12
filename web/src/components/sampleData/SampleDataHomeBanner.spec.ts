@@ -128,11 +128,12 @@ describe("SampleDataHomeBanner", () => {
     vi.mocked(removeSampleData).mockReturnValue(removal.promise);
     const header = session.remove(ORG);
     await flushPromises();
-    expect(removeBtn().attributes("disabled")).toBeDefined();
+    // A busy OButton stays focusable, so it reports unavailability through aria-disabled.
+    expect(removeBtn().attributes("aria-disabled")).toBe("true");
     removal.resolve([]);
     await header;
     await flushPromises();
-    expect(removeBtn().attributes("disabled")).toBeUndefined();
+    expect(removeBtn().attributes("aria-disabled")).toBeUndefined();
   });
 
   it("ends failed in the dialog when Remove is confirmed while this org's load runs", async () => {

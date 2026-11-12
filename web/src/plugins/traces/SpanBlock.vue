@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ...durationStyle,
             zIndex: 1,
           }"
-          class="absolute flex items-center text-xs transition-all duration-500 ease-[ease]"
+          class="absolute flex items-center text-xs"
           :data-label-above-bar="labelAboveBar"
           data-test="span-block-duration"
         >

@@ -1402,7 +1402,7 @@ mod tests {
             entity_id: Set(id()),
             name: Set(format!("orgdel {}", id())),
             version: Set(1),
-            scorer_type: Set(scorers::ScorerType::LlmJudge),
+            scorer_type: Set(scorers::ScorerType::LlmJudge.to_string()),
             template: Set("t".to_string()),
             params: Set(json!({})),
             is_active: Set(true),

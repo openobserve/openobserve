@@ -181,27 +181,31 @@ impl std::fmt::Display for WorkflowTriggerEntity {
     }
 }
 
+/// Every workflow; a row this version cannot read is logged and skipped.
 pub async fn list_all() -> Result<Vec<Workflow>, anyhow::Error> {
     let client = get_orm_client_ro().await;
     let entities = workflows::Entity::find().all(client).await?;
-    let mut ret = Vec::with_capacity(entities.len());
-    for e in entities {
-        ret.push(e.try_into()?);
-    }
-    Ok(ret)
+    Ok(readable_workflows(entities))
 }
 
+/// An org's workflows; a row this version cannot read is logged and skipped.
 pub async fn list_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
     let client = get_orm_client_ro().await;
     let entities = workflows::Entity::find()
         .filter(workflows::Column::OrgId.eq(org_id))
         .all(client)
         .await?;
-    let mut ret = Vec::with_capacity(entities.len());
-    for e in entities {
-        ret.push(e.try_into()?);
-    }
-    Ok(ret)
+    Ok(readable_workflows(entities))
+}
+
+/// An org's workflows, failing on a row this version cannot read, for reference checks.
+pub async fn list_by_org_fully_decoded(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
+    let client = get_orm_client_ro().await;
+    let entities = workflows::Entity::find()
+        .filter(workflows::Column::OrgId.eq(org_id))
+        .all(client)
+        .await?;
+    Ok(fully_decoded_workflows(entities)?)
 }
 
 /// Lists an org's workflows, optionally restricted to one folder and/or to rows
@@ -212,6 +216,7 @@ pub async fn list_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
 ///
 /// The leading-wildcard LIKE cannot use an index; the scan is accepted because
 /// `workflows_org_folder_idx` bounds it to one org. Revisit with `pg_trgm` if that grows.
+/// A row this version cannot read is logged and skipped.
 pub async fn list_by_org_folder(
     org_id: &str,
     folder_pk: Option<&str>,
@@ -239,11 +244,7 @@ pub async fn list_by_org_folder(
         );
     }
     let entities = query.all(client).await?;
-    let mut ret = Vec::with_capacity(entities.len());
-    for e in entities {
-        ret.push(e.try_into()?);
-    }
-    Ok(ret)
+    Ok(readable_workflows(entities))
 }
 
 /// Counts the workflows in a folder, drafts included. Backs the folder delete
@@ -740,7 +741,7 @@ pub async fn delete_association_by_entity(org_id: &str, entity: &str) -> Result<
 }
 
 /// Lists an org's drafts, optionally restricted to one folder. `folder_pk` is the
-/// folder's primary key, not the slug from the URL.
+/// folder's primary key, not the slug from the URL. A row this version cannot read is skipped.
 pub async fn list_drafts_by_org(
     org_id: &str,
     folder_pk: Option<&str>,
@@ -752,11 +753,7 @@ pub async fn list_drafts_by_org(
         query = query.filter(workflow_drafts::Column::FolderId.eq(pk));
     }
     let entities = query.all(client).await?;
-    let mut ret = Vec::with_capacity(entities.len());
-    for e in entities {
-        ret.push(e.try_into()?);
-    }
-    Ok(ret)
+    Ok(readable_drafts(entities))
 }
 
 pub async fn get_draft_by_org_draft_id(
@@ -875,6 +872,35 @@ pub async fn promote_draft_to_workflow(org_id: &str, draft: Workflow) -> Result<
     Ok(())
 }
 
+fn readable_workflows(models: Vec<workflows::Model>) -> Vec<Workflow> {
+    super::convert_skipping_unreadable(
+        "workflows",
+        models,
+        |m| format!("org={} id={}", m.org_id, m.id),
+        Workflow::try_from,
+    )
+}
+
+fn fully_decoded_workflows(
+    models: Vec<workflows::Model>,
+) -> Result<Vec<Workflow>, crate::errors::Error> {
+    super::convert_failing_on_unreadable(
+        "workflows",
+        models,
+        |m| format!("org={} id={}", m.org_id, m.id),
+        Workflow::try_from,
+    )
+}
+
+fn readable_drafts(models: Vec<workflow_drafts::Model>) -> Vec<Workflow> {
+    super::convert_skipping_unreadable(
+        "workflow_drafts",
+        models,
+        |m| format!("org={} id={}", m.org_id, m.id),
+        Workflow::try_from,
+    )
+}
+
 async fn update_draft_in<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -948,13 +974,124 @@ pub async fn create_tables_for_tests(
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::{ConnectOptions, Database, DatabaseConnection, Schema};
+    use sea_orm::{
+        ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, IntoActiveModel, Schema,
+    };
 
     use super::*;
+    use crate::table::testing::{capture_error_logs, logged_errors_containing};
 
     const DRAFT_ID: &str = "draft-1";
     const OWNER_ORG: &str = "owner";
     const OTHER_ORG: &str = "other";
+
+    fn nodes_with_operator(operator: &str) -> String {
+        serde_json::json!([{"id": "c", "io_type": "default", "position": {"x": 0.0, "y": 0.0},
+            "data": {"node_type": "condition", "version": 2, "conditions": {
+                "filterType": "group", "logicalOperator": "AND", "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": operator,
+                     "value": "error", "logicalOperator": "AND"}]}}}])
+        .to_string()
+    }
+
+    fn model(id: &str, nodes: String) -> workflows::Model {
+        workflows::Model {
+            id: id.to_string(),
+            org_id: "o".to_string(),
+            folder_id: "f".to_string(),
+            created_at: 0,
+            updated_at: 0,
+            created_by: "u".to_string(),
+            enabled: true,
+            name: id.to_string(),
+            description: String::new(),
+            nodes,
+            edges: "[]".to_string(),
+        }
+    }
+
+    fn draft(workflow: workflows::Model) -> workflow_drafts::Model {
+        workflow_drafts::Model {
+            id: workflow.id,
+            org_id: workflow.org_id,
+            folder_id: workflow.folder_id,
+            created_at: workflow.created_at,
+            updated_at: workflow.updated_at,
+            created_by: workflow.created_by,
+            name: workflow.name,
+            description: workflow.description,
+            nodes: workflow.nodes,
+            edges: workflow.edges,
+        }
+    }
+
+    /// A readable workflow, one with an operator this version lacks, and one with junk nodes.
+    fn rows() -> Vec<workflows::Model> {
+        vec![
+            model("w1_good", nodes_with_operator("=")),
+            model("w2_in", nodes_with_operator("future_op")),
+            model("w3_junk", "{".to_string()),
+        ]
+    }
+
+    #[tokio::test]
+    async fn test_listed_workflows_skip_and_log_rows_they_cannot_read() {
+        capture_error_logs();
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let create = Schema::new(backend).create_table_from_entity(workflows::Entity);
+        db.execute(backend.build(&create)).await.unwrap();
+        for row in rows() {
+            row.into_active_model().insert(&db).await.unwrap();
+        }
+
+        let stored = workflows::Entity::find().all(&db).await.unwrap();
+        let ids: Vec<String> = readable_workflows(stored)
+            .into_iter()
+            .map(|w| w.id)
+            .collect();
+
+        assert_eq!(ids, ["w1_good"]);
+        let logged = logged_errors_containing("[workflows] skipped unreadable row org=o id=w2_in");
+        assert!(
+            logged
+                .iter()
+                .any(|l| l.contains("unknown variant `future_op`")),
+            "{logged:?}"
+        );
+        assert!(!logged_errors_containing("id=w3_junk").is_empty());
+    }
+
+    #[test]
+    fn test_fully_decoded_workflows_fail_on_a_row_they_cannot_read() {
+        let Err(err) = fully_decoded_workflows(rows()) else {
+            panic!("an unreadable row must fail the list");
+        };
+        let err = err.to_string();
+        assert!(err.contains("org=o id=w2_in is unreadable"), "{err}");
+        let good = fully_decoded_workflows(rows().into_iter().take(1).collect()).unwrap();
+        assert_eq!(good.len(), 1);
+    }
+
+    #[test]
+    fn test_listed_drafts_skip_rows_they_cannot_read() {
+        let ids: Vec<String> = readable_drafts(rows().into_iter().map(draft).collect())
+            .into_iter()
+            .map(|w| w.id)
+            .collect();
+        assert_eq!(ids, ["w1_good"]);
+    }
+
+    #[test]
+    fn test_an_unreadable_workflow_converts_to_an_error() {
+        let Err(err) = Workflow::try_from(model("w2_in", nodes_with_operator("future_op"))) else {
+            panic!("an unknown operator must not convert");
+        };
+        assert!(
+            err.to_string().contains("unknown variant `future_op`"),
+            "{err}"
+        );
+    }
 
     async fn db_with_draft() -> DatabaseConnection {
         let mut opts = ConnectOptions::new("sqlite::memory:".to_string());

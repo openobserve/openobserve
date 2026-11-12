@@ -443,7 +443,7 @@ import {
   formatDuration,
 } from "@/enterprise/components/AIObservability/experimentRowContent";
 import { experimentScoreSummaryValue, openExperimentTrace } from "./experimentResults";
-import { experimentCostText } from "./experimentDiscovery";
+import { experimentCostText, scoreColumnLabel } from "./experimentDiscovery";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 defineOptions({ name: "AIExperimentDetailPage" });
@@ -787,6 +787,7 @@ const metricCards = computed<MetricCard[]>(() => {
       dataTest: "ai-experiment-detail-progress",
     });
   }
+  const clientSummaries = results.clientScoreSummaries ?? [];
   if (scoring && (scoreOutcomes?.total || scoring.total > 0 || results.scoreSummaries?.length)) {
     cards.push({
       key: "scoring",
@@ -799,6 +800,42 @@ const metricCards = computed<MetricCard[]>(() => {
         : t("aiObservability.experiments.detail.scoringDistribution", scoreDistribution),
       icon: "fact-check" as IconName,
       dataTest: "ai-experiment-detail-scoring",
+    });
+  } else if (clientSummaries.length) {
+    // The platform scheduled no scoring, so there is no denominator: count what the code reported.
+    cards.push({
+      key: "scoring",
+      label: t("aiObservability.experiments.detail.scores"),
+      value: String(clientSummaries.reduce((total, summary) => total + summary.sampleCount, 0)),
+      footer: t(
+        "aiObservability.experiments.detail.clientScoresDistribution",
+        { count: clientSummaries.length },
+        clientSummaries.length,
+      ),
+      icon: "fact-check" as IconName,
+      dataTest: "ai-experiment-detail-scoring",
+    });
+  }
+  // Row table score columns come from pinned Scorers, so client scores surface here.
+  for (const summary of clientSummaries) {
+    const id = `${summary.scoreConfigId}-${summary.clientScorerKey}`;
+    cards.push({
+      key: `client-score:${id}`,
+      label: scoreColumnLabel(
+        {
+          name: summary.scoreConfigName || summary.clientScorerKey,
+          clientScorerKey: summary.clientScorerKey,
+        },
+        t,
+      ),
+      value: experimentScoreSummaryValue(summary.value),
+      footer: t(
+        "aiObservability.experiments.detail.clientScoreFooter",
+        { count: summary.sampleCount, key: summary.clientScorerKey },
+        summary.sampleCount,
+      ),
+      icon: "fact-check" as IconName,
+      dataTest: `ai-experiment-detail-client-score-${id}`,
     });
   }
   return cards;

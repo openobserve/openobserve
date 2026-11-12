@@ -189,11 +189,13 @@
               {{
                 scorerType === "llm_judge"
                   ? t("onlineEvals.scorer.detail.promptSection")
-                  : t("onlineEvals.scorer.detail.requestTemplateSection")
+                  : scorerType === "code"
+                    ? t("codeScorer.functionSection")
+                    : t("onlineEvals.scorer.detail.requestTemplateSection")
               }}
               <OTag v-if="variables.length" type="fieldTag" value="soft">
                 {{ variables.length }}
-                {{ t("onlineEvals.scorer.detail.variablesSuffix") }}
+                {{ t("onlineEvals.scorer.detail.variablesSuffix", variables.length) }}
               </OTag>
             </h4>
             <pre class="sd-code text-text-heading" data-test="scorer-detail-template">{{
@@ -412,9 +414,9 @@ function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined
   return row[camel] ?? row[snake];
 }
 
-const scorerType = computed<"llm_judge" | "remote">(() => {
+const scorerType = computed<"llm_judge" | "remote" | "code">(() => {
   const raw = valueOf<string>(props.row, "scorerType", "scorer_type") ?? "llm_judge";
-  return raw === "remote" ? "remote" : "llm_judge";
+  return raw === "remote" || raw === "code" ? raw : "llm_judge";
 });
 
 const params = computed<Record<string, any>>(() => props.row.params ?? {});

@@ -130,7 +130,8 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
     cooldown_mins: cooldownMins ?? 0,
 
     destinations: notifications.destinations,
-    template: check.template ?? null,
+    // With no destination the picker is hidden, so a hidden override is cleared.
+    template: notifications.destinations.length ? (check.template ?? null) : null,
 
     variables: (variables ?? []).map(({ id: _id, name, value, secure, example }) => ({
       name,
@@ -259,7 +260,8 @@ export function buildCreateProtocolCheckPayload(check: ProtocolCheck): Record<st
     cooldown_mins: check.cooldownMins ?? 0,
 
     destinations: check.notifications.destinations,
-    template: check.template ?? null,
+    // With no destination the picker is hidden, so a hidden override is cleared.
+    template: check.notifications.destinations.length ? (check.template ?? null) : null,
 
     variables: (check.variables ?? []).map(({ name, value, secure, example }) => ({
       name,

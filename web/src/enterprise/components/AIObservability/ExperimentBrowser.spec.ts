@@ -19,8 +19,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
 import ExperimentBrowser from "./ExperimentBrowser.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { makeExperiment } from "@/enterprise/views/AIObservability/experimentTestFixtures";
 import type { ExperimentScoreSummary } from "@/services/llm-experiments.service";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { createStore } from "vuex";
 import { writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 
@@ -37,14 +39,27 @@ const cloneExperiment = vi.fn();
 const setBaseline = vi.fn();
 const clearBaseline = vi.fn();
 const toast = vi.fn();
+const compareExperiments = vi.fn();
 vi.mock("@/services/llm-experiments.service", () => ({
   default: {
     clone: (...a: any[]) => cloneExperiment(...a),
     setBaseline: (...a: any[]) => setBaseline(...a),
     clearBaseline: (...a: any[]) => clearBaseline(...a),
+    compare: (...a: any[]) => compareExperiments(...a),
   },
 }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...a: any[]) => toast(...a) }));
+// No disclosure is the healthy answer, so a rising "% true" is a regression.
+vi.mock("@/services/online-evals.service", () => ({
+  default: {
+    scoreConfigs: {
+      list: async () => [
+        { entityId: "cfg-leak", dataType: "boolean", healthyThreshold: { healthy_value: false } },
+        { entityId: "cfg-latency", dataType: "numeric", healthyThreshold: { direction: "lte" } },
+      ],
+    },
+  },
+}));
 
 vi.mock("vue-i18n", () => ({
   // Params are echoed, not dropped: a label is only correct if the right
@@ -117,6 +132,10 @@ const stubs = {
       "isRowSelectable",
       "showHeader",
       "loading",
+      "tree",
+      "getChildren",
+      "rowSection",
+      "sectionOrder",
     ],
     emits: ["update:selectedIds", "row-click"],
     methods: {
@@ -128,6 +147,9 @@ const stubs = {
       },
     },
     template: `<table :data-loading="String(loading ?? false)"><tbody>
+      <template v-if="rowSection">
+        <tr v-for="key in sectionOrder" :key="key"><td><slot name="group-header" :section-key="key" /></td></tr>
+      </template>
       <template v-for="row in data" :key="row.id">
         <tr @click="$emit('row-click', row, $event)">
           <td v-if="selection === 'multiple'">
@@ -354,8 +376,14 @@ describe("ExperimentBrowser", () => {
   });
 
   it("calls clearBaseline when the pin is clicked on the current baseline", async () => {
-    const cleared = makeExperiment({ id: "old", isBaseline: false });
-    clearBaseline.mockResolvedValue(cleared);
+    // The response carries no summary, so the emitted row must keep the listed scores.
+    clearBaseline.mockResolvedValue(makeExperiment({ id: "old", isBaseline: false }));
+    const scoreSummaries = [
+      makeScoreSummary({
+        name: "approved",
+        value: { kind: "boolean", trueCount: 1, falseCount: 0 },
+      }),
+    ];
     const wrapper = mount(ExperimentBrowser, {
       props: {
         orgId: "acme",
@@ -367,6 +395,7 @@ describe("ExperimentBrowser", () => {
             datasetId: "dataset-a",
             createdAt: 1,
             isBaseline: true,
+            scoreSummaries,
           }),
         ],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
@@ -379,7 +408,10 @@ describe("ExperimentBrowser", () => {
 
     expect(clearBaseline).toHaveBeenCalledWith("acme", "old");
     expect(setBaseline).not.toHaveBeenCalled();
-    expect(wrapper.emitted("baseline-changed")?.[0]).toEqual([cleared, null]);
+    expect(wrapper.emitted("baseline-changed")?.[0]).toEqual([
+      expect.objectContaining({ id: "old", name: "old", isBaseline: false, scoreSummaries }),
+      null,
+    ]);
   });
 
   it("calls setBaseline when the pin is clicked on a non-baseline row", async () => {
@@ -673,5 +705,456 @@ describe("ExperimentBrowser", () => {
     expect(wrapper.findAll('[data-test$="-actions-menu-draft-dot"]')).toHaveLength(1);
     const plain = menus.find((m) => m !== drafted[0]);
     expect(plain?.attributes("aria-label")).toBe("common.moreActions");
+  });
+
+  // The mode alone read "none × 39" and hid the 17 full leaks beside it.
+  it("shows every category of a categorical score with its count", () => {
+    const row = experiment("scored", "dataset-a", 1);
+    row.scoreSummaries = [
+      makeScoreSummary({
+        name: "severity",
+        value: { kind: "categorical", counts: { full: 17, none: 39 } },
+      }),
+    ];
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [row], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+
+    expect(wrapper.get('[data-test="cell-score:severity-scored"]').text()).toBe(
+      "none × 39 · full × 17",
+    );
+  });
+
+  const leak = (trueCount: number) => [
+    makeScoreSummary({
+      name: "leak",
+      scoreConfigId: "cfg-leak",
+      sampleCount: 56,
+      value: { kind: "boolean", trueCount, falseCount: 56 - trueCount },
+    }),
+  ];
+
+  it("judges each run against the baseline on its scores, with the delta in each cell", async () => {
+    const base = makeExperiment({
+      id: "base",
+      name: "base",
+      createdAt: 1,
+      isBaseline: true,
+      scoreSummaries: leak(17),
+    });
+    const pr = makeExperiment({ id: "pr", name: "pr", createdAt: 2, scoreSummaries: leak(23) });
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [base, pr], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    const outcome = wrapper.get('[data-test="ai-experiment-outcome-pr"]').text();
+    expect(outcome).toContain("experimentsAtScale.outcome.regressed");
+    expect(outcome).toContain("leak −10.7");
+    expect(wrapper.get('[data-test="ai-experiment-delta-pr-leak"]').text()).toContain("−10.7");
+    expect(wrapper.find('[data-test="ai-experiment-outcome-base"]').exists()).toBe(false);
+    // The trend plots both runs and counts the one outside the band.
+    expect(wrapper.get('[data-test="ai-experiment-trend-regressed"]').text()).toBe(
+      "experimentsAtScale.regressedCount 1",
+    );
+  });
+
+  it("still judges matching runs against a baseline the name search hides", async () => {
+    const base = makeExperiment({
+      id: "base",
+      name: "base",
+      createdAt: 1,
+      isBaseline: true,
+      scoreSummaries: leak(17),
+    });
+    const pr = makeExperiment({ id: "pr", name: "pr", createdAt: 2, scoreSummaries: leak(23) });
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [base, pr], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+    await wrapper.get('[data-test="ai-experiment-name-search"]').setValue("pr");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="ai-experiment-row-base"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="ai-experiment-outcome-pr"]').text()).toContain(
+      "experimentsAtScale.outcome.regressed",
+    );
+    expect(wrapper.find('[data-test="ai-experiment-trend-regressed"]').exists()).toBe(true);
+  });
+
+  it("folds re-runs of one name on one commit into the latest, with their spread", () => {
+    const rerun = (id: string, createdAt: number, trueCount: number) =>
+      makeExperiment({
+        id,
+        name: "gh-pr172-303cfc8",
+        createdAt,
+        metadata: { "git.commit": "303cfc8", "git.pr": 172 },
+        scoreSummaries: leak(trueCount),
+      });
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [rerun("r2", 2, 18), rerun("r1", 1, 15)],
+        datasets: [] as any,
+      },
+      global: { stubs, plugins: [store] },
+    });
+
+    expect(wrapper.find('[data-test="ai-experiment-row-r1"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="ai-experiment-fold-r2"]').text()).toContain(
+      "experimentsAtScale.foldCount 2",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-spread-r2-leak"]').text()).toContain("27–32%");
+  });
+
+  it("judges a run on a newer dataset version over the cases it shares with the baseline", async () => {
+    compareExperiments.mockResolvedValue({
+      counts: { commonRows: 10, new: 1, missing: 0 },
+      dimensions: [
+        {
+          kind: "score",
+          name: "leak",
+          gating: true,
+          comparableRowCount: 10,
+          orientedDelta: 0,
+          delta: 0,
+        },
+      ],
+    });
+    const base = makeExperiment({
+      id: "qa2-base",
+      name: "qa2-base",
+      createdAt: 1,
+      isBaseline: true,
+      datasetVersion: 10,
+      scoreSummaries: leak(17),
+    });
+    // Its own means include the failing new case, so alone they read as a regression.
+    const dsv11 = makeExperiment({
+      id: "qa2-dsv11",
+      name: "qa2-dsv11",
+      createdAt: 2,
+      datasetVersion: 11,
+      scoreSummaries: leak(23),
+    });
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [base, dsv11], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    expect(compareExperiments).toHaveBeenCalledWith("acme", "qa2-base", "qa2-dsv11");
+    expect(wrapper.get('[data-test="ai-experiment-outcome-qa2-dsv11"]').text()).toContain(
+      "experimentsAtScale.outcome.unchanged",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-cases-qa2-dsv11"]').text()).toContain(
+      "experimentsAtScale.sharedCasesExcluded 10 1",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-delta-qa2-dsv11-leak"]').text()).toContain("0.0");
+    expect(wrapper.find('[data-test="ai-experiment-trend-point-qa2-dsv11"]').exists()).toBe(true);
+    expect(wrapper.get('[data-test="ai-experiment-trend-regressed"]').text()).toBe(
+      "experimentsAtScale.regressedCount 0",
+    );
+  });
+
+  // An SDK run with `scorers: []` whose code reports its own Scores.
+  it("gives client-reported scores their own column and judges them against the baseline", async () => {
+    const clientLeak = (trueCount: number) => [
+      {
+        scoreConfigId: "cfg-leak",
+        scoreConfigName: "leak",
+        clientScorerKey: "ci_leak",
+        sampleCount: 56,
+        value: { kind: "boolean", trueCount, falseCount: 56 - trueCount },
+      },
+    ];
+    const base = makeExperiment({
+      id: "sdk-base",
+      name: "sdk-base",
+      createdAt: 1,
+      isBaseline: true,
+      scoreSummaries: [],
+      clientScoreSummaries: clientLeak(17),
+    });
+    const pr = makeExperiment({
+      id: "sdk-pr",
+      name: "sdk-pr",
+      createdAt: 2,
+      scoreSummaries: [],
+      clientScoreSummaries: clientLeak(23),
+    });
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [base, pr], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    const column = "score:client:cfg-leak:ci_leak";
+    const columns = wrapper.findComponent(stubs.OTable).props("columns") as OTableColumnDef[];
+    const header = columns.find((entry) => entry.id === column);
+    expect(header?.header).toBe("experimentsAtScale.clientScore leak");
+    expect(header?.meta?.headerTooltip).toBe("experimentsAtScale.clientScoreTooltip ci_leak");
+    expect(wrapper.get(`[data-test="cell-${column}-sdk-pr"]`).text()).toContain("41% true");
+
+    const outcome = wrapper.get('[data-test="ai-experiment-outcome-sdk-pr"]').text();
+    expect(outcome).toContain("experimentsAtScale.outcome.regressed");
+    expect(outcome).toContain("experimentsAtScale.clientScore leak −10.7");
+    expect(
+      wrapper.get('[data-test="ai-experiment-delta-sdk-pr-client:cfg-leak:ci_leak"]').text(),
+    ).toContain("−10.7");
+    expect(wrapper.get('[data-test="ai-experiment-trend-regressed"]').text()).toBe(
+      "experimentsAtScale.regressedCount 1",
+    );
+  });
+
+  // Four completed re-runs of qa2-flaky on PR 108, then a cancelled fifth.
+  it("keeps the newest completed re-run's verdict when a newer re-run was cancelled", async () => {
+    route.query = { group: "pr", sort: "regressions" };
+    const flaky = (
+      id: string,
+      createdAt: number,
+      trueCount: number,
+      status: "completed" | "cancelled" = "completed",
+    ) =>
+      makeExperiment({
+        id,
+        name: "qa2-flaky",
+        createdAt,
+        status,
+        metadata: { "git.commit": "108aaaa", "git.pr": 108 },
+        scoreSummaries: status === "completed" ? leak(trueCount) : [],
+      });
+    const base = makeExperiment({
+      id: "flaky-base",
+      name: "flaky-base",
+      createdAt: 1,
+      isBaseline: true,
+      scoreSummaries: leak(17),
+    });
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [
+          base,
+          flaky("f1", 2, 17),
+          flaky("f2", 3, 18),
+          flaky("f3", 4, 16),
+          flaky("f4", 5, 23),
+          flaky("f5", 6, 0, "cancelled"),
+        ],
+        datasets: [] as any,
+        syncUrl: true,
+      },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="ai-experiment-row-f5"]').exists()).toBe(false);
+    const outcome = wrapper.get('[data-test="ai-experiment-outcome-f4"]').text();
+    expect(outcome).toContain("experimentsAtScale.outcome.regressed");
+    expect(outcome).toContain("leak −10.7");
+    expect(wrapper.get('[data-test="ai-experiment-newer-rerun-f4"]').text()).toContain(
+      "experimentsAtScale.newerRerun Cancelled",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-spread-f4-leak"]').text()).toContain(
+      "experimentsAtScale.spread 4 ",
+    );
+    // One count everywhere: the four settled runs; the cancelled one is named beside them.
+    const fold = wrapper.get('[data-test="ai-experiment-fold-f4"]');
+    expect(fold.text()).toContain("experimentsAtScale.foldCount 4");
+    expect(fold.findComponent(OTooltip).props("content")).toContain(
+      "experimentsAtScale.incomplete.cancelled 1",
+    );
+    const section = wrapper.get('[data-test="ai-experiment-ci-group-pr:108"]').text();
+    expect(section).toContain("experimentsAtScale.groupRuns 4");
+    expect(section).toContain("experimentsAtScale.incomplete.cancelled 1");
+    expect(wrapper.get('[data-test="ai-experiment-ci-group-pr:108"]').text()).toContain(
+      "experimentsAtScale.regressedCount 1",
+    );
+    expect(wrapper.find('[data-test="ai-experiment-trend-point-f4"]').exists()).toBe(true);
+  });
+
+  it("groups by pull request from the URL and writes the sort back to it", async () => {
+    route.query = { group: "pr" };
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [
+          makeExperiment({ id: "pr", name: "pr", metadata: { "git.pr": "181" } }),
+          makeExperiment({ id: "hand", name: "hand", createdAt: 2 }),
+        ],
+        datasets: [] as any,
+        syncUrl: true,
+      },
+      global: { stubs, plugins: [store] },
+    });
+
+    expect(wrapper.get('[data-test="ai-experiment-ci-group-pr:181"]').text()).toContain(
+      "experimentsAtScale.prGroup 181",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-ci-group-none"]').text()).toContain(
+      "experimentsAtScale.noGroup.pr",
+    );
+
+    await wrapper.get('[data-test="ai-experiment-sort"]').setValue("regressions");
+    await flushPromises();
+    expect(replace).toHaveBeenLastCalledWith({ query: { group: "pr", sort: "regressions" } });
+  });
+
+  // qa2-partial, whose tone Scorer errored on 5 of 10 rows.
+  it("judges a run whose scorer failed on some rows by its other scores, and marks the failed one", async () => {
+    const base = makeExperiment({
+      id: "base",
+      name: "base",
+      createdAt: 1,
+      isBaseline: true,
+      scoreSummaries: leak(17),
+    });
+    const tone = makeScoreSummary({
+      name: "tone",
+      sampleCount: 5,
+      errorCount: 5,
+      value: { kind: "numeric", mean: 0.5 },
+    });
+    const partial = makeExperiment({
+      id: "partial",
+      name: "partial",
+      createdAt: 2,
+      status: "scoring_failed",
+      scoreSummaries: [...leak(23), tone],
+    });
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [base, partial], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    expect(wrapper.get('[data-test="ai-experiment-outcome-partial"]').text()).toContain(
+      "experimentsAtScale.outcome.regressed",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-score-errors-partial-tone"]').text()).toContain(
+      "experimentsAtScale.scoreErrors 5",
+    );
+    expect(wrapper.find('[data-test="ai-experiment-score-errors-partial-leak"]').exists()).toBe(
+      false,
+    );
+  });
+
+  // Unranged qa2-latency (lte), baseline 100, run 0.
+  it("reads an unranged score's move as a percent of the baseline, not points", async () => {
+    const latency = (mean: number) => [
+      makeScoreSummary({
+        name: "latency",
+        scoreConfigId: "cfg-latency",
+        value: { kind: "numeric", mean },
+      }),
+    ];
+    const base = makeExperiment({
+      id: "base",
+      name: "base",
+      createdAt: 1,
+      isBaseline: true,
+      scoreSummaries: latency(100),
+    });
+    const fast = makeExperiment({
+      id: "fast",
+      name: "fast",
+      createdAt: 2,
+      scoreSummaries: latency(0),
+    });
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [base, fast], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    expect(wrapper.get('[data-test="ai-experiment-outcome-fast"]').text()).toContain(
+      "experimentsAtScale.headlineRelative latency +100.0",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-delta-fast-latency"]').text()).toContain(
+      "+100.0%",
+    );
+  });
+
+  // qa2-allerr: every task errored, then finalized.
+  it("says how many tasks failed on a completed run and refuses it as the baseline", async () => {
+    const allErr = makeExperiment({
+      id: "allerr",
+      name: "allerr",
+      createdAt: 1,
+      status: "completed",
+      taskOutcomes: { total: 10, succeeded: 0, failed: 10, pending: 0, skipped: 0 },
+    });
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [allErr], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    expect(wrapper.get('[data-test="ai-experiment-task-failures-allerr"]').text()).toContain(
+      "experimentsAtScale.tasksFailed 10 10",
+    );
+    expect(
+      wrapper.get('[data-test="ai-experiment-baseline-allerr"]').attributes("disabled"),
+    ).toBeDefined();
+  });
+
+  // The row numbers follow the data, so the data must be in section order.
+  it("hands the table its rows in the order the sections show them", async () => {
+    route.query = { group: "pr" };
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [
+          makeExperiment({ id: "pr1", name: "pr1", createdAt: 1, metadata: { "git.pr": "1" } }),
+          makeExperiment({ id: "hand", name: "hand", createdAt: 3 }),
+          makeExperiment({ id: "pr2", name: "pr2", createdAt: 2, metadata: { "git.pr": "2" } }),
+        ],
+        datasets: [] as any,
+        syncUrl: true,
+      },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    const table = wrapper.findComponent(stubs.OTable);
+    expect(table.props("sectionOrder")).toEqual(["pr:2", "pr:1", "none"]);
+    expect((table.props("data") as { id: string }[]).map(({ id }) => id)).toEqual([
+      "pr2",
+      "pr1",
+      "hand",
+    ]);
+  });
+
+  // CI re-runs minutes apart read "Nov 6 … Nov 6" without the time.
+  it("adds the time to the trend axis when its first and last runs share a day", async () => {
+    const day = new Date(2026, 10, 6, 10, 0).getTime();
+    const base = makeExperiment({
+      id: "base",
+      name: "base",
+      createdAt: day,
+      isBaseline: true,
+      scoreSummaries: leak(17),
+    });
+    const pr = makeExperiment({
+      id: "pr",
+      name: "pr",
+      createdAt: day + 30 * 60_000,
+      scoreSummaries: leak(23),
+    });
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [base, pr], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    const axis = wrapper
+      .findAll('[data-test="ai-experiment-trend"] text')
+      .filter((text) => text.attributes("y") === "136")
+      .map((text) => text.text());
+    expect(axis).toHaveLength(2);
+    expect(axis[0]).not.toBe(axis[1]);
   });
 });
