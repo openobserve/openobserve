@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :allow-annotations-a-p-i="false"
       @error="onPanelError"
       @updated:data-zoom="$emit('zoom', $event)"
+      @painted="$emit('painted')"
     />
   </div>
 </template>
@@ -121,7 +122,7 @@ export default defineComponent({
    * show its error tile — the query itself already succeeded (these are already
    * fetched results), so this is a render-time failure only.
    */
-  emits: ["error", "zoom"],
+  emits: ["error", "zoom", "painted"],
   setup(props, { emit }) {
     /** How many series the chart will actually draw, across every query. */
     const seriesCount = () => {

@@ -32,13 +32,13 @@ use crate::{common::utils::redirect_response::RedirectResponseBuilder, service::
     context_path = "/api",
     operation_id = "createShortUrl",
     summary = "Create short URL",
-    description = "Generates a shortened URL from a longer original URL. This is useful for creating more manageable links for dashboards, reports, or search queries that can be easily shared via email, chat, or documentation. The short URL remains valid and can be used to redirect back to the original destination.",
+    description = "Generates a shortened URL from a longer original URL. This is useful for creating more manageable links for dashboards, reports, or search queries that can be easily shared via email, chat, or documentation. The original URL must be an http(s) URL or a path starting with '/'; only its path, query and fragment are stored, so the short URL always resolves within this OpenObserve instance.",
     request_body(
         content = inline(ShortenUrlRequest),
         description = "The original URL to shorten",
         content_type = "application/json",
         example = json!({
-            "original_url": "https://example.com/some/long/url"
+            "original_url": "https://openobserve.example.com/web/logs?stream=default&org_identifier=default"
         })
     ),
     responses(
@@ -51,7 +51,7 @@ use crate::{common::utils::redirect_response::RedirectResponseBuilder, service::
                 "short_url": "http://localhost:5080/short/ddbffcea3ad44292"
             })
         ),
-        (status = 400, description = "Invalid request", content_type = "application/json")
+        (status = 400, description = "Invalid request, or original_url is not an http(s) URL or a path starting with '/'", content_type = "application/json")
     ),
     security(("Authorization" = [])),
     extensions(
@@ -89,14 +89,14 @@ pub struct RetrieveQuery {
     context_path = "/api",
     operation_id = "resolveShortUrl",
     summary = "Resolve short URL",
-    description = "Resolves a shortened URL back to its original destination. By default, this endpoint redirects the user to the original URL. When the 'type=ui' query parameter is provided, it returns the original URL as JSON instead of performing a redirect. This is useful for applications that need to inspect or validate URLs before navigation.",
+    description = "Resolves a shortened URL. By default, this endpoint redirects to the web UI route /web/short/{short_id}, which loads the stored destination. When the 'type=ui' query parameter is provided, it returns the stored destination as a JSON string instead of redirecting.",
     params(
         ("short_id" = String, Path, description = "The short ID to retrieve the original URL", example = "ddbffcea3ad44292"),
         ("type" = Option<String>, Query, description = "Response type - if 'ui', returns JSON object instead of redirect", example = "ui")
     ),
     responses(
-        (status = 302, description = "Redirect to original URL (if < 1024 chars) or /web/short_url/{short_id}", headers(
-            ("Location" = String, description = "The original URL or /web/short_url/{short_id} to which the client is redirected")
+        (status = 302, description = "Redirect to the web UI route /web/short/{short_id}", headers(
+            ("Location" = String, description = "The /web/short/{short_id} URL of this instance")
         )),
         (status = 200, description = "JSON response when type=ui", body = String, content_type = "application/json"),
         (status = 404, description = "Short URL not found", content_type = "text/plain")

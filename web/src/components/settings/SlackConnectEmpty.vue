@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
+import config from "@/aws-exports";
 import addToSlackImage from "@/assets/images/common/add_to_slack.png";
 import addToSlackImage2x from "@/assets/images/common/add_to_slack@2x.png";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -58,7 +59,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{ setup: []; installed: [confirmation: SlackInstallConfirmation] }>();
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
+// The digest is an enterprise and Cloud feature, so only those builds mention it.
+const autoobserveEdition = props.isCloud || config.isEnterprise == "true";
 const store = useStore();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const orgName = computed<string>(() => store.state.selectedOrganization?.label || org.value);
@@ -69,6 +72,36 @@ const instance = computed(() => installations.data.value?.instance ?? null);
 const offered = computed(() =>
   props.available.filter((item) => item.installation_id !== instance.value?.installation_id),
 );
+const addedDay = (micros: number): string =>
+  new Intl.DateTimeFormat(locale.value, { dateStyle: "medium" }).format(micros / 1000);
+const addedTime = (micros: number): string =>
+  new Intl.DateTimeFormat(locale.value, { timeStyle: "short", hourCycle: "h23" }).format(
+    micros / 1000,
+  );
+// Only rows that share a name get a second line, so the usual single workspace keeps its layout.
+const offeredDetail = computed(() => {
+  const detail = new Map<string, I18nText>();
+  for (const item of offered.value) {
+    const twins = offered.value.filter((o) => o !== item && o.team_name === item.team_name);
+    if (!twins.length) continue;
+    const day = item.created_at ? addedDay(item.created_at) : null;
+    const sameDay =
+      day !== null && twins.some((o) => o.created_at && addedDay(o.created_at) === day);
+    const added =
+      item.created_at && day
+        ? sameDay
+          ? t("slackApp.connect.addedOnAt", {
+              date: raw(day),
+              time: raw(addedTime(item.created_at)),
+            })
+          : t("slackApp.connect.addedOn", { date: raw(day) })
+        : null;
+    const app = item.app_name ? raw(item.app_name) : null;
+    const line = app && added ? t("slackApp.connect.appAndAdded", { app, added }) : (app ?? added);
+    if (line) detail.set(item.installation_id, line);
+  }
+  return detail;
+});
 const copyRequest = (): void => {
   const notice = instance.value;
   if (!notice) return;
@@ -283,7 +316,15 @@ const nextSteps = computed<I18nText[]>(() =>
         class="border-border-default flex items-center justify-between gap-3 border-t pt-3"
         :data-test="`slack-available-${item.installation_id}`"
       >
-        <span class="text-text-body text-sm font-medium">{{ raw(item.team_name) }}</span>
+        <div class="flex min-w-0 flex-col">
+          <span class="text-text-body text-sm font-medium">{{ raw(item.team_name) }}</span>
+          <span
+            v-if="offeredDetail.has(item.installation_id)"
+            class="text-text-secondary text-xs"
+            :data-test="`slack-available-detail-${item.installation_id}`"
+            >{{ offeredDetail.get(item.installation_id) }}</span
+          >
+        </div>
         <OButton
           variant="primary"
           size="sm-action"
@@ -303,6 +344,11 @@ const nextSteps = computed<I18nText[]>(() =>
         :title="t('slackApp.connect.title')"
         :backdrop="false"
       >
+        <template v-if="autoobserveEdition" #description>
+          <span data-test="slack-connect-autoobserve">{{
+            t("slackApp.connect.autoobserveHint")
+          }}</span>
+        </template>
         <template #actions>
           <OButton
             v-if="isCloud"

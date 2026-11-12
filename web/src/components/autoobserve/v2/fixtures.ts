@@ -48,6 +48,8 @@ import {
   type Severity,
 } from "../data/facts";
 import type { LogEntry } from "./useDecisions";
+import type { LookKind } from "./changes";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 export type { Autonomy, HistoryKind, Outcome, RequestKind, Scenario, Severity };
 export type ProblemOutcome = Outcome | "fixing" | "contained";
@@ -96,10 +98,20 @@ export interface Problem {
   chart: ProblemChart;
 }
 
+// Ready-made card text for a request that has no fixture copy keys, such as an engine finding.
+export interface RequestCopy {
+  label: I18nText;
+  headline: I18nText;
+  why: I18nText | null;
+  tags: { label: I18nText; variant: BadgeVariant; hint?: I18nText }[];
+  look: LookKind;
+}
+
 export interface Request {
   id: string;
   problem?: string;
   kind: RequestKind;
+  copy?: RequestCopy;
   doneSettled?: Msg;
   body: Msg;
   yes: I18nKey;
@@ -448,12 +460,20 @@ export const DESTINATION_OPTIONS: DestinationOption[] = DESTINATIONS.map((d) => 
 
 export const LAST_CHECKED = LAST_CHECKED_MINUTES;
 
-export const ALL_SERVICES = scenarioFacts("demo").services.map((s) => s.name);
+export const allServices = () => scenarioFacts("demo").services.map((s) => s.name);
 
 export { SCENARIOS };
 
-export const coverageSummary = (scenario: Scenario) => {
-  const s = serviceStats(scenario);
+export interface ServiceCounts {
+  total: number;
+  watching: number;
+  learning: number;
+  unseen: number;
+}
+
+export const coverageSummary = (scenario: Scenario) => summaryOf(serviceStats(scenario));
+
+export const summaryOf = (s: ServiceCounts) => {
   const watched = s.watching + s.learning;
   const allLearning = s.learning === s.total;
   const head = allLearning

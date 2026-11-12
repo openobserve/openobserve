@@ -4,6 +4,7 @@ import { computed, ref, shallowRef } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 
 import alertsService from "@/services/alerts";
+import { isForbiddenError } from "@/composables/security/useSecurityAccess";
 import type { DetectionMeta } from "@/utils/security/detection";
 import { detectionMetaOf } from "@/utils/security/detection";
 
@@ -28,6 +29,9 @@ export function useSiemDetections() {
   const alerts = shallowRef<Record<string, any>[]>([]);
   const loading = ref(false);
   const error = ref("");
+  /** The caller cannot list alerts, so an empty list says nothing about detections. */
+  const forbidden = ref(false);
+  const failure = shallowRef<unknown>(null);
 
   const rows = computed<DetectionRow[]>(() =>
     alerts.value.map((alert) => ({ alert, meta: detectionMetaOf(alert) })),
@@ -68,10 +72,13 @@ export function useSiemDetections() {
       alerts.value = cached.list;
       loading.value = false;
       error.value = "";
+      forbidden.value = false;
       return;
     }
     loading.value = true;
     error.value = "";
+    forbidden.value = false;
+    failure.value = null;
     try {
       const res = await alertsService.listByFolderId(0, 1000, "name", false, "", orgId);
       const list = (res.data?.list ?? []).map((row: any) => ({
@@ -86,7 +93,11 @@ export function useSiemDetections() {
       );
     } catch (e: any) {
       if (seq !== loadSeq) return;
-      error.value = e?.response?.data?.message ?? t("siem.detections.loadError");
+      failure.value = e;
+      forbidden.value = isForbiddenError(e);
+      error.value = forbidden.value
+        ? ""
+        : (e?.response?.data?.message ?? t("siem.detections.loadError"));
     } finally {
       if (seq === loadSeq) loading.value = false;
     }
@@ -129,6 +140,8 @@ export function useSiemDetections() {
     byId,
     loading,
     error,
+    forbidden,
+    failure,
     load,
     loadFull,
     patch,

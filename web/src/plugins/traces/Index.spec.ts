@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent, h, KeepAlive, nextTick, reactive, ref } from "vue";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { createMemoryHistory, createRouter } from "vue-router";
 import Index from "@/plugins/traces/Index.vue";
 import DateTime from "@/components/DateTime.vue";
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
@@ -406,6 +407,8 @@ describe("Index.vue (Main Traces Page)", () => {
   const routerCurrentRouteSpy = vi.spyOn(router, "currentRoute", "get").mockReturnValue({
     value: { query: {}, name: "traces", path: "/traces" },
   } as any);
+  // The shared router's install navigation never settles here, so it must not read as leaving Traces.
+  vi.spyOn(router, "beforeEach").mockReturnValue(() => {});
 
   beforeEach(async () => {
     // Set default stream mock implementations (tests can override with mockResolvedValueOnce)
@@ -2192,6 +2195,18 @@ describe("Index.vue (Main Traces Page)", () => {
       mockSearchObj.meta.metricsRangeFilters.clear();
       // Reset auto_query_enabled to undefined for each test
       delete store.state.zoConfig.auto_query_enabled;
+    });
+
+    it("should grow the query pane with the filter builder and shrink it back", async () => {
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+      const bar = wrapper.findComponent('[data-test="logs-search-bar"]');
+      bar.vm.$emit("filterBuilderGrowth", 54);
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(90 + 54);
+      bar.vm.$emit("filterBuilderGrowth", null);
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(90);
     });
 
     it("should render the drill-down target in the search tab", async () => {
@@ -4348,6 +4363,18 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(query.tab).toBe("spans");
     });
 
+    it("skips the URL write when the view finishes applying after leaving Traces", async () => {
+      await mountPage();
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: {}, name: "logs", path: "/logs" },
+      } as any);
+      routerReplaceSpy.mockClear();
+
+      await applyViewAndWaitForSearch(savedView());
+
+      expect(routerReplaceSpy).not.toHaveBeenCalled();
+    });
+
     it("applies a view saved without selectedFields as no selected fields", async () => {
       await mountPage();
       mockSearchObj.data.stream.selectedFields = ["stale_field"];
@@ -4658,6 +4685,162 @@ describe("Index.vue (Main Traces Page)", () => {
       warn.mockRestore();
       err.mockRestore();
       mockSearchObj.data.queryPayload = null;
+    });
+  });
+
+  describe("URL writes around leaving Traces", () => {
+    const makeRouter = () =>
+      createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/traces", name: "traces", component: { template: "<div />" } },
+          { path: "/logs", name: "logs", component: { template: "<div />" } },
+        ],
+      });
+
+    const mountOn = async (appRouter: ReturnType<typeof makeRouter>) => {
+      await appRouter.push("/traces");
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, appRouter],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+    };
+
+    const changeMode = async (mode: "traces" | "spans") => {
+      mockSearchObj.meta.searchMode = mode;
+      await flushPromises();
+    };
+
+    const holdNavigation = (appRouter: ReturnType<typeof makeRouter>) => {
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      appRouter.beforeEach(() => gate);
+      return release;
+    };
+
+    it("still writes the mode to the URL while on Traces", async () => {
+      const appRouter = makeRouter();
+      await mountOn(appRouter);
+      await changeMode("traces");
+      expect(appRouter.currentRoute.value.query.tab).toBe("traces");
+    });
+
+    it("skips a mode write that lands after leaving", async () => {
+      const appRouter = makeRouter();
+      await mountOn(appRouter);
+      await appRouter.push("/logs");
+      await changeMode("traces");
+      expect(appRouter.currentRoute.value.fullPath).toBe("/logs");
+    });
+
+    it("lets a pending navigation finish when a mode write lands during it", async () => {
+      const appRouter = makeRouter();
+      await mountOn(appRouter);
+      const release = holdNavigation(appRouter);
+      const leaving = appRouter.push("/logs");
+      await flushPromises();
+      await changeMode("traces");
+      release();
+      await leaving;
+      await flushPromises();
+      expect(appRouter.currentRoute.value.fullPath).toBe("/logs");
+    });
+
+    it("writes again after a guard threw on the way out", async () => {
+      const appRouter = makeRouter();
+      await mountOn(appRouter);
+      const stop = appRouter.beforeEach(() => {
+        throw new Error("guard failed");
+      });
+      await expect(appRouter.push("/logs")).rejects.toThrow("guard failed");
+      stop();
+      await changeMode("traces");
+      expect(appRouter.currentRoute.value.query.tab).toBe("traces");
+    });
+
+    it("skips the query builder write after leaving but still returns the request", async () => {
+      const appRouter = makeRouter();
+      await mountOn(appRouter);
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      await appRouter.push("/logs");
+      const pushSpy = vi.spyOn(appRouter, "push");
+      expect(wrapper.vm.buildSearch()).toBeTruthy();
+      await flushPromises();
+      expect(pushSpy).not.toHaveBeenCalled();
+      expect(appRouter.currentRoute.value.fullPath).toBe("/logs");
+    });
+
+    it("skips the query builder write during a pending navigation", async () => {
+      const appRouter = makeRouter();
+      await mountOn(appRouter);
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      const release = holdNavigation(appRouter);
+      const leaving = appRouter.push("/logs");
+      await flushPromises();
+      const pushSpy = vi.spyOn(appRouter, "push");
+      expect(wrapper.vm.buildSearch()).toBeTruthy();
+      expect(pushSpy).not.toHaveBeenCalled();
+      release();
+      await leaving;
+      expect(appRouter.currentRoute.value.fullPath).toBe("/logs");
+    });
+
+    it("keeps the query builder write while on Traces", async () => {
+      const appRouter = makeRouter();
+      await mountOn(appRouter);
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      const pushSpy = vi.spyOn(appRouter, "push");
+      expect(wrapper.vm.buildSearch()).toBeTruthy();
+      expect(pushSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not strip run-query over a pending navigation", async () => {
+      const appRouter = makeRouter();
+      mockGetStreams.mockClear();
+      let finishStreams: (value: unknown) => void = () => {};
+      mockGetStreams.mockReturnValueOnce(new Promise((resolve) => (finishStreams = resolve)));
+      await appRouter.push("/traces?run-query=true");
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, appRouter],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await vi.waitFor(() => expect(mockGetStreams).toHaveBeenCalled(), { timeout: 2000 });
+      expect(appRouter.currentRoute.value.query["run-query"]).toBe("true");
+      const release = holdNavigation(appRouter);
+      const leaving = appRouter.push("/logs");
+      await flushPromises();
+      const replaceSpy = vi.spyOn(appRouter, "replace");
+      finishStreams(mockStreamList);
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false), { timeout: 2000 });
+      await flushPromises();
+      expect(replaceSpy).not.toHaveBeenCalled();
+      release();
+      await leaving;
+      await flushPromises();
+      expect(appRouter.currentRoute.value.fullPath).toBe("/logs");
     });
   });
 });

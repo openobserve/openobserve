@@ -14,12 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  AI Observability module shell — mirrors the Settings/IAM scaffold so the
-  module fits the new app-wide UX (left section rail + breadcrumb in the top
-  chrome). The rail is data-driven via SectionHubGroup[]; routing each item
-  picks the route the rail/breadcrumb highlight.
--->
+<!-- AI Observability shell: a section rail; tabbed rail items draw a tab strip, one route per tab. -->
 <template>
   <OPageLayout bleed :sidebar-width="railCollapsed ? RAIL_COLLAPSED_WIDTH : RAIL_WIDTH">
     <template #sidebar>
@@ -30,22 +25,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('aiObservability.title')"
         :icon="AI_ICON"
         collapsible
-      />
+      >
+        <!-- Rail foot: Playground and a Tools menu of Configure pages; they stack when collapsed. -->
+        <template v-if="footerItem || configureItems.length" #footer="{ collapsed }">
+          <div class="flex gap-2" :class="collapsed ? 'flex-col items-center' : 'items-center'">
+            <OButton
+              v-if="footerItem"
+              variant="outline-primary"
+              :size="collapsed ? 'icon-md' : 'md'"
+              :active="activeSection === footerItem.key"
+              :icon-left="collapsed ? undefined : 'play-arrow'"
+              :icon-right="footerItem.locked && !collapsed ? 'lock' : undefined"
+              :aria-label="collapsed ? footerItem.label : undefined"
+              :aria-current="activeSection === footerItem.key ? 'page' : undefined"
+              :class="collapsed ? undefined : 'flex-1'"
+              :data-test="footerItem.locked ? `${footerItem.dataTest}-locked` : footerItem.dataTest"
+              @click="openEntry(footerItem)"
+            >
+              <OIcon v-if="collapsed" name="play-arrow" size="sm" />
+              <template v-else>{{ footerItem.label }}</template>
+              <OTooltip v-if="collapsed" :content="footerItem.label" side="right" />
+            </OButton>
+            <ODropdown
+              v-if="configureItems.length"
+              v-model:open="toolsOpen"
+              :side="collapsed ? 'right' : 'top'"
+              align="end"
+            >
+              <template #trigger>
+                <OButton
+                  variant="outline"
+                  size="icon-md"
+                  :active="configureActive"
+                  :aria-label="t('aiObservability.nav.tools')"
+                  data-test="ai-rail-tools"
+                >
+                  <OIcon name="tune" size="sm" />
+                  <!-- Off while the menu is open: it would sit over the menu's items. -->
+                  <OTooltip
+                    v-if="!toolsOpen"
+                    :content="t('aiObservability.nav.tools')"
+                    side="right"
+                  />
+                </OButton>
+              </template>
+              <ODropdownGroup :label="groupLabels.Configure">
+                <ODropdownItem
+                  v-for="entry in configureItems"
+                  :key="entry.key"
+                  :icon-left="entry.icon"
+                  :aria-current="activeSection === entry.key ? 'page' : undefined"
+                  :data-test="entry.locked ? `${entry.dataTest}-locked` : entry.dataTest"
+                  @select="openEntry(entry)"
+                >
+                  {{ entry.label }}
+                  <template v-if="entry.locked" #icon-right>
+                    <OIcon name="lock" size="xs" />
+                  </template>
+                </ODropdownItem>
+              </ODropdownGroup>
+            </ODropdown>
+          </div>
+        </template>
+      </SectionRail>
     </template>
 
-    <section class="h-full min-h-0 min-w-0 overflow-y-auto">
-      <OnlineEvalsDisabled v-if="onlineEvalsRouteOff" />
-      <router-view v-else />
+    <section class="flex h-full min-h-0 min-w-0 flex-col">
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        <OnlineEvalsDisabled v-if="onlineEvalsRouteOff" />
+        <!-- Only pages that declare the event get the listener; elsewhere Vue warns on fragment roots. -->
+        <router-view v-else v-slot="{ Component }">
+          <component :is="Component" v-bind="aiChatListener(Component)" />
+        </router-view>
+      </div>
     </section>
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { computed, provide, ref, watch, type VNode } from "vue";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import type { SectionHubGroup, SectionHubItem } from "@/components/common/SectionHub.vue";
 import { navSection } from "./navSection";
@@ -53,13 +121,26 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import {
   AI_OBSERVABILITY_SECTIONS,
+  AI_OBSERVABILITY_TABBED_ITEMS,
   ONLINE_EVAL_FEATURE_KEYS,
+  type AiObservabilityGroup,
+  type AiObservabilityTabbedItemKey,
 } from "@/composables/shared/useAIObservabilityRoutes";
 import {
   hidesOnlineEvalEntries,
   useOnlineEvalsRouteOff,
 } from "@/composables/shared/useOnlineEvalsGate";
 import OnlineEvalsDisabled from "@/components/OnlineEvalsDisabled.vue";
+import { AI_SECTION_TABS } from "@/enterprise/components/AIObservability/aiSectionTabs";
+
+const emit = defineEmits<{ (e: "sendToAiChat", ...args: unknown[]): void }>();
+
+const forwardToAiChat = (...args: unknown[]) => emit("sendToAiChat", ...args);
+function aiChatListener(page: VNode | undefined) {
+  const emits = (page?.type as { emits?: string[] | Record<string, unknown> } | undefined)?.emits;
+  const declared = Array.isArray(emits) ? emits.includes("sendToAiChat") : !!emits?.sendToAiChat;
+  return declared ? { onSendToAiChat: forwardToAiChat } : {};
+}
 
 /** The same mark the primary nav uses for this module, so the collapsed rail
  *  still says which module it belongs to. */
@@ -97,37 +178,38 @@ defineOptions({ name: "AIObservabilityShell" });
 const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
+const router = useRouter();
 
 const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization?.identifier,
 }));
 
-const activeSection = computed<string>(() => navSection(route.name, route.query.tab));
+/** The lit section: a rail item of its own, or a tab of one. */
+const activeTab = computed<string>(() => navSection(route.name, route.query.tab));
 
 // A deep link to an evaluation page with evaluations off renders the disabled state instead.
 const onlineEvalsRouteOff = useOnlineEvalsRouteOff();
 
-// Single source of truth for the rail items (groups) AND the breadcrumb
-// switcher, derived from AI_OBSERVABILITY_SECTIONS — the SAME list the OSS
-// and enterprise routers build their /ai routes from (see
-// composables/shared/useAIObservabilityRoutes.ts), so a nav item's
-// `featureKey`/`routeName` can't drift from what actually gates/names its
-// route. Every section beyond Monitor's LLM Insights + Sessions is
-// enterprise/cloud-only — rather than hiding those items in OSS, they stay
-// visible but locked (lock icon + pitch-card tooltip), matching the
-// Settings/IAM rail pattern.
-const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => {
+type SectionEntry = Omit<SectionHubItem, "icon" | "dataTest"> & {
+  icon: IconName;
+  dataTest: string;
+  group: AiObservabilityGroup;
+  tabOf?: AiObservabilityTabbedItemKey;
+  footer?: true;
+};
+
+// Derived from AI_OBSERVABILITY_SECTIONS, the list the routers use, so nav keys can't drift from routes.
+const sectionEntries = computed<SectionEntry[]>(() => {
   const featureGateCtx = buildFeatureGateContext(store.state.zoConfig);
   // With online evaluations off the server serves no evaluation sections, so drop them.
   const hideEvalSections = hidesOnlineEvalEntries(store.state.zoConfig);
-  // Memoized per featureKey, not per nav item — the four Evaluate entries
-  // share one key and would otherwise recompute the same access check 4x.
+  // Per featureKey, not per section: the four Evaluations tabs share one key.
   const accessByFeatureKey = new Map<string, ReturnType<typeof checkFeatureAccess>>();
-  const sections = hideEvalSections
-    ? AI_OBSERVABILITY_SECTIONS.filter(
-        (section) => !section.featureKey || !ONLINE_EVAL_FEATURE_KEYS[section.featureKey],
-      )
-    : AI_OBSERVABILITY_SECTIONS;
+  const sections = AI_OBSERVABILITY_SECTIONS.filter(
+    (section) =>
+      !(hideEvalSections && section.featureKey && ONLINE_EVAL_FEATURE_KEYS[section.featureKey]) &&
+      (!section.requiresConfigFlag || store.state.zoConfig?.[section.requiresConfigFlag] === true),
+  );
   return sections.map((section) => {
     let locked: boolean | undefined;
     let lockedMessage: I18nText | undefined;
@@ -150,6 +232,8 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => {
       },
       dataTest: section.dataTest,
       group: section.group,
+      tabOf: section.tabOf,
+      footer: section.footer,
       locked,
       lockedMessage,
       lockedLabel: locked ? lockedMessage : undefined,
@@ -157,25 +241,116 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => {
   });
 });
 
-const activeSectionItem = computed(() =>
-  sectionItems.value.find((i) => i.key === activeSection.value),
+const tabsByItem = computed(() => {
+  const tabs = new Map<AiObservabilityTabbedItemKey, SectionEntry[]>();
+  for (const entry of sectionEntries.value) {
+    if (!entry.tabOf) continue;
+    tabs.set(entry.tabOf, [...(tabs.get(entry.tabOf) ?? []), entry]);
+  }
+  return tabs;
+});
+
+// A tabbed item opens on its first unlocked tab and is locked only when every tab is.
+const railItems = computed<SectionEntry[]>(() => {
+  const items: SectionEntry[] = [];
+  for (const entry of sectionEntries.value) {
+    if (entry.footer || entry.group === "Configure") continue;
+    if (!entry.tabOf) {
+      items.push(entry);
+      continue;
+    }
+    const tabs = tabsByItem.value.get(entry.tabOf)!;
+    if (tabs[0] !== entry) continue;
+    const item = AI_OBSERVABILITY_TABBED_ITEMS[entry.tabOf];
+    const open = tabs.find((tab) => !tab.locked);
+    items.push({
+      key: entry.tabOf,
+      label: t(item.labelKey),
+      icon: item.icon,
+      to: (open ?? entry).to,
+      dataTest: item.dataTest,
+      group: entry.group,
+      locked: !open || undefined,
+      lockedMessage: open ? undefined : entry.lockedMessage,
+      lockedLabel: open ? undefined : entry.lockedMessage,
+    });
+  }
+  return items;
+});
+
+/** The section pinned to the rail's foot (Playground), when the rail lists it. */
+const footerItem = computed(() => sectionEntries.value.find((entry) => entry.footer));
+
+/** The Configure pages, listed in the foot's Tools menu rather than as a group. */
+const configureItems = computed(() =>
+  sectionEntries.value.filter((entry) => entry.group === "Configure"),
+);
+const configureActive = computed(() =>
+  configureItems.value.some((entry) => entry.key === activeSection.value),
+);
+const toolsOpen = ref(false);
+
+// A locked entry goes where a locked rail item does (see SectionRail).
+function openEntry(entry: SectionEntry) {
+  Promise.resolve(router.push(entry.locked ? { name: "enterpriseFeatures" } : entry.to)).catch(
+    () => {},
+  );
+}
+
+// Looked up in the full table so a deep link to a hidden section still lights its rail item.
+const TAB_OF_SECTION = new Map(AI_OBSERVABILITY_SECTIONS.map((s) => [s.key, s.tabOf]));
+
+const activeSection = computed<string>(
+  () => TAB_OF_SECTION.get(activeTab.value) ?? activeTab.value,
 );
 
-// Group order: Monitor, then Evaluate, then Experiment, then Annotate at the
-// bottom. Experiment is its own section (not an Evaluate sub-item) because an
-// experiment is a run you author, not a scoring config you maintain.
-const sectionGroupOrder = ["Monitor", "Evaluate", "Experiment", "Annotate"];
+const activeTabs = computed<SectionEntry[]>(() => {
+  const item = TAB_OF_SECTION.get(activeTab.value);
+  return item ? (tabsByItem.value.get(item) ?? []) : [];
+});
+
+// A locked tab goes where a locked rail item does (see SectionRail).
+function openTab(key: string | number) {
+  if (key === activeTab.value) return;
+  const tab = activeTabs.value.find((entry) => entry.key === key);
+  if (!tab) return;
+  Promise.resolve(router.push(tab.locked ? { name: "enterpriseFeatures" } : tab.to)).catch(
+    () => {},
+  );
+}
+
+const ITEM_SUBTITLES: Record<AiObservabilityTabbedItemKey, I18nKey> = {
+  agents: "aiObservability.itemSubtitle.agents",
+  costUsage: "aiObservability.itemSubtitle.costUsage",
+  evaluations: "aiObservability.itemSubtitle.evaluations",
+  scorers: "aiObservability.itemSubtitle.scorers",
+  experiments: "aiObservability.itemSubtitle.experiments",
+};
+const activeItemHeader = computed(() => {
+  const key = TAB_OF_SECTION.get(activeTab.value);
+  if (!key) return null;
+  const item = AI_OBSERVABILITY_TABBED_ITEMS[key];
+  return { title: t(item.labelKey), subtitle: t(ITEM_SUBTITLES[key]), icon: item.icon };
+});
+provide(AI_SECTION_TABS, {
+  tabs: activeTabs,
+  header: activeItemHeader,
+  active: activeTab,
+  open: openTab,
+});
+
+const sectionGroupOrder = ["Monitor", "Evaluate", "Annotate"];
 
 const groupLabels = computed<Record<string, I18nText>>(() => ({
   Monitor: t("aiObservability.sections.monitor"),
   Annotate: t("aiObservability.sections.annotate"),
   Evaluate: t("aiObservability.sections.evaluate"),
-  Experiment: t("aiObservability.sections.experiment"),
+  Configure: t("aiObservability.sections.configure"),
 }));
 
 const sectionGroups = computed<SectionHubGroup[]>(() => {
   const buckets = new Map<string, SectionHubItem[]>();
-  for (const item of sectionItems.value) {
+  for (const item of railItems.value) {
     const g = item.group;
     if (!buckets.has(g)) buckets.set(g, []);
     buckets.get(g)!.push(item);
@@ -188,8 +363,4 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
     .sort((a, b) => rank(a) - rank(b))
     .map((key) => ({ label: groupLabels.value[key] ?? raw(key), items: buckets.get(key)! }));
 });
-
-// Reserved for future per-section header chrome wiring (mirrors Settings'
-// activeSectionItem use). Keeping the reference live for clarity.
-void activeSectionItem.value;
 </script>

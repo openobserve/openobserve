@@ -57,6 +57,8 @@ export interface Incident {
   rca_off_reason?: string | null;
   /** List only: every alert that fired into the incident and how often, most-fired first. */
   alert_groups?: { alert_id: string; alert_name: string; count: number }[];
+  /** A security case only backfills over past data fired into. */
+  historical?: boolean;
 }
 
 export type RcaRunState = "running" | "waiting_input" | "completed" | "failed" | "cancelled";
@@ -686,7 +688,7 @@ export interface IncidentAlert {
   incident_id: string;
   alert_id: string;
   alert_name: string;
-  alert_kind?: "internal" | "external";
+  alert_kind?: "internal" | "external" | "autoobserve";
   alert_fired_at: number;
   correlation_reason: "service_discovery" | "primary_match" | "secondary_match" | "alert_id";
   created_at: number;

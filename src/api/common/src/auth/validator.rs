@@ -326,6 +326,11 @@ fn is_org_agnostic_path(path: &str) -> bool {
     matches!(segments.as_slice(), [_org, "password_complexity"])
 }
 
+/// GHSA-29xv-5rx7-5q7v: matching only the last segment let `/{org}/kv/organizations` skip the org.
+fn is_top_level_org_route(path_columns: &[&str]) -> bool {
+    matches!(path_columns, ["organizations"])
+}
+
 /// Compare a password under the lockout policy, recording the attempt.
 ///
 /// `compare` is whatever "this credential matches" means at the call site, and it runs only once
@@ -536,6 +541,7 @@ pub async fn validate_credentials(
     // if the password starts with this prefix, check the dedicated
     // org_ingestion_tokens cache/table instead of the user tables.
     if user_password.starts_with(infra::table::org_ingestion_tokens::ORG_INGESTION_TOKEN_PREFIX) {
+        use infra::table::org_ingestion_tokens::is_writer_token_name;
         let org_id = (!path_columns.is_empty()).then(|| org_from_path(&path_columns));
 
         if let Some(org_id) = org_id {
@@ -546,7 +552,8 @@ pub async fn validate_credentials(
             if let Some(r) = ORG_INGESTION_TOKENS.get(&cache_key) {
                 let token_name = r.value().clone();
 
-                if !is_ingestion_path {
+                // A feature writer's token is good only for its own stream, over the ingest RPC.
+                if !is_ingestion_path || is_writer_token_name(&token_name) {
                     return Ok(TokenValidationResponse {
                         is_valid: false,
                         user_email: user_id.to_string(),
@@ -572,10 +579,12 @@ pub async fn validate_credentials(
             // Cache miss — do DB lookup. find_enabled_token filters by enabled=true.
             match db::org_ingestion_tokens::find_enabled_token(org_id, user_password).await {
                 Ok(Some(token_record)) => {
-                    // Populate cache for future fast lookups
-                    ORG_INGESTION_TOKENS.insert(cache_key, token_record.name.clone());
+                    // A writer token is refused here, and a late insert could revive a revoked one.
+                    if !is_writer_token_name(&token_record.name) {
+                        ORG_INGESTION_TOKENS.insert(cache_key, token_record.name.clone());
+                    }
 
-                    if !is_ingestion_path {
+                    if !is_ingestion_path || is_writer_token_name(&token_record.name) {
                         return Ok(TokenValidationResponse {
                             is_valid: false,
                             user_email: user_id.to_string(),
@@ -608,7 +617,7 @@ pub async fn validate_credentials(
         }
     }
 
-    let mut user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+    let mut user = if is_top_level_org_route(&path_columns) {
         let db_user = db::user::get_db_user(user_id).await;
         match db_user {
             Ok(user) => {
@@ -841,7 +850,7 @@ pub async fn validate_credentials_ext(
         path_columns.pop();
     }
 
-    let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+    let user = if is_top_level_org_route(&path_columns) {
         let db_user = db::user::get_db_user(user_id).await;
         match db_user {
             Ok(user) => {
@@ -2134,6 +2143,78 @@ CN5lTowpVXP2OIiiNTGa75Fj
         ORG_INGESTION_TOKENS.remove(&format!("{org_id}/{token}"));
     }
 
+    #[tokio::test]
+    async fn the_http_fallback_never_caches_a_writer_token() {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        ONCE.get_or_init(|| async {
+            std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+        let org = format!("demo-org-fallback-{}", config::utils::time::now_micros());
+        let writer = openobserve_core::ingestion_tokens::create_token(
+            &org,
+            "_o2_alert_calibration",
+            "",
+            "system",
+            false,
+        )
+        .await
+        .unwrap();
+        ORG_INGESTION_TOKENS.remove(&format!("{org}/{}", writer.token));
+        let path = format!("{org}/default/_json");
+        let checked = validate_credentials(
+            "alert_calibration@system.local",
+            &writer.token,
+            &path,
+            Some("/api/{org_id}/{stream_name}/_json"),
+            &Method::POST,
+            false,
+        )
+        .await
+        .unwrap();
+        assert!(!checked.is_valid);
+        assert!(
+            !ORG_INGESTION_TOKENS.contains_key(&format!("{org}/{}", writer.token)),
+            "the fallback cached a writer token"
+        );
+    }
+
+    #[tokio::test]
+    async fn writer_tokens_are_refused_on_http() {
+        let token = "o2oi_writer_on_http";
+        ORG_INGESTION_TOKENS.insert(
+            format!("demo-org/{token}"),
+            "_o2_alert_calibration".to_string(),
+        );
+        for (path, route) in [
+            (
+                "demo-org/default/_json",
+                "/api/{org_id}/{stream_name}/_json",
+            ),
+            (
+                "demo-org/_o2_alert_calibration_digests/_json",
+                "/api/{org_id}/{stream_name}/_json",
+            ),
+            ("demo-org/v1/logs", "/api/{org_id}/v1/logs"),
+            ("demo-org/_bulk", "/api/{org_id}/_bulk"),
+        ] {
+            let checked = validate_credentials(
+                "alert_calibration@system.local",
+                token,
+                path,
+                Some(route),
+                &Method::POST,
+                false,
+            )
+            .await
+            .unwrap();
+            assert!(!checked.is_valid, "a writer token was accepted on {path}");
+        }
+        ORG_INGESTION_TOKENS.remove(&format!("demo-org/{token}"));
+    }
+
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn fleet_token_is_valid_only_on_its_org_writes_while_fleet_is_on() {
@@ -2461,6 +2542,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         exercise_empty_password_rejected(org_id).await;
         exercise_saltless_sso_user_refused(org_id).await;
         exercise_path_org_is_the_routed_org().await;
+        exercise_object_named_organizations_stays_in_its_org(org_id).await;
         exercise_user_path_refusal_is_a_role_refusal(org_id).await;
 
         let static_token = users::get_user(Some(org_id), init_user)
@@ -2591,6 +2673,46 @@ CN5lTowpVXP2OIiiNTGa75Fj
             !bad.unwrap().is_valid,
             "a bad password stays a failed login"
         );
+    }
+
+    async fn exercise_object_named_organizations_stays_in_its_org(victim_org: &str) {
+        let pwd = "Complexpass#123";
+        let attacker = "other-org-member@example.com";
+        let _ = organization::check_and_create_org_without_ofga("attacker_org").await;
+        seed_user_without_password_ext("attacker_org", attacker, UserRole::Admin, pwd, "atk-tok")
+            .await;
+        assert!(
+            validate_credentials(
+                attacker,
+                pwd,
+                "attacker_org/kv/organizations",
+                None,
+                &Method::GET,
+                false
+            )
+            .await
+            .unwrap()
+            .is_valid,
+            "a member must still reach its own org"
+        );
+        for (path, method) in [
+            ("kv/organizations", Method::GET),
+            ("kv/organizations", Method::POST),
+            ("alerts/templates/organizations", Method::GET),
+            ("functions/organizations", Method::PUT),
+            ("enrichment_tables/organizations", Method::POST),
+            ("streams/organizations", Method::DELETE),
+            ("organizations", Method::DELETE),
+        ] {
+            let path = format!("{victim_org}/{path}");
+            assert!(
+                !validate_credentials(attacker, pwd, &path, None, &method, false)
+                    .await
+                    .unwrap()
+                    .is_valid,
+                "GHSA-29xv-5rx7-5q7v: a non-member was accepted on {method} /{path}"
+            );
+        }
     }
 
     // Each URI is what the auth layer sees once axum has stripped its mount.
@@ -3228,16 +3350,17 @@ CN5lTowpVXP2OIiiNTGa75Fj
     }
 
     #[test]
-    fn test_validate_credentials_path_handling() {
-        // Test path handling in validate_credentials
-        let path_columns = ["api", "v1", "organizations"];
-        let last_segment = path_columns.last().unwrap_or(&"");
-        assert_eq!(*last_segment, "organizations");
-
-        // Test path with trailing slash
-        let path_with_slash = ["api", "v1", "logs", ""];
-        let last_segment_with_slash = path_with_slash.last().unwrap_or(&"");
-        assert_eq!(*last_segment_with_slash, "");
+    fn only_the_top_level_org_route_skips_the_path_org() {
+        assert!(is_top_level_org_route(&["organizations"]));
+        for path in [
+            &["acme", "kv", "organizations"][..],
+            &["acme", "alerts", "templates", "organizations"],
+            &["acme", "streams", "organizations"],
+            &["acme", "organizations"],
+            &["_meta", "organizations"],
+        ] {
+            assert!(!is_top_level_org_route(path), "{path:?}");
+        }
     }
 
     #[test]

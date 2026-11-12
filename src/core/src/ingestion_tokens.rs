@@ -39,14 +39,13 @@ pub async fn create_default_token(org_id: &str, created_by: &str) -> Result<(), 
     Ok(())
 }
 
-/// List all tokens for an org.
-///
-/// If no tokens exist (including disabled), a system-created default token
-/// is auto-generated and returned so the org always has at least one
-/// ingestion token.
+/// Lists the org's tokens, first making `default` when only feature writers' tokens exist.
 pub async fn list_tokens(org_id: &str) -> Result<Vec<OrgIngestionToken>, anyhow::Error> {
     let mut records = db::org_ingestion_tokens::list_by_org(org_id).await?;
-    if records.is_empty() {
+    if records
+        .iter()
+        .all(|r| org_ingestion_tokens::is_writer_token_name(&r.name))
+    {
         // No tokens exist (including disabled) — create a system default
         create_default_token(org_id, "system").await?;
         records = db::org_ingestion_tokens::list_by_org(org_id).await?;

@@ -424,9 +424,8 @@ async function multistreamselect(page) {
     await pageManager.logsPage.clickStreamsMenuItem();
     await pageManager.logsPage.clickSearchStreamInput();
     await pageManager.logsPage.fillSearchStreamInput('e2e');
-    await page.waitForTimeout(MULTISTREAM_CONFIG.TIMEOUTS.TOAST_WAIT);
-    await pageManager.logsPage.clickExploreButton();
-    await page.waitForTimeout(MULTISTREAM_CONFIG.TIMEOUTS.NAVIGATION);
+    await pageManager.logsPage.expectStreamListFilteredBy('e2e');
+    await pageManager.logsPage.exploreFirstStreamAndExpectLogs();
     
     // Verify saved view exists and can be loaded
     await pageManager.logsPage.waitForSavedViewsButton();

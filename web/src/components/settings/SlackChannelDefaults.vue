@@ -35,6 +35,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
+import { useSlackReadOnly } from "./slackReadOnly";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { alertRoutesByChannel } from "@/utils/slackAppDestination";
 import {
@@ -73,8 +74,9 @@ const onInstance = computed(
 // R-80: on an instance workspace a channel another org owns changes only through _meta.
 const instanceAdmin = computed(() => onInstance.value && isMetaOrg.value);
 const ownOrgOnly = computed(() => onInstance.value && !isMetaOrg.value);
+const readOnly = useSlackReadOnly();
 const canChange = (row: SlackChannelDefaultRow): boolean =>
-  row.set_by_this_org || instanceAdmin.value;
+  !readOnly.value && (row.set_by_this_org || instanceAdmin.value);
 const ownerName = (row: SlackChannelDefaultRow) =>
   instanceAdmin.value && row.org_id ? raw(row.org_name || row.org_id) : null;
 
@@ -218,10 +220,12 @@ const save = async (value: DefaultForm): Promise<void> => {
         variant="outline"
         size="sm-action"
         icon-left="add"
+        :disabled="readOnly"
         data-test="slack-channel-set-default"
         @click="openDrawer(null)"
       >
         {{ t("slackApp.channels.setDefault") }}
+        <OTooltip v-if="readOnly" side="bottom" :content="t('slackApp.connect.permissionHint')" />
       </OButton>
     </div>
 

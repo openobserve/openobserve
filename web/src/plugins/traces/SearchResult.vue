@@ -18,15 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="traces-search-result" class="h-full overflow-hidden">
-    <div class="bg-card-glass-bg flex h-full flex-col overflow-hidden">
+    <div class="bg-card-glass-bg @container/results flex h-full flex-col overflow-hidden">
       <div
-        v-if="
-          searchObj.data.stream.selectedStream.value &&
-          !searchObj.data.errorMsg?.trim()?.length &&
-          searchObj.searchApplied
-        "
+        v-if="showHeader"
         data-test="traces-section-header"
-        class="border-border-default flex h-9 shrink-0 items-center border-b px-[0.4rem]! max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
+        class="border-border-default relative flex h-9 shrink-0 items-center border-b px-[0.4rem]! max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5 @max-[58rem]/results:h-auto @max-[58rem]/results:min-h-9 @max-[58rem]/results:flex-wrap @max-[58rem]/results:gap-y-1 @max-[58rem]/results:py-0.5"
       >
         <!-- Field panel toggle — same style as logs page -->
         <OButton
@@ -58,93 +54,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
 
-        <div
-          data-test="traces-count-chips"
-          class="flex items-center transition-opacity"
-          :class="{ 'opacity-60': countPending }"
+        <!-- Left: count chips -->
+        <OTag
+          data-test="traces-count-badge"
+          type="logsResultChip"
+          value="neutral"
+          class="me-[0.6rem] tabular-nums"
+          :aria-busy="countState.loading ? 'true' : undefined"
         >
-          <OTag
-            data-test="traces-count-badge"
-            type="logsResultChip"
-            value="neutral"
-            class="me-[0.6rem] tabular-nums"
-            :aria-busy="countPending"
-          >
-            <template v-if="searchObj.meta.searchMode === 'spans'">
-              <OSkeleton
-                v-if="shownTotal == null"
-                type="text"
-                animation="pulse"
-                class="me-1 h-3 w-8 shrink-0"
-              />
-              {{ spansLabel }}
-            </template>
-            <i18n-t
-              v-else
-              keypath="traces.results.tracesWithMatchingSpan"
-              :plural="shownTotal ?? 2"
-              tag="span"
-              class="inline-flex items-center whitespace-pre"
-            >
-              <template #count>
-                <OSkeleton
-                  v-if="shownTotal == null"
-                  type="text"
-                  animation="pulse"
-                  class="h-3 w-8 shrink-0"
-                />
-                <template v-else>{{ formatLargeNumber(shownTotal) }}</template>
-              </template>
-            </i18n-t>
-          </OTag>
-          <OTag
-            v-if="
-              searchObj.data.queryResults.errorCount != null &&
-              searchObj.data.queryResults.errorCount > 0
-            "
-            data-test="traces-error-count-badge"
-            variant="error"
-            :clickable="true"
-            :disabled="countPending"
-            :aria-busy="countPending"
-            class="rounded-default! px-2.5! py-[0.4rem]! text-xs text-xs! tabular-nums"
-            :class="[
-              showErrorOnly
-                ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
-                : 'bg-error-tag-bg! text-error-tag-text!',
-              { 'opacity-100!': countPending },
-            ]"
-            @click="toggleErrorOnly"
-          >
-            {{
-              `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === "traces" ? t("traces.errorTraces") : t("traces.errorSpans")}`
-            }}
-            <OTooltip
-              :content="showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
-              side="bottom"
+          <template v-if="countState.loading">
+            <OSkeleton
+              type="text"
+              animation="none"
+              class="w-11"
+              data-test="traces-count-skeleton"
+              aria-hidden="true"
             />
-            <template #trailing>
-              <OIcon name="filter-alt" size="xs" class="shrink-0" />
-            </template>
-          </OTag>
-          <OSpinner
-            v-if="countPending"
-            size="xs"
-            class="ms-1.5"
-            :aria-label="t('traces.updatingResults')"
-            data-test="traces-count-pending"
+            <span class="sr-only">{{ t("common.loading") }}</span>
+            <span aria-hidden="true">{{ countNoun }}</span>
+          </template>
+          <span v-else class="transition-opacity" :class="{ 'opacity-60': headerDimmed }">
+            {{ countLabel }}
+          </span>
+        </OTag>
+        <OTag
+          v-if="shownErrorCount > 0"
+          data-test="traces-error-count-badge"
+          variant="error"
+          :clickable="true"
+          class="rounded-default! px-2.5! py-[0.4rem]! text-xs text-xs! tabular-nums transition-opacity"
+          :class="[
+            showErrorOnly
+              ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
+              : 'bg-error-tag-bg! text-error-tag-text!',
+            { 'opacity-60': headerDimmed },
+          ]"
+          :aria-disabled="regionBusy ? 'true' : undefined"
+          @click="toggleErrorOnly"
+        >
+          {{
+            `${formatLargeNumber(shownErrorCount)} ${searchObj.meta.searchMode === "traces" ? t("traces.errorTraces") : t("traces.errorSpans")}`
+          }}
+          <OTooltip
+            :content="showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
+            side="bottom"
+          />
+          <template #trailing>
+            <OIcon name="filter-alt" size="xs" class="shrink-0" />
+          </template>
+        </OTag>
+
+        <div
+          class="hidden basis-full @max-[58rem]/results:block"
+          aria-hidden="true"
+          data-test="traces-search-result-header-break"
+        />
+        <div class="flex min-w-0 flex-1 items-center px-2 @max-[58rem]/results:flex-none">
+          <ORegionStatus
+            :noun="regionNoun"
+            :elapsed-seconds="region.elapsedSeconds.value"
+            data-test="traces-search-result-long-wait"
           />
         </div>
 
-        <div class="flex-1" />
-
         <div
-          class="border-card-glass-border rounded-default me-1 inline-flex h-6 items-center overflow-hidden border px-1"
+          class="me-1 flex min-w-0 items-center @max-[58rem]/results:flex-1 @max-[58rem]/results:justify-end @min-[58rem]/results:min-w-33"
+          data-test="traces-search-result-data-age"
         >
           <ORefreshButton
+            layout="inline"
+            age-format="clock"
             :last-run-at="searchObj.meta.lastRunAt"
-            :loading="searchObj.loading"
-            :disabled="searchObj.loading"
+            :failed-at="searchObj.meta.refreshFailedAt"
+            :loading="regionBusy"
+            :spinner="false"
+            data-test="traces-search-result-refresh"
             @click="$emit('run-query')"
           />
         </div>
@@ -161,26 +145,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="wrap-text" size="sm" />
           <OTooltip :content="t('search.messageWrapContent')" />
         </OButton>
-        <template v-if="searchObj.meta.resultGrid.showPagination">
+        <div
+          v-if="pagerShown"
+          class="flex items-center transition-opacity"
+          :class="{ 'opacity-60': pagerInert }"
+          :aria-disabled="regionBusy ? 'true' : undefined"
+          data-test="traces-search-result-pager-group"
+        >
           <OSelect
             :model-value="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
             class="select-pagination ms-1 me-1 mt-0!"
             size="sm"
             :searchable="false"
-            :disabled="searchObj.loading || countPending"
             data-test="traces-search-result-records-per-page"
             @update:model-value="changeRowsPerPage"
           />
           <OPagination
-            :disable="searchObj.loading || countPending"
             :model-value="searchObj.data.resultGrid.currentPage + 1"
             :max="totalPages"
-            class="paginator-section float-right mt-0!"
+            class="paginator-section float-right mt-0! min-w-54 justify-end"
             data-test="traces-search-result-pagination"
             @update:model-value="(page: number) => changePage(page)"
           />
-        </template>
+        </div>
       </div>
 
       <!-- Combined scroll area: RED metrics + trace list scroll together.
@@ -189,54 +177,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         ref="scrollContainerRef"
         class="bg-card-glass-solid flex-1 overflow-auto"
+        :data-test="pending ? 'traces-search-loading' : undefined"
+        v-bind="region.regionAttrs.value"
         @scroll.passive="rememberScrollTop"
       >
         <!-- ════════════════════ RED Metrics Section ════════════════════ -->
-        <transition
-          enter-active-class="transition-all duration-300 ease-in-out"
-          leave-active-class="transition-all duration-300 ease-in-out"
-          enter-from-class="opacity-0 -translate-y-4 max-h-0"
-          enter-to-class="opacity-100 translate-y-0 max-h-250"
-          leave-from-class="opacity-100 translate-y-0 max-h-250"
-          leave-to-class="opacity-0 -translate-y-4 max-h-0"
-        >
-          <TracesMetricsDashboard
-            v-show="searchObj.meta.showHistogram"
-            v-if="searchObj.data.stream.selectedStream.value && searchObj.searchApplied"
-            ref="metricsDashboardRef"
-            class="sticky start-0 z-1"
-            :streamName="searchObj.data.stream.selectedStream.value"
-            :timeRange="{
-              startTime: searchObj.data.datetime.startTime,
-              endTime: searchObj.data.datetime.endTime,
-            }"
-            :filter="searchObj.data.editorValue"
-            :streamFields="searchObj.data.stream.selectedStreamFields"
-            :show="searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length"
-            :ai-enabled="aiEnabled"
-            @time-range-selected="onMetricsTimeRangeSelected"
-            @editor-filter-set="onMetricsEditorFilterSet"
-            @editor-filter-run="onMetricsEditorFilterRun"
-            @send-to-ai-chat="(v) => $emit('send-to-ai-chat', v)"
-          />
-        </transition>
+        <TracesMetricsDashboard
+          v-show="searchObj.meta.showHistogram"
+          v-if="searchObj.data.stream.selectedStream.value && searchObj.searchApplied"
+          ref="metricsDashboardRef"
+          class="sticky start-0 z-1"
+          :streamName="searchObj.data.stream.selectedStream.value"
+          :timeRange="{
+            startTime: searchObj.data.datetime.startTime,
+            endTime: searchObj.data.datetime.endTime,
+          }"
+          :filter="searchObj.data.editorValue"
+          :streamFields="searchObj.data.stream.selectedStreamFields"
+          :show="searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length"
+          :ai-enabled="aiEnabled"
+          @time-range-selected="onMetricsTimeRangeSelected"
+          @editor-filter-set="onMetricsEditorFilterSet"
+          @editor-filter-run="onMetricsEditorFilterRun"
+          @send-to-ai-chat="$emit('send-to-ai-chat', $event)"
+        />
+        <TracesMetricsPlaceholder v-else-if="pending && searchObj.meta.showHistogram" />
 
         <TracesSearchResultList
           ref="searchResultListRef"
           :hits="hits"
           :wrap="searchObj.meta.resultGrid.wrapCells"
           :scroll-el="scrollContainerRef"
-          :loading="searchObj.loading"
+          :loading="searchObj.loading || pending"
           :search-performed="searchPerformed"
           :total="searchObj.data.queryResults.total"
           :error-count="searchObj.data.queryResults.errorCount"
-          :show-header="
-            !!(
-              searchObj.data.stream.selectedStream.value &&
-              !searchObj.data.errorMsg?.trim()?.length &&
-              searchObj.searchApplied
-            )
-          "
+          :show-header="showHeader"
           :current-page="searchObj.data.resultGrid.currentPage + 1"
           :rows-per-page="searchObj.meta.resultGrid.rowsPerPage"
           :show-pagination="searchObj.meta.resultGrid.showPagination && !countPending"
@@ -293,8 +269,13 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import TracesMetricsPlaceholder from "./metrics/TracesMetricsPlaceholder.vue";
+import ORegionStatus from "@/lib/feedback/RegionStatus/ORegionStatus.vue";
+import { useRegionLoading } from "@/lib/feedback/RegionStatus/useRegionLoading";
+import { resultText, type RegionNoun } from "@/lib/feedback/RegionStatus/regionText";
+import { useSettledValue } from "@/composables/useSettledValue";
+import { formatRefreshFailed } from "@/utils/formatters";
 
 export default defineComponent({
   name: "SearchResult",
@@ -305,15 +286,29 @@ export default defineComponent({
     OSelect,
     OPagination,
     OTag,
-    OSpinner,
     OSkeleton,
+    ORegionStatus,
     TracesSearchResultList,
-    TracesMetricsDashboard: defineAsyncComponent(
-      () => import("./metrics/TracesMetricsDashboard.vue"),
-    ),
+    TracesMetricsPlaceholder,
+    TracesMetricsDashboard: defineAsyncComponent({
+      // Its charts load as chunks of their own, so they load with it and the placeholder stays until they can draw.
+      loader: () =>
+        Promise.all([
+          import("./metrics/TracesMetricsDashboard.vue"),
+          import("@/views/Dashboards/RenderDashboardCharts.vue"),
+          import("@/components/dashboards/panels/ChartRenderer.vue"),
+        ]).then(([dashboard]) => dashboard),
+      loadingComponent: TracesMetricsPlaceholder,
+      delay: 0,
+    }),
     OIcon,
   },
   props: {
+    /** The stream list is still loading: draw the final layout with its loaders, no data yet. */
+    pending: {
+      type: Boolean,
+      default: false,
+    },
     showErrorOnly: {
       type: Boolean,
       default: false,
@@ -350,6 +345,7 @@ export default defineComponent({
   ],
   methods: {
     toggleErrorOnly() {
+      if (this.regionBusy) return;
       this.$emit("error-only-toggled", !this.showErrorOnly);
     },
     closeColumn(col: any) {
@@ -368,7 +364,7 @@ export default defineComponent({
       this.$emit("search:timeboxed", obj);
     },
   },
-  setup(_props, { emit }) {
+  setup(props, { emit }) {
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
@@ -409,10 +405,17 @@ export default defineComponent({
       searchObj.meta.resultGrid.wrapCells = useLocalWrapTracesContent() === "true";
     });
 
+    // A failed run leaves the age where it was, so kept rows never read as fresh.
     watch(
       () => searchObj.loading,
       (loading, wasLoading) => {
-        if (wasLoading && !loading && searchObj.searchApplied) {
+        if (
+          wasLoading &&
+          !loading &&
+          searchObj.searchApplied &&
+          !searchObj.meta.refreshFailedAt &&
+          !searchObj.data.errorMsg?.trim()?.length
+        ) {
           searchObj.meta.lastRunAt = Date.now();
         }
       },
@@ -495,34 +498,89 @@ export default defineComponent({
 
     const rowsPerPageOptions = [10, 25, 50, 100];
 
+    const showHeader = computed(
+      () =>
+        props.pending ||
+        !!(
+          searchObj.data.stream.selectedStream.value &&
+          !searchObj.data.errorMsg?.trim()?.length &&
+          searchObj.searchApplied
+        ),
+    );
+
     // The count runs after the rows, so until it answers there is no total to show.
     const countPending = computed(() => searchObj.data.queryResults?.countPending === true);
+    const regionBusy = computed(() => props.pending || searchObj.loading || countPending.value);
+    const regionNoun = computed<RegionNoun>(() =>
+      searchObj.meta.searchMode === "spans" ? "spans" : "traces",
+    );
 
-    // A re-run has no total until its count lands; the pager keeps the last one meanwhile.
-    const pagerTotal = ref<number | null>(
-      countPending.value ? null : Number(searchObj.data.queryResults?.total) || 0,
-    );
-    watch(
-      () => [searchObj.data.queryResults?.total, countPending.value] as const,
-      ([total, pending]) => {
-        if (!pending) pagerTotal.value = Number(total) || 0;
-      },
-    );
-    // Index.vue clears errorCount when a run changes dataset or its count fails, so no kept total then.
-    const shownTotal = computed<number | null>(() => {
-      if (!countPending.value) return resultTotal.value;
-      return searchObj.data.queryResults?.errorCount != null ? pagerTotal.value : null;
+    // Another stream or mode is another count, so its previous value is never kept.
+    const countSettled = useSettledValue<{ total: number; errorCount: number }>(() => {
+      const results = searchObj.data.queryResults;
+      const busy = regionBusy.value;
+      return {
+        value: busy
+          ? null
+          : { total: resultTotal.value, errorCount: Number(results?.errorCount ?? 0) },
+        busy,
+        key: `${searchObj.data.stream.selectedStream.value}|${searchObj.meta.searchMode}`,
+      };
     });
-    const spansLabel = computed(() =>
-      shownTotal.value == null
-        ? t("traces.spansFound")
-        : `${formatLargeNumber(shownTotal.value)} ${t("traces.spansFound")}`,
+    const countState = computed(() => countSettled.state.value);
+    const headerDimmed = computed(() => countSettled.dimmed.value);
+    const pagerShown = computed(
+      () => searchObj.meta.resultGrid.showPagination || countState.value.loading,
     );
-    const totalPages = computed(() =>
-      pagerTotal.value && searchObj.meta.resultGrid.rowsPerPage
-        ? Math.max(1, Math.ceil(pagerTotal.value / searchObj.meta.resultGrid.rowsPerPage))
-        : 1,
+    const pagerInert = computed(() => headerDimmed.value || countState.value.loading);
+    const shownTotal = computed(() => countState.value.value?.total ?? resultTotal.value);
+    const shownErrorCount = computed(() => countState.value.value?.errorCount ?? 0);
+
+    const countText = (count: string, plural: number) =>
+      searchObj.meta.searchMode === "spans"
+        ? `${count} ${t("traces.spansFound")}`
+        : t("traces.results.tracesWithMatchingSpan", { count }, plural);
+    const countLabel = computed(() =>
+      countText(formatLargeNumber(shownTotal.value), shownTotal.value),
     );
+    // A blank count would be replaced by the plural number, so a space stands in and is trimmed.
+    const countNoun = computed(() => countText(" ", 2).trim());
+
+    // The pager keeps the last settled page count through a run, so it never shrinks to one page.
+    const settledTotal = ref<number | null>(null);
+    watch(
+      () => [countPending.value, searchObj.data.queryResults?.total] as const,
+      ([pending, total]) => {
+        if (!pending && total != null) settledTotal.value = Number(total);
+      },
+      { immediate: true },
+    );
+    const totalPages = computed(() => {
+      const total = searchObj.data.queryResults?.total ?? settledTotal.value;
+      return total && searchObj.meta.resultGrid.rowsPerPage
+        ? Math.max(1, Math.ceil(total / searchObj.meta.resultGrid.rowsPerPage))
+        : 1;
+    });
+
+    // Leaving the page cancels its search; that end must not be announced over the page now shown.
+    let pageShown = true;
+    onDeactivated(() => (pageShown = false));
+    onActivated(() => (pageShown = true));
+    const region = useRegionLoading({
+      busy: () => regionBusy.value,
+      noun: () => regionNoun.value,
+      error: () =>
+        pageShown && searchObj.meta.refreshFailedAt && searchObj.meta.lastRunAt
+          ? formatRefreshFailed(t, {
+              failedAt: searchObj.meta.refreshFailedAt,
+              dataFrom: searchObj.meta.lastRunAt,
+            })
+          : null,
+      result: () =>
+        !pageShown || searchObj.data.errorMsg?.trim()?.length || props.pending
+          ? null
+          : resultText(t, { count: resultTotal.value, noun: regionNoun.value }),
+    });
 
     const resetRowSelection = () => {
       const navigation = searchObj.meta.resultGrid.navigation;
@@ -531,15 +589,16 @@ export default defineComponent({
       navigation.pendingPageSelection = null;
     };
 
+    // Until the count settles the pager shows the previous run's page count, so a page picked from it may not exist.
     function changePage(page: number, options: { fromCrossing?: boolean } = {}) {
-      if (searchObj.loading) return;
+      if (options.fromCrossing ? searchObj.loading : regionBusy.value) return;
       if (!options.fromCrossing) resetRowSelection();
       searchObj.data.resultGrid.currentPage = page - 1;
       emit("update:scroll");
     }
 
     function changeRowsPerPage(val: SelectModelValue) {
-      if (searchObj.loading) return;
+      if (regionBusy.value) return;
       resetRowSelection();
       // rowsPerPageOptions are all numbers, so val is always a number here
       searchObj.meta.resultGrid.rowsPerPage = val as number;
@@ -593,9 +652,18 @@ export default defineComponent({
       getDashboardData,
       hits,
       searchPerformed,
+      showHeader,
       countPending,
-      shownTotal,
-      spansLabel,
+      countState,
+      countLabel,
+      countNoun,
+      headerDimmed,
+      pagerShown,
+      pagerInert,
+      shownErrorCount,
+      regionBusy,
+      regionNoun,
+      region,
       rememberScrollTop,
       changePage,
       changeRowsPerPage,

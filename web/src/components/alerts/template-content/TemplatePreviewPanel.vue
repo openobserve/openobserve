@@ -145,7 +145,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-wrap items-center gap-1"
       data-test="template-preview-panel-unknown-variables-warning"
     >
-      <OTag variant="warning-soft" data-test="template-preview-panel-unknown-variables-chip">
+      <OTag
+        variant="warning-soft"
+        class="max-w-full leading-snug! wrap-anywhere whitespace-normal!"
+        data-test="template-preview-panel-unknown-variables-chip"
+      >
         {{ t("alert_templates.unknownVariables") }}: {{ unknownVariables.join(", ") }}
       </OTag>
     </div>
@@ -155,7 +159,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-wrap items-center gap-1"
       data-test="template-preview-panel-empty-variables-warning"
     >
-      <OTag variant="warning-soft" data-test="template-preview-panel-empty-variables-chip">
+      <OTag
+        variant="warning-soft"
+        class="max-w-full leading-snug! wrap-anywhere whitespace-normal!"
+        data-test="template-preview-panel-empty-variables-chip"
+      >
         {{
           t("alert_templates.emptyVariables", {
             kind: t(kindLabelKey(previewKind)),

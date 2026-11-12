@@ -131,6 +131,7 @@ import streamService from "@/services/stream";
 import config from "@/aws-exports";
 import OverviewTab from "./OverviewTab.vue";
 import analytics from "@/services/product_analytics";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamProbeQuery } from "@/services/stream.queries";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
@@ -245,6 +246,10 @@ describe("OverviewTab", () => {
       data: mockOverview.buildAlertHistory(),
     } as never);
   };
+
+  /** The deployment serves anomaly detection; the OSS build reports it off. */
+  const givenAnomalyDetectionOn = () =>
+    store.commit("setConfig", { ...store.state.zoConfig, anomaly_detection_enabled: true });
 
   /** Make the anomalies fetch hang until the returned deferred is resolved. */
   const givenAnomaliesHang = () => {
@@ -430,6 +435,7 @@ describe("OverviewTab", () => {
     beforeEach(async () => {
       // Recreated per test — a describe-scoped deferred would already be
       // settled by the time the second test mounts.
+      givenAnomalyDetectionOn();
       anomaliesPending = givenAnomaliesHang();
       recentEventsPending = givenRecentEventsHang();
       wrapper = mountOverviewTab();
@@ -463,6 +469,7 @@ describe("OverviewTab", () => {
 
     beforeEach(async () => {
       // Recent events resolves immediately with rows; anomalies hangs.
+      givenAnomalyDetectionOn();
       givenRecentEvents();
       anomaliesPending = givenAnomaliesHang();
       wrapper = mountOverviewTab();
@@ -519,6 +526,7 @@ describe("OverviewTab", () => {
     let anomaliesPending: Deferred<{ data: unknown[] }>;
 
     beforeEach(async () => {
+      givenAnomalyDetectionOn();
       givenRecentEvents();
       anomaliesPending = givenAnomaliesHang();
       wrapper = mountOverviewTab();
@@ -602,6 +610,7 @@ describe("OverviewTab", () => {
     beforeEach(async () => {
       // First load: anomalies has rows (so content is on screen), recent events
       // legitimately empty.
+      givenAnomalyDetectionOn();
       vi.mocked(anomalyService.list).mockResolvedValue({
         data: mockOverview.anomalyConfigs,
       } as never);
@@ -677,6 +686,7 @@ describe("OverviewTab", () => {
 
   describe("hasAnyData sources", () => {
     it("should count anomalies as data when the anomaly history returns hits", async () => {
+      givenAnomalyDetectionOn();
       vi.mocked(anomalyService.list).mockResolvedValue({
         data: mockOverview.anomalyConfigs,
       } as never);
@@ -797,6 +807,37 @@ describe("OverviewTab", () => {
       expect(alertsService.getHistory).toHaveBeenCalled();
       expect(anomalyService.list).toHaveBeenCalled();
       expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
+    });
+  });
+
+  describe("a build without anomaly detection", () => {
+    it("should not request anomalies when the build reports anomaly detection off", async () => {
+      config.isEnterprise = "false";
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        anomaly_detection_enabled: false,
+        features: { incidents: "locked", oncall: "locked" },
+      });
+      givenRecentEvents();
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(anomalyService.list).not.toHaveBeenCalled();
+      expect(anomalyService.getAllHistory).not.toHaveBeenCalled();
+      expect(alertsService.getHistory).toHaveBeenCalled();
+      expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
+    });
+
+    it("should request anomalies when the config reports anomaly detection on after mount", async () => {
+      givenRecentEvents();
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(anomalyService.list).not.toHaveBeenCalled();
+
+      givenAnomalyDetectionOn();
+      await flushPromises();
+
+      expect(anomalyService.list).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1031,6 +1072,87 @@ describe("OverviewTab", () => {
       await flushPromises();
 
       expect(wrapper.findComponent({ name: "ServiceGraphNodeSidePanel" }).exists()).toBe(false);
+    });
+
+    it("a finding's chips read what, name, type everywhere, and another incident's stay alphabetical", async () => {
+      const list = mockOverview.buildIncidentList();
+      list.incidents = [
+        {
+          ...list.incidents[0],
+          id: "incident-0",
+          title: "checkout (logs) stopped sending data",
+          group_values: {
+            env: "prod",
+            stream_type: "logs",
+            stream_name: "checkout",
+            autoobserve_finding: "stream_silence",
+          } as never,
+        },
+        {
+          ...list.incidents[0],
+          id: "incident-1",
+          title: "payments errors",
+          group_values: { service: "api", env: "prod", cluster: "eu" } as never,
+        },
+      ];
+      vi.mocked(incidentsService.list).mockResolvedValue({ data: list } as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const keys = wrapper
+        .find(INCIDENTS)
+        .findAllComponents(ODimensionChip)
+        .map((c) => c.props("dimKey"));
+      expect(keys).toEqual([
+        "autoobserve_finding",
+        "stream_name",
+        "stream_type",
+        "env",
+        "cluster",
+        "env",
+        "service",
+      ]);
+    });
+
+    it("the home incidents rows show a finding's chips in words", async () => {
+      const list = mockOverview.buildIncidentList();
+      list.incidents.unshift({
+        ...list.incidents[0],
+        id: "incident-0",
+        title: "checkout (logs) stopped sending data",
+        group_values: {
+          autoobserve_finding: "stream_silence",
+          stream_type: "logs",
+          stream_name: "checkout",
+        } as never,
+      });
+      vi.mocked(incidentsService.list).mockResolvedValue({ data: list } as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const chips = wrapper.find(INCIDENTS).findAllComponents(ODimensionChip);
+      const finding = chips.slice(0, 3);
+      expect(finding.map((c) => c.props("keyLabel"))).toEqual([
+        "Finding",
+        "Stream Name",
+        "Stream Type",
+      ]);
+      expect(finding.map((c) => c.props("value"))).toEqual([
+        "Stopped sending data",
+        "checkout",
+        "logs",
+      ]);
+      expect(finding.map((c) => c.props("tooltip"))).toEqual([false, false, false]);
+      expect(finding.map((c) => c.html()).join(" ")).not.toMatch(
+        /autoobserve_finding|stream_name|stream_type|stream_silence/,
+      );
+
+      const k8s = chips[3];
+      expect(k8s.props("dimKey")).toBe("k8s-namespace");
+      expect(k8s.props("keyLabel")).toBe("namespace");
+      expect(k8s.props("tooltip")).toBe(true);
     });
 
     it("should render only the incidents skeleton when the incident list alone is in flight", async () => {
@@ -2625,6 +2747,7 @@ describe("OverviewTab", () => {
 
   describe("the alert history drawer across an org switch", () => {
     it("closes the drawer and clears its alert when the organization changes", async () => {
+      givenAnomalyDetectionOn();
       vi.mocked(anomalyService.list).mockResolvedValue({
         data: mockOverview.anomalyConfigs,
       } as never);

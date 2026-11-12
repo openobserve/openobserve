@@ -373,12 +373,14 @@ const typeCounts = computed(() => {
   const rows = props.rows || [];
   let llm = 0;
   let remote = 0;
+  let code = 0;
   for (const r of rows) {
     const ty = scorerTypeOf(r);
     if (ty === "llm_judge") llm += 1;
     else if (ty === "remote") remote += 1;
+    else if (ty === "code") code += 1;
   }
-  return { llm, remote, total: rows.length };
+  return { llm, remote, code, total: rows.length };
 });
 const summaryStats = computed<StatItem[]>(() => {
   const c = typeCounts.value;
@@ -403,6 +405,15 @@ const summaryStats = computed<StatItem[]>(() => {
       tone: "teal",
       max: share,
       dataTest: "scorer-summary-remote",
+    },
+    {
+      key: "code",
+      label: t("codeScorer.summaryLabel"),
+      value: v(c.code),
+      icon: "code",
+      tone: "purple",
+      max: share,
+      dataTest: "scorer-summary-code",
     },
     {
       key: "all",

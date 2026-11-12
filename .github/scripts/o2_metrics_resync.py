@@ -11,7 +11,7 @@ Env: GITHUB_REPOSITORY, GH_TOKEN, O2_REPORTING_INGEST_BASE, O2_REPORTING_AUTH,
      O2_REPORTING_INSECURE (opt), LOOKBACK_DAYS (default 2), GITHUB_API_URL (opt).
 Never raises fatally — best-effort.
 """
-import os, json, ssl, base64, urllib.request, urllib.error, time
+import os, json, ssl, urllib.request, urllib.error, time
 from datetime import datetime, timezone, timedelta
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "")
@@ -100,7 +100,7 @@ def reconstruct(run, suite, is_reg, prefix, build_job):
 def post(stream, docs):
     if not docs: return 0
     url = f"{BASE.rstrip('/')}/{stream}/_json"
-    hdr = {"Authorization": "Basic " + base64.b64encode(AUTH.encode()).decode(), "Content-Type": "application/json"}
+    hdr = {"Authorization": "Basic " + AUTH, "Content-Type": "application/json"}
     ok = 0
     for k in range(0, len(docs), 200):
         chunk = docs[k:k+200]

@@ -118,7 +118,7 @@ onMounted(fetch);
     </div>
 
     <div v-if="loading" class="text-text-secondary flex items-center gap-2 py-6 text-sm">
-      <OIcon name="refresh" size="sm" class="animate-spin" />
+      <OIcon name="refresh" size="sm" class="o2-motion-keep animate-spin" />
       {{ t("alerts.composite.timelineLoading") }}
     </div>
 

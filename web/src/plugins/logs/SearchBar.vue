@@ -1301,9 +1301,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'fn-editor-open': showFunctionEditor,
               }"
             >
+              <OButton
+                v-if="
+                  !searchObj.meta.sqlMode &&
+                  !searchObj.meta.nlpMode &&
+                  searchObj.meta.logsVisualizeToggle === 'logs'
+                "
+                :icon-left="filterBuilderOn ? 'code' : 'filter-list'"
+                data-test="logs-search-bar-filter-builder-toggle"
+                :aria-pressed="filterBuilderOn"
+                variant="ghost"
+                size="icon-toolbar"
+                @click="toggleFilterBuilder"
+                class="rounded-default border-card-glass-border! absolute! top-0.75 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
+                :style="{ right: filterBuilderToggleRight }"
+              >
+                <OTooltip
+                  :content="
+                    filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')
+                  "
+                />
+              </OButton>
+              <div
+                v-if="showFilterBuilder"
+                class="h-full overflow-y-auto py-0.75 ps-1.5"
+                :class="aiButtonShown ? 'pe-26.5' : 'pe-18'"
+              >
+                <SqlFilterBuilder
+                  ref="filterBuilderRef"
+                  :query="searchObj.data.query"
+                  :fields="filterBuilderFields"
+                  :load-values="loadFilterBuilderValues"
+                  :fields-loading="searchObj.loadingStream"
+                  :extra-suggestions="recentFilterSection"
+                  data-test="logs-search-bar-filter-builder"
+                  @update:query="onFilterBuilderQuery"
+                  @submit="handleRunQueryFn()"
+                  @exit="toggleFilterBuilder"
+                  @focus="onFilterBuilderFocus"
+                  @extra-select="pickRecentFilterRow"
+                />
+              </div>
+              <OButton
+                v-if="showFilterBuilder && aiButtonShown"
+                data-test="logs-search-bar-filter-builder-ai-btn"
+                variant="ghost"
+                size="icon-toolbar"
+                :disabled="!searchObj.data.stream.selectedStream.length"
+                @click="openAiFromBuilder"
+                class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! absolute! top-1 z-51 h-7! min-h-7! w-7! min-w-7! hover:shadow-md"
+                :style="{ right: aiButtonRight }"
+              >
+                <img
+                  :src="aiIcon"
+                  :alt="t('search.aiModeIconAlt')"
+                  class="h-4.5 w-4.5 group-hover:brightness-0 group-hover:invert"
+                />
+                <span
+                  v-if="!aiAccess.allowed"
+                  aria-hidden="true"
+                  class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
+                >
+                  <OIcon name="lock" size="xs" class="text-icon-locked size-2.5!" />
+                </span>
+                <OTooltip
+                  v-if="aiAccess.allowed"
+                  :content="
+                    searchObj.data.stream.selectedStream.length
+                      ? t('nlMode.toggle')
+                      : t('search.selectStreamForAI')
+                  "
+                />
+              </OButton>
               <!-- Unified Query Editor (with built-in AI bar) -->
               <UnifiedQueryEditor
                 v-if="router.currentRoute.value.name === 'logs'"
+                v-show="!showFilterBuilder"
                 ref="queryEditorRef"
                 :query="searchObj.data.query"
                 :keywords="effectiveKeywords"
@@ -1361,6 +1434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchObj.data.editorValue == '' &&
                   searchObj.meta.queryEditorPlaceholderFlag &&
                   !searchObj.meta.nlpMode &&
+                  !showFilterBuilder &&
                   !recentFocusOpen
                 "
                 class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
@@ -1753,6 +1827,7 @@ import {
   useRecentSearches,
   useRecentSearchesList,
 } from "@/composables/queryHistory/useRecentSearches";
+import { useRecentFilterSuggestions } from "@/composables/queryHistory/useRecentFilterSuggestions";
 import { useLogsHistoryRecorder } from "@/composables/queryHistory/useLogsHistoryRecorder";
 import {
   recentQueryList,
@@ -1787,6 +1862,10 @@ const RECENT_SEARCHES_LAYERS =
 const EDITOR_POINTER_FOCUS_MS = 1000;
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
+import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
+import { useFilterBuilderPreference } from "@/components/filterBar/useFilterBuilderPreference";
+import { useFilterBarGrowth } from "@/components/filterBar/useFilterBarGrowth";
+import { toFilterFields } from "@/utils/query/filterBar";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { json2csv } from "json-2-csv";
 import QueryPlanDialog from "@/components/QueryPlanDialog.vue";
@@ -1944,6 +2023,7 @@ export default defineComponent({
   components: {
     OPageHeaderStatus,
     CreateAlertAction,
+    SqlFilterBuilder,
     OSeparator,
     OSplitter,
     OButtonGroup,
@@ -1982,6 +2062,7 @@ export default defineComponent({
   },
   emits: [
     "searchdata",
+    "filterBuilderGrowth",
     "onChangeInterval",
     "onChangeTimezone",
     "handleQuickModeChange",
@@ -2257,6 +2338,55 @@ export default defineComponent({
     const recentFocusRef = ref<InstanceType<typeof RecentSearchesFocusDropdown> | null>(null);
     const recentDrawerRef = ref<InstanceType<typeof RecentSearchesDrawer> | null>(null);
     const recentFocusOpen = ref(false);
+
+    const { builderOn: filterBuilderOn, toggle: toggleFilterBuilder } =
+      useFilterBuilderPreference("o2.logs.queryInput");
+    const filterBuilderRef = ref(null);
+    // The query pane grows with the builder's lines (it caps itself at three), so nothing in it is cut.
+    const filterBuilderGrowth = useFilterBarGrowth(filterBuilderRef);
+    watch(filterBuilderGrowth, (growth) => emit("filterBuilderGrowth", growth), {
+      immediate: true,
+    });
+    // SQL mode and the visualize/build views keep the editor: the builder writes filter-mode WHERE text only.
+    const showFilterBuilder = computed(
+      () =>
+        filterBuilderOn.value &&
+        !searchObj.meta.sqlMode &&
+        !searchObj.meta.nlpMode &&
+        searchObj.meta.logsVisualizeToggle === "logs",
+    );
+    const aiAccess = computed(() =>
+      checkFeatureAccess("aiAssistant", buildFeatureGateContext(store.state.zoConfig)),
+    );
+    // Mirrors QueryEditor's floating AI button; the builder shows its own copy in the same corner slot.
+    const aiButtonShown = computed(
+      () => !aiAccess.value.allowed || Boolean(store.state.zoConfig.ai_enabled),
+    );
+    const aiButtonRight = computed(() =>
+      searchObj.meta.showTransformEditor ? "0.25rem" : "2.375rem",
+    );
+    const filterBuilderToggleRight = computed(() => {
+      const corner = searchObj.meta.showTransformEditor ? 0.25 : 2.375;
+      return `${aiButtonShown.value ? corner + 2.125 : corner}rem`;
+    });
+    const aiIcon = computed(() =>
+      getImageURL(
+        isDark.value ? "images/common/ai_icon_dark.svg" : "images/common/ai_icon_gradient.svg",
+      ),
+    );
+    const openAiFromBuilder = () =>
+      (queryEditorRef.value as { openAiMode?: () => void } | null)?.openAiMode?.();
+    const filterBuilderFields = computed(() =>
+      toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
+    );
+    const loadFilterBuilderValues = (field: string, search: string) =>
+      resolveFieldValues(field, { prefix: search });
+    const onFilterBuilderQuery = (sql: string) => {
+      searchObj.data.query = sql;
+      searchObj.data.editorValue = sql;
+      (queryEditorRef.value as { setValue?: (v: string) => void } | null)?.setValue?.(sql);
+      autoRun.request("filter");
+    };
     const syntaxGuideRef = ref(null);
 
     const {
@@ -4593,6 +4723,22 @@ export default defineComponent({
       focusEditor();
     };
 
+    const { section: recentFilterSection, pick: pickRecentFilterRow } = useRecentFilterSuggestions(
+      "logs",
+      {
+        active: recentListActive,
+        examples: recentExamples,
+        run: (entry, when) => restoreRecent(entry, when, true),
+        load: (entry, when) => restoreRecent(entry, when, false),
+        viewAll: openRecentSearches,
+        example: applyRecentExample,
+      },
+    );
+
+    const onFilterBuilderFocus = () => {
+      if (recentSearchesEnabled.value) recentListActive.value = true;
+    };
+
     const cancelRun = () => {
       autoRun.engine.cancelGeneration(null, { cause: "user" });
       toast({
@@ -5175,6 +5321,9 @@ export default defineComponent({
       recentFocusRef,
       recentDrawerRef,
       recentFocusOpen,
+      recentFilterSection,
+      pickRecentFilterRow,
+      onFilterBuilderFocus,
       recentQueries,
       recentExamples,
       onRecentEditorKeydown,
@@ -5187,6 +5336,19 @@ export default defineComponent({
       effectiveKeywords,
       resolveFieldValues,
       effectiveSuggestions,
+      filterBuilderOn,
+      toggleFilterBuilder,
+      showFilterBuilder,
+      aiAccess,
+      aiButtonShown,
+      aiButtonRight,
+      aiIcon,
+      openAiFromBuilder,
+      filterBuilderToggleRight,
+      filterBuilderFields,
+      filterBuilderRef,
+      loadFilterBuilderValues,
+      onFilterBuilderQuery,
       onRefreshIntervalUpdate,
       updateTimezone,
       dateTimeRef,

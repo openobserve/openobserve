@@ -3947,3 +3947,19 @@ describe("EditRole - nothing stages while a save is in flight", () => {
     expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([streamsList]);
   });
 });
+
+describe("EditRole - job preset from the query", () => {
+  it("stages a job preset an access lock links to", async () => {
+    const wrapper = await mountWithPreset("dashboard_viewer");
+    const staged = Object.values(wrapper.vm.addedPermissions);
+    expect(staged.length).toBeGreaterThan(0);
+    expect(staged.every((p) => p.permission === "AllowGet" || p.permission === "AllowList")).toBe(
+      true,
+    );
+  });
+
+  it("stages nothing for a preset that needs a module this org lacks", async () => {
+    const wrapper = await mountWithPreset("soc_analyst");
+    expect(Object.keys(wrapper.vm.addedPermissions)).toHaveLength(0);
+  });
+});

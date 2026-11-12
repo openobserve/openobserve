@@ -202,7 +202,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ error }}
       </p>
 
-      <OText v-if="state === 'codeSent'" variant="meta" class="md:ps-31">
+      <OText
+        v-if="state === 'codeSent'"
+        variant="meta"
+        class="md:ps-31"
+        data-test="oncall-phone-code-sent-text"
+      >
         {{ t("oncall.phoneCodeSentTo", { phone: raw(contact.phone) }) }}
       </OText>
     </template>

@@ -53,6 +53,8 @@ use {
 use crate::models::alerts::requests::UpdateAnomalyAlertFields;
 #[cfg(feature = "enterprise")]
 use crate::models::alerts::responses::anomaly_list_items;
+#[cfg(feature = "enterprise")]
+use crate::request::security;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     models::alerts::{
@@ -424,6 +426,21 @@ pub async fn create_alert(
     }
     let overwrite = is_overwrite(query_str);
     let mut alert: MetaAlert = req_body.into();
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::guard_siem(
+        &org_id,
+        &user_email.user_id,
+        "POST",
+        security::marks_siem(alert.context_attributes.as_ref()),
+    )
+    .await
+    {
+        return resp;
+    }
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::validate_detection(&org_id, Some(&folder_id), &alert).await {
+        return resp;
+    }
     if let Err(resp) = validate_oncall_team(&org_id, alert.oncall_team.as_deref()).await {
         return resp;
     }
@@ -1298,6 +1315,11 @@ pub async fn get_composite_references(
         {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
+        if let Err(resp) =
+            security::guard_siem_ids(&org_id, &user_email.user_id, "GET", [alert_id.as_str()]).await
+        {
+            return resp;
+        }
     }
     let kind = if subject.is_some() {
         infra::table::alert_composites::ChildKind::Composite
@@ -1434,22 +1456,26 @@ pub async fn get_composite_timeline(
     .await
     .unwrap_or_default();
 
+    #[cfg(feature = "enterprise")]
+    let reads_security = security::security_allowed(&org_id, &user_email.user_id, "GET").await;
     let mut children = Vec::with_capacity(composite.children.len());
     for (slot, child) in composite.children.into_iter().enumerate() {
         let id = child.child_alert_id;
+        // A SIEM child's labels and transitions are Security data, so it is a hidden lane.
         #[cfg(feature = "enterprise")]
-        let authorized = check_permissions(
-            &id,
-            &org_id,
-            &user_email.user_id,
-            "alerts",
-            "GET",
-            None,
-            false,
-            true,
-            false,
-        )
-        .await;
+        let authorized = (reads_security || !security::is_siem_alert(&org_id, &id).await)
+            && check_permissions(
+                &id,
+                &org_id,
+                &user_email.user_id,
+                "alerts",
+                "GET",
+                None,
+                false,
+                true,
+                false,
+            )
+            .await;
         #[cfg(not(feature = "enterprise"))]
         let authorized = true;
         let name = if !authorized {
@@ -1713,7 +1739,10 @@ fn parse_group_labels(rendered: Option<&str>) -> Vec<AlertGroupLabel> {
         ("x-o2-mcp" = json!({"enabled": false, "description": "List the per-group states of a multi-alert", "category": "alerts"}))
     )
 )]
-pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+pub async fn list_alert_groups(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
     let Ok(ksuid) = Ksuid::from_str(&alert_id) else {
         return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
     };
@@ -1722,10 +1751,21 @@ pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>)
     // org scoping and not-found behaviour as every other alert read — a raw
     // state-table query would happily serve another org's group labels, which
     // carry host and service names.
-    let folder_id = match alert::get_by_id(client, &org_id, ksuid).await {
-        Ok((folder, _)) => folder.folder_id,
+    let (folder_id, _alert) = match alert::get_by_id(client, &org_id, ksuid).await {
+        Ok((folder, alert)) => (folder.folder_id, alert),
         Err(e) => return e.into(),
     };
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::guard_siem(
+        &org_id,
+        &user_email.user_id,
+        "GET",
+        security::marks_siem(_alert.context_attributes.as_ref()),
+    )
+    .await
+    {
+        return resp;
+    }
 
     let mut groups = match infra::table::alert_states::list_groups(&alert_id).await {
         Ok(g) => g,
@@ -1837,13 +1877,26 @@ pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>)
 pub async fn list_alert_group_transitions(
     Path((org_id, alert_id)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let Ok(ksuid) = Ksuid::from_str(&alert_id) else {
         return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
     };
     let client = get_orm_client_ro().await;
-    if let Err(e) = alert::get_by_id(client, &org_id, ksuid).await {
-        return e.into();
+    let _alert = match alert::get_by_id(client, &org_id, ksuid).await {
+        Ok((_, alert)) => alert,
+        Err(e) => return e.into(),
+    };
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::guard_siem(
+        &org_id,
+        &user_email.user_id,
+        "GET",
+        security::marks_siem(_alert.context_attributes.as_ref()),
+    )
+    .await
+    {
+        return resp;
     }
 
     // `None` means every group, which is NOT `Some("")` — that is the rollup
@@ -1923,6 +1976,17 @@ pub async fn get_alert(
     let client = get_orm_client_rw().await;
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok((_, alert)) => {
+            #[cfg(feature = "enterprise")]
+            if let Err(resp) = security::guard_siem(
+                &org_id,
+                &user_email.user_id,
+                "GET",
+                security::marks_siem(alert.context_attributes.as_ref()),
+            )
+            .await
+            {
+                return resp;
+            }
             let key = alert.get_unique_key();
             let scheduled_job = scheduler::get(&org_id, TriggerModule::Alert, &key)
                 .await
@@ -1995,7 +2059,10 @@ pub async fn get_alert(
         ("x-o2-mcp" = json!({"description": "Export alert as JSON", "category": "alerts"}))
     )
 )]
-pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+pub async fn export_alert(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     let alert_id_str = alert_id.clone();
     let alert_id = match Ksuid::from_str(&alert_id) {
@@ -2007,6 +2074,17 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     let client = get_orm_client_rw().await;
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok((_, alert)) => {
+            #[cfg(feature = "enterprise")]
+            if let Err(resp) = security::guard_siem(
+                &org_id,
+                &user_email.user_id,
+                "GET",
+                security::marks_siem(alert.context_attributes.as_ref()),
+            )
+            .await
+            {
+                return resp;
+            }
             let key = alert.get_unique_key();
             let scheduled_job = scheduler::get(&org_id, TriggerModule::Alert, &key)
                 .await
@@ -2115,6 +2193,17 @@ pub async fn clone_alert(
             .await
             {
                 return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
+            #[cfg(feature = "enterprise")]
+            if let Err(resp) = security::guard_siem(
+                &org_id,
+                &user_email.user_id,
+                "POST",
+                security::marks_siem(src_alert.context_attributes.as_ref()),
+            )
+            .await
+            {
+                return resp;
             }
             // Clone the alert: copy fields, generate new name
             let new_name = req_body
@@ -2380,6 +2469,18 @@ pub async fn update_alert(
     let alert_fields_for_fallback = req_body.alert.clone();
 
     let mut alert: MetaAlert = req_body.into();
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::guard_siem(
+        &org_id,
+        &user_email.user_id,
+        "POST",
+        security::marks_siem(alert.context_attributes.as_ref())
+            || security::is_siem_alert(&org_id, &alert_id_str).await,
+    )
+    .await
+    {
+        return resp;
+    }
     if let Err(resp) = validate_oncall_team(&org_id, alert.oncall_team.as_deref()).await {
         return resp;
     }
@@ -2388,6 +2489,10 @@ pub async fn update_alert(
     }
     alert.last_edited_by = Some(user_email.user_id.clone());
     alert.id = Some(alert_id);
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::validate_detection(&org_id, None, &alert).await {
+        return resp;
+    }
     // the save's own checks answer first, so a bad body is never reported as a refused read
     #[cfg(feature = "enterprise")]
     if openobserve_core::background_access::rbac_enforced().await {
@@ -2558,6 +2663,17 @@ pub async fn delete_alert(
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::guard_siem(
+        &org_id,
+        &user_email.user_id,
+        "DELETE",
+        security::is_siem_alert(&org_id, &alert_id_str).await,
+    )
+    .await
+    {
+        return resp;
+    }
     let client = get_orm_client_rw().await;
 
     // Check whether this ID belongs to a regular alert before attempting delete.
@@ -2752,6 +2868,17 @@ pub async fn delete_alert_bulk(
         {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
+    }
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::guard_siem_ids(
+        &org_id,
+        &_user_id,
+        "DELETE",
+        req.ids.iter().map(String::as_str),
+    )
+    .await
+    {
+        return resp;
     }
 
     let mut successful = Vec::with_capacity(req.ids.len());
@@ -3052,6 +3179,22 @@ pub async fn list_alerts(
     let name_substring = query.alert_name_substring.clone();
     let enabled_filter = query.enabled;
     let page_size_and_idx = query.page_size.map(|s| (s, query.page_idx.unwrap_or(0)));
+    // The route check is skipped for a cross-folder read, so the handler is the only folder gate.
+    #[cfg(feature = "enterprise")]
+    let listable_folders = if folder_slug.is_none() {
+        match alert::listable_alert_folders(&org_id, &user_email.user_id).await {
+            // No listable folder is no access to alerts, which the skipped route check refused.
+            Ok(Some(folders)) if folders.is_empty() => {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
+            Ok(folders) => folders,
+            Err(e) => return e.into(),
+        }
+    } else {
+        None
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let listable_folders: Option<Vec<String>> = None;
 
     // Resolve the tag filter to an alert-ID set BEFORE building the query
     // (PT-8): the tags column is JSON, and the filter must enter the SQL as an
@@ -3067,12 +3210,24 @@ pub async fn list_alerts(
     let mut params = query.into(&org_id);
     #[cfg(feature = "enterprise")]
     let mut params = query.into(&org_id);
+    if let Some(folders) = &listable_folders {
+        params = params.within_folders(folders.clone());
+    }
 
     if !requested_tags.is_empty() {
         // `Some(empty)` is meaningful: no alert carries these tags, so the
         // result must be empty. Leaving it `None` would match everything.
         params = params.with_tag_alert_ids(
             db::alerts::alert::resolve_alert_ids_by_tags(&org_id, &requested_tags).await,
+        );
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        params = params.without_alert_ids(
+            security::hidden_siem_alert_ids(&org_id, &user_email.user_id)
+                .await
+                .into_iter()
+                .collect(),
         );
     }
 
@@ -3216,12 +3371,14 @@ pub async fn list_alerts(
             {
                 continue;
             }
-            if !visible_alert(
-                &visibility,
-                &definition.id,
-                &definition.folder_id,
-                &definition.name,
-            ) {
+            if !in_listable_folder(&listable_folders, &definition.folder_id)
+                || !visible_alert(
+                    &visibility,
+                    &definition.id,
+                    &definition.folder_id,
+                    &definition.name,
+                )
+            {
                 continue;
             }
             let folder_name = folder_names
@@ -3266,6 +3423,7 @@ pub async fn list_alerts(
             anomaly_list_items(&org_id, &configs)
                 .await
                 .into_iter()
+                .filter(|item| in_listable_folder(&listable_folders, &item.folder_id))
                 .filter(|item| anomaly_row_visible(&visibility, item))
                 .filter(|item| enabled_filter.is_none_or(|enabled| item.enabled == enabled))
                 .filter(|item| match &priority_filter {
@@ -3329,6 +3487,12 @@ pub async fn list_alerts(
         list,
         status_unavailable,
     })
+}
+
+fn in_listable_folder(listable_folders: &Option<Vec<String>>, folder_id: &str) -> bool {
+    listable_folders
+        .as_ref()
+        .is_none_or(|folders| folders.iter().any(|folder| folder == folder_id))
 }
 
 // The anomaly merge has no permission filter of its own, unlike the SQL path.
@@ -3800,6 +3964,17 @@ pub async fn enable_alert(
     };
     let should_enable = query.value;
     #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::guard_siem(
+        &org_id,
+        &user_email.user_id,
+        "POST",
+        security::is_siem_alert(&org_id, &alert_id.to_string()).await,
+    )
+    .await
+    {
+        return resp;
+    }
+    #[cfg(feature = "enterprise")]
     if should_enable
         && let Err(resp) = openobserve_core::background_access::guard_loaded(
             &org_id,
@@ -3948,6 +4123,12 @@ pub async fn enable_alert_bulk(
                 return MetaHttpResponse::forbidden("Unauthorized Access");
             }
         }
+        let ids: Vec<String> = req.ids.iter().map(ToString::to_string).collect();
+        if let Err(resp) =
+            security::guard_siem_ids(&org_id, user_id, "POST", ids.iter().map(String::as_str)).await
+        {
+            return resp;
+        }
     }
 
     let mut successful = Vec::with_capacity(req.ids.len());
@@ -4091,6 +4272,17 @@ pub async fn trigger_alert(
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::guard_siem(
+        &org_id,
+        &user_email.user_id,
+        "POST",
+        security::is_siem_alert(&org_id, &alert_id.to_string()).await,
+    )
+    .await
+    {
+        return resp;
+    }
     #[cfg(feature = "enterprise")]
     if let Err(resp) = openobserve_core::background_access::guard_loaded(
         &org_id,
@@ -4288,6 +4480,20 @@ pub async fn move_alerts(
     Headers(user_email): Headers<UserEmail>,
     Json(req_body): Json<MoveAlertsRequestBody>,
 ) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let ids: Vec<String> = req_body.alert_ids.iter().map(ToString::to_string).collect();
+        if let Err(resp) = security::guard_siem_ids(
+            &org_id,
+            &user_email.user_id,
+            "POST",
+            ids.iter().map(String::as_str),
+        )
+        .await
+        {
+            return resp;
+        }
+    }
     let client = get_orm_client_rw().await;
     let total_ids = req_body.alert_ids.len() + req_body.anomaly_config_ids.len();
 
@@ -4634,9 +4840,9 @@ mod tests {
         BulkDeleteRequest, GetAlertResponseBody, HashMap, Headers, Json, Ksuid,
         ListAlertsResponseBodyItem, MetaAlert, ONCALL_LOCKED_WARNING, Path, Query, UserEmail,
         WORKFLOWS_LOCKED_WARNING, anomaly_row_visible, composite_created_response,
-        composite_save_warnings, composite_updated_response, delete_alert_bulk, known_target_names,
-        locked_target_ids, locked_target_warnings, resolve_generate_sql, save_warnings,
-        visible_alert,
+        composite_save_warnings, composite_updated_response, delete_alert_bulk, in_listable_folder,
+        known_target_names, locked_target_ids, locked_target_warnings, resolve_generate_sql,
+        save_warnings, visible_alert,
     };
 
     fn row(name: &str, extra: serde_json::Value) -> ListAlertsResponseBodyItem {
@@ -5032,6 +5238,15 @@ mod tests {
             status(AlertError::CreateAlreadyExists),
             StatusCode::CONFLICT
         );
+    }
+
+    #[test]
+    fn test_cross_folder_list_keeps_only_listable_folders() {
+        let listable = Some(vec!["mine".to_string()]);
+        assert!(in_listable_folder(&listable, "mine"));
+        assert!(!in_listable_folder(&listable, "other"));
+        assert!(!in_listable_folder(&Some(vec![]), "mine"));
+        assert!(in_listable_folder(&None, "other"));
     }
 
     #[test]

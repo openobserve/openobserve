@@ -25,6 +25,7 @@ const mockSortBy = ref("end_time");
 const mockSortOrder = ref<"asc" | "desc">("desc");
 // Applied search term — module-scoped in the real composable, like the pagination.
 const mockSearchKeyword = ref("");
+const mockSearchUser = ref("");
 const mockAgents = ref<any[]>([]);
 const mockAgentsLoaded = ref(false);
 const mockAgentsError = ref<"forbidden" | "failed" | null>(null);
@@ -35,6 +36,7 @@ const mockListAgents = vi.fn();
 const mockRouterPush = vi.fn();
 const mockRouterReplace = vi.fn(() => Promise.resolve());
 let mockRouteQuery: Record<string, any> = {};
+let mockOrgId = "test-org";
 
 // The real module pulls in the streaming-search stack (vuex store et al), so
 // the term helper the component imports is mirrored here instead of pulled
@@ -57,6 +59,7 @@ vi.mock("./composables/useSessions", () => ({
     currentPage: mockCurrentPage,
     rowsPerPage: mockRowsPerPage,
     searchKeyword: mockSearchKeyword,
+    searchUser: mockSearchUser,
     sortBy: mockSortBy,
     sortOrder: mockSortOrder,
     agents: mockAgents,
@@ -102,7 +105,7 @@ vi.mock("vue-router", () => ({
 vi.mock("vuex", () => ({
   useStore: vi.fn(() => ({
     state: {
-      selectedOrganization: { identifier: "test-org" },
+      selectedOrganization: { identifier: mockOrgId },
     },
   })),
 }));
@@ -272,6 +275,7 @@ beforeEach(() => {
   mockCurrentPage.value = 1;
   mockRowsPerPage.value = 20;
   mockSearchKeyword.value = "";
+  mockSearchUser.value = "";
   mockSortBy.value = "end_time";
   mockSortOrder.value = "desc";
   mockAgents.value = [];
@@ -279,6 +283,7 @@ beforeEach(() => {
   mockAgentsError.value = null;
   mockAgentsOrg.value = null;
   mockRouteQuery = {};
+  mockOrgId = "test-org";
   // The agents query is cached per window bucket; each test brings its own list.
   queryClient.clear();
 
@@ -609,7 +614,8 @@ describe("SessionsList — agent filter", () => {
       2000,
       0,
       20,
-      `gen_ai_agent_id = 'agent-1'`,
+      // supportAgent has no env: the env-less variant.
+      `gen_ai_agent_id = 'agent-1' AND (gen_ai_agent_env IS NULL OR gen_ai_agent_env = '')`,
       undefined,
     );
   });
@@ -839,6 +845,38 @@ describe("SessionsList — auto mode is decided per org", () => {
   });
 });
 
+describe("SessionsList — org round trip through an org without trace streams", () => {
+  // The parent's DateTime replays its window on mount: a non-forced load.
+  async function mountReplay() {
+    const wrapper = await mountComponent();
+    await (wrapper.vm as any).refresh(undefined, undefined, false);
+    await flushPromises();
+  }
+
+  it("loads the first org's sessions again after visiting an org with no streams", async () => {
+    // The list was filled for org-a.
+    mockHasLoadedOnce.value = true;
+    mockLoadedOrg.value = "org-a";
+    mockSessions.value = [makeSession()];
+
+    // org-b has no trace streams: the load ends with an empty list.
+    mockOrgId = "org-b";
+    mockGetStreams.mockResolvedValue({ list: [] });
+    await mountReplay();
+    expect(mockFetchPage).not.toHaveBeenCalled();
+    expect(mockSessions.value).toEqual([]);
+
+    // Back on org-a, the empty list is not served as org-a's.
+    mockOrgId = "org-a";
+    mockGetStreams.mockResolvedValue({
+      list: [{ name: "test-stream", settings: { is_llm_stream: true } }],
+    });
+    await mountReplay();
+    expect(mockFetchPage).toHaveBeenCalledTimes(1);
+    expect(mockFetchPage.mock.calls[0][0]).toBe("test-stream");
+  });
+});
+
 describe("SessionsList — agents list fails to load", () => {
   it("shows the load error with a retry, not Stream mode or the no-identity banner", async () => {
     mockListAgents.mockRejectedValue(
@@ -1035,6 +1073,24 @@ describe("SessionsList — search", () => {
     });
   });
 
+  it("filters to the exact user from `?user=` and drops it on clear", async () => {
+    mockRouteQuery = { type: "stream", user: "qa-u1" };
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+    expect(mockFetchPage).toHaveBeenLastCalledWith("test-stream", 1000, 2000, 0, 20, "", {
+      user: "qa-u1",
+    });
+    expect(mockRouterReplace).toHaveBeenLastCalledWith({
+      query: expect.objectContaining({ user: "qa-u1" }),
+    });
+    expect(value(wrapper, SEARCH)).toBe("");
+
+    wrapper.findComponent('[data-test="sessions-list-user-filter"]').vm.$emit("remove");
+    await flushPromises();
+    expect(mockFetchPage).toHaveBeenLastCalledWith("test-stream", 1000, 2000, 0, 20, "", undefined);
+    expect(mockRouterReplace.mock.lastCall?.[0].query).not.toHaveProperty("user");
+  });
+
   it("a URL term that differs from the cached list bypasses the mount cache", async () => {
     // Cached rows were fetched without a search; the pasted link carries one.
     mockHasLoadedOnce.value = true;
@@ -1056,14 +1112,33 @@ describe("SessionsList — search", () => {
     mockSessions.value = [makeSession({ sessionId: "sess-luis", userId: "luis@example.com" })];
     mockTotal.value = 1;
     mockRouteQuery = { type: "stream", keyword: "luis" };
+    // A Back navigation: the history entry knows the page it came back from.
+    window.history.replaceState({ forward: "/ai/session-details" }, "");
+
+    const wrapper = await mountComponent();
+    await wrapper.vm.refresh(1000, 2000, false);
+    await flushPromises();
+    window.history.replaceState(null, "");
+
+    expect(mockFetchPage).not.toHaveBeenCalled();
+    expect(wrapper.find("[data-session-id='sess-luis']").exists()).toBe(true);
+    expect(value(wrapper, SEARCH)).toBe("luis");
+  });
+
+  it("a followed link with the same term fetches: it may name another stream", async () => {
+    mockHasLoadedOnce.value = true;
+    mockLoadedOrg.value = "test-org";
+    mockSearchKeyword.value = "luis";
+    mockSessions.value = [makeSession({ sessionId: "sess-luis", userId: "luis@example.com" })];
+    mockRouteQuery = { type: "stream", keyword: "luis" };
 
     const wrapper = await mountComponent();
     await wrapper.vm.refresh(1000, 2000, false);
     await flushPromises();
 
-    expect(mockFetchPage).not.toHaveBeenCalled();
-    expect(wrapper.find("[data-session-id='sess-luis']").exists()).toBe(true);
-    expect(value(wrapper, SEARCH)).toBe("luis");
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
+      keyword: "luis",
+    });
   });
 
   it("shows the filtered empty state, not the first-run screen, and its Clear action re-fetches", async () => {

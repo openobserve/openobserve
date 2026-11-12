@@ -2,19 +2,10 @@
 
 import { describe, expect, it } from "vitest";
 
-import { sourceHealth, widerPeriodFor } from "./streams";
+import { widerPeriodFor } from "./streams";
 
 const NOW = 1_800_000_000_000_000;
 const MIN = 60_000_000;
-
-describe("sourceHealth", () => {
-  it("separates live, quiet and never-reported sources", () => {
-    expect(sourceHealth({ doc_num: 3, doc_time_max: NOW - MIN }, NOW)).toBe("live");
-    expect(sourceHealth({ doc_num: 3, doc_time_max: NOW - 25 * 60 * MIN }, NOW)).toBe("quiet");
-    expect(sourceHealth({ doc_num: 0, doc_time_max: 0 }, NOW)).toBe("never");
-    expect(sourceHealth(null, NOW)).toBe("never");
-  });
-});
 
 describe("widerPeriodFor", () => {
   const fifteenMinutesAgo = NOW - 15 * MIN;

@@ -43,4 +43,16 @@ describe("OText", () => {
     expect(wrapper.findComponent(OTooltip).exists()).toBe(false);
     expect(wrapper.attributes("data-o-tooltip-off")).toBe("");
   });
+
+  it("wrap gives a meta line a readable line height, and leaves it tight otherwise", () => {
+    const tight = mount(OText, { props: { variant: "meta" }, slots: { default: "x" } });
+    const wrapped = mount(OText, {
+      props: { variant: "meta", wrap: true },
+      slots: { default: "x" },
+    });
+
+    expect(tight.classes()).toContain("leading-none");
+    expect(wrapped.classes()).toContain("leading-normal");
+    expect(wrapped.classes()).not.toContain("leading-none");
+  });
 });

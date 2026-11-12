@@ -27,6 +27,7 @@ import {
   muteAlertMutation,
   extendAlertMuteMutation,
   cancelAlertMuteMutation,
+  retrainAnomalyMutation,
 } from "./alerts.queries";
 import { alertKeys } from "./alerts.querykeys";
 import { incidentKeys } from "./incidents.querykeys";
@@ -133,6 +134,23 @@ describe("promRulePreviewQuery", () => {
     await expect(
       (promRulePreviewQuery("org", "foo", 600).queryFn as () => Promise<number>)(),
     ).rejects.toThrow("Incomplete");
+  });
+});
+
+describe("alert state toggles", () => {
+  // The cache's error handler skips a mutation with no meta, so the toast needs meta present and not silent.
+  it.each([
+    ["alert", toggleAlertStateMutation],
+    ["anomaly", toggleAnomalyAlertStateMutation],
+  ])("leaves a failed %s toggle to the central mutation toast", (_kind, build) => {
+    const { meta } = build(ORG);
+    expect(meta).toBeDefined();
+    expect(meta?.silentError).toBeUndefined();
+  });
+
+  // The list toasts a failed retrain itself, so a central toast would report it twice.
+  it("keeps a failed retrain out of the central mutation toast", () => {
+    expect(retrainAnomalyMutation(ORG).meta?.silentError).toBe(true);
   });
 });
 

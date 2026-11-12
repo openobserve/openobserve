@@ -35,6 +35,8 @@ mod agent_signals;
 mod ai_chat_retention;
 mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
+#[cfg(feature = "enterprise")]
+mod alert_transitions_reaper;
 #[cfg(feature = "cloud")]
 mod cloud;
 mod compactor;
@@ -928,6 +930,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if let Err(e) = alerts::alert_calibration::backfill_org_configs().await {
         log::error!("[alert_calibration] default config backfill failed: {e}");
     }
+    #[cfg(feature = "enterprise")]
+    if let Err(e) = openobserve_core::autoobserve::init().await {
+        log::error!("[autoobserve] engine start-up failed: {e}");
+    }
 
     // cache alerts (this will include the system templates we just created)
     db::alerts::templates::cache()
@@ -1254,6 +1260,21 @@ pub async fn init() -> Result<(), anyhow::Error> {
             },
         );
 
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::health::register_budget_transition(
+            |org_id, job_id, pause_at_spend| {
+                Box::pin(async move {
+                    openobserve_core::llm_evaluations::eval_jobs::transition_for_budget(
+                        &org_id,
+                        &job_id,
+                        pause_at_spend,
+                    )
+                    .await
+                    .map(|_| ())
+                    .map_err(|error| anyhow::anyhow!(error))
+                })
+            },
+        );
+
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_experiment_task_runner(
             |pointer| {
                 Box::pin(async move {
@@ -1281,6 +1302,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 .get("total")
                 .copied()
             },
+        );
+
+        // Registered here: the enterprise crate can't depend on the transform crate's QuickJS.
+        o2_enterprise::enterprise::llm_evaluations::scorers::code::register_code_runner(
+            transform::js::run_score_fn,
         );
 
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::start_eval_task_consumers();
@@ -1537,6 +1563,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // gated: retention deletes do not replicate, so every region reaps its own
     // copy or it grows without bound.
     alert_eval_ledger_reaper::run();
+    // Not job-cluster gated for the same reason; OSS builds keep every level change.
+    #[cfg(feature = "enterprise")]
+    alert_transitions_reaper::run();
     query_history_reaper::run();
     public_dashboards_outbox::run();
     // Reconciliation is what makes the rolling window actually roll: the

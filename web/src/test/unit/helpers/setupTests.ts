@@ -262,6 +262,11 @@ Object.defineProperty(navigator, "clipboard", {
   writable: true,
 });
 
+// Loaded before any spec module runs, since some specs stub globals such as URL at import time.
+await (
+  await import("@/components/autoobserve/data/facts")
+).factsReady;
+
 beforeAll(() => {
   server.listen();
 
@@ -347,6 +352,9 @@ afterEach(() => {
   // not enough — persisted entries would be restored from IndexedDB.
   queryClient.clear();
   void purgeAllPersisted();
+  // With no devtools hook, every mounted app's plugins queue here forever and keep its whole tree alive.
+  const devtoolsQueue = (globalThis as any).__VUE_DEVTOOLS_PLUGINS__;
+  if (Array.isArray(devtoolsQueue)) devtoolsQueue.length = 0;
 });
 
 // Stop the server when tests are done

@@ -82,6 +82,9 @@ vi.mock("@/composables/useStreams", () => ({
         // This one is in userDataSet so it populates streamFields
         { name: "user_agent_device_brand", type: "keyword" },
         { name: "geo_info_city", type: "keyword" },
+        { name: "o2source", type: "keyword" },
+        { name: "o2_evp_origin", type: "keyword" },
+        { name: "o2_evp_origin_version", type: "keyword" },
       ],
     }),
   }),
@@ -124,19 +127,25 @@ vi.mock("@/composables/useSqlEditorDiagnostics", () => ({
   },
 }));
 
-vi.mock("@/components/logs/useQueryPlaceholder", () => ({
-  useQueryPlaceholder: (...args: any[]) => {
-    // Same rationale (and same TDZ deferral) as above.
-    Promise.resolve().then(() => {
-      for (const arg of args) {
-        void (arg && typeof arg === "object" && "value" in arg ? arg.value : arg);
-      }
-    });
-    return {
-      placeholder: ref("Filter errors…"),
-    };
-  },
-}));
+const placeholderMode = vi.hoisted(() => ({ real: false }));
+
+vi.mock("@/components/logs/useQueryPlaceholder", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/components/logs/useQueryPlaceholder")>();
+  return {
+    useQueryPlaceholder: (...args: Parameters<typeof actual.useQueryPlaceholder>) => {
+      if (placeholderMode.real) return actual.useQueryPlaceholder(...args);
+      // Same rationale (and same TDZ deferral) as above.
+      Promise.resolve().then(() => {
+        for (const arg of args) {
+          void (arg && typeof arg === "object" && "value" in arg ? arg.value : arg);
+        }
+      });
+      return {
+        placeholder: ref("Filter errors…"),
+      };
+    },
+  };
+});
 
 vi.mock("@/plugins/traces/SyntaxGuide.vue", () => ({
   default: { template: '<div data-test="syntax-guide-stub" />' },
@@ -448,6 +457,21 @@ describe("AppErrors", () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Rendering
   // ─────────────────────────────────────────────────────────────────────────
+  describe("with the real query placeholder", () => {
+    beforeEach(() => {
+      placeholderMode.real = true;
+    });
+
+    afterEach(() => {
+      placeholderMode.real = false;
+    });
+
+    it("mounts without reading the page state before it exists", async () => {
+      ({ wrapper } = await mountAppErrors());
+      expect(wrapper.find('[data-test="errors-kpi-cards-stub"]').exists()).toBe(true);
+    });
+  });
+
   describe("rendering", () => {
     it("renders the table when composable returns issues", async () => {
       mockIssues.value = [ISSUE_1, ISSUE_2];
@@ -605,9 +629,35 @@ describe("AppErrors", () => {
         expect.objectContaining({
           name: "ErrorViewer",
           params: { id: ISSUE_1.latest_error_id },
-          query: { timestamp: ISSUE_1.zo_sql_timestamp },
+          query: {
+            timestamp: ISSUE_1.zo_sql_timestamp,
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
         }),
       );
+    });
+
+    it("keeps the org on the Error Viewer link, so a reload in another org reopens the same error", async () => {
+      mockIssues.value = [ISSUE_1];
+      const original = store.state.selectedOrganization.identifier;
+      store.state.selectedOrganization.identifier = "rum_errors_org";
+      try {
+        ({ wrapper, router } = await mountAppErrors());
+        await flushPromises();
+        const pushSpy = vi.spyOn(router, "push");
+
+        await wrapper.findAll('[data-test="table-row"]')[0].trigger("click");
+        await flushPromises();
+
+        expect(pushSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: "ErrorViewer",
+            query: expect.objectContaining({ org_identifier: "rum_errors_org" }),
+          }),
+        );
+      } finally {
+        store.state.selectedOrganization.identifier = original;
+      }
     });
 
     it("sets errorTrackingState.data.selectedError on row click", async () => {
@@ -675,6 +725,17 @@ describe("AppErrors", () => {
           }),
         }),
       );
+    });
+
+    it("keeps the o2-prefixed SDK fields in the field sidebar (o2-enterprise#2724)", async () => {
+      ({ wrapper, router } = await mountAppErrors());
+      await flushPromises();
+
+      const names = (wrapper.vm as any).streamFields.map((f: { name: string }) => f.name);
+      expect(names).toEqual(
+        expect.arrayContaining(["o2source", "o2_evp_origin", "o2_evp_origin_version"]),
+      );
+      expect(names).not.toContain("error_message");
     });
 
     it("passes startTime and endTime from dateTime state to fetchAll", async () => {

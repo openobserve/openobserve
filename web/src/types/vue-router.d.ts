@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import "vue-router";
+import type { I18nKey } from "@/types/i18n";
 
 declare module "vue-router" {
   interface RouteMeta {
@@ -28,5 +29,7 @@ declare module "vue-router" {
     licenseFeature?: string;
     /** The license key comes from `query.stream_type` instead, via `streamTypeFeature`. */
     licenseFeatureFromStreamType?: boolean;
+    /** Tab-title key per `?tab=` value, for a route several rail items share; wins over `titleKey`. */
+    titleKeyByTab?: Record<string, I18nKey>;
   }
 }

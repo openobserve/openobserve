@@ -158,12 +158,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ inc.title || t("overview.untitledIncident") }}
               <template v-if="inc.group_values && Object.keys(inc.group_values).length > 0">
                 <ODimensionChip
-                  v-for="[key, val] in sortedDimensions(inc.group_values)"
-                  :key="key"
-                  :dim-key="key"
-                  :key-label="shortDimKey(key)"
-                  :value="val"
-                  :tooltip="true"
+                  v-for="dim in incidentDimensions(inc.group_values)"
+                  :key="dim.key"
+                  :dim-key="dim.key"
+                  :key-label="dim.label"
+                  :value="dim.value"
+                  :tooltip="dim.rawTooltip"
                 />
               </template>
             </div>
@@ -858,6 +858,7 @@ import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import analytics from "@/services/product_analytics";
+import { chipDimensionKeys, dimensionDisplay } from "@/utils/incidents/findingDimensions";
 
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
@@ -1387,7 +1388,8 @@ const loadUserStreams = async (force = false) => {
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
 const loadAnomalies = async (force = false, current: () => boolean = () => true) => {
   sectionFailure.anomalies = null;
-  if (anomalyLocked.value) {
+  // the OSS build does not register the anomaly routes, and their 401 would end the session
+  if (!anomalyEnabled.value) {
     anomalies.value = [];
     anomalyConfigCount.value = null;
     return;
@@ -1716,13 +1718,23 @@ const formatReqRate = (reqs: number) => {
 };
 
 const sortedDimensions = (dims: Record<string, string>): [string, string][] =>
-  Object.keys(dims)
-    .sort()
-    .map((k) => [k, dims[k]]);
+  chipDimensionKeys(dims).map((k) => [k, dims[k]]);
 
 // Shorten verbose k8s-style keys for display: "k8s-namespace" → "namespace"
 const shortDimKey = (key: string): string =>
   key.replace(/^k8s-/, "").replace(/^kubernetes[_-]/, "");
+
+// A shortened key keeps the full key in its tooltip; a finding's words need none.
+const incidentDimensions = (dims: Record<string, string>) =>
+  sortedDimensions(dims).map(([key, val]) => {
+    const shown = dimensionDisplay(t, dims, key, val);
+    return {
+      key,
+      label: shown.label ?? shortDimKey(key),
+      value: shown.value,
+      rawTooltip: !shown.label,
+    };
+  });
 
 const severityRowClass = (severity: string) =>
   severity === "critical"
@@ -1947,5 +1959,11 @@ watch(isIncidentsEnabled, (enabled) => {
   // the earlier pass returned early and marked the section loaded, so re-arm its skeleton
   sectionState.incidents.loaded = false;
   void runSection("incidents", (current) => loadIncidents(false, current));
+});
+// a failed config fetch is retried after mount, so the flag can turn on once the first pass has skipped the section
+watch(anomalyEnabled, (enabled) => {
+  if (!enabled) return;
+  sectionState.anomalies.loaded = false;
+  void runSection("anomalies", (current) => loadAnomalies(false, current));
 });
 </script>

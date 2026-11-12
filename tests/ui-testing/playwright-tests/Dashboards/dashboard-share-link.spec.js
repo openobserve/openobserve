@@ -368,12 +368,9 @@ test.describe("dashboard share URL button testcases", () => {
     await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    // Get current URL to verify variable parameter
-    const currentURL = page.url();
-    testLogger.info("Current URL with variable:", { currentURL });
-
-    // Verify URL contains the variable parameter
-    expect(currentURL).toContain(`var-${variableName}`);
+    // The URL updates after the selection commits, and the waits above swallow their timeouts.
+    await expect.poll(() => page.url(), { timeout: 15000 }).toContain(`var-${variableName}`);
+    testLogger.info("Current URL with variable:", { currentURL: page.url() });
 
     // Click the share button
     await pm.dashboardShareExport.clickShareButton();

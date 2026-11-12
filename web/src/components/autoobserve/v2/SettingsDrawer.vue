@@ -36,7 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         saved ? t("autoobserve2.settingsDrawer.saved") : ""
       }}</span>
     </template>
-    <div class="flex flex-col gap-8 pb-8">
+    <slot v-if="$slots.empty" name="empty" />
+    <div v-else class="flex flex-col gap-8 pb-8">
       <DrawerSection
         :title="t('autoobserve2.settingsDrawer.reach')"
         data-test="autoobserve2-settings-reach"
@@ -158,7 +159,7 @@ import DrawerSection from "./DrawerSection.vue";
 import { useAutonomy, useCompletedFixes } from "./useDecisions";
 import { DEFAULT_AUTONOMY } from "../data/facts";
 import {
-  ALL_SERVICES,
+  allServices,
   DESTINATION_OPTIONS,
   settingsKinds,
   say,
@@ -216,7 +217,7 @@ const dayOptions = computed(() =>
 );
 
 const excluded = ref<string[]>([]);
-const serviceOptions = ALL_SERVICES.map((name) => ({ value: name, label: raw(name) }));
+const serviceOptions = allServices().map((name) => ({ value: name, label: raw(name) }));
 
 const SAVED_MS = 2000;
 

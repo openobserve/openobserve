@@ -145,7 +145,10 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 145: add alerts.incident_title_template.
 // 146: rename user folders named default so the built-in default folder can be created.
 // 147: index alert_incidents.last_alert_at over unresolved incidents.
-pub const DB_SCHEMA_VERSION: u64 = 147;
+// 148: add alert_incidents.security_case, backfilled from SIEM detections and case group keys.
+// 149: add alert_incidents.historical, set on a security case only backfilled firings opened.
+// 150: add budget to online_eval_jobs.
+pub const DB_SCHEMA_VERSION: u64 = 150;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -635,6 +638,16 @@ pub fn get_instance_id() -> String {
         Some(id) => id.clone(),
         None => "".to_string(),
     }
+}
+
+/// Keyed by the instance id, so an unauthenticated caller cannot map it to a public commit.
+pub fn build_fingerprint() -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::new()
+        .chain_update(get_instance_id())
+        .chain_update(COMMIT_HASH)
+        .finalize();
+    hex::encode(&digest[..12])
 }
 
 /// Caches the internal gRPC token stored in the meta db; empty means none is stored.
@@ -2995,6 +3008,12 @@ pub struct Limit {
     )]
     pub alert_eval_ledger_retention_days: i64,
     #[env_config(
+        name = "ZO_ALERT_TRANSITIONS_RETENTION_DAYS",
+        default = 97,
+        help = "Enterprise builds only: how long alert state changes (alert_state_transitions, the level-change history) are kept, in days. Enterprise alert calibration reads up to 90 days, so values below 97 shorten its history. 0 or less disables the reaper; open-source builds never delete them."
+    )]
+    pub alert_transitions_retention_days: i64,
+    #[env_config(
         name = "ZO_QUERY_HISTORY_ENABLED",
         default = true,
         help = "Records the queries users run in their query history. When false nothing is stored and the history lists empty; existing entries are kept until deleted or reaped."
@@ -3525,6 +3544,12 @@ pub struct Compact {
     pub pending_jobs_metric_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_GROUP_FILES", default = 10000)]
     pub max_group_files: usize,
+    #[env_config(
+        name = "ZO_COMPACT_METRICS_MAX_GROUPS",
+        default = 100,
+        help = "Max sorted inputs (ingester files plus chains of already merged files) one metrics merge opens at once; a closed hour holding more is first pre-merged into hash-merged files. 0 disables the cap, other values below 10 are raised to 10"
+    )]
+    pub metrics_max_groups: usize,
     #[env_config(
         name = "ZO_COMPACT_RETENTION_ALLOWED_HOURS",
         default = "",
@@ -5183,6 +5208,10 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.compact.old_data_min_files < 1 {
         cfg.compact.old_data_min_files = 10;
+    }
+    // 0 disables the cap; a smaller cap would pre-merge an hour over too many rounds
+    if (1..10).contains(&cfg.compact.metrics_max_groups) {
+        cfg.compact.metrics_max_groups = 10;
     }
     if cfg.compact.file_list_deleted_batch_size == 0 {
         cfg.compact.file_list_deleted_batch_size = 1000;

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet, VecDeque},
     io::{BufRead, Cursor, Read},
     sync::{LazyLock, Mutex},
@@ -23,7 +24,7 @@ use std::{
 use axum::http;
 use chrono::Utc;
 use config::{
-    ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
+    TIMESTAMP_COL_NAME,
     meta::{
         db_monitoring::is_dbm_server_stream,
         self_reporting::usage::{UsageType, is_internal_rollup_stream},
@@ -58,7 +59,7 @@ use prost::Message;
 use transform::TRANSFORM_FAILED;
 
 use super::{
-    IngestJsonData,
+    DestinationSettings, IngestJsonData,
     bulk::{BulkResponseOrder, TS_PARSE_FAILED},
     columnar::JsonColumnar,
     ingestion_log_enabled, log_failed_record,
@@ -114,10 +115,9 @@ struct StreamRecordNeeds {
 
 impl StreamRecordNeeds {
     async fn load(stream_param: StreamParams) -> Self {
-        // Chat history is replayed verbatim and hash-checked; no user pipeline may
-        // read (copy elsewhere) or rewrite it.
+        // No user pipeline may copy a protected stream's rows elsewhere or rewrite them.
         let executable_pipelines =
-            if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+            if config::meta::self_reporting::protected_streams::is_read_protected_stream(
                 &stream_param.stream_name,
             ) {
                 Vec::new()
@@ -176,7 +176,12 @@ fn is_blocked_internal_rollup_write(
     user: &IngestUser,
     is_derived: bool,
 ) -> bool {
-    is_internal_rollup_stream(stream_name) && !is_derived && matches!(user, IngestUser::User(_))
+    is_internal_rollup_stream(stream_name) && !is_internal_writer(user, is_derived)
+}
+
+/// A pipeline-derived write or a server-side job; a user credential is never one.
+fn is_internal_writer(user: &IngestUser, is_derived: bool) -> bool {
+    is_derived || matches!(user, IngestUser::SystemJob(_))
 }
 
 /// Keyed on the destination: gRPC relabels forwarded customer writes as `InternalGrpc`.
@@ -319,7 +324,7 @@ async fn ingest_inner(
     // Internal writers pass the same test as the rollup write guard below.
     #[cfg(feature = "vectorscan")]
     let platform_write = {
-        let internal_writer = is_derived || matches!(user, IngestUser::SystemJob(_));
+        let internal_writer = is_internal_writer(&user, is_derived);
         let source = stream_name.clone();
         move |stream: &str| {
             config::meta::self_reporting::redaction::is_platform_write(
@@ -565,28 +570,17 @@ async fn ingest_inner(
     // batch process records through pipeline
     if !executable_pipelines.is_empty() {
         let records_count = pipeline_inputs.len();
-        let mut evaluation_tasks = tokio::task::JoinSet::new();
-        for exec_pl in &executable_pipelines {
-            if exec_pl.kind == config::meta::pipeline::PipelineKind::Evaluation
-                && exec_pl.contains_llm_evaluation_node()
-            {
-                let exec_pl = exec_pl.clone();
-                let org_id = org_id.to_string();
-                let stream_name = stream_name.clone();
-                let records = pipeline_inputs.clone();
-                evaluation_tasks.spawn(async move {
-                    if let Err(e) = exec_pl
-                        .process_batch(&org_id, records, Some(stream_name.clone()))
-                        .await
-                    {
-                        log::error!(
-                            "[Pipeline] evaluation pipeline for stream {org_id}/{stream_name}: Batch execution error: {e}.",
-                        );
-                    }
-                });
-                continue;
-            }
-
+        let evaluation_tasks = crate::ingestion::spawn_llm_evaluations(
+            org_id,
+            &stream_name,
+            &executable_pipelines,
+            &pipeline_inputs,
+            Some(&stream_name),
+        );
+        for exec_pl in executable_pipelines
+            .iter()
+            .filter(|p| !crate::ingestion::is_llm_evaluation(p))
+        {
             let pipeline_start = std::time::Instant::now();
             let pl_result = exec_pl
                 .process_batch(org_id, pipeline_inputs.clone(), Some(stream_name.clone()))
@@ -654,6 +648,21 @@ async fn ingest_inner(
                             )
                             .await;
                         }
+                        let settings = DestinationSettings {
+                            org_id,
+                            stream_name: &destination_stream,
+                            dbm: dest_dbm_gate,
+                            uds_fields: user_defined_schema_map
+                                .get(&destination_stream)
+                                .and_then(Option::as_ref),
+                            need_original: streams_need_original_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v),
+                            need_all_values: streams_need_all_values_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v),
+                            all_values_max_len: index_all_max_value_length,
+                        };
 
                         for (idx, mut res) in stream_pl_results {
                             // handle timestamp
@@ -682,77 +691,19 @@ async fn ingest_inner(
                             // we calculate the size BEFORE applying uds
                             let original_size = estimate_json_bytes(&res);
 
-                            // get json object
-                            let mut local_val = match res.take() {
+                            let local_val = match res.take() {
                                 json::Value::Object(val) => val,
                                 _ => unreachable!(),
                             };
-
-                            // Keyed on the destination: client `o2_dbm_*` keys must not land raw.
-                            if dest_dbm_gate {
-                                crate::db_monitoring::server_vantage::canonicalize_dbm_record(
-                                    &mut local_val,
-                                );
-                            }
-
-                            if let Some(Some(fields)) =
-                                user_defined_schema_map.get(&destination_stream)
-                            {
-                                local_val = crate::ingestion::refactor_map(local_val, fields);
-                            }
-
-                            // usize::MAX used as a flag when pipeline is applied with
-                            // ResultArray vrl
-                            //  - invalid original_data
-                            // add `_original` and '_record_id` if required by StreamSettings
-                            if idx != usize::MAX
-                                && streams_need_original_map
-                                    .get(&destination_stream)
-                                    .is_some_and(|v| *v)
-                                && original_options[idx].is_some()
-                            {
-                                local_val.insert(
-                                    ORIGINAL_DATA_COL_NAME.to_string(),
-                                    original_options[idx].clone().unwrap().into(),
-                                );
-                                let record_id = crate::ingestion::generate_record_id(
-                                    org_id,
-                                    &destination_stream,
-                                    &StreamType::Logs,
-                                );
-                                local_val.insert(
-                                    ID_COL_NAME.to_string(),
-                                    json::Value::String(record_id.to_string()),
-                                );
-                            }
-
-                            // add `_all_values` if required by StreamSettings
-                            if streams_need_all_values_map
-                                .get(&destination_stream)
-                                .is_some_and(|v| *v)
-                            {
-                                let mut values = Vec::with_capacity(local_val.len());
-                                for (k, value) in local_val.iter() {
-                                    if ![
-                                        TIMESTAMP_COL_NAME,
-                                        ID_COL_NAME,
-                                        ORIGINAL_DATA_COL_NAME,
-                                        ALL_VALUES_COL_NAME,
-                                    ]
-                                    .contains(&k.as_str())
-                                        && (index_all_max_value_length == 0
-                                            || value.as_str().is_none_or(|s| {
-                                                s.len() <= index_all_max_value_length
-                                            }))
-                                    {
-                                        values.push(value.to_string());
-                                    }
-                                }
-                                local_val.insert(
-                                    ALL_VALUES_COL_NAME.to_string(),
-                                    json::Value::String(values.join(" ")),
-                                );
-                            }
+                            // a ResultArray record carries idx usize::MAX and has no source record
+                            let local_val = settings.apply(
+                                local_val,
+                                original_options
+                                    .get(idx)
+                                    .and_then(|o| o.as_deref())
+                                    .map(Cow::Borrowed),
+                                None,
+                            );
 
                             let (ts_data, fn_num) = json_data_by_stream
                                 .entry(destination_stream.clone())
@@ -777,29 +728,14 @@ async fn ingest_inner(
             }
         } // for each pipeline
 
-        while let Some(result) = evaluation_tasks.join_next().await {
-            if let Err(e) = result {
-                log::error!(
-                    "[Pipeline] evaluation pipeline task for stream {org_id}/{stream_name} failed: {e}.",
-                );
-            }
-        }
+        crate::ingestion::join_llm_evaluations(evaluation_tasks, org_id, &stream_name).await;
 
-        // When only evaluation pipelines exist for this stream (no user pipeline
-        // is responsible for writing to the source stream), preserve original
-        // records by writing them back to the source stream.
-        let has_user_pipeline = executable_pipelines
-            .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
-        let has_evaluation_pipeline = executable_pipelines
-            .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::Evaluation);
-        log::debug!(
-            "[LOGS] source preservation check stream={stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, has_evaluation_pipeline={has_evaluation_pipeline}, source_buffered={}",
-            executable_pipelines.len(),
-            json_data_by_stream.contains_key(&stream_name)
-        );
-        if !has_user_pipeline && !json_data_by_stream.contains_key(&stream_name) {
+        if crate::ingestion::should_preserve_source(
+            org_id,
+            &stream_name,
+            &executable_pipelines,
+            json_data_by_stream.contains_key(&stream_name),
+        ) {
             for (idx, item) in pipeline_inputs.iter().enumerate() {
                 let _ = finalize_and_buffer_record(
                     item.clone(),
@@ -1153,7 +1089,7 @@ fn finalize_and_buffer_record(
             return false;
         }
     };
-    let mut local_val = match res.take() {
+    let local_val = match res.take() {
         json::Value::Object(val) => val,
         _ => {
             ctx.stream_status.status.failed += 1;
@@ -1167,63 +1103,25 @@ fn finalize_and_buffer_record(
             return false;
         }
     };
-    // DBM server-vantage canonicalization (design D1, applied to logs): resolve the
-    // receiver-local vendor vocabulary (`dl_*`, `my_*`, `blocked_*`) into stable
-    // `o2_dbm_*` columns ONCE, here, so the read API and UI never touch a raw
-    // receiver field. Runs BEFORE `refactor_map` so a user-defined schema that
-    // lists the canonical columns keeps them (D1 condition 2).
-    //
-    // Client-supplied `o2_dbm_*` keys are dropped first — the logs path flattens
-    // user keys directly, so without this a caller could spoof a deadlock event
-    // (the same exposure D1 condition 1 closes for spans).
-    if ctx.dbm_enabled {
-        crate::db_monitoring::server_vantage::canonicalize_dbm_record(&mut local_val);
-    }
-
-    if let Some(Some(fields)) = ctx.user_defined_schema_map.get(ctx.stream_name) {
-        local_val = crate::ingestion::refactor_map(local_val, fields);
-    }
-    if ctx
-        .streams_need_original_map
-        .get(ctx.stream_name)
-        .is_some_and(|v| *v)
-        && let Some(ref od) = original_data
-    {
-        local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), od.clone().into());
-        let record_id =
-            crate::ingestion::generate_record_id(ctx.org_id, ctx.stream_name, &StreamType::Logs);
-        local_val.insert(
-            ID_COL_NAME.to_string(),
-            json::Value::String(record_id.to_string()),
-        );
-    }
-    if ctx
-        .streams_need_all_values_map
-        .get(ctx.stream_name)
-        .is_some_and(|v| *v)
-    {
-        let mut values = Vec::with_capacity(local_val.len());
-        for (k, value) in local_val.iter() {
-            if ![
-                TIMESTAMP_COL_NAME,
-                ID_COL_NAME,
-                ORIGINAL_DATA_COL_NAME,
-                ALL_VALUES_COL_NAME,
-            ]
-            .contains(&k.as_str())
-                && (ctx.index_all_max_value_length == 0
-                    || value
-                        .as_str()
-                        .is_none_or(|s| s.len() <= ctx.index_all_max_value_length))
-            {
-                values.push(value.to_string());
-            }
-        }
-        local_val.insert(
-            ALL_VALUES_COL_NAME.to_string(),
-            json::Value::String(values.join(" ")),
-        );
-    }
+    let settings = DestinationSettings {
+        org_id: ctx.org_id,
+        stream_name: ctx.stream_name,
+        dbm: ctx.dbm_enabled,
+        uds_fields: ctx
+            .user_defined_schema_map
+            .get(ctx.stream_name)
+            .and_then(Option::as_ref),
+        need_original: ctx
+            .streams_need_original_map
+            .get(ctx.stream_name)
+            .is_some_and(|v| *v),
+        need_all_values: ctx
+            .streams_need_all_values_map
+            .get(ctx.stream_name)
+            .is_some_and(|v| *v),
+        all_values_max_len: ctx.index_all_max_value_length,
+    };
+    let local_val = settings.apply(local_val, original_data.map(Cow::Owned), None);
     match ctx.json_data_by_stream.get_mut(ctx.stream_name) {
         Some((ts_data, fn_num)) => {
             ts_data.push((timestamp, local_val));
@@ -1890,6 +1788,23 @@ mod tests {
             &user,
             true
         ));
+    }
+
+    #[test]
+    fn feature_writers_pass_the_rollup_guard_and_sdr_fail_closed() {
+        use config::meta::{
+            alerts::alert_calibration::DIGEST_STREAM, self_reporting::redaction::is_platform_write,
+        };
+        for job in [SystemJobType::AlertCalibration, SystemJobType::AutoObserve] {
+            let writer = IngestUser::SystemJob(job);
+            assert!(is_internal_writer(&writer, false), "{job:?}");
+            for stream in [DIGEST_STREAM, "_o2_autoobserve_health"] {
+                assert!(!is_blocked_internal_rollup_write(stream, &writer, false));
+                assert!(is_platform_write(false, true, stream, stream), "{stream}");
+            }
+        }
+        let user = IngestUser::User("someone@example.com".to_string());
+        assert!(!is_internal_writer(&user, false));
     }
 
     #[test]

@@ -4,7 +4,7 @@
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
-import type { SigmaLevel } from "./sigma";
+import type { SigmaLevel } from "@/services/securitySigma";
 
 export const SEVERITY_TONES = ["critical", "high", "medium", "low", "info"] as const;
 export type SeverityTone = (typeof SEVERITY_TONES)[number] | "unknown";

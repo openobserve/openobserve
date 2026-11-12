@@ -121,9 +121,9 @@ pub async fn get_dimension_analytics(
         ("org_id" = String, Path, description = "Organization ID")
     ),
     responses(
-        (status = 200, description = "List of discovered services"),
+        (status = 200, description = "List of discovered services. When RBAC is enforced, a non-admin caller gets only the services with a stream they can read, each listing only those streams"),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - Enterprise feature"),
+        (status = 403, description = "Forbidden - Enterprise feature, or no service_streams permission"),
         (status = 500, description = "Internal server error")
     ),
     security(("Authorization" = [])),
@@ -167,6 +167,15 @@ pub async fn list_services(
         } else {
             records
         };
+        // after the merge, which needs every record's streams to spot a stream-name fallback
+        let checker = openobserve_core::authz::active_checker();
+        let records = openobserve_core::authz::readable_service_records(
+            checker.as_ref(),
+            &user_email.user_id,
+            &org_id,
+            records,
+        )
+        .await;
         // The ids ingest names a service from, set `distinguish_by` included.
         let tracked = &identity_config.naming_alias_ids();
         let rows: Vec<ServiceRow> = records
@@ -230,7 +239,8 @@ pub async fn list_services(
 /// - The matched service
 /// - Which dimensions were used for matching (minimal set)
 /// - Which dimensions are available for additional filtering
-/// - All related streams (logs/traces/metrics) with their dimension requirements
+/// - The related streams (logs/traces/metrics/profiles) the caller can read, with their dimension
+///   requirements; with RBAC enforced, a non-admin caller may get empty lists for a matched service
 #[utoipa::path(
     post,
     path = "/{org_id}/service_streams/_correlate",
@@ -248,7 +258,7 @@ pub async fn list_services(
         (status = 200, description = "Correlation results", body = CorrelationResponse),
         (status = 400, description = "Bad request"),
         (status = 401, description = "Unauthorized - Authentication required"),
-        (status = 403, description = "Forbidden - Enterprise feature"),
+        (status = 403, description = "Forbidden - Enterprise feature, or no service_streams permission"),
         (status = 404, description = "No matching service found"),
         (status = 500, description = "Internal server error")
     ),
@@ -265,8 +275,6 @@ pub async fn correlate_streams(
     Headers(user_email): Headers<UserEmail>, // Require authentication
     #[allow(unused_variables)] Json(req): Json<CorrelationRequest>,
 ) -> Response {
-    // Note: No stream-specific permissions needed - user already has access to source stream
-
     #[cfg(feature = "enterprise")]
     {
         if !check_permissions(
@@ -329,6 +337,16 @@ pub async fn correlate_streams(
                 // guess which resolved stream (and field aliases) the source maps to.
                 response.source_stream = Some(req.source_stream.clone());
                 response.source_type = Some(req.source_type.clone());
+                let checker = openobserve_core::authz::active_checker();
+                response.related_streams = openobserve_core::authz::readable_related_streams(
+                    checker.as_ref(),
+                    &user_email.user_id,
+                    &org_id,
+                    response.related_streams,
+                )
+                .await;
+                // all_streams is a flattened copy, so it would still list the dropped streams
+                response.build_all_streams();
                 MetaHttpResponse::json(response)
             }
             Ok(None) => {

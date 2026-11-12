@@ -185,6 +185,29 @@ def test_mrg13_trace_and_span_filter(client: OpenObserveClient, ref: RefData):
     assert node["self"] == 250_000_000
 
 
+@pytest.mark.parametrize(
+    ("flt", "total"),
+    [
+        ({"key": "service_version", "op": "!=", "value": "v1.4.0"}, 8_000_000_000),
+        ({"key": "service_version", "op": "<>", "value": "v1.5.0"}, 4_000_000_000),
+        ({"key": "service_version", "op": "=~", "value": "^v1\\.5"}, 8_000_000_000),
+        ({"key": "service_version", "op": "!~", "value": "^v1\\.5"}, 4_000_000_000),
+        ({"key": "host_name", "op": "in", "values": ["host-a", "host-c"]}, 4_150_000_000),
+        ({"key": "host_name", "op": "in", "value": "host-b, host-c"}, 8_000_000_000),
+        ({"key": "host_name", "op": "not_in", "values": ["host-a"]}, 8_000_000_000),
+    ],
+    ids=["ne", "ne-sql", "re-match", "re-not-match", "in-values", "in-comma-value", "not-in"],
+)
+def test_mrg14_filter_ops(client: OpenObserveClient, ref: RefData, flt: dict, total: int):
+    assert merge_ok(client, ref.stream, _checkout(ref, filters=[flt]))["total"] == total
+
+
+def test_mrg14_filter_op_bad_regex(client: OpenObserveClient, ref: RefData):
+    resp = merge(client, ref.stream, _checkout(ref, filters=[{"key": "host_name", "op": "=~", "value": "("}]))
+    assert resp.status_code == 400, resp.text
+    assert resp.json()["message"].startswith("Condition on 'host_name': invalid regex"), resp.text
+
+
 def test_mrg14_quoted_filter_value_is_safe(client: OpenObserveClient, ref: RefData):
     body = merge_ok(client, ref.stream, _checkout(ref, filters=[{"key": "service_version", "value": "v1' OR '1'='1"}]))
     assert (body["total"], body["top"]) == (0, [])
@@ -319,7 +342,11 @@ MRG29_CASES = [
     ("unit", {"profile_unit": None}, "profile_unit is required"),
     ("start-eq-end", {"start_time": "END"}, "start_time must be less than end_time"),
     ("no-start", {"start_time": None}, "start_time and end_time are required (microseconds)"),
-    ("op", {"filters": [{"key": "host_name", "op": "!=", "value": "x"}]}, "only filter op '=' is supported"),
+    (
+        "op",
+        {"filters": [{"key": "host_name", "op": ">", "value": "x"}]},
+        "unsupported filter op '>'; use =, !=, =~, !~, in or not_in",
+    ),
     ("key-stack", {"filters": [{"key": "stack", "value": "x"}]}, "invalid filter key: stack"),
     ("key-unsafe", {"filters": [{"key": "a;b", "value": "x"}]}, "invalid filter key: a;b"),
     ("key-129", {"filters": [{"key": "a" * 129, "value": "x"}]}, f"invalid filter key: {'a' * 129}"),

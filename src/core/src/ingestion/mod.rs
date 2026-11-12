@@ -30,6 +30,7 @@ use config::{
     ider::SnowflakeIdGenerator,
     meta::{
         alerts::{TriggerCondition, alert::Alert},
+        pipeline::PipelineKind,
         promql::HASH_LABEL,
         self_reporting::usage::{RequestStats, RunOutcome, TriggerData, TriggerDataType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
@@ -69,6 +70,7 @@ use crate::{
 };
 
 pub mod columnar;
+pub mod feature_writer;
 pub mod grpc;
 pub mod ingestion_service;
 pub mod realtime_mute;
@@ -174,6 +176,75 @@ pub async fn get_stream_partition_keys(
 pub async fn get_stream_executable_pipelines(stream: &StreamParams) -> Vec<ExecutablePipeline> {
     pipeline::report_broken_realtime_pipelines(stream).await;
     pipeline::get_executable_pipelines(stream).await
+}
+
+/// Whether a user pipeline, which owns what reaches the source stream, is among `pipelines`.
+pub fn has_user_pipeline(pipelines: &[ExecutablePipeline]) -> bool {
+    pipelines.iter().any(|p| p.kind == PipelineKind::User)
+}
+
+/// Whether the source stream gets its inputs back: no user pipeline owns it and none reached it.
+pub fn should_preserve_source(
+    org_id: &str,
+    stream_name: &str,
+    pipelines: &[ExecutablePipeline],
+    source_buffered: bool,
+) -> bool {
+    let has_user_pipeline = has_user_pipeline(pipelines);
+    log::debug!(
+        "[Pipeline] source preservation check stream={org_id}/{stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, source_buffered={source_buffered}",
+        pipelines.len()
+    );
+    !has_user_pipeline && !source_buffered
+}
+
+/// Whether the pipeline only scores records with an LLM, so its batch runs off the write path.
+pub fn is_llm_evaluation(pipeline: &ExecutablePipeline) -> bool {
+    pipeline.kind == PipelineKind::Evaluation && pipeline.contains_llm_evaluation_node()
+}
+
+/// Starts the stream's LLM evaluation pipelines over `records`; nothing they return is ingested.
+pub fn spawn_llm_evaluations(
+    org_id: &str,
+    stream_name: &str,
+    pipelines: &[ExecutablePipeline],
+    records: &[Value],
+    in_stream_name: Option<&str>,
+) -> tokio::task::JoinSet<()> {
+    let mut tasks = tokio::task::JoinSet::new();
+    for exec_pl in pipelines.iter().filter(|p| is_llm_evaluation(p)) {
+        let exec_pl = exec_pl.clone();
+        let org_id = org_id.to_string();
+        let stream_name = stream_name.to_string();
+        let records = records.to_vec();
+        let in_stream_name = in_stream_name.map(String::from);
+        tasks.spawn(async move {
+            if let Err(e) = exec_pl
+                .process_batch(&org_id, records, in_stream_name)
+                .await
+            {
+                log::error!(
+                    "[Pipeline] evaluation pipeline for stream {org_id}/{stream_name}: Batch execution error: {e}.",
+                );
+            }
+        });
+    }
+    tasks
+}
+
+/// Waits for the evaluations `spawn_llm_evaluations` started, logging any that panicked.
+pub async fn join_llm_evaluations(
+    mut tasks: tokio::task::JoinSet<()>,
+    org_id: &str,
+    stream_name: &str,
+) {
+    while let Some(result) = tasks.join_next().await {
+        if let Err(e) = result {
+            log::error!(
+                "[Pipeline] evaluation pipeline task for stream {org_id}/{stream_name} failed: {e}.",
+            );
+        }
+    }
 }
 
 pub async fn get_stream_alerts(
@@ -851,7 +922,8 @@ pub async fn get_uds_and_original_data_streams(
         );
 
         if !stream_settings.defined_schema_fields.is_empty() {
-            let fields = uds_pack_fields(&stream_settings.defined_schema_fields);
+            let fields =
+                uds_pack_fields(stream.stream_type, &stream_settings.defined_schema_fields);
             user_defined_schema_map.insert(stream.stream_name.to_string(), Some(fields));
         } else {
             user_defined_schema_map.insert(stream.stream_name.to_string(), None);
@@ -861,6 +933,7 @@ pub async fn get_uds_and_original_data_streams(
 
 /// The fields to repack a batch with when its own schema check turned the UDS on, else None.
 pub fn newly_enabled_uds_fields(
+    stream_type: StreamType,
     had_uds: bool,
     schema: Option<&SchemaCache>,
 ) -> Option<HashSet<String>> {
@@ -871,7 +944,7 @@ pub fn newly_enabled_uds_fields(
     if settings.defined_schema_fields.is_empty() {
         return None;
     }
-    let mut fields = uds_pack_fields(&settings.defined_schema_fields);
+    let mut fields = uds_pack_fields(stream_type, &settings.defined_schema_fields);
     // ingest adds these after packing, so a repack must not move them into `_all`
     fields.extend(settings.uds_internal_columns());
     Some(fields)
@@ -946,8 +1019,11 @@ pub fn refactor_map(
     new_map
 }
 
-fn uds_pack_fields(defined_schema_fields: &[String]) -> HashSet<String> {
-    let mut fields = HashSet::<_>::from_iter(defined_schema_fields.iter().cloned());
+fn uds_pack_fields(stream_type: StreamType, defined_schema_fields: &[String]) -> HashSet<String> {
+    let mut fields = HashSet::<_>::from_iter(schema::effective_uds_fields(
+        stream_type,
+        defined_schema_fields,
+    ));
     fields.insert(TIMESTAMP_COL_NAME.to_string());
     fields
 }
@@ -1162,7 +1238,7 @@ mod tests {
         let uds_schema = with_settings(&uds);
         let no_uds_schema = with_settings(&Default::default());
 
-        let fields = newly_enabled_uds_fields(false, Some(&uds_schema)).unwrap();
+        let fields = newly_enabled_uds_fields(StreamType::Logs, false, Some(&uds_schema)).unwrap();
         for name in [
             "foo",
             TIMESTAMP_COL_NAME,
@@ -1171,9 +1247,44 @@ mod tests {
         ] {
             assert!(fields.contains(name), "missing {name}");
         }
-        assert!(newly_enabled_uds_fields(true, Some(&uds_schema)).is_none());
-        assert!(newly_enabled_uds_fields(false, Some(&no_uds_schema)).is_none());
-        assert!(newly_enabled_uds_fields(false, None).is_none());
+        assert!(newly_enabled_uds_fields(StreamType::Logs, true, Some(&uds_schema)).is_none());
+        assert!(newly_enabled_uds_fields(StreamType::Logs, false, Some(&no_uds_schema)).is_none());
+        assert!(newly_enabled_uds_fields(StreamType::Logs, false, None).is_none());
+    }
+
+    #[test]
+    fn test_uds_pack_fields_keeps_required_columns_not_yet_in_schema() {
+        let fields = uds_pack_fields(StreamType::Profiles, &["service_name".to_string()]);
+        assert!(fields.contains("service_name"));
+        assert!(fields.contains("trace_id"));
+        assert!(fields.contains("span_id"));
+        assert!(fields.contains(TIMESTAMP_COL_NAME));
+        assert!(!fields.contains("k8s_pod_name"));
+    }
+
+    #[test]
+    fn test_uds_pack_fields_empty_saved_list_does_not_enable_uds() {
+        let fields = uds_pack_fields(StreamType::Profiles, &[]);
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains(TIMESTAMP_COL_NAME));
+    }
+
+    #[test]
+    fn test_newly_enabled_uds_fields_includes_required_columns() {
+        let settings = config::meta::stream::StreamSettings {
+            defined_schema_fields: vec!["foo".to_string()],
+            ..Default::default()
+        };
+        let schema = SchemaCache::new(arrow_schema::Schema::empty().with_metadata(
+            std::collections::HashMap::from([(
+                "settings".to_string(),
+                json::to_string(&settings).unwrap(),
+            )]),
+        ));
+
+        let fields = newly_enabled_uds_fields(StreamType::Metrics, false, Some(&schema)).unwrap();
+        assert!(fields.contains("foo"));
+        assert!(fields.contains(config::meta::promql::BUCKET_LABEL));
     }
 
     #[test]

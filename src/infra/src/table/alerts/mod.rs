@@ -59,6 +59,21 @@ pub struct AlertSummaryRow {
     pub enabled: bool,
 }
 
+/// A guarded save lands only while `updated_at` holds `written_us` and the fence row its bytes.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct WriteGuard {
+    pub written_us: Option<i64>,
+    pub fence: Option<KvFence>,
+}
+
+/// A kv row of the alert's org that the save swaps from `expected` to `written` in its transaction.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KvFence {
+    pub key: String,
+    pub expected: Vec<u8>,
+    pub written: Vec<u8>,
+}
+
 impl TryFrom<alerts::Model> for MetaAlert {
     type Error = errors::Error;
 
@@ -409,6 +424,19 @@ pub async fn update<C: TransactionTrait + ConnectionTrait>(
     folder_id: Option<&str>,
     alert: MetaAlert,
 ) -> Result<MetaAlert, errors::Error> {
+    update_where(conn, org_id, folder_id, alert, None)
+        .await?
+        .ok_or_else(|| errors::DbError::PutAlert(PutAlertError::UpdateAlertNotFound).into())
+}
+
+/// With `guard`, writes only while it holds, as one transaction; None when it did not.
+pub async fn update_where<C: TransactionTrait + ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: Option<&str>,
+    alert: MetaAlert,
+    guard: Option<WriteGuard>,
+) -> Result<Option<MetaAlert>, errors::Error> {
     // Ensure that ID is provided.
     let Some(alert_id) = alert.id else {
         return Err(errors::DbError::PutAlert(PutAlertError::UpdateAlertMissingID).into());
@@ -443,10 +471,34 @@ pub async fn update<C: TransactionTrait + ConnectionTrait>(
         alert_am.folder_id = Set(folder_m.id);
     }
 
-    let alert_m: alerts::Model = alert_am.update(&txn).await?.try_into_model()?;
+    let mut write = alerts::Entity::update(alert_am);
+    if let Some(guard) = &guard {
+        if let Some(fence) = &guard.fence {
+            let expected = Some(fence.expected.as_slice());
+            let swap = super::kv_store::compare_and_set_in(
+                &txn,
+                org_id,
+                &fence.key,
+                expected,
+                &fence.written,
+            );
+            if !swap.await? {
+                return Ok(None);
+            }
+        }
+        write = write.filter(match guard.written_us {
+            Some(us) => alerts::Column::UpdatedAt.eq(us),
+            None => alerts::Column::UpdatedAt.is_null(),
+        });
+    }
+    let alert_m: alerts::Model = match write.exec(&txn).await {
+        Ok(model) => model,
+        Err(sea_orm::DbErr::RecordNotUpdated) if guard.is_some() => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
     let alert = alert_m.try_into()?;
     txn.commit().await?;
-    Ok(alert)
+    Ok(Some(alert))
 }
 
 /// Deletes an alert by its ID.
@@ -463,21 +515,32 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Lists alerts.
+/// Lists alerts; a row this version cannot read is logged and skipped.
 pub async fn list<C: ConnectionTrait>(
     conn: &C,
     params: ListAlertsParams,
 ) -> Result<Vec<(MetaFolder, MetaAlert)>, errors::Error> {
-    let alerts = list_models(conn, params)
-        .await?
-        .into_iter()
-        .map(|(f, a)| {
-            let f = MetaFolder::from(f);
-            let a = MetaAlert::try_from(a)?;
-            Ok((f, a))
-        })
-        .collect::<Result<_, errors::Error>>()?;
-    Ok(alerts)
+    let models = list_models(conn, params).await?;
+    Ok(super::convert_skipping_unreadable(
+        "alerts",
+        models,
+        |(_, a)| alert_row_key(a),
+        |(f, a)| MetaAlert::try_from(a).map(|a| (MetaFolder::from(f), a)),
+    ))
+}
+
+/// Lists alerts like `list` but fails on a row this version cannot read, for reference checks.
+pub async fn list_fully_decoded<C: ConnectionTrait>(
+    conn: &C,
+    params: ListAlertsParams,
+) -> Result<Vec<(MetaFolder, MetaAlert)>, errors::Error> {
+    let models = list_models(conn, params).await?;
+    super::convert_failing_on_unreadable(
+        "alerts",
+        models,
+        |(_, a)| alert_row_key(a),
+        |(f, a)| MetaAlert::try_from(a).map(|a| (MetaFolder::from(f), a)),
+    )
 }
 
 /// Lists every alert in the org as [`AlertSummaryRow`], selecting only the columns it needs.
@@ -625,14 +688,15 @@ pub async fn last_written_us<C: ConnectionTrait>(
         .and_then(|m| m.updated_at))
 }
 
-/// Lists all alerts.
+/// Lists all alerts; a row this version cannot read is logged and skipped.
 pub async fn list_all<C: ConnectionTrait>(conn: &C) -> Result<Vec<MetaAlert>, errors::Error> {
-    let alerts = list_all_models(conn)
-        .await?
-        .into_iter()
-        .map(MetaAlert::try_from)
-        .collect::<Result<_, errors::Error>>()?;
-    Ok(alerts)
+    let models = list_all_models(conn).await?;
+    Ok(super::convert_skipping_unreadable(
+        "alerts",
+        models,
+        alert_row_key,
+        MetaAlert::try_from,
+    ))
 }
 
 /// Tries to get an alert ORM entity and its parent folder ORM entity.
@@ -704,6 +768,20 @@ async fn list_models<C: ConnectionTrait>(
         query.filter(folders::Column::FolderId.eq(folder_id))
     } else {
         query
+    };
+    let query = match &params.listable_folder_ids {
+        None => query,
+        // `IN ()` is not portable, and no filter would list every folder.
+        Some(ids) if ids.is_empty() => {
+            query.filter(alerts::Column::Id.eq(TAG_FILTER_NO_MATCH_SENTINEL))
+        }
+        Some(ids) => {
+            let mut cond = Condition::any();
+            for chunk in ids.chunks(TAG_ID_PREDICATE_CHUNK) {
+                cond = cond.add(folders::Column::FolderId.is_in(chunk.to_vec()));
+            }
+            query.filter(cond)
+        }
     };
 
     // Apply the optional alert name substring filter.
@@ -814,6 +892,15 @@ async fn list_models<C: ConnectionTrait>(
             query.filter(cond)
         }
     };
+    let query = if params.excluded_alert_ids.is_empty() {
+        query
+    } else {
+        let mut cond = Condition::all();
+        for chunk in params.excluded_alert_ids.chunks(TAG_ID_PREDICATE_CHUNK) {
+            cond = cond.add(alerts::Column::Id.is_not_in(chunk.to_vec()));
+        }
+        query.filter(cond)
+    };
 
     // Apply ordering (PT-3).
     //
@@ -874,6 +961,10 @@ async fn list_models<C: ConnectionTrait>(
         .filter_map(|(d, maybe_f)| maybe_f.map(|f| (f, d)))
         .collect();
     Ok(folders_and_dashboards)
+}
+
+fn alert_row_key(alert: &alerts::Model) -> String {
+    format!("org={} id={}", alert.org, alert.id)
 }
 
 /// Lists all alert ORM models.
@@ -1333,6 +1424,8 @@ pub(super) mod tests {
     // ===================================================================
 
     mod slo_lookups {
+        use std::str::FromStr;
+
         use config::meta::{
             alerts::{
                 Operator,
@@ -1342,7 +1435,8 @@ pub(super) mod tests {
             slo::condition::{SloAlertKind, SloCondition},
         };
         use sea_orm::{
-            ActiveValue::Set, ConnectionTrait, Database, DatabaseConnection, EntityTrait, Schema,
+            ActiveValue::Set, ColumnTrait, ConnectionTrait, Database, DatabaseConnection,
+            EntityTrait, QueryFilter, Schema,
         };
         use svix_ksuid::{Ksuid, KsuidLike as _};
 
@@ -1352,9 +1446,10 @@ pub(super) mod tests {
         use super::make_model;
         use crate::table::{
             alerts::{
-                intermediate, list_models, list_names_by_oncall_team, list_slo_burn_window_pairs,
+                KvFence, WriteGuard, get_by_id, intermediate, last_written_us, list_models,
+                list_names_by_oncall_team, list_slo_burn_window_pairs, update, update_where,
             },
-            entity::{alerts, folders},
+            entity::{alerts, folders, kv_store},
             folders::folder_type_into_i16,
         };
 
@@ -1396,6 +1491,10 @@ pub(super) mod tests {
             let db = Database::connect("sqlite::memory:")
                 .await
                 .expect("in-memory sqlite");
+            with_tables(db).await
+        }
+
+        async fn with_tables(db: DatabaseConnection) -> DatabaseConnection {
             let backend = db.get_database_backend();
             let schema = Schema::new(backend);
             // Folders first: the entity FK is emitted and sqlx enables
@@ -1408,6 +1507,10 @@ pub(super) mod tests {
                 (
                     "alerts",
                     backend.build(&schema.create_table_from_entity(alerts::Entity)),
+                ),
+                (
+                    "kv_store",
+                    backend.build(&schema.create_table_from_entity(kv_store::Entity)),
                 ),
             ] {
                 db.execute(stmt)
@@ -2275,6 +2378,27 @@ pub(super) mod tests {
             );
         }
 
+        #[tokio::test]
+        async fn excluded_ids_are_dropped_and_intersect_the_tag_predicate() {
+            let db = db_with_folder().await;
+            let (a1, a2, p1) = (alert_id(), alert_id(), alert_id());
+            insert_alert(&db, AlertSpec::plain(&a1, "a1")).await;
+            insert_alert(&db, AlertSpec::plain(&a2, "a2")).await;
+            insert_alert(&db, AlertSpec::plain(&p1, "p1")).await;
+
+            let params = ListAlertsParams::new(ORG).without_alert_ids(vec![a2.clone()]);
+            let mut kept = ids_of(&db, params).await;
+            kept.sort();
+            let mut expected = vec![a1.clone(), p1.clone()];
+            expected.sort();
+            assert_eq!(kept, expected);
+
+            let params = ListAlertsParams::new(ORG)
+                .with_tag_alert_ids(vec![a2.clone(), p1.clone()])
+                .without_alert_ids(vec![a2]);
+            assert_eq!(ids_of(&db, params).await, vec![p1]);
+        }
+
         /// An empty resolved tag set means "no alert carries these tags" and
         /// must still match nothing once a SLO filter is also present.
         #[tokio::test]
@@ -2333,6 +2457,34 @@ pub(super) mod tests {
                 2,
                 "the folder filter alone still returns non-SLO alerts"
             );
+        }
+
+        #[tokio::test]
+        async fn listable_folders_scope_a_cross_folder_list() {
+            let db = db_with_folder().await;
+            seed_folder(&db, FOLDER_B_PK, ORG, "team-a").await;
+            let (in_default, in_team) = (alert_id(), alert_id());
+            insert_alert(&db, AlertSpec::plain(&in_default, "p0")).await;
+            insert_alert(
+                &db,
+                AlertSpec::plain(&in_team, "p1").in_folder(ORG, FOLDER_B_PK),
+            )
+            .await;
+
+            let unrestricted = ListAlertsParams::new(ORG);
+            assert_eq!(ids_of(&db, unrestricted).await.len(), 2);
+
+            let one = ListAlertsParams::new(ORG).within_folders(vec!["team-a".to_string()]);
+            assert_eq!(ids_of(&db, one).await, vec![in_team]);
+
+            let none = ListAlertsParams::new(ORG).within_folders(vec![]);
+            assert!(
+                ids_of(&db, none).await.is_empty(),
+                "no listable folder must list nothing, not everything"
+            );
+
+            let other = ListAlertsParams::new(ORG).within_folders(vec!["team-z".to_string()]);
+            assert!(ids_of(&db, other).await.is_empty());
         }
 
         /// Ordering must survive the new predicate — including the deliberate
@@ -2396,6 +2548,272 @@ pub(super) mod tests {
             params.slo_id = Some(SLO_A.to_string());
 
             assert_eq!(ids_of(&db, params).await, vec![a1]);
+        }
+
+        mod unreadable_rows {
+            use std::str::FromStr;
+
+            use super::*;
+            use crate::table::{
+                alerts::{get_by_id, list, list_all, list_fully_decoded},
+                testing::{capture_error_logs, logged_errors_containing},
+            };
+
+            fn new_operator_conditions() -> serde_json::Value {
+                serde_json::json!({"version": 2, "conditions": {
+                    "filterType": "group", "logicalOperator": "AND",
+                    "conditions": [{"filterType": "condition", "column": "level",
+                                    "operator": "future_op", "value": ["error"],
+                                    "logicalOperator": "AND"}]
+                }})
+            }
+
+            async fn insert_with_conditions(
+                db: &DatabaseConnection,
+                id: &str,
+                conditions: serde_json::Value,
+            ) {
+                let mut model = make_model(id);
+                model.org = ORG.to_string();
+                model.folder_id = FOLDER_A_PK.to_string();
+                model.name = format!("alert-{id}");
+                model.query_conditions = Some(conditions);
+                alerts::Entity::insert(alerts::ActiveModel::from(model))
+                    .exec(db)
+                    .await
+                    .unwrap();
+            }
+
+            /// Three rows: one readable, one with an operator this version lacks, one junk.
+            async fn db_with_unreadable_rows() -> (DatabaseConnection, [String; 3]) {
+                let db = db_with_folder().await;
+                let ids = [alert_id(), alert_id(), alert_id()];
+                insert_alert(&db, AlertSpec::plain(&ids[0], "good")).await;
+                insert_with_conditions(&db, &ids[1], new_operator_conditions()).await;
+                insert_with_conditions(&db, &ids[2], serde_json::json!(42)).await;
+                (db, ids)
+            }
+
+            #[tokio::test]
+            async fn list_skips_and_logs_rows_it_cannot_read() {
+                capture_error_logs();
+                let (db, [good, new_op, junk]) = db_with_unreadable_rows().await;
+
+                let listed: Vec<String> = list(&db, ListAlertsParams::new(ORG))
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|(_, a)| a.id.unwrap().to_string())
+                    .collect();
+
+                assert_eq!(listed, vec![good]);
+                let logged = logged_errors_containing(&new_op);
+                assert!(
+                    logged
+                        .iter()
+                        .any(|l| l.contains(ORG) && l.contains("unknown variant `future_op`")),
+                    "{logged:?}"
+                );
+                assert!(!logged_errors_containing(&junk).is_empty());
+            }
+
+            #[tokio::test]
+            async fn list_fully_decoded_fails_on_a_row_it_cannot_read() {
+                let (db, [good, ..]) = db_with_unreadable_rows().await;
+                let err = list_fully_decoded(&db, ListAlertsParams::new(ORG))
+                    .await
+                    .unwrap_err()
+                    .to_string();
+                assert!(err.contains("unreadable"), "{err}");
+
+                let db = db_with_folder().await;
+                insert_alert(&db, AlertSpec::plain(&good, "good")).await;
+                let listed = list_fully_decoded(&db, ListAlertsParams::new(ORG))
+                    .await
+                    .unwrap();
+                assert_eq!(listed.len(), 1);
+            }
+
+            #[tokio::test]
+            async fn list_all_skips_rows_it_cannot_read() {
+                let (db, [good, ..]) = db_with_unreadable_rows().await;
+                let listed: Vec<String> = list_all(&db)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|a| a.id.unwrap().to_string())
+                    .collect();
+                assert_eq!(listed, vec![good]);
+            }
+
+            #[tokio::test]
+            async fn get_by_id_of_an_unreadable_row_is_an_error() {
+                let (db, [good, new_op, _]) = db_with_unreadable_rows().await;
+                let get = |id: &str| get_by_id(&db, ORG, Ksuid::from_str(id).unwrap());
+                assert!(get(&good).await.unwrap().is_some());
+                let err = get(&new_op).await.unwrap_err();
+                assert!(
+                    err.to_string().contains("unknown variant `future_op`"),
+                    "{err}"
+                );
+            }
+        }
+
+        #[tokio::test]
+        async fn a_guarded_update_refuses_once_another_save_moved_the_column() {
+            guarded_update_refuses_a_moved_column(&db_with_folder().await).await;
+        }
+
+        #[tokio::test]
+        async fn a_guarded_update_refuses_a_moved_column_on_postgres() {
+            let Ok(dsn) = std::env::var("ZO_META_POSTGRES_DSN") else {
+                eprintln!("skipped: needs a postgres at ZO_META_POSTGRES_DSN");
+                return;
+            };
+            // The SQLite lane sets the variable empty rather than unsetting it.
+            if dsn.trim().is_empty() {
+                eprintln!("skipped: needs a postgres at ZO_META_POSTGRES_DSN");
+                return;
+            }
+            let schema = format!("alg_test_{}", config::ider::generate().to_ascii_lowercase());
+            let admin = Database::connect(&dsn).await.unwrap();
+            admin
+                .execute_unprepared(&format!(r#"CREATE SCHEMA "{schema}""#))
+                .await
+                .unwrap();
+            let mut options = sea_orm::ConnectOptions::new(dsn.clone());
+            options
+                .max_connections(1)
+                .set_schema_search_path(schema.clone());
+            let db = with_tables(Database::connect(options).await.unwrap()).await;
+            seed_folder(&db, FOLDER_A_PK, ORG, "default").await;
+            guarded_update_refuses_a_moved_column(&db).await;
+            eprintln!("ran on postgres schema {schema}");
+            db.close().await.unwrap();
+            admin
+                .execute_unprepared(&format!(r#"DROP SCHEMA "{schema}" CASCADE"#))
+                .await
+                .unwrap();
+        }
+
+        async fn guarded_update_refuses_a_moved_column(db: &DatabaseConnection) {
+            let id = alert_id();
+            insert_alert(db, AlertSpec::plain(&id, "a1")).await;
+            let ksuid = Ksuid::from_str(&id).unwrap();
+            let read = last_written_us(db, ORG, &id).await.unwrap();
+            let (_, mut theirs) = get_by_id(db, ORG, ksuid).await.unwrap().unwrap();
+            let mut ours = theirs.clone();
+            theirs.pending_period_sec = 300;
+            update(db, ORG, None, theirs).await.unwrap();
+            ours.pending_period_sec = 120;
+            let refused = update_where(db, ORG, None, ours.clone(), Some(guard(read))).await;
+            assert!(refused.unwrap().is_none(), "the stale guard writes nothing");
+            let (_, kept) = get_by_id(db, ORG, ksuid).await.unwrap().unwrap();
+            assert_eq!(kept.pending_period_sec, 300);
+            let fresh = last_written_us(db, ORG, &id).await.unwrap();
+            let saved = update_where(db, ORG, None, ours, Some(guard(fresh))).await;
+            assert_eq!(saved.unwrap().unwrap().pending_period_sec, 120);
+        }
+
+        #[tokio::test]
+        async fn a_fenced_update_writes_the_alert_and_its_row_together_or_neither() {
+            fenced_update_writes_both_or_neither(&db_with_folder().await).await;
+        }
+
+        #[tokio::test]
+        async fn a_fenced_update_writes_both_or_neither_on_postgres() {
+            let Ok(dsn) = std::env::var("ZO_META_POSTGRES_DSN") else {
+                eprintln!("skipped: needs a postgres at ZO_META_POSTGRES_DSN");
+                return;
+            };
+            if dsn.trim().is_empty() {
+                eprintln!("skipped: needs a postgres at ZO_META_POSTGRES_DSN");
+                return;
+            }
+            let schema = format!("alf_test_{}", config::ider::generate().to_ascii_lowercase());
+            let admin = Database::connect(&dsn).await.unwrap();
+            admin
+                .execute_unprepared(&format!(r#"CREATE SCHEMA "{schema}""#))
+                .await
+                .unwrap();
+            let mut options = sea_orm::ConnectOptions::new(dsn.clone());
+            options
+                .max_connections(1)
+                .set_schema_search_path(schema.clone());
+            let db = with_tables(Database::connect(options).await.unwrap()).await;
+            seed_folder(&db, FOLDER_A_PK, ORG, "default").await;
+            fenced_update_writes_both_or_neither(&db).await;
+            eprintln!("ran fenced on postgres schema {schema}");
+            db.close().await.unwrap();
+            admin
+                .execute_unprepared(&format!(r#"DROP SCHEMA "{schema}" CASCADE"#))
+                .await
+                .unwrap();
+        }
+
+        fn guard(written_us: Option<i64>) -> WriteGuard {
+            WriteGuard {
+                written_us,
+                fence: None,
+            }
+        }
+
+        async fn kv_row(db: &DatabaseConnection, key: &str) -> Option<Vec<u8>> {
+            kv_store::Entity::find()
+                .filter(kv_store::Column::OrgId.eq(ORG))
+                .filter(kv_store::Column::Key.eq(key))
+                .one(db)
+                .await
+                .unwrap()
+                .map(|m| m.value)
+        }
+
+        async fn fenced_update_writes_both_or_neither(db: &DatabaseConnection) {
+            const KEY: &str = "_o2_ao/applied/a1/f1";
+            let id = alert_id();
+            insert_alert(db, AlertSpec::plain(&id, "a1")).await;
+            let ksuid = Ksuid::from_str(&id).unwrap();
+            let (_, mut ours) = get_by_id(db, ORG, ksuid).await.unwrap().unwrap();
+            ours.pending_period_sec = 120;
+            let set = crate::table::kv_store::compare_and_set_in(db, ORG, KEY, None, b"intent");
+            assert!(set.await.unwrap());
+            let fenced = |expected: &[u8], written_us| WriteGuard {
+                written_us,
+                fence: Some(KvFence {
+                    key: KEY.to_string(),
+                    expected: expected.to_vec(),
+                    written: b"written".to_vec(),
+                }),
+            };
+            let read = last_written_us(db, ORG, &id).await.unwrap();
+            let taken_back =
+                update_where(db, ORG, None, ours.clone(), Some(fenced(b"other", read)));
+            assert!(
+                taken_back.await.unwrap().is_none(),
+                "a moved fence writes nothing"
+            );
+            let (_, kept) = get_by_id(db, ORG, ksuid).await.unwrap().unwrap();
+            assert_eq!(kept.pending_period_sec, 0);
+            assert_eq!(kv_row(db, KEY).await.as_deref(), Some(&b"intent"[..]));
+            let stale = update_where(
+                db,
+                ORG,
+                None,
+                ours.clone(),
+                Some(fenced(b"intent", Some(-1))),
+            );
+            assert!(
+                stale.await.unwrap().is_none(),
+                "a moved column writes nothing"
+            );
+            assert_eq!(
+                kv_row(db, KEY).await.as_deref(),
+                Some(&b"intent"[..]),
+                "the row's swap rolls back with the refused alert write"
+            );
+            let saved = update_where(db, ORG, None, ours, Some(fenced(b"intent", read)));
+            assert_eq!(saved.await.unwrap().unwrap().pending_period_sec, 120);
+            assert_eq!(kv_row(db, KEY).await.as_deref(), Some(&b"written"[..]));
         }
 
         #[tokio::test]

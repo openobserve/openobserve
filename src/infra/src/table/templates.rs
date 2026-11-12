@@ -348,8 +348,8 @@ pub const BRANCH_KIND_SEEDS: [&str; 5] = [
 pub const RENAMED_ALIASES_KEY: &str = "templates_renamed";
 /// System setting holding the renames a migration made, whose ownership tuples boot still moves.
 pub const RENAMES_PENDING_KEY: &str = "templates_renamed_pending";
-/// The templates name column is varchar(256).
-const NAME_MAX_CHARS: usize = 256;
+/// The templates and destinations name columns are varchar(256).
+pub const NAME_MAX_CHARS: usize = 256;
 
 /// A shipped seed row: the default org, one of `seeds` or a branch kind seed, Content; the seeder
 /// writes `prebuilt_default` with `is_default` false, which an API save in the default org never

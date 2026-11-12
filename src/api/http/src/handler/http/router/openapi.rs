@@ -108,6 +108,7 @@ use crate::{
         rum::ingest::data,
         rum::ingest::sessionreplay,
         openobserve_api_management::request::ingest_rejections::recent_rejections,
+        openobserve_api_management::request::security::get_security_access,
         openobserve_api_search::search::search,
         openobserve_api_search::search::search_partition,
         openobserve_api_search::search::query_functions::list,
@@ -320,6 +321,7 @@ use crate::{
         gen_ai::get_agent_mapping,
         gen_ai::list_scored_agents,
         gen_ai::save_agent_mapping,
+        gen_ai::strip_harness_text,
         openobserve_api_management::request::gen_ai_health::get_data_health,
         openobserve_api_management::request::model_pricing::list_unpriced,
         openobserve_api_management::request::alerts::deduplication::get_semantic_groups,
@@ -614,6 +616,9 @@ use crate::{
             config::meta::stream::UpdateStreamSettings,
             config::meta::stream::SecuritySourceSetting,
             config::meta::gen_ai::GenAiAgentMappingConfig,
+            config::meta::gen_ai::HarnessStripRequest,
+            config::meta::gen_ai::HarnessStripResponse,
+            config::meta::gen_ai::HarnessStripped,
             gen_ai::GenAiAgentListItem,
             gen_ai::GenAiAgentListResponse,
             openobserve_core::sample_data::SampleDataStatus,
@@ -1067,7 +1072,7 @@ use crate::{
         (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
         (name = "Anomaly Detection", description = "Anomaly detection configs, model training and detection history (enterprise)"),
         (name = "Workflows", description = "Workflow authoring, drafts, runs and run history (enterprise)"),
-        (name = "Security", description = "Built-in OCSF mapping packs for security sources (enterprise)"),
+        (name = "Security", description = "Security sources, OCSF packs, detections, cases and investigation (enterprise)"),
         (name = "AWS Marketplace", description = "AWS Marketplace subscription linking (cloud)"),
         (name = "AnnotationQueues", description = "Annotation queues for human review of LLM traces (enterprise)"),
         (name = "Annotations", description = "Annotations on traces and spans (enterprise)"),
@@ -1119,6 +1124,32 @@ pub struct ApiDoc;
 #[cfg(feature = "enterprise")]
 #[derive(OpenApi)]
 #[openapi(paths(
+    openobserve_api_management::request::security::cases::get_case_settings,
+    openobserve_api_management::request::security::cases::update_case_settings,
+    openobserve_api_management::request::security::cases::lookup_cases,
+    openobserve_api_management::request::security::cases::promote_to_case,
+    openobserve_api_management::request::security::audit::list_security_audit,
+    openobserve_api_management::request::security::investigate::list_entities,
+    openobserve_api_management::request::security::investigate::get_entity_graph,
+    openobserve_api_management::request::security::investigate::get_entity_detail,
+    openobserve_api_management::request::security::investigate::score_users,
+    openobserve_api_management::request::security::investigate::search_events,
+    openobserve_api_management::request::security::intel::sweep,
+    openobserve_api_management::request::security::intel::sightings,
+    openobserve_api_management::request::security::intel::validate,
+    openobserve_api_management::request::security::list_ocsf_packs,
+    openobserve_api_management::request::security::sources::list_sources,
+    openobserve_api_management::request::security::sources::list_source_types,
+    openobserve_api_management::request::security::sources::match_source,
+    openobserve_api_management::request::security::sources::classify_sources,
+    openobserve_api_management::request::security::sources::attach_pack,
+    openobserve_api_management::request::security::sources::detach_pack,
+    openobserve_api_management::request::security::sigma::get_catalog,
+    openobserve_api_management::request::security::sigma::compile,
+    openobserve_api_management::request::security::sigma::get_mitre_coverage,
+    openobserve_api_management::request::security::sigma::get_detection_evidence,
+    openobserve_api_management::request::slack::insights::get_insights_settings,
+    openobserve_api_management::request::slack::insights::put_insights_settings,
     openobserve_api_management::request::prompts::list_prompts,
     openobserve_api_management::request::prompts::create_prompt,
     openobserve_api_management::request::prompts::match_prompts,
@@ -1187,6 +1218,9 @@ pub struct ApiDoc;
     openobserve_api_management::request::alert_calibration::digests::list_runs_for_alert,
     openobserve_api_management::request::alert_calibration::digests::get_run_records,
     openobserve_api_management::request::alert_calibration::digests::count_findings_by_rule,
+    openobserve_api_management::request::alert_calibration::dismissals::list_dismissals,
+    openobserve_api_management::request::alert_calibration::dismissals::dismiss_finding,
+    openobserve_api_management::request::alert_calibration::dismissals::reopen_dismissal,
     openobserve_api_management::request::db_monitoring::handler::get_dbm_deadlocks,
     openobserve_api_management::request::db_monitoring::handler::get_dbm_blocking,
     openobserve_api_management::request::db_monitoring::handler::get_dbm_table_health,
@@ -1200,7 +1234,6 @@ pub struct ApiDoc;
     openobserve_api_management::request::anomaly_detection::detect_anomalies,
     openobserve_api_management::request::anomaly_detection::get_detection_history,
     openobserve_api_management::request::alerts::history::get_all_anomaly_history,
-    openobserve_api_management::request::security::list_ocsf_packs,
     openobserve_api_management::request::alerts::history_summary::get_alert_history_summary,
     openobserve_api_management::request::workflows::save_workflow,
     openobserve_api_management::request::workflows::list_workflows,
@@ -1404,6 +1437,25 @@ pub struct ApiDoc;
     openobserve_core::traces::agent_signals::api::compare_agent_versions,
     openobserve_core::traces::agent_signals::api::get_agent_signals,
     openobserve_core::traces::service_graph::api::get_edge_history,
+    openobserve_api_management::request::autoobserve::entity_types,
+    openobserve_api_management::request::autoobserve::coverage,
+    openobserve_api_management::request::autoobserve::coverage_history,
+    openobserve_api_management::request::autoobserve::suggestions,
+    openobserve_api_management::request::autoobserve::decisions::preview_decision,
+    openobserve_api_management::request::autoobserve::decisions::decide,
+    openobserve_api_management::request::autoobserve::decisions::undo_decision,
+    openobserve_api_management::request::autoobserve::decisions::list_decisions,
+    openobserve_api_management::request::autoobserve::list_marks,
+    openobserve_api_management::request::autoobserve::put_mark,
+    openobserve_api_management::request::autoobserve::delete_mark,
+    openobserve_api_management::request::autoobserve::incidents::list_incidents,
+    openobserve_api_management::request::autoobserve::review::get_review,
+    openobserve_api_management::request::autoobserve::review::put_verdict,
+    openobserve_api_management::request::autoobserve::paging::get_paging_settings,
+    openobserve_api_management::request::autoobserve::paging::put_paging_settings,
+))]
+#[openapi(tags(
+    (name = "AutoObserve", description = "Monitoring coverage, suggestions and entity marks from the AutoObserve engine (enterprise)"),
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
@@ -1482,7 +1534,14 @@ pub struct SecurityAddon;
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         #[cfg(feature = "enterprise")]
-        overlay_doc(openapi, EnterpriseExperimentApiDoc::openapi());
+        {
+            let mut enterprise = EnterpriseExperimentApiDoc::openapi();
+            openapi
+                .tags
+                .get_or_insert_with(Vec::new)
+                .extend(enterprise.tags.take().unwrap_or_default());
+            overlay_doc(openapi, enterprise);
+        }
         #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
         overlay_doc(openapi, WorkflowHttpTriggerApiDoc::openapi());
         #[cfg(feature = "cloud")]
@@ -2185,6 +2244,80 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn a_build_without_enterprise_publishes_no_autoobserve_path_or_tag() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths: Vec<&String> = spec["paths"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .filter(|p| p.contains("autoobserve"))
+            .collect();
+        assert!(paths.is_empty(), "{paths:?}");
+        let tags = spec["tags"].to_string();
+        assert!(!tags.contains("AutoObserve"), "{tags}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn autoobserve_paths_are_rate_limited_mcp_tagged_and_delete_has_no_body() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let tags = spec["tags"].as_array().unwrap();
+        assert!(tags.iter().any(|t| t["name"] == "AutoObserve"), "{tags:?}");
+        let paths = &spec["paths"];
+        let mark = "/api/v2/{org_id}/autoobserve/marks/{mark}/{entity_type}/{entity_id}";
+        let base = "/api/v2/{org_id}/autoobserve";
+        for (path, method, operation) in [
+            (format!("{base}/entity_types"), "get", "list"),
+            (format!("{base}/coverage"), "get", "get"),
+            (format!("{base}/coverage/history"), "get", "list"),
+            (format!("{base}/suggestions"), "get", "list"),
+            (format!("{base}/incidents"), "get", "list"),
+            (format!("{base}/marks"), "get", "list"),
+            (mark.to_string(), "put", "update"),
+            (mark.to_string(), "delete", "delete"),
+            (format!("{base}/review"), "get", "list"),
+            (
+                format!("{base}/review/{{decision_kind}}/{{cohort_id}}"),
+                "put",
+                "update",
+            ),
+        ] {
+            let op = &paths[path.as_str()][method];
+            assert_eq!(
+                op["x-o2-ratelimit"]["module"], "AutoObserve",
+                "{method} {path}"
+            );
+            assert_eq!(
+                op["x-o2-ratelimit"]["operation"], operation,
+                "{method} {path}"
+            );
+            assert_eq!(op["x-o2-mcp"]["category"], "autoobserve", "{method} {path}");
+            let responses = &op["responses"];
+            assert_eq!(
+                responses["403"]["description"], "Forbidden",
+                "{method} {path}"
+            );
+            assert!(
+                responses["404"]["description"]
+                    .as_str()
+                    .is_some_and(|d| d.contains("disabled")),
+                "{method} {path}: a switched-off deployment is a 404"
+            );
+        }
+        let delete = &paths[mark]["delete"];
+        assert_eq!(delete["x-o2-mcp"]["requires_confirmation"], true);
+        assert!(delete.get("requestBody").is_none(), "{delete}");
+        let params = delete["parameters"].as_array().unwrap();
+        assert!(
+            params
+                .iter()
+                .any(|p| p["name"] == "group_key" && p["in"] == "query"),
+            "{params:?}"
+        );
+    }
+
     #[test]
     fn slack_paths_are_rate_limited_and_hidden_from_mcp() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
@@ -2215,6 +2348,13 @@ mod tests {
             .iter()
             .map(|(m, p)| (m.to_string(), p.to_string()))
             .collect();
+        #[cfg(feature = "enterprise")]
+        want.extend(["get", "put"].map(|m| {
+            (
+                m.to_string(),
+                "/api/{org_id}/slack/insights-settings".to_string(),
+            )
+        }));
         want.sort();
         assert_eq!(documented, want);
     }
@@ -2323,6 +2463,160 @@ mod tests {
             "OcsfPackKind",
         ] {
             assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_sources_paths_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, method, id) in [
+            (
+                "/api/{org_id}/security/sources",
+                "get",
+                "ListSecuritySources",
+            ),
+            (
+                "/api/{org_id}/security/sources/types",
+                "get",
+                "ListSecuritySourceTypes",
+            ),
+            (
+                "/api/{org_id}/security/sources/match",
+                "post",
+                "MatchSecuritySource",
+            ),
+            (
+                "/api/{org_id}/security/sources/classify",
+                "post",
+                "ClassifySecuritySources",
+            ),
+            (
+                "/api/{org_id}/security/sources/{stream_name}/attach",
+                "post",
+                "AttachSecuritySourcePack",
+            ),
+            (
+                "/api/{org_id}/security/sources/{stream_name}/detach",
+                "post",
+                "DetachSecuritySourcePack",
+            ),
+        ] {
+            assert_eq!(spec["paths"][path][method]["operationId"], id, "{path}");
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "SourceListing",
+            "SourceRow",
+            "SourceType",
+            "MatchResponse",
+            "AttachError",
+            "AttachPlan",
+            "DetachSkip",
+        ] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[test]
+    fn security_access_path_and_schema_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/security/access"]["get"];
+        assert_eq!(op["operationId"], "GetSecurityAccess", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/SecurityAccessResponse"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_investigation_paths_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, id, schema) in [
+            (
+                "/api/{org_id}/security/entities",
+                "ListSecurityEntities",
+                "EntitiesResponse",
+            ),
+            (
+                "/api/{org_id}/security/entities/graph",
+                "GetSecurityEntityGraph",
+                "EntityGraphResponse",
+            ),
+            (
+                "/api/{org_id}/security/entities/detail",
+                "GetSecurityEntityDetail",
+                "EntityDetailResponse",
+            ),
+            (
+                "/api/{org_id}/security/ueba",
+                "ScoreSecurityUsers",
+                "UebaReport",
+            ),
+            (
+                "/api/{org_id}/security/events/search",
+                "SearchSecurityEvents",
+                "EventSearchResponse",
+            ),
+        ] {
+            let op = &spec["paths"][path]["post"];
+            assert_eq!(op["operationId"], id, "{op}");
+            assert_eq!(
+                op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                format!("#/components/schemas/{schema}")
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_audit_path_and_schema_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/security/audit"]["get"];
+        assert_eq!(op["operationId"], "ListSecurityAudit", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/SecurityAuditResponse"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_sigma_paths_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, method, id, schema) in [
+            (
+                "/api/{org_id}/security/sigma/catalog",
+                "get",
+                "GetSigmaCatalog",
+                "SigmaCatalogResponse",
+            ),
+            (
+                "/api/{org_id}/security/sigma/compile",
+                "post",
+                "CompileSigmaRule",
+                "SigmaCompileResponse",
+            ),
+            (
+                "/api/{org_id}/security/mitre/coverage",
+                "get",
+                "GetMitreCoverage",
+                "MitreCoverage",
+            ),
+            (
+                "/api/{org_id}/security/detections/{alert_id}/evidence",
+                "get",
+                "GetDetectionEvidence",
+                "DetectionEvidence",
+            ),
+        ] {
+            let op = &spec["paths"][path][method];
+            assert_eq!(op["operationId"], id, "{op}");
+            assert_eq!(
+                op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                format!("#/components/schemas/{schema}")
+            );
         }
     }
 

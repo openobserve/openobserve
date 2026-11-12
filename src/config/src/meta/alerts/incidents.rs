@@ -20,6 +20,9 @@ use utoipa::ToSchema;
 
 use super::rca_steering::SteerKind;
 
+/// The `Reopened` reason of a manual status change; an unacknowledge writes another one.
+pub const MANUAL_REOPEN_REASON: &str = "Manually reopened";
+
 /// Incident status lifecycle: Open → Acknowledged → Resolved
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
@@ -100,6 +103,8 @@ pub enum CorrelationReason {
     SecondaryMatch,
     /// Fallback: no dimensions found, isolated by alert ID
     AlertId,
+    /// A security firing on the same host, user or address as the case
+    Entity,
 }
 
 impl std::fmt::Display for CorrelationReason {
@@ -109,6 +114,7 @@ impl std::fmt::Display for CorrelationReason {
             Self::PrimaryMatch => write!(f, "primary_match"),
             Self::SecondaryMatch => write!(f, "secondary_match"),
             Self::AlertId => write!(f, "alert_id"),
+            Self::Entity => write!(f, "entity"),
         }
     }
 }
@@ -122,6 +128,7 @@ impl std::str::FromStr for CorrelationReason {
             "primary_match" => Ok(Self::PrimaryMatch),
             "secondary_match" => Ok(Self::SecondaryMatch),
             "alert_id" => Ok(Self::AlertId),
+            "entity" => Ok(Self::Entity),
             unmatched => Err(format!("'{unmatched}' is not a valid CorrelationReason")),
         }
     }
@@ -352,6 +359,10 @@ pub struct Incident {
     /// Every alert that fired into the incident and how often, most-fired first; list only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alert_groups: Option<Vec<IncidentAlertGroup>>,
+
+    /// A security case only backfills over past data fired into.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub historical: bool,
 }
 
 /// One alert's firings within an incident, for the list row.
@@ -378,6 +389,8 @@ pub struct IncidentAlert {
     pub source_url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub labels: Option<std::collections::HashMap<String, String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub annotations: Option<std::collections::HashMap<String, String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detected_source: Option<String>,
 }
@@ -439,15 +452,36 @@ pub enum IncidentCorrelationOutcome {
         incident_id: String,
         service_name: String,
     },
+    /// A member alert's first firing after a manual reopen; notification should be sent.
+    FiredAfterReopen {
+        incident_id: String,
+        service_name: String,
+    },
 }
 
 impl IncidentCorrelationOutcome {
+    /// A member alert firing again sends only when a manual reopen still waited for it.
+    pub fn repeated(incident_id: String, service_name: String, after_reopen: bool) -> Self {
+        if after_reopen {
+            Self::FiredAfterReopen {
+                incident_id,
+                service_name,
+            }
+        } else {
+            Self::ExistingAlertRepeated {
+                incident_id,
+                service_name,
+            }
+        }
+    }
+
     pub fn incident_id(&self) -> &str {
         match self {
             Self::NewIncidentCreated { incident_id, .. }
             | Self::NewAlertTypeJoined { incident_id, .. }
             | Self::ExistingAlertRepeated { incident_id, .. }
-            | Self::SeverityEscalated { incident_id, .. } => incident_id,
+            | Self::SeverityEscalated { incident_id, .. }
+            | Self::FiredAfterReopen { incident_id, .. } => incident_id,
         }
     }
 
@@ -456,7 +490,8 @@ impl IncidentCorrelationOutcome {
             Self::NewIncidentCreated { service_name, .. }
             | Self::NewAlertTypeJoined { service_name, .. }
             | Self::ExistingAlertRepeated { service_name, .. }
-            | Self::SeverityEscalated { service_name, .. } => service_name,
+            | Self::SeverityEscalated { service_name, .. }
+            | Self::FiredAfterReopen { service_name, .. } => service_name,
         }
     }
 
@@ -466,7 +501,8 @@ impl IncidentCorrelationOutcome {
             Self::NewAlertTypeJoined { incident_id, .. } => Some(incident_id),
             Self::NewIncidentCreated { .. }
             | Self::ExistingAlertRepeated { .. }
-            | Self::SeverityEscalated { .. } => None,
+            | Self::SeverityEscalated { .. }
+            | Self::FiredAfterReopen { .. } => None,
         }
     }
 }
@@ -479,6 +515,9 @@ pub enum AlertKind {
     #[default]
     Internal,
     External,
+    /// A finding AutoObserve paged for; snake_case would read `auto_observe`.
+    #[serde(rename = "autoobserve")]
+    AutoObserve,
 }
 
 impl AlertKind {
@@ -486,12 +525,14 @@ impl AlertKind {
         match self {
             AlertKind::Internal => "internal",
             AlertKind::External => "external",
+            AlertKind::AutoObserve => "autoobserve",
         }
     }
 
     pub fn from_stored(s: &str) -> Self {
         match s {
             "external" => AlertKind::External,
+            "autoobserve" => AlertKind::AutoObserve,
             _ => AlertKind::Internal,
         }
     }
@@ -580,6 +621,30 @@ impl std::fmt::Display for AnalysisTriggerType {
     }
 }
 
+/// An analyst's verdict when closing a security case.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CaseVerdict {
+    TruePositive,
+    FalsePositive,
+    Benign,
+    Duplicate,
+    /// Real activity, but too old to act on, such as a backfill over past data.
+    Stale,
+}
+
+impl CaseVerdict {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::TruePositive => "true_positive",
+            Self::FalsePositive => "false_positive",
+            Self::Benign => "benign",
+            Self::Duplicate => "duplicate",
+            Self::Stale => "stale",
+        }
+    }
+}
+
 /// A single event in an incident's lifecycle timeline
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct IncidentEvent {
@@ -656,10 +721,34 @@ pub enum IncidentEventType {
     },
 
     /// Incident assigned/unassigned
-    /// TODO: service-layer emission is not yet implemented; wired up on the frontend.
     AssignmentChanged {
         from: Option<String>,
         to: Option<String>,
+        /// Who changed it; absent on events written before it was recorded.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        user_id: Option<String>,
+    },
+
+    /// A security case closed with the analyst's verdict.
+    Verdict {
+        user_id: String,
+        verdict: CaseVerdict,
+        reason: String,
+    },
+
+    /// Firings an analyst attached to the case by hand.
+    AlertsAttached {
+        user_id: String,
+        alert_ids: Vec<String>,
+        alert_names: Vec<String>,
+    },
+
+    /// An event an analyst opened the case from, or attached to it.
+    EventAttached {
+        user_id: String,
+        stream: String,
+        /// The event's own time, in microseconds.
+        event_at: i64,
     },
 
     /// User comment
@@ -757,6 +846,9 @@ impl IncidentEventType {
         "DimensionsUpgraded",
         "TitleChanged",
         "AssignmentChanged",
+        "Verdict",
+        "AlertsAttached",
+        "EventAttached",
         "Comment",
         "ai_analysis_begin",
         "ai_analysis_complete",
@@ -844,6 +936,10 @@ impl IncidentEvent {
         })
     }
 
+    pub fn manually_reopened(user_id: impl Into<String>) -> Self {
+        Self::reopened(user_id, MANUAL_REOPEN_REASON)
+    }
+
     pub fn reopened(user_id: impl Into<String>, reason: impl Into<String>) -> Self {
         Self::now(IncidentEventType::Reopened {
             user_id: user_id.into(),
@@ -867,6 +963,54 @@ impl IncidentEvent {
             from: from.into(),
             to: to.into(),
             user_id: user_id.into(),
+        })
+    }
+
+    pub fn assignment_changed(
+        from: Option<String>,
+        to: Option<String>,
+        user_id: impl Into<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::AssignmentChanged {
+            from,
+            to,
+            user_id: Some(user_id.into()),
+        })
+    }
+
+    pub fn verdict(
+        user_id: impl Into<String>,
+        verdict: CaseVerdict,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::Verdict {
+            user_id: user_id.into(),
+            verdict,
+            reason: reason.into(),
+        })
+    }
+
+    pub fn alerts_attached(
+        user_id: impl Into<String>,
+        alert_ids: Vec<String>,
+        alert_names: Vec<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::AlertsAttached {
+            user_id: user_id.into(),
+            alert_ids,
+            alert_names,
+        })
+    }
+
+    pub fn event_attached(
+        user_id: impl Into<String>,
+        stream: impl Into<String>,
+        event_at: i64,
+    ) -> Self {
+        Self::now(IncidentEventType::EventAttached {
+            user_id: user_id.into(),
+            stream: stream.into(),
+            event_at,
         })
     }
 
@@ -951,6 +1095,13 @@ impl IncidentEvent {
         false
     }
 
+    pub fn is_manual_reopen(&self) -> bool {
+        matches!(
+            &self.event_type,
+            IncidentEventType::Reopened { reason, .. } if reason == MANUAL_REOPEN_REASON
+        )
+    }
+
     /// Check if this event is any Alert event (regardless of alert_id)
     pub fn is_alert(&self) -> bool {
         matches!(&self.event_type, IncidentEventType::Alert { .. })
@@ -965,9 +1116,139 @@ impl IncidentEvent {
     }
 }
 
+/// Counts a firing into the trailing block of Alert events, or appends a new Alert event.
+pub fn push_alert_event(
+    events: &mut Vec<IncidentEvent>,
+    alert_id: &str,
+    alert_name: &str,
+    triggered_at: i64,
+) {
+    for event in events.iter_mut().rev() {
+        if !event.is_alert() {
+            break;
+        }
+        if event.is_alert_for(alert_id) {
+            event.increment_alert(alert_id, triggered_at);
+            return;
+        }
+    }
+    events.push(IncidentEvent::alert(alert_id, alert_name, triggered_at));
+}
+
+/// Whether no firing followed the latest manual reopen; metadata edits do not end the wait.
+pub fn manual_reopen_awaits_firing(events: &[IncidentEvent]) -> bool {
+    for event in events.iter().rev() {
+        if event.is_manual_reopen() {
+            return true;
+        }
+        if event.is_alert() {
+            return false;
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors record_alert: decide on the timeline, then record the firing into it.
+    fn fire_repeat(events: &mut Vec<IncidentEvent>, alert_id: &str) -> bool {
+        let after_reopen = manual_reopen_awaits_firing(events);
+        push_alert_event(events, alert_id, alert_id, 1);
+        matches!(
+            IncidentCorrelationOutcome::repeated("inc_1".into(), "checkout".into(), after_reopen),
+            IncidentCorrelationOutcome::FiredAfterReopen { .. }
+        )
+    }
+
+    #[test]
+    fn a_manual_reopen_sends_the_next_firing_once() {
+        let title = || IncidentEvent::title_changed("old", "new", "u@x.io");
+        let cases: Vec<(&str, Vec<IncidentEvent>, Vec<bool>)> = vec![
+            (
+                "reopen, two firings",
+                vec![IncidentEvent::manually_reopened("u@x.io")],
+                vec![true, false],
+            ),
+            (
+                "reopen, title change, two firings",
+                vec![IncidentEvent::manually_reopened("u@x.io"), title()],
+                vec![true, false],
+            ),
+            (
+                "reopen, title change, assignment, two firings",
+                vec![
+                    IncidentEvent::manually_reopened("u@x.io"),
+                    title(),
+                    IncidentEvent::assignment_changed(None, Some("v@x.io".into()), "u@x.io"),
+                ],
+                vec![true, false],
+            ),
+            (
+                "unacknowledge is not a manual reopen",
+                vec![IncidentEvent::reopened("u@x.io", "Unacknowledged")],
+                vec![false, false],
+            ),
+            (
+                "an acknowledge and unacknowledge after the reopen keep the wait",
+                vec![
+                    IncidentEvent::manually_reopened("u@x.io"),
+                    IncidentEvent::acknowledged("u@x.io"),
+                    IncidentEvent::reopened("u@x.io", "Unacknowledged"),
+                ],
+                vec![true, false],
+            ),
+            ("no reopen", vec![], vec![false, false]),
+        ];
+        for (name, after_reopen, want) in cases {
+            // The alert's pre-reopen Alert event must not end the wait.
+            let mut events = vec![
+                IncidentEvent::created(),
+                IncidentEvent::alert("a1", "a1", 0),
+                IncidentEvent::resolved(Some("u@x.io".into())),
+            ];
+            events.extend(after_reopen);
+            let got: Vec<bool> = want
+                .iter()
+                .map(|_| fire_repeat(&mut events, "a1"))
+                .collect();
+            assert_eq!(got, want, "{name}");
+        }
+    }
+
+    #[test]
+    fn another_member_firing_first_uses_up_the_reopen() {
+        let mut events = vec![
+            IncidentEvent::alert("a1", "a1", 0),
+            IncidentEvent::alert("a2", "a2", 0),
+            IncidentEvent::manually_reopened("u@x.io"),
+        ];
+        assert!(fire_repeat(&mut events, "a2"));
+        assert!(!fire_repeat(&mut events, "a1"));
+    }
+
+    #[test]
+    fn each_manual_reopen_sends_its_first_firing() {
+        let mut events = vec![IncidentEvent::manually_reopened("u@x.io")];
+        assert!(fire_repeat(&mut events, "a1"));
+        assert!(!fire_repeat(&mut events, "a1"));
+        events.push(IncidentEvent::resolved(Some("u@x.io".into())));
+        events.push(IncidentEvent::manually_reopened("u@x.io"));
+        assert!(fire_repeat(&mut events, "a1"));
+        assert!(!fire_repeat(&mut events, "a1"));
+    }
+
+    #[test]
+    fn push_alert_event_compacts_only_the_trailing_alert_block() {
+        let mut events = vec![IncidentEvent::alert("a1", "a1", 0)];
+        push_alert_event(&mut events, "a1", "a1", 5);
+        assert_eq!(events.len(), 1);
+        events.push(IncidentEvent::manually_reopened("u@x.io"));
+        push_alert_event(&mut events, "a1", "a1", 9);
+        assert_eq!(events.len(), 3);
+        assert!(events[2].is_alert_for("a1"));
+    }
 
     /// Only a new alert joining counts; the same alert firing again never re-pages.
     #[test]
@@ -997,6 +1278,13 @@ mod tests {
             ),
             (
                 IncidentCorrelationOutcome::NewIncidentCreated {
+                    incident_id: id(),
+                    service_name: svc(),
+                },
+                None,
+            ),
+            (
+                IncidentCorrelationOutcome::FiredAfterReopen {
                     incident_id: id(),
                     service_name: svc(),
                 },
@@ -1118,6 +1406,22 @@ mod tests {
             IncidentEventType::AssignmentChanged {
                 from: None,
                 to: None,
+                user_id: None,
+            },
+            IncidentEventType::Verdict {
+                user_id: "u".into(),
+                verdict: CaseVerdict::FalsePositive,
+                reason: "r".into(),
+            },
+            IncidentEventType::AlertsAttached {
+                user_id: "u".into(),
+                alert_ids: vec!["a".into()],
+                alert_names: vec!["n".into()],
+            },
+            IncidentEventType::EventAttached {
+                user_id: "u".into(),
+                stream: "s".into(),
+                event_at: 1,
             },
             IncidentEventType::Comment {
                 user_id: "u".into(),
@@ -1883,6 +2187,7 @@ mod tests {
             rca: None,
             rca_off_reason: None,
             alert_groups: None,
+            historical: false,
         }
     }
 
@@ -2194,6 +2499,19 @@ mod tests {
     }
 
     #[test]
+    fn the_autoobserve_kind_round_trips() {
+        let kind = AlertKind::AutoObserve;
+        assert_eq!(kind.as_str(), "autoobserve");
+        assert_eq!(serde_json::to_string(&kind).unwrap(), "\"autoobserve\"");
+        assert_eq!(
+            serde_json::from_str::<AlertKind>("\"autoobserve\"").unwrap(),
+            kind
+        );
+        assert_eq!(AlertKind::from_stored(kind.as_str()), kind);
+        assert_eq!(AlertKind::from_stored("x"), AlertKind::Internal);
+    }
+
+    #[test]
     fn test_incident_alert_external_fields_serde() {
         let alert = IncidentAlert {
             incident_id: "inc1".to_string(),
@@ -2208,6 +2526,10 @@ mod tests {
                 "service".to_string(),
                 "checkout".to_string(),
             )])),
+            annotations: Some(std::collections::HashMap::from([(
+                "description".to_string(),
+                "p99 disk latency > 2s".to_string(),
+            )])),
             detected_source: Some("pagerduty".to_string()),
         };
 
@@ -2215,6 +2537,7 @@ mod tests {
         assert_eq!(json["alert_kind"], "external");
         assert_eq!(json["source_url"], "https://example.com/alert/1");
         assert_eq!(json["detected_source"], "pagerduty");
+        assert_eq!(json["annotations"]["description"], "p99 disk latency > 2s");
 
         let round_tripped: IncidentAlert = serde_json::from_value(json).unwrap();
         assert_eq!(round_tripped.alert_kind, AlertKind::External);
@@ -2222,6 +2545,7 @@ mod tests {
             round_tripped.source_url,
             Some("https://example.com/alert/1".to_string())
         );
+        assert_eq!(round_tripped.annotations, alert.annotations);
     }
 
     #[test]
@@ -2241,6 +2565,9 @@ mod tests {
         assert_eq!(alert.source_url, None);
         assert_eq!(alert.labels, None);
         assert_eq!(alert.detected_source, None);
+        assert_eq!(alert.annotations, None);
+        let json = serde_json::to_value(&alert).unwrap();
+        assert!(json.get("annotations").is_none());
     }
 
     #[test]
@@ -2286,5 +2613,35 @@ mod tests {
         let back: ExternalAlertEvent = serde_json::from_str(&json).unwrap();
         assert_eq!(back.dedup_key, "abc123");
         assert_eq!(back.severity, IncidentSeverity::P1);
+    }
+
+    #[test]
+    fn test_assignment_event_without_actor_still_parses() {
+        let old = serde_json::json!({
+            "timestamp": 1,
+            "type": "AssignmentChanged",
+            "data": {"from": null, "to": "a@acme.io"}
+        });
+        let event: IncidentEvent = serde_json::from_value(old).unwrap();
+        assert!(matches!(
+            event.event_type,
+            IncidentEventType::AssignmentChanged { user_id: None, .. }
+        ));
+    }
+
+    #[test]
+    fn test_verdict_event_round_trips_with_snake_case_verdict() {
+        let event = IncidentEvent::verdict("a@acme.io", CaseVerdict::TruePositive, "confirmed");
+        let v = serde_json::to_value(&event).unwrap();
+        assert_eq!(v["type"], "Verdict");
+        assert_eq!(v["data"]["verdict"], "true_positive");
+        let back: IncidentEvent = serde_json::from_value(v).unwrap();
+        assert!(matches!(
+            back.event_type,
+            IncidentEventType::Verdict {
+                verdict: CaseVerdict::TruePositive,
+                ..
+            }
+        ));
     }
 }

@@ -19,6 +19,7 @@ import useRoutes from "./router";
 import Login from "@/views/Login.vue";
 import store from "@/stores";
 import { routeGuard } from "@/utils/zincutils";
+import { loadSecurityAccess } from "@/composables/security/useSecurityAccess";
 import { isPaywalledDestination, shouldPaywallRoute } from "@/utils/auth";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import config from "@/aws-exports";
@@ -57,6 +58,11 @@ vi.mock("@/utils/zincutils", () => ({
   useLocalTimezone: vi.fn(),
   invalidateLoginData: vi.fn(),
   getPath: vi.fn(() => "/"),
+}));
+
+vi.mock("@/composables/security/useSecurityAccess", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/composables/security/useSecurityAccess")>()),
+  loadSecurityAccess: vi.fn(async () => ({ read: true, triage: true, admin: true })),
 }));
 
 // ---------------------------------------------------------------------------
@@ -2748,6 +2754,116 @@ describe("useRoutes (router.ts)", () => {
       expect(findRoute(useRoutes().homeChildRoutes, "alertSources").meta.licenseFeature).toBe(
         "incidents",
       );
+    });
+  });
+
+  describe("security route guard", () => {
+    const SECURITY_ROUTES = [
+      "securityOverview",
+      "securityEvents",
+      "securityDetections",
+      "securityAlerts",
+      "securityCases",
+      "securityEntities",
+      "securityIntel",
+      "securityUEBA",
+      "securityMitre",
+      "securitySources",
+      "securityContent",
+    ];
+
+    const enter = async (
+      name: string,
+      zoConfig: Record<string, unknown>,
+      query: Record<string, string> = { org_identifier: "acme" },
+    ) => {
+      const previous = store.state.zoConfig;
+      store.state.zoConfig = zoConfig;
+      try {
+        const next = vi.fn();
+        findRoute(useRoutes().homeChildRoutes, name).beforeEnter({ query }, {}, next);
+        await vi.waitFor(() => expect(next).toHaveBeenCalled());
+        return next;
+      } finally {
+        store.state.zoConfig = previous;
+      }
+    };
+
+    beforeEach(() => {
+      config.isEnterprise = "true";
+      vi.mocked(loadSecurityAccess).mockResolvedValue({ read: true, triage: false, admin: false });
+    });
+
+    it.each(SECURITY_ROUTES)("tags %s with the security license feature", (name) => {
+      expect(findRoute(useRoutes().homeChildRoutes, name).meta.licenseFeature).toBe("security");
+    });
+
+    it("opens a page for a reader of the org", async () => {
+      const next = await enter("securityCases", {});
+      expect(loadSecurityAccess).toHaveBeenCalledWith("acme");
+      expect(next).toHaveBeenCalledWith();
+    });
+
+    it.each(SECURITY_ROUTES)(
+      "opens %s without read, for the layout's access lock",
+      async (name) => {
+        vi.mocked(loadSecurityAccess).mockResolvedValue({
+          read: false,
+          triage: false,
+          admin: false,
+        });
+        const next = await enter(name, {});
+        expect(next).toHaveBeenCalledWith();
+      },
+    );
+
+    it("waits for the access answer instead of bouncing a cold load", async () => {
+      let answer!: (value: { read: boolean; triage: boolean; admin: boolean }) => void;
+      vi.mocked(loadSecurityAccess).mockReturnValue(new Promise((resolve) => (answer = resolve)));
+      const next = vi.fn();
+      findRoute(useRoutes().homeChildRoutes, "securityEvents").beforeEnter(
+        { query: { org_identifier: "acme" } },
+        {},
+        next,
+      );
+      await Promise.resolve();
+      expect(next).not.toHaveBeenCalled();
+      answer({ read: true, triage: false, admin: false });
+      await vi.waitFor(() => expect(next).toHaveBeenCalledWith());
+    });
+
+    it("renders a locked license locked rather than redirecting", async () => {
+      vi.mocked(loadSecurityAccess).mockResolvedValue({ read: false, triage: false, admin: false });
+      const next = await enter("securityAlerts", { features: { security: "locked" } });
+      expect(next).toHaveBeenCalledWith();
+      expect(loadSecurityAccess).not.toHaveBeenCalled();
+    });
+
+    it("sends a hidden license home without asking for access", async () => {
+      const next = await enter("securityAlerts", { features: { security: "hidden" } });
+      expect(next).toHaveBeenCalledWith({ name: "home", query: { org_identifier: "acme" } });
+      expect(loadSecurityAccess).not.toHaveBeenCalled();
+    });
+
+    it("lets a load with no org yet through, for the layout to decide", async () => {
+      const previousOrg = store.state.selectedOrganization;
+      store.state.selectedOrganization = {} as any;
+      try {
+        const next = await enter("securityOverview", {}, {});
+        expect(next).toHaveBeenCalledWith();
+        expect(loadSecurityAccess).not.toHaveBeenCalled();
+      } finally {
+        store.state.selectedOrganization = previousOrg;
+      }
+    });
+
+    it("forwards a routeGuard redirect untouched", async () => {
+      vi.mocked(routeGuard).mockImplementationOnce((_to: any, _from: any, next: any) =>
+        next({ name: "plans" }),
+      );
+      const next = await enter("securityOverview", {});
+      expect(next).toHaveBeenCalledWith({ name: "plans" });
+      expect(loadSecurityAccess).not.toHaveBeenCalled();
     });
   });
 

@@ -675,6 +675,8 @@ pub async fn prepare_cache_response(
     if !use_cache && sql.histogram_offset != Some(0) {
         return Ok((
             MultiCachedQueryResponse {
+                ts_column,
+                is_descending,
                 order_by: sql.order_by,
                 ..Default::default()
             },
@@ -1491,6 +1493,97 @@ fn redaction_error(all_streams: &str, reason: &str) -> infra::errors::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_prepare_histogram_response_ordering() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "histogram_response_ordering";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org_id}/logs/t"),
+            SchemaCache::new(Schema::new(vec![Field::new(
+                TIMESTAMP_COL_NAME,
+                DataType::Int64,
+                false,
+            )])),
+        );
+        let cases = [("+08:00", false), ("+00:00", false), ("+08:00", true)];
+        let orders = [
+            ("", [30, 20, 10]),
+            (" ORDER BY ts ASC", [10, 20, 30]),
+            (" ORDER BY ts DESC", [30, 20, 10]),
+            (" ORDER BY c DESC", [20, 10, 30]),
+        ];
+        for (offset, mixed_offsets) in cases {
+            for (order, expected) in orders {
+                for use_cache in [false, true] {
+                    let filter = if mixed_offsets {
+                        " WHERE histogram(_timestamp, '1 hour', '+00:00') IS NOT NULL"
+                    } else {
+                        ""
+                    };
+                    let mut req = search::Request {
+                        query: search::Query {
+                            sql: format!(
+                                "SELECT histogram(_timestamp, '1 hour', '{offset}') AS ts, count(*) AS c FROM t{filter} GROUP BY ts{order}"
+                            ),
+                            start_time: 1_735_689_600_000_000,
+                            end_time: 1_735_776_000_000_000,
+                            size: 100,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    };
+                    let (prepared, should_exec_query) = prepare_cache_response(
+                        "histogram_response_ordering",
+                        org_id,
+                        StreamType::Logs,
+                        &mut req,
+                        use_cache,
+                    )
+                    .await
+                    .unwrap();
+                    let mut response = search::Response {
+                        hits: vec![
+                            json::json!({"ts": 20, "c": 3}),
+                            json::json!({"ts": 30, "c": 1}),
+                            json::json!({"ts": 10, "c": 2}),
+                        ],
+                        ..Default::default()
+                    };
+                    sort_response(
+                        prepared.is_descending,
+                        &mut response,
+                        &prepared.ts_column,
+                        &prepared.order_by,
+                    );
+                    let timestamps: Vec<_> = response
+                        .hits
+                        .iter()
+                        .map(|hit| hit["ts"].as_i64().unwrap())
+                        .collect();
+                    assert_eq!(
+                        timestamps, expected,
+                        "offset={offset}, mixed={mixed_offsets}, order={order}, use_cache={use_cache}"
+                    );
+                    assert_eq!(prepared.ts_column, "ts");
+                    assert!(should_exec_query);
+                    assert!(!prepared.has_cached_data);
+                    assert!(prepared.cached_response.is_empty());
+                    assert!(prepared.deltas.is_empty());
+                    if offset != "+00:00" || mixed_offsets {
+                        assert!(!prepared.cache_query_response);
+                        assert!(prepared.file_path.is_empty());
+                    }
+                }
+            }
+        }
+        STREAM_SCHEMAS_LATEST
+            .write()
+            .await
+            .remove(&format!("{org_id}/logs/t"));
+    }
 
     #[test]
     fn test_histogram_cacheable_range_snaps_to_histogram_grid() {

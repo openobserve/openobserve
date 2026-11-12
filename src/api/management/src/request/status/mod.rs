@@ -66,8 +66,9 @@ use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
     audit::audit,
+    axum::{Extension, http::HeaderMap},
     common::utils::jwt::verify_decode_token,
-    config::{ider, utils::time::now_micros},
+    config::{axum::middlewares::RealIp, ider, utils::time::now_micros},
     o2_dex::{
         config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
         service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
@@ -244,6 +245,8 @@ struct ConfigResponse<'a> {
     /// The clamped operator refresh floor; the share form shows each range's floor from it.
     public_dashboard_min_refresh_secs: u32,
     oncall_enabled: bool,
+    /// Per org: an incident-only alert reaches a person, so on-call is on and the org has a team.
+    incidents_page_oncall: bool,
     slack_enabled: bool,
     /// The same reason for every org, null when on.
     slack_disabled_reason: Option<DisabledReason>,
@@ -259,6 +262,8 @@ struct ConfigResponse<'a> {
     query_history_enabled: bool,
     /// Days unstarred recent searches are kept; 0 or less keeps them until the per-page cap.
     query_history_retention_days: i64,
+    /// Days alert level changes are kept; 0 or less keeps them all.
+    alert_transitions_retention_days: i64,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
@@ -323,7 +328,7 @@ impl LicenseSearchConfig {
 struct ConfigBootstrapResponse {
     /// `enterprise` / `cloud` / `opensource`; the o2 CLI and o2-operator read it here.
     build_type: String,
-    /// The UI's stale-build checker compares it across deploys.
+    /// [`config::build_fingerprint`], not the commit: the UI's stale-build checker compares it.
     commit_hash: String,
     telemetry_enabled: bool,
     sso_enabled: bool,
@@ -469,7 +474,7 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
 
     axum::Json(ConfigBootstrapResponse {
         build_type: build_type.to_string(),
-        commit_hash: config::COMMIT_HASH.to_string(),
+        commit_hash: config::build_fingerprint(),
         telemetry_enabled: cfg.common.telemetry_enabled,
         sso_enabled,
         native_login_enabled,
@@ -595,6 +600,7 @@ pub async fn zo_config(
         false,
         o2cfg.oncall.enabled && check_features(&[Feature::Oncall])
     );
+    let incidents_page_oncall = enterprise_value!(false, incidents_page_oncall(&org_id).await);
     let slack_disabled_reason = enterprise_value!(
         Some(DisabledReason::Edition),
         o2_enterprise::enterprise::slack::disabled_reason(&org_id)
@@ -773,6 +779,7 @@ pub async fn zo_config(
         public_dashboards_enabled: cfg.public_dashboards.enabled,
         public_dashboard_min_refresh_secs: cfg.public_dashboards.min_refresh_secs,
         oncall_enabled,
+        incidents_page_oncall,
         slack_enabled: slack_disabled_reason.is_none(),
         slack_disabled_reason,
         synthetics_private_locations_enabled,
@@ -781,6 +788,7 @@ pub async fn zo_config(
         database_monitoring_enabled: cfg.db_monitoring.enabled,
         query_history_enabled: cfg.limit.query_history_enabled,
         query_history_retention_days: cfg.limit.query_history_retention_days,
+        alert_transitions_retention_days: transitions_retention_days(&cfg),
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled,
@@ -819,6 +827,17 @@ async fn license_config(license_server_url: String) -> LicenseConfig {
             now_micros(),
         ),
     }
+}
+
+// A failed team read says no one is paged: a false gap is visible, a hidden one is not.
+#[cfg(feature = "enterprise")]
+async fn incidents_page_oncall(org_id: &str) -> bool {
+    o2_enterprise::enterprise::oncall::incidents_page_oncall_for(org_id)
+        .await
+        .unwrap_or_else(|e| {
+            log::warn!("[CONFIG] org {org_id}: could not read on-call teams: {e}");
+            false
+        })
 }
 
 // Every org member reads this response, unlike org settings, so stream pages can rely on it.
@@ -869,6 +888,15 @@ async fn org_admin(org_id: &str, user_id: &str) -> bool {
         || openobserve_core::users::get_user(Some(org_id), user_id)
             .await
             .is_some_and(|u| matches!(u.role, UserRole::Root | UserRole::Admin))
+}
+
+/// Only enterprise builds run the transitions reaper; 0 tells the UI nothing is ever dropped.
+fn transitions_retention_days(cfg: &Config) -> i64 {
+    if cfg!(feature = "enterprise") {
+        cfg.limit.alert_transitions_retention_days
+    } else {
+        0
+    }
 }
 
 pub async fn cache_status() -> impl IntoResponse {
@@ -1195,6 +1223,8 @@ pub async fn config_reload(Headers(user_email): Headers<UserEmail>) -> impl Into
     // Audit this event
     #[cfg(feature = "enterprise")]
     audit(AuditMessage {
+        login_ip: None,
+        user_agent: None,
         user_email: user_id.to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -1300,12 +1330,15 @@ async fn get_stream_schema_status() -> (usize, usize) {
 #[cfg(feature = "enterprise")]
 pub async fn redirect(
     cookies: CookieJar,
+    headers: HeaderMap,
+    real_ip: Option<Extension<RealIp>>,
     Query(query): Query<std::collections::HashMap<String, String>>,
 ) -> Response {
     use axum_extra::extract::cookie::{Cookie, SameSite};
     use common::meta::user::AuthTokens;
     use config::meta::user::UserRole;
-    use itertools::Itertools;
+
+    use crate::request::{LoginFailure, audit_login_failure};
 
     let code = match query.get("code") {
         Some(code) => code,
@@ -1316,8 +1349,9 @@ pub async fn redirect(
                 .unwrap();
         }
     };
-    let query_string = query.iter().map(|(k, v)| format!("{k}={v}")).join("&");
     let mut audit_message = AuditMessage {
+        login_ip: real_ip.map(|Extension(ip)| ip.0.to_string()),
+        user_agent: super::users::login_user_agent(&headers),
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -1326,7 +1360,7 @@ pub async fn redirect(
             http_method: "GET".to_string(),
             http_path: "/config/redirect".to_string(),
             http_body: "".to_string(),
-            http_query_params: query_string,
+            http_query_params: String::new(),
             http_response_code: 302,
             error_msg: None,
             trace_id: None,
@@ -1338,15 +1372,17 @@ pub async fn redirect(
 
     let state_cookie = cookies.get(LOGIN_STATE_COOKIE).map(|c| c.value());
     if let Err(msg) = consume_login_state(query.get("state"), state_cookie).await {
-        audit_message.response_meta.http_response_code = 400;
-        audit(audit_message).await;
+        audit_login_failure(
+            audit_message,
+            LoginFailure::InvalidLoginState,
+            StatusCode::BAD_REQUEST,
+        )
+        .await;
         return Response::builder()
             .status(StatusCode::BAD_REQUEST)
             .body(Body::from(msg))
             .unwrap();
     }
-
-    log::info!("entering exchange_code: {code}");
 
     match exchange_code(code).await {
         Ok(login_data) => {
@@ -1362,6 +1398,7 @@ pub async fn redirect(
             let id_token;
             let login_url = match token_ver {
                 Ok(res) => {
+                    audit_message.user_email = res.0.user_email.clone();
                     // check for service accounts , do not to allow login
                     if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await
                         && db_user
@@ -1384,9 +1421,12 @@ pub async fn redirect(
                     {
                         Ok(allowed) => {
                             if !allowed {
-                                audit_message.response_meta.http_response_code = 403;
-                                audit_message._timestamp = now_micros();
-                                audit(audit_message).await;
+                                audit_login_failure(
+                                    audit_message,
+                                    LoginFailure::LoginPolicyDenied,
+                                    StatusCode::UNAUTHORIZED,
+                                )
+                                .await;
                                 return Response::builder()
                                     .status(StatusCode::UNAUTHORIZED)
                                     .header(header::CONTENT_TYPE, "application/json")
@@ -1401,7 +1441,6 @@ pub async fn redirect(
                         }
                     }
 
-                    audit_message.user_email = res.0.user_email.clone();
                     id_token = json::to_string(&json::json!({
                         "email": res.0.user_email,
                         "name": res.0.user_name,
@@ -1431,9 +1470,12 @@ pub async fn redirect(
                     )
                 }
                 Err(e) => {
-                    audit_message.response_meta.http_response_code = 400;
-                    audit_message._timestamp = now_micros();
-                    audit(audit_message).await;
+                    audit_login_failure(
+                        audit_message,
+                        LoginFailure::TokenValidationFailed,
+                        StatusCode::UNAUTHORIZED,
+                    )
+                    .await;
                     return Response::builder()
                         .status(StatusCode::UNAUTHORIZED)
                         .header(header::CONTENT_TYPE, "application/json")
@@ -1446,9 +1488,12 @@ pub async fn redirect(
             let session_id = ider::uuid();
 
             if access_token.is_empty() {
-                audit_message.response_meta.http_response_code = 400;
-                audit_message._timestamp = now_micros();
-                audit(audit_message).await;
+                audit_login_failure(
+                    audit_message,
+                    LoginFailure::TokenValidationFailed,
+                    StatusCode::UNAUTHORIZED,
+                )
+                .await;
                 return Response::builder()
                     .status(StatusCode::UNAUTHORIZED)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -1506,9 +1551,12 @@ pub async fn redirect(
                 .unwrap()
         }
         Err(e) => {
-            audit_message.response_meta.http_response_code = 400;
-            audit_message._timestamp = now_micros();
-            audit(audit_message).await;
+            audit_login_failure(
+                audit_message,
+                LoginFailure::TokenExchangeFailed,
+                StatusCode::UNAUTHORIZED,
+            )
+            .await;
             Response::builder()
                 .status(StatusCode::UNAUTHORIZED)
                 .header(header::CONTENT_TYPE, "application/json")
@@ -1571,6 +1619,8 @@ pub async fn refresh_token_with_dex(
         .collect::<Vec<_>>()
         .join("&");
     let mut audit_message = AuditMessage {
+        login_ip: None,
+        user_agent: None,
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -1864,6 +1914,8 @@ pub async fn logout(
     #[cfg(feature = "enterprise")]
     if let Some(user_email) = user_email {
         audit(AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email,
             org_id: "".to_string(),
             _timestamp: now_micros(),
@@ -2674,6 +2726,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_zo_config_says_whether_an_orgs_incidents_page_someone() {
+        async fn paging(org: &str) -> serde_json::Value {
+            let response = zo_config(Path(org.to_string()), None).await.into_response();
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap()["incidents_page_oncall"]
+                .clone()
+        }
+        #[cfg(feature = "enterprise")]
+        crate::request::security::tests::meta_store().await;
+        assert_eq!(
+            paging("zo_config_no_team_org").await,
+            serde_json::json!(false)
+        );
+        #[cfg(feature = "enterprise")]
+        {
+            let org = "zo_config_team_org";
+            infra::table::oncall_teams::create(org, "platform", "UTC", None)
+                .await
+                .unwrap();
+            let gate = o2_enterprise::enterprise::oncall::incidents_page_oncall();
+            assert_eq!(paging(org).await, serde_json::json!(gate));
+        }
+    }
+
+    #[tokio::test]
     async fn test_zo_config_serves_the_global_and_merged_retention() {
         let org_id = "zo_config_retention_org";
         #[cfg(feature = "enterprise")]
@@ -2756,6 +2835,17 @@ mod tests {
             assert_ne!(json["slack_disabled_reason"], "allowlist", "{org}: {json}");
             assert!(json.get("slack_home_region").is_none(), "{org}: {json}");
         }
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_the_transitions_retention() {
+        let json = zo_config_json().await;
+        let served = if cfg!(feature = "enterprise") {
+            get_config().limit.alert_transitions_retention_days
+        } else {
+            0
+        };
+        assert_eq!(json["alert_transitions_retention_days"], served);
     }
 
     async fn zo_config_json() -> serde_json::Value {

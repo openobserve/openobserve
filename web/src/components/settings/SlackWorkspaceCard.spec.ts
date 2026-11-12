@@ -446,6 +446,55 @@ describe("SlackWorkspaceCard (A3)", () => {
     expect(cloud.find('[data-test="slack-uninstall"]').exists()).toBe(false);
   });
 
+  it("a_reader_without_manage_slack_gets_disconnect_and_uninstall_off_with_the_reason", async () => {
+    const w = mount(SlackWorkspaceCard, {
+      props: { installation: installationView(), isCloud: false, readOnly: true },
+      attachTo: document.body,
+      global: {
+        plugins: [i18n, makeSlackStore()],
+        config: { errorHandler },
+        stubs: {
+          OTable: OTableStub,
+          ConfirmDialog: NamedConfirmDialogStub,
+          SlackCredentialsDialog: CredentialsStub,
+        },
+      },
+    });
+    expect(w.find('[data-test="slack-disconnect-org"]').attributes("disabled")).toBeDefined();
+    expect(w.find('[data-test="slack-uninstall"]').attributes("disabled")).toBeDefined();
+    expect(w.find('[data-test="slack-danger-locked"]').text()).toContain(
+      "They need the Manage Slack permission.",
+    );
+    await w.find('[data-test="slack-disconnect-org"]').trigger("click");
+    expect(w.emitted("disconnect")).toBeUndefined();
+  });
+
+  it("a_reader_without_manage_slack_gets_every_write_on_the_card_off", async () => {
+    const w = mount(SlackWorkspaceCard, {
+      props: { installation: installationView(), isCloud: false, readOnly: true },
+      attachTo: document.body,
+      global: {
+        plugins: [i18n, makeSlackStore()],
+        config: { errorHandler },
+        stubs: {
+          OTable: OTableStub,
+          ConfirmDialog: NamedConfirmDialogStub,
+          SlackCredentialsDialog: CredentialsStub,
+        },
+      },
+    });
+    await flushPromises();
+    for (const test of [
+      "slack-test-connection",
+      "slack-reinstall",
+      "slack-update-credentials",
+      "slack-forget-token",
+      "slack-help-contact-save",
+    ]) {
+      expect(w.find(`[data-test="${test}"]`).attributes("disabled"), test).toBeDefined();
+    }
+  });
+
   it("a managed workspace shows Managed by your instance admin with the _meta contact", () => {
     const w = mountCard(managedView());
     const banner = w.find('[data-test="slack-managed-banner"]');

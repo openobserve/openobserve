@@ -132,6 +132,7 @@ export class LogsPage {
         this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
         this.searchStreamInput = '[data-test="streams-search-stream-input"] input';
         this.exploreButtonSelector = '[data-test="log-stream-explore-btn"]';
+        this.streamNameCell = '[data-test^="log-stream-name-cell-"]';
         this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.menuTransformEditorToggleBtn = '[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]';
         this.menuListSavedViewsBtn = '[data-test="logs-search-bar-menu-list-saved-views-btn"]';
@@ -315,8 +316,8 @@ export class LogsPage {
         // the hidden one and fail Playwright's visibility actionability check.
         this.fieldListSearchInput = '[data-test="logs-build-query-page"] [data-test="o-field-list-search-field"]';
         this.fieldListSearchInputWrapper = '[data-test="logs-build-query-page"] [data-test="o-field-list-search"]';
-        // Builder filter conditions — each rendered with data-test="dashboard-add-condition-label-{index}-{label}"
-        this.filterConditionLabelItems = '[data-test^="dashboard-add-condition-label-"]';
+        // Builder filter conditions — each a chip of the shared filter builder, data-test="dashboard-filter-builder-chip-{field}"
+        this.filterConditionLabelItems = '[data-test^="dashboard-filter-builder-chip-"]:has([data-test$="-field"])';
 
         // Chart selection
         this.chartSelectionContainer = '[data-test="dashboard-addpanel-chart-selection-item"]';
@@ -3621,6 +3622,18 @@ export class LogsPage {
 
     async clickExploreButton() {
         return await this.page.locator(this.exploreButtonSelector).first().click({ force: true });
+    }
+
+    async expectStreamListFilteredBy(keyword) {
+        const matching = `[data-test*="${keyword}" i]`;
+        await expect(this.page.locator(`${this.streamNameCell}${matching}`).first()).toBeVisible();
+        // OTable keeps the previous rows inert during a slow filter fetch, and a click on them is silently dropped.
+        await expect(this.page.locator(`[data-test-stale] ${this.streamNameCell}, ${this.streamNameCell}:not(${matching})`)).toHaveCount(0);
+    }
+
+    async exploreFirstStreamAndExpectLogs() {
+        await this.page.locator(this.exploreButtonSelector).first().click();
+        await expect(this.page).toHaveURL(/\/logs(\?|$)/);
     }
 
     async waitForSavedViewsButton() {
@@ -11295,7 +11308,7 @@ export class LogsPage {
     /**
      * Check if the filter section has any conditions populated.
      * Looks for filter condition items inside the filter layout.
-     * Filter conditions use data-test="dashboard-add-condition-label-{index}-{label}" pattern.
+     * Filter conditions are chips with data-test="dashboard-filter-builder-chip-{field}".
      * @returns {Promise<number>} Number of filter conditions found
      */
     async getFilterConditionCount() {

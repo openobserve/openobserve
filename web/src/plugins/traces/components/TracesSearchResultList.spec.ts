@@ -63,6 +63,7 @@ vi.mock("@/composables/useTraces", () => ({
   default: () => ({
     searchObj: sharedSearchObj,
     updatedLocalLogFilterField: vi.fn(),
+    loadLocalLogFilterField: vi.fn(),
   }),
   DEFAULT_TRACE_COLUMNS: {
     traces: ["service_name", "operation_name", "duration", "spans", "status", "service_latency"],

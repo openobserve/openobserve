@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { rewriteWhereLiterals, type LiteralNode } from "./sqlLiteralRewrite";
+
 /**
  * Maps OTEL numeric span kind IDs to human-readable display names.
  * Reference: https://opentelemetry.io/docs/specs/otel/trace/api/#spankind
@@ -55,42 +57,38 @@ export const parseSpanKindWhereClause = (
 
   if (parser) {
     try {
-      const fullSql = `SELECT * FROM "${streamName}" WHERE ${whereClause}`;
-      const ast = parser.astify(fullSql);
-
-      const replaceSpanKindStringNode = (strNode: any) => {
-        if (strNode?.type === "single_quote_string" || strNode?.type === "string") {
-          const label = String(strNode.value).trim().toLowerCase();
-          const key = SPAN_KIND_LABEL_TO_KEY[label];
-          if (key !== undefined) {
-            strNode.value = key;
+      const result = rewriteWhereLiterals(whereClause, parser, streamName, (where) => {
+        const replacements = new Map<LiteralNode, string>();
+        const replaceSpanKindStringNode = (strNode: any) => {
+          if (strNode?.type === "single_quote_string" || strNode?.type === "string") {
+            const label = String(strNode.value).trim().toLowerCase();
+            const key = SPAN_KIND_LABEL_TO_KEY[label];
+            if (key !== undefined) replacements.set(strNode, `'${key}'`);
           }
-        }
-      };
+        };
 
-      const processNode = (node: any) => {
-        if (!node || node.type !== "binary_expr") return;
+        const processNode = (node: any) => {
+          if (!node || node.type !== "binary_expr") return;
 
-        const isSpanKind =
-          node.left?.column === "span_kind" || node.left?.column?.expr?.value === "span_kind";
+          const isSpanKind =
+            node.left?.column === "span_kind" || node.left?.column?.expr?.value === "span_kind";
 
-        if (isSpanKind) {
-          if (node.right?.type === "single_quote_string" || node.right?.type === "string") {
-            replaceSpanKindStringNode(node.right);
-          } else if (node.right?.type === "expr_list" && Array.isArray(node.right.value)) {
-            node.right.value.forEach(replaceSpanKindStringNode);
+          if (isSpanKind) {
+            if (node.right?.type === "single_quote_string" || node.right?.type === "string") {
+              replaceSpanKindStringNode(node.right);
+            } else if (node.right?.type === "expr_list" && Array.isArray(node.right.value)) {
+              node.right.value.forEach(replaceSpanKindStringNode);
+            }
           }
-        }
 
-        processNode(node.left);
-        processNode(node.right);
-      };
+          processNode(node.left);
+          processNode(node.right);
+        };
 
-      processNode(ast.where);
-
-      const resultSql: string = parser.sqlify(ast);
-      const whereMatch = resultSql.match(/\bWHERE\b\s+([\s\S]+)$/i);
-      return whereMatch ? whereMatch[1].trim() : whereClause;
+        processNode(where);
+        return replacements;
+      });
+      if (result !== null) return result;
     } catch {
       // fall through to regex fallback
     }

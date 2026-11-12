@@ -444,34 +444,43 @@ fn closes_single_row_cycle(query: &config::meta::alerts::QueryCondition) -> bool
     !query.multi_alert_enabled()
 }
 
-/// Ends the single-row firing cycle a clear run closes, ahead of the on-call clear-run and persist.
+/// The cycle a single-row clear closes, and whether that close resolves a delivered episode. [pure]
+fn single_row_close(
+    prev: Option<&config::meta::alerts::state::AlertState>,
+    level: Option<config::meta::alerts::level::AlertLevel>,
+    keep_firing_for_secs: i64,
+    now: i64,
+) -> Option<(config::meta::alerts::recovery::FiringCycleClose, bool)> {
+    let close =
+        config::meta::alerts::recovery::single_row_clear(prev, level, keep_firing_for_secs, now)?;
+    Some((close, prev.is_some_and(|p| p.episode_id.is_some())))
+}
+
+/// Ends the single-row firing cycle a clear run closes; true when it resolved a delivered episode.
 async fn close_single_row_cycle(
     alert: &config::meta::alerts::alert::Alert,
     level: Option<config::meta::alerts::level::AlertLevel>,
     now: i64,
-) {
+) -> bool {
     use config::meta::alerts::state::ROLLUP_GROUP_KEY;
 
     if !closes_single_row_cycle(&alert.query_condition) {
-        return;
+        return false;
     }
     let Some(alert_id) = alert.id.as_ref().map(|id| id.to_string()) else {
-        return;
+        return false;
     };
     let prev = match infra::table::alert_states::get(&alert_id, ROLLUP_GROUP_KEY).await {
         Ok(prev) => prev,
         Err(e) => {
             log::warn!("[SCHEDULER] could not read alert state for {alert_id}: {e}");
-            return;
+            return false;
         }
     };
-    let Some(close) = config::meta::alerts::recovery::single_row_clear(
-        prev.as_ref(),
-        level,
-        alert.keep_firing_for,
-        now,
-    ) else {
-        return;
+    let Some((close, ends_episode)) =
+        single_row_close(prev.as_ref(), level, alert.keep_firing_for, now)
+    else {
+        return false;
     };
     crate::alerts::lifecycle::on_cleared(
         &alert.org_id,
@@ -482,6 +491,7 @@ async fn close_single_row_cycle(
         crate::alerts::lifecycle::ClearKind::Recovered,
     )
     .await;
+    ends_episode
 }
 
 /// Every state row this alert currently tracks, keyed by `group_key` — the
@@ -1019,6 +1029,7 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::OncallSlackSync => {
             handle_oncall_slack_sync_triggers(trigger).await
         }
+        db::scheduler::TriggerModule::AutoObserve => handle_autoobserve_triggers(trigger).await,
     }
 }
 
@@ -1074,6 +1085,26 @@ async fn handle_fleet_rollout_triggers(
     infra::scheduler::delete(
         &trigger.org,
         db::scheduler::TriggerModule::FleetRollout,
+        &trigger.module_key,
+    )
+    .await?;
+    Ok(())
+}
+
+/// Region-local: its row lives only in `infra::scheduler`, which never replicates.
+#[cfg(feature = "enterprise")]
+async fn handle_autoobserve_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
+    // The tick re-arms its own row, fenced by this claim; while the engine is off the claim lapses.
+    o2_enterprise::enterprise::autoobserve::job::tick(trigger).await?;
+    Ok(())
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn handle_autoobserve_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
+    // No OSS lane pulls this module, so only a direct call lands here; it cannot run the row.
+    infra::scheduler::delete(
+        &trigger.org,
+        db::scheduler::TriggerModule::AutoObserve,
         &trigger.module_key,
     )
     .await?;
@@ -1611,6 +1642,7 @@ async fn handle_composite_alert_trigger(
                     Some(evaluated.level),
                     Some(i32::from(evaluated.result) as f64),
                     None,
+                    None,
                 )
                 .await
                 {
@@ -1663,23 +1695,39 @@ async fn handle_composite_alert_trigger(
                     .await
             };
             delivery_error = composite_delivery_error(&delivery_result, incident_notify_error);
+            if let Some(failed) = composite_failed_send_update(
+                update.state.as_ref(),
+                &delivery_result,
+                evaluated.level,
+                now,
+            ) && let Err(e) = db::alerts::alert_states::persist(&failed, None).await
+            {
+                log::error!(
+                    "[COMPOSITE_ALERT] could not record the failed delivery on {}/{}: {e}",
+                    trigger.org,
+                    definition.definition.id
+                );
+            }
+            let cycle_ends = composite_cycle_ends(
+                &delivery_result,
+                trigger.retries,
+                get_scheduler_max_retries(),
+            );
             match delivery_result {
-                Ok(outcome) if outcome.failed.is_empty() => {
-                    scheduled_data.notified_destinations.clear();
+                Ok(outcome) if cycle_ends => {
                     scheduled_data.last_notified_level = Some(evaluated.level.to_i32());
                     scheduled_data.delivery_silenced_until = definition
                         .definition
                         .silence_seconds
                         .checked_mul(1_000_000)
                         .and_then(|window| now.checked_add(window));
-                    trigger.retries = 0;
+                    if outcome.failed.is_empty() {
+                        trigger.retries = 0;
+                    }
                 }
                 Ok(outcome) => {
-                    for destination in outcome.succeeded {
-                        if !scheduled_data.notified_destinations.contains(&destination) {
-                            scheduled_data.notified_destinations.push(destination);
-                        }
-                    }
+                    scheduled_data.notified_destinations =
+                        merge_ledger(&scheduled_data.notified_destinations, &outcome.succeeded);
                     trigger.retries = trigger.retries.saturating_add(1);
                     delivery_retry_at = Some(now.saturating_add(10_000_000));
                 }
@@ -1689,9 +1737,9 @@ async fn handle_composite_alert_trigger(
                         trigger.org,
                         definition.definition.id
                     );
-                    delivery_retry_at = composite_retry_at(&error, now);
-                    if delivery_retry_at.is_some() {
+                    if !cycle_ends {
                         trigger.retries = trigger.retries.saturating_add(1);
+                        delivery_retry_at = Some(now.saturating_add(10_000_000));
                     }
                 }
             }
@@ -1714,6 +1762,7 @@ async fn handle_composite_alert_trigger(
                     now,
                     Some(evaluated.level),
                     downtime,
+                    None,
                 )
                 .await;
             }
@@ -1798,6 +1847,12 @@ async fn handle_composite_alert_trigger(
             now,
         )
         .await;
+    }
+
+    // A list kept past the cycle would skip those destinations on the next firing.
+    if delivery_retry_at.is_none() {
+        scheduled_data.notified_destinations.clear();
+        trigger.retries = 0;
     }
 
     log::info!(
@@ -1925,9 +1980,40 @@ fn retries_exhausted(error: &AlertError, retries: i32, max_retries: i32) -> bool
     retries + 1 >= max_retries || matches!(error, AlertError::FeatureNotLicensed(_))
 }
 
-/// When a failed composite send retries; a license denial waits for the normal sweep.
-fn composite_retry_at(error: &AlertError, now: i64) -> Option<i64> {
-    (!matches!(error, AlertError::FeatureNotLicensed(_))).then(|| now.saturating_add(10_000_000))
+/// Whether this send ends a composite's notification cycle instead of retrying what failed.
+fn composite_cycle_ends(
+    delivery: &Result<NotificationOutcome, AlertError>,
+    retries: i32,
+    max_retries: i32,
+) -> bool {
+    match delivery {
+        Ok(outcome) => outcome.failed.is_empty() || retries + 1 >= max_retries,
+        Err(error) => retries_exhausted(error, retries, max_retries),
+    }
+}
+
+/// The state rewrite a composite's failed send owes, as a scheduled alert records it. [pure]
+fn composite_failed_send_update(
+    committed: Option<&config::meta::alerts::state::AlertState>,
+    delivery: &Result<NotificationOutcome, AlertError>,
+    level: config::meta::alerts::level::AlertLevel,
+    now: i64,
+) -> Option<config::meta::alerts::state::StateUpdate> {
+    if delivery
+        .as_ref()
+        .is_ok_and(|outcome| outcome.failed.is_empty())
+    {
+        return None;
+    }
+    let committed = committed?;
+    Some(config::meta::alerts::state::apply_outcome(
+        &committed.alert_id,
+        &committed.group_key,
+        Some(committed),
+        RunOutcome::NotifyFailed,
+        Some(level),
+        now,
+    ))
 }
 
 fn composite_notification_row(
@@ -2327,6 +2413,22 @@ fn get_skipped_timestamps(
         }
     };
     (skipped_timestamps, final_timestamp)
+}
+
+/// The slot a run's delay counts from; an unaligned window ends at now, which would hide all lag.
+fn late_against(
+    supposed_to_run_at: i64,
+    skipped_timestamps: &[i64],
+    final_end_time: i64,
+    align_time: bool,
+) -> i64 {
+    if align_time {
+        return final_end_time;
+    }
+    skipped_timestamps
+        .last()
+        .copied()
+        .unwrap_or(supposed_to_run_at)
 }
 
 /// Cron runs within `delay` plus the next one, or `None` when the schedule cannot be evaluated.
@@ -3135,6 +3237,7 @@ pub(crate) async fn correlate_muted_incident(
     triggered_at: i64,
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
     downtime: &config::meta::downtimes::ActiveDowntime,
+    history_before: Option<i64>,
 ) {
     let Some(first_row) = rows.first() else {
         return;
@@ -3151,6 +3254,7 @@ pub(crate) async fn correlate_muted_incident(
         eval_level,
         None,
         Some(downtime),
+        history_before,
     )
     .await
     {
@@ -3171,6 +3275,7 @@ async fn correlate_repeated_incident(
     triggered_at: i64,
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
     actual_value: Option<f64>,
+    history_before: Option<i64>,
 ) {
     let Some(first_row) = rows.first() else {
         return;
@@ -3188,6 +3293,7 @@ async fn correlate_repeated_incident(
         eval_level,
         actual_value,
         None,
+        history_before,
     )
     .await
     {
@@ -3326,6 +3432,11 @@ fn starts_silence_window(
         && !suppressed_by_downtime
         && silence_minutes > 0
         && !evaluates_through_silence
+}
+
+/// Whether a cycle that gave up on a failed send still reached someone, before or via its incident.
+fn failed_cycle_delivered(incident_delivered: bool, delivered_before: &[String]) -> bool {
+    incident_delivered || !delivered_before.is_empty()
 }
 
 /// A pending run of an alert with silence stores no end time, as when silence was decided first.
@@ -3666,6 +3777,8 @@ async fn handle_alert_triggers(
             backfill_job: None,
             notified_destinations: vec![],
             chart_id: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
         }
     };
 
@@ -3758,7 +3871,14 @@ async fn handle_alert_triggers(
             trigger.module_key,
             delay
         );
-        (now - final_end_time, true)
+        let align_time = alert.trigger_condition.align_time;
+        let slot = late_against(
+            trigger.next_run_at,
+            &skipped_timestamps,
+            final_end_time,
+            align_time,
+        );
+        (now - slot, true)
     };
 
     // This is the end time of the last trigger timerange  + 1.
@@ -3770,6 +3890,12 @@ async fn handle_alert_triggers(
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
+    #[cfg(feature = "enterprise")]
+    let siem_run = super::siem::SiemRun::for_alert(&alert, &trigger_data);
+    #[cfg(feature = "enterprise")]
+    let start_time = siem_run
+        .as_ref()
+        .map_or(start_time, |run| run.window_start(final_end_time));
 
     let last_states = if !alert.query_condition.multi_alert_enabled()
         && (alert.pending_period_sec > 0 || alert.suppresses_repeats())
@@ -3808,11 +3934,32 @@ async fn handle_alert_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(time_in_queue),
+        #[cfg(feature = "enterprise")]
+        severity: siem_run.as_ref().and_then(|run| run.severity.clone()),
+        #[cfg(feature = "enterprise")]
+        siem: siem_run.is_some().then_some(true),
         ..Default::default()
     };
 
     let evaluation_took = Instant::now();
     // evaluate alert
+    #[cfg(feature = "enterprise")]
+    let result = match siem_run.as_ref() {
+        Some(run) => {
+            run.evaluate(&alert, start_time, final_end_time, &query_trace_id)
+                .await
+        }
+        None => {
+            alert
+                .evaluate(
+                    None,
+                    (Some(start_time), final_end_time),
+                    Some(query_trace_id.clone()),
+                )
+                .await
+        }
+    };
+    #[cfg(not(feature = "enterprise"))]
     let result = alert
         .evaluate(
             None,
@@ -3908,7 +4055,29 @@ async fn handle_alert_triggers(
         return Err(err);
     }
 
-    let trigger_results = result.unwrap();
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
+    let mut trigger_results = result.unwrap();
+    #[cfg(feature = "enterprise")]
+    let mut siem_history_before = None;
+    #[cfg(feature = "enterprise")]
+    if let Some(run) = siem_run.as_ref() {
+        run.dedupe(
+            &mut trigger_results,
+            &mut trigger_data,
+            start_time,
+            final_end_time,
+        );
+        siem_history_before = run.history_before(final_end_time);
+        trigger_data_stream.historical = trigger_results
+            .data
+            .as_deref()
+            .is_some_and(|rows| run.is_historical(rows, final_end_time))
+            .then_some(true);
+        trigger_data_stream.siem_groups = trigger_results
+            .data
+            .as_deref()
+            .and_then(o2_enterprise::enterprise::security::sigma::correlation::fired_groups_json);
+    }
     // Classified severity for this evaluation (alerts_2.md Feature 1). Captured
     // once here so every downstream path — state persistence and the trigger
     // record — reports the same level.
@@ -3931,8 +4100,8 @@ async fn handle_alert_triggers(
     );
 
     // The clear hook runs before anything reads downtimes for this clear (§6.3).
-    if matched_level.is_none() {
-        close_single_row_cycle(&alert, eval_level, now).await;
+    if matched_level.is_none() && close_single_row_cycle(&alert, eval_level, now).await {
+        trigger_data.clear_delivery();
     }
 
     // Every clear run: on-call pages BEFORE the send, so an undelivered page leaves it open.
@@ -4029,6 +4198,12 @@ async fn handle_alert_triggers(
         alert.query_condition.multi_alert_enabled(),
         multi_level,
     );
+    // An ack or a silence must never leave a security detection blind to a returning attacker.
+    #[cfg(feature = "enterprise")]
+    let evaluates_through_silence = evaluates_through_silence
+        || o2_enterprise::enterprise::security::detection::evaluates_through_silence(
+            alert.context_attributes.as_ref(),
+        );
     // ── §7.1 delivery decision ──────────────────────────────────────────────
     // Computed for multi-level alerts only; single-level alerts short-circuit
     // to `Deliver` so their behaviour is bit-for-bit unchanged (G5).
@@ -4080,6 +4255,8 @@ async fn handle_alert_triggers(
                 .get_next_trigger_time(true, alert.tz_offset, false, None)?;
         new_trigger.is_silenced = false;
         trigger_data_stream.next_run_at = new_trigger.next_run_at;
+        #[cfg(feature = "enterprise")]
+        super::siem::SiemRun::restore(siem_run.as_ref(), &mut trigger_data);
         new_trigger.data = json::to_string(&trigger_data).unwrap();
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         if let Some(alert_id) = alert.id.as_ref() {
@@ -4201,11 +4378,14 @@ async fn handle_alert_triggers(
             triggered_at,
             eval_level,
             &downtime,
+            siem_history_before,
         )
         .await;
     }
     #[cfg(feature = "enterprise")]
-    if delivery == DeliveryDecision::SuppressedAsRepeat
+    if (delivery == DeliveryDecision::SuppressedAsRepeat
+        || (siem_run.is_some()
+            && o2_enterprise::enterprise::security::detection::attaches_withheld_firing(&delivery)))
         && let Some(rows) = trigger_results.data.as_deref()
     {
         correlate_repeated_incident(
@@ -4215,6 +4395,7 @@ async fn handle_alert_triggers(
             triggered_at,
             eval_level,
             trigger_results.actual_value,
+            siem_history_before,
         )
         .await;
     }
@@ -4268,6 +4449,7 @@ async fn handle_alert_triggers(
                 eval_level,
                 trigger_results.actual_value,
                 None,
+                siem_history_before,
             )
             .await
             {
@@ -4568,6 +4750,8 @@ async fn handle_alert_triggers(
                         // reachable from the evaluation-error path, so that
                         // safety valve does NOT trip for delivery failures.
                         trigger_data_stream.status = RunOutcome::NotifyFailed;
+                        #[cfg(feature = "enterprise")]
+                        super::siem::SiemRun::restore(siem_run.as_ref(), &mut trigger_data);
                         let retry_data = json::to_string(&trigger_data).unwrap();
                         db::scheduler::update_status(
                             &new_trigger.org,
@@ -4643,6 +4827,21 @@ async fn handle_alert_triggers(
                         // So, in the next run, the period will be used to
                         // evaluate the alert.
                         trigger_data.period_end_time = None;
+                        let delivered = failed_cycle_delivered(
+                            incident_handled_notification,
+                            &trigger_data.notified_destinations,
+                        );
+                        if delivered {
+                            record_delivery(&mut trigger_data);
+                            episode_delivered = true;
+                        }
+                        // D6: nothing landed, so no silence window opens.
+                        if !delivered && new_trigger.is_silenced {
+                            new_trigger.next_run_at = alert
+                                .trigger_condition
+                                .get_next_trigger_time(true, alert.tz_offset, false, None)?;
+                            new_trigger.is_silenced = false;
+                        }
                         // Max retries reached = the notification cycle is over.
                         // The ledger MUST NOT survive it: any destination left
                         // listed here would be skipped on the NEXT firing and
@@ -4652,6 +4851,8 @@ async fn handle_alert_triggers(
                         trigger_data_stream.next_run_at = new_trigger.next_run_at;
                         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
                     } else {
+                        #[cfg(feature = "enterprise")]
+                        super::siem::SiemRun::restore(siem_run.as_ref(), &mut trigger_data);
                         let trigger_data = json::to_string(&trigger_data).unwrap();
                         // Otherwise update its status and data only
                         db::scheduler::update_status(
@@ -4678,10 +4879,11 @@ async fn handle_alert_triggers(
         }
         #[cfg(feature = "enterprise")]
         if let Some(error) = incident_notify_error {
-            durable_outcome = Some(record_incident_notify_failure(
-                &mut trigger_data_stream,
-                error,
-            ));
+            let durable = record_incident_notify_failure(&mut trigger_data_stream, error);
+            // A detection whose pages never land must not look healthy on the Security list.
+            if siem_run.is_none() {
+                durable_outcome = Some(durable);
+            }
         }
     } else {
         if condition_matched {
@@ -8586,6 +8788,31 @@ mod tests {
     }
 
     #[test]
+    fn an_unaligned_run_is_late_against_its_latest_scheduled_slot() {
+        let minute = second_micros(60);
+        let planned = 1_760_000_000_000_000;
+        let now = planned + 90_000_000;
+        let (skipped, end) =
+            get_skipped_timestamps(planned, "", 0, 300, 90_000_000, false, now, None);
+        assert_eq!((skipped.len(), end), (0, now));
+        assert_eq!(
+            now - late_against(planned, &skipped, end, false),
+            90_000_000
+        );
+
+        let now = planned + 11 * minute;
+        let (skipped, end) =
+            get_skipped_timestamps(planned, "", 0, 300, 11 * minute, false, now, None);
+        assert_eq!(skipped, [planned + 5 * minute, planned + 10 * minute]);
+        assert_eq!(now - late_against(planned, &skipped, end, false), minute);
+
+        assert_eq!(
+            late_against(planned, &skipped, planned + minute, true),
+            planned + minute
+        );
+    }
+
+    #[test]
     fn get_skipped_timestamps_skips_nothing_for_a_schedule_it_cannot_evaluate() {
         let supposed_to_run_at = 1640995200000000;
         let now = 1640995800000000;
@@ -9381,12 +9608,89 @@ mod tests {
 
     #[test]
     fn test_a_license_denial_leaves_a_composite_to_its_normal_sweep() {
-        let denied = crate::alerts::alert::all_workflows_failed_error(1, 1, String::new());
-        assert_eq!(composite_retry_at(&denied, 100), None);
-        let failed = AlertError::SendNotificationError {
+        let denied = Err(crate::alerts::alert::all_workflows_failed_error(
+            1,
+            1,
+            String::new(),
+        ));
+        assert!(composite_cycle_ends(&denied, 0, 3));
+        let failed = Err(AlertError::SendNotificationError {
             error_message: "http 500".to_string(),
+        });
+        assert!(!composite_cycle_ends(&failed, 0, 3));
+        assert!(composite_cycle_ends(&failed, 2, 3));
+    }
+
+    #[test]
+    fn test_a_composite_partial_failure_retries_only_up_to_the_limit() {
+        let partial = Ok(NotificationOutcome {
+            succeeded: vec!["a".to_string()],
+            failed: vec!["b".to_string()],
+            ..Default::default()
+        });
+        assert!(!composite_cycle_ends(&partial, 0, 3));
+        assert!(!composite_cycle_ends(&partial, 1, 3));
+        assert!(composite_cycle_ends(&partial, 2, 3));
+        let delivered = Ok(NotificationOutcome {
+            succeeded: vec!["a".to_string(), "b".to_string()],
+            ..Default::default()
+        });
+        assert!(composite_cycle_ends(&delivered, 0, 3));
+    }
+
+    #[test]
+    fn test_a_composite_whose_send_fails_records_not_delivered_on_its_state() {
+        use config::meta::alerts::{
+            level::AlertLevel,
+            state::{ROLLUP_GROUP_KEY, apply_outcome},
         };
-        assert_eq!(composite_retry_at(&failed, 100), Some(10_000_100));
+
+        let committed = apply_outcome(
+            "composite_1",
+            ROLLUP_GROUP_KEY,
+            None,
+            RunOutcome::Firing,
+            Some(AlertLevel::Critical),
+            0,
+        )
+        .state
+        .unwrap();
+        let rewrite = |delivery| {
+            composite_failed_send_update(Some(&committed), &delivery, AlertLevel::Critical, 10)
+                .and_then(|update| update.state)
+        };
+
+        let failed = rewrite(Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        }))
+        .unwrap();
+        assert_eq!(failed.last_outcome, Some(RunOutcome::NotifyFailed));
+        assert_eq!(failed.firing_started_at, Some(0), "still the same firing");
+
+        let partial = rewrite(Ok(NotificationOutcome {
+            succeeded: vec!["a".to_string()],
+            failed: vec!["b".to_string()],
+            ..Default::default()
+        }));
+        assert_eq!(
+            partial.and_then(|s| s.last_outcome),
+            Some(RunOutcome::NotifyFailed)
+        );
+
+        let delivered = rewrite(Ok(NotificationOutcome {
+            succeeded: vec!["a".to_string()],
+            ..Default::default()
+        }));
+        assert_eq!(delivered, None);
+        let no_state = composite_failed_send_update(
+            None,
+            &Err(AlertError::SendNotificationError {
+                error_message: "http 500".to_string(),
+            }),
+            AlertLevel::Critical,
+            10,
+        );
+        assert!(no_state.is_none());
     }
 
     #[test]
@@ -9592,6 +9896,22 @@ mod tests {
     }
 
     #[test]
+    fn a_failed_cycle_that_reached_someone_counts_as_delivered() {
+        assert!(
+            !failed_cycle_delivered(false, &[]),
+            "every send failed: no silence window, no episode"
+        );
+        assert!(
+            failed_cycle_delivered(false, &["slack".to_string()]),
+            "an earlier attempt reached slack, so repeats to it are suppressed"
+        );
+        assert!(
+            failed_cycle_delivered(true, &[]),
+            "the incident path delivered the page and only a workflow failed"
+        );
+    }
+
+    #[test]
     fn a_pending_run_with_silence_stores_no_period_end_time() {
         // Silence 10, pending 2, no downtime: the end time is re-derived, as on main.
         assert!(!pending_stores_end_time(true, 10, false));
@@ -9631,6 +9951,62 @@ mod tests {
         let never_notified =
             delivery_decision(AlertLevel::Critical, None, None, after_window, None);
         assert!(never_notified.should_deliver());
+    }
+
+    #[test]
+    fn a_refire_after_a_resolved_episode_delivers_inside_the_silence_window() {
+        use config::meta::alerts::{
+            level::{AlertLevel, delivery_decision},
+            recovery::{EpisodeInput, apply_episode},
+            state::{AlertState, apply_outcome},
+        };
+
+        const MINUTE: i64 = 60_000_000;
+        let firing = |delivered: bool| -> AlertState {
+            let mut s = apply_outcome(
+                "alert_1",
+                "",
+                None,
+                RunOutcome::Firing,
+                Some(AlertLevel::Critical),
+                0,
+            )
+            .state
+            .unwrap();
+            let input = EpisodeInput {
+                delivered,
+                ..EpisodeInput::undelivered(0)
+            };
+            apply_episode(&mut s, true, &input, 0, || "ep_1".into());
+            s
+        };
+        let mut data = ScheduledTriggerData {
+            last_notified_level: Some(AlertLevel::Critical.to_i32()),
+            delivery_silenced_until: Some(20 * MINUTE),
+            ..Default::default()
+        };
+
+        let delivered = firing(true);
+        let (_, ends_episode) =
+            single_row_close(Some(&delivered), Some(AlertLevel::Ok), 0, 5 * MINUTE).unwrap();
+        assert!(ends_episode, "the clear resolves the delivered episode");
+        data.clear_delivery();
+        let refire = delivery_decision(
+            AlertLevel::Critical,
+            data.last_notified_level.and_then(AlertLevel::from_i32),
+            data.delivery_silenced_until,
+            10 * MINUTE,
+            None,
+        );
+        assert!(refire.should_deliver(), "got {refire:?}");
+
+        let undelivered = firing(false);
+        let (_, ends_episode) =
+            single_row_close(Some(&undelivered), Some(AlertLevel::Ok), 0, 5 * MINUTE).unwrap();
+        assert!(!ends_episode, "nothing was resolved, so the silence holds");
+
+        let held = single_row_close(Some(&delivered), Some(AlertLevel::Ok), 600, 5 * MINUTE);
+        assert_eq!(held, None, "a keep_firing_for hold has not resolved yet");
     }
 
     #[cfg(feature = "enterprise")]
@@ -10060,6 +10436,7 @@ mod tests {
                 operator: config::meta::alerts::Operator::GreaterThan,
                 value: json::json!(0),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: None,
             multi_alert: true,
@@ -10385,5 +10762,33 @@ mod tests {
             Some(&(PARK_NOW + UNREADABLE_ORG_RECHECK_MICROS)),
             "{written:?}"
         );
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_an_oss_build_deletes_the_autoobserve_row_it_cannot_run() {
+        let cfg = config::get_config();
+        if !(cfg.common.meta_store.is_empty() || cfg.common.meta_store == "sqlite") {
+            return;
+        }
+        std::fs::create_dir_all(&cfg.common.data_db_dir).unwrap();
+        infra::scheduler::init().await.unwrap();
+        let module = db::scheduler::TriggerModule::AutoObserve;
+        let org = format!("ao_stub_{}", now_micros());
+        let row = db::scheduler::Trigger {
+            org: org.clone(),
+            module: module.clone(),
+            module_key: "engine".to_string(),
+            next_run_at: 1,
+            ..Default::default()
+        };
+        infra::scheduler::push(row.clone()).await.unwrap();
+        assert!(
+            infra::scheduler::get(&org, module.clone(), "engine")
+                .await
+                .is_ok()
+        );
+        handle_triggers("t", row).await.unwrap();
+        assert!(infra::scheduler::get(&org, module, "engine").await.is_err());
     }
 }
