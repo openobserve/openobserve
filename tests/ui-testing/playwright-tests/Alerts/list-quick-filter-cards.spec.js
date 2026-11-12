@@ -44,8 +44,9 @@ test.describe('List quick filter cards', { tag: ['@quickFilterCards', '@all'] },
     const seed = `e2e_qfc_alerts_${Date.now()}_${randomUUID().slice(0, 8)}`;
     const folder = await pm.apiCleanup.createAlertFolder(seed);
     created.folderId = folder.folderId;
-    created.alertSeed = await pm.apiCleanup.seedAlertsInFolder(folder.folderId, 3, seed, { enabledCount: 2 });
-    const [active1, active2, paused] = created.alertSeed.alerts.map((a) => a.name);
+    created.alertSeed = {};
+    const seeded = await pm.apiCleanup.seedAlertsInFolder(folder.folderId, 3, seed, { enabledCount: 2, sink: created.alertSeed });
+    const [active1, active2, paused] = seeded.alerts.map((a) => a.name);
     const qfc = pm.quickFilterCardsPage;
 
     await pm.alertsPage.gotoAlertListFolder(folder.folderId);
@@ -84,7 +85,8 @@ test.describe('List quick filter cards', { tag: ['@quickFilterCards', '@all'] },
 
   test('QFC-02 pipeline cards count the org by state and filter the rows', { tag: ['@P1'] }, async () => {
     const seed = `e2e_qfc_pipes_${Date.now()}_${randomUUID().slice(0, 8)}`;
-    created.pipelines = await pm.apiCleanup.seedPipelinesMix(seed, 2, 1);
+    created.pipelines = { pipelines: [], streams: [] };
+    await pm.apiCleanup.seedPipelinesMix(seed, 2, 1, created.pipelines);
     const [active1, active2, paused] = created.pipelines.pipelines.map((p) => p.name);
     const expected = await pm.apiCleanup.pipelineNamesByState();
     expect(expected.active, 'seeded enabled pipelines read back as active').toEqual(expect.arrayContaining([active1, active2]));

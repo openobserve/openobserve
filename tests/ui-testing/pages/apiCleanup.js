@@ -257,11 +257,13 @@ class APICleanup {
      * @param {number} count
      * @param {string} prefix - Alert name prefix (deterministic ordering by name); also used
      *   to derive the source stream name
-     * @param {{enabledCount?: number}} [options] - The first `enabledCount` alerts are created enabled
+     * @param {{enabledCount?: number, sink?: object}} [options] - The first `enabledCount` alerts are
+     *   created enabled; `sink` gets the stream/template/destination names before any is created
      * @returns {Promise<Array<{alertId: string, name: string}>>}
      */
-    async seedAlertsInFolder(folderId, count, prefix, { enabledCount = 0 } = {}) {
+    async seedAlertsInFolder(folderId, count, prefix, { enabledCount = 0, sink = {} } = {}) {
         const streamName = `${prefix}_stream`;
+        Object.assign(sink, { streamName, templateName: `${prefix}_tmpl`, destinationName: `${prefix}_dest` });
         await this._fetch(`${ingestBase(this.baseUrl)}/api/${this.org}/${streamName}/_json`, {
             method: 'POST',
             headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
@@ -954,26 +956,26 @@ class APICleanup {
 
     /**
      * Seed realtime pipelines, the first `activeCount` enabled and the rest paused.
+     * Each resource lands in `sink` as it is made, so a failed seed still cleans up.
      * @returns {Promise<{pipelines: Array<{id: string, name: string, enabled: boolean}>, streams: string[]}>}
      */
-    async seedPipelinesMix(prefix, activeCount, pausedCount) {
-        const pipelines = [];
-        const streams = [];
+    async seedPipelinesMix(prefix, activeCount, pausedCount, sink = { pipelines: [], streams: [] }) {
+        const { pipelines, streams } = sink;
         for (let i = 0; i < activeCount + pausedCount; i++) {
             const name = `${prefix}_p${i}`;
             // A stream keeps one realtime pipeline, so each pipeline gets its own source.
             const source = `${name}_src`;
+            streams.push(source);
             await this.ingestData(source, [{ message: 'quick filter cards seed row' }]);
             await this.waitForStreamSchema(source);
-            streams.push(source);
             await this.createPlainPipeline(name, source);
             const created = (await this.listPipelinesStrict()).find((p) => p.name === name);
             if (!created) throw new Error(`seedPipelinesMix: pipeline ${name} missing after create`);
             const enabled = i < activeCount;
-            if (!enabled) await this.setPipelineEnabled(created.pipeline_id, false);
             pipelines.push({ id: created.pipeline_id, name, enabled });
+            if (!enabled) await this.setPipelineEnabled(created.pipeline_id, false);
         }
-        return { pipelines, streams };
+        return sink;
     }
 
     /** Pipelines of the org; throws instead of returning [] so a count oracle never reads a failed call as empty. */

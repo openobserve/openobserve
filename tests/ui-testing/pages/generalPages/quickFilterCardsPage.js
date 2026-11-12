@@ -3,6 +3,8 @@
 import { expect } from '@playwright/test';
 
 const ORG = () => process.env.ORGNAME || 'default';
+// Default page size of all three lists; a row count is only the full answer within one page.
+const PAGE_SIZE = 20;
 
 // Each list page names its table, its card hooks and how a row shows its object.
 const LISTS = {
@@ -66,6 +68,7 @@ export class QuickFilterCardsPage {
   /** The table lists exactly `count` rows, every `shown` object among them and no `hidden` one. */
   async expectRows(list, { count, shown = [], hidden = [] }) {
     const { table, rowName } = LISTS[list];
+    expect(count, `${list}: expected rows must fit the first page of ${PAGE_SIZE}`).toBeLessThanOrEqual(PAGE_SIZE);
     for (const name of shown) {
       await expect(this.page.locator(`${table} ${rowName(name)}`), `${list} row ${name} shown`).toBeVisible({ timeout: 30000 });
     }
