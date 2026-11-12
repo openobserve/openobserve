@@ -15,12 +15,14 @@
 
 import type { I18nKey, TranslateFn } from "@/types/i18n";
 import type {
+  AlertGroupRef,
   DimensionCondition,
   Downtime,
   DowntimeNotifications,
   DowntimeRequest,
   DowntimeSchedule,
   DowntimeTarget,
+  EndOnClear,
   IncidentMode,
   NotificationEvent,
   Repeat,
@@ -116,7 +118,14 @@ export interface DowntimeFormValues extends Record<string, unknown> {
   notifications: NotifyFormValues;
   /** The version an edit loaded, sent back so a stale save is refused. */
   version?: number;
+  /** A loaded row's group scope; only "Mute all groups" clears it. */
+  alert_groups?: AlertGroupRef[] | null;
+  /** A loaded row's "until it clears" end; an Edit keeps it, a Duplicate drops it. */
+  end_on_clear?: EndOnClear | null;
 }
+
+/** Edit keeps the whole scope of the row; Duplicate keeps the groups but not the "until it clears" end. */
+export type LoadMode = "edit" | "duplicate";
 
 /** What a row action already knows, read from the create page's query string. */
 export interface DowntimePrefill {
@@ -353,6 +362,29 @@ export function buildNotifications(n: NotifyFormValues): DowntimeNotifications |
   };
 }
 
+/** The alert ids the request names, the only ids a group or the "until it clears" alert may name. */
+const alertTargetIds = (values: DowntimeFormValues): Set<string> =>
+  new Set(buildTargets(values).find((t) => t.module === "alerts")?.ids ?? []);
+
+/** The loaded groups whose alert is still a target. */
+export function keptAlertGroups(values: DowntimeFormValues): AlertGroupRef[] {
+  const ids = alertTargetIds(values);
+  return (values.alert_groups ?? []).filter((g) => ids.has(g.alert_id));
+}
+
+/** Removing the last limited alert would mute every group of the alerts that stay; only "Mute all groups" may do that. */
+export function groupLimitLost(values: DowntimeFormValues): boolean {
+  if (!values.alert_groups?.length || !values.modules.includes("alerts")) return false;
+  return keptAlertGroups(values).length === 0;
+}
+
+/** "Until it clears" holds only on a one-time row with an end whose alert is still a target. */
+const keptEndOnClear = (values: DowntimeFormValues): EndOnClear | null => {
+  const end = values.end_on_clear;
+  if (!end || values.schedule.repeat !== "none" || !values.schedule.end_date) return null;
+  return alertTargetIds(values).has(end.alert_id) ? end : null;
+};
+
 /** The request body, with explicit keys: schema-only helpers never reach the API. */
 export function buildDowntimeRequest(values: DowntimeFormValues): DowntimeRequest {
   const body: DowntimeRequest = {
@@ -370,6 +402,10 @@ export function buildDowntimeRequest(values: DowntimeFormValues): DowntimeReques
   const notifications = buildNotifications(values.notifications);
   if (notifications) body.notifications = notifications;
   if (values.version !== undefined) body.version = values.version;
+  // Always explicit: the server keeps a stored value for an omitted field, so a removal must be null.
+  const groups = keptAlertGroups(values);
+  body.alert_groups = groups.length ? groups : null;
+  body.end_on_clear = keptEndOnClear(values);
   return body;
 }
 
@@ -420,7 +456,7 @@ const targetValues = (target: DowntimeTarget | undefined): TargetFormValues => {
 };
 
 /** Edit and Duplicate: a saved row back into the form, the reverse of `buildDowntimeRequest`. */
-export function downtimeToFormValues(d: Downtime): DowntimeFormValues {
+export function downtimeToFormValues(d: Downtime, mode: LoadMode = "edit"): DowntimeFormValues {
   const byModule = new Map(d.targets.map((t) => [t.module, t]));
   return {
     name: d.name,
@@ -439,6 +475,9 @@ export function downtimeToFormValues(d: Downtime): DowntimeFormValues {
     show_banner: d.show_banner,
     notifications: notifyValues(d.notifications),
     version: d.version,
+    alert_groups: d.alert_groups?.length ? d.alert_groups.map((g) => ({ ...g })) : null,
+    // A copy that ends when the alert clears can end at once, so a Duplicate drops it.
+    end_on_clear: mode === "edit" && d.end_on_clear ? { ...d.end_on_clear } : null,
   };
 }
 

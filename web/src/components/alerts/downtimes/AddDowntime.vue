@@ -174,6 +174,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroupItem>
               </OFormToggleGroup>
             </div>
+            <div
+              v-if="groupScopeText"
+              class="text-text-secondary mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+              data-test="downtime-form-group-scope"
+            >
+              <span>{{ groupScopeText }}</span>
+              <OButton
+                variant="ghost-primary"
+                size="xs"
+                :disabled="isSubmitting"
+                data-test="downtime-form-group-scope-clear"
+                @click="clearGroupScope"
+              >
+                {{ t("alerts.downtimes.form.groupScopeClear") }}
+              </OButton>
+            </div>
           </div>
 
           <div class="bg-card-glass-bg mx-2 flex min-h-0 flex-1 flex-col max-lg:flex-none">
@@ -445,6 +461,7 @@ import DowntimeNotifySection from "./DowntimeNotifySection.vue";
 import DowntimePreviewPane from "./DowntimePreviewPane.vue";
 import DowntimeSummary from "./DowntimeSummary.vue";
 import { browserTimezone } from "@/utils/timezoneAliases";
+import { groupRefLabels } from "@/utils/alerts/ackState";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 
@@ -690,7 +707,7 @@ const resetToken = ref(0);
 const loadedFrom = ref("");
 const loadRow = (row: DowntimeDetail) => {
   loadedFrom.value = sourceId.value;
-  const loaded = downtimeToFormValues(row);
+  const loaded = downtimeToFormValues(row, isEdit.value ? "edit" : "duplicate");
   if (!isEdit.value) {
     loaded.name = t("alerts.downtimes.copyOf", { name: row.name });
     // A duplicate is a new row, so it carries no version to check.
@@ -749,6 +766,49 @@ const autoName = useAutoName({
   apply: (name: string) => form.setFieldValue("name", name),
   enabled: () => !isEdit.value && !duplicateId.value,
 });
+
+// ── Group scope of a loaded mute ────────────────────────────────────────────
+const groupScopeText = computed<I18nText | null>(() => {
+  const groups = values.value.alert_groups ?? [];
+  const end = values.value.end_on_clear;
+  if (!groups.length && !end) return null;
+  const parts: string[] = [];
+  if (groups.length) {
+    const alertId = groups[0].alert_id;
+    const alert = itemName("alerts", alertId) ?? alertId;
+    const labels = groups
+      .map(groupRefLabels)
+      .filter((l): l is string => !!l)
+      .join("; ");
+    parts.push(
+      labels
+        ? t(
+            "alerts.downtimes.form.groupScope",
+            { count: groups.length, alert, labels },
+            groups.length,
+          )
+        : t(
+            "alerts.downtimes.form.groupScopeNoLabels",
+            { count: groups.length, alert },
+            groups.length,
+          ),
+    );
+  }
+  if (end) {
+    parts.push(
+      end.group_key
+        ? t("alerts.downtimes.form.groupScopeEndsOnGroupClear")
+        : t("alerts.downtimes.form.groupScopeEndsOnAlertClear"),
+    );
+  }
+  return raw(parts.join(" "));
+});
+
+// Widening a mute is an explicit act: both fields go out as null on the next save.
+const clearGroupScope = () => {
+  form.setFieldValue("alert_groups", null);
+  form.setFieldValue("end_on_clear", null);
+};
 
 // ── Modules and tabs ────────────────────────────────────────────────────────
 const chosenModules = computed(() => MODULE_ORDER.filter((m) => values.value.modules.includes(m)));

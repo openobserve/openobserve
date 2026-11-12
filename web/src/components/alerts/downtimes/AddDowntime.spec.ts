@@ -558,4 +558,84 @@ describe("AddDowntime", () => {
     expect(vi.mocked(downtimes.update).mock.calls[1][2].version).toBe(4);
     wrapper.unmount();
   });
+  describe("group scope of a loaded mute", () => {
+    const scopedRow = () => ({
+      id: "d1",
+      org: "default",
+      folder_id: "default",
+      name: "Quick mute · payments-latency",
+      reason: "flaky",
+      targets: [{ module: "alerts", folders: { kind: "all" }, ids: ["a1"] }],
+      schedule: {
+        repeat: "none",
+        starts_at: (Date.now() - 600_000) * 1000,
+        ends_at: (Date.now() + 3_000_000) * 1000,
+        timezone: "UTC",
+        duration_secs: 3600,
+        weekdays: [],
+      },
+      alert_groups: [{ alert_id: "a1", group_key: "k1", group_labels: { region: "pune" } }],
+      end_on_clear: { alert_id: "a1", group_key: "k1" },
+      show_banner: false,
+      created_by: "lin",
+      created_at: 1,
+      updated_by: "lin",
+      updated_at: 1,
+      version: 2,
+      status: "active",
+      current_window: null,
+      next_window: null,
+      matched_alerts: 1,
+      matched_anomalies: 0,
+      matched_synthetics: 0,
+      matched_slos: 0,
+      affected: { alerts: [], anomalies: [], synthetics: [], slos: [] },
+    });
+
+    const mountEdit = async () => {
+      vi.mocked(downtimes.get).mockResolvedValue({ data: scopedRow() } as any);
+      vi.mocked(downtimes.update).mockReset();
+      vi.mocked(downtimes.update).mockResolvedValue({ data: {} } as any);
+      const router = makeRouter();
+      await router.push({
+        name: "editDowntime",
+        params: { id: "d1" },
+        query: { org_identifier: "default", folder: "default" },
+      });
+      await router.isReady();
+      const wrapper = mount(AddDowntime, {
+        global: { plugins: [store, router] },
+        attachTo: document.body,
+      });
+      await flushPromises();
+      return wrapper;
+    };
+
+    it("shows the scope note and keeps the groups and the end on save", async () => {
+      const wrapper = await mountEdit();
+      const note = wrapper.get('[data-test="downtime-form-group-scope"]');
+      expect(note.text()).toContain("Mutes only 1 group");
+      expect(note.text()).toContain("region=pune");
+      expect(note.text()).toContain("Ends when this group stops firing.");
+      await save(wrapper);
+      expect(downtimes.update).toHaveBeenCalledTimes(1);
+      const body = vi.mocked(downtimes.update).mock.calls[0][2];
+      expect(body.alert_groups).toEqual(scopedRow().alert_groups);
+      expect(body.end_on_clear).toEqual(scopedRow().end_on_clear);
+      wrapper.unmount();
+    });
+
+    it("clears both fields with Mute all groups and saves explicit nulls", async () => {
+      const wrapper = await mountEdit();
+      await wrapper.get('[data-test="downtime-form-group-scope-clear"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="downtime-form-group-scope"]').exists()).toBe(false);
+      await save(wrapper);
+      expect(downtimes.update).toHaveBeenCalledTimes(1);
+      const body = vi.mocked(downtimes.update).mock.calls[0][2];
+      expect(body.alert_groups).toBeNull();
+      expect(body.end_on_clear).toBeNull();
+      wrapper.unmount();
+    });
+  });
 });

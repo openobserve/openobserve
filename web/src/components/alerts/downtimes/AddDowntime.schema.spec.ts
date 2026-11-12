@@ -28,6 +28,20 @@ describe("AddDowntime schema", () => {
     expect(errorsOf(valid())).toEqual({});
   });
 
+  it("refuses to drop the last group limit until Mute all groups clears it", () => {
+    const v = valid();
+    v.targets.alerts.ids_open = true;
+    v.targets.alerts.ids = ["a1", "a2"];
+    v.alert_groups = [{ alert_id: "a1", group_key: "k1" }];
+    expect(errorsOf(v)).toEqual({});
+    v.targets.alerts.ids = ["a2"];
+    expect(errorsOf(v)["targets.alerts.ids"]).toBe(
+      "Removing this alert also removes the group limit. Use Mute all groups to confirm.",
+    );
+    v.alert_groups = null;
+    expect(errorsOf(v)).toEqual({});
+  });
+
   it("needs at least one module", () => {
     expect(errorsOf({ ...valid(), modules: [] }).modules).toBe("Choose at least one module.");
   });
